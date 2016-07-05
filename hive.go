@@ -22,12 +22,13 @@ const (
 )
 
 var (
-	dockerEndpoint = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Unix socket to th local Docker daemon")
-	smokeClient    = flag.String("smoke", "", "Regexp selecting the client(s) to smoke-test")
-	validateClient = flag.String("validate", "[^:]+:develop", "Regexp selecting the client(s) to validate")
-	overrideClient = flag.String("override", "", "Client binary to override the default one with")
-	noImageCache   = flag.Bool("nocache", false, "Disabled image caching, rebuilding all modified docker images")
-	loglevelFlag   = flag.Int("loglevel", 3, "Log level to use for displaying system events")
+	dockerEndpoint   = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Unix socket to th local Docker daemon")
+	smokePattern     = flag.String("smoke", "", "Regexp selecting the client(s) to smoke-test")
+	validatePattern  = flag.String("validate", "[^:]+:master", "Regexp selecting the client(s) to validate")
+	validatorPattern = flag.String("validators", ".", "Regexp selecting the validation tests to run")
+	overrideClient   = flag.String("override", "", "Client binary to override the default one with")
+	noImageCache     = flag.Bool("nocache", false, "Disabled image caching, rebuilding all modified docker images")
+	loglevelFlag     = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 )
 
 func main() {
@@ -54,16 +55,16 @@ func main() {
 	log15.Info("docker daemon online", "version", env.Get("Version"))
 
 	switch {
-	case *smokeClient != "":
+	case *smokePattern != "":
 		// If smoke testing is requested, run only part of the validators
-		if err := validateClients(daemon, *smokeClient, "smoke/.", *overrideClient, true); err != nil {
+		if err := validateClients(daemon, *smokePattern, "smoke/.", *overrideClient, true); err != nil {
 			log15.Crit("failed to smoke-test client images", "error", err)
 			return
 		}
 
-	case *validateClient != "":
+	case *validatePattern != "":
 		// If validation is requested, run only the standalone tests
-		if err := validateClients(daemon, *validateClient, ".", *overrideClient, *noImageCache); err != nil {
+		if err := validateClients(daemon, *validatePattern, *validatorPattern, *overrideClient, *noImageCache); err != nil {
 			log15.Crit("failed to validate client images", "error", err)
 			return
 		}

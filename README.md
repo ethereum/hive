@@ -14,9 +14,36 @@ adherence to official specs or behaviours under different circumstances.
 Most importantly, it is essential to be able to run this test suite as part of the CI workflow! To
 this effect the entire suite is based on docker containers.
 
+# Installing the hive validator
+
+The `hive` project is based on Go. Although there are plans to make running `hive` possible using
+only docker, for now you'll need a valid Go (1.6 and upwards) installation available.
+
+You can install `hive` via:
+
+```
+$ go get github.com/karalabe/hive
+```
+
+*Note: For now `hive` requires running from the repository root as it needs access to quite a number
+of resource files to build the corrent docker images and containers. This requirement will be removed
+in the future.*
+
 # Validating clients
 
-todo
+You can run the full suite of `hive` validation tests against all the known implementations tagged
+`master` by simply running `hive` from the repository root. It will build a docker image for every
+known client as well as one for every known validation test. **As this make take a while, you can
+track the detailed progress in the `log.txt` file.
+
+The end result should be a JSON report, detailing for each client the list of validations failed and
+those passed. If you wish to explore the reasons of failure, full logs from all clients and testers
+are pushed into the `log.txt` log file.
+
+You may request a different set of clients to be validated via the `--validate` regexp flag (e.g.
+validating all `go-ethereum` versions would be `--validate go-ethereum:`). Similarly you may request
+only a subset of validation tests to be run via the `--validators` regexp flag (e.g. running only the
+smoke tests would be `--validators smoke/.`).
 
 # Adding new clients
 
