@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -20,6 +21,7 @@ const (
 
 var (
 	dockerEndpoint = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Unix socket to th local Docker daemon")
+	smokeClient    = flag.String("smoke", "", "Regexp selecting the client(s) to smoke-test")
 	validateClient = flag.String("validate", "[^:]+:develop", "Regexp selecting the client(s) to validate")
 	overrideClient = flag.String("override", "", "Client binary to override the default one with")
 	noImageCache   = flag.Bool("nocache", false, "Disabled image caching, rebuilding all modified docker images")
@@ -41,10 +43,18 @@ func main() {
 	}
 	log15.Info("docker daemon online", "version", env.Get("Version"))
 
-	// If validation is requested, run only the standalone tests
-	if *validateClient != "" {
-		if err := validateClients(daemon, *validateClient, *overrideClient, *noImageCache); err != nil {
-			log15.Crit("failed to build client images", "error", err)
+	switch {
+	case *smokeClient != "":
+		// If smoke testing is requested, run only part of the validators
+		if err := validateClients(daemon, *smokeClient, "smoke/.+", *overrideClient, true); err != nil {
+			log15.Crit("failed to smoke-test client images", "error", err)
+			return
+		}
+
+	case *validateClient != "":
+		// If validation is requested, run only the standalone tests
+		if err := validateClients(daemon, *validateClient, ".+", *overrideClient, *noImageCache); err != nil {
+			log15.Crit("failed to validate client images", "error", err)
 			return
 		}
 	}
@@ -52,30 +62,47 @@ func main() {
 
 // validateClients runs all the standalone validation tests against a number of
 // clients matching the given pattern.
-func validateClients(daemon *docker.Client, pattern string, binary string, nocache bool) error {
+func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, binary string, nocache bool) error {
 	// Build all the clients matching the validation pattern
-	log15.Info("building clients for validation", "pattern", pattern)
-	clients, err := buildClients(daemon, pattern, nocache)
+	log15.Info("building clients for validation", "pattern", clientPattern)
+	clients, err := buildClients(daemon, clientPattern, nocache)
 	if err != nil {
 		return err
 	}
 	// Build all the validators known to the test harness
-	log15.Info("building validators for testing")
-	validators, err := buildValidators(daemon, nocache)
+	log15.Info("building validators for testing", "pattern", validatorPattern)
+	validators, err := buildValidators(daemon, validatorPattern, nocache)
 	if err != nil {
 		return err
 	}
 	// Iterate over all client and validator combos and cross-execute them
+	results := make(map[string]map[string][]string)
+
 	for client, clientImage := range clients {
+		results[client] = make(map[string][]string)
+
 		for validator, validatorImage := range validators {
 			logger := log15.New("client", client, "validator", validator)
-			validate(daemon, clientImage, validatorImage, logger)
+			pass, err := validate(daemon, clientImage, validatorImage, logger)
+			if pass {
+				results[client]["pass"] = append(results[client]["pass"], validator)
+			} else {
+				fail := validator
+				if err != nil {
+					fail += ": " + err.Error()
+				}
+				results[client]["fail"] = append(results[client]["fail"], fail)
+			}
 		}
 	}
+	// Print the validation logs
+	out, _ := json.MarshalIndent(results, "", "  ")
+	fmt.Println(string(out))
+
 	return nil
 }
 
-func validate(daemon *docker.Client, client, validator string, logger log15.Logger) error {
+func validate(daemon *docker.Client, client, validator string, logger log15.Logger) (bool, error) {
 	logger.Info("running client validation")
 
 	// Create the client container and make sure it's cleaned up afterwards
@@ -85,7 +112,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 	})
 	if err != nil {
 		logger.Error("failed to create client", "error", err)
-		return err
+		return false, err
 	}
 	clogger := logger.New("id", cc.ID[:8])
 	clogger.Debug("created client container")
@@ -102,7 +129,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 	})
 	if err != nil {
 		logger.Error("failed to create validator", "error", err)
-		return err
+		return false, err
 	}
 	vlogger := logger.New("id", vc.ID[:8])
 	vlogger.Debug("created validator container")
@@ -115,18 +142,24 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 	logger.Debug("copying genesis.json into client")
 	if err = copyBetweenContainers(daemon, cc.ID, vc.ID, "/genesis.json"); err != nil {
 		logger.Error("failed to copy genesis", "error", err)
-		return err
+		return false, err
+	}
+	logger.Debug("copying chain into client")
+	if err = copyBetweenContainers(daemon, cc.ID, vc.ID, "/chain.rlp"); err != nil {
+		logger.Error("failed to copy chain", "error", err)
+		return false, err
 	}
 	logger.Debug("copying blocks into client")
 	if err = copyBetweenContainers(daemon, cc.ID, vc.ID, "/blocks"); err != nil {
 		logger.Error("failed to copy blocks", "error", err)
-		return err
+		return false, err
 	}
 	// Start the client and wait for it to finish
 	clogger.Debug("running client container")
 	cwaiter, err := runContainer(daemon, cc.ID, clogger)
 	if err != nil {
 		clogger.Error("failed to run client", "error", err)
+		return false, err
 	}
 	defer cwaiter.Close()
 
@@ -136,6 +169,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 		c, err := daemon.InspectContainer(cc.ID)
 		if err != nil {
 			clogger.Error("failed to inspect client", "error", err)
+			return false, err
 		}
 		if !c.State.Running {
 			break
@@ -153,10 +187,17 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 	vwaiter, err := runContainer(daemon, vc.ID, vlogger)
 	if err != nil {
 		vlogger.Error("failed to run client", "error", err)
+		return false, err
 	}
 	vwaiter.Wait()
 
-	return nil
+	// Retrieve the exist status to report pass of fail
+	v, err := daemon.InspectContainer(vc.ID)
+	if err != nil {
+		vlogger.Error("failed to inspect validator", "error", err)
+		return false, err
+	}
+	return v.State.ExitCode == 0, nil
 }
 
 // copyBetweenContainers copies a file from one docker container to another one.

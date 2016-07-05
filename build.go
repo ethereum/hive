@@ -46,8 +46,12 @@ func buildClients(daemon *docker.Client, pattern string, nocache bool) (map[stri
 
 // buildValidators iterates over all the known validators and builds a docker
 // image for all unknown ones.
-func buildValidators(daemon *docker.Client, nocache bool) (map[string]string, error) {
+func buildValidators(daemon *docker.Client, pattern string, nocache bool) (map[string]string, error) {
 	// Gather all the client validator tests
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil, err
+	}
 	suite, err := ioutil.ReadDir("validators")
 	if err != nil {
 		return nil, err
@@ -60,8 +64,11 @@ func buildValidators(daemon *docker.Client, nocache bool) (map[string]string, er
 				return nil, err
 			}
 			for _, test := range tests {
-				name := filepath.Join(group.Name(), test.Name())
-				validators[name] = validatorImagePrefix + name
+				if test.IsDir() {
+					if name := filepath.Join(group.Name(), test.Name()); re.MatchString(name) {
+						validators[name] = validatorImagePrefix + name
+					}
+				}
 			}
 		}
 	}

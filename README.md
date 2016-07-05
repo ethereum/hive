@@ -14,6 +14,97 @@ adherence to official specs or behaviours under different circumstances.
 Most importantly, it is essential to be able to run this test suite as part of the CI workflow! To
 this effect the entire suite is based on docker containers.
 
+# Validating clients
+
+todo
+
+# Adding new clients
+
+The `hive` test harness can validate arbitrary implementations of the [Ethereum yellow paper](http://gavwood.com/paper.pdf).
+
+Being based on docker containers, `hive` is pretty liberal on pretty much all aspects of a client
+implementation:
+
+ * `hive` doesn't care what dependencies a client has: language, libraries or otherwise.
+ * `hive` doesn't care how the client is built: environment, tooling or otherwise.
+ * `hive` doesn't care what garbage clients generates during execution.
+
+As long as a client can run on Linux, and you can package it up into a Docker image, `hive` can test it!
+
+## Creating a client image
+
+Adding a new client implementation to `hive` entails creating a Dockerfile (and related resources),
+based on which `hive` will assemble the docker image to use as the blueprint for testing.
+
+The client definition(s) should reside in the `clients` folder, each named `<project>:<tag>` where
+`<project>` is the official name of the client (lowercase, no fancy characters), and `<tag>` is an
+arbitrary id up to the client maintainers to make the best use of. `hive` will automatically pick
+up all clients from this folder.
+
+There are little contraints on the image itself, though a few required caveats are:
+
+ * It should be as tiny as possible (play nice with others). Preferrably use `alpine` Linux.
+ * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
+ * It should have a single entrypoint (script?) defined, which can initialize and run the client.
+
+For guidance, check out the reference [`go-ethereum:master`](https://github.com/karalabe/hive/tree/master/clients/go-ethereum:master/Dockerfile) client.
+
+### Initializing the client
+
+Since `hive` does not want to enforce any CLI parametrization scheme on client implementations, it
+injects all the required configurations into the Linux containers prior to launching the client's
+`entrypoint` script. It is then left to this script to interpret all the environmental configs and
+initialize the client appropriately.
+
+The chain configurations are:
+
+ * `/genesis.json` contains the JSON specification of the Ethereum genesis states
+ * `/chain.rlp` contains a batch of RLP encoded blocks to import before startup
+ * `/blocks/` folder with numbered singleton blocks to import before startup
+
+Client startup scripts need to ensure that they load the genesis state first, then import a possibly
+longer blockchain and then import possibly numerous individual blocks. The reason for requiring two
+different block sources is that specifying a singe chain is more optimal, but tests requiring forking
+chains cannot create a single chain.
+
+### Starting the client
+
+After initializing the client blockchain (genesis, chain, blocks), the last task of the entry script
+is to start up the client itself. The following defaults are required by `hive` to enable automatic
+network assembly and firewall enforcement:
+
+ * Clients should open their HTTP-RPC endpoint on `0.0.0.0:8545` (mandatory)
+ * Clients should open their WS-RPC endpoint on `0.0.0.0:8546` (optional)
+ * Clients should open their IPC-RPC endpoints at `/rpc.ipc` (optional)
+
+There is no need to handle graceful client termination. Clients will be forcefully aborted upon test
+suite completion and all related data purged. A new instance will be started for every test.
+
+### Smoke testing new clients
+
+To quickly check if a client adheres to the requirements of `hive`, there is a smoke test that will
+initialize a client with some pre-configured states and query it from the various RPC endpoints.
+
+```
+$ hive --smoke go-ethereum:master
+...
+{
+  "go-ethereum:master": {
+    "pass": [
+      "smoke/genesis-only",
+      "smoke/genesis-chain",
+      "smoke/genesis-chain-blocks"
+    ]
+  }
+}
+```
+
+*Note: All smoke tests must pass for a client to be included into `hive`.*
+
+# Adding new validators
+
+todo
+
 # Contributions
 
 This project takes a different approach to code contributions than your usual FOSS project with well
@@ -28,12 +119,9 @@ be used to for additional polishes – and patches may even be outright reverted
 have a negative impact – but no change must be rejected based on personal values.
 
 Please consult the two C4 documents for details:
+
  * [Collective Code Construction Contract (C4)](http://rfc.zeromq.org/spec:22/C4/)
  * [The ZeroMQ Process](https://hintjens.gitbooks.io/social-architecture/content/chapter4.html)
-
-## Ethereum clients
-
-## Client validators
 
 # License
 

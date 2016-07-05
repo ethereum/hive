@@ -19,8 +19,10 @@ RUN sed -i -- "s#'http://localhost:8545'#'http://' + process.env.CLIENT_PORT_854
 
 # Configure the blockchain for testing
 ADD genesis.json /genesis.json
+RUN touch /chain.rlp
+
 ADD makechain.js /makechain.js
-RUN nodejs makechain.js
+RUN nodejs /makechain.js
 
 WORKDIR /rpc-tests
 ENTRYPOINT ["make", "test"]

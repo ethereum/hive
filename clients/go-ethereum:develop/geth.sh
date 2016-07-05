@@ -15,8 +15,13 @@ echo "Initializing database with genesis state..."
 /geth init /genesis.json
 /geth --exec 'eth.getBlock(0)' --nodiscover --ipcdisable console 2>/dev/null
 
-# Load the remainder of the test chain
+# Load the test chain if present
 echo "Loading initial blockchain..."
+/geth import /chain.rlp
+echo
+
+# Load the remainder of the test chain
+echo "Loading remaining individual blocks..."
 for block in `ls /blocks | sort -n`; do
 	/geth import /blocks/$block
 done
