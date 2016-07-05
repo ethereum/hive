@@ -5,7 +5,7 @@
 # This script assumes:
 #  - `geth` binary is located in the filesystem root
 #  - `genesis.json` file is located in the filesystem root
-#  - `chain.rlp` file is located n the filesystem root
+#  - `chain.rlp` file is located in the filesystem root
 
 # Immediately abort the script on any error encountered
 set -e
@@ -13,7 +13,7 @@ set -e
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
 /geth init /genesis.json
-/geth --exec 'eth.getBlock(0)' --nodiscover --ipcdisable console 2>/dev/null
+echo
 
 # Load the test chain if present
 echo "Loading initial blockchain..."

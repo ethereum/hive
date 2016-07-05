@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"syscall"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
@@ -25,10 +26,18 @@ var (
 	validateClient = flag.String("validate", "[^:]+:develop", "Regexp selecting the client(s) to validate")
 	overrideClient = flag.String("override", "", "Client binary to override the default one with")
 	noImageCache   = flag.Bool("nocache", false, "Disabled image caching, rebuilding all modified docker images")
+	loglevelFlag   = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 )
 
 func main() {
+	// Parse the flags and configure the logger
 	flag.Parse()
+	log15.Root().SetHandler(log15.MultiHandler(
+		log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StdoutHandler),
+		log15.LvlFilterHandler(log15.LvlDebug, log15.StreamHandler(os.Stderr, log15.LogfmtFormat())),
+	))
+	log, _ := os.OpenFile("log.txt", os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0644)
+	syscall.Dup2(int(log.Fd()), 2)
 
 	// Connect to the local docker daemon and make sure it works
 	daemon, err := docker.NewClient(*dockerEndpoint)
@@ -46,14 +55,14 @@ func main() {
 	switch {
 	case *smokeClient != "":
 		// If smoke testing is requested, run only part of the validators
-		if err := validateClients(daemon, *smokeClient, "smoke/.+", *overrideClient, true); err != nil {
+		if err := validateClients(daemon, *smokeClient, "smoke/.", *overrideClient, true); err != nil {
 			log15.Crit("failed to smoke-test client images", "error", err)
 			return
 		}
 
 	case *validateClient != "":
 		// If validation is requested, run only the standalone tests
-		if err := validateClients(daemon, *validateClient, ".+", *overrideClient, *noImageCache); err != nil {
+		if err := validateClients(daemon, *validateClient, ".", *overrideClient, *noImageCache); err != nil {
 			log15.Crit("failed to validate client images", "error", err)
 			return
 		}
@@ -83,10 +92,13 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 
 		for validator, validatorImage := range validators {
 			logger := log15.New("client", client, "validator", validator)
-			pass, err := validate(daemon, clientImage, validatorImage, logger)
-			if pass {
+			start := time.Now()
+
+			if pass, err := validate(daemon, clientImage, validatorImage, logger); pass {
+				logger.Info("validation passed", "time", time.Since(start))
 				results[client]["pass"] = append(results[client]["pass"], validator)
 			} else {
+				logger.Error("validation failed", "time", time.Since(start))
 				fail := validator
 				if err != nil {
 					fail += ": " + err.Error()
@@ -164,6 +176,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 	defer cwaiter.Close()
 
 	// Wait for the HTTP/RPC socket to open or the container to fail
+	start := time.Now()
 	for {
 		// If the container died, bail out
 		c, err := daemon.InspectContainer(cc.ID)
@@ -176,7 +189,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 		}
 		// Container seems to be alive, check whether the RPC is accepting connections
 		if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.NetworkSettings.IPAddress, 8545)); err == nil {
-			clogger.Debug("client container online")
+			clogger.Debug("client container online", "time", time.Since(start))
 			conn.Close()
 			break
 		}
@@ -228,7 +241,7 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger) (docker
 	outR, outW := io.Pipe()
 	errR, errW := io.Pipe()
 
-	go io.Copy(os.Stdout, outR)
+	go io.Copy(os.Stderr, outR)
 	go io.Copy(os.Stderr, errR)
 
 	logger.Debug("attaching to container")

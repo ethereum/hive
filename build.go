@@ -98,7 +98,7 @@ func buildImage(daemon *docker.Client, image, context string, nocache bool, logg
 	logger.Info("building new docker image")
 
 	r, w := io.Pipe()
-	go io.Copy(os.Stdout, r)
+	go io.Copy(os.Stderr, r)
 
 	opts := docker.BuildImageOptions{
 		Name:         image,
