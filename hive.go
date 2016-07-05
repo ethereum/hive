@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -185,7 +186,8 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 			return false, err
 		}
 		if !c.State.Running {
-			break
+			clogger.Error("client container terminated")
+			return false, errors.New("terminated unexpectedly")
 		}
 		// Container seems to be alive, check whether the RPC is accepting connections
 		if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.NetworkSettings.IPAddress, 8545)); err == nil {
