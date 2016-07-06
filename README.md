@@ -133,7 +133,7 @@ injects all the required configurations into the Linux containers prior to launc
 `entrypoint` script. It is then left to this script to interpret all the environmental configs and
 initialize the client appropriately.
 
-The chain configurations are:
+The chain configurations files:
 
  * `/genesis.json` contains the JSON specification of the Ethereum genesis states
  * `/chain.rlp` contains a batch of RLP encoded blocks to import before startup
@@ -143,6 +143,20 @@ Client startup scripts need to ensure that they load the genesis state first, th
 longer blockchain and then import possibly numerous individual blocks. The reason for requiring two
 different block sources is that specifying a singe chain is more optimal, but tests requiring forking
 chains cannot create a single chain.
+
+Beside the standardized chain configurations, clients can in general be modified behavior wise in
+quite a few ways that are mostly supported by all clients, yet are implemented differently in each.
+As such, each possible behavioral change required by some validator or simulator is characterized by
+an environment variable, which clients should interpret as best as they can.
+
+The behavioral configuration variables:
+
+  * `HIVE_TESTNET` whether clients should run with modified starting nonces (`2^20`)
+  * `HIVE_NODETYPE` specifying the sync and pruning algos that should be used
+    * If unset, then uninteresting and run in the node's default mode
+    * If `archive`, assumes that all historical state is retained after sync
+    * If `full`, assumes fast sync and consecutive pruning of historical state
+    * If `light`, assumes header only sync and no state maintenance at all
 
 ### Starting the client
 

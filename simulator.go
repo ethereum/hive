@@ -67,7 +67,7 @@ func simulate(daemon *docker.Client, client, simulator string, logger log15.Logg
 	logger.Info("running client simulation")
 
 	// Start the simulator HTTP API
-	sim, err := startSimulatorAPI(daemon, client, logger)
+	sim, err := startSimulatorAPI(daemon, client, simulator, logger)
 	if err != nil {
 		logger.Error("failed to start simulator API", "error", err)
 		return false, err
@@ -94,7 +94,7 @@ func simulate(daemon *docker.Client, client, simulator string, logger log15.Logg
 	}()
 
 	// Finish configuring the HTTP webserver with the controlled container
-	sim.simulator = sc
+	sim.runner = sc
 
 	// Start the tester container and wait until it finishes
 	slogger.Debug("running simulator container")
@@ -116,7 +116,7 @@ func simulate(daemon *docker.Client, client, simulator string, logger log15.Logg
 
 // startSimulatorAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startSimulatorAPI(daemon *docker.Client, client string, logger log15.Logger) (*simulatorAPIHandler, error) {
+func startSimulatorAPI(daemon *docker.Client, client, simulator string, logger log15.Logger) (*simulatorAPIHandler, error) {
 	// Find the IP address of the host container
 	logger.Debug("looking up docker bridge IP")
 	bridge, err := lookupBridgeIP(logger)
@@ -140,11 +140,12 @@ func startSimulatorAPI(daemon *docker.Client, client string, logger log15.Logger
 	// Serve connections until the listener is terminated
 	logger.Debug("starting simulator API server")
 	sim := &simulatorAPIHandler{
-		listener: listener,
-		daemon:   daemon,
-		logger:   logger,
-		client:   client,
-		nodes:    make(map[string]*docker.Container),
+		listener:  listener,
+		daemon:    daemon,
+		logger:    logger,
+		simulator: simulator,
+		client:    client,
+		nodes:     make(map[string]*docker.Container),
 	}
 	go http.Serve(listener, sim)
 
@@ -156,13 +157,14 @@ func startSimulatorAPI(daemon *docker.Client, client string, logger log15.Logger
 type simulatorAPIHandler struct {
 	listener *net.TCPListener
 
-	daemon *docker.Client
-	logger log15.Logger
-	client string
-	autoID uint32
+	daemon    *docker.Client
+	logger    log15.Logger
+	simulator string
+	client    string
+	autoID    uint32
 
-	simulator *docker.Container
-	nodes     map[string]*docker.Container
+	runner *docker.Container
+	nodes  map[string]*docker.Container
 }
 
 // ServeHTTP handles all the simulator API requests and executes them.
@@ -212,28 +214,26 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		case "/nodes":
 			// A new node startup was requested, start the container
 			logger.Debug("starting new client")
-			container, err := h.daemon.CreateContainer(docker.CreateContainerOptions{
-				Config: &docker.Config{Image: h.client},
-			})
+			container, err := createClientContainer(h.daemon, h.client, h.simulator)
 			if err != nil {
 				logger.Error("failed to create client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			logger.Debug("copying genesis.json into client")
-			if err = copyBetweenContainers(h.daemon, container.ID, h.simulator.ID, "/genesis.json"); err != nil {
+			if err = copyBetweenContainers(h.daemon, container.ID, h.runner.ID, "/genesis.json"); err != nil {
 				logger.Error("failed to copy genesis", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			logger.Debug("copying chain into client")
-			if err = copyBetweenContainers(h.daemon, container.ID, h.simulator.ID, "/chain.rlp"); err != nil {
+			if err = copyBetweenContainers(h.daemon, container.ID, h.runner.ID, "/chain.rlp"); err != nil {
 				logger.Error("failed to copy chain", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			logger.Debug("copying blocks into client")
-			if err = copyBetweenContainers(h.daemon, container.ID, h.simulator.ID, "/blocks"); err != nil {
+			if err = copyBetweenContainers(h.daemon, container.ID, h.runner.ID, "/blocks"); err != nil {
 				logger.Error("failed to copy blocks", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

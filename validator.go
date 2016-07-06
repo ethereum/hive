@@ -61,9 +61,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 
 	// Create the client container and make sure it's cleaned up afterwards
 	logger.Debug("creating client container")
-	cc, err := daemon.CreateContainer(docker.CreateContainerOptions{
-		Config: &docker.Config{Image: client},
-	})
+	cc, err := createClientContainer(daemon, client, validator)
 	if err != nil {
 		logger.Error("failed to create client", "error", err)
 		return false, err

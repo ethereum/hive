@@ -6,10 +6,38 @@ import (
 	"bytes"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
+
+// hiveEnvvarPrefix is the prefix of the environment variables names that should
+// be moved from test images to client container to fine tune their setup.
+const hiveEnvvarPrefix = "HIVE_"
+
+// createClientContainer creates a docker container from a client image and moves
+// any hive environment variables from the tester image into the new client.
+func createClientContainer(daemon *docker.Client, client string, tester string) (*docker.Container, error) {
+	// Gather all the hive environment variables from the tester
+	ti, err := daemon.InspectImage(tester)
+	if err != nil {
+		return nil, err
+	}
+	vars := []string{}
+	for _, envvar := range ti.Config.Env {
+		if strings.HasPrefix(envvar, hiveEnvvarPrefix) {
+			vars = append(vars, envvar)
+		}
+	}
+	// Create the client container with tester envvars injected
+	return daemon.CreateContainer(docker.CreateContainerOptions{
+		Config: &docker.Config{
+			Image: client,
+			Env:   vars,
+		},
+	})
+}
 
 // copyBetweenContainers copies a file from one docker container to another one.
 func copyBetweenContainers(daemon *docker.Client, dest, src string, path string) error {
