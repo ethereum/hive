@@ -16,11 +16,6 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
-const (
-	clientImagePrefix    = "hive/client/"
-	validatorImagePrefix = "hive/validator/"
-)
-
 var (
 	dockerEndpoint   = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Unix socket to th local Docker daemon")
 	smokePattern     = flag.String("smoke", "", "Regexp selecting the client(s) to smoke-test")
