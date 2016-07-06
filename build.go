@@ -1,3 +1,6 @@
+// This file contains the utility methods to build docker images from contexts
+// scattered over various folders and hierarchies.
+
 package main
 
 import (
