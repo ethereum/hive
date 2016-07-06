@@ -40,6 +40,24 @@ The end result should be a JSON report, detailing for each client the list of va
 those passed. If you wish to explore the reasons of failure, full logs from all clients and testers
 are pushed into the `log.txt` log file.
 
+```
+$ hive --validate=go-ethereum:develop --validators=.
+...
+Validation results:
+{
+  "go-ethereum:develop": {
+    "fail": [
+      "ethereum/rpc-tests"
+    ],
+    "pass": [
+      "smoke/genesis-chain-blocks",
+      "smoke/genesis-only",
+      "smoke/genesis-chain"
+    ]
+  }
+}
+```
+
 You may request a different set of clients to be validated via the `--validate` regexp flag (e.g.
 validating all `go-ethereum` versions would be `--validate go-ethereum:`). Similarly you may request
 only a subset of validation tests to be run via the `--validators` regexp flag (e.g. running only the
@@ -58,6 +76,20 @@ they can be quite lengthy.
 Similarly to validations, end result of simulations should be a JSON report, detailing for each
 client the list of simulations failed and those passed. Likewise, if you wish to explore the reasons
 of failure, full logs from all clients and testers are pushed into the `log.txt` log file.
+
+```
+$ hive --validate="" --simulate=go-ethereum:develop --simulators=.
+...
+Simulation results:
+{
+  "go-ethereum:develop": {
+    "pass": [
+      "dao-hard-fork",
+      "smoke/single-node"
+    ]
+  }
+}
+```
 
 Currently `hive` does not support simulating mixed networks (i.e. different Ethereum implementations).
 This will be expanded in the future when we learn a bit more about the tests people write and how
@@ -127,18 +159,29 @@ suite completion and all related data purged. A new instance will be started for
 
 ### Smoke testing new clients
 
-To quickly check if a client adheres to the requirements of `hive`, there is a smoke test that will
-initialize a client with some pre-configured states and query it from the various RPC endpoints.
+To quickly check if a client adheres to the requirements of `hive`, there is a suite of smoke test
+validations and simulations that just initialize clients with some pre-configured states and query
+it from the various RPC endpoints.
 
 ```
 $ hive --smoke go-ethereum:master
 ...
+Validation results:
 {
   "go-ethereum:master": {
     "pass": [
-      "smoke/genesis-only",
       "smoke/genesis-chain",
-      "smoke/genesis-chain-blocks"
+      "smoke/genesis-chain-blocks",
+      "smoke/genesis-only"
+    ]
+  }
+}
+...
+Simulation results:
+{
+  "go-ethereum:master": {
+    "pass": [
+      "smoke/single-node"
     ]
   }
 }
