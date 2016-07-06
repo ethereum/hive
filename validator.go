@@ -13,7 +13,7 @@ import (
 
 // validateClients runs a batch of validation tests matched by validatorPattern
 // against all clients matching clientPattern.
-func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, binary string, nocache bool) error {
+func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, nocache bool) error {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for validation", "pattern", clientPattern)
 	clients, err := buildClients(daemon, clientPattern, nocache)
@@ -51,7 +51,7 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 	}
 	// Print the validation logs
 	out, _ := json.MarshalIndent(results, "", "  ")
-	fmt.Println(string(out))
+	fmt.Printf("Validation results:\n%s\n", string(out))
 
 	return nil
 }
@@ -142,7 +142,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 	vlogger.Debug("running validator container")
 	vwaiter, err := runContainer(daemon, vc.ID, vlogger)
 	if err != nil {
-		vlogger.Error("failed to run client", "error", err)
+		vlogger.Error("failed to run validator", "error", err)
 		return false, err
 	}
 	vwaiter.Wait()

@@ -78,7 +78,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 		if err := buildImage(daemon, image, context, nocache, logger); err != nil {
 			return nil, fmt.Errorf("%s: %v", context, err)
 		}
-		images[context] = image
+		images[name] = image
 	}
 	return images, nil
 }
