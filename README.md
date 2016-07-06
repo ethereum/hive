@@ -34,7 +34,7 @@ in the future.*
 You can run the full suite of `hive` validation tests against all the known implementations tagged
 `master` by simply running `hive` from the repository root. It will build a docker image for every
 known client as well as one for every known validation test. **As this make take a while, you can
-track the detailed progress in the `log.txt` file.
+track the detailed progress in the `log.txt` file.**
 
 The end result should be a JSON report, detailing for each client the list of validations failed and
 those passed. If you wish to explore the reasons of failure, full logs from all clients and testers
@@ -44,6 +44,24 @@ You may request a different set of clients to be validated via the `--validate` 
 validating all `go-ethereum` versions would be `--validate go-ethereum:`). Similarly you may request
 only a subset of validation tests to be run via the `--validators` regexp flag (e.g. running only the
 smoke tests would be `--validators smoke/.`).
+
+# Simulating clients
+
+`hive` supports a more advanced form of client testing called *simulations*, where entire networka
+of clients are run concurrently under various circumstances and teir behavior monitored and checked.
+
+Running network simulations is completely analogous to validations from the user's perspective: you
+can specify which clients to simulate with the `--simulate` regexp flag, and you can specify which
+simulations to run via the `--simulators` regexp flag. By default simulations aren't being run as
+they can be quite lengthy.
+
+Similarly to validations, end result of simulations should be a JSON report, detailing for each
+client the list of simulations failed and those passed. Likewise, if you wish to explore the reasons
+of failure, full logs from all clients and testers are pushed into the `log.txt` log file.
+
+Currently `hive` does not support simulating mixed networks (i.e. different Ethereum implementations).
+This will be expanded in the future when we learn a bit more about the tests people write and how
+those can be usefully checked against multiple client types.
 
 # Adding new clients
 
@@ -128,9 +146,15 @@ $ hive --smoke go-ethereum:master
 
 *Note: All smoke tests must pass for a client to be included into `hive`.*
 
+## Under the hood
+
 # Adding new validators
 
-todo
+## Under the hood
+
+# Adding new simulators
+
+## Under the hood
 
 # Contributions
 
