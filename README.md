@@ -151,12 +151,15 @@ an environment variable, which clients should interpret as best as they can.
 
 The behavioral configuration variables:
 
+  * `HIVE_BOOTNODE` enode URL of the discovery-only node to bootstrap the client
   * `HIVE_TESTNET` whether clients should run with modified starting nonces (`2^20`)
   * `HIVE_NODETYPE` specifying the sync and pruning algos that should be used
     * If unset, then uninteresting and run in the node's default mode
     * If `archive`, assumes that all historical state is retained after sync
     * If `full`, assumes fast sync and consecutive pruning of historical state
     * If `light`, assumes header only sync and no state maintenance at all
+  * `HIVE_FORK_HOMESTEAD` the block number of the Ethereum Homestead transition
+  * `HIVE_FORK_DAO` the block number of the DAO hard-fork transition (unset = no fork)
 
 ### Starting the client
 

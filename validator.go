@@ -61,7 +61,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 
 	// Create the client container and make sure it's cleaned up afterwards
 	logger.Debug("creating client container")
-	cc, err := createClientContainer(daemon, client, validator)
+	cc, err := createClientContainer(daemon, client, validator, nil)
 	if err != nil {
 		logger.Error("failed to create client", "error", err)
 		return false, err
@@ -134,7 +134,7 @@ func validate(daemon *docker.Client, client, validator string, logger log15.Logg
 			conn.Close()
 			break
 		}
-		time.Sleep(time.Second)
+		time.Sleep(100 * time.Millisecond)
 	}
 	// Start the tester container and wait until it finishes
 	vlogger.Debug("running validator container")

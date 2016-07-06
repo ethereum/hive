@@ -13,6 +13,13 @@
 # Immediately abort the script on any error encountered
 set -e
 
+# It doesn't make sense to dial out, use only a pre-set bootnode
+if [ "$HIVE_BOOTNODE" != "" ]; then
+	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
+else
+	FLAGS="$FLAGS --bootnodes \"\""
+fi
+
 # If the client is to be run in testnet mode, flag it as such
 if [ "$HIVE_TESTNET" == "1" ]; then
 	FLAGS="$FLAGS --testnet"
@@ -45,5 +52,5 @@ echo
 
 # Run the go-ethereum implementation with the requested flags
 echo "Running go-ethereum..."
-/geth $FLAGS --rpc --rpcaddr "0.0.0.0"
+/geth $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --etherbase "0x00000000000000000000000000000000000001"
 echo

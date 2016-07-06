@@ -18,7 +18,11 @@ const hiveEnvvarPrefix = "HIVE_"
 
 // createClientContainer creates a docker container from a client image and moves
 // any hive environment variables from the tester image into the new client.
-func createClientContainer(daemon *docker.Client, client string, tester string) (*docker.Container, error) {
+//
+// A batch of environment variables may be specified to override from originating
+// from the tester image. This is useful in particular during simulations where
+// the tester itself can fine tune parameters for individual nodes.
+func createClientContainer(daemon *docker.Client, client string, tester string, override map[string][]string) (*docker.Container, error) {
 	// Gather all the hive environment variables from the tester
 	ti, err := daemon.InspectImage(tester)
 	if err != nil {
@@ -26,9 +30,13 @@ func createClientContainer(daemon *docker.Client, client string, tester string) 
 	}
 	vars := []string{}
 	for _, envvar := range ti.Config.Env {
-		if strings.HasPrefix(envvar, hiveEnvvarPrefix) {
+		if strings.HasPrefix(envvar, hiveEnvvarPrefix) && override[envvar] == nil {
 			vars = append(vars, envvar)
 		}
+	}
+	// Inject any explicit overrides
+	for key, vals := range override {
+		vars = append(vars, key+"="+vals[0])
 	}
 	// Create the client container with tester envvars injected
 	return daemon.CreateContainer(docker.CreateContainerOptions{

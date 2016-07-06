@@ -212,9 +212,11 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		// Data mutation, execute the request and return the results
 		switch r.URL.Path {
 		case "/nodes":
-			// A new node startup was requested, start the container
+			// A new node startup was requested, start up the client (override any explicit env vars)
+			r.ParseForm()
+
 			logger.Debug("starting new client")
-			container, err := createClientContainer(h.daemon, h.client, h.simulator)
+			container, err := createClientContainer(h.daemon, h.client, h.simulator, r.Form)
 			if err != nil {
 				logger.Error("failed to create client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -264,7 +266,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 					conn.Close()
 					break
 				}
-				time.Sleep(time.Second)
+				time.Sleep(100 * time.Millisecond)
 			}
 			// Container online and responsive, return it's ID for later reference
 			h.nodes[container.ID[:8]] = container
