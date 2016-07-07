@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -43,6 +44,9 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 		Config: &docker.Config{
 			Image: client,
 			Env:   vars,
+		},
+		HostConfig: &docker.HostConfig{
+			Binds: []string{fmt.Sprintf("%s/.ethash:/root/.ethash", os.Getenv("HOME"))},
 		},
 	})
 }
