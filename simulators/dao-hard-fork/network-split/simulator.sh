@@ -11,17 +11,18 @@ BOOTNODE_ENODE="enode://$BOOTNODE_ENODEID@$BOOTNODE_IP:30303"
 /bootnode --nodekeyhex $BOOTNODE_KEYHEX --addr=0.0.0.0:30303 &
 
 # Configure the simulation parameters
-NO_FORK_NODES=3       # Number of no-fork nodes to boot up
-PRO_FORK_NODES=3      # Number of pro-fork nodes to boot up
-PRE_FORK_PEERS="0x5"  # Number of peers to require pre-fork (total - 1), RPC reply
-POST_FORK_PEERS="0x2" # Number of peers to require post-fork (same camp - 1), RPC reply
-DAO_FORK_BLOCK=25     # Block number at which to fork the chain
+NO_FORK_NODES=3   # Number of no-fork nodes to boot up
+PRO_FORK_NODES=3  # Number of pro-fork nodes to boot up
+PRE_FORK_PEERS=5  # Number of peers to require pre-fork (total - 1), RPC reply
+POST_FORK_PEERS=2 # Number of peers to require post-fork (same camp - 1), RPC reply
+DAO_FORK_BLOCK=10 # Block number at which to fork the chain
 
 # Start a batch of clients for the no-fork camp
 nofork=()
 for i in `seq 1 $NO_FORK_NODES`; do
 	echo "Starting no-fork client #$i..."
 	nofork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes`)
+	sleep 1 # Wait a bit until it's registered by the bootnode
 done
 
 # Start a batch of clients for the pro-fork camp
@@ -29,6 +30,7 @@ profork=()
 for i in `seq 1 $PRO_FORK_NODES`; do
 	echo "Starting pro-fork client #$i..."
 	profork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO=$DAO_FORK_BLOCK`)
+	sleep 1 # Wait a bit until it's registered by the bootnode
 done
 
 allnodes=( "${nofork[@]}" "${profork[@]}" )
@@ -41,6 +43,7 @@ for id in ${allnodes[@]}; do
 	ip=`curl -sf $HIVE_SIMULATOR/nodes/$id`
 	peers=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":0}' $ip:8545 | jq '.result' | tr -d '"'`
 
+	peers=$((16#${peers#*x}))
 	if [ "$peers" != "$PRE_FORK_PEERS" ]; then
 		echo "Invalid peer count for $ip: have $peers, want $PRE_FORK_PEERS"
 		exit -1
@@ -82,6 +85,7 @@ for id in ${allnodes[@]}; do
 	ip=`curl -sf $HIVE_SIMULATOR/nodes/$id`
 	peers=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":4}' $ip:8545 | jq '.result' | tr -d '"'`
 
+	peers=$((16#${peers#*x}))
 	if [ "$peers" != "$POST_FORK_PEERS" ]; then
 		echo "Invalid peer count for $ip: have $peers, want $POST_FORK_PEERS"
 		exit -1
