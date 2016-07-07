@@ -13,6 +13,9 @@ RUN \
   apk del go git make gcc musl-dev                  && \
   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
+# MAke sure bash is available for easier wrapper implementation
+RUN apk add --update bash
+
 # Inject the startup script
 ADD geth.sh /geth.sh
 RUN chmod +x /geth.sh

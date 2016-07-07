@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # Startup script to initialize and boot a go-ethereum instance.
 #
