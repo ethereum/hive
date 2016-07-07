@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 	"syscall"
 
 	"github.com/fsouza/go-dockerclient"
@@ -18,6 +19,7 @@ var (
 	validatorPattern = flag.String("validators", ".", "Regexp selecting the validation tests to run")
 	simulatePattern  = flag.String("simulate", "", "Regexp selecting the client(s) to simulate")
 	simulatorPattern = flag.String("simulators", ".", "Regexp selecting the simulation tests to run")
+	overrideFiles    = flag.String("override", "", "Comma separated files to override in client containers")
 
 	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 )
@@ -48,13 +50,18 @@ func main() {
 	}
 	log15.Info("docker daemon online", "version", env.Get("Version"))
 
+	// Gather any client files needing overriding
+	overrides := []string{}
+	if *overrideFiles != "" {
+		overrides = strings.Split(*overrideFiles, ",")
+	}
 	// Smoke tests are exclusive with all other flags
 	if *smokePattern != "" {
-		if err := validateClients(daemon, *smokePattern, "smoke/", true); err != nil {
+		if err := validateClients(daemon, *smokePattern, "smoke/", overrides, true); err != nil {
 			log15.Crit("failed to smoke-validate client images", "error", err)
 			return
 		}
-		if err := simulateClients(daemon, *smokePattern, "smoke/", true); err != nil {
+		if err := simulateClients(daemon, *smokePattern, "smoke/", overrides, true); err != nil {
 			log15.Crit("failed to smoke-simulate client images", "error", err)
 			return
 		}
@@ -62,13 +69,13 @@ func main() {
 	}
 	// Otherwise run all requested validation and simulation tests
 	if *validatePattern != "" {
-		if err := validateClients(daemon, *validatePattern, *validatorPattern, *noImageCache); err != nil {
+		if err := validateClients(daemon, *validatePattern, *validatorPattern, overrides, *noImageCache); err != nil {
 			log15.Crit("failed to validate clients", "error", err)
 			return
 		}
 	}
 	if *simulatePattern != "" {
-		if err := simulateClients(daemon, *simulatePattern, *simulatorPattern, *noImageCache); err != nil {
+		if err := simulateClients(daemon, *simulatePattern, *simulatorPattern, overrides, *noImageCache); err != nil {
 			log15.Crit("failed to simulate clients", "error", err)
 			return
 		}

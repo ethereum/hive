@@ -13,7 +13,7 @@ import (
 
 // validateClients runs a batch of validation tests matched by validatorPattern
 // against all clients matching clientPattern.
-func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, nocache bool) error {
+func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string, nocache bool) error {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for validation", "pattern", clientPattern)
 	clients, err := buildClients(daemon, clientPattern, nocache)
@@ -36,7 +36,7 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 			logger := log15.New("client", client, "validator", validator)
 			start := time.Now()
 
-			if pass, err := validate(daemon, clientImage, validatorImage, logger); pass {
+			if pass, err := validate(daemon, clientImage, validatorImage, overrides, logger); pass {
 				logger.Info("validation passed", "time", time.Since(start))
 				results[client]["pass"] = append(results[client]["pass"], validator)
 			} else {
@@ -56,12 +56,12 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 	return nil
 }
 
-func validate(daemon *docker.Client, client, validator string, logger log15.Logger) (bool, error) {
+func validate(daemon *docker.Client, client, validator string, overrides []string, logger log15.Logger) (bool, error) {
 	logger.Info("running client validation")
 
 	// Create the client container and make sure it's cleaned up afterwards
 	logger.Debug("creating client container")
-	cc, err := createClientContainer(daemon, client, validator, nil)
+	cc, err := createClientContainer(daemon, client, validator, overrides, nil)
 	if err != nil {
 		logger.Error("failed to create client", "error", err)
 		return false, err

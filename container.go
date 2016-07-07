@@ -3,10 +3,13 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
@@ -23,7 +26,7 @@ const hiveEnvvarPrefix = "HIVE_"
 // A batch of environment variables may be specified to override from originating
 // from the tester image. This is useful in particular during simulations where
 // the tester itself can fine tune parameters for individual nodes.
-func createClientContainer(daemon *docker.Client, client string, tester string, override map[string][]string) (*docker.Container, error) {
+func createClientContainer(daemon *docker.Client, client string, tester string, overrideFiles []string, overrideEnvs map[string]string) (*docker.Container, error) {
 	// Gather all the hive environment variables from the tester
 	ti, err := daemon.InspectImage(tester)
 	if err != nil {
@@ -31,16 +34,18 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	}
 	vars := []string{}
 	for _, envvar := range ti.Config.Env {
-		if strings.HasPrefix(envvar, hiveEnvvarPrefix) && override[envvar] == nil {
+		if strings.HasPrefix(envvar, hiveEnvvarPrefix) && overrideEnvs[envvar] == "" {
 			vars = append(vars, envvar)
 		}
 	}
-	// Inject any explicit overrides
-	for key, vals := range override {
-		vars = append(vars, key+"="+vals[0])
+	// Inject any explicit envvar overrides
+	for key, val := range overrideEnvs {
+		if strings.HasPrefix(key, hiveEnvvarPrefix) {
+			vars = append(vars, key+"="+val)
+		}
 	}
 	// Create the client container with tester envvars injected
-	return daemon.CreateContainer(docker.CreateContainerOptions{
+	c, err := daemon.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: client,
 			Env:   vars,
@@ -48,6 +53,64 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 		HostConfig: &docker.HostConfig{
 			Binds: []string{fmt.Sprintf("%s/.ethash:/root/.ethash", os.Getenv("HOME"))},
 		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	// Inject any explicit file overrides into the container
+	if err := uploadToContainer(daemon, c.ID, overrideFiles); err != nil {
+		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true})
+		return nil, err
+	}
+	return c, nil
+}
+
+// uploadToContainer injects a batch of files into the target container.
+func uploadToContainer(daemon *docker.Client, id string, files []string) error {
+	// Short circuit if there are no files to upload
+	if len(files) == 0 {
+		return nil
+	}
+	// Create a tarball archive with all the data files
+	tarball := new(bytes.Buffer)
+	tw := tar.NewWriter(tarball)
+
+	for _, path := range files {
+		// Fetch the next file to inject into the container
+		file, err := os.Open(path)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		data, err := ioutil.ReadAll(file)
+		if err != nil {
+			return err
+		}
+		info, err := file.Stat()
+		if err != nil {
+			return err
+		}
+		// Insert the file into the tarball archive
+		header := &tar.Header{
+			Name: filepath.Base(file.Name()),
+			Mode: int64(info.Mode()),
+			Size: int64(len(data)),
+		}
+		if err := tw.WriteHeader(header); err != nil {
+			return err
+		}
+		if _, err := tw.Write(data); err != nil {
+			return err
+		}
+	}
+	if err := tw.Close(); err != nil {
+		return err
+	}
+	// Upload the tarball into the destination container
+	return daemon.UploadToContainer(id, docker.UploadToContainerOptions{
+		InputStream: tarball,
+		Path:        "/",
 	})
 }
 

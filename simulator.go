@@ -17,7 +17,7 @@ import (
 
 // simulateClients runs a batch of simulation tests matched by simulatorPattern
 // against all clients matching clientPattern.
-func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, nocache bool) error {
+func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string, nocache bool) error {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for simulation", "pattern", clientPattern)
 	clients, err := buildClients(daemon, clientPattern, nocache)
@@ -40,7 +40,7 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 			logger := log15.New("client", client, "simulator", simulator)
 			start := time.Now()
 
-			if pass, err := simulate(daemon, clientImage, simulatorImage, logger); pass {
+			if pass, err := simulate(daemon, clientImage, simulatorImage, overrides, logger); pass {
 				logger.Info("simulation passed", "time", time.Since(start))
 				results[client]["pass"] = append(results[client]["pass"], simulator)
 			} else {
@@ -63,11 +63,11 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 // simulate starts a simulator service locally, starts a controlling container
 // and executes its commands until torn down. The exit statis of the controller
 // container will signal whether the simulation passed or failed.
-func simulate(daemon *docker.Client, client, simulator string, logger log15.Logger) (bool, error) {
+func simulate(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger) (bool, error) {
 	logger.Info("running client simulation")
 
 	// Start the simulator HTTP API
-	sim, err := startSimulatorAPI(daemon, client, simulator, logger)
+	sim, err := startSimulatorAPI(daemon, client, simulator, overrides, logger)
 	if err != nil {
 		logger.Error("failed to start simulator API", "error", err)
 		return false, err
@@ -116,7 +116,7 @@ func simulate(daemon *docker.Client, client, simulator string, logger log15.Logg
 
 // startSimulatorAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startSimulatorAPI(daemon *docker.Client, client, simulator string, logger log15.Logger) (*simulatorAPIHandler, error) {
+func startSimulatorAPI(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger) (*simulatorAPIHandler, error) {
 	// Find the IP address of the host container
 	logger.Debug("looking up docker bridge IP")
 	bridge, err := lookupBridgeIP(logger)
@@ -143,8 +143,9 @@ func startSimulatorAPI(daemon *docker.Client, client, simulator string, logger l
 		listener:  listener,
 		daemon:    daemon,
 		logger:    logger,
-		simulator: simulator,
 		client:    client,
+		simulator: simulator,
+		overrides: overrides,
 		nodes:     make(map[string]*docker.Container),
 	}
 	go http.Serve(listener, sim)
@@ -159,8 +160,9 @@ type simulatorAPIHandler struct {
 
 	daemon    *docker.Client
 	logger    log15.Logger
-	simulator string
 	client    string
+	simulator string
+	overrides []string
 	autoID    uint32
 
 	runner *docker.Container
@@ -212,11 +214,15 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		// Data mutation, execute the request and return the results
 		switch r.URL.Path {
 		case "/nodes":
-			// A new node startup was requested, start up the client (override any explicit env vars)
+			// A new node startup was requested, fetch any envvar overrides from simulators
 			r.ParseForm()
-
+			envs := make(map[string]string)
+			for key, vals := range r.Form {
+				envs[key] = vals[0]
+			}
+			// Create and start a new client container
 			logger.Debug("starting new client")
-			container, err := createClientContainer(h.daemon, h.client, h.simulator, r.Form)
+			container, err := createClientContainer(h.daemon, h.client, h.simulator, h.overrides, envs)
 			if err != nil {
 				logger.Error("failed to create client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
