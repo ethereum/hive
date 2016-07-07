@@ -8,7 +8,9 @@
 #  - `chain.rlp` file is located in the filesystem root
 #
 # This script assumes the following environment variables:
-#  - HIVE_TESTNET whether testnet nonces (2^20) are needed
+#  - HIVE_BOOTNODE enode URL of the remote bootstrap node
+#  - HIVE_TESTNET  whether testnet nonces (2^20) are needed
+#  - HIVE_NODETYPE sync and pruning selector (archive, full, light)
 
 # Immediately abort the script on any error encountered
 set -e
