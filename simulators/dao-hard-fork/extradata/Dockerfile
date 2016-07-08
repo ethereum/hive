@@ -20,7 +20,7 @@ RUN apk add --update bash curl jq
 ADD genesis.json /genesis.json
 RUN touch chain.rlp && mkdir /blocks
 
-ENV HIVE_FORK_DAO 3
+ENV HIVE_FORK_DAO_BLOCK 3
 
 # Add the simulation controller
 ADD simulator.sh /simulator.sh
