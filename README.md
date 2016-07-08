@@ -216,6 +216,15 @@ Simulation results:
 
 ## Under the hood
 
+# Trophies
+
+If you find a bug in you client implementation due to this project, please be so
+kind add add it here to the trophy list. It could help prove that `hive` is indeed
+a useful tool for validating Ethereum client implementations.
+
+ * go-ethereum
+   * Genesis chain config couldn't handle present but empty settings: [#2790](https://github.com/ethereum/go-ethereum/pull/2790)
+
 # Contributions
 
 This project takes a different approach to code contributions than your usual FOSS project with well
