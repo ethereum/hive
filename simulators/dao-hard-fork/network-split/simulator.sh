@@ -15,13 +15,12 @@ NO_FORK_NODES=3   # Number of no-fork nodes to boot up
 PRO_FORK_NODES=3  # Number of pro-fork nodes to boot up
 PRE_FORK_PEERS=5  # Number of peers to require pre-fork (total - 1), RPC reply
 POST_FORK_PEERS=2 # Number of peers to require post-fork (same camp - 1), RPC reply
-DAO_FORK_BLOCK=10 # Block number at which to fork the chain
 
 # Start a batch of clients for the no-fork camp
 nofork=()
 for i in `seq 1 $NO_FORK_NODES`; do
 	echo "Starting no-fork client #$i..."
-	nofork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes`)
+	nofork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=0`)
 	sleep 1 # Wait a bit until it's registered by the bootnode
 done
 
@@ -29,7 +28,7 @@ done
 profork=()
 for i in `seq 1 $PRO_FORK_NODES`; do
 	echo "Starting pro-fork client #$i..."
-	profork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO=$DAO_FORK_BLOCK`)
+	profork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=1`)
 	sleep 1 # Wait a bit until it's registered by the bootnode
 done
 
@@ -60,7 +59,7 @@ curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_start","params":[1],"i
 while [ true ]; do
 	block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":2}' $noforkMiner:8545 | jq '.result' | tr -d '"'`
 	block=$((16#${block#*x}))
-	if [ "$block" -gt "$DAO_FORK_BLOCK" ]; then
+	if [ "$block" -gt "$((HIVE_FORK_DAO_BLOCK + 10))" ]; then
 		break
 	fi
 	sleep 1
@@ -70,15 +69,12 @@ curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_stop","params":[],"id"
 while [ true ]; do
 	block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":2}' $proforkMiner:8545 | jq '.result' | tr -d '"'`
 	block=$((16#${block#*x}))
-	if [ "$block" -gt "$DAO_FORK_BLOCK" ]; then
+	if [ "$block" -gt "$((HIVE_FORK_DAO_BLOCK + 10))" ]; then
 		break
 	fi
 	sleep 1
 done
 curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_stop","params":[],"id":3}' $proforkMiner:8545
-
-# Wait a bit for the network to partition
-sleep 3
 
 # Check that we have two disjoint est of nodes
 for id in ${allnodes[@]}; do
