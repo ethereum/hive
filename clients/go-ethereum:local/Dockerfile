@@ -5,9 +5,10 @@
 # As such build times are short, possibly resulting in higher disk usage.
 FROM ubuntu:16.04
 
-# Since Go binaries are cross Linux portable, we don't need any dependencies aside
+# Since Go binaries are cross Linux portable, we don't need many dependencies aside
 # from the stuff that's already included in the base Ubuntu image. The Geth binary
 # itself will be mounted into the container during startup.
+RUN apt-get update && apt-get install -y jq --no-install-recommends
 
 # Inject the startup script
 ADD geth.sh /geth.sh

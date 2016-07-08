@@ -8,9 +8,11 @@
 #  - `chain.rlp` file is located in the filesystem root
 #
 # This script assumes the following environment variables:
-#  - HIVE_BOOTNODE enode URL of the remote bootstrap node
-#  - HIVE_TESTNET  whether testnet nonces (2^20) are needed
-#  - HIVE_NODETYPE sync and pruning selector (archive, full, light)
+#  - HIVE_BOOTNODE       enode URL of the remote bootstrap node
+#  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
+#  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
+#  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
+#  - HIVE_FORK_DAO       block number of the DAO hard-fork transition
 
 # Immediately abort the script on any error encountered
 set -e
@@ -19,7 +21,7 @@ set -e
 if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
 else
-	FLAGS="$FLAGS --bootnodes \"\""
+	FLAGS="$FLAGS --nodiscover"
 fi
 
 # If the client is to be run in testnet mode, flag it as such
@@ -33,6 +35,18 @@ if [ "$HIVE_NODETYPE" == "full" ]; then
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
 	FLAGS="$FLAGS --light"
+fi
+
+# Override any chain configs in the go-ethereum specific way
+chainconfig="{}"
+if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"`
+fi
+if [ "$HIVE_FORK_DAO" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"daoForkBlock\": $HIVE_FORK_DAO}"`
+fi
+if [ "$chainconfig" != "{}" ]; then
+	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 fi
 
 # Initialize the local testchain with the genesis state
