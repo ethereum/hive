@@ -12,7 +12,8 @@
 #  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
-#  - HIVE_FORK_DAO       block number of the DAO hard-fork transition
+#  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
+#  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
 
 # Immediately abort the script on any error encountered
 set -e
@@ -42,8 +43,14 @@ chainconfig="{}"
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"`
 fi
-if [ "$HIVE_FORK_DAO" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkBlock\": $HIVE_FORK_DAO}"`
+if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"`
+fi
+if [ "$HIVE_FORK_DAO_VOTE" == "0" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": false}"`
+fi
+if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": true}"`
 fi
 if [ "$chainconfig" != "{}" ]; then
 	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
