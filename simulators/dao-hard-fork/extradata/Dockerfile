@@ -1,5 +1,15 @@
 # This simulation tests that miners pushing for the dao hard-fork set the correct
-# extradata field for the fork block.
+# extradata field for the fork block and the 10 consecutive blocks.
+#
+# This is important to allow header-only mode clients (fast sync algo, light
+# client) to verify whether a header is indeed on the corrent chain and not get
+# duped into syncing a live alternative fork. It also helps full nodes to split
+# the network between two forks and avoid cross network noise.
+#
+# Consecutive blocks are needed to prevent any malicious miner from minting a
+# non-forked block with the fork extradata. Unless almost all non-forking miners
+# are malicious, there will be a non-forking block in the first 10 that does not
+# have the fork extra-data set, separating that chain from the forked chain.
 FROM alpine:3.3
 
 # Install curl to allow controlling the simulator as well as to interact with the
