@@ -159,7 +159,8 @@ The behavioral configuration variables:
     * If `full`, assumes fast sync and consecutive pruning of historical state
     * If `light`, assumes header only sync and no state maintenance at all
   * `HIVE_FORK_HOMESTEAD` the block number of the Ethereum Homestead transition
-  * `HIVE_FORK_DAO` the block number of the DAO hard-fork transition (unset = no fork)
+  * `HIVE_FORK_DAO_BLOCK` the block number of the DAO hard-fork transition
+  * `HIVE_FORK_DAO_VOTE` whether the node supports or opposes the DAO hard-fork
 
 ### Starting the client
 
@@ -224,6 +225,7 @@ a useful tool for validating Ethereum client implementations.
 
  * go-ethereum
    * Genesis chain config couldn't handle present but empty settings: [#2790](https://github.com/ethereum/go-ethereum/pull/2790)
+   * Data race between remote block import and local block mining: [#2793](https://github.com/ethereum/go-ethereum/pull/2793)
 
 # Contributions
 
