@@ -14,6 +14,8 @@
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
+#  - HIVE_MINER          address to credit with mining rewards (single thread)
+#  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
 # Immediately abort the script on any error encountered
 set -e
@@ -74,6 +76,13 @@ done
 echo
 
 # Run the go-ethereum implementation with the requested flags
-echo "Running go-ethereum..."
-/geth $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --etherbase "0x00000000000000000000000000000000000001"
+if [ "$HIVE_MINER" != "" ]; then
+	FLAGS="$FLAGS --mine --minerthreads 1 --etherbase $HIVE_MINER"
+fi
+if [ "$HIVE_MINER_EXTRA" != "" ]; then
+	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
+fi
+
+echo "Running go-ethereum... $FLAGS"
+/geth $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3"
 echo

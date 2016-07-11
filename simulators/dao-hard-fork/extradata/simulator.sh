@@ -4,20 +4,15 @@ set -e
 # Start two DAO enabled clients, one pro and one contra fork (don't connect them)
 echo -n "Starting DAO enabled clients..."
 
-proID=`curl -sf -X POST $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=1`
+proID=`curl -sf -X POST $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=1\&HIVE_MINER=0x00000000000000000000000000000000000001`
 proIP=`curl -sf $HIVE_SIMULATOR/nodes/$proID`
 echo "Started pro-fork node $proID at $proIP"
 
-conID=`curl -sf -X POST $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=0`
+conID=`curl -sf -X POST $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=0\&HIVE_MINER=0x00000000000000000000000000000000000001\&HIVE_MINER_EXTRA=dao-hard-fork`
 conIP=`curl -sf $HIVE_SIMULATOR/nodes/$conID`
 echo "Started contra-fork node $conID at $conIP"
 
 # Let both nodes mine past the DAO fork blocks by a few
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_start","params":[1],"id":0}' $proIP:8545
-
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_setExtra","params":["dao-hard-fork"],"id":0}' $conIP:8545 # Try to impersoante a pro-forker
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_start","params":[1],"id":0}' $conIP:8545
-
 proLatest=0
 while [ true ]; do
 	proLatest=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' $proIP:8545 | jq '.result' | tr -d '"'`
@@ -25,9 +20,8 @@ while [ true ]; do
 	if [ "$proLatest" -ge "$((HIVE_FORK_DAO_BLOCK + 13))" ]; then
 		break
 	fi
-	sleep 1
+	sleep 0.25
 done
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_stop","params":[],"id":2}' $proIP:8545
 
 conLatest=0
 while [ true ]; do
@@ -36,9 +30,8 @@ while [ true ]; do
 	if [ "$conLatest" -ge "$((HIVE_FORK_DAO_BLOCK + 13))" ]; then
 		break
 	fi
-	sleep 1
+	sleep 0.25
 done
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_stop","params":[],"id":2}' $conIP:8545
 
 # Retrieve all pro-fork blocks and validate DAO fork range extradata ("dao-hard-fork" -> 0x64616f2d686172642d666f726b)
 for block in `seq 1 $proLatest`; do

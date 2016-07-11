@@ -11,10 +11,10 @@ BOOTNODE_ENODE="enode://$BOOTNODE_ENODEID@$BOOTNODE_IP:30303"
 /bootnode --nodekeyhex $BOOTNODE_KEYHEX --addr=0.0.0.0:30303 &
 
 # Configure the simulation parameters
-NO_FORK_NODES=3   # Number of no-fork nodes to boot up
-PRO_FORK_NODES=3  # Number of pro-fork nodes to boot up
-PRE_FORK_PEERS=5  # Number of peers to require pre-fork (total - 1), RPC reply
-POST_FORK_PEERS=2 # Number of peers to require post-fork (same camp - 1), RPC reply
+NO_FORK_NODES=2   # Number of plain no-fork nodes to boot up (+1 miner)
+PRO_FORK_NODES=2  # Number of plain pro-fork nodes to boot up (+1 miner)
+PRE_FORK_PEERS=5  # Number of peers to require pre-fork (total - 1)
+POST_FORK_PEERS=2 # Number of peers to require post-fork (same camp - 1)
 
 # netPeerCount executes an RPC request to a node to retrieve its current number
 # of connected peers.
@@ -44,12 +44,15 @@ for i in `seq 1 $PRO_FORK_NODES`; do
 	sleep 1 # Wait a bit until it's registered by the bootnode
 done
 
+# Start the miners for the two camps
+nofork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=0\&HIVE_MINER=0x00000000000000000000000000000000000001`)
+profork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=1\&HIVE_MINER=0x00000000000000000000000000000000000001`)
+
 allnodes=( "${nofork[@]}" "${profork[@]}" )
 
 # Wait a bit for the nodes to all find each other
 sleep 3
 
-# Check that we have a full graph for all nodes
 for id in ${allnodes[@]}; do
 	peers=`netPeerCount $id`
 	if [ "$peers" != "$PRE_FORK_PEERS" ]; then
@@ -58,12 +61,9 @@ for id in ${allnodes[@]}; do
 	fi
 done
 
-# Start a miner for each camp, wait until they pass the DAO fork block
-noforkMiner=`curl -sf $HIVE_SIMULATOR/nodes/${nofork[0]}`
-proforkMiner=`curl -sf $HIVE_SIMULATOR/nodes/${profork[0]}`
-
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_start","params":[1],"id":1}' $noforkMiner:8545
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_start","params":[1],"id":1}' $proforkMiner:8545
+# Wait until all miners pass the DAO fork block range
+noforkMiner=`curl -sf $HIVE_SIMULATOR/nodes/${nofork[$NO_FORK_NODES]}`
+proforkMiner=`curl -sf $HIVE_SIMULATOR/nodes/${profork[$PRO_FORK_NODES]}`
 
 while [ true ]; do
 	block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":2}' $noforkMiner:8545 | jq '.result' | tr -d '"'`
@@ -73,7 +73,6 @@ while [ true ]; do
 	fi
 	sleep 1
 done
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_stop","params":[],"id":3}' $noforkMiner:8545
 
 while [ true ]; do
 	block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":2}' $proforkMiner:8545 | jq '.result' | tr -d '"'`
@@ -83,7 +82,6 @@ while [ true ]; do
 	fi
 	sleep 1
 done
-curl -sf -X POST --data '{"jsonrpc":"2.0","method":"miner_stop","params":[],"id":3}' $proforkMiner:8545
 
 # Check that we have two disjoint set of nodes
 for id in ${allnodes[@]}; do
@@ -94,9 +92,6 @@ for id in ${allnodes[@]}; do
 		if [ "$peers" == "$POST_FORK_PEERS" ]; then
 			break
 		fi
-		ip=`curl -sf $HIVE_SIMULATOR/nodes/$id`
-		curl -sf -X POST --data '{"jsonrpc":"2.0","method":"admin_peers","params":[],"id":0}' $ip:8545
-
 		# Seems peer count is wrong, unless too many trials, sleep a bit and retry
 		if [ "$i" == "3" ]; then
 			echo "Invalid peer count for $id: have $peers, want $POST_FORK_PEERS"
