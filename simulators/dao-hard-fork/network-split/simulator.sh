@@ -11,9 +11,9 @@ BOOTNODE_ENODE="enode://$BOOTNODE_ENODEID@$BOOTNODE_IP:30303"
 /bootnode --nodekeyhex $BOOTNODE_KEYHEX --addr=0.0.0.0:30303 &
 
 # Configure the simulation parameters
-NO_FORK_NODES=2   # Number of plain no-fork nodes to boot up (+1 miner)
-PRO_FORK_NODES=2  # Number of plain pro-fork nodes to boot up (+1 miner)
-PRE_FORK_PEERS=5  # Number of peers to require pre-fork (total - 1)
+NO_FORK_NODES=2	 # Number of plain no-fork nodes to boot up (+1 miner)
+PRO_FORK_NODES=2	# Number of plain pro-fork nodes to boot up (+1 miner)
+PRE_FORK_PEERS=5	# Number of peers to require pre-fork (total - 1)
 POST_FORK_PEERS=2 # Number of peers to require post-fork (same camp - 1)
 
 # netPeerCount executes an RPC request to a node to retrieve its current number
@@ -22,10 +22,56 @@ POST_FORK_PEERS=2 # Number of peers to require post-fork (same camp - 1)
 # If looks up the IP address of the node from the hive simulator and executes the
 # actual peer lookup. As the result is hex encoded, it will decode and return it.
 function netPeerCount {
-	local ip=`curl -sf $HIVE_SIMULATOR/nodes/$1`
-	local peers=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":0}' $ip:8545 | jq '.result' | tr -d '"'`
-
+	local peers=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":0}' $1:8545 | jq '.result' | tr -d '"'`
 	echo $((16#${peers#*x}))
+}
+
+# waitPeers verifies whether a node has a given number of peers, and if not waits
+# a bit and retries a few times (to avoid devp2p pending handshakes and similar
+# anomalies). If the peer count doesn't converge to the desired target, the method
+# will fail.
+function waitPeers {
+	local ip=`curl -sf $HIVE_SIMULATOR/nodes/$1`
+
+	for i in `seq 1 10`; do
+		# Fetch the current peer count and stop if it's correct
+		peers=`netPeerCount $ip`
+		if [ "$peers" == "$2" ]; then
+			break
+		fi
+		# Seems peer count is wrong, unless too many trials, sleep a bit and retry
+		if [ "$i" == "10" ]; then
+			echo "Invalid peer count for $1 ($ip): have $peers, want $2"
+			exit -1
+		fi
+
+		sleep 0.5
+	done
+}
+
+# ethBlockBumber executes an RPC request to a node to retrieve its current block
+# number.
+#
+# If looks up the IP address of the node from the hive simulator and executes the
+# actual number lookup. As the result is hex encoded, it will decode and return it.
+function ethBlockBumber {
+	local block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' $1:8545 | jq '.result' | tr -d '"'`
+	echo $((16#${block#*x}))
+}
+
+# waitBlock waits until the block number of a remote node is at least the specified
+# one, periodically polling and sleeping otherwise. There is no timeout, the method
+# will block until it succeeds.
+function waitBlock {
+	local ip=`curl -sf $HIVE_SIMULATOR/nodes/$1`
+
+	while [ true ]; do
+		block=`ethBlockBumber $ip`
+		if [ "$block" -gt "$2" ]; then
+			break
+		fi
+		sleep 0.5
+	done
 }
 
 # Start a batch of clients for the no-fork camp
@@ -47,57 +93,20 @@ done
 # Start the miners for the two camps
 nofork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=0\&HIVE_MINER=0x00000000000000000000000000000000000001`)
 profork+=(`curl -sf -X POST --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes?HIVE_FORK_DAO_VOTE=1\&HIVE_MINER=0x00000000000000000000000000000000000001`)
+sleep 1
 
 allnodes=( "${nofork[@]}" "${profork[@]}" )
 
 # Wait a bit for the nodes to all find each other
-sleep 3
-
 for id in ${allnodes[@]}; do
-	peers=`netPeerCount $id`
-	if [ "$peers" != "$PRE_FORK_PEERS" ]; then
-		echo "Invalid peer count for $id: have $peers, want $PRE_FORK_PEERS"
-		exit -1
-	fi
+	waitPeers $id $PRE_FORK_PEERS
 done
 
 # Wait until all miners pass the DAO fork block range
-noforkMiner=`curl -sf $HIVE_SIMULATOR/nodes/${nofork[$NO_FORK_NODES]}`
-proforkMiner=`curl -sf $HIVE_SIMULATOR/nodes/${profork[$PRO_FORK_NODES]}`
-
-while [ true ]; do
-	block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":2}' $noforkMiner:8545 | jq '.result' | tr -d '"'`
-	block=$((16#${block#*x}))
-	if [ "$block" -gt "$((HIVE_FORK_DAO_BLOCK + 10))" ]; then
-		break
-	fi
-	sleep 1
-done
-
-while [ true ]; do
-	block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":2}' $proforkMiner:8545 | jq '.result' | tr -d '"'`
-	block=$((16#${block#*x}))
-	if [ "$block" -gt "$((HIVE_FORK_DAO_BLOCK + 10))" ]; then
-		break
-	fi
-	sleep 1
-done
+waitBlock ${nofork[$NO_FORK_NODES]} $((HIVE_FORK_DAO_BLOCK + 10))
+waitBlock ${profork[$PRO_FORK_NODES]} $((HIVE_FORK_DAO_BLOCK + 10))
 
 # Check that we have two disjoint set of nodes
 for id in ${allnodes[@]}; do
-	# devp2p is a bit feisty, so retry a few times to ensure pending handshakes don't count
-	for i in `seq 1 3`; do
-		# Fetch the current peer count and stop if it's correct
-		peers=`netPeerCount $id`
-		if [ "$peers" == "$POST_FORK_PEERS" ]; then
-			break
-		fi
-		# Seems peer count is wrong, unless too many trials, sleep a bit and retry
-		if [ "$i" == "3" ]; then
-			echo "Invalid peer count for $id: have $peers, want $POST_FORK_PEERS"
-			exit -1
-		fi
-
-		sleep 0.5
-	done
+	waitPeers $id $POST_FORK_PEERS
 done
