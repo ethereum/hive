@@ -228,6 +228,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			logger = logger.New("id", container.ID[:8])
+
 			logger.Debug("copying genesis.json into client")
 			if err = copyBetweenContainers(h.daemon, container.ID, h.runner.ID, "/genesis.json"); err != nil {
 				logger.Error("failed to copy genesis", "error", err)

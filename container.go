@@ -4,6 +4,7 @@ package main
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
@@ -142,8 +143,14 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger) (docker
 	outR, outW := io.Pipe()
 	errR, errW := io.Pipe()
 
-	go io.Copy(os.Stderr, outR)
-	go io.Copy(os.Stderr, errR)
+	copy := func(dst io.Writer, src io.Reader) {
+		scanner := bufio.NewScanner(src)
+		for scanner.Scan() {
+			dst.Write([]byte(fmt.Sprintf("[%s] %s\n", id[:8], scanner.Text())))
+		}
+	}
+	go copy(os.Stderr, outR)
+	go copy(os.Stderr, errR)
 
 	logger.Debug("attaching to container")
 	waiter, err := daemon.AttachToContainerNonBlocking(docker.AttachToContainerOptions{
