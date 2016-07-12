@@ -83,6 +83,6 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
 fi
 
-echo "Running go-ethereum... $FLAGS"
+echo "Running go-ethereum..."
 /geth $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3"
 echo

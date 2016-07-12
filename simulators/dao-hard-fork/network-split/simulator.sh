@@ -49,12 +49,12 @@ function waitPeers {
 	done
 }
 
-# ethBlockBumber executes an RPC request to a node to retrieve its current block
+# ethBlockNumber executes an RPC request to a node to retrieve its current block
 # number.
 #
 # If looks up the IP address of the node from the hive simulator and executes the
 # actual number lookup. As the result is hex encoded, it will decode and return it.
-function ethBlockBumber {
+function ethBlockNumber {
 	local block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' $1:8545 | jq '.result' | tr -d '"'`
 	echo $((16#${block#*x}))
 }
@@ -66,7 +66,7 @@ function waitBlock {
 	local ip=`curl -sf $HIVE_SIMULATOR/nodes/$1`
 
 	while [ true ]; do
-		block=`ethBlockBumber $ip`
+		block=`ethBlockNumber $ip`
 		if [ "$block" -gt "$2" ]; then
 			break
 		fi
