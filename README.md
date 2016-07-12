@@ -41,7 +41,7 @@ those passed. If you wish to explore the reasons of failure, full logs from all 
 are pushed into the `log.txt` log file.
 
 ```
-$ hive --validate=go-ethereum:develop --validators=.
+$ hive --client=go-ethereum:develop --test=.
 ...
 Validation results:
 {
@@ -58,27 +58,27 @@ Validation results:
 }
 ```
 
-You may request a different set of clients to be validated via the `--validate` regexp flag (e.g.
-validating all `go-ethereum` versions would be `--validate go-ethereum:`). Similarly you may request
-only a subset of validation tests to be run via the `--validators` regexp flag (e.g. running only the
-smoke tests would be `--validators smoke/.`).
+You may request a different set of clients to be validated via the `--client` regexp flag (e.g.
+validating all `go-ethereum` versions would be `--client=go-ethereum:`). Similarly you may request
+only a subset of validation tests to be run via the `--test` regexp flag (e.g. running only the
+smoke tests would be `--test=smoke`).
 
 # Simulating clients
 
-`hive` supports a more advanced form of client testing called *simulations*, where entire networka
+`hive` supports a more advanced form of client testing called *simulations*, where entire networks
 of clients are run concurrently under various circumstances and teir behavior monitored and checked.
 
 Running network simulations is completely analogous to validations from the user's perspective: you
-can specify which clients to simulate with the `--simulate` regexp flag, and you can specify which
-simulations to run via the `--simulators` regexp flag. By default simulations aren't being run as
-they can be quite lengthy.
+can specify which clients to simulate with the `--client` regexp flag, and you can specify which
+simulations to run via the `--sim` regexp flag. By default simulations aren't being run as they can
+be quite lengthy.
 
 Similarly to validations, end result of simulations should be a JSON report, detailing for each
 client the list of simulations failed and those passed. Likewise, if you wish to explore the reasons
 of failure, full logs from all clients and testers are pushed into the `log.txt` log file.
 
 ```
-$ hive --validate="" --simulate=go-ethereum:develop --simulators=.
+$ hive --client=go-ethereum:develop --test=NONE --sim=.
 ...
 Simulation results:
 {
@@ -184,7 +184,7 @@ validations and simulations that just initialize clients with some pre-configure
 it from the various RPC endpoints.
 
 ```
-$ hive --smoke go-ethereum:master
+$ hive --client=go-ethereum:master --smoke
 ...
 Validation results:
 {
