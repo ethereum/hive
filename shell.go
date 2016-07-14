@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"os/signal"
+
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -38,7 +41,16 @@ func mainInShell(daemon *docker.Client, overrides []string) error {
 		log15.Error("failed to execute hive shell", "error", err)
 		return err
 	}
-	waiter.Wait()
+	// Register an interrupt handler to cleanly tear the shell down
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
 
+	go func() {
+		<-interrupt
+		log15.Error("shell interrupted, stopping")
+		daemon.StopContainer(shell.ID, 0)
+	}()
+	// Wait for comtainer termination and return
+	waiter.Wait()
 	return nil
 }
