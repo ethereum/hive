@@ -26,7 +26,6 @@ RUN (cd $GOPATH/src/github.com/karalabe/hive && go install ./...)
 
 # Inject and build hive itself (modified during hive dev only, cache builds)
 ADD *.go $GOPATH/src/github.com/karalabe/hive/
-ADD internal $GOPATH/src/github.com/karalabe/hive/internal
 
 WORKDIR $GOPATH/src/github.com/karalabe/hive
 RUN go install
