@@ -4,7 +4,6 @@ import (
 	"flag"
 	"os"
 	"strings"
-	"syscall"
 
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -27,16 +26,8 @@ var (
 func main() {
 	// Parse the flags and configure the logger
 	flag.Parse()
-	if *loglevelFlag < 6 {
-		log15.Root().SetHandler(log15.MultiHandler(
-			log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stdout, log15.TerminalFormat())),
-			log15.LvlFilterHandler(log15.LvlDebug, log15.StreamHandler(os.Stderr, log15.LogfmtFormat())),
-		))
-		log, _ := os.OpenFile("log.txt", os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0644)
-		syscall.Dup2(int(log.Fd()), 2)
-	} else {
-		log15.Root().SetHandler(log15.LvlFilterHandler(log15.LvlDebug, log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
-	}
+	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
+
 	// Connect to the local docker daemon and make sure it works
 	daemon, err := docker.NewClient(*dockerEndpoint)
 	if err != nil {

@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
@@ -34,9 +37,12 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 
 		for validator, validatorImage := range validators {
 			logger := log15.New("client", client, "validator", validator)
-			start := time.Now()
 
-			if pass, err := validate(daemon, clientImage, validatorImage, overrides, logger); pass {
+			logdir := filepath.Join(hiveLogsFolder, "validations", fmt.Sprintf("%s[%s]", strings.Replace(validator, "/", ":", -1), client))
+			os.RemoveAll(logdir)
+
+			start := time.Now()
+			if pass, err := validate(daemon, clientImage, validatorImage, overrides, logger, logdir); pass {
 				logger.Info("validation passed", "time", time.Since(start))
 				results[client]["pass"] = append(results[client]["pass"], validator)
 			} else {
@@ -56,7 +62,7 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 	return nil
 }
 
-func validate(daemon *docker.Client, client, validator string, overrides []string, logger log15.Logger) (bool, error) {
+func validate(daemon *docker.Client, client, validator string, overrides []string, logger log15.Logger, logdir string) (bool, error) {
 	logger.Info("running client validation")
 
 	// Create the client container and make sure it's cleaned up afterwards
@@ -108,7 +114,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	}
 	// Start the client and wait for it to finish
 	clogger.Debug("running client container")
-	cwaiter, err := runContainer(daemon, cc.ID, clogger, false)
+	cwaiter, err := runContainer(daemon, cc.ID, clogger, filepath.Join(logdir, "client.log"), false)
 	if err != nil {
 		clogger.Error("failed to run client", "error", err)
 		return false, err
@@ -138,7 +144,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	}
 	// Start the tester container and wait until it finishes
 	vlogger.Debug("running validator container")
-	vwaiter, err := runContainer(daemon, vc.ID, vlogger, false)
+	vwaiter, err := runContainer(daemon, vc.ID, vlogger, filepath.Join(logdir, "validator.log"), false)
 	if err != nil {
 		vlogger.Error("failed to run validator", "error", err)
 		return false, err

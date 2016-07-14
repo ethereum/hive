@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -93,13 +94,14 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 func buildImage(daemon *docker.Client, image, context string, logger log15.Logger) error {
 	logger.Info("building new docker image")
 
-	r, w := io.Pipe()
-	go io.Copy(os.Stderr, r)
-
+	stream := io.Writer(new(bytes.Buffer))
+	if *loglevelFlag > 5 {
+		stream = os.Stderr
+	}
 	opts := docker.BuildImageOptions{
 		Name:         image,
 		ContextDir:   context,
-		OutputStream: w,
+		OutputStream: stream,
 	}
 	if err := daemon.BuildImage(opts); err != nil {
 		logger.Error("failed to build docker image", "error", err)

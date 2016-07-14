@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -38,9 +40,12 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 
 		for simulator, simulatorImage := range simulators {
 			logger := log15.New("client", client, "simulator", simulator)
-			start := time.Now()
 
-			if pass, err := simulate(daemon, clientImage, simulatorImage, overrides, logger); pass {
+			logdir := filepath.Join(hiveLogsFolder, "simulations", fmt.Sprintf("%s[%s]", strings.Replace(simulator, "/", ":", -1), client))
+			os.RemoveAll(logdir)
+
+			start := time.Now()
+			if pass, err := simulate(daemon, clientImage, simulatorImage, overrides, logger, logdir); pass {
 				logger.Info("simulation passed", "time", time.Since(start))
 				results[client]["pass"] = append(results[client]["pass"], simulator)
 			} else {
@@ -63,11 +68,11 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 // simulate starts a simulator service locally, starts a controlling container
 // and executes its commands until torn down. The exit statis of the controller
 // container will signal whether the simulation passed or failed.
-func simulate(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger) (bool, error) {
+func simulate(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger, logdir string) (bool, error) {
 	logger.Info("running client simulation")
 
 	// Start the simulator HTTP API
-	sim, err := startSimulatorAPI(daemon, client, simulator, overrides, logger)
+	sim, err := startSimulatorAPI(daemon, client, simulator, overrides, logger, logdir)
 	if err != nil {
 		logger.Error("failed to start simulator API", "error", err)
 		return false, err
@@ -98,7 +103,7 @@ func simulate(daemon *docker.Client, client, simulator string, overrides []strin
 
 	// Start the tester container and wait until it finishes
 	slogger.Debug("running simulator container")
-	waiter, err := runContainer(daemon, sc.ID, slogger, false)
+	waiter, err := runContainer(daemon, sc.ID, slogger, filepath.Join(logdir, "simulator.log"), false)
 	if err != nil {
 		slogger.Error("failed to run simulator", "error", err)
 		return false, err
@@ -116,7 +121,7 @@ func simulate(daemon *docker.Client, client, simulator string, overrides []strin
 
 // startSimulatorAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startSimulatorAPI(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger) (*simulatorAPIHandler, error) {
+func startSimulatorAPI(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger, logdir string) (*simulatorAPIHandler, error) {
 	// Find the IP address of the host container
 	logger.Debug("looking up docker bridge IP")
 	bridge, err := lookupBridgeIP(logger)
@@ -143,6 +148,7 @@ func startSimulatorAPI(daemon *docker.Client, client, simulator string, override
 		listener:  listener,
 		daemon:    daemon,
 		logger:    logger,
+		logdir:    logdir,
 		client:    client,
 		simulator: simulator,
 		overrides: overrides,
@@ -160,6 +166,7 @@ type simulatorAPIHandler struct {
 
 	daemon    *docker.Client
 	logger    log15.Logger
+	logdir    string
 	client    string
 	simulator string
 	overrides []string
@@ -248,7 +255,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			if _, err = runContainer(h.daemon, container.ID, logger, false); err != nil {
+			logfile := fmt.Sprintf("client#%s.log", container.ID[:8])
+			if _, err = runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, logfile), false); err != nil {
 				logger.Error("failed to start client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

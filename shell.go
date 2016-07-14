@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"os/signal"
+	"path/filepath"
 
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -36,7 +37,7 @@ func mainInShell(daemon *docker.Client, overrides []string) error {
 	// Start up a hive instance within the shell
 	log15.Info("starting outer shell container")
 
-	waiter, err := runContainer(daemon, shell.ID, log15.Root(), true)
+	waiter, err := runContainer(daemon, shell.ID, log15.Root(), filepath.Join(hiveLogsFolder, "shell.log"), true)
 	if err != nil {
 		log15.Error("failed to execute hive shell", "error", err)
 		return err
