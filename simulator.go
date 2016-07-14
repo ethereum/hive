@@ -17,16 +17,16 @@ import (
 
 // simulateClients runs a batch of simulation tests matched by simulatorPattern
 // against all clients matching clientPattern.
-func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string, nocache bool) error {
+func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string) error {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for simulation", "pattern", clientPattern)
-	clients, err := buildClients(daemon, clientPattern, nocache)
+	clients, err := buildClients(daemon, clientPattern)
 	if err != nil {
 		return err
 	}
 	// Build all the validators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
-	simulators, err := buildSimulators(daemon, simulatorPattern, nocache)
+	simulators, err := buildSimulators(daemon, simulatorPattern)
 	if err != nil {
 		return err
 	}
@@ -98,7 +98,7 @@ func simulate(daemon *docker.Client, client, simulator string, overrides []strin
 
 	// Start the tester container and wait until it finishes
 	slogger.Debug("running simulator container")
-	waiter, err := runContainer(daemon, sc.ID, slogger)
+	waiter, err := runContainer(daemon, sc.ID, slogger, false)
 	if err != nil {
 		slogger.Error("failed to run simulator", "error", err)
 		return false, err
@@ -248,7 +248,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			if _, err = runContainer(h.daemon, container.ID, logger); err != nil {
+			if _, err = runContainer(h.daemon, container.ID, logger, false); err != nil {
 				logger.Error("failed to start client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return

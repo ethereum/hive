@@ -13,16 +13,16 @@ import (
 
 // validateClients runs a batch of validation tests matched by validatorPattern
 // against all clients matching clientPattern.
-func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string, nocache bool) error {
+func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string) error {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for validation", "pattern", clientPattern)
-	clients, err := buildClients(daemon, clientPattern, nocache)
+	clients, err := buildClients(daemon, clientPattern)
 	if err != nil {
 		return err
 	}
 	// Build all the validators known to the test harness
 	log15.Info("building validators for testing", "pattern", validatorPattern)
-	validators, err := buildValidators(daemon, validatorPattern, nocache)
+	validators, err := buildValidators(daemon, validatorPattern)
 	if err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	}
 	// Start the client and wait for it to finish
 	clogger.Debug("running client container")
-	cwaiter, err := runContainer(daemon, cc.ID, clogger)
+	cwaiter, err := runContainer(daemon, cc.ID, clogger, false)
 	if err != nil {
 		clogger.Error("failed to run client", "error", err)
 		return false, err
@@ -138,7 +138,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	}
 	// Start the tester container and wait until it finishes
 	vlogger.Debug("running validator container")
-	vwaiter, err := runContainer(daemon, vc.ID, vlogger)
+	vwaiter, err := runContainer(daemon, vc.ID, vlogger, false)
 	if err != nil {
 		vlogger.Error("failed to run validator", "error", err)
 		return false, err

@@ -1,0 +1,6 @@
+# Ignore random stuff non important from hive's perspective
+.git
+
+# Ignore any local build artifacts and runtime caches
+hive
+workspace

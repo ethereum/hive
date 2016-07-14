@@ -21,6 +21,42 @@ import (
 // be moved from test images to client container to fine tune their setup.
 const hiveEnvvarPrefix = "HIVE_"
 
+// createShellContainer creates a docker container from the hive shell's image.
+func createShellContainer(daemon *docker.Client, image string, overrides []string) (*docker.Container, error) {
+	// Configure any workspace requirements for the container
+	pwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	if err := os.MkdirAll(filepath.Join(pwd, "workspace", "docker"), os.ModePerm); err != nil {
+		return nil, err
+	}
+	// Create the list of bind points to make host files available internally
+	binds := make([]string, 0, len(overrides)+2)
+	for _, override := range overrides {
+		if path, err := filepath.Abs(override); err == nil {
+			binds = append(binds, fmt.Sprintf("%s:%s:ro", path, path)) // Mount to the same place, read only
+		}
+	}
+	binds = append(binds, []string{
+		fmt.Sprintf("%s/.ethash:/root/.ethash", os.Getenv("HOME")), // Reuse any already existing ethash DAGs
+		fmt.Sprintf("%s/workspace/docker:/var/lib/docker", pwd),    // Surface any docker-in-docker data caches
+	}...)
+
+	// Create and return the actual docker container
+	return daemon.CreateContainer(docker.CreateContainerOptions{
+		Config: &docker.Config{
+			Image: image,
+			Env:   []string{fmt.Sprintf("UID=%d", os.Getuid())}, // Forward the user ID for the workspace permissions
+			Cmd:   os.Args[1:],
+		},
+		HostConfig: &docker.HostConfig{
+			Privileged: true, // Docker in docker requires privileged mode
+			Binds:      binds,
+		},
+	})
+}
+
 // createClientContainer creates a docker container from a client image and moves
 // any hive environment variables from the tester image into the new client.
 //
@@ -138,19 +174,25 @@ func copyBetweenContainers(daemon *docker.Client, dest, src string, path string)
 // runContainer attaches to the output streams of an existing container, then
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
-func runContainer(daemon *docker.Client, id string, logger log15.Logger) (docker.CloseWaiter, error) {
+func runContainer(daemon *docker.Client, id string, logger log15.Logger, shell bool) (docker.CloseWaiter, error) {
 	// Attach to the container and stream stderr and stdout
 	outR, outW := io.Pipe()
 	errR, errW := io.Pipe()
 
-	copy := func(dst io.Writer, src io.Reader) {
-		scanner := bufio.NewScanner(src)
-		for scanner.Scan() {
-			dst.Write([]byte(fmt.Sprintf("[%s] %s\n", id[:8], scanner.Text())))
+	if shell {
+		go io.Copy(os.Stdout, outR)
+		go io.Copy(os.Stdout, errR)
+	} else {
+		copy := func(dst io.Writer, src io.Reader) (int64, error) {
+			scanner := bufio.NewScanner(src)
+			for scanner.Scan() {
+				dst.Write([]byte(fmt.Sprintf("[%s] %s\n", id[:8], scanner.Text())))
+			}
+			return 0, nil
 		}
+		go copy(os.Stderr, outR)
+		go copy(os.Stderr, errR)
 	}
-	go copy(os.Stderr, outR)
-	go copy(os.Stderr, errR)
 
 	logger.Debug("attaching to container")
 	waiter, err := daemon.AttachToContainerNonBlocking(docker.AttachToContainerOptions{

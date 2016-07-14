@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	dockerEndpoint = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Unix socket to th local Docker daemon")
-	noImageCache   = flag.Bool("nocache", false, "Disabled image caching, rebuilding all modified docker images")
+	dockerEndpoint   = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Unix socket to the local Docker daemon")
+	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 
 	clientPattern = flag.String("client", ":master", "Regexp selecting the client(s) to run against")
 	overrideFiles = flag.String("override", "", "Comma separated files to override in client containers")
@@ -29,13 +29,13 @@ func main() {
 	flag.Parse()
 	if *loglevelFlag < 6 {
 		log15.Root().SetHandler(log15.MultiHandler(
-			log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StdoutHandler),
+			log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stdout, log15.TerminalFormat())),
 			log15.LvlFilterHandler(log15.LvlDebug, log15.StreamHandler(os.Stderr, log15.LogfmtFormat())),
 		))
 		log, _ := os.OpenFile("log.txt", os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0644)
 		syscall.Dup2(int(log.Fd()), 2)
 	} else {
-		log15.Root().SetHandler(log15.LvlFilterHandler(log15.LvlDebug, log15.StderrHandler))
+		log15.Root().SetHandler(log15.LvlFilterHandler(log15.LvlDebug, log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
 	}
 	// Connect to the local docker daemon and make sure it works
 	daemon, err := docker.NewClient(*dockerEndpoint)
@@ -55,29 +55,46 @@ func main() {
 	if *overrideFiles != "" {
 		overrides = strings.Split(*overrideFiles, ",")
 	}
+	// Depending on the flags, either run hive in place or in an outer container shell
+	var fail error
+	if *noShellContainer {
+		fail = mainInHost(daemon, overrides)
+	} else {
+		fail = mainInShell(daemon, overrides)
+	}
+	if fail != nil {
+		os.Exit(-1)
+	}
+}
+
+// mainInHost runs the actual hive validation, simulation and benchmarking on the
+// host machine itself. This is usually the path executed within an outer shell
+// container, but can be also requested directly.
+func mainInHost(daemon *docker.Client, overrides []string) error {
 	// Smoke tests are exclusive with all other flags
 	if *smokeFlag {
-		if err := validateClients(daemon, *clientPattern, "smoke/", overrides, true); err != nil {
+		if err := validateClients(daemon, *clientPattern, "smoke/", overrides); err != nil {
 			log15.Crit("failed to smoke-validate client images", "error", err)
-			return
+			return err
 		}
-		if err := simulateClients(daemon, *clientPattern, "smoke/", overrides, true); err != nil {
+		if err := simulateClients(daemon, *clientPattern, "smoke/", overrides); err != nil {
 			log15.Crit("failed to smoke-simulate client images", "error", err)
-			return
+			return err
 		}
-		return
+		return nil
 	}
 	// Otherwise run all requested validation and simulation tests
 	if *validatorPattern != "" {
-		if err := validateClients(daemon, *clientPattern, *validatorPattern, overrides, *noImageCache); err != nil {
+		if err := validateClients(daemon, *clientPattern, *validatorPattern, overrides); err != nil {
 			log15.Crit("failed to validate clients", "error", err)
-			return
+			return err
 		}
 	}
 	if *simulatorPattern != "" {
-		if err := simulateClients(daemon, *clientPattern, *simulatorPattern, overrides, *noImageCache); err != nil {
+		if err := simulateClients(daemon, *clientPattern, *simulatorPattern, overrides); err != nil {
 			log15.Crit("failed to simulate clients", "error", err)
-			return
+			return err
 		}
 	}
+	return nil
 }

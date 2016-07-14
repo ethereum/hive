@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -20,30 +19,37 @@ import (
 // to avoid name collisions with local images.
 const hiveImageNamespace = "hive"
 
+// buildShell builds the outer shell docker image for running the entirety of hive
+// within an all encompassing container.
+func buildShell(daemon *docker.Client) (string, error) {
+	image := hiveImageNamespace + "/shell"
+	return image, buildImage(daemon, image, ".", log15.Root())
+}
+
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern. If nocache was requested, images
 // are attempted to be rebuilt.
-func buildClients(daemon *docker.Client, pattern string, nocache bool) (map[string]string, error) {
-	return buildNestedImages(daemon, "clients", pattern, "client", nocache)
+func buildClients(daemon *docker.Client, pattern string) (map[string]string, error) {
+	return buildNestedImages(daemon, "clients", pattern, "client")
 }
 
 // buildValidators iterates over all the known validators and builds a docker image
 // for all unknown ones matching the given pattern. If nocache was requested, images
 // are attempted to be rebuilt.
-func buildValidators(daemon *docker.Client, pattern string, nocache bool) (map[string]string, error) {
-	return buildNestedImages(daemon, "validators", pattern, "validator", nocache)
+func buildValidators(daemon *docker.Client, pattern string) (map[string]string, error) {
+	return buildNestedImages(daemon, "validators", pattern, "validator")
 }
 
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern. If nocache was requested, images
 // are attempted to be rebuilt.
-func buildSimulators(daemon *docker.Client, pattern string, nocache bool) (map[string]string, error) {
-	return buildNestedImages(daemon, "simulators", pattern, "simulator", nocache)
+func buildSimulators(daemon *docker.Client, pattern string) (map[string]string, error) {
+	return buildNestedImages(daemon, "simulators", pattern, "simulator")
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested
 // docker image definitions and builds all of them matching the provided pattern.
-func buildNestedImages(daemon *docker.Client, root string, pattern string, kind string, nocache bool) (map[string]string, error) {
+func buildNestedImages(daemon *docker.Client, root string, pattern string, kind string) (map[string]string, error) {
 	// Gather all the folders with Dockerfiles within them
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -75,7 +81,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 			image   = filepath.Join(hiveImageNamespace, context)
 			logger  = log15.New(kind, name)
 		)
-		if err := buildImage(daemon, image, context, nocache, logger); err != nil {
+		if err := buildImage(daemon, image, context, logger); err != nil {
 			return nil, fmt.Errorf("%s: %v", context, err)
 		}
 		images[name] = image
@@ -84,15 +90,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 }
 
 // buildImage builds a single docker image from the specified context.
-func buildImage(daemon *docker.Client, image, context string, nocache bool, logger log15.Logger) error {
-	// Skip the build overhead if an image already exists
-	if !nocache {
-		if info, err := daemon.InspectImage(image); err == nil {
-			logger.Info("docker image already exists", "age", time.Since(info.Created))
-			return nil
-		}
-	}
-	// Otherwise build a new docker image for the specified context
+func buildImage(daemon *docker.Client, image, context string, logger log15.Logger) error {
 	logger.Info("building new docker image")
 
 	r, w := io.Pipe()
