@@ -46,6 +46,7 @@ RUN \
 	\
 	echo 'adduser -u $UID -D hive'       >> $GOPATH/bin/hive.sh && \
 	echo 'chown -R hive /var/lib/docker' >> $GOPATH/bin/hive.sh && \
+  echo 'chown -R hive workspace'       >> $GOPATH/bin/hive.sh && \
 	\
 	chmod +x $GOPATH/bin/hive.sh
 

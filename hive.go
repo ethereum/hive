@@ -82,6 +82,10 @@ func mainInHost(daemon *docker.Client, overrides []string) error {
 		}
 	}
 	if *simulatorPattern != "" {
+		if err := makeGenesisDAG(daemon); err != nil {
+			log15.Crit("failed generate DAG for simulations", "error", err)
+			return err
+		}
 		if err := simulateClients(daemon, *clientPattern, *simulatorPattern, overrides); err != nil {
 			log15.Crit("failed to simulate clients", "error", err)
 			return err

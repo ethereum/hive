@@ -32,8 +32,10 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 	if err != nil {
 		return nil, err
 	}
-	if err := os.MkdirAll(filepath.Join(pwd, "workspace", "docker"), os.ModePerm); err != nil {
-		return nil, err
+	for _, dir := range []string{"docker", "ethash", "logs"} {
+		if err := os.MkdirAll(filepath.Join(pwd, "workspace", dir), os.ModePerm); err != nil {
+			return nil, err
+		}
 	}
 	// Create the list of bind points to make host files available internally
 	binds := make([]string, 0, len(overrides)+2)
@@ -43,9 +45,10 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 		}
 	}
 	binds = append(binds, []string{
-		fmt.Sprintf("%s/.ethash:/root/.ethash", os.Getenv("HOME")),                                // Reuse any already existing ethash DAGs
-		fmt.Sprintf("%s/workspace/docker:/var/lib/docker", pwd),                                   // Surface any docker-in-docker data caches
-		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/karalabe/hive/workspace/logs", pwd), // Surface all the log files from the shell
+		fmt.Sprintf("%s/.ethash:/root/.ethash", os.Getenv("HOME")),                                    // Reuse any already existing ethash DAGs
+		fmt.Sprintf("%s/workspace/docker:/var/lib/docker", pwd),                                       // Surface any docker-in-docker data caches
+		fmt.Sprintf("%s/workspace/ethash:/gopath/src/github.com/karalabe/hive/workspace/ethash", pwd), // Surface any generated DAGs from the shell
+		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/karalabe/hive/workspace/logs", pwd),     // Surface all the log files from the shell
 	}...)
 
 	// Create and return the actual docker container
@@ -58,6 +61,29 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 		HostConfig: &docker.HostConfig{
 			Privileged: true, // Docker in docker requires privileged mode
 			Binds:      binds,
+		},
+	})
+}
+
+// createEthashContainer creates a docker container to generate ethash DAGs.
+func createEthashContainer(daemon *docker.Client, image string) (*docker.Container, error) {
+	// Configure the workspace for ethash generation
+	pwd, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	ethash := filepath.Join(pwd, "workspace", "ethash")
+	if err := os.MkdirAll(ethash, os.ModePerm); err != nil {
+		return nil, err
+	}
+	// Create and return the actual docker container
+	return daemon.CreateContainer(docker.CreateContainerOptions{
+		Config: &docker.Config{
+			Image: image,
+			Env:   []string{fmt.Sprintf("UID=%d", os.Getuid())}, // Forward the user ID for the workspace permissions
+		},
+		HostConfig: &docker.HostConfig{
+			Binds: []string{fmt.Sprintf("%s:/root/.ethash", ethash)},
 		},
 	})
 }

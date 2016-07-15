@@ -27,6 +27,13 @@ func buildShell(daemon *docker.Client) (string, error) {
 	return image, buildImage(daemon, image, ".", log15.Root())
 }
 
+// buildEthash builds the ethash DAG generator docker image to run before any real
+// simulation needing it takes place.
+func buildEthash(daemon *docker.Client) (string, error) {
+	image := hiveImageNamespace + "/internal/ethash"
+	return image, buildImage(daemon, image, filepath.Join("internal", "ethash"), log15.Root())
+}
+
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern. If nocache was requested, images
 // are attempted to be rebuilt.
