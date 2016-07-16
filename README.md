@@ -209,15 +209,9 @@ Simulation results:
 
 *Note: All smoke tests must pass for a client to be included into `hive`.*
 
-## Under the hood
-
 # Adding new validators
 
-## Under the hood
-
 # Adding new simulators
-
-## Under the hood
 
 # Continuous integration
 
