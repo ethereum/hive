@@ -94,7 +94,6 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		return false, err
 	}
 	cip := lcc.NetworkSettings.IPAddress
-	fmt.Println(cip)
 
 	// Wait for the HTTP/RPC socket to open or the container to fail
 	start := time.Now()
