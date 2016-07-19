@@ -103,7 +103,7 @@ implementation:
 
  * `hive` doesn't care what dependencies a client has: language, libraries or otherwise.
  * `hive` doesn't care how the client is built: environment, tooling or otherwise.
- * `hive` doesn't care what garbage clients generates during execution.
+ * `hive` doesn't care what garbage a client generates during execution.
 
 As long as a client can run on Linux, and you can package it up into a Docker image, `hive` can test it!
 
@@ -209,6 +209,85 @@ Simulation results:
 *Note: All smoke tests must pass for a client to be included into `hive`.*
 
 # Adding new validators
+
+Validators are `hive` testers whose sole purpose is to check that a client implementation conforms to
+some standardized specifications (e.g. RPC API conformance, Mist compatibility, consensus tests, etc).
+They are not meant to check a client's behavior in complex network environment, rather that given a
+single client instance, it seems to function correctly from the **users** perspective.
+
+Similar to client implementations inside `hive`, validators themselves are also based on docker images
+and containers:
+
+ * `hive` doesn't care what dependencies a validator has: language, libraries or otherwise.
+ * `hive` doesn't care how the validator is built: environment, tooling or otherwise.
+ * `hive` doesn't care what garbage a validator generates during execution.
+
+As long as a validator can run on Linux, and you can package it up into a Docker image, `hive` can
+use it to test every client implementation with it!
+
+## Creating a validator image
+
+Adding a new client validator to `hive` entails creating a Dockerfile (and related resources), based
+on which `hive` will assemble the docker image to use as the blueprint for validation.
+
+The validator definition(s) should reside in the `validators` folder, each nested as `<group>/<test>`,
+where `<group>` is a higher level collection of similar tests (e.g. `mist`, `consensus`), and `<test>`
+is an individual validator. Contributors are free to define new groups as long as it makes sense from
+a cross-client perspective. A few existing ones are:
+
+ * `ethereum` contains ports of old test frameworks from the Ethereum repositories
+ * `issues` contains interesting corner cases from clients that may affect others too
+ * `mist` contains API conformance tests to validate if a client can be a [Mist](https://github.com/ethereum/mist) backend
+ * `smoke` contains general smoke tests to insta-check is a client image is correct
+
+There are little contraints on the image itself, though a few required caveats are:
+
+ * It should be as tiny as possible (play nice with others). Preferrably use `alpine` Linux.
+ * It should have a single entrypoint (script?) defined, which can initialize and run the test.
+
+For guidance, check out the [genesis-only](https://github.com/karalabe/hive/blob/master/validators/smoke/genesis-only/Dockerfile) smoke test.
+
+### Defining the validator
+
+> Since `hive` does not want to enforce any CLI parametrization scheme on client implementations, it
+injects all the required configurations into the Linux containers prior to launching the client's
+`entrypoint` script. It is then left to this script to interpret all the environmental configs and
+initialize the client appropriately.
+
+What this means from a validator's perspective is, that validators themselves must define these
+initial chain configurations files and client behavioral modifier environment variables that will
+be loaded into the client images.
+
+To prevent duplicating the list of config files and env vars that need to be implemented to cross
+over from validators to clients, we'll refer the reader to the readme's [Initializing the client](#initializing-the-client)
+section which lists all of them, also detailing what each means.
+
+In short, a validator must create all of the above linked chain configuration files and define some
+subset of behavioral environmental variables **in the validator's docker image**. This is important
+as the validator is always started **after** the client, so all information needs to be already ready
+for client initialization prior to running the validator entrypoint.
+
+*Trick: If you don't want to initialize a tested client with a starting chain, only the genesis file,
+you can specify `RUN touch chain.rlp && mkdir /blocks` in the validator Dockerfile, which will create
+an empy initial chain and empty set of blocks.*
+
+### Executing the validation
+
+After `hive` creates and initializes a client implementation based on the docker **image** of the
+chosen validator, it will extract the IP address of the running client and boot up the validator
+with the client's IP address injected as the `HIVE_CLIENT_IP` environmental variable.
+
+From this point onward the validator may execute arbitrary code against the running client's:
+
+ * HTTP RPC endpoint exposed at `HIVE_CLIENT_IP:8545`
+ * WebSocket RPC (if supported) at `HIVE_CLIENT_IP:8546`
+ * devp2p TCP and UDP endpoints at `HIVE_CLIENT_IP:30303`
+
+The validation will be considered successful if and only if the exit code of the entrypoint script
+is zero! Any output that the validators generate will be saved to an appropriate log file in the `hive`
+workspace folder and also echoed out to the console on `--loglevel=6`.
+
+*Note: There is no constraint on how much a validation may run, but please be considerate.*
 
 # Adding new simulators
 
