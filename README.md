@@ -33,12 +33,11 @@ in the future.*
 
 You can run the full suite of `hive` validation tests against all the known implementations tagged
 `master` by simply running `hive` from the repository root. It will build a docker image for every
-known client as well as one for every known validation test. **As this make take a while, you can
-track the detailed progress in the `log.txt` file.**
+known client as well as one for every known validation test.
 
 The end result should be a JSON report, detailing for each client the list of validations failed and
 those passed. If you wish to explore the reasons of failure, full logs from all clients and testers
-are pushed into the `log.txt` log file.
+are pushed into the `workspace/logs` folder.
 
 ```
 $ hive --client=go-ethereum:develop --test=.
@@ -61,7 +60,7 @@ Validation results:
 You may request a different set of clients to be validated via the `--client` regexp flag (e.g.
 validating all `go-ethereum` versions would be `--client=go-ethereum:`). Similarly you may request
 only a subset of validation tests to be run via the `--test` regexp flag (e.g. running only the
-smoke tests would be `--test=smoke`).
+smoke validation tests would be `--test=smoke`).
 
 # Simulating clients
 
