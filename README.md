@@ -259,7 +259,7 @@ initial chain configurations files and client behavioral modifier environment va
 be loaded into the client images.
 
 To prevent duplicating the list of config files and env vars that need to be implemented to cross
-over from validators to clients, we'll refer the reader to the readme's [Initializing the client](#initializing-the-client)
+over from validators to clients, we'll refer the reader to the readme's [*"Initializing the client"*](#initializing-the-client)
 section which lists all of them, also detailing what each means.
 
 In short, a validator must create all of the above linked chain configuration files and define some
@@ -284,12 +284,86 @@ From this point onward the validator may execute arbitrary code against the runn
  * devp2p TCP and UDP endpoints at `HIVE_CLIENT_IP:30303`
 
 The validation will be considered successful if and only if the exit code of the entrypoint script
-is zero! Any output that the validators generate will be saved to an appropriate log file in the `hive`
+is zero! Any output that the validator generate will be saved to an appropriate log file in the `hive`
 workspace folder and also echoed out to the console on `--loglevel=6`.
 
 *Note: There is no constraint on how much a validation may run, but please be considerate.*
 
 # Adding new simulators
+
+Simulators are `hive` testers whose purpose is to check that client implementations conform to some
+desired behavior when running in both multi-node network environments, as well as for scenarios where
+participant nodes perform live mining using the full `ethash` DAG. The goal of a simulator is to try
+and test a node in an almost-live way: don't take testing shortcuts like fake PoW, smaller DAGs, less
+secure key encryption schemas.
+
+Similar to all other entities inside `hive`, simulators too are based on docker images and containers:
+
+ * `hive` doesn't care what dependencies a simulator has: language, libraries or otherwise.
+ * `hive` doesn't care how the simulator is built: environment, tooling or otherwise.
+ * `hive` doesn't care what garbage a simulator generates during execution.
+
+As long as a simulatr can run on Linux, and you can package it up into a Docker image, `hive` can
+use it to test every client implementation with it!
+
+## Creating a simulator image
+
+Adding a new client simulator to `hive` entails creating a Dockerfile (and related resources), based
+on which `hive` will assemble the docker image to use as the blueprint for simulation.
+
+The simulator definition(s) should reside in the `simulators` folder, each nested as `<group>/<sim>`,
+where `<group>` is a higher level collection of similar tests (e.g. `dao-hard-fork`), and `<sim>` is
+an individual simulator. Contributors are free to define new groups as long as it makes sense from a
+cross-client perspective. A few existing ones are:
+
+ * `dao-hard-fork` contains network simulations/tests with regard to the DAO hard-fork
+ * `smoke` contains general smoke tests to insta-check is a client image is correct
+
+There are little contraints on the image itself, though a few required caveats are:
+
+ * It should be as tiny as possible (play nice with others). Preferrably use `alpine` Linux.
+ * It should have a single entrypoint (script?) defined, which can initialize and run the test.
+
+For guidance, check out the [lifecycle](https://github.com/karalabe/hive/blob/master/simulators/smoke/lifecycle/Dockerfile) smoke test.
+
+### Defining the simulator
+
+Defining a simulator is **exactly** the same as defining the docker image of a validator with regard
+to every aspect of `hive` (chain configs, behavioral envvars), As such, we refer the user to the readme's
+[*"Defining the validator"*](#defining-the-validator) section. Apart from what the `entrypoint` script
+is allowed to do, validator and simulator images are equivalent.
+
+### Executing the simulation
+
+As detailed in the readme's [*"Executing the validation"*](#executing-the-validation) section, during
+validation `hive` starts a client node first, and then the validator itself. This is **not** true in
+the case of simulations however. Since it is impossible to define arbitrary networking scenarios with
+simple configuration files, `hive` will instead boot up only the simulator instance, and will provide
+it with the necessary mechanisms to create any scenario it wants.
+
+To this effect, `hive` exposes a RESTful HTTP API that all simulators can use to direct how `hive`
+should create and organize the simulated network. This API is exposed at the HTTP endpoint set in the
+`HIVE_SIMULATOR` environmental variable. The currently available API endpoints are:
+
+ * `/nodes` with method `POST` boots up a new client instance, returning it's unique ID
+   * Simulators may override any [behavioral envvars](#initializing-the-client) via `URL` and `form` parameters
+ * `/nodes/$ID` with method `GET` retrieves the IP address of an existing client instance
+   * The client's exposed services can be reached via ports `8545`, `8546` and `30303`
+ * `/nodes/$ID` with method `DELETE` instantly terminates an existing client instance
+
+*Note: It is up to simulators to wire the clients together. The simplest way to do this is to start
+a bootnode inside the simulator and specify it for new clients via the documented `HIVE_BOOTNODE`
+environemtnal variable. This is required to make simulators fully self contained, also enabling much
+more complex networking scenarios not doable with forced fixed topologies.*
+
+The simulation will be considered successful if and only if the exit code of the entrypoint script
+is zero! Any output that the simulator generate will be saved to an appropriate log file in the `hive`
+workspace folder and also echoed out to the console on `--loglevel=6`.
+
+Closing notes:
+
+ * There is no constraint on how much time a simulation may run, but please be considerate.
+ * The simulator doesn't have to terminate nodes itself, upon exit all resources are reclaimed.
 
 # Continuous integration
 
