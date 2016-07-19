@@ -89,11 +89,17 @@ func createEthashContainer(daemon *docker.Client, image string) (*docker.Contain
 }
 
 // createClientContainer creates a docker container from a client image and moves
-// any hive environment variables from the tester image into the new client.
+// any hive environment variables and initial chain configuration files from the
+// tester image into the new client.
 //
 // A batch of environment variables may be specified to override from originating
 // from the tester image. This is useful in particular during simulations where
 // the tester itself can fine tune parameters for individual nodes.
+//
+// Also a batch of files may be specified to override either the chain configs or
+// the client binaries. This is useful in particular during client development as
+// local executables may be injected into a client docker container without them
+// needing to be rebuilt inside hive.
 func createClientContainer(daemon *docker.Client, client string, tester string, overrideFiles []string, overrideEnvs map[string]string) (*docker.Container, error) {
 	// Gather all the hive environment variables from the tester
 	ti, err := daemon.InspectImage(tester)
@@ -125,7 +131,23 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	if err != nil {
 		return nil, err
 	}
-	// Inject any explicit file overrides into the container
+	// Inject all the chain configuration files from the tester into the client
+	t, err := daemon.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: tester}})
+	if err != nil {
+		return nil, err
+	}
+	defer daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true})
+
+	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/genesis.json"); err != nil {
+		return nil, err
+	}
+	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/chain.rlp"); err != nil {
+		return nil, err
+	}
+	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/blocks"); err != nil {
+		return nil, err
+	}
+	// Inject any explicit file overrides into the client container
 	if err := uploadToContainer(daemon, c.ID, overrideFiles); err != nil {
 		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true})
 		return nil, err

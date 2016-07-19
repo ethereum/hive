@@ -95,23 +95,6 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		vlogger.Debug("deleting validator container")
 		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true})
 	}()
-
-	// Retrieve the genesis block and initial chain from the validator
-	logger.Debug("copying genesis.json into client")
-	if err = copyBetweenContainers(daemon, cc.ID, vc.ID, "/genesis.json"); err != nil {
-		logger.Error("failed to copy genesis", "error", err)
-		return false, err
-	}
-	logger.Debug("copying chain into client")
-	if err = copyBetweenContainers(daemon, cc.ID, vc.ID, "/chain.rlp"); err != nil {
-		logger.Error("failed to copy chain", "error", err)
-		return false, err
-	}
-	logger.Debug("copying blocks into client")
-	if err = copyBetweenContainers(daemon, cc.ID, vc.ID, "/blocks"); err != nil {
-		logger.Error("failed to copy blocks", "error", err)
-		return false, err
-	}
 	// Start the client and wait for it to finish
 	clogger.Debug("running client container")
 	cwaiter, err := runContainer(daemon, cc.ID, clogger, filepath.Join(logdir, "client.log"), false)

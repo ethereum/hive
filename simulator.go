@@ -237,24 +237,6 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			logger = logger.New("id", container.ID[:8])
 
-			logger.Debug("copying genesis.json into client")
-			if err = copyBetweenContainers(h.daemon, container.ID, h.runner.ID, "/genesis.json"); err != nil {
-				logger.Error("failed to copy genesis", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			logger.Debug("copying chain into client")
-			if err = copyBetweenContainers(h.daemon, container.ID, h.runner.ID, "/chain.rlp"); err != nil {
-				logger.Error("failed to copy chain", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			logger.Debug("copying blocks into client")
-			if err = copyBetweenContainers(h.daemon, container.ID, h.runner.ID, "/blocks"); err != nil {
-				logger.Error("failed to copy blocks", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
 			logfile := fmt.Sprintf("client-%s.log", container.ID[:8])
 			if _, err = runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, logfile), false); err != nil {
 				logger.Error("failed to start client", "error", err)
