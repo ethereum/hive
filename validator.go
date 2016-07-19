@@ -79,23 +79,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cc.ID, Force: true})
 	}()
 
-	// Create the validator container and make sure it's cleaned up afterwards
-	logger.Debug("creating validator container")
-	vc, err := daemon.CreateContainer(docker.CreateContainerOptions{
-		Config:     &docker.Config{Image: validator},
-		HostConfig: &docker.HostConfig{Links: []string{cc.ID + ":client"}},
-	})
-	if err != nil {
-		logger.Error("failed to create validator", "error", err)
-		return false, err
-	}
-	vlogger := logger.New("id", vc.ID[:8])
-	vlogger.Debug("created validator container")
-	defer func() {
-		vlogger.Debug("deleting validator container")
-		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true})
-	}()
-	// Start the client and wait for it to finish
+	// Start the client container and retrieve its IP address for the validator
 	clogger.Debug("running client container")
 	cwaiter, err := runContainer(daemon, cc.ID, clogger, filepath.Join(logdir, "client.log"), false)
 	if err != nil {
@@ -103,6 +87,14 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		return false, err
 	}
 	defer cwaiter.Close()
+
+	lcc, err := daemon.InspectContainer(cc.ID)
+	if err != nil {
+		clogger.Error("failed to retrieve client IP", "error", err)
+		return false, err
+	}
+	cip := lcc.NetworkSettings.IPAddress
+	fmt.Println(cip)
 
 	// Wait for the HTTP/RPC socket to open or the container to fail
 	start := time.Now()
@@ -125,6 +117,25 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		}
 		time.Sleep(100 * time.Millisecond)
 	}
+	// Create the validator container and make sure it's cleaned up afterwards
+	logger.Debug("creating validator container")
+	vc, err := daemon.CreateContainer(docker.CreateContainerOptions{
+		Config: &docker.Config{
+			Image: validator,
+			Env:   []string{"HIVE_CLIENT_IP=" + cip},
+		},
+	})
+	if err != nil {
+		logger.Error("failed to create validator", "error", err)
+		return false, err
+	}
+	vlogger := logger.New("id", vc.ID[:8])
+	vlogger.Debug("created validator container")
+	defer func() {
+		vlogger.Debug("deleting validator container")
+		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true})
+	}()
+
 	// Start the tester container and wait until it finishes
 	vlogger.Debug("running validator container")
 	vwaiter, err := runContainer(daemon, vc.ID, vlogger, filepath.Join(logdir, "validator.log"), false)

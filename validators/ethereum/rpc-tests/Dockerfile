@@ -15,7 +15,7 @@ RUN \
 	npm install
 
 # Hack the tester to connect to a remote node, not local one
-RUN sed -i -- "s#'http://localhost:8545'#'http://' + process.env.CLIENT_PORT_8545_TCP_ADDR + ':8545'#g" /rpc-tests/lib/config.js
+RUN sed -i -- "s#'http://localhost:8545'#'http://' + process.env.HIVE_CLIENT_IP + ':8545'#g" /rpc-tests/lib/config.js
 
 # Configure the blockchain for testing
 ADD genesis.json /genesis.json
