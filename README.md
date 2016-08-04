@@ -478,7 +478,7 @@ file being used by the `go-ethereum` client.
 # Trophies
 
 If you find a bug in your client implementation due to this project, please be so
-kind to add it here to the trophy list. It could help prove that `hive` is indeed
+kind as to add it here to the trophy list. It could help prove that `hive` is indeed
 a useful tool for validating Ethereum client implementations.
 
  * go-ethereum
