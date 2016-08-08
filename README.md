@@ -65,7 +65,7 @@ smoke validation tests would be `--test=smoke`).
 # Simulating clients
 
 `hive` supports a more advanced form of client testing called *simulations*, where entire networks
-of clients are run concurrently under various circumstances and teir behavior monitored and checked.
+of clients are run concurrently under various circumstances and their behavior monitored and checked.
 
 Running network simulations is completely analogous to validations from the user's perspective: you
 can specify which clients to simulate with the `--client` regexp flag, and you can specify which
@@ -119,7 +119,7 @@ up all clients from this folder.
 
 There are little contraints on the image itself, though a few required caveats are:
 
- * It should be as tiny as possible (play nice with others). Preferrably use `alpine` Linux.
+ * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
  * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
  * It should have a single entrypoint (script?) defined, which can initialize and run the client.
 
@@ -127,7 +127,7 @@ For guidance, check out the reference [`go-ethereum:master`](https://github.com/
 
 ### Initializing the client
 
-Since `hive` does not want to enforce any CLI parametrization scheme on client implementations, it
+Since `hive` does not want to enforce any CLI parameterization scheme on client implementations, it
 injects all the required configurations into the Linux containers prior to launching the client's
 `entrypoint` script. It is then left to this script to interpret all the environmental configs and
 initialize the client appropriately.
@@ -140,10 +140,10 @@ The chain configurations files:
 
 Client startup scripts need to ensure that they load the genesis state first, then import a possibly
 longer blockchain and then import possibly numerous individual blocks. The reason for requiring two
-different block sources is that specifying a singe chain is more optimal, but tests requiring forking
+different block sources is that specifying a single chain is more optimal, but tests requiring forking
 chains cannot create a single chain.
 
-Beside the standardized chain configurations, clients can in general be modified behavior wise in
+Beside the standardized chain configurations, clients can in general be modified behavior-wise in
 quite a few ways that are mostly supported by all clients, yet are implemented differently in each.
 As such, each possible behavioral change required by some validator or simulator is characterized by
 an environment variable, which clients should interpret as best as they can.
@@ -238,18 +238,18 @@ a cross-client perspective. A few existing ones are:
  * `ethereum` contains ports of old test frameworks from the Ethereum repositories
  * `issues` contains interesting corner cases from clients that may affect others too
  * `mist` contains API conformance tests to validate if a client can be a [Mist](https://github.com/ethereum/mist) backend
- * `smoke` contains general smoke tests to insta-check is a client image is correct
+ * `smoke` contains general smoke tests to insta-check if a client image is correct
 
 There are little contraints on the image itself, though a few required caveats are:
 
- * It should be as tiny as possible (play nice with others). Preferrably use `alpine` Linux.
+ * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
  * It should have a single entrypoint (script?) defined, which can initialize and run the test.
 
 For guidance, check out the [genesis-only](https://github.com/karalabe/hive/blob/master/validators/smoke/genesis-only/Dockerfile) smoke test.
 
 ### Defining the validator
 
-> Since `hive` does not want to enforce any CLI parametrization scheme on client implementations, it
+> Since `hive` does not want to enforce any CLI parameterization scheme on client implementations, it
 injects all the required configurations into the Linux containers prior to launching the client's
 `entrypoint` script. It is then left to this script to interpret all the environmental configs and
 initialize the client appropriately.
@@ -277,14 +277,14 @@ After `hive` creates and initializes a client implementation based on the docker
 chosen validator, it will extract the IP address of the running client and boot up the validator
 with the client's IP address injected as the `HIVE_CLIENT_IP` environmental variable.
 
-From this point onward the validator may execute arbitrary code against the running client's:
+From this point onward the validator may execute arbitrary code against the running clients:
 
  * HTTP RPC endpoint exposed at `HIVE_CLIENT_IP:8545`
  * WebSocket RPC (if supported) at `HIVE_CLIENT_IP:8546`
  * devp2p TCP and UDP endpoints at `HIVE_CLIENT_IP:30303`
 
 The validation will be considered successful if and only if the exit code of the entrypoint script
-is zero! Any output that the validator generate will be saved to an appropriate log file in the `hive`
+is zero! Any output that the validator generates will be saved to an appropriate log file in the `hive`
 workspace folder and also echoed out to the console on `--loglevel=6`.
 
 *Note: There is no constraint on how much a validation may run, but please be considerate.*
@@ -303,7 +303,7 @@ Similar to all other entities inside `hive`, simulators too are based on docker 
  * `hive` doesn't care how the simulator is built: environment, tooling or otherwise.
  * `hive` doesn't care what garbage a simulator generates during execution.
 
-As long as a simulatr can run on Linux, and you can package it up into a Docker image, `hive` can
+As long as a simulator can run on Linux, and you can package it up into a Docker image, `hive` can
 use it to test every client implementation with it!
 
 ## Creating a simulator image
@@ -317,11 +317,11 @@ an individual simulator. Contributors are free to define new groups as long as i
 cross-client perspective. A few existing ones are:
 
  * `dao-hard-fork` contains network simulations/tests with regard to the DAO hard-fork
- * `smoke` contains general smoke tests to insta-check is a client image is correct
+ * `smoke` contains general smoke tests to insta-check if a client image is correct
 
 There are little contraints on the image itself, though a few required caveats are:
 
- * It should be as tiny as possible (play nice with others). Preferrably use `alpine` Linux.
+ * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
  * It should have a single entrypoint (script?) defined, which can initialize and run the test.
 
 For guidance, check out the [lifecycle](https://github.com/karalabe/hive/blob/master/simulators/smoke/lifecycle/Dockerfile) smoke test.
@@ -345,7 +345,7 @@ To this effect, `hive` exposes a RESTful HTTP API that all simulators can use to
 should create and organize the simulated network. This API is exposed at the HTTP endpoint set in the
 `HIVE_SIMULATOR` environmental variable. The currently available API endpoints are:
 
- * `/nodes` with method `POST` boots up a new client instance, returning it's unique ID
+ * `/nodes` with method `POST` boots up a new client instance, returning its unique ID
    * Simulators may override any [behavioral envvars](#initializing-the-client) via `URL` and `form` parameters
  * `/nodes/$ID` with method `GET` retrieves the IP address of an existing client instance
    * The client's exposed services can be reached via ports `8545`, `8546` and `30303`
@@ -353,11 +353,11 @@ should create and organize the simulated network. This API is exposed at the HTT
 
 *Note: It is up to simulators to wire the clients together. The simplest way to do this is to start
 a bootnode inside the simulator and specify it for new clients via the documented `HIVE_BOOTNODE`
-environemtnal variable. This is required to make simulators fully self contained, also enabling much
+environment variable. This is required to make simulators fully self contained, also enabling much
 more complex networking scenarios not doable with forced fixed topologies.*
 
 The simulation will be considered successful if and only if the exit code of the entrypoint script
-is zero! Any output that the simulator generate will be saved to an appropriate log file in the `hive`
+is zero! Any output that the simulator generates will be saved to an appropriate log file in the `hive`
 workspace folder and also echoed out to the console on `--loglevel=6`.
 
 Closing notes:
@@ -368,9 +368,9 @@ Closing notes:
 # Continuous integration
 
 As mentioned in the beginning of this document, one of the major goals of `hive` is to support running
-the validators, simulators and benchmarks as part of an Ethereum clients' CI workflow. This is needed
+the validators, simulators and benchmarks as part of an Ethereum client's CI workflow. This is needed
 to ensure a baseline quality for implementations, particularly because developers notoriously hate the
-idea of having to do a manual testing step, heavens forbid having to install dependencies of "that"
+idea of having to do a manual testing step, heaven forbid having to install dependencies of "that"
 language.
 
 Providing detailed configuration description for multiple CI services is out of scope of this project,
@@ -396,7 +396,7 @@ machine:
 Now comes the juicy part. Although we could just simply install `hive` and run it as the main test
 step, the `circleci` service offers an interesting concept called *dependencies*. Users can define
 and install various libraries, tools, etc. that will be persisted between test runs. This is a very
-powerful feature as it allows caching all those non-chainging dependencies between CI runs and only
+powerful feature as it allows caching all those non-changing dependencies between CI runs and only
 download and rebuild those that have changed.
 
 Since `hive` is both based on docker containers that may take a non-insignificant time to build, as
@@ -404,7 +404,7 @@ well as the simulations needing a full `ethash` DAG which can take at least 5 mi
 like to cache as much as possible and only rebuild what changed.
 
 To this effect we will define two special folders we'd like to include in the `circleci` caches. One
-to collect all the docker images build by `hive`; and another to store the `ethash` DAG:
+to collect all the docker images built by `hive`; and another to store the `ethash` DAG:
 
 ```yaml
 dependencies:
@@ -450,7 +450,7 @@ the client.
 
 With the client built, we'll need to start `hive` from its repository root, specify the client image
 we want to use (e.g. `--client=go-ethereum:local`), override any files in the image (i.e. inject our
-freshly build binary `--override=$HOME/geth`) and run the whole suite (`--test=. --sim=.`).
+freshly built binary `--override=$HOME/geth`) and run the whole suite (`--test=. --sim=.`).
 
 *Note, as `circleci` seems unable to handle multiple docker containers embedded in one another, we'll
 need to specify the `--docker-noshell` flag to omit `hive`'s outer shell container. This is fine as
@@ -477,8 +477,8 @@ file being used by the `go-ethereum` client.
 
 # Trophies
 
-If you find a bug in you client implementation due to this project, please be so
-kind add add it here to the trophy list. It could help prove that `hive` is indeed
+If you find a bug in your client implementation due to this project, please be so
+kind as to add it here to the trophy list. It could help prove that `hive` is indeed
 a useful tool for validating Ethereum client implementations.
 
  * go-ethereum
