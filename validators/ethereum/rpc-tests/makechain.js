@@ -7,9 +7,9 @@ var fs = require('fs');
 var test = require("/rpc-tests/lib/tests/BlockchainTests/bcRPC_API_Test.json");
 
 // Iterate over all the blocks and export them
-fs.mkdir("/blocks")
+fs.mkdirSync("/blocks")
 
 var blocks = test.RPC_API_Test.blocks;
 for (var i = 0; i < blocks.length; i++) {
-	fs.writeFile("/blocks/" + i, new Buffer(blocks[i].rlp.substring(2), "hex"));
+	fs.writeFileSync("/blocks/" + i, new Buffer(blocks[i].rlp.substring(2), "hex"));
 }
