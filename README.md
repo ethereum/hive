@@ -137,6 +137,7 @@ The chain configurations files:
  * `/genesis.json` contains the JSON specification of the Ethereum genesis states
  * `/chain.rlp` contains a batch of RLP encoded blocks to import before startup
  * `/blocks/` folder with numbered singleton blocks to import before startup
+ * `/keys/` contains account keys that should be imported before startup
 
 Client startup scripts need to ensure that they load the genesis state first, then import a possibly
 longer blockchain and then import possibly numerous individual blocks. The reason for requiring two

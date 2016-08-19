@@ -138,16 +138,16 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	}
 	defer daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true})
 
-	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/genesis.json"); err != nil {
+	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/genesis.json", false); err != nil {
 		return nil, err
 	}
-	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/chain.rlp"); err != nil {
+	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/chain.rlp", true); err != nil {
 		return nil, err
 	}
-	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/blocks"); err != nil {
+	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/blocks", true); err != nil {
 		return nil, err
 	}
-	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/keystore"); err != nil {
+	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/keys", true); err != nil {
 		return nil, err
 	}
 
@@ -209,13 +209,17 @@ func uploadToContainer(daemon *docker.Client, id string, files []string) error {
 }
 
 // copyBetweenContainers copies a file from one docker container to another one.
-func copyBetweenContainers(daemon *docker.Client, dest, src string, path string) error {
+func copyBetweenContainers(daemon *docker.Client, dest, src string, path string, optional bool) error {
 	// Download a tarball of the file from the source container
 	tarball := new(bytes.Buffer)
 	if err := daemon.DownloadFromContainer(src, docker.DownloadFromContainerOptions{
 		Path:         path,
 		OutputStream: tarball,
 	}); err != nil {
+		// Check whether we're missing an optional file only
+		if err.(*docker.Error).Status == 404 && optional {
+			return nil
+		}
 		return err
 	}
 	// Upload the tarball into the destination container

@@ -19,8 +19,6 @@ RUN apk add --update bash curl jq
 
 # Configure the clients for the simulation
 ADD genesis.json /genesis.json
-RUN touch chain.rlp && mkdir /blocks
-
 ENV HIVE_FORK_DAO_BLOCK 128
 
 # Inject the simulator startup script and related resources

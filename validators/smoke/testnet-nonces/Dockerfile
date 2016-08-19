@@ -7,7 +7,6 @@ RUN apk add --update curl
 
 # Inject the chain definition
 ADD genesis.json /genesis.json
-RUN touch chain.rlp && mkdir /blocks
 
 # Fine tune the client parameters
 ENV HIVE_TESTNET 1

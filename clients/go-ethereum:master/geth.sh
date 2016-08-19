@@ -71,7 +71,9 @@ echo
 
 # Load the test chain if present
 echo "Loading initial blockchain..."
-/geth $FLAGS import /chain.rlp
+if [ -f /chain.rlp ]; then
+	/geth $FLAGS import /chain.rlp
+fi
 echo
 
 # Load the remainder of the test chain

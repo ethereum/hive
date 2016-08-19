@@ -2,7 +2,6 @@
 set -e
 
 # Start a new client node
-echo -n "Starting a new client..."
 id=`curl -sf -X POST $HIVE_SIMULATOR/nodes`
 echo $id
 

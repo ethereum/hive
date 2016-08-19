@@ -18,8 +18,6 @@ RUN apk add --update bash curl jq
 
 # Configure the initial setup for the individual nodes
 ADD genesis.json /genesis.json
-RUN touch chain.rlp && mkdir /blocks
-
 ENV HIVE_FORK_DAO_BLOCK 3
 
 # Add the simulation controller

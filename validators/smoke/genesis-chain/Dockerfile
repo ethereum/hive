@@ -8,7 +8,6 @@ RUN apk add --update curl
 # Inject the chain definition
 ADD genesis.json /genesis.json
 ADD chain.rlp /chain.rlp
-RUN mkdir /blocks
 
 # Inject the tester and set the entrypoint
 ADD test.sh /test.sh

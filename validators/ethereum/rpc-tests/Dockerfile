@@ -19,8 +19,6 @@ RUN sed -i -- "s#'http://localhost:8545'#'http://' + process.env.HIVE_CLIENT_IP 
 
 # Configure the blockchain for testing
 ADD genesis.json /genesis.json
-RUN touch /chain.rlp
-
 ADD makechain.js /makechain.js
 RUN nodejs /makechain.js
 
