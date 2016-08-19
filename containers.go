@@ -147,6 +147,10 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/blocks"); err != nil {
 		return nil, err
 	}
+	if err = copyBetweenContainers(daemon, c.ID, t.ID, "/keystore"); err != nil {
+		return nil, err
+	}
+
 	// Inject any explicit file overrides into the client container
 	if err := uploadToContainer(daemon, c.ID, overrideFiles); err != nil {
 		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true})
