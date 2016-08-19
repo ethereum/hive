@@ -160,6 +160,7 @@ The behavioral configuration variables:
   * `HIVE_FORK_HOMESTEAD` the block number of the Ethereum Homestead transition
   * `HIVE_FORK_DAO_BLOCK` the block number of the DAO hard-fork transition
   * `HIVE_FORK_DAO_VOTE` whether the node supports or opposes the DAO hard-fork
+  * `HIVE_KEYSTORE` custom keystore directory for node
   * `HIVE_MINER` address to credit with mining rewards (if set, start mining)
   * `HIVE_MINER_EXTRA` extra-data field to set for newly minted blocks
 

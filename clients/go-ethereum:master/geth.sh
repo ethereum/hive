@@ -14,6 +14,7 @@
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
+#  - HIVE_KEYSTORE       location for the keystore
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
@@ -38,6 +39,11 @@ if [ "$HIVE_NODETYPE" == "full" ]; then
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
 	FLAGS="$FLAGS --light"
+fi
+
+# Handle keystore location
+if [ "$HIVE_KEYSTORE" != "" ]; then
+    FLAGS="$FLAGS --keystore $HIVE_KEYSTORE"
 fi
 
 # Override any chain configs in the go-ethereum specific way
