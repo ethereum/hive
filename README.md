@@ -161,7 +161,6 @@ The behavioral configuration variables:
   * `HIVE_FORK_HOMESTEAD` the block number of the Ethereum Homestead transition
   * `HIVE_FORK_DAO_BLOCK` the block number of the DAO hard-fork transition
   * `HIVE_FORK_DAO_VOTE` whether the node supports or opposes the DAO hard-fork
-  * `HIVE_KEYSTORE` custom keystore directory for node
   * `HIVE_MINER` address to credit with mining rewards (if set, start mining)
   * `HIVE_MINER_EXTRA` extra-data field to set for newly minted blocks
 
@@ -348,10 +347,25 @@ should create and organize the simulated network. This API is exposed at the HTT
 `HIVE_SIMULATOR` environmental variable. The currently available API endpoints are:
 
  * `/nodes` with method `POST` boots up a new client instance, returning its unique ID
-   * Simulators may override any [behavioral envvars](#initializing-the-client) via `URL` and `form` parameters
+   * Simulators may override any [chain init files](#initializing-the-client) via `URL` and `form` parameters (see below)
+   * Simulators may override any [behavioral envvars](#initializing-the-client) directly via `URL` and `form` parameters
  * `/nodes/$ID` with method `GET` retrieves the IP address of an existing client instance
    * The client's exposed services can be reached via ports `8545`, `8546` and `30303`
  * `/nodes/$ID` with method `DELETE` instantly terminates an existing client instance
+
+Overriding environmental variables that change client behaviors via HTTP parameters is easy to do in
+any HTTP client utility and/or library, but uploading files needed for chain initializations is much
+more complex, especially if multiple files are needed. As long as all clients run with the same set
+of init files this is not an issue (they can be placed in the default locations). However if instances
+need to run with different initial chain setups, a simulator needs to be able to specify these per
+client. To avoid file uploads, `hive` solves this by defining a set of API variables that allow a
+simulator to specify the source paths to use for specific init files which will be extracted from the
+live container:
+
+ * `HIVE_INIT_GENESIS` path to the genesis file to seed the client with (default = "/genesis.json")
+ * `HIVE_INIT_CHAIN` path to an initial blockchain to seed the client with (default = "/chain.rlp")
+ * `HIVE_INIT_BLOCKS` path to a folder of blocks to import after seeding (default = "/blocks/")
+ * `HIVE_INIT_KEYS` path to a folder of account keys to import after init (default = "/keys/")
 
 *Note: It is up to simulators to wire the clients together. The simplest way to do this is to start
 a bootnode inside the simulator and specify it for new clients via the documented `HIVE_BOOTNODE`
