@@ -8,7 +8,6 @@ RUN apk add --update curl
 
 # Configure the initial setup for the individual nodes
 ADD genesis.json /genesis.json
-RUN touch chain.rlp && mkdir /blocks
 
 # Add the simulation controller
 ADD simulator.sh /simulator.sh

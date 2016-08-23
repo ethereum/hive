@@ -19,6 +19,7 @@ var (
 
 	validatorPattern = flag.String("test", ".", "Regexp selecting the validation tests to run")
 	simulatorPattern = flag.String("sim", "", "Regexp selecting the simulation tests to run")
+	benchmarkPattern = flag.String("bench", "", "Regexp selecting the benchmarks to run")
 
 	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 )
@@ -72,6 +73,10 @@ func mainInHost(daemon *docker.Client, overrides []string) error {
 			log15.Crit("failed to smoke-simulate client images", "error", err)
 			return err
 		}
+		if err := benchmarkClients(daemon, *clientPattern, "smoke/", overrides); err != nil {
+			log15.Crit("failed to smoke-benchmark client images", "error", err)
+			return err
+		}
 		return nil
 	}
 	// Otherwise run all requested validation and simulation tests
@@ -88,6 +93,16 @@ func mainInHost(daemon *docker.Client, overrides []string) error {
 		}
 		if err := simulateClients(daemon, *clientPattern, *simulatorPattern, overrides); err != nil {
 			log15.Crit("failed to simulate clients", "error", err)
+			return err
+		}
+	}
+	if *benchmarkPattern != "" {
+		if err := makeGenesisDAG(daemon); err != nil {
+			log15.Crit("failed generate DAG for simulations", "error", err)
+			return err
+		}
+		if err := benchmarkClients(daemon, *clientPattern, *benchmarkPattern, overrides); err != nil {
+			log15.Crit("failed to benchmark clients", "error", err)
 			return err
 		}
 	}

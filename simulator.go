@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -132,7 +131,7 @@ func startSimulatorAPI(daemon *docker.Client, client, simulator string, override
 	logger.Debug("docker bridge IP found", "ip", bridge)
 
 	// Start a tiny API webserver for simulators to coordinate with
-	logger.Debug("opening TCP socker for simulator")
+	logger.Debug("opening TCP socket for simulator")
 
 	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
 	listener, err := net.ListenTCP("tcp4", addr)
@@ -313,39 +312,4 @@ func (h *simulatorAPIHandler) Close() {
 		h.logger.Debug("deleting client container", "id", node.ID[:8])
 		h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true})
 	}
-}
-
-// lookupBridgeIP attempts to locate the IPv4 address of the local docker0 bridge
-// network adapter.
-func lookupBridgeIP(logger log15.Logger) (net.IP, error) {
-	// Find the local IPv4 address of the docker0 bridge adapter
-	interfaes, err := net.Interfaces()
-	if err != nil {
-		logger.Error("failed to list network interfaces", "error", err)
-		return nil, err
-	}
-	// Iterate over all the interfaces and find the docker0 bridge
-	for _, iface := range interfaes {
-		if iface.Name == "docker0" {
-			// Retrieve all the addresses assigned to the bridge adapter
-			addrs, err := iface.Addrs()
-			if err != nil {
-				logger.Error("failed to list docker bridge addresses", "error", err)
-				return nil, err
-			}
-			// Find a suitable IPv4 address and return it
-			for _, addr := range addrs {
-				ip, _, err := net.ParseCIDR(addr.String())
-				if err != nil {
-					logger.Error("failed to list parse address", "address", addr, "error", err)
-					return nil, err
-				}
-				if ipv4 := ip.To4(); ipv4 != nil {
-					return ipv4, nil
-				}
-			}
-		}
-	}
-	// Crap, no IPv4 found, bounce
-	return nil, errors.New("not found")
 }

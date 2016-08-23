@@ -35,24 +35,27 @@ func buildEthash(daemon *docker.Client) (string, error) {
 }
 
 // buildClients iterates over all the known clients and builds a docker image for
-// all unknown ones matching the given pattern. If nocache was requested, images
-// are attempted to be rebuilt.
+// all unknown ones matching the given pattern.
 func buildClients(daemon *docker.Client, pattern string) (map[string]string, error) {
 	return buildNestedImages(daemon, "clients", pattern, "client")
 }
 
 // buildValidators iterates over all the known validators and builds a docker image
-// for all unknown ones matching the given pattern. If nocache was requested, images
-// are attempted to be rebuilt.
+// for all unknown ones matching the given pattern.
 func buildValidators(daemon *docker.Client, pattern string) (map[string]string, error) {
 	return buildNestedImages(daemon, "validators", pattern, "validator")
 }
 
 // buildSimulators iterates over all the known simulators and builds a docker image
-// for all unknown ones matching the given pattern. If nocache was requested, images
-// are attempted to be rebuilt.
+// for all unknown ones matching the given pattern.
 func buildSimulators(daemon *docker.Client, pattern string) (map[string]string, error) {
 	return buildNestedImages(daemon, "simulators", pattern, "simulator")
+}
+
+// buildBenchmarkers iterates over all the known benchmarkers and builds a docker image
+// for all unknown ones matching the given pattern.
+func buildBenchmarkers(daemon *docker.Client, pattern string) (map[string]string, error) {
+	return buildNestedImages(daemon, "benchmarkers", pattern, "benchmarker")
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested
