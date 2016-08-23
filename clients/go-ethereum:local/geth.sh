@@ -4,8 +4,10 @@
 #
 # This script assumes the following files:
 #  - `geth` binary is located in the filesystem root
-#  - `genesis.json` file is located in the filesystem root
-#  - `chain.rlp` file is located in the filesystem root
+#  - `genesis.json` file is located in the filesystem root (mandatory)
+#  - `chain.rlp` file is located in the filesystem root (optional)
+#  - `blocks` folder is located in the filesystem root (optional)
+#  - `keys` folder is located in the filesystem root (optional)
 #
 # This script assumes the following environment variables:
 #  - HIVE_BOOTNODE       enode URL of the remote bootstrap node
@@ -14,7 +16,6 @@
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
-#  - HIVE_KEYSTORE       location for the keystore
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
@@ -39,11 +40,6 @@ if [ "$HIVE_NODETYPE" == "full" ]; then
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
 	FLAGS="$FLAGS --light"
-fi
-
-# Handle keystore location
-if [ "$HIVE_KEYSTORE" != "" ]; then
-    FLAGS="$FLAGS --keystore $HIVE_KEYSTORE"
 fi
 
 # Override any chain configs in the go-ethereum specific way
@@ -78,10 +74,17 @@ echo
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
-for block in `ls /blocks | sort -n`; do
-	/geth $FLAGS import /blocks/$block
-done
+if [ -d /blocks ]; then
+	for block in `ls /blocks | sort -n`; do
+		/geth $FLAGS import /blocks/$block
+	done
+fi
 echo
+
+# Load any keys explicitly added to the node
+if [ -d /keys ]; then
+	FLAGS="$FLAGS --keystore /keys"
+fi
 
 # Run the go-ethereum implementation with the requested flags
 if [ "$HIVE_MINER" != "" ]; then

@@ -229,7 +229,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			// Create and start a new client container
 			logger.Debug("starting new client")
-			container, err := createClientContainer(h.daemon, h.client, h.simulator, h.overrides, envs)
+			container, err := createClientContainer(h.daemon, h.client, h.simulator, h.runner, h.overrides, envs)
 			if err != nil {
 				logger.Error("failed to create client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
