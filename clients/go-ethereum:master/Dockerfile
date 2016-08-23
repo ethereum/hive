@@ -3,14 +3,15 @@
 # The build process it potentially longer running but every effort was made to
 # produce a very minimalistic container that can be reused many times without
 # needing to constantly rebuild.
-FROM alpine:3.3
+FROM alpine:3.4
 
+# Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  apk add --update go git make gcc musl-dev         && \
-  git clone https://github.com/ethereum/go-ethereum && \
-  (cd go-ethereum && make geth)                     && \
-  cp go-ethereum/build/bin/geth /geth               && \
-  apk del go git make gcc musl-dev                  && \
+  apk add --update go git make gcc musl-dev                   && \
+  git clone --depth 1 https://github.com/ethereum/go-ethereum && \
+  (cd go-ethereum && make geth)                               && \
+  cp go-ethereum/build/bin/geth /geth                         && \
+  apk del go git make gcc musl-dev                            && \
   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
 # Make sure bash and jq is available for easier wrapper implementation
