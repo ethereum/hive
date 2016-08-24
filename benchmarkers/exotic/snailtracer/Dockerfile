@@ -20,6 +20,7 @@ RUN npm install web3
 # Configure the initial setup for the individual nodes
 ADD genesis.json /genesis.json
 ADD chain.rlp /chain.rlp
+ENV HIVE_FORK_HOMESTEAD 1150000
 
 # Add the benchmark controller
 ADD benchmark.js /benchmark.js

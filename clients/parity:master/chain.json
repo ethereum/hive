@@ -1,0 +1,24 @@
+{
+  "name": "Hive",
+  "engine": {
+    "Ethash": {
+      "params": {
+        "gasLimitBoundDivisor": "0x0400",
+        "minimumDifficulty": "0x020000",
+        "difficultyBoundDivisor": "0x0800",
+        "durationLimit": "0x0a",
+        "blockReward": "0x4563918244F40000",
+        "registrar": "",
+        "frontierCompatibilityModeLimit": "0x0"
+      }
+    }
+  },
+  "params": {
+    "accountStartNonce": "0x0",
+    "maximumExtraDataSize": "0x20",
+    "minGasLimit": "0x1388",
+    "networkID" : "0x0"
+  },
+  "nodes": [],
+  "accounts": {}
+}

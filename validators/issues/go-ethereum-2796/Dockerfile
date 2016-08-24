@@ -17,6 +17,8 @@ FROM alpine:3.4
 RUN apk add --update curl jq
 
 # Inject the chain definition
+ENV HIVE_FORK_HOMESTEAD 1150000
+
 ADD genesis.json /genesis.json
 ADD chain.rlp /chain.rlp
 

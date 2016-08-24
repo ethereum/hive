@@ -22,5 +22,7 @@ ADD genesis.json /genesis.json
 ADD makechain.js /makechain.js
 RUN nodejs /makechain.js
 
+ENV HIVE_FORK_HOMESTEAD 1150000
+
 WORKDIR /rpc-tests
 ENTRYPOINT ["make", "test"]
