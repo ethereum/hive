@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -135,6 +136,7 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 			Env: []string{
 				"HIVE_CLIENT_IP=" + cip,
 				"HIVE_BENCHMARKER=http://" + bench.listener.Addr().String(),
+				"HIVE_BENCHMARKER_ITERS=" + strconv.Itoa(b.N),
 			},
 		},
 	})
