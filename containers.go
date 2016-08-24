@@ -11,6 +11,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
@@ -40,7 +41,11 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 	// Create the list of bind points to make host files available internally
 	binds := make([]string, 0, len(overrides)+2)
 	for _, override := range overrides {
-		if path, err := filepath.Abs(override); err == nil {
+		file := override
+		if strings.Contains(override, ":") {
+			file = override[strings.LastIndex(override, ":")+1:]
+		}
+		if path, err := filepath.Abs(file); err == nil {
 			binds = append(binds, fmt.Sprintf("%s:%s:ro", path, path)) // Mount to the same place, read only
 		}
 	}
@@ -178,7 +183,24 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 		return nil, err
 	}
 	// Inject any explicit file overrides into the client container
-	if err := uploadToContainer(daemon, c.ID, overrideFiles); err != nil {
+	overrides := make([]string, 0, len(overrideFiles))
+	for _, override := range overrideFiles {
+		// Split the override into a pattern/path combo
+		pattern, file := ".", override
+		if strings.Contains(override, ":") {
+			pattern = override[:strings.LastIndex(override, ":")]
+			file = override[strings.LastIndex(override, ":")+1:]
+		}
+		// If the pattern matches the client image, override the file
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, err
+		}
+		if re.MatchString(client) {
+			overrides = append(overrides, file)
+		}
+	}
+	if err := uploadToContainer(daemon, c.ID, overrides); err != nil {
 		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true})
 		return nil, err
 	}

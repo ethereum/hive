@@ -14,7 +14,7 @@ var (
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 
 	clientPattern = flag.String("client", ":master", "Regexp selecting the client(s) to run against")
-	overrideFiles = flag.String("override", "", "Comma separated files to override in client containers")
+	overrideFiles = flag.String("override", "", "Comma separated regexp:files to override in client containers")
 	smokeFlag     = flag.Bool("smoke", false, "Whether to only smoke test or run full test suite")
 
 	validatorPattern = flag.String("test", ".", "Regexp selecting the validation tests to run")
@@ -97,10 +97,6 @@ func mainInHost(daemon *docker.Client, overrides []string) error {
 		}
 	}
 	if *benchmarkPattern != "" {
-		if err := makeGenesisDAG(daemon); err != nil {
-			log15.Crit("failed generate DAG for simulations", "error", err)
-			return err
-		}
 		if err := benchmarkClients(daemon, *clientPattern, *benchmarkPattern, overrides); err != nil {
 			log15.Crit("failed to benchmark clients", "error", err)
 			return err
