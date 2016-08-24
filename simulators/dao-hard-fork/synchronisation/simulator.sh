@@ -16,7 +16,7 @@ BOOTNODE_ENODE="enode://$BOOTNODE_ENODEID@$BOOTNODE_IP:30303"
 # If looks up the IP address of the node from the hive simulator and executes the
 # actual number lookup. As the result is hex encoded, it will decode and return it.
 function ethBlockNumber {
-	local block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' $1:8545 | jq '.result' | tr -d '"'`
+	local block=`curl -sf -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' $1:8545 | jq '.result' | tr -d '"'`
 	echo $((16#${block#*x}))
 }
 

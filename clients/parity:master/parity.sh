@@ -65,7 +65,6 @@ echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
 	/parity $FLAGS import /chain.rlp
 fi
-echo
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
@@ -74,21 +73,21 @@ if [ -d /blocks ]; then
 		/parity $FLAGS import /blocks/$block
 	done
 fi
-echo
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then
 	FLAGS="$FLAGS --keys-path /keys"
 fi
 
-# Run the parity implementation with the requested flags
+# If mining was requested, fire up an ethminer instance
 if [ "$HIVE_MINER" != "" ]; then
-	FLAGS="$FLAGS --mine --minerthreads 1 --author $HIVE_MINER"
+	FLAGS="$FLAGS --author $HIVE_MINER"
+	ethminer --mining-threads 1 &
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
-	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
+	FLAGS="$FLAGS --extra-data $HIVE_MINER_EXTRA"
 fi
 
+# Run the parity implementation with the requested flags
 echo "Running parity..."
 /parity $FLAGS --nat none --jsonrpc-interface all --jsonrpc-hosts all
-echo

@@ -22,7 +22,7 @@ POST_FORK_PEERS=2 # Number of peers to require post-fork (same camp - 1)
 # If looks up the IP address of the node from the hive simulator and executes the
 # actual peer lookup. As the result is hex encoded, it will decode and return it.
 function netPeerCount {
-	local peers=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":0}' $1:8545 | jq '.result' | tr -d '"'`
+	local peers=`curl -sf -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"net_peerCount","params":[],"id":0}' $1:8545 | jq '.result' | tr -d '"'`
 	echo $((16#${peers#*x}))
 }
 
@@ -55,7 +55,7 @@ function waitPeers {
 # If looks up the IP address of the node from the hive simulator and executes the
 # actual number lookup. As the result is hex encoded, it will decode and return it.
 function ethBlockNumber {
-	local block=`curl -sf -X POST --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' $1:8545 | jq '.result' | tr -d '"'`
+	local block=`curl -sf -X POST -H "Content-Type: application/json" --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' $1:8545 | jq '.result' | tr -d '"'`
 	echo $((16#${block#*x}))
 }
 
