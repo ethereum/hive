@@ -63,14 +63,12 @@ fi
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
 /geth $FLAGS init /genesis.json
-echo
 
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
 	/geth $FLAGS import /chain.rlp
 fi
-echo
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
@@ -79,14 +77,13 @@ if [ -d /blocks ]; then
 		/geth $FLAGS import /blocks/$block
 	done
 fi
-echo
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then
 	FLAGS="$FLAGS --keystore /keys"
 fi
 
-# Run the go-ethereum implementation with the requested flags
+# Configure any mining operation
 if [ "$HIVE_MINER" != "" ]; then
 	FLAGS="$FLAGS --mine --minerthreads 1 --etherbase $HIVE_MINER"
 fi
@@ -94,6 +91,6 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
 fi
 
+# Run the go-ethereum implementation with the requested flags
 echo "Running go-ethereum..."
 /geth $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3"
-echo
