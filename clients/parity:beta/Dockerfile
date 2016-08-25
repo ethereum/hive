@@ -9,9 +9,9 @@ RUN \
   curl -sSf https://static.rust-lang.org/rustup.sh -o rustup.sh && \
   sh rustup.sh -s -- --disable-sudo                             && \
 	\
-  git clone --depth 1 https://github.com/ethcore/parity && \
-	cd parity && cargo build --release                    && \
-	strip /parity/target/release/parity                   && \
+  git clone --depth 1 --branch beta https://github.com/ethcore/parity && \
+	cd parity && cargo build --release                                  && \
+	strip /parity/target/release/parity                                 && \
 	\
 	cd / && cp /parity/target/release/parity /parity.bin && \
 	rm -rf parity && mv /parity.bin /parity              && \
