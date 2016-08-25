@@ -501,6 +501,8 @@ a useful tool for validating Ethereum client implementations.
    * Genesis chain config couldn't handle present but empty settings: [#2790](https://github.com/ethereum/go-ethereum/pull/2790)
    * Data race between remote block import and local block mining: [#2793](https://github.com/ethereum/go-ethereum/pull/2793)
    * Downloader didn't penalize incompatible forks hashly enough: [#2801](https://github.com/ethereum/go-ethereum/pull/2801)
+ * parity
+   * Returning string from a call doesn't work correctly: [#2007](https://github.com/ethcore/parity/issues/2007)
 
 # Contributions
 
