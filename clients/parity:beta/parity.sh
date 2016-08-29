@@ -41,7 +41,7 @@ accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.allo
 genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": $nonce, \"mixHash\": $mixhash}}}"`
 
 if [ "$accounts" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"accounts\": $accounts}"`
+	chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
 fi
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
