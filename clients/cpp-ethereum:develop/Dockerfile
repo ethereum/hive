@@ -46,9 +46,10 @@ RUN apk add --update bash jq
 
 # Inject the startup script
 ADD eth.sh /eth.sh
+ADD config.json /config.json
 RUN chmod +x /eth.sh
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 30303
 
-ENTRYPOINT ["eth"]
+ENTRYPOINT ["/eth.sh"]
