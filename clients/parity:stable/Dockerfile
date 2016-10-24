@@ -6,8 +6,7 @@ RUN \
   # Install parity from sources
   apt-get -y update                                             && \
   apt-get install -y curl git make g++ gcc file binutils        && \
-  curl -sSf https://static.rust-lang.org/rustup.sh -o rustup.sh && \
-  sh rustup.sh --disable-sudo                             && \
+  curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- --disable-sudo && \
 	\
   git clone --depth 1 --branch stable https://github.com/ethcore/parity && \
 	cd parity && cargo build --release                                    && \
