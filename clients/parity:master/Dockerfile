@@ -7,7 +7,7 @@ RUN \
   apt-get -y update                                             && \
   apt-get install -y curl git make g++ gcc file binutils        && \
   curl -sSf https://static.rust-lang.org/rustup.sh -o rustup.sh && \
-  sh rustup.sh -s -- --disable-sudo                             && \
+  sh rustup.sh --disable-sudo                             && \
 	\
   git clone --depth 1 https://github.com/ethcore/parity && \
 	cd parity && cargo build --release                    && \
