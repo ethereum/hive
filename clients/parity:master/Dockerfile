@@ -24,13 +24,13 @@ RUN git clone https://github.com/ethcore/parity && \
 
 # Build parity on the fly and delete all build tools afterwards
 RUN \
-  cd parity && cargo build --release
-  strip /parity/target/release/parity                                 && \
+  cd parity && cargo build --release                    && \
+  strip /parity/target/release/parity                   && \
   \
-  cd / && cp /parity/target/release/parity /parity.bin && \
+  cd / && cp /parity/target/release/parity /parity.bin  && \
   rm -rf parity && mv /parity.bin /parity
 
-RUN sh rustup.sh --uninstall --disable-sudo               && \
+RUN sh rustup.sh --uninstall --disable-sudo             && \
   apt-get remove -y curl git make g++ gcc file binutils && \
   rm -rf /root/.cargo
 
