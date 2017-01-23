@@ -38,12 +38,21 @@ genesis="${genesis/coinbase/author}"
 nonce=`echo $genesis | jq ".nonce"` && genesis=`echo $genesis | jq "del(.nonce)"`
 mixhash=`echo $genesis | jq ".mixHash"` && genesis=`echo $genesis | jq "del(.mixHash)"`
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
+builtins=`echo $genesis | jq ".extras.builtins"` && genesis=`echo $genesis | jq "del(.extras.builtins)"`
+genesis=`echo $genesis | jq "del(.extras)"`
 genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": $nonce, \"mixHash\": $mixhash}}}"`
 
 if [ "$accounts" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
 fi
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
+
+if [ "$builtins" != "" ]; then
+	for account in `echo $builtins | jq 'keys[]'`; do
+		val=`echo $builtins | jq "getpath([$account])"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", $account]; $val)"`
+	done
+fi
 
 if [ "$HIVE_TESTNET" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`

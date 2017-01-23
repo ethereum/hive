@@ -57,7 +57,8 @@ if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": true}"`
 fi
 if [ "$chainconfig" != "{}" ]; then
-	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
+	genesis=`cat /genesis.json | jq "del(.extras)"`
+	genesis=`echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json`
 fi
 
 # Initialize the local testchain with the genesis state
