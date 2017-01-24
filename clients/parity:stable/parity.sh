@@ -26,7 +26,7 @@ set -e
 if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
 else
-	FLAGS="$FLAGS --no-network"
+	FLAGS="$FLAGS --nodiscover"
 fi
 
 # Configure and set the chain definition for the node
