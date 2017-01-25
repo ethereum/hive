@@ -7,19 +7,27 @@ from web3 import Web3, RPCProvider
 
 from collections import defaultdict
 
-class HiveNode(object):
+# Some utilities
 
-    def __init__(self, nodeId, nodeIp):
-        self.nodeId =nodeId
-        self.ip = nodeIp
-        self.web3 = Web3(RPCProvider(host=self.ip, port="8545"))
+def canonicalize(v):
+    if type(v) == str:
+        if v.startswith("0x"):
+            return v.lower()
 
-    
+def getFiles(root):
+    print("Root %s" % root)
+    counter = 0
+    for subdir, dirs, files in os.walk(root):
+        print("subdir %s" % subdir)
+        for fil in files:
+            filepath = subdir + os.sep + fil
+            if filepath.endswith(".json"):
+                yield filepath 
+                counter = counter +1
+            if counter == 10:
+                return
 
-    def __str__(self):
-        return "Node[%s]@%s"%(self.nodeId, self.ip)
-
-
+# Model for the testcases
 
 class Testfile(object):
 
@@ -40,7 +48,7 @@ class Testcase(object):
     def __init__(self,name, jsondata):
         self.name = name
         self.data = jsondata
-
+        self.raw_genesis = None
     def __str__(self):
         return self.name
 
@@ -53,25 +61,27 @@ class Testcase(object):
                 print("Missing key %s" % k)
         return len(missing_keys) == 0
 
-    def genesis(self):
+    def genesis(self, key = None):
         # Genesis block
-        raw_genesis = self.data['genesisBlockHeader']
-        # The pre-section
+        if self.raw_genesis is None:
+            raw_genesis = self.data['genesisBlockHeader']
 
-#                "pre" : {
-#            "a94f5374fce5edbc8e2a8697c15331677e6ebf0b" : {
-#                "balance" : "0x09184e72a000",
-#                "code" : "0x",
-#                "nonce" : "0x00",
-#                "storage" : {
-#                }
-#            }
-        #alloc = {}
-        #for address, acct in self.data['pre'].items()
-        #    alloc[address]
-        raw_genesis['alloc'] = self.data['pre']
-        return raw_genesis
+            # Turns out the testcases have noncewritten as 0102030405060708. 
+            # Which is supposed to be interpreted as 0x0102030405060708. 
+            # But if it's written as 0102030405060708 in the genesis file, 
+            # it's interpreted differently. So we'll need to mod that on the fly 
+            # for every testcase.
+            nonce = raw_genesis[u'nonce']
+            if not raw_genesis[u'nonce'][:2] == '0x':
+                raw_genesis[u'nonce'] = '0x'+raw_genesis[u'nonce']
 
+            raw_genesis['alloc'] = self.data['pre']
+            self.raw_genesis = raw_genesis
+
+        if key is None:
+            return self.raw_genesis
+
+        return self.raw_genesis[key]
 
     def blocks(self):
         return self.data['blocks']
@@ -83,18 +93,27 @@ class Testcase(object):
 
         return None
 
-def getFiles(root):
-    print("Root %s" % root)
-    counter = 0
-    for subdir, dirs, files in os.walk(root):
-        print("subdir %s" % subdir)
-        for fil in files:
-            filepath = subdir + os.sep + fil
-            if filepath.endswith(".json"):
-                yield filepath 
-                counter = counter +1
-            if counter == 10:
-                return
+# Model for the Hive interaction
+
+class HiveNode(object):
+
+    def __init__(self, nodeId, nodeIp):
+        self.nodeId =nodeId
+        self.ip = nodeIp
+        self.web3 = Web3(RPCProvider(host=self.ip, port="8545"))
+
+
+    def invokeRPC(self,method, arguments):
+        """ Can be used to call things not implemented in web3. 
+        Example:         
+            invokeRPC("debug_traceTransaction", [txHash, traceOpts]))
+        """
+        return self.web3._requestManager.request_blocking(method, arguments)
+
+
+
+    def __str__(self):
+        return "Node[%s]@%s"%(self.nodeId, self.ip)
 
 class HiveAPI(object):
     
@@ -150,12 +169,15 @@ class HiveAPI(object):
         if testcase.blocks() is not None:
             for block in testcase.blocks():
                 counter = 1
-                b_file = "./artefacts/%s/blocks/%d.rlp" % (testcase, int(block['blocknumber']))
+                b_file = "./artefacts/%s/blocks/%d.rlp" % (testcase, counter)
                 binary_string = binascii.unhexlify(block['rlp'][2:])
                 with open(b_file,"wb+") as outf:
                     outf.write(binary_string)
+                counter = counter +1
 
         return (g_file, c_file, b_folder)
+
+
 
     def executeBlocktest(self,testcase):
 
@@ -178,31 +200,41 @@ class HiveAPI(object):
         node = self.newNode(params)
 
         print("Started node %s" % node)
-        import time
-        print("Sleeping 10 seconds")
-        time.sleep(10)
-        print("Latest block:")
-        latest =  node.web3.eth.getBlock("latest")
-        print(latest)
-        print("Hash: %s"  % latest[u'hash'])
-        print("Should be ")
-        print(testcase.genesis()[u'hash'])
+        #import time
+        #print("Sleeping 10 seconds")
+        #time.sleep(10)
+
+        print "Verifying preconditions"
 
 
-        print("Balance ")
-        print node.web3.eth.getBalance("0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b")
+        first =  node.web3.eth.getBlock(0)
+        err = False
 
-        print("Code ")
-        print node.web3.eth.getCode("0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b")
+        def _assertEq(v,exp,msg):
+            if canonicalize(v) != canonicalize(exp):
+                print("Assertion error: %s" % msg)
+                print("Found %s"  % v)
+                print("Expected %s" % exp) 
+                return False
+            return True
 
-        print("Empty Code:")
-        print node.web3.eth.getCode("0x1111111111122222222222333333444444444455")
-        
-        print("Nonce: ")
-        print node.web3.eth.getTransactionCount("0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b")
+        if not _assertEq(first[u'hash'], testcase.genesis('hash'),"Hash incorrect"):
+            print(first)
+            err = True
 
-        print("Quitting...")
-        sys.exit(1)
+        if not _assertEq(first[u'stateRoot'], testcase.genesis('stateRoot'),"State differs"):
+            print("State dump: (geth only)")
+            print node.invokeRPC("debug_dumpBlock", [0])
+            err = True
+
+        if err: 
+            return False
+
+
+        print("Verified 'pre'")
+        return True
+        #node.web3.query(debug_dumpBlock")
+
 
     def newNode(self, params):
 
