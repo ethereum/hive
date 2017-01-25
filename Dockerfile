@@ -53,4 +53,4 @@ RUN \
 ENTRYPOINT ["hive.sh"]
 
 # Inject all other runtime resources (modified most frequently)
-ADD . $GOPATH/src/github.com/karalabe/hive
+COPY . $GOPATH/src/github.com/karalabe/hive
