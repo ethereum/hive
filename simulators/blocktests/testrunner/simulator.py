@@ -185,6 +185,14 @@ class Testcase(object):
         for msg in self.msg:
             print("  %s" % msg)
 
+    def status(self):
+
+        if self._skipped:
+            return "skipped"
+        if self._success:
+            return "success"
+
+        return "failed"
 
 # Model for the Hive interaction
 class HiveNode(object):
@@ -239,18 +247,19 @@ class HiveAPI(object):
         requests.post("%s/logs" % (self.hive_simulator ), data = msg) 
 
 
-    def blockTests(self):
+    def blockTests(self, start = 0, end = 1000000000000000000):
+
+        count = 0
 
         for testfile in getFiles("./tests/BlockchainTests"):
-            
-#            if testfile != "./tests/BlockchainTests/bcWalletTest.json":
-            if testfile != "./tests/BlockchainTests/bcInvalidRLPTest.json":
+            count = count +1
+            if count < start:
                 continue
-
+            if count >= end:
+                break
             tf = Testfile(testfile)
-            self.log("Commencing tests in %s\n " % tf)
+            self.log("Commencing testfile [%d] (%s)\n " % (count, tf))
             for testcase in tf.tests() :
-                self.log(" Performing test: %s" % testcase)
                 (ok, err) = testcase.validate()
 
                 if ok:
@@ -259,8 +268,11 @@ class HiveAPI(object):
                     self.log("Skipped test %s" % testcase )
                     testcase.skipped(["Testcase failed initial validation", err])
 
+                self.log("Test: %s %s (%s)" % (testfile, testcase, testcase.status()))
+
                 #testcase.report()
             tf.report()
+            count = count +1
             
 
 
@@ -326,23 +338,24 @@ class HiveAPI(object):
         try:
             node = self.newNode(params)
         except Exception, e:
-            testcase.fail("Failed to start node (%s)" % str(e))
+            testcase.fail(["Failed to start node (%s)" % str(e)])
             return False
 
 
-        self.log("Started node %s" % node)
+        #self.log("Started node %s" % node)
 
         try:
             (ok, err ) = self.verifyPreconditions(testcase, node)
 
             if not ok:
-                testcase.fail("Preconditions failed", err)
+
+                testcase.fail(["Preconditions failed"].extend(err))
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
 
             if not ok: 
-                testcase.fail("Postcondition check failed", err)
+                testcase.fail(["Postcondition check failed"].extend(err))
 
             testcase.success()
             return True
@@ -463,7 +476,7 @@ def main(args):
     print("Hive simulator: %s\n" % hivesim)
     hive = HiveAPI(hivesim)
 
-    hive.blockTests()
+    hive.blockTests(start = 3)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
