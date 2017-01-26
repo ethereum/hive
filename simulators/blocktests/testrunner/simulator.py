@@ -10,9 +10,11 @@ from collections import defaultdict
 # Some utilities
 
 def canonicalize(v):
-    if type(v) == str:
+    if type(v) == str or type(v) == unicode:
+        v = v.lower()
         if v.startswith("0x"):
-            return v.lower()
+            return str(v[2:])
+    return v
 
 def getFiles(root):
     print("Root %s" % root)
@@ -27,21 +29,56 @@ def getFiles(root):
             if counter == 10:
                 return
 
+def hex2big(txt):
+    txt = canonicalize(txt)
+    print("txt: %s (%s)" % (str(txt), type(txt)))
+    return int(txt,16)
+
 # Model for the testcases
 
 class Testfile(object):
 
     def __init__(self,fname):
         self.filename = fname
+        self._tests = []
 
     def tests(self):
         with open(self.filename,"r") as infile: 
             json_data = json.load(infile)
             for k,v in json_data.items():
-                yield Testcase(k,v)
+                t = Testcase(k,v)
+                self._tests.append(t)
+                yield t
+
+    def report(self):
+        skipped = []
+        failed = []
+        success = []
+        for test in self._tests:
+            if test.wasSkipped(): 
+                skipped.append(test)
+            elif not test.wasSuccessfull():
+                failed.append(test)
+            else:
+                success.append(test)
+
+        print("#  %s\n" % self.filename )
+        print("Success: %d / Fail: %d / Skipped: %d\n" % (len(success), len(failed), len(skipped)))
+
+        def x(l,title):
+            if len(l) > 0:
+                print("## %s\n" % title)
+                for test in l:
+                    print("  * %s" % test)
+
+        x(failed , "Failed")
+        x(skipped, "Skipped")
+        x(success, "Successfull")
 
     def __str__(self):
         return self.filename
+
+
 
 class Testcase(object):
 
@@ -49,6 +86,8 @@ class Testcase(object):
         self.name = name
         self.data = jsondata
         self.raw_genesis = None
+        self._skipped = True
+        self._message = ""
     def __str__(self):
         return self.name
 
@@ -83,6 +122,20 @@ class Testcase(object):
 
         return self.raw_genesis[key]
 
+    def postconditions(self, key = None):
+        postconditions = self.data['postState']
+
+        if key is None:
+            return self.data['postState']
+
+
+        if self.has_postcondition(key):
+            return self.data['postState'][key]
+
+        return None
+    def has_postcondition(self, key):
+        return self.data['postState'].has_key(key)
+
     def blocks(self):
         return self.data['blocks']
 
@@ -93,8 +146,45 @@ class Testcase(object):
 
         return None
 
-# Model for the Hive interaction
+    def fail(self, message):
+        """Set if this test failed"""
+        self._success = True
+        self._message = message
+        self._skipped = False
+    
+    def success(self, message = ""):
+        self._success = True
+        self._message = message
+        self._skipped = False
 
+    def skipped(self, message = ""):
+        self._skipped = True
+        self._message = message
+
+
+    def wasSuccessfull(self):
+        return bool(self._success)
+
+    def wasSkipped(self):
+        return self._skipped
+
+    def report(self):
+        if self.wasSkipped():
+            print("%s: Skipped")
+            for msg in self.msg:
+                print("  %s" % msg)
+            return
+
+        if self.wasSuccessfull():
+            print("%s: Ok." % self.name)
+            return
+
+        print("%s: Failed" % self.name)
+        for msg in self.msg:
+            print("  %s" % msg)
+
+
+# Model for the Hive interaction
 class HiveNode(object):
 
     def __init__(self, nodeId, nodeIp):
@@ -138,15 +228,37 @@ class HiveAPI(object):
             raise Exception("Failed to POST req (%d)" % req.status_code)
         return req.text
 
+    def _delete(self,path, params = None):
+        req = requests.delete("%s%s" % (self.hive_simulator , path),  params=params)
+        
+        if req.status_code != 200:
+            print("!! Error killing client")
+            print(req.text)
+            print("--------------------")
+            raise Exception("Failed to DELETE req (%d)" % req.status_code)
+
+        return req.text
+
+    def log(self,msg):
+        requests.post("%s/logs" % (self.hive_simulator ), data = msg) 
+
 
     def blockTests(self):
         for testfile in getFiles("./tests/BlockchainTests"):
             tf = Testfile(testfile)
             print("Testfile %s" % tf)
             for testcase in tf.tests() :
-                print("Test: %s" % testcase)
+                print(" Test: %s" % testcase)
                 if testcase.validate():
                     self.executeBlocktest(testcase)
+                else:
+                    print("Skipped test %s" % testcase )
+                    testcase.skipped("Testcase failed initial validation")
+
+                testcase.report()
+            tf.report()
+            return
+
 
     def generateArtefacts(self,testcase):
         try:
@@ -163,78 +275,155 @@ class HiveAPI(object):
         if testcase.genesis() is not None:
             with open(g_file,"w+") as g:
                 json.dump(testcase.genesis(),g)
-#        if testcase.chain() is not None:
-#            with open(c_file,"w+") as g:
-#                json.dump(testcase.chain(),g)
+
         if testcase.blocks() is not None:
+            counter = 1
             for block in testcase.blocks():
-                counter = 1
-                b_file = "./artefacts/%s/blocks/%d.rlp" % (testcase, counter)
+                
+                b_file = "./artefacts/%s/blocks/%04d.rlp" % (testcase, counter)
                 binary_string = binascii.unhexlify(block['rlp'][2:])
                 with open(b_file,"wb+") as outf:
                     outf.write(binary_string)
                 counter = counter +1
+
+# Maybe do it all in one go: 
+#        if testcase.blocks() is not None:
+#            b_file = "./artefacts/%s/blocks/blocks.rlp" % (testcase)
+#            with open(b_file,"wb+") as outf:
+#                for block in testcase.blocks():
+#                    binary_string = binascii.unhexlify(block['rlp'][2:])
+#                    outf.write(binary_string)
+#
+
 
         return (g_file, c_file, b_folder)
 
 
 
     def executeBlocktest(self,testcase):
-
-
         (genesis, init_chain, blocks ) = self.generateArtefacts(testcase)
-
-
-        print("Running test %s" % testcase)
 
         #HIVE_INIT_GENESIS path to the genesis file to seed the client with (default = "/genesis.json")
         #HIVE_INIT_CHAIN path to an initial blockchain to seed the client with (default = "/chain.rlp")
         #HIVE_INIT_BLOCKS path to a folder of blocks to import after seeding (default = "/blocks/")
         #HIVE_INIT_KEYS path to a folder of account keys to import after init (default = "/keys/")
         params = {
-            "HIVE_INIT_GENESIS" : genesis, 
-           # "HIVE_INIT_BLOCKS" : blocks,
+            "HIVE_INIT_GENESIS": genesis, 
+            "HIVE_INIT_BLOCKS" : blocks,
 #             "HIVE_INIT_CHAIN" : chain,
         }
 
         node = self.newNode(params)
 
-        print("Started node %s" % node)
-        #import time
-        #print("Sleeping 10 seconds")
-        #time.sleep(10)
+        self.log("Started node %s" % node)
 
-        print "Verifying preconditions"
+        try:
+            (ok, err ) = self.verifyPreconditions(testcase, node)
 
-
-        first =  node.web3.eth.getBlock(0)
-        err = False
-
-        def _assertEq(v,exp,msg):
-            if canonicalize(v) != canonicalize(exp):
-                print("Assertion error: %s" % msg)
-                print("Found %s"  % v)
-                print("Expected %s" % exp) 
+            if not ok:
+                testcase.failed("Preconditions failed", err)
                 return False
+
+            (ok, err) = self.verifyPostconditions(testcase, node)
+
+            if not ok: 
+                testcase.failed("Postcondition check failed", err)
+
+            testcase.success()
             return True
 
-        if not _assertEq(first[u'hash'], testcase.genesis('hash'),"Hash incorrect"):
-            print(first)
-            err = True
-
-        if not _assertEq(first[u'stateRoot'], testcase.genesis('stateRoot'),"State differs"):
-            print("State dump: (geth only)")
-            print node.invokeRPC("debug_dumpBlock", [0])
-            err = True
-
-        if err: 
-            return False
+        finally:
+            self.killNode(node)
 
 
-        print("Verified 'pre'")
-        return True
-        #node.web3.query(debug_dumpBlock")
 
+    def verifyPreconditions(self, testcase, node):
+        """ Verify preconditions 
+        @return (bool isOk, list of error messags) 
+        """
+
+        first =  node.web3.eth.getBlock(0)
+        errs = []
+
+        def _verifyEq(v,exp):
+            v = canonicalize(v)
+            exp = canonicalize(exp)
+            if v != exp:
+                return "Found %s, expected %s"  % (v, exp)
+            return None
+
+        err = _verifyEq(first[u'hash'], testcase.genesis('hash'))
+
+              # Check hash
+        if err is not None:
+            errs.append("Hash error")
+            errs.append(err)
+
+            
+        # Check stateroot (only needed if hash failed really...)
+        state_err = _verifyEq(first[u'stateRoot'],testcase.genesis('stateRoot'))
+        if state_err is not None:
+            errs.append("State differs")
+            errs.append(state_err)
+        
+        return (len(errs) == 0, errs)
+
+
+    def verifyPostconditions(self, testcase, node):
+        """ Verify postconditions 
+        @return (bool isOk, list of error messags) 
+        """
+        errs = []
+        def _verifyEqRaw(v,exp):
+            if v != exp:
+                return "Found %s, expected %s"  % (v, exp)
+            return None
+
+        def _verifyEqHex(v,exp):
+            if canonicalize(v) != canonicalize(exp):
+                return "Found %s, expected %s"  % (v, exp)
+            return True
+
+
+        for address, account in testcase.postconditions().items():
+            # Actual values
+            _n = node.web3.eth.getTransactionCount(address)
+            _c = node.web3.eth.getCode(address)
+            _b = node.web3.eth.getBalance(address)
+            # Expected values
+
+            if testcase.has_postcondition("nonce"):
+                exp = hex2big(testcase.postconditions("nonce"))
+                err = _verifyEqRaw(_n, exp)
+                if err is not None:
+                    errs.append("Nonce error (%s)" % address)
+                    errs.append(err)
+
+            if testcase.has_postcondition("code"):
+                exp = testcase.postconditions("code")
+                err = _verifyEqRaw(_n, exp)
+                if err is not None:
+                    errs.append("Code error (%s)" % address)
+                    errs.append(err)
+
+            if testcase.has_postcondition("balance"):
+                exp = hex2big(testcase.postconditions("balance"))
+                err = _verifyEqRaw(_n, exp)
+                if err is not None:
+                    errs.append("Balance error (%s)" % address)
+                    errs.append(err)
+
+            if testcase.has_postcondition("storage"):
+                # Must iterate over storage
+                for _hash,exp in account[key].items():
+                    value = node.web3.eth.getState(address, _hash )
+
+                    err = _verifyEqHex(value, exp)
+                    if err is not None:
+                        errs.append("Storage error (%s) key %s" % (address, _hash))
+                        errs.append(err)
+
+        return (len(errs) == 0, errs)
 
     def newNode(self, params):
 
@@ -249,7 +438,8 @@ class HiveAPI(object):
                 if count == 10:
                     raise e
 
-
+    def killNode(self,node):
+        self._delete("/nodes/%s" % node.nodeId)
 
 
 
