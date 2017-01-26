@@ -62,7 +62,7 @@ class Testfile(object):
             else:
                 success.append(test)
 
-        print("#  %s\n" % self.filename )
+        print("\n#  %s\n" % self.filename )
         print("Success: %d / Fail: %d / Skipped: %d\n" % (len(success), len(failed), len(skipped)))
 
         def x(l,title):
@@ -131,12 +131,11 @@ class Testcase(object):
             return self.data['postState']
 
 
-        if self.has_postcondition(key):
+        if key in self.data['poststate']:
             return self.data['postState'][key]
 
         return None
-    def has_postcondition(self, key):
-        return self.data['postState'].has_key(key)
+
 
     def blocks(self):
         return self.data['blocks']
@@ -150,7 +149,7 @@ class Testcase(object):
 
     def fail(self, message):
         """Set if this test failed"""
-        self._success = True
+        self._success = False
         self._message = message
         self._skipped = False
     
@@ -182,7 +181,7 @@ class Testcase(object):
             return
 
         print("%s: Failed" % self.name)
-        for msg in self.msg:
+        for msg in self._message:
             print("  %s" % msg)
 
     def status(self):
@@ -246,6 +245,10 @@ class HiveAPI(object):
     def log(self,msg):
         requests.post("%s/logs" % (self.hive_simulator ), data = msg) 
 
+    def debugp(self, msg):
+        self.log(msg)
+#        print(msg)
+
 
     def blockTests(self, start = 0, end = 1000000000000000000):
 
@@ -257,6 +260,7 @@ class HiveAPI(object):
                 continue
             if count >= end:
                 break
+
             tf = Testfile(testfile)
             self.log("Commencing testfile [%d] (%s)\n " % (count, tf))
             for testcase in tf.tests() :
@@ -270,7 +274,9 @@ class HiveAPI(object):
 
                 self.log("Test: %s %s (%s)" % (testfile, testcase, testcase.status()))
 
-                #testcase.report()
+                testcase.report()
+                break
+
             tf.report()
             count = count +1
             
@@ -353,9 +359,11 @@ class HiveAPI(object):
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
+            self.debugp("verifyPostconditions returned %s" % ok)
 
             if not ok: 
                 testcase.fail(["Postcondition check failed"].extend(err))
+                return False
 
             testcase.success()
             return True
@@ -413,39 +421,59 @@ class HiveAPI(object):
             return None
 
 
-        for address, account in testcase.postconditions().items():
+        for address, poststate_account in testcase.postconditions().items():
             # Actual values
-            _n = node.web3.eth.getTransactionCount(address)
-            _c = node.web3.eth.getCode(address)
-            _b = node.web3.eth.getBalance(address)
+            _n = None
+            _c = None
+            _b = None
+            # Parity fails otherwise...
+            if address[:2] != "0x":
+                address = "0x%s" % address
+
+            try:
+                _n = node.web3.eth.getTransactionCount(address)
+                _c = node.web3.eth.getCode(address)
+                _b = node.web3.eth.getBalance(address)
+            except Exception, e:
+                errs.append("Postcondition verification failed %s" % str(e))
+                return (False, errs)
+
+
             # Expected values
 
-            if testcase.has_postcondition("nonce"):
-                exp = hex2big(testcase.postconditions("nonce"))
+            if 'nonce' in poststate_account:
+                exp = hex2big(poststate_account["nonce"])
                 err = _verifyEqRaw(_n, exp)
+                self.debugp("Postcond check nonce %s = %s => %s" % (_n, exp, err))
                 if err is not None:
                     errs.append("Nonce error (%s)" % address)
                     errs.append(err)
+            else:
+                self.debugp("No nonce in postcond ")
 
-            if testcase.has_postcondition("code"):
-                exp = testcase.postconditions("code")
-                err = _verifyEqRaw(_n, exp)
+
+            if 'code' in poststate_account:
+                exp = poststate_account["code"]
+                err = _verifyEqRaw(_c, exp)
+                self.debugp("Postcond check code %s = %s => %s" % (_c, exp, err))
                 if err is not None:
                     errs.append("Code error (%s)" % address)
                     errs.append(err)
 
-            if testcase.has_postcondition("balance"):
-                exp = hex2big(testcase.postconditions("balance"))
-                err = _verifyEqRaw(_n, exp)
+
+            if 'balance' in poststate_account:
+                exp = hex2big(poststate_account["balance"])
+                err = _verifyEqRaw(_b, exp)
+                self.debugp("Postcond check balance %s = %s => %s" % (_b, exp, err))
                 if err is not None:
                     errs.append("Balance error (%s)" % address)
                     errs.append(err)
 
-            if testcase.has_postcondition("storage"):
+            if 'storage' in poststate_account:
                 # Must iterate over storage
-                for _hash,exp in account[key].items():
+                self.debugp("Postcond check balance")
+                for _hash,exp in poststate_account['storage'].items():
                     value = node.web3.eth.getState(address, _hash )
-
                     err = _verifyEqHex(value, exp)
                     if err is not None:
                         errs.append("Storage error (%s) key %s" % (address, _hash))
@@ -476,7 +504,7 @@ def main(args):
     print("Hive simulator: %s\n" % hivesim)
     hive = HiveAPI(hivesim)
 
-    hive.blockTests(start = 3)
+    hive.blockTests(start = 0, end=2)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
