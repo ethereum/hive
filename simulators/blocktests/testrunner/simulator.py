@@ -31,7 +31,7 @@ def getFiles(root):
 
 def hex2big(txt):
     txt = canonicalize(txt)
-    print("txt: %s (%s)" % (str(txt), type(txt)))
+
     return int(txt,16)
 
 # Model for the testcases
@@ -87,18 +87,20 @@ class Testcase(object):
         self.data = jsondata
         self.raw_genesis = None
         self._skipped = True
-        self._message = ""
+        self._message = []
+
     def __str__(self):
         return self.name
 
     def validate(self):
-        required_keys = ["pre","blocks","genesisRLP","postState","genesisBlockHeader"]
+        required_keys = ["pre","blocks","postState","genesisBlockHeader"]
         missing_keys = []
         for k in required_keys:
             if k not in self.data.keys():
                 missing_keys.append(k)
-                print("Missing key %s" % k)
-        return len(missing_keys) == 0
+
+        
+        return (len(missing_keys) == 0 ,"Missing keys: %s" % (",".join(missing_keys))) 
 
     def genesis(self, key = None):
         # Genesis block
@@ -152,12 +154,12 @@ class Testcase(object):
         self._message = message
         self._skipped = False
     
-    def success(self, message = ""):
+    def success(self, message = []):
         self._success = True
         self._message = message
         self._skipped = False
 
-    def skipped(self, message = ""):
+    def skipped(self, message = []):
         self._skipped = True
         self._message = message
 
@@ -214,7 +216,6 @@ class HiveAPI(object):
     def _get(self,path, params = None):
         req = requests.get("%s%s" % (self.hive_simulator , path),  params=params)
         if req.status_code != 200:
-            print(req.text)
             raise Exception("Failed to GET req (%d)" % req.status_code)
         return req.text
     
@@ -222,19 +223,14 @@ class HiveAPI(object):
         req = requests.post("%s%s" % (self.hive_simulator , path),  params=params)
         
         if req.status_code != 200:
-            print("!! Error starting client")
-            print(req.text)
-            print("--------------------")
             raise Exception("Failed to POST req (%d)" % req.status_code)
+
         return req.text
 
     def _delete(self,path, params = None):
         req = requests.delete("%s%s" % (self.hive_simulator , path),  params=params)
         
         if req.status_code != 200:
-            print("!! Error killing client")
-            print(req.text)
-            print("--------------------")
             raise Exception("Failed to DELETE req (%d)" % req.status_code)
 
         return req.text
@@ -244,20 +240,28 @@ class HiveAPI(object):
 
 
     def blockTests(self):
+
         for testfile in getFiles("./tests/BlockchainTests"):
+            
+#            if testfile != "./tests/BlockchainTests/bcWalletTest.json":
+            if testfile != "./tests/BlockchainTests/bcInvalidRLPTest.json":
+                continue
+
             tf = Testfile(testfile)
-            print("Testfile %s" % tf)
+            self.log("Commencing tests in %s\n " % tf)
             for testcase in tf.tests() :
-                print(" Test: %s" % testcase)
-                if testcase.validate():
+                self.log(" Performing test: %s" % testcase)
+                (ok, err) = testcase.validate()
+
+                if ok:
                     self.executeBlocktest(testcase)
                 else:
-                    print("Skipped test %s" % testcase )
-                    testcase.skipped("Testcase failed initial validation")
+                    self.log("Skipped test %s" % testcase )
+                    testcase.skipped(["Testcase failed initial validation", err])
 
-                testcase.report()
+                #testcase.report()
             tf.report()
-            return
+            
 
 
     def generateArtefacts(self,testcase):
@@ -278,8 +282,7 @@ class HiveAPI(object):
 
         if testcase.blocks() is not None:
             counter = 1
-            for block in testcase.blocks():
-                
+            for block in testcase.blocks():                
                 b_file = "./artefacts/%s/blocks/%04d.rlp" % (testcase, counter)
                 binary_string = binascii.unhexlify(block['rlp'][2:])
                 with open(b_file,"wb+") as outf:
@@ -292,8 +295,8 @@ class HiveAPI(object):
 #            with open(b_file,"wb+") as outf:
 #                for block in testcase.blocks():
 #                    binary_string = binascii.unhexlify(block['rlp'][2:])
-#                    outf.write(binary_string)
-#
+#                   outf.write(binary_string)
+
 
 
         return (g_file, c_file, b_folder)
@@ -301,8 +304,15 @@ class HiveAPI(object):
 
 
     def executeBlocktest(self,testcase):
-        (genesis, init_chain, blocks ) = self.generateArtefacts(testcase)
+        genesis = None
+        init_chain = None
+        blocks = None
 
+        try:
+            (genesis, init_chain, blocks ) = self.generateArtefacts(testcase)
+        except Exception, e:
+            testcase.fail(["Failed to write test data to disk", str(e)])
+            return False
         #HIVE_INIT_GENESIS path to the genesis file to seed the client with (default = "/genesis.json")
         #HIVE_INIT_CHAIN path to an initial blockchain to seed the client with (default = "/chain.rlp")
         #HIVE_INIT_BLOCKS path to a folder of blocks to import after seeding (default = "/blocks/")
@@ -312,8 +322,13 @@ class HiveAPI(object):
             "HIVE_INIT_BLOCKS" : blocks,
 #             "HIVE_INIT_CHAIN" : chain,
         }
+        node = None
+        try:
+            node = self.newNode(params)
+        except Exception, e:
+            testcase.fail("Failed to start node (%s)" % str(e))
+            return False
 
-        node = self.newNode(params)
 
         self.log("Started node %s" % node)
 
@@ -321,13 +336,13 @@ class HiveAPI(object):
             (ok, err ) = self.verifyPreconditions(testcase, node)
 
             if not ok:
-                testcase.failed("Preconditions failed", err)
+                testcase.fail("Preconditions failed", err)
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
 
             if not ok: 
-                testcase.failed("Postcondition check failed", err)
+                testcase.fail("Postcondition check failed", err)
 
             testcase.success()
             return True
@@ -382,7 +397,7 @@ class HiveAPI(object):
         def _verifyEqHex(v,exp):
             if canonicalize(v) != canonicalize(exp):
                 return "Found %s, expected %s"  % (v, exp)
-            return True
+            return None
 
 
         for address, account in testcase.postconditions().items():
@@ -426,17 +441,9 @@ class HiveAPI(object):
         return (len(errs) == 0, errs)
 
     def newNode(self, params):
-
-        count = 0
-        while count < 10:
-            count = count +1
-            try:
-                _id = self._post("/nodes", params)
-                _ip = self._get("/nodes/%s" % _id)
-                return HiveNode(_id, _ip)
-            except Exception, e:
-                if count == 10:
-                    raise e
+        _id = self._post("/nodes", params)
+        _ip = self._get("/nodes/%s" % _id)
+        return HiveNode(_id, _ip)
 
     def killNode(self,node):
         self._delete("/nodes/%s" % node.nodeId)
@@ -457,39 +464,6 @@ def main(args):
     hive = HiveAPI(hivesim)
 
     hive.blockTests()
-
-
-#    c = hive.newNode()
-#    print("Got client %s\n" % c)
-#
-#    client =c.ethClient()
-#
-#    print(client.make_request("personal_importRawKey",[
-#        "0000000000000000000000000000000000000001", "pass"]))
-#    coinbase = client.get_coinbase()
-#
-#    print(client.make_request("personal_listAccounts",[]))
-#
-#    # Fill up pending
-#    for i in range(0,60):
-#        client.make_request("personal_signAndSendTransaction",[
-#                {
-#                    "from":coinbase, 
-#                    "to":"0x0000000000000000000000000000000000000000", 
-#                    "value":1, 
-#                },
-#                "pass"      
-#            ])
-#        if i % 100 == 0:
-#            print(".\n")
-#    #Fill up future
-#
-#
-#    txpool =  client.make_request("txpool_content",[])
-#    pending = json.loads(txpool)['result'].pending
-#    queued = json.loads(txpool)['result'].pending
-#    print("Pending %d, Queued %d\n" , len(pending), len(queued))
-
 
 if __name__ == '__main__':
     main(sys.argv[1:])
