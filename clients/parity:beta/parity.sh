@@ -60,6 +60,9 @@ fi
 echo $chainconfig > /chain.json
 FLAGS="$FLAGS --chain /chain.json"
 
+# Don't immediately abort, some imports are meant to fail
+set +e
+
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
@@ -73,6 +76,9 @@ if [ -d /blocks ]; then
 		/parity $FLAGS import /blocks/$block
 	done
 fi
+
+# Immediately abort the script on any error encountered
+set -e
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then

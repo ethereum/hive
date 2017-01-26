@@ -64,6 +64,9 @@ fi
 echo "Initializing database with genesis state..."
 /geth $FLAGS init /genesis.json
 
+# Don't immediately abort, some imports are meant to fail
+set +e
+
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
@@ -77,6 +80,8 @@ if [ -d /blocks ]; then
 		/geth $FLAGS import /blocks/$block
 	done
 fi
+
+set -e
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then
