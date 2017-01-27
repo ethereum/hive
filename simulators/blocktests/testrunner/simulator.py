@@ -258,7 +258,7 @@ class HiveAPI(object):
 #        print(msg)
 
 
-    def blockTests(self, start = 0, end = 1000000000000000000):
+    def blockTests(self, start = 0, end = 1000000000000000000, whitelist = [], blacklist =[]):
 
         count = 0
 
@@ -272,6 +272,15 @@ class HiveAPI(object):
             tf = Testfile(testfile)
             self.log("Commencing testfile [%d] (%s)\n " % (count, tf))
             for testcase in tf.tests() :
+
+                if len(whitelist) > 0 and str(testcase) not in whitelist:
+                    testcase.skipped(["Testcase not in whitelist"])
+                    continue
+
+                if len(blacklist) > 0 and str(testcase) in blacklist:
+                    testcase.skipped(["Testcase in blacklist"])
+                    continue
+
                 (ok, err) = testcase.validate()
 
                 if ok:
@@ -464,7 +473,6 @@ class HiveAPI(object):
                 #schecked_conditions.add('nonce')
                 exp = hex2big(poststate_account["nonce"])
                 err = _verifyEqRaw(_n, exp)
- #               self.debugp("Postcond check nonce %s = %s => %s" % (_n, exp, err)
                 if err is not None:
                     errs.append("Nonce error (%s)" % address)
                     errs.append(err)
@@ -473,7 +481,6 @@ class HiveAPI(object):
                 checked_conditions.add('code')
                 exp = poststate_account["code"]
                 err = _verifyEqRaw(_c, exp)
-#                self.debugp("Postcond check code %s = %s => %s" % (_c, exp, err)
                 if err is not None:
                     errs.append("Code error (%s)" % address)
                     errs.append(err)
@@ -483,7 +490,6 @@ class HiveAPI(object):
                 checked_conditions.add('balance')
                 exp = hex2big(poststate_account["balance"])
                 err = _verifyEqRaw(_b, exp)
- #               self.debugp("Postcond check balance %s = %s => %s" % (_b, exp,err)
                 if err is not None:
                     errs.append("Balance error (%s)" % address)
                     errs.append(err)
@@ -583,7 +589,7 @@ def main(args):
     print("Hive simulator: %s\n" % hivesim)
     hive = HiveAPI(hivesim)
 
-    hive.blockTests(start = 0, end=2)
+    hive.blockTests(start = 0, end=2, blacklist = ["newChainFrom6Block"])
 
 if __name__ == '__main__':
     main(sys.argv[1:])
