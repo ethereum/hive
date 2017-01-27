@@ -60,6 +60,9 @@ fi
 echo $chainconfig > /chain.json
 FLAGS="$FLAGS --chain /chain.json"
 
+echo "Using the following chain config"
+cat /chain.json
+
 # Don't immediately abort, some imports are meant to fail
 set +e
 
