@@ -67,7 +67,7 @@ class Testfile(object):
 
         def x(l,title):
             if len(l) > 0:
-                print("## %s\n" % title)
+                print("\n## %s\n" % title)
                 for test in l:
                     print("* %s" % test.getReport())
 
@@ -349,7 +349,10 @@ class HiveAPI(object):
         params = {
             "HIVE_INIT_GENESIS": genesis, 
             "HIVE_INIT_BLOCKS" : blocks,
-            "HIVE_FORK_HOMESTEAD" : "00",
+            # These tests run with Frontier rules
+            "HIVE_FORK_HOMESTEAD" : "20000",
+            "HIVE_FORK_TANGERINE" : "20000",
+            "HIVE_FORK_SPURIOUS"  : "20000",
 #             "HIVE_INIT_CHAIN" : chain,
         }
         node = None
@@ -432,8 +435,12 @@ class HiveAPI(object):
                 return "Found `%s`, expected `%s`"  % (v, exp)
             return None
 
-
         for address, poststate_account in testcase.postconditions().items():
+            
+            # Keep track of what we check, so we don't miss any postconditions
+
+            checked_conditions = set()
+            should_check = set(poststate_account.keys())
             # Actual values
             _n = None
             _c = None
@@ -454,31 +461,35 @@ class HiveAPI(object):
             # Expected values
 
             if 'nonce' in poststate_account:
+                #schecked_conditions.add('nonce')
                 exp = hex2big(poststate_account["nonce"])
                 err = _verifyEqRaw(_n, exp)
-                self.debugp("Postcond check nonce %s = %s => %s" % (_n, exp, err))
+ #               self.debugp("Postcond check nonce %s = %s => %s" % (_n, exp, err)
                 if err is not None:
                     errs.append("Nonce error (%s)" % address)
                     errs.append(err)
 
             if 'code' in poststate_account:
+                checked_conditions.add('code')
                 exp = poststate_account["code"]
                 err = _verifyEqRaw(_c, exp)
-                self.debugp("Postcond check code %s = %s => %s" % (_c, exp, err))
+#                self.debugp("Postcond check code %s = %s => %s" % (_c, exp, err)
                 if err is not None:
                     errs.append("Code error (%s)" % address)
                     errs.append(err)
 
 
             if 'balance' in poststate_account:
+                checked_conditions.add('balance')
                 exp = hex2big(poststate_account["balance"])
                 err = _verifyEqRaw(_b, exp)
-                self.debugp("Postcond check balance %s = %s => %s" % (_b, exp, err))
+ #               self.debugp("Postcond check balance %s = %s => %s" % (_b, exp,err)
                 if err is not None:
                     errs.append("Balance error (%s)" % address)
                     errs.append(err)
 
             if 'storage' in poststate_account:
+                checked_conditions.add('storage')
                 # Must iterate over storage
                 self.debugp("Postcond check balance")
                 for _hash,exp in poststate_account['storage'].items():
@@ -487,6 +498,11 @@ class HiveAPI(object):
                     if err is not None:
                         errs.append("Storage error (%s) key %s" % (address, _hash))
                         errs.append(err)
+
+            missing_checks = should_check.difference(checked_conditions)
+
+            if len(missing_checks) > 0:
+                self.log("Error: Missing postcond checks: %s" % ",".join(missing_checks))
 
         return (len(errs) == 0, errs)
 
