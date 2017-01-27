@@ -45,6 +45,8 @@ if [ "$accounts" != "" ]; then
 fi
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
+# See https://github.com/ethcore/parity/wiki/Consensus-Engines for info about options
+
 if [ "$HIVE_TESTNET" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
 	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do
@@ -53,12 +55,29 @@ if [ "$HIVE_TESTNET" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x789b0\")"`
 fi
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-	HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x$HIVE_FORK_HOMESTEAD\")"`
+	HEX_HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; $HIVE_FORK_HOMESTEAD)"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x$HEX_HIVE_FORK_HOMESTEAD\")"`
 fi
+if [ "$HIVE_FORK_TANGERINE" != "" ]; then
+	HIVE_FORK_TANGERINE=`echo "obase=10; $HIVE_FORK_TANGERINE" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip150Transition\"]; $HIVE_FORK_TANGERINE )"`
+fi
+
+if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
+	HIVE_FORK_SPURIOUS=`echo "obase=10; $HIVE_FORK_SPURIOUS" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip155Transition\"]; $HIVE_FORK_SPURIOUS)"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip160Transition\"]; $HIVE_FORK_SPURIOUS)"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161abcTransition\"]; $HIVE_FORK_SPURIOUS)"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161dTransition\"]; $HIVE_FORK_SPURIOUS)"`
+fi
+
 
 echo $chainconfig > /chain.json
 FLAGS="$FLAGS --chain /chain.json"
+
+echo "Using the following chain config"
+cat /chain.json
 
 # Don't immediately abort, some imports are meant to fail
 set +e
