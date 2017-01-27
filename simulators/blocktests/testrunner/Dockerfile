@@ -8,12 +8,9 @@ RUN apk add --update curl git && \
   git clone --depth 1 https://github.com/ethereum/tests.git
 
 
-RUN echo "2"
-# Configure the initial setup for the individual nodes
-
 # Add the simulation controller
 ADD simulator.sh /simulator.sh
 RUN chmod +x /simulator.sh
-ADD simulator.py /simulator.py
+COPY *.py /
 
 ENTRYPOINT ["python","/simulator.py"]
