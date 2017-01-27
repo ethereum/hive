@@ -33,7 +33,7 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 	if err != nil {
 		return nil, err
 	}
-	for _, dir := range []string{"docker", "ethash", "logs"} {
+	for _, dir := range []string{"docker", "ethash", "logs","reports"} {
 		if err := os.MkdirAll(filepath.Join(pwd, "workspace", dir), os.ModePerm); err != nil {
 			return nil, err
 		}
@@ -53,6 +53,7 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 		fmt.Sprintf("%s/workspace/docker:/var/lib/docker", pwd),                                       // Surface any docker-in-docker data caches
 		fmt.Sprintf("%s/workspace/ethash:/gopath/src/github.com/karalabe/hive/workspace/ethash", pwd), // Surface any generated DAGs from the shell
 		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/karalabe/hive/workspace/logs", pwd),     // Surface all the log files from the shell
+		fmt.Sprintf("%s/workspace/reports:/gopath/src/github.com/karalabe/hive/workspace/reports", pwd),     // Surface all the log files from the shell
 	}...)
 
 	// Create and return the actual docker container

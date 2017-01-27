@@ -16,6 +16,11 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
+// hiveReportsFolder is the directory in which to place runtime reports from each of
+// the docker containers.
+
+var hiveReportsFolder = filepath.Join("workspace", "reports")
+
 // simulateClients runs a batch of simulation tests matched by simulatorPattern
 // against all clients matching clientPattern.
 func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string) error {
@@ -184,6 +189,10 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	case "GET":
 		// Information retrieval, fetch whatever's needed and return it
 		switch {
+		case r.URL.Path == "/clientinfo":
+			
+			fmt.Fprintf(w, "%s", strings.TrimPrefix(h.client, "hive/clients/"))
+
 		case r.URL.Path == "/docker":
 			// Docker infos requested, gather and send them back
 			info, err := h.daemon.Info()
@@ -218,8 +227,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 
 	case "POST":
 		// Data mutation, execute the request and return the results
-		switch r.URL.Path {
-		case "/nodes":
+		switch {
+		case r.URL.Path == "/nodes":
 			// A new node startup was requested, fetch any envvar overrides from simulators
 			r.ParseForm()
 			envs := make(map[string]string)
@@ -270,9 +279,23 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			fmt.Fprintf(w, "%s", container.ID[:8])
 			return
 
-		case "/logs":
+		case r.URL.Path == "/logs":
 			body, _ := ioutil.ReadAll(r.Body)
 			h.logger.Info("message from simulator", "log", string(body))
+
+		case strings.HasPrefix(r.URL.Path, "/report/"):
+
+			body, _ := ioutil.ReadAll(r.Body)
+			filename := fmt.Sprintf("%s_%s", time.Now().Format("20060102150405"),strings.TrimPrefix(r.URL.Path, "/report/"))
+			fullpath := filepath.Join(hiveReportsFolder, filename)
+			if err := ioutil.WriteFile(fullpath, body,0644); err != nil{
+				logger.Error("failed writing report","err", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+
+			}else{
+				h.logger.Info("report written" ,"path", fullpath)
+			}
+
 
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
