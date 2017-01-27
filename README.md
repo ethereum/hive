@@ -159,7 +159,11 @@ The behavioral configuration variables:
     * If `full`, assumes fast sync and consecutive pruning of historical state
     * If `light`, assumes header only sync and no state maintenance at all
   * `HIVE_FORK_HOMESTEAD` the block number of the Ethereum Homestead transition
-  * `HIVE_FORK_DAO_BLOCK` the block number of the DAO hard-fork transition
+  * `HIVE_FORK_TANGERINE` the block number of the Ethereum TangerineWhistle transition
+    * The HF for repricing certain opcodes, EIP 150
+  * `HIVE_FORK_SPURIOUS` the block number of the Ethereum Homestead transition
+    * The HF for replay protection, state cleaning etc. EIPs 155,160,161. 
+    * `HIVE_FORK_DAO_BLOCK` the block number of the DAO hard-fork transition
   * `HIVE_FORK_DAO_VOTE` whether the node supports or opposes the DAO hard-fork
   * `HIVE_MINER` address to credit with mining rewards (if set, start mining)
   * `HIVE_MINER_EXTRA` extra-data field to set for newly minted blocks
