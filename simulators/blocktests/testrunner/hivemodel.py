@@ -8,9 +8,10 @@ from utils import canonicalize, getFiles, hex2big
 # Model for the Hive interaction
 class HiveNode(object):
 
-    def __init__(self, nodeId, nodeIp):
+    def __init__(self, nodeId, nodeIp, clienttype="N/A"):
         self.nodeId =nodeId
         self.ip = nodeIp
+        self.client = clienttype
         self.web3 = Web3(RPCProvider(host=self.ip, port="8545"))
 
 
@@ -31,6 +32,9 @@ class HiveAPI(object):
     def __init__(self, hive_simulator):
         self.nodes = []
         self.hive_simulator = hive_simulator
+        self.clienttype = self._get("/clientinfo")
+        self.log("HiveAPI using %s" % self.clienttype)
+
 
     def _get(self,path, params = None):
         req = requests.get("%s%s" % (self.hive_simulator , path),  params=params)
@@ -61,6 +65,8 @@ class HiveAPI(object):
         self.log(msg)
 #        print(msg)
 
+    def sendReport(self, fname, data):
+        requests.post("%s/report/%s" % (self.hive_simulator,fname), data = data)
 
     def blockTests(self, start = 0, end = 1000000000000000000, whitelist = [], blacklist =[]):
 
@@ -96,10 +102,11 @@ class HiveAPI(object):
 
                 self.log("Test: %s %s (%s)" % (testfile, testcase, testcase.status()))
 
-                testcase.report()
+                #testcase.report()
                 #break
 
-            tf.report()
+            r = tf.getReport(self.clienttype)
+            self.sendReport("%s.md" % self.clienttype.replace(":","-"),r)
             count = count +1
             
 
@@ -110,8 +117,8 @@ class HiveAPI(object):
            os.makedirs("./artefacts/%s/blocks/" % testcase)
            os.makedirs("./artefacts/%s/" % testcase)
         except Exception, e:
-            print("Exception creating directory:%s " % e)
-            #pass
+            #print("Exception creating directory:%s " % e)
+            pass
 
         g_file = "./artefacts/%s/genesis.json" % testcase
         c_file = "./artefacts/%s/chain.rlp" % testcase
@@ -168,7 +175,7 @@ class HiveAPI(object):
             "HIVE_FORK_HOMESTEAD" : "20000",
             "HIVE_FORK_TANGERINE" : "20000",
             "HIVE_FORK_SPURIOUS"  : "20000",
-#             "HIVE_INIT_CHAIN" : chain,
+
         }
         node = None
         try:
@@ -178,9 +185,10 @@ class HiveAPI(object):
             return False
 
 
-        #self.log("Started node %s" % node)
+        self.log("Started node %s" % node)
 
         try:
+            testcase.setNodeInfo(str(node))
             (ok, err ) = self.verifyPreconditions(testcase, node)
 
             if not ok:
@@ -321,7 +329,7 @@ class HiveAPI(object):
     def newNode(self, params):
         _id = self._post("/nodes", params)
         _ip = self._get("/nodes/%s" % _id)
-        return HiveNode(_id, _ip)
+        return HiveNode(_id, _ip, self.clienttype)
 
     def killNode(self,node):
         self._delete("/nodes/%s" % node.nodeId)

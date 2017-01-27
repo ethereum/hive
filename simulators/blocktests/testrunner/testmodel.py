@@ -15,7 +15,9 @@ class Testfile(object):
                 self._tests.append(t)
                 yield t
 
-    def report(self):
+    def getReport(self, clienttype):
+        outp = []
+
         skipped = []
         failed = []
         success = []
@@ -27,20 +29,22 @@ class Testfile(object):
             else:
                 success.append(test)
 
-        print("\n#  %s\n" % self )
-        print("Success: %d / Fail: %d / Skipped: %d\n" % (len(success), len(failed), len(skipped)))
+        outp.append("\n# %s %s\n" % (clienttype, self) )
+        outp.append("Success: %d / Fail: %d / Skipped: %d\n" % (len(success), len(failed), len(skipped)))
 
         def x(l,title):
             if len(l) > 0:
-                print("\n## %s\n" % title)
+                outp.append("\n## %s\n" % title)
                 for test in l:
-                    print("* %s" % test.getReport())
+                    outp.append("* %s" % test.getReport())
 
 
         x(failed , "Failed")
         x(skipped, "Skipped")
         x(success, "Successfull")
 
+        return "\n".join(outp)
+        
     def __str__(self):
         return "File `%s`" % self.filename
 
@@ -54,9 +58,13 @@ class Testcase(object):
         self.raw_genesis = None
         self._skipped = True
         self._message = []
+        self.nodeInfo = "N/A"
 
     def __str__(self):
         return self.name
+
+    def setNodeInfo(self, nodeInfo):
+        self.nodeInfo = nodeInfo
 
     def validate(self):
         required_keys = ["pre","blocks","postState","genesisBlockHeader"]
@@ -154,7 +162,14 @@ class Testcase(object):
 
         if self._message is not None:
             for msg in self._message:
-                outp.append("   * %s" % str(msg))
+                if type(msg) == list:
+                    for _m in msg: 
+                        outp.append("    * %s" % str(_m))
+                else:
+                    outp.append("   * %s" % str(msg))
+  
+            outp.append("  * Executed on %s" % self.nodeInfo)
+
         return "\n".join(outp)
 
     def status(self):

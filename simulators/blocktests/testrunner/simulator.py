@@ -33,12 +33,19 @@ class HiveTestNode(HiveNode):
 
 
     def __str__(self):
-        return "Node[%s]@%s"%(self.nodeId, self.ip)
+        return "Node[test]@test"
 
 class HiveTestAPI(HiveAPI):
 
     def __init__(self):
         super(HiveAPI, self).__init__()
+        self.clienttype = "N/A"
+
+    def _get(self,path, params = None):
+        return "foo"
+
+    def _post(self,path, params = None):
+        return "foo"
 
     def newNode(self, params):
         return HiveTestNode()
@@ -50,6 +57,9 @@ class HiveTestAPI(HiveAPI):
 
     def log(self,msg):
         print("LOG: %s" % msg)
+    def sendReport(self,fname,data):
+        print("Would save report (%s)" % fname)
+        print(data)
 
 def test():
     hive = HiveTestAPI()
@@ -65,7 +75,7 @@ def main(args):
     print("Hive simulator: %s\n" % hivesim)
     hive = HiveAPI(hivesim)
 
-    hive.blockTests(start = 7, end=200, blacklist = ["newChainFrom6Block"])
+    hive.blockTests(start = 7, end=200, whitelist = ["newChainFrom6Block"])
 
 if __name__ == '__main__':
     main(sys.argv[1:])
