@@ -4,7 +4,7 @@ import binascii
 import json
 import requests
 from web3 import Web3, RPCProvider
-
+import traceback
 from collections import defaultdict
 
 # Some utilities
@@ -151,6 +151,9 @@ class Testcase(object):
         """Set if this test failed"""
         self._success = False
         self._message = message
+
+        print("testcase.fail(%s) called" % (self._message))
+
         self._skipped = False
     
     def success(self, message = []):
@@ -168,6 +171,7 @@ class Testcase(object):
 
     def wasSkipped(self):
         return self._skipped
+
 
     def report(self):
         if self.wasSkipped():
@@ -329,15 +333,19 @@ class HiveAPI(object):
         try:
             (genesis, init_chain, blocks ) = self.generateArtefacts(testcase)
         except Exception, e:
+            traceback.print_exc(file=sys.stdout)
             testcase.fail(["Failed to write test data to disk", str(e)])
             return False
         #HIVE_INIT_GENESIS path to the genesis file to seed the client with (default = "/genesis.json")
         #HIVE_INIT_CHAIN path to an initial blockchain to seed the client with (default = "/chain.rlp")
         #HIVE_INIT_BLOCKS path to a folder of blocks to import after seeding (default = "/blocks/")
         #HIVE_INIT_KEYS path to a folder of account keys to import after init (default = "/keys/")
+
+        #HIVE_FORK_HOMESTEAD
         params = {
             "HIVE_INIT_GENESIS": genesis, 
             "HIVE_INIT_BLOCKS" : blocks,
+            "HIVE_FORK_HOMESTEAD" : "00",
 #             "HIVE_INIT_CHAIN" : chain,
         }
         node = None
@@ -355,14 +363,14 @@ class HiveAPI(object):
 
             if not ok:
 
-                testcase.fail(["Preconditions failed"].extend(err))
+                testcase.fail(["Preconditions failed",err])
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
             self.debugp("verifyPostconditions returned %s" % ok)
 
             if not ok: 
-                testcase.fail(["Postcondition check failed"].extend(err))
+                testcase.fail(["Postcondition check failed",err])
                 return False
 
             testcase.success()
@@ -448,9 +456,6 @@ class HiveAPI(object):
                 if err is not None:
                     errs.append("Nonce error (%s)" % address)
                     errs.append(err)
-            else:
-                self.debugp("No nonce in postcond ")
-
 
             if 'code' in poststate_account:
                 exp = poststate_account["code"]
@@ -490,6 +495,60 @@ class HiveAPI(object):
         self._delete("/nodes/%s" % node.nodeId)
 
 
+# Model for the Hive interaction
+
+class FakeEth():
+    def getTransactionCount(arg):
+        return 10000
+    def getBalance(arg):
+        return 1000
+    def getCode(arg):
+        return "0xDEADBEEF"
+    def getBlock(arg,arg2):
+        return {u'hash':"0x0000", u'stateRoot':"0x0102030405060708"}
+
+class FakeWeb3():
+    def __init__(self):
+        self.eth = FakeEth()
+
+class HiveTestNode(HiveNode):
+
+    def __init__(self, nodeId = None, nodeIp = None):
+        self.nodeId ="Testnode"
+        self.web3 = FakeWeb3()
+
+
+    def invokeRPC(self,method, arguments):
+        """ Can be used to call things not implemented in web3. 
+        Example:         
+            invokeRPC("debug_traceTransaction", [txHash, traceOpts]))
+        """
+        return self.web3._requestManager.request_blocking(method, arguments)
+
+
+
+    def __str__(self):
+        return "Node[%s]@%s"%(self.nodeId, self.ip)
+
+class HiveTestAPI(HiveAPI):
+
+    def __init__(self):
+        super(HiveAPI, self).__init__()
+
+    def newNode(self, params):
+        return HiveTestNode()
+
+    def killNode(self, node):
+        pass
+    def generateArtefacts(self,testcase):
+        return (None, None, None)
+
+    def log(self,msg):
+        print("LOG: %s" % msg)
+
+def test():
+    hive = HiveTestAPI()
+    hive.blockTests()
 
 def main(args):
     print("Validator started\n")
@@ -508,4 +567,4 @@ def main(args):
 
 if __name__ == '__main__':
     main(sys.argv[1:])
-
+    #test()
