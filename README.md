@@ -356,6 +356,8 @@ should create and organize the simulated network. This API is exposed at the HTT
  * `/nodes/$ID` with method `GET` retrieves the IP address of an existing client instance
    * The client's exposed services can be reached via ports `8545`, `8546` and `30303`
  * `/nodes/$ID` with method `DELETE` instantly terminates an existing client instance
+ * `/log` with method `POST` sends a logging message from the simulator to the main process.
+ 
 
 Overriding environmental variables that change client behaviors via HTTP parameters is easy to do in
 any HTTP client utility and/or library, but uploading files needed for chain initializations is much
