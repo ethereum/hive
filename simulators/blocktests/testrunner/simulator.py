@@ -62,21 +62,22 @@ class Testfile(object):
             else:
                 success.append(test)
 
-        print("\n#  %s\n" % self.filename )
+        print("\n#  %s\n" % self )
         print("Success: %d / Fail: %d / Skipped: %d\n" % (len(success), len(failed), len(skipped)))
 
         def x(l,title):
             if len(l) > 0:
                 print("## %s\n" % title)
                 for test in l:
-                    print("  * %s" % test)
+                    print("* %s" % test.getReport())
+
 
         x(failed , "Failed")
         x(skipped, "Skipped")
         x(success, "Successfull")
 
     def __str__(self):
-        return self.filename
+        return "File `%s`" % self.filename
 
 
 
@@ -151,9 +152,6 @@ class Testcase(object):
         """Set if this test failed"""
         self._success = False
         self._message = message
-
-        print("testcase.fail(%s) called" % (self._message))
-
         self._skipped = False
     
     def success(self, message = []):
@@ -174,19 +172,25 @@ class Testcase(object):
 
 
     def report(self):
+        if self.wasSuccessfull():
+            print("%s: Success" % self.name)
+            return
+
         if self.wasSkipped():
             print("%s: Skipped")
-            for msg in self.msg:
-                print("  %s" % msg)
-            return
-
-        if self.wasSuccessfull():
-            print("%s: Ok." % self.name)
-            return
-
-        print("%s: Failed" % self.name)
+        else:
+            print("%s: Failed" % self.name)
+        
         for msg in self._message:
             print("  %s" % msg)
+
+    def getReport(self):
+        outp = ["%s (%s)" % (self.name, self.status())]
+
+        if self._message is not None:
+            for msg in self._message:
+                outp.append("   * %s" % str(msg))
+        return "\n".join(outp)
 
     def status(self):
 
@@ -279,7 +283,7 @@ class HiveAPI(object):
                 self.log("Test: %s %s (%s)" % (testfile, testcase, testcase.status()))
 
                 testcase.report()
-                break
+                #break
 
             tf.report()
             count = count +1
@@ -393,7 +397,7 @@ class HiveAPI(object):
             v = canonicalize(v)
             exp = canonicalize(exp)
             if v != exp:
-                return "Found %s, expected %s"  % (v, exp)
+                return "Found `%s`, expected `%s`"  % (v, exp)
             return None
 
         err = _verifyEq(first[u'hash'], testcase.genesis('hash'))
@@ -420,12 +424,12 @@ class HiveAPI(object):
         errs = []
         def _verifyEqRaw(v,exp):
             if v != exp:
-                return "Found %s, expected %s"  % (v, exp)
+                return "Found `%s`, expected `%s`"  % (v, exp)
             return None
 
         def _verifyEqHex(v,exp):
             if canonicalize(v) != canonicalize(exp):
-                return "Found %s, expected %s"  % (v, exp)
+                return "Found `%s`, expected `%s`"  % (v, exp)
             return None
 
 
