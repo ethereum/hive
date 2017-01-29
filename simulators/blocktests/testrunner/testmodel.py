@@ -58,13 +58,17 @@ class Testcase(object):
         self.raw_genesis = None
         self._skipped = True
         self._message = []
-        self.nodeInfo = "N/A"
+        self.nodeInstance = "N/A"
+        self.clientType = "N/A"
 
     def __str__(self):
         return self.name
 
-    def setNodeInfo(self, nodeInfo):
-        self.nodeInfo = nodeInfo
+    def setNodeInstance(self, instanceId):
+        self.nodeInstance = instanceId
+
+    def setClientType(self, clienttype):
+        self.clientType = clienttype
 
     def validate(self):
         required_keys = ["pre","blocks","postState","genesisBlockHeader"]

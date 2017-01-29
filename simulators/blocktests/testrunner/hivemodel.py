@@ -5,13 +5,34 @@ import binascii
 import json
 from testmodel import Testcase, Testfile
 from utils import canonicalize, getFiles, hex2big
+import time
+
+class ReportCollector(object):
+    
+
+    def __init__(self):
+        self.data = { "meta" : [], "results" : []}
+
+
+    def addResult(self,obj):
+        self.data['results'].append(obj)
+
+    def addMeta(self, k,v):
+        self.data['meta'].append([k,v])
+
+    def getResults(self):
+        self.addMeta("Execution end", time.asctime( time.localtime(time.time())))
+        return json.dumps(self.data)
+
+reporter = ReportCollector()
+
 # Model for the Hive interaction
 class HiveNode(object):
 
     def __init__(self, nodeId, nodeIp, clienttype="N/A"):
         self.nodeId =nodeId
         self.ip = nodeIp
-        self.client = clienttype
+        self.clienttype = clienttype
         self.web3 = Web3(RPCProvider(host=self.ip, port="8545"))
 
 
@@ -25,7 +46,7 @@ class HiveNode(object):
 
 
     def __str__(self):
-        return "Node[%s]@%s"%(self.nodeId, self.ip)
+        return "Node[%s]@%s" % (self.nodeId, self.ip)
 
 class HiveAPI(object):
     
@@ -101,15 +122,24 @@ class HiveAPI(object):
                     testcase.skipped(["Testcase failed initial validation", err])
 
                 self.log("Test: %s %s (%s)" % (testfile, testcase, testcase.status()))
+                reporter.addResult({
+                    "testname"  : testcase.name, 
+                    "filename"  : tf.name, 
+                    "client"    : self.clienttype,
+                    "status"    : testcase.status(),
+                    "message"   : testcase._message,
+                    "instance"  : testcase.nodeInstance,
+                    })
 
                 #testcase.report()
-                #break
+                break
 
-            r = tf.getReport(self.clienttype)
-            self.sendReport("%s.md" % self.clienttype.replace(":","-"),r)
+#            r = tf.getReport(self.clienttype)
+#            self.sendReport("%s.md" % self.clienttype.replace(":","-"),r)
             count = count +1
+        
+        self.sendReport("data.jsonp", "onData(%s);" % reporter.getResults())
             
-
 
     def generateArtefacts(self,testcase):
         try:
@@ -188,7 +218,8 @@ class HiveAPI(object):
         self.log("Started node %s" % node)
 
         try:
-            testcase.setNodeInfo(str(node))
+            testcase.setNodeInstance(node.nodeId)
+            testcase.setClientType(node.clienttype)
             (ok, err ) = self.verifyPreconditions(testcase, node)
 
             if not ok:

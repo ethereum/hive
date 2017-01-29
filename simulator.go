@@ -286,9 +286,17 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		case strings.HasPrefix(r.URL.Path, "/report/"):
 
 			body, _ := ioutil.ReadAll(r.Body)
-			filename := fmt.Sprintf("%s_%s", time.Now().Format("20060102150405"),strings.TrimPrefix(r.URL.Path, "/report/"))
-			fullpath := filepath.Join(hiveReportsFolder, filename)
-			if err := ioutil.WriteFile(fullpath, body,0644); err != nil{
+//			filename := fmt.Sprintf("%s_%s", time.Now().Format("20060102150405"),strings.TrimPrefix(r.URL.Path, "/report/"))
+			//filename := fmt.Sprintf()
+
+			fullpath := filepath.Join(hiveReportsFolder, strings.TrimPrefix(r.URL.Path, "/report/"))
+
+			if err := os.MkdirAll(filepath.Dir(fullpath), os.ModePerm); err != nil {
+				logger.Error("failed writing report","err", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
+
+			if err := ioutil.WriteFile(fullpath, body, 0644); err != nil{
 				logger.Error("failed writing report","err", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 
