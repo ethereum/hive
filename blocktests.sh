@@ -1,6 +1,6 @@
 #!/bin/bash
 
-hive -sim blocktest -test none -client *:master  > tmp.json
+hive -sim blocktest -test none -client .*:master  > tmp.json
 
 #Some quirk in hive is makinga '.' appear on the std out.
 # We'll just work around it for now...
