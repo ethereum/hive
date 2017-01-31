@@ -81,15 +81,16 @@ def main(args):
     print("Hive simulator: %s\n" % hivesim)
     hive = hivemodel.HiveAPI(hivesim)
 
-    #executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_FRONTIER)
-
-    #hive.blockTests(start = 0, testfiles= utils.getFiles("./tests/BlockchainTests"), executor = executor)
+    executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_FRONTIER)
+    hive.blockTests(start = 0, testfiles= utils.getFiles("./tests/BlockchainTests"), executor = executor)
 #        whitelist = ["newChainFrom6Block"])
 
     executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE)
 
-
-    status = hive.blockTests(start = 0, testfiles= utils.getFiles("./tests/BlockchainTests/EIP150"),executor = executor)
+    status = hive.blockTests(start = 0, 
+        testfiles= utils.getFiles("./tests/BlockchainTests/EIP150"),
+        executor = executor)
+#        whitelist=["SuicideIssue"])
 
     if not status:
         sys.exit(-1)
