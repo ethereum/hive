@@ -28,7 +28,6 @@ RUN \
 # Make sure bash and jq is available for easier wrapper implementation
 RUN apt-get install -y bash jq bc
 
-
 # Inject the startup script and associated resources
 ADD parity.sh /parity.sh
 RUN chmod +x /parity.sh
