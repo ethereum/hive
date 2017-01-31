@@ -1,14 +1,25 @@
 #!/bin/bash
 
-hive -sim blocktest -test none -client .*:master  -loglevel 6
-curl -L https://github.com/holiman/testreport_template/archive/0.1.tar.gz | tar -xvz
+hive -sim blocktest -test none -client .*:master  -loglevel 6 > data.json
+curl -o tmp.zip -L https://github.com/holiman/testreport_template/archive/master.zip && unzip tmp.zip && rm tmp.zip
 
 REPORTDIR="`pwd`/testreport"
 NOW=$(date +"%Y-%d-%m_%H-%M-%S")
 
-mv ./testreport_template-0.1 $REPORTDIR
-cp -r ./workspace/logs $REPORTDIR/
-cp  ./workspace/reports/*.json $REPORTDIR/
-cp  ./workspace/reports/*.jsonp $REPORTDIR/
-tar -cvzf $NOW.tar.gz $REPORTDIR 
-echo "Report generated into $REPORTDIR and $NOW.tar.gz.\nCheck out file://$REPORTDIR/index.html"
+mv ./testreport_template-master/ $REPORTDIR
+cp -r ./workspace/logs/simulations/ $REPORTDIR 
+
+
+
+
+#Create jsonp aswell
+echo "onData(" > data.jsonp
+cat data.json >> data.jsonp
+echo ");" >> data.jsonp
+
+mv  data.jsonp $REPORTDIR/
+mv  data.json $REPORTDIR/
+
+tar -cvzf $NOW.tar.gz -C $REPORTDIR . # && rm -rf $REPORTDIR
+ 
+echo "Report generated into $NOW.tar.gz"
