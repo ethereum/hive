@@ -218,10 +218,6 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	case "GET":
 		// Information retrieval, fetch whatever's needed and return it
 		switch {
-		case r.URL.Path == "/clientinfo":
-			
-			fmt.Fprintf(w, "%s", strings.TrimPrefix(h.client, "hive/clients/"))
-
 		case r.URL.Path == "/docker":
 			// Docker infos requested, gather and send them back
 			info, err := h.daemon.Info()

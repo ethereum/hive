@@ -25,21 +25,8 @@ RUN \
   add-apt-repository ppa:ethereum/ethereum      && \
   apt-get -y update && apt-get install -y ethminer
 
-# Fetch parity and dependencies
-RUN git clone https://github.com/ethcore/parity && \
-  cd parity && cargo fetch 
-
-# Build parity on the fly and delete all build tools afterwards
-RUN \
-  cd parity && git checkout stable && cargo build --release && \
-  strip /parity/target/release/parity                       && \
-  \
-  cd / && cp /parity/target/release/parity /parity.bin      && \
-  rm -rf parity && mv /parity.bin /parity
-
-RUN sh rustup.sh --uninstall --disable-sudo                 && \
-  apt-get remove -y curl git make g++ gcc file binutils     && \
-  rm -rf /root/.cargo
+# Make sure bash and jq is available for easier wrapper implementation
+RUN apt-get install -y bash jq bc
 
 
 # Inject the startup script and associated resources
