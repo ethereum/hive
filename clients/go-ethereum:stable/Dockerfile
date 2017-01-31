@@ -1,4 +1,4 @@
-# Docker container spec for building the develop branch of go-ethereum.
+# Docker container spec for building the stable branch of go-ethereum.
 #
 # The build process it potentially longer running but every effort was made to
 # produce a very minimalistic container that can be reused many times without
@@ -7,11 +7,11 @@ FROM alpine:latest
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  apk add --update go git make gcc musl-dev                                    && \
-  git clone --depth 1 --branch develop https://github.com/ethereum/go-ethereum && \
-  (cd go-ethereum && make geth)                                                && \
-  cp go-ethereum/build/bin/geth /geth                                          && \
-  apk del go git make gcc musl-dev                                             && \
+  apk add --update go git make gcc musl-dev                                        && \
+  git clone --depth 1 --branch release/1.5 https://github.com/ethereum/go-ethereum && \
+  (cd go-ethereum && make geth)                                                    && \
+  cp go-ethereum/build/bin/geth /geth                                              && \
+  apk del go git make gcc musl-dev                                                 && \
   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
 # Make sure bash and jq is available for easier wrapper implementation
