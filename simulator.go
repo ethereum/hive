@@ -39,18 +39,18 @@ type simulationSubresult struct {
 
 // simulateClients runs a batch of simulation tests matched by simulatorPattern
 // against all clients matching clientPattern.
-func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string) error {
+func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string) (map[string]map[string]*simulationResult, error) {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for simulation", "pattern", clientPattern)
 	clients, err := buildClients(daemon, clientPattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Build all the validators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
 	simulators, err := buildSimulators(daemon, simulatorPattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Iterate over all client and simulator combos and cross-execute them
 	results := make(map[string]map[string]*simulationResult)
@@ -73,11 +73,7 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 			results[client][simulator] = result
 		}
 	}
-	// Print the validation logs
-	out, _ := json.MarshalIndent(results, "", "  ")
-	fmt.Printf("Simulation results:\n%s\n", string(out))
-
-	return nil
+	return results, nil
 }
 
 // simulate starts a simulator service locally, starts a controlling container

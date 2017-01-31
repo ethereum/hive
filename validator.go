@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -14,26 +13,35 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
+// validationResult represents the results of a validation run, containing
+// various metadata.
+type validationResult struct {
+	Start   time.Time `json:"start"`           // Time instance when the validation ended
+	End     time.Time `json:"end"`             // Time instance when the validation ended
+	Success bool      `json:"success"`         // Whether the entire validation succeeded
+	Error   error     `json:"error,omitempty"` // Potential hive failure during validation
+}
+
 // validateClients runs a batch of validation tests matched by validatorPattern
 // against all clients matching clientPattern.
-func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string) error {
+func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string) (map[string]map[string]*validationResult, error) {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for validation", "pattern", clientPattern)
 	clients, err := buildClients(daemon, clientPattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Build all the validators known to the test harness
 	log15.Info("building validators for testing", "pattern", validatorPattern)
 	validators, err := buildValidators(daemon, validatorPattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Iterate over all client and validator combos and cross-execute them
-	results := make(map[string]map[string][]string)
+	results := make(map[string]map[string]*validationResult)
 
 	for client, clientImage := range clients {
-		results[client] = make(map[string][]string)
+		results[client] = make(map[string]*validationResult)
 
 		for validator, validatorImage := range validators {
 			logger := log15.New("client", client, "validator", validator)
@@ -41,36 +49,32 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 			logdir := filepath.Join(hiveLogsFolder, "validations", fmt.Sprintf("%s[%s]", strings.Replace(validator, "/", ":", -1), client))
 			os.RemoveAll(logdir)
 
-			start := time.Now()
-			if pass, err := validate(daemon, clientImage, validatorImage, overrides, logger, logdir); pass {
-				logger.Info("validation passed", "time", time.Since(start))
-				results[client]["pass"] = append(results[client]["pass"], validator)
+			result := validate(daemon, clientImage, validatorImage, overrides, logger, logdir)
+			if result.Success {
+				logger.Info("validation passed", "time", result.End.Sub(result.Start))
 			} else {
-				logger.Error("validation failed", "time", time.Since(start))
-				fail := validator
-				if err != nil {
-					fail += ": " + err.Error()
-				}
-				results[client]["fail"] = append(results[client]["fail"], fail)
+				logger.Error("validation failed", "time", result.End.Sub(result.Start))
 			}
+			results[client][validator] = result
 		}
 	}
-	// Print the validation logs
-	out, _ := json.MarshalIndent(results, "", "  ")
-	fmt.Printf("Validation results:\n%s\n", string(out))
-
-	return nil
+	return results, nil
 }
 
-func validate(daemon *docker.Client, client, validator string, overrides []string, logger log15.Logger, logdir string) (bool, error) {
+func validate(daemon *docker.Client, client, validator string, overrides []string, logger log15.Logger, logdir string) *validationResult {
 	logger.Info("running client validation")
+	result := &validationResult{
+		Start: time.Now(),
+	}
+	defer func() { result.End = time.Now() }()
 
 	// Create the client container and make sure it's cleaned up afterwards
 	logger.Debug("creating client container")
 	cc, err := createClientContainer(daemon, client, validator, nil, overrides, nil)
 	if err != nil {
 		logger.Error("failed to create client", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	clogger := logger.New("id", cc.ID[:8])
 	clogger.Debug("created client container")
@@ -84,14 +88,16 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	cwaiter, err := runContainer(daemon, cc.ID, clogger, filepath.Join(logdir, "client.log"), false)
 	if err != nil {
 		clogger.Error("failed to run client", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	defer cwaiter.Close()
 
 	lcc, err := daemon.InspectContainer(cc.ID)
 	if err != nil {
 		clogger.Error("failed to retrieve client IP", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	cip := lcc.NetworkSettings.IPAddress
 
@@ -102,11 +108,13 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		c, err := daemon.InspectContainer(cc.ID)
 		if err != nil {
 			clogger.Error("failed to inspect client", "error", err)
-			return false, err
+			result.Error = err
+			return result
 		}
 		if !c.State.Running {
 			clogger.Error("client container terminated")
-			return false, errors.New("terminated unexpectedly")
+			result.Error = errors.New("terminated unexpectedly")
+			return result
 		}
 		// Container seems to be alive, check whether the RPC is accepting connections
 		if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.NetworkSettings.IPAddress, 8545)); err == nil {
@@ -126,7 +134,8 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	})
 	if err != nil {
 		logger.Error("failed to create validator", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	vlogger := logger.New("id", vc.ID[:8])
 	vlogger.Debug("created validator container")
@@ -140,7 +149,8 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	vwaiter, err := runContainer(daemon, vc.ID, vlogger, filepath.Join(logdir, "validator.log"), false)
 	if err != nil {
 		vlogger.Error("failed to run validator", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	vwaiter.Wait()
 
@@ -148,7 +158,9 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	v, err := daemon.InspectContainer(vc.ID)
 	if err != nil {
 		vlogger.Error("failed to inspect validator", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
-	return v.State.ExitCode == 0, nil
+	result.Success = v.State.ExitCode == 0
+	return result
 }

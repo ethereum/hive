@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -18,26 +17,37 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
+// benchmarkResult represents the results of a benchmark run, containing
+// various metadata.
+type benchmarkResult struct {
+	Start      time.Time `json:"start"`                // Time instance when the benchmark ended
+	End        time.Time `json:"end"`                  // Time instance when the benchmark ended
+	Success    bool      `json:"success"`              // Whether the entire benchmark succeeded
+	Error      error     `json:"error,omitempty"`      // Potential hive failure during benchmark
+	Iterations int       `json:"iterations,omitempty"` // Number of benchmark iterations made
+	NsPerOp    int64     `json:"ns/op,omitempty"`      // Nanoseconds spend per single iteration
+}
+
 // benchmarkClients runs a batch of benchmark tests matched by benchmarkerPattern
 // against all clients matching clientPattern.
-func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern string, overrides []string) error {
+func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern string, overrides []string) (map[string]map[string]*benchmarkResult, error) {
 	// Build all the clients matching the benchmark pattern
 	log15.Info("building clients for benchmark", "pattern", clientPattern)
 	clients, err := buildClients(daemon, clientPattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Build all the benchmarkers known to the harness
 	log15.Info("building benchmarkers for measurements", "pattern", benchmarkerPattern)
 	benchmarkers, err := buildBenchmarkers(daemon, benchmarkerPattern)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// Iterate over all client and benchmarker combos and cross-execute them
-	results := make(map[string]map[string]map[string]int64)
+	results := make(map[string]map[string]*benchmarkResult)
 
 	for client, clientImage := range clients {
-		results[client] = make(map[string]map[string]int64)
+		results[client] = make(map[string]*benchmarkResult)
 
 		for benchmarker, benchmarkerImage := range benchmarkers {
 			// Create the logger and log folder
@@ -47,34 +57,34 @@ func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern s
 			os.RemoveAll(logdir)
 
 			// Wrap the benchmark code into the Go's testing framework
-			result := testing.Benchmark(func(b *testing.B) {
-				if pass, err := benchmark(daemon, clientImage, benchmarkerImage, overrides, logger, logdir, b); err != nil {
-					b.Fatalf("benchmark failed: %v", err)
-				} else if !pass {
+			var result *benchmarkResult
+			report := testing.Benchmark(func(b *testing.B) {
+				if result = benchmark(daemon, clientImage, benchmarkerImage, overrides, logger, logdir, b); !result.Success {
 					b.Fatalf("benchmark failed")
 				}
 			})
-			results[client][benchmarker] = make(map[string]int64)
-			results[client][benchmarker]["iters"] = int64(result.N)
-			results[client][benchmarker]["ns/op"] = result.NsPerOp()
+			result.Iterations = report.N
+			result.NsPerOp = report.NsPerOp()
+			results[client][benchmarker] = result
 		}
 	}
-	// Print the benchmark logs
-	out, _ := json.MarshalIndent(results, "", "  ")
-	fmt.Printf("Benchmark results:\n%s\n", string(out))
-
-	return nil
+	return results, nil
 }
 
-func benchmark(daemon *docker.Client, client, benchmarker string, overrides []string, logger log15.Logger, logdir string, b *testing.B) (bool, error) {
+func benchmark(daemon *docker.Client, client, benchmarker string, overrides []string, logger log15.Logger, logdir string, b *testing.B) *benchmarkResult {
 	logger.Info("running client benchmark", "iterations", b.N)
+	result := &benchmarkResult{
+		Start: time.Now(),
+	}
+	defer func() { result.End = time.Now() }()
 
 	// Create the client container and make sure it's cleaned up afterwards
 	logger.Debug("creating client container")
 	cc, err := createClientContainer(daemon, client, benchmarker, nil, overrides, nil)
 	if err != nil {
 		logger.Error("failed to create client", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	clogger := logger.New("id", cc.ID[:8])
 	clogger.Debug("created client container")
@@ -88,14 +98,16 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	cwaiter, err := runContainer(daemon, cc.ID, clogger, filepath.Join(logdir, "client.log"), false)
 	if err != nil {
 		clogger.Error("failed to run client", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	defer cwaiter.Close()
 
 	lcc, err := daemon.InspectContainer(cc.ID)
 	if err != nil {
 		clogger.Error("failed to retrieve client IP", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	cip := lcc.NetworkSettings.IPAddress
 
@@ -106,11 +118,13 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 		c, err := daemon.InspectContainer(cc.ID)
 		if err != nil {
 			clogger.Error("failed to inspect client", "error", err)
-			return false, err
+			result.Error = err
+			return result
 		}
 		if !c.State.Running {
 			clogger.Error("client container terminated")
-			return false, errors.New("terminated unexpectedly")
+			result.Error = errors.New("terminated unexpectedly")
+			return result
 		}
 		// Container seems to be alive, check whether the RPC is accepting connections
 		if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.NetworkSettings.IPAddress, 8545)); err == nil {
@@ -124,7 +138,8 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	bench, err := startBenchmarkerAPI(logger, b)
 	if err != nil {
 		logger.Error("failed to start benchmarker API", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	defer bench.Close()
 
@@ -142,7 +157,8 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	})
 	if err != nil {
 		logger.Error("failed to create benchmarker", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	blogger := logger.New("id", vc.ID[:8])
 	blogger.Debug("created benchmarker container")
@@ -158,7 +174,8 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	bwaiter, err := runContainer(daemon, vc.ID, blogger, filepath.Join(logdir, "benchmarker.log"), false)
 	if err != nil {
 		blogger.Error("failed to run benchmarker", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
 	bwaiter.Wait()
 	b.StopTimer()
@@ -167,9 +184,11 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	v, err := daemon.InspectContainer(vc.ID)
 	if err != nil {
 		blogger.Error("failed to inspect benchmarker", "error", err)
-		return false, err
+		result.Error = err
+		return result
 	}
-	return v.State.ExitCode == 0, nil
+	result.Success = v.State.ExitCode == 0
+	return result
 }
 
 // startBenchmarkerAPI starts an HTTP webserver listening for benchmarker commands

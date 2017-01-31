@@ -400,7 +400,7 @@ resides at `/subresults` and has the following parameters:
 For example, doing a call to this endpoint with curl:
 
 ```
-url -sf -v -X POST -F 'details={"Preconditions failed": ["nonce 1 != 2", "balance 0"]}' \
+$ curl -sf -v -X POST -F 'details={"Preconditions failed": ["nonce 1 != 2", "balance 0"]}' \
   "$HIVE_SIMULATOR/subresults?name=Demo%20error&success=false&error=Something%20went%20wrong..."
 ```
 

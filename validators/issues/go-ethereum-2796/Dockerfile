@@ -11,7 +11,7 @@
 #         return "Hello, World!";
 #     }
 # }
-FROM alpine:3.4
+FROM alpine:latest
 
 # Install curl to allow querying the HTTP-RPC endpoint
 RUN apk add --update curl jq

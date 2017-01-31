@@ -10,7 +10,7 @@
 # non-forked block with the fork extradata. Unless almost all non-forking miners
 # are malicious, there will be a non-forking block in the first 10 that does not
 # have the fork extra-data set, separating that chain from the forked chain.
-FROM alpine:3.4
+FROM alpine:latest
 
 # Install curl to allow controlling the simulator as well as to interact with the
 # client via HTTP-RPC, bash and jq to allow writing a bit more exotic test scripts.

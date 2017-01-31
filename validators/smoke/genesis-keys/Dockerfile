@@ -3,7 +3,7 @@
 # web3 secret storage definition format.
 #
 # Details at https://github.com/ethereum/wiki/wiki/Web3-Secret-Storage-Definition
-FROM alpine:3.4
+FROM alpine:latest
 
 # Install curl to allow querying the HTTP-RPC endpoint
 RUN apk add --update curl
