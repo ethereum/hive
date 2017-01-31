@@ -1,16 +1,23 @@
 # Docker container spec for building the master branch of parity.
 FROM ubuntu:16.04
 
-RUN apt-get -y update
-
-# Make sure bash and jq is available for easier wrapper implementation
-RUN apt-get install -y bash jq bc
-
-# Rust and Parity deps
-RUN apt-get install -y curl git make g++ gcc file binutils
-RUN curl -OsSf https://static.rust-lang.org/rustup.sh && \
-  sh rustup.sh --disable-sudo
-
+# Build parity on the fly and delete all build tools afterwards
+RUN \
+  # Install parity from sources
+  apt-get -y update                                             && \
+  apt-get install -y curl git make g++ gcc file binutils pkg-config openssl libssl-dev && \
+  curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- --disable-sudo && \
+	\
+  git clone --depth 1 --branch stable https://github.com/ethcore/parity && \
+	cd parity && cargo build --release                                    && \
+	strip /parity/target/release/parity                                   && \
+	\
+	cd / && cp /parity/target/release/parity /parity.bin && \
+	rm -rf parity && mv /parity.bin /parity              && \
+  \
+  /usr/local/lib/rustlib/uninstall.sh                  && \
+  apt-get remove -y curl git make g++ gcc file binutils pkg-config openssl libssl-dev && \
+  rm -rf /root/.cargo
 
 # Inject ethminer to support mining
 RUN \

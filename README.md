@@ -204,9 +204,11 @@ Validation results:
 Simulation results:
 {
   "go-ethereum:master": {
-    "pass": [
-      "smoke/single-node"
-    ]
+    "smoke/lifecycle": {
+      "start": "2017-01-31T09:20:16.975219924Z",
+      "end": "2017-01-31T09:20:18.705302536Z",
+      "success": true
+    }
   }
 }
 ```
@@ -348,7 +350,7 @@ it with the necessary mechanisms to create any scenario it wants.
 
 To this effect, `hive` exposes a RESTful HTTP API that all simulators can use to direct how `hive`
 should create and organize the simulated network. This API is exposed at the HTTP endpoint set in the
-`HIVE_SIMULATOR` environmental variable. The currently available API endpoints are:
+`HIVE_SIMULATOR` environmental variable. The currently available topology endpoints are:
 
  * `/nodes` with method `POST` boots up a new client instance, returning its unique ID
    * Simulators may override any [chain init files](#initializing-the-client) via `URL` and `form` parameters (see below)
@@ -382,7 +384,45 @@ The simulation will be considered successful if and only if the exit code of the
 is zero! Any output that the simulator generates will be saved to an appropriate log file in the `hive`
 workspace folder and also echoed out to the console on `--loglevel=6`.
 
-Closing notes:
+#### Reporting sub-results
+
+It may happen that the setup/teardown cost of a simulation be large enough to warrant validating not
+just one, but perhaps multiple invariants in the same test. Although the results for these subtests
+could be reported in the log file, retrieving them would become unwieldy. As such, `hive` exposes a
+special HTTP endpoint on its RESTful API that can add sub-results to a single simulation. The endpoint
+resides at `/subresults` and has the following parameters:
+
+ * `name`: textual name to report for the subtest
+ * `success`: boolean flag (`true` or `false`) representing whether the subtest failed
+ * `error`: textual details for the reason behind the subtest failing
+ * `details`: structured JSON object containing arbitrary extra infos to surface
+
+For example, doing a call to this endpoint with curl:
+
+```
+url -sf -v -X POST -F 'details={"Preconditions failed": ["nonce 1 != 2", "balance 0"]}' \
+  "$HIVE_SIMULATOR/subresults?name=Demo%20error&success=false&error=Something%20went%20wrong..."
+```
+
+will result a `subresults` field
+
+```json
+"subresults": [
+  {
+    "name": "Demo error",
+    "success": false,
+    "error": "Something went wrong...",
+    "details": {
+      "Preconditions failed": [
+        "nonce 1 != 2",
+        "balance 0"
+      ]
+    }
+  }
+]
+```
+
+### Closing notes
 
  * There is no constraint on how much time a simulation may run, but please be considerate.
  * The simulator doesn't have to terminate nodes itself, upon exit all resources are reclaimed.
