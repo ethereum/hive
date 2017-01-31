@@ -1,6 +1,6 @@
 # Docker container spec defining and running the simplest possible smoke test
 # validating whether a client can import a genesis definition.
-FROM alpine:3.4
+FROM alpine:latest
 
 # Install curl to allow querying the HTTP-RPC endpoint
 RUN apk add --update curl

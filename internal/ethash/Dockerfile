@@ -4,7 +4,7 @@
 # Callers need to:
 #   - Bind /root/.ethash to an external volume for cache reuse
 #   - Forward UID envvar to reown newly generated ethash files
-FROM alpine:3.4
+FROM alpine:latest
 
 # Inject the DAG generator script
 ADD ethash.go ethash.go

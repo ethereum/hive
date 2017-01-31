@@ -1,6 +1,6 @@
 # Docker container spec verifying whether a client can configure itself to run a
 # testnet, in particular that the starting nonces are indeed 2^20.
-FROM alpine:3.4
+FROM alpine:latest
 
 # Install curl to allow querying the HTTP-RPC endpoint
 RUN apk add --update curl

@@ -3,7 +3,7 @@
 # The build process it potentially longer running but every effort was made to
 # produce a very minimalistic container that can be reused many times without
 # needing to constantly rebuild.
-FROM alpine:3.4
+FROM alpine:latest
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \

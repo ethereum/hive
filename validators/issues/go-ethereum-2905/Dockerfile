@@ -3,7 +3,7 @@
 # handled for chain initialization as well as import operations.
 #
 # Details in https://github.com/ethereum/go-ethereum/issues/2905
-FROM alpine:3.4
+FROM alpine:latest
 
 # The test is trivial, just initializes a chain and returns
 ADD genesis.json /genesis.json
