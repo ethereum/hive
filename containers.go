@@ -310,6 +310,7 @@ func copyBetweenContainers(daemon *docker.Client, dest, src string, path, target
 // to wait for termination.
 func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile string, shell bool) (docker.CloseWaiter, error) {
 	// If we're the outer shell, log straight to stderr, nothing fancy
+	stdout := io.Writer(os.Stdout)
 	stream := io.Writer(os.Stderr)
 	if !shell {
 		// For non shell containers, create and open the log file for the output
@@ -338,11 +339,13 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 			}
 			go copy(os.Stderr, hookedR)
 		}
+		// Only the shell gets to keep its standard output
+		stdout = stream
 	}
 	logger.Debug("attaching to container")
 	waiter, err := daemon.AttachToContainerNonBlocking(docker.AttachToContainerOptions{
 		Container:    id,
-		OutputStream: stream,
+		OutputStream: stdout,
 		ErrorStream:  stream,
 		Stream:       true,
 		Stdout:       true,
