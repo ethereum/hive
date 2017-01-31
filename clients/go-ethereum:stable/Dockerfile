@@ -8,12 +8,7 @@ FROM alpine:latest
 # Make sure bash and jq is available for easier wrapper implementation
 RUN apk add --update bash jq
 
-# Build tools
-RUN apk add --update go git make gcc musl-dev
-
 # Build go-ethereum on the fly and delete all build tools afterwards
-RUN git clone https://github.com/ethereum/go-ethereum
-
 RUN \
   apk add --update go git make gcc musl-dev                                        && \
   git clone --depth 1 --branch release/1.5 https://github.com/ethereum/go-ethereum && \
