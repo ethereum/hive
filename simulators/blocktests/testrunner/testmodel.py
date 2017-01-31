@@ -62,9 +62,19 @@ class Testcase(object):
             # But if it's written as 0102030405060708 in the genesis file, 
             # it's interpreted differently. So we'll need to mod that on the fly 
             # for every testcase.
-            nonce = raw_genesis[u'nonce']
-            if not raw_genesis[u'nonce'][:2] == '0x':
-                raw_genesis[u'nonce'] = '0x'+raw_genesis[u'nonce']
+            if 'nonce' in raw_genesis:
+                nonce = raw_genesis[u'nonce']
+                if not raw_genesis[u'nonce'][:2] == '0x':
+                    raw_genesis[u'nonce'] = '0x'+raw_genesis[u'nonce']
+
+            # Also, testcases have 'code' written as 0xdead
+            # But geth does not handle that, so we'll need to mod any of those also
+            for addr, account in self.data['pre'].items():
+                if 'code' in account:
+                    code = account['code']
+                    if code[:2] == '0x':
+                        account['code'] = code[2:]
+
 
             raw_genesis['alloc'] = self.data['pre']
             self.raw_genesis = raw_genesis
@@ -96,25 +106,34 @@ class Testcase(object):
     def chain(self):
         return None
 
+    def addMessage(self, msg):
+        if msg is None:
+            return
+
+        if type(msg) != list:
+            msg = [msg]
+
+        if len(msg) == 0:
+            return 
+
+        self._message.extend(msg)
+
     def fail(self, message):
         """Set if this test failed"""
         self._success = False
-        if type(message) == list:
-            self._message = message
-        else:
-            self._message = [message]
+        self.addMessage(message)
 
         self._skipped = False
         print("%s failed : %s " %(self, str(self._message)))
 
     def success(self, message = []):
         self._success = True
-        self._message = message
         self._skipped = False
+        self.addMessage(message)
 
     def skipped(self, message = []):
         self._skipped = True
-        self._message = message
+        self.addMessage(message)
 
 
     def wasSuccessfull(self):
@@ -126,6 +145,7 @@ class Testcase(object):
     def topLevelError(self):
         if self._message is not None and len(self._message) > 0:
             return self._message[0]
+
         return None
 
     def details(self):
@@ -136,33 +156,6 @@ class Testcase(object):
             _d["errors"] = self._message
         return _d
 
-#    def report(self):
-#        if self.wasSuccessfull():
-#            print("%s: Success" % self.name)
-#            return
-#
-#        if self.wasSkipped():
-#            print("%s: Skipped")
-#        else:
-#            print("%s: Failed" % self.name)
-#        
-#        for msg in self._message:
-#            print("  %s" % msg)
-#
-#    def getReport(self):
-#        outp = ["%s (%s)" % (self.name, self.status())]
-#
-#        if self._message is not None:
-#            for msg in self._message:
-#                if type(msg) == list:
-#                    for _m in msg: 
-#                        outp.append("    * %s" % str(_m))
-#                else:
-#                    outp.append("   * %s" % str(msg))
-#  
-#            outp.append("  * Executed on %s" % self.nodeInfo)
-#
-#        return "\n".join(outp)
 
     def status(self):
 

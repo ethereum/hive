@@ -196,7 +196,7 @@ class TestExecutor(object):
 
         return (g_file, c_file, b_folder)
 
-    def executeTeestcase(self, testcase):
+    def executeTestcase(self, testcase):
         testcase.fail("Executor not defined")
         return False
 
@@ -256,8 +256,8 @@ class BlockTestExecutor(TestExecutor):
             (ok, err ) = self.verifyPreconditions(testcase, node)
 
             if not ok:
-
-                testcase.fail(["Preconditions failed",err])
+                testcase.fail(["Preconditions failed",[err]])
+                print("Precondition fail - genesis used: \n%s\n" % json.dumps(testcase.genesis()))
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
@@ -292,7 +292,7 @@ class BlockTestExecutor(TestExecutor):
 
         err = _verifyEq(first[u'hash'], testcase.genesis('hash'))
 
-              # Check hash
+        # Check hash
         if err is not None:
             errs.append("Hash error")
             errs.append(err)
@@ -337,6 +337,7 @@ class BlockTestExecutor(TestExecutor):
                 _n = node.web3.eth.getTransactionCount(address)
                 _c = node.web3.eth.getCode(address)
                 _b = node.web3.eth.getBalance(address)
+
             except Exception, e:
                 errs.append("Postcondition verification failed %s" % str(e))
                 return (False, errs)
@@ -376,7 +377,7 @@ class BlockTestExecutor(TestExecutor):
                 for _hash,exp in poststate_account['storage'].items():
                     value = node.web3.eth.getStorageAt(address, _hash )
                     if int(value,16) != int(exp,16):
-                        err  ="Found `%s`, expected `%s`"  % (v, exp)
+                        err  ="Found `%s`, expected `%s`"  % (value, exp)
 
 
                     if err is not None:
