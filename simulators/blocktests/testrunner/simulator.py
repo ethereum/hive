@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os,sys
-from hivemodel import HiveNode, HiveAPI
+import hivemodel
+import utils
 
 class FakeEth():
     def getTransactionCount(arg):
@@ -16,7 +17,7 @@ class FakeWeb3():
     def __init__(self):
         self.eth = FakeEth()
 
-class HiveTestNode(HiveNode):
+class HiveTestNode(hivemodel.HiveNode):
 
     def __init__(self, nodeId = None, nodeIp = None):
         self.nodeId ="Testnode"
@@ -35,11 +36,11 @@ class HiveTestNode(HiveNode):
     def __str__(self):
         return "Node[test]@test"
 
-class HiveTestAPI(HiveAPI):
+class HiveTestAPI(hivemodel.HiveAPI):
 
     def __init__(self):
-        super(HiveAPI, self).__init__()
-        self.clienttype = "N/A"
+        super(hivemodel.HiveAPI, self).__init__()
+
 
     def _get(self,path, params = None):
         return "foo"
@@ -55,27 +56,46 @@ class HiveTestAPI(HiveAPI):
     def generateArtefacts(self,testcase):
         return (None, None, None)
 
+    def subresult(self, name, success, errormsg, errors = None ):
+        print("subresult: \n\t%s\n\t%s\n\t%s\n\t%s" % (name, success, errormsg, errors))
+
+
     def log(self,msg):
         print("LOG: %s" % msg)
-    def sendReport(self,fname,data):
-        print("Would save report (%s)" % fname)
-        print(data)
+
 
 def test():
     hive = HiveTestAPI()
-    hive.blockTests()
+    executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE)
+    hive.blockTests(testfiles= utils.getFiles("./tests/BlockchainTests"), executor = executor)
 
 def main(args):
+
     print("Validator started\n")
-    print("-" * 40)
+
     if 'HIVE_SIMULATOR' not in os.environ:
         print("Running in TEST-mode")
         return test()
+
     hivesim = os.environ['HIVE_SIMULATOR']
     print("Hive simulator: %s\n" % hivesim)
-    hive = HiveAPI(hivesim)
+    hive = hivemodel.HiveAPI(hivesim)
 
-    hive.blockTests(start = 7, end=200, whitelist = ["newChainFrom6Block"])
+    #executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_FRONTIER)
+
+    #hive.blockTests(start = 0, testfiles= utils.getFiles("./tests/BlockchainTests"), executor = executor)
+#        whitelist = ["newChainFrom6Block"])
+
+    executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE)
+
+
+    status = hive.blockTests(start = 0, testfiles= utils.getFiles("./tests/BlockchainTests/EIP150"),executor = executor)
+
+    if not status:
+        sys.exit(-1)
+
+    sys.exit(0)
+    #hive.generalStateTests(start=0, end=2000, whitelist="blockhash0.json", testfiles=utils.getFilesRecursive("./tests/generalStateTests"))
 
 if __name__ == '__main__':
     main(sys.argv[1:])

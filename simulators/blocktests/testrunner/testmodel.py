@@ -14,41 +14,9 @@ class Testfile(object):
                 t = Testcase(k,v)
                 self._tests.append(t)
                 yield t
-
-    def getReport(self, clienttype):
-        outp = []
-
-        skipped = []
-        failed = []
-        success = []
-        for test in self._tests:
-            if test.wasSkipped(): 
-                skipped.append(test)
-            elif not test.wasSuccessfull():
-                failed.append(test)
-            else:
-                success.append(test)
-
-        outp.append("\n# %s %s\n" % (clienttype, self) )
-        outp.append("Success: %d / Fail: %d / Skipped: %d\n" % (len(success), len(failed), len(skipped)))
-
-        def x(l,title):
-            if len(l) > 0:
-                outp.append("\n## %s\n" % title)
-                for test in l:
-                    outp.append("* %s" % test.getReport())
-
-
-        x(failed , "Failed")
-        x(skipped, "Skipped")
-        x(success, "Successfull")
-
-        return "\n".join(outp)
         
     def __str__(self):
-        return "File `%s`" % self.filename
-
-
+        return self.filename
 
 class Testcase(object):
 
@@ -60,6 +28,7 @@ class Testcase(object):
         self._message = []
         self.nodeInstance = "N/A"
         self.clientType = "N/A"
+        self.required_keys = ["pre","blocks","postState","genesisBlockHeader"]
 
     def __str__(self):
         return self.name
@@ -67,13 +36,14 @@ class Testcase(object):
     def setNodeInstance(self, instanceId):
         self.nodeInstance = instanceId
 
-    def setClientType(self, clienttype):
-        self.clientType = clienttype
-
     def validate(self):
-        required_keys = ["pre","blocks","postState","genesisBlockHeader"]
+        """Validates that the provided json contains the necessary data
+        to perform the test
+
+        @return (ok , msg)
+        """
         missing_keys = []
-        for k in required_keys:
+        for k in self.required_keys:
             if k not in self.data.keys():
                 missing_keys.append(k)
 
@@ -81,6 +51,8 @@ class Testcase(object):
         return (len(missing_keys) == 0 ,"Missing keys: %s" % (",".join(missing_keys))) 
 
     def genesis(self, key = None):
+        """ Returns the 'genesis' block for this testcase, 
+        including any alloc's (prestate) required """
         # Genesis block
         if self.raw_genesis is None:
             raw_genesis = self.data['genesisBlockHeader']
@@ -130,7 +102,8 @@ class Testcase(object):
         self._success = False
         self._message = message
         self._skipped = False
-    
+        print("%s failed : %s " %(self, str(self._message)))
+
     def success(self, message = []):
         self._success = True
         self._message = message
@@ -147,34 +120,46 @@ class Testcase(object):
     def wasSkipped(self):
         return self._skipped
 
-
-    def report(self):
-        if self.wasSuccessfull():
-            print("%s: Success" % self.name)
-            return
-
-        if self.wasSkipped():
-            print("%s: Skipped")
-        else:
-            print("%s: Failed" % self.name)
-        
-        for msg in self._message:
-            print("  %s" % msg)
-
-    def getReport(self):
-        outp = ["%s (%s)" % (self.name, self.status())]
-
+    def topLevelError(self):
         if self._message is not None:
-            for msg in self._message:
-                if type(msg) == list:
-                    for _m in msg: 
-                        outp.append("    * %s" % str(_m))
-                else:
-                    outp.append("   * %s" % str(msg))
-  
-            outp.append("  * Executed on %s" % self.nodeInfo)
+            return self._message[0]
+        return None
 
-        return "\n".join(outp)
+    def details(self):
+        _d = {
+            "instanceid" : self.nodeInstance
+        }
+        if self._message is not None:
+            _d["errors"] = self._message
+        return _d
+
+#    def report(self):
+#        if self.wasSuccessfull():
+#            print("%s: Success" % self.name)
+#            return
+#
+#        if self.wasSkipped():
+#            print("%s: Skipped")
+#        else:
+#            print("%s: Failed" % self.name)
+#        
+#        for msg in self._message:
+#            print("  %s" % msg)
+#
+#    def getReport(self):
+#        outp = ["%s (%s)" % (self.name, self.status())]
+#
+#        if self._message is not None:
+#            for msg in self._message:
+#                if type(msg) == list:
+#                    for _m in msg: 
+#                        outp.append("    * %s" % str(_m))
+#                else:
+#                    outp.append("   * %s" % str(msg))
+#  
+#            outp.append("  * Executed on %s" % self.nodeInfo)
+#
+#        return "\n".join(outp)
 
     def status(self):
 
@@ -184,3 +169,35 @@ class Testcase(object):
             return "success"
 
         return "failed"
+
+#class GeneralStateTestcase(Testcase):
+#    
+#    def __init__(self,name, jsondata):
+#        super(GeneralStateTestcase, self).__init__(name, jsondata)
+#        self.required_keys = ["env","post","pre","transaction"]
+#
+#
+#    def genesis(self, key = None):
+#        """ Returns the 'genesis' block for this testcase, 
+#        including any alloc's (prestate) required """
+#        # Genesis block
+#        if self.raw_genesis is None:
+#            test_env = self.data['env']
+#
+#            # Turns out the testcases have noncewritten as 0102030405060708. 
+#            # Which is supposed to be interpreted as 0x0102030405060708. 
+#            # But if it's written as 0102030405060708 in the genesis file, 
+#            # it's interpreted differently. So we'll need to mod that on the fly 
+#            # for every testcase.
+#            nonce = raw_genesis[u'nonce']
+#            if not raw_genesis[u'nonce'][:2] == '0x':
+#                raw_genesis[u'nonce'] = '0x'+raw_genesis[u'nonce']
+#
+#            raw_genesis['alloc'] = self.data['pre']
+#            self.raw_genesis = raw_genesis
+#
+#        if key is None:
+#            return self.raw_genesis
+#
+#        return self.raw_genesis[key]
+#
