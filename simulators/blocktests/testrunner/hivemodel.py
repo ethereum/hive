@@ -48,7 +48,7 @@ class HiveAPI(object):
         req = requests.post("%s%s" % (self.hive_simulator , path),  params=params, data = data)
         
         if req.status_code != 200:
-            raise Exception("Failed to POST req (%d)" % req.status_code)
+            raise Exception("Failed to POST req (%d):%s" % (req.status_code, req.text))
 
         return req.text
 
@@ -74,14 +74,14 @@ class HiveAPI(object):
                 "name" : name, 
                 "success" : success
         }
-        if error is not None:
+        if errormsg is not None:
             params["error"] = errormsg
 
         data = None
         if details is not None:
-            data = {
-                details : errors
-            }
+            data = {"details" : json.dumps(details) }
+
+#        print("Sending the following data with request: %s" % data)
 
         return self._post("/subresults", params = params, data = data);
 

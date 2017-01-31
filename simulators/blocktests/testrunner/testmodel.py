@@ -94,13 +94,16 @@ class Testcase(object):
         return None
 
     def chain(self):
-
         return None
 
     def fail(self, message):
         """Set if this test failed"""
         self._success = False
-        self._message = message
+        if type(message) == list:
+            self._message = message
+        else:
+            self._message = [message]
+
         self._skipped = False
         print("%s failed : %s " %(self, str(self._message)))
 
@@ -121,7 +124,7 @@ class Testcase(object):
         return self._skipped
 
     def topLevelError(self):
-        if self._message is not None:
+        if self._message is not None and len(self._message) > 0:
             return self._message[0]
         return None
 
