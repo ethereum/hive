@@ -1,6 +1,11 @@
 #!/bin/bash
 
-hive -sim blocktest -test none -client *:master  > data.json
+hive -sim blocktest -test none -client *:master  > tmp.json
+
+#Some quirk in hive is makinga '.' appear on the std out.
+# We'll just work around it for now...
+cat tmp.json | grep -v "^\.$" > data.json
+
 curl -o tmp.zip -L https://github.com/holiman/testreport_template/archive/master.zip && unzip tmp.zip && rm tmp.zip
 
 NOW=$(date +"%Y-%d-%m_%H-%M-%S")
