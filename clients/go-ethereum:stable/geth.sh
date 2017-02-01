@@ -16,10 +16,10 @@
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
-#  - HIVE_MINER          address to credit with mining rewards (single thread)
-#  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_FORK_TANGERINE block number of TangerineWhistle
 #  - HIVE_FORK_SPURIOUS  block number of SpurioisDragon
+#  - HIVE_MINER          address to credit with mining rewards (single thread)
+#  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
 # Immediately abort the script on any error encountered
 set -e
