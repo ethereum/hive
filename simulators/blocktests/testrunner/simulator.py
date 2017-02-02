@@ -3,35 +3,27 @@ import os,sys
 import hivemodel
 import utils
 
-class FakeEth():
-    def getTransactionCount(arg):
-        return 10000
-    def getBalance(arg):
-        return 1000
-    def getCode(arg):
-        return "0xDEADBEEF"
-    def getBlock(arg,arg2):
-        return {u'hash':"0x0000", u'stateRoot':"0x0102030405060708"}
-
-class FakeWeb3():
-    def __init__(self):
-        self.eth = FakeEth()
-
 class HiveTestNode(hivemodel.HiveNode):
 
     def __init__(self, nodeId = None, nodeIp = None):
         self.nodeId ="Testnode"
-        self.web3 = FakeWeb3()
+
+    def getBlockByNumber(self,blnum):
+        return {u'hash':"0x0000", u'stateRoot':"0x0102030405060708"}
+
+    def getNonce(self,address):
+        return 10000
+
+    def getBalance(self,address):
+        return 1000
 
 
-    def invokeRPC(self,method, arguments):
-        """ Can be used to call things not implemented in web3. 
-        Example:         
-            invokeRPC("debug_traceTransaction", [txHash, traceOpts]))
-        """
-        return self.web3._requestManager.request_blocking(method, arguments)
+    def getCode(self,address):
+        return "0xDEADBEEF"
 
 
+    def getStorageAt(self,address, _hash):
+        return "0xDEADBEEF"
 
     def __str__(self):
         return "Node[test]@test"
@@ -81,16 +73,20 @@ def main(args):
     print("Hive simulator: %s\n" % hivesim)
     hive = hivemodel.HiveAPI(hivesim)
 
-    executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_FRONTIER)
-    hive.blockTests(start = 0, testfiles= utils.getFiles("./tests/BlockchainTests"), executor = executor)
-#        whitelist = ["newChainFrom6Block"])
 
-    executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE)
+#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests"), 
+#        executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_FRONTIER))
+#
+#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/EIP150"),
+#        executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE))
+#
+    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/Homestead"),
+            executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_HOMESTEAD))
 
-    status = hive.blockTests(start = 0, 
-        testfiles= utils.getFiles("./tests/BlockchainTests/EIP150"),
-        executor = executor)
-#        whitelist=["SuicideIssue"])
+    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/TestNetwork"),
+            executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TRANSITIONNET))
+
+
 
     if not status:
         sys.exit(-1)

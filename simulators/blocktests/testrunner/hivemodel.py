@@ -11,6 +11,17 @@ RULES_FRONTIER = 0
 RULES_HOMESTEAD = 1
 RULES_TANGERINE = 2
 RULES_SPURIOUS = 4
+""" 
+The 'RULES_TRANSITIONNET' is a bit peculiar: 
+
+    block #0 - 4: Frontier Rules
+    block #5: Transition Block to Homestead
+    block #8: Dao Hardfork block
+    block #10: Transition Block to EIP150
+"""
+RULES_TRANSITIONNET = 5
+
+
 
 # Model for the Hive interaction
 class HiveNode(object):
@@ -250,7 +261,18 @@ class BlockTestExecutor(TestExecutor):
         if self.rules >= RULES_TANGERINE:
             params["HIVE_FORK_TANGERINE"] = "0",
         if self.rules >= RULES_SPURIOUS:
-            params["HIVE_FORK_HOMESTEAD"] = "0",
+            params["HIVE_FORK_SPURIOUS"] = "0",
+
+
+        if self.rules == RULES_TRANSITIONNET:
+            #    block #0 - 4: Frontier Rules
+            #    block #5: Transition Block to Homestead
+            #    block #8: Dao Hardfork block
+            #    block #10: Transition Block to EIP150
+            params["HIVE_FORK_HOMESTEAD"] = "5",
+            params["HIVE_FORK_DAO_BLOCK"] = "8",
+            params["HIVE_FORK_TANGERINE"] = "10",
+            params["HIVE_FORK_SPURIOUS"]  = "10",
 
         node = None
         self.hive.log("Starting node")
@@ -270,7 +292,7 @@ class BlockTestExecutor(TestExecutor):
 
             if not ok:
                 testcase.fail(["Preconditions failed",[err]])
-                #print("Precondition fail - genesis used: \n%s\n" % json.dumps(testcase.genesis()))
+                #testcase.addMessage(self.customCheck(testcase, node))
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
@@ -286,8 +308,20 @@ class BlockTestExecutor(TestExecutor):
         finally:
             self.hive.killNode(node)
 
+    def customCheck(self, testcase, node):
+        """This is a special method meant for debugging particular testcases in hive, 
+        not meant to be run in general"""
 
+        value = node.getStorageAt("0xaaaf5374fce5edbc8e2a8697c15331677e6ebf0b", "0x010340fef9c35e91836ea450d2e0b39079f7ac19da70f533a0c9a6770d6d8efc" )
+        value2 = node.getStorageAt("0xaaaf5374fce5edbc8e2a8697c15331677e6ebf0b", "0x00" )
+        errs = [
+            "Checked storage 0xaaaf5374fce5edbc8e2a8697c15331677e6ebf0b / 0x010340fef9c35e91836ea450d2e0b39079f7ac19da70f533a0c9a6770d6d8efc",
+            "Got %s, expected %s" % (value , "0x0516afa543fbe239a5a78a4588f77f82aee7f22d"),
+            "Checked storage 0xaaaf5374fce5edbc8e2a8697c15331677e6ebf0b / 0x00",
+            "Got %s, expected %s" % (value2 , "0x1f40") ]
 
+        return errs
+        
     def verifyPreconditions(self, testcase, node):
         """ Verify preconditions 
         @return (bool isOk, list of error messags) 
