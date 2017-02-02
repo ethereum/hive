@@ -67,6 +67,12 @@ if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; $HIVE_FORK_HOMESTEAD)"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x$HEX_HIVE_FORK_HOMESTEAD\")"`
 fi
+
+if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+	HEX_HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"daoHardforkTransition\"]; $HIVE_FORK_DAO_BLOCK)"`
+fi
+
 if [ "$HIVE_FORK_TANGERINE" != "" ]; then
 	HIVE_FORK_TANGERINE=`echo "obase=10; $HIVE_FORK_TANGERINE" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip150Transition\"]; $HIVE_FORK_TANGERINE )"`
