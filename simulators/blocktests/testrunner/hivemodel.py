@@ -1,11 +1,11 @@
 import requests
-from web3 import Web3, RPCProvider
 import traceback,sys,os
 import binascii
 import json
 from testmodel import Testcase, Testfile
 from utils import canonicalize, getFiles, hex2big
 import time
+
 
 RULES_FRONTIER = 0
 RULES_HOMESTEAD = 1
@@ -18,16 +18,39 @@ class HiveNode(object):
     def __init__(self, nodeId, nodeIp):
         self.nodeId =nodeId
         self.ip = nodeIp
-        self.web3 = Web3(RPCProvider(host=self.ip, port="8545"))
+        self.session = requests.Session()
+        self.url = "http://%s:%d" % (self.ip, 8545) 
+        self.rpcid = 1
 
 
-    def invokeRPC(self,method, arguments):
-        """ Can be used to call things not implemented in web3. 
-        Example:         
-            invokeRPC("debug_traceTransaction", [txHash, traceOpts]))
-        """
-        return self.web3._requestManager.request_blocking(method, arguments)
+    def _getNodeData(self, method, params):
+        payload = {"jsonrpc":"2.0","method":method,"params":params,"id":self.rpcid}
+        self.rpcid = self.rpcid+1
+        r = self.session.post(self.url,json = payload)
+        return r.json()['result']        
 
+    def getBlockByNumber(self,blnum):
+        return self._getNodeData("eth_getBlockByNumber", [str(int(blnum)),True])
+
+
+    def getNonce(self,address):
+        
+        j = self._getNodeData("eth_getTransactionCount", [address,"latest"])
+        return int(j[2:], 16 )
+
+
+    def getBalance(self,address):
+
+        j = self._getNodeData("eth_getBalance", [address,"latest"])
+        return int(j[2:], 16 )
+
+
+    def getCode(self,address):
+        return self._getNodeData("eth_getCode", [address,"latest"])
+
+
+    def getStorageAt(self,address, _hash):
+        return self._getNodeData("eth_getStorageAt", [address,_hash, "latest"])
 
     def __str__(self):
         return "Node[%s]@%s" % (self.nodeId, self.ip)
@@ -184,16 +207,6 @@ class TestExecutor(object):
                     outf.write(binary_string)
                 counter = counter +1
 
-# Maybe do it all in one go: 
-#        if testcase.blocks() is not None:
-#            b_file = "./artefacts/%s/blocks/blocks.rlp" % (testcase)
-#            with open(b_file,"wb+") as outf:
-#                for block in testcase.blocks():
-#                    binary_string = binascii.unhexlify(block['rlp'][2:])
-#                   outf.write(binary_string)
-
-
-
         return (g_file, c_file, b_folder)
 
     def executeTestcase(self, testcase):
@@ -257,7 +270,7 @@ class BlockTestExecutor(TestExecutor):
 
             if not ok:
                 testcase.fail(["Preconditions failed",[err]])
-                print("Precondition fail - genesis used: \n%s\n" % json.dumps(testcase.genesis()))
+                #print("Precondition fail - genesis used: \n%s\n" % json.dumps(testcase.genesis()))
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
@@ -280,7 +293,7 @@ class BlockTestExecutor(TestExecutor):
         @return (bool isOk, list of error messags) 
         """
 
-        first =  node.web3.eth.getBlock(0)
+        first = node.getBlockByNumber(0)
         errs = []
 
         def _verifyEq(v,exp):
@@ -319,75 +332,86 @@ class BlockTestExecutor(TestExecutor):
                 return "Found `%s`, expected `%s`"  % (v, exp)
             return None
 
-        for address, poststate_account in testcase.postconditions().items():
-            
-            # Keep track of what we check, so we don't miss any postconditions
+        req_count_start = node.rpcid
+        current = ""
+        numaccounts = len(testcase.postconditions())
+        if numaccounts > 1000:
+            self.hive.log("This may take a while, %d accounts to check postconditions for " % numaccounts)
 
-            checked_conditions = set()
-            should_check = set(poststate_account.keys())
-            # Actual values
-            _n = None
-            _c = None
-            _b = None
+        for address, poststate_account in testcase.postconditions().items():
+
+
+            if len(errs) > 9:
+                errs.append("Postcondition check aborted due to earlier errors")
+                return (len(errs) == 0, errs)
+
+            if (node.rpcid - req_count_start) % 1000 == 0:
+                self.hive.log("Verifying poststate, have checked %d items ..." % (node.rpcid - req_count_start))
+            
             # Parity fails otherwise...
             if address[:2] != "0x":
                 address = "0x%s" % address
 
             try:
-                _n = node.web3.eth.getTransactionCount(address)
-                _c = node.web3.eth.getCode(address)
-                _b = node.web3.eth.getBalance(address)
-
-            except Exception, e:
-                errs.append("Postcondition verification failed %s" % str(e))
-                return (False, errs)
-
-
-            # Expected values
-
-            if 'nonce' in poststate_account:
-                #schecked_conditions.add('nonce')
-                exp = hex2big(poststate_account["nonce"])
-                err = _verifyEqRaw(_n, exp)
-                if err is not None:
-                    errs.append("Nonce error (`%s`)" % address)
-                    errs.append(err)
-
-            if 'code' in poststate_account:
-                checked_conditions.add('code')
-                exp = poststate_account["code"]
-                err = _verifyEqRaw(_c, exp)
-                if err is not None:
-                    errs.append("Code error (`%s`)" % address)
-                    errs.append(err)
-
-
-            if 'balance' in poststate_account:
-                checked_conditions.add('balance')
-                exp = hex2big(poststate_account["balance"])
-                err = _verifyEqRaw(_b, exp)
-                if err is not None:
-                    errs.append("Balance error (`%s`)" % address)
-                    errs.append(err)
-
-            if 'storage' in poststate_account:
-                checked_conditions.add('storage')
-                # Must iterate over storage
-                self.hive.debugp("Postcond check balance")
-                for _hash,exp in poststate_account['storage'].items():
-                    value = node.web3.eth.getStorageAt(address, _hash )
-                    if int(value,16) != int(exp,16):
-                        err  ="Found `%s`, expected `%s`"  % (value, exp)
-
-
+                if 'nonce' in poststate_account:
+                    current = "noncecheck"
+                    _n = node.getNonce(address)
+                    exp = hex2big(poststate_account["nonce"])
+                    err = _verifyEqRaw(_n, exp)
                     if err is not None:
-                        errs.append("Storage error (`%s`) key `%s`" % (address, _hash))
+                        errs.append("Nonce error (`%s`)" % address)
                         errs.append(err)
 
-            missing_checks = should_check.difference(checked_conditions)
+                if 'code' in poststate_account:
+                    current = "codecheck"
+                    _c = node.getCode(address)
+                    exp = poststate_account["code"]
+                    err = _verifyEqRaw(_c, exp)
+                    if err is not None:
+                        errs.append("Code error (`%s`)" % address)
+                        errs.append(err)
 
-            if len(missing_checks) > 0:
-                self.hive.log("Error: Missing postcond checks: %s" % ",".join(missing_checks))
+
+                if 'balance' in poststate_account:
+                    current = "balancecheck"
+                    _b = node.getBalance(address)
+                    exp = hex2big(poststate_account["balance"])
+                    err = _verifyEqRaw(_b, exp)
+                    if err is not None:
+                        errs.append("Balance error (`%s`)" % address)
+                        errs.append(err)
+
+                if 'storage' in poststate_account and len(poststate_account['storage']) > 0:
+
+                    numkeys = len(poststate_account['storage'])
+                    if numkeys > 1000:
+                        self.hive.log("This may take a while, checking storage for %d keys" % numkeys)
+
+                    current = "storagecheck"
+                    # Must iterate over storage
+                    for _hash,exp in poststate_account['storage'].items():
+                        current = "Storage (%s)" % _hash
+                        value = node.getStorageAt(address, _hash )
+
+                        if int(value,16) != int(exp,16):
+                            err  ="Found `%s`, expected `%s`"  % (value, exp)
+
+
+                        if err is not None:
+                            errs.append("Storage error (`%s`) key `%s`" % (address, _hash))
+                            errs.append(err)
+
+                        if len(errs) > 9:
+                            errs.append("Postcondition check aborted due to earlier errors")
+                            return (len(errs) == 0, errs)
+
+                        if (node.rpcid - req_count_start) % 1000 == 0:
+                            self.hive.log("Verifying poststate storage, have checked %d items ..." % (node.rpcid - req_count_start))
+
+            except Exception, e:
+                errs.append("Postcondition verification failed on %s @ %s after %d checks: %s" %(current,address, count,  str(e)))
+                return (False, errs)
+
 
         return (len(errs) == 0, errs)
 
