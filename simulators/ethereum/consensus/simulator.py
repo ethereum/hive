@@ -74,12 +74,12 @@ def main(args):
     hive = hivemodel.HiveAPI(hivesim)
 
 
-#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests"), 
-#        executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_FRONTIER))
-#
-#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/EIP150"),
-#        executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE))
-#
+    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests"), 
+        executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_FRONTIER))
+
+    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/EIP150"),
+        executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE))
+
     status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/Homestead"),
             executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_HOMESTEAD))
 
