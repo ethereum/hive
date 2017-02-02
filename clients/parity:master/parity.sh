@@ -35,13 +35,21 @@ chainconfig=`cat /chain.json`
 genesis=`cat /genesis.json`
 genesis="${genesis/coinbase/author}"
 
+accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 nonce=`echo $genesis | jq ".nonce"` && genesis=`echo $genesis | jq "del(.nonce)"`
 mixhash=`echo $genesis | jq ".mixHash"` && genesis=`echo $genesis | jq "del(.mixHash)"`
-accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": $nonce, \"mixHash\": $mixhash}}}"`
 
 if [ "$accounts" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
+	#In some cases, the 'alloc' portion can be extremely large
+	# Because of this, it can't be handled via cmd line parameters, 
+	# This fails :
+	# chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
+	# The following solution instead uses two temporary files
+
+	echo $accounts| jq "{ \"accounts\": .}" > tmp1
+	echo $chainconfig > tmp2
+	chainconfig=`jq -s '.[0] * .[1]' tmp1 tmp2`
 fi
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
@@ -75,9 +83,6 @@ fi
 
 echo $chainconfig > /chain.json
 FLAGS="$FLAGS --chain /chain.json"
-
-echo "Using the following chain config"
-cat /chain.json
 
 # Don't immediately abort, some imports are meant to fail
 set +e
