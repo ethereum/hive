@@ -251,6 +251,7 @@ class BlockTestExecutor(TestExecutor):
         params = {
             "HIVE_INIT_GENESIS": genesis, 
             "HIVE_INIT_BLOCKS" : blocks,
+            "HIVE_FORK_DAO_VOTE" : "1",
         }
         params["HIVE_FORK_HOMESTEAD"] = "20000",
         params["HIVE_FORK_TANGERINE"] = "20000",
@@ -272,7 +273,8 @@ class BlockTestExecutor(TestExecutor):
             params["HIVE_FORK_HOMESTEAD"] = "5",
             params["HIVE_FORK_DAO_BLOCK"] = "8",
             params["HIVE_FORK_TANGERINE"] = "10",
-            params["HIVE_FORK_SPURIOUS"]  = "10",
+            params["HIVE_FORK_SPURIOUS"]  = "20000",
+            #params["HIVE_FORK_SPURIOUS"]  = "10",
 
         node = None
         self.hive.log("Starting node")
@@ -379,7 +381,7 @@ class BlockTestExecutor(TestExecutor):
                 errs.append("Postcondition check aborted due to earlier errors")
                 return (len(errs) == 0, errs)
 
-            if (node.rpcid - req_count_start) % 1000 == 0:
+            if (node.rpcid - req_count_start) % 1000 == 0 and (node.rpcid - req_count_start) > 0:
                 self.hive.log("Verifying poststate, have checked %d items ..." % (node.rpcid - req_count_start))
             
             # Parity fails otherwise...
