@@ -1,5 +1,44 @@
 import json
 
+class Rules():
+
+    RULES_FRONTIER = {
+        "HIVE_FORK_HOMESTEAD" : 2000000,
+        "HIVE_FORK_TANGERINE" : 2000000,
+        "HIVE_FORK_SPURIOUS"  : 2000000,
+        "HIVE_FORK_DAO_BLOCK" : 2000000
+    }
+
+    RULES_HOMESTEAD = {
+
+        "HIVE_FORK_HOMESTEAD" : 0,
+        "HIVE_FORK_TANGERINE" : 2000000,
+        "HIVE_FORK_SPURIOUS"  : 2000000,
+        "HIVE_FORK_DAO_BLOCK" : 2000000
+    }
+
+    RULES_TANGERINE = {
+        "HIVE_FORK_HOMESTEAD" : 0,
+        "HIVE_FORK_TANGERINE" : 0,
+        "HIVE_FORK_SPURIOUS"  : 2000000,
+        "HIVE_FORK_DAO_BLOCK" : 2000000
+    }
+    RULES_SPURIOUS = {
+
+        "HIVE_FORK_HOMESTEAD" : 0,
+        "HIVE_FORK_TANGERINE" : 0,
+        "HIVE_FORK_SPURIOUS"  : 0,
+        "HIVE_FORK_DAO_BLOCK" : 2000000
+    }
+
+    RULES_TRANSITIONNET = {
+
+        "HIVE_FORK_HOMESTEAD" : 5,
+        "HIVE_FORK_TANGERINE" : 8,
+        "HIVE_FORK_SPURIOUS"  : 10,
+        "HIVE_FORK_DAO_BLOCK" : 2000000
+    }
+
 # Model for the testcases
 class Testfile(object):
 
@@ -49,6 +88,33 @@ class Testcase(object):
 
         
         return (len(missing_keys) == 0 ,"Missing keys: %s" % (",".join(missing_keys))) 
+
+    def ruleset(self, default=Rules.RULES_FRONTIER):
+        """In some cases (newer tests), the ruleset is specified in the 
+        testcase json
+        If so, it's returned. Otherwise, default is returned
+        """
+        if "network" not in self.data:
+            return default
+
+        defined_sets = {
+            "Homestead" : Rules.RULES_HOMESTEAD,
+            "Frontier"  : Rules.RULES_FRONTIER,
+            "EIP150"    : Rules.RULES_TANGERINE,
+            "EIP158"    : Rules.RULES_SPURIOUS,
+            "TransitionNet" : Rules.RULES_TRANSITIONNET,
+            }
+
+
+        if self.data['network'] in defined_sets:
+            return defined_sets[self.data['network']]
+
+        return default
+
+    def get(self, key):
+        if key in self.data:
+            return self.data[key]
+        return None
 
     def genesis(self, key = None):
         """ Returns the 'genesis' block for this testcase, 
@@ -149,9 +215,7 @@ class Testcase(object):
         return None
 
     def details(self):
-        _d = {
-            "instanceid" : self.nodeInstance
-        }
+        _d = { "instanceid" : self.nodeInstance}
         if self._message is not None:
             _d["errors"] = self._message
         return _d
@@ -165,35 +229,3 @@ class Testcase(object):
             return "success"
 
         return "failed"
-
-#class GeneralStateTestcase(Testcase):
-#    
-#    def __init__(self,name, jsondata):
-#        super(GeneralStateTestcase, self).__init__(name, jsondata)
-#        self.required_keys = ["env","post","pre","transaction"]
-#
-#
-#    def genesis(self, key = None):
-#        """ Returns the 'genesis' block for this testcase, 
-#        including any alloc's (prestate) required """
-#        # Genesis block
-#        if self.raw_genesis is None:
-#            test_env = self.data['env']
-#
-#            # Turns out the testcases have noncewritten as 0102030405060708. 
-#            # Which is supposed to be interpreted as 0x0102030405060708. 
-#            # But if it's written as 0102030405060708 in the genesis file, 
-#            # it's interpreted differently. So we'll need to mod that on the fly 
-#            # for every testcase.
-#            nonce = raw_genesis[u'nonce']
-#            if not raw_genesis[u'nonce'][:2] == '0x':
-#                raw_genesis[u'nonce'] = '0x'+raw_genesis[u'nonce']
-#
-#            raw_genesis['alloc'] = self.data['pre']
-#            self.raw_genesis = raw_genesis
-#
-#        if key is None:
-#            return self.raw_genesis
-#
-#        return self.raw_genesis[key]
-#

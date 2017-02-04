@@ -5,7 +5,7 @@ FROM jfloff/alpine-python:2.7-onbuild
 # Install curl to allow controlling the simulator as well as to interact with the
 # client via HTTP-RPC.
 RUN apk add --update curl git && \
-  git clone --depth 1 https://github.com/ethereum/tests.git
+  git clone --depth 1 https://github.com/ethereum/tests.git --branch generaltestsasbc && echo "cacheoff"
 
 
 # Add the simulation controller

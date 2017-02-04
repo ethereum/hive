@@ -2,25 +2,9 @@ import requests
 import traceback,sys,os
 import binascii
 import json
-from testmodel import Testcase, Testfile
+from testmodel import Testcase, Testfile, Rules
 from utils import canonicalize, getFiles, hex2big
 import time
-
-
-RULES_FRONTIER = 0
-RULES_HOMESTEAD = 1
-RULES_TANGERINE = 2
-RULES_SPURIOUS = 4
-""" 
-The 'RULES_TRANSITIONNET' is a bit peculiar: 
-
-    block #0 - 4: Frontier Rules
-    block #5: Transition Block to Homestead
-    block #8: Dao Hardfork block
-    block #10: Transition Block to EIP150
-"""
-RULES_TRANSITIONNET = 5
-
 
 
 # Model for the Hive interaction
@@ -40,8 +24,14 @@ class HiveNode(object):
         r = self.session.post(self.url,json = payload)
         return r.json()['result']        
 
+    def getClientversion(self):
+        return self._getNodeData("web3_clientVersion",[])
+
     def getBlockByNumber(self,blnum):
         return self._getNodeData("eth_getBlockByNumber", [str(int(blnum)),True])
+
+    def getLatestBlock(self):
+        return self._getNodeData("eth_getBlockByNumber", ["latest",True])
 
 
     def getNonce(self,address):
@@ -120,9 +110,6 @@ class HiveAPI(object):
         return self._post("/subresults", params = params, data = data);
 
 
-#    def generalStateTests(self, start =0 , end = -1, whitelist = [], blacklist = [], testfiles = []):
-#        self._performTests(start,end,whitelist, blacklist, testfiles, GeneralStateTestExecutor)
-#
     def blockTests(self, start =0 , end = -1, whitelist = [], blacklist = [], testfiles = [],executor= None) :
         return self._performTests(start,end,whitelist, blacklist, testfiles, executor)
 
@@ -185,9 +172,9 @@ class TestExecutor(object):
     This should probably be moved into 'testmodel' instead. 
 
     """
-    def __init__(self, hiveapi, rules = RULES_FRONTIER):
+    def __init__(self, hiveapi, rules = Rules.RULES_FRONTIER):
         self.hive = hiveapi
-        self.rules = rules
+        self.default_rules = rules
 
     def log(msg):
         self.hive.log(msg)
@@ -229,7 +216,7 @@ class BlockTestExecutor(TestExecutor):
 
     def __init__(self, hiveapi, rules):
         super(BlockTestExecutor, self).__init__(hiveapi, rules)
-
+        self.clientVersion = None
 
     def executeTestcase(self,testcase):
         genesis = None
@@ -253,28 +240,12 @@ class BlockTestExecutor(TestExecutor):
             "HIVE_INIT_BLOCKS" : blocks,
             "HIVE_FORK_DAO_VOTE" : "1",
         }
+
         params["HIVE_FORK_HOMESTEAD"] = "20000",
         params["HIVE_FORK_TANGERINE"] = "20000",
         params["HIVE_FORK_SPURIOUS"]  = "20000",
 
-        if self.rules >= RULES_HOMESTEAD:
-            params["HIVE_FORK_HOMESTEAD"] = "0",
-        if self.rules >= RULES_TANGERINE:
-            params["HIVE_FORK_TANGERINE"] = "0",
-        if self.rules >= RULES_SPURIOUS:
-            params["HIVE_FORK_SPURIOUS"] = "0",
-
-
-        if self.rules == RULES_TRANSITIONNET:
-            #    block #0 - 4: Frontier Rules
-            #    block #5: Transition Block to Homestead
-            #    block #8: Dao Hardfork block
-            #    block #10: Transition Block to EIP150
-            params["HIVE_FORK_HOMESTEAD"] = "5",
-            params["HIVE_FORK_DAO_BLOCK"] = "8",
-            params["HIVE_FORK_TANGERINE"] = "10",
-            params["HIVE_FORK_SPURIOUS"]  = "20000",
-            #params["HIVE_FORK_SPURIOUS"]  = "10",
+        params.update(testcase.ruleset(self.default_rules))
 
         node = None
         self.hive.log("Starting node")
@@ -285,6 +256,9 @@ class BlockTestExecutor(TestExecutor):
             testcase.fail(["Failed to start node (%s)" % str(e)])
             return False
 
+        if self.clientversion is None:
+            self.clientversion = node.getClientversion()
+            print("Client version: %s" % self.clientversion)
 
         self.hive.log("Started node %s" % node)
 
@@ -368,6 +342,21 @@ class BlockTestExecutor(TestExecutor):
                 return "Found `%s`, expected `%s`"  % (v, exp)
             return None
 
+        # With a bit of luck, we can just check the `lastblockhash` directly
+        exp_lastblockhash = testcase.get("lastblockhash")
+        if exp_lastblockhash is not None: 
+            actual_lastblockhash = node.getLatestBlock()['hash']
+            err = _verifyEqRaw(actual_lastblockhash[-64:],exp_lastblockhash[-64:])
+            #TODO, run with whitelist ['DaoTransactions_EmptyTransactionAndForkBlocksAhead']
+            # on parity, to see why that test is passing!
+            if err is not None:
+                errs.append("Last block hash wrong")
+                errs.append([err])
+            else:
+                return (len(errs) == 0, errs)
+
+        # Either 'lastblockhash' is missing, or it isn't right. Continue checking to debug what's wrong
+
         req_count_start = node.rpcid
         current = ""
         numaccounts = len(testcase.postconditions())
@@ -396,7 +385,7 @@ class BlockTestExecutor(TestExecutor):
                     err = _verifyEqRaw(_n, exp)
                     if err is not None:
                         errs.append("Nonce error (`%s`)" % address)
-                        errs.append(err)
+                        errs.append([err])
 
                 if 'code' in poststate_account:
                     current = "codecheck"
@@ -405,7 +394,7 @@ class BlockTestExecutor(TestExecutor):
                     err = _verifyEqRaw(_c, exp)
                     if err is not None:
                         errs.append("Code error (`%s`)" % address)
-                        errs.append(err)
+                        errs.append([err])
 
 
                 if 'balance' in poststate_account:
@@ -415,7 +404,7 @@ class BlockTestExecutor(TestExecutor):
                     err = _verifyEqRaw(_b, exp)
                     if err is not None:
                         errs.append("Balance error (`%s`)" % address)
-                        errs.append(err)
+                        errs.append([err])
 
                 if 'storage' in poststate_account and len(poststate_account['storage']) > 0:
 
@@ -435,7 +424,7 @@ class BlockTestExecutor(TestExecutor):
 
                         if err is not None:
                             errs.append("Storage error (`%s`) key `%s`" % (address, _hash))
-                            errs.append(err)
+                            errs.append([err])
 
                         if len(errs) > 9:
                             errs.append("Postcondition check aborted due to earlier errors")
@@ -450,18 +439,3 @@ class BlockTestExecutor(TestExecutor):
 
 
         return (len(errs) == 0, errs)
-
-#class GeneralStateTestExecutor(TestExecutor):
-#
-#    def __init__(self, hiveapi, rules = RULES_FRONTIER):
-#        super(GeneralStateTestExecutor, self).__init__(hiveapi)
-#        self.ruleset = rules
-#
-#    def executeTestcase(self,testcase):
-#        """
-#        Executes a general-state-test testcase. 
-#
-#
-#        """
-#        pass
-#

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os,sys
 import hivemodel
+from testmodel import Rules
 import utils
 
 class HiveTestNode(hivemodel.HiveNode):
@@ -58,12 +59,12 @@ class HiveTestAPI(hivemodel.HiveAPI):
 
 def test():
     hive = HiveTestAPI()
-    executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE)
+    executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TANGERINE)
     hive.blockTests(testfiles= utils.getFiles("./tests/BlockchainTests"), executor = executor)
 
 def main(args):
 
-    print("Validator started\n")
+    print("Simulator started\n")
 
     if 'HIVE_SIMULATOR' not in os.environ:
         print("Running in TEST-mode")
@@ -73,26 +74,28 @@ def main(args):
     print("Hive simulator: %s\n" % hivesim)
     hive = hivemodel.HiveAPI(hivesim)
 
-
     status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests"), 
-        executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_FRONTIER))
-
-    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/EIP150"),
-        executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TANGERINE))
-
-    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/Homestead"),
-            executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_HOMESTEAD))
-
-    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/TestNetwork"),
-            executor = hivemodel.BlockTestExecutor(hive , hivemodel.RULES_TRANSITIONNET))
-
+        executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_FRONTIER),
+        start=0, end=2, whitelist=["newChainFrom5Block"])
+#
+#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/EIP150"),
+#        executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TANGERINE))
+#
+#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/Homestead"),
+#            executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_HOMESTEAD))
+#
+#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/TestNetwork"),
+#            executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TRANSITIONNET),
+#            whitelist=["DaoTransactions_EmptyTransactionAndForkBlocksAhead"])
+#    
+#    status = hive.blockTests(testfiles = utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"), 
+#        executor = hivemodel.BlockTestExecutor(hive , None))
 
 
     if not status:
         sys.exit(-1)
 
     sys.exit(0)
-    #hive.generalStateTests(start=0, end=2000, whitelist="blockhash0.json", testfiles=utils.getFilesRecursive("./tests/generalStateTests"))
 
 if __name__ == '__main__':
     main(sys.argv[1:])

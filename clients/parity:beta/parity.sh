@@ -69,8 +69,8 @@ if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 fi
 
 if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
-	HEX_HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"daoHardforkTransition\"]; $HIVE_FORK_DAO_BLOCK)"`
+	HEX_HIVE_FORK_DAO_BLOCK=`echo "obase=16; $HIVE_FORK_DAO_BLOCK" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"daoHardforkTransition\"]; $HEX_HIVE_FORK_DAO_BLOCK)"`
 fi
 
 if [ "$HIVE_FORK_TANGERINE" != "" ]; then
