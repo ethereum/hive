@@ -35,15 +35,25 @@ chainconfig=`cat /chain.json`
 genesis=`cat /genesis.json`
 genesis="${genesis/coinbase/author}"
 
+accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 nonce=`echo $genesis | jq ".nonce"` && genesis=`echo $genesis | jq "del(.nonce)"`
 mixhash=`echo $genesis | jq ".mixHash"` && genesis=`echo $genesis | jq "del(.mixHash)"`
-accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": $nonce, \"mixHash\": $mixhash}}}"`
 
 if [ "$accounts" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
+	#In some cases, the 'alloc' portion can be extremely large
+	# Because of this, it can't be handled via cmd line parameters, 
+	# This fails :
+	# chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
+	# The following solution instead uses two temporary files
+
+	echo $accounts| jq "{ \"accounts\": .}" > tmp1
+	echo $chainconfig > tmp2
+	chainconfig=`jq -s '.[0] * .[1]' tmp1 tmp2`
 fi
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
+
+# See https://github.com/ethcore/parity/wiki/Consensus-Engines for info about options
 
 if [ "$HIVE_TESTNET" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
@@ -53,12 +63,35 @@ if [ "$HIVE_TESTNET" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x789b0\")"`
 fi
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-	HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x$HIVE_FORK_HOMESTEAD\")"`
+	HEX_HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; $HEX_HIVE_FORK_HOMESTEAD)"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x$HEX_HIVE_FORK_HOMESTEAD\")"`
 fi
+
+if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+	HIVE_FORK_DAO_BLOCK=`echo "obase=16; $HIVE_FORK_DAO_BLOCK" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"daoHardforkTransition\"]; $HIVE_FORK_DAO_BLOCK)"`
+fi
+
+if [ "$HIVE_FORK_TANGERINE" != "" ]; then
+	HIVE_FORK_TANGERINE=`echo "obase=10; $HIVE_FORK_TANGERINE" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip150Transition\"]; $HIVE_FORK_TANGERINE )"`
+fi
+
+if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
+	HIVE_FORK_SPURIOUS=`echo "obase=10; $HIVE_FORK_SPURIOUS" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip155Transition\"]; $HIVE_FORK_SPURIOUS)"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip160Transition\"]; $HIVE_FORK_SPURIOUS)"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161abcTransition\"]; $HIVE_FORK_SPURIOUS)"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161dTransition\"]; $HIVE_FORK_SPURIOUS)"`
+fi
+
 
 echo $chainconfig > /chain.json
 FLAGS="$FLAGS --chain /chain.json"
+
+# Don't immediately abort, some imports are meant to fail
+set +e
 
 # Load the test chain if present
 echo "Loading initial blockchain..."
@@ -73,6 +106,9 @@ if [ -d /blocks ]; then
 		/parity $FLAGS import /blocks/$block
 	done
 fi
+
+# Immediately abort the script on any error encountered
+set -e
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then

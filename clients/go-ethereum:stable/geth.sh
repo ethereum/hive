@@ -16,6 +16,8 @@
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
+#  - HIVE_FORK_TANGERINE block number of TangerineWhistle
+#  - HIVE_FORK_SPURIOUS  block number of SpurioisDragon
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
@@ -56,6 +58,15 @@ fi
 if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": true}"`
 fi
+
+if [ "$HIVE_FORK_TANGERINE" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"eip150Block\": $HIVE_FORK_TANGERINE}"`
+fi
+if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"`
+	chainconfig=`echo $chainconfig | jq ". + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"`
+fi
+
 if [ "$chainconfig" != "{}" ]; then
 	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 fi
@@ -63,6 +74,9 @@ fi
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
 /geth $FLAGS init /genesis.json
+
+# Don't immediately abort, some imports are meant to fail
+set +e
 
 # Load the test chain if present
 echo "Loading initial blockchain..."
@@ -77,6 +91,8 @@ if [ -d /blocks ]; then
 		/geth $FLAGS import /blocks/$block
 	done
 fi
+
+set -e
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then

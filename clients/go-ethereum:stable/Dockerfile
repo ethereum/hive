@@ -5,6 +5,9 @@
 # needing to constantly rebuild.
 FROM alpine:latest
 
+# Make sure bash and jq is available for easier wrapper implementation
+RUN apk add --update bash jq
+
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
   apk add --update go git make gcc musl-dev                                        && \
@@ -13,9 +16,6 @@ RUN \
   cp go-ethereum/build/bin/geth /geth                                              && \
   apk del go git make gcc musl-dev                                                 && \
   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
-
-# Make sure bash and jq is available for easier wrapper implementation
-RUN apk add --update bash jq
 
 # Inject the startup script
 ADD geth.sh /geth.sh

@@ -161,6 +161,10 @@ The behavioral configuration variables:
   * `HIVE_FORK_HOMESTEAD` the block number of the Ethereum Homestead transition
   * `HIVE_FORK_DAO_BLOCK` the block number of the DAO hard-fork transition
   * `HIVE_FORK_DAO_VOTE` whether the node supports or opposes the DAO hard-fork
+  * `HIVE_FORK_TANGERINE` the block number of the Ethereum TangerineWhistle transition
+    * The HF for repricing certain opcodes, EIP 150
+  * `HIVE_FORK_SPURIOUS` the block number of the Ethereum Homestead transition
+    * The HF for replay protection, state cleaning etc. EIPs 155,160,161. 
   * `HIVE_MINER` address to credit with mining rewards (if set, start mining)
   * `HIVE_MINER_EXTRA` extra-data field to set for newly minted blocks
 
@@ -354,6 +358,8 @@ should create and organize the simulated network. This API is exposed at the HTT
  * `/nodes/$ID` with method `GET` retrieves the IP address of an existing client instance
    * The client's exposed services can be reached via ports `8545`, `8546` and `30303`
  * `/nodes/$ID` with method `DELETE` instantly terminates an existing client instance
+ * `/log` with method `POST` sends a logging message from the simulator to the main process.
+ 
 
 Overriding environmental variables that change client behaviors via HTTP parameters is easy to do in
 any HTTP client utility and/or library, but uploading files needed for chain initializations is much
