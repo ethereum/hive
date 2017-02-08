@@ -3,32 +3,32 @@ import json
 class Rules():
 
     RULES_FRONTIER = {
-        "HIVE_FORK_HOMESTEAD" : 2000000,
-        "HIVE_FORK_TANGERINE" : 2000000,
-        "HIVE_FORK_SPURIOUS"  : 2000000,
-        "HIVE_FORK_DAO_BLOCK" : 2000000
+        "HIVE_FORK_HOMESTEAD" : 2000,
+        "HIVE_FORK_TANGERINE" : 2000,
+        "HIVE_FORK_SPURIOUS"  : 2000,
+        "HIVE_FORK_DAO_BLOCK" : 2000
     }
 
     RULES_HOMESTEAD = {
 
         "HIVE_FORK_HOMESTEAD" : 0,
-        "HIVE_FORK_TANGERINE" : 2000000,
-        "HIVE_FORK_SPURIOUS"  : 2000000,
-        "HIVE_FORK_DAO_BLOCK" : 2000000
+        "HIVE_FORK_TANGERINE" : 2000,
+        "HIVE_FORK_SPURIOUS"  : 2000,
+        "HIVE_FORK_DAO_BLOCK" : 2000
     }
 
     RULES_TANGERINE = {
         "HIVE_FORK_HOMESTEAD" : 0,
         "HIVE_FORK_TANGERINE" : 0,
-        "HIVE_FORK_SPURIOUS"  : 2000000,
-        "HIVE_FORK_DAO_BLOCK" : 2000000
+        "HIVE_FORK_SPURIOUS"  : 2000,
+        "HIVE_FORK_DAO_BLOCK" : 2000
     }
     RULES_SPURIOUS = {
 
         "HIVE_FORK_HOMESTEAD" : 0,
         "HIVE_FORK_TANGERINE" : 0,
         "HIVE_FORK_SPURIOUS"  : 0,
-        "HIVE_FORK_DAO_BLOCK" : 2000000
+        "HIVE_FORK_DAO_BLOCK" : 2000
     }
 
     RULES_TRANSITIONNET = {
@@ -36,7 +36,7 @@ class Rules():
         "HIVE_FORK_HOMESTEAD" : 5,
         "HIVE_FORK_TANGERINE" : 8,
         "HIVE_FORK_SPURIOUS"  : 10,
-        "HIVE_FORK_DAO_BLOCK" : 2000000
+        "HIVE_FORK_DAO_BLOCK" : 2000
     }
 
 # Model for the testcases
@@ -135,6 +135,7 @@ class Testcase(object):
 
             # Also, testcases have 'code' written as 0xdead
             # But geth does not handle that, so we'll need to mod any of those also
+            # However, cpp-ethereum rejects 'code' written as 'dead'
             for addr, account in self.data['pre'].items():
                 if 'code' in account:
                     code = account['code']

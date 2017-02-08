@@ -75,21 +75,21 @@ def main(args):
     hive = hivemodel.HiveAPI(hivesim)
 
     status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests"), 
-        executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_FRONTIER),
-        start=0, end=2, whitelist=["newChainFrom5Block"])
-#
-#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/EIP150"),
-#        executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TANGERINE))
-#
-#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/Homestead"),
-#            executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_HOMESTEAD))
-#
-#    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/TestNetwork"),
-#            executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TRANSITIONNET),
-#            whitelist=["DaoTransactions_EmptyTransactionAndForkBlocksAhead"])
-#    
-#    status = hive.blockTests(testfiles = utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"), 
-#        executor = hivemodel.BlockTestExecutor(hive , None))
+        executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_FRONTIER))
+#        start=0, end=2, whitelist=["newChainFrom5Block"])
+
+    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/EIP150"),
+        executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TANGERINE))
+
+    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/Homestead"),
+            executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_HOMESTEAD))
+
+    status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/TestNetwork"),
+            executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TRANSITIONNET),
+            whitelist=["DaoTransactions_EmptyTransactionAndForkBlocksAhead"])
+    
+    status = hive.blockTests(testfiles = utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"), 
+        executor = hivemodel.BlockTestExecutor(hive , None))
 
 
     if not status:
