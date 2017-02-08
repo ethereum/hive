@@ -98,9 +98,9 @@ func estimateGasTest(t *testing.T, client *TestClient) {
 
 	var (
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
-		key            = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		account        = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
 		intArg         = big.NewInt(rand.Int63())
-		addrArg        = crypto.PubkeyToAddress(key.PublicKey)
+		addrArg        = account.Address
 	)
 
 	payload, err := contractABI.Pack("events", intArg, addrArg)
@@ -110,7 +110,7 @@ func estimateGasTest(t *testing.T, client *TestClient) {
 
 	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
 	msg := ethereum.CallMsg{
-		From: crypto.PubkeyToAddress(key.PublicKey),
+		From: account.Address,
 		To:   &predeployedContractAddr,
 		Data: payload,
 	}
@@ -122,7 +122,7 @@ func estimateGasTest(t *testing.T, client *TestClient) {
 
 	// send the actual tx and test gas usage
 	rawTx := types.NewTransaction(0, *msg.To, msg.Value, new(big.Int).Add(estimated, big.NewInt(100000)), new(big.Int).Mul(common.Big32, common.Shannon), msg.Data)
-	tx, err := SignTransaction(rawTx, key)
+	tx, err := SignTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Could not sign transaction: %v", err)
 	}
@@ -154,12 +154,12 @@ func balanceAndNonceAtTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		sourceKey     = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		sourceAccount = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
 		sourceNonce   = uint64(0)
-		sourceAddress = crypto.PubkeyToAddress(sourceKey.PublicKey)
+		sourceAddress = sourceAccount.Address
 
-		targetKey  = createAndFundAccount(t, nil, client)
-		targetAddr = crypto.PubkeyToAddress(targetKey.PublicKey)
+		targetAccount = createAndFundAccount(t, nil, client)
+		targetAddr    = targetAccount.Address
 	)
 
 	// Get current balance
@@ -189,7 +189,7 @@ func balanceAndNonceAtTest(t *testing.T, client *TestClient) {
 	gasLimit := big.NewInt(50000)
 
 	rawTx := types.NewTransaction(sourceNonce, targetAddr, amount, gasLimit, gasPrice, nil)
-	valueTx, err := SignTransaction(rawTx, sourceKey)
+	valueTx, err := SignTransaction(rawTx, sourceAccount)
 	if err != nil {
 		t.Fatalf("Unable to sign value tx: %v", err)
 	}
@@ -475,8 +475,8 @@ func deployContractTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		key     = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
-		address = crypto.PubkeyToAddress(key.PublicKey)
+		account = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		address = account.Address
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
@@ -485,7 +485,7 @@ func deployContractTest(t *testing.T, client *TestClient) {
 	)
 
 	rawTx := types.NewContractCreation(nonce, common.Big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, key)
+	deployTx, err := SignTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -557,8 +557,8 @@ func deployContractOutOfGasTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		key     = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
-		address = crypto.PubkeyToAddress(key.PublicKey)
+		account = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		address = account.Address
 		nonce   = uint64(0)
 
 		contractAddress = crypto.CreateAddress(address, nonce)
@@ -569,7 +569,7 @@ func deployContractOutOfGasTest(t *testing.T, client *TestClient) {
 	t.Logf("Calculated contract address: %x", contractAddress)
 
 	rawTx := types.NewContractCreation(nonce, common.Big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, key)
+	deployTx, err := SignTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -612,11 +612,11 @@ func receiptTest(t *testing.T, client *TestClient) {
 
 	var (
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
-		key            = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		account        = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
 		nonce          = uint64(0)
 
 		intArg  = big.NewInt(rand.Int63())
-		addrArg = crypto.PubkeyToAddress(key.PublicKey)
+		addrArg = account.Address
 	)
 
 	payload, err := contractABI.Pack("events", intArg, addrArg)
@@ -626,7 +626,7 @@ func receiptTest(t *testing.T, client *TestClient) {
 
 	gasPrice := new(big.Int).Mul(big.NewInt(30), common.Shannon)
 	rawTx := types.NewTransaction(nonce, predeployedContractAddr, common.Big0, big.NewInt(500000), gasPrice, payload)
-	tx, err := SignTransaction(rawTx, key)
+	tx, err := SignTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -892,8 +892,8 @@ func logSubscriptionTest(t *testing.T, client *TestClient) {
 
 	var (
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
-		key            = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
-		address        = crypto.PubkeyToAddress(key.PublicKey)
+		account        = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		address        = account.Address
 		nonce          = uint64(0)
 
 		arg0 = big.NewInt(rand.Int63())
@@ -903,7 +903,7 @@ func logSubscriptionTest(t *testing.T, client *TestClient) {
 	payload, _ := contractABI.Pack("events", arg0, arg1)
 	gasPrice := new(big.Int).Mul(big.NewInt(30), common.Shannon)
 	rawTx := types.NewTransaction(nonce, predeployedContractAddr, common.Big0, big.NewInt(500000), gasPrice, payload)
-	tx, err := SignTransaction(rawTx, key)
+	tx, err := SignTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}

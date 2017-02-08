@@ -2,16 +2,15 @@ package main
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"golang.org/x/net/context"
@@ -283,13 +282,10 @@ func runTest(test func(t *testing.T, client *TestClient), clients chan *TestClie
 
 // SignTransaction signs the given transaction with the test account and returns it.
 // It uses the EIP155 signing rules.
-func SignTransaction(tx *types.Transaction, key *ecdsa.PrivateKey) (*types.Transaction, error) {
-	signer := types.NewEIP155Signer(chainID)
-	hash := signer.Hash(tx)
-	signature, err := crypto.Sign(hash[:], key)
+func SignTransaction(tx *types.Transaction, account accounts.Account) (*types.Transaction, error) {
+	wallet, err := accountsManager.Find(account)
 	if err != nil {
 		return nil, err
 	}
-	return tx.WithSignature(signer, signature)
-
+	return wallet.SignTxWithPassphrase(account, defaultPassword, tx, chainID)
 }

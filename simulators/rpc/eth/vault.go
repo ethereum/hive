@@ -2,20 +2,21 @@ package main
 
 import (
 	"context"
-	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"strings"
 	"testing"
-
-	"fmt"
 	"time"
 
+	"os"
+
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var (
@@ -41,7 +42,18 @@ contract Vault {
 	predeployedVaultABI = `[{"constant":false,"inputs":[{"name":"to","type":"address"},{"name":"amount","type":"uint256"}],"name":"sendSome","outputs":[],"payable":false,"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"","type":"address"},{"indexed":false,"name":"","type":"uint256"}],"name":"Send","type":"event"}]`
 	// wait for vaultTxConfirmationCount before a vault fund tx is considered confirmed
 	vaultTxConfirmationCount = uint64(10)
+	// software based keystore
+	keyStore *keystore.KeyStore
+	// account manager used to create new accounts and sign data
+	accountsManager *accounts.Manager
+	// default password for generated accounts
+	defaultPassword = ""
 )
+
+func init() {
+	keyStore = keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
+	accountsManager = accounts.NewManager(keyStore)
+}
 
 // nodeAddress returns the first account from the node and unlocks it.
 func nodeAddress(t *testing.T, client *TestClient) common.Address {
@@ -67,19 +79,18 @@ func nodeAddress(t *testing.T, client *TestClient) common.Address {
 
 // createAndFundAccount creates a new account that is funded from the vault contract.
 // It will panic when the account could not be created and funded.
-func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client *TestClient) *ecdsa.PrivateKey {
-	key, err := crypto.GenerateKey()
+func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client *TestClient) accounts.Account {
+	account, err := keyStore.NewAccount(defaultPassword)
 	if err != nil {
 		panic(err)
 	}
 
-	address := crypto.PubkeyToAddress(key.PublicKey)
-	if amount == nil || amount.Cmp(common.Big0) == 0 {
-		return key
-	}
-
 	// each node has at least one 1 key with some of pre-allocated ether
 	fromAddr := nodeAddress(t, client)
+
+	if amount == nil {
+		amount = common.Big0
+	}
 
 	// setup subscriptions
 	var (
@@ -100,7 +111,7 @@ func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client 
 	defer headsSub.Unsubscribe()
 
 	eventTopic := vault.Events["Send"].Id()
-	addressTopic := common.BytesToHash(common.LeftPadBytes(address[:], 32))
+	addressTopic := common.BytesToHash(common.LeftPadBytes(account.Address[:], 32))
 	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
 	q := ethereum.FilterQuery{
 		Addresses: []common.Address{predeployedVaultAddr},
@@ -113,7 +124,7 @@ func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client 
 	defer logsSub.Unsubscribe()
 
 	// order the vault to send some ether
-	payload, err := vault.Pack("sendSome", address, amount)
+	payload, err := vault.Pack("sendSome", account.Address, amount)
 	if err != nil {
 		t.Fatalf("Unable to send some ether to new account: %v", err)
 	}
@@ -158,33 +169,32 @@ func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client 
 
 		if latestHeader != nil && receivedLog != nil {
 			if receivedLog.BlockNumber+vaultTxConfirmationCount <= latestHeader.Number.Uint64() {
-				return key
+				return account
 			}
 		}
 	}
 
-	return key
+	return account
 }
 
 // createAndFundAccount creates a new account that is funded from the vault contract.
 // It will panic when the account could not be created and funded.
-func createAndFundAccount(t *testing.T, amount *big.Int, client *TestClient) *ecdsa.PrivateKey {
-	key, err := crypto.GenerateKey()
+func createAndFundAccount(t *testing.T, amount *big.Int, client *TestClient) accounts.Account {
+	account, err := keyStore.NewAccount(defaultPassword)
 	if err != nil {
 		panic(err)
-	}
-
-	address := crypto.PubkeyToAddress(key.PublicKey)
-	if amount == nil || amount.Cmp(common.Big0) == 0 {
-		return key
 	}
 
 	// each node has at least one 1 key with some of pre-allocated ether
 	fromAddr := nodeAddress(t, client)
 
+	if amount == nil {
+		amount = common.Big0
+	}
+
 	// order the vault to send some ether
 	vault, _ := abi.JSON(strings.NewReader(predeployedVaultABI))
-	payload, err := vault.Pack("sendSome", address, amount)
+	payload, err := vault.Pack("sendSome", account.Address, amount)
 	if err != nil {
 		t.Fatalf("Unable to send some ether to new account: %v", err)
 	}
@@ -208,22 +218,22 @@ func createAndFundAccount(t *testing.T, amount *big.Int, client *TestClient) *ec
 		ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
 		block, err := client.BlockByNumber(ctx, nil)
 		if err != nil {
-			return nil
+			panic(err)
 		}
 
 		if block.NumberU64() > vaultTxConfirmationCount {
 			ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-			balance, err := client.BalanceAt(ctx, address, new(big.Int).Sub(block.Number(), new(big.Int).SetUint64(vaultTxConfirmationCount)))
+			balance, err := client.BalanceAt(ctx, account.Address, new(big.Int).Sub(block.Number(), new(big.Int).SetUint64(vaultTxConfirmationCount)))
 			if err != nil {
 				panic(err)
 			}
 			if balance.Cmp(amount) >= 0 {
-				return key
+				return account
 			}
 		}
 
 		time.Sleep(time.Second)
 	}
 
-	panic(fmt.Sprintf("Could not fund account 0x%x in transaction 0x%x", address, txHash))
+	panic(fmt.Sprintf("Could not fund account 0x%x in transaction 0x%x", account.Address, txHash))
 }

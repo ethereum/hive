@@ -71,8 +71,8 @@ func transactContractTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		key     = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
-		address = crypto.PubkeyToAddress(key.PublicKey)
+		account = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		address = account.Address
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
@@ -81,11 +81,11 @@ func transactContractTest(t *testing.T, client *TestClient) {
 
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
 		intArg         = big.NewInt(rand.Int63())
-		addrArg        = crypto.PubkeyToAddress(key.PublicKey)
+		addrArg        = address
 	)
 
 	rawTx := types.NewContractCreation(nonce, common.Big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, key)
+	deployTx, err := SignTransaction(rawTx, account)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -120,7 +120,7 @@ func transactContractTest(t *testing.T, client *TestClient) {
 	}
 
 	eventsTx := types.NewTransaction(nonce, predeployedContractAddr, common.Big0, big.NewInt(500000), gasPrice, payload)
-	tx, err := SignTransaction(eventsTx, key)
+	tx, err := SignTransaction(eventsTx, account)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -162,8 +162,8 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		key     = createAndFundAccountWithSubscription(t, new(big.Int).Mul(common.Big1, common.Ether), client)
-		address = crypto.PubkeyToAddress(key.PublicKey)
+		account = createAndFundAccountWithSubscription(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		address = account.Address
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
@@ -172,14 +172,14 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
 		intArg         = big.NewInt(rand.Int63())
-		addrArg        = crypto.PubkeyToAddress(key.PublicKey)
+		addrArg        = account.Address
 
 		logs = make(chan types.Log)
 	)
 
 	// deploy contract
 	rawTx := types.NewContractCreation(nonce, common.Big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, key)
+	deployTx, err := SignTransaction(rawTx, account)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -228,12 +228,7 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 		From:  address,
 		Nonce: new(big.Int).SetUint64(nonce),
 		Signer: func(signer types.Signer, addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
-			hash := signer.Hash(tx)
-			signature, err := crypto.Sign(hash[:], key)
-			if err != nil {
-				return nil, err
-			}
-			return tx.WithSignature(signer, signature)
+			return SignTransaction(tx, account)
 		},
 	}
 
