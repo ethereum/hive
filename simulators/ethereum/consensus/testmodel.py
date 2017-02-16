@@ -32,13 +32,11 @@ class Rules():
     }
 
     RULES_TRANSITIONNET = {
-
         "HIVE_FORK_HOMESTEAD" : 5,
-        "HIVE_FORK_TANGERINE" : 8,
-        "HIVE_FORK_SPURIOUS"  : 10,
-        "HIVE_FORK_DAO_BLOCK" : 2000
+        "HIVE_FORK_DAO_BLOCK" : 8
+        "HIVE_FORK_TANGERINE" : 10,
+        "HIVE_FORK_SPURIOUS"  : 14,
     }
-
 # Model for the testcases
 class Testfile(object):
 
@@ -47,13 +45,13 @@ class Testfile(object):
         self._tests = []
 
     def tests(self):
-        with open(self.filename,"r") as infile: 
+        with open(self.filename,"r") as infile:
             json_data = json.load(infile)
             for k,v in json_data.items():
                 t = Testcase(k,v)
                 self._tests.append(t)
                 yield t
-        
+
     def __str__(self):
         return self.filename
 
@@ -86,11 +84,11 @@ class Testcase(object):
             if k not in self.data.keys():
                 missing_keys.append(k)
 
-        
-        return (len(missing_keys) == 0 ,"Missing keys: %s" % (",".join(missing_keys))) 
+
+        return (len(missing_keys) == 0 ,"Missing keys: %s" % (",".join(missing_keys)))
 
     def ruleset(self, default=Rules.RULES_FRONTIER):
-        """In some cases (newer tests), the ruleset is specified in the 
+        """In some cases (newer tests), the ruleset is specified in the
         testcase json
         If so, it's returned. Otherwise, default is returned
         """
@@ -117,16 +115,16 @@ class Testcase(object):
         return None
 
     def genesis(self, key = None):
-        """ Returns the 'genesis' block for this testcase, 
+        """ Returns the 'genesis' block for this testcase,
         including any alloc's (prestate) required """
         # Genesis block
         if self.raw_genesis is None:
             raw_genesis = self.data['genesisBlockHeader']
 
-            # Turns out the testcases have noncewritten as 0102030405060708. 
-            # Which is supposed to be interpreted as 0x0102030405060708. 
-            # But if it's written as 0102030405060708 in the genesis file, 
-            # it's interpreted differently. So we'll need to mod that on the fly 
+            # Turns out the testcases have noncewritten as 0102030405060708.
+            # Which is supposed to be interpreted as 0x0102030405060708.
+            # But if it's written as 0102030405060708 in the genesis file,
+            # it's interpreted differently. So we'll need to mod that on the fly
             # for every testcase.
             if 'nonce' in raw_genesis:
                 nonce = raw_genesis[u'nonce']
@@ -181,7 +179,7 @@ class Testcase(object):
             msg = [msg]
 
         if len(msg) == 0:
-            return 
+            return
 
         self._message.extend(msg)
 
