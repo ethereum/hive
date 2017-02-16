@@ -16,9 +16,9 @@ Get source.
 Create datadir and copy keys.
 
 ```
-> geth --datadir $MY_DATADIR init $GOPATH/src/github.com/karalabe/hive/simulators/rpc/eth/genesis.json
+> geth --datadir $MY_DATADIR init $GOPATH/src/github.com/karalabe/hive/simulators/ethereum/rpc/eth/genesis.json
 > mkdir $MY_DATADIR/keystore
-> cp $GOPATH/src/github.com/karalabe/hive/simulators/rpc/eth/keys/* $MY_DATADIR/keystore
+> cp $GOPATH/src/github.com/karalabe/hive/simulators/ethereum/rpc/eth/keys/* $MY_DATADIR/keystore
 ```
 
 Start node with HTTP and websocket interface and necessary API modules enabled.
@@ -31,7 +31,7 @@ Start node with HTTP and websocket interface and necessary API modules enabled.
 Generate ABI bindings (optional, repo contains already pre-generated bindings):
 
 ```
-> cd $GOPATH/src/github.com/karalabe/hive/simulators/rpc/eth
+> cd $GOPATH/src/github.com/karalabe/hive/simulators/ethereum/rpc/eth
 > abigen -abi contractABI.json -pkg main -type TestContract -out ABI_generated.go
 ```
 

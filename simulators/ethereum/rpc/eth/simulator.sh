@@ -98,4 +98,4 @@ echo "Run RPC tests against ${ips[@]}..."
 # Run hive (must be run from root directory of hive repo)
 # hive --client=go-ethereum:master --test=NONE --sim=rpc/eth --docker-noshell -loglevel 6
 #
-# Logs can be found in workspace/logs/simulations/rpc\:eth\[go-ethereum\:develop\]/simulator.log
+# Logs can be found in workspace/logs/simulations/ethereum/rpc\:eth\[go-ethereum\:develop\]/simulator.log
