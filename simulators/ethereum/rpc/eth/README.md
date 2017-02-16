@@ -94,7 +94,7 @@ The test suite can be run in a multi-node simulation. This simulation mimics a r
 ```
 > go get -u github.com/karalabe/hive
 > cd $GOPATH/src/github.com/karalabe/hive
-> hive --client=go-ethereum:master --test=NONE --sim=rpc/eth --docker-noshell --loglevel 6
+> hive --client=go-ethereum:master --test=NONE --sim=ethereum/rpc/eth --docker-noshell --loglevel 6
 ```
 
 Hive uses docker. On some platforms `--docker-noshell` argument needs to be given. More logging can be enabled by adding the `--loglevel 6` argument.
