@@ -6,7 +6,7 @@
 FROM golang:1-alpine
 
 # Build a geth bootnode, regular node from the develop branch and unit test binary
-RUN apk add --update git make gcc musl-dev curl jq
+RUN apk add --update git make gcc musl-dev curl jq linux-headers
 
 # Checkout source, pin version to ensure that RPC test suite doesn't break due
 # to incompatibility issues in the client packages/generated abi sources.
@@ -34,7 +34,7 @@ RUN (cd / && /abigen -abi /contractABI.json -pkg main -type TestContract -out /A
 RUN (cd / && GOPATH=/go go test -c -o /rpc.test)
 
 # Cleanup dependencies
-RUN apk del git make gcc musl-dev                                                                         
+RUN apk del git make gcc musl-dev linux-headers
 RUN (rm -rf /var/cache/apk/* && rm -rf /go)
 
 RUN apk add --update bash

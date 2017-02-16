@@ -10,11 +10,11 @@ RUN apk add --update bash jq
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  apk add --update go git make gcc musl-dev                                        && \
+  apk add --update go git make gcc musl-dev linux-headers                          && \
   git clone --depth 1 --branch release/1.5 https://github.com/ethereum/go-ethereum && \
   (cd go-ethereum && make geth)                                                    && \
   cp go-ethereum/build/bin/geth /geth                                              && \
-  apk del go git make gcc musl-dev                                                 && \
+  apk del go git make gcc musl-dev linux-headers                                   && \
   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
 # Inject the startup script
