@@ -8,8 +8,10 @@ FROM golang:1-alpine
 # Build a geth bootnode, regular node from the develop branch and unit test binary
 RUN apk add --update git make gcc musl-dev curl jq
 
-# Checkout source
+# Checkout source, pin version to ensure that RPC test suite doesn't break due
+# to incompatibility issues in the client packages/generated abi sources.
 RUN (git clone -b master --single-branch https://github.com/ethereum/go-ethereum /go/src/github.com/ethereum/go-ethereum)
+RUN (cd /go/src/github.com/ethereum/go-ethereum && git checkout c8695fae359aa327da9203a57ffaf4f2d47d4370)
 
 # Build binaries
 RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go make all)
