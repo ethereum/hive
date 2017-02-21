@@ -3,52 +3,49 @@
 # The build process it potentially longer running but every effort was made to
 # produce a very minimalistic container that can be reused many times without
 # needing to constantly rebuild.
-FROM alpine:latest
+#
+# This image is based on
+# https://github.com/ethereum/cpp-ethereum/blob/ccac1dd777c5b25de1c0bacc72dbecb6b376689e/scripts/docker/eth-alpine/Dockerfile
 
-# Since we need to build some libs, set the flags globally
-ENV CFLAGS   '-fPIC'
-ENV CPPFLAGS '-fPIC'
-ENV LDFLAGS  '-fPIC'
+FROM alpine
 
-# Build cpp-ethereum on the fly and delete all build tools afterwards
-RUN \
-  # Install any dependencies of cpp-ethereum
-  apk add --update sed git make cmake gcc g++ musl-dev jsoncpp-dev curl-dev boost-dev libmicrohttpd-dev                                      && \
-  apk add --update crypto++-dev leveldb-dev --update-cache --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing/ --allow-untrusted && \
-  \
-  # Install libraries missing from Alpine
-  wget http://prdownloads.sourceforge.net/argtable/argtable2-13.tar.gz && tar -zxvf argtable2-13.tar.gz                   && \
-  cd argtable2-13 && mkdir build && cd build && cmake .. && make install && cp /argtable2-13/src/argtable2.h /usr/include && \
-  cd / && rm -rf argtable2-13                                                                                             && \
-  \
-  git clone --depth 1 git://github.com/cinemast/libjson-rpc-cpp.git                                                 && \
-  sed -i -e s/\<string\>/\<cstring\>/g /libjson-rpc-cpp/src/jsonrpccpp/server/connectors/unixdomainsocketserver.cpp && \
-  cd libjson-rpc-cpp && mkdir build && cd build && cmake .. && make -j install                                      && \
-  cd / && rm -rf libjson-rpc-cpp                                                                                    && \
-  \
-  git clone --depth 1 git://github.com/miniupnp/miniupnp.git && \
-  cd miniupnp/miniupnpc && make -j && make install           && \
-  cd / && rm -rf miniupnp                                    && \
-  \
-  # Install cpp-ethereum itself, with a bit of a hack to fix some includes
-  git clone --depth 1 --branch develop https://github.com/ethereum/cpp-ethereum                                     && \
-  sed -i -e s/\<sys\\/poll.h\>/\<poll.h\>/g /usr/include/boost/asio/detail/socket_types.hpp                         && \
-  cd cpp-ethereum && mkdir build && cd build && cmake -DETHASHCL=NO -DTESTS=NO -DSOLIDITY=NO .. && make -j4 install && \
-  rm -rf cpp-ethereum                                                                                               && \
-  \
-  # Clean up all the dependency crap
-  apk add --update jsoncpp libcurl boost-random boost-regex boost-filesystem boost-thread libmicrohttpd crypto++ leveldb && \
-  apk del sed git make cmake gcc g++ musl-dev jsoncpp-dev curl-dev boost-dev libmicrohttpd-dev crypto++-dev leveldb-dev  && \
-  rm -rf /var/cache/apk/*
+# Make sure bash, bc and jq is available for easier wrapper implementation
+RUN apk add --no-cache \
+        bash jq bc \
+        libstdc++ \
+        gmp \
+        libcurl \
+        libmicrohttpd \
+        leveldb --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing/ \
+    && apk add --no-cache --virtual .build-deps \
+        git \
+        cmake \
+        g++ \
+        make \
+        linux-headers curl-dev libmicrohttpd-dev \
+        leveldb-dev --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing/ \
+    && sed -i -E -e 's|#warning|//#warning|' /usr/include/sys/poll.h \
+    && git clone --recursive https://github.com/ethereum/cpp-ethereum --branch develop --single-branch --depth 1 \
+    && mkdir /build && cd /build \
+    && cmake /cpp-ethereum -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTOOLS=Off -DTESTS=Off \
+    && make eth \
+    && make install \
+    && cd / && rm /build -rf \
+    && rm /cpp-ethereum -rf \
+    && apk del .build-deps \
+    && rm /var/cache/apk/* -f
 
-# Make sure bash and jq is available for easier wrapper implementation
-RUN apk add --update bash jq
+# See https://github.com/ethereum/cpp-ethereum/issues/3300
+# Using more than j4 can cause failures randomly
+
+ADD config.json /config.json
+
+#RUN apk add --no-cache gdb valgrind
 
 # Inject the startup script
 ADD eth.sh /eth.sh
 RUN chmod +x /eth.sh
-
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 30303
 
-ENTRYPOINT ["eth"]
+ENTRYPOINT ["/eth.sh"]
