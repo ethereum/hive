@@ -39,7 +39,7 @@ function waitPeers {
 			break
 		fi
 		# Seems peer count is wrong, unless too many trials, sleep a bit and retry
-		if [ "$i" == $N_NODES ]; then
+		if [ "$i" == "20" ]; then
 			echo "Invalid peer count for $1 ($ip): have $peers, want $2"
 			exit -1
 		fi
