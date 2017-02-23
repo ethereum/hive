@@ -256,9 +256,9 @@ class BlockTestExecutor(TestExecutor):
             testcase.fail(["Failed to start node (%s)" % str(e)])
             return False
 
-        if self.clientversion is None:
-            self.clientversion = node.getClientversion()
-            print("Client version: %s" % self.clientversion)
+        if self.clientVersion is None:
+            self.clientVersion = node.getClientversion()
+            print("Client version: %s" % self.clientVersion)
 
         self.hive.log("Started node %s" % node)
 
