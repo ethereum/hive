@@ -172,7 +172,7 @@ class TestExecutor(object):
     This should probably be moved into 'testmodel' instead. 
 
     """
-    def __init__(self, hiveapi, rules = Rules.RULES_FRONTIER):
+    def __init__(self, hiveapi, rules = None):
         self.hive = hiveapi
         self.default_rules = rules
 
@@ -214,7 +214,7 @@ class TestExecutor(object):
 
 class BlockTestExecutor(TestExecutor):
 
-    def __init__(self, hiveapi, rules):
+    def __init__(self, hiveapi, rules = None):
         super(BlockTestExecutor, self).__init__(hiveapi, rules)
         self.clientVersion = None
 
@@ -240,15 +240,18 @@ class BlockTestExecutor(TestExecutor):
             "HIVE_INIT_BLOCKS" : blocks,
             "HIVE_FORK_DAO_VOTE" : "1",
         }
-
         params["HIVE_FORK_HOMESTEAD"] = "20000",
         params["HIVE_FORK_TANGERINE"] = "20000",
         params["HIVE_FORK_SPURIOUS"]  = "20000",
 
-        params.update(testcase.ruleset(self.default_rules))
+
+        if self.default_rules is not None:
+            self.hive.log("Setting default rules")
+        else:
+            self.hive.log("Not using default rules")
 
         node = None
-        self.hive.log("Starting node")
+        self.hive.log("Starting node for test %s" % testcase)
 
         try:
             node = self.hive.newNode(params)
@@ -260,7 +263,7 @@ class BlockTestExecutor(TestExecutor):
             self.clientVersion = node.getClientversion()
             print("Client version: %s" % self.clientVersion)
 
-        self.hive.log("Started node %s" % node)
+        #self.hive.log("Started node %s" % node)
 
         try:
             testcase.setNodeInstance(node.nodeId)
@@ -272,7 +275,7 @@ class BlockTestExecutor(TestExecutor):
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
-            self.hive.debugp("verifyPostconditions returned %s" % ok)
+            #self.hive.debugp("verifyPostconditions returned %s" % ok)
 
             if not ok: 
                 testcase.fail(["Postcondition check failed",err])

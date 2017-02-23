@@ -85,11 +85,11 @@ def main(args):
             executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_HOMESTEAD))
 
     status = hive.blockTests(testfiles = utils.getFiles("./tests/BlockchainTests/TestNetwork"),
-            executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TRANSITIONNET),
-            whitelist=["DaoTransactions_EmptyTransactionAndForkBlocksAhead"])
+            executor = hivemodel.BlockTestExecutor(hive , Rules.RULES_TRANSITIONNET))
+#           whitelist=["DaoTransactions_EmptyTransactionAndForkBlocksAhead"])
     
     status = hive.blockTests(testfiles = utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"), 
-        executor = hivemodel.BlockTestExecutor(hive , None))
+        executor = hivemodel.BlockTestExecutor(hive))
 
 
     if not status:
