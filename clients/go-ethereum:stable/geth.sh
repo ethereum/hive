@@ -109,4 +109,6 @@ fi
 
 # Run the go-ethereum implementation with the requested flags
 echo "Running go-ethereum..."
-/geth $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3"
+HTTP="--rpc --rpcaddr 0.0.0.0 --rpcapi admin,debug,eth,miner,net,personal,shh,txpool,web3"
+WS="--ws --wsaddr 0.0.0.0 --wsorigins "*" --wsapi admin,debug,eth,miner,net,personal,shh,txpool,web3"
+/geth $FLAGS --nat=none $HTTP $WS
