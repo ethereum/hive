@@ -246,9 +246,9 @@ class BlockTestExecutor(TestExecutor):
 
 
         if self.default_rules is not None:
-            self.hive.log("Setting default rules")
+            params.update(self.default_rules)
         else:
-            self.hive.log("Not using default rules")
+            params.update(testcase.ruleset())
 
         node = None
         self.hive.log("Starting node for test %s" % testcase)
