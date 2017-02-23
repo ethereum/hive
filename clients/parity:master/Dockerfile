@@ -4,10 +4,12 @@ FROM ubuntu:16.04
 # Build parity on the fly and delete all build tools afterwards
 RUN \
   # Install parity from sources
-  apt-get -y update                                             && \
-  apt-get install -y curl git make g++ gcc file binutils pkg-config openssl libssl-dev && \
-  curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- --disable-sudo && \
-	\
+  apt-get -y update                                        && \
+  apt-get install -y bash jq bc curl git make g++ gcc file    \
+  binutils pkg-config openssl libssl-dev libudev-dev       && \
+  curl -sSf https://static.rust-lang.org/rustup.sh         |  \
+  sh -s -- --disable-sudo                                  && \
+  \
   git clone --depth 1 https://github.com/ethcore/parity && \
 	cd parity && cargo build --release                    && \
 	strip /parity/target/release/parity                   && \
@@ -20,13 +22,10 @@ RUN \
   rm -rf /root/.cargo
 
 # Inject ethminer to support mining
-RUN \
-  apt-get install -y software-properties-common && \
-  add-apt-repository ppa:ethereum/ethereum      && \
-  apt-get -y update && apt-get install -y ethminer
-
-# Make sure bash and jq is available for easier wrapper implementation
-RUN apt-get install -y bash jq bc
+#RUN \
+#  apt-get install -y software-properties-common && \
+#  add-apt-repository ppa:ethereum/ethereum      && \
+#  apt-get -y update && apt-get install -y ethminer
 
 # Inject the startup script and associated resources
 ADD parity.sh /parity.sh

@@ -5,12 +5,11 @@
 # needing to constantly rebuild.
 FROM alpine:latest
 
-# Make sure bash and jq is available for easier wrapper implementation
-RUN apk add --update bash jq
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  apk add --update go git make gcc musl-dev linux-headers     && \
+  apk add --update bash jq go git make gcc musl-dev              \ 
+  	  ca-certificates linux-headers                           && \
   git clone --depth 1 https://github.com/ethereum/go-ethereum && \
   (cd go-ethereum && make geth)                               && \
   cp go-ethereum/build/bin/geth /geth                         && \
