@@ -48,7 +48,7 @@ class Testfile(object):
         with open(self.filename,"r") as infile:
             json_data = json.load(infile)
             for k,v in json_data.items():
-                t = Testcase(k,v)
+                t = Testcase(k,v,self)
                 self._tests.append(t)
                 yield t
 
@@ -57,8 +57,9 @@ class Testfile(object):
 
 class Testcase(object):
 
-    def __init__(self,name, jsondata):
+    def __init__(self,name, jsondata, testfile):
         self.name = name
+        self.testfile = testfile
         self.data = jsondata
         self.raw_genesis = None
         self._skipped = True
@@ -70,6 +71,9 @@ class Testcase(object):
     def __str__(self):
         return self.name
 
+    def fullname(self):
+        return "%s:%s" % (self.testfile, self.name)
+        
     def setNodeInstance(self, instanceId):
         self.nodeInstance = instanceId
 

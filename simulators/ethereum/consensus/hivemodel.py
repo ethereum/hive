@@ -1,3 +1,4 @@
+from multiprocessing.dummy import Pool as ThreadPool 
 import requests
 import traceback,sys,os
 import binascii
@@ -61,6 +62,10 @@ class HiveAPI(object):
     def __init__(self, hive_simulator):
         self.nodes = []
         self.hive_simulator = hive_simulator
+        self.count = 0
+
+    def inc(self):
+        self.count = self.count+1
 
     def _get(self,path, params = None):
         req = requests.get("%s%s" % (self.hive_simulator , path),  params=params)
@@ -113,48 +118,66 @@ class HiveAPI(object):
     def blockTests(self, start =0 , end = -1, whitelist = [], blacklist = [], testfiles = [],executor= None) :
         return self._performTests(start,end,whitelist, blacklist, testfiles, executor)
 
+    def mkTestcaseIterator(self, start = 0, end = -1, whitelist = [], blacklist =[], testfiles=[],executor= None):
+        
+        hive = self
+
+        def iterator():
+            count = 0
+            for testfile in testfiles:
+
+                count = count +1
+                if count < start:
+                    continue
+                if 0 <= end <= count:
+                    break
+
+                tf = Testfile(testfile)
+                hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
+
+                for testcase in tf.tests() :
+
+                    if len(whitelist) > 0 and str(testcase) not in whitelist:
+                        testcase.skipped(["Testcase not in whitelist"])
+                        continue
+
+                    if len(blacklist) > 0 and str(testcase) in blacklist:
+                        testcase.skipped(["Testcase in blacklist"])
+                        continue
+
+                    (ok, err) = testcase.validate()
+
+                    if not ok:
+                        hive.log("%s failed initial validation" % testcase )
+                        testcase.fail(["Testcase failed initial validation", err])
+                    else:
+                        yield testcase
+
+            
+        return iterator
+
+
     def _performTests(self, start = 0, end = -1, whitelist = [], blacklist =[], testfiles=[],executor= None):
 
-        count = 0
-        for testfile in testfiles:
+        iterator = self.mkTestcaseIterator(start, end, whitelist, blacklist,testfiles, executor)
+        hive = self
 
-            count = count +1
-            if count < start:
-                continue
-            if 0 <= end <= count:
-                break
+        def perform_work(testcase):
+            executor.executeTestcase(testcase)
+            hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
+            hive.subresult(
+                    testcase.fullname(),
+                    testcase.wasSuccessfull(),
+                    testcase.topLevelError(),
+                    testcase.details(),
+                )
 
-            tf = Testfile(testfile)
-            self.log("Commencing testfile [%d] (%s)\n " % (count, tf))
 
-            for testcase in tf.tests() :
-
-                if len(whitelist) > 0 and str(testcase) not in whitelist:
-                    testcase.skipped(["Testcase not in whitelist"])
-                    continue
-
-                if len(blacklist) > 0 and str(testcase) in blacklist:
-                    testcase.skipped(["Testcase in blacklist"])
-                    continue
-
-                (ok, err) = testcase.validate()
-
-                if ok:
-                    executor.executeTestcase(testcase)
-                else:
-                    self.log("%s failed initial validation" % testcase )
-                    testcase.fail(["Testcase failed initial validation", err])
-
-                self.log("Test: %s %s (%s)" % (testfile, testcase, testcase.status()))
-
-                self.subresult(
-                        "%s:%s" % (tf.filename, testcase.name),
-                        testcase.wasSuccessfull(),
-                        testcase.topLevelError(),
-                        testcase.details(),
-                    )
-
-                break
+        pool = ThreadPool(7) 
+        #Turns out a raw iterator isn't supported, so comprehending a list instead :(
+        pool.map(perform_work, [x for x in iterator()])
+        pool.close()
+        pool.join()
             
         return True
 
@@ -252,7 +275,7 @@ class BlockTestExecutor(TestExecutor):
 
         node = None
         self.hive.log("Starting node for test %s" % testcase)
-
+        
         try:
             node = self.hive.newNode(params)
         except Exception, e:
