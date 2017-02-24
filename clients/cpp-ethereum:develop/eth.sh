@@ -97,6 +97,9 @@ echo "Flags: $FLAGS"
 #	eth $FLAGS import /chain.rlp
 #fi
 
+# Don't immediately abort, some imports are meant to fail
+set +e
+
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
@@ -108,8 +111,6 @@ if [ -d /blocks ]; then
 	done
 fi
 
-# Fail on errors
-set +e
 # Load any keys explicitly added to the node
 echo "Not importing keys, TODO implement relevant command"
 
