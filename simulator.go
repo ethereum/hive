@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"sync"
 	"time"
 
 	"github.com/fsouza/go-dockerclient"
@@ -203,6 +204,8 @@ type simulatorAPIHandler struct {
 	nodes  map[string]*docker.Container
 
 	result *simulationResult
+	nodesMutex sync.RWMutex
+
 }
 
 // ServeHTTP handles all the simulator API requests and executes them.
@@ -296,8 +299,10 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				time.Sleep(100 * time.Millisecond)
 			}
 			// Container online and responsive, return it's ID for later reference
-			h.nodes[container.ID[:8]] = container
 			fmt.Fprintf(w, "%s", container.ID[:8])
+			h.nodesMutex.Lock()
+			defer h.nodesMutex.Unlock()
+			h.nodes[container.ID[:8]] = container
 			return
 
 		case "/logs":
@@ -338,6 +343,9 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		case strings.HasPrefix(r.URL.Path, "/nodes/"):
 			// Node deletion requested
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
+			h.nodesMutex.Lock()
+			defer h.nodesMutex.Unlock()
+
 			node, ok := h.nodes[id]
 			if !ok {
 				logger.Error("unknown client deletion requested", "id", id)
