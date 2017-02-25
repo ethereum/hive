@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -203,6 +204,7 @@ type simulatorAPIHandler struct {
 	nodes  map[string]*docker.Container
 
 	result *simulationResult
+	lock   sync.RWMutex
 }
 
 // ServeHTTP handles all the simulator API requests and executes them.
@@ -296,8 +298,10 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				time.Sleep(100 * time.Millisecond)
 			}
 			// Container online and responsive, return it's ID for later reference
-			h.nodes[container.ID[:8]] = container
 			fmt.Fprintf(w, "%s", container.ID[:8])
+			h.lock.Lock()
+			h.nodes[container.ID[:8]] = container
+			h.lock.Unlock()
 			return
 
 		case "/logs":
@@ -321,13 +325,14 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				}
 			}
 			// If everything parsed correctly, append the subresult
+			h.lock.Lock()
 			h.result.Subresults = append(h.result.Subresults, simulationSubresult{
 				Name:    r.Form.Get("name"),
 				Success: success,
 				Error:   r.Form.Get("error"),
 				Details: details,
 			})
-
+			h.lock.Unlock()
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
 		}
@@ -338,6 +343,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		case strings.HasPrefix(r.URL.Path, "/nodes/"):
 			// Node deletion requested
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
+			h.lock.Lock()
+			defer h.lock.Unlock()
 			node, ok := h.nodes[id]
 			if !ok {
 				logger.Error("unknown client deletion requested", "id", id)

@@ -1,3 +1,4 @@
+from multiprocessing.dummy import Pool as ThreadPool 
 import requests
 import traceback,sys,os
 import binascii
@@ -61,6 +62,10 @@ class HiveAPI(object):
     def __init__(self, hive_simulator):
         self.nodes = []
         self.hive_simulator = hive_simulator
+        self.count = 0
+
+    def inc(self):
+        self.count = self.count+1
 
     def _get(self,path, params = None):
         req = requests.get("%s%s" % (self.hive_simulator , path),  params=params)
@@ -113,48 +118,66 @@ class HiveAPI(object):
     def blockTests(self, start =0 , end = -1, whitelist = [], blacklist = [], testfiles = [],executor= None) :
         return self._performTests(start,end,whitelist, blacklist, testfiles, executor)
 
+    def mkTestcaseIterator(self, start = 0, end = -1, whitelist = [], blacklist =[], testfiles=[],executor= None):
+        
+        hive = self
+
+        def iterator():
+            count = 0
+            for testfile in testfiles:
+
+                count = count +1
+                if count < start:
+                    continue
+                if 0 <= end <= count:
+                    break
+
+                tf = Testfile(testfile)
+                hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
+
+                for testcase in tf.tests() :
+
+                    if len(whitelist) > 0 and str(testcase) not in whitelist:
+                        testcase.skipped(["Testcase not in whitelist"])
+                        continue
+
+                    if len(blacklist) > 0 and str(testcase) in blacklist:
+                        testcase.skipped(["Testcase in blacklist"])
+                        continue
+
+                    (ok, err) = testcase.validate()
+
+                    if not ok:
+                        hive.log("%s failed initial validation" % testcase )
+                        testcase.fail(["Testcase failed initial validation", err])
+                    else:
+                        yield testcase
+
+            
+        return iterator
+
+
     def _performTests(self, start = 0, end = -1, whitelist = [], blacklist =[], testfiles=[],executor= None):
 
-        count = 0
-        for testfile in testfiles:
+        iterator = self.mkTestcaseIterator(start, end, whitelist, blacklist,testfiles, executor)
+        hive = self
 
-            count = count +1
-            if count < start:
-                continue
-            if 0 <= end <= count:
-                break
+        def perform_work(testcase):
+            executor.executeTestcase(testcase)
+            hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
+            hive.subresult(
+                    testcase.fullname(),
+                    testcase.wasSuccessfull(),
+                    testcase.topLevelError(),
+                    testcase.details(),
+                )
 
-            tf = Testfile(testfile)
-            self.log("Commencing testfile [%d] (%s)\n " % (count, tf))
 
-            for testcase in tf.tests() :
-
-                if len(whitelist) > 0 and str(testcase) not in whitelist:
-                    testcase.skipped(["Testcase not in whitelist"])
-                    continue
-
-                if len(blacklist) > 0 and str(testcase) in blacklist:
-                    testcase.skipped(["Testcase in blacklist"])
-                    continue
-
-                (ok, err) = testcase.validate()
-
-                if ok:
-                    executor.executeTestcase(testcase)
-                else:
-                    self.log("%s failed initial validation" % testcase )
-                    testcase.fail(["Testcase failed initial validation", err])
-
-                self.log("Test: %s %s (%s)" % (testfile, testcase, testcase.status()))
-
-                self.subresult(
-                        "%s:%s" % (tf.filename, testcase.name),
-                        testcase.wasSuccessfull(),
-                        testcase.topLevelError(),
-                        testcase.details(),
-                    )
-
-                break
+        pool = ThreadPool(7) 
+        #Turns out a raw iterator isn't supported, so comprehending a list instead :(
+        pool.map(perform_work, [x for x in iterator()])
+        pool.close()
+        pool.join()
             
         return True
 
@@ -172,7 +195,7 @@ class TestExecutor(object):
     This should probably be moved into 'testmodel' instead. 
 
     """
-    def __init__(self, hiveapi, rules = Rules.RULES_FRONTIER):
+    def __init__(self, hiveapi, rules = None):
         self.hive = hiveapi
         self.default_rules = rules
 
@@ -214,7 +237,7 @@ class TestExecutor(object):
 
 class BlockTestExecutor(TestExecutor):
 
-    def __init__(self, hiveapi, rules):
+    def __init__(self, hiveapi, rules = None):
         super(BlockTestExecutor, self).__init__(hiveapi, rules)
         self.clientVersion = None
 
@@ -240,16 +263,19 @@ class BlockTestExecutor(TestExecutor):
             "HIVE_INIT_BLOCKS" : blocks,
             "HIVE_FORK_DAO_VOTE" : "1",
         }
-
         params["HIVE_FORK_HOMESTEAD"] = "20000",
         params["HIVE_FORK_TANGERINE"] = "20000",
         params["HIVE_FORK_SPURIOUS"]  = "20000",
 
-        params.update(testcase.ruleset(self.default_rules))
+
+        if self.default_rules is not None:
+            params.update(self.default_rules)
+        else:
+            params.update(testcase.ruleset())
 
         node = None
-        self.hive.log("Starting node")
-
+        self.hive.log("Starting node for test %s" % testcase)
+        
         try:
             node = self.hive.newNode(params)
         except Exception, e:
@@ -260,7 +286,7 @@ class BlockTestExecutor(TestExecutor):
             self.clientVersion = node.getClientversion()
             print("Client version: %s" % self.clientVersion)
 
-        self.hive.log("Started node %s" % node)
+        #self.hive.log("Started node %s" % node)
 
         try:
             testcase.setNodeInstance(node.nodeId)
@@ -272,7 +298,7 @@ class BlockTestExecutor(TestExecutor):
                 return False
 
             (ok, err) = self.verifyPostconditions(testcase, node)
-            self.hive.debugp("verifyPostconditions returned %s" % ok)
+            #self.hive.debugp("verifyPostconditions returned %s" % ok)
 
             if not ok: 
                 testcase.fail(["Postcondition check failed",err])
