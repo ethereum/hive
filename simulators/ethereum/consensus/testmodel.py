@@ -63,6 +63,7 @@ class Testcase(object):
         self.data = jsondata
         self.raw_genesis = None
         self._skipped = True
+        self._timeElapsed = None
         self._message = []
         self.nodeInstance = "N/A"
         self.clientType = "N/A"
@@ -221,8 +222,12 @@ class Testcase(object):
         _d = { "instanceid" : self.nodeInstance}
         if self._message is not None:
             _d["errors"] = self._message
+        if self._timeElapsed is not None:
+            _d['ms'] = self._timeElapsed
         return _d
 
+    def setTimeElapsed(self,timeInMillis):
+        self._timeElapsed = timeInMillis
 
     def status(self):
 
