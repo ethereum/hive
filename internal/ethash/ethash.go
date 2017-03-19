@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-//	"log"
+	//	"log"
 	"os"
 	"path/filepath"
 
@@ -23,6 +23,6 @@ func main() {
 	// Generate the requested DAG
 	flag.Parse()
 	if err := ethash.MakeDAG(uint64(*blockFlag), *outFlag); err != nil {
-		log.Crit("Failed to generate DAG", "err",err)
+		log.Crit("Failed to generate DAG", "err", err)
 	}
 }
