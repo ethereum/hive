@@ -1,0 +1,3 @@
+[account]
+unlock = ["0xbe93f9bacbcffc8ee6663f2647917ed7a20a57bb"]
+password = ["/keys/password.file"]
