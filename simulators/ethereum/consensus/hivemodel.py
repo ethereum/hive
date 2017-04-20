@@ -163,13 +163,18 @@ class HiveAPI(object):
         hive = self
 
         def perform_work(testcase):
+
+
+            start = time.time()
             executor.executeTestcase(testcase)
+            end = time.time()
+            testcase.setTimeElapsed(1000 * (end - start))
             hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
             hive.subresult(
                     testcase.fullname(),
                     testcase.wasSuccessfull(),
                     testcase.topLevelError(),
-                    testcase.details(),
+                    testcase.details()
                 )
 
 
@@ -182,9 +187,17 @@ class HiveAPI(object):
         return True
 
     def newNode(self, params):
+        try:
+            _id = self._post("/nodes", params)
+            _ip = self._get("/nodes/%s" % _id)
+            return HiveNode(_id, _ip)
+        except Exception, e:
+            self.log("Failed to start node, trying again")
+
         _id = self._post("/nodes", params)
         _ip = self._get("/nodes/%s" % _id)
         return HiveNode(_id, _ip)
+
 
     def killNode(self,node):
         self._delete("/nodes/%s" % node.nodeId)

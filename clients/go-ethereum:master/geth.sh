@@ -88,9 +88,7 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-	for block in `ls /blocks | sort -n`; do
-		/geth $FLAGS import /blocks/$block
-	done
+	(cd blocks && ../geth $FLAGS --nocompaction import `ls | sort -n`)
 fi
 
 set -e

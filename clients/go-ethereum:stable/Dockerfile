@@ -12,7 +12,7 @@ RUN apk add --update bash jq
 RUN \
   apk add --update bash jq go git make gcc musl-dev        \ 
   	  ca-certificates linux-headers                     && \
-  git clone --depth 1 --branch release/1.5                 \
+  git clone --depth 1 --branch release/1.6                 \
      https://github.com/ethereum/go-ethereum            && \
   (cd go-ethereum && make geth)                         && \
   cp go-ethereum/build/bin/geth /geth                   && \

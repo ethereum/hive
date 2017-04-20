@@ -2,12 +2,12 @@ package main
 
 import (
 	"flag"
-	"log"
+	//	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/ethereum/ethash"
-	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 var (
@@ -17,12 +17,12 @@ var (
 
 func main() {
 	// Enable logging for the DAG generator
-	glog.SetV(3)
-	glog.SetToStderr(true)
+	//glog.SetV(3)
+	//glog.SetToStderr(true)
 
 	// Generate the requested DAG
 	flag.Parse()
 	if err := ethash.MakeDAG(uint64(*blockFlag), *outFlag); err != nil {
-		log.Fatalf("Failed to generate DAG: %v", err)
+		log.Crit("Failed to generate DAG", "err", err)
 	}
 }
