@@ -142,7 +142,7 @@ class Testcase(object):
 
             for key in fields_to_fix:
                 v = raw_genesis[key]
-                if not v[:2] == '0x':
+                if len(v) > 2 and v[:2] != '0x':
                     raw_genesis[key] = '0x'+raw_genesis[key]
 
             # And fix the alloc-section

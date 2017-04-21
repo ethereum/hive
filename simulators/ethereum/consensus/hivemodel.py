@@ -29,7 +29,7 @@ class HiveNode(object):
         return self._getNodeData("web3_clientVersion",[])
 
     def getBlockByNumber(self,blnum):
-        return self._getNodeData("eth_getBlockByNumber", [str(int(blnum)),True])
+        return self._getNodeData("eth_getBlockByNumber", [hex(int(blnum)),True])
 
     def getLatestBlock(self):
         return self._getNodeData("eth_getBlockByNumber", ["latest",True])
@@ -177,13 +177,17 @@ class HiveAPI(object):
                     testcase.details()
                 )
 
+        if True:
+            pool = ThreadPool(7) 
+            #Turns out a raw iterator isn't supported, so comprehending a list instead :(
+            pool.map(perform_work, [x for x in iterator()])
+            pool.close()
+            pool.join()
+        else:
+            for testcase in iterator():
+                perform_work(testcase)
 
-        pool = ThreadPool(7) 
-        #Turns out a raw iterator isn't supported, so comprehending a list instead :(
-        pool.map(perform_work, [x for x in iterator()])
-        pool.close()
-        pool.join()
-            
+
         return True
 
     def newNode(self, params):
@@ -212,7 +216,7 @@ class TestExecutor(object):
         self.hive = hiveapi
         self.default_rules = rules
 
-    def log(msg):
+    def log(self,msg):
         self.hive.log(msg)
 
     def generateArtefacts(self,testcase):
@@ -234,12 +238,16 @@ class TestExecutor(object):
 
         if testcase.blocks() is not None:
             counter = 1
-            for block in testcase.blocks():                
-                b_file = "./artefacts/%s/blocks/%04d.rlp" % (testcase, counter)
-                binary_string = binascii.unhexlify(block['rlp'][2:])
-                with open(b_file,"wb+") as outf:
-                    outf.write(binary_string)
-                counter = counter +1
+            try:
+                for block in testcase.blocks():                
+                    b_file = "./artefacts/%s/blocks/%04d.rlp" % (testcase, counter)
+                    binary_string = binascii.unhexlify(block['rlp'][2:])
+                    with open(b_file,"wb+") as outf:
+                        outf.write(binary_string)
+                    counter = counter +1
+            except TypeError, e:
+                #Bad rlp
+                self.log("Exception: %s, continuing regardless" % e)
 
         return (g_file, c_file, b_folder)
 
