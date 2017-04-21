@@ -8,7 +8,7 @@ RUN \
   apt-get install -y curl git make g++ gcc file binutils pkg-config openssl libssl-dev && \
   curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- --disable-sudo && \
 	\
-  git clone --depth 1 --branch beta https://github.com/ethcore/parity && \
+  git clone --depth 1 --branch beta https://github.com/paritytech/parity && \
 	cd parity && cargo build --release                                  && \
 	strip /parity/target/release/parity                                 && \
 	\
