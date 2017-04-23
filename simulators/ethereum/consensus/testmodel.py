@@ -7,6 +7,7 @@ class Rules():
         "HIVE_FORK_TANGERINE" : 2000,
         "HIVE_FORK_SPURIOUS"  : 2000,
         "HIVE_FORK_DAO_BLOCK" : 2000,
+        "HIVE_FORK_METROPOLIS": 2000, 
     }
 
     RULES_HOMESTEAD = {
@@ -15,6 +16,7 @@ class Rules():
         "HIVE_FORK_TANGERINE" : 2000,
         "HIVE_FORK_SPURIOUS"  : 2000,
         "HIVE_FORK_DAO_BLOCK" : 2000,
+        "HIVE_FORK_METROPOLIS": 2000, 
     }
 
     RULES_TANGERINE = {
@@ -22,6 +24,7 @@ class Rules():
         "HIVE_FORK_TANGERINE" : 0,
         "HIVE_FORK_SPURIOUS"  : 2000,
         "HIVE_FORK_DAO_BLOCK" : 2000,
+        "HIVE_FORK_METROPOLIS": 2000, 
     }
     RULES_SPURIOUS = {
 
@@ -29,6 +32,7 @@ class Rules():
         "HIVE_FORK_TANGERINE" : 0,
         "HIVE_FORK_SPURIOUS"  : 0,
         "HIVE_FORK_DAO_BLOCK" : 2000,
+        "HIVE_FORK_METROPOLIS": 2000, 
     }
 
     RULES_TRANSITIONNET = {
@@ -36,6 +40,15 @@ class Rules():
         "HIVE_FORK_DAO_BLOCK" : 8,
         "HIVE_FORK_TANGERINE" : 10,
         "HIVE_FORK_SPURIOUS"  : 14,
+        "HIVE_FORK_METROPOLIS": 2000, 
+    }
+
+    RULES_METROPOLIS = {
+        "HIVE_FORK_HOMESTEAD" : 0,
+        "HIVE_FORK_TANGERINE" : 0,
+        "HIVE_FORK_SPURIOUS"  : 0,
+        "HIVE_FORK_DAO_BLOCK" : 0,
+        "HIVE_FORK_METROPOLIS": 0, 
     }
 # Model for the testcases
 class Testfile(object):
@@ -113,6 +126,7 @@ class Testcase(object):
             "EIP150"    : Rules.RULES_TANGERINE,
             "EIP158"    : Rules.RULES_SPURIOUS,
             "TransitionNet" : Rules.RULES_TRANSITIONNET,
+            "Metropolis" : Rules.RULES_METROPOLIS,
             }
 
 
