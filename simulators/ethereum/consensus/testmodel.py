@@ -7,6 +7,7 @@ class Rules():
         "HIVE_FORK_TANGERINE" : 2000,
         "HIVE_FORK_SPURIOUS"  : 2000,
         "HIVE_FORK_DAO_BLOCK" : 2000,
+        "HIVE_FORK_METROPOLIS": 2000, 
     }
 
     RULES_HOMESTEAD = {
@@ -15,6 +16,7 @@ class Rules():
         "HIVE_FORK_TANGERINE" : 2000,
         "HIVE_FORK_SPURIOUS"  : 2000,
         "HIVE_FORK_DAO_BLOCK" : 2000,
+        "HIVE_FORK_METROPOLIS": 2000, 
     }
 
     RULES_TANGERINE = {
@@ -22,6 +24,7 @@ class Rules():
         "HIVE_FORK_TANGERINE" : 0,
         "HIVE_FORK_SPURIOUS"  : 2000,
         "HIVE_FORK_DAO_BLOCK" : 2000,
+        "HIVE_FORK_METROPOLIS": 2000, 
     }
     RULES_SPURIOUS = {
 
@@ -29,6 +32,7 @@ class Rules():
         "HIVE_FORK_TANGERINE" : 0,
         "HIVE_FORK_SPURIOUS"  : 0,
         "HIVE_FORK_DAO_BLOCK" : 2000,
+        "HIVE_FORK_METROPOLIS": 2000, 
     }
 
     RULES_TRANSITIONNET = {
@@ -36,6 +40,15 @@ class Rules():
         "HIVE_FORK_DAO_BLOCK" : 8,
         "HIVE_FORK_TANGERINE" : 10,
         "HIVE_FORK_SPURIOUS"  : 14,
+        "HIVE_FORK_METROPOLIS": 2000, 
+    }
+
+    RULES_METROPOLIS = {
+        "HIVE_FORK_HOMESTEAD" : 0,
+        "HIVE_FORK_TANGERINE" : 0,
+        "HIVE_FORK_SPURIOUS"  : 0,
+        "HIVE_FORK_DAO_BLOCK" : 0,
+        "HIVE_FORK_METROPOLIS": 0, 
     }
 # Model for the testcases
 class Testfile(object):
@@ -54,6 +67,13 @@ class Testfile(object):
 
     def __str__(self):
         return self.filename
+
+def padHash(data):
+
+    if(data[:2] == '0x'):
+        data = data[2:]
+
+    return "0x"+data.zfill(64)
 
 class Testcase(object):
 
@@ -106,6 +126,7 @@ class Testcase(object):
             "EIP150"    : Rules.RULES_TANGERINE,
             "EIP158"    : Rules.RULES_SPURIOUS,
             "TransitionNet" : Rules.RULES_TRANSITIONNET,
+            "Metropolis" : Rules.RULES_METROPOLIS,
             }
 
 
@@ -122,31 +143,41 @@ class Testcase(object):
     def genesis(self, key = None):
         """ Returns the 'genesis' block for this testcase,
         including any alloc's (prestate) required """
+
+
         # Genesis block
         if self.raw_genesis is None:
+
+            #We must fix some fields in the genesis, geth is picky about that
+            fields_to_fix = ['nonce','coinbase','hash','mixHash','parentHash','receiptTrie','stateRoot','transactionsTrie','uncleHash']
+        
+
             raw_genesis = self.data['genesisBlockHeader']
 
-            # Turns out the testcases have noncewritten as 0102030405060708.
-            # Which is supposed to be interpreted as 0x0102030405060708.
-            # But if it's written as 0102030405060708 in the genesis file,
-            # it's interpreted differently. So we'll need to mod that on the fly
-            # for every testcase.
-            if 'nonce' in raw_genesis:
-                nonce = raw_genesis[u'nonce']
-                if not raw_genesis[u'nonce'][:2] == '0x':
-                    raw_genesis[u'nonce'] = '0x'+raw_genesis[u'nonce']
+            for key in fields_to_fix:
+                v = raw_genesis[key]
+                if len(v) > 2 and v[:2] != '0x':
+                    raw_genesis[key] = '0x'+raw_genesis[key]
 
-            # Also, testcases have 'code' written as 0xdead
-            # But geth does not handle that, so we'll need to mod any of those also
-            # However, cpp-ethereum rejects 'code' written as 'dead'
-#            for addr, account in self.data['pre'].items():
-#                if 'code' in account:
-#                    code = account['code']
-#                    if code[:2] == '0x':
-#                        account['code'] = code[2:]
+            # And fix the alloc-section
+            alloc = {}
+
+            for addr in self.data['pre']:
+                v = self.data['pre'][addr]
+                if not addr[:2] == '0x':
+                    addr = '0x'+addr
+                
+                if 'storage' in v.keys():
+                    storage = {}
+                    for slot,data in v['storage'].items():
+                        _slot = padHash(slot)
+                        _data = padHash(data)
+                        storage[_slot] = _data
+                    v['storage'] = storage
+                alloc[addr] = v
 
 
-            raw_genesis['alloc'] = self.data['pre']
+            raw_genesis['alloc'] = alloc
             self.raw_genesis = raw_genesis
 
         if key is None:
