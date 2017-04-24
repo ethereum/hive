@@ -67,7 +67,7 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"`
 	chainconfig=`echo $chainconfig | jq ". + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"`
 fi
-if [ "$HIVE_FORK_METROPOLIS" != ""]; then
+if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"MetropolisBlock\": $HIVE_FORK_METROPOLIS}"`
 fi
 
