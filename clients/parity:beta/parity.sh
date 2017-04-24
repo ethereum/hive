@@ -16,6 +16,7 @@
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
+#  - HIVE_FORK_METROPOLIS block number for Metropolis transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
@@ -85,7 +86,11 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161abcTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161dTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 fi
-
+if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
+	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_SPURIOUS" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip86Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+fi
 
 echo $chainconfig > /chain.json
 FLAGS="$FLAGS --chain /chain.json"

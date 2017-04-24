@@ -16,6 +16,7 @@
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
+#  - HIVE_FORK_METROPOLIS block number for Metropolis transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
@@ -53,12 +54,39 @@ if [ "$HIVE_TESTNET" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x789b0\")"`
 fi
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-	HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x$HIVE_FORK_HOMESTEAD\")"`
+	HEX_HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; \"0x$HEX_HIVE_FORK_HOMESTEAD\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x$HEX_HIVE_FORK_HOMESTEAD\")"`
+fi
+
+if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+	HIVE_FORK_DAO_BLOCK=`echo "obase=16; $HIVE_FORK_DAO_BLOCK" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"daoHardforkTransition\"]; \"0x$HIVE_FORK_DAO_BLOCK\")"`
+fi
+
+if [ "$HIVE_FORK_TANGERINE" != "" ]; then
+	HIVE_FORK_TANGERINE=`echo "obase=16; $HIVE_FORK_TANGERINE" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip150Transition\"]; \"0x$HIVE_FORK_TANGERINE\" )"`
+fi
+
+if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
+	HIVE_FORK_SPURIOUS=`echo "obase=16; $HIVE_FORK_SPURIOUS" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip155Transition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip160Transition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161abcTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161dTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
+fi
+if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
+	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_SPURIOUS" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip86Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 fi
 
 echo $chainconfig > /chain.json
 FLAGS="$FLAGS --chain /chain.json"
+
+# Don't immediately abort, some imports are meant to fail
+set +e
 
 # Load the test chain if present
 echo "Loading initial blockchain..."
@@ -73,6 +101,9 @@ if [ -d /blocks ]; then
 		/parity $FLAGS import /blocks/$block
 	done
 fi
+
+# Immediately abort the script on any error encountered
+set -e
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then

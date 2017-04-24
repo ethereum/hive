@@ -165,8 +165,10 @@ The behavioral configuration variables:
     * The HF for repricing certain opcodes, EIP 150
   * `HIVE_FORK_SPURIOUS` the block number of the Ethereum Homestead transition
     * The HF for replay protection, state cleaning etc. EIPs 155,160,161. 
+  * `HIVE_FORK_METROPOLIS` the block number of the Metropolis hardfork
   * `HIVE_MINER` address to credit with mining rewards (if set, start mining)
   * `HIVE_MINER_EXTRA` extra-data field to set for newly minted blocks
+
 
 ### Starting the client
 
