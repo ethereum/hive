@@ -10,7 +10,7 @@ RUN apk add --update bash jq
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  apk add --update bash jq go git make gcc musl-dev        \ 
+  apk add --update bash jq go git make gcc musl-dev        \
   	  ca-certificates linux-headers                     && \
   git clone --depth 1 --branch release/1.6                 \
      https://github.com/ethereum/go-ethereum            && \

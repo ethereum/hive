@@ -11,6 +11,7 @@
 #
 # This script assumes the following environment variables:
 #  - HIVE_BOOTNODE       enode URL of the remote bootstrap node
+#  - HIVE_NETWORK_ID     network ID number to use for the eth protocol
 #  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
@@ -29,9 +30,14 @@ set -e
 
 # It doesn't make sense to dial out, use only a pre-set bootnode
 if [ "$HIVE_BOOTNODE" != "" ]; then
-	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
+	FLAGS="$FLAGS --peerset $HIVE_BOOTNODE"
 else
 	FLAGS="$FLAGS --no-discovery"
+fi
+
+# If a specific network ID is requested, use that
+if [ "$HIVE_NETWORK_ID" != "" ]; then
+	FLAGS="$FLAGS --network-id $HIVE_NETWORK_ID"
 fi
 
 # Configure and set the chain definition for the node
@@ -42,9 +48,9 @@ genesis="${genesis/coinbase/author}"
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 
 if [ "$accounts" != "" ]; then
-	#In some cases, the 'alloc' portion can be extremely large
-	# Because of this, it can't be handled via cmd line parameters, 
-	# This fails :
+	# In some cases, the 'alloc' portion can be extremely large.
+	# Because of this, it can't be handled via cmd line parameters,
+	# this fails:
 	# chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
 	# The following solution instead uses two temporary files
 
@@ -107,7 +113,7 @@ if [ -d /blocks ]; then
 		echo "Command: eth $FLAGS import /blocks/$block"
 		$ETHEXEC $FLAGS import /blocks/$block
 		#valgrind --leak-check=yes $ETHEXEC $FLAGS import /blocks/$block
-		#gdb -q -n -ex r -ex bt --args eth $FLAGS import /blocks/$block		
+		#gdb -q -n -ex r -ex bt --args eth $FLAGS import /blocks/$block
 	done
 fi
 

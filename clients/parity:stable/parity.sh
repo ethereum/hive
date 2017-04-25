@@ -30,6 +30,11 @@ else
 	FLAGS="$FLAGS --nodiscover"
 fi
 
+# If a specific network ID is requested, use that
+if [ "$HIVE_NETWORK_ID" != "" ]; then
+	FLAGS="$FLAGS --network-id $HIVE_NETWORK_ID"
+fi
+
 # Configure and set the chain definition for the node
 chainconfig=`cat /chain.json`
 
@@ -42,7 +47,15 @@ accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.allo
 genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": $nonce, \"mixHash\": $mixhash}}}"`
 
 if [ "$accounts" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
+	# In some cases, the 'alloc' portion can be extremely large.
+	# Because of this, it can't be handled via cmd line parameters,
+	# this fails:
+	# chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
+	# The following solution instead uses two temporary files
+
+	echo $accounts| jq "{ \"accounts\": .}" > tmp1
+	echo $chainconfig > tmp2
+	chainconfig=`jq -s '.[0] * .[1]' tmp1 tmp2`
 fi
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 

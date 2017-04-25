@@ -8,7 +8,7 @@ FROM alpine:latest
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  apk add --update bash jq go git make gcc musl-dev              \ 
+  apk add --update bash jq go git make gcc musl-dev              \
   	  ca-certificates linux-headers                           && \
   git clone --depth 1 --branch metropolis-finalisation \
   https://github.com/obscuren/go-ethereum.git && \

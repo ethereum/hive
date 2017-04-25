@@ -11,6 +11,7 @@
 #
 # This script assumes the following environment variables:
 #  - HIVE_BOOTNODE       enode URL of the remote bootstrap node
+#  - HIVE_NETWORK_ID     network ID number to use for the eth protocol
 #  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
@@ -30,6 +31,11 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
 else
 	FLAGS="$FLAGS --nodiscover"
+fi
+
+# If a specific network ID is requested, use that
+if [ "$HIVE_NETWORK_ID" != "" ]; then
+	FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
 fi
 
 # If the client is to be run in testnet mode, flag it as such
@@ -70,10 +76,7 @@ fi
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"metropolisBlock\": $HIVE_FORK_METROPOLIS}"`
 fi
-
-if [ "$chainconfig" != "{}" ]; then
-	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
-fi
+genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
@@ -111,6 +114,4 @@ fi
 
 # Run the go-ethereum implementation with the requested flags
 echo "Running go-ethereum..."
-HTTP="--rpc --rpcaddr 0.0.0.0 --rpcapi admin,debug,eth,miner,net,personal,shh,txpool,web3"
-WS="--ws --wsaddr 0.0.0.0 --wsorigins "*" --wsapi admin,debug,eth,miner,net,personal,shh,txpool,web3"
-/geth $FLAGS --nat=none $HTTP $WS
+/geth $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
