@@ -1,12 +1,12 @@
-# This is a regression test to cover a go-ethereum issue introduced after the EDGE
-# release where sync was optimised to discard inbound transactions until an initial
-# sync cycle completes. However, for single miner private network scenarios the
-# miner itself never completes this cycle, so it never accepts transactions.
+# This is a regression test to cover a go-ethereum issue where the Ethereum net
+# ID was represented with multiple different types (int, uint32 and uint64) in
+# different code paths, causing nodes to be unable to connect to each other if
+# the network ID was larger that maxuint32.
 #
-# Details in https://github.com/ethereum/go-ethereum/issues/2769
+# Details in https://github.com/ethereum/go-ethereum/issues/14359
 #
-# The test starts up a network of two nodes (a miner and a non miner) and checks
-# that transactions from both nodes propagate to the other.
+# The test starts up a network of two nodesand checks that they can successfully
+# connect to each other.
 FROM alpine:latest
 
 # Build a bootnode to cross-discover the two plain nodes
