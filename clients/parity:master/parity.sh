@@ -93,7 +93,7 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161dTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 fi
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
-	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_SPURIOUS" | bc`
+	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_METROPOLIS" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip86Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 fi
