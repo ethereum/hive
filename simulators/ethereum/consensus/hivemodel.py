@@ -1,6 +1,6 @@
 from multiprocessing.dummy import Pool as ThreadPool 
 import requests
-import traceback,sys,os
+import traceback,os
 import binascii
 import json
 from testmodel import Testcase, Testfile, Rules
@@ -15,15 +15,18 @@ class HiveNode(object):
         self.nodeId =nodeId
         self.ip = nodeIp
         self.session = requests.Session()
-        self.url = "http://%s:%d" % (self.ip, 8545) 
+        self.url = "http://%s:%d" % (self.ip, 8545)
         self.rpcid = 1
-
 
     def _getNodeData(self, method, params):
         payload = {"jsonrpc":"2.0","method":method,"params":params,"id":self.rpcid}
         self.rpcid = self.rpcid+1
-        r = self.session.post(self.url,json = payload)
-        return r.json()['result']        
+        response = self.session.post(self.url,json = payload).json()
+        if 'result' in response:
+            return response['result']
+        else:
+            raise Exception("Error getting node data; payload=%s, response=%s" % (
+                payload, response['error']))
 
     def getClientversion(self):
         return self._getNodeData("web3_clientVersion",[])
@@ -36,13 +39,11 @@ class HiveNode(object):
 
 
     def getNonce(self,address):
-        
         j = self._getNodeData("eth_getTransactionCount", [address,"latest"])
         return int(j[2:], 16 )
 
 
     def getBalance(self,address):
-
         j = self._getNodeData("eth_getBalance", [address,"latest"])
         return int(j[2:], 16 )
 
@@ -58,7 +59,7 @@ class HiveNode(object):
         return "Node[%s]@%s" % (self.nodeId, self.ip)
 
 class HiveAPI(object):
-    
+
     def __init__(self, hive_simulator):
         self.nodes = []
         self.hive_simulator = hive_simulator
@@ -72,10 +73,10 @@ class HiveAPI(object):
         if req.status_code != 200:
             raise Exception("Failed to GET req (%d)" % req.status_code)
         return req.text
-    
+
     def _post(self,path, params = None, data = None):
         req = requests.post("%s%s" % (self.hive_simulator , path),  params=params, data = data)
-        
+
         if req.status_code != 200:
             raise Exception("Failed to POST req (%d):%s" % (req.status_code, req.text))
 
@@ -83,24 +84,21 @@ class HiveAPI(object):
 
     def _delete(self,path, params = None):
         req = requests.delete("%s%s" % (self.hive_simulator , path),  params=params)
-        
+
         if req.status_code != 200:
             raise Exception("Failed to DELETE req (%d)" % req.status_code)
 
         return req.text
 
-
-
     def log(self,msg):
-        requests.post("%s/logs" % (self.hive_simulator ), data = msg) 
+        requests.post("%s/logs" % (self.hive_simulator ), data = msg)
 
     def debugp(self, msg):
         self.log(msg)
 
-
     def subresult(self, name, success, errormsg, details = None ):
         params = {
-                "name" : name, 
+                "name" : name,
                 "success" : success
         }
         if errormsg is not None:
@@ -119,7 +117,6 @@ class HiveAPI(object):
         return self._performTests(start,end,whitelist, blacklist, testfiles, executor)
 
     def mkTestcaseIterator(self, start = 0, end = -1, whitelist = [], blacklist =[], testfiles=[],executor= None):
-        
         hive = self
 
         def iterator():
@@ -153,7 +150,6 @@ class HiveAPI(object):
                     else:
                         yield testcase
 
-            
         return iterator
 
 
@@ -187,7 +183,6 @@ class HiveAPI(object):
             for testcase in iterator():
                 perform_work(testcase)
 
-
         return True
 
     def newNode(self, params):
@@ -209,7 +204,7 @@ class HiveAPI(object):
 class TestExecutor(object):
     """ Test-execution engine
 
-    This should probably be moved into 'testmodel' instead. 
+    This should probably be moved into 'testmodel' instead.
 
     """
     def __init__(self, hiveapi, rules = None):
@@ -239,7 +234,7 @@ class TestExecutor(object):
         if testcase.blocks() is not None:
             counter = 1
             try:
-                for block in testcase.blocks():                
+                for block in testcase.blocks():
                     b_file = "./artefacts/%s/blocks/%04d.rlp" % (testcase, counter)
                     binary_string = binascii.unhexlify(block['rlp'][2:])
                     with open(b_file,"wb+") as outf:
@@ -280,7 +275,7 @@ class BlockTestExecutor(TestExecutor):
         #HIVE_FORK_HOMESTEAD
 
         params = {
-            "HIVE_INIT_GENESIS": genesis, 
+            "HIVE_INIT_GENESIS": genesis,
             "HIVE_INIT_BLOCKS" : blocks,
             "HIVE_FORK_DAO_VOTE" : "1",
         }
@@ -296,11 +291,11 @@ class BlockTestExecutor(TestExecutor):
 
         node = None
         self.hive.log("Starting node for test %s" % testcase)
-        
+
         try:
             node = self.hive.newNode(params)
         except Exception, e:
-            testcase.fail(["Failed to start node (%s)" % str(e)])
+            testcase.fail(["Failed to start node", traceback.format_exc()])
             return False
 
         if self.clientVersion is None:
@@ -311,23 +306,18 @@ class BlockTestExecutor(TestExecutor):
 
         try:
             testcase.setNodeInstance(node.nodeId)
-            (ok, err ) = self.verifyPreconditions(testcase, node)
-
-            if not ok:
-                testcase.fail(["Preconditions failed",[err]])
-                #testcase.addMessage(self.customCheck(testcase, node))
+            errors = self.verifyPreconditions(testcase, node)
+            if errors:
+                testcase.fail(["Preconditions failed", errors])
                 return False
 
-            (ok, err) = self.verifyPostconditions(testcase, node)
-            #self.hive.debugp("verifyPostconditions returned %s" % ok)
-
-            if not ok: 
-                testcase.fail(["Postcondition check failed",err])
+            errors = self.verifyPostconditions(testcase, node)
+            if errors:
+                testcase.fail(["Postcondition check failed", errors])
                 return False
 
             testcase.success()
             return True
-
         finally:
             self.hive.killNode(node)
 
@@ -344,14 +334,19 @@ class BlockTestExecutor(TestExecutor):
             "Got %s, expected %s" % (value2 , "0x1f40") ]
 
         return errs
-        
+
     def verifyPreconditions(self, testcase, node):
-        """ Verify preconditions 
-        @return (bool isOk, list of error messags) 
+        """ Verify preconditions
+        @return list of error messages
         """
 
-        first = node.getBlockByNumber(0)
         errs = []
+        try:
+            first = node.getBlockByNumber(0)
+        except Exception, e:
+            errs.append("Failed to get first block")
+            errs.append(e)
+            return errs
 
         def _verifyEq(v,exp):
             v = canonicalize(v)
@@ -367,19 +362,18 @@ class BlockTestExecutor(TestExecutor):
             errs.append("Hash error")
             errs.append(err)
 
-            
         # Check stateroot (only needed if hash failed really...)
         state_err = _verifyEq(first[u'stateRoot'],testcase.genesis('stateRoot'))
         if state_err is not None:
             errs.append("State differs")
             errs.append(state_err)
-        
-        return (len(errs) == 0, errs)
+
+        return errs
 
 
     def verifyPostconditions(self, testcase, node):
-        """ Verify postconditions 
-        @return (bool isOk, list of error messags) 
+        """ Verify postconditions
+        @return list of error messages
         """
         errs = []
         err = None
@@ -400,7 +394,7 @@ class BlockTestExecutor(TestExecutor):
                 errs.append("Last block hash wrong")
                 errs.append([err])
             else:
-                return (len(errs) == 0, errs)
+                return errs
 
         # Either 'lastblockhash' is missing, or it isn't right. Continue checking to debug what's wrong
 
@@ -415,11 +409,11 @@ class BlockTestExecutor(TestExecutor):
 
             if len(errs) > 9:
                 errs.append("Postcondition check aborted due to earlier errors")
-                return (len(errs) == 0, errs)
+                return errs
 
             if (node.rpcid - req_count_start) % 1000 == 0 and (node.rpcid - req_count_start) > 0:
                 self.hive.log("Verifying poststate, have checked %d items ..." % (node.rpcid - req_count_start))
-            
+
             # Parity fails otherwise...
             if address[:2] != "0x":
                 address = "0x%s" % address
@@ -475,14 +469,13 @@ class BlockTestExecutor(TestExecutor):
 
                         if len(errs) > 9:
                             errs.append("Postcondition check aborted due to earlier errors")
-                            return (len(errs) == 0, errs)
+                            return errs
 
                         if (node.rpcid - req_count_start) % 1000 == 0:
                             self.hive.log("Verifying poststate storage, have checked %d items ..." % (node.rpcid - req_count_start))
 
             except Exception, e:
-                errs.append("Postcondition verification failed on %s @ %s after %d checks: %s" %(current,address, count,  str(e)))
-                return (False, errs)
+                errs.append("Postcondition verification failed on %s @ %s: %s" %(current,address, str(e)))
+                return errs
 
-
-        return (len(errs) == 0, errs)
+        return errs

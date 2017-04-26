@@ -312,6 +312,7 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 	// If we're the outer shell, log straight to stderr, nothing fancy
 	stdout := io.Writer(os.Stdout)
 	stream := io.Writer(os.Stderr)
+	var fdsToClose []io.Closer
 	if !shell {
 		// For non shell containers, create and open the log file for the output
 		if err := os.MkdirAll(filepath.Dir(logfile), os.ModePerm); err != nil {
@@ -322,12 +323,17 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 			return nil, err
 		}
 		stream = io.Writer(log)
+		fdsToClose = append(fdsToClose, log)
 
 		// If console logging was requested, tee the output and tag it with the container id
 		if *loglevelFlag > 5 {
 			// Hook into the containers output stream and tee it out
-			hookedR, hookedW := io.Pipe()
+			hookedR, hookedW, err := os.Pipe()
+			if err != nil {
+				return nil, err
+			}
 			stream = io.MultiWriter(log, hookedW)
+			fdsToClose = append(fdsToClose, hookedW)
 
 			// Tag all log messages with the container ID if not the outer shell
 			copy := func(dst io.Writer, src io.Reader) (int64, error) {
@@ -361,5 +367,27 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 		logger.Error("failed to start container", "error", err)
 		return nil, err
 	}
-	return waiter, nil
+	return fdClosingWaiter{
+		CloseWaiter: waiter,
+		closers:     fdsToClose,
+		logger:      logger,
+	}, nil
+}
+
+// fdClosingWaiter wraps a docker.CloseWaiter and closes all io.Closer
+// instances passed to it, after it is done waiting.
+type fdClosingWaiter struct {
+	docker.CloseWaiter
+	closers []io.Closer
+	logger  log15.Logger
+}
+
+func (w fdClosingWaiter) Wait() error {
+	err := w.CloseWaiter.Wait()
+	for _, closer := range w.closers {
+		if err := closer.Close(); err != nil {
+			w.logger.Error("failed to close fd", "error", err)
+		}
+	}
+	return err
 }

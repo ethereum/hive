@@ -269,11 +269,23 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			logger = logger.New("id", container.ID[:8])
 
 			logfile := fmt.Sprintf("client-%s.log", container.ID[:8])
-			if _, err = runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, logfile), false); err != nil {
+			waiter, err := runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, logfile), false)
+			if err != nil {
 				logger.Error("failed to start client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			go func() {
+				// Ensure the goroutine started by runContainer exits, so that
+				// its resources (e.g. the logfile it creates) can be garbage
+				// collected.
+				err := waiter.Wait()
+				if err == nil {
+					logger.Debug("client container finished cleanly")
+				} else {
+					logger.Error("client container finished with error", "error", err)
+				}
+			}()
 			// Wait for the HTTP/RPC socket to open or the container to fail
 			start := time.Now()
 			for {
