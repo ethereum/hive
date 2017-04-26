@@ -12,6 +12,12 @@ RUN \
   	  ca-certificates linux-headers                           && \
   git clone --depth 1 https://github.com/ethereum/go-ethereum && \
   (cd go-ethereum && make geth)                               && \
+  (cd go-ethereum                                             && \
+  echo "{}"                                                      \
+  | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
+  | jq ".+ {\"branch\":\"$(git branch)\"}"                       \
+  | jq ".+ {\"hash\":\"$(git log --pretty=format:'%h' -n 1)\"}"    \
+	> /client_version.json)                                   && \
   cp go-ethereum/build/bin/geth /geth                         && \
   apk del go git make gcc musl-dev linux-headers              && \
   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
@@ -19,7 +25,6 @@ RUN \
 # Inject the startup script
 ADD geth.sh /geth.sh
 RUN chmod +x /geth.sh
-
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8546 30303
 
