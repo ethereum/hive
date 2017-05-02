@@ -3,13 +3,12 @@ FROM ubuntu:16.04
 
 RUN \
   apt-get -y update                                                         && \
-  apt-get -y install git curl python-dev libssl-dev build-essential            \
+  apt-get -y install jq git curl python-dev libssl-dev build-essential         \
                      automake pkg-config libtool libffi-dev libgmp-dev      && \
   curl -sSf https://bootstrap.pypa.io/get-pip.py -o get-pip.py              && \
   python get-pip.py &&                                                         \
-  git clone --depth 1 --branch hive https://github.com/cdetrio/pyethapp  && \
-  cd pyethapp && git checkout 9c54661c681e90c91e3d72d54c8a513e2d0f09a7      && \
-  python setup.py develop                                                   && \
+  git clone --depth 1 https://github.com/ethereum/pyethapp  && \
+  cd pyethapp && python setup.py develop                                                   && \
   apt-get -y remove git curl automake build-essential libtool pkg-config
 
 # We can't delete /pyethapp--it's necessary for pyethapp to function.
