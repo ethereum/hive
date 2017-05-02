@@ -265,8 +265,7 @@ class BlockTestExecutor(TestExecutor):
         try:
             (genesis, init_chain, blocks ) = self.generateArtefacts(testcase)
         except Exception, e:
-            traceback.print_exc(file=sys.stdout)
-            testcase.fail(["Failed to write test data to disk", str(e)])
+            testcase.fail(["Failed to write test data to disk", traceback.format_exc()])
             return False
         #HIVE_INIT_GENESIS path to the genesis file to seed the client with (default = "/genesis.json")
         #HIVE_INIT_CHAIN path to an initial blockchain to seed the client with (default = "/chain.rlp")
