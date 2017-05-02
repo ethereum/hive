@@ -17,24 +17,6 @@ RUN \
   cp -a rpc-specs-tests/. /                                   && \
   mv /configs/bcRPC_API_Test.json /bcRPC_API_Test.json
 
-# For local testing
-#RUN \
-#  cd interfaces                                               && \
-#  cp -a rpc-specs-tests/. /                                   && \
-#  mv /configs/bcRPC_API_Test.json /bcRPC_API_Test.json
-
-#COPY interfaces/rpc-specs-tests/* /
-COPY interfaces/rpc-specs-tests/*.py /
-COPY interfaces/rpc-specs-tests/tests /tests
-COPY interfaces/rpc-specs-tests/schemas /schemas
-COPY interfaces/rpc-specs-tests/configs/bcRPC_API_Test.json /bcRPC_API_Test.json
-COPY interfaces/rpc-specs-tests/configs /config
-
-#COPY configs/bcRPC_API_Test.json /bcRPC_API_Test.json
-#RUN mv /configs/bcRPC_API_Test.json /bcRPC_API_Test.json
-
-#ADD parity-config.toml /config.toml
-
 # Add the simulation controller
 ADD genesis.json /genesis.json
 # put keys in folder for parity

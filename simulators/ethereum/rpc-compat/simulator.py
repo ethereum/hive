@@ -57,7 +57,7 @@ with open('/bcRPC_API_Test.json') as block_data:
 block_i = 0
 for block in blocks_json['RPC_API_Test']['blocks']:
     binary_string = binascii.unhexlify(block['rlp'][2:])
-    block_file = '/blocks/' + str(block_i)
+    block_file = '/blocks/%04d.rlp' % block_i
     with open(block_file,"wb+") as outf:
         outf.write(binary_string)
     block_i = block_i + 1
