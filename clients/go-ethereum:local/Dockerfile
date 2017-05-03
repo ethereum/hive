@@ -17,4 +17,5 @@ RUN chmod +x /geth.sh
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8546 30303
 
+ADD client.json /client.json
 ENTRYPOINT ["/geth.sh"]

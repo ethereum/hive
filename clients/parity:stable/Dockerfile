@@ -15,8 +15,8 @@ RUN \
   echo "{}"                                                      \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
   | jq ".+ {\"branch\":\"$(git branch)\"}"                       \
-  | jq ".+ {\"hash\":\"$(git log --pretty=format:'%h' -n 1)\"}"    \
-  > /client_version.json                                   && \
+  | jq ".+ {\"hash\":\"$(git log --pretty=format:'%h' -n 1)\"}"  \
+  > /version.json                                             && \
 	strip /parity/target/release/parity                                   && \
 	\
 	cd / && cp /parity/target/release/parity /parity.bin && \
