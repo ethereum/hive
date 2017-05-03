@@ -164,8 +164,8 @@ class Testcase(object):
 
             for addr in self.data['pre']:
                 v = self.data['pre'][addr]
-                if not addr[:2] == '0x':
-                    addr = '0x'+addr
+                if addr[:2] == '0x':
+                    addr = addr[2:]
                 
                 if 'storage' in v.keys():
                     storage = {}
