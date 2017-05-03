@@ -17,14 +17,9 @@ RUN \
   cp -a rpc-specs-tests/. /                                   && \
   mv /configs/bcRPC_API_Test.json /bcRPC_API_Test.json
 
-# Add the simulation controller
 ADD genesis.json /genesis.json
-# put keys in folder for parity
-ADD keys.tar.gz /keys/Hive
-# put keys in folder for geth
 ADD keys.tar.gz /keys
+# Add the simulation controller
 COPY *.py /
-COPY parity-config.toml /keys/config.toml
-COPY password.file /keys/password.file
 
 ENTRYPOINT ["python","/simulator.py"]
