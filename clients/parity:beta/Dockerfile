@@ -5,11 +5,16 @@ FROM ubuntu:16.04
 RUN \
   # Install parity from sources
   apt-get -y update                                             && \
-  apt-get install -y curl git make g++ gcc file binutils pkg-config openssl libssl-dev && \
+  apt-get install -y curl jq git make g++ gcc file binutils pkg-config openssl libssl-dev && \
   curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- --disable-sudo && \
 	\
   git clone --depth 1 --branch beta https://github.com/paritytech/parity && \
 	cd parity && cargo build --release                                  && \
+  echo "{}"                                                      \
+  | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
+  | jq ".+ {\"branch\":\"$(git branch)\"}"                       \
+  | jq ".+ {\"hash\":\"$(git log --pretty=format:'%h' -n 1)\"}"  \
+  > /version.json                                             && \
 	strip /parity/target/release/parity                                 && \
 	\
 	cd / && cp /parity/target/release/parity /parity.bin && \
