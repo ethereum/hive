@@ -28,7 +28,10 @@ func makeGenesisDAG(daemon *docker.Client) error {
 	log15.Debug("created ethash container")
 	defer func() {
 		log15.Debug("deleting ethash container")
-		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: ethash.ID, Force: true})
+		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: ethash.ID, Force: true})
+		if err != nil {
+			log15.Error("failed to delete ethash container ", "error", err)
+		}
 	}()
 	// Start generating the genesis ethash DAG
 	log15.Info("generating genesis DAG")
@@ -46,7 +49,10 @@ func makeGenesisDAG(daemon *docker.Client) error {
 	go func() {
 		<-interrupt
 		errc <- errors.New("interrupted")
-		daemon.StopContainer(ethash.ID, 0)
+		err := daemon.StopContainer(ethash.ID, 0)
+		if err != nil {
+			log15.Error("failed to stop ethash", "error", err)
+		}
 	}()
 	// Wait for container termination and return
 	waiter.Wait()

@@ -148,7 +148,12 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	if err != nil {
 		return nil, err
 	}
-	defer daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true})
+	defer func() {
+		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true})
+		if err != nil {
+			log15.Error("failed to cleanup tester container", "id", t.ID[:8], "error", err)
+		}
+	}()
 
 	if path := overrideEnvs["HIVE_INIT_GENESIS"]; path != "" {
 		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/genesis.json", false)
@@ -201,7 +206,10 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 		}
 	}
 	if err := uploadToContainer(daemon, c.ID, overrides); err != nil {
-		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true})
+		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true})
+		if err != nil {
+			log15.Error("failed to cleanup client container", "id", c.ID[:8], "error", err)
+		}
 		return nil, err
 	}
 	return c, nil

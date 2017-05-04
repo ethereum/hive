@@ -90,7 +90,10 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	clogger.Debug("created client container")
 	defer func() {
 		clogger.Debug("deleting client container")
-		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cc.ID, Force: true})
+		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cc.ID, Force: true})
+		if err != nil {
+			clogger.Error("failed to delete client container", "error", err)
+		}
 	}()
 
 	// Start the client container and retrieve its IP address for the benchmarker
@@ -164,7 +167,10 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	blogger.Debug("created benchmarker container")
 	defer func() {
 		blogger.Debug("deleting benchmarker container")
-		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true})
+		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true})
+		if err != nil {
+			blogger.Error("failed to delete benchmarker container", "error", err)
+		}
 	}()
 
 	// Start the tester container and wait until it finishes

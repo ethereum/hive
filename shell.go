@@ -31,7 +31,10 @@ func mainInShell(daemon *docker.Client, overrides []string) error {
 	log15.Debug("created shell container")
 	defer func() {
 		log15.Debug("deleting shell container")
-		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: shell.ID, Force: true})
+		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: shell.ID, Force: true})
+		if err != nil {
+			log15.Error("failed to delete shell container", "error", err)
+		}
 	}()
 	// Start up a hive instance within the shell
 	log15.Info("starting outer shell container")
@@ -48,7 +51,10 @@ func mainInShell(daemon *docker.Client, overrides []string) error {
 	go func() {
 		<-interrupt
 		log15.Error("shell interrupted, stopping")
-		daemon.StopContainer(shell.ID, 0)
+		err := daemon.StopContainer(shell.ID, 0)
+		if err != nil {
+			log15.Error("failed to stop hive shell", "error", err)
+		}
 	}()
 	// Wait for container termination and return
 	waiter.Wait()
