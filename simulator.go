@@ -113,7 +113,10 @@ func simulate(daemon *docker.Client, client, simulator string, overrides []strin
 	slogger.Debug("created simulator container")
 	defer func() {
 		slogger.Debug("deleting simulator container")
-		daemon.RemoveContainer(docker.RemoveContainerOptions{ID: sc.ID, Force: true})
+		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: sc.ID, Force: true})
+		if err != nil {
+			slogger.Error("failed to delete simulator container", "error", err)
+		}
 	}()
 
 	// Finish configuring the HTTP webserver with the controlled container
@@ -364,7 +367,11 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				return
 			}
 			h.logger.Debug("deleting client container", "id", node.ID[:8])
-			h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true})
+			err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true})
+			if err != nil {
+				logger.Error("failed to delete client ", "id", id, "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 			delete(h.nodes, id)
 
 		default:
@@ -383,6 +390,9 @@ func (h *simulatorAPIHandler) Close() {
 
 	for _, node := range h.nodes {
 		h.logger.Debug("deleting client container", "id", node.ID[:8])
-		h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true})
+		err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true})
+		if err != nil {
+			h.logger.Error("failed to delete client container", "id", node.ID[:8], "error", err)
+		}
 	}
 }
