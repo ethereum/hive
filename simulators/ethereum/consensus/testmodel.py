@@ -236,7 +236,6 @@ class Testcase(object):
         self._skipped = True
         self.addMessage(message)
 
-
     def wasSuccessfull(self):
         return bool(self._success)
 
