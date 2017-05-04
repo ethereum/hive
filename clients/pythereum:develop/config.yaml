@@ -1,0 +1,369 @@
+accounts: {keystore_dir: keystore, must_include_coinbase: true}
+block:
+  ACCOUNT_INITIAL_NONCE: 0
+  BLKLIM_FACTOR_DEN: 2
+  BLKLIM_FACTOR_NOM: 3
+  BLOCK_DIFF_FACTOR: 2048
+  BLOCK_REWARD: 5000000000000000000
+  CHILD_DAO_LIST: &id001
+  - !!binary |
+    u5vCRNeYEj/eeD/MHHLTu4wYlBM=
+  - !!binary |
+    gHZAoTSD+Kx4PFV/zfJ74R6krHo=
+  - !!binary |
+    1P57wxztt7+4o0XzHmaAMwVrJyg=
+  - !!binary |
+    MZ9wuraEVYX0Eux3JLdE/sYJXIU=
+  - !!binary |
+    d5VDoEkag3yjbOjGNdYVTjxJEaY=
+  - !!binary |
+    XG5nzNWEnA0pIZxPlfGnqTs/XcU=
+  - !!binary |
+    IARQ8GUgvdbFJ2IqJzMzOE2HDvs=
+  - !!binary |
+    LBnH+a6LdR43rrLZOmmXIjla4Y8=
+  - !!binary |
+    awxNQbqauNjPtdN5xpphLyztjss=
+  - !!binary |
+    0ayLHvG2n/UdHUAaR25+YSQU8JE=
+  - !!binary |
+    UeDd2ZmDZKLrOFiGefDSxCZT5KY=
+  - !!binary |
+    nyfa6nrKCqBEYiC5jQKHFeO8gD0=
+  - !!binary |
+    8LGqDrZgdURIp5N8Ai4wqmkv4MU=
+  - !!binary |
+    SS6juw8zFVIcMfJz5WW4aPwJDxc=
+  - !!binary |
+    zDRnPGxA55EFGJhWehIi2vkL4oc=
+  - !!binary |
+    4wi9GsX9oQOWc1mycS3Yne/7eXM=
+  - !!binary |
+    rB7KsycnNY26iWKg87JhcxqtlyM=
+  - !!binary |
+    RAxZsyXSmXoTTCx8YKjGFhEhK60=
+  - !!binary |
+    b2cE5aEDMq9mcuULPZdU3EYN+k0=
+  - !!binary |
+    YTHEL6mC5WkpEHQTqdUm/ZlAVWA=
+  - !!binary |
+    HKar0U0wr/5TOyTXohv/TC1eHzs=
+  - !!binary |
+    2a7zoeOKOcFrMdGs5xvKjvWNMVs=
+  - !!binary |
+    eCSVt7M1XvsoM9VuyzTcIq19/MQ=
+  - !!binary |
+    VCqVFSANFLaOk06YMNkWRamA3Xo=
+  - !!binary |
+    XIU2iY+7dPx0RYFJAv0IQi6sVtA=
+  - !!binary |
+    GXW9BtSGFi1dwpd5jfxB7dXRYKc=
+  - !!binary |
+    5K4e/fxTtziTr0kRPYaUoFe5wNE=
+  - !!binary |
+    nqd5+QfwsxWzZLDPw5oP3lsCpBY=
+  - !!binary |
+    O6TYHbAW3CiQyB86zsJFS/9araU=
+  - !!binary |
+    UsUxfISLogx1BMssgFKr0f3inQM=
+  - !!binary |
+    XSsub8vjsR0mtSXghf+Bja4zJHk=
+  - !!binary |
+    BXtWc20yuGYWoQ9hmFnGzW9ZCSo=
+  - !!binary |
+    NaBRoAEKunBckAjXp+/2+4j26ns=
+  - !!binary |
+    vPiZ5sfZ1aIVqx40RMhoBvqFTHY=
+  - !!binary |
+    ovHMupOV1/yxVbuovJLbm6+urec=
+  - !!binary |
+    TesAM7smvFNLGX5h0Z4HM+Vnl4Q=
+  - !!binary |
+    0WSwiL2RCLYNDKN1HaS86yB7B4I=
+  - !!binary |
+    AQHzvo67S705ouO5o2OdQlmDL9k=
+  - !!binary |
+    MEpVSjEMflRt/kNGacYoILfYNJA=
+  - !!binary |
+    n80t6v83KjnMZ51cXk3nuvsLEzk=
+  - !!binary |
+    BzemuDf5f0brreQbm8PhxQnIXFM=
+  - !!binary |
+    Dg2nCTP0x4SfwNID9dHUO5rkUy0=
+  - !!binary |
+    vAcRi5rCkORiL153oIU1OXie/74=
+  - !!binary |
+    naOXuegHVTAaOzIXMoOpHA72yH4=
+  - !!binary |
+    HLoj00Opg+m1z9GUlrmpcBraOF8=
+  - !!binary |
+    VSTFX7A88h9UlETMvstmTQrK1wY=
+  - !!binary |
+    Icf9ue2NKR15/9gussQ1bsDYEkE=
+  - !!binary |
+    nBW1SHi6YY9JSzjwrnRD22r2SLo=
+  - !!binary |
+    rNh+KLDJ0SVOhouBy6TMINmjIiU=
+  - !!binary |
+    /iTN2GSBIaQ6fIbSib5N0pUe1J8=
+  - !!binary |
+    JTSIB4pO301vQvET0eYoNqlCzxo=
+  - !!binary |
+    8UwUB11sTthLhnmK8JVt7vZzZbU=
+  - !!binary |
+    bYdXgoi2y1VJ1QdqIHRWofamPcA=
+  - !!binary |
+    ruuP8nKIvavA+l67cxtvQJUHUWw=
+  - !!binary |
+    rMwjDopuW+kWC4zfKGTdKgAcKLY=
+  - !!binary |
+    RhPzvKXETqBjN6nkOfvG1C5QHQo=
+  - !!binary |
+    sTZwdkKk6hL7S66CDwPSVi6/9Ic=
+  - !!binary |
+    9MZFGOoQ+ZWRikVBWMa2FAfqNFw=
+  - !!binary |
+    hO9LI1cHnNenxp/Xo3zQYJpnkQY=
+  - !!binary |
+    s/sOWroOIOXEnSUt/TDhArFxpCU=
+  - !!binary |
+    BnBt0/LJq/CiHdzGlB2bhvBZaTY=
+  - !!binary |
+    Kl7ZYDleKkmxx1jO9KoVITz9h0w=
+  - !!binary |
+    nFBCa+BduX9dZPxUv4nv+UfwoyE=
+  - !!binary |
+    voU5v+g3tn0SgrKx1hw/cjlm8Ek=
+  - !!binary |
+    7NE1+k9hplUxHoYjjJKtzXeVVdI=
+  - !!binary |
+    8ThfskqtDNdDKCQIXkKv+QiG/vU=
+  - !!binary |
+    gWPn+0mekPhUTqYrv4DSHNJtnv0=
+  - !!binary |
+    YnoKlgwHnCHDT3YS1dIw4BtK1Mc=
+  - !!binary |
+    pdxazWp5aKRVTYnWXlm3/Tv/D5A=
+  - !!binary |
+    JMTZUN/U3RkCu+01CBRKVFQrupQ=
+  - !!binary |
+    D/MNbeFKgiSql7eK6lOI0cUcHwA=
+  - !!binary |
+    V5qA2QnzRvv7EYlJP1Idf0jVIjg=
+  - !!binary |
+    TLMWKAefsU5Lw81eMML3SJsAlgw=
+  - !!binary |
+    T9as50fwbs6cSWmcfKvGLQIhH3U=
+  - !!binary |
+    RIaj1o+saWcAbXpRe4if0/mMECs=
+  - !!binary |
+    d8p7ULbNfi8/oAjiSreT/VbLFfY=
+  - !!binary |
+    FZH8D2iMgfvrF/VCahYqcCTUMMI=
+  - !!binary |
+    uWNxVtMwwNYFp5HxwxuliQWC/hw=
+  - !!binary |
+    Y+1aJy3i9tloQItKy5Ak9Mwgjr8=
+  - !!binary |
+    WLlcmp1dJoJecKgratsTnT/YKes=
+  - !!binary |
+    xLvQc4gt0q3SQkz0fTUhNAWwEyQ=
+  - !!binary |
+    aWarDUhTUwlRSKIVWFiRDglltvk=
+  - !!binary |
+    o6zzoeFrHXwxXiNRD914R7SCNPY=
+  - !!binary |
+    PAKnvAOR6G2Rt9FE5hwsAaJaecU=
+  - !!binary |
+    zq60gXR8psVAoADB82QfjO8WH6c=
+  - !!binary |
+    tSBCyMo/iqJG+nnD/qo9lZNHwKs=
+  - !!binary |
+    SGMiZ4D+fANWRUI207HIeSeFdI0=
+  - !!binary |
+    X58zkun2L2O46sC+tVVB/IYn9Cw=
+  - !!binary |
+    mqAI9l3guSOipPAgEq0DSl4uIZI=
+  - !!binary |
+    T6gCMk6Sl4bb2juIINx4NOkTSio=
+  - !!binary |
+    EuYmsO6/6GpW1jO5hk44m0XcsmA=
+  - !!binary |
+    7I5XdWYm/cB8Y60ur70o0I57DKU=
+  - !!binary |
+    B/XB4bwsk+BALyM0GXOg4EP3v4o=
+  - !!binary |
+    YjG20NXnf+ABwqRgvZWE/uYNQJs=
+  - !!binary |
+    XcKLFd/+2UBI1zgGzkt6RhKh1I8=
+  - !!binary |
+    kU0bi0PpJyPmT9Cgb1vbjdmxDHk=
+  - !!binary |
+    AF9c7npDMx1aPT7scTBZJaYvNLY=
+  - !!binary |
+    l/Q6N/WVq13TGPtG56FV6uBXMXo=
+  - !!binary |
+    0TFjfVJ1/RpooyAPStJccaKpUi4=
+  - !!binary |
+    R+eqVta98/Nr40YZZg3mEnVCCvg=
+  - !!binary |
+    jZ7bMFTOXFd0pCCsN+uuCsAjQ8Y=
+  - !!binary |
+    qC82Co00VcXEE2aXW95znDe/64o=
+  - !!binary |
+    QLgDqavOFvUPNqd7pBGA65ACOSU=
+  - !!binary |
+    I7dcL2eR7vScaWhNtMbB+Tv0mlA=
+  - !!binary |
+    J7E3qFZWVEscy1oPLlYaVwPGpo8=
+  - !!binary |
+    rfgNrse6jc8VOS8axhH/9l2U+IA=
+  - !!binary |
+    F4AvQ6ATfFBrqSKRORqKjyB/SH0=
+  - !!binary |
+    hq8+lib84ZV8guiMvwTd86LteRU=
+  - !!binary |
+    ylROXEaH0QlhHQ+PkotTolr3JEg=
+  - !!binary |
+    ssbw37txasVi4thdbLL41e6HYD4=
+  - !!binary |
+    y7nTcD5lGw1JbN77i5LCWushcfc=
+  - !!binary |
+    KzRV7H/t8W5kYmi/iIRr16Ixm7I=
+  - !!binary |
+    00OyF95EAwr6onX1TTGpMXx/RB4=
+  - !!binary |
+    2+m2FaOuhwmvi5MzbOm0d+SsCUA=
+  - !!binary |
+    dgK0bfU5DkMu8cMH1PLJ/21lzJc=
+  - !!binary |
+    2i/vnkoyMJiP8X3yFlRA836LFwg=
+  DAO_FORK_BLKNUM: 1920000
+  DAO_WITHDRAWER: !!binary |
+    v07Xsn8dZmVG4w101Q0XPSC8p1Q=
+  DIFF_ADJUSTMENT_CUTOFF: 13
+  EXPDIFF_FREE_PERIODS: 2
+  EXPDIFF_PERIOD: 100000
+  GASLIMIT_ADJMAX_FACTOR: 1024
+  GASLIMIT_EMA_FACTOR: 1024
+  GENESIS_COINBASE: "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+  GENESIS_DIFFICULTY: 131072
+  GENESIS_EXTRA_DATA: ''
+  GENESIS_GAS_LIMIT: 3141592
+  GENESIS_INITIAL_ALLOC:
+    '0000000000000000000000000000000000000001': {balance: '1'}
+    '0000000000000000000000000000000000000002': {balance: '1'}
+    '0000000000000000000000000000000000000003': {balance: '1'}
+    '0000000000000000000000000000000000000004': {balance: '1'}
+    1a26338f0d905e295fccb71fa9ea849ffa12aaf4: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+    2ef47100e0787b915105fd5e3f4ff6752079d5cb: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+    6c386a4b26f73c802f34673f7248bb118f97424a: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+    b9c015918bdaba24b4ff057a92a3873d6eb201be: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+    cd2a3d9f938e13cd947ec05abc7fe734df8dd826: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+    dbdbdb2cbd23b783741e8d7fcf51e459b497e4a6: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+    e4157b34ea9615cfbde6b4fda419828124b70c78: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+    e6716f9544a56c530d868e4bfbacb172315bdead: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+  GENESIS_MIXHASH: "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+    \0"
+  GENESIS_NONCE: "\0\0\0\0\0\0\0*"
+  GENESIS_PREVHASH: "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+    \0"
+  GENESIS_TIMESTAMP: 0
+  HOMESTEAD_DIFF_ADJUSTMENT_CUTOFF: 10
+  HOMESTEAD_FORK_BLKNUM: 1150000
+  MAX_EXTRADATA_LENGTH: 32
+  MAX_UNCLES: 2
+  MAX_UNCLE_DEPTH: 6
+  METROPOLIS_BLOCKHASH_STORE: 32
+  METROPOLIS_DIFF_ADJUSTMENT_CUTOFF: 9
+  METROPOLIS_ENTRY_POINT: &id002 1461501637330902918203684832716283019655932542975
+  METROPOLIS_FORK_BLKNUM: &id003 1267650600228229401496703205376
+  METROPOLIS_GETTER_CODE: !!binary |
+    YAA1VGAgUmAgYCDz
+  METROPOLIS_STATEROOT_STORE: 16
+  METROPOLIS_WRAPAROUND: 65536
+  MIN_DIFF: 131072
+  MIN_GAS_LIMIT: 5000
+  NEPHEW_REWARD: 156250000000000000
+  POW_EPOCH_LENGTH: 30000
+  UNCLE_DEPTH_PENALTY_FACTOR: 8
+client_version_string: pyethapp/v1.5.0/linux2/py2.7.12
+data_dir: !!python/unicode '/root/.config/pyethapp'
+db: {implementation: LevelDB}
+deactivated_services: [pow]
+discovery:
+  bootstrap_nodes: []
+  listen_host: 0.0.0.0
+  listen_port: 30303
+eth:
+  block:
+    ACCOUNT_INITIAL_NONCE: 0
+    BLKLIM_FACTOR_DEN: 2
+    BLKLIM_FACTOR_NOM: 3
+    BLOCK_DIFF_FACTOR: 2048
+    BLOCK_REWARD: 5000000000000000000
+    CHILD_DAO_LIST: *id001
+    DAO_FORK_BLKNUM: 1920000
+    DAO_WITHDRAWER: !!binary |
+      v07Xsn8dZmVG4w101Q0XPSC8p1Q=
+    DIFF_ADJUSTMENT_CUTOFF: 13
+    EXPDIFF_FREE_PERIODS: 2
+    EXPDIFF_PERIOD: 100000
+    GASLIMIT_ADJMAX_FACTOR: 1024
+    GASLIMIT_EMA_FACTOR: 1024
+    GENESIS_COINBASE: "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0"
+    GENESIS_DIFFICULTY: 131072
+    GENESIS_EXTRA_DATA: ''
+    GENESIS_GAS_LIMIT: 3141592
+    GENESIS_INITIAL_ALLOC:
+      '0000000000000000000000000000000000000001': {balance: '1'}
+      '0000000000000000000000000000000000000002': {balance: '1'}
+      '0000000000000000000000000000000000000003': {balance: '1'}
+      '0000000000000000000000000000000000000004': {balance: '1'}
+      1a26338f0d905e295fccb71fa9ea849ffa12aaf4: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+      2ef47100e0787b915105fd5e3f4ff6752079d5cb: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+      6c386a4b26f73c802f34673f7248bb118f97424a: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+      b9c015918bdaba24b4ff057a92a3873d6eb201be: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+      cd2a3d9f938e13cd947ec05abc7fe734df8dd826: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+      dbdbdb2cbd23b783741e8d7fcf51e459b497e4a6: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+      e4157b34ea9615cfbde6b4fda419828124b70c78: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+      e6716f9544a56c530d868e4bfbacb172315bdead: {balance: '1606938044258990275541962092341162602522202993782792835301376'}
+    GENESIS_MIXHASH: "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+      \0\0"
+    GENESIS_NONCE: "\0\0\0\0\0\0\0B"
+    GENESIS_PREVHASH: "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\
+      \0\0"
+    GENESIS_TIMESTAMP: 0
+    HOMESTEAD_DIFF_ADJUSTMENT_CUTOFF: 10
+    HOMESTEAD_FORK_BLKNUM: 1150000
+    MAX_EXTRADATA_LENGTH: 32
+    MAX_UNCLES: 2
+    MAX_UNCLE_DEPTH: 6
+    METROPOLIS_BLOCKHASH_STORE: 32
+    METROPOLIS_DIFF_ADJUSTMENT_CUTOFF: 9
+    METROPOLIS_ENTRY_POINT: *id002
+    METROPOLIS_FORK_BLKNUM: *id003
+    METROPOLIS_GETTER_CODE: !!binary |
+      YAA1VGAgUmAgYCDz
+    METROPOLIS_STATEROOT_STORE: 16
+    METROPOLIS_WRAPAROUND: 65536
+    MIN_DIFF: 131072
+    MIN_GAS_LIMIT: 5000
+    NEPHEW_REWARD: 156250000000000000
+    POW_EPOCH_LENGTH: 30000
+    UNCLE_DEPTH_PENALTY_FACTOR: 8
+  genesis: /genesis.json
+  network_id: 1
+  pruning: -1
+ipc: {ipcpath: /rpc.ipc}
+jsonrpc: {corsdomain: '', listen_host: 0.0.0.0, listen_port: 8545}
+log_disconnects: false
+node: {privkey_hex: ce0a48b566c72f52feb98fbf0304e29f2f2bd05a34838d3a99b3015ff165a41d}
+p2p:
+  bootstrap_nodes: []
+  listen_host: 0.0.0.0
+  listen_port: 30303
+  max_peers: 10
+  min_peers: 5
+post_app_start_callback: null
+pow: {activated: false, coinbase_hex: null, cpu_pct: 100, mine_empty_blocks: true}
