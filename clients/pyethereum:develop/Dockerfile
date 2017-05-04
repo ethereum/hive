@@ -9,6 +9,11 @@ RUN \
   python get-pip.py &&                                                         \
   git clone --depth 1 https://github.com/ethereum/pyethapp  && \
   cd pyethapp && python setup.py develop                                                   && \
+  (cd pyethapp && echo "{}"                                      \
+  | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
+  | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
+  | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
+  > /version.json) && \
   apt-get -y remove git curl automake build-essential libtool pkg-config
 
 # We can't delete /pyethapp--it's necessary for pyethapp to function.
