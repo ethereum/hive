@@ -14,8 +14,8 @@ RUN \
 	cd parity && cargo build --release                    && \
   echo "{}"                                                      \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-  | jq ".+ {\"branch\":\"$(git branch)\"}"                       \
-  | jq ".+ {\"hash\":\"$(git log --pretty=format:'%h' -n 1)\"}"  \
+  | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
+  | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
   > /version.json                                       && \
 	strip /parity/target/release/parity                   && \
 	\

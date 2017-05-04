@@ -28,9 +28,9 @@ RUN apk add --no-cache \
     && git clone --recursive https://github.com/ethereum/cpp-ethereum --branch develop --single-branch --depth 1 \
     && cd cpp-ethereum && echo "{}"                                               \
             | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-            | jq ".+ {\"branch\":\"$(git branch)\"}"                       \
-            | jq ".+ {\"hash\":\"$(git log --pretty=format:'%h' -n 1)\"}"  \
-            > /version.json                                            && \
+            | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
+            | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
+            > /version.json                                             && \
     && mkdir /build && cd /build \
     && cmake /cpp-ethereum -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTOOLS=Off -DTESTS=Off \
     && make eth \

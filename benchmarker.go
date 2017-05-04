@@ -90,8 +90,7 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	clogger.Debug("created client container")
 	defer func() {
 		clogger.Debug("deleting client container")
-		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cc.ID, Force: true})
-		if err != nil {
+		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cc.ID, Force: true}); err != nil {
 			clogger.Error("failed to delete client container", "error", err)
 		}
 	}()
@@ -167,8 +166,7 @@ func benchmark(daemon *docker.Client, client, benchmarker string, overrides []st
 	blogger.Debug("created benchmarker container")
 	defer func() {
 		blogger.Debug("deleting benchmarker container")
-		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true})
-		if err != nil {
+		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true}); err != nil {
 			blogger.Error("failed to delete benchmarker container", "error", err)
 		}
 	}()

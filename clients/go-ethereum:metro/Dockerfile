@@ -16,8 +16,8 @@ RUN \
   (cd go-ethereum                                             && \
   echo "{}"                                                      \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-  | jq ".+ {\"branch\":\"$(git branch)\"}"                       \
-  | jq ".+ {\"hash\":\"$(git log --pretty=format:'%h' -n 1)\"}"  \
+  | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
+  | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
 	> /version.json)                                            && \
   cp go-ethereum/build/bin/geth /geth                         && \
   apk del go git make gcc musl-dev linux-headers              && \

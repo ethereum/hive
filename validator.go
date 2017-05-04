@@ -80,8 +80,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	clogger.Debug("created client container")
 	defer func() {
 		clogger.Debug("deleting client container")
-		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cc.ID, Force: true})
-		if err != nil {
+		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cc.ID, Force: true}); err != nil {
 			clogger.Error("failed to delete client container", "error", err)
 		}
 	}()
@@ -144,8 +143,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	vlogger.Debug("created validator container")
 	defer func() {
 		vlogger.Debug("deleting validator container")
-		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true})
-		if err != nil {
+		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: vc.ID, Force: true}); err != nil {
 			vlogger.Error("failed to delete validator container", "error", err)
 		}
 	}()

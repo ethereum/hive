@@ -4,7 +4,9 @@
 package main
 
 import (
+	"archive/tar"
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -38,6 +40,32 @@ func buildEthash(daemon *docker.Client) (string, error) {
 // all unknown ones matching the given pattern.
 func buildClients(daemon *docker.Client, pattern string) (map[string]string, error) {
 	return buildNestedImages(daemon, "clients", pattern, "client")
+}
+
+// fetchClientVersions downloads the version json specs from all clients that
+// match the given patten.
+func fetchClientVersions(daemon *docker.Client, pattern string) (map[string]map[string]string, error) {
+	// Build all the client that we need the versions of
+	clients, err := buildClients(daemon, pattern)
+	if err != nil {
+		return nil, err
+	}
+	// Iterate over the images and collect the versions
+	versions := make(map[string]map[string]string)
+	for client, image := range clients {
+		logger := log15.New("client", client)
+
+		blob, err := downloadFromImage(daemon, image, "/version.json", logger)
+		if err != nil {
+			return nil, err
+		}
+		var version map[string]string
+		if err := json.Unmarshal(blob, &version); err != nil {
+			return nil, err
+		}
+		versions[client] = version
+	}
+	return versions, nil
 }
 
 // buildValidators iterates over all the known validators and builds a docker image
@@ -118,4 +146,43 @@ func buildImage(daemon *docker.Client, image, context string, logger log15.Logge
 		return err
 	}
 	return nil
+}
+
+// downloadFromImage retrieves a file from a docker image. To do so it creates a
+// temporary container, downloads the file from it and destroys the container.
+func downloadFromImage(daemon *docker.Client, image, path string, logger log15.Logger) ([]byte, error) {
+	// Create the temporary container and ensure it's cleaned up
+	cont, err := daemon.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: image}})
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID, Force: true}); err != nil {
+			logger.Error("failed to delete temporary container", "id", cont.ID[:8], "error", err)
+		}
+	}()
+	// Download a tarball of the file from the container
+	download := new(bytes.Buffer)
+	if err := daemon.DownloadFromContainer(cont.ID, docker.DownloadFromContainerOptions{
+		Path:         path,
+		OutputStream: download,
+	}); err != nil {
+		return nil, err
+	}
+	in := tar.NewReader(download)
+	for {
+		// Fetch the next file header from the archive
+		header, err := in.Next()
+		if err != nil {
+			return nil, err
+		}
+		// If it's the file we're looking for, save its contents
+		if header.Name == path[1:] {
+			content := new(bytes.Buffer)
+			if _, err := io.Copy(content, in); err != nil {
+				return nil, err
+			}
+			return content.Bytes(), nil
+		}
+	}
 }

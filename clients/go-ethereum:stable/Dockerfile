@@ -5,24 +5,21 @@
 # needing to constantly rebuild.
 FROM alpine:latest
 
-# Make sure bash and jq is available for easier wrapper implementation
-RUN apk add --update bash jq
-
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  apk add --update bash jq go git make gcc musl-dev        \
-  	  ca-certificates linux-headers                     && \
-  git clone --depth 1 --branch release/1.6                 \
-     https://github.com/ethereum/go-ethereum            && \
-  (cd go-ethereum && make geth)                         && \
+  apk add --update bash jq go git make gcc musl-dev              \
+  	  ca-certificates linux-headers                           && \
+  git clone --depth 1 --branch release/1.6                       \
+     https://github.com/ethereum/go-ethereum                  && \
+  (cd go-ethereum && make geth)                               && \
   (cd go-ethereum                                             && \
   echo "{}"                                                      \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-  | jq ".+ {\"branch\":\"$(git branch)\"}"                       \
-  | jq ".+ {\"hash\":\"$(git log --pretty=format:'%h' -n 1)\"}"  \
-	> /version.json)                                      && \
-  cp go-ethereum/build/bin/geth /geth                   && \
-  apk del go git make gcc musl-dev linux-headers        && \
+  | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
+  | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
+	> /version.json)                                            && \
+  cp go-ethereum/build/bin/geth /geth                         && \
+  apk del go git make gcc musl-dev linux-headers              && \
   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
 # Inject the startup script

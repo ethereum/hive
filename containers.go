@@ -149,8 +149,7 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 		return nil, err
 	}
 	defer func() {
-		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true})
-		if err != nil {
+		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true}); err != nil {
 			log15.Error("failed to cleanup tester container", "id", t.ID[:8], "error", err)
 		}
 	}()
@@ -206,8 +205,7 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 		}
 	}
 	if err := uploadToContainer(daemon, c.ID, overrides); err != nil {
-		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true})
-		if err != nil {
+		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true}); err != nil {
 			log15.Error("failed to cleanup client container", "id", c.ID[:8], "error", err)
 		}
 		return nil, err

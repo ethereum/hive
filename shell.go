@@ -31,8 +31,7 @@ func mainInShell(daemon *docker.Client, overrides []string) error {
 	log15.Debug("created shell container")
 	defer func() {
 		log15.Debug("deleting shell container")
-		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: shell.ID, Force: true})
-		if err != nil {
+		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: shell.ID, Force: true}); err != nil {
 			log15.Error("failed to delete shell container", "error", err)
 		}
 	}()

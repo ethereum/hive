@@ -66,12 +66,18 @@ func main() {
 // container, but can be also requested directly.
 func mainInHost(daemon *docker.Client, overrides []string) error {
 	results := struct {
+		Clients     map[string]map[string]string            `json:"clients,omitempty"`
 		Validations map[string]map[string]*validationResult `json:"validations,omitempty"`
 		Simulations map[string]map[string]*simulationResult `json:"simulations,omitempty"`
 		Benchmarks  map[string]map[string]*benchmarkResult  `json:"benchmarks,omitempty"`
 	}{}
 	var err error
 
+	// Retrieve the versions of all clients being tested
+	if results.Clients, err = fetchClientVersions(daemon, *clientPattern); err != nil {
+		log15.Crit("failed to retrieve client versions", "error", err)
+		return err
+	}
 	// Smoke tests are exclusive with all other flags
 	if *smokeFlag {
 		if results.Validations, err = validateClients(daemon, *clientPattern, "smoke/", overrides); err != nil {
