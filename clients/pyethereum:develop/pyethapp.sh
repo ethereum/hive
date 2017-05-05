@@ -11,11 +11,6 @@ genesis=$(cat /genesis.json | \
 # Don't immediately abort, some imports are meant to fail
 set +e
 
-if [ -f /chain.rlp ]; then
-  echo "Found chain.rlp"
-  pyethapp import /chain.rlp
-fi
-
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
   extra_config="-c eth.block.METROPOLIS_FORK_BLKNUM=$HIVE_FORK_METROPOLIS"
 fi
@@ -34,6 +29,11 @@ fi
 
 if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
   extra_config="$extra_config -c eth.block.DAO_FORK_BLKNUM=$HIVE_FORK_DAO_BLOCK"
+fi
+
+if [ -f /chain.rlp ]; then
+  echo "Found chain.rlp"
+  pyethapp -c eth.genesis="$genesis" $extra_config import /chain.rlp
 fi
 
 if [ -d /blocks/ ]; then
