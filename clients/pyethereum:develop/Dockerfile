@@ -1,20 +1,20 @@
 # Docker container spec for building the develop branch of pythereum.
-FROM ubuntu:16.04
+FROM alpine:latest
 
 RUN \
-  apt-get -y update                                                         && \
-  apt-get -y install jq git curl python-dev libssl-dev build-essential         \
-                     automake pkg-config libtool libffi-dev libgmp-dev      && \
+  apk add --update bash jq git curl python-dev musl-dev gcc make openssl-dev   \
+                 g++ autoconf automake pkgconfig libtool libffi-dev gmp-dev && \
   curl -sSf https://bootstrap.pypa.io/get-pip.py -o get-pip.py              && \
-  python get-pip.py &&                                                         \
-  git clone --depth 1 https://github.com/ethereum/pyethapp  && \
-  cd pyethapp && python setup.py develop                                                   && \
-  (cd pyethapp && echo "{}"                                      \
-  | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-  | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
-  | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
-  > /version.json) && \
-  apt-get -y remove git curl automake build-essential libtool pkg-config
+  python get-pip.py                                                         && \
+  git clone --depth 1 https://github.com/ethereum/pyethapp                  && \
+  cd pyethapp                                                               && \
+  python setup.py develop                                                   && \
+  echo "{}"                                                                    \
+      | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}"           \
+      | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"            \
+      | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"                         \
+      > /version.json                                                       && \
+  apk del git make gcc g++ musl-dev curl pkgconfig libtool automake autoconf
 
 # We can't delete /pyethapp--it's necessary for pyethapp to function.
 
