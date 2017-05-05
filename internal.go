@@ -11,11 +11,11 @@ import (
 
 // makeGenesisDAG runs the ethash DAG generator to ensure that the genesis epochs
 // DAG is created prior to it being needed by simulations.
-func makeGenesisDAG(daemon *docker.Client) error {
+func makeGenesisDAG(daemon *docker.Client, cacher *buildCacher) error {
 	// Build the image for the DAG generator
 	log15.Info("creating ethash container")
 
-	image, err := buildEthash(daemon)
+	image, err := buildEthash(daemon, cacher)
 	if err != nil {
 		return err
 	}

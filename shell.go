@@ -14,11 +14,11 @@ import (
 //
 // The end goal of this mechanism is preventing any leakage of junk (be that file
 // system, docker images and/or containers, network traffic) into the host system.
-func mainInShell(daemon *docker.Client, overrides []string) error {
+func mainInShell(daemon *docker.Client, overrides []string, cacher *buildCacher) error {
 	// Build the image for the outer shell container and the container itself
 	log15.Info("creating outer shell container")
 
-	image, err := buildShell(daemon)
+	image, err := buildShell(daemon, cacher)
 	if err != nil {
 		return err
 	}

@@ -24,16 +24,16 @@ type validationResult struct {
 
 // validateClients runs a batch of validation tests matched by validatorPattern
 // against all clients matching clientPattern.
-func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string) (map[string]map[string]*validationResult, error) {
+func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*validationResult, error) {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for validation", "pattern", clientPattern)
-	clients, err := buildClients(daemon, clientPattern)
+	clients, err := buildClients(daemon, clientPattern, cacher)
 	if err != nil {
 		return nil, err
 	}
 	// Build all the validators known to the test harness
 	log15.Info("building validators for testing", "pattern", validatorPattern)
-	validators, err := buildValidators(daemon, validatorPattern)
+	validators, err := buildValidators(daemon, validatorPattern, cacher)
 	if err != nil {
 		return nil, err
 	}

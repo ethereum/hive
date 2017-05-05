@@ -30,16 +30,16 @@ type benchmarkResult struct {
 
 // benchmarkClients runs a batch of benchmark tests matched by benchmarkerPattern
 // against all clients matching clientPattern.
-func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern string, overrides []string) (map[string]map[string]*benchmarkResult, error) {
+func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*benchmarkResult, error) {
 	// Build all the clients matching the benchmark pattern
 	log15.Info("building clients for benchmark", "pattern", clientPattern)
-	clients, err := buildClients(daemon, clientPattern)
+	clients, err := buildClients(daemon, clientPattern, cacher)
 	if err != nil {
 		return nil, err
 	}
 	// Build all the benchmarkers known to the harness
 	log15.Info("building benchmarkers for measurements", "pattern", benchmarkerPattern)
-	benchmarkers, err := buildBenchmarkers(daemon, benchmarkerPattern)
+	benchmarkers, err := buildBenchmarkers(daemon, benchmarkerPattern, cacher)
 	if err != nil {
 		return nil, err
 	}

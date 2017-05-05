@@ -14,6 +14,7 @@ import (
 var (
 	dockerEndpoint   = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Unix socket to the local Docker daemon")
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
+	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
 	clientPattern = flag.String("client", ":master", "Regexp selecting the client(s) to run against")
 	overrideFiles = flag.String("override", "", "Comma separated regexp:files to override in client containers")
@@ -44,17 +45,22 @@ func main() {
 	}
 	log15.Info("docker daemon online", "version", env.Get("Version"))
 
-	// Gather any client files needing overriding
+	// Gather any client files needing overriding and images not caching
 	overrides := []string{}
 	if *overrideFiles != "" {
 		overrides = strings.Split(*overrideFiles, ",")
 	}
+	cacher, err := newBuildCacher(*noCachePattern)
+	if err != nil {
+		log15.Crit("failed to parse nocache regexp", "error", err)
+		return
+	}
 	// Depending on the flags, either run hive in place or in an outer container shell
 	var fail error
 	if *noShellContainer {
-		fail = mainInHost(daemon, overrides)
+		fail = mainInHost(daemon, overrides, cacher)
 	} else {
-		fail = mainInShell(daemon, overrides)
+		fail = mainInShell(daemon, overrides, cacher)
 	}
 	if fail != nil {
 		os.Exit(-1)
@@ -64,7 +70,7 @@ func main() {
 // mainInHost runs the actual hive validation, simulation and benchmarking on the
 // host machine itself. This is usually the path executed within an outer shell
 // container, but can be also requested directly.
-func mainInHost(daemon *docker.Client, overrides []string) error {
+func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) error {
 	results := struct {
 		Clients     map[string]map[string]string            `json:"clients,omitempty"`
 		Validations map[string]map[string]*validationResult `json:"validations,omitempty"`
@@ -74,44 +80,44 @@ func mainInHost(daemon *docker.Client, overrides []string) error {
 	var err error
 
 	// Retrieve the versions of all clients being tested
-	if results.Clients, err = fetchClientVersions(daemon, *clientPattern); err != nil {
+	if results.Clients, err = fetchClientVersions(daemon, *clientPattern, cacher); err != nil {
 		log15.Crit("failed to retrieve client versions", "error", err)
 		return err
 	}
 	// Smoke tests are exclusive with all other flags
 	if *smokeFlag {
-		if results.Validations, err = validateClients(daemon, *clientPattern, "smoke/", overrides); err != nil {
+		if results.Validations, err = validateClients(daemon, *clientPattern, "smoke/", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-validate client images", "error", err)
 			return err
 		}
-		if results.Simulations, err = simulateClients(daemon, *clientPattern, "smoke/", overrides); err != nil {
+		if results.Simulations, err = simulateClients(daemon, *clientPattern, "smoke/", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-simulate client images", "error", err)
 			return err
 		}
-		if results.Benchmarks, err = benchmarkClients(daemon, *clientPattern, "smoke/", overrides); err != nil {
+		if results.Benchmarks, err = benchmarkClients(daemon, *clientPattern, "smoke/", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-benchmark client images", "error", err)
 			return err
 		}
 	} else {
 		// Otherwise run all requested validation and simulation tests
 		if *validatorPattern != "" {
-			if results.Validations, err = validateClients(daemon, *clientPattern, *validatorPattern, overrides); err != nil {
+			if results.Validations, err = validateClients(daemon, *clientPattern, *validatorPattern, overrides, cacher); err != nil {
 				log15.Crit("failed to validate clients", "error", err)
 				return err
 			}
 		}
 		if *simulatorPattern != "" {
-			if err = makeGenesisDAG(daemon); err != nil {
+			if err = makeGenesisDAG(daemon, cacher); err != nil {
 				log15.Crit("failed generate DAG for simulations", "error", err)
 				return err
 			}
-			if results.Simulations, err = simulateClients(daemon, *clientPattern, *simulatorPattern, overrides); err != nil {
+			if results.Simulations, err = simulateClients(daemon, *clientPattern, *simulatorPattern, overrides, cacher); err != nil {
 				log15.Crit("failed to simulate clients", "error", err)
 				return err
 			}
 		}
 		if *benchmarkPattern != "" {
-			if results.Benchmarks, err = benchmarkClients(daemon, *clientPattern, *benchmarkPattern, overrides); err != nil {
+			if results.Benchmarks, err = benchmarkClients(daemon, *clientPattern, *benchmarkPattern, overrides, cacher); err != nil {
 				log15.Crit("failed to benchmark clients", "error", err)
 				return err
 			}
