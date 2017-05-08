@@ -30,7 +30,7 @@ RUN apk add --no-cache \
             | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
             | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
             | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
-            > /version.json                                             && \
+            > /version.json                                             \
     && mkdir /build && cd /build \
     && cmake /cpp-ethereum -DCMAKE_BUILD_TYPE=RelWithDebInfo -DTOOLS=Off -DTESTS=Off \
     && make eth \
