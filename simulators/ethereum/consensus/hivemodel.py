@@ -1,4 +1,4 @@
-from multiprocessing.dummy import Pool as ThreadPool 
+from multiprocessing.dummy import Pool as ThreadPool
 import requests
 import traceback,os
 import binascii
@@ -7,6 +7,8 @@ from testmodel import Testcase, Testfile, Rules
 from utils import canonicalize, getFiles, hex2big
 import time
 
+# Number of tests to run in parallel.
+PARALLEL_TESTS = 7
 
 # Model for the Hive interaction
 class HiveNode(object):
@@ -113,77 +115,94 @@ class HiveAPI(object):
         return self._post("/subresults", params = params, data = data);
 
 
-    def blockTests(self, start =0 , end = -1, whitelist = [], blacklist = [], testfiles = [],executor= None) :
-        return self._performTests(start,end,whitelist, blacklist, testfiles, executor)
+    def blockTests(self, start=0 , end=-1, whitelist=[], blacklist=[], testfiles=[], executor=None) :
+        return self._performTests(start, end, whitelist, blacklist, testfiles, executor)
 
-    def mkTestcaseIterator(self, start = 0, end = -1, whitelist = [], blacklist =[], testfiles=[],executor= None):
-        hive = self
+    def makeTestcases(self, start=0, end=-1, whitelist=[], blacklist=[], testfiles=[], executor=None):
+        count = 0
+        for testfile in testfiles:
+            count = count +1
+            if count < start:
+                continue
+            if 0 <= end <= count:
+                break
 
-        def iterator():
-            count = 0
-            for testfile in testfiles:
+            tf = Testfile(testfile)
+            self.log("Commencing testfile [%d] (%s)\n " % (count, tf))
 
-                count = count +1
-                if count < start:
+            for testcase in tf.tests() :
+
+                if len(whitelist) > 0 and str(testcase) not in whitelist:
+                    testcase.skipped(["Testcase not in whitelist"])
                     continue
-                if 0 <= end <= count:
-                    break
 
-                tf = Testfile(testfile)
-                hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
+                if len(blacklist) > 0 and str(testcase) in blacklist:
+                    testcase.skipped(["Testcase in blacklist"])
+                    continue
 
-                for testcase in tf.tests() :
+                (ok, err) = testcase.validate()
 
-                    if len(whitelist) > 0 and str(testcase) not in whitelist:
-                        testcase.skipped(["Testcase not in whitelist"])
-                        continue
+                if not ok:
+                    self.log("%s failed initial validation" % testcase )
+                    testcase.fail(["Testcase failed initial validation", err])
+                else:
+                    yield testcase
 
-                    if len(blacklist) > 0 and str(testcase) in blacklist:
-                        testcase.skipped(["Testcase in blacklist"])
-                        continue
+    def _startNodeAndRunTest(self, testcase, executor):
+        start = time.time()
+        try:
+            genesis, init_chain, blocks = self._generateArtefacts(testcase)
+        except Exception, e:
+            testcase.fail(["Failed to write test data to disk", traceback.format_exc()])
+            return
+        #HIVE_INIT_GENESIS path to the genesis file to seed the client with (default = "/genesis.json")
+        #HIVE_INIT_CHAIN path to an initial blockchain to seed the client with (default = "/chain.rlp")
+        #HIVE_INIT_BLOCKS path to a folder of blocks to import after seeding (default = "/blocks/")
+        #HIVE_INIT_KEYS path to a folder of account keys to import after init (default = "/keys/")
+        #HIVE_FORK_HOMESTEAD
 
-                    (ok, err) = testcase.validate()
+        params = {
+            "HIVE_INIT_GENESIS": genesis,
+            "HIVE_INIT_BLOCKS" : blocks,
+            "HIVE_FORK_DAO_VOTE" : "1",
+        }
+        params["HIVE_FORK_HOMESTEAD"] = "20000",
+        params["HIVE_FORK_TANGERINE"] = "20000",
+        params["HIVE_FORK_SPURIOUS"]  = "20000",
 
-                    if not ok:
-                        hive.log("%s failed initial validation" % testcase )
-                        testcase.fail(["Testcase failed initial validation", err])
-                    else:
-                        yield testcase
-
-        return iterator
-
-
-    def _performTests(self, start = 0, end = -1, whitelist = [], blacklist =[], testfiles=[],executor= None):
-
-        iterator = self.mkTestcaseIterator(start, end, whitelist, blacklist,testfiles, executor)
-        hive = self
-
-        def perform_work(testcase):
-
-
-            start = time.time()
-            executor.executeTestcase(testcase)
-            end = time.time()
-            testcase.setTimeElapsed(1000 * (end - start))
-            hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
-            hive.subresult(
-                    testcase.fullname(),
-                    testcase.wasSuccessfull(),
-                    testcase.topLevelError(),
-                    testcase.details()
-                )
-
-        if True:
-            pool = ThreadPool(7) 
-            #Turns out a raw iterator isn't supported, so comprehending a list instead :(
-            pool.map(perform_work, [x for x in iterator()])
-            pool.close()
-            pool.join()
+        if executor.default_rules is not None:
+            params.update(executor.default_rules)
         else:
-            for testcase in iterator():
-                perform_work(testcase)
+            params.update(testcase.ruleset())
 
-        return True
+        self.log("Starting client node for test %s" % testcase)
+        try:
+            node = self.newNode(params)
+        except Exception, e:
+            testcase.fail(["Failed to start client node", traceback.format_exc()])
+        else:
+            executor.executeTestcase(testcase, node)
+        end = time.time()
+        testcase.setTimeElapsed(1000 * (end - start))
+        self.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
+        self.subresult(
+                testcase.fullname(),
+                testcase.wasSuccessfull(),
+                testcase.topLevelError(),
+                testcase.details()
+            )
+        try:
+            self.killNode(node)
+        except Exception, e:
+            self.log("Failed to kill node %s: %s" % (node, traceback.format_exc()))
+
+    def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[], testfiles=[], executor=None):
+        pool = ThreadPool(PARALLEL_TESTS)
+        pool.map(lambda test: self._startNodeAndRunTest(test, executor),
+                 self.makeTestcases(start, end, whitelist, blacklist, testfiles, executor))
+        pool.close()
+        pool.join()
+        # FIXME: Return false if any tests fail.
 
     def newNode(self, params):
         try:
@@ -197,24 +216,10 @@ class HiveAPI(object):
         _ip = self._get("/nodes/%s" % _id)
         return HiveNode(_id, _ip)
 
-
     def killNode(self,node):
         self._delete("/nodes/%s" % node.nodeId)
 
-class TestExecutor(object):
-    """ Test-execution engine
-
-    This should probably be moved into 'testmodel' instead.
-
-    """
-    def __init__(self, hiveapi, rules = None):
-        self.hive = hiveapi
-        self.default_rules = rules
-
-    def log(self,msg):
-        self.hive.log(msg)
-
-    def generateArtefacts(self,testcase):
+    def _generateArtefacts(self, testcase):
         try:
            os.makedirs("./artefacts/%s/" % testcase)
            os.makedirs("./artefacts/%s/blocks/" % testcase)
@@ -246,82 +251,33 @@ class TestExecutor(object):
 
         return (g_file, c_file, b_folder)
 
-    def executeTestcase(self, testcase):
-        testcase.fail("Executor not defined")
-        return False
 
+class BlockTestExecutor(object):
 
-class BlockTestExecutor(TestExecutor):
-
-    def __init__(self, hiveapi, rules = None):
-        super(BlockTestExecutor, self).__init__(hiveapi, rules)
+    def __init__(self, rules=None):
         self.clientVersion = None
+        self.default_rules = rules
 
-    def executeTestcase(self,testcase):
-        genesis = None
-        init_chain = None
-        blocks = None
-
-        try:
-            (genesis, init_chain, blocks ) = self.generateArtefacts(testcase)
-        except Exception, e:
-            testcase.fail(["Failed to write test data to disk", traceback.format_exc()])
-            return False
-        #HIVE_INIT_GENESIS path to the genesis file to seed the client with (default = "/genesis.json")
-        #HIVE_INIT_CHAIN path to an initial blockchain to seed the client with (default = "/chain.rlp")
-        #HIVE_INIT_BLOCKS path to a folder of blocks to import after seeding (default = "/blocks/")
-        #HIVE_INIT_KEYS path to a folder of account keys to import after init (default = "/keys/")
-        #HIVE_FORK_HOMESTEAD
-
-        params = {
-            "HIVE_INIT_GENESIS": genesis,
-            "HIVE_INIT_BLOCKS" : blocks,
-            "HIVE_FORK_DAO_VOTE" : "1",
-        }
-        params["HIVE_FORK_HOMESTEAD"] = "20000",
-        params["HIVE_FORK_TANGERINE"] = "20000",
-        params["HIVE_FORK_SPURIOUS"]  = "20000",
-
-
-        if self.default_rules is not None:
-            params.update(self.default_rules)
-        else:
-            params.update(testcase.ruleset())
-
-        node = None
-        self.hive.log("Starting node for test %s" % testcase)
-
-        try:
-            node = self.hive.newNode(params)
-        except Exception, e:
-            testcase.fail(["Failed to start node", traceback.format_exc()])
-            return False
-
+    def executeTestcase(self, testcase, node):
         if self.clientVersion is None:
             self.clientVersion = node.getClientversion()
             print("Client version: %s" % self.clientVersion)
 
-        #self.hive.log("Started node %s" % node)
+        testcase.setNodeInstance(node.nodeId)
+        errors = self.verifyPreconditions(testcase, node)
+        if errors:
+            testcase.fail(["Preconditions failed", errors])
+            return
 
-        try:
-            testcase.setNodeInstance(node.nodeId)
-            errors = self.verifyPreconditions(testcase, node)
-            if errors:
-                testcase.fail(["Preconditions failed", errors])
-                return False
+        errors = self.verifyPostconditions(testcase, node)
+        if errors:
+            testcase.fail(["Postcondition check failed", errors])
+            return
 
-            errors = self.verifyPostconditions(testcase, node)
-            if errors:
-                testcase.fail(["Postcondition check failed", errors])
-                return False
-
-            testcase.success()
-            return True
-        finally:
-            self.hive.killNode(node)
+        testcase.success()
 
     def customCheck(self, testcase, node):
-        """This is a special method meant for debugging particular testcases in hive, 
+        """This is a special method meant for debugging particular testcases in hive,
         not meant to be run in general"""
 
         value = node.getStorageAt("0xaaaf5374fce5edbc8e2a8697c15331677e6ebf0b", "0x010340fef9c35e91836ea450d2e0b39079f7ac19da70f533a0c9a6770d6d8efc" )
@@ -369,7 +325,6 @@ class BlockTestExecutor(TestExecutor):
 
         return errs
 
-
     def verifyPostconditions(self, testcase, node):
         """ Verify postconditions
         @return list of error messages
@@ -384,7 +339,7 @@ class BlockTestExecutor(TestExecutor):
 
         # With a bit of luck, we can just check the `lastblockhash` directly
         exp_lastblockhash = testcase.get("lastblockhash")
-        if exp_lastblockhash is not None: 
+        if exp_lastblockhash is not None:
             actual_lastblockhash = node.getLatestBlock()['hash']
             err = _verifyEqRaw(actual_lastblockhash[-64:],exp_lastblockhash[-64:])
             #TODO, run with whitelist ['DaoTransactions_EmptyTransactionAndForkBlocksAhead']
@@ -404,7 +359,6 @@ class BlockTestExecutor(TestExecutor):
             self.hive.log("This may take a while, %d accounts to check postconditions for " % numaccounts)
 
         for address, poststate_account in testcase.postconditions().items():
-
 
             if len(errs) > 9:
                 errs.append("Postcondition check aborted due to earlier errors")
@@ -436,7 +390,6 @@ class BlockTestExecutor(TestExecutor):
                         errs.append("Code error (`%s`)" % address)
                         errs.append([err])
 
-
                 if 'balance' in poststate_account:
                     current = "balancecheck"
                     _b = node.getBalance(address)
@@ -461,7 +414,6 @@ class BlockTestExecutor(TestExecutor):
                         if int(value,16) != int(exp,16):
                             err  ="Found `%s`, expected `%s`"  % (value, exp)
 
-
                         if err is not None:
                             errs.append("Storage error (`%s`) key `%s`" % (address, _hash))
                             errs.append([err])
@@ -478,3 +430,4 @@ class BlockTestExecutor(TestExecutor):
                 return errs
 
         return errs
+
