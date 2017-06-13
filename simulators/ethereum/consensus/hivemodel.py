@@ -152,7 +152,7 @@ class HiveAPI(object):
         start = time.time()
         try:
             genesis, init_chain, blocks = self._generateArtefacts(testcase)
-        except Exception, e:
+        except:
             testcase.fail(["Failed to write test data to disk", traceback.format_exc()])
             return
         #HIVE_INIT_GENESIS path to the genesis file to seed the client with (default = "/genesis.json")
@@ -178,10 +178,11 @@ class HiveAPI(object):
         self.log("Starting client node for test %s" % testcase)
         try:
             node = self.newNode(params)
-        except Exception, e:
+        except:
             testcase.fail(["Failed to start client node", traceback.format_exc()])
-        else:
-            executor.executeTestcase(testcase, node)
+            return
+
+        executor.executeTestcase(testcase, node)
         end = time.time()
         testcase.setTimeElapsed(1000 * (end - start))
         self.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
@@ -191,9 +192,10 @@ class HiveAPI(object):
                 testcase.topLevelError(),
                 testcase.details()
             )
+
         try:
             self.killNode(node)
-        except Exception, e:
+        except:
             self.log("Failed to kill node %s: %s" % (node, traceback.format_exc()))
 
     def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[], testfiles=[], executor=None):
