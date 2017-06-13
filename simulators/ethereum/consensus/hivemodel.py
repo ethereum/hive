@@ -63,12 +63,7 @@ class HiveNode(object):
 class HiveAPI(object):
 
     def __init__(self, hive_simulator):
-        self.nodes = []
         self.hive_simulator = hive_simulator
-        self.count = 0
-
-    def inc(self):
-        self.count = self.count+1
 
     def _get(self,path, params = None):
         req = requests.get("%s%s" % (self.hive_simulator , path),  params=params)
@@ -114,13 +109,36 @@ class HiveAPI(object):
 
         return self._post("/subresults", params = params, data = data);
 
+    def newNode(self, params):
+        try:
+            _id = self._post("/nodes", params)
+            _ip = self._get("/nodes/%s" % _id)
+            return HiveNode(_id, _ip)
+        except Exception, e:
+            self.log("Failed to start node, trying again")
 
-    def blockTests(self, start=0 , end=-1, whitelist=[], blacklist=[], testfiles=[], executor=None) :
-        return self._performTests(start, end, whitelist, blacklist, testfiles, executor)
+        _id = self._post("/nodes", params)
+        _ip = self._get("/nodes/%s" % _id)
+        return HiveNode(_id, _ip)
 
-    def makeTestcases(self, start=0, end=-1, whitelist=[], blacklist=[], testfiles=[], executor=None):
+    def killNode(self,node):
+        self._delete("/nodes/%s" % node.nodeId)
+
+
+class BlockTestExecutor(object):
+
+    def __init__(self, hive_api, testfiles, rules=None):
+        self.clientVersion = None
+        self.default_rules = rules
+        self.hive = hive_api
+        self.testfiles = testfiles
+
+    def run(self, start=0 , end=-1, whitelist=[], blacklist=[]) :
+        return self._performTests(start, end, whitelist, blacklist)
+
+    def makeTestcases(self, start=0, end=-1, whitelist=[], blacklist=[]):
         count = 0
-        for testfile in testfiles:
+        for testfile in self.testfiles:
             count = count +1
             if count < start:
                 continue
@@ -128,7 +146,7 @@ class HiveAPI(object):
                 break
 
             tf = Testfile(testfile)
-            self.log("Commencing testfile [%d] (%s)\n " % (count, tf))
+            self.hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
 
             for testcase in tf.tests() :
 
@@ -143,12 +161,12 @@ class HiveAPI(object):
                 (ok, err) = testcase.validate()
 
                 if not ok:
-                    self.log("%s failed initial validation" % testcase )
+                    self.hive.log("%s failed initial validation" % testcase )
                     testcase.fail(["Testcase failed initial validation", err])
                 else:
                     yield testcase
 
-    def _startNodeAndRunTest(self, testcase, executor):
+    def _startNodeAndRunTest(self, testcase):
         start = time.time()
         try:
             genesis, init_chain, blocks = self._generateArtefacts(testcase)
@@ -170,23 +188,23 @@ class HiveAPI(object):
         params["HIVE_FORK_TANGERINE"] = "20000",
         params["HIVE_FORK_SPURIOUS"]  = "20000",
 
-        if executor.default_rules is not None:
-            params.update(executor.default_rules)
+        if self.default_rules is not None:
+            params.update(self.default_rules)
         else:
             params.update(testcase.ruleset())
 
-        self.log("Starting client node for test %s" % testcase)
+        self.hive.log("Starting client node for test %s" % testcase)
         try:
-            node = self.newNode(params)
+            node = self.hive.newNode(params)
         except:
             testcase.fail(["Failed to start client node", traceback.format_exc()])
             return
 
-        executor.executeTestcase(testcase, node)
+        self.executeTestcase(testcase, node)
         end = time.time()
         testcase.setTimeElapsed(1000 * (end - start))
-        self.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
-        self.subresult(
+        self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
+        self.hive.subresult(
                 testcase.fullname(),
                 testcase.wasSuccessfull(),
                 testcase.topLevelError(),
@@ -194,32 +212,17 @@ class HiveAPI(object):
             )
 
         try:
-            self.killNode(node)
+            self.hive.killNode(node)
         except:
-            self.log("Failed to kill node %s: %s" % (node, traceback.format_exc()))
+            self.hive.log("Failed to kill node %s: %s" % (node, traceback.format_exc()))
 
-    def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[], testfiles=[], executor=None):
+    def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[]):
         pool = ThreadPool(PARALLEL_TESTS)
-        pool.map(lambda test: self._startNodeAndRunTest(test, executor),
-                 self.makeTestcases(start, end, whitelist, blacklist, testfiles, executor))
+        pool.map(lambda test: self._startNodeAndRunTest(test),
+                 self.makeTestcases(start, end, whitelist, blacklist))
         pool.close()
         pool.join()
         # FIXME: Return false if any tests fail.
-
-    def newNode(self, params):
-        try:
-            _id = self._post("/nodes", params)
-            _ip = self._get("/nodes/%s" % _id)
-            return HiveNode(_id, _ip)
-        except Exception, e:
-            self.log("Failed to start node, trying again")
-
-        _id = self._post("/nodes", params)
-        _ip = self._get("/nodes/%s" % _id)
-        return HiveNode(_id, _ip)
-
-    def killNode(self,node):
-        self._delete("/nodes/%s" % node.nodeId)
 
     def _generateArtefacts(self, testcase):
         try:
@@ -249,16 +252,9 @@ class HiveAPI(object):
                     counter = counter +1
             except TypeError, e:
                 #Bad rlp
-                self.log("Exception: %s, continuing regardless" % e)
+                self.hive.log("Exception: %s, continuing regardless" % e)
 
         return (g_file, c_file, b_folder)
-
-
-class BlockTestExecutor(object):
-
-    def __init__(self, rules=None):
-        self.clientVersion = None
-        self.default_rules = rules
 
     def executeTestcase(self, testcase, node):
         if self.clientVersion is None:

@@ -74,21 +74,30 @@ def main(args):
     print("Hive simulator: %s\n" % hivesim)
     hive = hivemodel.HiveAPI(hivesim)
 
-    status = hive.blockTests(testfiles=utils.getFiles("./tests/BlockchainTests"),
-        executor=hivemodel.BlockTestExecutor(Rules.RULES_FRONTIER))
+    status = hivemodel.BlockTestExecutor(
+        hive_api=hive,
+        testfiles=utils.getFiles("./tests/BlockchainTests"),
+        rules=Rules.RULES_FRONTIER).run()
 
-    status = hive.blockTests(testfiles=utils.getFiles("./tests/BlockchainTests/EIP150"),
-        executor=hivemodel.BlockTestExecutor(Rules.RULES_TANGERINE))
+    status = hivemodel.BlockTestExecutor(
+        hive_api=hive,
+        testfiles=utils.getFiles("./tests/BlockchainTests/EIP150"),
+        rules=Rules.RULES_TANGERINE).run()
 
-    status = hive.blockTests(testfiles=utils.getFiles("./tests/BlockchainTests/Homestead"),
-        executor=hivemodel.BlockTestExecutor(Rules.RULES_HOMESTEAD))
+    status = hivemodel.BlockTestExecutor(
+        hive_api=hive,
+        testfiles=utils.getFiles("./tests/BlockchainTests/Homestead"),
+        rules=Rules.RULES_HOMESTEAD).run()
 
-    status = hive.blockTests(testfiles=utils.getFiles("./tests/BlockchainTests/TestNetwork"),
-        executor=hivemodel.BlockTestExecutor(Rules.RULES_TRANSITIONNET))
+    status = hivemodel.BlockTestExecutor(
+        hive_api=hive,
+        testfiles=utils.getFiles("./tests/BlockchainTests/TestNetwork"),
+        rules=Rules.RULES_TRANSITIONNET).run()
 
-    status = hive.blockTests(testfiles=utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"), 
-        executor=hivemodel.BlockTestExecutor())
-#        whitelist=["mload32bitBound_return2_d0g0v0_EIP150"])
+    status = hivemodel.BlockTestExecutor(
+        hive_api=hive,
+        testfiles=utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"),
+        rules=None).run()
 
     if not status:
         sys.exit(-1)
