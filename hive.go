@@ -9,6 +9,7 @@ import (
 
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
+	"gopkg.in/inconshreveable/log15.v2/term"
 )
 
 var (
@@ -30,7 +31,11 @@ var (
 func main() {
 	// Parse the flags and configure the logger
 	flag.Parse()
-	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
+	format := log15.LogfmtFormat()
+	if term.IsTty(os.Stderr.Fd()) {
+		format = log15.TerminalFormat()
+	}
+	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, format)))
 
 	// Connect to the local docker daemon and make sure it works
 	daemon, err := docker.NewClient(*dockerEndpoint)
