@@ -4,8 +4,9 @@ FROM ubuntu:16.04
 # Build parity on the fly and delete all build tools afterwards
 RUN \
   # Install parity from sources
-  apt-get -y update                                             && \
-  apt-get install -y curl jq git make g++ gcc file binutils pkg-config openssl libssl-dev && \
+  apt-get -y update                                        && \
+  apt-get install -y bash jq bc curl git make g++ gcc file    \
+  binutils pkg-config openssl libssl-dev libudev-dev       && \
   curl -sSf https://static.rust-lang.org/rustup.sh | sh -s -- --disable-sudo && \
 	\
   git clone --depth 1 --branch beta https://github.com/paritytech/parity && \
