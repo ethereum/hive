@@ -47,7 +47,7 @@ class Rules():
         "HIVE_FORK_HOMESTEAD" : 0,
         "HIVE_FORK_TANGERINE" : 0,
         "HIVE_FORK_SPURIOUS"  : 0,
-        "HIVE_FORK_DAO_BLOCK" : 0,
+        "HIVE_FORK_DAO_BLOCK" : 2000,
         "HIVE_FORK_METROPOLIS": 0, 
     }
 # Model for the testcases
