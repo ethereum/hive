@@ -26,6 +26,8 @@
 # Immediately abort the script on any error encountered
 set -e
 
+FLAGS="-shh"
+
 # It doesn't make sense to dial out, use only a pre-set bootnode
 if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
