@@ -18,7 +18,8 @@ import (
 
 var (
 	// default timeout for RPC calls
-	rpcTimeout = 5 * time.Second
+	rpcTimeout = 60 * time.Second
+
 	// unique chain identifier used to sign transaction
 	chainID = new(big.Int).SetInt64(7) // used for signing transactions
 )
@@ -29,6 +30,8 @@ var (
 type TestClient struct {
 	*ethclient.Client
 	rc *rpc.Client
+
+	endpoint string
 }
 
 // CallContext is a helper method that forwards a raw RPC request to
@@ -81,7 +84,7 @@ func waitForTxConfirmations(client *TestClient, txHash common.Hash, n uint64) (*
 				if bytes.Compare(receipt.PostState, checkReceipt.PostState) == 0 {
 					return receipt, nil
 				} else { // chain reorg
-					waitForTxConfirmations(client, txHash, n)
+					return waitForTxConfirmations(client, txHash, n)
 				}
 			} else {
 				return nil, err
@@ -105,11 +108,12 @@ func createHTTPClients(hosts []string) chan *TestClient {
 	)
 
 	for i := 0; i < N; i++ {
-		client, err := rpc.Dial(fmt.Sprintf("http://%s:8545", hosts[i%len(hosts)]))
+		endpoint := fmt.Sprintf("http://%s:8545", hosts[i%len(hosts)])
+		client, err := rpc.Dial(endpoint)
 		if err != nil {
 			panic(err)
 		}
-		clients <- &TestClient{ethclient.NewClient(client), client}
+		clients <- &TestClient{ethclient.NewClient(client), client, endpoint}
 	}
 
 	return clients
@@ -126,11 +130,12 @@ func createWebsocketClients(hosts []string) chan *TestClient {
 	)
 
 	for i := 0; i < N; i++ {
-		client, err := rpc.Dial(fmt.Sprintf("ws://%s:8546", hosts[i%len(hosts)]))
+		endpoint := fmt.Sprintf("ws://%s:8546", hosts[i%len(hosts)])
+		client, err := rpc.Dial(endpoint)
 		if err != nil {
 			panic(err)
 		}
-		clients <- &TestClient{ethclient.NewClient(client), client}
+		clients <- &TestClient{ethclient.NewClient(client), client, endpoint}
 	}
 
 	return clients

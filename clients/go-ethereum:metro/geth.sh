@@ -14,6 +14,7 @@
 #  - HIVE_NETWORK_ID     network ID number to use for the eth protocol
 #  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
+#  - HIVE_CHAIN_ID       chain id (EIP155)
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
@@ -22,6 +23,7 @@
 #  - HIVE_FORK_METROPOLIS block number for Metropolis transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
+#  - HIVE_LIGHT_SERVER   enable light client server
 
 # Immediately abort the script on any error encountered
 set -e
@@ -45,14 +47,22 @@ fi
 
 # Handle any client mode or operation requests
 if [ "$HIVE_NODETYPE" == "full" ]; then
-	FLAGS="$FLAGS --fast"
+	FLAGS="$FLAGS --fast --lightserv 25"
 fi
+
 if [ "$HIVE_NODETYPE" == "light" ]; then
 	FLAGS="$FLAGS --light"
 fi
 
+if [ "$HIVE_LIGHT_SERVER" == "1" ]; then
+    FLAGS="$FLAGS --lightserv 25 --lightpeers 10"
+fi
+
 # Override any chain configs in the go-ethereum specific way
 chainconfig="{}"
+if [ "$HIVE_CHAIN_ID" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"chainId\": $HIVE_CHAIN_ID}"`
+fi
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"`
 fi

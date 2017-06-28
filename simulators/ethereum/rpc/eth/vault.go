@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 	"testing"
 	"time"
-
-	"os"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
@@ -41,7 +40,7 @@ contract Vault {
 	// vault ABI
 	predeployedVaultABI = `[{"constant":false,"inputs":[{"name":"to","type":"address"},{"name":"amount","type":"uint256"}],"name":"sendSome","outputs":[],"payable":false,"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"","type":"address"},{"indexed":false,"name":"","type":"uint256"}],"name":"Send","type":"event"}]`
 	// wait for vaultTxConfirmationCount before a vault fund tx is considered confirmed
-	vaultTxConfirmationCount = uint64(10)
+	vaultTxConfirmationCount = uint64(5)
 	// software based keystore
 	keyStore *keystore.KeyStore
 	// account manager used to create new accounts and sign data
@@ -57,15 +56,20 @@ func init() {
 
 // nodeAddress returns the first account from the node and unlocks it.
 func nodeAddress(t *testing.T, client *TestClient) common.Address {
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
 	var accounts []common.Address
 	if err := client.CallContext(ctx, &accounts, "eth_accounts"); err != nil {
 		panic(err)
 	}
+	cancel()
+
+	if len(accounts) == 0 {
+		panic(fmt.Sprintf("Node has no accounts [endpoint: %s]", client.endpoint))
+	}
 
 	addr := accounts[0]
 
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
 	var success bool
 	if err := client.CallContext(ctx, &success, "personal_unlockAccount", addr, "", 3600); err != nil {
 		t.Fatalf("Unable to unlock account 0x%x: %v", addr, err)
@@ -73,6 +77,8 @@ func nodeAddress(t *testing.T, client *TestClient) common.Address {
 	if !success {
 		t.Fatalf("Unable to unlock node account 0x%x", addr)
 	}
+
+	cancel()
 
 	return addr
 }
@@ -94,7 +100,6 @@ func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client 
 
 	// setup subscriptions
 	var (
-		ctx      context.Context
 		headsSub ethereum.Subscription
 		heads    = make(chan *types.Header)
 		logsSub  ethereum.Subscription
@@ -103,16 +108,17 @@ func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client 
 		vault, _ = abi.JSON(strings.NewReader(predeployedVaultABI))
 	)
 
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
 	headsSub, err = client.SubscribeNewHead(ctx, heads)
 	if err != nil {
 		panic(fmt.Sprintf("Could not create new head subscription: %v", err))
 	}
+	cancel()
 	defer headsSub.Unsubscribe()
 
 	eventTopic := vault.Events["Send"].Id()
 	addressTopic := common.BytesToHash(common.LeftPadBytes(account.Address[:], 32))
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
 	q := ethereum.FilterQuery{
 		Addresses: []common.Address{predeployedVaultAddr},
 		Topics:    [][]common.Hash{[]common.Hash{eventTopic}, []common.Hash{addressTopic}},
@@ -121,6 +127,7 @@ func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client 
 	if err != nil {
 		panic(fmt.Sprintf("Could not create log filter subscription: %v", err))
 	}
+	cancel()
 	defer logsSub.Unsubscribe()
 
 	// order the vault to send some ether
@@ -136,11 +143,12 @@ func createAndFundAccountWithSubscription(t *testing.T, amount *big.Int, client 
 		"gas":  hexutil.EncodeBig(big.NewInt(75000)),
 	}
 
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
 	var txHash common.Hash
 	if err := client.CallContext(ctx, &txHash, "eth_sendTransaction", txPayload); err != nil {
 		t.Fatalf("Unable to send funding transaction: %v", err)
 	}
+	cancel()
 
 	var (
 		latestHeader *types.Header
@@ -185,12 +193,12 @@ func createAndFundAccount(t *testing.T, amount *big.Int, client *TestClient) acc
 		panic(err)
 	}
 
+	if amount == nil {
+		return account
+	}
+
 	// each node has at least one 1 key with some of pre-allocated ether
 	fromAddr := nodeAddress(t, client)
-
-	if amount == nil {
-		amount = common.Big0
-	}
 
 	// order the vault to send some ether
 	vault, _ := abi.JSON(strings.NewReader(predeployedVaultABI))
@@ -206,34 +214,51 @@ func createAndFundAccount(t *testing.T, amount *big.Int, client *TestClient) acc
 		"gas":  hexutil.EncodeBig(big.NewInt(75000)),
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
 	var txHash common.Hash
 	if err := client.CallContext(ctx, &txHash, "eth_sendTransaction", txPayload); err != nil {
-		t.Fatalf("Unable to send funding transaction: %v", err)
+		t.Fatalf("Unable to send funding transaction: %v (from=%x)", err, fromAddr)
 	}
+	cancel()
 
 	// wait for vaultTxConfirmationCount confirmation by checking the balance vaultTxConfirmationCount blocks back.
 	// createAndFundAccountWithSubscription for a better solution using logs
 	for i := 0; i < 120; i++ {
-		ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
+		time.Sleep(time.Second)
+
+		// check if the account has the required balance and enough confirmations
+		ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
 		block, err := client.BlockByNumber(ctx, nil)
 		if err != nil {
 			panic(err)
 		}
+		cancel()
 
-		if block.NumberU64() > vaultTxConfirmationCount {
-			ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-			balance, err := client.BalanceAt(ctx, account.Address, new(big.Int).Sub(block.Number(), new(big.Int).SetUint64(vaultTxConfirmationCount)))
-			if err != nil {
-				panic(err)
-			}
-			if balance.Cmp(amount) >= 0 {
-				return account
+		ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
+		balance, err := client.BalanceAt(ctx, account.Address, block.Number())
+		if err != nil {
+			panic(err)
+		}
+		cancel()
+
+		if balance.Cmp(amount) == 0 {
+			// check if there are enough confirmations
+			min := new(big.Int).Sub(block.Number(), new(big.Int).SetUint64(vaultTxConfirmationCount))
+			if min.Cmp(common.Big0) >= 0 {
+				ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
+				balance, err := client.BalanceAt(ctx, account.Address, min)
+				if err != nil {
+					panic(err)
+				}
+				cancel()
+
+				if balance.Cmp(amount) == 0 {
+					return account
+				}
 			}
 		}
-
-		time.Sleep(time.Second)
 	}
 
-	panic(fmt.Sprintf("Could not fund account 0x%x in transaction 0x%x", account.Address, txHash))
+	t.Fatalf("Could not fund account 0x%x in transaction 0x%x", account.Address, txHash)
+	return account
 }

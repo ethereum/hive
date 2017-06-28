@@ -4,10 +4,8 @@ import (
 	"context"
 	"math/big"
 	"math/rand"
-	"testing"
-
 	"strings"
-
+	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -16,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // callContractTest uses the generated ABI binding to call methods in the
@@ -71,12 +70,12 @@ func transactContractTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		account = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		account = createAndFundAccount(t, new(big.Int).Mul(common.Big1, big.NewInt(params.Ether)), client)
 		address = account.Address
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
-		gasPrice                = new(big.Int).Mul(big.NewInt(30), common.Shannon)
+		gasPrice                = new(big.Int).Mul(big.NewInt(30), big.NewInt(params.Shannon))
 		gasLimit                = big.NewInt(1200000)
 
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
@@ -92,8 +91,10 @@ func transactContractTest(t *testing.T, client *TestClient) {
 	}
 
 	// deploy contract
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	if err := client.SendTransaction(ctx, deployTx); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
+	err = client.SendTransaction(ctx, deployTx)
+	cancel()
+	if err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
@@ -126,8 +127,10 @@ func transactContractTest(t *testing.T, client *TestClient) {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
 
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-	if err := client.SendTransaction(ctx, tx); err != nil {
+	ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
+	err = client.SendTransaction(ctx, tx)
+	cancel()
+	if err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
@@ -162,12 +165,12 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		account = createAndFundAccountWithSubscription(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		account = createAndFundAccountWithSubscription(t, new(big.Int).Mul(common.Big1, big.NewInt(params.Ether)), client)
 		address = account.Address
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
-		gasPrice                = new(big.Int).Mul(big.NewInt(30), common.Shannon)
+		gasPrice                = new(big.Int).Mul(big.NewInt(30), big.NewInt(params.Shannon))
 		gasLimit                = big.NewInt(1200000)
 
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
@@ -185,8 +188,10 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	if err := client.SendTransaction(ctx, deployTx); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), rpcTimeout)
+	err = client.SendTransaction(ctx, deployTx)
+	cancel()
+	if err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
@@ -206,9 +211,10 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 	t.Logf("ABI test contract deployed on 0x%x", receipt.ContractAddress)
 
 	// setup log subscription
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
+	ctx, cancel = context.WithTimeout(context.Background(), rpcTimeout)
 	q := ethereum.FilterQuery{Addresses: []common.Address{receipt.ContractAddress}}
 	sub, err := client.SubscribeFilterLogs(ctx, q, logs)
+	cancel()
 	if err != nil {
 		t.Fatalf("Unable to create log subscription: %v", err)
 	}

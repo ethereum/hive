@@ -158,6 +158,7 @@ The behavioral configuration variables:
     * If `archive`, assumes that all historical state is retained after sync
     * If `full`, assumes fast sync and consecutive pruning of historical state
     * If `light`, assumes header only sync and no state maintenance at all
+  * `HIVE_CHAIN_ID` the chain id, EIP 155
   * `HIVE_FORK_HOMESTEAD` the block number of the Ethereum Homestead transition
   * `HIVE_FORK_DAO_BLOCK` the block number of the DAO hard-fork transition
   * `HIVE_FORK_DAO_VOTE` whether the node supports or opposes the DAO hard-fork
@@ -168,6 +169,7 @@ The behavioral configuration variables:
   * `HIVE_FORK_METROPOLIS` the block number of the Metropolis hardfork
   * `HIVE_MINER` address to credit with mining rewards (if set, start mining)
   * `HIVE_MINER_EXTRA` extra-data field to set for newly minted blocks
+  * `HIVE_LIGHT_SERVER` enable light client server support
 
 
 ### Starting the client

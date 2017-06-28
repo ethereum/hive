@@ -62,6 +62,11 @@ chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
 # See https://github.com/ethcore/parity/wiki/Consensus-Engines for info about options
 
+if [ "$HIVE_CHAIN_ID" != "" ]; then
+    HEX_HIVE_CHAIN_ID=`echo "obase=16; $HIVE_CHAIN_ID" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainID\"]; \"0x$HEX_HIVE_CHAIN_ID\")"`
+fi
+
 if [ "$HIVE_TESTNET" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
 	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do

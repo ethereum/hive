@@ -10,9 +10,10 @@ BOOTNODE_ENODE="enode://$BOOTNODE_ENODEID@$BOOTNODE_IP:30303"
 echo "Start bootnode..."
 /bootnode --nodekeyhex $BOOTNODE_KEYHEX --addr=0.0.0.0:30303 &
 
-N_NODES=5  # Number of nodes to start
-N_PEERS=4  # Number of peers for each node (N_NODES-1)
-N_MINERS=2 # Number of nodes that have the miner running
+N_NODES=8         # Number of nodes to start
+N_MINERS=2        # Number of nodes that have the miner running and act as light servers
+N_LIGHT_SERVER=2  # Number of nodes that can serve light client requests
+N_LIGHT_CLIENTS=2 # Number of nodes that run in light mode
 
 # netPeerCount executes an RPC request to a node to retrieve its current number
 # of connected peers.
@@ -34,9 +35,9 @@ function waitPeers {
 	for i in `seq 1 20`; do
 		# Fetch the current peer count and stop if it's correct
 		peers=`netPeerCount $ip`
-		if [ "$peers" == "$2" ]; then
-		  echo "Node $1 ($ip) has $peers/$2 peers"
-			break
+		if [ "$peers" -ge "$2" ]; then
+		    echo "Node $1 ($ip) has $peers/$2 peers"
+		    break
 		fi
 		# Seems peer count is wrong, unless too many trials, sleep a bit and retry
 		if [ "$i" == "20" ]; then
@@ -66,20 +67,63 @@ function waitBlock {
 # instruct HIVE to start N_NODES nodes, by default the RPC node will start the RPC
 # interface with all API modules enabled. $N_MINERS nodes will have the miner running.
 nodes=()
-for i in `seq 1 $N_NODES`; do
-	echo "Starting geth node #$i... $BOOTNODE_ENODE"
-	if [ "$i" -le "$N_MINERS" ]; then
-	    nodes+=(`curl -sf -X POST --data "HIVE_MINER=0x0000000000000000000000000000000000000001" --data "HIVE_INIT_KEYS=/keystores$i" --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes`)
-	else
-	    nodes+=(`curl -sf -X POST --data "HIVE_INIT_KEYS=/keystores$i" --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes`)
-	fi
+lightServers=() # see workaround lower in file
+lightClients=() # see workaround lower in file
 
-	sleep 2 # Wait a bit until it's registered by the bootnode
+for i in `seq 1 $N_NODES`; do
+	if [ "$i" -le "$N_MINERS" ]; then
+	    node=(`curl -sf -X POST --data "HIVE_CHAIN_ID=7" --data "HIVE_FORK_HOMESTEAD=0" --data "HIVE_FORK_SPURIOUS=0" --data "HIVE_INIT_KEYS=/keystores$i" --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" --data "HIVE_MINER=0x0000000000000000000000000000000000000001" $HIVE_SIMULATOR/nodes`)
+	    echo "Started geth node $i/$node as miner"
+        nodes+=($node)
+	elif [ "$i" -le $((N_MINERS+N_LIGHT_SERVER)) ]; then
+        node=(`curl -sf -X POST --data "HIVE_CHAIN_ID=7" --data "HIVE_FORK_HOMESTEAD=0" --data "HIVE_FORK_SPURIOUS=0" --data "HIVE_INIT_KEYS=/keystores$i" --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" --data "HIVE_LIGHT_SERVER=1" $HIVE_SIMULATOR/nodes`)
+        echo "Started geth node $i/$node as light client server"
+        nodes+=($node)
+        lightServers+=($node)
+	elif [ "$i" -le $((N_MINERS+N_LIGHT_SERVER+N_LIGHT_CLIENTS)) ]; then
+        node=(`curl -sf -X POST --data "HIVE_CHAIN_ID=7" --data "HIVE_FORK_HOMESTEAD=0" --data "HIVE_FORK_SPURIOUS=0" --data "HIVE_INIT_KEYS=/keystores$i" --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" --data "HIVE_NODETYPE=light" $HIVE_SIMULATOR/nodes`)
+        echo "Started geth node $i/$node as light client"
+        nodes+=($node)
+        lightClients+=($node)
+	else
+	    node=(`curl -sf -X POST --data "HIVE_CHAIN_ID=7" --data "HIVE_FORK_HOMESTEAD=0" --data "HIVE_FORK_SPURIOUS=0" --data "HIVE_INIT_KEYS=/keystores$i" --data-urlencode "HIVE_BOOTNODE=$BOOTNODE_ENODE" $HIVE_SIMULATOR/nodes`)
+	    echo "Started geth node $i/$node"
+	    nodes+=($node)
+	fi
+done
+
+sleep 5 # Wait a bit until nodes are registered with the bootnode
+
+# add light server peers to light clients manually, workaround until discovery v5 is stable.
+for c in "${lightClients[@]}"
+do
+	for s in "${lightServers[@]}"
+    do
+        # retrieve light server enode and do an addPeer on the client
+        clientIp=(`curl -sf $HIVE_SIMULATOR/nodes/$c`)
+        serverIp=(`curl -sf $HIVE_SIMULATOR/nodes/$s`)
+
+        sEnode=`curl -sf --data '{"id": 1, "method": "admin_nodeInfo", "jsonrpc": "2.0"}' $serverIp:8545 | jq '.result.enode'`
+        replace="\[::\]"
+        sEnode=${sEnode/$replace/$serverIp}
+
+        header="Content-Type: application/json"
+request_body=$(cat <<EOF
+{
+  "jsonrpc": "2.0",
+  "method": "admin_addPeer",
+  "id": 1,
+  "params": [$sEnode]
+}
+EOF
+)
+        curl -i -X POST -H "$header" -d "$request_body" $clientIp:8545 #--trace-ascii /dev/stdout
+    done
 done
 
 # Wait a bit for the nodes to all find each other
 for id in ${nodes[@]}; do
-	waitPeers $id $N_PEERS
+	waitPeers $id $((N_NODES/3))
 done
 
 # Collect IP addresses of nodes for RPC endpoints
