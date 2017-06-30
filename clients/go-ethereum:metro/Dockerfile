@@ -10,8 +10,8 @@ FROM alpine:latest
 RUN \
   apk add --update bash jq go git make gcc musl-dev              \
   	  ca-certificates linux-headers                           && \
-  git clone --depth 1 --branch metropolis-finalisation \
-  https://github.com/obscuren/go-ethereum.git && \
+  git clone --depth 1 --branch metropolis \
+  https://github.com/karalabe/go-ethereum.git && \
   (cd go-ethereum && make geth)                               && \
   (cd go-ethereum                                             && \
   echo "{}"                                                      \
