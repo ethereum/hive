@@ -40,11 +40,11 @@ those passed. If you wish to explore the reasons of failure, full logs from all 
 are pushed into the `workspace/logs` folder.
 
 ```
-$ hive --client=go-ethereum:develop --test=.
+$ hive --client=go-ethereum:master --test=.
 ...
 Validation results:
 {
-  "go-ethereum:develop": {
+  "go-ethereum:master": {
     "fail": [
       "ethereum/rpc-tests"
     ],
@@ -77,11 +77,11 @@ client the list of simulations failed and those passed. Likewise, if you wish to
 of failure, full logs from all clients and testers are pushed into the `log.txt` log file.
 
 ```
-$ hive --client=go-ethereum:develop --test=NONE --sim=.
+$ hive --client=go-ethereum:master --test=NONE --sim=.
 ...
 Simulation results:
 {
-  "go-ethereum:develop": {
+  "go-ethereum:master": {
     "pass": [
       "dao-hard-fork",
       "smoke/single-node"
