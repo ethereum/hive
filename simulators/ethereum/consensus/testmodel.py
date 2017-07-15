@@ -87,7 +87,7 @@ class Testcase(object):
         self._message = []
         self.nodeInstance = "N/A"
         self.clientType = "N/A"
-        self.required_keys = ["pre","blocks","postState","genesisBlockHeader"]
+        self.required_keys = ["pre","blocks","postState","genesisBlockHeader","network"]
 
     def __str__(self):
         return self.name
@@ -110,7 +110,10 @@ class Testcase(object):
                 missing_keys.append(k)
 
 
-        return (len(missing_keys) == 0 ,"Missing keys: %s" % (",".join(missing_keys)))
+        if len(missing_keys) > 0:
+            return "Missing keys: %s" % (",".join(missing_keys))
+
+        return None
 
     def ruleset(self, default=Rules.RULES_FRONTIER):
         """In some cases (newer tests), the ruleset is specified in the
@@ -225,7 +228,7 @@ class Testcase(object):
         self.addMessage(message)
 
         self._skipped = False
-        print("%s failed : %s " %(self, str(self._message)))
+        print("%s %s failed : %s " %(self.testfile, self, str(self._message)))
 
     def success(self, message = []):
         self._success = True

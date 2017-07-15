@@ -76,29 +76,15 @@ def main(args):
 
     status = hivemodel.BlockTestExecutor(
         hive_api=hive,
-        testfiles=utils.getFiles("./tests/BlockchainTests"),
-        rules=Rules.RULES_FRONTIER).run()
-
-    status = hivemodel.BlockTestExecutor(
-        hive_api=hive,
-        testfiles=utils.getFiles("./tests/BlockchainTests/EIP150"),
-        rules=Rules.RULES_TANGERINE).run()
-
-    status = hivemodel.BlockTestExecutor(
-        hive_api=hive,
-        testfiles=utils.getFiles("./tests/BlockchainTests/Homestead"),
-        rules=Rules.RULES_HOMESTEAD).run()
-
-    status = hivemodel.BlockTestExecutor(
-        hive_api=hive,
-        testfiles=utils.getFiles("./tests/BlockchainTests/TestNetwork"),
-        rules=Rules.RULES_TRANSITIONNET).run()
-
-    status = hivemodel.BlockTestExecutor(
-        hive_api=hive,
-        testfiles=utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"),
+        testfiles=utils.getFilesRecursive("./tests/BlockchainTests/"),
         rules=None).run()
 
+
+#    status = hivemodel.BlockTestExecutor(
+#        hive_api=hive,
+#        testfiles=utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"),
+#        rules=None).run()
+#
     if not status:
         sys.exit(-1)
 
