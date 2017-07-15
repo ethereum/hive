@@ -105,8 +105,6 @@ class HiveAPI(object):
         if details is not None:
             data = {"details" : json.dumps(details) }
 
-#        print("Sending the following data with request: %s" % data)
-
         return self._post("/subresults", params = params, data = data);
 
     def newNode(self, params):
@@ -158,10 +156,10 @@ class BlockTestExecutor(object):
                     testcase.skipped(["Testcase in blacklist"])
                     continue
 
-                (ok, err) = testcase.validate()
+                err = testcase.validate()
 
-                if not ok:
-                    self.hive.log("%s failed initial validation" % testcase )
+                if err is not None:
+                    self.hive.log("%s / %s failed initial validation" % (tf, testcase) )
                     testcase.fail(["Testcase failed initial validation", err])
                 else:
                     yield testcase
