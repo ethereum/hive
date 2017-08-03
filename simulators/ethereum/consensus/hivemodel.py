@@ -426,4 +426,3 @@ class BlockTestExecutor(object):
                 return errs
 
         return errs
-

@@ -4,26 +4,13 @@
 # Callers need to:
 #   - Bind /root/.ethash to an external volume for cache reuse
 #   - Forward UID envvar to reown newly generated ethash files
-FROM alpine:latest
-
-# Inject the DAG generator script
-ADD ethash.go ethash.go
-
-# Build the DAG maker and remove all dependencies
-ENV GOPATH /gopath
-
-RUN \
-  apk add --update go git gcc musl-dev && \
-	go get github.com/ethereum/ethash    && \
-  go build -o ethash ethash.go         && \
-  apk del go git gcc musl-dev          && \
-  rm -rf /var/cache/apk/* $GOPATH/*
+FROM ethereum/client-go
 
 # Define the tiny startup script to generate the DAG and reown it
 RUN \
   echo '#!/bin/sh'                          > /ethash.sh && \
 	echo 'set -e'                            >> /ethash.sh && \
-	echo '/ethash'                           >> /ethash.sh && \
+	echo 'geth makedag 1 /root/.ethash'      >> /ethash.sh && \
   echo 'if [ "$UID" != "0" ]; then'        >> /ethash.sh && \
 	echo '  adduser -u $UID -D ethash'       >> /ethash.sh && \
 	echo '  chown -R ethash /root/.ethash/*' >> /ethash.sh && \
