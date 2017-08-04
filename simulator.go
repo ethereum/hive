@@ -357,9 +357,12 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		case strings.HasPrefix(r.URL.Path, "/nodes/"):
 			// Node deletion requested
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
+
 			h.lock.Lock()
-			defer h.lock.Unlock()
 			node, ok := h.nodes[id]
+			delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
+			h.lock.Unlock()
+
 			if !ok {
 				logger.Error("unknown client deletion requested", "id", id)
 				http.Error(w, "not found", http.StatusNotFound)
@@ -370,7 +373,6 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				logger.Error("failed to delete client ", "id", id, "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
-			delete(h.nodes, id)
 
 		default:
 			http.Error(w, "not found", http.StatusNotFound)

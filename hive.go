@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/fsouza/go-dockerclient"
@@ -28,6 +29,9 @@ var (
 )
 
 func main() {
+	// Make sure hive can use multiple CPU cores when needed
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	// Parse the flags and configure the logger
 	flag.Parse()
 	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))

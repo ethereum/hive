@@ -8,7 +8,7 @@ from utils import canonicalize, getFiles, hex2big
 import time
 
 # Number of tests to run in parallel.
-PARALLEL_TESTS = 7
+PARALLEL_TESTS = 16
 
 # Model for the Hive interaction
 class HiveNode(object):
