@@ -59,7 +59,7 @@ class HiveTestAPI(hivemodel.HiveAPI):
 
 def test():
     hive = HiveTestAPI()
-    executor = hivemodel.BlockTestExecutor(Rules.RULES_TANGERINE)
+    executor = hivemodel.BlockTestExecutor(Rules.RULESETS['Tangerine'])
     hive.blockTests(testfiles=utils.getFiles("./tests/BlockchainTests"), executor=executor)
 
 def main(args):

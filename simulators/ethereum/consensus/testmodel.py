@@ -2,54 +2,74 @@ import json
 
 class Rules():
 
-    RULES_FRONTIER = {
-        "HIVE_FORK_HOMESTEAD" : 2000,
-        "HIVE_FORK_TANGERINE" : 2000,
-        "HIVE_FORK_SPURIOUS"  : 2000,
-        "HIVE_FORK_DAO_BLOCK" : 2000,
-        "HIVE_FORK_METROPOLIS": 2000, 
+    RULESETS = {
+        "Frontier"  : {
+            "HIVE_FORK_HOMESTEAD" : 2000,
+            "HIVE_FORK_TANGERINE" : 2000,
+            "HIVE_FORK_SPURIOUS"  : 2000,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 2000, 
+        },
+        "Homestead" : {
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 2000,
+            "HIVE_FORK_SPURIOUS"  : 2000,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 2000, 
+
+        },
+        "EIP150"    : {
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 0,
+            "HIVE_FORK_SPURIOUS"  : 2000,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 2000, 
+        },
+        "EIP158"    : {
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 0,
+            "HIVE_FORK_SPURIOUS"  : 0,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 2000, 
+
+        },
+        "Byzantium" : {
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 0,
+            "HIVE_FORK_SPURIOUS"  : 0,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 0, 
+        },
+        "FrontierToHomesteadAt5" : {
+            "HIVE_FORK_HOMESTEAD" : 5,
+            "HIVE_FORK_TANGERINE" : 2000,
+            "HIVE_FORK_SPURIOUS"  : 2000,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 2000,             
+        },
+        "HomesteadToEIP150At5" : {
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 5,
+            "HIVE_FORK_SPURIOUS"  : 2000,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 2000, 
+        },
+        "HomesteadToDaoAt5":{
+                "HIVE_FORK_HOMESTEAD" : 0,
+                "HIVE_FORK_TANGERINE" : 2000,
+                "HIVE_FORK_SPURIOUS"  : 2000,
+                "HIVE_FORK_DAO_BLOCK" : 5,
+                "HIVE_FORK_METROPOLIS" : 2000, 
+        },
+        "EIP158ToByzantiumAt5":{
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 0,
+            "HIVE_FORK_SPURIOUS"  : 0,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 5, 
+        },
     }
 
-    RULES_HOMESTEAD = {
-
-        "HIVE_FORK_HOMESTEAD" : 0,
-        "HIVE_FORK_TANGERINE" : 2000,
-        "HIVE_FORK_SPURIOUS"  : 2000,
-        "HIVE_FORK_DAO_BLOCK" : 2000,
-        "HIVE_FORK_METROPOLIS": 2000, 
-    }
-
-    RULES_TANGERINE = {
-        "HIVE_FORK_HOMESTEAD" : 0,
-        "HIVE_FORK_TANGERINE" : 0,
-        "HIVE_FORK_SPURIOUS"  : 2000,
-        "HIVE_FORK_DAO_BLOCK" : 2000,
-        "HIVE_FORK_METROPOLIS": 2000, 
-    }
-    RULES_SPURIOUS = {
-
-        "HIVE_FORK_HOMESTEAD" : 0,
-        "HIVE_FORK_TANGERINE" : 0,
-        "HIVE_FORK_SPURIOUS"  : 0,
-        "HIVE_FORK_DAO_BLOCK" : 2000,
-        "HIVE_FORK_METROPOLIS": 2000, 
-    }
-
-    RULES_TRANSITIONNET = {
-        "HIVE_FORK_HOMESTEAD" : 5,
-        "HIVE_FORK_DAO_BLOCK" : 8,
-        "HIVE_FORK_TANGERINE" : 10,
-        "HIVE_FORK_SPURIOUS"  : 14,
-        "HIVE_FORK_METROPOLIS": 2000, 
-    }
-
-    RULES_METROPOLIS = {
-        "HIVE_FORK_HOMESTEAD" : 0,
-        "HIVE_FORK_TANGERINE" : 0,
-        "HIVE_FORK_SPURIOUS"  : 0,
-        "HIVE_FORK_DAO_BLOCK" : 2000,
-        "HIVE_FORK_METROPOLIS": 0, 
-    }
 # Model for the testcases
 class Testfile(object):
 
@@ -115,7 +135,7 @@ class Testcase(object):
 
         return None
 
-    def ruleset(self, default=Rules.RULES_FRONTIER):
+    def ruleset(self, default=Rules.RULESETS['Frontier']):
         """In some cases (newer tests), the ruleset is specified in the
         testcase json
         If so, it's returned. Otherwise, default is returned
@@ -123,18 +143,10 @@ class Testcase(object):
         if "network" not in self.data:
             return default
 
-        defined_sets = {
-            "Homestead" : Rules.RULES_HOMESTEAD,
-            "Frontier"  : Rules.RULES_FRONTIER,
-            "EIP150"    : Rules.RULES_TANGERINE,
-            "EIP158"    : Rules.RULES_SPURIOUS,
-            "TransitionNet" : Rules.RULES_TRANSITIONNET,
-            "Metropolis" : Rules.RULES_METROPOLIS,
-            }
 
 
-        if self.data['network'] in defined_sets:
-            return defined_sets[self.data['network']]
+        if self.data['network'] in Rules.RULESETS:
+            return Rules.RULESETS[self.data['network']]
 
         return default
 
