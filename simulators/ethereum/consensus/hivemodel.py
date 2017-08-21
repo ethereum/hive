@@ -194,7 +194,11 @@ class BlockTestExecutor(object):
         self.hive.log("Starting client node for test %s" % testcase)
         try:
             node = self.hive.newNode(params)
-        except:
+        except Exception, startNodeError:
+            try:
+                error = traceback.format_exc()
+            except Exception, e:
+                error = str(startNodeError)
             testcase.fail(["Failed to start client node", traceback.format_exc()])
             return
 
@@ -211,8 +215,13 @@ class BlockTestExecutor(object):
 
         try:
             self.hive.killNode(node)
-        except:
-            self.hive.log("Failed to kill node %s: %s" % (node, traceback.format_exc()))
+        except Exception, killNodeError:
+            try:
+                error = traceback.format_exc()
+            except Exception, e:
+                error = str(killNodeError)
+
+            self.hive.log("Failed to kill node %s: %s" % (node, error))
 
     def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[]):
         pool = ThreadPool(PARALLEL_TESTS)
@@ -338,13 +347,15 @@ class BlockTestExecutor(object):
         if exp_lastblockhash is not None:
             actual_lastblockhash = node.getLatestBlock()['hash']
             err = _verifyEqRaw(actual_lastblockhash[-64:],exp_lastblockhash[-64:])
-            #TODO, run with whitelist ['DaoTransactions_EmptyTransactionAndForkBlocksAhead']
-            # on parity, to see why that test is passing!
             if err is not None:
                 errs.append("Last block hash wrong")
                 errs.append([err])
-            else:
-                return errs
+
+            # To make the hive-runs go faster, we can just stop here. 
+            # Either the last blockhash is right (everything ok), or the last blockhash 
+            # is wrong (fail.)
+
+            return errs
 
         # Either 'lastblockhash' is missing, or it isn't right. Continue checking to debug what's wrong
 
