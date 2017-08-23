@@ -305,7 +305,7 @@ class BlockTestExecutor(object):
             first = node.getBlockByNumber(0)
         except Exception, e:
             errs.append("Failed to get first block")
-            errs.append(e)
+            errs.append(str(e))
             return errs
 
         def _verifyEq(v,exp):
@@ -321,7 +321,7 @@ class BlockTestExecutor(object):
         if err is not None:
             errs.append("Hash error")
             errs.append(err)
-
+            
         # Check stateroot (only needed if hash failed really...)
         state_err = _verifyEq(first[u'stateRoot'],testcase.genesis('stateRoot'))
         if state_err is not None:
