@@ -94,10 +94,10 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 fi
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_METROPOLIS" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]: \"0x$HIVE_FORK_METROPOLIS\")"`
-    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip140Transition\"]: \"0x$HIVE_FORK_METROPOLIS\")"`
-    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip210Transition\"]: \"0x$HIVE_FORK_METROPOLIS\")"`
-    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip155Transition\"]: \"0x$HIVE_FORK_METROPOLIS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip140Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip210Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip155Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 fi
 
 echo $chainconfig > /chain.json
