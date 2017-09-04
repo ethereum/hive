@@ -19,6 +19,7 @@
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
 #  - HIVE_FORK_TANGERINE block number of TangerineWhistle
 #  - HIVE_FORK_SPURIOUS  block number of SpurioisDragon
+#  - HIVE_FORK_METROPOLIS block number for Metropolis transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
@@ -89,6 +90,10 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP158ForkBlock\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP158ForkBlock\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP158ForkBlock\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
+fi
+if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
+	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_METROPOLIS" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 fi
 
 
