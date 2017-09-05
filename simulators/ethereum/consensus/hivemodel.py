@@ -156,6 +156,10 @@ class BlockTestExecutor(object):
                     testcase.skipped(["Testcase in blacklist"])
                     continue
 
+                if testcase.get('network') == 'Constantinople':
+                    testcase.skipped(["Testcase for Constantinople skipped"])
+                    continue
+
                 err = testcase.validate()
 
                 if err is not None:
