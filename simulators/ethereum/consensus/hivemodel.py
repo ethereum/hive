@@ -125,9 +125,8 @@ class HiveAPI(object):
 
 class BlockTestExecutor(object):
 
-    def __init__(self, hive_api, testfiles, rules=None):
+    def __init__(self, hive_api, testfiles):
         self.clientVersion = None
-        self.default_rules = rules
         self.hive = hive_api
         self.testfiles = testfiles
 
@@ -156,6 +155,11 @@ class BlockTestExecutor(object):
                     testcase.skipped(["Testcase in blacklist"])
                     continue
 
+                err = testcase.validateNetwork()
+                if err != None:
+                    testcase.skipped([err])
+                    continue
+
                 err = testcase.validate()
 
                 if err is not None:
@@ -182,14 +186,8 @@ class BlockTestExecutor(object):
             "HIVE_INIT_BLOCKS" : blocks,
             "HIVE_FORK_DAO_VOTE" : "1",
         }
-        params["HIVE_FORK_HOMESTEAD"] = "20000",
-        params["HIVE_FORK_TANGERINE"] = "20000",
-        params["HIVE_FORK_SPURIOUS"]  = "20000",
 
-        if self.default_rules is not None:
-            params.update(self.default_rules)
-        else:
-            params.update(testcase.ruleset())
+        params.update(testcase.ruleset())
 
         self.hive.log("Starting client node for test %s" % testcase)
         try:
