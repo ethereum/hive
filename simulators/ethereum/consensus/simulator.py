@@ -59,7 +59,7 @@ class HiveTestAPI(hivemodel.HiveAPI):
 
 def test():
     hive = HiveTestAPI()
-    executor = hivemodel.BlockTestExecutor(Rules.RULESETS['Tangerine'])
+    executor = hivemodel.BlockTestExecutor()
     hive.blockTests(testfiles=utils.getFiles("./tests/BlockchainTests"), executor=executor)
 
 def main(args):
@@ -76,15 +76,8 @@ def main(args):
 
     status = hivemodel.BlockTestExecutor(
         hive_api=hive,
-        testfiles=utils.getFilesRecursive("./tests/BlockchainTests/"),
-        rules=None).run()
+        testfiles=utils.getFilesRecursive("./tests/BlockchainTests/")).run()
 
-
-#    status = hivemodel.BlockTestExecutor(
-#        hive_api=hive,
-#        testfiles=utils.getFilesRecursive("./tests/BlockchainTests/GeneralStateTests/"),
-#        rules=None).run()
-#
     if not status:
         sys.exit(-1)
 

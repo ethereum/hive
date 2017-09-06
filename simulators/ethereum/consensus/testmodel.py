@@ -118,11 +118,26 @@ class Testcase(object):
     def setNodeInstance(self, instanceId):
         self.nodeInstance = instanceId
 
+    def validateNetwork(self):
+        """Returns error message if this test case is not properly 
+        configured for a network in the defined ruleset. 
+        @return error message or None
+        """
+
+        if "network" not in self.data:
+            return "Testcase does not have a 'network' specification"
+        
+        if self.data['network'] not in Rules.RULESETS:     
+            return "Network %s not defined in hive ruleset" % self.data['network']
+
+        return None
+
     def validate(self):
         """Validates that the provided json contains the necessary data
         to perform the test
 
-        @return (ok , msg)
+        @return 'ErrorMessage' if error,
+                 None if all correct
         """
         missing_keys = []
         for k in self.required_keys:
@@ -133,22 +148,16 @@ class Testcase(object):
         if len(missing_keys) > 0:
             return "Missing keys: %s" % (",".join(missing_keys))
 
-        return None
+        #And finally, fail if no ruleset is defined
+        return self.validateNetwork()
 
-    def ruleset(self, default=Rules.RULESETS['Frontier']):
-        """In some cases (newer tests), the ruleset is specified in the
-        testcase json
-        If so, it's returned. Otherwise, default is returned
+    def ruleset(self):
+        """The ruleset for tests should be specified in the json
         """
-        if "network" not in self.data:
-            return default
-
-
-
-        if self.data['network'] in Rules.RULESETS:
+        if "network" in self.data and self.data['network'] in Rules.RULESETS:
             return Rules.RULESETS[self.data['network']]
 
-        return default
+        return None
 
     def get(self, key):
         if key in self.data:
