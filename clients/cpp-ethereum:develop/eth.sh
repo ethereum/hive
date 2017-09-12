@@ -48,27 +48,11 @@ genesis="${genesis/coinbase/author}"
 
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 
-if [ "$accounts" != "" ]; then
-	# In some cases, the 'alloc' portion can be extremely large.
-	# Because of this, it can't be handled via cmd line parameters,
-	# this fails:
-	# chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
-	# The following solution instead uses two temporary files
-
-	echo $accounts| jq "{ \"accounts\": .}" > tmp1
-	echo $chainconfig > tmp2
-	chainconfig=`jq -s '.[0] * .[1]' tmp1 tmp2`
-fi
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
 # See https://github.com/ethcore/parity/wiki/Consensus-Engines for info about options
 
-if [ "$HIVE_TESTNET" == "1" ]; then
-	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
-	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do
-		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", $account, \"nonce\"]; \"0x0100000\")"`
-	done
-fi
+
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 	HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"homesteadForkBlock\"]; \"0x$HIVE_FORK_HOMESTEAD\")"`
@@ -91,11 +75,47 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP158ForkBlock\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP158ForkBlock\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 fi
+
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_METROPOLIS" | bc`
+
+	if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
+		# Also new precompiles
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\"]; { \"precompiled\": { \"name\": \"modexp\" } })"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_add\", \"linear\": { \"base\": 500, \"word\": 0 } } })"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_mul\", \"linear\": { \"base\": 2000, \"word\": 0 } } })"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"precompiled\": { \"name\": \"alt_bn128_pairing_product\" } })"`
+	fi
+
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 fi
 
+
+if [ "$accounts" != "" ]; then
+	# In some cases, the 'alloc' portion can be extremely large.
+	# Because of this, it can't be handled via cmd line parameters,
+	# this fails:
+	# chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
+	# The following solution instead uses two temporary files
+	echo $chainconfig > tmp1
+	echo $accounts| jq "{ \"accounts\": .}" > tmp2
+	chainconfig=`jq -s '.[0] * .[1]' tmp1 tmp2`
+fi
+
+
+if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000005\", \"code\"]])"`
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000006\", \"code\"]])"`
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000007\", \"code\"]])"`
+fi
+
+
+#if [ "$HIVE_TESTNET" == "1" ]; then
+#	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
+#	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do
+#		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", $account, \"nonce\"]; \"0x0100000\")"`
+#	done
+#fi
 
 echo $chainconfig > /chain2.json
 
