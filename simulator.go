@@ -232,7 +232,9 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		case strings.HasPrefix(r.URL.Path, "/nodes/"):
 			// Node IP retrieval requested
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
+			h.lock.Lock()
 			node, ok := h.nodes[id]
+			h.lock.Unlock()
 			if !ok {
 				logger.Error("unknown client requested", "id", id)
 				http.Error(w, "not found", http.StatusNotFound)
