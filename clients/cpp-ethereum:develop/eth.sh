@@ -53,9 +53,7 @@ chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 # See https://github.com/ethcore/parity/wiki/Consensus-Engines for info about options
 
 
-
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-	echo "HIVE_FORK_HOMESTEAD: $HIVE_FORK_HOMESTEAD"
 	HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"homesteadForkBlock\"]; \"0x$HIVE_FORK_HOMESTEAD\")"`
 fi
@@ -66,13 +64,11 @@ if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
 fi
 
 if [ "$HIVE_FORK_TANGERINE" != "" ]; then
-	echo "HIVE_FORK_TANGERINE: $HIVE_FORK_TANGERINE"
 	HIVE_FORK_TANGERINE=`echo "obase=16; $HIVE_FORK_TANGERINE" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP150ForkBlock\"]; \"0x$HIVE_FORK_TANGERINE\" )"`
 fi
 
 if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
-	echo "HIVE_FORK_SPURIOUS: $HIVE_FORK_SPURIOUS"
 	HIVE_FORK_SPURIOUS=`echo "obase=16; $HIVE_FORK_SPURIOUS" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP158ForkBlock\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP158ForkBlock\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
@@ -81,7 +77,6 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 fi
 
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
-	echo "HIVE_FORK_METROPOLIS: $HIVE_FORK_METROPOLIS"
 	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_METROPOLIS" | bc`
 
 	if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
@@ -123,9 +118,6 @@ fi
 #fi
 
 echo $chainconfig > /chain2.json
-
-echo "FINAL CONFIGURED config.json:"
-echo $chainconfig
 
 # Initialize the local testchain with the genesis state
 FLAGS="$FLAGS --config /chain2.json"
