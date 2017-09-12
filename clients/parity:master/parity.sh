@@ -120,6 +120,10 @@ if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 fi
 
 echo $chainconfig > /chain.json
+echo "Chain config: "
+cat /chain.json
+echo "----------"
+
 FLAGS="$FLAGS --chain /chain.json"
 
 # Don't immediately abort, some imports are meant to fail
