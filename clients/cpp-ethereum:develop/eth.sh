@@ -52,12 +52,6 @@ chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
 # See https://github.com/ethcore/parity/wiki/Consensus-Engines for info about options
 
-if [ "$HIVE_TESTNET" == "1" ]; then
-	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
-	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do
-		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", $account, \"nonce\"]; \"0x0100000\")"`
-	done
-fi
 
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 	HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
@@ -84,13 +78,16 @@ fi
 
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_METROPOLIS" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 
-	# Also new precompiles
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\"]; { \"precompiled\": { \"name\": \"modexp\", \"startingBlock\": \"0x$HIVE_FORK_METROPOLIS\" } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_add\", \"startingBlock\": \"0x$HIVE_FORK_METROPOLIS\", \"linear\": { \"base\": 500, \"word\": 0 } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_mul\", \"startingBlock\": \"0x$HIVE_FORK_METROPOLIS\", \"linear\": { \"base\": 2000, \"word\": 0 } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"precompiled\": { \"name\": \"alt_bn128_pairing_product\", \"startingBlock\": \"0x$HIVE_FORK_METROPOLIS\" } })"`
+	if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
+		# Also new precompiles
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\"]; { \"precompiled\": { \"name\": \"modexp\" } })"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_add\", \"linear\": { \"base\": 500, \"word\": 0 } } })"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_mul\", \"linear\": { \"base\": 2000, \"word\": 0 } } })"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"precompiled\": { \"name\": \"alt_bn128_pairing_product\" } })"`
+	fi
+
+	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 fi
 
 
@@ -100,11 +97,25 @@ if [ "$accounts" != "" ]; then
 	# this fails:
 	# chainconfig=`echo $chainconfig | jq ". * {\"accounts\": $accounts}"`
 	# The following solution instead uses two temporary files
-
-	echo $accounts| jq "{ \"accounts\": .}" > tmp1
-	echo $chainconfig > tmp2
+	echo $chainconfig > tmp1
+	echo $accounts| jq "{ \"accounts\": .}" > tmp2
 	chainconfig=`jq -s '.[0] * .[1]' tmp1 tmp2`
 fi
+
+
+if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000005\", \"code\"]])"`
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000006\", \"code\"]])"`
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000007\", \"code\"]])"`
+fi
+
+
+#if [ "$HIVE_TESTNET" == "1" ]; then
+#	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
+#	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do
+#		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", $account, \"nonce\"]; \"0x0100000\")"`
+#	done
+#fi
 
 echo $chainconfig > /chain2.json
 
