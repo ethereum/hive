@@ -102,10 +102,10 @@ if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	# Ethash params
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip649Reward\"]; \"0x29A2241AF62C0000\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip649Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip100bTransition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 
 	# General params
     chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip140Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
-    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip210Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
     chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip211Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
     chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip214Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip658Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
