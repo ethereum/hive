@@ -7,6 +7,7 @@
         "difficultyBoundDivisor": "0x0800",
         "durationLimit": "0x0d",
         "frontierCompatibilityModeLimit": "0x0",
+        "maxCodeSize": 24576,
         "daoHardforkBeneficiary": "0xbf4ed7b27f1d666546e30d74d50d173d20bca754",
         "daoHardforkAccounts": [  
           "0xd4fe7bc31cedb7bfb8a345f31e668033056b2728",

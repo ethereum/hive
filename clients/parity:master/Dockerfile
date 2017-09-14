@@ -10,7 +10,7 @@ RUN \
   curl -sSf https://static.rust-lang.org/rustup.sh         |  \
   sh -s -- --disable-sudo                                  && \
   \
-  git clone --depth 1 https://github.com/paritytech/parity && \
+  git clone --depth 1 --branch metropolis-update https://github.com/paritytech/parity && \
 	cd parity && cargo build --release                    && \
   echo "{}"                                                      \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \

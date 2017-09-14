@@ -93,14 +93,37 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip161dTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 fi
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
+	# Based on 
+	# https://github.com/paritytech/parity/blob/metropolis-update/ethcore/res/ethereum/byzantium_test.json
+
 	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_METROPOLIS" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+#	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+
+	# Ethash params
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip649Reward\"]; \"0x29A2241AF62C0000\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip649Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip100bTransition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+
+	# General params
     chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip140Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
-    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip210Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
-    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip155Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip211Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+    chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip214Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip658Transition\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+
+
+	# Also new precompiles
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\"]; { \"builtin\": { \"name\": \"modexp\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"modexp\": { \"divisor\": 20 } } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\"]; { \"builtin\": { \"name\": \"alt_bn128_add\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"linear\": { \"base\": 500, \"word\": 0 } } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\"]; { \"builtin\": { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"linear\": { \"base\": 40000, \"word\": 0 } } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"builtin\": { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 } } } })"`
+
 fi
 
 echo $chainconfig > /chain.json
+echo "Chain config: "
+cat /chain.json
+echo "----------"
+
 FLAGS="$FLAGS --chain /chain.json"
 
 # Don't immediately abort, some imports are meant to fail
