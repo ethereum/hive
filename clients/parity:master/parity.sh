@@ -112,11 +112,11 @@ if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 
 
 	# Also new precompiles
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\"]; { \"builtin\": { \"name\": \"modexp\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"modexp\": { \"divisor\": 20 } } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\"]; { \"builtin\": { \"name\": \"alt_bn128_add\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"linear\": { \"base\": 500, \"word\": 0 } } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\"]; { \"builtin\": { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"linear\": { \"base\": 40000, \"word\": 0 } } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"builtin\": { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 } } } })"`
 
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\", \"builtin\"]; { \"name\": \"modexp\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"modexp\": { \"divisor\": 20 }  } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"linear\": { \"base\": 500, \"word\": 0 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"linear\": { \"base\": 40000, \"word\": 0 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 } } })"`
 fi
 
 echo $chainconfig > /chain.json
