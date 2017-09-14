@@ -83,7 +83,7 @@ if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 		# Also new precompiles
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\"]; { \"precompiled\": { \"name\": \"modexp\" } })"`
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_add\", \"linear\": { \"base\": 500, \"word\": 0 } } })"`
-		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_mul\", \"linear\": { \"base\": 2000, \"word\": 0 } } })"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_mul\", \"linear\": { \"base\": 40000, \"word\": 0 } } })"`
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"precompiled\": { \"name\": \"alt_bn128_pairing_product\" } })"`
 	fi
 
