@@ -6,11 +6,13 @@ RUN \
          bsd-compat-headers g++ autoconf automake pkgconfig libtool libffi-dev gmp-dev && \
   curl -sSf https://bootstrap.pypa.io/get-pip.py -o get-pip.py              && \
   python get-pip.py                                                         && \
-  # XXX: Workaround for https://github.com/ethereum/pyethereum/issues/720
-  pip install http://github.com/ethereum/serpent/tarball/develop#egg=serpent && \
+  git clone --depth 1 https://github.com/ethereum/pyethereum                && \
+  cd pyethereum                                                             && \
+  python setup.py install                                                   && \
+  cd ..                                                                     && \
   git clone --depth 1 https://github.com/ethereum/pyethapp                  && \
   cd pyethapp                                                               && \
-  USE_PYETHEREUM_DEVELOP=1 python setup.py install                          && \
+  python setup.py install                                                   && \
   echo "{}"                                                                    \
       | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}"           \
       | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"            \
