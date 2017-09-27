@@ -4,10 +4,10 @@
     "Ethash": {
       "params": {
         "minimumDifficulty": "0x020000",
+        "blockReward": "0x4563918244F40000",
         "difficultyBoundDivisor": "0x0800",
         "durationLimit": "0x0d",
         "frontierCompatibilityModeLimit": "0x0",
-        "maxCodeSize": 24576,
         "daoHardforkBeneficiary": "0xbf4ed7b27f1d666546e30d74d50d173d20bca754",
         "daoHardforkAccounts": [  
           "0xd4fe7bc31cedb7bfb8a345f31e668033056b2728",
@@ -134,8 +134,8 @@
   "params": {
     "registrar": "",
     "gasLimitBoundDivisor": "0x0400",
-    "blockReward": "0x4563918244F40000",
     "accountStartNonce": "0x0",
+    "maxCodeSize": 24576,
     "maximumExtraDataSize": "0x20",
     "minGasLimit": "0x1388",
     "networkID" : "0x0",
