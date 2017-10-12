@@ -48,6 +48,9 @@ genesis="${genesis/coinbase/author}"
 
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 
+# Remove genesis fields unsupported by cpp-ethereum
+genesis=`echo $genesis | jq "del(.bloom) | del(.hash) | del(.number) | del(.receiptTrie) | del(.stateRoot) | del(.transactionsTrie) | del(.uncleHash)"`
+
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
 # See https://github.com/ethcore/parity/wiki/Consensus-Engines for info about options
