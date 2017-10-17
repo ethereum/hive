@@ -246,18 +246,33 @@ class BlockTestExecutor(object):
             with open(g_file,"w+") as g:
                 json.dump(testcase.genesis(),g)
 
+#        if testcase.blocks() is not None:
+#            counter = 1
+#            try:
+#                for block in testcase.blocks():
+#                    b_file = "./artefacts/%s/blocks/%04d.rlp" % (testcase, counter)
+#                    binary_string = binascii.unhexlify(block['rlp'][2:])
+#                    with open(b_file,"wb+") as outf:
+#                        outf.write(binary_string)
+#                    counter = counter +1
+#            except TypeError, e:
+#                #Bad rlp
+#                self.hive.log("Exception: %s, continuing regardless" % e)
+
+        # Try writing all blocks into one file
         if testcase.blocks() is not None:
             counter = 1
-            try:
-                for block in testcase.blocks():
-                    b_file = "./artefacts/%s/blocks/%04d.rlp" % (testcase, counter)
-                    binary_string = binascii.unhexlify(block['rlp'][2:])
-                    with open(b_file,"wb+") as outf:
-                        outf.write(binary_string)
-                    counter = counter +1
-            except TypeError, e:
-                #Bad rlp
-                self.hive.log("Exception: %s, continuing regardless" % e)
+            blocksrlp = []
+            for block in testcase.blocks():
+                try:
+                    blocksrlp.append(binascii.unhexlify(block['rlp'][2:]))
+                except TypeError, e:
+                    #Bad rlp
+                    self.hive.log("Exception: %s, continuing regardless" % e)
+
+            b_file = "./artefacts/%s/blocks/%04d.rlp" % (testcase, counter)
+            with open(b_file,"wb+") as outf:
+                outf.write("".join(blocksrlp))
 
         return (g_file, c_file, b_folder)
 
