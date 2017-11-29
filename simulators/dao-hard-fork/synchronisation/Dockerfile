@@ -6,12 +6,12 @@ FROM alpine:latest
 
 # Build a bootnode and Geth to act as the two pro-fork and no-fork sources.
 RUN \
-  apk add --update go git make gcc musl-dev                   && \
-  git clone --depth 1 https://github.com/ethereum/go-ethereum && \
-  (cd go-ethereum && make all)                                && \
-  cp go-ethereum/build/bin/bootnode /bootnode                 && \
-  cp go-ethereum/build/bin/geth /geth                         && \
-  apk del go git make gcc musl-dev                            && \
+  apk add --update go git make gcc musl-dev ca-certificates linux-headers && \
+  git clone --depth 1 https://github.com/ethereum/go-ethereum             && \
+  (cd go-ethereum && make all)                                            && \
+  cp go-ethereum/build/bin/bootnode /bootnode                             && \
+  cp go-ethereum/build/bin/geth /geth                                     && \
+  apk del go git make gcc musl-dev                                        && \
   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
 RUN apk add --update bash curl jq
