@@ -138,8 +138,8 @@ set +e
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
 	for block in `ls /blocks | sort -n`; do
-		echo "Command: eth $FLAGS import /blocks/$block"
-		$ETHEXEC $FLAGS import /blocks/$block
+		echo "Command: eth $FLAGS --import /blocks/$block"
+		$ETHEXEC $FLAGS --import /blocks/$block
 		#valgrind --leak-check=yes $ETHEXEC $FLAGS import /blocks/$block
 		#gdb -q -n -ex r -ex bt --args eth $FLAGS import /blocks/$block
 	done
@@ -156,6 +156,7 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
 fi
 
-# Run the go-ethereum implementation with the requested flags
+# Run the cpp implementation with the requested flags
 echo "Running cpp-ethereum..."
-eth $FLAGS --json-rpc --json-rpc-port 8545 --admin-via-http
+python /scripts/jsonrpcproxy.py &
+eth $FLAGS
