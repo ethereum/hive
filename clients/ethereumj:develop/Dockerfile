@@ -76,18 +76,17 @@ echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' >> /etc/nsswitch.c
 # Build Harmony on the fly and delete all build tools afterwards
 RUN \
   apk add --update git jq                                                 && \
-  git clone -b develop https://github.com/ether-camp/ethereum-harmony.git && \
-  git clone -b develop https://github.com/ethereum/ethereumj.git          && \
-  (cd ethereum-harmony                                                    && \
+  git clone --depth 1 -b develop https://github.com/ether-camp/ethereum-harmony.git && \
+  git clone --depth 1 -b develop https://github.com/ethereum/ethereumj.git          && \
+  (cd ethereum-harmony && git checkout develop  && git pull               && \
   echo "{}"                                                                  \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}"             \
   | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"              \
   | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"                           \
 	> /version.json)                                                      && \
-  cd /ethereumj && git checkout develop                                   && \
-  cd /ethereumj && git pull                                               && \
-  cd /ethereumj && ./gradlew install -x test                              && \
-  cd /ethereum-harmony && git pull	                                      && \
+  (cd /ethereumj && git checkout develop && git pull)                     && \
+  (cd /ethereumj && ./gradlew install -x test)                            && \
+  (cd /ethereum-harmony && ./gradlew dependencyManagement jar -x test -PuseMavenLocal) && \
   apk del git
 
 
