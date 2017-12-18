@@ -77,13 +77,14 @@ echo 'hosts: files mdns4_minimal [NOTFOUND=return] dns mdns4' >> /etc/nsswitch.c
 RUN \
   apk add --update git jq                                     && \
   git clone --depth 1 -b master https://github.com/ether-camp/ethereum-harmony.git && \
-  (cd ethereum-harmony && ./gradlew build -x test)            && \
-  (cd ethereum-harmony                                        && \
+  (cd ethereum-harmony && git checkout master  && git pull    && \
   echo "{}"                                                      \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
   | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
   | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
 	> /version.json)                                          && \
+  (cd /ethereum-harmony && ./gradlew distTar -x test)         && \
+  (cd /ethereum-harmony/build/distributions/ && tar -C / -xf harmony.ether.camp.tar) && \
   apk del git
 
 
