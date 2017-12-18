@@ -32,7 +32,7 @@ fi
 
 # If the client is to be run in testnet mode, flag it as such
 if [ "$HIVE_TESTNET" == "1" ]; then
-	FLAGS="$FLAGS -Dblockchain.config.name=morden"
+	FLAGS="$FLAGS -Dblockchain.config.name=ropsten"
 fi
 
 # Handle any client mode or operation requests
@@ -73,10 +73,19 @@ fi
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
 FLAGS="$FLAGS -DgenesisFile=/genesis.json"
+FLAGS="$FLAGS -Dethash.dir=/root/.ethash"
 
 FLAGS="$FLAGS -Dserver.port=8545"
 FLAGS="$FLAGS -Ddatabase.dir=database"
 FLAGS="$FLAGS -Dlogs.keepStdOut=true"
+
+FLAGS="$FLAGS -Dlogging.level.sync=ERROR"
+FLAGS="$FLAGS -Dlogging.level.net=INFO"
+FLAGS="$FLAGS -Dlogging.level.discover=ERROR"
+FLAGS="$FLAGS -Dlogging.level.general=ERROR"
+FLAGS="$FLAGS -Dlogging.level.mine=ERROR"
+FLAGS="$FLAGS -Dlogging.level.jsonrpc=ERROR"
+FLAGS="$FLAGS -Dlogging.level.harmony=ERROR"
 
 # Load the test chain if present
 echo "Loading initial blockchain..."
@@ -100,12 +109,12 @@ fi
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then
-	FLAGS="$FLAGS -Dkeystore.dir=/keys"
+    FLAGS="$FLAGS -Dkeystore.dir=/keys"
 fi
 
 # Configure any mining operation
 if [ "$HIVE_MINER" != "" ]; then
-	# We don't start mining here, but only set mining options
+    # We don't start mining here, but only set mining options
 	FLAGS="$FLAGS -Dmine.coinbase=$HIVE_MINER -Dmine.cpuMineThreads=1"
 
 	if [ "$HIVE_MINER_NO_AUTO_MINE" != "1" ]; then
