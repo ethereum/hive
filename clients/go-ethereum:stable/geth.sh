@@ -88,13 +88,13 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	/geth $FLAGS import /chain.rlp
+	/geth $FLAGS --gcmode=archive import /chain.rlp
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-	(cd blocks && ../geth $FLAGS --nocompaction import `ls | sort -n`)
+	(cd blocks && ../geth $FLAGS --gcmode=archive --nocompaction import `ls | sort -n`)
 fi
 
 set -e
