@@ -19,7 +19,8 @@
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
 #  - HIVE_FORK_TANGERINE block number of TangerineWhistle
 #  - HIVE_FORK_SPURIOUS  block number of SpuriousDragon
-#  - HIVE_FORK_METROPOLIS block number for Metropolis transition
+#  - HIVE_FORK_METROPOLIS block number for Byzantium transition
+#  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
@@ -75,6 +76,9 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 fi
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"byzantiumBlock\": $HIVE_FORK_METROPOLIS}"`
+fi
+if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
 fi
 genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
