@@ -9,7 +9,7 @@ FROM alpine:latest
 RUN \
   apk add --update bash jq go git make gcc musl-dev              \
   	  ca-certificates linux-headers                           && \
-  git clone --depth 1 --branch release/1.6                       \
+  git clone --depth 1 --branch release/1.8                       \
      https://github.com/ethereum/go-ethereum                  && \
   (cd go-ethereum && make geth)                               && \
   (cd go-ethereum                                             && \
