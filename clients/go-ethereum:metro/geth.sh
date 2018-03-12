@@ -19,7 +19,8 @@
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
 #  - HIVE_FORK_TANGERINE block number of TangerineWhistle
 #  - HIVE_FORK_SPURIOUS  block number of SpuriousDragon
-#  - HIVE_FORK_METROPOLIS block number for Metropolis transition
+#  - HIVE_FORK_METROPOLIS block number for Byzantium transition
+#  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 
@@ -76,6 +77,9 @@ fi
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"byzantiumBlock\": $HIVE_FORK_METROPOLIS}"`
 fi
+if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
+fi
 genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
 # Initialize the local testchain with the genesis state
@@ -88,13 +92,13 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	/geth $FLAGS import /chain.rlp
+	/geth $FLAGS --gcmode=archive import /chain.rlp
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-	(cd blocks && ../geth $FLAGS --nocompaction import `ls | sort -n`)
+	(cd blocks && ../geth $FLAGS --gcmode=archive --nocompaction import `ls | sort -n`)
 fi
 
 set -e
