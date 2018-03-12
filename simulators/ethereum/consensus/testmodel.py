@@ -9,6 +9,7 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "Homestead" : {
             "HIVE_FORK_HOMESTEAD" : 0,
@@ -16,7 +17,7 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 2000, 
-
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "EIP150"    : {
             "HIVE_FORK_HOMESTEAD" : 0,
@@ -24,6 +25,7 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "EIP158"    : {
             "HIVE_FORK_HOMESTEAD" : 0,
@@ -31,7 +33,7 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 2000, 
-
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "Byzantium" : {
             "HIVE_FORK_HOMESTEAD" : 0,
@@ -39,6 +41,16 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 0, 
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
+        },
+        "Constantinople" : {
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 0,
+            "HIVE_FORK_SPURIOUS"  : 0,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 0, 
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
+            "HIVE_FORK_CONSTANTINOPLE" : 0, 
         },
         "FrontierToHomesteadAt5" : {
             "HIVE_FORK_HOMESTEAD" : 5,
@@ -46,6 +58,7 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 2000,             
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "HomesteadToEIP150At5" : {
             "HIVE_FORK_HOMESTEAD" : 0,
@@ -53,13 +66,15 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "HomesteadToDaoAt5":{
-                "HIVE_FORK_HOMESTEAD" : 0,
-                "HIVE_FORK_TANGERINE" : 2000,
-                "HIVE_FORK_SPURIOUS"  : 2000,
-                "HIVE_FORK_DAO_BLOCK" : 5,
-                "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 2000,
+            "HIVE_FORK_SPURIOUS"  : 2000,
+            "HIVE_FORK_DAO_BLOCK" : 5,
+            "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "EIP158ToByzantiumAt5":{
             "HIVE_FORK_HOMESTEAD" : 0,
@@ -67,7 +82,16 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 5, 
+            "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
+        "ByzantiumToConstantinopleAt5":{
+            "HIVE_FORK_HOMESTEAD" : 0,
+            "HIVE_FORK_TANGERINE" : 0,
+            "HIVE_FORK_SPURIOUS"  : 0,
+            "HIVE_FORK_DAO_BLOCK" : 2000,
+            "HIVE_FORK_METROPOLIS" : 0, 
+            "HIVE_FORK_CONSTANTINOPLE" : 5,         
+      }
     }
 
 # Model for the testcases
