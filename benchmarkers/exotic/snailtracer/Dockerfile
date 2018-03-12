@@ -15,7 +15,7 @@ FROM mhart/alpine-node
 
 # Install web3 to allow interacting with the tracer
 RUN apk add --no-cache git
-RUN npm install web3
+RUN npm install web3@0.19.0
 
 # Configure the initial setup for the individual nodes
 ADD genesis.json /genesis.json
