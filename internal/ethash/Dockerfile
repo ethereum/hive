@@ -8,13 +8,13 @@ FROM ethereum/client-go
 
 # Define the tiny startup script to generate the DAG and reown it
 RUN \
-  echo '#!/bin/sh'                          > /ethash.sh && \
-	echo 'set -e'                            >> /ethash.sh && \
-	echo 'geth makedag 1 /root/.ethash'      >> /ethash.sh && \
-  echo 'if [ "$UID" != "0" ]; then'        >> /ethash.sh && \
-	echo '  adduser -u $UID -D ethash'       >> /ethash.sh && \
-	echo '  chown -R ethash /root/.ethash/*' >> /ethash.sh && \
-  echo 'fi'                                >> /ethash.sh && \
-	chmod +x /ethash.sh
+  echo '#!/bin/sh'                          > /root/ethash.sh && \
+  echo 'set -e'                            >> /root/ethash.sh && \
+  echo 'geth makedag 1 /root/.ethash'      >> /root/ethash.sh && \
+  echo 'if [ "$UID" != "0" ]; then'        >> /root/ethash.sh && \
+  echo '  adduser -u $UID -D ethash'       >> /root/ethash.sh && \
+  echo '  chown -R ethash /root/.ethash/*' >> /root/ethash.sh && \
+  echo 'fi'                                >> /root/ethash.sh && \
+  chmod +x /root/ethash.sh
 
-ENTRYPOINT ["/ethash.sh"]
+ENTRYPOINT ["/root/ethash.sh"]
