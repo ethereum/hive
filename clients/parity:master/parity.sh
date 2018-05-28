@@ -91,7 +91,7 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip160Transition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip161abcTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip161dTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"maxCodeSizeTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"maxCodeSizeTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 fi
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	# Based on 
