@@ -82,7 +82,7 @@ fi
 
 if [ "$HIVE_FORK_TANGERINE" != "" ]; then
 	HIVE_FORK_TANGERINE=`echo "obase=16; $HIVE_FORK_TANGERINE" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip150Transition\"]; \"0x$HIVE_FORK_TANGERINE\" )"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip150Transition\"]; \"0x$HIVE_FORK_TANGERINE\" )"`
 fi
 
 if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
