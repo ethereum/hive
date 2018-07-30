@@ -5,7 +5,7 @@ FROM ubuntu:16.04
 RUN \
   # Install parity from sources
   apt-get -y update                                        && \
-  apt-get install -y bash jq bc curl git make g++ gcc file    \
+  apt-get install -y bash jq bc curl git make cmake g++ gcc file    \
   binutils pkg-config openssl libssl-dev libudev-dev       && \
   curl -sSf https://static.rust-lang.org/rustup.sh         |  \
   sh -s -- --disable-sudo                                  && \
@@ -23,7 +23,7 @@ RUN \
 	rm -rf parity && mv /parity.bin /parity              && \
   \
   /usr/local/lib/rustlib/uninstall.sh                  && \
-  apt-get remove -y curl git make g++ gcc file binutils pkg-config openssl libssl-dev && \
+  apt-get remove -y curl git make cmake g++ gcc file binutils pkg-config openssl libssl-dev && \
   rm -rf /root/.cargo
 
 # Inject ethminer to support mining
