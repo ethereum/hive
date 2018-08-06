@@ -198,6 +198,15 @@ class BlockTestExecutor(object):
             except Exception, e:
                 error = str(startNodeError)
             testcase.fail(["Failed to start client node", traceback.format_exc()])
+            end = time.time()
+            testcase.setTimeElapsed(1000 * (end - start))
+            self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
+            self.hive.subresult(
+                    testcase.fullname(),
+                    testcase.wasSuccessfull(),
+                    testcase.topLevelError(),
+                    testcase.details()
+                )
             return
 
         self.executeTestcase(testcase, node)
@@ -262,9 +271,13 @@ class BlockTestExecutor(object):
         return (g_file, c_file, b_folder)
 
     def executeTestcase(self, testcase, node):
-        if self.clientVersion is None:
-            self.clientVersion = node.getClientversion()
-            print("Client version: %s" % self.clientVersion)
+        print("Checking version")
+        try:
+            if self.clientVersion is None:
+                self.clientVersion = node.getClientversion()
+        except Exception, e:
+            print("Failed to get client version")
+            print(str(e))
 
         testcase.setNodeInstance(node.nodeId)
         errors = self.verifyPreconditions(testcase, node)
@@ -297,7 +310,6 @@ class BlockTestExecutor(object):
         """ Verify preconditions
         @return list of error messages
         """
-
         errs = []
         try:
             first = node.getBlockByNumber(0)
