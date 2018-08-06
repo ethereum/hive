@@ -23,7 +23,7 @@ RUN cd cpp-ethereum && echo "{}"                                               \
             > /version.json 
 WORKDIR /build
 RUN cmake /cpp-ethereum -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release -DTOOLS=OFF -DTESTS=OFF -DHUNTER_JOBS_NUMBER=$(nproc)
-RUN make -j $(nproc) && make install
+RUN make -j $(nproc) && make install && cp /cpp-ethereum/scripts/jsonrpcproxy.py /usr/bin/jsonrpcproxy.py
 
 # If the base is built separately, enable this and put 
 # the section below in a separate dockerfile
@@ -44,7 +44,7 @@ COPY --from=builder /usr/bin/aleth /usr/bin/jsonrpcproxy.py /usr/bin/
 # open before it considers the node to be 'up'. 
 # However, the aleth.py script starts the http socket immediately, 
 # but the backend ipc socket is not available yet. Hence, 
-# the modified scrip waits until the ipc socket exists before starting the http service
+# the modified script waits until the ipc socket exists before starting the http service
 
 ADD aleth.py /usr/bin
 COPY --from=builder /version.json /
