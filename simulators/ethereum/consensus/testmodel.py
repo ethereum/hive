@@ -49,7 +49,6 @@ class Rules():
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
             "HIVE_FORK_METROPOLIS" : 0, 
-            "HIVE_FORK_CONSTANTINOPLE" : 2000,
             "HIVE_FORK_CONSTANTINOPLE" : 0, 
         },
         "FrontierToHomesteadAt5" : {

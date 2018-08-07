@@ -49,7 +49,7 @@ genesis="${genesis/coinbase/author}"
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 
 # Remove genesis fields unsupported by cpp-ethereum
-genesis=`echo $genesis | jq "del(.bloom) | del(.hash) | del(.number) | del(.receiptTrie) | del(.stateRoot) | del(.transactionsTrie) | del(.uncleHash)"`
+genesis=`echo $genesis | jq "del(.bloom) | del(.hash) | del(.number) | del(.receiptTrie) | del(.stateRoot) | del(.transactionsTrie) | del(.uncleHash) | del(.gasUsed)"`
 
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
@@ -112,7 +112,6 @@ if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
 	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000007\", \"code\"]])"`
 fi
 
-
 #if [ "$HIVE_TESTNET" == "1" ]; then
 #	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
 #	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do
@@ -124,7 +123,7 @@ echo $chainconfig > /chain2.json
 
 # Initialize the local testchain with the genesis state
 FLAGS="$FLAGS --config /chain2.json"
-ETHEXEC=/usr/local/bin/eth
+ETHEXEC=/usr/bin/aleth
 echo "Flags: $FLAGS"
 #echo "Initializing database with genesis state and loading inital blockchain"
 #if [ -f /chain.rlp ]; then
@@ -157,6 +156,8 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 fi
 
 # Run the cpp implementation with the requested flags
-echo "Running cpp-ethereum..."
-python /scripts/jsonrpcproxy.py &
-eth $FLAGS
+echo "Running cpp-ethereum... "
+
+RUNCMD="python3 /usr/bin/aleth.py --rpc http://0.0.0.0:8545 --aleth-exec $ETHEXEC $FLAGS"
+echo "cmd: $RUNCMD"
+$RUNCMD

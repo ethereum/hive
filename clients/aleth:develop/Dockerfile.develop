@@ -1,0 +1,46 @@
+# Multistage Dockerfile for the Aleth Ethereum node.
+# Build stage
+
+# This docker build relies on the ethereum/aleth docker image. It makes it a lot quicker
+# to build, with the downside that it does not know the git version number. 
+#
+
+FROM ethereum/aleth:latest as builder
+
+# Install stage
+FROM alpine:latest
+RUN apk add --no-cache \
+        python3 \
+        libstdc++ \
+        leveldb --repository http://dl-cdn.alpinelinux.org/alpine/edge/testing/ \
+        bash jq bc
+COPY --from=builder /usr/bin/aleth /usr/bin/jsonrpcproxy.py /usr/bin/
+
+# Our modified aleth.py, needed because Hive waits for a socket to 
+# open before it considers the node to be 'up'. 
+# However, the aleth.py script starts the http socket immediately, 
+# but the backend ipc socket is not available yet. Hence, 
+# the modified script waits until the ipc socket exists before starting the http service
+
+
+ADD aleth.py /usr/bin
+
+# Hack:  We have to have a version-json
+RUN echo "{}"                                               \
+            | jq ".+ {\"repo\":\"\"}" \
+            | jq ".+ {\"branch\":\"\"}"  \
+            | jq ".+ {\"commit\":\"\"}"               \
+            > /version.json
+
+
+# Genesis template
+ADD config.json /config.json
+
+# Inject the startup script
+ADD eth.sh /eth.sh
+RUN chmod +x /eth.sh
+
+# Export the usual networking ports to allow outside access to the node
+EXPOSE 8545 30303
+
+ENTRYPOINT ["/eth.sh"]
