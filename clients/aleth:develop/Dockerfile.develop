@@ -37,10 +37,10 @@ RUN echo "{}"                                               \
 ADD config.json /config.json
 
 # Inject the startup script
-ADD eth.sh /eth.sh
-RUN chmod +x /eth.sh
+ADD aleth.sh /aleth.sh
+RUN chmod +x /aleth.sh
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 30303
 
-ENTRYPOINT ["/eth.sh"]
+ENTRYPOINT ["/aleth.sh"]
