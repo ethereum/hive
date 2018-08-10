@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Startup script to initialize and boot a cpp-ethereum instance.
+# Startup script to initialize and boot an Aleth instance.
 #
 # This script assumes the following files:
 #  - `eth` binary is located somewhere on the $PATH
@@ -48,7 +48,7 @@ genesis="${genesis/coinbase/author}"
 
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 
-# Remove genesis fields unsupported by cpp-ethereum
+# Remove unsupported genesis fields
 genesis=`echo $genesis | jq "del(.bloom) | del(.hash) | del(.number) | del(.receiptTrie) | del(.stateRoot) | del(.transactionsTrie) | del(.uncleHash) | del(.gasUsed)"`
 
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
@@ -105,12 +105,12 @@ if [ "$accounts" != "" ]; then
 	chainconfig=`jq -s '.[0] * .[1]' tmp1 tmp2`
 fi
 
-
-if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
-	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000005\", \"code\"]])"`
-	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000006\", \"code\"]])"`
-	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000007\", \"code\"]])"`
-fi
+# For some reason, aleth doesn't like it when precompiles have code/nonce/storage, so we need to remove those fields. 
+for i in $(seq 1 8); do
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"000000000000000000000000000000000000000$i\", \"code\"]])"`
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"000000000000000000000000000000000000000$i\", \"nonce\"]])"`
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"000000000000000000000000000000000000000$i\", \"storage\"]])"`
+done
 
 #if [ "$HIVE_TESTNET" == "1" ]; then
 #	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
@@ -155,8 +155,8 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
 fi
 
-# Run the cpp implementation with the requested flags
-echo "Running cpp-ethereum... "
+# Run the client with the requested flags
+echo "Running Aleth... "
 
 RUNCMD="python3 /usr/bin/aleth.py --rpc http://0.0.0.0:8545 --aleth-exec $ETHEXEC $FLAGS"
 echo "cmd: $RUNCMD"
