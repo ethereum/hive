@@ -105,12 +105,12 @@ if [ "$accounts" != "" ]; then
 	chainconfig=`jq -s '.[0] * .[1]' tmp1 tmp2`
 fi
 
-
-if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
-	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000005\", \"code\"]])"`
-	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000006\", \"code\"]])"`
-	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"0000000000000000000000000000000000000007\", \"code\"]])"`
-fi
+# For some reason, aleth doesn't like it when precompiles have code/nonce/storage, so we need to remove those fields. 
+for i in $(seq 1 8); do
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"000000000000000000000000000000000000000$i\", \"code\"]])"`
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"000000000000000000000000000000000000000$i\", \"nonce\"]])"`
+	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"000000000000000000000000000000000000000$i\", \"storage\"]])"`
+done
 
 #if [ "$HIVE_TESTNET" == "1" ]; then
 #	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
