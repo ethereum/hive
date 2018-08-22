@@ -18,13 +18,9 @@ RUN chmod +x /aleth.sh
 
 RUN apk add --no-cache jq bc bash
 
-# The /version.json is a softlink, which hive won't resolve when trying to read it.
-# We copy it into a regular file, and also remove the 'bool' field is_prerelease
+# Copy buildinfo into version.json, and also remove the 'bool' field is_prerelease
 
-
-RUN cat /version.json | jq "del(.is_prerelease)" > /x.json && \
-	rm /version.json && \
-    mv /x.json /version.json
+RUN cat /usr/share/aleth/buildinfo.json | jq "del(.is_prerelease)" > /version.json
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 30303
