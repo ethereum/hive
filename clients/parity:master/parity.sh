@@ -119,7 +119,15 @@ if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"linear\": { \"base\": 40000, \"word\": 0 } } })"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_METROPOLIS\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 } } })"`
 fi
+if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
+	# New shift instructions
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip145Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
+	# EXTCODEHASH
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1052Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
+	# EIP 1283, net gas metering version 2
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
 
+fi
 echo $chainconfig > /chain.json
 echo "Chain config: "
 cat /chain.json
