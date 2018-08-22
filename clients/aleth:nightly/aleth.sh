@@ -93,6 +93,10 @@ if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
 fi
 
+if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
+	HIVE_FORK_CONSTANTINOPLE=`echo "obase=16; $HIVE_FORK_CONSTANTINOPLE" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"constantinopleForkBlock\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
+fi
 
 if [ "$accounts" != "" ]; then
 	# In some cases, the 'alloc' portion can be extremely large.
