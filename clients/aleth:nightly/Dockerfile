@@ -21,7 +21,6 @@ RUN apk add --no-cache jq bc bash
 # Copy buildinfo into version.json, and also remove the 'bool' field is_prerelease
 
 # remove softlink
-RUN rm /version.json
 RUN cat /usr/share/aleth/buildinfo.json |jq "del(.is_prerelease)"  > /version.json
 
 # Export the usual networking ports to allow outside access to the node
