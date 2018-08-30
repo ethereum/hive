@@ -29,6 +29,21 @@ $ go get github.com/karalabe/hive
 of resource files to build the corrent docker images and containers. This requirement will be removed
 in the future.*
 
+## Compatibility note
+
+`hive` uses Docker-in-Docker to bootstrap its test environment, and as such is incompatible with OSX or Windows at this time. This is because OSX and Windows only support the `vfs` storage driver reliably when running Docker-in-Docker, and `vfs` is too slow for usage within `hive`. The lack of reliability manifests itself through opaque filesystem errors such as `unable to mount... not implemented`.
+
+ To use `hive` on one of these operating systems, we recommend using a virtual machine solution such as Vagrant. We have included a sample `Vagrantfile` that will compile and install `hive` and all related dependencies. To run hive from within the Vagrant VM, use the following commands:
+ 
+```bash
+vagrant up
+vagrant ssh
+cd /go/src/github.com/karalabe/hive
+hive <args>
+```
+
+To sync your local Hive directory with the VM, run `vagrant rsync`.
+
 # Validating clients
 
 You can run the full suite of `hive` validation tests against all the known implementations tagged
