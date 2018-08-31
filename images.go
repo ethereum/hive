@@ -145,11 +145,25 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 			logger  = log15.New(kind, name)
 		)
 		if err := buildImage(daemon, image, context, cacher, logger); err != nil {
-			return nil, fmt.Errorf("%s: %v", context, err)
+			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
+			return nil, berr
 		}
 		images[name] = image
 	}
 	return images, nil
+}
+
+type buildError struct {
+	err error
+	client string
+}
+
+func (b *buildError) Error() string {
+	return b.err.Error()
+}
+
+func (b *buildError) Client() string {
+	return b.client
 }
 
 // buildImage builds a single docker image from the specified context.
