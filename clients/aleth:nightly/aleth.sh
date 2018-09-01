@@ -19,7 +19,7 @@
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
 #  - HIVE_FORK_TANGERINE block number of TangerineWhistle
 #  - HIVE_FORK_SPURIOUS  block number of SpuriousDragon
-#  - HIVE_FORK_METROPOLIS block number for Byzantium transition
+#  - HIVE_FORK_BYZANTIUM block number for Byzantium transition
 #  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
@@ -81,10 +81,10 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"EIP158ForkBlock\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 fi
 
-if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
-	HIVE_FORK_METROPOLIS=`echo "obase=16; $HIVE_FORK_METROPOLIS" | bc`
+if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
+	HIVE_FORK_BYZANTIUM=`echo "obase=16; $HIVE_FORK_BYZANTIUM" | bc`
 
-	if [ "$((16#$HIVE_FORK_METROPOLIS))" -eq "0" ]; then
+	if [ "$((16#$HIVE_FORK_BYZANTIUM))" -eq "0" ]; then
 		# Also new precompiles
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\"]; { \"precompiled\": { \"name\": \"modexp\" } })"`
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_add\", \"linear\": { \"base\": 500, \"word\": 0 } } })"`
@@ -92,7 +92,7 @@ if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"precompiled\": { \"name\": \"alt_bn128_pairing_product\" } })"`
 	fi
 
-	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_METROPOLIS\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 fi
 
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
