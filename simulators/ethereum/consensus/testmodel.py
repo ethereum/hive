@@ -174,6 +174,10 @@ class Testcase(object):
         #And finally, fail if no ruleset is defined
         return self.validateNetwork()
 
+    def skipPow(self):
+        """ Returns True if this testcase should be executed without PoW verification"""
+        return "sealEngine" in self.data and self.data['sealEngine'] == 'NoProof'
+
     def ruleset(self):
         """The ruleset for tests should be specified in the json
         """

@@ -143,7 +143,7 @@ class BlockTestExecutor(object):
                 break
 
             tf = Testfile(testfile)
-            self.hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
+#            self.hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
 
             for testcase in tf.tests() :
 
@@ -188,6 +188,9 @@ class BlockTestExecutor(object):
         }
 
         params.update(testcase.ruleset())
+
+        if testcase.skipPow():
+            params["HIVE_SKIP_POW"] = "1"
 
         self.hive.log("Starting client node for test %s" % testcase)
         try:
