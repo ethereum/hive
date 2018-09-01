@@ -32,7 +32,7 @@ set -e
 if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
 else
-	FLAGS="$FLAGS --nodiscover"
+	FLAGS="$FLAGS --no-discovery"
 fi
 
 if [ "$HIVE_SKIP_POW" != "" ]; then
@@ -158,6 +158,7 @@ fi
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
 	for block in `ls /blocks | sort -n`; do
+		echo "/parity $FLAGS import /blocks/$block"
 		/parity $FLAGS import /blocks/$block
 	done
 fi
