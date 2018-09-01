@@ -18,10 +18,12 @@
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
 #  - HIVE_FORK_TANGERINE block number of TangerineWhistle
-#  - HIVE_FORK_SPURIOUS  block number of SpurioisDragon
-#  - HIVE_FORK_METROPOLIS block number for Metropolis transition
+#  - HIVE_FORK_SPURIOUS  block number of SpuriousDragon
+#  - HIVE_FORK_METROPOLIS block number for Byzantium transition
+#  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
+#  - HIVE_SKIP_POW       If set, skip PoW verification during block import
 
 # Immediately abort the script on any error encountered
 set -e
@@ -116,12 +118,9 @@ for i in $(seq 1 8); do
 	chainconfig=`echo $chainconfig | jq "delpaths([[\"accounts\", \"000000000000000000000000000000000000000$i\", \"storage\"]])"`
 done
 
-#if [ "$HIVE_TESTNET" == "1" ]; then
-#	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"accountStartNonce\"]; \"0x0100000\")"`
-#	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do
-#		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", $account, \"nonce\"]; \"0x0100000\")"`
-#	done
-#fi
+if [ "$HIVE_SKIP_POW" != "" ]; then
+	chainconfig=`echo $chainconfig | jq "setpath([\"sealEngine\"];\"NoProof\")"`
+fi
 
 echo $chainconfig > /chain2.json
 

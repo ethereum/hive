@@ -23,6 +23,7 @@
 #  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
+#  - HIVE_SKIP_POW       If set, skip PoW verification during block import
 
 # Immediately abort the script on any error encountered
 set -e
@@ -32,6 +33,10 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
 else
 	FLAGS="$FLAGS --nodiscover"
+fi
+
+if [ "$HIVE_SKIP_POW" != "" ]; then
+	FLAGS="$FLAGS --fakepow"
 fi
 
 # If a specific network ID is requested, use that
