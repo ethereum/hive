@@ -81,11 +81,13 @@ func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCac
 
 		blob, err := downloadFromImage(daemon, image, "/version.json", logger)
 		if err != nil {
-			return nil, err
+			berr := &buildError{err: err, client: image}
+			return nil, berr
 		}
 		var version map[string]string
 		if err := json.Unmarshal(blob, &version); err != nil {
-			return nil, err
+			berr := &buildError{err: err, client: image}
+			return nil, berr
 		}
 		versions[client] = version
 	}
@@ -154,7 +156,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 }
 
 type buildError struct {
-	err error
+	err    error
 	client string
 }
 
