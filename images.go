@@ -81,12 +81,12 @@ func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCac
 
 		blob, err := downloadFromImage(daemon, image, "/version.json", logger)
 		if err != nil {
-			berr := &buildError{err: err, client: image}
+			berr := &buildError{err: err, client: client}
 			return nil, berr
 		}
 		var version map[string]string
 		if err := json.Unmarshal(blob, &version); err != nil {
-			berr := &buildError{err: err, client: image}
+			berr := &buildError{err: err, client: client}
 			return nil, berr
 		}
 		versions[client] = version
