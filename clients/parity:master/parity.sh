@@ -109,8 +109,9 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 #	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 
 	# Ethash params
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip649Reward\"]; \"0x29A2241AF62C0000\")"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip649Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
+	#  Set blockreward to 3M for byzantium
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"blockReward\",\"0x$HIVE_FORK_BYZANTIUM\"]; \"0x29A2241AF62C0000\")"`
+	# difficulty calculation -- aka bomb delay
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip100bTransition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 
 	# General params
@@ -136,6 +137,9 @@ if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
 	# Skinny create 2 (overloaded on eip86 for some reason)
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip86Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
+	# Ethash params
+	#  Set blockreward to 2M for constantinople
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"blockReward\",\"0x$HIVE_FORK_CONSTANTINOPLE\"]; \"0x1BC16D674EC80000\")"`
 
 fi
 echo $chainconfig > /chain.json
