@@ -86,6 +86,17 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 	// Retrieve the versions of all clients being tested
 	if results.Clients, err = fetchClientVersions(daemon, *clientPattern, cacher); err != nil {
 		log15.Crit("failed to retrieve client versions", "error", err)
+		b, ok := err.(*buildError)
+		if ok {
+			results.Clients = make(map[string]map[string]string)
+			results.Clients[b.Client()] = map[string]string{"error": b.Error()}
+			out, errMarshal := json.MarshalIndent(results, "", "  ")
+			if errMarshal != nil {
+				log15.Crit("failed to report results. Docker Failed build.", "error", err)
+				return err
+			}
+			fmt.Println(string(out))
+		}
 		return err
 	}
 	// Smoke tests are exclusive with all other flags
