@@ -5,7 +5,7 @@
       "params": {
         "minimumDifficulty": "0x020000",
         "blockReward": {
-          "0": "0x4563918244F40000",
+          "0": "0x4563918244F40000"
         },
         "difficultyBoundDivisor": "0x0800",
         "durationLimit": "0x0d",
