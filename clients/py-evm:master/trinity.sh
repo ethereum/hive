@@ -29,24 +29,22 @@ set -e
 
 # It doesn't make sense to dial out, use only a pre-set bootnode
 if [ "$HIVE_BOOTNODE" != "" ]; then
-	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
-else
-	FLAGS="$FLAGS --nodiscover"
+	FLAGS="$FLAGS --preferred-node=$HIVE_BOOTNODE"
 fi
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
-	FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
+	FLAGS="$FLAGS --network-id=$HIVE_NETWORK_ID"
 fi
 
 # If the client is to be run in testnet mode, flag it as such
 if [ "$HIVE_TESTNET" == "1" ]; then
-	FLAGS="$FLAGS --testnet"
+	FLAGS="$FLAGS --ropsten"
 fi
 
 # Handle any client mode or operation requests
 if [ "$HIVE_NODETYPE" == "full" ]; then
-	FLAGS="$FLAGS --fast"
+	FLAGS="$FLAGS --sync-mode=full"
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
 	FLAGS="$FLAGS --light"
@@ -80,11 +78,21 @@ fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
 fi
-genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
-# Initialize the local testchain with the genesis state
-echo "Initializing database with genesis state..."
-# TODO: Somehow apply a genesis block for trinity to use /trinity $FLAGS init /genesis.json
+genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}"
+
+# Configure any mining operation
+if [ "$HIVE_MINER" != "" ]; then
+	genesis=`echo $genesis` | jq ". + {\"coinbase\": $HIVE_MINER}"
+fi
+if [ "$HIVE_MINER_EXTRA" != "" ]; then
+	genesis=`echo $genesis` | jq ". + {\"extraData\": $HIVE_MINER_EXTRA}"
+fi
+
+genesis=`echo $genesis` | jq ". + {\"config\": $chainconfig}" > /genesis.json
+
+# set the genesis config flag
+FLAGS="$FLAGS --genesis /genesis.json"
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -92,32 +100,22 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	echo "TODO: import chain data into trinity"
-	# /trinity $FLAGS --gcmode=archive import /chain.rlp
-fi
+	BLOCKS="/chain.rlp"
 
-# Load the remainder of the test chain
-echo "Loading remaining individual blocks..."
-if [ -d /blocks ]; then
-	echo "TODO: import blocks into trinity"
-	# (cd blocks && /trinity $FLAGS --gcmode=archive --nocompaction import `ls | sort -n`)
+	echo "Loading remaining individual blocks..."
+	if [ -d /blocks ]; then
+		BLOCKs="$BLOCKS `ls | sort -n`"
+	fi
+	FLAGS="$FLAGS --import $BLOCKS"
 fi
 
 set -e
 
 # Load any keys explicitly added to the node
 if [ -d /keys ]; then
-	FLAGS="$FLAGS --keystore /keys"
-fi
-
-# Configure any mining operation
-if [ "$HIVE_MINER" != "" ]; then
-	FLAGS="$FLAGS --mine --minerthreads 1 --etherbase $HIVE_MINER"
-fi
-if [ "$HIVE_MINER_EXTRA" != "" ]; then
-	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
+	# trinity does not currently support keystore flags
 fi
 
 # Run the py-evm implementation with the requested flags
 echo "Running trinity..."
-/trinity
+/trinity $FLAGS
