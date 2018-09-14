@@ -86,6 +86,10 @@ FLAGS="$FLAGS -Dserver.port=8545"
 FLAGS="$FLAGS -Ddatabase.dir=database"
 FLAGS="$FLAGS -Dlogs.keepStdOut=true"
 
+FLAGS="$FLAGS -Dmodules.contracts.enabled=false"
+FLAGS="$FLAGS -Dmodules.web.enabled=false"
+FLAGS="$FLAGS -Dmodules.rpc.enabled=true"
+
 FLAGS="$FLAGS -Dlogging.level.sync=ERROR"
 FLAGS="$FLAGS -Dlogging.level.net=INFO"
 FLAGS="$FLAGS -Dlogging.level.discover=ERROR"
@@ -99,16 +103,14 @@ echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
     export HARMONY_ETHER_CAMP_OPTS="$FLAGS -Dblocks.format=rlp -Dblocks.loader=/chain.rlp -Dpeer.listen.port=0"
     echo "importBlocks options: $HARMONY_ETHER_CAMP_OPTS"
-    eval "${HARMONY_EXECUTABLE} importBlocks"
+    eval ${HARMONY_EXECUTABLE}
 fi
 
 # Load the remainder of the test chain
 if [ -d /blocks ]; then
     echo "Loading remaining individual blocks..."
-    for block in `ls /blocks | sort -n`; do
-        export HARMONY_ETHER_CAMP_OPTS="$FLAGS -Dblocks.format=rlp -Dblocks.loader=/blocks/$block -Dpeer.listen.port=0"
-		eval "${HARMONY_EXECUTABLE} importBlocks"
-	done
+    export HARMONY_ETHER_CAMP_OPTS="$FLAGS -Dblocks.format=rlp -Dblocks.loader=/blocks -Dpeer.listen.port=0"
+    eval ${HARMONY_EXECUTABLE}
 fi
 
 # Load any keys explicitly added to the node
