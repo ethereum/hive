@@ -25,7 +25,17 @@
 # Immediately abort the script on any error encountered
 set -e
 
-HARMONY_EXECUTABLE=/harmony.ether.camp/bin/harmony.ether.camp
+# Runs Harmony client with specified options.
+# Parameters:
+#   $1 - run description;
+#   $2 - Harmony options;
+run_harmony() {
+    echo "Harmony running: $1"
+    echo "Harmony run options: $2"
+
+    export HARMONY_ETHER_CAMP_OPTS=$2
+    /harmony.ether.camp/bin/harmony.ether.camp
+}
 
 # It doesn't make sense to dial out, use only a pre-set bootnode
 if [ "$HIVE_BOOTNODE" != "" ]; then
@@ -101,16 +111,12 @@ FLAGS="$FLAGS -Dlogging.level.harmony=ERROR"
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-    export HARMONY_ETHER_CAMP_OPTS="$FLAGS -Dblocks.format=rlp -Dblocks.loader=/chain.rlp -Dpeer.listen.port=0"
-    echo "importBlocks options: $HARMONY_ETHER_CAMP_OPTS"
-    eval ${HARMONY_EXECUTABLE}
+    run_harmony "single blocks dump loading" "$FLAGS -Dblocks.format=rlp -Dblocks.loader=/chain.rlp -Dpeer.listen.port=0"
 fi
 
 # Load the remainder of the test chain
 if [ -d /blocks ]; then
-    echo "Loading remaining individual blocks..."
-    export HARMONY_ETHER_CAMP_OPTS="$FLAGS -Dblocks.format=rlp -Dblocks.loader=/blocks -Dpeer.listen.port=0"
-    eval ${HARMONY_EXECUTABLE}
+    run_harmony "multiple blocks dump loading" "$FLAGS -Dblocks.format=rlp -Dblocks.loader=/blocks -Dpeer.listen.port=0"
 fi
 
 # Load any keys explicitly added to the node
@@ -132,7 +138,4 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 fi
 
 # Run the peer implementation with the requested flags
-echo "Parameters $FLAGS"
-echo "Running Harmony Develop..."
-export HARMONY_ETHER_CAMP_OPTS=$FLAGS
-eval $HARMONY_EXECUTABLE
+run_harmony "Develop ..." "$FLAGS"
