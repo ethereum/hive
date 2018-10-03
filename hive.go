@@ -26,6 +26,9 @@ var (
 	benchmarkPattern = flag.String("bench", "", "Regexp selecting the benchmarks to run")
 
 	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
+
+	dockerTimeout = flag.Int("dockertimeout", 1, "Time to wait for container to finish before stopping it")
+	timeoutCheck  = flag.Int("timeoutcheck", 30, "Seconds to check for timeouts of containers")
 )
 
 func main() {
