@@ -143,7 +143,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 	for _, name := range names {
 		var (
 			context = filepath.Join(root, name)
-			image   = filepath.Join(hiveImageNamespace, context)
+			image   = strings.Replace(filepath.Join(hiveImageNamespace, context), string(os.PathSeparator), "/", -1)
 			logger  = log15.New(kind, name)
 		)
 		if err := buildImage(daemon, image, context, cacher, logger); err != nil {
@@ -177,6 +177,15 @@ func buildImage(daemon *docker.Client, image, context string, cacher *buildCache
 	}
 	logger.Info("building new docker image", "nocache", nocache)
 
+	//FRANK TEMP TESTING
+
+	//context = "C:\\Users\\frank\\go\\src\\github.com\\frankszendzielarz\\hive\\" + context
+	//ENDFRANK
+	context, err := filepath.Abs(context)
+	if err != nil {
+		logger.Error("failed to build docker image", "error", err)
+		return err
+	}
 	stream := io.Writer(new(bytes.Buffer))
 	if *loglevelFlag > 5 {
 		stream = os.Stderr

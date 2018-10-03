@@ -120,10 +120,12 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		}
 		// Container seems to be alive, check whether the RPC is accepting connections
 		if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.NetworkSettings.IPAddress, 8545)); err == nil {
+
 			clogger.Debug("client container online", "time", time.Since(start))
 			conn.Close()
 			break
 		}
+
 		time.Sleep(100 * time.Millisecond)
 	}
 	// Create the validator container and make sure it's cleaned up afterwards
