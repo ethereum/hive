@@ -7,7 +7,7 @@ FROM alpine:latest
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  apk add --update bash jq go git make gcc musl-dev              \
+  apk add --update bash curl jq go git make gcc musl-dev              \
   	  ca-certificates linux-headers                           && \
   git clone --depth 1 https://github.com/ethereum/go-ethereum && \
   (cd go-ethereum && make geth)                               && \
@@ -25,12 +25,20 @@ RUN \
 ADD geth.sh /geth.sh
 RUN chmod +x /geth.sh
 
+# Inject the enode id retriever script
+ADD enode.sh /enode.sh
+RUN chmod +x /enode.sh
+
+ADD genesis.json /genesis.json
+
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 8546 30303
+EXPOSE 8545 8546 30303 30303/udp
 
 # Generate the ethash verification caches
 RUN \
   /geth makecache     1 ~/.ethereum/geth/ethash && \
   /geth makecache 30001 ~/.ethereum/geth/ethash
+
+
 
 ENTRYPOINT ["/geth.sh"]

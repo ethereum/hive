@@ -23,7 +23,7 @@ RUN \
 	rm -rf parity && mv /parity.bin /parity              && \
   \
   /usr/local/lib/rustlib/uninstall.sh                  && \
-  apt-get remove -y curl git make cmake g++ gcc file binutils pkg-config openssl libssl-dev && \
+  apt-get remove -y  git make cmake g++ gcc file binutils pkg-config openssl libssl-dev && \
   rm -rf /root/.cargo
 
 # Inject ethminer to support mining
@@ -37,7 +37,14 @@ ADD parity.sh /parity.sh
 RUN chmod +x /parity.sh
 ADD chain.json /chain.json
 
+# Inject the enode id retriever script
+ADD enode.sh /enode.sh
+RUN chmod +x /enode.sh 
+
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 30303
+EXPOSE 8545 30303 30303/udp
+
+ADD genesis.json /genesis.json
+
 
 ENTRYPOINT ["/parity.sh"]

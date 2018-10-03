@@ -1,6 +1,6 @@
 # inspired by Hive simulator for consensus tests
-# https://github.com/karalabe/hive/blob/243b64b80a84c131b462ef0ad380887c2c2c2f09/simulators/ethereum/consensus/simulator.py
-# https://github.com/karalabe/hive/blob/243b64b80a84c131b462ef0ad380887c2c2c2f09/simulators/ethereum/consensus/hivemodel.py
+# https://github.com/ethereum/hive/blob/243b64b80a84c131b462ef0ad380887c2c2c2f09/simulators/ethereum/consensus/simulator.py
+# https://github.com/ethereum/hive/blob/243b64b80a84c131b462ef0ad380887c2c2c2f09/simulators/ethereum/consensus/hivemodel.py
 
 import os
 import sys
