@@ -46,7 +46,38 @@ Currently, the Windows version must be run from the Host. To achieve this run wi
 ## Debugging or executing from Visual Studio Code
 As described above, golang must be installed on the machine. The golang extension for VSCode is then required, along with Delve and the standard tools recommended by the Golang extension.
 
-When VS Code is configured for general go development, `hive` may be run simply by launching with F5. A .vscode folder is included with an example launch.json. The launch.json includes example parameters that limit the client to `geth` as the full client suite may take significant time to build initial docker images.
+When VS Code is configured for general go development, `hive` may be run simply by launching with F5 with the following `launch.json`. This `launch.json` includes example parameters that limit the client to `geth` as the full client suite may take significant time to build initial docker images.
+
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "remotePath": "",
+            "port": 2345,
+            "host": "127.0.0.1",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                
+                "--docker-endpoint","tcp://localhost:2375",
+                "--docker-noshell",
+                "--client","go-ethereum_master" , //the initial docker image build can take a long time (30+ min for parity). This case limits to a fairly quick image build (geth).
+                "--loglevel","6",
+                "--smoke"
+                
+               
+            ],
+            "showLog": true
+        }
+    ]
+}
 
 ## Access to the local drive
 Docker will need access to the `workspace` folder. This will either be requested automatically in an Windows notification, or permission can be set in the docker settings in advance.
