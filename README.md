@@ -47,7 +47,7 @@ Currently, the Windows version must be run from the Host. To achieve this run wi
 As described above, golang must be installed on the machine. The golang extension for VSCode is then required, along with Delve and the standard tools recommended by the Golang extension.
 
 When VS Code is configured for general go development, `hive` may be run simply by launching with F5 with the following `launch.json`. This `launch.json` includes example parameters that limit the client to `geth` as the full client suite may take significant time to build initial docker images.
-
+```json
 {
     // Use IntelliSense to learn about possible attributes.
     // Hover to view descriptions of existing attributes.
@@ -78,6 +78,7 @@ When VS Code is configured for general go development, `hive` may be run simply 
         }
     ]
 }
+```
 
 ## Access to the local drive
 Docker will need access to the `workspace` folder. This will either be requested automatically in an Windows notification, or permission can be set in the docker settings in advance.
