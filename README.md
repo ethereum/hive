@@ -49,9 +49,7 @@ As described above, golang must be installed on the machine. The golang extensio
 When VS Code is configured for general go development, `hive` may be run simply by launching with F5 with the following `launch.json`. This `launch.json` includes example parameters that limit the client to `geth` as the full client suite may take significant time to build initial docker images.
 ```json
 {
-    // Use IntelliSense to learn about possible attributes.
-    // Hover to view descriptions of existing attributes.
-    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+   
     "version": "0.2.0",
     "configurations": [
         {
@@ -68,7 +66,7 @@ When VS Code is configured for general go development, `hive` may be run simply 
                 
                 "--docker-endpoint","tcp://localhost:2375",
                 "--docker-noshell",
-                "--client","go-ethereum_master" , //the initial docker image build can take a long time (30+ min for parity). This case limits to a fairly quick image build (geth).
+                "--client","go-ethereum_master" , 
                 "--loglevel","6",
                 "--smoke"
                 
