@@ -212,21 +212,35 @@ type simulatorAPIHandler struct {
 	lock   sync.RWMutex
 }
 
+// CheckTimeout is a goroutine that checks if the timeout has passed and stops
+// container if it has.
 func (h *simulatorAPIHandler) CheckTimeout() {
 	for {
 		for id, c := range h.nodes {
 			h.lock.Lock()
 			if !c.State.Running || (time.Now().After(h.nodesTimeout[id])) {
-				delete(h.nodes, id)
-				delete(h.nodesTimeout, id)
-				h.logger.Debug("deleting client container", "id", id)
-				if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: id, Force: true}); err != nil {
-					h.logger.Error("failed to delete client ", "id", id, "error", err)
-				}
+				h.terminateContainer(id, nil)
 			}
 			h.lock.Unlock()
 		}
-		time.Sleep(time.Duration(*timeoutCheck) * time.Second)
+		time.Sleep(timeoutCheckDuration)
+	}
+}
+
+func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
+	node, ok := h.nodes[id]
+	delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
+	delete(h.nodesTimeout, id)
+
+	if !ok {
+		h.logger.Error("unknown client deletion requested", "id", id)
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	h.logger.Debug("deleting client container", "id", node.ID[:8])
+	if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
+		h.logger.Error("failed to delete client ", "id", id, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
@@ -338,7 +352,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			fmt.Fprintf(w, "%s", container.ID[:8])
 			h.lock.Lock()
 			h.nodes[container.ID[:8]] = container
-			h.nodesTimeout[container.ID[:8]] = time.Now().Add(time.Duration(*dockerTimeout) * time.Minute)
+			h.nodesTimeout[container.ID[:8]] = time.Now().Add(dockerTimeoutDuration)
 			h.lock.Unlock()
 			return
 
@@ -383,21 +397,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
 
 			h.lock.Lock()
-			node, ok := h.nodes[id]
-			delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
-			delete(h.nodesTimeout, id)
+			h.terminateContainer(id, w)
 			h.lock.Unlock()
-
-			if !ok {
-				logger.Error("unknown client deletion requested", "id", id)
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-			h.logger.Debug("deleting client container", "id", node.ID[:8])
-			if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
-				logger.Error("failed to delete client ", "id", id, "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
 
 		default:
 			http.Error(w, "not found", http.StatusNotFound)

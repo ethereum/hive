@@ -7,6 +7,7 @@ import (
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -27,8 +28,10 @@ var (
 
 	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 
-	dockerTimeout = flag.Int("dockertimeout", 1, "Time to wait for container to finish before stopping it")
-	timeoutCheck  = flag.Int("timeoutcheck", 30, "Seconds to check for timeouts of containers")
+	dockerTimeout         = flag.Int("dockertimeout", 10, "Time to wait for container to finish before stopping it")
+	dockerTimeoutDuration = time.Duration(*dockerTimeout) * time.Minute
+	timeoutCheck          = flag.Int("timeoutcheck", 30, "Seconds to check for timeouts of containers")
+	timeoutCheckDuration  = time.Duration(*timeoutCheck) * time.Second
 )
 
 func main() {
