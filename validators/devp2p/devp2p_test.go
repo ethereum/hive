@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/crypto"
-
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -28,7 +27,7 @@ var (
 func TestMain(m *testing.M) {
 	flag.Parse()
 
-	testTarget := flag.String("enodeTarget", "enode://3f1d12044546b76342d59d4a05532c14b85aa669704bfe1f864fe079415aa2c02d743e03218e57a33fb94523adb54032871a6c51b2cc5514cb7c7e35b3ed0a99@13.93.211.84:30303", "Enode address of target")
+	testTarget := flag.String("enodeTarget", "enode://06051a5573c81934c9554ef2898eb13b33a34b94cf36b202b69fde139ca17a85051979867720d4bdae4323d4943ddf9aeeb6643633aa656e0be843659795007a@35.177.226.168:30303", "Enode address of target")
 	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 	targetnode, err = enode.ParseV4(*testTarget)
 	if err != nil {
@@ -44,22 +43,19 @@ func TestDiscovery(t *testing.T) {
 	// discovery v4 test suites
 	t.Run("discoveryv4", func(t *testing.T) {
 		//setup
-		setupv4UDP()
+		v4udp := setupv4UDP()
 
 		t.Run("ping", func(t *testing.T) {
 
 			//with the use of helper functions
-
 			//.signal that the other hive client should be reset
 			//TODO
 
-			//.get the endpoint of the other hive client
-			//TODO
+			//TODO - set up expectations and check (don't use panic)
+			if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}); err != nil {
+				panic(err)
+			}
 
-			//.generate a ping message and send to the hive client
-			//connect to remote endpoint
-
-			//v4UDP.ping(...)
 		})
 	})
 
