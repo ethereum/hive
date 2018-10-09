@@ -1,0 +1,13 @@
+Run Devp2p tests against TODO
+=== RUN   TestDiscovery
+=== RUN   TestDiscovery/discoveryv4
+=== RUN   TestDiscovery/discoveryv4/ping
+=== RUN   TestDiscovery/discoveryv5
+=== RUN   TestDiscovery/discoveryv5/ping
+--- FAIL: TestDiscovery (5.00s)
+    --- FAIL: TestDiscovery/discoveryv4 (5.00s)
+        --- FAIL: TestDiscovery/discoveryv4/ping (5.00s)
+            devp2p_test.go:56: Unable to v4 ping: RPC timeout
+    --- PASS: TestDiscovery/discoveryv5 (0.00s)
+        --- PASS: TestDiscovery/discoveryv5/ping (0.00s)
+FAIL

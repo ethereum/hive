@@ -53,7 +53,7 @@ func TestDiscovery(t *testing.T) {
 
 			//TODO - set up expectations and check (don't use panic)
 			if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}); err != nil {
-				panic(err)
+				t.Fatalf("Unable to v4 ping: %v", err)
 			}
 
 		})

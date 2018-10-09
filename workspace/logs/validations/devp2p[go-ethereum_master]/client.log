@@ -1,0 +1,31 @@
+Initializing database with genesis state...
+WARN [10-09|14:00:10.654] Sanitizing cache to Go's GC limits       provided=1024 updated=660
+INFO [10-09|14:00:10.656] Maximum peer count                       ETH=25 LES=0 total=25
+INFO [10-09|14:00:10.656] Allocated cache and file handles         database=/root/.ethereum/geth/chaindata cache=16 handles=16
+INFO [10-09|14:00:10.669] Writing custom genesis block 
+INFO [10-09|14:00:10.670] Persisted trie from memory database      nodes=1 size=146.00B time=97µs gcnodes=0 gcsize=0.00B gctime=0s livenodes=1 livesize=0.00B
+INFO [10-09|14:00:10.670] Successfully wrote genesis state         database=chaindata                      hash=f8f013…fe217f
+INFO [10-09|14:00:10.670] Allocated cache and file handles         database=/root/.ethereum/geth/lightchaindata cache=16 handles=16
+INFO [10-09|14:00:10.680] Writing custom genesis block 
+INFO [10-09|14:00:10.680] Persisted trie from memory database      nodes=1 size=146.00B time=138.6µs gcnodes=0 gcsize=0.00B gctime=0s livenodes=1 livesize=0.00B
+INFO [10-09|14:00:10.681] Successfully wrote genesis state         database=lightchaindata                      hash=f8f013…fe217f
+Loading initial blockchain...
+Loading remaining individual blocks...
+Running go-ethereum...
+WARN [10-09|14:00:10.718] Sanitizing cache to Go's GC limits       provided=1024 updated=660
+INFO [10-09|14:00:10.719] Maximum peer count                       ETH=25 LES=0 total=25
+INFO [10-09|14:00:10.719] Starting peer-to-peer node               instance=Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1
+INFO [10-09|14:00:10.719] Allocated cache and file handles         database=/root/.ethereum/geth/chaindata cache=495 handles=1024
+INFO [10-09|14:00:10.738] Initialised chain configuration          config="{ChainID: <nil> Homestead: <nil> DAO: <nil> DAOSupport: false EIP150: <nil> EIP155: <nil> EIP158: <nil> Byzantium: <nil> Constantinople: <nil> Engine: unknown}"
+INFO [10-09|14:00:10.738] Disk storage enabled for ethash caches   dir=/root/.ethereum/geth/ethash count=3
+INFO [10-09|14:00:10.738] Disk storage enabled for ethash DAGs     dir=/root/.ethash               count=2
+INFO [10-09|14:00:10.739] Initialising Ethereum protocol           versions="[63 62]" network=1
+INFO [10-09|14:00:10.739] Loaded most recent local header          number=0 hash=f8f013…fe217f td=131072 age=3y8mo4w
+INFO [10-09|14:00:10.739] Loaded most recent local full block      number=0 hash=f8f013…fe217f td=131072 age=3y8mo4w
+INFO [10-09|14:00:10.739] Loaded most recent local fast block      number=0 hash=f8f013…fe217f td=131072 age=3y8mo4w
+INFO [10-09|14:00:10.740] Regenerated local transaction journal    transactions=0 accounts=0
+INFO [10-09|14:00:10.740] Starting P2P networking 
+INFO [10-09|14:00:10.740] RLPx listener up                         self="enode://1e961495a8aeef0c3ffd3283041cd9b9ed6ddbb7726439c8f541c988614c51a96d89823664031968bef92b236829cfc618f9342749a2bf8f3237ea017771195a@127.0.0.1:30303?discport=0"
+INFO [10-09|14:00:10.742] IPC endpoint opened                      url=/root/.ethereum/geth.ipc
+INFO [10-09|14:00:10.742] HTTP endpoint opened                     url=http://0.0.0.0:8545      cors= vhosts=localhost
+INFO [10-09|14:00:10.743] WebSocket endpoint opened                url=ws://[::]:8546

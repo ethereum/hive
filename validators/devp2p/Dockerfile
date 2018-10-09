@@ -29,5 +29,7 @@ RUN (rm -rf /var/cache/apk/* && rm -rf /go)
 RUN apk add --update bash
 # Add the entry script
 ADD tests.sh /tests.sh
+#mandatory init file
+ADD genesis.json /genesis.json
 
 ENTRYPOINT ["/tests.sh"]
