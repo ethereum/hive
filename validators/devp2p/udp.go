@@ -283,7 +283,7 @@ func (t *V4Udp) close() {
 	close(t.closing)
 	t.conn.Close()
 	//t.db.Close()
-	// TODO: wait for the loops to end.
+
 }
 
 // ping sends a ping message to the given node and waits for a reply.
