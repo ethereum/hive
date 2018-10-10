@@ -29,11 +29,11 @@
 set -e
 
 # It doesn't make sense to dial out, use only a pre-set bootnode
-if [ "$HIVE_BOOTNODE" != "" ]; then
-	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
-else
-	FLAGS="$FLAGS --nodiscover"
-fi
+# if [ "$HIVE_BOOTNODE" != "" ]; then
+# 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
+# else
+# 	FLAGS="$FLAGS --nodiscover"
+# fi
 
 if [ "$HIVE_SKIP_POW" != "" ]; then
 	FLAGS="$FLAGS --fakepow"
@@ -123,4 +123,4 @@ fi
 
 # Run the go-ethereum implementation with the requested flags
 echo "Running go-ethereum..."
-/geth $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
+/geth --verbosity 6 $FLAGS --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"

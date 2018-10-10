@@ -47,7 +47,7 @@ var (
 
 // Timeouts
 const (
-	respTimeout    = 5000 * time.Millisecond //FRANK: testing, should be 500
+	respTimeout    = 500000 * time.Millisecond //FRANK: testing, should be 500
 	expiration     = 20 * time.Second
 	bondExpiration = 24 * time.Hour
 
@@ -300,12 +300,14 @@ func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-
 		To:         makeEndpoint(toaddr, 0), // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
+
 	packet, hash, err := encodePacket(t.priv, pingPacket, req)
 	if err != nil {
 		errc := make(chan error, 1)
 		errc <- err
 		return errc
 	}
+
 	errc := t.pending(toid, pongPacket, func(p interface{}) bool {
 		ok := bytes.Equal(p.(*pong).ReplyTok, hash)
 		if ok && callback != nil {

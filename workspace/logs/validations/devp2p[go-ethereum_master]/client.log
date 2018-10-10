@@ -1,31 +1,634 @@
 Initializing database with genesis state...
-WARN [10-09|14:27:06.956] Sanitizing cache to Go's GC limits       provided=1024 updated=660
-INFO [10-09|14:27:06.957] Maximum peer count                       ETH=25 LES=0 total=25
-INFO [10-09|14:27:06.958] Allocated cache and file handles         database=/root/.ethereum/geth/chaindata cache=16 handles=16
-INFO [10-09|14:27:06.969] Writing custom genesis block 
-INFO [10-09|14:27:06.970] Persisted trie from memory database      nodes=1 size=146.00B time=83.8µs gcnodes=0 gcsize=0.00B gctime=0s livenodes=1 livesize=0.00B
-INFO [10-09|14:27:06.970] Successfully wrote genesis state         database=chaindata                      hash=f8f013…fe217f
-INFO [10-09|14:27:06.970] Allocated cache and file handles         database=/root/.ethereum/geth/lightchaindata cache=16 handles=16
-INFO [10-09|14:27:06.983] Writing custom genesis block 
-INFO [10-09|14:27:06.984] Persisted trie from memory database      nodes=1 size=146.00B time=53.9µs gcnodes=0 gcsize=0.00B gctime=0s livenodes=1 livesize=0.00B
-INFO [10-09|14:27:06.984] Successfully wrote genesis state         database=lightchaindata                      hash=f8f013…fe217f
+WARN [10-10|16:37:17.086] Sanitizing cache to Go's GC limits       provided=1024 updated=660
+INFO [10-10|16:37:17.088] Maximum peer count                       ETH=25 LES=0 total=25
+INFO [10-10|16:37:17.089] Allocated cache and file handles         database=/root/.ethereum/geth/chaindata cache=16 handles=16
+INFO [10-10|16:37:17.100] Writing custom genesis block 
+INFO [10-10|16:37:17.101] Persisted trie from memory database      nodes=1 size=146.00B time=42.6µs gcnodes=0 gcsize=0.00B gctime=0s livenodes=1 livesize=0.00B
+INFO [10-10|16:37:17.101] Successfully wrote genesis state         database=chaindata                      hash=f8f013…fe217f
+INFO [10-10|16:37:17.101] Allocated cache and file handles         database=/root/.ethereum/geth/lightchaindata cache=16 handles=16
+INFO [10-10|16:37:17.112] Writing custom genesis block 
+INFO [10-10|16:37:17.112] Persisted trie from memory database      nodes=1 size=146.00B time=31µs   gcnodes=0 gcsize=0.00B gctime=0s livenodes=1 livesize=0.00B
+INFO [10-10|16:37:17.112] Successfully wrote genesis state         database=lightchaindata                      hash=f8f013…fe217f
 Loading initial blockchain...
 Loading remaining individual blocks...
 Running go-ethereum...
-WARN [10-09|14:27:07.023] Sanitizing cache to Go's GC limits       provided=1024 updated=660
-INFO [10-09|14:27:07.024] Maximum peer count                       ETH=25 LES=0 total=25
-INFO [10-09|14:27:07.025] Starting peer-to-peer node               instance=Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1
-INFO [10-09|14:27:07.025] Allocated cache and file handles         database=/root/.ethereum/geth/chaindata cache=495 handles=1024
-INFO [10-09|14:27:07.043] Initialised chain configuration          config="{ChainID: <nil> Homestead: <nil> DAO: <nil> DAOSupport: false EIP150: <nil> EIP155: <nil> EIP158: <nil> Byzantium: <nil> Constantinople: <nil> Engine: unknown}"
-INFO [10-09|14:27:07.043] Disk storage enabled for ethash caches   dir=/root/.ethereum/geth/ethash count=3
-INFO [10-09|14:27:07.043] Disk storage enabled for ethash DAGs     dir=/root/.ethash               count=2
-INFO [10-09|14:27:07.043] Initialising Ethereum protocol           versions="[63 62]" network=1
-INFO [10-09|14:27:07.043] Loaded most recent local header          number=0 hash=f8f013…fe217f td=131072 age=3y8mo4w
-INFO [10-09|14:27:07.043] Loaded most recent local full block      number=0 hash=f8f013…fe217f td=131072 age=3y8mo4w
-INFO [10-09|14:27:07.043] Loaded most recent local fast block      number=0 hash=f8f013…fe217f td=131072 age=3y8mo4w
-INFO [10-09|14:27:07.044] Regenerated local transaction journal    transactions=0 accounts=0
-INFO [10-09|14:27:07.044] Starting P2P networking 
-INFO [10-09|14:27:07.045] RLPx listener up                         self="enode://02e75929dfb7c27c5cc1a8292d6eeca3c1787d6ceb71ccec03fbc95bdcd2811b66c64690c748e815b9f4ca4e3cbd497b6fe81d0e398ea892bc3a6558093886ea@127.0.0.1:30303?discport=0"
-INFO [10-09|14:27:07.046] IPC endpoint opened                      url=/root/.ethereum/geth.ipc
-INFO [10-09|14:27:07.046] HTTP endpoint opened                     url=http://0.0.0.0:8545      cors= vhosts=localhost
-INFO [10-09|14:27:07.047] WebSocket endpoint opened                url=ws://[::]:8546
+WARN [10-10|16:37:17.149] Sanitizing cache to Go's GC limits       provided=1024 updated=660
+DEBUG[10-10|16:37:17.150] Sanitizing Go's GC trigger               percent=100
+INFO [10-10|16:37:17.150] Maximum peer count                       ETH=25 LES=0 total=25
+TRACE[10-10|16:37:17.151] Started watching keystore folder         path=/root/.ethereum/keystore
+DEBUG[10-10|16:37:17.150] FS scan times                            list=40.1µs set=1.3µs diff=1.5µs
+INFO [10-10|16:37:17.151] Starting peer-to-peer node               instance=Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1
+INFO [10-10|16:37:17.152] Allocated cache and file handles         database=/root/.ethereum/geth/chaindata cache=495 handles=1024
+INFO [10-10|16:37:17.170] Initialised chain configuration          config="{ChainID: <nil> Homestead: <nil> DAO: <nil> DAOSupport: false EIP150: <nil> EIP155: <nil> EIP158: <nil> Byzantium: <nil> Constantinople: <nil> Engine: unknown}"
+INFO [10-10|16:37:17.170] Disk storage enabled for ethash caches   dir=/root/.ethereum/geth/ethash count=3
+INFO [10-10|16:37:17.171] Disk storage enabled for ethash DAGs     dir=/root/.ethash               count=2
+INFO [10-10|16:37:17.171] Initialising Ethereum protocol           versions="[63 62]" network=1
+INFO [10-10|16:37:17.171] Loaded most recent local header          number=0 hash=f8f013…fe217f td=131072 age=3y9mo15h
+INFO [10-10|16:37:17.171] Loaded most recent local full block      number=0 hash=f8f013…fe217f td=131072 age=3y9mo15h
+INFO [10-10|16:37:17.171] Loaded most recent local fast block      number=0 hash=f8f013…fe217f td=131072 age=3y9mo15h
+DEBUG[10-10|16:37:17.172] Reinjecting stale transactions           count=0
+INFO [10-10|16:37:17.172] Regenerated local transaction journal    transactions=0 accounts=0
+DEBUG[10-10|16:37:17.172] Recalculated downloader QoS values       rtt=20s confidence=1.000 ttl=1m0s
+INFO [10-10|16:37:17.172] Starting P2P networking 
+DEBUG[10-10|16:37:17.186] Found seed node in database              id=930cf49cd4de09a6 addr=52.16.188.185:30303 age=427552h37m17.1865501s
+DEBUG[10-10|16:37:17.186] Found seed node in database              id=674085f698115146 addr=13.93.211.84:30303  age=427552h37m17.1867766s
+DEBUG[10-10|16:37:17.187] Found seed node in database              id=009be51d1fc4aa23 addr=191.235.84.50:30303 age=427552h37m17.1870205s
+DEBUG[10-10|16:37:17.187] Found seed node in database              id=816ee7e319567986 addr=13.75.154.138:30303 age=427552h37m17.1870842s
+DEBUG[10-10|16:37:17.187] Found seed node in database              id=3d1edcb0c6a7e329 addr=52.74.57.123:30303  age=427552h37m17.1871076s
+DEBUG[10-10|16:37:17.187] Found seed node in database              id=29cca67d5db0fbb2 addr=5.1.83.226:30303    age=427552h37m17.1871298s
+INFO [10-10|16:37:17.187] UDP listener up                          self=enode://4e48797a4ca8b8927b130d40424300ca688ba2caab376d34e881b979d1ad766a690a3af24ab2cefc1a93b6c0597e3fc5f30603a49b54264483ff2b2c60e6b165@[::]:30303
+DEBUG[10-10|16:37:17.187] InProc registered                        service=&{node:0xc420134280} namespace=admin
+DEBUG[10-10|16:37:17.187] InProc registered                        service=&{node:0xc420134280} namespace=admin
+DEBUG[10-10|16:37:17.188] InProc registered                        service="&{mu:{state:0 sema:0} cpuW:<nil> cpuFile: traceW:<nil> traceFile:}" namespace=debug
+DEBUG[10-10|16:37:17.188] InProc registered                        service=&{node:0xc420134280}                                                 namespace=debug
+DEBUG[10-10|16:37:17.188] InProc registered                        service=&{stack:0xc420134280}                                                namespace=web3
+DEBUG[10-10|16:37:17.188] InProc registered                        service=&{b:0xc42038bcf0}                                                    namespace=eth
+TRACE[10-10|16:37:17.188] New dial task                            task="discovery lookup"
+DEBUG[10-10|16:37:17.188] InProc registered                        service=&{b:0xc42038bcf0}                                                    namespace=eth
+DEBUG[10-10|16:37:17.189] InProc registered                        service="&{b:0xc42038bcf0 nonceLock:0xc42038b670}"                           namespace=eth
+DEBUG[10-10|16:37:17.189] InProc registered                        service=&{b:0xc42038bcf0}                                                    namespace=txpool
+DEBUG[10-10|16:37:17.189] InProc registered                        service=&{b:0xc42038bcf0}                                                    namespace=debug
+DEBUG[10-10|16:37:17.189] InProc registered                        service=&{b:0xc42038bcf0}                                                    namespace=debug
+DEBUG[10-10|16:37:17.189] InProc registered                        service=&{am:0xc4201fb380}                                                   namespace=eth
+DEBUG[10-10|16:37:17.190] InProc registered                        service="&{am:0xc4201fb380 nonceLock:0xc42038b670 b:0xc42038bcf0}"           namespace=personal
+DEBUG[10-10|16:37:17.190] InProc registered                        service=&{ethash:0xc4202ce9a0}                                               namespace=eth
+DEBUG[10-10|16:37:17.190] InProc registered                        service=&{ethash:0xc4202ce9a0}                                               namespace=ethash
+DEBUG[10-10|16:37:17.190] InProc registered                        service=&{e:0xc4202ceb60}                                                    namespace=eth
+DEBUG[10-10|16:37:17.190] InProc registered                        service=&{e:0xc4202ceb60}                                                    namespace=eth
+DEBUG[10-10|16:37:17.190] InProc registered                        service="&{d:0xc4200a6b60 mux:0xc4200932f0 installSyncSubscription:0xc420088ba0 uninstallSyncSubscription:0xc420089740}" namespace=eth
+DEBUG[10-10|16:37:17.190] InProc registered                        service=&{e:0xc4202ceb60}                                                                                                namespace=miner
+DEBUG[10-10|16:37:17.190] InProc registered                        service="&{backend:0xc42038bcf0 mux:0xc4200932f0 quit:<nil> chainDb:0xc4202b7130 events:0xc4203a8c80 filtersMu:{state:0 sema:0} filters:map[]}" namespace=eth
+DEBUG[10-10|16:37:17.190] InProc registered                        service=&{eth:0xc4202ceb60}                                                                                                                     namespace=admin
+DEBUG[10-10|16:37:17.190] InProc registered                        service=&{eth:0xc4202ceb60}                                                                                                                     namespace=debug
+DEBUG[10-10|16:37:17.191] InProc registered                        service="&{config:0xc4201f6180 eth:0xc4202ceb60}"                                                                                               namespace=debug
+DEBUG[10-10|16:37:17.191] InProc registered                        service="&{net:0xc420134a00 networkVersion:1}"                                                                                                  namespace=net
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=admin
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=admin
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=debug
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=debug
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=web3
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=txpool
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=debug
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=debug
+DEBUG[10-10|16:37:17.191] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=personal
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=ethash
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=miner
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=eth
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=admin
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=debug
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=debug
+DEBUG[10-10|16:37:17.192] IPC registered                           namespace=net
+INFO [10-10|16:37:17.192] IPC endpoint opened                      url=/root/.ethereum/geth.ipc
+DEBUG[10-10|16:37:17.192] HTTP registered                          namespace=admin
+DEBUG[10-10|16:37:17.192] HTTP registered                          namespace=admin
+DEBUG[10-10|16:37:17.192] HTTP registered                          namespace=debug
+DEBUG[10-10|16:37:17.192] HTTP registered                          namespace=debug
+DEBUG[10-10|16:37:17.192] HTTP registered                          namespace=web3
+DEBUG[10-10|16:37:17.193] HTTP registered                          namespace=eth
+DEBUG[10-10|16:37:17.193] HTTP registered                          namespace=eth
+DEBUG[10-10|16:37:17.193] HTTP registered                          namespace=eth
+DEBUG[10-10|16:37:17.193] HTTP registered                          namespace=txpool
+DEBUG[10-10|16:37:17.193] HTTP registered                          namespace=debug
+DEBUG[10-10|16:37:17.193] HTTP registered                          namespace=debug
+DEBUG[10-10|16:37:17.193] HTTP registered                          namespace=eth
+DEBUG[10-10|16:37:17.194] HTTP registered                          namespace=personal
+DEBUG[10-10|16:37:17.194] HTTP registered                          namespace=eth
+TRACE[10-10|16:37:17.194] >> PING/v4                               addr=13.93.211.84:30303  err=nil
+DEBUG[10-10|16:37:17.194] HTTP registered                          namespace=eth
+DEBUG[10-10|16:37:17.195] HTTP registered                          namespace=eth
+DEBUG[10-10|16:37:17.195] HTTP registered                          namespace=eth
+DEBUG[10-10|16:37:17.195] HTTP registered                          namespace=miner
+TRACE[10-10|16:37:17.200] >> PING/v4                               addr=13.75.154.138:30303 err=nil
+TRACE[10-10|16:37:17.202] >> PING/v4                               addr=52.16.188.185:30303 err=nil
+INFO [10-10|16:37:17.188] RLPx listener up                         self=enode://4e48797a4ca8b8927b130d40424300ca688ba2caab376d34e881b979d1ad766a690a3af24ab2cefc1a93b6c0597e3fc5f30603a49b54264483ff2b2c60e6b165@[::]:30303
+DEBUG[10-10|16:37:17.188] Found seed node in database              id=930cf49cd4de09a6 addr=52.16.188.185:30303 age=427552h37m17.1885824s
+DEBUG[10-10|16:37:17.202] Found seed node in database              id=674085f698115146 addr=13.93.211.84:30303  age=427552h37m17.2025457s
+DEBUG[10-10|16:37:17.202] Found seed node in database              id=009be51d1fc4aa23 addr=191.235.84.50:30303 age=427552h37m17.2025752s
+DEBUG[10-10|16:37:17.202] Found seed node in database              id=816ee7e319567986 addr=13.75.154.138:30303 age=427552h37m17.2025948s
+DEBUG[10-10|16:37:17.202] Found seed node in database              id=3d1edcb0c6a7e329 addr=52.74.57.123:30303  age=427552h37m17.2026146s
+DEBUG[10-10|16:37:17.202] Found seed node in database              id=29cca67d5db0fbb2 addr=5.1.83.226:30303    age=427552h37m17.202632s
+TRACE[10-10|16:37:17.202] >> PING/v4                               addr=191.235.84.50:30303 err=nil
+TRACE[10-10|16:37:17.203] >> PING/v4                               addr=5.1.83.226:30303    err=nil
+TRACE[10-10|16:37:17.203] >> PING/v4                               addr=52.74.57.123:30303  err=nil
+DEBUG[10-10|16:37:17.203] HTTP registered                          namespace=eth
+DEBUG[10-10|16:37:17.203] HTTP registered                          namespace=admin
+DEBUG[10-10|16:37:17.203] HTTP registered                          namespace=debug
+DEBUG[10-10|16:37:17.203] HTTP registered                          namespace=debug
+DEBUG[10-10|16:37:17.203] HTTP registered                          namespace=net
+INFO [10-10|16:37:17.203] HTTP endpoint opened                     url=http://0.0.0.0:8545      cors= vhosts=localhost
+DEBUG[10-10|16:37:17.203] WebSocket registered                     service=&{node:0xc420134280}                                                                                                                    namespace=admin
+DEBUG[10-10|16:37:17.203] WebSocket registered                     service=&{node:0xc420134280}                                                                                                                    namespace=admin
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service="&{mu:{state:0 sema:0} cpuW:<nil> cpuFile: traceW:<nil> traceFile:}"                                                                    namespace=debug
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{node:0xc420134280}                                                                                                                    namespace=debug
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{stack:0xc420134280}                                                                                                                   namespace=web3
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{b:0xc42038bcf0}                                                                                                                       namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{b:0xc42038bcf0}                                                                                                                       namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service="&{b:0xc42038bcf0 nonceLock:0xc42038b670}"                                                                                              namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{b:0xc42038bcf0}                                                                                                                       namespace=txpool
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{b:0xc42038bcf0}                                                                                                                       namespace=debug
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{b:0xc42038bcf0}                                                                                                                       namespace=debug
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{am:0xc4201fb380}                                                                                                                      namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service="&{am:0xc4201fb380 nonceLock:0xc42038b670 b:0xc42038bcf0}"                                                                              namespace=personal
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{ethash:0xc4202ce9a0}                                                                                                                  namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{e:0xc4202ceb60}                                                                                                                       namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{e:0xc4202ceb60}                                                                                                                       namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service="&{d:0xc4200a6b60 mux:0xc4200932f0 installSyncSubscription:0xc420088ba0 uninstallSyncSubscription:0xc420089740}"                        namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{e:0xc4202ceb60}                                                                                                                       namespace=miner
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service="&{backend:0xc42038bcf0 mux:0xc4200932f0 quit:<nil> chainDb:0xc4202b7130 events:0xc4203a8c80 filtersMu:{state:0 sema:0} filters:map[]}" namespace=eth
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{eth:0xc4202ceb60}                                                                                                                     namespace=admin
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service=&{eth:0xc4202ceb60}                                                                                                                     namespace=debug
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service="&{config:0xc4201f6180 eth:0xc4202ceb60}"                                                                                               namespace=debug
+DEBUG[10-10|16:37:17.204] WebSocket registered                     service="&{net:0xc420134a00 networkVersion:1}"                                                                                                  namespace=net
+DEBUG[10-10|16:37:17.204] Allowed origin(s) for WS RPC interface [*]
+ 
+INFO [10-10|16:37:17.204] WebSocket endpoint opened                url=ws://[::]:8546
+TRACE[10-10|16:37:17.421] >> PONG/v4                               addr=191.235.84.50:30303 err=nil
+TRACE[10-10|16:37:17.423] >> PING/v4                               addr=191.235.84.50:30303 err=nil
+TRACE[10-10|16:37:17.424] << PING/v4                               addr=191.235.84.50:30303 err=nil
+TRACE[10-10|16:37:17.508] >> PONG/v4                               addr=13.75.154.138:30303 err=nil
+TRACE[10-10|16:37:17.510] >> PING/v4                               addr=13.75.154.138:30303 err=nil
+TRACE[10-10|16:37:17.511] << PING/v4                               addr=13.75.154.138:30303 err=nil
+TRACE[10-10|16:37:17.515] >> PONG/v4                               addr=52.74.57.123:30303  err=nil
+TRACE[10-10|16:37:17.517] >> PING/v4                               addr=52.74.57.123:30303  err=nil
+TRACE[10-10|16:37:17.517] << PING/v4                               addr=52.74.57.123:30303  err=nil
+TRACE[10-10|16:37:17.664] << PONG/v4                               addr=191.235.84.50:30303 err=nil
+TRACE[10-10|16:37:17.831] << PONG/v4                               addr=52.74.57.123:30303  err=nil
+TRACE[10-10|16:37:17.844] << PONG/v4                               addr=13.75.154.138:30303 err=nil
+TRACE[10-10|16:37:18.164] >> FINDNODE/v4                           addr=191.235.84.50:30303 err=nil
+TRACE[10-10|16:37:18.198] >> FINDNODE/v4                           addr=13.93.211.84:30303  err=nil
+TRACE[10-10|16:37:18.201] >> FINDNODE/v4                           addr=13.75.154.138:30303 err=nil
+TRACE[10-10|16:37:18.203] >> FINDNODE/v4                           addr=52.16.188.185:30303 err=nil
+TRACE[10-10|16:37:18.203] >> FINDNODE/v4                           addr=5.1.83.226:30303    err=nil
+TRACE[10-10|16:37:18.204] >> FINDNODE/v4                           addr=52.74.57.123:30303  err=nil
+TRACE[10-10|16:37:18.489] << NEIGHBORS/v4                          addr=191.235.84.50:30303 err=nil
+TRACE[10-10|16:37:18.490] << NEIGHBORS/v4                          addr=191.235.84.50:30303 err=nil
+TRACE[10-10|16:37:18.491] >> PING/v4                               addr=150.95.154.81:30303 err=nil
+TRACE[10-10|16:37:18.575] << NEIGHBORS/v4                          addr=52.74.57.123:30303  err="unsolicited reply"
+TRACE[10-10|16:37:18.577] << NEIGHBORS/v4                          addr=52.74.57.123:30303  err="unsolicited reply"
+TRACE[10-10|16:37:18.581] << NEIGHBORS/v4                          addr=13.75.154.138:30303 err=nil
+TRACE[10-10|16:37:18.698] Findnode failed                          id=674085f698115146 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:18.699] >> PING/v4                               addr=5.1.83.226:30303    err=nil
+TRACE[10-10|16:37:18.701] Findnode failed                          id=816ee7e319567986 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:18.702] >> PING/v4                               addr=67.205.152.246:30303 err=nil
+TRACE[10-10|16:37:18.703] Findnode failed                          id=930cf49cd4de09a6 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:18.704] >> PING/v4                               addr=35.240.203.86:30303  err=nil
+TRACE[10-10|16:37:18.704] Findnode failed                          id=29cca67d5db0fbb2 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:18.705] >> PING/v4                               addr=199.247.9.76:30305   err=nil
+TRACE[10-10|16:37:18.705] Findnode failed                          id=3d1edcb0c6a7e329 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:18.706] >> PING/v4                               addr=51.255.87.121:30303  err=nil
+TRACE[10-10|16:37:18.821] << PONG/v4                               addr=199.247.9.76:30305   err=nil
+TRACE[10-10|16:37:18.821] >> PONG/v4                               addr=199.247.9.76:30305   err=nil
+TRACE[10-10|16:37:18.822] >> FINDNODE/v4                           addr=199.247.9.76:30305   err=nil
+TRACE[10-10|16:37:18.822] << PING/v4                               addr=199.247.9.76:30305   err=nil
+TRACE[10-10|16:37:18.823] << PONG/v4                               addr=51.255.87.121:30303  err=nil
+TRACE[10-10|16:37:18.823] >> PONG/v4                               addr=51.255.87.121:30303  err=nil
+TRACE[10-10|16:37:18.824] >> FINDNODE/v4                           addr=51.255.87.121:30303  err=nil
+TRACE[10-10|16:37:18.824] << PING/v4                               addr=51.255.87.121:30303  err=nil
+TRACE[10-10|16:37:18.825] >> PONG/v4                               addr=150.95.154.81:30303  err=nil
+TRACE[10-10|16:37:18.825] >> PING/v4                               addr=150.95.154.81:30303  err=nil
+TRACE[10-10|16:37:18.825] << PING/v4                               addr=150.95.154.81:30303  err=nil
+TRACE[10-10|16:37:18.883] << NEIGHBORS/v4                          addr=199.247.9.76:30305   err=nil
+TRACE[10-10|16:37:18.884] << NEIGHBORS/v4                          addr=51.255.87.121:30303  err=nil
+TRACE[10-10|16:37:19.066] << PONG/v4                               addr=35.240.203.86:30303  err=nil
+TRACE[10-10|16:37:19.134] << PONG/v4                               addr=150.95.154.81:30303  err=nil
+TRACE[10-10|16:37:19.322] Findnode failed                          id=21bd4fdd2d468039 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:19.323] >> PING/v4                               addr=86.107.207.196:30303 err=nil
+TRACE[10-10|16:37:19.324] Findnode failed                          id=2067c3643a63b93a failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:19.325] >> PING/v4                               addr=23.236.115.42:30303  err=nil
+TRACE[10-10|16:37:19.369] >> PONG/v4                               addr=86.107.207.196:30303 err=nil
+TRACE[10-10|16:37:19.369] >> PING/v4                               addr=86.107.207.196:30303 err=nil
+TRACE[10-10|16:37:19.369] << PING/v4                               addr=86.107.207.196:30303 err=nil
+TRACE[10-10|16:37:19.421] << PONG/v4                               addr=86.107.207.196:30303 err=nil
+TRACE[10-10|16:37:19.492] >> FINDNODE/v4                           addr=150.95.154.81:30303  err=nil
+TRACE[10-10|16:37:19.506] >> PONG/v4                               addr=23.236.115.42:30303  err=nil
+TRACE[10-10|16:37:19.506] >> PING/v4                               addr=23.236.115.42:30303  err=nil
+TRACE[10-10|16:37:19.506] << PING/v4                               addr=23.236.115.42:30303  err=nil
+TRACE[10-10|16:37:19.567] >> FINDNODE/v4                           addr=35.240.203.86:30303  err=nil
+TRACE[10-10|16:37:19.682] << PONG/v4                               addr=23.236.115.42:30303  err=nil
+TRACE[10-10|16:37:19.700] >> FINDNODE/v4                           addr=5.1.83.226:30303     err=nil
+TRACE[10-10|16:37:19.703] >> FINDNODE/v4                           addr=67.205.152.246:30303 err=nil
+TRACE[10-10|16:37:19.792] << NEIGHBORS/v4                          addr=150.95.154.81:30303  err=nil
+TRACE[10-10|16:37:19.793] << NEIGHBORS/v4                          addr=150.95.154.81:30303  err=nil
+TRACE[10-10|16:37:19.794] >> PING/v4                               addr=148.72.151.8:27617   err=nil
+TRACE[10-10|16:37:19.865] Invalid neighbor node received           ip=10.0.1.180 addr=67.205.152.246:30303 err="LAN address from WAN host"
+TRACE[10-10|16:37:19.866] << NEIGHBORS/v4                          addr=67.205.152.246:30303 err=nil
+TRACE[10-10|16:37:19.896] << NEIGHBORS/v4                          addr=35.240.203.86:30303  err=nil
+TRACE[10-10|16:37:19.922] >> FINDNODE/v4                           addr=86.107.207.196:30303 err=nil
+TRACE[10-10|16:37:19.931] >> PONG/v4                               addr=148.72.151.8:27617   err=nil
+TRACE[10-10|16:37:19.932] >> PING/v4                               addr=148.72.151.8:27617   err=nil
+TRACE[10-10|16:37:19.932] << PING/v4                               addr=148.72.151.8:27617   err=nil
+TRACE[10-10|16:37:19.967] << NEIGHBORS/v4                          addr=86.107.207.196:30303 err=nil
+TRACE[10-10|16:37:20.067] Findnode failed                          id=c1bb80ce594a9c5f failcount=1 err="RPC timeout"
+DEBUG[10-10|16:37:20.067] IP exceeds bucket limit                  ip=35.240.203.86
+DEBUG[10-10|16:37:20.067] IP exceeds bucket limit                  ip=35.240.203.86
+DEBUG[10-10|16:37:20.067] IP exceeds bucket limit                  ip=35.240.203.86
+DEBUG[10-10|16:37:20.067] IP exceeds bucket limit                  ip=35.240.203.86
+TRACE[10-10|16:37:20.067] >> PING/v4                               addr=35.240.203.86:30303  err=nil
+TRACE[10-10|16:37:20.070] << PONG/v4                               addr=148.72.151.8:27617   err=nil
+TRACE[10-10|16:37:20.182] >> FINDNODE/v4                           addr=23.236.115.42:30303  err=nil
+TRACE[10-10|16:37:20.200] Findnode failed                          id=29cca67d5db0fbb2 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:20.201] >> PING/v4                               addr=35.240.203.86:22843  err=nil
+TRACE[10-10|16:37:20.203] Findnode failed                          id=ca3cdf7dd95b2924 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:20.203] >> PING/v4                               addr=35.240.203.86:30303  err=nil
+TRACE[10-10|16:37:20.358] << NEIGHBORS/v4                          addr=23.236.115.42:30303  err=nil
+TRACE[10-10|16:37:20.395] << PONG/v4                               addr=35.240.203.86:30303  err="unsolicited reply"
+TRACE[10-10|16:37:20.422] Findnode failed                          id=2a3134fd39eef3a4 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:20.422] >> PING/v4                               addr=66.42.66.13:30303    err=nil
+TRACE[10-10|16:37:20.524] << PONG/v4                               addr=35.240.203.86:30303  err="unsolicited reply"
+TRACE[10-10|16:37:20.571] >> FINDNODE/v4                           addr=148.72.151.8:27617   err=nil
+TRACE[10-10|16:37:20.592] << PONG/v4                               addr=66.42.66.13:30303    err=nil
+TRACE[10-10|16:37:20.595] >> PONG/v4                               addr=66.42.66.13:30303    err=nil
+TRACE[10-10|16:37:20.595] << PING/v4                               addr=66.42.66.13:30303    err=nil
+TRACE[10-10|16:37:20.595] >> FINDNODE/v4                           addr=66.42.66.13:30303    err=nil
+TRACE[10-10|16:37:20.683] Findnode failed                          id=2a153c8af28a4618 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:20.684] >> PING/v4                               addr=159.65.75.207:30303  err=nil
+TRACE[10-10|16:37:20.705] << NEIGHBORS/v4                          addr=148.72.151.8:27617   err=nil
+TRACE[10-10|16:37:20.707] << NEIGHBORS/v4                          addr=148.72.151.8:27617   err=nil
+TRACE[10-10|16:37:20.708] >> PING/v4                               addr=159.69.123.83:30323  err=nil
+TRACE[10-10|16:37:20.735] >> PONG/v4                               addr=159.69.123.83:30323  err=nil
+TRACE[10-10|16:37:20.735] >> PING/v4                               addr=159.69.123.83:30323  err=nil
+TRACE[10-10|16:37:20.736] << PING/v4                               addr=159.69.123.83:30323  err=nil
+TRACE[10-10|16:37:20.760] << PONG/v4                               addr=159.69.123.83:30323  err=nil
+TRACE[10-10|16:37:20.776] << NEIGHBORS/v4                          addr=66.42.66.13:30303    err=nil
+TRACE[10-10|16:37:20.896] << PONG/v4                               addr=159.65.75.207:30303  err=nil
+TRACE[10-10|16:37:21.068] >> FINDNODE/v4                           addr=35.240.203.86:30303  err=nil
+TRACE[10-10|16:37:21.096] Findnode failed                          id=29b07bc7d582acb1 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:21.096] >> PING/v4                               addr=45.32.207.41:30305   err=nil
+TRACE[10-10|16:37:21.202] >> FINDNODE/v4                           addr=35.240.203.86:22843  err=nil
+TRACE[10-10|16:37:21.204] >> FINDNODE/v4                           addr=35.240.203.86:30303  err=nil
+TRACE[10-10|16:37:21.246] >> PONG/v4                               addr=45.32.207.41:30305   err=nil
+TRACE[10-10|16:37:21.247] >> PING/v4                               addr=45.32.207.41:30305   err=nil
+TRACE[10-10|16:37:21.247] << PING/v4                               addr=45.32.207.41:30305   err=nil
+TRACE[10-10|16:37:21.261] >> FINDNODE/v4                           addr=159.69.123.83:30323  err=nil
+TRACE[10-10|16:37:21.287] << NEIGHBORS/v4                          addr=159.69.123.83:30323  err=nil
+TRACE[10-10|16:37:21.288] << NEIGHBORS/v4                          addr=159.69.123.83:30323  err=nil
+TRACE[10-10|16:37:21.289] >> PING/v4                               addr=54.88.111.47:30303   err=nil
+TRACE[10-10|16:37:21.394] << NEIGHBORS/v4                          addr=35.240.203.86:30303  err="unsolicited reply"
+TRACE[10-10|16:37:21.395] << PONG/v4                               addr=45.32.207.41:30305   err=nil
+TRACE[10-10|16:37:21.396] >> FINDNODE/v4                           addr=159.65.75.207:30303  err=nil
+TRACE[10-10|16:37:21.526] << NEIGHBORS/v4                          addr=35.240.203.86:30303  err="unsolicited reply"
+TRACE[10-10|16:37:21.527] << NEIGHBORS/v4                          addr=35.240.203.86:30303  err="unsolicited reply"
+TRACE[10-10|16:37:21.569] Findnode failed                          id=e84aced1338d47c3 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:21.569] >> PING/v4                               addr=18.194.184.225:30307 err=nil
+TRACE[10-10|16:37:21.634] << NEIGHBORS/v4                          addr=159.65.75.207:30303  err=nil
+TRACE[10-10|16:37:21.702] Findnode failed                          id=e9b4e8bfd8242372 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:21.702] >> PING/v4                               addr=13.58.39.53:30303    err=nil
+TRACE[10-10|16:37:21.704] Findnode failed                          id=e9bbcd0b8df83439 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:21.705] >> PING/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:21.740] << PONG/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:21.835] << PONG/v4                               addr=13.58.39.53:30303     err=nil
+TRACE[10-10|16:37:21.846] << PONG/v4                               addr=18.194.184.225:30307  err="unsolicited reply"
+TRACE[10-10|16:37:21.896] >> FINDNODE/v4                           addr=45.32.207.41:30305    err=nil
+TRACE[10-10|16:37:21.896] Findnode failed                          id=298ecb86965b2f49 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:21.897] >> PING/v4                               addr=168.63.250.85:30303   err=nil
+TRACE[10-10|16:37:22.046] << NEIGHBORS/v4                          addr=45.32.207.41:30305    err=nil
+TRACE[10-10|16:37:22.241] >> FINDNODE/v4                           addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:22.283] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:22.290] >> FINDNODE/v4                           addr=54.88.111.47:30303    err=nil
+TRACE[10-10|16:37:22.336] >> FINDNODE/v4                           addr=13.58.39.53:30303     err=nil
+TRACE[10-10|16:37:22.396] Findnode failed                          id=29646c3a8176e291 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:22.396] >> PING/v4                               addr=120.79.160.74:40404   err=nil
+TRACE[10-10|16:37:22.488] Invalid neighbor node received           ip=10.0.1.180    addr=13.58.39.53:30303     err="LAN address from WAN host"
+TRACE[10-10|16:37:22.488] << NEIGHBORS/v4                          addr=13.58.39.53:30303     err=nil
+TRACE[10-10|16:37:22.570] >> FINDNODE/v4                           addr=18.194.184.225:30307  err=nil
+TRACE[10-10|16:37:22.585] >> PING/v4                               addr=82.228.231.140:30303  err=nil
+TRACE[10-10|16:37:22.634] >> PONG/v4                               addr=82.228.231.140:30303  err=nil
+TRACE[10-10|16:37:22.635] >> PING/v4                               addr=82.228.231.140:30303  err=nil
+TRACE[10-10|16:37:22.635] << PING/v4                               addr=82.228.231.140:30303  err=nil
+DEBUG[10-10|16:37:22.691] Revalidated node                         b=5 id=297272e2c880955d
+TRACE[10-10|16:37:22.691] << PONG/v4                               addr=82.228.231.140:30303  err=nil
+TRACE[10-10|16:37:22.723] >> PONG/v4                               addr=120.79.160.74:40404   err=nil
+TRACE[10-10|16:37:22.724] >> PING/v4                               addr=120.79.160.74:40404   err=nil
+TRACE[10-10|16:37:22.724] << PING/v4                               addr=120.79.160.74:40404   err=nil
+TRACE[10-10|16:37:22.741] Findnode failed                          id=de4b634d6a79c859 failcount=1 err="RPC timeout"
+DEBUG[10-10|16:37:22.741] IP exceeds bucket limit                  ip=167.114.236.175
+DEBUG[10-10|16:37:22.741] IP exceeds bucket limit                  ip=167.114.236.175
+DEBUG[10-10|16:37:22.741] IP exceeds bucket limit                  ip=167.114.236.175
+DEBUG[10-10|16:37:22.741] IP exceeds bucket limit                  ip=167.114.236.175
+TRACE[10-10|16:37:22.741] >> PING/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:22.775] << PONG/v4                               addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:22.791] Findnode failed                          id=2964bf8a4a779da5 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:22.791] >> PING/v4                               addr=13.124.100.162:30303  err=nil
+TRACE[10-10|16:37:22.792] << NEIGHBORS/v4                          addr=18.194.184.225:30307  err="unsolicited reply"
+TRACE[10-10|16:37:22.836] Findnode failed                          id=c4c4b3196efa0f9d failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:22.837] >> PING/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:22.872] << PONG/v4                               addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:22.898] >> FINDNODE/v4                           addr=168.63.250.85:30303   err=nil
+TRACE[10-10|16:37:23.040] << PONG/v4                               addr=120.79.160.74:40404   err=nil
+TRACE[10-10|16:37:23.070] Findnode failed                          id=c3a8147943bf9773 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:23.071] >> PING/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:23.147] << PONG/v4                               addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:23.397] >> FINDNODE/v4                           addr=120.79.160.74:40404   err=nil
+TRACE[10-10|16:37:23.398] Findnode failed                          id=2968505e9fc5891c failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:23.398] >> FINDNODE/v4                           addr=82.228.231.140:30303  err=nil
+TRACE[10-10|16:37:23.454] << NEIGHBORS/v4                          addr=82.228.231.140:30303  err=nil
+TRACE[10-10|16:37:23.716] << NEIGHBORS/v4                          addr=120.79.160.74:40404   err=nil
+TRACE[10-10|16:37:23.743] >> FINDNODE/v4                           addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:23.793] >> FINDNODE/v4                           addr=13.124.100.162:30303  err=nil
+TRACE[10-10|16:37:23.799] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:23.799] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:23.838] >> FINDNODE/v4                           addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:23.877] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:23.897] Findnode failed                          id=296936b05f8a29fc failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:23.898] >> PING/v4                               addr=217.23.7.171:30303    err=nil
+TRACE[10-10|16:37:23.898] Findnode failed                          id=297272e2c880955d failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:23.899] >> PING/v4                               addr=167.114.185.62:30303  err=nil
+TRACE[10-10|16:37:23.933] >> PONG/v4                               addr=217.23.7.171:30303    err=nil
+TRACE[10-10|16:37:23.934] >> PING/v4                               addr=217.23.7.171:30303    err=nil
+TRACE[10-10|16:37:23.934] << PING/v4                               addr=217.23.7.171:30303    err=nil
+TRACE[10-10|16:37:23.970] << PONG/v4                               addr=217.23.7.171:30303    err=nil
+TRACE[10-10|16:37:24.018] >> PONG/v4                               addr=167.114.185.62:30303  err=nil
+TRACE[10-10|16:37:24.018] >> PING/v4                               addr=167.114.185.62:30303  err=nil
+TRACE[10-10|16:37:24.018] << PING/v4                               addr=167.114.185.62:30303  err=nil
+TRACE[10-10|16:37:24.072] >> FINDNODE/v4                           addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:24.115] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:24.116] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:24.137] << PONG/v4                               addr=167.114.185.62:30303  err=nil
+TRACE[10-10|16:37:24.243] Findnode failed                          id=e8d9b44ca1ba3bd9 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:24.244] >> PING/v4                               addr=184.73.138.220:30303  err=nil
+TRACE[10-10|16:37:24.293] Findnode failed                          id=296efaeae10c89ac failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:24.293] >> PING/v4                               addr=18.188.65.230:30303   err=nil
+TRACE[10-10|16:37:24.338] Findnode failed                          id=e822639e456286b8 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:24.338] >> PING/v4                               addr=71.105.137.13:30303   err=nil
+TRACE[10-10|16:37:24.389] << PONG/v4                               addr=184.73.138.220:30303  err="unsolicited reply"
+TRACE[10-10|16:37:24.471] >> FINDNODE/v4                           addr=217.23.7.171:30303    err=nil
+TRACE[10-10|16:37:24.505] << NEIGHBORS/v4                          addr=217.23.7.171:30303    err=nil
+TRACE[10-10|16:37:24.572] Findnode failed                          id=e803ab6c85c91de6 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:24.900] >> FINDNODE/v4                           addr=167.114.185.62:30303  err=nil
+TRACE[10-10|16:37:24.971] Findnode failed                          id=29776e5a25a8d4f8 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:24.971] >> PING/v4                               addr=113.161.58.67:65247   err=nil
+TRACE[10-10|16:37:25.022] << NEIGHBORS/v4                          addr=167.114.185.62:30303  err=nil
+TRACE[10-10|16:37:25.245] >> FINDNODE/v4                           addr=184.73.138.220:30303  err=nil
+TRACE[10-10|16:37:25.294] >> FINDNODE/v4                           addr=18.188.65.230:30303   err=nil
+TRACE[10-10|16:37:25.339] >> FINDNODE/v4                           addr=71.105.137.13:30303   err=nil
+TRACE[10-10|16:37:25.372] << NEIGHBORS/v4                          addr=184.73.138.220:30303  err="unsolicited reply"
+TRACE[10-10|16:37:25.400] Findnode failed                          id=297bea0d70b8841f failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:25.401] >> PING/v4                               addr=34.233.108.126:55891  err=nil
+TRACE[10-10|16:37:25.746] Findnode failed                          id=67ecd45a7dc8fe80 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:25.795] Findnode failed                          id=297ba3f5af03cce2 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:25.797] >> PING/v4                               addr=35.240.180.18:30303   err=nil
+TRACE[10-10|16:37:25.839] Findnode failed                          id=41e4173899b1bde2 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:25.839] Dial task done                           task="discovery lookup (16 results)"
+TRACE[10-10|16:37:25.839] New dial task                            task="dyndial e8d9b44ca1ba3bd9 167.114.236.175:30303"
+TRACE[10-10|16:37:25.840] New dial task                            task="dyndial e822639e456286b8 167.114.236.175:30303"
+TRACE[10-10|16:37:25.840] New dial task                            task="dyndial e803ab6c85c91de6 167.114.236.175:30303"
+TRACE[10-10|16:37:25.840] New dial task                            task="dyndial e84aced1338d47c3 35.240.203.86:30303"
+TRACE[10-10|16:37:25.840] New dial task                            task="dyndial e9b4e8bfd8242372 35.240.203.86:30303"
+TRACE[10-10|16:37:25.840] New dial task                            task="dyndial e9bbcd0b8df83439 35.240.203.86:30303"
+TRACE[10-10|16:37:25.840] New dial task                            task="dyndial ca3cdf7dd95b2924 67.205.152.246:30303"
+TRACE[10-10|16:37:25.840] New dial task                            task="dyndial c1bb80ce594a9c5f 35.240.203.86:30303"
+TRACE[10-10|16:37:25.947] Failed RLPx handshake                    addr=167.114.236.175:30303 conn=dyndial err=EOF
+TRACE[10-10|16:37:25.948] Setting up connection failed             addr=167.114.236.175:30303 err=EOF
+TRACE[10-10|16:37:25.948] Dial error                               task="dyndial e8d9b44ca1ba3bd9 167.114.236.175:30303" err=EOF
+TRACE[10-10|16:37:25.948] Dial task done                           task="dyndial e8d9b44ca1ba3bd9 167.114.236.175:30303"
+TRACE[10-10|16:37:25.948] New dial task                            task="dyndial c3a8147943bf9773 18.194.184.225:30307"
+TRACE[10-10|16:37:25.952] Failed RLPx handshake                    addr=167.114.236.175:30303 conn=dyndial err=EOF
+TRACE[10-10|16:37:25.952] Setting up connection failed             addr=167.114.236.175:30303 err=EOF
+TRACE[10-10|16:37:25.952] Dial error                               task="dyndial e822639e456286b8 167.114.236.175:30303" err=EOF
+TRACE[10-10|16:37:25.952] Failed RLPx handshake                    addr=167.114.236.175:30303 conn=dyndial err=EOF
+TRACE[10-10|16:37:25.952] Setting up connection failed             addr=167.114.236.175:30303 err=EOF
+TRACE[10-10|16:37:25.952] Dial error                               task="dyndial e803ab6c85c91de6 167.114.236.175:30303" err=EOF
+TRACE[10-10|16:37:25.952] Dial task done                           task="dyndial e822639e456286b8 167.114.236.175:30303"
+TRACE[10-10|16:37:25.952] New dial task                            task="dyndial c4c4b3196efa0f9d 13.58.39.53:30303"
+TRACE[10-10|16:37:25.953] Dial task done                           task="dyndial e803ab6c85c91de6 167.114.236.175:30303"
+TRACE[10-10|16:37:25.953] New dial task                            task="dyndial de4b634d6a79c859 167.114.236.175:30303"
+TRACE[10-10|16:37:25.972] >> FINDNODE/v4                           addr=113.161.58.67:65247   err=nil
+TRACE[10-10|16:37:26.031] Failed RLPx handshake                    addr=18.194.184.225:30307  conn=dyndial err=EOF
+TRACE[10-10|16:37:26.031] Setting up connection failed             addr=18.194.184.225:30307  err=EOF
+TRACE[10-10|16:37:26.031] Dial error                               task="dyndial c3a8147943bf9773 18.194.184.225:30307"  err=EOF
+TRACE[10-10|16:37:26.031] Dial task done                           task="dyndial c3a8147943bf9773 18.194.184.225:30307"
+TRACE[10-10|16:37:26.031] New dial task                            task="dyndial 816ee7e319567986 13.75.154.138:30303"
+DEBUG[10-10|16:37:26.105] Adding p2p peer                          name=Parity-Ethereum/v2.0... addr=167.114.236.175:30303 peers=1
+TRACE[10-10|16:37:26.105] connection set up                        id=de4b634d6a79c859 addr=167.114.236.175:30303 conn=dyndial inbound=false
+TRACE[10-10|16:37:26.105] Dial task done                           task="dyndial de4b634d6a79c859 167.114.236.175:30303"
+TRACE[10-10|16:37:26.105] Starting protocol eth/63                 id=de4b634d6a79c859 conn=dyndial
+DEBUG[10-10|16:37:26.105] Ethereum peer connected                  id=de4b634d6a79c859 conn=dyndial name=Parity-Ethereum/v2.0.1-beta-e7dc0be-20180726/x86_64-linux-gnu/rustc1.28.0
+DEBUG[10-10|16:37:26.110] Ethereum handshake failed                id=de4b634d6a79c859 conn=dyndial err=EOF
+DEBUG[10-10|16:37:26.110] Removing p2p peer                        id=de4b634d6a79c859 conn=dyndial duration=4.986ms peers=0 req=true err="too many peers"
+TRACE[10-10|16:37:26.110] New dial task                            task="dyndial 930cf49cd4de09a6 52.16.188.185:30303"
+TRACE[10-10|16:37:26.122] << PONG/v4                               addr=35.240.180.18:30303   err=nil
+TRACE[10-10|16:37:26.250] Failed proto handshake                   id=930cf49cd4de09a6 addr=52.16.188.185:30303   conn=dyndial err="too many peers"
+TRACE[10-10|16:37:26.250] Setting up connection failed             addr=52.16.188.185:30303   err="too many peers"
+TRACE[10-10|16:37:26.250] Dial error                               task="dyndial 930cf49cd4de09a6 52.16.188.185:30303"   err="too many peers"
+TRACE[10-10|16:37:26.250] Dial task done                           task="dyndial 930cf49cd4de09a6 52.16.188.185:30303"
+TRACE[10-10|16:37:26.250] New dial task                            task="dyndial 67ecd45a7dc8fe80 184.73.138.220:30303"
+DEBUG[10-10|16:37:26.288] Adding p2p peer                          name=Parity/v1.11.3-beta-...                                                   addr=67.205.152.246:30303  peers=1
+TRACE[10-10|16:37:26.288] connection set up                        id=ca3cdf7dd95b2924 addr=67.205.152.246:30303  conn=dyndial inbound=false
+TRACE[10-10|16:37:26.288] Dial task done                           task="dyndial ca3cdf7dd95b2924 67.205.152.246:30303"
+TRACE[10-10|16:37:26.288] Starting protocol eth/63                 id=ca3cdf7dd95b2924 conn=dyndial
+DEBUG[10-10|16:37:26.289] Ethereum peer connected                  id=ca3cdf7dd95b2924 conn=dyndial name=Parity/v1.11.3-beta-a66e36b-20180605/x86_64-linux-gnu/rustc1.26.1
+DEBUG[10-10|16:37:26.301] Ethereum handshake failed                id=ca3cdf7dd95b2924 conn=dyndial err=EOF
+DEBUG[10-10|16:37:26.301] Removing p2p peer                        id=ca3cdf7dd95b2924 conn=dyndial duration=13.012ms peers=0 req=false err=EOF
+TRACE[10-10|16:37:26.302] New dial task                            task="dyndial 674085f698115146 13.93.211.84:30303"
+DEBUG[10-10|16:37:26.358] Adding p2p peer                          name=Parity/v1.11.7-stabl...                                                   addr=13.58.39.53:30303     peers=1
+TRACE[10-10|16:37:26.358] connection set up                        id=c4c4b3196efa0f9d addr=13.58.39.53:30303     conn=dyndial inbound=false
+TRACE[10-10|16:37:26.358] Dial task done                           task="dyndial c4c4b3196efa0f9d 13.58.39.53:30303"
+TRACE[10-10|16:37:26.358] Starting protocol eth/63                 id=c4c4b3196efa0f9d conn=dyndial
+DEBUG[10-10|16:37:26.359] Ethereum peer connected                  id=c4c4b3196efa0f9d conn=dyndial name=Parity/v1.11.7-stable-085035f-20180717/x86_64-linux-gnu/rustc1.27.1
+DEBUG[10-10|16:37:26.360] Ethereum handshake failed                id=c4c4b3196efa0f9d conn=dyndial err=EOF
+DEBUG[10-10|16:37:26.361] Removing p2p peer                        id=c4c4b3196efa0f9d conn=dyndial duration=2.306ms  peers=0 req=false err=EOF
+TRACE[10-10|16:37:26.361] New dial task                            task="dyndial 41e4173899b1bde2 71.105.137.13:30303"
+TRACE[10-10|16:37:26.402] >> FINDNODE/v4                           addr=34.233.108.126:55891  err=nil
+TRACE[10-10|16:37:26.472] Findnode failed                          id=297c8bfb03436152 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:26.472] >> PING/v4                               addr=63.98.63.242:53761    err=nil
+TRACE[10-10|16:37:26.484] Failed RLPx handshake                    addr=35.240.203.86:30303   conn=dyndial err=EOF
+TRACE[10-10|16:37:26.484] Setting up connection failed             addr=35.240.203.86:30303   err=EOF
+TRACE[10-10|16:37:26.484] Dial error                               task="dyndial e84aced1338d47c3 35.240.203.86:30303"   err=EOF
+TRACE[10-10|16:37:26.484] Dial task done                           task="dyndial e84aced1338d47c3 35.240.203.86:30303"
+TRACE[10-10|16:37:26.484] New dial task                            task="discovery lookup"
+TRACE[10-10|16:37:26.484] >> PING/v4                               addr=67.205.152.246:30303  err=nil
+TRACE[10-10|16:37:26.485] >> FINDNODE/v4                           addr=13.75.154.138:30303   err=nil
+TRACE[10-10|16:37:26.485] >> PING/v4                               addr=52.16.188.185:30303   err=nil
+TRACE[10-10|16:37:26.507] Failed RLPx handshake                    addr=35.240.203.86:30303   conn=dyndial err=EOF
+TRACE[10-10|16:37:26.507] Setting up connection failed             addr=35.240.203.86:30303   err=EOF
+TRACE[10-10|16:37:26.507] Dial error                               task="dyndial e9bbcd0b8df83439 35.240.203.86:30303"   err=EOF
+TRACE[10-10|16:37:26.507] Dial task done                           task="dyndial e9bbcd0b8df83439 35.240.203.86:30303"
+TRACE[10-10|16:37:26.507] Failed RLPx handshake                    addr=35.240.203.86:30303   conn=dyndial err=EOF
+TRACE[10-10|16:37:26.508] Setting up connection failed             addr=35.240.203.86:30303   err=EOF
+TRACE[10-10|16:37:26.508] Dial error                               task="dyndial e9b4e8bfd8242372 35.240.203.86:30303"   err=EOF
+TRACE[10-10|16:37:26.508] Dial task done                           task="dyndial e9b4e8bfd8242372 35.240.203.86:30303"
+TRACE[10-10|16:37:26.521] Failed RLPx handshake                    addr=184.73.138.220:30303  conn=dyndial err=EOF
+TRACE[10-10|16:37:26.521] Setting up connection failed             addr=184.73.138.220:30303  err=EOF
+TRACE[10-10|16:37:26.521] Dial error                               task="dyndial 67ecd45a7dc8fe80 184.73.138.220:30303"  err=EOF
+TRACE[10-10|16:37:26.521] Dial task done                           task="dyndial 67ecd45a7dc8fe80 184.73.138.220:30303"
+TRACE[10-10|16:37:26.615] << PONG/v4                               addr=67.205.152.246:30303  err=nil
+TRACE[10-10|16:37:26.623] >> FINDNODE/v4                           addr=35.240.180.18:30303   err=nil
+TRACE[10-10|16:37:26.676] Failed proto handshake                   id=816ee7e319567986 addr=13.75.154.138:30303   conn=dyndial err="too many peers"
+TRACE[10-10|16:37:26.676] Setting up connection failed             addr=13.75.154.138:30303   err="too many peers"
+TRACE[10-10|16:37:26.676] Dial error                               task="dyndial 816ee7e319567986 13.75.154.138:30303"   err="too many peers"
+TRACE[10-10|16:37:26.676] Dial task done                           task="dyndial 816ee7e319567986 13.75.154.138:30303"
+TRACE[10-10|16:37:26.815] << NEIGHBORS/v4                          addr=13.75.154.138:30303   err=nil
+DEBUG[10-10|16:37:26.845] Adding p2p peer                          name=Parity-Ethereum/v2.0...                                                   addr=35.240.203.86:30303   peers=1
+TRACE[10-10|16:37:26.846] connection set up                        id=c1bb80ce594a9c5f addr=35.240.203.86:30303   conn=dyndial inbound=false
+TRACE[10-10|16:37:26.846] Dial task done                           task="dyndial c1bb80ce594a9c5f 35.240.203.86:30303"
+TRACE[10-10|16:37:26.846] Starting protocol eth/63                 id=c1bb80ce594a9c5f conn=dyndial
+DEBUG[10-10|16:37:26.846] Ethereum peer connected                  id=c1bb80ce594a9c5f conn=dyndial name=Parity-Ethereum/v2.0.0-beta-6eae372-20180717/x86_64-linux-gnu/rustc1.27.1
+DEBUG[10-10|16:37:26.849] Ethereum handshake failed                id=c1bb80ce594a9c5f conn=dyndial err=EOF
+DEBUG[10-10|16:37:26.849] Removing p2p peer                        id=c1bb80ce594a9c5f conn=dyndial duration=4.390ms  peers=0 req=false err=EOF
+TRACE[10-10|16:37:26.902] Findnode failed                          id=29406d4a2b00b84f failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:26.903] >> PING/v4                               addr=160.16.96.185:30303   err=nil
+TRACE[10-10|16:37:26.951] << NEIGHBORS/v4                          addr=35.240.180.18:30303   err=nil
+TRACE[10-10|16:37:26.985] Findnode failed                          id=816ee7e319567986 failcount=2 err="RPC timeout"
+TRACE[10-10|16:37:26.986] >> PING/v4                               addr=95.216.18.200:58438   err=nil
+TRACE[10-10|16:37:27.115] >> FINDNODE/v4                           addr=67.205.152.246:30303  err=nil
+TRACE[10-10|16:37:27.123] Findnode failed                          id=294584437b7aba95 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:27.272] << NEIGHBORS/v4                          addr=67.205.152.246:30303  err=nil
+TRACE[10-10|16:37:27.474] >> FINDNODE/v4                           addr=63.98.63.242:53761    err=nil
+TRACE[10-10|16:37:27.486] >> FINDNODE/v4                           addr=52.16.188.185:30303   err=nil
+TRACE[10-10|16:37:27.615] Findnode failed                          id=ca3cdf7dd95b2924 failcount=2 err="RPC timeout"
+TRACE[10-10|16:37:27.616] >> PING/v4                               addr=198.211.118.34:30303  err=nil
+TRACE[10-10|16:37:27.727] << PONG/v4                               addr=198.211.118.34:30303  err="unsolicited reply"
+TRACE[10-10|16:37:27.863] Dial error                               task="dyndial 674085f698115146 13.93.211.84:30303"    err="dial tcp 13.93.211.84:30303: connect: connection refused"
+TRACE[10-10|16:37:27.863] Dial task done                           task="dyndial 674085f698115146 13.93.211.84:30303"
+TRACE[10-10|16:37:27.904] >> FINDNODE/v4                           addr=160.16.96.185:30303   err=nil
+TRACE[10-10|16:37:27.974] Findnode failed                          id=29495d272f25a6c8 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:27.986] Findnode failed                          id=930cf49cd4de09a6 failcount=2 err="RPC timeout"
+TRACE[10-10|16:37:27.986] >> PING/v4                               addr=40.78.44.195:30303    err=nil
+TRACE[10-10|16:37:27.987] >> FINDNODE/v4                           addr=95.216.18.200:58438   err=nil
+TRACE[10-10|16:37:28.168] >> PONG/v4                               addr=40.78.44.195:30303    err=nil
+TRACE[10-10|16:37:28.168] >> PING/v4                               addr=40.78.44.195:30303    err=nil
+TRACE[10-10|16:37:28.168] << PING/v4                               addr=40.78.44.195:30303    err=nil
+TRACE[10-10|16:37:28.358] << PONG/v4                               addr=40.78.44.195:30303    err=nil
+TRACE[10-10|16:37:28.404] Findnode failed                          id=294be00efc6e6ccd failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:28.406] >> PING/v4                               addr=13.58.39.53:30303     err=nil
+TRACE[10-10|16:37:28.407] >> PING/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:28.407] >> PING/v4                               addr=67.205.152.246:30303  err=nil
+TRACE[10-10|16:37:28.457] << PONG/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:28.487] Findnode failed                          id=88490908f8bcaa6c failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:28.488] >> PING/v4                               addr=145.239.7.226:30303   err=nil
+TRACE[10-10|16:37:28.547] << PONG/v4                               addr=13.58.39.53:30303     err=nil
+TRACE[10-10|16:37:28.558] << PONG/v4                               addr=67.205.152.246:30303  err=nil
+TRACE[10-10|16:37:28.574] << PONG/v4                               addr=145.239.7.226:30303   err=nil
+TRACE[10-10|16:37:28.617] >> FINDNODE/v4                           addr=198.211.118.34:30303  err=nil
+TRACE[10-10|16:37:28.804] << NEIGHBORS/v4                          addr=198.211.118.34:30303  err="unsolicited reply"
+TRACE[10-10|16:37:28.957] >> FINDNODE/v4                           addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:28.988] >> FINDNODE/v4                           addr=40.78.44.195:30303    err=nil
+TRACE[10-10|16:37:28.993] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:29.047] >> FINDNODE/v4                           addr=13.58.39.53:30303     err=nil
+TRACE[10-10|16:37:29.059] >> FINDNODE/v4                           addr=67.205.152.246:30303  err=nil
+TRACE[10-10|16:37:29.074] >> FINDNODE/v4                           addr=145.239.7.226:30303   err=nil
+TRACE[10-10|16:37:29.117] Findnode failed                          id=8c6879c534554e83 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:29.117] >> PING/v4                               addr=185.86.80.68:30388    err=nil
+TRACE[10-10|16:37:29.205] << NEIGHBORS/v4                          addr=40.78.44.195:30303    err=nil
+TRACE[10-10|16:37:29.205] Invalid neighbor node received           ip=10.10.249.90    addr=145.239.7.226:30303   err="LAN address from WAN host"
+TRACE[10-10|16:37:29.207] << NEIGHBORS/v4                          addr=145.239.7.226:30303   err=nil
+TRACE[10-10|16:37:29.207] Invalid neighbor node received           ip=10.0.7.69       addr=145.239.7.226:30303   err="LAN address from WAN host"
+TRACE[10-10|16:37:29.207] << NEIGHBORS/v4                          addr=145.239.7.226:30303   err=nil
+TRACE[10-10|16:37:29.208] >> PING/v4                               addr=13.251.66.118:30303   err=nil
+TRACE[10-10|16:37:29.208] >> PONG/v4                               addr=185.86.80.68:30388    err=nil
+TRACE[10-10|16:37:29.208] >> PING/v4                               addr=185.86.80.68:30388    err=nil
+TRACE[10-10|16:37:29.208] << PING/v4                               addr=185.86.80.68:30388    err=nil
+TRACE[10-10|16:37:29.218] << NEIGHBORS/v4                          addr=13.58.39.53:30303     err=nil
+TRACE[10-10|16:37:29.239] Invalid neighbor node received           ip=10.0.2.15       addr=67.205.152.246:30303  err="LAN address from WAN host"
+TRACE[10-10|16:37:29.239] << NEIGHBORS/v4                          addr=67.205.152.246:30303  err=nil
+TRACE[10-10|16:37:29.283] << PONG/v4                               addr=185.86.80.68:30388    err=nil
+TRACE[10-10|16:37:29.457] Findnode failed                          id=de4b634d6a79c859 failcount=2 err="RPC timeout"
+DEBUG[10-10|16:37:29.457] IP exceeds bucket limit                  ip=167.114.236.175
+DEBUG[10-10|16:37:29.457] IP exceeds bucket limit                  ip=167.114.236.175
+DEBUG[10-10|16:37:29.457] IP exceeds bucket limit                  ip=167.114.236.175
+TRACE[10-10|16:37:29.458] >> PING/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:29.488] Findnode failed                          id=89a5a27925a52f5e failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:29.488] >> PING/v4                               addr=195.201.200.84:30303  err=nil
+TRACE[10-10|16:37:29.492] << PONG/v4                               addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:29.497] << PONG/v4                               addr=13.251.66.118:30303   err=nil
+TRACE[10-10|16:37:29.559] Findnode failed                          id=c4c4b3196efa0f9d failcount=2 err="RPC timeout"
+TRACE[10-10|16:37:29.559] Findnode failed                          id=ca3cdf7dd95b2924 failcount=3 err="RPC timeout"
+TRACE[10-10|16:37:29.559] >> PING/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:29.559] << PONG/v4                               addr=195.201.200.84:30303  err=nil
+TRACE[10-10|16:37:29.559] >> PING/v4                               addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:29.560] >> PONG/v4                               addr=195.201.200.84:30303  err=nil
+TRACE[10-10|16:37:29.560] << PING/v4                               addr=195.201.200.84:30303  err=nil
+TRACE[10-10|16:37:29.560] >> FINDNODE/v4                           addr=195.201.200.84:30303  err=nil
+TRACE[10-10|16:37:29.586] << NEIGHBORS/v4                          addr=195.201.200.84:30303  err=nil
+TRACE[10-10|16:37:29.595] << PONG/v4                               addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:29.599] << PONG/v4                               addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:29.784] >> FINDNODE/v4                           addr=185.86.80.68:30388    err=nil
+TRACE[10-10|16:37:29.855] << NEIGHBORS/v4                          addr=185.86.80.68:30388    err=nil
+TRACE[10-10|16:37:29.858] << NEIGHBORS/v4                          addr=185.86.80.68:30388    err=nil
+TRACE[10-10|16:37:29.858] >> PING/v4                               addr=206.189.23.223:30303  err=nil
+TRACE[10-10|16:37:29.904] >> PONG/v4                               addr=206.189.23.223:30303  err=nil
+TRACE[10-10|16:37:29.906] >> PING/v4                               addr=206.189.23.223:30303  err=nil
+TRACE[10-10|16:37:29.906] << PING/v4                               addr=206.189.23.223:30303  err=nil
+TRACE[10-10|16:37:29.955] << PONG/v4                               addr=206.189.23.223:30303  err=nil
+TRACE[10-10|16:37:29.997] >> FINDNODE/v4                           addr=13.251.66.118:30303   err=nil
+TRACE[10-10|16:37:30.061] Findnode failed                          id=8fd3095e4d5de235 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:30.062] >> PING/v4                               addr=45.77.201.38:30303    err=nil
+TRACE[10-10|16:37:30.188] >> PONG/v4                               addr=45.77.201.38:30303    err=nil
+TRACE[10-10|16:37:30.189] >> PING/v4                               addr=45.77.201.38:30303    err=nil
+TRACE[10-10|16:37:30.189] << PING/v4                               addr=45.77.201.38:30303    err=nil
+TRACE[10-10|16:37:30.287] << NEIGHBORS/v4                          addr=13.251.66.118:30303   err=nil
+TRACE[10-10|16:37:30.314] << PONG/v4                               addr=45.77.201.38:30303    err=nil
+TRACE[10-10|16:37:30.337] >> PING/v4                               addr=51.140.159.107:30303  err=nil
+TRACE[10-10|16:37:30.379] >> PONG/v4                               addr=51.140.159.107:30303  err=nil
+TRACE[10-10|16:37:30.381] >> PING/v4                               addr=51.140.159.107:30303  err=nil
+TRACE[10-10|16:37:30.382] << PING/v4                               addr=51.140.159.107:30303  err=nil
+DEBUG[10-10|16:37:30.428] Revalidated node                         b=7 id=290cbefd010caa50
+TRACE[10-10|16:37:30.428] << PONG/v4                               addr=51.140.159.107:30303  err=nil
+TRACE[10-10|16:37:30.455] >> FINDNODE/v4                           addr=206.189.23.223:30303  err=nil
+TRACE[10-10|16:37:30.459] >> FINDNODE/v4                           addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:30.497] Findnode failed                          id=8ec6db3fbbf48236 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:30.498] >> PING/v4                               addr=13.229.150.200:30303  err=nil
+TRACE[10-10|16:37:30.501] << NEIGHBORS/v4                          addr=206.189.23.223:30303  err=nil
+TRACE[10-10|16:37:30.502] << NEIGHBORS/v4                          addr=206.189.23.223:30303  err=nil
+TRACE[10-10|16:37:30.503] >> PING/v4                               addr=209.250.238.69:30303  err=nil
+TRACE[10-10|16:37:30.513] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:30.528] >> PONG/v4                               addr=209.250.238.69:30303  err=nil
+TRACE[10-10|16:37:30.529] >> PING/v4                               addr=209.250.238.69:30303  err=nil
+TRACE[10-10|16:37:30.529] << PING/v4                               addr=209.250.238.69:30303  err=nil
+TRACE[10-10|16:37:30.556] << PONG/v4                               addr=209.250.238.69:30303  err=nil
+TRACE[10-10|16:37:30.560] >> FINDNODE/v4                           addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:30.560] >> FINDNODE/v4                           addr=167.114.236.175:30303 err=nil
+TRACE[10-10|16:37:30.600] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:30.602] << NEIGHBORS/v4                          addr=167.114.236.175:30303 err="unsolicited reply"
+TRACE[10-10|16:37:30.815] >> FINDNODE/v4                           addr=45.77.201.38:30303    err=nil
+TRACE[10-10|16:37:30.936] << NEIGHBORS/v4                          addr=45.77.201.38:30303    err=nil
+TRACE[10-10|16:37:30.959] Findnode failed                          id=ddbd4374c0c35433 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:30.961] >> PING/v4                               addr=35.240.203.86:30303   err=nil
+TRACE[10-10|16:37:31.056] >> FINDNODE/v4                           addr=209.250.238.69:30303  err=nil
+TRACE[10-10|16:37:31.060] Findnode failed                          id=dd895a5255852bf0 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:31.061] >> PING/v4                               addr=18.194.184.225:30307  err=nil
+TRACE[10-10|16:37:31.061] Findnode failed                          id=dd934ed5d2a22806 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:31.061] >> PING/v4                               addr=178.128.201.62:30300  err=nil
+TRACE[10-10|16:37:31.080] Invalid neighbor node received           ip=73.4.32.78      addr=209.250.238.69:30303  err="low port"
+TRACE[10-10|16:37:31.081] << NEIGHBORS/v4                          addr=209.250.238.69:30303  err=nil
+TRACE[10-10|16:37:31.083] << NEIGHBORS/v4                          addr=209.250.238.69:30303  err=nil
+TRACE[10-10|16:37:31.083] >> PING/v4                               addr=188.166.4.188:30303   err=nil
+TRACE[10-10|16:37:31.119] >> PONG/v4                               addr=188.166.4.188:30303   err=nil
+TRACE[10-10|16:37:31.120] >> PING/v4                               addr=188.166.4.188:30303   err=nil
+TRACE[10-10|16:37:31.120] << PING/v4                               addr=188.166.4.188:30303   err=nil
+TRACE[10-10|16:37:31.126] << PONG/v4                               addr=178.128.201.62:30300  err="unsolicited reply"
+TRACE[10-10|16:37:31.160] << PONG/v4                               addr=188.166.4.188:30303   err=nil
+TRACE[10-10|16:37:31.315] Findnode failed                          id=8e926a0eb0283780 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:31.318] >> PING/v4                               addr=13.79.32.232:30424    err=nil
+TRACE[10-10|16:37:31.320] << PONG/v4                               addr=35.240.203.86:30303   err=nil
+TRACE[10-10|16:37:31.377] >> PONG/v4                               addr=13.79.32.232:30424    err=nil
+TRACE[10-10|16:37:31.378] >> PING/v4                               addr=13.79.32.232:30424    err=nil
+TRACE[10-10|16:37:31.378] << PING/v4                               addr=13.79.32.232:30424    err=nil
+TRACE[10-10|16:37:31.429] << PONG/v4                               addr=13.79.32.232:30424    err=nil
+TRACE[10-10|16:37:31.499] >> FINDNODE/v4                           addr=13.229.150.200:30303  err=nil
+TRACE[10-10|16:37:31.522] << PONG/v4                               addr=18.194.184.225:30307  err="unsolicited reply"
+TRACE[10-10|16:37:31.822] >> FINDNODE/v4                           addr=35.240.203.86:30303   err=nil
+TRACE[10-10|16:37:31.929] >> FINDNODE/v4                           addr=13.79.32.232:30424    err=nil
+TRACE[10-10|16:37:31.998] << NEIGHBORS/v4                          addr=13.79.32.232:30424    err=nil
+TRACE[10-10|16:37:31.999] Findnode failed                          id=8eadf7a5ea8ad0d9 failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:31.999] >> PING/v4                               addr=35.165.162.68:30303   err=nil
+TRACE[10-10|16:37:32.061] >> FINDNODE/v4                           addr=18.194.184.225:30307  err=nil
+TRACE[10-10|16:37:32.062] >> FINDNODE/v4                           addr=178.128.201.62:30300  err=nil
+TRACE[10-10|16:37:32.084] >> FINDNODE/v4                           addr=188.166.4.188:30303   err=nil
+TRACE[10-10|16:37:32.129] << NEIGHBORS/v4                          addr=188.166.4.188:30303   err="unsolicited reply"
+TRACE[10-10|16:37:32.149] << NEIGHBORS/v4                          addr=35.240.203.86:30303   err=nil
+TRACE[10-10|16:37:32.291] << NEIGHBORS/v4                          addr=178.128.201.62:30300  err="unsolicited reply"
+TRACE[10-10|16:37:32.322] Findnode failed                          id=c1bb80ce594a9c5f failcount=2 err="RPC timeout"
+DEBUG[10-10|16:37:32.322] IP exceeds bucket limit                  ip=35.240.203.86
+DEBUG[10-10|16:37:32.322] IP exceeds bucket limit                  ip=35.240.203.86
+TRACE[10-10|16:37:32.322] >> PING/v4                               addr=35.240.203.86:30303   err=nil
+TRACE[10-10|16:37:32.429] Findnode failed                          id=8eaf074c2e68775b failcount=1 err="RPC timeout"
+TRACE[10-10|16:37:32.430] >> PING/v4                               addr=52.79.121.176:53573   err=nil

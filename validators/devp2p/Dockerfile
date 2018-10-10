@@ -18,6 +18,7 @@ ADD devp2p_test.go /devp2p_test.go
 ADD node.go /node.go
 ADD udp.go /udp.go
 
+
 #go test -c -o means compile the tests (-c) and rename (-o) to 
 RUN (cd / && GOPATH=/go go test -c -o /devp2p.test)
 
@@ -26,10 +27,12 @@ RUN apk del git make gcc musl-dev linux-headers
 RUN (rm -rf /var/cache/apk/* && rm -rf /go)
 
 # Add shell
-RUN apk add --update bash
+RUN apk add --update bash curl jq
 # Add the entry script
 ADD tests.sh /tests.sh
 #mandatory init file
 ADD genesis.json /genesis.json
+
+EXPOSE 8545 8546 30303 30303/udp
 
 ENTRYPOINT ["/tests.sh"]

@@ -26,7 +26,8 @@ var (
 
 func TestMain(m *testing.M) {
 
-	testTarget := flag.String("enodeTarget", "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@13.75.154.138:30303", "Enode address of target")
+	//testTarget := flag.String("enodeTarget", "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@13.75.154.138:30303", "Enode address of target")
+	testTarget := flag.String("enodeTarget", "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@172.17.0.2:30303", "Enode address of target")
 	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 	flag.Parse()
 	targetnode, err = enode.ParseV4(*testTarget)

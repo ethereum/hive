@@ -24,6 +24,6 @@ RUN apk add --no-cache jq bc bash
 RUN cat /usr/share/aleth/buildinfo.json |jq "del(.is_prerelease)"  > /version.json
 
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 30303
+EXPOSE 8545 30303 30303/udp
 
 ENTRYPOINT ["/aleth.sh"]
