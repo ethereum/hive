@@ -32,10 +32,6 @@ func TestMain(m *testing.M) {
 	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 	flag.Parse()
 
-	//testing
-	*testTarget = "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@13.75.154.138:30303"
-	//*testTargetIP = "13.75.154.138"
-
 	//If an enode was supplied, use that
 	if *testTarget != "" {
 		targetnode, err = enode.ParseV4(*testTarget)
@@ -79,7 +75,9 @@ func TestDiscovery(t *testing.T) {
 			t.Log("Pinging unknown node id.")
 			pingTest = func(t *testing.T) {
 				if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetip, Port: 30303}, false, func(e *ecdsa.PublicKey) {
+
 					targetnode = enode.NewV4(e, targetip, 30303, 30303)
+					t.Log("Discovered node id " + targetnode.String())
 				}); err != nil {
 					t.Fatalf("Unable to v4 ping: %v", err)
 				}

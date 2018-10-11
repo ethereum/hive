@@ -28,12 +28,12 @@
 # Immediately abort the script on any error encountered
 set -e
 
-# It doesn't make sense to dial out, use only a pre-set bootnode
-# if [ "$HIVE_BOOTNODE" != "" ]; then
-# 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
-# else
-# 	FLAGS="$FLAGS --nodiscover"
-# fi
+#It doesn't make sense to dial out, use only a pre-set bootnode
+if [ "$HIVE_BOOTNODE" != "" ]; then
+	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
+else
+	FLAGS="$FLAGS --nodiscover"
+fi
 
 if [ "$HIVE_SKIP_POW" != "" ]; then
 	FLAGS="$FLAGS --fakepow"

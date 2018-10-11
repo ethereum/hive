@@ -1,17 +1,18 @@
 Starting validator.
 Trying to get enode.
-Got admin enode info response: {"jsonrpc":"2.0","id":1,"result":{"id":"0ef118e1f8965a758f99ae72e8ece60a419a04a65d713dce80378a58c36ac18b","name":"Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1","enode":"enode://c834f6c31a7ef7bf33c67ef88a25aa0f459b0054e9992a3efaf3621168b7d6bdc9af427d3e64686ab235c6a54f9a7c737a28929d0da9a2ec163a7f0b1ee0cde7@[::]:30303","ip":"::","ports":{"discovery":30303,"listener":30303},"listenAddr":"[::]:30303","protocols":{"eth":{"network":1,"difficulty":131072,"genesis":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f","config":{"chainId":null,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"},"head":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f"}}}}
-Target enode identified as enode://c834f6c31a7ef7bf33c67ef88a25aa0f459b0054e9992a3efaf3621168b7d6bdc9af427d3e64686ab235c6a54f9a7c737a28929d0da9a2ec163a7f0b1ee0cde7@[::]:30303
-Run Devp2p tests against enode://c834f6c31a7ef7bf33c67ef88a25aa0f459b0054e9992a3efaf3621168b7d6bdc9af427d3e64686ab235c6a54f9a7c737a28929d0da9a2ec163a7f0b1ee0cde7@[::]:30303
+Got admin enode info response: {"jsonrpc":"2.0","id":1,"result":{"id":"e2293ecf0e4eede010c2df40b82814b12fbb33a77b976097c27ecc3ac37cd12b","name":"Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1","enode":"enode://ab412235f3bb6a2b33d6e4e7a1673fae6df7421d50ec323c5ff7373caea0bcecaa116ba7d47904e46ea6ebeb873b3049e79e3e00c827b7265b0412d089b0579a@127.0.0.1:30303?discport=0","ip":"127.0.0.1","ports":{"discovery":0,"listener":30303},"listenAddr":"[::]:30303","protocols":{"eth":{"network":1,"difficulty":131072,"genesis":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f","config":{"chainId":null,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"},"head":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f"}}}}
+Target enode identified as enode://ab412235f3bb6a2b33d6e4e7a1673fae6df7421d50ec323c5ff7373caea0bcecaa116ba7d47904e46ea6ebeb873b3049e79e3e00c827b7265b0412d089b0579a@127.0.0.1:30303?discport=0
+Run Devp2p tests against enode://ab412235f3bb6a2b33d6e4e7a1673fae6df7421d50ec323c5ff7373caea0bcecaa116ba7d47904e46ea6ebeb873b3049e79e3e00c827b7265b0412d089b0579a@127.0.0.1:30303?discport=0
 === RUN   TestDiscovery
 === RUN   TestDiscovery/discoveryv4
 === RUN   TestDiscovery/discoveryv4/ping
-panic: interface conversion: interface {} is main.incomingPacket, not *main.incomingPacket
-
-goroutine 26 [running]:
-_.(*V4Udp).sendPing.func1(0xa9a2a0, 0xc0001c1b30, 0x20)
-	/udp.go:317 +0x22f
-_.(*V4Udp).loop(0xc0001c9ea0)
-	/udp.go:461 +0x5e4
-created by _.newUDP
-	/udp.go:282 +0x211
+=== RUN   TestDiscovery/discoveryv5
+=== RUN   TestDiscovery/discoveryv5/ping
+--- FAIL: TestDiscovery (0.50s)
+    --- FAIL: TestDiscovery/discoveryv4 (0.50s)
+        devp2p_test.go:86: Pinging known node id.
+        --- FAIL: TestDiscovery/discoveryv4/ping (0.50s)
+            devp2p_test.go:89: Unable to v4 ping: RPC timeout
+    --- PASS: TestDiscovery/discoveryv5 (0.00s)
+        --- PASS: TestDiscovery/discoveryv5/ping (0.00s)
+FAIL
