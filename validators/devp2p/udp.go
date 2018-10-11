@@ -47,7 +47,7 @@ var (
 
 // Timeouts
 const (
-	respTimeout    = 5000 * time.Millisecond //FRANK: testing, should be 500
+	respTimeout    = 500000 * time.Millisecond //FRANK: testing, should be 500
 	expiration     = 20 * time.Second
 	bondExpiration = 24 * time.Hour
 
@@ -101,6 +101,11 @@ type (
 		Expiration uint64
 		// Ignore additional fields (for forward compatibility).
 		Rest []rlp.RawValue `rlp:"tail"`
+	}
+
+	incomingPacket struct {
+		packet      interface{}
+		recoveredID encPubkey
 	}
 
 	rpcNode struct {
@@ -287,13 +292,13 @@ func (t *V4Udp) close() {
 }
 
 // ping sends a ping message to the given node and waits for a reply.
-func (t *V4Udp) ping(toid enode.ID, toaddr *net.UDPAddr) error {
-	return <-t.sendPing(toid, toaddr, nil)
+func (t *V4Udp) ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+	return <-t.sendPing(toid, toaddr, recoveryCallback, validateEnodeID)
 }
 
 // sendPing sends a ping message to the given node and invokes the callback
 // when the reply arrives.
-func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-chan error {
+func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, recoveryCallback func(e *ecdsa.PublicKey), validateEnodeID bool) <-chan error {
 	req := &ping{
 		Version:    4,
 		From:       t.ourEndpoint,
@@ -309,9 +314,17 @@ func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, callback func()) <-
 	}
 
 	errc := t.pending(toid, pongPacket, func(p interface{}) bool {
-		ok := bytes.Equal(p.(*pong).ReplyTok, hash)
-		if ok && callback != nil {
-			callback()
+		inPacket := p.(incomingPacket)
+		ok := bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash)
+		if ok && validateEnodeID {
+			ok = ok && (toid == inPacket.recoveredID.id())
+		}
+
+		if ok && recoveryCallback != nil {
+			key, err := decodePubkey(inPacket.recoveredID)
+			if err != nil {
+				recoveryCallback(key)
+			}
 		}
 		return ok
 	})
@@ -342,7 +355,7 @@ func (t *V4Udp) findnode(toid enode.ID, toaddr *net.UDPAddr, target encPubkey) (
 	nodes := make([]*node, 0, bucketSize)
 	nreceived := 0
 	errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
-		reply := r.(*neighbors)
+		reply := r.(incomingPacket).packet.(*neighbors)
 		for _, rn := range reply.Nodes {
 			nreceived++
 			n, err := t.nodeFromRPC(toaddr, rn)
@@ -375,7 +388,7 @@ func (t *V4Udp) pending(id enode.ID, ptype byte, callback func(interface{}) bool
 	return ch
 }
 
-func (t *V4Udp) handleReply(from enode.ID, ptype byte, req packet) bool {
+func (t *V4Udp) handleReply(from enode.ID, ptype byte, req incomingPacket) bool {
 	matched := make(chan bool, 1)
 	select {
 	case t.gotreply <- reply{from, ptype, req, matched}:
@@ -585,17 +598,18 @@ func (t *V4Udp) readLoop(unhandled chan<- ReadPacket) {
 }
 
 func (t *V4Udp) handlePacket(from *net.UDPAddr, buf []byte) error {
-	packet, fromID, hash, err := decodePacket(buf)
+	inpacket, fromKey, hash, err := decodePacket(buf)
 	if err != nil {
 		log.Debug("Bad discv4 packet", "addr", from, "err", err)
 		return err
 	}
-	err = packet.handle(t, from, fromID, hash)
-	log.Trace("<< "+packet.name(), "addr", from, "err", err)
+	err = inpacket.handle(t, from, fromKey, hash)
+	log.Trace("<< "+inpacket.name(), "addr", from, "err", err)
 	return err
 }
 
 func decodePacket(buf []byte) (packet, encPubkey, []byte, error) {
+
 	if len(buf) < headSize+1 {
 		return nil, encPubkey{}, nil, errPacketTooSmall
 	}
@@ -620,10 +634,11 @@ func decodePacket(buf []byte) (packet, encPubkey, []byte, error) {
 	case neighborsPacket:
 		req = new(neighbors)
 	default:
-		return nil, fromKey, hash, fmt.Errorf("unknown type: %d", ptype)
+		return req, fromKey, hash, fmt.Errorf("unknown type: %d", ptype)
 	}
 	s := rlp.NewStream(bytes.NewReader(sigdata[1:]), 0)
 	err = s.Decode(req)
+
 	return req, fromKey, hash, err
 }
 
@@ -641,10 +656,10 @@ func (req *ping) handle(t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []by
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	})
 	n := wrapNode(enode.NewV4(key, from.IP, int(req.From.TCP), from.Port))
-	t.handleReply(n.ID(), pingPacket, req)
+	t.handleReply(n.ID(), pingPacket, incomingPacket{packet: req, recoveredID: fromKey})
 
 	//**********!!!!!!!!!!!********************
-	//TODO - Needs parameterising and replacing
+	//TODO -Will eventually need parameterising and replacing
 	//with test-scoped variables
 	//**********!!!!!!!!!!!********************
 	// if time.Since(t.db.LastPongReceived(n.ID())) > bondExpiration {
@@ -663,9 +678,8 @@ func (req *pong) handle(t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []by
 		return errExpired
 	}
 	fromID := fromKey.id()
-	if !t.handleReply(fromID, pongPacket, req) {
-		return errUnsolicitedReply
-	}
+	t.handleReply(fromID, pongPacket, incomingPacket{packet: req, recoveredID: fromKey})
+
 	//********************************
 	//TODO
 	//********************************
@@ -724,7 +738,7 @@ func (req *neighbors) handle(t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac
 	if expired(req.Expiration) {
 		return errExpired
 	}
-	if !t.handleReply(fromKey.id(), neighborsPacket, req) {
+	if !t.handleReply(fromKey.id(), neighborsPacket, incomingPacket{packet: req, recoveredID: fromKey}) {
 		return errUnsolicitedReply
 	}
 	return nil

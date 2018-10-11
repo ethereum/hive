@@ -15,10 +15,10 @@ import (
 )
 
 var (
-	listenPort *string     // udp listen port
-	natdesc    *string     //nat mode
-	targetnode *enode.Node // parsed Node
-
+	listenPort   *string     // udp listen port
+	natdesc      *string     //nat mode
+	targetnode   *enode.Node // parsed Node
+	targetip     net.IP      //targetIP
 	nodeKey      *ecdsa.PrivateKey
 	err          error
 	restrictList *netutil.Netlist
@@ -26,23 +26,39 @@ var (
 
 func TestMain(m *testing.M) {
 
-	//testTarget := flag.String("enodeTarget", "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@13.75.154.138:30303", "Enode address of target")
-	testTarget := flag.String("enodeTarget", "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@172.17.0.2:30303", "Enode address of target")
+	testTarget := flag.String("enodeTarget", "", "Enode address of target")
 	testTargetIP := flag.String("targetIP", "", "IP Address of hive container client")
+	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
-
 	flag.Parse()
 
-	targetnode, err = enode.ParseV4(*testTarget)
-	if err != nil {
-		panic(err)
-	}
-	if *testTargetIP != "" {
-		ip := net.ParseIP(*testTargetIP)
-		targetnode = enode.NewV4(targetnode.Pubkey(), ip, targetnode.TCP(), targetnode.UDP())
+	//testing
+	*testTarget = "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@13.75.154.138:30303"
+	//*testTargetIP = "13.75.154.138"
+
+	//If an enode was supplied, use that
+	if *testTarget != "" {
+		targetnode, err = enode.ParseV4(*testTarget)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	listenPort = flag.String("listenPort", ":30303", "")
+	//If a target ip was supplied, parse it and use it
+	if *testTargetIP != "" {
+		targetip = net.ParseIP(*testTargetIP)
+		//if the target enode was supplied, override the ip address with the target ip supplied, which
+		//seems to be useful when the supplied enode ip address is incorrect in some way when reported
+		//from a docker container
+		if targetnode != nil {
+			targetnode = enode.NewV4(targetnode.Pubkey(), targetip, targetnode.TCP(), targetnode.UDP())
+		}
+	}
+
+	//Exit if no args supplied
+	if *testTargetIP == "" && targetnode == nil {
+		panic("No target enode or ip supplied")
+	}
 
 	os.Exit(m.Run())
 }
@@ -54,17 +70,30 @@ func TestDiscovery(t *testing.T) {
 		//setup
 		v4udp := setupv4UDP()
 
-		t.Run("ping", func(t *testing.T) {
+		//If the client has a known enode, obtained from an admin API, then run a standard ping
+		//Otherwise, run a different ping where we override any enode validation checks
+		//The recovered id can be used to set the target node id for any further tests that might want to verify that.
+		var pingTest func(t *testing.T)
 
-			//with the use of helper functions
-			//.signal that the other hive client should be reset?
-			//TODO
-
-			if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}); err != nil {
-				t.Fatalf("Unable to v4 ping: %v", err)
+		if targetnode == nil {
+			t.Log("Pinging unknown node id.")
+			pingTest = func(t *testing.T) {
+				if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetip, Port: 30303}, false, func(e *ecdsa.PublicKey) {
+					targetnode = enode.NewV4(e, targetip, 30303, 30303)
+				}); err != nil {
+					t.Fatalf("Unable to v4 ping: %v", err)
+				}
 			}
+		} else {
+			t.Log("Pinging known node id.")
+			pingTest = func(t *testing.T) {
+				if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+					t.Fatalf("Unable to v4 ping: %v", err)
+				}
+			}
+		}
 
-		})
+		t.Run("ping", pingTest)
 	})
 
 	t.Run("discoveryv5", func(t *testing.T) {
