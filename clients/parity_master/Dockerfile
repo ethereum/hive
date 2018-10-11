@@ -37,7 +37,11 @@ ADD parity.sh /parity.sh
 RUN chmod +x /parity.sh
 ADD chain.json /chain.json
 
+# Inject the enode id retriever script
+ADD enode.sh /enode.sh
+
+
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 30303
+EXPOSE 8545 30303 30303/udp
 
 ENTRYPOINT ["/parity.sh"]

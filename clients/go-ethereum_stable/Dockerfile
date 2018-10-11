@@ -27,6 +27,6 @@ ADD geth.sh /geth.sh
 RUN chmod +x /geth.sh
 
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 8546 30303
+EXPOSE 8545 8546 30303 30303/udp
 
 ENTRYPOINT ["/geth.sh"]
