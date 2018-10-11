@@ -47,7 +47,7 @@ var (
 
 // Timeouts
 const (
-	respTimeout    = 500000 * time.Millisecond //FRANK: testing, should be 500
+	respTimeout    = 5000 * time.Millisecond //FRANK: testing, should be 500
 	expiration     = 20 * time.Second
 	bondExpiration = 24 * time.Hour
 

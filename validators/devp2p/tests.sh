@@ -13,7 +13,7 @@ chmod +x /enode.sh
 . /enode.sh
 
 echo "Run Devp2p tests against $TARGET_ENODE"
-/devp2p.test -test.v -test.run Discovery -enodeTarget "$TARGET_ENODE"
+/devp2p.test -test.v -test.run Discovery -enodeTarget "$TARGET_ENODE" -targetIP "$HIVE_CLIENT_IP"
 
 
 # Run hive (must be run from root directory of hive repo)

@@ -1,3 +1,16 @@
 Starting validator.
 Trying to get enode.
-/enode.sh: line 12: invalid: command not found
+Got admin enode info response: {"jsonrpc":"2.0","id":1,"result":{"id":"20c50f7172a6e0c74819fa232dbf85cc18c8264926b37d4d5a9a5f271747b476","name":"Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1","enode":"enode://4d99fa4842f6b9a8d35b32e279bbc189a367d728fa022bae233c4bd25f7b05d6c14434874fe015f061d8f7a6f6040d83dbcdf8a7300257d8eea5895176289914@[::]:30303","ip":"::","ports":{"discovery":30303,"listener":30303},"listenAddr":"[::]:30303","protocols":{"eth":{"network":1,"difficulty":131072,"genesis":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f","config":{"chainId":null,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"},"head":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f"}}}}
+Target enode identified as enode://4d99fa4842f6b9a8d35b32e279bbc189a367d728fa022bae233c4bd25f7b05d6c14434874fe015f061d8f7a6f6040d83dbcdf8a7300257d8eea5895176289914@[::]:30303
+Run Devp2p tests against enode://4d99fa4842f6b9a8d35b32e279bbc189a367d728fa022bae233c4bd25f7b05d6c14434874fe015f061d8f7a6f6040d83dbcdf8a7300257d8eea5895176289914@[::]:30303
+=== RUN   TestDiscovery
+=== RUN   TestDiscovery/discoveryv4
+=== RUN   TestDiscovery/discoveryv4/ping
+=== RUN   TestDiscovery/discoveryv5
+=== RUN   TestDiscovery/discoveryv5/ping
+--- PASS: TestDiscovery (0.00s)
+    --- PASS: TestDiscovery/discoveryv4 (0.00s)
+        --- PASS: TestDiscovery/discoveryv4/ping (0.00s)
+    --- PASS: TestDiscovery/discoveryv5 (0.00s)
+        --- PASS: TestDiscovery/discoveryv5/ping (0.00s)
+PASS
