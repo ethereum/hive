@@ -22,6 +22,7 @@ var (
 	nodeKey      *ecdsa.PrivateKey
 	err          error
 	restrictList *netutil.Netlist
+	v4udp        V4Udp
 )
 
 func TestMain(m *testing.M) {
@@ -64,7 +65,7 @@ func TestDiscovery(t *testing.T) {
 	// discovery v4 test suites
 	t.Run("discoveryv4", func(t *testing.T) {
 		//setup
-		v4udp := setupv4UDP()
+		v4udp = setupv4UDP()
 
 		//If the client has a known enode, obtained from an admin API, then run a standard ping
 		//Otherwise, run a different ping where we override any enode validation checks
@@ -72,26 +73,15 @@ func TestDiscovery(t *testing.T) {
 		var pingTest func(t *testing.T)
 
 		if targetnode == nil {
-			t.Log("Pinging unknown node id.")
-			pingTest = func(t *testing.T) {
-				if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetip, Port: 30303}, false, func(e *ecdsa.PublicKey) {
-
-					targetnode = enode.NewV4(e, targetip, 30303, 30303)
-					t.Log("Discovered node id " + targetnode.String())
-				}); err != nil {
-					t.Fatalf("Unable to v4 ping: %v", err)
-				}
-			}
+			pingTest = PingUnknownEnode
 		} else {
-			t.Log("Pinging known node id.")
-			pingTest = func(t *testing.T) {
-				if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-					t.Fatalf("Unable to v4 ping: %v", err)
-				}
-			}
+			pingTest = PingKnownEnode
 		}
 
-		t.Run("ping", pingTest)
+		t.Run("v4001", pingTest)
+
+		t.Run("v4002", ping)
+
 	})
 
 	t.Run("discoveryv5", func(t *testing.T) {
@@ -100,6 +90,103 @@ func TestDiscovery(t *testing.T) {
 			//TODO
 		})
 	})
+
+}
+
+//v4001a
+func SourceUnknownPingUnknownEnode(t *testing.T) {
+	t.Log("Pinging unknown node id.")
+	if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetip, Port: 30303}, false, func(e *ecdsa.PublicKey) {
+
+		targetnode = enode.NewV4(e, targetip, 30303, 30303)
+		t.Log("Discovered node id " + targetnode.String())
+	}); err != nil {
+		t.Fatalf("Unable to v4 ping: %v", err)
+	}
+}
+
+//v4001b
+func SourceUnknownPingKnownEnode(t *testing.T) {
+	t.Log("Pinging known node id.")
+	if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Unable to v4 ping: %v", err)
+	}
+}
+
+//v4002
+func SourceUnknownPingWrongTo(t *testing.T) {
+	t.Log("Pinging with incorrect target endpoint.")
+
+}
+
+//v4003
+func SourceUnknownPingWrongFrom(t *testing.T) {
+	t.Log("Pinging with incorrect sender.")
+
+}
+
+//v4004
+func SourceUnknownPingExtraData(t *testing.T) {
+
+}
+
+//v4005
+func SourceUnknownPingExtraDataWrongFrom(t *testing.T) {
+
+}
+
+//v4006
+func SourceUnknownPingExtraDataWrongTo(t *testing.T) {
+
+}
+
+//v4007
+func SourceUnknownFindNeighbours(t *testing.T) {
+
+}
+
+//v4008
+func SourceUnknownUnsolicitedNeighbours(t *testing.T) {
+
+}
+
+//v4009
+func SourceKnownPingWrongTo(t *testing.T) {
+
+}
+
+//v4010
+func SourceKnownPingFromSignatureMismatch(t *testing.T) {
+
+}
+
+//v4011
+func SourceKnownSignaturePingFromMismatch(t *testing.T) {
+
+}
+
+//v4012
+func FindNeighboursOnRecentlyBondedTarget(t *testing.T) {
+
+}
+
+//v4013
+func FindNeighboursOnOldBondedTarget(t *testing.T) {
+
+}
+
+//v4014
+func PingRLPxEvictedNode(t *testing.T) {
+
+}
+
+//v4015
+func PingPastExpiration(t *testing.T) {
+
+}
+
+//v4017
+func FindNeighboursPastExpiration(t *testing.T) {
 
 }
 
