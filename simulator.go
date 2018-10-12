@@ -216,13 +216,13 @@ type simulatorAPIHandler struct {
 // container if it has.
 func (h *simulatorAPIHandler) CheckTimeout() {
 	for {
+		h.lock.Lock()
 		for id, c := range h.nodes {
-			h.lock.Lock()
 			if !c.State.Running || (time.Now().After(h.nodesTimeout[id])) {
 				h.terminateContainer(id, nil)
 			}
-			h.lock.Unlock()
 		}
+		h.lock.Unlock()
 		time.Sleep(timeoutCheckDuration)
 	}
 }
@@ -234,13 +234,17 @@ func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWrite
 
 	if !ok {
 		h.logger.Error("unknown client deletion requested", "id", id)
-		http.Error(w, "not found", http.StatusNotFound)
+		if w != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+		}
 		return
 	}
 	h.logger.Debug("deleting client container", "id", node.ID[:8])
 	if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
 		h.logger.Error("failed to delete client ", "id", id, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		if w != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
