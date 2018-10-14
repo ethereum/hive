@@ -73,14 +73,26 @@ func TestDiscovery(t *testing.T) {
 		var pingTest func(t *testing.T)
 
 		if targetnode == nil {
-			pingTest = PingUnknownEnode
+			pingTest = SourceUnknownPingUnknownEnode
 		} else {
-			pingTest = PingKnownEnode
+			pingTest = SourceUnknownPingKnownEnode
 		}
 
 		t.Run("v4001", pingTest)
-
-		t.Run("v4002", ping)
+		t.Run("v4002", SourceUnknownPingWrongTo)
+		t.Run("v4003", SourceUnknownPingWrongFrom)
+		t.Run("v4004", SourceUnknownPingExtraData)
+		t.Run("v4005", SourceUnknownPingExtraDataWrongFrom)
+		t.Run("v4006", SourceUnknownPingExtraDataWrongTo)
+		t.Run("v4007", SourceUnknownFindNeighbours)
+		t.Run("v4008", SourceUnknownUnsolicitedNeighbours)
+		t.Run("v4009", SourceKnownPingWrongTo)
+		t.Run("v4010", SourceKnownPingFromSignatureMismatch)
+		t.Run("v4011", SourceKnownSignaturePingFromMismatch)
+		t.Run("v4012", FindNeighboursOnRecentlyBondedTarget)
+		t.Run("v4013", FindNeighboursOnOldBondedTarget)
+		t.Run("v4014", PingPastExpiration)
+		t.Run("v4015", FindNeighboursPastExpiration)
 
 	})
 
@@ -176,16 +188,11 @@ func FindNeighboursOnOldBondedTarget(t *testing.T) {
 }
 
 //v4014
-func PingRLPxEvictedNode(t *testing.T) {
-
-}
-
-//v4015
 func PingPastExpiration(t *testing.T) {
 
 }
 
-//v4017
+//v4015
 func FindNeighboursPastExpiration(t *testing.T) {
 
 }
