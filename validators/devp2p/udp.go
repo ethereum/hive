@@ -319,6 +319,7 @@ func (t *V4Udp) ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, r
 
 			if !bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash) {
 				return errUnsolicitedReply
+			}
 
 			if validateEnodeID && toid != inPacket.recoveredID.id() {
 				return errUnknownNode
@@ -330,10 +331,10 @@ func (t *V4Udp) ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, r
 					recoveryCallback(key)
 				}
 			}
-		
 		} else {
 			return errPacketMismatch
 		}
+		return nil
 
 	}
 	return <-t.sendPing(toid, toaddr, req, packet, callback)
@@ -351,6 +352,24 @@ func (t *V4Udp) pingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID 
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
 
+	packet, _, err := encodePacket(t.priv, pingPacket, req)
+	if err != nil {
+		return err
+	}
+
+	callback := func(p reply) error {
+		if p.ptype == pongPacket {
+			return errUnsolicitedReply
+		}
+
+		if p.ptype == pingPacket {
+			return errUnsolicitedReply
+		}
+
+		return errPacketMismatch
+	}
+	return <-t.sendPing(toid, toaddr, req, packet, callback)
+
 }
 
 func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, req *ping, packet []byte, callback func(reply) error) <-chan error {
@@ -360,9 +379,9 @@ func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, req *ping, packet [
 	return errc
 }
 
-func (t *V4Udp) waitping(from enode.ID) error {
-	return <-t.pending(from, pingPacket, func(interface{}) bool { return true })
-}
+// func (t *V4Udp) waitping(from enode.ID) error {
+// 	return <-t.pending(from, pingPacket, func(interface{}) bool { return true })
+// }
 
 // findnode sends a findnode request to the given node and waits until
 // the node has sent up to k neighbors.
@@ -379,27 +398,30 @@ func (t *V4Udp) findnode(toid enode.ID, toaddr *net.UDPAddr, target encPubkey) (
 	// 	t.waitping(toid)
 	// }
 	//bucketSize
-	bucketSize := 16
-	nodes := make([]*node, 0, bucketSize)
-	nreceived := 0
-	errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
-		reply := r.(incomingPacket).packet.(*neighbors)
-		for _, rn := range reply.Nodes {
-			nreceived++
-			n, err := t.nodeFromRPC(toaddr, rn)
-			if err != nil {
-				log.Trace("Invalid neighbor node received", "ip", rn.IP, "addr", toaddr, "err", err)
-				continue
-			}
-			nodes = append(nodes, n)
-		}
-		return nreceived >= bucketSize
-	})
-	t.send(toaddr, findnodePacket, &findnode{
-		Target:     target,
-		Expiration: uint64(time.Now().Add(expiration).Unix()),
-	})
-	return nodes, <-errc
+
+	//*********************//
+	// bucketSize := 16
+	// nodes := make([]*node, 0, bucketSize)
+	// nreceived := 0
+	// errc := t.pending(toid, neighborsPacket, func(r interface{}) bool {
+	// 	reply := r.(incomingPacket).packet.(*neighbors)
+	// 	for _, rn := range reply.Nodes {
+	// 		nreceived++
+	// 		n, err := t.nodeFromRPC(toaddr, rn)
+	// 		if err != nil {
+	// 			log.Trace("Invalid neighbor node received", "ip", rn.IP, "addr", toaddr, "err", err)
+	// 			continue
+	// 		}
+	// 		nodes = append(nodes, n)
+	// 	}
+	// 	return nreceived >= bucketSize
+	// })
+	// t.send(toaddr, findnodePacket, &findnode{
+	// 	Target:     target,
+	// 	Expiration: uint64(time.Now().Add(expiration).Unix()),
+	// })
+	//return nodes, <-errc
+	return nil, nil
 }
 
 // pending adds a reply callback to the pending reply queue.
@@ -480,18 +502,27 @@ func (t *V4Udp) loop() {
 			var matched bool
 			for el := plist.Front(); el != nil; el = el.Next() {
 				p := el.Value.(*pending)
-				if p.from == r.from && p.ptype == r.ptype {
-					matched = true
+				if p.from == r.from {
+
 					// Remove the matcher if its callback indicates
 					// that all replies have been received. This is
 					// required for packet types that expect multiple
 					// reply packets.
 
-					//if p.callback(r.data) {
-					if p.callback(r) {
-						p.errc <- nil
-						plist.Remove(el)
+					cbres := p.callback(r)
+					if cbres == errPacketMismatch {
+						matched = false
+					} else {
+						matched = true
+						if cbres == nil {
+							plist.Remove(el)
+							p.errc <- nil
+						} else {
+							plist.Remove(el)
+							p.errc <- cbres
+						}
 					}
+
 					// Reset the continuous timeout counter (time drift detection)
 					contTimeouts = 0
 				}
