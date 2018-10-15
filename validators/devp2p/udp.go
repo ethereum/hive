@@ -510,9 +510,7 @@ func (t *V4Udp) loop() {
 					// reply packets.
 
 					cbres := p.callback(r)
-					if cbres == errPacketMismatch {
-						matched = false
-					} else {
+					if cbres != errPacketMismatch {
 						matched = true
 						if cbres == nil {
 							plist.Remove(el)
