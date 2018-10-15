@@ -43,6 +43,9 @@ var (
 	errTimeout          = errors.New("RPC timeout")
 	errClockWarp        = errors.New("reply deadline too far in the future")
 	errClosed           = errors.New("socket closed")
+	errResponseReceived = errors.New("response received")
+	pingHandler         = defaultPingHandler
+	unexpectedPacket    = false
 )
 
 // Timeouts
@@ -293,16 +296,36 @@ func (t *V4Udp) close() {
 
 // ping sends a ping message to the given node and waits for a reply.
 func (t *V4Udp) ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
-	return <-t.sendPing(toid, toaddr, recoveryCallback, validateEnodeID)
+	return <-t.sendPing(toid, toaddr, recoveryCallback, validateEnodeID, false)
+}
+
+func (t *V4Udp) pingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+
+	//We don't expect any pings at all
+	pingHandler = func(req *ping, t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []byte) error {
+		unexpectedPacket = true
+		return nil
+	}
+
+	return <-t.sendPing(toid, toaddr, recoveryCallback, validateEnodeID, false)
 }
 
 // sendPing sends a ping message to the given node and invokes the callback
 // when the reply arrives.
-func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, recoveryCallback func(e *ecdsa.PublicKey), validateEnodeID bool) <-chan error {
+func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, recoveryCallback func(e *ecdsa.PublicKey), validateEnodeID bool, fudgeTo bool) <-chan error {
+
+	var to rpcEndpoint
+
+	if fudgeTo {
+		to = makeEndpoint(&net.UDPAddr{IP: []byte{0, 1, 2, 3}, Port: 1}, 0)
+	} else {
+		to = makeEndpoint(toaddr, 0)
+	}
+
 	req := &ping{
 		Version:    4,
 		From:       t.ourEndpoint,
-		To:         makeEndpoint(toaddr, 0), // TODO: maybe use known TCP port from DB
+		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
 
@@ -326,7 +349,7 @@ func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, recoveryCallback fu
 				recoveryCallback(key)
 			}
 		}
-		return ok
+		return ok && unexpectedPacket
 	})
 	t.write(toaddr, req.name(), packet)
 	return errc
@@ -642,7 +665,7 @@ func decodePacket(buf []byte) (packet, encPubkey, []byte, error) {
 	return req, fromKey, hash, err
 }
 
-func (req *ping) handle(t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []byte) error {
+func defaultPingHandler(req *ping, t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []byte) error {
 	if expired(req.Expiration) {
 		return errExpired
 	}
@@ -669,6 +692,10 @@ func (req *ping) handle(t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []by
 	// }
 	// t.db.UpdateLastPingReceived(n.ID(), time.Now())
 	return nil
+}
+
+func (req *ping) handle(t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []byte) error {
+	return pingHandler(req, t, from, fromKey, mac)
 }
 
 func (req *ping) name() string { return "PING/v4" }

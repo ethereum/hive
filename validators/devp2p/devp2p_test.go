@@ -143,7 +143,7 @@ func SourceUnknownPingUnknownEnode(t *testing.T) {
 
 //v4001b
 func SourceUnknownPingKnownEnode(t *testing.T) {
-	t.Log("Pinging known node id.")
+	t.Log("Test v4001")
 	if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
 		t.Fatalf("Unable to v4 ping: %v", err)
 	}
@@ -151,74 +151,77 @@ func SourceUnknownPingKnownEnode(t *testing.T) {
 
 //v4002
 func SourceUnknownPingWrongTo(t *testing.T) {
-	t.Log("Pinging with incorrect target endpoint.")
+	t.Log("Test v4002")
+	if err := v4udp.pingWrongTo(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err == nil {
+		t.Fatalf("Unable to v4 ping: %v", err)
+	}
 
 }
 
 //v4003
 func SourceUnknownPingWrongFrom(t *testing.T) {
-	t.Log("Pinging with incorrect sender.")
+	t.Log("Test v4003")
 
 }
 
 //v4004
 func SourceUnknownPingExtraData(t *testing.T) {
-
+	t.Log("Test v4004")
 }
 
 //v4005
 func SourceUnknownPingExtraDataWrongFrom(t *testing.T) {
-
+	t.Log("Test v4005")
 }
 
 //v4006
 func SourceUnknownPingExtraDataWrongTo(t *testing.T) {
-
+	t.Log("Test v4006")
 }
 
 //v4007
 func SourceUnknownFindNeighbours(t *testing.T) {
-
+	t.Log("Test v4007")
 }
 
 //v4008
 func SourceUnknownUnsolicitedNeighbours(t *testing.T) {
-
+	t.Log("Test v4008")
 }
 
 //v4009
 func SourceKnownPingWrongTo(t *testing.T) {
-
+	t.Log("Test v4009")
 }
 
 //v4010
 func SourceKnownPingFromSignatureMismatch(t *testing.T) {
-
+	t.Log("Test v4010")
 }
 
 //v4011
 func SourceKnownSignaturePingFromMismatch(t *testing.T) {
-
+	t.Log("Test v4011")
 }
 
 //v4012
 func FindNeighboursOnRecentlyBondedTarget(t *testing.T) {
-
+	t.Log("Test v4012")
 }
 
 //v4013
 func FindNeighboursOnOldBondedTarget(t *testing.T) {
-
+	t.Log("Test v4013")
 }
 
 //v4014
 func PingPastExpiration(t *testing.T) {
-
+	t.Log("Test v4014")
 }
 
 //v4015
 func FindNeighboursPastExpiration(t *testing.T) {
-
+	t.Log("Test v4015")
 }
 
 // TestRLPx checks the RLPx handshaking
