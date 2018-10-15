@@ -22,14 +22,13 @@ Some tests attempt to show how the target node responds to packets when the targ
 #### v4001
 This test attempts to ping the target from a hitherto unknown source node with `from` and `to` set correctly.
 
-There are two versions depending on the situation as described above. If the target enode is known, the test attempts to ping and waits for a pong *from that enode.* If the target is not known, it pings the target ip and waits for a pong response, and if one is obtained within the timeout it recovers the enode id for successive tests.
+There are two versions depending on the situation as described above. If the target enode is known, the test attempts to ping and waits for a pong *from that enode.* If the target is not known, it pings the target ip and waits for a pong response.
 
 Fail: 
 - No pong within timeout in both cases. 
 - No bonding ping received within 20s.
 - Pong from incorrect target enode in the first case.
 - Ping from incorrect target enode in the first case.
-- Ping `from` field with incorrect endpoint.
 - Packet received >1280 bytes
 - Pong received with missing or incorrect ping hash
 - Packet expirations in the past.

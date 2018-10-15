@@ -133,7 +133,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	vc, err := daemon.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: validator,
-			Env:   []string{"HIVE_CLIENT_IP=" + cip},
+			Env:   []string{"HIVE_CLIENT_IP=" + cip, "HIVE_CLIENT_ID=" + cc.ID, "HIVE_DOCKER_HOST_ALIAS=" + *dockerHostAlias},
 		},
 	})
 	if err != nil {

@@ -12,13 +12,17 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 var (
-	listenPort   *string     // udp listen port
-	natdesc      *string     //nat mode
-	targetnode   *enode.Node // parsed Node
-	targetip     net.IP      //targetIP
+	listenPort   *string        // udp listen port
+	natdesc      *string        //nat mode
+	targetnode   *enode.Node    // parsed Node
+	targetIP     net.IP         //targetIP
+	dockerHost   *string        //docker host api endpoint
+	daemon       *docker.Client //docker daemon proxy
+	targetID     *string        //docker client id
 	nodeKey      *ecdsa.PrivateKey
 	err          error
 	restrictList *netutil.Netlist
@@ -31,6 +35,8 @@ func TestMain(m *testing.M) {
 	testTargetIP := flag.String("targetIP", "", "IP Address of hive container client")
 	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
+	dockerHost = flag.String("dockerHost", "", "docker host api endpoint")
+	targetID = flag.String("targetID", "", "the hive client container id")
 	flag.Parse()
 
 	//If an enode was supplied, use that
@@ -43,12 +49,12 @@ func TestMain(m *testing.M) {
 
 	//If a target ip was supplied, parse it and use it
 	if *testTargetIP != "" {
-		targetip = net.ParseIP(*testTargetIP)
+		targetIP = net.ParseIP(*testTargetIP)
 		//if the target enode was supplied, override the ip address with the target ip supplied, which
 		//seems to be useful when the supplied enode ip address is incorrect in some way when reported
 		//from a docker container
 		if targetnode != nil {
-			targetnode = enode.NewV4(targetnode.Pubkey(), targetip, targetnode.TCP(), targetnode.UDP())
+			targetnode = enode.NewV4(targetnode.Pubkey(), targetIP, targetnode.TCP(), targetnode.UDP())
 		}
 	}
 
@@ -60,9 +66,27 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func ConnectToDockerDaemon(t *testing.T) {
+	// this test suite needs to be able to control the client container to:
+	// - Reset the container so that nodes are known/unknown
+	// - Manipulate faketime for timing related tests
+	daemon, err = docker.NewClient(*dockerHost)
+	if err != nil {
+		t.Error("failed to connect to docker daemon")
+		return
+	}
+	env, err := daemon.Version()
+	if err != nil {
+		t.Fatalf("failed to retrieve docker version %s", err)
+		return
+	}
+	t.Logf("Daemon with version %s is up", env.Get("Version"))
+}
+
 // TestDiscovery tests the set of discovery protocols
 func TestDiscovery(t *testing.T) {
 	// discovery v4 test suites
+
 	t.Run("discoveryv4", func(t *testing.T) {
 		//setup
 		v4udp = setupv4UDP()
@@ -108,9 +132,9 @@ func TestDiscovery(t *testing.T) {
 //v4001a
 func SourceUnknownPingUnknownEnode(t *testing.T) {
 	t.Log("Pinging unknown node id.")
-	if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetip, Port: 30303}, false, func(e *ecdsa.PublicKey) {
+	if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetIP, Port: 30303}, false, func(e *ecdsa.PublicKey) {
 
-		targetnode = enode.NewV4(e, targetip, 30303, 30303)
+		targetnode = enode.NewV4(e, targetIP, 30303, 30303)
 		t.Log("Discovered node id " + targetnode.String())
 	}); err != nil {
 		t.Fatalf("Unable to v4 ping: %v", err)

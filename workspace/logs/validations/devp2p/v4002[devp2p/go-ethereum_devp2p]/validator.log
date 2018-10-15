@@ -1,0 +1,14 @@
+Starting validator.
+Trying to get enode.
+Got admin enode info response: {"jsonrpc":"2.0","id":1,"result":{"id":"626ccdc72b52e3690dd7025707e2960b5442ceed60ae092d531daac844e17b3a","name":"Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1","enode":"enode://afbfbde7b38719999d3b38c21739b3ce1c40e67d3758fe171a49dceefeaba6f741b977bdfefa0f02e55eb19f2c11a2614b706999c488a71a0c18728ad1691961@[::]:30303","ip":"::","ports":{"discovery":30303,"listener":30303},"listenAddr":"[::]:30303","protocols":{"eth":{"network":1,"difficulty":131072,"genesis":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f","config":{"chainId":null,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"},"head":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f"}}}}
+Target enode identified as enode://afbfbde7b38719999d3b38c21739b3ce1c40e67d3758fe171a49dceefeaba6f741b977bdfefa0f02e55eb19f2c11a2614b706999c488a71a0c18728ad1691961@[::]:30303
+Run Devp2p tests against enode://afbfbde7b38719999d3b38c21739b3ce1c40e67d3758fe171a49dceefeaba6f741b977bdfefa0f02e55eb19f2c11a2614b706999c488a71a0c18728ad1691961@[::]:30303
+=== RUN   TestDiscovery
+=== RUN   TestDiscovery/discoveryv4
+=== RUN   TestDiscovery/discoveryv4/v4002
+--- PASS: TestDiscovery (0.02s)
+    devp2p_test.go:86: Daemon with version 18.09.0-ce-beta1 is up
+    --- PASS: TestDiscovery/discoveryv4 (0.00s)
+        --- PASS: TestDiscovery/discoveryv4/v4002 (0.00s)
+            devp2p_test.go:154: Pinging with incorrect target endpoint.
+PASS

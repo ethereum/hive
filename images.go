@@ -131,7 +131,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 			if name := filepath.Dir(path); re.MatchString(name) {
 				names = append(names, filepath.Join(strings.Split(name, string(filepath.Separator))[1:]...))
 			}
-			return filepath.SkipDir
+			//return filepath.SkipDir
 		}
 		// Continue walking the path
 		return nil

@@ -13,6 +13,15 @@ RUN (cd /go/src/github.com/ethereum/go-ethereum )
 RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go make all)
 RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go go get)
 
+# Add the docker client
+RUN (git clone -b master https://github.com/fsouza/go-dockerclient /go/src/github.com/fsouza/go-dockerclient)
+
+RUN (cd /go/src/github.com/fsouza/go-dockerclient && GOPATH=/go go get)
+
+
+
+#RUN (cd / && GOPATH=/go go get github.com/fsouza/go-dockerclient)
+
 # Add the local test stuff
 ADD devp2p_test.go /devp2p_test.go
 ADD node.go /node.go
