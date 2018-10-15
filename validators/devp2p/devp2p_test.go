@@ -145,15 +145,15 @@ func SourceUnknownPingUnknownEnode(t *testing.T) {
 func SourceUnknownPingKnownEnode(t *testing.T) {
 	t.Log("Test v4001")
 	if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Unable to v4 ping: %v", err)
+		t.Fatalf("Ping test failed: %v", err)
 	}
 }
 
 //v4002
 func SourceUnknownPingWrongTo(t *testing.T) {
 	t.Log("Test v4002")
-	if err := v4udp.pingWrongTo(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err == nil {
-		t.Fatalf("Unable to v4 ping: %v", err)
+	if err := v4udp.pingWrongTo(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Ping test failed: %v", err)
 	}
 
 }

@@ -1,14 +1,13 @@
 Starting validator.
 Trying to get enode.
-Got admin enode info response: {"jsonrpc":"2.0","id":1,"result":{"id":"ff68950aff958f123cc9e29e1b5b2178f3cc4495962cdf05cde0b10a1ad9f05d","name":"Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1","enode":"enode://04390cb8a46555a80cca7d01a1656fe7aab8e6124dcca1d0a59c103c80ae925896e354af5c8c614d52c8b3cd511a58cf8b0d58cbd9caa6f01c2a23653097eb75@[::]:30303","ip":"::","ports":{"discovery":30303,"listener":30303},"listenAddr":"[::]:30303","protocols":{"eth":{"network":1,"difficulty":131072,"genesis":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f","config":{"chainId":null,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"},"head":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f"}}}}
-Target enode identified as enode://04390cb8a46555a80cca7d01a1656fe7aab8e6124dcca1d0a59c103c80ae925896e354af5c8c614d52c8b3cd511a58cf8b0d58cbd9caa6f01c2a23653097eb75@[::]:30303
-Run Devp2p tests against enode://04390cb8a46555a80cca7d01a1656fe7aab8e6124dcca1d0a59c103c80ae925896e354af5c8c614d52c8b3cd511a58cf8b0d58cbd9caa6f01c2a23653097eb75@[::]:30303
+Got admin enode info response: {"jsonrpc":"2.0","id":1,"result":{"id":"bc402ebd7223536200077ccc9912f6748897fde2af360efe4bf0a5e781bdd529","name":"Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1","enode":"enode://79f5bf29a3b3de4534674db3f5a85d5e123e48d97572063877c98c2171715ccb74ccab0f0474be7b756510003eff776f19efde4cf495dba1266d18535b50567f@[::]:30303","ip":"::","ports":{"discovery":30303,"listener":30303},"listenAddr":"[::]:30303","protocols":{"eth":{"network":1,"difficulty":131072,"genesis":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f","config":{"chainId":null,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"},"head":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f"}}}}
+Target enode identified as enode://79f5bf29a3b3de4534674db3f5a85d5e123e48d97572063877c98c2171715ccb74ccab0f0474be7b756510003eff776f19efde4cf495dba1266d18535b50567f@[::]:30303
+Run Devp2p tests against enode://79f5bf29a3b3de4534674db3f5a85d5e123e48d97572063877c98c2171715ccb74ccab0f0474be7b756510003eff776f19efde4cf495dba1266d18535b50567f@[::]:30303
 === RUN   TestDiscovery
 === RUN   TestDiscovery/discoveryv4
 === RUN   TestDiscovery/discoveryv4/v4001
---- PASS: TestDiscovery (0.03s)
-    devp2p_test.go:86: Daemon with version 18.09.0-ce-beta1 is up
-    --- PASS: TestDiscovery/discoveryv4 (0.02s)
-        --- PASS: TestDiscovery/discoveryv4/v4001 (0.02s)
-            devp2p_test.go:146: Pinging known node id.
+--- PASS: TestDiscovery (0.00s)
+    --- PASS: TestDiscovery/discoveryv4 (0.00s)
+        --- PASS: TestDiscovery/discoveryv4/v4001 (0.00s)
+            devp2p_test.go:146: Test v4001
 PASS
