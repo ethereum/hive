@@ -44,7 +44,7 @@ var (
 	errClockWarp        = errors.New("reply deadline too far in the future")
 	errClosed           = errors.New("socket closed")
 	errResponseReceived = errors.New("response received")
-	pingHandler         = defaultPingHandler
+	errPacketMismatch   = errors.New("packet mismatch")
 	unexpectedPacket    = false
 )
 
@@ -200,17 +200,19 @@ type V4Udp struct {
 // to all the callback functions for that node.
 type pending struct {
 	// these fields must match in the reply.
-	from  enode.ID
-	ptype byte
+	from enode.ID
 
 	// time when the request must complete
 	deadline time.Time
 
-	// callback is called when a matching reply arrives. if it returns
-	// true, the callback is removed from the pending reply queue.
-	// if it returns false, the reply is considered incomplete and
-	// the callback will be invoked again for the next matching reply.
-	callback func(resp interface{}) (done bool)
+	//callback is called when a packet is received. if it returns nil,
+	//the callback is removed from the pending reply queue (handled successfully and expected by test case).
+	//if it returns a mismatch error, (ignored by callback, further 'pendings' may be in the test case)
+	//if it returns any other error, that error is considered the outcome of the
+	//'pending' operation
+
+	//callback func(resp interface{}) (done error)
+	callback func(resp reply) (done error)
 
 	// errc receives nil when the callback indicates completion or an
 	// error if no further reply is received within the timeout.
@@ -296,31 +298,8 @@ func (t *V4Udp) close() {
 
 // ping sends a ping message to the given node and waits for a reply.
 func (t *V4Udp) ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
-	return <-t.sendPing(toid, toaddr, recoveryCallback, validateEnodeID, false)
-}
 
-func (t *V4Udp) pingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
-
-	//We don't expect any pings at all
-	pingHandler = func(req *ping, t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []byte) error {
-		unexpectedPacket = true
-		return nil
-	}
-
-	return <-t.sendPing(toid, toaddr, recoveryCallback, validateEnodeID, false)
-}
-
-// sendPing sends a ping message to the given node and invokes the callback
-// when the reply arrives.
-func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, recoveryCallback func(e *ecdsa.PublicKey), validateEnodeID bool, fudgeTo bool) <-chan error {
-
-	var to rpcEndpoint
-
-	if fudgeTo {
-		to = makeEndpoint(&net.UDPAddr{IP: []byte{0, 1, 2, 3}, Port: 1}, 0)
-	} else {
-		to = makeEndpoint(toaddr, 0)
-	}
+	to := makeEndpoint(toaddr, 0)
 
 	req := &ping{
 		Version:    4,
@@ -331,26 +310,52 @@ func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, recoveryCallback fu
 
 	packet, hash, err := encodePacket(t.priv, pingPacket, req)
 	if err != nil {
-		errc := make(chan error, 1)
-		errc <- err
-		return errc
+		return err
 	}
 
-	errc := t.pending(toid, pongPacket, func(p interface{}) bool {
-		inPacket := p.(incomingPacket)
-		ok := bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash)
-		if ok && validateEnodeID {
-			ok = ok && (toid == inPacket.recoveredID.id())
+	callback := func(p reply) error {
+		if p.ptype == pongPacket {
+			inPacket := p.data.(incomingPacket)
+
+			if !bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash) {
+				return errUnsolicitedReply
+
+			if validateEnodeID && toid != inPacket.recoveredID.id() {
+				return errUnknownNode
+			}
+
+			if recoveryCallback != nil {
+				key, err := decodePubkey(inPacket.recoveredID)
+				if err != nil {
+					recoveryCallback(key)
+				}
+			}
+		
+		} else {
+			return errPacketMismatch
 		}
 
-		if ok && recoveryCallback != nil {
-			key, err := decodePubkey(inPacket.recoveredID)
-			if err != nil {
-				recoveryCallback(key)
-			}
-		}
-		return ok && unexpectedPacket
-	})
+	}
+	return <-t.sendPing(toid, toaddr, req, packet, callback)
+
+}
+
+func (t *V4Udp) pingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+
+	to := makeEndpoint(&net.UDPAddr{IP: []byte{0, 1, 2, 3}, Port: 1}, 0)
+
+	req := &ping{
+		Version:    4,
+		From:       t.ourEndpoint,
+		To:         to, // TODO: maybe use known TCP port from DB
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+}
+
+func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, req *ping, packet []byte, callback func(reply) error) <-chan error {
+
+	errc := t.pending(toid, callback)
 	t.write(toaddr, req.name(), packet)
 	return errc
 }
@@ -399,9 +404,9 @@ func (t *V4Udp) findnode(toid enode.ID, toaddr *net.UDPAddr, target encPubkey) (
 
 // pending adds a reply callback to the pending reply queue.
 // see the documentation of type pending for a detailed explanation.
-func (t *V4Udp) pending(id enode.ID, ptype byte, callback func(interface{}) bool) <-chan error {
+func (t *V4Udp) pending(id enode.ID, callback func(reply) error) <-chan error {
 	ch := make(chan error, 1)
-	p := &pending{from: id, ptype: ptype, callback: callback, errc: ch}
+	p := &pending{from: id, callback: callback, errc: ch}
 	select {
 	case t.addpending <- p:
 		// loop will handle it
@@ -481,7 +486,9 @@ func (t *V4Udp) loop() {
 					// that all replies have been received. This is
 					// required for packet types that expect multiple
 					// reply packets.
-					if p.callback(r.data) {
+
+					//if p.callback(r.data) {
+					if p.callback(r) {
 						p.errc <- nil
 						plist.Remove(el)
 					}
@@ -665,7 +672,7 @@ func decodePacket(buf []byte) (packet, encPubkey, []byte, error) {
 	return req, fromKey, hash, err
 }
 
-func defaultPingHandler(req *ping, t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []byte) error {
+func (req *ping) handle(t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []byte) error {
 	if expired(req.Expiration) {
 		return errExpired
 	}
@@ -692,10 +699,6 @@ func defaultPingHandler(req *ping, t *V4Udp, from *net.UDPAddr, fromKey encPubke
 	// }
 	// t.db.UpdateLastPingReceived(n.ID(), time.Now())
 	return nil
-}
-
-func (req *ping) handle(t *V4Udp, from *net.UDPAddr, fromKey encPubkey, mac []byte) error {
-	return pingHandler(req, t, from, fromKey, mac)
 }
 
 func (req *ping) name() string { return "PING/v4" }
