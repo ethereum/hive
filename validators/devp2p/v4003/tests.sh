@@ -13,7 +13,7 @@ chmod +x /enode.sh
 . /enode.sh
 
 echo "Run Devp2p tests against $TARGET_ENODE"
-/devp2p.test -test.v -test.run Discovery/discoveryv4/v4003 -enodeTarget "$TARGET_ENODE" -targetIP "$HIVE_CLIENT_IP" -dockerHost "tcp://docker.for.win.localhost:2375" -targetID "$HIVE_CLIENT_ID"
+/devp2p.test -test.v -test.run Discovery/discoveryv4/v4003 -enodeTarget "$TARGET_ENODE" -targetIP "$HIVE_CLIENT_IP" -dockerHost "$HIVE_DOCKER_HOST_ALIAS"-targetID "$HIVE_CLIENT_ID"
 
 
 # Run hive (must be run from root directory of hive repo)
