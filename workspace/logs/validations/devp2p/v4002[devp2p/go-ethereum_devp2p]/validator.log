@@ -1,13 +1,14 @@
 Starting validator.
 Trying to get enode.
-Got admin enode info response: {"jsonrpc":"2.0","id":1,"result":{"id":"ba79009eafe743a5b132bb5d44f92ddb1c2618b24db722b9f3af0126ba635723","name":"Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1","enode":"enode://13bf44103de048521384f2d629a607c737260fc2657e48f626b513f45bedbb62e1c75d4e7e2b6aaf03addd770ae623628287fef078450d0b91ce21693848b6f8@[::]:30303","ip":"::","ports":{"discovery":30303,"listener":30303},"listenAddr":"[::]:30303","protocols":{"eth":{"network":1,"difficulty":131072,"genesis":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f","config":{"chainId":null,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"},"head":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f"}}}}
-Target enode identified as enode://13bf44103de048521384f2d629a607c737260fc2657e48f626b513f45bedbb62e1c75d4e7e2b6aaf03addd770ae623628287fef078450d0b91ce21693848b6f8@[::]:30303
-Run Devp2p tests against enode://13bf44103de048521384f2d629a607c737260fc2657e48f626b513f45bedbb62e1c75d4e7e2b6aaf03addd770ae623628287fef078450d0b91ce21693848b6f8@[::]:30303
+Got admin enode info response: {"jsonrpc":"2.0","id":1,"result":{"id":"6580e3ead02a30372b880e83ea4ae3fc8d6694fb4a4f4b39b231cff15eb4a75f","name":"Geth/v1.8.17-unstable-bd1f7ebd/linux-amd64/go1.10.1","enode":"enode://21a47820f8fdb115eea3212c11f2146691a7133b3f55e92c98d10cea750c81c8d7271f074c2d31911615f9fa2ea381d0fea97093ca175c0df084af2b6c88cc5b@[::]:30303","ip":"::","ports":{"discovery":30303,"listener":30303},"listenAddr":"[::]:30303","protocols":{"eth":{"network":1,"difficulty":131072,"genesis":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f","config":{"chainId":null,"eip150Hash":"0x0000000000000000000000000000000000000000000000000000000000000000"},"head":"0xf8f01382f5636d02edac7fff679a6feb7a572d37a395daaab77938feb6fe217f"}}}}
+Target enode identified as enode://21a47820f8fdb115eea3212c11f2146691a7133b3f55e92c98d10cea750c81c8d7271f074c2d31911615f9fa2ea381d0fea97093ca175c0df084af2b6c88cc5b@[::]:30303
+Run Devp2p tests against enode://21a47820f8fdb115eea3212c11f2146691a7133b3f55e92c98d10cea750c81c8d7271f074c2d31911615f9fa2ea381d0fea97093ca175c0df084af2b6c88cc5b@[::]:30303
 === RUN   TestDiscovery
 === RUN   TestDiscovery/discoveryv4
 === RUN   TestDiscovery/discoveryv4/v4002
---- PASS: TestDiscovery (0.00s)
-    --- PASS: TestDiscovery/discoveryv4 (0.00s)
-        --- PASS: TestDiscovery/discoveryv4/v4002 (0.00s)
+--- FAIL: TestDiscovery (0.00s)
+    --- FAIL: TestDiscovery/discoveryv4 (0.00s)
+        --- FAIL: TestDiscovery/discoveryv4/v4002 (0.00s)
             devp2p_test.go:154: Test v4002
-PASS
+            devp2p_test.go:156: Ping test failed: unsolicited reply
+FAIL

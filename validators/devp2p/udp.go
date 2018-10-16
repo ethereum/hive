@@ -50,7 +50,7 @@ var (
 
 // Timeouts
 const (
-	respTimeout    = 500 * time.Millisecond //FRANK: testing, should be 500
+	respTimeout    = 500 * time.Millisecond
 	expiration     = 20 * time.Second
 	bondExpiration = 24 * time.Hour
 
@@ -65,6 +65,14 @@ const (
 	pongPacket
 	findnodePacket
 	neighborsPacket
+	garbagePacket1
+	garbagePacket2
+	garbagePacket3
+	garbagePacket4
+	garbagePacket5
+	garbagePacket6
+	garbagePacket7
+	garbagePacket8
 )
 
 // RPC request structures
@@ -73,6 +81,16 @@ type (
 		Version    uint
 		From, To   rpcEndpoint
 		Expiration uint64
+		// Ignore additional fields (for forward compatibility).
+		Rest []rlp.RawValue `rlp:"tail"`
+	}
+
+	pingExtra struct {
+		Version    uint
+		From, To   rpcEndpoint
+		Expiration uint64
+		JunkData1  uint
+		JunkData2  []byte
 		// Ignore additional fields (for forward compatibility).
 		Rest []rlp.RawValue `rlp:"tail"`
 	}
@@ -341,6 +359,53 @@ func (t *V4Udp) ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, r
 
 }
 
+func (t *V4Udp) pingWrongFrom(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+
+	to := makeEndpoint(toaddr, 0)
+
+	from := makeEndpoint(&net.UDPAddr{IP: []byte{0, 1, 2, 3}, Port: 1}, 0) //this is a garbage endpoint
+
+	req := &ping{
+		Version:    4,
+		From:       from,
+		To:         to, // TODO: maybe use known TCP port from DB
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+	packet, hash, err := encodePacket(t.priv, pingPacket, req)
+	if err != nil {
+		return err
+	}
+
+	//expect the usual ping stuff - a bad 'from' should be ignored
+	callback := func(p reply) error {
+		if p.ptype == pongPacket {
+			inPacket := p.data.(incomingPacket)
+
+			if !bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash) {
+				return errUnsolicitedReply
+			}
+
+			if validateEnodeID && toid != inPacket.recoveredID.id() {
+				return errUnknownNode
+			}
+
+			if recoveryCallback != nil {
+				key, err := decodePubkey(inPacket.recoveredID)
+				if err != nil {
+					recoveryCallback(key)
+				}
+			}
+		} else {
+			return errPacketMismatch
+		}
+		return nil
+
+	}
+	return <-t.sendPing(toid, toaddr, req, packet, callback)
+
+}
+
 func (t *V4Udp) pingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
 
 	to := makeEndpoint(&net.UDPAddr{IP: []byte{0, 1, 2, 3}, Port: 1}, 0)
@@ -372,7 +437,139 @@ func (t *V4Udp) pingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID 
 
 }
 
-func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, req *ping, packet []byte, callback func(reply) error) <-chan error {
+//ping with a 'future format' packet containing extra fields
+func (t *V4Udp) pingExtraData(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+
+	to := makeEndpoint(toaddr, 0)
+
+	req := &pingExtra{
+		Version:   4,
+		From:      t.ourEndpoint,
+		To:        to,
+		JunkData1: 42,
+		JunkData2: []byte{9, 8, 7, 6, 5, 4, 3, 2, 1},
+
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+	packet, hash, err := encodePacket(t.priv, pingPacket, req)
+	if err != nil {
+		return err
+	}
+
+	//expect the usual ping reponses
+	callback := func(p reply) error {
+		if p.ptype == pongPacket {
+			inPacket := p.data.(incomingPacket)
+
+			if !bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash) {
+				return errUnsolicitedReply
+			}
+
+			if validateEnodeID && toid != inPacket.recoveredID.id() {
+				return errUnknownNode
+			}
+
+			if recoveryCallback != nil {
+				key, err := decodePubkey(inPacket.recoveredID)
+				if err != nil {
+					recoveryCallback(key)
+				}
+			}
+		} else {
+			return errPacketMismatch
+		}
+		return nil
+	}
+	return <-t.sendPing(toid, toaddr, &ping{}, packet, callback) //the dummy ping is just to get the name
+
+}
+
+//ping with a 'future format' packet containing extra fields and make sure it works even with the wrong 'from' field
+func (t *V4Udp) pingExtraDataWrongFrom(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+
+	to := makeEndpoint(toaddr, 0)
+
+	from := makeEndpoint(&net.UDPAddr{IP: []byte{0, 1, 2, 3}, Port: 1}, 0) //this is a garbage endpoint
+
+	req := &pingExtra{
+		Version:   4,
+		From:      from,
+		To:        to,
+		JunkData1: 42,
+		JunkData2: []byte{9, 8, 7, 6, 5, 4, 3, 2, 1},
+
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+	packet, hash, err := encodePacket(t.priv, pingPacket, req)
+	if err != nil {
+		return err
+	}
+
+	//expect the usual ping reponses
+	callback := func(p reply) error {
+		if p.ptype == pongPacket {
+			inPacket := p.data.(incomingPacket)
+
+			if !bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash) {
+				return errUnsolicitedReply
+			}
+
+			if validateEnodeID && toid != inPacket.recoveredID.id() {
+				return errUnknownNode
+			}
+
+			if recoveryCallback != nil {
+				key, err := decodePubkey(inPacket.recoveredID)
+				if err != nil {
+					recoveryCallback(key)
+				}
+			}
+		} else {
+			return errPacketMismatch
+		}
+		return nil
+	}
+	return <-t.sendPing(toid, toaddr, &ping{}, packet, callback) //the dummy ping is just to get the name
+
+}
+
+// send a packet (a ping packet, though it could be something else) with an unknown packet type to the client and
+// see how the target behaves. If the target responds to the ping, then fail.
+func (t *V4Udp) pingTargetWrongPacketType(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+
+	to := makeEndpoint(toaddr, 0)
+
+	req := &ping{
+		Version:    4,
+		From:       t.ourEndpoint,
+		To:         to, // TODO: maybe use known TCP port from DB
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+	packet, _, err := encodePacket(t.priv, garbagePacket8, req)
+	if err != nil {
+		return err
+	}
+
+	//expect anything but a ping or pong
+	callback := func(p reply) error {
+		if p.ptype == pongPacket {
+			return errUnsolicitedReply
+		}
+
+		if p.ptype == pingPacket {
+			return errUnsolicitedReply
+		}
+
+		return errPacketMismatch
+	}
+	return <-t.sendPing(toid, toaddr, req, packet, callback)
+
+}
+
+func (t *V4Udp) sendPing(toid enode.ID, toaddr *net.UDPAddr, req packet, packet []byte, callback func(reply) error) <-chan error {
 
 	errc := t.pending(toid, callback)
 	t.write(toaddr, req.name(), packet)

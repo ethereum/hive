@@ -102,11 +102,11 @@ func TestDiscovery(t *testing.T) {
 			pingTest = SourceUnknownPingKnownEnode
 		}
 
-		t.Run("v4001", pingTest)
-		t.Run("v4002", SourceUnknownPingWrongTo)
-		t.Run("v4003", SourceUnknownPingWrongFrom)
-		t.Run("v4004", SourceUnknownPingExtraData)
-		t.Run("v4005", SourceUnknownPingExtraDataWrongFrom)
+		t.Run("v4001", pingTest)                            //+
+		t.Run("v4002", SourceUnknownPingWrongTo)            //+
+		t.Run("v4003", SourceUnknownPingWrongFrom)          //+
+		t.Run("v4004", SourceUnknownPingExtraData)          //+
+		t.Run("v4005", SourceUnknownPingExtraDataWrongFrom) //+
 		t.Run("v4006", SourceUnknownPingExtraDataWrongTo)
 		t.Run("v4007", SourceUnknownFindNeighbours)
 		t.Run("v4008", SourceUnknownUnsolicitedNeighbours)
@@ -114,11 +114,14 @@ func TestDiscovery(t *testing.T) {
 		t.Run("v4010", SourceKnownPingFromSignatureMismatch)
 		t.Run("v4011", SourceKnownSignaturePingFromMismatch)
 		t.Run("v4012", FindNeighboursOnRecentlyBondedTarget)
-		t.Run("v4013", FindNeighboursOnOldBondedTarget)
+		t.Run("v4013", FindNeighboursOnOldBondedTarget) //Go and faketime? Defer this.
 		t.Run("v4014", PingPastExpiration)
 		t.Run("v4015", FindNeighboursPastExpiration)
 
 	})
+	//ENR
+	//Rename above test codes to function names.
+	//TAP ( test anything protocol) - add to hive?
 
 	t.Run("discoveryv5", func(t *testing.T) {
 
@@ -167,6 +170,10 @@ func SourceUnknownPingWrongFrom(t *testing.T) {
 //v4004
 func SourceUnknownPingExtraData(t *testing.T) {
 	t.Log("Test v4004")
+	if err := v4udp.pingExtraData(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Ping test failed: %v", err)
+	}
+
 }
 
 //v4005
@@ -175,7 +182,7 @@ func SourceUnknownPingExtraDataWrongFrom(t *testing.T) {
 }
 
 //v4006
-func SourceUnknownPingExtraDataWrongTo(t *testing.T) {
+func SourceUnknownWrongPacketType(t *testing.T) {
 	t.Log("Test v4006")
 }
 
