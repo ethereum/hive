@@ -174,16 +174,18 @@ func startSimulatorAPI(daemon *docker.Client, client, simulator string, override
 	// Serve connections until the listener is terminated
 	logger.Debug("starting simulator API server")
 	sim := &simulatorAPIHandler{
-		listener:  listener,
-		daemon:    daemon,
-		logger:    logger,
-		logdir:    logdir,
-		client:    client,
-		simulator: simulator,
-		overrides: overrides,
-		nodes:     make(map[string]*docker.Container),
-		result:    result,
+		listener:     listener,
+		daemon:       daemon,
+		logger:       logger,
+		logdir:       logdir,
+		client:       client,
+		simulator:    simulator,
+		overrides:    overrides,
+		nodes:        make(map[string]*docker.Container),
+		nodesTimeout: make(map[string]time.Time),
+		result:       result,
 	}
+	go sim.CheckTimeout()
 	go http.Serve(listener, sim)
 
 	return sim, nil
@@ -202,11 +204,48 @@ type simulatorAPIHandler struct {
 	overrides []string
 	autoID    uint32
 
-	runner *docker.Container
-	nodes  map[string]*docker.Container
+	runner       *docker.Container
+	nodes        map[string]*docker.Container
+	nodesTimeout map[string]time.Time
 
 	result *simulationResult
 	lock   sync.RWMutex
+}
+
+// CheckTimeout is a goroutine that checks if the timeout has passed and stops
+// container if it has.
+func (h *simulatorAPIHandler) CheckTimeout() {
+	for {
+		h.lock.Lock()
+		for id, c := range h.nodes {
+			if !c.State.Running || (time.Now().After(h.nodesTimeout[id])) {
+				h.terminateContainer(id, nil)
+			}
+		}
+		h.lock.Unlock()
+		time.Sleep(timeoutCheckDuration)
+	}
+}
+
+func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
+	node, ok := h.nodes[id]
+	delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
+	delete(h.nodesTimeout, id)
+
+	if !ok {
+		h.logger.Error("unknown client deletion requested", "id", id)
+		if w != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+		return
+	}
+	h.logger.Debug("deleting client container", "id", node.ID[:8])
+	if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
+		h.logger.Error("failed to delete client ", "id", id, "error", err)
+		if w != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
 }
 
 // ServeHTTP handles all the simulator API requests and executes them.
@@ -317,6 +356,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			fmt.Fprintf(w, "%s", container.ID[:8])
 			h.lock.Lock()
 			h.nodes[container.ID[:8]] = container
+			h.nodesTimeout[container.ID[:8]] = time.Now().Add(dockerTimeoutDuration)
 			h.lock.Unlock()
 			return
 
@@ -361,20 +401,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
 
 			h.lock.Lock()
-			node, ok := h.nodes[id]
-			delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
+			h.terminateContainer(id, w)
 			h.lock.Unlock()
-
-			if !ok {
-				logger.Error("unknown client deletion requested", "id", id)
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-			h.logger.Debug("deleting client container", "id", node.ID[:8])
-			if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
-				logger.Error("failed to delete client ", "id", id, "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
 
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
