@@ -81,10 +81,11 @@ Fail:
 
 #### v4010
 This test calls find neighbours on a target after the bonding process is completed. The neighbours response is expected.
+It also sends an unsolicited neighbours packet with garbage data. If the fake neighbour is accepted by the target and returned, then this is a failure in that it allows the DHT to be corrupted.
 
 Fail:
 - No neighbours response is received. 
-- TODO: - need to add a bootnode container with a predetermined set of neighbours. Verify that the neighbours response contains those neighbours. 
+- Corrupted DHT (fake neighbour accepted)
 
 
 
