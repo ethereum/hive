@@ -12,16 +12,21 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 var (
-	listenPort   *string     // udp listen port
-	natdesc      *string     //nat mode
-	targetnode   *enode.Node // parsed Node
-	targetip     net.IP      //targetIP
+	listenPort   *string        // udp listen port
+	natdesc      *string        //nat mode
+	targetnode   *enode.Node    // parsed Node
+	targetIP     net.IP         //targetIP
+	dockerHost   *string        //docker host api endpoint
+	daemon       *docker.Client //docker daemon proxy
+	targetID     *string        //docker client id
 	nodeKey      *ecdsa.PrivateKey
 	err          error
 	restrictList *netutil.Netlist
+	v4udp        V4Udp
 )
 
 func TestMain(m *testing.M) {
@@ -30,6 +35,8 @@ func TestMain(m *testing.M) {
 	testTargetIP := flag.String("targetIP", "", "IP Address of hive container client")
 	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
+	dockerHost = flag.String("dockerHost", "", "docker host api endpoint")
+	targetID = flag.String("targetID", "", "the hive client container id")
 	flag.Parse()
 
 	//If an enode was supplied, use that
@@ -42,12 +49,12 @@ func TestMain(m *testing.M) {
 
 	//If a target ip was supplied, parse it and use it
 	if *testTargetIP != "" {
-		targetip = net.ParseIP(*testTargetIP)
+		targetIP = net.ParseIP(*testTargetIP)
 		//if the target enode was supplied, override the ip address with the target ip supplied, which
 		//seems to be useful when the supplied enode ip address is incorrect in some way when reported
 		//from a docker container
 		if targetnode != nil {
-			targetnode = enode.NewV4(targetnode.Pubkey(), targetip, targetnode.TCP(), targetnode.UDP())
+			targetnode = enode.NewV4(targetnode.Pubkey(), targetIP, targetnode.TCP(), targetnode.UDP())
 		}
 	}
 
@@ -59,12 +66,31 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+//not currently necessary:
+func connectToDockerDaemon(t *testing.T) {
+	// this test suite needs to be able to control the client container to:
+	// - Reset the container so that nodes are known/unknown
+	// - Manipulate faketime for timing related tests
+	daemon, err = docker.NewClient(*dockerHost)
+	if err != nil {
+		t.Error("failed to connect to docker daemon")
+		return
+	}
+	env, err := daemon.Version()
+	if err != nil {
+		t.Fatalf("failed to retrieve docker version %s", err)
+		return
+	}
+	t.Logf("Daemon with version %s is up", env.Get("Version"))
+}
+
 // TestDiscovery tests the set of discovery protocols
 func TestDiscovery(t *testing.T) {
 	// discovery v4 test suites
+
 	t.Run("discoveryv4", func(t *testing.T) {
 		//setup
-		v4udp := setupv4UDP()
+		v4udp = setupv4UDP()
 
 		//If the client has a known enode, obtained from an admin API, then run a standard ping
 		//Otherwise, run a different ping where we override any enode validation checks
@@ -72,26 +98,24 @@ func TestDiscovery(t *testing.T) {
 		var pingTest func(t *testing.T)
 
 		if targetnode == nil {
-			t.Log("Pinging unknown node id.")
-			pingTest = func(t *testing.T) {
-				if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetip, Port: 30303}, false, func(e *ecdsa.PublicKey) {
-
-					targetnode = enode.NewV4(e, targetip, 30303, 30303)
-					t.Log("Discovered node id " + targetnode.String())
-				}); err != nil {
-					t.Fatalf("Unable to v4 ping: %v", err)
-				}
-			}
+			pingTest = SourceUnknownPingUnknownEnode
 		} else {
-			t.Log("Pinging known node id.")
-			pingTest = func(t *testing.T) {
-				if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-					t.Fatalf("Unable to v4 ping: %v", err)
-				}
-			}
+			pingTest = SourceUnknownPingKnownEnode
 		}
 
-		t.Run("ping", pingTest)
+		t.Run("pingTest(v4001)", pingTest)
+		t.Run("SourceUnknownPingWrongTo(v4002)", SourceUnknownPingWrongTo)
+		t.Run("SourceUnknownPingWrongFrom(v4003)", SourceUnknownPingWrongFrom)
+		t.Run("SourceUnknownPingExtraData(v4004)", SourceUnknownPingExtraData)
+		t.Run("SourceUnknownPingExtraDataWrongFrom(v4005)", SourceUnknownPingExtraDataWrongFrom)
+		t.Run("SourceUnknownWrongPacketType(v4006)", SourceUnknownWrongPacketType)
+		t.Run("SourceUnknownFindNeighbours(v4007)", SourceUnknownFindNeighbours)
+
+		t.Run("SourceKnownPingFromSignatureMismatch(v4009)", SourceKnownPingFromSignatureMismatch)
+		t.Run("FindNeighboursOnRecentlyBondedTarget(v4010)", FindNeighboursOnRecentlyBondedTarget)
+		t.Run("PingPastExpiration(v4011)", PingPastExpiration)
+		t.Run("FindNeighboursPastExpiration(v4012)", FindNeighboursPastExpiration)
+
 	})
 
 	t.Run("discoveryv5", func(t *testing.T) {
@@ -101,6 +125,112 @@ func TestDiscovery(t *testing.T) {
 		})
 	})
 
+}
+
+//v4001a
+func SourceUnknownPingUnknownEnode(t *testing.T) {
+	t.Log("Pinging unknown node id.")
+	if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetIP, Port: 30303}, false, func(e *ecdsa.PublicKey) {
+
+		targetnode = enode.NewV4(e, targetIP, 30303, 30303)
+		t.Log("Discovered node id " + targetnode.String())
+	}); err != nil {
+		t.Fatalf("Unable to v4 ping: %v", err)
+	}
+}
+
+//v4001b
+func SourceUnknownPingKnownEnode(t *testing.T) {
+	t.Log("Test v4001")
+	if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Ping test failed: %v", err)
+	}
+}
+
+//v4002
+func SourceUnknownPingWrongTo(t *testing.T) {
+	t.Log("Test v4002")
+	if err := v4udp.pingWrongTo(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
+
+}
+
+//v4003
+func SourceUnknownPingWrongFrom(t *testing.T) {
+	t.Log("Test v4003")
+	if err := v4udp.pingWrongFrom(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
+}
+
+//v4004
+func SourceUnknownPingExtraData(t *testing.T) {
+	t.Log("Test v4004")
+	if err := v4udp.pingExtraData(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
+}
+
+//v4005
+func SourceUnknownPingExtraDataWrongFrom(t *testing.T) {
+	t.Log("Test v4005")
+	if err := v4udp.pingExtraDataWrongFrom(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
+}
+
+//v4006
+func SourceUnknownWrongPacketType(t *testing.T) {
+	t.Log("Test v4006")
+	if err := v4udp.pingTargetWrongPacketType(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != errTimeout {
+		t.Fatalf("Test failed: %v", err)
+	}
+}
+
+//v4007
+func SourceUnknownFindNeighbours(t *testing.T) {
+	t.Log("Test v4007")
+	targetEncKey := encodePubkey(targetnode.Pubkey())
+	if err := v4udp.findnodeWithoutBond(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != errTimeout {
+		t.Fatalf("Test failed: %v", err)
+	}
+}
+
+//v4009
+func SourceKnownPingFromSignatureMismatch(t *testing.T) {
+
+	t.Log("Test v4009")
+	if err := v4udp.pingBondedWithMangledFromField(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
+
+}
+
+//v4010
+func FindNeighboursOnRecentlyBondedTarget(t *testing.T) {
+	t.Log("Test v4010")
+	targetEncKey := encodePubkey(targetnode.Pubkey())
+	if err := v4udp.bondedSourceFindNeighbours(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
+}
+
+//v4011
+func PingPastExpiration(t *testing.T) {
+	t.Log("Test v4011")
+	if err := v4udp.pingPastExpiration(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != errTimeout {
+		t.Fatalf("Test failed: %v", err)
+	}
+}
+
+//v4012
+func FindNeighboursPastExpiration(t *testing.T) {
+	t.Log("Test v4012")
+	targetEncKey := encodePubkey(targetnode.Pubkey())
+	if err := v4udp.bondedSourceFindNeighboursPastExpiration(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != errTimeout {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 // TestRLPx checks the RLPx handshaking
