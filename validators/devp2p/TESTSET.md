@@ -71,11 +71,7 @@ Fail:
 - A neighbours response is received within 500ms.
 
 #### v4008
-This test makes sure that the contents of unsolicited neighbours packets does not find its way into the client's table. A `neighbours` packet is sent with false neighbours information. A find neighbours request is then sent to the target.
-
-Fail:
-- No neighbours response within 500ms
-- Neighbours reponse contains information from the the fake neighbours packet.
+Test removed
 
 #### v4009
 This test verifies that the default behaviour of ignoring `from` fields is unaffected by the bonding process. After bonding, ping the target with a different `from` endpoint. 

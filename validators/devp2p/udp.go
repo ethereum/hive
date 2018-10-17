@@ -423,11 +423,7 @@ func (t *V4Udp) pingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID 
 
 	callback := func(p reply) error {
 		if p.ptype == pongPacket {
-			return errUnsolicitedReply
-		}
-
-		if p.ptype == pingPacket {
-			return errUnsolicitedReply
+			return nil
 		}
 
 		return errPacketMismatch
@@ -590,56 +586,6 @@ func (t *V4Udp) findnodeWithoutBond(toid enode.ID, toaddr *net.UDPAddr, target e
 
 }
 
-func (t *V4Udp) sourceUnknownCorruptDHT(toid enode.ID, toaddr *net.UDPAddr, target encPubkey) error {
-
-	//neighbours packet
-	req := neighbors{Expiration: uint64(time.Now().Add(expiration).Unix())}
-	var fakeKey *ecdsa.PrivateKey
-	if fakeKey, err = crypto.GenerateKey(); err != nil {
-		return err
-	}
-	fakePub := fakeKey.PublicKey
-	encFakeKey := encodePubkey(&fakePub)
-	fakeNeighbour := rpcNode{ID: encFakeKey, IP: net.IP{1, 2, 3, 4}, UDP: 123, TCP: 123}
-	req.Nodes = []rpcNode{fakeNeighbour}
-
-	t.send(toaddr, neighborsPacket, &req)
-
-	//now call find neighbours
-	findReq := &findnode{
-		Target:     target,
-		Expiration: uint64(time.Now().Add(expiration).Unix()),
-	}
-
-	packet, _, err := encodePacket(t.priv, findnodePacket, findReq)
-	if err != nil {
-		return err
-	}
-
-	//expect neighbours response with no junk
-	callback := func(p reply) error {
-
-		if p.ptype == neighborsPacket {
-			//got a response.
-			//we assume the target is not connected to a public or populated bootnode
-			//so we assume the target does not have any other neighbours in the DHT
-			inPacket := p.data.(incomingPacket)
-
-			for _, neighbour := range inPacket.packet.(*neighbors).Nodes {
-				if neighbour.ID == encFakeKey {
-					return errCorruptDHT
-				}
-			}
-			return nil
-		}
-
-		return errUnsolicitedReply
-	}
-
-	return <-t.sendPacket(toid, toaddr, findReq, packet, callback)
-
-}
-
 func (t *V4Udp) pingBondedWithMangledFromField(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
 
 	//try to bond with the target using normal ping data
@@ -773,9 +719,8 @@ func (t *V4Udp) pingPastExpiration(toid enode.ID, toaddr *net.UDPAddr, validateE
 	callback := func(p reply) error {
 		if p.ptype == pongPacket {
 			return errUnsolicitedReply
-		} else {
-			return errPacketMismatch
 		}
+		return errPacketMismatch
 
 	}
 	return <-t.sendPacket(toid, toaddr, req, packet, callback)

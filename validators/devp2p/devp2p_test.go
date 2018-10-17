@@ -66,7 +66,8 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func ConnectToDockerDaemon(t *testing.T) {
+//not currently necessary:
+func connectToDockerDaemon(t *testing.T) {
 	// this test suite needs to be able to control the client container to:
 	// - Reset the container so that nodes are known/unknown
 	// - Manipulate faketime for timing related tests
@@ -102,23 +103,20 @@ func TestDiscovery(t *testing.T) {
 			pingTest = SourceUnknownPingKnownEnode
 		}
 
-		t.Run("v4001", pingTest)
-		t.Run("v4002", SourceUnknownPingWrongTo)
-		t.Run("v4003", SourceUnknownPingWrongFrom)
-		t.Run("v4004", SourceUnknownPingExtraData)
-		t.Run("v4005", SourceUnknownPingExtraDataWrongFrom)
-		t.Run("v4006", SourceUnknownWrongPacketType)
-		t.Run("v4007", SourceUnknownFindNeighbours)
-		t.Run("v4008", SourceUnknownUnsolicitedNeighbours)
-		t.Run("v4009", SourceKnownSignaturePingFromMismatch)
-		t.Run("v4010", FindNeighboursOnRecentlyBondedTarget)
-		t.Run("v4011", PingPastExpiration)
-		t.Run("v4012", FindNeighboursPastExpiration)
+		t.Run("pingTest(v4001)", pingTest)
+		t.Run("SourceUnknownPingWrongTo(v4002)", SourceUnknownPingWrongTo)
+		t.Run("SourceUnknownPingWrongFrom(v4003)", SourceUnknownPingWrongFrom)
+		t.Run("SourceUnknownPingExtraData(v4004)", SourceUnknownPingExtraData)
+		t.Run("SourceUnknownPingExtraDataWrongFrom(v4005)", SourceUnknownPingExtraDataWrongFrom)
+		t.Run("SourceUnknownWrongPacketType(v4006)", SourceUnknownWrongPacketType)
+		t.Run("SourceUnknownFindNeighbours(v4007)", SourceUnknownFindNeighbours)
+
+		t.Run("SourceKnownPingFromSignatureMismatch(v4009)", SourceKnownPingFromSignatureMismatch)
+		t.Run("FindNeighboursOnRecentlyBondedTarget(v4010)", FindNeighboursOnRecentlyBondedTarget)
+		t.Run("PingPastExpiration(v4011)", PingPastExpiration)
+		t.Run("FindNeighboursPastExpiration(v4012)", FindNeighboursPastExpiration)
 
 	})
-	//ENR
-	//Rename above test codes to function names.
-	//TAP ( test anything protocol) - add to hive?
 
 	t.Run("discoveryv5", func(t *testing.T) {
 
@@ -199,34 +197,40 @@ func SourceUnknownFindNeighbours(t *testing.T) {
 	}
 }
 
-//v4008
-func SourceUnknownUnsolicitedNeighbours(t *testing.T) {
-	t.Log("Test v4008")
-	targetEncKey := encodePubkey(targetnode.Pubkey())
-	if err := v4udp.sourceUnknownCorruptDHT(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != nil {
-		t.Fatalf("Test failed: %v", err)
-	}
-}
-
 //v4009
 func SourceKnownPingFromSignatureMismatch(t *testing.T) {
+
 	t.Log("Test v4009")
+	if err := v4udp.pingBondedWithMangledFromField(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
 
 }
 
 //v4010
 func FindNeighboursOnRecentlyBondedTarget(t *testing.T) {
 	t.Log("Test v4010")
+	targetEncKey := encodePubkey(targetnode.Pubkey())
+	if err := v4udp.bondedSourceFindNeighbours(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 //v4011
 func PingPastExpiration(t *testing.T) {
 	t.Log("Test v4011")
+	if err := v4udp.pingPastExpiration(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != errTimeout {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 //v4012
 func FindNeighboursPastExpiration(t *testing.T) {
 	t.Log("Test v4012")
+	targetEncKey := encodePubkey(targetnode.Pubkey())
+	if err := v4udp.bondedSourceFindNeighboursPastExpiration(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != errTimeout {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 // TestRLPx checks the RLPx handshaking
