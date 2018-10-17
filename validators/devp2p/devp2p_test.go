@@ -102,21 +102,18 @@ func TestDiscovery(t *testing.T) {
 			pingTest = SourceUnknownPingKnownEnode
 		}
 
-		t.Run("v4001", pingTest)                            //+
-		t.Run("v4002", SourceUnknownPingWrongTo)            //+
-		t.Run("v4003", SourceUnknownPingWrongFrom)          //+
-		t.Run("v4004", SourceUnknownPingExtraData)          //+
-		t.Run("v4005", SourceUnknownPingExtraDataWrongFrom) //+
-		t.Run("v4006", SourceUnknownPingExtraDataWrongTo)
+		t.Run("v4001", pingTest)
+		t.Run("v4002", SourceUnknownPingWrongTo)
+		t.Run("v4003", SourceUnknownPingWrongFrom)
+		t.Run("v4004", SourceUnknownPingExtraData)
+		t.Run("v4005", SourceUnknownPingExtraDataWrongFrom)
+		t.Run("v4006", SourceUnknownWrongPacketType)
 		t.Run("v4007", SourceUnknownFindNeighbours)
 		t.Run("v4008", SourceUnknownUnsolicitedNeighbours)
-		t.Run("v4009", SourceKnownPingWrongTo)
-		t.Run("v4010", SourceKnownPingFromSignatureMismatch)
-		t.Run("v4011", SourceKnownSignaturePingFromMismatch)
-		t.Run("v4012", FindNeighboursOnRecentlyBondedTarget)
-		t.Run("v4013", FindNeighboursOnOldBondedTarget) //Go and faketime? Defer this.
-		t.Run("v4014", PingPastExpiration)
-		t.Run("v4015", FindNeighboursPastExpiration)
+		t.Run("v4009", SourceKnownSignaturePingFromMismatch)
+		t.Run("v4010", FindNeighboursOnRecentlyBondedTarget)
+		t.Run("v4011", PingPastExpiration)
+		t.Run("v4012", FindNeighboursPastExpiration)
 
 	})
 	//ENR
@@ -156,7 +153,7 @@ func SourceUnknownPingKnownEnode(t *testing.T) {
 func SourceUnknownPingWrongTo(t *testing.T) {
 	t.Log("Test v4002")
 	if err := v4udp.pingWrongTo(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Ping test failed: %v", err)
+		t.Fatalf("Test failed: %v", err)
 	}
 
 }
@@ -164,71 +161,72 @@ func SourceUnknownPingWrongTo(t *testing.T) {
 //v4003
 func SourceUnknownPingWrongFrom(t *testing.T) {
 	t.Log("Test v4003")
-
+	if err := v4udp.pingWrongFrom(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 //v4004
 func SourceUnknownPingExtraData(t *testing.T) {
 	t.Log("Test v4004")
 	if err := v4udp.pingExtraData(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Ping test failed: %v", err)
+		t.Fatalf("Test failed: %v", err)
 	}
-
 }
 
 //v4005
 func SourceUnknownPingExtraDataWrongFrom(t *testing.T) {
 	t.Log("Test v4005")
+	if err := v4udp.pingExtraDataWrongFrom(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 //v4006
 func SourceUnknownWrongPacketType(t *testing.T) {
 	t.Log("Test v4006")
+	if err := v4udp.pingTargetWrongPacketType(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != errTimeout {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 //v4007
 func SourceUnknownFindNeighbours(t *testing.T) {
 	t.Log("Test v4007")
+	targetEncKey := encodePubkey(targetnode.Pubkey())
+	if err := v4udp.findnodeWithoutBond(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != errTimeout {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 //v4008
 func SourceUnknownUnsolicitedNeighbours(t *testing.T) {
 	t.Log("Test v4008")
+	targetEncKey := encodePubkey(targetnode.Pubkey())
+	if err := v4udp.sourceUnknownCorruptDHT(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != nil {
+		t.Fatalf("Test failed: %v", err)
+	}
 }
 
 //v4009
-func SourceKnownPingWrongTo(t *testing.T) {
+func SourceKnownPingFromSignatureMismatch(t *testing.T) {
 	t.Log("Test v4009")
+
 }
 
 //v4010
-func SourceKnownPingFromSignatureMismatch(t *testing.T) {
+func FindNeighboursOnRecentlyBondedTarget(t *testing.T) {
 	t.Log("Test v4010")
 }
 
 //v4011
-func SourceKnownSignaturePingFromMismatch(t *testing.T) {
+func PingPastExpiration(t *testing.T) {
 	t.Log("Test v4011")
 }
 
 //v4012
-func FindNeighboursOnRecentlyBondedTarget(t *testing.T) {
-	t.Log("Test v4012")
-}
-
-//v4013
-func FindNeighboursOnOldBondedTarget(t *testing.T) {
-	t.Log("Test v4013")
-}
-
-//v4014
-func PingPastExpiration(t *testing.T) {
-	t.Log("Test v4014")
-}
-
-//v4015
 func FindNeighboursPastExpiration(t *testing.T) {
-	t.Log("Test v4015")
+	t.Log("Test v4012")
 }
 
 // TestRLPx checks the RLPx handshaking

@@ -78,21 +78,12 @@ Fail:
 - Neighbours reponse contains information from the the fake neighbours packet.
 
 #### v4009
-Placeholder
-
-
-#### v4010
-Placeholder
-
-#### v4011
 This test verifies that the default behaviour of ignoring `from` fields is unaffected by the bonding process. After bonding, ping the target with a different `from` endpoint. 
 
 Fail:
 - No pong response is received.
 
-
-
-#### v4012
+#### v4010
 This test calls find neighbours on a target after the bonding process is completed. The neighbours response is expected.
 
 Fail:
@@ -101,17 +92,13 @@ Fail:
 
 
 
-
-#### v4013
-Placeholder
-
-#### v4014
+#### v4011
 Test pinging with a past expiration. 
 
 Fail: 
 - Client responds with pong.
 
-#### v4015
+#### v4012
 Test a find neighbours call with a past expiration.
 
 Fail:
@@ -122,6 +109,7 @@ Fail:
 
 
 ## RLPx
+<TBD>
 
 
 
