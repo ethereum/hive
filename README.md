@@ -29,6 +29,69 @@ $ go get github.com/karalabe/hive
 of resource files to build the corrent docker images and containers. This requirement will be removed
 in the future.*
 
+# Running on Windows
+
+The following information assumes Docker for Windows (CE) is installed on Windows 10 Pro. 
+
+## Docker daemon
+`hive` uses the Docker API to connect to the Docker Daemon to dynamically create and run containers. At the time of writing, the daemon is disabled by default. This must be enabled. 
+
+To enable the daemon, right click on the Docker Whale in the system tray and press Settings. Under 'General' select "Expose daemon on tcp.... without TLS".
+
+To run `hive`, use the following command line option --docker-endpoint tcp://localhost:2375 Alternatively, if using VSCode simply run using the supplied launch.json (see below)
+
+## Shell container
+Currently, the Windows version must be run from the Host. To achieve this run with the --docker-noshell command line option. 
+
+## Debugging or executing from Visual Studio Code
+As described above, golang must be installed on the machine. The golang extension for VSCode is then required, along with Delve and the standard tools recommended by the Golang extension.
+
+When VS Code is configured for general go development, `hive` may be run simply by launching with F5 with the following `launch.json`. This `launch.json` includes example parameters that limit the client to `geth` as the full client suite may take significant time to build initial docker images.
+```json
+{
+   
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "remotePath": "",
+            "port": 2345,
+            "host": "127.0.0.1",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                
+                "--docker-endpoint","tcp://localhost:2375",
+                "--docker-noshell",
+                "--client","go-ethereum_master" , 
+                "--loglevel","6",
+                "--smoke"
+                
+               
+            ],
+            "showLog": true
+        }
+    ]
+}
+```
+
+## Access to the local drive
+Docker will need access to the `workspace` folder. This will either be requested automatically in an Windows notification, or permission can be set in the docker settings in advance.
+
+To set the permissions to access your drive, right click on the Docker Whale in the system tray and press Settings. Under 'Shared Drives' select the drive where the `workspace` folder is for sharing.
+
+## Host access to the docker network
+
+`hive` requires network access to the docker containers it creates. While this is automatically available on Linux, at the time of writing because of virtualisation there needs to be some further network configuration so that the `hive` host can connect. The following is dependent on your docker configuration, and there may be other ways to achieve the same result, but a typical setting may be:
+
+'route /P add 172.17.0.0 MASK 255.255.0.0 10.0.75.2'
+
+An administrator level command prompt must be opened and the target IPs of the containers routed to HyperV's IP address for the docker containers.
+
+
 # Validating clients
 
 You can run the full suite of `hive` validation tests against all the known implementations tagged

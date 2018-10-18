@@ -14,11 +14,12 @@ import (
 )
 
 var (
-	dockerEndpoint   = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Unix socket to the local Docker daemon")
+	dockerEndpoint   = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Endpoint to the local Docker daemon")
+	dockerHostAlias  = flag.String("docker-hostalias", "unix:///var/run/docker.sock", "Endpoint to the host Docket daemon from within a validator")
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
-	clientPattern = flag.String("client", ":master", "Regexp selecting the client(s) to run against")
+	clientPattern = flag.String("client", "_master", "Regexp selecting the client(s) to run against")
 	overrideFiles = flag.String("override", "", "Comma separated regexp:files to override in client containers")
 	smokeFlag     = flag.Bool("smoke", false, "Whether to only smoke test or run full test suite")
 
@@ -107,15 +108,15 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 	}
 	// Smoke tests are exclusive with all other flags
 	if *smokeFlag {
-		if results.Validations, err = validateClients(daemon, *clientPattern, "smoke/", overrides, cacher); err != nil {
+		if results.Validations, err = validateClients(daemon, *clientPattern, "smoke", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-validate client images", "error", err)
 			return err
 		}
-		if results.Simulations, err = simulateClients(daemon, *clientPattern, "smoke/", overrides, cacher); err != nil {
+		if results.Simulations, err = simulateClients(daemon, *clientPattern, "smoke", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-simulate client images", "error", err)
 			return err
 		}
-		if results.Benchmarks, err = benchmarkClients(daemon, *clientPattern, "smoke/", overrides, cacher); err != nil {
+		if results.Benchmarks, err = benchmarkClients(daemon, *clientPattern, "smoke", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-benchmark client images", "error", err)
 			return err
 		}

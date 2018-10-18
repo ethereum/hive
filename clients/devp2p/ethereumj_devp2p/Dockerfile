@@ -1,0 +1,4 @@
+# Dockerfile allowing devp2p tests on geth master
+FROM hive/clients/ethereumj_master
+
+ENV HIVE_BOOTNODE enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@13.75.154.138:30303
