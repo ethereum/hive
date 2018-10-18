@@ -90,7 +90,7 @@ func TestDiscovery(t *testing.T) {
 
 	t.Run("discoveryv4", func(t *testing.T) {
 		//setup
-		v4udp = setupv4UDP()
+		v4udp = setupv4UDP(t)
 
 		//If the client has a known enode, obtained from an admin API, then run a standard ping
 		//Otherwise, run a different ping where we override any enode validation checks
@@ -245,7 +245,8 @@ func TestRLPx(t *testing.T) {
 
 }
 
-func setupv4UDP() V4Udp {
+func setupv4UDP(l logger) V4Udp {
+
 	//Resolve an address (eg: ":port") to a UDP endpoint.
 	addr, err := net.ResolveUDPAddr("udp", *listenPort)
 	if err != nil {
@@ -289,7 +290,7 @@ func setupv4UDP() V4Udp {
 
 	var v4UDP *V4Udp
 
-	if v4UDP, err = ListenUDP(conn, cfg); err != nil {
+	if v4UDP, err = ListenUDP(conn, cfg, l); err != nil {
 		panic(err)
 	}
 
