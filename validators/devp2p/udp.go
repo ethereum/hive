@@ -452,7 +452,7 @@ func (t *V4Udp) pingExtraData(toid enode.ID, toaddr *net.UDPAddr, validateEnodeI
 		return err
 	}
 
-	//expect the usual ping reponses
+	//expect the usual ping responses
 	callback := func(p reply) error {
 		if p.ptype == pongPacket {
 			inPacket := p.data.(incomingPacket)
