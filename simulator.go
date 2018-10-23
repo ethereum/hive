@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -43,7 +42,7 @@ type simulationSubresult struct {
 func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*simulationResult, error) {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for simulation", "pattern", clientPattern)
-	clients, err := buildClients(daemon, clientPattern, cacher)
+	clients, clientNames, err := buildClients(daemon, clientPattern, cacher)
 	if err != nil {
 		return nil, err
 	}
@@ -56,21 +55,24 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 	// Iterate over all client and simulator combos and cross-execute them
 	results := make(map[string]map[string]*simulationResult)
 
-	for client, clientImage := range clients {
-		results[client] = make(map[string]*simulationResult)
+	for simulator, simulatorImage := range simulators {
 
-		for simulator, simulatorImage := range simulators {
+		logdir, err := makeTestOutputDirectory(strings.Replace(simulator, "/", "_", -1), "simulator", clientNames)
+		if err != nil {
+			return nil, err
+		}
+
+		for client, clientImage := range clients {
+
 			logger := log15.New("client", client, "simulator", simulator)
 
-			logdir := filepath.Join(hiveLogsFolder, "simulations", fmt.Sprintf("%s[%s]", strings.Replace(simulator, "/", ":", -1), client))
-			os.RemoveAll(logdir)
-
-			result := simulate(daemon, clientImage, simulatorImage, overrides, logger, logdir)
+			result := simulate(daemon, clientImage, simulatorImage, overrides, logger, filepath.Join(logdir, client))
 			if result.Success {
 				logger.Info("simulation passed", "time", result.End.Sub(result.Start))
 			} else {
 				logger.Error("simulation failed", "time", result.End.Sub(result.Start))
 			}
+			results[client] = make(map[string]*simulationResult)
 			results[client][simulator] = result
 		}
 	}

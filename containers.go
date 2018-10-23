@@ -24,7 +24,6 @@ const hiveEnvvarPrefix = "HIVE_"
 
 // hiveLogsFolder is the directory in which to place runtime logs from each of
 // the docker containers.
-var hiveLogsFolder = filepath.Join("workspace", "logs")
 
 // createShellContainer creates a docker container from the hive shell's image.
 func createShellContainer(daemon *docker.Client, image string, overrides []string) (*docker.Container, error) {

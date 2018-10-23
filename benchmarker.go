@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -31,12 +30,14 @@ type benchmarkResult struct {
 // benchmarkClients runs a batch of benchmark tests matched by benchmarkerPattern
 // against all clients matching clientPattern.
 func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*benchmarkResult, error) {
+
 	// Build all the clients matching the benchmark pattern
 	log15.Info("building clients for benchmark", "pattern", clientPattern)
-	clients, err := buildClients(daemon, clientPattern, cacher)
+	clients, clientNames, err := buildClients(daemon, clientPattern, cacher)
 	if err != nil {
 		return nil, err
 	}
+
 	// Build all the benchmarkers known to the harness
 	log15.Info("building benchmarkers for measurements", "pattern", benchmarkerPattern)
 	benchmarkers, err := buildBenchmarkers(daemon, benchmarkerPattern, cacher)
@@ -46,25 +47,27 @@ func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern s
 	// Iterate over all client and benchmarker combos and cross-execute them
 	results := make(map[string]map[string]*benchmarkResult)
 
-	for client, clientImage := range clients {
-		results[client] = make(map[string]*benchmarkResult)
+	for benchmarker, benchmarkerImage := range benchmarkers {
 
-		for benchmarker, benchmarkerImage := range benchmarkers {
-			// Create the logger and log folder
+		logdir, err := makeTestOutputDirectory(strings.Replace(benchmarker, "/", "_", -1), "benchmarker", clientNames)
+		if err != nil {
+			return nil, err
+		}
+
+		for client, clientImage := range clients {
+
 			logger := log15.New("client", client, "benchmarker", benchmarker)
-
-			logdir := filepath.Join(hiveLogsFolder, "benchmarks", fmt.Sprintf("%s[%s]", strings.Replace(benchmarker, "/", ":", -1), client))
-			os.RemoveAll(logdir)
 
 			// Wrap the benchmark code into the Go's testing framework
 			var result *benchmarkResult
 			report := testing.Benchmark(func(b *testing.B) {
-				if result = benchmark(daemon, clientImage, benchmarkerImage, overrides, logger, logdir, b); !result.Success {
+				if result = benchmark(daemon, clientImage, benchmarkerImage, overrides, logger, filepath.Join(logdir, client), b); !result.Success {
 					b.Fatalf("benchmark failed")
 				}
 			})
 			result.Iterations = report.N
 			result.NsPerOp = report.NsPerOp()
+			results[client] = make(map[string]*benchmarkResult)
 			results[client][benchmarker] = result
 		}
 	}

@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -14,8 +15,13 @@ import (
 )
 
 var (
-	dockerEndpoint   = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Endpoint to the local Docker daemon")
-	dockerHostAlias  = flag.String("docker-hostalias", "unix:///var/run/docker.sock", "Endpoint to the host Docket daemon from within a validator")
+	dockerEndpoint = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Endpoint to the local Docker daemon")
+
+	//TODO - this needs to be passed on to the shell container if it is being used
+	dockerHostAlias = flag.String("docker-hostalias", "unix:///var/run/docker.sock", "Endpoint to the host Docket daemon from within a validator")
+
+	testResultsRoot = flag.String("results-root", "workspace/logs", "Target folder for results output and historical results aggregation")
+
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
@@ -33,6 +39,8 @@ var (
 	dockerTimeoutDuration = time.Duration(*dockerTimeout) * time.Minute
 	timeoutCheck          = flag.Int("timeoutcheck", 30, "Seconds to check for timeouts of containers")
 	timeoutCheckDuration  = time.Duration(*timeoutCheck) * time.Second
+
+	runPath = time.Now().Format("20060102150405")
 )
 
 func main() {
@@ -76,6 +84,46 @@ func main() {
 	if fail != nil {
 		os.Exit(-1)
 	}
+}
+
+func makeTestOutputDirectory(testName string, testCategory string, clientTypes []string) (string, error) {
+
+	//<WORKSPACE/LOGS>/20191803261015/validator_devp2p/
+	testRoot := filepath.Join(*testResultsRoot, runPath, testCategory+"_"+testName)
+
+	for _, client := range clientTypes {
+		outputDir := filepath.Join(testRoot, client)
+		if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
+			return "", err
+		}
+	}
+
+	//write out the test metadata
+	testInfo := struct {
+		Category string   `json:"category,omitempty"`
+		Name     string   `json:"name,omitempty"`
+		Clients  []string `json:"clients,omitempty"`
+	}{Category: testCategory, Name: testName, Clients: clientTypes}
+
+	testInfoJSON, err := json.MarshalIndent(testInfo, "", "  ")
+	if err != nil {
+		log15.Crit("failed to report results", "error", err)
+		return "", err
+	}
+
+	testInfoJSONFileName := filepath.Join(testRoot, "testInfo.json")
+
+	testInfoJSONFile, err := os.OpenFile(testInfoJSONFileName, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = testInfoJSONFile.Write(testInfoJSON)
+	if err != nil {
+		return "", err
+	}
+
+	return testRoot, nil
 }
 
 // mainInHost runs the actual hive validation, simulation and benchmarking on the
@@ -152,6 +200,17 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 		return err
 	}
 	fmt.Println(string(out))
+
+	//send the output to a file as output.log in the target root
+	logFileName := filepath.Join(*testResultsRoot, "output.log")
+	logFile, err := os.OpenFile(logFileName, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	_, err = logFile.WriteString(string(out))
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
