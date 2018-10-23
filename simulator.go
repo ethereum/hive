@@ -27,6 +27,7 @@ type simulationResult struct {
 	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
 
 	Subresults []simulationSubresult `json:"subresults,omitempty"` // Optional list of subresults to report
+	summaryData
 }
 
 // simulationSubresult represents a sub-test a simulation may run and report.

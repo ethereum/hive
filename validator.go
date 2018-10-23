@@ -19,6 +19,7 @@ type validationResult struct {
 	End     time.Time `json:"end"`             // Time instance when the validation ended
 	Success bool      `json:"success"`         // Whether the entire validation succeeded
 	Error   error     `json:"error,omitempty"` // Potential hive failure during validation
+	summaryData
 }
 
 // validateClients runs a batch of validation tests matched by validatorPattern

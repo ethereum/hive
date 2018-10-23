@@ -25,6 +25,7 @@ type benchmarkResult struct {
 	Error      error     `json:"error,omitempty"`      // Potential hive failure during benchmark
 	Iterations int       `json:"iterations,omitempty"` // Number of benchmark iterations made
 	NsPerOp    int64     `json:"ns/op,omitempty"`      // Nanoseconds spend per single iteration
+	summaryData
 }
 
 // benchmarkClients runs a batch of benchmark tests matched by benchmarkerPattern
