@@ -331,7 +331,7 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 	logFile.Close()
 
 	//process the output into a summary and append it to the summary index
-	resultSummary := summariseResults(&results, logFileName)
+	resultSummary := summariseResults(&results, filepath.Join(runPath, "log.json"))
 
 	summaryFileName := filepath.Join(*testResultsRoot, *testResultsSummaryFile)
 

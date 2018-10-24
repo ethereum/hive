@@ -63,7 +63,9 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 				logger.Error("validation failed", "time", result.End.Sub(result.Start))
 			}
 
-			results[client] = make(map[string]*validationResult)
+			if _, in := results[client]; !in {
+				results[client] = make(map[string]*validationResult)
+			}
 			results[client][validator] = result
 		}
 	}

@@ -73,7 +73,9 @@ func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern s
 			})
 			result.Iterations = report.N
 			result.NsPerOp = report.NsPerOp()
-			results[client] = make(map[string]*benchmarkResult)
+			if _, in := results[client]; !in {
+				results[client] = make(map[string]*benchmarkResult)
+			}
 			results[client][benchmarker] = result
 		}
 	}

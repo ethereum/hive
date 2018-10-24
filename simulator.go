@@ -82,7 +82,9 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 			} else {
 				logger.Error("simulation failed", "time", result.End.Sub(result.Start))
 			}
-			results[client] = make(map[string]*simulationResult)
+			if _, in := results[client]; !in {
+				results[client] = make(map[string]*simulationResult)
+			}
 			results[client][simulator] = result
 		}
 	}
