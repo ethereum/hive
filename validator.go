@@ -19,6 +19,11 @@ type validationResult struct {
 	End     time.Time `json:"end"`             // Time instance when the validation ended
 	Success bool      `json:"success"`         // Whether the entire validation succeeded
 	Error   error     `json:"error,omitempty"` // Potential hive failure during validation
+
+}
+
+type validationResultSummary struct {
+	validationResult
 	summaryData
 }
 
@@ -43,7 +48,7 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 
 	for validator, validatorImage := range validators {
 
-		logdir, err := makeTestOutputDirectory(strings.Replace(validator, "/", "_", -1), "validator", clientNames)
+		logdir, err := makeTestOutputDirectory(validator, "validator", clientNames)
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +56,7 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 
 			logger := log15.New("client", client, "validator", validator)
 
-			result := validate(daemon, clientImage, validatorImage, overrides, logger, filepath.Join(logdir, client))
+			result := validate(daemon, clientImage, validatorImage, overrides, logger, filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)))
 			if result.Success {
 				logger.Info("validation passed", "time", result.End.Sub(result.Start))
 			} else {

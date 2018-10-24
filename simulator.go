@@ -27,6 +27,15 @@ type simulationResult struct {
 	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
 
 	Subresults []simulationSubresult `json:"subresults,omitempty"` // Optional list of subresults to report
+
+}
+
+type simulationResultSummary struct {
+	Start   time.Time `json:"start"`           // Time instance when the simulation ended
+	End     time.Time `json:"end"`             // Time instance when the simulation ended
+	Success bool      `json:"success"`         // Whether the entire simulation succeeded
+	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
+
 	summaryData
 }
 
@@ -58,7 +67,7 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 
 	for simulator, simulatorImage := range simulators {
 
-		logdir, err := makeTestOutputDirectory(strings.Replace(simulator, "/", "_", -1), "simulator", clientNames)
+		logdir, err := makeTestOutputDirectory(strings.Replace(simulator, string(filepath.Separator), "_", -1), "simulator", clientNames)
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +76,7 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 
 			logger := log15.New("client", client, "simulator", simulator)
 
-			result := simulate(daemon, clientImage, simulatorImage, overrides, logger, filepath.Join(logdir, client))
+			result := simulate(daemon, clientImage, simulatorImage, overrides, logger, filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)))
 			if result.Success {
 				logger.Info("simulation passed", "time", result.End.Sub(result.Start))
 			} else {

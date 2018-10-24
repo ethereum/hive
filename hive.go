@@ -22,7 +22,7 @@ var (
 	dockerHostAlias = flag.String("docker-hostalias", "unix:///var/run/docker.sock", "Endpoint to the host Docket daemon from within a validator")
 
 	testResultsRoot        = flag.String("results-root", "workspace/logs", "Target folder for results output and historical results aggregation")
-	testResultsSummaryFile = flag.String("summary-file", "listings.json", "Test run summary file to which summaries are appended")
+	testResultsSummaryFile = flag.String("summary-file", "listing.json", "Test run summary file to which summaries are appended")
 
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
@@ -90,12 +90,13 @@ func main() {
 
 func makeTestOutputDirectory(testName string, testCategory string, clientTypes []string) (string, error) {
 
-	testName = strings.Replace(testName, "\\", "_", -1)
+	testName = strings.Replace(testName, string(filepath.Separator), "_", -1)
 
 	//<WORKSPACE/LOGS>/20191803261015/validator_devp2p/
 	testRoot := filepath.Join(*testResultsRoot, runPath, testCategory+"_"+testName)
 
 	for _, client := range clientTypes {
+		client = strings.Replace(client, string(filepath.Separator), "_", -1)
 		outputDir := filepath.Join(testRoot, client)
 		if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
 			return "", err
@@ -131,9 +132,9 @@ func makeTestOutputDirectory(testName string, testCategory string, clientTypes [
 }
 
 type summaryData struct {
-	NSuccesses  int `json:"n_successes"`  //Number of successes
-	NFails      int `json:"n_fails"`      //Number of fails
-	NSubresults int `json:"n_subresults"` //Number of subresults
+	Successes  int `json:"n_successes"` //Number of successes
+	Fails      int `json:"n_fails"`     //Number of fails
+	Subresults int `json:"subresults"`
 }
 
 type resultSet struct {
@@ -144,61 +145,105 @@ type resultSet struct {
 }
 
 type resultSetSummary struct {
-	resultSet
-	FileName string `json:"filename"`
+	Clients     map[string]map[string]string                   `json:"clients,omitempty"`
+	Validations map[string]map[string]*validationResultSummary `json:"validations,omitempty"`
+	Simulations map[string]map[string]*simulationResultSummary `json:"simulations,omitempty"`
+	Benchmarks  map[string]map[string]*benchmarkResultSummary  `json:"benchmarks,omitempty"`
+	FileName    string                                         `json:"filename"`
 }
 
 type summaryFile struct {
-	Files []resultSetSummary
+	Files []resultSetSummary `json:"files"`
 }
 
 func summariseResults(results *resultSet, detailFile string) resultSetSummary {
 
-	for _, v := range results.Validations {
-		for _, v2 := range v {
-			v2.NSubresults = 1
-			if v2.Success {
-				v2.NSuccesses = 1
-				v2.NFails = 0
-			} else {
-				v2.NSuccesses = 1
-				v2.NFails = 0
+	valSummary := make(map[string]map[string]*validationResultSummary)
+
+	for k, v := range results.Validations {
+
+		valSummary[k] = make(map[string]*validationResultSummary)
+
+		for k2, v2 := range v {
+
+			valResultSummary := validationResultSummary{
+				validationResult{Start: v2.Start,
+					End:     v2.End,
+					Success: v2.Success,
+					Error:   v2.Error},
+				summaryData{Successes: 0, Fails: 0, Subresults: 1},
 			}
+
+			if v2.Success {
+				valResultSummary.Successes = 1
+			} else {
+				valResultSummary.Successes = 0
+			}
+
+			valSummary[k][k2] = &valResultSummary
 		}
 	}
 
-	for _, b := range results.Benchmarks {
-		for _, b2 := range b {
-			b2.NSubresults = 1
-			if b2.Success {
-				b2.NSuccesses = 1
-				b2.NFails = 0
-			} else {
-				b2.NSuccesses = 1
-				b2.NFails = 0
+	benchSummary := make(map[string]map[string]*benchmarkResultSummary)
+	for k, b := range results.Benchmarks {
+
+		benchSummary[k] = make(map[string]*benchmarkResultSummary)
+
+		for k2, b2 := range b {
+
+			benchResultSummary := benchmarkResultSummary{
+				benchmarkResult{Start: b2.Start,
+					End:     b2.End,
+					Success: b2.Success,
+					Error:   b2.Error},
+				summaryData{Successes: 0, Fails: 0, Subresults: 1},
 			}
+
+			if b2.Success {
+				benchResultSummary.Successes = 1
+			} else {
+				benchResultSummary.Fails = 1
+			}
+			benchSummary[k][k2] = &benchResultSummary
 		}
 	}
 
 	//TODO Change this type - it expects a number for subresults
-	for _, s := range results.Simulations {
-		for _, s2 := range s {
-			s2.NSuccesses = 0
-			s2.NFails = 0
+	simSummary := make(map[string]map[string]*simulationResultSummary)
+	for k, s := range results.Simulations {
+
+		simSummary[k] = make(map[string]*simulationResultSummary)
+
+		for k2, s2 := range s {
+			simResultSummary := simulationResultSummary{
+				Start:   s2.Start,
+				End:     s2.End,
+				Success: s2.Success,
+				Error:   s2.Error,
+			}
+
 			for _, sub := range s2.Subresults {
 				if sub.Success {
-					s2.NSuccesses++
+					simResultSummary.Successes++
 				} else {
-					s2.NFails++
+					simResultSummary.Fails++
 				}
 			}
-			s2.Subresults = nil //remove this from the summary
+
+			simResultSummary.Subresults = len(s2.Subresults)
+
+			simSummary[k][k2] = &simResultSummary
+
 		}
 	}
 
-	res := resultSetSummary{}
-	res.resultSet = *results
-	res.FileName = detailFile
+	res := resultSetSummary{
+		Benchmarks:  benchSummary,
+		Validations: valSummary,
+		Simulations: simSummary,
+		FileName:    detailFile,
+		Clients:     results.Clients,
+	}
 	return res
 
 }

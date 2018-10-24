@@ -25,6 +25,11 @@ type benchmarkResult struct {
 	Error      error     `json:"error,omitempty"`      // Potential hive failure during benchmark
 	Iterations int       `json:"iterations,omitempty"` // Number of benchmark iterations made
 	NsPerOp    int64     `json:"ns/op,omitempty"`      // Nanoseconds spend per single iteration
+
+}
+
+type benchmarkResultSummary struct {
+	benchmarkResult
 	summaryData
 }
 
@@ -62,7 +67,7 @@ func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern s
 			// Wrap the benchmark code into the Go's testing framework
 			var result *benchmarkResult
 			report := testing.Benchmark(func(b *testing.B) {
-				if result = benchmark(daemon, clientImage, benchmarkerImage, overrides, logger, filepath.Join(logdir, client), b); !result.Success {
+				if result = benchmark(daemon, clientImage, benchmarkerImage, overrides, logger, filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)), b); !result.Success {
 					b.Fatalf("benchmark failed")
 				}
 			})
