@@ -62,7 +62,7 @@ func buildEthash(daemon *docker.Client, cacher *buildCacher) (string, error) {
 
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
-func buildClients(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, []string, error) {
+func buildClients(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
 	return buildNestedImages(daemon, "clients", pattern, "client", cacher)
 }
 
@@ -70,7 +70,7 @@ func buildClients(daemon *docker.Client, pattern string, cacher *buildCacher) (m
 // match the given patten.
 func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]map[string]string, error) {
 	// Build all the client that we need the versions of
-	clients, _, err := buildClients(daemon, pattern, cacher)
+	clients, err := buildClients(daemon, pattern, cacher)
 	if err != nil {
 		return nil, err
 	}
@@ -97,31 +97,31 @@ func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCac
 // buildValidators iterates over all the known validators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildValidators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, _, err := buildNestedImages(daemon, "validators", pattern, "validator", cacher)
+	images, err := buildNestedImages(daemon, "validators", pattern, "validator", cacher)
 	return images, err
 }
 
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildSimulators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, _, err := buildNestedImages(daemon, "simulators", pattern, "simulator", cacher)
+	images, err := buildNestedImages(daemon, "simulators", pattern, "simulator", cacher)
 	return images, err
 }
 
 // buildBenchmarkers iterates over all the known benchmarkers and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildBenchmarkers(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, _, err := buildNestedImages(daemon, "benchmarkers", pattern, "benchmarker", cacher)
+	images, err := buildNestedImages(daemon, "benchmarkers", pattern, "benchmarker", cacher)
 	return images, err
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested
 // docker image definitions and builds all of them matching the provided pattern.
-func buildNestedImages(daemon *docker.Client, root string, pattern string, kind string, cacher *buildCacher) (map[string]string, []string, error) {
+func buildNestedImages(daemon *docker.Client, root string, pattern string, kind string, cacher *buildCacher) (map[string]string, error) {
 	// Gather all the folders with Dockerfiles within them
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	names := []string{}
 	if err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -139,7 +139,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 		// Continue walking the path
 		return nil
 	}); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// Iterate over all the matched specs and build their docker images
 	images := make(map[string]string)
@@ -151,11 +151,11 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 		)
 		if err := buildImage(daemon, image, context, cacher, logger); err != nil {
 			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
-			return nil, nil, berr
+			return nil, berr
 		}
 		images[name] = image
 	}
-	return images, names, nil
+	return images, nil
 }
 
 type buildError struct {

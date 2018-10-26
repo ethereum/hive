@@ -49,8 +49,8 @@ class HiveTestAPI(hivemodel.HiveAPI):
     def generateArtefacts(self,testcase):
         return (None, None, None)
 
-    def subresult(self, name, success, errormsg, errors = None ):
-        print("subresult: \n\t%s\n\t%s\n\t%s\n\t%s" % (name, success, errormsg, errors))
+    def subresult(self, client, name, success, errormsg, errors = None ):
+        print("subresult: \n\t%s\n\t%s\n\t%s\n\t%s" % (name, client, success, errormsg, errors))
 
 
     def log(self,msg):

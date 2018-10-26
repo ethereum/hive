@@ -39,7 +39,7 @@ func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern s
 
 	// Build all the clients matching the benchmark pattern
 	log15.Info("building clients for benchmark", "pattern", clientPattern)
-	clients, clientNames, err := buildClients(daemon, clientPattern, cacher)
+	clients, err := buildClients(daemon, clientPattern, cacher)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern s
 
 	for benchmarker, benchmarkerImage := range benchmarkers {
 
-		logdir, err := makeTestOutputDirectory(strings.Replace(benchmarker, "/", "_", -1), "benchmarker", clientNames)
+		logdir, err := makeTestOutputDirectory(strings.Replace(benchmarker, "/", "_", -1), "benchmarker", clients)
 		if err != nil {
 			return nil, err
 		}

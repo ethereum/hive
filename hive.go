@@ -88,14 +88,19 @@ func main() {
 	}
 }
 
-func makeTestOutputDirectory(testName string, testCategory string, clientTypes []string) (string, error) {
+func makeTestOutputDirectory(testName string, testCategory string, clientTypes map[string]string) (string, error) {
 
 	testName = strings.Replace(testName, string(filepath.Separator), "_", -1)
 
 	//<WORKSPACE/LOGS>/20191803261015/validator_devp2p/
 	testRoot := filepath.Join(*testResultsRoot, runPath, testCategory+"_"+testName)
 
-	for _, client := range clientTypes {
+	clientNames := make([]string, 0, len(clientTypes))
+
+	for client := range clientTypes {
+
+		clientNames = append(clientNames, client)
+
 		client = strings.Replace(client, string(filepath.Separator), "_", -1)
 		outputDir := filepath.Join(testRoot, client)
 		if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
@@ -108,7 +113,7 @@ func makeTestOutputDirectory(testName string, testCategory string, clientTypes [
 		Category string   `json:"category,omitempty"`
 		Name     string   `json:"name,omitempty"`
 		Clients  []string `json:"clients,omitempty"`
-	}{Category: testCategory, Name: testName, Clients: clientTypes}
+	}{Category: testCategory, Name: testName, Clients: clientNames}
 
 	testInfoJSON, err := json.MarshalIndent(testInfo, "", "  ")
 	if err != nil {

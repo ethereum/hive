@@ -93,9 +93,10 @@ class HiveAPI(object):
     def debugp(self, msg):
         self.log(msg)
 
-    def subresult(self, name, success, errormsg, details = None ):
+    def subresult(self,client, name, success, errormsg, details = None ):
         params = {
                 "name" : name,
+                "client": client,
                 "success" : success
         }
         if errormsg is not None:
@@ -181,7 +182,10 @@ class BlockTestExecutor(object):
         #HIVE_INIT_KEYS path to a folder of account keys to import after init (default = "/keys/")
         #HIVE_FORK_HOMESTEAD
 
+        clientName= testcase.clientType
+
         params = {
+            "CLIENT":clientName,
             "HIVE_INIT_GENESIS": genesis,
             "HIVE_INIT_BLOCKS" : blocks,
             "HIVE_FORK_DAO_VOTE" : "1",
@@ -205,7 +209,9 @@ class BlockTestExecutor(object):
             testcase.setTimeElapsed(1000 * (end - start))
             self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
             self.hive.subresult(
+                    
                     testcase.fullname(),
+                    testcase.client(),
                     testcase.wasSuccessfull(),
                     testcase.topLevelError(),
                     testcase.details()
@@ -217,6 +223,7 @@ class BlockTestExecutor(object):
         testcase.setTimeElapsed(1000 * (end - start))
         self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
         self.hive.subresult(
+                client,
                 testcase.fullname(),
                 testcase.wasSuccessfull(),
                 testcase.topLevelError(),
