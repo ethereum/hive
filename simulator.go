@@ -186,6 +186,7 @@ func startSimulatorAPI(daemon *docker.Client, clients map[string]string, simulat
 		simulator:        simulator,
 		overrides:        overrides,
 		nodes:            make(map[string]*docker.Container),
+		nodeNames:        make(map[string]string),
 		nodesTimeout:     make(map[string]time.Time),
 		result:           results, //the simulator now has access to a map of results-by-client. The simulator decides which clients to run/
 	}
@@ -210,6 +211,7 @@ type simulatorAPIHandler struct {
 
 	runner       *docker.Container
 	nodes        map[string]*docker.Container
+	nodeNames    map[string]string
 	nodesTimeout map[string]time.Time
 
 	result map[string]map[string]*simulationResult //simulation result log per client name
@@ -291,7 +293,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
 
-		case strings.HasPrefix(r.URL.Path, "/clients/"):
+		case strings.HasPrefix(r.URL.Path, "/clients"):
 			w.Header().Set("Content-Type", "application/json")
 			clients := make([]string, 0, len(h.availableClients))
 			for client := range h.availableClients {
@@ -387,7 +389,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			fmt.Fprintf(w, "%s", containerID)
 			h.lock.Lock()
 			h.nodes[containerID] = container
-
+			h.nodeNames[containerID] = clientName
 			h.nodesTimeout[containerID] = time.Now().Add(dockerTimeoutDuration)
 			h.lock.Unlock()
 			return
@@ -432,8 +434,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			// If everything parsed correctly, append the subresult
 			h.lock.Lock()
 
-			container := h.nodes[nodeid]
-			imageName := container.Image
+			imageName := h.nodeNames[nodeid]
 
 			h.result[imageName][h.simulator].Subresults = append(h.result[imageName][h.simulator].Subresults, simulationSubresult{
 				Name:    r.Form.Get("name"),

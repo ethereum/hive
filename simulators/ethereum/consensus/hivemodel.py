@@ -108,10 +108,11 @@ class HiveAPI(object):
 
         return self._post("/subresults", params = params, data = data);
     
-    def clients(self)
+    def clients(self):
         _jsonclients= self._get("/clients")
         _clients  = json.loads(_jsonclients)
-        return _clients['clients']
+     
+        return _clients
 
     def newNode(self, params):
         try:
@@ -134,8 +135,8 @@ class BlockTestExecutor(object):
     def __init__(self, hive_api, testfiles):
         self.clientVersion = None
         self.hive = hive_api
-        self.testfiles = self.hive.clients()
-        self.clients=_get
+        self.testfiles = testfiles
+        self.clients=self.hive.clients()
 
     def run(self, start=0 , end=-1, whitelist=[], blacklist=[]) :
         return self._performTests(start, end, whitelist, blacklist)
