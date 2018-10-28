@@ -213,7 +213,6 @@ func summariseResults(results *resultSet, detailFile string) resultSetSummary {
 		}
 	}
 
-	//TODO Change this type - it expects a number for subresults
 	simSummary := make(map[string]map[string]*simulationResultSummary)
 	for k, s := range results.Simulations {
 

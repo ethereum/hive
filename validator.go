@@ -33,7 +33,7 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for validation", "pattern", clientPattern)
-	clients, clientNames, err := buildClients(daemon, clientPattern, cacher)
+	clients, err := buildClients(daemon, clientPattern, cacher)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 
 	for validator, validatorImage := range validators {
 
-		logdir, err := makeTestOutputDirectory(validator, "validator", clientNames)
+		logdir, err := makeTestOutputDirectory(validator, "validator", clients)
 		if err != nil {
 			return nil, err
 		}

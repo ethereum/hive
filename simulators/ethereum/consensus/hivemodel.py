@@ -93,10 +93,10 @@ class HiveAPI(object):
     def debugp(self, msg):
         self.log(msg)
 
-    def subresult(self,client, name, success, errormsg, details = None ):
+    def subresult(self,nodeid, name, success, errormsg, details = None ):
         params = {
                 "name" : name,
-                "client": client,
+                "nodeid" : nodeid,
                 "success" : success
         }
         if errormsg is not None:
@@ -107,6 +107,11 @@ class HiveAPI(object):
             data = {"details" : json.dumps(details) }
 
         return self._post("/subresults", params = params, data = data);
+    
+    def clients(self)
+        _jsonclients= self._get("/clients")
+        _clients  = json.loads(_jsonclients)
+        return _clients['clients']
 
     def newNode(self, params):
         try:
@@ -129,7 +134,8 @@ class BlockTestExecutor(object):
     def __init__(self, hive_api, testfiles):
         self.clientVersion = None
         self.hive = hive_api
-        self.testfiles = testfiles
+        self.testfiles = self.hive.clients()
+        self.clients=_get
 
     def run(self, start=0 , end=-1, whitelist=[], blacklist=[]) :
         return self._performTests(start, end, whitelist, blacklist)
@@ -145,29 +151,33 @@ class BlockTestExecutor(object):
 
             tf = Testfile(testfile)
 #            self.hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
+            
+            #apply the testcases to each available client type
+            for client in self.clients:
+                for testcase in tf.tests() :
+                    
+                    if len(whitelist) > 0 and str(testcase) not in whitelist:
+                        testcase.skipped(["Testcase not in whitelist"])
+                        continue
 
-            for testcase in tf.tests() :
+                    if len(blacklist) > 0 and str(testcase) in blacklist:
+                        testcase.skipped(["Testcase in blacklist"])
+                        continue
 
-                if len(whitelist) > 0 and str(testcase) not in whitelist:
-                    testcase.skipped(["Testcase not in whitelist"])
-                    continue
+                    err = testcase.validateNetwork()
+                    if err != None:
+                        testcase.skipped([err])
+                        continue
 
-                if len(blacklist) > 0 and str(testcase) in blacklist:
-                    testcase.skipped(["Testcase in blacklist"])
-                    continue
+                    err = testcase.validate()
 
-                err = testcase.validateNetwork()
-                if err != None:
-                    testcase.skipped([err])
-                    continue
+                    testcase.clientType= client
 
-                err = testcase.validate()
-
-                if err is not None:
-                    self.hive.log("%s / %s failed initial validation" % (tf, testcase) )
-                    testcase.fail(["Testcase failed initial validation", err])
-                else:
-                    yield testcase
+                    if err is not None:
+                        self.hive.log("%s / %s failed initial validation" % (tf, testcase) )
+                        testcase.fail(["Testcase failed initial validation", err])
+                    else:
+                        yield testcase
 
     def _startNodeAndRunTest(self, testcase):
         start = time.time()
@@ -209,9 +219,7 @@ class BlockTestExecutor(object):
             testcase.setTimeElapsed(1000 * (end - start))
             self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
             self.hive.subresult(
-                    
                     testcase.fullname(),
-                    testcase.client(),
                     testcase.wasSuccessfull(),
                     testcase.topLevelError(),
                     testcase.details()
@@ -223,7 +231,7 @@ class BlockTestExecutor(object):
         testcase.setTimeElapsed(1000 * (end - start))
         self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
         self.hive.subresult(
-                client,
+                node.nodeId,            
                 testcase.fullname(),
                 testcase.wasSuccessfull(),
                 testcase.topLevelError(),
