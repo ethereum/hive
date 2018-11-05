@@ -252,7 +252,7 @@ function onFileListing(data, error){
 
 
                 var fname = f.filename;
-                var logs = logFolder(fname,"simulator",testname, clientname)
+                var logs = logFolder(fname,"simulator",testname, '')
                 files.push([s.start,
                     s.end,
                     "Simulation",
@@ -412,9 +412,17 @@ function logFolder(testlog,category,test, client)
 {
     testpath = testlog.replace(/\\/g, "/").split('/').slice(0, -1).join('/');
     test = category+"_"+test.replace(/\\/g, "/").replace("/", "_");
+    
     client = client.replace(/\\/g, "/").replace("/", "_");
-    return testpath+"/"+test + "/" + client;
+    if (client != '') {
+        return testpath + "/" + test + "/" + client;
+    } else {
+        return testpath + "/" + test;
+    }
+    
 }
+
+
 
 function onData(data, jsonsource, clientname,testname,resultsFolder){
 
