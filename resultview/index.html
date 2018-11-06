@@ -535,7 +535,7 @@ function onData(data, jsonsource, clientname,testname,resultsFolder){
 			{ title: "Log", data: "instance" , 
 				render: function ( data, type, row ) {
 						if(!data) { return ""};
-						var href= resultsFolder+"/client-"+data+".log"
+						var href= resultsFolder+"/"+row.client+"/client-"+data+".log"
 						return utils.get_js_link("displayLog('"+href+ "')", data);
 				}},
 			{ title: "Exec time (s)", data: "ms", 
