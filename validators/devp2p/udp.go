@@ -464,7 +464,10 @@ func (t *V4Udp) pingExtraData(toid enode.ID, toaddr *net.UDPAddr, validateEnodeI
 	}
 
 	//expect the usual ping responses
+<<<<<<< HEAD
 	t.l.Log("Establishing criteria: Will succeed if a valid pong packet is received.")
+=======
+>>>>>>> 32f8a2836b9a2cd8ae2cf36b969fb21d3312c4a4
 	callback := func(p reply) error {
 		if p.ptype == pongPacket {
 			inPacket := p.data.(incomingPacket)
