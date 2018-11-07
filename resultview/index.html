@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+    <script src="jquery.dataTables.min.js"></script>
+    <script src="dataTables.bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link rel="stylesheet" href="dataTables.bootstrap.min.css">
+    <style>
+
+        .modal-lg {
+            width: 1600px;
+        }
+
+        .modal-dialog {
+            width: 90%;
+        }
+    </style>
+</head>
+
+
+
+<body>
+
+
+	<div class="container-fluid">
+		<div class="row">
+			<div class="col-md-9" role="main">
+				<h1>Files</h1>
+				<p>These files are available at the server for loading. You can select which results to load and compare</p>
+				<table class="table table-bordered" id="filetable">
+				</table>
+
+				<h1>Test report</h1>
+				<h2>Failure summary</h2>
+				<table id="summary" class="table table-striped table-bordered" width="100%">
+				</table>
+
+				<h2>Execution results</h2>
+				<table id="execresults" class="table table-striped table-bordered" width="100%">
+				</table>
+			</div>
+			<div class="col-md-3" role="complementary"></div>
+		</div>
+	</div>
+	<!-- Modal -->
+	<div class="modal fade modal-lg" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
+	  <div class="modal-dialog" role="document">
+		<div class="modal-content">
+		  <div class="modal-header">
+			<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+			<h4 class="modal-title" id="myModalLabel">Logs</h4>
+		  </div>
+		  <pre class="modal-body" id="modal-logs">
+
+		  </pre>
+		  <div class="modal-footer">
+			<button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+		  </div>
+		</div>
+	  </div>
+	</div>
+
+
+
+
+</body>
+<script>
+
+	function displayLog(url){
+		$("#myModalLabel").text("");
+        $("#modal-logs").text("");
+       
+		  $("#modal-logs").load(url,function(result){
+			//Also show a permalink
+				u = (""+window.location).split("#")[0]
+				$("#myModalLabel").text("Log permalink: "+u+"#displayLog="+url);
+				$('#myModal').modal({show:true});
+			});
+	}
+
+utils = {
+
+	/*
+	* HTML-encoding
+	*/
+	html_encode : function (str){
+		//Let the DOM do it for us. 
+		var d = document.createElement('textarea');
+		d.innerText = str;
+		//Yes, I'm aware of 
+		// http://stackoverflow.com/questions/1219860/html-encoding-in-javascript-jquery
+		// I just don't agree. 
+		return d.innerHTML;
+	},
+	/*
+	* HTML Attribute encoding
+	*/
+	attr_encode : function (str){	
+		x = document.createElement("x");
+		x.setAttribute("b",str);
+		var all = x.outerHTML;
+		return all.substring(6,all.length-6);
+	},
+	/*
+	* Dirty url-parsing of the url hash segment
+	*/
+	get_hash_params : function() {
+		var retval = {}
+		var query = window.location.hash.substring(1);
+		var vars = query.split('&');
+		for (var i = 0; i < vars.length; i++) {
+			var pair = vars[i].split('=');
+			retval[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1])
+		}
+		return retval;
+	},
+	/*
+	* Creates an anchor-element from 'untrusted' link 'data'
+	*/
+	get_link : function(url, text){
+		var a = document.createElement('a');
+		a.setAttribute("href",url);
+		a.text = text;
+		a.setAttribute("target", "_blank");
+		return a.outerHTML;
+	},
+	get_js_link : function(js, text){
+		var a = document.createElement('a');
+		a.setAttribute("href","javascript:"+js);
+		a.text = text;
+		return a.outerHTML;
+	},
+
+	/*
+	* Creates
+	* <button type="button" class="btn btn-default">Default</button>
+	*/
+	get_button: function(onclick, text){
+		var a = document.createElement('button');
+		a.setAttribute("type","button");
+		a.setAttribute("class","btn btn-primary btn-xs")
+		a.textContent = text;
+		a.setAttribute("onclick", onclick)
+		return a.outerHTML;
+	},
+
+	format_timespan: function(d1,d2){
+
+		var diff = d2-d1;var _s="";
+		if (diff < 0) {
+			_s = "-";
+			diff = -diff;
+		}
+		var d = Math.floor(diff / 86400000);
+		diff %= 86400000;
+		var h = Math.floor(diff / 3600000);
+		diff %= 3600000;
+		var m = Math.floor(diff / 60000) ;
+		diff %= 60000;
+		var s = Math.floor(diff / 1000);
+
+		var a =    d ? ( d + "d") : "";
+		a += ((a||h) ? ( h + "h") : "");
+		a += ((a||m) ? ( m + "m") : "") + s + "s";
+		return _s+a;
+	},
+
+	/**
+	Expects an object like 
+		{
+			"repo": "https://github.com/ethereum/go-ethereum",
+			"commit": "021c3c281629baf2eae967dc2f0a7532ddfdc1fb",
+			"branch": "release/1.6"
+		}
+	Will return a link to the right place in the repo
+
+	link : https://github.com/ethereum/go-ethereum/tree/021c3c281629baf2eae967dc2f0a7532ddfdc1fb
+	text : ethereum/go-ethereum@021c3c2 [⎇ release/1.6]
+	**/
+	githubRepoLink: function(data){
+		if (data.repo == "" ) {return "";}		
+		if (data.commit == "" ) {return data.repo;}
+		if (data.branch == "" ) {return data.repo+"@"+data.commit.slice(0,7);}
+
+		var text = data.repo+"@"+data.commit.slice(0,7)+" [⎇ "+data.branch+"]";
+
+		if (!data.repo.indexOf("https://")==0){
+			//Not github
+			return utils.html_encode(text);
+		}
+
+		var a = document.createElement('a');
+		a.setAttribute("target", "_blank");
+		// Set just repo first
+		a.setAttribute("href",data.repo);
+		// Use path for text
+		a.text = a.pathname.slice(1)+"@"+data.commit.slice(0,7)+" [\u2387 "+data.branch+"]";
+		// Set both repo and tree/commit version
+		a.setAttribute("href", data.repo+"/tree/"+data.commit);
+
+		return a.outerHTML;
+
+	}
+
+}
+
+function recurseList(elem){
+	if (typeof(elem) == 'string'){
+		return "<li>"+utils.html_encode(elem)+"</li>"
+	}
+	return "<ul>" + elem.map(recurseList).join("\n")+"</ul>"
+}
+
+function progress(message){
+
+	//Todo, make this a nice UI component
+	console.log(message)
+
+}
+function resultStats(fails, success, total)
+{
+	f = parseInt(fails), s = parseInt(success); t = parseInt(total);
+
+	f = isNaN(f) ?  "?": f ;
+	s = isNaN(s) ?  "?": s ;
+	t = isNaN(t) ?  "?": t ;
+
+	return '<b><span class="text-danger">'+f
+		+'</span>&nbsp;:&nbsp;<span class="text-success">'+s
+		+'</span> &nbsp;/&nbsp;'+t+'</b>';
+}
+
+function onFileListing(data, error){
+
+	progress("Got file list")
+	table = $("#filetable")
+	files = []
+
+	//var logs = logFolder(jsonsource,client);
+ 
+	for (var i in data.files){
+		var f = data.files[i];
+
+        for (var clientname in f.simulations) {
+
+            var clientInfo = f.clients[clientname]
+            for (var testname in f.simulations[clientname]) {
+                var s = f.simulations[clientname][testname];
+
+
+                var fname = f.filename;
+                var logs = logFolder(fname,"simulator",testname, '')
+                files.push([s.start,
+                    s.end,
+                    "Simulation",
+                testname,
+                    utils.get_js_link("displayLog('" + fname.replace(/\\/g, "/") + "')", "log.json"),
+                    utils.get_js_link("displayLog('" + logs + "/simulator.log')", "simulator.log"),
+                    clientname,
+                    clientInfo,
+                resultStats(s.n_fails, s.n_successes, s.subresults),
+                    fname,
+                    logs])
+            }
+        }
+
+        for (var clientname in f.validations) {
+
+            var clientInfo = f.clients[clientname]
+            for (var testname in f.validations[clientname]) {
+                var s = f.validations[clientname][testname];
+
+
+                var fname = f.filename;
+                var logs = logFolder(fname,"validator",testname, clientname)
+                files.push([s.start,
+                    s.end,
+                "Validation",
+                    testname,
+                    utils.get_js_link("displayLog('" + fname.replace(/\\/g, "/") + "')", "log.json"),
+                utils.get_js_link("displayLog('" + logs + "/validator.log')", "validator.log"),
+                    clientname,
+                    clientInfo,
+                resultStats(s.n_fails, s.n_successes, s.subresults),
+                    fname])
+            }
+        }
+
+        for (var clientname in f.benchmarks) {
+
+            var clientInfo = f.clients[clientname]
+            for (var testname in f.benchmarks[clientname]) {
+                var s = f.benchmarks[clientname][testname];
+
+
+                var fname = f.filename;
+                var logs = logFolder(fname,"benchmarker",testname, clientname)
+                files.push([s.start,
+                    s.end,
+                    "Benchmark",
+                    testname,
+                    utils.get_js_link("displayLog('" + fname.replace(/\\/g, "/") + "')", "log.json"),
+                utils.get_js_link("displayLog('" + logs + "/benchmarker.log')", "benchmarker.log"),
+                    clientname,
+                    clientInfo,
+                resultStats(s.n_fails, s.n_successes, s.subresults),
+                    fname])
+            }
+        }
+	}
+
+	filetable = $("#filetable").DataTable({
+		data : files,
+		columns: [
+			{title: "Start time",
+				render: function(data){ return new Date(data);}
+			},
+			{ title: "Duration",
+				render: function(data,t, row){ 
+					end = new Date(data);
+					start = new Date(row[0]);
+					return utils.format_timespan(start, end);
+				}
+            },
+            { title: "Test Category" },
+            { title: "Test" },
+			{ title: "Hive log" },
+			{ title: "Test log" },
+			{ title: "Client" },
+			{ title: "Client info", render : utils.githubRepoLink},
+			{ title: "Number of tests"},
+			{ title: "Load?",
+                render: function (data, t, row) {
+                    if (row[2].toLowerCase() == "simulation") {
+                        return '<button type="button" class="btn btn-sm btn-primary" >Load</button>';
+                    } else {
+                        return '';
+                    }
+			}}
+
+			],
+		order: [[0, 'desc']],    	
+	});
+
+
+	$('#filetable tbody').on( 'click', 'button', function () {
+		var data = filetable.row( $(this).parents('tr') ).data();
+        fname = data[9].replace(/\\/g, "/") ;
+        cname = data[6];
+        testname = data[3];
+        
+		loadResults(fname, cname, testname,data[10]);
+		$(this).prop("disabled",true);
+		$(this).text("Loaded");
+	} );
+}
+
+$(document).ready(function() {
+
+	// Retrieve the list of files
+	progress("Loading file list...")
+	$.getJSON( "listing.json", onFileListing)
+		.fail(function(){
+				progress("Failed fetching file list", true);
+			}
+		);
+	// Lastly, check any URL directives
+	var params = utils.get_hash_params()
+	if(params.displayLog){
+		displayLog(params.displayLog);
+	}
+
+});
+function loadResults(filename, clientname,testname, resultsFolder){
+
+	progress("Loading " +filename+" / " + clientname);
+
+	$.getJSON( filename, function(data){ onData(data, filename, clientname,testname,resultsFolder);})
+		.fail(function(){
+				console.log("Failed");
+			}
+		);	
+}
+
+/*
+
+*/
+
+/*
+* Performs filtering on the "Execution Result" datatable
+*/
+function execfilter(str){
+	$('#execresults').dataTable().api().search(str).draw();
+}
+
+//The datatables
+var overallresults  = null; // Overall results
+var execresults     = null; // Execution results
+var failuresummary  = null; // Failure summary
+
+
+
+
+// Contains all the data that we load
+var alldata = {};
+
+
+function logFolder(testlog,category,test, client)
+{
+    testpath = testlog.replace(/\\/g, "/").split('/').slice(0, -1).join('/');
+    test = category+"_"+test.replace(/\\/g, "/").replace("/", "_");
+    
+    client = client.replace(/\\/g, "/").replace("/", "_");
+    if (client != '') {
+        return testpath + "/" + test + "/" + client;
+    } else {
+        return testpath + "/" + test;
+    }
+    
+}
+
+
+
+function onData(data, jsonsource, clientname,testname,resultsFolder){
+
+	/**
+	* datatables can't be reinitalized, we need to destroy them if they exist
+	**/
+	if(execresults    != null ){ execresults    .clear().destroy();}
+
+	//For the failure summary, we need to also delete the html, 
+	// since clear/destroy leaves th/td fields. This causes datatables
+	// to fail, if we try to add more columns
+	if(failuresummary != null ){ failuresummary .clear().destroy();}
+	$("#summary").html("");
+	
+
+
+	var overallresults = {
+		results : {},
+		clients : {"Testcase":0},
+		cols : [{ "title": "Testcase"} ]
+	}
+
+	function addOverallResult(testcase, client, status, jsonsource){
+		client = jsonsource+" - "+client
+		if (overallresults.results[testcase] == null){
+			overallresults.results[testcase] = [testcase]
+		}
+		_tcase = overallresults.results[testcase]
+		if (overallresults[client] == null)
+		{
+			overallresults[client] = overallresults.cols.length
+			overallresults.cols.push({"title" : client});
+		}
+		_clientnum = overallresults[client]
+		_tcase[_clientnum] = status
+	}
+
+	var items = []
+	data = data["simulations"]
+
+	for (var client in data){
+		if (client != clientname) continue;
+	//	if (!data[client]["ethereum/consensus"]) continue;
+		
+
+		if (!alldata[jsonsource]){ 
+			alldata[jsonsource] = {} ;
+		}
+		testreport = data[client][testname]
+
+		alldata[jsonsource][client] = testreport.subresults
+	}
+	for ( var jsonsource in alldata)
+	{
+		for (var client in alldata[jsonsource]){
+			var subresults = alldata[jsonsource][client]
+			var x = subresults.map(function(subresult){
+
+                var fname = subresult.name;
+                
+				if(fname.indexOf("./tests/")==0)
+				{
+					fname = fname.substring(8);
+				}
+				addOverallResult(fname,client,subresult.success, jsonsource);
+				return { 
+					"filename" 	: fname,
+					"status" 	: subresult.success,
+					"client"	: client,
+					"instance"	: subresult.details.instanceid,
+					"message" 	: subresult.details.errors,
+					"source"    : jsonsource,
+					"ms"        : subresult.details.ms
+				}			
+			});
+			items = items.concat(x)
+
+		}
+	}
+
+
+	var TEST_REPO = "https://github.com/ethereum/tests/blob/develop/";
+
+	var linkToTestRepo = function(data){
+			if(!data) { return ""};
+			[file, tcase] = data.split(":")
+			return utils.get_link(TEST_REPO+file, tcase);
+	}
+	var linkToTestRepoAndFilter = function(data){
+			if(!data) { return ""};
+			[file, tcase] = data.split(":")
+			firstlink = utils.get_button("javascript:execfilter('"+tcase+"')", "filter")
+			secondlink =  utils.get_link(TEST_REPO+file, tcase);
+			return firstlink +"&nbsp;&nbsp;"+ secondlink
+	}
+
+
+   execresults = $('#execresults').DataTable( {
+		data: items,
+		pageLength: 100,
+		columns: [
+			{ title: "Filename", data: "filename" ,
+				render: linkToTestRepo},
+			{ title: "Status", data: "status",
+				render: function(data){
+					if (data) return "&#x2713";
+					return "&#x2715; <b>Fail</b>";
+				} },
+			{ title: "Client", data: "client" },
+			{ title: "Log", data: "instance" , 
+				render: function ( data, type, row ) {
+						if(!data) { return ""};
+						var href= resultsFolder+"/"+row.client+"/client-"+data+".log"
+						return utils.get_js_link("displayLog('"+href+ "')", data);
+				}},
+			{ title: "Exec time (s)", data: "ms", 
+				render: function(data){
+					return Number(data/1000).toFixed(2);
+				} },
+			{ title: "Message", data: "message", 
+				render: function ( data, type, row ) {
+					   if(!data) { return ""};
+					   return recurseList(data);
+
+				}, 
+			},
+		],
+
+		fnRowCallback: function( nRow, aData, iDisplayIndex, iDisplayIndexFull ) {
+			var _s = {"false" : "danger", "true": "success"}[aData.status];
+			$(nRow).addClass( _s || "info")
+			return nRow;
+		},
+
+	});
+
+
+	//Process overallresults
+	
+
+	var sum_items = [];
+	var cols = overallresults.cols;
+	//var _x  = function(data, type, row){ return data ? "&#x2713;": "&#x2715; <b>Fail</b>"; }
+	//for (c in cols){
+	//  cols[c].render = _x
+	//}
+	cols[0].render =  linkToTestRepoAndFilter;
+	var numclients = overallresults.cols.length;
+	Object.keys(overallresults.results).map(function(key, index) {
+	   //Only bother with the ones containng failures
+	   var results = overallresults.results[key]
+	   var fail = false;
+	   for (var i = 1 ; i < numclients ; i++){
+			
+			//If a test result does not exist for this client
+			if (results[i] == undefined){
+				results[i] = "?";
+				fail = true;
+			}else if (results[i] == false){
+				results[i] = "&#x2715; <b>Fail</b>";
+				fail = true;
+			}else{
+				results[i] = "&#x2713";
+			}
+	   }
+	   if (fail){
+		sum_items.push(results);
+	   }
+	});
+	failuresummary = $("#summary").DataTable({
+		data : sum_items,
+		columns : cols,
+	});
+
+/*	if(params.execfilter){
+		execfilter(params.execfilter);
+	}
+	if(params.summaryfilter){
+		$('#summary').dataTable().api()
+			.search(params.summaryfilter).draw();
+	}
+	*/
+
+}
+</script>
+</html>
+
+<!-- 
+Lovingly handcrafted by Martin Holst Swende @mhswende in 2017 
+-->

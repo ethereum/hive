@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -28,18 +27,30 @@ type simulationResult struct {
 	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
 
 	Subresults []simulationSubresult `json:"subresults,omitempty"` // Optional list of subresults to report
+
+}
+
+type simulationResultSummary struct {
+	Start   time.Time `json:"start"`           // Time instance when the simulation ended
+	End     time.Time `json:"end"`             // Time instance when the simulation ended
+	Success bool      `json:"success"`         // Whether the entire simulation succeeded
+	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
+
+	summaryData
 }
 
 // simulationSubresult represents a sub-test a simulation may run and report.
 type simulationSubresult struct {
-	Name    string          `json:"name"`              // Unique name for a sub-test within a simulation
+	Name string `json:"name"` // Unique name for a sub-test within a simulation
+
 	Success bool            `json:"success"`           // Whether the sub-test succeeded or not
 	Error   string          `json:"error,omitempty"`   // Textual details to explain a failure
 	Details json.RawMessage `json:"details,omitempty"` // Structured infos a tester mightw wish to surface
 }
 
 // simulateClients runs a batch of simulation tests matched by simulatorPattern
-// against all clients matching clientPattern.
+// against a set of clients matching clientPattern, where  the simulator decides
+// which of those clients to invoke
 func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*simulationResult, error) {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for simulation", "pattern", clientPattern)
@@ -47,52 +58,68 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 	if err != nil {
 		return nil, err
 	}
-	// Build all the validators known to the test harness
+
+	// Build all the simulators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
 	simulators, err := buildSimulators(daemon, simulatorPattern, cacher)
 	if err != nil {
 		return nil, err
 	}
-	// Iterate over all client and simulator combos and cross-execute them
+
+	// The results are a map of clients=>simulators=>results
 	results := make(map[string]map[string]*simulationResult)
 
-	for client, clientImage := range clients {
+	//build the per-client simulator result set
+	for client := range clients {
 		results[client] = make(map[string]*simulationResult)
+	}
 
-		for simulator, simulatorImage := range simulators {
-			logger := log15.New("client", client, "simulator", simulator)
-
-			logdir := filepath.Join(hiveLogsFolder, "simulations", fmt.Sprintf("%s[%s]", strings.Replace(simulator, "/", ":", -1), client))
-			os.RemoveAll(logdir)
-
-			result := simulate(daemon, clientImage, simulatorImage, overrides, logger, logdir)
-			if result.Success {
-				logger.Info("simulation passed", "time", result.End.Sub(result.Start))
-			} else {
-				logger.Error("simulation failed", "time", result.End.Sub(result.Start))
+	//set the end time of the test
+	defer func() {
+		for _, cv := range results {
+			for _, sv := range cv {
+				sv.End = time.Now()
 			}
-			results[client][simulator] = result
 		}
+	}()
+
+	for simulator, simulatorImage := range simulators {
+
+		logdir, err := makeTestOutputDirectory(strings.Replace(simulator, string(filepath.Separator), "_", -1), "simulator", clients)
+		if err != nil {
+			return nil, err
+		}
+
+		logger := log15.New("simulator", simulator)
+
+		for client := range clients {
+			results[client][simulator] = &simulationResult{
+				Start: time.Now(),
+			}
+
+		}
+
+		err = simulate(daemon, clients, simulatorImage, simulator, overrides, logger, logdir, results) //filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)))
+		if err != nil {
+			return nil, err
+		}
+
 	}
 	return results, nil
 }
 
 // simulate starts a simulator service locally, starts a controlling container
-// and executes its commands until torn down. The exit statis of the controller
+// and executes its commands until torn down. The exit status of the controller
 // container will signal whether the simulation passed or failed.
-func simulate(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger, logdir string) *simulationResult {
+func simulate(daemon *docker.Client, clients map[string]string, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string, results map[string]map[string]*simulationResult) error {
 	logger.Info("running client simulation")
-	result := &simulationResult{
-		Start: time.Now(),
-	}
-	defer func() { result.End = time.Now() }()
 
 	// Start the simulator HTTP API
-	sim, err := startSimulatorAPI(daemon, client, simulator, overrides, logger, logdir, result)
+	sim, err := startSimulatorAPI(daemon, clients, simulator, simulatorLabel, overrides, logger, logdir, results)
 	if err != nil {
 		logger.Error("failed to start simulator API", "error", err)
-		result.Error = err
-		return result
+		return err
+
 	}
 	defer sim.Close()
 
@@ -106,9 +133,9 @@ func simulate(daemon *docker.Client, client, simulator string, overrides []strin
 	})
 	if err != nil {
 		logger.Error("failed to create simulator", "error", err)
-		result.Error = err
-		return result
+		return err
 	}
+
 	slogger := logger.New("id", sc.ID[:8])
 	slogger.Debug("created simulator container")
 	defer func() {
@@ -126,31 +153,17 @@ func simulate(daemon *docker.Client, client, simulator string, overrides []strin
 	waiter, err := runContainer(daemon, sc.ID, slogger, filepath.Join(logdir, "simulator.log"), false)
 	if err != nil {
 		slogger.Error("failed to run simulator", "error", err)
-		result.Error = err
-		return result
+		return err
 	}
 	waiter.Wait()
 
-	// Retrieve the exist status to report pass of fail
-	s, err := daemon.InspectContainer(sc.ID)
-	if err != nil {
-		slogger.Error("failed to inspect simulator", "error", err)
-		result.Error = err
-		return result
-	}
-	result.Success = s.State.ExitCode == 0
-	for _, subres := range result.Subresults {
-		if !subres.Success {
-			result.Success = false
-			break
-		}
-	}
-	return result
+	return nil
+
 }
 
 // startSimulatorAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startSimulatorAPI(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger, logdir string, result *simulationResult) (*simulatorAPIHandler, error) {
+func startSimulatorAPI(daemon *docker.Client, clients map[string]string, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string, results map[string]map[string]*simulationResult) (*simulatorAPIHandler, error) {
 	// Find the IP address of the host container
 	logger.Debug("looking up docker bridge IP")
 	bridge, err := lookupBridgeIP(logger)
@@ -174,16 +187,18 @@ func startSimulatorAPI(daemon *docker.Client, client, simulator string, override
 	// Serve connections until the listener is terminated
 	logger.Debug("starting simulator API server")
 	sim := &simulatorAPIHandler{
-		listener:     listener,
-		daemon:       daemon,
-		logger:       logger,
-		logdir:       logdir,
-		client:       client,
-		simulator:    simulator,
-		overrides:    overrides,
-		nodes:        make(map[string]*docker.Container),
-		nodesTimeout: make(map[string]time.Time),
-		result:       result,
+		listener:         listener,
+		daemon:           daemon,
+		logger:           logger,
+		logdir:           logdir,
+		availableClients: clients,
+		simulator:        simulator,
+		simulatorLabel:   simulatorLabel,
+		overrides:        overrides,
+		nodes:            make(map[string]*docker.Container),
+		nodeNames:        make(map[string]string),
+		nodesTimeout:     make(map[string]time.Time),
+		result:           results, //the simulator now has access to a map of results-by-client. The simulator decides which clients to run/
 	}
 	go sim.CheckTimeout()
 	go http.Serve(listener, sim)
@@ -196,19 +211,21 @@ func startSimulatorAPI(daemon *docker.Client, client, simulator string, override
 type simulatorAPIHandler struct {
 	listener *net.TCPListener
 
-	daemon    *docker.Client
-	logger    log15.Logger
-	logdir    string
-	client    string
-	simulator string
-	overrides []string
-	autoID    uint32
+	daemon           *docker.Client
+	logger           log15.Logger
+	logdir           string
+	availableClients map[string]string //the client filter specified by the host. Simulations may not execute other clients.
+	simulator        string            //the image name
+	simulatorLabel   string            //the simulator label
+	overrides        []string
+	autoID           uint32
 
 	runner       *docker.Container
 	nodes        map[string]*docker.Container
+	nodeNames    map[string]string
 	nodesTimeout map[string]time.Time
 
-	result *simulationResult
+	result map[string]map[string]*simulationResult //simulation result log per client name
 	lock   sync.RWMutex
 }
 
@@ -287,6 +304,14 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
 
+		case strings.HasPrefix(r.URL.Path, "/clients"):
+			w.Header().Set("Content-Type", "application/json")
+			clients := make([]string, 0, len(h.availableClients))
+			for client := range h.availableClients {
+				clients = append(clients, client)
+			}
+			json.NewEncoder(w).Encode(clients)
+
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
 		}
@@ -301,18 +326,38 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			for key, vals := range r.Form {
 				envs[key] = vals[0]
 			}
-			// Create and start a new client container
+
+			//the simulation controller needs to tell us now what client to run for the test
+			clientName, in := envs["CLIENT"]
+			if !in {
+				logger.Error("Missing client type", "error", nil)
+				http.Error(w, "Missing client type", http.StatusBadRequest)
+				return
+			}
+
+			//the simulation host may prevent or be unaware of the simulation controller's requested client
+			imageName, in := h.availableClients[clientName]
+			if !in {
+				logger.Error("Unknown or forbidden client type", "error", nil)
+				http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)
+				return
+			}
+
+			// Create and start the requested client container
 			logger.Debug("starting new client")
-			container, err := createClientContainer(h.daemon, h.client, h.simulator, h.runner, h.overrides, envs)
+			container, err := createClientContainer(h.daemon, imageName, h.simulator, h.runner, h.overrides, envs)
 			if err != nil {
 				logger.Error("failed to create client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			logger = logger.New("id", container.ID[:8])
+			containerID := container.ID[:8]
 
-			logfile := fmt.Sprintf("client-%s.log", container.ID[:8])
-			waiter, err := runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, logfile), false)
+			logger = logger.New("client started with id", containerID)
+
+			logfile := fmt.Sprintf("client-%s.log", containerID)
+
+			waiter, err := runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), logfile), false)
 			if err != nil {
 				logger.Error("failed to start client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -352,11 +397,12 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
-			// Container online and responsive, return it's ID for later reference
-			fmt.Fprintf(w, "%s", container.ID[:8])
+			//  Container online and responsive, return its ID for later reference
+			fmt.Fprintf(w, "%s", containerID)
 			h.lock.Lock()
-			h.nodes[container.ID[:8]] = container
-			h.nodesTimeout[container.ID[:8]] = time.Now().Add(dockerTimeoutDuration)
+			h.nodes[containerID] = container
+			h.nodeNames[containerID] = clientName
+			h.nodesTimeout[containerID] = time.Now().Add(dockerTimeoutDuration)
 			h.lock.Unlock()
 			return
 
@@ -373,6 +419,23 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+
+			//If there has been a failure, update the whole test result
+			//which at present means updating the result set for each
+			//known client. TODO: the output format should be
+			//re-arranged so that it is grouped first by test and then by client instance type
+			if !success {
+				for _, resultset := range h.result {
+					resultset[h.simulatorLabel].Success = false
+				}
+			}
+
+			nodeid := r.Form.Get("nodeid")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
 			var details json.RawMessage
 			if blob := r.Form.Get("details"); blob != "" {
 				if err := json.Unmarshal([]byte(blob), &details); err != nil {
@@ -382,7 +445,10 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			// If everything parsed correctly, append the subresult
 			h.lock.Lock()
-			h.result.Subresults = append(h.result.Subresults, simulationSubresult{
+
+			imageName := h.nodeNames[nodeid]
+
+			h.result[imageName][h.simulatorLabel].Subresults = append(h.result[imageName][h.simulatorLabel].Subresults, simulationSubresult{
 				Name:    r.Form.Get("name"),
 				Success: success,
 				Error:   r.Form.Get("error"),

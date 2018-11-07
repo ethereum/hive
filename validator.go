@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,11 +19,18 @@ type validationResult struct {
 	End     time.Time `json:"end"`             // Time instance when the validation ended
 	Success bool      `json:"success"`         // Whether the entire validation succeeded
 	Error   error     `json:"error,omitempty"` // Potential hive failure during validation
+
+}
+
+type validationResultSummary struct {
+	validationResult
+	summaryData
 }
 
 // validateClients runs a batch of validation tests matched by validatorPattern
 // against all clients matching clientPattern.
 func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*validationResult, error) {
+
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for validation", "pattern", clientPattern)
 	clients, err := buildClients(daemon, clientPattern, cacher)
@@ -40,20 +46,25 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 	// Iterate over all client and validator combos and cross-execute them
 	results := make(map[string]map[string]*validationResult)
 
-	for client, clientImage := range clients {
-		results[client] = make(map[string]*validationResult)
+	for validator, validatorImage := range validators {
 
-		for validator, validatorImage := range validators {
+		logdir, err := makeTestOutputDirectory(validator, "validator", clients)
+		if err != nil {
+			return nil, err
+		}
+		for client, clientImage := range clients {
+
 			logger := log15.New("client", client, "validator", validator)
 
-			logdir := filepath.Join(hiveLogsFolder, "validations", fmt.Sprintf("%s[%s]", strings.Replace(validator, "/", ":", -1), client))
-			os.RemoveAll(logdir)
-
-			result := validate(daemon, clientImage, validatorImage, overrides, logger, logdir)
+			result := validate(daemon, clientImage, validatorImage, overrides, logger, filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)))
 			if result.Success {
 				logger.Info("validation passed", "time", result.End.Sub(result.Start))
 			} else {
 				logger.Error("validation failed", "time", result.End.Sub(result.Start))
+			}
+
+			if _, in := results[client]; !in {
+				results[client] = make(map[string]*validationResult)
 			}
 			results[client][validator] = result
 		}

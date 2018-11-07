@@ -24,7 +24,6 @@ const hiveEnvvarPrefix = "HIVE_"
 
 // hiveLogsFolder is the directory in which to place runtime logs from each of
 // the docker containers.
-var hiveLogsFolder = filepath.Join("workspace", "logs")
 
 // createShellContainer creates a docker container from the hive shell's image.
 func createShellContainer(daemon *docker.Client, image string, overrides []string) (*docker.Container, error) {
@@ -55,11 +54,16 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/karalabe/hive/workspace/logs", pwd),     // Surface all the log files from the shell
 	}...)
 
+	uid := os.Getuid()
+	if uid == -1 {
+		uid = 0
+	}
+
 	// Create and return the actual docker container
 	return daemon.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: image,
-			Env:   []string{fmt.Sprintf("UID=%d", os.Getuid())}, // Forward the user ID for the workspace permissions
+			Env:   []string{fmt.Sprintf("UID=%d", uid)}, // Forward the user ID for the workspace permissions
 			Cmd:   os.Args[1:],
 		},
 		HostConfig: &docker.HostConfig{
@@ -80,11 +84,17 @@ func createEthashContainer(daemon *docker.Client, image string) (*docker.Contain
 	if err := os.MkdirAll(ethash, os.ModePerm); err != nil {
 		return nil, err
 	}
+
+	uid := os.Getuid()
+	if uid == -1 {
+		uid = 0 //hack for windows
+	}
+
 	// Create and return the actual docker container
 	return daemon.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: image,
-			Env:   []string{fmt.Sprintf("UID=%d", os.Getuid())}, // Forward the user ID for the workspace permissions
+			Env:   []string{fmt.Sprintf("UID=%d", uid)}, // Forward the user ID for the workspace permissions
 		},
 		HostConfig: &docker.HostConfig{
 			Binds: []string{fmt.Sprintf("%s:/root/.ethash", ethash)},

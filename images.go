@@ -97,19 +97,22 @@ func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCac
 // buildValidators iterates over all the known validators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildValidators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages(daemon, "validators", pattern, "validator", cacher)
+	images, err := buildNestedImages(daemon, "validators", pattern, "validator", cacher)
+	return images, err
 }
 
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildSimulators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages(daemon, "simulators", pattern, "simulator", cacher)
+	images, err := buildNestedImages(daemon, "simulators", pattern, "simulator", cacher)
+	return images, err
 }
 
 // buildBenchmarkers iterates over all the known benchmarkers and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildBenchmarkers(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages(daemon, "benchmarkers", pattern, "benchmarker", cacher)
+	images, err := buildNestedImages(daemon, "benchmarkers", pattern, "benchmarker", cacher)
+	return images, err
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested

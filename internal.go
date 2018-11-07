@@ -25,6 +25,7 @@ func makeGenesisDAG(daemon *docker.Client, cacher *buildCacher) error {
 		log15.Error("failed to create ethash container", "error", err)
 		return err
 	}
+
 	log15.Debug("created ethash container")
 	defer func() {
 		log15.Debug("deleting ethash container")
