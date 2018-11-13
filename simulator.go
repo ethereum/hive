@@ -125,11 +125,13 @@ func simulate(daemon *docker.Client, clients map[string]string, simulator string
 
 	// Start the simulator controller container
 	logger.Debug("creating simulator container")
+	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
 	sc, err := daemon.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: simulator,
 			Env:   []string{"HIVE_SIMULATOR=http://" + sim.listener.Addr().String()},
 		},
+		HostConfig: hostConfig,
 	})
 	if err != nil {
 		logger.Error("failed to create simulator", "error", err)

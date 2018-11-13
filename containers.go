@@ -379,7 +379,12 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 	}
 	// Start the requested container and wait until it terminates
 	logger.Debug("starting container")
-	if err := daemon.StartContainer(id, nil); err != nil {
+	//	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
+
+	//apparmor=unconfined
+
+	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
+	if err := daemon.StartContainer(id, hostConfig); err != nil {
 		logger.Error("failed to start container", "error", err)
 		return nil, err
 	}
