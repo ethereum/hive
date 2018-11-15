@@ -25,21 +25,19 @@ RUN go get -u -v github.com/derekparker/delve/cmd/dlv
 #RUN (cd / && GOPATH=/go go get github.com/fsouza/go-dockerclient)
 
 # Add the local test stuff
-ADD devp2p_test.go /tests/simulators/devp2p/basic/devp2p_test.go
-ADD node.go /tests/simulators/devp2p/basic/node.go
-ADD udp.go /tests/simulators/devp2p/basic/udp.go
+ADD /devp2p/basic/devp2p_test.go /go/src/github.com/ethereum/hive/simulators/devp2p/basic/devp2p_test.go
+ADD /devp2p/node.go  /go/src/github.com/ethereum/hive/simulators/devp2p/node.go
+ADD /devp2p/udp.go  /go/src/github.com/ethereum/hive/simulators/devp2p/udp.go
+ADD common /go/src/github.com/ethereum/hive/simulators/common
 
-
-#go test -c -o means compile the tests (-c) and rename (-o) to 
-#RUN (cd /go/src/github.com/frankszendzielarz/hive/simulators/devp2p/basic/ && GOPATH=/go go test -gcflags='all=-N -l' -c -o /go/src/github.com/frankszendzielarz/hive/simulators/devp2p/basic/devp2p.test)
 
 
 # Add shell
 RUN apk add --update bash curl jq
 # Add the entry script
-ADD tests.sh /tests.sh
-#mandatory init file
-ADD genesis.json /genesis.json
+ADD /devp2p/basic/tests.sh /tests.sh
+#TODO - check is this needed: mandatory init file
+ADD /devp2p/basic/genesis.json /genesis.json
 
 EXPOSE 2345 8545 8546 8080 30303 30303/udp 
 

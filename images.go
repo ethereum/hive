@@ -50,20 +50,20 @@ func newBuildCacher(pattern string) (*buildCacher, error) {
 // within an all encompassing container.
 func buildShell(daemon *docker.Client, cacher *buildCacher) (string, error) {
 	image := hiveImageNamespace + "/shell"
-	return image, buildImage(daemon, image, ".", cacher, log15.Root())
+	return image, buildImage(daemon, image, ".", cacher, log15.Root(), "")
 }
 
 // buildEthash builds the ethash DAG generator docker image to run before any real
 // simulation needing it takes place.
 func buildEthash(daemon *docker.Client, cacher *buildCacher) (string, error) {
 	image := hiveImageNamespace + "/internal/ethash"
-	return image, buildImage(daemon, image, filepath.Join("internal", "ethash"), cacher, log15.Root())
+	return image, buildImage(daemon, image, filepath.Join("internal", "ethash"), cacher, log15.Root(), "")
 }
 
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
 func buildClients(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages(daemon, "clients", pattern, "client", cacher)
+	return buildNestedImages(daemon, "clients", pattern, "client", cacher, false)
 }
 
 // fetchClientVersions downloads the version json specs from all clients that
@@ -97,27 +97,40 @@ func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCac
 // buildValidators iterates over all the known validators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildValidators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages(daemon, "validators", pattern, "validator", cacher)
+	images, err := buildNestedImages(daemon, "validators", pattern, "validator", cacher, false)
 	return images, err
 }
 
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildSimulators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages(daemon, "simulators", pattern, "simulator", cacher)
+	images, err := buildNestedImages(daemon, "simulators", pattern, "simulator", cacher, true)
 	return images, err
 }
 
 // buildBenchmarkers iterates over all the known benchmarkers and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildBenchmarkers(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages(daemon, "benchmarkers", pattern, "benchmarker", cacher)
+	images, err := buildNestedImages(daemon, "benchmarkers", pattern, "benchmarker", cacher, false)
 	return images, err
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested
 // docker image definitions and builds all of them matching the provided pattern.
-func buildNestedImages(daemon *docker.Client, root string, pattern string, kind string, cacher *buildCacher) (map[string]string, error) {
+func buildNestedImages(daemon *docker.Client, root string, pattern string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
+
+	var contextBuilder func(root string, path string) (string, string)
+
+	if rootContext {
+		contextBuilder = func(root string, path string) (string, string) {
+			return root, strings.Replace(path+string(filepath.Separator)+"Dockerfile", "\\", "/", -1)
+		}
+	} else {
+		contextBuilder = func(root string, path string) (string, string) {
+			return filepath.Join(root, path), ""
+		}
+	}
+
 	// Gather all the folders with Dockerfiles within them
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -145,11 +158,11 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 	images := make(map[string]string)
 	for _, name := range names {
 		var (
-			context = filepath.Join(root, name)
-			image   = strings.Replace(filepath.Join(hiveImageNamespace, context), string(os.PathSeparator), "/", -1)
-			logger  = log15.New(kind, name)
+			context, dockerfile = contextBuilder(root, name)
+			image               = strings.Replace(filepath.Join(hiveImageNamespace, root, name), string(os.PathSeparator), "/", -1)
+			logger              = log15.New(kind, name)
 		)
-		if err := buildImage(daemon, image, context, cacher, logger); err != nil {
+		if err := buildImage(daemon, image, context, cacher, logger, dockerfile); err != nil {
 			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
 			return nil, berr
 		}
@@ -172,7 +185,7 @@ func (b *buildError) Client() string {
 }
 
 // buildImage builds a single docker image from the specified context.
-func buildImage(daemon *docker.Client, image, context string, cacher *buildCacher, logger log15.Logger) error {
+func buildImage(daemon *docker.Client, image, context string, cacher *buildCacher, logger log15.Logger, dockerfile string) error {
 	var nocache bool
 	if cacher != nil && cacher.pattern.MatchString(image) && !cacher.rebuilt[image] {
 		cacher.rebuilt[image] = true
@@ -192,6 +205,7 @@ func buildImage(daemon *docker.Client, image, context string, cacher *buildCache
 	opts := docker.BuildImageOptions{
 		Name:         image,
 		ContextDir:   context,
+		Dockerfile:   dockerfile,
 		OutputStream: stream,
 		NoCache:      nocache,
 	}

@@ -8,10 +8,10 @@
 #TARGET_ENODE is defined in the following script, which is obtained
 #from the client container during simulator or validator execution. It is client-specific.
 echo "Starting simulator."
-cd /tests/simulators/devp2p/basic/
+cd /go/src/github.com/ethereum/hive/simulators/devp2p/basic/
 #dlv exec /go/src/github.com/frankszendzielarz/hive/simulators/devp2p/basic/devp2p.test --headless  --listen=:2345 --log   --api-version=2 -- -simulatorHost "$HIVE_SIMULATOR" 
-
-dlv test  --headless  --listen=:2345 --log=true  --api-version=1 -- -simulatorHost "$HIVE_SIMULATOR" 
+echo "Simulator endpoint: $HIVE_SIMULATOR"
+dlv test  --headless  --listen=:2345 --log=true  --api-version=2 -- -simulatorHost "$HIVE_SIMULATOR" 
 
 echo "Ending simulator."
 #/devp2p.test -test.v -test.run Discovery/discoveryv4/v4001  -simulatorHost "$HIVE_SIMULATOR" 

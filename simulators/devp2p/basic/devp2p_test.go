@@ -2,11 +2,9 @@ package main
 
 import (
 	"crypto/ecdsa"
-	"encoding/json"
 	"flag"
-	"io/ioutil"
+	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"testing"
 
@@ -15,265 +13,260 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
+	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/hive/simulators/devp2p"
 	docker "github.com/fsouza/go-dockerclient"
 )
 
 var (
-	listenPort       *string        //udp listen port
-	natdesc          *string        //nat mode
-	dockerHost       *string        //docker host api endpoint
-	simulatorHost    *string        //simulator host endpoint
-	daemon           *docker.Client //docker daemon proxy
-	targetID         *string        //docker client id
-	nodeKey          *ecdsa.PrivateKey
-	err              error
-	restrictList     *netutil.Netlist
-	v4udp            V4Udp
-	availableClients []string
-	targetnode       *enode.Node // parsed Node
-	targetIP         net.IP      //targetIP
+	listenPort   *string //udp listen port
+	natdesc      *string //nat mode
+	dockerHost   *string //docker host api endpoint
+	hostURI      *string //simulator host endpoint
+	host         common.SimulatorAPI
+	daemon       *docker.Client //docker daemon proxy
+	targetID     *string        //docker client id
+	nodeKey      *ecdsa.PrivateKey
+	err          error
+	restrictList *netutil.Netlist
+	v4udp        devp2p.V4Udp
+
+	//targetnode       *enode.Node // parsed Node
+	//targetIP         net.IP      //targetIP
+
 )
+
+type testCase struct {
+	Client string
+}
 
 func TestMain(m *testing.M) {
 
-	//Not meaningful in simulator context : testTarget := flag.String("enodeTarget", "", "Enode address of target")
-	//Not meaningful in simulator context : testTargetIP := flag.String("targetIP", "", "IP Address of hive container client")
+	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
+
 	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
-	simulatorHost = flag.String("simulatorHost", "", "url of simulator host api")
+	hostURI = flag.String("simulatorHost", "", "url of simulator host api")
 	dockerHost = flag.String("dockerHost", "", "docker host api endpoint")
 
 	flag.Parse()
 
 	//Try to connect to the simulator host and get the client list
-	resp, err := http.Get(*simulatorHost + "/clients")
-	if err != nil {
-		panic(err)
+	host = &common.SimulatorHost{
+		HostURI: hostURI,
 	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	err = json.Unmarshal(body, &availableClients)
-	if err != nil {
-		panic(err)
-	}
-
-	// for _,i := range availableClients {
-
-	// }
-
-	//THIS IS ABOUT TO BE DITCHED
-
-	//If an enode was supplied, use that
-	// if *testTarget != "" {
-	// 	targetnode, err = enode.ParseV4(*testTarget)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	}
-	// }
-
-	//If a target ip was supplied, parse it and use it
-	// if *testTargetIP != "" {
-	// 	targetIP = net.ParseIP(*testTargetIP)
-	// 	//if the target enode was supplied, override the ip address with the target ip supplied, which
-	// 	//seems to be useful when the supplied enode ip address is incorrect in some way when reported
-	// 	//from a docker container
-	// 	if targetnode != nil {
-	// 		targetnode = enode.NewV4(targetnode.Pubkey(), targetIP, targetnode.TCP(), targetnode.UDP())
-	// 	}
-	// }
-
-	//Exit if no args supplied
-	// if *testTargetIP == "" && targetnode == nil {
-	// 	panic("No target enode or ip supplied")
-	// }
 
 	os.Exit(m.Run())
 }
 
-//not currently necessary:
-func connectToDockerDaemon(t *testing.T) {
-	// this test suite needs to be able to control the client container to:
-	// - Reset the container so that nodes are known/unknown
-	// - Manipulate faketime for timing related tests
-	daemon, err = docker.NewClient(*dockerHost)
-	if err != nil {
-		t.Error("failed to connect to docker daemon")
-		return
-	}
-	env, err := daemon.Version()
-	if err != nil {
-		t.Fatalf("failed to retrieve docker version %s", err)
-		return
-	}
-	t.Logf("Daemon with version %s is up", env.Get("Version"))
+func ClientTestRunner(t *testing.T, client string, testName string, testFunc func(common.Logger, *enode.Node) (string, bool)) {
+
+	t.Run(testName, func(t *testing.T) {
+
+		t.Parallel()
+
+		var errorMessage string
+		var ok bool
+
+		parms := map[string]string{"CLIENT": client}
+
+		nodeID, err := host.StartNewNode(parms)
+		if err != nil {
+			errorMessage = fmt.Sprintf("FATAL: Unable to start node: %v", err)
+			ok = false
+		}
+
+		if ok {
+			enodeID, err := host.GetClientEnode(*nodeID)
+			if err != nil && *enodeID != "" {
+				errorMessage = fmt.Sprintf("FATAL: Unable to get node: %v", err)
+				ok = false
+			}
+
+			targetNode, err := enode.ParseV4(*enodeID)
+
+			if ok {
+				errorMessage, ok = testFunc(t, targetNode)
+			}
+		}
+
+		host.AddResults(ok, *nodeID, errorMessage)
+
+		if !ok {
+			t.Errorf("Test failed: %s", errorMessage)
+		}
+
+	})
+
 }
 
 // TestDiscovery tests the set of discovery protocols
 func TestDiscovery(t *testing.T) {
-	// discovery v4 test suites
 
+	// discovery v4 test suites
 	t.Run("discoveryv4", func(t *testing.T) {
+
 		//setup
 		v4udp = setupv4UDP(t)
 
-		//If the client has a known enode, obtained from an admin API, then run a standard ping
-		//Otherwise, run a different ping where we override any enode validation checks
-		//The recovered id can be used to set the target node id for any further tests that might want to verify that.
-		var pingTest func(t *testing.T)
-
-		if targetnode == nil {
-			pingTest = SourceUnknownPingUnknownEnode
-		} else {
-			pingTest = SourceUnknownPingKnownEnode
+		//get all client types required to test
+		availableClients, err := host.GetClientTypes()
+		if err != nil {
+			t.Fatalf("Simulator error. Cannot get client types. %v", err)
 		}
 
-		t.Run("pingTest(v4001)", pingTest)
-		t.Run("SourceUnknownPingWrongTo(v4002)", SourceUnknownPingWrongTo)
-		t.Run("SourceUnknownPingWrongFrom(v4003)", SourceUnknownPingWrongFrom)
-		t.Run("SourceUnknownPingExtraData(v4004)", SourceUnknownPingExtraData)
-		t.Run("SourceUnknownPingExtraDataWrongFrom(v4005)", SourceUnknownPingExtraDataWrongFrom)
-		t.Run("SourceUnknownWrongPacketType(v4006)", SourceUnknownWrongPacketType)
-		t.Run("SourceUnknownFindNeighbours(v4007)", SourceUnknownFindNeighbours)
+		//get all available tests
+		availableTests := map[string]func(common.Logger, *enode.Node) (string, bool){
+			"pingTest(v4001)":                             SourceUnknownPingKnownEnode,
+			"SourceUnknownPingWrongTo(v4002)":             SourceUnknownPingWrongTo,
+			"SourceUnknownPingWrongFrom(v4003)":           SourceUnknownPingWrongFrom,
+			"SourceUnknownPingExtraData(v4004)":           SourceUnknownPingExtraData,
+			"SourceUnknownPingExtraDataWrongFrom(v4005)":  SourceUnknownPingExtraDataWrongFrom,
+			"SourceUnknownWrongPacketType(v4006)":         SourceUnknownWrongPacketType,
+			"SourceUnknownFindNeighbours(v4007)":          SourceUnknownFindNeighbours,
+			"SourceKnownPingFromSignatureMismatch(v4009)": SourceKnownPingFromSignatureMismatch,
+			"FindNeighboursOnRecentlyBondedTarget(v4010)": FindNeighboursOnRecentlyBondedTarget,
+			"PingPastExpiration(v4011)":                   PingPastExpiration,
+			"FindNeighboursPastExpiration(v4012)":         FindNeighboursPastExpiration,
+		}
 
-		t.Run("SourceKnownPingFromSignatureMismatch(v4009)", SourceKnownPingFromSignatureMismatch)
-		t.Run("FindNeighboursOnRecentlyBondedTarget(v4010)", FindNeighboursOnRecentlyBondedTarget)
-		t.Run("PingPastExpiration(v4011)", PingPastExpiration)
-		t.Run("FindNeighboursPastExpiration(v4012)", FindNeighboursPastExpiration)
+		//for every client type
+		for _, i := range availableClients {
 
-	})
+			//for every test
+			for testName, testFunc := range availableTests {
 
-	t.Run("discoveryv5", func(t *testing.T) {
+				//we have a testcase of client-type+test
+				//run that testcase with a helper function (client, testfunc)
+				//the testcase will be run with max concurrency specified by the test parallel flag
+				ClientTestRunner(t, i, testName, testFunc)
 
-		t.Run("ping", func(t *testing.T) {
-			//TODO
-		})
+			}
+
+		}
+
 	})
 
 }
 
-//v4001a
-func SourceUnknownPingUnknownEnode(t *testing.T) {
-	t.Log("Pinging unknown node id.")
-	if err := v4udp.ping(enode.ID{}, &net.UDPAddr{IP: targetIP, Port: 30303}, false, func(e *ecdsa.PublicKey) {
+//v4001a - Temporarily removing as this case no longer acceptable?
+// func SourceUnknownPingUnknownEnode(t common.Logger, targetIP net.IP) (bool, string) {
 
-		targetnode = enode.NewV4(e, targetIP, 30303, 30303)
-		t.Log("Discovered node id " + targetnode.String())
-	}); err != nil {
-		t.Fatalf("Unable to v4 ping: %v", err)
-	}
-}
+// 	t.Log("Pinging unknown node id.")
+// 	if err := v4udp.Ping(enode.ID{}, &net.UDPAddr{IP: targetIP, Port: 30303}, false, func(e *ecdsa.PublicKey) {
+
+// 		targetnode = enode.NewV4(e, targetIP, 30303, 30303)
+// 		t.Log("Discovered node id " + targetnode.String())
+// 	}); err != nil {
+// 		t.Fatalf("Unable to v4 ping: %v", err)
+// 	}
+// }
 
 //v4001b
-func SourceUnknownPingKnownEnode(t *testing.T) {
+func SourceUnknownPingKnownEnode(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4001")
-	if err := v4udp.ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Ping test failed: %v", err)
+	if err := v4udp.Ping(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		return fmt.Sprintf("Ping test failed: %v", err), false
 	}
+	return "", true
 }
 
 //v4002
-func SourceUnknownPingWrongTo(t *testing.T) {
+func SourceUnknownPingWrongTo(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4002")
-	if err := v4udp.pingWrongTo(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Test failed: %v", err)
+	if err := v4udp.PingWrongTo(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
-
+	return "", true
 }
 
 //v4003
-func SourceUnknownPingWrongFrom(t *testing.T) {
+func SourceUnknownPingWrongFrom(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4003")
-	if err := v4udp.pingWrongFrom(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Test failed: %v", err)
+	if err := v4udp.PingWrongFrom(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 }
 
 //v4004
-func SourceUnknownPingExtraData(t *testing.T) {
+func SourceUnknownPingExtraData(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4004")
-	if err := v4udp.pingExtraData(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Test failed: %v", err)
+	if err := v4udp.PingExtraData(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 }
 
 //v4005
-func SourceUnknownPingExtraDataWrongFrom(t *testing.T) {
+func SourceUnknownPingExtraDataWrongFrom(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4005")
-	if err := v4udp.pingExtraDataWrongFrom(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Test failed: %v", err)
+	if err := v4udp.PingExtraDataWrongFrom(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 }
 
 //v4006
-func SourceUnknownWrongPacketType(t *testing.T) {
+func SourceUnknownWrongPacketType(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4006")
-	if err := v4udp.pingTargetWrongPacketType(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != errTimeout {
-		t.Fatalf("Test failed: %v", err)
+	if err := v4udp.PingTargetWrongPacketType(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != devp2p.ErrTimeout {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 }
 
 //v4007
-func SourceUnknownFindNeighbours(t *testing.T) {
+func SourceUnknownFindNeighbours(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4007")
-	targetEncKey := encodePubkey(targetnode.Pubkey())
-	if err := v4udp.findnodeWithoutBond(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != errTimeout {
-		t.Fatalf("Test failed: %v", err)
+	targetEncKey := devp2p.EncodePubkey(targetnode.Pubkey())
+	if err := v4udp.FindnodeWithoutBond(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != devp2p.ErrTimeout {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 }
 
 //v4009
-func SourceKnownPingFromSignatureMismatch(t *testing.T) {
+func SourceKnownPingFromSignatureMismatch(t common.Logger, targetnode *enode.Node) (string, bool) {
 
 	t.Log("Test v4009")
-	if err := v4udp.pingBondedWithMangledFromField(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
-		t.Fatalf("Test failed: %v", err)
+	if err := v4udp.PingBondedWithMangledFromField(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 
 }
 
 //v4010
-func FindNeighboursOnRecentlyBondedTarget(t *testing.T) {
+func FindNeighboursOnRecentlyBondedTarget(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4010")
-	targetEncKey := encodePubkey(targetnode.Pubkey())
-	if err := v4udp.bondedSourceFindNeighbours(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != nil {
-		t.Fatalf("Test failed: %v", err)
+	targetEncKey := devp2p.EncodePubkey(targetnode.Pubkey())
+	if err := v4udp.BondedSourceFindNeighbours(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != nil {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 }
 
 //v4011
-func PingPastExpiration(t *testing.T) {
+func PingPastExpiration(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4011")
-	if err := v4udp.pingPastExpiration(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != errTimeout {
-		t.Fatalf("Test failed: %v", err)
+	if err := v4udp.PingPastExpiration(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != devp2p.ErrTimeout {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 }
 
 //v4012
-func FindNeighboursPastExpiration(t *testing.T) {
+func FindNeighboursPastExpiration(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4012")
-	targetEncKey := encodePubkey(targetnode.Pubkey())
-	if err := v4udp.bondedSourceFindNeighboursPastExpiration(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != errTimeout {
-		t.Fatalf("Test failed: %v", err)
+	targetEncKey := devp2p.EncodePubkey(targetnode.Pubkey())
+	if err := v4udp.BondedSourceFindNeighboursPastExpiration(targetnode.ID(), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, targetEncKey); err != devp2p.ErrTimeout {
+		return fmt.Sprintf("Test failed: %v", err), false
 	}
+	return "", true
 }
 
-// TestRLPx checks the RLPx handshaking
-func TestRLPx(t *testing.T) {
-	// discovery v4 test suites
-	t.Run("connect", func(t *testing.T) {
-		//
-		t.Run("basic", func(t *testing.T) {
-
-		})
-	})
-
-}
-
-func setupv4UDP(l logger) V4Udp {
+func setupv4UDP(l common.Logger) devp2p.V4Udp {
 
 	//Resolve an address (eg: ":port") to a UDP endpoint.
 	addr, err := net.ResolveUDPAddr("udp", *listenPort)
@@ -287,7 +280,7 @@ func setupv4UDP(l logger) V4Udp {
 		utils.Fatalf("-ListenUDP: %v", err)
 	}
 
-	//FS: The following just gets the local address, does something with NAT and converts into a
+	//The following just gets the local address, does something with NAT and converts into a
 	//general address type.
 	natm, err := nat.Parse(*natdesc)
 	if err != nil {
@@ -298,7 +291,7 @@ func setupv4UDP(l logger) V4Udp {
 		if !realaddr.IP.IsLoopback() {
 			go nat.Map(natm, nil, "udp", realaddr.Port, realaddr.Port, "ethereum discovery")
 		}
-		// TODO: react to external IP changes over time.
+
 		if ext, err := natm.ExternalIP(); err == nil {
 			realaddr = &net.UDPAddr{IP: ext, Port: realaddr.Port}
 		}
@@ -310,15 +303,15 @@ func setupv4UDP(l logger) V4Udp {
 		utils.Fatalf("could not generate key: %v", err)
 	}
 
-	cfg := Config{
+	cfg := devp2p.Config{
 		PrivateKey:   nodeKey,
 		AnnounceAddr: realaddr,
 		NetRestrict:  restrictList,
 	}
 
-	var v4UDP *V4Udp
+	var v4UDP *devp2p.V4Udp
 
-	if v4UDP, err = ListenUDP(conn, cfg, l); err != nil {
+	if v4UDP, err = devp2p.ListenUDP(conn, cfg, l); err != nil {
 		panic(err)
 	}
 
