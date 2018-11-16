@@ -120,7 +120,14 @@ class HiveAPI(object):
             _ip = self._get("/nodes/%s" % _id)
             return HiveNode(_id, _ip)
         except Exception, e:
-            self.log("Failed to start node, trying again")
+            self.log("Failed to start node[1], trying again")
+
+        try:
+            _id = self._post("/nodes", params)
+            _ip = self._get("/nodes/%s" % _id)
+            return HiveNode(_id, _ip)
+        except Exception, e:
+            self.log("Failed to start node[2], trying again (last attempt)")
 
         _id = self._post("/nodes", params)
         _ip = self._get("/nodes/%s" % _id)
@@ -208,6 +215,20 @@ class BlockTestExecutor(object):
             params["HIVE_SKIP_POW"] = "1"
 
         self.hive.log("Starting client node for test %s" % testcase)
+
+
+        def reportTest(tc):
+            tc.setTimeElapsed(1000 * ( time.time() - start))
+            self.hive.log("Test: %s %s (%s)" % (tc.testfile, tc, tc.status()))
+            self.hive.subresult(
+                    node.nodeId,
+                    testcase.fullname(),
+                    testcase.wasSuccessfull(),
+                    testcase.topLevelError(),
+                    testcase.details()
+                )
+
+
         try:
             node = self.hive.newNode(params)
         except Exception, startNodeError:
@@ -216,28 +237,11 @@ class BlockTestExecutor(object):
             except Exception, e:
                 error = str(startNodeError)
             testcase.fail(["Failed to start client node", traceback.format_exc()])
-            end = time.time()
-            testcase.setTimeElapsed(1000 * (end - start))
-            self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
-            self.hive.subresult(
-                    testcase.fullname(),
-                    testcase.wasSuccessfull(),
-                    testcase.topLevelError(),
-                    testcase.details()
-                )
+            reportTest(testcase)
             return
 
         self.executeTestcase(testcase, node)
-        end = time.time()
-        testcase.setTimeElapsed(1000 * (end - start))
-        self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
-        self.hive.subresult(
-                node.nodeId,            
-                testcase.fullname(),
-                testcase.wasSuccessfull(),
-                testcase.topLevelError(),
-                testcase.details()
-            )
+        reportTest(testcase)
 
         try:
             self.hive.killNode(node)
@@ -251,8 +255,8 @@ class BlockTestExecutor(object):
 
     def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[]):
         pool = ThreadPool(PARALLEL_TESTS)
-        pool.map(lambda test: self._startNodeAndRunTest(test),
-                 self.makeTestcases(start, end, whitelist, blacklist))
+        testgenerator = self.makeTestcases(start, end, whitelist, blacklist)
+        pool.map(lambda test: self._startNodeAndRunTest(test),testgenerator)
         pool.close()
         pool.join()
         # FIXME: Return false if any tests fail.
