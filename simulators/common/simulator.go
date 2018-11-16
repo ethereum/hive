@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"net/url"
+	"strconv"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -37,7 +39,7 @@ type SimulatorAPI interface {
 	//	Success flag
 	//	Node id
 	//  Details
-	AddResults(bool, string, string) error
+	AddResults(bool, string, string, string, string) error
 	//Stop and delete the specified container
 	KillNode(string) error
 }
@@ -52,22 +54,42 @@ type Logger interface {
 func (sim SimulatorHost) GetDockerInfo() (*docker.DockerInfo, error) {
 	//TODO
 	d := &docker.DockerInfo{}
+
 	return d, nil
 }
 
 //GetClientIP Get the client IP
-func (sim SimulatorHost) GetClientIP(string) (*string, error) {
-	//TODO
-	return nil, nil
+func (sim SimulatorHost) GetClientIP(node string) (*string, error) {
+
+	resp, err := http.Get(*sim.HostURI + "/nodes/" + node)
+	if err != nil {
+		return nil, err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	ip := string(body)
+
+	return &ip, nil
 }
 
 //GetClientEnode Get the client enode for the specified container id
-func (sim SimulatorHost) GetClientEnode(string) (*string, error) {
-	//calls request to create node, which returns node local identifier, and
-	//should be updated to a) copy the enode.sh to the local container
-	//add client api function to get enode id
+func (sim SimulatorHost) GetClientEnode(node string) (*string, error) {
+	resp, err := http.Get(*sim.HostURI + "/enodes/" + node)
+	if err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	res := string(body)
+
+	return &res, nil
 }
 
 //GetClientTypes Get all client types available to this simulator run
@@ -95,12 +117,31 @@ func (sim SimulatorHost) GetClientTypes() (availableClients []string, err error)
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
 //Returns container id
-func (sim SimulatorHost) StartNewNode(map[string]string) (*string, error) {
-	return nil, nil
+func (sim SimulatorHost) StartNewNode(parms map[string]string) (*string, error) {
+
+	vals := make(url.Values)
+	for k, v := range parms {
+		vals.Add(k, v)
+	}
+
+	resp, err := http.PostForm(*sim.HostURI+"/nodes", vals)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	res := string(body)
+	return &res, nil
+
 }
 
 //Log Submit log info to the simulator log
 func (sim SimulatorHost) Log(string) error {
+	//TODO
 	return nil
 }
 
@@ -108,8 +149,19 @@ func (sim SimulatorHost) Log(string) error {
 //	Success flag
 //	Node id
 //  Details
-func (sim SimulatorHost) AddResults(bool, string, string) error {
-	return nil
+func (sim SimulatorHost) AddResults(success bool, nodeID string, details string, name string, errMsg string) error {
+	vals := make(url.Values)
+
+	vals.Add("success", strconv.FormatBool(success))
+	vals.Add("details", details)
+	vals.Add("nodeid", nodeID)
+	vals.Add("details", details)
+	vals.Add("error", errMsg)
+
+	_, err := http.PostForm(*sim.HostURI+"/nodes", vals)
+
+	return err
+
 }
 
 //KillNode Stop and delete the specified container
