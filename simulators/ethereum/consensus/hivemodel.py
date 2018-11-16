@@ -220,6 +220,7 @@ class BlockTestExecutor(object):
             testcase.setTimeElapsed(1000 * (end - start))
             self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
             self.hive.subresult(
+                    node.nodeId,
                     testcase.fullname(),
                     testcase.wasSuccessfull(),
                     testcase.topLevelError(),
@@ -251,8 +252,8 @@ class BlockTestExecutor(object):
 
     def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[]):
         pool = ThreadPool(PARALLEL_TESTS)
-        pool.map(lambda test: self._startNodeAndRunTest(test),
-                 self.makeTestcases(start, end, whitelist, blacklist))
+        testgenerator = self.makeTestcases(start, end, whitelist, blacklist)
+        pool.map(lambda test: self._startNodeAndRunTest(test),testgenerator)
         pool.close()
         pool.join()
         # FIXME: Return false if any tests fail.
