@@ -343,22 +343,17 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 
 	summaryFileName := filepath.Join(*testResultsRoot, *testResultsSummaryFile)
 
-	//read the existing summary data
-	summaryFileData, err := ioutil.ReadFile(summaryFileName)
-	if err != nil {
-		log15.Crit("failed to report summarised results", "error", err)
-		return err
-	}
-
-	//back it up
-	ioutil.WriteFile(summaryFileName+".bak", summaryFileData, 0644)
-
-	//deserialize from json
 	var allSummaryInfo summaryFile
-	err = json.Unmarshal(summaryFileData, &allSummaryInfo)
-	if err != nil {
-		log15.Crit("failed to read summarised results", "error", err)
-		return err
+	//read the existing summary data, if present
+	if summaryFileData, err := ioutil.ReadFile(summaryFileName); err == nil{
+		//back it up
+		ioutil.WriteFile(summaryFileName+".bak", summaryFileData, 0644)
+		//deserialize from json
+		err = json.Unmarshal(summaryFileData, &allSummaryInfo)
+		if err != nil {
+			log15.Crit("failed to read summarised results", "error", err)
+			return err
+		}
 	}
 
 	//add the new summary
