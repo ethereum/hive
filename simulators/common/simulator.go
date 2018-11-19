@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -65,12 +66,13 @@ func (sim SimulatorHost) GetClientIP(node string) (*string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	ip := string(body)
+	ip := strings.TrimRight(string(body), "\r\n")
 
 	return &ip, nil
 }
@@ -87,7 +89,7 @@ func (sim SimulatorHost) GetClientEnode(node string) (*string, error) {
 		return nil, err
 	}
 
-	res := string(body)
+	res := strings.TrimRight(string(body), "\r\n")
 
 	return &res, nil
 }
@@ -158,7 +160,7 @@ func (sim SimulatorHost) AddResults(success bool, nodeID string, details string,
 	vals.Add("details", details)
 	vals.Add("error", errMsg)
 
-	_, err := http.PostForm(*sim.HostURI+"/nodes", vals)
+	_, err := http.PostForm(*sim.HostURI+"/subresults", vals)
 
 	return err
 

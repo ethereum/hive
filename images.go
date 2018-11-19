@@ -104,7 +104,7 @@ func buildValidators(daemon *docker.Client, pattern string, cacher *buildCacher)
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildSimulators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages(daemon, "simulators", pattern, "simulator", cacher, true)
+	images, err := buildNestedImages(daemon, "simulators", pattern, "simulator", cacher, *simRootContext)
 	return images, err
 }
 

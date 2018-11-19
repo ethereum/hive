@@ -21,13 +21,13 @@ ENV GOPATH /gopath
 ENV PATH   $GOPATH/bin:$PATH
 
 # Inject and build the hive dependencies (modified very rarely, cache builds)
-ADD vendor $GOPATH/src/github.com/karalabe/hive/vendor
-RUN (cd $GOPATH/src/github.com/karalabe/hive && go install ./...)
+ADD vendor $GOPATH/src/github.com/ethereum/hive/vendor
+RUN (cd $GOPATH/src/github.com/ethereum/hive && go install ./...)
 
 # Inject and build hive itself (modified during hive dev only, cache builds)
-ADD *.go $GOPATH/src/github.com/karalabe/hive/
+ADD *.go $GOPATH/src/github.com/ethereum/hive/
 
-WORKDIR $GOPATH/src/github.com/karalabe/hive
+WORKDIR $GOPATH/src/github.com/ethereum/hive
 RUN go install
 
 # Define the tiny startup script to boot docker and hive afterwards
@@ -53,4 +53,4 @@ RUN \
 ENTRYPOINT ["hive.sh"]
 
 # Inject all other runtime resources (modified most frequently)
-COPY . $GOPATH/src/github.com/karalabe/hive
+COPY . $GOPATH/src/github.com/ethereum/hive

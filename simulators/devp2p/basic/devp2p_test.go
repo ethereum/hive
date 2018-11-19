@@ -70,7 +70,8 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 
 		parms := map[string]string{
 			"CLIENT":        client,
-			"HIVE_BOOTNODE": "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@0.0.0.0:30303"}
+			"HIVE_BOOTNODE": "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@1.2.3.4:30303",
+		}
 
 		nodeID, err := host.StartNewNode(parms)
 		if err != nil {
@@ -79,6 +80,13 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 		}
 
 		if ok {
+
+			ip, err := host.GetClientIP(*nodeID)
+			if err != nil {
+				errorMessage = fmt.Sprintf("FATAL: Unable to get client IP: %v", err)
+				ok = false
+			}
+
 			enodeID, err := host.GetClientEnode(*nodeID)
 			if err != nil || enodeID == nil || *enodeID == "" {
 				errorMessage = fmt.Sprintf("FATAL: Unable to get node: %v", err)
@@ -92,19 +100,13 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 				ok = false
 			}
 
-			ip, err := host.GetClientIP(*nodeID)
-			if err != nil {
-				errorMessage = fmt.Sprintf("FATAL: Unable to get client IP: %v", err)
-				ok = false
-			}
-
 			ipAddr := net.ParseIP(*ip)
 			if ipAddr == nil {
 				errorMessage = fmt.Sprintf("FATAL: Unable to parse IP: %v", err)
 			}
 
 			//replace the ip with what docker says it is
-			targetNode = enode.NewV4(targetNode.Pubkey(), ipAddr, targetNode.TCP(), targetNode.UDP())
+			targetNode = enode.NewV4(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303) //targetNode.UDP())
 
 			if ok {
 				errorMessage, ok = testFunc(t, targetNode)

@@ -50,8 +50,8 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 	}
 	binds = append(binds, []string{
 		fmt.Sprintf("%s/workspace/docker:/var/lib/docker", pwd),                                       // Surface any docker-in-docker data caches
-		fmt.Sprintf("%s/workspace/ethash:/gopath/src/github.com/karalabe/hive/workspace/ethash", pwd), // Surface any generated DAGs from the shell
-		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/karalabe/hive/workspace/logs", pwd),     // Surface all the log files from the shell
+		fmt.Sprintf("%s/workspace/ethash:/gopath/src/github.com/ethereum/hive/workspace/ethash", pwd), // Surface any generated DAGs from the shell
+		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/ethereum/hive/workspace/logs", pwd),     // Surface all the log files from the shell
 	}...)
 
 	uid := os.Getuid()

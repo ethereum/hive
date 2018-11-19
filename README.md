@@ -22,7 +22,7 @@ only docker, for now you'll need a valid Go (1.6 and upwards) installation avail
 You can install `hive` via:
 
 ```
-$ go get github.com/karalabe/hive
+$ go get github.com/ethereum/hive
 ```
 
 *Note: For now `hive` requires running from the repository root as it needs access to quite a number
