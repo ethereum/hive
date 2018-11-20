@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fsouza/go-dockerclient"
 )
@@ -40,7 +41,7 @@ type SimulatorAPI interface {
 	//	Success flag
 	//	Node id
 	//  Details
-	AddResults(bool, string, string, string, string) error
+	AddResults(bool, string, string, string, time.Duration) error
 	//Stop and delete the specified container
 	KillNode(string) error
 }
@@ -147,22 +148,38 @@ func (sim SimulatorHost) Log(string) error {
 	return nil
 }
 
+type resultDetails struct {
+	Instanceid string   `json:"instanceid"`
+	Errors     []string `json:"errors"`
+	Ms         float64  `json:"ms"`
+}
+
 //AddResults //Submit node test results
 //	Success flag
 //	Node id
 //  Details
-func (sim SimulatorHost) AddResults(success bool, nodeID string, details string, name string, errMsg string) error {
+func (sim SimulatorHost) AddResults(success bool, nodeID string, name string, errMsg string, duration time.Duration) error {
 	vals := make(url.Values)
 
 	vals.Add("success", strconv.FormatBool(success))
-	vals.Add("details", details)
 	vals.Add("nodeid", nodeID)
-	vals.Add("details", details)
+	vals.Add("name", name)
 	vals.Add("error", errMsg)
 
-	_, err := http.PostForm(*sim.HostURI+"/subresults", vals)
+	details := &resultDetails{
+		Instanceid: nodeID,
+		Errors:     []string{errMsg},
+		Ms:         float64(duration) / float64(time.Millisecond),
+	}
 
-	return err
+	detailsBytes, err := json.Marshal(details)
+	if err != nil {
+		return err
+	}
+	vals.Add("details", string(detailsBytes))
+
+	_, error := http.PostForm(*sim.HostURI+"/subresults", vals)
+	return error
 
 }
 

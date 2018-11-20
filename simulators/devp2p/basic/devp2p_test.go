@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -65,6 +66,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 
 		t.Parallel()
 
+		var startTime = time.Now()
 		var errorMessage string
 		var ok = true
 
@@ -103,17 +105,21 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 			ipAddr := net.ParseIP(*ip)
 			if ipAddr == nil {
 				errorMessage = fmt.Sprintf("FATAL: Unable to parse IP: %v", err)
+				ok = false
 			}
 
 			//replace the ip with what docker says it is
 			targetNode = enode.NewV4(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303) //targetNode.UDP())
-
+			if targetNode == nil {
+				errorMessage = fmt.Sprintf("FATAL: Unable to generate targetNode: %v", err)
+				ok = false
+			}
 			if ok {
 				errorMessage, ok = testFunc(t, targetNode)
 			}
 		}
 
-		host.AddResults(ok, *nodeID, "", testName, errorMessage)
+		host.AddResults(ok, *nodeID, testName, errorMessage, time.Since(startTime))
 
 		if !ok {
 			t.Errorf("Test failed: %s", errorMessage)
