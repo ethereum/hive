@@ -107,6 +107,7 @@ func makeTestOutputDirectory(testName string, testCategory string, clientTypes m
 
 		client = strings.Replace(client, string(filepath.Separator), "_", -1)
 		outputDir := filepath.Join(testRoot, client)
+		log15.Info("Creating output folder", "folder", outputDir)
 		if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
 			return "", err
 		}
