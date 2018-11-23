@@ -35,6 +35,10 @@ var (
 	simulatorPattern = flag.String("sim", "", "Regexp selecting the simulation tests to run")
 	benchmarkPattern = flag.String("bench", "", "Regexp selecting the benchmarks to run")
 
+	simulatorParallelism = flag.Int("sim-parallelism", 1, "Max number of parallel clients/containers to run tests against")
+	hiveDebug            = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
+	simRootContext       = flag.Bool("sim-rootcontext", false, "Indicates if the simulation should build the dockerfile with root (simulator) or local context. Needed for access to sibling folders like simulators/common")
+
 	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 
 	dockerTimeout         = flag.Int("dockertimeout", 10, "Time to wait for container to finish before stopping it")

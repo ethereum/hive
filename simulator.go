@@ -125,11 +125,16 @@ func simulate(daemon *docker.Client, clients map[string]string, simulator string
 
 	// Start the simulator controller container
 	logger.Debug("creating simulator container")
+	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
 	sc, err := daemon.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: simulator,
-			Env:   []string{"HIVE_SIMULATOR=http://" + sim.listener.Addr().String()},
+			Env: []string{"HIVE_SIMULATOR=http://" + sim.listener.Addr().String(),
+				"HIVE_DEBUG=" + strconv.FormatBool(*hiveDebug),
+				"HIVE_PARALLELISM=" + fmt.Sprintf("%d", simulatorParallelism),
+			},
 		},
+		HostConfig: hostConfig,
 	})
 	if err != nil {
 		logger.Error("failed to create simulator", "error", err)
@@ -303,6 +308,42 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				return
 			}
 			fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
+
+		//docker exec container bash -c 'echo "$ENV_VAR"'
+		case strings.HasPrefix(r.URL.Path, "/enodes/"):
+			// Node IP retrieval requested
+			id := strings.TrimPrefix(r.URL.Path, "/enodes/")
+			h.lock.Lock()
+			container, ok := h.nodes[id]
+			h.lock.Unlock()
+			if !ok {
+				logger.Error("unknown client for enode", "id", id)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+
+			exec, err := h.daemon.CreateExec(docker.CreateExecOptions{
+				AttachStdout: true,
+				AttachStderr: false,
+				Tty:          false,
+				Cmd:          []string{"/enode.sh"},
+				Container:    container.ID,
+			})
+			if err != nil {
+				logger.Error("failed to create target enode exec", "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			err = h.daemon.StartExec(exec.ID, docker.StartExecOptions{
+				Detach:       false,
+				OutputStream: w,
+			})
+			if err != nil {
+				logger.Error("failed to start target enode exec", "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 
 		case strings.HasPrefix(r.URL.Path, "/clients"):
 			w.Header().Set("Content-Type", "application/json")

@@ -22,7 +22,7 @@ only docker, for now you'll need a valid Go (1.6 and upwards) installation avail
 You can install `hive` via:
 
 ```
-$ go get github.com/karalabe/hive
+$ go get github.com/ethereum/hive
 ```
 
 *Note: For now `hive` requires running from the repository root as it needs access to quite a number
@@ -94,6 +94,8 @@ An administrator level command prompt must be opened and the target IPs of the c
 
 # Validating clients
 
+UPDATE: Unless we hear a desire to keep them, Validators will be deprecated. Please see `Simulators` for updates.
+
 You can run the full suite of `hive` validation tests against all the known implementations tagged
 `master` by simply running `hive` from the repository root. It will build a docker image for every
 known client as well as one for every known validation test.
@@ -127,6 +129,8 @@ smoke validation tests would be `--test=smoke`).
 
 # Simulating clients
 
+
+----
 `hive` supports a more advanced form of client testing called *simulations*, where entire networks
 of clients are run concurrently under various circumstances and their behavior monitored and checked.
 
@@ -134,6 +138,30 @@ Running network simulations is completely analogous to validations from the user
 can specify which clients to simulate with the `--client` regexp flag, and you can specify which
 simulations to run via the `--sim` regexp flag. By default simulations aren't being run as they can
 be quite lengthy.
+
+
+
+Simulators now offer a golang client framework, that allows them to call into the Hive Simulator 
+API and create different types of client. The simulator can run tests or other experiments written in 
+Golang against one or more instances of clients. To achieve this, a number of new options are added:
+
+`--sim-rootcontext` a boolean, which when set tells the compiler to build the docker image with 'simulators'
+as the root of the context, allowing the simulators\common and simulators\devp2p common code to be included
+in the simulator. 
+
+Sim-rootcontext needs to be set differently depending on the type of simulation being run. For the consensus tests
+the base simulator image relies on files to be added from a folder local to the image. For developing new simulations,
+or extending the existing ones, it is recommended to use sim-rootcontext as true. 
+
+
+`--debug` allows a flag to be set that is passed into the simulator as an environment variable, allowing the 
+simulator to be run as a delve 'headless server. The go simulator can then be remote debugged by attaching to 
+the delve headless server.
+
+`--sim-parallelism` a flag to indicate how many tests or containers should be run concurrently. This can be
+implementation specific. In this version it is used to drive the -test.parallel flag in the devp2p simulation.
+
+
 
 Similarly to validations, end result of simulations should be a JSON report, detailing for each
 client the list of simulations failed and those passed. Likewise, if you wish to explore the reasons
@@ -153,9 +181,7 @@ Simulation results:
 }
 ```
 
-Currently `hive` does not support simulating mixed networks (i.e. different Ethereum implementations).
-This will be expanded in the future when we learn a bit more about the tests people write and how
-those can be usefully checked against multiple client types.
+
 
 # Adding new clients
 

@@ -10,15 +10,15 @@ This mode is useful when the user wants to safe some time by not running a full 
 Get source.
 
 ```
-> go get -u github.com/karalabe/hive
+> go get -u github.com/ethereum/hive
 ```
 
 Create datadir and copy keys.
 
 ```
-> geth --datadir $MY_DATADIR init $GOPATH/src/github.com/karalabe/hive/simulators/ethereum/rpc/eth/genesis.json
+> geth --datadir $MY_DATADIR init $GOPATH/src/github.com/ethereum/hive/simulators/ethereum/rpc/eth/genesis.json
 > mkdir $MY_DATADIR/keystore
-> cp $GOPATH/src/github.com/karalabe/hive/simulators/ethereum/rpc/eth/keys/* $MY_DATADIR/keystore
+> cp $GOPATH/src/github.com/ethereum/hive/simulators/ethereum/rpc/eth/keys/* $MY_DATADIR/keystore
 ```
 
 Start node with HTTP and websocket interface and necessary API modules enabled.
@@ -31,7 +31,7 @@ Start node with HTTP and websocket interface and necessary API modules enabled.
 Generate ABI bindings (optional, repo contains already pre-generated bindings):
 
 ```
-> cd $GOPATH/src/github.com/karalabe/hive/simulators/ethereum/rpc/eth
+> cd $GOPATH/src/github.com/ethereum/hive/simulators/ethereum/rpc/eth
 > abigen -abi contractABI.json -pkg main -type TestContract -out ABI_generated.go
 ```
 
@@ -92,8 +92,8 @@ The test suite can be run in a multi-node simulation. This simulation mimics a r
 ### Run simulation against geth master branch
 
 ```
-> go get -u github.com/karalabe/hive
-> cd $GOPATH/src/github.com/karalabe/hive
+> go get -u github.com/ethereum/hive
+> cd $GOPATH/src/github.com/ethereum/hive
 > hive --client=go-ethereum:master --test=NONE --sim=ethereum/rpc/eth --docker-noshell --loglevel 6
 ```
 

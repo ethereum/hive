@@ -50,8 +50,8 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 	}
 	binds = append(binds, []string{
 		fmt.Sprintf("%s/workspace/docker:/var/lib/docker", pwd),                                       // Surface any docker-in-docker data caches
-		fmt.Sprintf("%s/workspace/ethash:/gopath/src/github.com/karalabe/hive/workspace/ethash", pwd), // Surface any generated DAGs from the shell
-		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/karalabe/hive/workspace/logs", pwd),     // Surface all the log files from the shell
+		fmt.Sprintf("%s/workspace/ethash:/gopath/src/github.com/ethereum/hive/workspace/ethash", pwd), // Surface any generated DAGs from the shell
+		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/ethereum/hive/workspace/logs", pwd),     // Surface all the log files from the shell
 	}...)
 
 	uid := os.Getuid()
@@ -379,7 +379,9 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 	}
 	// Start the requested container and wait until it terminates
 	logger.Debug("starting container")
-	if err := daemon.StartContainer(id, nil); err != nil {
+
+	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
+	if err := daemon.StartContainer(id, hostConfig); err != nil {
 		logger.Error("failed to start container", "error", err)
 		return nil, err
 	}
