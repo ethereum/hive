@@ -201,7 +201,7 @@ As long as a client can run on Linux, and you can package it up into a Docker im
 Adding a new client implementation to `hive` entails creating a Dockerfile (and related resources),
 based on which `hive` will assemble the docker image to use as the blueprint for testing.
 
-The client definition(s) should reside in the `clients` folder, each named `<project>:<tag>` where
+The client definition(s) should reside in the `clients` folder, each named `<project>_<tag>` where
 `<project>` is the official name of the client (lowercase, no fancy characters), and `<tag>` is an
 arbitrary id up to the client maintainers to make the best use of. `hive` will automatically pick
 up all clients from this folder.
@@ -211,6 +211,15 @@ There are little contraints on the image itself, though a few required caveats a
  * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
  * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
  * It should have a single entrypoint (script?) defined, which can initialize and run the client.
+
+For devp2p tests or other simulations that require to know the specific enode of the client instance, 
+the client must provide an `enode.sh` that echoes the enode of the running instance. This is executed
+by the Hive host remotely to get the id. 
+
+The client has the responsibility of mapping the Hive genesis.json and Hive environment variables
+to its own local genesis format and command line flags. To assist in this, Hive illustrates a technique
+in the `clients/trinity_master` folder using `mapper.jq`, which is invoked in `trinity.sh` This 
+technique can be replicated for other clients.
 
 For guidance, check out the reference [`go-ethereum:master`](https://github.com/karalabe/hive/tree/master/clients/go-ethereum:master/Dockerfile) client.
 

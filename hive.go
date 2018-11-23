@@ -107,6 +107,7 @@ func makeTestOutputDirectory(testName string, testCategory string, clientTypes m
 
 		client = strings.Replace(client, string(filepath.Separator), "_", -1)
 		outputDir := filepath.Join(testRoot, client)
+		log15.Info("Creating output folder", "folder", outputDir)
 		if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
 			return "", err
 		}
@@ -345,7 +346,7 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 
 	var allSummaryInfo summaryFile
 	//read the existing summary data, if present
-	if summaryFileData, err := ioutil.ReadFile(summaryFileName); err == nil{
+	if summaryFileData, err := ioutil.ReadFile(summaryFileName); err == nil {
 		//back it up
 		ioutil.WriteFile(summaryFileName+".bak", summaryFileData, 0644)
 		//deserialize from json
