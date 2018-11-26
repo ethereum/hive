@@ -150,7 +150,7 @@ class BlockTestExecutor(object):
 
     def makeTestcasesWrapped(self, start=0, end=-1, whitelist=[], blacklist=[]):
         try:
-            self.makeTestcases(start, end, whitelist, blacklist)
+            return self.makeTestcases(start, end, whitelist, blacklist)
         except Exception as e:
             print("Exception while making testcases!")
             print(str(e))
@@ -197,7 +197,7 @@ class BlockTestExecutor(object):
 
     def _startNodeAndRunTestWrapped(self, testcase):
         try:
-            self._startNodeAndRunTest(start, end, whitelist, blacklist)
+            return self._startNodeAndRunTest(start, end, whitelist, blacklist)
         except Exception as e:
             print("Exception while starting/running node")
             print(str(e))
