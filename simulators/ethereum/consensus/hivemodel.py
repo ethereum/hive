@@ -197,7 +197,7 @@ class BlockTestExecutor(object):
 
     def _startNodeAndRunTestWrapped(self, testcase):
         try:
-            return self._startNodeAndRunTest(testcase):
+            return self._startNodeAndRunTest(testcase)
         except Exception as e:
             print("Exception while starting/running node")
             print(str(e))
