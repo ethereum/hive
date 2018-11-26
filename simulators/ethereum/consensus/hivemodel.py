@@ -148,6 +148,14 @@ class BlockTestExecutor(object):
     def run(self, start=0 , end=-1, whitelist=[], blacklist=[]) :
         return self._performTests(start, end, whitelist, blacklist)
 
+    def makeTestcasesWrapped(self, start=0, end=-1, whitelist=[], blacklist=[]):
+        try:
+            self.makeTestcases(start, end, whitelist, blacklist)
+        except Exception as e:
+            print("Exception while making testcases!")
+            print(str(e))
+            print(traceback.format_exc())
+
     def makeTestcases(self, start=0, end=-1, whitelist=[], blacklist=[]):
         count = 0
         for testfile in self.testfiles:
@@ -186,6 +194,14 @@ class BlockTestExecutor(object):
                         testcase.fail(["Testcase failed initial validation", err])
                     else:
                         yield testcase
+
+    def _startNodeAndRunTestWrapped(self, testcase):
+        try:
+            self._startNodeAndRunTest(start, end, whitelist, blacklist)
+        except Exception as e:
+            print("Exception while starting/running node")
+            print(str(e))
+            print(traceback.format_exc())
 
     def _startNodeAndRunTest(self, testcase):
         start = time.time()
@@ -255,8 +271,8 @@ class BlockTestExecutor(object):
 
     def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[]):
         pool = ThreadPool(PARALLEL_TESTS)
-        testgenerator = self.makeTestcases(start, end, whitelist, blacklist)
-        pool.map(lambda test: self._startNodeAndRunTest(test),testgenerator)
+        testgenerator = self.makeTestcasesWrapped(start, end, whitelist, blacklist)
+        pool.map(lambda test: self._startNodeAndRunTestWrapped(test),testgenerator)
         pool.close()
         pool.join()
         # FIXME: Return false if any tests fail.
