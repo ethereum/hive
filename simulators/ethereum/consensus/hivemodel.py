@@ -204,7 +204,8 @@ class BlockTestExecutor(object):
             print(traceback.format_exc())
 
 
-   def reportTest(self, tc, start, nodeId = "NA"):
+    def reportTest(self, tc, start, nodeId = "NA"):
+
         tc.setTimeElapsed(1000 * ( time.time() - start))
         self.hive.log("Test: %s %s (%s)" % (tc.testfile, tc, tc.status()))
         self.hive.subresult(nodeId,
