@@ -205,6 +205,7 @@ class BlockTestExecutor(object):
 
 
     def reportTest(self, tc, start, nodeId = "NA"):
+
         tc.setTimeElapsed(1000 * ( time.time() - start))
         try:
             self.hive.log("Test: %s %s (%s)" % (tc.testfile, tc, tc.status()))
