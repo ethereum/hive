@@ -206,13 +206,17 @@ class BlockTestExecutor(object):
 
     def reportTest(self, tc, start, nodeId = "NA"):
         tc.setTimeElapsed(1000 * ( time.time() - start))
-        self.hive.log("Test: %s %s (%s)" % (tc.testfile, tc, tc.status()))
-        self.hive.subresult(nodeId,
-                tc.fullname(),
-                tc.wasSuccessfull(),
-                tc.topLevelError(),
-                tc.details()
-            )
+        try:
+            self.hive.log("Test: %s %s (%s)" % (tc.testfile, tc, tc.status()))
+            self.hive.subresult(nodeId,
+                    tc.fullname(),
+                    tc.wasSuccessfull(),
+                    tc.topLevelError(),
+                    tc.details()
+                )
+        except Exception as e:
+            print("Exception reporting test", e )
+
     def _startNodeAndRunTest(self, testcase):
         start = time.time()
         try:
