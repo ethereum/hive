@@ -148,6 +148,14 @@ class BlockTestExecutor(object):
     def run(self, start=0 , end=-1, whitelist=[], blacklist=[]) :
         return self._performTests(start, end, whitelist, blacklist)
 
+    def makeTestcasesWrapped(self, start=0, end=-1, whitelist=[], blacklist=[]):
+        try:
+            return self.makeTestcases(start, end, whitelist, blacklist)
+        except Exception as e:
+            print("Exception while making testcases!")
+            print(str(e))
+            print(traceback.format_exc())
+
     def makeTestcases(self, start=0, end=-1, whitelist=[], blacklist=[]):
         count = 0
         for testfile in self.testfiles:
@@ -187,6 +195,25 @@ class BlockTestExecutor(object):
                     else:
                         yield testcase
 
+    def _startNodeAndRunTestWrapped(self, testcase):
+        try:
+            return self._startNodeAndRunTest(testcase)
+        except Exception as e:
+            print("Exception while starting/running node")
+            print(str(e))
+            print(traceback.format_exc())
+
+
+    def reportTest(self, tc, start, nodeId = "NA"):
+
+        tc.setTimeElapsed(1000 * ( time.time() - start))
+        self.hive.log("Test: %s %s (%s)" % (tc.testfile, tc, tc.status()))
+        self.hive.subresult(nodeId,
+                tc.fullname(),
+                tc.wasSuccessfull(),
+                tc.topLevelError(),
+                tc.details()
+            )
     def _startNodeAndRunTest(self, testcase):
         start = time.time()
         try:
@@ -216,19 +243,6 @@ class BlockTestExecutor(object):
 
         self.hive.log("Starting client node for test %s" % testcase)
 
-
-        def reportTest(tc):
-            tc.setTimeElapsed(1000 * ( time.time() - start))
-            self.hive.log("Test: %s %s (%s)" % (tc.testfile, tc, tc.status()))
-            self.hive.subresult(
-                    node.nodeId,
-                    testcase.fullname(),
-                    testcase.wasSuccessfull(),
-                    testcase.topLevelError(),
-                    testcase.details()
-                )
-
-
         try:
             node = self.hive.newNode(params)
         except Exception, startNodeError:
@@ -237,26 +251,28 @@ class BlockTestExecutor(object):
             except Exception, e:
                 error = str(startNodeError)
             testcase.fail(["Failed to start client node", traceback.format_exc()])
-            reportTest(testcase)
+            self.reportTest(testcase, start)
             return
 
         self.executeTestcase(testcase, node)
-        reportTest(testcase)
+        self.reportTest(testcase, start, nodeId = node.nodeId)
 
         try:
             self.hive.killNode(node)
         except Exception, killNodeError:
-            try:
-                error = traceback.format_exc()
-            except Exception, e:
-                error = str(killNodeError)
+            # Clients are sometimes already killed by timeouts
+            pass
+            #try:
+            #    error = traceback.format_exc()
+            #except Exception, e:
+            #    error = str(killNodeError)
 
-            self.hive.log("Failed to kill node %s: %s" % (node, error))
+            #self.hive.log("Failed to kill node %s: %s" % (node, error))
 
     def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[]):
         pool = ThreadPool(PARALLEL_TESTS)
-        testgenerator = self.makeTestcases(start, end, whitelist, blacklist)
-        pool.map(lambda test: self._startNodeAndRunTest(test),testgenerator)
+        testgenerator = self.makeTestcasesWrapped(start, end, whitelist, blacklist)
+        pool.map(lambda test: self._startNodeAndRunTestWrapped(test),testgenerator)
         pool.close()
         pool.join()
         # FIXME: Return false if any tests fail.
