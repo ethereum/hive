@@ -7,6 +7,7 @@ RUN \
         linux-headers libxml2-dev libxslt-dev                                   && \
     apk --repository http://dl-3.alpinelinux.org/alpine/edge/testing/ --update add leveldb leveldb-dev && \
     python3 -m ensurepip                                                        && \
+    pip3 install --upgrade pip                                                  && \
     pip3 install virtualenv setuptools                                          && \
     git clone --recursive https://github.com/ethereum/py-evm.git                && \
     virtualenv -p python3 venv                                                  && \
