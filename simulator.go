@@ -131,7 +131,7 @@ func simulate(daemon *docker.Client, clients map[string]string, simulator string
 			Image: simulator,
 			Env: []string{"HIVE_SIMULATOR=http://" + sim.listener.Addr().String(),
 				"HIVE_DEBUG=" + strconv.FormatBool(*hiveDebug),
-				"HIVE_PARALLELISM=" + fmt.Sprintf("%d", simulatorParallelism),
+				"HIVE_PARALLELISM=" + fmt.Sprintf("%d", *simulatorParallelism),
 			},
 		},
 		HostConfig: hostConfig,

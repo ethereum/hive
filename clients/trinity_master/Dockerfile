@@ -5,7 +5,7 @@ WORKDIR /usr/src/app
 
 RUN \
   apt-get -y update                                        && \
-  apt-get install -y bash  bc curl git make cmake  file    
+  apt-get install -y bash  bc curl git make cmake netcat file      
 
 RUN git clone --recursive https://github.com/ethereum/py-evm.git .
 RUN pip install -e .[dev]  --no-cache-dir
@@ -21,11 +21,14 @@ RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /
 ADD config.json /config.json
 ADD mapper.jq /mapper.jq
 ADD trinity.sh /trinity.sh
+RUN chmod +x /trinity.sh
+ADD enode.sh /enode.sh
+RUN chmod +x /enode.sh
 #debug genesis, overriden at runtime:
 ADD genesis.json /genesis.json
 
 
-EXPOSE 8545 30303 30303/udp
+EXPOSE  8545 8546 30303 30303/udp
 
 RUN \
   echo "{}"                                                      \
@@ -35,4 +38,4 @@ RUN \
   > /version.json              
 
 
-ENTRYPOINT ["/trinity.sh"]
+CMD ["/trinity.sh"]
