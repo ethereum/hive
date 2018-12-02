@@ -2,7 +2,9 @@ package common
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -34,14 +36,14 @@ type SimulatorAPI interface {
 	//returned client types from GetClientTypes
 	//The input is used as environment variables in the new container
 	//Returns container id
-	StartNewNode(map[string]string) (*string, error)
+	StartNewNode(map[string]string) (string, net.IP, error)
 	//Submit log info to the simulator log
 	Log(string) error
 	//Submit node test results
 	//	Success flag
 	//	Node id
 	//  Details
-	AddResults(bool, string, string, string, time.Duration) error
+	AddResults(success bool, nodeID string, name string, errMsg string, duration time.Duration) error
 	//Stop and delete the specified container
 	KillNode(string) error
 }
@@ -84,14 +86,11 @@ func (sim SimulatorHost) GetClientEnode(node string) (*string, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-
 	res := strings.TrimRight(string(body), "\r\n")
-
 	return &res, nil
 }
 
@@ -119,27 +118,20 @@ func (sim SimulatorHost) GetClientTypes() (availableClients []string, err error)
 //One parameter must be named CLIENT and should contain one of the
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
-//Returns container id
-func (sim SimulatorHost) StartNewNode(parms map[string]string) (*string, error) {
-
+//Returns container id and ip
+func (sim SimulatorHost) StartNewNode(parms map[string]string) (string, net.IP, error) {
 	vals := make(url.Values)
 	for k, v := range parms {
 		vals.Add(k, v)
 	}
-
-	resp, err := http.PostForm(*sim.HostURI+"/nodes", vals)
+	data, err := wrapHttpErrorsPost(*sim.HostURI+"/nodes", vals)
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	if idip := strings.Split(data, "@"); len(idip) > 1 {
+		return idip[0], net.ParseIP(idip[1]), nil
 	}
-
-	res := string(body)
-	return &res, nil
-
+	return data, net.IP{}, fmt.Errorf("no ip address returned: %v", data)
 }
 
 //Log Submit log info to the simulator log
@@ -154,6 +146,24 @@ type resultDetails struct {
 	Ms         float64  `json:"ms"`
 }
 
+// wrapHttpErrorsPost wraps http.PostForm to convert responses that are not 200 OK into errors
+func wrapHttpErrorsPost(url string, data url.Values) (string, error) {
+
+	resp, err := http.PostForm(url, data)
+	if err != nil {
+		return "", err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode >= 200 && resp.StatusCode <= 300 {
+		return string(body), nil
+	}
+	return "", fmt.Errorf("request failed (%d): %v", resp.StatusCode, string(body))
+}
+
 //AddResults //Submit node test results
 //	Success flag
 //	Node id
@@ -164,12 +174,15 @@ func (sim SimulatorHost) AddResults(success bool, nodeID string, name string, er
 	vals.Add("success", strconv.FormatBool(success))
 	vals.Add("nodeid", nodeID)
 	vals.Add("name", name)
-	vals.Add("error", errMsg)
 
 	details := &resultDetails{
 		Instanceid: nodeID,
-		Errors:     []string{errMsg},
 		Ms:         float64(duration) / float64(time.Millisecond),
+	}
+
+	if len(errMsg) > 0 {
+		vals.Add("error", errMsg)
+		details.Errors = []string{errMsg}
 	}
 
 	detailsBytes, err := json.Marshal(details)
@@ -178,12 +191,17 @@ func (sim SimulatorHost) AddResults(success bool, nodeID string, name string, er
 	}
 	vals.Add("details", string(detailsBytes))
 
-	_, error := http.PostForm(*sim.HostURI+"/subresults", vals)
+	_, error := wrapHttpErrorsPost(*sim.HostURI+"/subresults", vals)
 	return error
 
 }
 
 //KillNode Stop and delete the specified container
-func (sim SimulatorHost) KillNode(string) error {
-	return nil
+func (sim SimulatorHost) KillNode(nodeid string) error {
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/delete/%s", *sim.HostURI, nodeid), nil)
+	if err != nil {
+		return err
+	}
+	_, err = http.DefaultClient.Do(req)
+	return err
 }

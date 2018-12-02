@@ -393,7 +393,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				return
 			}
 			containerID := container.ID[:8]
-
+			containerIP := ""
 			logger = logger.New("client started with id", containerID)
 
 			logfile := fmt.Sprintf("client-%s.log", containerID)
@@ -430,16 +430,17 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 					http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
 					return
 				}
+				containerIP = c.NetworkSettings.IPAddress
 				// Container seems to be alive, check whether the RPC is accepting connections
-				if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.NetworkSettings.IPAddress, 8545)); err == nil {
+				if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", containerIP, 8545)); err == nil {
 					logger.Debug("client container online", "time", time.Since(start))
 					conn.Close()
 					break
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
-			//  Container online and responsive, return its ID for later reference
-			fmt.Fprintf(w, "%s", containerID)
+			//  Container online and responsive, return its ID and IP for later reference
+			fmt.Fprintf(w, "%s@%s", containerID, containerIP)
 			h.lock.Lock()
 			h.nodes[containerID] = container
 			h.nodeNames[containerID] = clientName
@@ -476,7 +477,6 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-
 			var details json.RawMessage
 			if blob := r.Form.Get("details"); blob != "" {
 				if err := json.Unmarshal([]byte(blob), &details); err != nil {
@@ -486,15 +486,19 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			// If everything parsed correctly, append the subresult
 			h.lock.Lock()
-
-			imageName := h.nodeNames[nodeid]
-
+			imageName, exist := h.nodeNames[nodeid]
+			if !exist {
+				http.Error(w, fmt.Sprintf("unknown node %v", nodeid), http.StatusBadRequest)
+				return
+			}
 			h.result[imageName][h.simulatorLabel].Subresults = append(h.result[imageName][h.simulatorLabel].Subresults, simulationSubresult{
 				Name:    r.Form.Get("name"),
 				Success: success,
 				Error:   r.Form.Get("error"),
 				Details: details,
 			})
+			// Also terminate the container now
+			h.terminateContainer(nodeid, w)
 			h.lock.Unlock()
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
