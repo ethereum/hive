@@ -229,6 +229,7 @@ type simulatorAPIHandler struct {
 	nodes        map[string]*docker.Container
 	nodeNames    map[string]string
 	nodesTimeout map[string]time.Time
+	terminating  map[string]bool
 
 	result map[string]map[string]*simulationResult //simulation result log per client name
 	lock   sync.RWMutex
@@ -250,6 +251,22 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 }
 
 func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
+
+	h.lock.Lock()
+	_, ok := h.terminating[id]
+	if ok {
+		h.logger.Info("client already deleting", "id", id)
+		h.lock.Unlock()
+		return
+	}
+	h.terminating[id] = true // avoid timeout check race condition with DELETE call
+	defer func() {
+		h.lock.Lock()
+		delete(h.terminating, id)
+		h.lock.Unlock()
+	}()
+	h.lock.Unlock()
+
 	node, ok := h.nodes[id]
 	delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
 	delete(h.nodesTimeout, id)
@@ -440,12 +457,15 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				time.Sleep(100 * time.Millisecond)
 			}
 			//  Container online and responsive, return its ID and IP for later reference
-			fmt.Fprintf(w, "%s@%s", containerID, containerIP)
+
 			h.lock.Lock()
 			h.nodes[containerID] = container
 			h.nodeNames[containerID] = clientName
 			h.nodesTimeout[containerID] = time.Now().Add(dockerTimeoutDuration)
 			h.lock.Unlock()
+			//Moved to end to prevent possible race condition (simulator receives
+			//id before local in-memory db contains container)
+			fmt.Fprintf(w, "%s@%s", containerID, containerIP)
 			return
 
 		case "/logs":

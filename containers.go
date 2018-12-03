@@ -153,21 +153,24 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	if err != nil {
 		return nil, err
 	}
-	// Inject all the chain configuration files from the tester (or live container) into the client
-	t, err := daemon.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: tester}})
-	if err != nil {
-		return nil, err
-	}
+
+	// Remove the temp container t, if it gets created. The temp container is only used to copy default
+	// files from when the live container is not 'trusted' to supply it at runtime.
+	var t *docker.Container
 	defer func() {
-		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true}); err != nil {
-			log15.Error("failed to cleanup tester container", "id", t.ID[:8], "error", err)
+		if t != nil {
+			if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true}); err != nil {
+				log15.Error("failed to cleanup tester container", "id", t.ID[:8], "error", err)
+			}
 		}
 	}()
+
+	// Inject all the chain configuration files from the tester (or live container) into the client
 
 	if path := overrideEnvs["HIVE_INIT_GENESIS"]; path != "" {
 		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/genesis.json", false)
 	} else {
-		err = copyBetweenContainers(daemon, c.ID, t.ID, "", "/genesis.json", false)
+		err = copyFromTempContainer(&t, daemon, c.ID, tester, "", "/genesis.json", false)
 	}
 	if err != nil {
 		return nil, err
@@ -175,7 +178,8 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	if path := overrideEnvs["HIVE_INIT_CHAIN"]; path != "" {
 		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/chain.rlp", true)
 	} else {
-		err = copyBetweenContainers(daemon, c.ID, t.ID, "", "/chain.rlp", true)
+
+		err = copyFromTempContainer(&t, daemon, c.ID, tester, "", "/chain.rlp", true)
 	}
 	if err != nil {
 		return nil, err
@@ -183,7 +187,8 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	if path := overrideEnvs["HIVE_INIT_BLOCKS"]; path != "" {
 		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/blocks", true)
 	} else {
-		err = copyBetweenContainers(daemon, c.ID, t.ID, "", "/blocks", true)
+
+		err = copyFromTempContainer(&t, daemon, c.ID, tester, "", "/blocks", true)
 	}
 	if err != nil {
 		return nil, err
@@ -191,7 +196,8 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 	if path := overrideEnvs["HIVE_INIT_KEYS"]; path != "" {
 		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/keys", true)
 	} else {
-		err = copyBetweenContainers(daemon, c.ID, t.ID, "", "/keys", true)
+
+		err = copyFromTempContainer(&t, daemon, c.ID, tester, "", "/keys", true)
 	}
 	if err != nil {
 		return nil, err
@@ -270,6 +276,22 @@ func uploadToContainer(daemon *docker.Client, id string, files []string) error {
 		InputStream: tarball,
 		Path:        "/",
 	})
+}
+
+func copyFromTempContainer(srcContainer **docker.Container, daemon *docker.Client, dest, srcName string, path, target string, optional bool) error {
+	if *srcContainer == nil {
+		t, err := daemon.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: srcName}})
+		if err != nil {
+			return err
+		}
+		*srcContainer = t
+	}
+
+	err := copyBetweenContainers(daemon, dest, (*srcContainer).ID, "", "/keys", true)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // copyBetweenContainers copies a file from one docker container to another one.
