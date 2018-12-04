@@ -201,6 +201,7 @@ func startSimulatorAPI(daemon *docker.Client, clients map[string]string, simulat
 		simulatorLabel:   simulatorLabel,
 		overrides:        overrides,
 		nodes:            make(map[string]*containerInfo),
+		timedOutNodes:    make(map[string]*containerInfo),
 		result:           results, //the simulator now has access to a map of results-by-client. The simulator decides which clients to run/
 	}
 	go sim.CheckTimeout()
