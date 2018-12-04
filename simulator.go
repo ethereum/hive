@@ -229,11 +229,11 @@ type simulatorAPIHandler struct {
 	overrides        []string
 	autoID           uint32
 
-	runner *docker.Container
-	nodes  map[string]*containerInfo //the running containers, keyed by container.ID[:8]
-
-	result map[string]map[string]*simulationResult //simulation result log per client name
-	lock   sync.RWMutex
+	runner        *docker.Container
+	nodes         map[string]*containerInfo               // the running containers, keyed by container.ID[:8]
+	timedOutNodes map[string]*containerInfo               // timed-out containers
+	result        map[string]map[string]*simulationResult //simulation result log per client name
+	lock          sync.RWMutex
 }
 
 // CheckTimeout is a goroutine that checks if the timeout has passed and stops
@@ -244,6 +244,8 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 		for id, cInfo := range h.nodes {
 			if !cInfo.container.State.Running || (time.Now().After(cInfo.timeout)) {
 				h.terminateContainer(id, nil)
+				// remember this container, for when the subresult comes in later
+				h.timedOutNodes[id] = cInfo
 			}
 		}
 		h.lock.Unlock()
@@ -492,6 +494,17 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			h.lock.Lock()
 			containerInfo, exist := h.nodes[nodeid]
 			if !exist {
+				// Add an error even so
+				if containerInfo, exist := h.timedOutNodes[nodeid]; exist {
+					delete(h.timedOutNodes, nodeid)
+					res := h.result[containerInfo.name][h.simulatorLabel]
+					res.Subresults = append(res.Subresults, simulationSubresult{
+						Name:    r.Form.Get("name"),
+						Success: success,
+						Error:   fmt.Sprintf("%s (killed after timeout by Hive)", r.Form.Get("error")),
+						Details: details,
+					})
+				}
 				http.Error(w, fmt.Sprintf("unknown node %v", nodeid), http.StatusBadRequest)
 				return
 			}
