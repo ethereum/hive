@@ -252,20 +252,18 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 
 func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
 
-	h.lock.Lock()
 	_, ok := h.terminating[id]
 	if ok {
 		h.logger.Info("client already deleting", "id", id)
-		h.lock.Unlock()
+
 		return
 	}
 	h.terminating[id] = true // avoid timeout check race condition with DELETE call
 	defer func() {
-		h.lock.Lock()
+
 		delete(h.terminating, id)
-		h.lock.Unlock()
+
 	}()
-	h.lock.Unlock()
 
 	node, ok := h.nodes[id]
 	delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
