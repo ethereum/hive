@@ -444,8 +444,6 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
-			//  Container online and responsive, return its ID and IP for later reference
-			fmt.Fprintf(w, "%s@%s", containerID, containerIP)
 			h.lock.Lock()
 			h.nodes[containerID] = &containerInfo{
 				container: container,
@@ -453,6 +451,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				timeout:   time.Now().Add(dockerTimeoutDuration),
 			}
 			h.lock.Unlock()
+			//  Container online and responsive, return its ID and IP for later reference
+			fmt.Fprintf(w, "%s@%s", containerID, containerIP)
 			return
 
 		case "/logs":
