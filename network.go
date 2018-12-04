@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"net"
+	"strings"
 
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -18,7 +19,7 @@ func lookupBridgeIP(logger log15.Logger) (net.IP, error) {
 	}
 	// Iterate over all the interfaces and find the docker0 bridge
 	for _, iface := range interfaes {
-		if iface.Name == "docker0" {
+		if iface.Name == "docker0" || strings.Contains(iface.Name, "vEthernet") {
 			// Retrieve all the addresses assigned to the bridge adapter
 			addrs, err := iface.Addrs()
 			if err != nil {

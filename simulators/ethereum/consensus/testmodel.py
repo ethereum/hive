@@ -8,7 +8,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 2000,
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_BYZANTIUM" : 2000, 
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "Homestead" : {
@@ -16,7 +16,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 2000,
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_BYZANTIUM" : 2000, 
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "EIP150"    : {
@@ -24,7 +24,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 0,
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_BYZANTIUM" : 2000, 
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "EIP158"    : {
@@ -32,7 +32,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 0,
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_BYZANTIUM" : 2000, 
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "Byzantium" : {
@@ -40,7 +40,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 0,
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 0, 
+            "HIVE_FORK_BYZANTIUM" : 0, 
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "Constantinople" : {
@@ -48,7 +48,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 0,
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 0, 
+            "HIVE_FORK_BYZANTIUM" : 0, 
             "HIVE_FORK_CONSTANTINOPLE" : 0, 
         },
         "FrontierToHomesteadAt5" : {
@@ -56,7 +56,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 2000,
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 2000,             
+            "HIVE_FORK_BYZANTIUM" : 2000,             
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "HomesteadToEIP150At5" : {
@@ -64,7 +64,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 5,
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_BYZANTIUM" : 2000, 
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "HomesteadToDaoAt5":{
@@ -72,7 +72,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 2000,
             "HIVE_FORK_SPURIOUS"  : 2000,
             "HIVE_FORK_DAO_BLOCK" : 5,
-            "HIVE_FORK_METROPOLIS" : 2000, 
+            "HIVE_FORK_BYZANTIUM" : 2000, 
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "EIP158ToByzantiumAt5":{
@@ -80,7 +80,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 0,
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 5, 
+            "HIVE_FORK_BYZANTIUM" : 5, 
             "HIVE_FORK_CONSTANTINOPLE" : 2000,
         },
         "ByzantiumToConstantinopleAt5":{
@@ -88,7 +88,7 @@ class Rules():
             "HIVE_FORK_TANGERINE" : 0,
             "HIVE_FORK_SPURIOUS"  : 0,
             "HIVE_FORK_DAO_BLOCK" : 2000,
-            "HIVE_FORK_METROPOLIS" : 0, 
+            "HIVE_FORK_BYZANTIUM" : 0, 
             "HIVE_FORK_CONSTANTINOPLE" : 5,         
       }
     }
@@ -173,6 +173,10 @@ class Testcase(object):
 
         #And finally, fail if no ruleset is defined
         return self.validateNetwork()
+
+    def skipPow(self):
+        """ Returns True if this testcase should be executed without PoW verification"""
+        return "sealEngine" in self.data and self.data['sealEngine'] == 'NoProof'
 
     def ruleset(self):
         """The ruleset for tests should be specified in the json

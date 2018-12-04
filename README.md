@@ -22,14 +22,79 @@ only docker, for now you'll need a valid Go (1.6 and upwards) installation avail
 You can install `hive` via:
 
 ```
-$ go get github.com/karalabe/hive
+$ go get github.com/ethereum/hive
 ```
 
 *Note: For now `hive` requires running from the repository root as it needs access to quite a number
 of resource files to build the corrent docker images and containers. This requirement will be removed
 in the future.*
 
+# Running on Windows
+
+The following information assumes Docker for Windows (CE) is installed on Windows 10 Pro. 
+
+## Docker daemon
+`hive` uses the Docker API to connect to the Docker Daemon to dynamically create and run containers. At the time of writing, the daemon is disabled by default. This must be enabled. 
+
+To enable the daemon, right click on the Docker Whale in the system tray and press Settings. Under 'General' select "Expose daemon on tcp.... without TLS".
+
+To run `hive`, use the following command line option --docker-endpoint tcp://localhost:2375 Alternatively, if using VSCode simply run using the supplied launch.json (see below)
+
+## Shell container
+Currently, the Windows version must be run from the Host. To achieve this run with the --docker-noshell command line option. 
+
+## Debugging or executing from Visual Studio Code
+As described above, golang must be installed on the machine. The golang extension for VSCode is then required, along with Delve and the standard tools recommended by the Golang extension.
+
+When VS Code is configured for general go development, `hive` may be run simply by launching with F5 with the following `launch.json`. This `launch.json` includes example parameters that limit the client to `geth` as the full client suite may take significant time to build initial docker images.
+```json
+{
+   
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "remotePath": "",
+            "port": 2345,
+            "host": "127.0.0.1",
+            "program": "${workspaceFolder}",
+            "env": {},
+            "args": [
+                
+                "--docker-endpoint","tcp://localhost:2375",
+                "--docker-noshell",
+                "--client","go-ethereum_master" , 
+                "--loglevel","6",
+                "--smoke"
+                
+               
+            ],
+            "showLog": true
+        }
+    ]
+}
+```
+
+## Access to the local drive
+Docker will need access to the `workspace` folder. This will either be requested automatically in an Windows notification, or permission can be set in the docker settings in advance.
+
+To set the permissions to access your drive, right click on the Docker Whale in the system tray and press Settings. Under 'Shared Drives' select the drive where the `workspace` folder is for sharing.
+
+## Host access to the docker network
+
+`hive` requires network access to the docker containers it creates. While this is automatically available on Linux, at the time of writing because of virtualisation there needs to be some further network configuration so that the `hive` host can connect. The following is dependent on your docker configuration, and there may be other ways to achieve the same result, but a typical setting may be:
+
+'route /P add 172.17.0.0 MASK 255.255.0.0 10.0.75.2'
+
+An administrator level command prompt must be opened and the target IPs of the containers routed to HyperV's IP address for the docker containers.
+
+
 # Validating clients
+
+UPDATE: Unless we hear a desire to keep them, Validators will be deprecated. Please see `Simulators` for updates.
 
 You can run the full suite of `hive` validation tests against all the known implementations tagged
 `master` by simply running `hive` from the repository root. It will build a docker image for every
@@ -64,6 +129,8 @@ smoke validation tests would be `--test=smoke`).
 
 # Simulating clients
 
+
+----
 `hive` supports a more advanced form of client testing called *simulations*, where entire networks
 of clients are run concurrently under various circumstances and their behavior monitored and checked.
 
@@ -71,6 +138,30 @@ Running network simulations is completely analogous to validations from the user
 can specify which clients to simulate with the `--client` regexp flag, and you can specify which
 simulations to run via the `--sim` regexp flag. By default simulations aren't being run as they can
 be quite lengthy.
+
+
+
+Simulators now offer a golang client framework, that allows them to call into the Hive Simulator 
+API and create different types of client. The simulator can run tests or other experiments written in 
+Golang against one or more instances of clients. To achieve this, a number of new options are added:
+
+`--sim-rootcontext` a boolean, which when set tells the compiler to build the docker image with 'simulators'
+as the root of the context, allowing the simulators\common and simulators\devp2p common code to be included
+in the simulator. 
+
+Sim-rootcontext needs to be set differently depending on the type of simulation being run. For the consensus tests
+the base simulator image relies on files to be added from a folder local to the image. For developing new simulations,
+or extending the existing ones, it is recommended to use sim-rootcontext as true. 
+
+
+`--debug` allows a flag to be set that is passed into the simulator as an environment variable, allowing the 
+simulator to be run as a delve 'headless server. The go simulator can then be remote debugged by attaching to 
+the delve headless server.
+
+`--sim-parallelism` a flag to indicate how many tests or containers should be run concurrently. This can be
+implementation specific. In this version it is used to drive the -test.parallel flag in the devp2p simulation.
+
+
 
 Similarly to validations, end result of simulations should be a JSON report, detailing for each
 client the list of simulations failed and those passed. Likewise, if you wish to explore the reasons
@@ -90,9 +181,7 @@ Simulation results:
 }
 ```
 
-Currently `hive` does not support simulating mixed networks (i.e. different Ethereum implementations).
-This will be expanded in the future when we learn a bit more about the tests people write and how
-those can be usefully checked against multiple client types.
+
 
 # Adding new clients
 

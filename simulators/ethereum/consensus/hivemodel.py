@@ -93,9 +93,10 @@ class HiveAPI(object):
     def debugp(self, msg):
         self.log(msg)
 
-    def subresult(self, name, success, errormsg, details = None ):
+    def subresult(self,nodeid, name, success, errormsg, details = None ):
         params = {
                 "name" : name,
+                "nodeid" : nodeid,
                 "success" : success
         }
         if errormsg is not None:
@@ -106,6 +107,12 @@ class HiveAPI(object):
             data = {"details" : json.dumps(details) }
 
         return self._post("/subresults", params = params, data = data);
+    
+    def clients(self):
+        _jsonclients= self._get("/clients")
+        _clients  = json.loads(_jsonclients)
+     
+        return _clients
 
     def newNode(self, params):
         try:
@@ -113,7 +120,14 @@ class HiveAPI(object):
             _ip = self._get("/nodes/%s" % _id)
             return HiveNode(_id, _ip)
         except Exception, e:
-            self.log("Failed to start node, trying again")
+            self.log("Failed to start node[1], trying again")
+
+        try:
+            _id = self._post("/nodes", params)
+            _ip = self._get("/nodes/%s" % _id)
+            return HiveNode(_id, _ip)
+        except Exception, e:
+            self.log("Failed to start node[2], trying again (last attempt)")
 
         _id = self._post("/nodes", params)
         _ip = self._get("/nodes/%s" % _id)
@@ -129,9 +143,18 @@ class BlockTestExecutor(object):
         self.clientVersion = None
         self.hive = hive_api
         self.testfiles = testfiles
+        self.clients=self.hive.clients()
 
     def run(self, start=0 , end=-1, whitelist=[], blacklist=[]) :
         return self._performTests(start, end, whitelist, blacklist)
+
+    def makeTestcasesWrapped(self, start=0, end=-1, whitelist=[], blacklist=[]):
+        try:
+            return self.makeTestcases(start, end, whitelist, blacklist)
+        except Exception as e:
+            print("Exception while making testcases!")
+            print(str(e))
+            print(traceback.format_exc())
 
     def makeTestcases(self, start=0, end=-1, whitelist=[], blacklist=[]):
         count = 0
@@ -143,31 +166,54 @@ class BlockTestExecutor(object):
                 break
 
             tf = Testfile(testfile)
-            self.hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
+#            self.hive.log("Commencing testfile [%d] (%s)\n " % (count, tf))
+            
+            #apply the testcases to each available client type
+            for client in self.clients:
+                for testcase in tf.tests() :
+                    
+                    if len(whitelist) > 0 and str(testcase) not in whitelist:
+                        testcase.skipped(["Testcase not in whitelist"])
+                        continue
 
-            for testcase in tf.tests() :
+                    if len(blacklist) > 0 and str(testcase) in blacklist:
+                        testcase.skipped(["Testcase in blacklist"])
+                        continue
 
-                if len(whitelist) > 0 and str(testcase) not in whitelist:
-                    testcase.skipped(["Testcase not in whitelist"])
-                    continue
+                    err = testcase.validateNetwork()
+                    if err != None:
+                        testcase.skipped([err])
+                        continue
 
-                if len(blacklist) > 0 and str(testcase) in blacklist:
-                    testcase.skipped(["Testcase in blacklist"])
-                    continue
+                    err = testcase.validate()
 
-                err = testcase.validateNetwork()
-                if err != None:
-                    testcase.skipped([err])
-                    continue
+                    testcase.clientType= client
 
-                err = testcase.validate()
+                    if err is not None:
+                        self.hive.log("%s / %s failed initial validation" % (tf, testcase) )
+                        testcase.fail(["Testcase failed initial validation", err])
+                    else:
+                        yield testcase
 
-                if err is not None:
-                    self.hive.log("%s / %s failed initial validation" % (tf, testcase) )
-                    testcase.fail(["Testcase failed initial validation", err])
-                else:
-                    yield testcase
+    def _startNodeAndRunTestWrapped(self, testcase):
+        try:
+            return self._startNodeAndRunTest(testcase)
+        except Exception as e:
+            print("Exception while starting/running node")
+            print(str(e))
+            print(traceback.format_exc())
 
+
+    def reportTest(self, tc, start, nodeId = "NA"):
+
+        tc.setTimeElapsed(1000 * ( time.time() - start))
+        self.hive.log("Test: %s %s (%s)" % (tc.testfile, tc, tc.status()))
+        self.hive.subresult(nodeId,
+                tc.fullname(),
+                tc.wasSuccessfull(),
+                tc.topLevelError(),
+                tc.details()
+            )
     def _startNodeAndRunTest(self, testcase):
         start = time.time()
         try:
@@ -181,7 +227,10 @@ class BlockTestExecutor(object):
         #HIVE_INIT_KEYS path to a folder of account keys to import after init (default = "/keys/")
         #HIVE_FORK_HOMESTEAD
 
+        clientName= testcase.clientType
+
         params = {
+            "CLIENT":clientName,
             "HIVE_INIT_GENESIS": genesis,
             "HIVE_INIT_BLOCKS" : blocks,
             "HIVE_FORK_DAO_VOTE" : "1",
@@ -189,7 +238,11 @@ class BlockTestExecutor(object):
 
         params.update(testcase.ruleset())
 
+        if testcase.skipPow():
+            params["HIVE_SKIP_POW"] = "1"
+
         self.hive.log("Starting client node for test %s" % testcase)
+
         try:
             node = self.hive.newNode(params)
         except Exception, startNodeError:
@@ -198,42 +251,28 @@ class BlockTestExecutor(object):
             except Exception, e:
                 error = str(startNodeError)
             testcase.fail(["Failed to start client node", traceback.format_exc()])
-            end = time.time()
-            testcase.setTimeElapsed(1000 * (end - start))
-            self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
-            self.hive.subresult(
-                    testcase.fullname(),
-                    testcase.wasSuccessfull(),
-                    testcase.topLevelError(),
-                    testcase.details()
-                )
+            self.reportTest(testcase, start)
             return
 
         self.executeTestcase(testcase, node)
-        end = time.time()
-        testcase.setTimeElapsed(1000 * (end - start))
-        self.hive.log("Test: %s %s (%s)" % (testcase.testfile, testcase, testcase.status()))
-        self.hive.subresult(
-                testcase.fullname(),
-                testcase.wasSuccessfull(),
-                testcase.topLevelError(),
-                testcase.details()
-            )
+        self.reportTest(testcase, start, nodeId = node.nodeId)
 
         try:
             self.hive.killNode(node)
         except Exception, killNodeError:
-            try:
-                error = traceback.format_exc()
-            except Exception, e:
-                error = str(killNodeError)
+            # Clients are sometimes already killed by timeouts
+            pass
+            #try:
+            #    error = traceback.format_exc()
+            #except Exception, e:
+            #    error = str(killNodeError)
 
-            self.hive.log("Failed to kill node %s: %s" % (node, error))
+            #self.hive.log("Failed to kill node %s: %s" % (node, error))
 
     def _performTests(self, start=0, end=-1, whitelist=[], blacklist=[]):
         pool = ThreadPool(PARALLEL_TESTS)
-        pool.map(lambda test: self._startNodeAndRunTest(test),
-                 self.makeTestcases(start, end, whitelist, blacklist))
+        testgenerator = self.makeTestcasesWrapped(start, end, whitelist, blacklist)
+        pool.map(lambda test: self._startNodeAndRunTestWrapped(test),testgenerator)
         pool.close()
         pool.join()
         # FIXME: Return false if any tests fail.

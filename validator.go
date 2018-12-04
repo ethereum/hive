@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -20,11 +19,18 @@ type validationResult struct {
 	End     time.Time `json:"end"`             // Time instance when the validation ended
 	Success bool      `json:"success"`         // Whether the entire validation succeeded
 	Error   error     `json:"error,omitempty"` // Potential hive failure during validation
+
+}
+
+type validationResultSummary struct {
+	validationResult
+	summaryData
 }
 
 // validateClients runs a batch of validation tests matched by validatorPattern
 // against all clients matching clientPattern.
 func validateClients(daemon *docker.Client, clientPattern, validatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*validationResult, error) {
+
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for validation", "pattern", clientPattern)
 	clients, err := buildClients(daemon, clientPattern, cacher)
@@ -40,20 +46,25 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 	// Iterate over all client and validator combos and cross-execute them
 	results := make(map[string]map[string]*validationResult)
 
-	for client, clientImage := range clients {
-		results[client] = make(map[string]*validationResult)
+	for validator, validatorImage := range validators {
 
-		for validator, validatorImage := range validators {
+		logdir, err := makeTestOutputDirectory(validator, "validator", clients)
+		if err != nil {
+			return nil, err
+		}
+		for client, clientImage := range clients {
+
 			logger := log15.New("client", client, "validator", validator)
 
-			logdir := filepath.Join(hiveLogsFolder, "validations", fmt.Sprintf("%s[%s]", strings.Replace(validator, "/", ":", -1), client))
-			os.RemoveAll(logdir)
-
-			result := validate(daemon, clientImage, validatorImage, overrides, logger, logdir)
+			result := validate(daemon, clientImage, validatorImage, overrides, logger, filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)))
 			if result.Success {
 				logger.Info("validation passed", "time", result.End.Sub(result.Start))
 			} else {
 				logger.Error("validation failed", "time", result.End.Sub(result.Start))
+			}
+
+			if _, in := results[client]; !in {
+				results[client] = make(map[string]*validationResult)
 			}
 			results[client][validator] = result
 		}
@@ -120,10 +131,12 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		}
 		// Container seems to be alive, check whether the RPC is accepting connections
 		if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.NetworkSettings.IPAddress, 8545)); err == nil {
+
 			clogger.Debug("client container online", "time", time.Since(start))
 			conn.Close()
 			break
 		}
+
 		time.Sleep(100 * time.Millisecond)
 	}
 	// Create the validator container and make sure it's cleaned up afterwards
@@ -131,7 +144,7 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 	vc, err := daemon.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: validator,
-			Env:   []string{"HIVE_CLIENT_IP=" + cip},
+			Env:   []string{"HIVE_CLIENT_IP=" + cip, "HIVE_CLIENT_ID=" + cc.ID, "HIVE_DOCKER_HOST_ALIAS=" + *dockerHostAlias},
 		},
 	})
 	if err != nil {
@@ -148,6 +161,12 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		}
 	}()
 
+	//copy the enode identifier script from the client to the validator
+	err = copyBetweenContainers(daemon, vc.ID, cc.ID, "", "/enode.sh", true)
+	if err != nil {
+		vlogger.Warn("No enode.sh provided. Discovery tests will not be able to identify their target node id.", "warning", err)
+	}
+
 	// Start the tester container and wait until it finishes
 	vlogger.Debug("running validator container")
 	vwaiter, err := runContainer(daemon, vc.ID, vlogger, filepath.Join(logdir, "validator.log"), false)
@@ -156,15 +175,23 @@ func validate(daemon *docker.Client, client, validator string, overrides []strin
 		result.Error = err
 		return result
 	}
-	vwaiter.Wait()
-
-	// Retrieve the exist status to report pass of fail
 	v, err := daemon.InspectContainer(vc.ID)
 	if err != nil {
 		vlogger.Error("failed to inspect validator", "error", err)
 		result.Error = err
 		return result
 	}
+	vlogger.Info("validator ip address:" + v.NetworkSettings.IPAddress)
+	vwaiter.Wait()
+
+	// Retrieve the exist status to report pass of fail
+	v, err = daemon.InspectContainer(vc.ID)
+	if err != nil {
+		vlogger.Error("failed to inspect validator", "error", err)
+		result.Error = err
+		return result
+	}
+
 	result.Success = v.State.ExitCode == 0
 	return result
 }

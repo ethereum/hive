@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -28,18 +27,30 @@ type simulationResult struct {
 	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
 
 	Subresults []simulationSubresult `json:"subresults,omitempty"` // Optional list of subresults to report
+
+}
+
+type simulationResultSummary struct {
+	Start   time.Time `json:"start"`           // Time instance when the simulation ended
+	End     time.Time `json:"end"`             // Time instance when the simulation ended
+	Success bool      `json:"success"`         // Whether the entire simulation succeeded
+	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
+
+	summaryData
 }
 
 // simulationSubresult represents a sub-test a simulation may run and report.
 type simulationSubresult struct {
-	Name    string          `json:"name"`              // Unique name for a sub-test within a simulation
+	Name string `json:"name"` // Unique name for a sub-test within a simulation
+
 	Success bool            `json:"success"`           // Whether the sub-test succeeded or not
 	Error   string          `json:"error,omitempty"`   // Textual details to explain a failure
 	Details json.RawMessage `json:"details,omitempty"` // Structured infos a tester mightw wish to surface
 }
 
 // simulateClients runs a batch of simulation tests matched by simulatorPattern
-// against all clients matching clientPattern.
+// against a set of clients matching clientPattern, where  the simulator decides
+// which of those clients to invoke
 func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*simulationResult, error) {
 	// Build all the clients matching the validation pattern
 	log15.Info("building clients for simulation", "pattern", clientPattern)
@@ -47,68 +58,89 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 	if err != nil {
 		return nil, err
 	}
-	// Build all the validators known to the test harness
+
+	// Build all the simulators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
 	simulators, err := buildSimulators(daemon, simulatorPattern, cacher)
 	if err != nil {
 		return nil, err
 	}
-	// Iterate over all client and simulator combos and cross-execute them
+
+	// The results are a map of clients=>simulators=>results
 	results := make(map[string]map[string]*simulationResult)
 
-	for client, clientImage := range clients {
+	//build the per-client simulator result set
+	for client := range clients {
 		results[client] = make(map[string]*simulationResult)
+	}
 
-		for simulator, simulatorImage := range simulators {
-			logger := log15.New("client", client, "simulator", simulator)
-
-			logdir := filepath.Join(hiveLogsFolder, "simulations", fmt.Sprintf("%s[%s]", strings.Replace(simulator, "/", ":", -1), client))
-			os.RemoveAll(logdir)
-
-			result := simulate(daemon, clientImage, simulatorImage, overrides, logger, logdir)
-			if result.Success {
-				logger.Info("simulation passed", "time", result.End.Sub(result.Start))
-			} else {
-				logger.Error("simulation failed", "time", result.End.Sub(result.Start))
+	//set the end time of the test
+	defer func() {
+		for _, cv := range results {
+			for _, sv := range cv {
+				sv.End = time.Now()
 			}
-			results[client][simulator] = result
 		}
+	}()
+
+	for simulator, simulatorImage := range simulators {
+
+		logdir, err := makeTestOutputDirectory(strings.Replace(simulator, string(filepath.Separator), "_", -1), "simulator", clients)
+		if err != nil {
+			return nil, err
+		}
+
+		logger := log15.New("simulator", simulator)
+
+		for client := range clients {
+			results[client][simulator] = &simulationResult{
+				Start: time.Now(),
+			}
+
+		}
+
+		err = simulate(daemon, clients, simulatorImage, simulator, overrides, logger, logdir, results) //filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)))
+		if err != nil {
+			return nil, err
+		}
+
 	}
 	return results, nil
 }
 
 // simulate starts a simulator service locally, starts a controlling container
-// and executes its commands until torn down. The exit statis of the controller
+// and executes its commands until torn down. The exit status of the controller
 // container will signal whether the simulation passed or failed.
-func simulate(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger, logdir string) *simulationResult {
+func simulate(daemon *docker.Client, clients map[string]string, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string, results map[string]map[string]*simulationResult) error {
 	logger.Info("running client simulation")
-	result := &simulationResult{
-		Start: time.Now(),
-	}
-	defer func() { result.End = time.Now() }()
 
 	// Start the simulator HTTP API
-	sim, err := startSimulatorAPI(daemon, client, simulator, overrides, logger, logdir, result)
+	sim, err := startSimulatorAPI(daemon, clients, simulator, simulatorLabel, overrides, logger, logdir, results)
 	if err != nil {
 		logger.Error("failed to start simulator API", "error", err)
-		result.Error = err
-		return result
+		return err
+
 	}
 	defer sim.Close()
 
 	// Start the simulator controller container
 	logger.Debug("creating simulator container")
+	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
 	sc, err := daemon.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: simulator,
-			Env:   []string{"HIVE_SIMULATOR=http://" + sim.listener.Addr().String()},
+			Env: []string{"HIVE_SIMULATOR=http://" + sim.listener.Addr().String(),
+				"HIVE_DEBUG=" + strconv.FormatBool(*hiveDebug),
+				"HIVE_PARALLELISM=" + fmt.Sprintf("%d", simulatorParallelism),
+			},
 		},
+		HostConfig: hostConfig,
 	})
 	if err != nil {
 		logger.Error("failed to create simulator", "error", err)
-		result.Error = err
-		return result
+		return err
 	}
+
 	slogger := logger.New("id", sc.ID[:8])
 	slogger.Debug("created simulator container")
 	defer func() {
@@ -126,31 +158,17 @@ func simulate(daemon *docker.Client, client, simulator string, overrides []strin
 	waiter, err := runContainer(daemon, sc.ID, slogger, filepath.Join(logdir, "simulator.log"), false)
 	if err != nil {
 		slogger.Error("failed to run simulator", "error", err)
-		result.Error = err
-		return result
+		return err
 	}
 	waiter.Wait()
 
-	// Retrieve the exist status to report pass of fail
-	s, err := daemon.InspectContainer(sc.ID)
-	if err != nil {
-		slogger.Error("failed to inspect simulator", "error", err)
-		result.Error = err
-		return result
-	}
-	result.Success = s.State.ExitCode == 0
-	for _, subres := range result.Subresults {
-		if !subres.Success {
-			result.Success = false
-			break
-		}
-	}
-	return result
+	return nil
+
 }
 
 // startSimulatorAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startSimulatorAPI(daemon *docker.Client, client, simulator string, overrides []string, logger log15.Logger, logdir string, result *simulationResult) (*simulatorAPIHandler, error) {
+func startSimulatorAPI(daemon *docker.Client, clients map[string]string, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string, results map[string]map[string]*simulationResult) (*simulatorAPIHandler, error) {
 	// Find the IP address of the host container
 	logger.Debug("looking up docker bridge IP")
 	bridge, err := lookupBridgeIP(logger)
@@ -174,19 +192,28 @@ func startSimulatorAPI(daemon *docker.Client, client, simulator string, override
 	// Serve connections until the listener is terminated
 	logger.Debug("starting simulator API server")
 	sim := &simulatorAPIHandler{
-		listener:  listener,
-		daemon:    daemon,
-		logger:    logger,
-		logdir:    logdir,
-		client:    client,
-		simulator: simulator,
-		overrides: overrides,
-		nodes:     make(map[string]*docker.Container),
-		result:    result,
+		listener:         listener,
+		daemon:           daemon,
+		logger:           logger,
+		logdir:           logdir,
+		availableClients: clients,
+		simulator:        simulator,
+		simulatorLabel:   simulatorLabel,
+		overrides:        overrides,
+		nodes:            make(map[string]*containerInfo),
+		timedOutNodes:    make(map[string]*containerInfo),
+		result:           results, //the simulator now has access to a map of results-by-client. The simulator decides which clients to run/
 	}
+	go sim.CheckTimeout()
 	go http.Serve(listener, sim)
 
 	return sim, nil
+}
+
+type containerInfo struct {
+	container *docker.Container
+	name      string
+	timeout   time.Time
 }
 
 // simulatorAPIHandler is the HTTP request handler directing the docker engine
@@ -194,19 +221,78 @@ func startSimulatorAPI(daemon *docker.Client, client, simulator string, override
 type simulatorAPIHandler struct {
 	listener *net.TCPListener
 
-	daemon    *docker.Client
-	logger    log15.Logger
-	logdir    string
-	client    string
-	simulator string
-	overrides []string
-	autoID    uint32
+	daemon           *docker.Client
+	logger           log15.Logger
+	logdir           string
+	availableClients map[string]string //the client filter specified by the host. Simulations may not execute other clients.
+	simulator        string            //the image name
+	simulatorLabel   string            //the simulator label
+	overrides        []string
+	autoID           uint32
 
-	runner *docker.Container
-	nodes  map[string]*docker.Container
+	runner        *docker.Container
+	nodes         map[string]*containerInfo               // the running containers, keyed by container.ID[:8]
+	timedOutNodes map[string]*containerInfo               // timed-out containers
+	result        map[string]map[string]*simulationResult //simulation result log per client name
+	lock          sync.RWMutex
+}
 
-	result *simulationResult
-	lock   sync.RWMutex
+// CheckTimeout is a goroutine that checks if the timeout has passed and stops
+// container if it has.
+func (h *simulatorAPIHandler) CheckTimeout() {
+	for {
+		h.lock.Lock()
+		for id, cInfo := range h.nodes {
+			if !cInfo.container.State.Running || (time.Now().After(cInfo.timeout)) {
+				h.timeoutContainer(id, nil)
+				// remember this container, for when the subresult comes in later
+				h.timedOutNodes[id] = cInfo
+			}
+		}
+		h.lock.Unlock()
+		time.Sleep(timeoutCheckDuration)
+	}
+}
+
+// timeoutContainer terminates a container. OBS! It assumes that the caller already holds h.lock
+func (h *simulatorAPIHandler) timeoutContainer(id string, w http.ResponseWriter) {
+	containerInfo, ok := h.nodes[id]
+
+	if !ok {
+		h.logger.Error("unknown client deletion requested", "id", id)
+		if w != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+		return
+	}
+	delete(h.nodes, id)
+	h.logger.Debug("deleting client container on timeout", "id", id)
+	if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
+		h.logger.Error("failed to delete client ", "id", id, "error", err)
+		if w != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
+}
+
+// terminateContainer terminates a container. OBS! It assumes that the caller already holds h.lock
+func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
+	containerInfo, ok := h.nodes[id]
+	if !ok {
+		h.logger.Error("unknown client deletion requested", "id", id)
+		if w != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+		return
+	}
+	delete(h.nodes, id)
+	h.logger.Debug("deleting client container", "id", id)
+	if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
+		h.logger.Error("failed to delete client ", "id", id, "error", err)
+		if w != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
+	}
 }
 
 // ServeHTTP handles all the simulator API requests and executes them.
@@ -233,20 +319,64 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			// Node IP retrieval requested
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
 			h.lock.Lock()
-			node, ok := h.nodes[id]
+			containerInfo, ok := h.nodes[id]
 			h.lock.Unlock()
 			if !ok {
 				logger.Error("unknown client requested", "id", id)
 				http.Error(w, "not found", http.StatusNotFound)
 				return
 			}
-			container, err := h.daemon.InspectContainer(node.ID)
+			container, err := h.daemon.InspectContainer(containerInfo.container.ID)
 			if err != nil {
 				logger.Error("failed to inspect client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 			fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
+
+		//docker exec container bash -c 'echo "$ENV_VAR"'
+		case strings.HasPrefix(r.URL.Path, "/enodes/"):
+			// Node IP retrieval requested
+			id := strings.TrimPrefix(r.URL.Path, "/enodes/")
+			h.lock.Lock()
+			containerInfo, ok := h.nodes[id]
+			h.lock.Unlock()
+			if !ok {
+				logger.Error("unknown client for enode", "id", id)
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+
+			exec, err := h.daemon.CreateExec(docker.CreateExecOptions{
+				AttachStdout: true,
+				AttachStderr: false,
+				Tty:          false,
+				Cmd:          []string{"/enode.sh"},
+				Container:    containerInfo.container.ID,
+			})
+			if err != nil {
+				logger.Error("failed to create target enode exec", "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			err = h.daemon.StartExec(exec.ID, docker.StartExecOptions{
+				Detach:       false,
+				OutputStream: w,
+			})
+			if err != nil {
+				logger.Error("failed to start target enode exec", "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+		case strings.HasPrefix(r.URL.Path, "/clients"):
+			w.Header().Set("Content-Type", "application/json")
+			clients := make([]string, 0, len(h.availableClients))
+			for client := range h.availableClients {
+				clients = append(clients, client)
+			}
+			json.NewEncoder(w).Encode(clients)
 
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
@@ -262,18 +392,38 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			for key, vals := range r.Form {
 				envs[key] = vals[0]
 			}
-			// Create and start a new client container
+
+			//the simulation controller needs to tell us now what client to run for the test
+			clientName, in := envs["CLIENT"]
+			if !in {
+				logger.Error("Missing client type", "error", nil)
+				http.Error(w, "Missing client type", http.StatusBadRequest)
+				return
+			}
+
+			//the simulation host may prevent or be unaware of the simulation controller's requested client
+			imageName, in := h.availableClients[clientName]
+			if !in {
+				logger.Error("Unknown or forbidden client type", "error", nil)
+				http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)
+				return
+			}
+
+			// Create and start the requested client container
 			logger.Debug("starting new client")
-			container, err := createClientContainer(h.daemon, h.client, h.simulator, h.runner, h.overrides, envs)
+			container, err := createClientContainer(h.daemon, imageName, h.simulator, h.runner, h.overrides, envs)
 			if err != nil {
 				logger.Error("failed to create client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			logger = logger.New("id", container.ID[:8])
+			containerID := container.ID[:8]
+			containerIP := ""
+			logger = logger.New("client started with id", containerID)
 
-			logfile := fmt.Sprintf("client-%s.log", container.ID[:8])
-			waiter, err := runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, logfile), false)
+			logfile := fmt.Sprintf("client-%s.log", containerID)
+
+			waiter, err := runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), logfile), false)
 			if err != nil {
 				logger.Error("failed to start client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -305,19 +455,24 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 					http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
 					return
 				}
+				containerIP = c.NetworkSettings.IPAddress
 				// Container seems to be alive, check whether the RPC is accepting connections
-				if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", c.NetworkSettings.IPAddress, 8545)); err == nil {
+				if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", containerIP, 8545)); err == nil {
 					logger.Debug("client container online", "time", time.Since(start))
 					conn.Close()
 					break
 				}
 				time.Sleep(100 * time.Millisecond)
 			}
-			// Container online and responsive, return it's ID for later reference
-			fmt.Fprintf(w, "%s", container.ID[:8])
 			h.lock.Lock()
-			h.nodes[container.ID[:8]] = container
+			h.nodes[containerID] = &containerInfo{
+				container: container,
+				name:      clientName,
+				timeout:   time.Now().Add(dockerTimeoutDuration),
+			}
 			h.lock.Unlock()
+			//  Container online and responsive, return its ID and IP for later reference
+			fmt.Fprintf(w, "%s@%s", containerID, containerIP)
 			return
 
 		case "/logs":
@@ -333,6 +488,22 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
+
+			//If there has been a failure, update the whole test result
+			//which at present means updating the result set for each
+			//known client. TODO: the output format should be
+			//re-arranged so that it is grouped first by test and then by client instance type
+			if !success {
+				for _, resultset := range h.result {
+					resultset[h.simulatorLabel].Success = false
+				}
+			}
+
+			nodeid := r.Form.Get("nodeid")
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			var details json.RawMessage
 			if blob := r.Form.Get("details"); blob != "" {
 				if err := json.Unmarshal([]byte(blob), &details); err != nil {
@@ -342,13 +513,38 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			// If everything parsed correctly, append the subresult
 			h.lock.Lock()
-			h.result.Subresults = append(h.result.Subresults, simulationSubresult{
+			defer h.lock.Unlock()
+			containerInfo, exist := h.nodes[nodeid]
+			if !exist {
+				// Add an error even so
+				if containerInfo, exist := h.timedOutNodes[nodeid]; exist {
+					delete(h.timedOutNodes, nodeid)
+					res := h.result[containerInfo.name][h.simulatorLabel]
+					res.Subresults = append(res.Subresults, simulationSubresult{
+						Name:    r.Form.Get("name"),
+						Success: success,
+						Error:   fmt.Sprintf("%s (killed after timeout by Hive)", r.Form.Get("error")),
+						Details: details,
+					})
+				}
+				http.Error(w, fmt.Sprintf("unknown node %v", nodeid), http.StatusBadRequest)
+				return
+			}
+			res := h.result[containerInfo.name][h.simulatorLabel]
+			res.Subresults = append(res.Subresults, simulationSubresult{
 				Name:    r.Form.Get("name"),
 				Success: success,
 				Error:   r.Form.Get("error"),
 				Details: details,
 			})
-			h.lock.Unlock()
+			// Also terminate the container now
+			delete(h.nodes, nodeid)
+			logger.Debug("deleting client container", "id", nodeid)
+			if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
+				logger.Error("failed to delete client ", "id", nodeid, "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
 		}
@@ -361,20 +557,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
 
 			h.lock.Lock()
-			node, ok := h.nodes[id]
-			delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
+			h.terminateContainer(id, w)
 			h.lock.Unlock()
-
-			if !ok {
-				logger.Error("unknown client deletion requested", "id", id)
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-			h.logger.Debug("deleting client container", "id", node.ID[:8])
-			if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
-				logger.Error("failed to delete client ", "id", id, "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-			}
 
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
@@ -390,10 +574,11 @@ func (h *simulatorAPIHandler) Close() {
 	h.logger.Debug("terminating simulator server")
 	h.listener.Close()
 
-	for _, node := range h.nodes {
-		h.logger.Debug("deleting client container", "id", node.ID[:8])
-		if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
-			h.logger.Error("failed to delete client container", "id", node.ID[:8], "error", err)
+	for _, containerInfo := range h.nodes {
+		id := containerInfo.container.ID
+		h.logger.Debug("deleting client container", "id", id[:8])
+		if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: id, Force: true}); err != nil {
+			h.logger.Error("failed to delete client container", "id", id[:8], "error", err)
 		}
 	}
 }
