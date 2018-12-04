@@ -200,15 +200,19 @@ func startSimulatorAPI(daemon *docker.Client, clients map[string]string, simulat
 		simulator:        simulator,
 		simulatorLabel:   simulatorLabel,
 		overrides:        overrides,
-		nodes:            make(map[string]*docker.Container),
-		nodeNames:        make(map[string]string),
-		nodesTimeout:     make(map[string]time.Time),
+		nodes:            make(map[string]*containerInfo),
 		result:           results, //the simulator now has access to a map of results-by-client. The simulator decides which clients to run/
 	}
 	go sim.CheckTimeout()
 	go http.Serve(listener, sim)
 
 	return sim, nil
+}
+
+type containerInfo struct {
+	container *docker.Container
+	name      string
+	timeout   time.Time
 }
 
 // simulatorAPIHandler is the HTTP request handler directing the docker engine
@@ -225,10 +229,8 @@ type simulatorAPIHandler struct {
 	overrides        []string
 	autoID           uint32
 
-	runner       *docker.Container
-	nodes        map[string]*docker.Container
-	nodeNames    map[string]string
-	nodesTimeout map[string]time.Time
+	runner *docker.Container
+	nodes  map[string]*containerInfo //the running containers, keyed by container.ID[:8]
 
 	result map[string]map[string]*simulationResult //simulation result log per client name
 	lock   sync.RWMutex
@@ -239,8 +241,8 @@ type simulatorAPIHandler struct {
 func (h *simulatorAPIHandler) CheckTimeout() {
 	for {
 		h.lock.Lock()
-		for id, c := range h.nodes {
-			if !c.State.Running || (time.Now().After(h.nodesTimeout[id])) {
+		for id, cInfo := range h.nodes {
+			if !cInfo.container.State.Running || (time.Now().After(cInfo.timeout)) {
 				h.terminateContainer(id, nil)
 			}
 		}
@@ -249,10 +251,9 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 	}
 }
 
+// terminateContainer terminates a container. OBS! It assumes that the caller already holds h.lock
 func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
-	node, ok := h.nodes[id]
-	delete(h.nodes, id) // Almost correct, removal may fail. Lock is too expensive though
-	delete(h.nodesTimeout, id)
+	containerInfo, ok := h.nodes[id]
 
 	if !ok {
 		h.logger.Error("unknown client deletion requested", "id", id)
@@ -261,8 +262,9 @@ func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWrite
 		}
 		return
 	}
-	h.logger.Debug("deleting client container", "id", node.ID[:8])
-	if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
+	delete(h.nodes, id)
+	h.logger.Debug("deleting client container", "id", id)
+	if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
 		h.logger.Error("failed to delete client ", "id", id, "error", err)
 		if w != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -294,14 +296,14 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			// Node IP retrieval requested
 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
 			h.lock.Lock()
-			node, ok := h.nodes[id]
+			containerInfo, ok := h.nodes[id]
 			h.lock.Unlock()
 			if !ok {
 				logger.Error("unknown client requested", "id", id)
 				http.Error(w, "not found", http.StatusNotFound)
 				return
 			}
-			container, err := h.daemon.InspectContainer(node.ID)
+			container, err := h.daemon.InspectContainer(containerInfo.container.ID)
 			if err != nil {
 				logger.Error("failed to inspect client", "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -314,7 +316,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			// Node IP retrieval requested
 			id := strings.TrimPrefix(r.URL.Path, "/enodes/")
 			h.lock.Lock()
-			container, ok := h.nodes[id]
+			containerInfo, ok := h.nodes[id]
 			h.lock.Unlock()
 			if !ok {
 				logger.Error("unknown client for enode", "id", id)
@@ -327,7 +329,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				AttachStderr: false,
 				Tty:          false,
 				Cmd:          []string{"/enode.sh"},
-				Container:    container.ID,
+				Container:    containerInfo.container.ID,
 			})
 			if err != nil {
 				logger.Error("failed to create target enode exec", "error", err)
@@ -442,9 +444,11 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			//  Container online and responsive, return its ID and IP for later reference
 			fmt.Fprintf(w, "%s@%s", containerID, containerIP)
 			h.lock.Lock()
-			h.nodes[containerID] = container
-			h.nodeNames[containerID] = clientName
-			h.nodesTimeout[containerID] = time.Now().Add(dockerTimeoutDuration)
+			h.nodes[containerID] = &containerInfo{
+				container: container,
+				name:      clientName,
+				timeout:   time.Now().Add(dockerTimeoutDuration),
+			}
 			h.lock.Unlock()
 			return
 
@@ -486,12 +490,13 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			// If everything parsed correctly, append the subresult
 			h.lock.Lock()
-			imageName, exist := h.nodeNames[nodeid]
+			containerInfo, exist := h.nodes[nodeid]
 			if !exist {
 				http.Error(w, fmt.Sprintf("unknown node %v", nodeid), http.StatusBadRequest)
 				return
 			}
-			h.result[imageName][h.simulatorLabel].Subresults = append(h.result[imageName][h.simulatorLabel].Subresults, simulationSubresult{
+			res := h.result[containerInfo.name][h.simulatorLabel]
+			res.Subresults = append(res.Subresults, simulationSubresult{
 				Name:    r.Form.Get("name"),
 				Success: success,
 				Error:   r.Form.Get("error"),
@@ -529,10 +534,11 @@ func (h *simulatorAPIHandler) Close() {
 	h.logger.Debug("terminating simulator server")
 	h.listener.Close()
 
-	for _, node := range h.nodes {
-		h.logger.Debug("deleting client container", "id", node.ID[:8])
-		if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: node.ID, Force: true}); err != nil {
-			h.logger.Error("failed to delete client container", "id", node.ID[:8], "error", err)
+	for _, containerInfo := range h.nodes {
+		id := containerInfo.container.ID
+		h.logger.Debug("deleting client container", "id", id[:8])
+		if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: id, Force: true}); err != nil {
+			h.logger.Error("failed to delete client container", "id", id[:8], "error", err)
 		}
 	}
 }
