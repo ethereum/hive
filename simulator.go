@@ -244,13 +244,34 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 		h.lock.Lock()
 		for id, cInfo := range h.nodes {
 			if !cInfo.container.State.Running || (time.Now().After(cInfo.timeout)) {
-				h.terminateContainer(id, nil)
+				h.timeoutContainer(id, nil)
 				// remember this container, for when the subresult comes in later
 				h.timedOutNodes[id] = cInfo
 			}
 		}
 		h.lock.Unlock()
 		time.Sleep(timeoutCheckDuration)
+	}
+}
+
+// timeoutContainer terminates a container. OBS! It assumes that the caller already holds h.lock
+func (h *simulatorAPIHandler) timeoutContainer(id string, w http.ResponseWriter) {
+	containerInfo, ok := h.nodes[id]
+
+	if !ok {
+		h.logger.Error("unknown client deletion requested", "id", id)
+		if w != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+		}
+		return
+	}
+	delete(h.nodes, id)
+	h.logger.Debug("deleting client container on timeout", "id", id)
+	if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
+		h.logger.Error("failed to delete client ", "id", id, "error", err)
+		if w != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		}
 	}
 }
 
