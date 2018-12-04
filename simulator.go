@@ -278,7 +278,6 @@ func (h *simulatorAPIHandler) timeoutContainer(id string, w http.ResponseWriter)
 // terminateContainer terminates a container. OBS! It assumes that the caller already holds h.lock
 func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
 	containerInfo, ok := h.nodes[id]
-
 	if !ok {
 		h.logger.Error("unknown client deletion requested", "id", id)
 		if w != nil {
@@ -514,6 +513,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			// If everything parsed correctly, append the subresult
 			h.lock.Lock()
+			defer h.lock.Unlock()
 			containerInfo, exist := h.nodes[nodeid]
 			if !exist {
 				// Add an error even so
@@ -538,8 +538,13 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				Details: details,
 			})
 			// Also terminate the container now
-			h.terminateContainer(nodeid, w)
-			h.lock.Unlock()
+			delete(h.nodes, nodeid)
+			logger.Debug("deleting client container", "id", nodeid)
+			if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
+				logger.Error("failed to delete client ", "id", nodeid, "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
 		}
