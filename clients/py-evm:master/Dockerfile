@@ -27,6 +27,10 @@ RUN \
 ADD trinity.sh /trinity.sh
 RUN chmod +x /trinity.sh
 
+ADD genesis.json /genesis.json
+
+RUN mkdir -p /.ethereum/logs
+
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8546 30303
 

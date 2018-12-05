@@ -53,43 +53,28 @@ fi
 # Override any chain configs in the go-ethereum specific way
 chainconfig="{}"
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"`
+	chainconfig=`echo $chainconfig | jq "params. + {\"homesteadForkBlock\": $HIVE_FORK_HOMESTEAD}"`
 fi
 if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"`
-fi
-if [ "$HIVE_FORK_DAO_VOTE" == "0" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": false}"`
-fi
-if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": true}"`
+	chainconfig=`echo $chainconfig | jq "params. + {\"DAOForkBlock\": $HIVE_FORK_DAO_BLOCK}"`
 fi
 
 if [ "$HIVE_FORK_TANGERINE" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"eip150Block\": $HIVE_FORK_TANGERINE}"`
+	chainconfig=`echo $chainconfig | jq "params. + {\"EIP150ForkBlock\": $HIVE_FORK_TANGERINE}"`
 fi
 if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"`
-	chainconfig=`echo $chainconfig | jq ". + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"`
+	chainconfig=`echo $chainconfig | jq "params. + {\"EIP158ForkBlock\": $HIVE_FORK_SPURIOUS}"`
 fi
 if [ "$HIVE_FORK_METROPOLIS" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"byzantiumBlock\": $HIVE_FORK_METROPOLIS}"`
+	chainconfig=`echo $chainconfig | jq "params. + {\"byzantiumForkBlock\": $HIVE_FORK_METROPOLIS}"`
 fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
+	chainconfig=`echo $chainconfig | jq "params. + {\"constantinopleForkBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
 fi
 
-genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}"
-
-# Configure any mining operation
-if [ "$HIVE_MINER" != "" ]; then
-	genesis=`echo $genesis` | jq ". + {\"coinbase\": $HIVE_MINER}"
+if [ "$chainconfig" != "{}" ]; then
+	genesis=`echo $genesis` | jq ". + {\"params\": $chainconfig}" > /genesis.json
 fi
-if [ "$HIVE_MINER_EXTRA" != "" ]; then
-	genesis=`echo $genesis` | jq ". + {\"extraData\": $HIVE_MINER_EXTRA}"
-fi
-
-genesis=`echo $genesis` | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
 # set the genesis config flag
 FLAGS="$FLAGS --genesis /genesis.json"
@@ -111,11 +96,6 @@ fi
 
 set -e
 
-# Load any keys explicitly added to the node
-if [ -d /keys ]; then
-	# trinity does not currently support keystore flags
-fi
-
 # Run the py-evm implementation with the requested flags
 echo "Running trinity..."
-/trinity $FLAGS
+/trinity $FLAGS --data-dir /.ethereum
