@@ -7,7 +7,7 @@
         "EIP158ForkBlock": "0x00",
         "byzantiumForkBlock": "0x00",
         "constantinopleForkBlock": "0x00",
-        "chainId": "0x01"
+        "chainId": "0x0123"
     },
     "genesis": {
         "nonce": "0x0000000000000042",
