@@ -513,7 +513,6 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			// If everything parsed correctly, append the subresult
 			h.lock.Lock()
-			defer h.lock.Unlock()
 			containerInfo, exist := h.nodes[nodeid]
 			if !exist {
 				// Add an error even so
@@ -527,6 +526,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 						Details: details,
 					})
 				}
+				h.lock.Unlock()
 				http.Error(w, fmt.Sprintf("unknown node %v", nodeid), http.StatusBadRequest)
 				return
 			}
@@ -540,6 +540,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			// Also terminate the container now
 			delete(h.nodes, nodeid)
 			logger.Debug("deleting client container", "id", nodeid)
+			h.lock.Unlock()
 			if err := h.daemon.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
 				logger.Error("failed to delete client ", "id", nodeid, "error", err)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
