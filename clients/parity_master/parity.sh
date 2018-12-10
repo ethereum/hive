@@ -45,15 +45,26 @@ if [ "$HIVE_NETWORK_ID" != "" ]; then
 fi
 
 # Configure and set the chain definition for the node
-chainconfig=`cat /chain.json`
+chainconfig=`cat ./chain.json`
 
-genesis=`cat /genesis.json`
+genesis=`cat ./genesis.json`
 genesis="${genesis/coinbase/author}"
 
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 nonce=`echo $genesis | jq ".nonce"` && genesis=`echo $genesis | jq "del(.nonce)"`
+# Nonce needs to be padded
+# First we snip off the quote-char and the '0x' prefix
+nonce=`echo $nonce| cut -c 4-`
+# Then the last quote char
+nonce=`echo ${nonce%?}`
+# pad it with zeroes
+while [ ${#nonce} -lt 16 ]; do
+  nonce=0$nonce
+done
+# Put back 0x
+nonce=0x$nonce
 mixhash=`echo $genesis | jq ".mixHash"` && genesis=`echo $genesis | jq "del(.mixHash)"`
-genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": $nonce, \"mixHash\": $mixhash}}}"`
+genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": \"$nonce\", \"mixHash\": $mixhash}}}"| jq "del (.config, .number)"`
 
 if [ "$accounts" != "" ]; then
 	# In some cases, the 'alloc' portion can be extremely large.
