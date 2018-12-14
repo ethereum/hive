@@ -541,7 +541,7 @@ improved in the future to offer generation of chains that exhibit different char
 * `chainConfig`     String              Reserved for future usage. Will allow Hive to generate test chains of different types
 *	`chainOutputPath` String  (.)   Chain destination folder
 *	`chainGenesis`    String  ("")  The path and filename to the source genesis.json
-*	`chainBlockTime`  Uint    (30)    The desired block time in seconds
+*	`chainBlockTime`  Uint    (30)    The desired block time in seconds. OBS: It's recommended to set this value to somwhere above 20s to keep the mining difficulty low.
 
 For example   `hive --loglevel 6 --chainGenerate --chainLength 2 --chainOutputPath "C:\Ethereum\Path" --chainGenesis "C:\Ethereum\Path\Genesis.json" --chainBlockTime 30`
 
