@@ -83,7 +83,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 
 		if ok {
 
-			enodeID, err := host.GetClientEnode(*nodeID)
+			enodeID, err := host.GetClientEnode(nodeID)
 			if err != nil || enodeID == nil || *enodeID == "" {
 				errorMessage = fmt.Sprintf("FATAL: Unable to get node: %v", err)
 				ok = false
@@ -107,7 +107,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 			}
 		}
 
-		host.AddResults(ok, *nodeID, testName, errorMessage, time.Since(startTime))
+		host.AddResults(ok, nodeID, testName, errorMessage, time.Since(startTime))
 
 		if !ok {
 			t.Errorf("Test failed: %s", errorMessage)
