@@ -287,7 +287,7 @@ func copyFromTempContainer(srcContainer **docker.Container, daemon *docker.Clien
 		*srcContainer = t
 	}
 
-	err := copyBetweenContainers(daemon, dest, (*srcContainer).ID, "", "/keys", true)
+	err := copyBetweenContainers(daemon, dest, (*srcContainer).ID, path, target, optional)
 	if err != nil {
 		return err
 	}
@@ -299,6 +299,9 @@ func copyBetweenContainers(daemon *docker.Client, dest, src string, path, target
 	// If no path was specified, use the target as the default
 	if path == "" {
 		path = target
+	}
+	if path == "ignore"{
+		return nil
 	}
 	// Download a tarball of the file from the source container
 	download, upload := new(bytes.Buffer), new(bytes.Buffer)
