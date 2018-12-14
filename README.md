@@ -521,11 +521,33 @@ will result a `subresults` field
   }
 ]
 ```
-
 ### Closing notes
 
  * There is no constraint on how much time a simulation may run, but please be considerate.
  * The simulator doesn't have to terminate nodes itself, upon exit all resources are reclaimed.
+
+# Generating test blockchains
+
+`Hive` allows you to create rlp encoded blockchains for inclusion into sync tests 
+
+## To generate a blockchain offline
+
+`Hive` can be run with the `chainGenerate` setting to generate a blockchain according to specification
+and then exit. The current version only generates blocks with empty transactions, but this will be
+improved in the future to offer generation of chains that exhibit different characteristics for testing.
+
+* `chainGenerate`   Bool    (false)  Tell Hive to generate a blockchain on the basis of a supplied genesis and terminate
+* `chainLength`     Uint    (2)     The length of the chain to generate
+* `chainConfig`     String              Reserved for future usage. Will allow Hive to generate test chains of different types
+*	`chainOutputPath` String  (.)   Chain destination folder
+*	`chainGenesis`    String  ("")  The path and filename to the source genesis.json
+*	`chainBlockTime`  Uint    (30)    The desired block time in seconds. OBS: It's recommended to set this value to somwhere above 20s to keep the mining difficulty low.
+
+For example   `hive --loglevel 6 --chainGenerate --chainLength 2 --chainOutputPath "C:\Ethereum\Path" --chainGenesis "C:\Ethereum\Path\Genesis.json" --chainBlockTime 30`
+
+
+
+
 
 # Continuous integration
 

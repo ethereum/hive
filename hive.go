@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/hive/chaintools"
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -39,6 +40,13 @@ var (
 	hiveDebug            = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
 	simRootContext       = flag.Bool("sim-rootcontext", false, "Indicates if the simulation should build the dockerfile with root (simulator) or local context. Needed for access to sibling folders like simulators/common")
 
+	chainGenerate   = flag.Bool("chainGenerate", false, "Tell Hive to generate a blockchain on the basis of a supplied genesis and terminate")
+	chainLength     = flag.Uint("chainLength", 2, "The length of the chain to generate")
+	chainConfig     = flag.String("chainConfig", "", "Reserved for future usage. Will allow Hive to generate test chains of different types")
+	chainOutputPath = flag.String("chainOutputPath", ".", "Chain destination folder")
+	chainGenesis    = flag.String("chainGenesis", "", "The path and filename to the source genesis.json")
+	chainBlockTime  = flag.Uint("chainBlockTime", 30, "The desired block time in seconds")
+
 	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 
 	dockerTimeout         = flag.Int("dockertimeout", 10, "Time to wait for container to finish before stopping it")
@@ -56,7 +64,10 @@ func main() {
 	// Parse the flags and configure the logger
 	flag.Parse()
 	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
-
+	if *chainGenerate {
+		chaintools.ProduceTestChainFromGenesisFile(*chainGenesis, *chainOutputPath, *chainLength, *chainBlockTime)
+		return
+	}
 	// Connect to the local docker daemon and make sure it works
 	daemon, err := docker.NewClient(*dockerEndpoint)
 	if err != nil {
