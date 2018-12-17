@@ -243,7 +243,7 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 	for {
 		h.lock.Lock()
 		for id, cInfo := range h.nodes {
-			if !cInfo.container.State.Running || (time.Now().After(cInfo.timeout)) {
+			if !cInfo.container.State.Running || (time.Now().Sub(cInfo.timeout) >= 0) {
 				h.timeoutContainer(id, nil)
 				// remember this container, for when the subresult comes in later
 				h.timedOutNodes[id] = cInfo
