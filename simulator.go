@@ -243,11 +243,21 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 	for {
 		h.lock.Lock()
 		for id, cInfo := range h.nodes {
+			var err error
+			cInfo.container, err = h.daemon.InspectContainer(cInfo.container.ID)
+			if err != nil {
+				h.logger.Error("failed to inspect client", "error", err)
+			}
+
 			if !cInfo.container.State.Running || (time.Now().Sub(cInfo.timeout) >= 0) {
+
+				h.logger.Info("Timing out. ", "Running", cInfo.container.State.Running)
 				h.timeoutContainer(id, nil)
+
 				// remember this container, for when the subresult comes in later
 				h.timedOutNodes[id] = cInfo
 			}
+
 		}
 		h.lock.Unlock()
 		time.Sleep(timeoutCheckDuration)
