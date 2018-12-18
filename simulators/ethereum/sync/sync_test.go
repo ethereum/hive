@@ -97,8 +97,6 @@ func TestSyncsWithGeth(t *testing.T) {
 		for i, clientType := range availableClients {
 			if i != firstGeth {
 
-				clientType = availableClients[firstGeth] //TESTING
-
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node
 				parms := map[string]string{
@@ -181,8 +179,6 @@ func TestSyncsWithGeth(t *testing.T) {
 		// for all others
 		for i, clientType := range availableClients {
 			if i != firstGeth {
-
-				clientType = availableClients[firstGeth] //TESTING
 
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node with genesis and no chain
