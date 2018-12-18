@@ -84,6 +84,9 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == ""]; then
 	if [ "$HIVE_FORK_TANGERINE" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"eip150Block\": $HIVE_FORK_TANGERINE}"
 	fi
+	if [ "$HIVE_FORK_TANGERINE_HASH" != "" ]; then
+		chainconfig=`echo $chainconfig | jq ". + {\"eip150Hash\": $HIVE_FORK_TANGERINE_HASH}"`
+	fi
 	if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"
 		JQPARAMS="$JQPARAMS + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"

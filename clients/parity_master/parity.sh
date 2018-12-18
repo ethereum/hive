@@ -12,6 +12,7 @@
 # This script assumes the following environment variables:
 #  - HIVE_BOOTNODE       enode URL of the remote bootstrap node
 #  - HIVE_NETWORK_ID     network ID number to use for the eth protocol
+#  - HIVE_CHAIN_ID     network ID number to use for the eth protocol
 #  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
@@ -89,6 +90,9 @@ if [ "$HIVE_TESTNET" == "1" ]; then
 	done
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; \"0x789b0\")"`
 fi
+if [ "$HIVE_CHAIN_ID" == "1" ]; then
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainID\"]; \"0x$HIVE_CHAIN_ID\")"`
+fi
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 	HEX_HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; \"0x$HEX_HIVE_FORK_HOMESTEAD\")"`
@@ -103,6 +107,11 @@ if [ "$HIVE_FORK_TANGERINE" != "" ]; then
 	HIVE_FORK_TANGERINE=`echo "obase=16; $HIVE_FORK_TANGERINE" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip150Transition\"]; \"0x$HIVE_FORK_TANGERINE\" )"`
 fi
+# if [ "$HIVE_FORK_TANGERINE_HASH" != "" ]; then
+# 	HIVE_FORK_TANGERINE_HASH=`echo "obase=16; $HIVE_FORK_TANGERINE_HASH" | bc`
+# 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip150Transition\"]; \"0x$HIVE_FORK_TANGERINE_HASH\" )"`
+# fi
+
 
 if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	HIVE_FORK_SPURIOUS=`echo "obase=16; $HIVE_FORK_SPURIOUS" | bc`
@@ -125,6 +134,8 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 	# difficulty calculation -- aka bomb delay
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip100bTransition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 
+	
+	
 	# General params
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip140Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip211Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`

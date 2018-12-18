@@ -54,6 +54,8 @@ func TestFastModeSyncsWithGeth(t *testing.T) {
 	// discovery v4 test suites
 	t.Run("compatibility", func(t *testing.T) {
 
+		startTime := time.Now()
+
 		//get all client types required to test
 		availableClients, err := host.GetClientTypes()
 		if err != nil {
@@ -102,17 +104,21 @@ func TestFastModeSyncsWithGeth(t *testing.T) {
 		for i, clientType := range availableClients {
 			if i != firstGeth {
 
+				clientType = availableClients[firstGeth] //TESTING
+
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node with genesis and no chain
 				parms := map[string]string{
 					"CLIENT":                   clientType,
 					"HIVE_INIT_GENESIS":        "/simplechain/genesis.json",
 					"HIVE_USE_GENESIS_CONFIG":  "1",
-					"HIVE_NETWORK_ID":          "1", //TODO chain id is missing
+					"HIVE_NETWORK_ID":          "1",
+					"HIVE_CHAIN_ID":            "1",
 					"HIVE_FORK_HOMESTEAD":      "0",
 					"HIVE_FORK_DAO_BLOCK":      "0",
 					"HIVE_FORK_DAO_VOTE":       "1",
 					"HIVE_FORK_TANGERINE":      "0",
+					"HIVE_FORK_TANGERINE_HASH": "0x0000000000000000000000000000000000000000000000000000000000000000",
 					"HIVE_FORK_SPURIOUS":       "0",
 					"HIVE_FORK_BYZANTIUM":      "0",
 					"HIVE_FORK_CONSTANTINOPLE": "0",
@@ -123,18 +129,20 @@ func TestFastModeSyncsWithGeth(t *testing.T) {
 				}
 
 				wg.Add(1)
-				go syncClient(&wg, mainNodeURL, clientID, nodeIP, t)
+				go syncClient(&wg, mainNodeURL, clientID, nodeIP, t, 10, startTime)
 
 			}
 		}
 		t.Log("Waiting for client sync.")
 		wg.Wait()
+		t.Log("Terminating.")
+		
 
 	})
 
 }
 
-func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *testing.T) {
+func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *testing.T, chainLength int, startTime time.Time) {
 
 	defer wg.Done()
 
@@ -160,10 +168,14 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 	//connect over rpc to the main node to add the peer (the mobile client does not have the admin function)
 	rpcClient, err := rpc.Dial(mainURL)
 	if err != nil {
+
 		t.Fatalf("Unable to connect to node via rpc: %v", err)
 	}
-	if err := rpcClient.Call(nil, "admin_addPeer", *peerEnodeID); err != nil {
+	var res = false
+	if err := rpcClient.Call(&res, "admin_addPeer", *peerEnodeID); err != nil {
 		t.Fatalf("Unable to add peer via rpc: %v", err)
+	} else {
+		t.Logf("Add peer result %v", res)
 	}
 
 	clientURL := fmt.Sprintf("http://%s:8545", nodeIP.String())
@@ -179,41 +191,27 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 		select {
 
 		case <-timeout:
+			host.AddResults(false, clientID, t.Name(), "Sync timed out.", time.Since(startTime))
 			t.Errorf("Client sync timed out %s", clientURL)
 			return
 		default:
+
 			ctx := geth.NewContext().WithTimeout(int64(1 * time.Second))
-			progress, err := ethClient.SyncProgress(ctx)
-			if progress == nil {
-				//	t.Errorf("Client is not syncing %s ", clientURL)
-				t.Logf("Client is not syncing %s ", clientURL)
-				//return
-			}
+
+			block, err := ethClient.GetBlockByNumber(ctx, -1)
 			if err != nil {
-				//	t.Fatalf("Unable to get sync progress %s", clientURL)
-				t.Logf("Client is not syncing %s ", clientURL)
-				//	return
+				t.Errorf("Error getting block from %s ", clientURL)
 			}
-			if progress != nil {
-				highest := progress.GetHighestBlock()
-				current := progress.GetCurrentBlock()
-				t.Logf("Progress - highest %d, current %d", highest, current)
-			}
-
-			ctx = geth.NewContext().WithTimeout(int64(1 * time.Second))
-			test, err := ethClient.GetBlockByNumber(ctx, -1)
-			if err != nil {
-				t.Errorf("Error getting block is not syncing %s ", clientURL)
-			}
-			if test != nil {
-				t.Logf("Block number: %d", test.GetNumber())
+			if block != nil {
+				blockNumber := block.GetNumber()
+				t.Logf("Block number: %d", block.GetNumber())
+				if blockNumber == int64(chainLength) {
+					//Success
+					host.AddResults(true, clientID, t.Name(), "Sync complete", time.Since(startTime))
+					return
+				}
 			}
 
-			//	if progress.GetCurrentBlock() == highest {
-			//Successful
-
-			//		return
-			//	}
 			//check in a little while....
 			time.Sleep(1000 * time.Millisecond)
 
