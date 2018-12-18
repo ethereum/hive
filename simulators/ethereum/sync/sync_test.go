@@ -111,12 +111,11 @@ func TestFastModeSyncsWithGeth(t *testing.T) {
 				parms := map[string]string{
 					"CLIENT":                   clientType,
 					"HIVE_INIT_GENESIS":        "/simplechain/genesis.json",
-					"HIVE_USE_GENESIS_CONFIG":  "1",
 					"HIVE_NETWORK_ID":          "1",
 					"HIVE_CHAIN_ID":            "1",
 					"HIVE_FORK_HOMESTEAD":      "0",
 					"HIVE_FORK_DAO_BLOCK":      "0",
-					"HIVE_FORK_DAO_VOTE":       "1",
+					"HIVE_FORK_DAO_VOTE":       "0",
 					"HIVE_FORK_TANGERINE":      "0",
 					"HIVE_FORK_TANGERINE_HASH": "0x0000000000000000000000000000000000000000000000000000000000000000",
 					"HIVE_FORK_SPURIOUS":       "0",
@@ -136,7 +135,6 @@ func TestFastModeSyncsWithGeth(t *testing.T) {
 		t.Log("Waiting for client sync.")
 		wg.Wait()
 		t.Log("Terminating.")
-		
 
 	})
 
@@ -207,7 +205,7 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 				t.Logf("Block number: %d", block.GetNumber())
 				if blockNumber == int64(chainLength) {
 					//Success
-					host.AddResults(true, clientID, t.Name(), "Sync complete", time.Since(startTime))
+					host.AddResults(true, clientID, t.Name(), "", time.Since(startTime))
 					return
 				}
 			}
