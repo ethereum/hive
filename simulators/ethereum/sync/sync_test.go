@@ -48,10 +48,88 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// TestDiscovery tests the set of discovery protocols
-func TestFastModeSyncsWithGeth(t *testing.T) {
+func TestSyncsWithGeth(t *testing.T) {
 
-	// discovery v4 test suites
+	t.Run("fastmodes", func(t *testing.T) {
+
+		startTime := time.Now()
+
+		//get all client types required to test
+		availableClients, err := host.GetClientTypes()
+		if err != nil {
+			t.Fatalf("Simulator error. Cannot get client types. %v", err)
+		}
+
+		//there needs to be only 2 types of client
+		if len(availableClients) < 2 {
+			t.Fatal("Cannot execute test with less than 2 types available. This test tries to sync from each other peer to geth.")
+		}
+
+		//start with the first geth
+		var firstGeth = -1
+		for i, clientType := range availableClients {
+			if strings.Contains(clientType, "go-ethereum") {
+				firstGeth = i
+				break
+			}
+		}
+
+		if firstGeth == -1 {
+			t.Fatal("Cannot execute test. No geth client available.")
+		}
+
+		//and load the genesis without a chain
+		mainParms := map[string]string{
+			"CLIENT":                  availableClients[firstGeth],
+			"HIVE_INIT_GENESIS":       "/simplechain/genesis.json",
+			"HIVE_USE_GENESIS_CONFIG": "1",
+			"HIVE_NODETYPE":           "full", //fast sync
+		}
+
+		t.Log("Starting main node (geth)")
+		_, mainNodeIP, err := host.StartNewNode(mainParms)
+		if err != nil {
+			t.Fatalf("Unable to start node: %v", err)
+		}
+		mainNodeURL := fmt.Sprintf("http://%s:8545", mainNodeIP.String())
+
+		//the main client will be asked to sync with the other client.
+		for i, clientType := range availableClients {
+			if i != firstGeth {
+
+				clientType = availableClients[firstGeth] //TESTING
+
+				t.Logf("Starting peer node (%s)", clientType)
+				// create the other node
+				parms := map[string]string{
+					"CLIENT":                   clientType,
+					"HIVE_INIT_GENESIS":        "/simplechain/genesis.json",
+					"HIVE_INIT_CHAIN":          "/simplechain/chain.rlp",
+					"HIVE_NETWORK_ID":          "1",
+					"HIVE_CHAIN_ID":            "1",
+					"HIVE_FORK_HOMESTEAD":      "0",
+					"HIVE_FORK_DAO_BLOCK":      "0",
+					"HIVE_FORK_DAO_VOTE":       "0",
+					"HIVE_FORK_TANGERINE":      "0",
+					"HIVE_FORK_TANGERINE_HASH": "0x0000000000000000000000000000000000000000000000000000000000000000",
+					"HIVE_FORK_SPURIOUS":       "0",
+					"HIVE_FORK_BYZANTIUM":      "0",
+					"HIVE_FORK_CONSTANTINOPLE": "0",
+				}
+				clientID, nodeIP, err := host.StartNewNode(parms)
+				if err != nil {
+					t.Fatalf("Unable to start node: %v", err)
+				}
+
+				syncClient(nil, mainNodeURL, clientID, nodeIP, t, 10, startTime, true)
+
+			}
+		}
+
+		t.Log("Terminating.")
+
+	})
+
 	t.Run("compatibility", func(t *testing.T) {
 
 		startTime := time.Now()
@@ -128,7 +206,7 @@ func TestFastModeSyncsWithGeth(t *testing.T) {
 				}
 
 				wg.Add(1)
-				go syncClient(&wg, mainNodeURL, clientID, nodeIP, t, 10, startTime)
+				go syncClient(&wg, mainNodeURL, clientID, nodeIP, t, 10, startTime, false)
 
 			}
 		}
@@ -140,9 +218,10 @@ func TestFastModeSyncsWithGeth(t *testing.T) {
 
 }
 
-func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *testing.T, chainLength int, startTime time.Time) {
-
-	defer wg.Done()
+func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *testing.T, chainLength int, startTime time.Time, checkMainForSync bool) {
+	if wg != nil {
+		defer wg.Done()
+	}
 
 	peerEnodeID, err := host.GetClientEnode(clientID)
 	if err != nil || peerEnodeID == nil || *peerEnodeID == "" {
@@ -176,7 +255,12 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 		t.Logf("Add peer result %v", res)
 	}
 
-	clientURL := fmt.Sprintf("http://%s:8545", nodeIP.String())
+	var clientURL string
+	if !checkMainForSync {
+		clientURL = fmt.Sprintf("http://%s:8545", nodeIP.String())
+	} else {
+		clientURL = mainURL
+	}
 
 	//connect (over rpc) to the peer using the mobile interface
 	ethClient, err := geth.NewEthereumClient(clientURL)
