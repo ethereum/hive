@@ -213,4 +213,4 @@ fi
 
 # Run the parity implementation with the requested flags
 echo "Running parity..."
-/parity $FLAGS --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all
+/parity $FLAGS  --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all

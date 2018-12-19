@@ -100,19 +100,16 @@ func TestSyncsWithGeth(t *testing.T) {
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node
 				parms := map[string]string{
-					"CLIENT":                   clientType,
-					"HIVE_INIT_GENESIS":        "/simplechain/genesis.json",
-					"HIVE_INIT_CHAIN":          "/simplechain/chain.rlp",
-					"HIVE_NETWORK_ID":          "1",
-					"HIVE_CHAIN_ID":            "1",
-					"HIVE_FORK_HOMESTEAD":      "0",
-					"HIVE_FORK_DAO_BLOCK":      "0",
-					"HIVE_FORK_DAO_VOTE":       "0",
-					"HIVE_FORK_TANGERINE":      "0",
-					"HIVE_FORK_TANGERINE_HASH": "0x0000000000000000000000000000000000000000000000000000000000000000",
-					"HIVE_FORK_SPURIOUS":       "0",
-					"HIVE_FORK_BYZANTIUM":      "0",
-					"HIVE_FORK_CONSTANTINOPLE": "0",
+					"CLIENT":              clientType,
+					"HIVE_INIT_GENESIS":   "/simplechain/genesis.json",
+					"HIVE_INIT_CHAIN":     "/simplechain/chain.rlp",
+					"HIVE_NETWORK_ID":     "1",
+					"HIVE_CHAIN_ID":       "1",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
 				clientID, nodeIP, err := host.StartNewNode(parms)
 				if err != nil {
@@ -183,18 +180,15 @@ func TestSyncsWithGeth(t *testing.T) {
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node with genesis and no chain
 				parms := map[string]string{
-					"CLIENT":                   clientType,
-					"HIVE_INIT_GENESIS":        "/simplechain/genesis.json",
-					"HIVE_NETWORK_ID":          "1",
-					"HIVE_CHAIN_ID":            "1",
-					"HIVE_FORK_HOMESTEAD":      "0",
-					"HIVE_FORK_DAO_BLOCK":      "0",
-					"HIVE_FORK_DAO_VOTE":       "0",
-					"HIVE_FORK_TANGERINE":      "0",
-					"HIVE_FORK_TANGERINE_HASH": "0x0000000000000000000000000000000000000000000000000000000000000000",
-					"HIVE_FORK_SPURIOUS":       "0",
-					"HIVE_FORK_BYZANTIUM":      "0",
-					"HIVE_FORK_CONSTANTINOPLE": "0",
+					"CLIENT":              clientType,
+					"HIVE_INIT_GENESIS":   "/simplechain/genesis.json",
+					"HIVE_NETWORK_ID":     "1",
+					"HIVE_CHAIN_ID":       "1",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
 				clientID, nodeIP, err := host.StartNewNode(parms)
 				if err != nil {
