@@ -7,9 +7,8 @@ RUN \
   apt-get -y update                                        && \
   apt-get install -y bash jq bc curl git make cmake g++ gcc file    \
   binutils pkg-config openssl libssl-dev libudev-dev       && \
-  curl -sSf https://static.rust-lang.org/rustup.sh         |  \
-  sh -s -- --disable-sudo                                  && \
-  \
+  curl https://sh.rustup.rs -sSf | sh -s --  -y            && \
+  export PATH="$HOME/.cargo/bin:$PATH"                     && \
   git clone --depth 1 https://github.com/paritytech/parity && \
 	cd parity && cargo build --release                    && \
   echo "{}"                                                      \
