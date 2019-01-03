@@ -20,8 +20,6 @@ RUN \
 	\
 	cd / && cp /parity/target/release/parity /parity.bin && \
 	rm -rf parity && mv /parity.bin /parity              && \
-  \
-  /usr/local/lib/rustlib/uninstall.sh                  && \
   apt-get remove -y  git make cmake g++ gcc file binutils pkg-config openssl libssl-dev && \
   rm -rf /root/.cargo
 
