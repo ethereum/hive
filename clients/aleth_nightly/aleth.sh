@@ -51,7 +51,7 @@ genesis="${genesis/coinbase/author}"
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 
 # Remove unsupported genesis fields
-genesis=`echo $genesis | jq "del(.bloom) | del(.hash) | del(.number) | del(.receiptTrie) | del(.stateRoot) | del(.transactionsTrie) | del(.uncleHash) | del(.gasUsed)"`
+genesis=`echo $genesis | jq "del(.bloom) | del(.hash) | del(.number) | del(.receiptTrie) | del(.stateRoot) | del(.transactionsTrie) | del(.uncleHash) | del(.gasUsed)| del(.config)"`
 
 chainconfig=`echo $chainconfig | jq ". + {\"genesis\": $genesis}"`
 
