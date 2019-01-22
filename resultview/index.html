@@ -4,7 +4,11 @@
 <head>
     <script src="https://code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+   
+
     <script src="jquery.dataTables.min.js"></script>
+ 
     <script src="dataTables.bootstrap.min.js"></script>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
     <link rel="stylesheet" href="dataTables.bootstrap.min.css">
@@ -153,8 +157,13 @@ utils = {
 		if (diff < 0) {
 			_s = "-";
 			diff = -diff;
-		}
-		var d = Math.floor(diff / 86400000);
+        }
+
+       
+
+        
+
+        var d = Math.floor(diff / 86400000);
 		diff %= 86400000;
 		var h = Math.floor(diff / 3600000);
 		diff %= 3600000;
@@ -181,9 +190,9 @@ utils = {
 	text : ethereum/go-ethereum@021c3c2 [⎇ release/1.6]
 	**/
 	githubRepoLink: function(data){
-		if (data.repo == "" ) {return "";}		
-		if (data.commit == "" ) {return data.repo;}
-		if (data.branch == "" ) {return data.repo+"@"+data.commit.slice(0,7);}
+		if (!data.repo ) {return "";}		
+		if (!data.commit  ) {return data.repo;}
+		if (!data.branch  ) {return data.repo+"@"+data.commit.slice(0,7);}
 
 		var text = data.repo+"@"+data.commit.slice(0,7)+" [⎇ "+data.branch+"]";
 
@@ -244,6 +253,26 @@ function onFileListing(data, error){
 	for (var i in data.files){
 		var f = data.files[i];
 
+        for (var cl in f.clients) {
+            var client = f.clients[cl];
+            if (typeof client.error!="undefined") {
+                //we have an errored out test run, which means there may be
+                //no results at all 
+                var fname = f.filename;
+                files.push([new Date(client.errorTime),
+                new Date(client.errorTime),
+                    "Error",
+                    "",
+                utils.get_js_link("displayLog('" + fname.replace(/\\/g, "/") + "')", "log.json"),
+                "",
+                    cl,
+                    client,
+                "",
+                    fname,
+                    null])
+            }
+        }
+
         for (var clientname in f.simulations) {
 
             var clientInfo = f.clients[clientname]
@@ -253,8 +282,8 @@ function onFileListing(data, error){
 
                 var fname = f.filename;
                 var logs = logFolder(fname,"simulator",testname, '')
-                files.push([s.start,
-                    s.end,
+                files.push([new Date(s.start),
+                    new Date(s.end),
                     "Simulation",
                 testname,
                     utils.get_js_link("displayLog('" + fname.replace(/\\/g, "/") + "')", "log.json"),
@@ -276,8 +305,8 @@ function onFileListing(data, error){
 
                 var fname = f.filename;
                 var logs = logFolder(fname,"validator",testname, clientname)
-                files.push([s.start,
-                    s.end,
+                files.push([new Date(s.start),
+                    new Date(s.end),
                 "Validation",
                     testname,
                     utils.get_js_link("displayLog('" + fname.replace(/\\/g, "/") + "')", "log.json"),
@@ -298,8 +327,8 @@ function onFileListing(data, error){
 
                 var fname = f.filename;
                 var logs = logFolder(fname,"benchmarker",testname, clientname)
-                files.push([s.start,
-                    s.end,
+                files.push([new Date(s.start),
+                    new Date(s.end),
                     "Benchmark",
                     testname,
                     utils.get_js_link("displayLog('" + fname.replace(/\\/g, "/") + "')", "log.json"),
@@ -316,16 +345,24 @@ function onFileListing(data, error){
 		data : files,
 		columns: [
 			{title: "Start time",
-				render: function(data){ return new Date(data);}
+             render: function (data,type,full,meta) {
+                 if (type == 'display' || type=='filter')
+                     return data;
+                 else
+                     return data.getTime();
+                },
+             sort: "1"
 			},
 			{ title: "Duration",
 				render: function(data,t, row){ 
 					end = new Date(data);
-					start = new Date(row[0]);
+                    start = new Date(row[0]);
+                    end = data;
+                    start = row[0];
 					return utils.format_timespan(start, end);
 				}
             },
-            { title: "Test Category" },
+            { title: "Category" },
             { title: "Test" },
 			{ title: "Hive log" },
 			{ title: "Test log" },
@@ -341,9 +378,13 @@ function onFileListing(data, error){
                     }
 			}}
 
-			],
-		order: [[0, 'desc']],    	
-	});
+        ],
+
+
+        order: [[0, 'desc']],    	
+    });
+
+   
 
 
 	$('#filetable tbody').on( 'click', 'button', function () {
@@ -359,7 +400,7 @@ function onFileListing(data, error){
 }
 
 $(document).ready(function() {
-
+    
 	// Retrieve the list of files
 	progress("Loading file list...")
 	$.getJSON( "listing.json", onFileListing)
@@ -463,6 +504,10 @@ function onData(data, jsonsource, clientname,testname,resultsFolder){
 	var items = []
 	data = data["simulations"]
 
+
+    //TODO 
+
+
 	for (var client in data){
 		if (client != clientname) continue;
 	//	if (!data[client]["ethereum/consensus"]) continue;
@@ -479,10 +524,15 @@ function onData(data, jsonsource, clientname,testname,resultsFolder){
 	{
 		for (var client in alldata[jsonsource]){
 			var subresults = alldata[jsonsource][client]
-			var x = subresults.map(function(subresult){
+
+            var x = subresults.map(function (subresult) {
 
                 var fname = subresult.name;
-                
+
+                if (!subresult.resultsFolder) {
+                    subresult.resultsFolder = resultsFolder;
+                }
+
 				if(fname.indexOf("./tests/")==0)
 				{
 					fname = fname.substring(8);
@@ -495,7 +545,9 @@ function onData(data, jsonsource, clientname,testname,resultsFolder){
 					"instance"	: subresult.details.instanceid,
 					"message" 	: subresult.details.errors,
 					"source"    : jsonsource,
-					"ms"        : subresult.details.ms
+                    "ms":   subresult.details.ms,
+                    "logFolder" :  subresult.resultsFolder
+
 				}			
 			});
 			items = items.concat(x)
@@ -535,7 +587,7 @@ function onData(data, jsonsource, clientname,testname,resultsFolder){
 			{ title: "Log", data: "instance" , 
 				render: function ( data, type, row ) {
 						if(!data) { return ""};
-						var href= resultsFolder+"/"+row.client+"/client-"+data+".log"
+						var href= row.logFolder+"/"+row.client+"/client-"+data+".log"
 						return utils.get_js_link("displayLog('"+href+ "')", data);
 				}},
 			{ title: "Exec time (s)", data: "ms", 

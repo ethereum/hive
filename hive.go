@@ -281,13 +281,17 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 		b, ok := err.(*buildError)
 		if ok {
 			results.Clients = make(map[string]map[string]string)
-			results.Clients[b.Client()] = map[string]string{"error": b.Error()}
-			out, errMarshal := json.MarshalIndent(results, "", "  ")
-			if errMarshal != nil {
-				log15.Crit("failed to report results. Docker Failed build.", "error", err)
+			results.Clients[b.Client()] = map[string]string{"error": b.Error(), "errorTime": time.Now().Format("2006-01-02T15:04:05.9999999-07:00")}
+
+			testRoot := filepath.Join(*testResultsRoot, runPath)
+
+			log15.Info("Creating output folder", "folder", testRoot)
+			if err := os.MkdirAll(testRoot, os.ModePerm); err != nil {
+				log15.Crit("failed to create logs folder", "error", err)
 				return err
 			}
-			fmt.Println(string(out))
+
+			handleAllLogs(&results)
 		}
 		return err
 	}
@@ -330,6 +334,14 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 			}
 		}
 	}
+
+	handleAllLogs(&results)
+
+	return nil
+
+}
+
+func handleAllLogs(results *resultSet) error {
 	// Flatten the results and print them in JSON form
 	out, err := json.MarshalIndent(results, "", "  ")
 	if err != nil {
@@ -351,7 +363,7 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 	logFile.Close()
 
 	//process the output into a summary and append it to the summary index
-	resultSummary := summariseResults(&results, filepath.Join(runPath, "log.json"))
+	resultSummary := summariseResults(results, filepath.Join(runPath, "log.json"))
 
 	summaryFileName := filepath.Join(*testResultsRoot, *testResultsSummaryFile)
 

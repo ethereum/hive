@@ -79,7 +79,7 @@ func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCac
 	for client, image := range clients {
 		logger := log15.New("client", client)
 
-		blob, err := downloadFromImage(daemon, image, "/version.json", logger)
+		blob, err := downloadFromImage(daemon, image, "/wrong.json", logger)
 		if err != nil {
 			berr := &buildError{err: err, client: client}
 			return nil, berr
