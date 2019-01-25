@@ -86,8 +86,8 @@ fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
 fi
-if [ "$HIVE_FORK_CONSTANTINOPLEFIX" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_CONSTANTINOPLEFIX}"`
+if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
 fi
 
 

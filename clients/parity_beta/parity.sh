@@ -153,9 +153,9 @@ if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"blockReward\",\"0x$HIVE_FORK_CONSTANTINOPLE\"]; \"0x1BC16D674EC80000\")"`
 
 fi
-if [ "$HIVE_FORK_CONSTANTINOPLEFIX" != "" ]; then
+if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 	# EIP 1283 disabling
-	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283DisableTransition\"]; \"0x$HIVE_FORK_CONSTANTINOPLEFIX\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283DisableTransition\"]; \"0x$HIVE_FORK_PETERSBURG\")"`
 fi
 
 echo $chainconfig > /chain.json
