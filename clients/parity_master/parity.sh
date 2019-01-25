@@ -21,6 +21,7 @@
 #  - HIVE_FORK_SPURIOUS  block number of SpuriousDragon
 #  - HIVE_FORK_BYZANTIUM block number for Byzantium transition
 #  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
+#  - HIVE_FORK_PETERSBURG  block number for ConstantinopleFix/PetersBurg transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW       If set, skip PoW verification during block import
@@ -152,6 +153,11 @@ if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"blockReward\",\"0x$HIVE_FORK_CONSTANTINOPLE\"]; \"0x1BC16D674EC80000\")"`
 
 fi
+if [ "$HIVE_FORK_CONSTANTINOPLEFIX" != "" ]; then
+	# EIP 1283 disabling
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283DisableTransition\"]; \"0x$HIVE_FORK_CONSTANTINOPLEFIX\")"`
+fi
+
 echo $chainconfig > /chain.json
 echo "Chain config: "
 cat /chain.json

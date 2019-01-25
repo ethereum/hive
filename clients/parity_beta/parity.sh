@@ -21,6 +21,7 @@
 #  - HIVE_FORK_SPURIOUS  block number of SpuriousDragon
 #  - HIVE_FORK_BYZANTIUM block number for Byzantium transition
 #  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
+#  - HIVE_FORK_PETERSBURG  block number for ConstantinopleFix/PetersBurg transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW       If set, skip PoW verification during block import
@@ -45,15 +46,26 @@ if [ "$HIVE_NETWORK_ID" != "" ]; then
 fi
 
 # Configure and set the chain definition for the node
-chainconfig=`cat /chain.json`
+chainconfig=`cat ./chain.json`
 
-genesis=`cat /genesis.json`
+genesis=`cat ./genesis.json`
 genesis="${genesis/coinbase/author}"
 
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
 nonce=`echo $genesis | jq ".nonce"` && genesis=`echo $genesis | jq "del(.nonce)"`
+# Nonce needs to be padded
+# First we snip off the quote-char and the '0x' prefix
+nonce=`echo $nonce| cut -c 4-`
+# Then the last quote char
+nonce=`echo ${nonce%?}`
+# pad it with zeroes
+while [ ${#nonce} -lt 16 ]; do
+  nonce=0$nonce
+done
+# Put back 0x
+nonce=0x$nonce
 mixhash=`echo $genesis | jq ".mixHash"` && genesis=`echo $genesis | jq "del(.mixHash)"`
-genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": $nonce, \"mixHash\": $mixhash}}}"`
+genesis=`echo $genesis | jq ". + {\"seal\": {\"ethereum\": {\"nonce\": \"$nonce\", \"mixHash\": $mixhash}}}"| jq "del (.config, .number)"`
 
 if [ "$accounts" != "" ]; then
 	# In some cases, the 'alloc' portion can be extremely large.
@@ -75,12 +87,11 @@ if [ "$HIVE_TESTNET" == "1" ]; then
 	for account in `echo $chainconfig | jq '.accounts | keys[]'`; do
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", $account, \"nonce\"]; \"0x0100000\")"`
 	done
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x789b0\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; \"0x789b0\")"`
 fi
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 	HEX_HIVE_FORK_HOMESTEAD=`echo "obase=16; $HIVE_FORK_HOMESTEAD" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; \"0x$HEX_HIVE_FORK_HOMESTEAD\")"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"frontierCompatibilityModeLimit\"]; \"0x$HEX_HIVE_FORK_HOMESTEAD\")"`
 fi
 
 if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
@@ -109,8 +120,9 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 #	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip98Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 
 	# Ethash params
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip649Reward\"]; \"0x29A2241AF62C0000\")"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip649Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
+	#  Set blockreward to 3M for byzantium
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"blockReward\",\"0x$HIVE_FORK_BYZANTIUM\"]; \"0x29A2241AF62C0000\")"`
+	# difficulty calculation -- aka bomb delay
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip100bTransition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 
 	# General params
@@ -134,10 +146,18 @@ if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1052Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
 	# EIP 1283, net gas metering version 2
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
-	# Skinny create 2 (overloaded on eip86 for some reason)
-	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip86Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
+	# Skinny create 2
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1014Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
+	# Ethash params
+	#  Set blockreward to 2M for constantinople
+	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"blockReward\",\"0x$HIVE_FORK_CONSTANTINOPLE\"]; \"0x1BC16D674EC80000\")"`
 
 fi
+if [ "$HIVE_FORK_CONSTANTINOPLEFIX" != "" ]; then
+	# EIP 1283 disabling
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283DisableTransition\"]; \"0x$HIVE_FORK_CONSTANTINOPLEFIX\")"`
+fi
+
 echo $chainconfig > /chain.json
 echo "Chain config: "
 cat /chain.json
