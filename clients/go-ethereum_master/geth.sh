@@ -21,6 +21,7 @@
 #  - HIVE_FORK_SPURIOUS  block number of SpuriousDragon
 #  - HIVE_FORK_BYZANTIUM block number for Byzantium transition
 #  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
+#  - HIVE_FORK_PETERSBURG  block number for ConstantinopleFix/PetersBurg transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW       If set, skip PoW verification during block import
@@ -85,6 +86,11 @@ fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
 fi
+if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
+	chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
+fi
+
+
 genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
 # Initialize the local testchain with the genesis state
@@ -122,6 +128,5 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 fi
 
 # Run the go-ethereum implementation with the requested flags
-echo "Running go-ethereum..."
-echo "$FLAGS"
+echo "Running go-ethereum with flags $FLAGS"
 /geth $FLAGS  --verbosity=3 --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
