@@ -60,36 +60,38 @@ fi
 
 # Override any chain configs in the go-ethereum specific way
 chainconfig="{}"
+
+JQPARAMS=". "
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"`
+	JQPARAMS="$JQPARAMS + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"
 fi
 if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"`
+	JQPARAMS="$JQPARAMS + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"
 fi
 if [ "$HIVE_FORK_DAO_VOTE" == "0" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": false}"`
+	JQPARAMS="$JQPARAMS + {\"daoForkSupport\": false}"
 fi
 if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": true}"`
+	JQPARAMS="$JQPARAMS + {\"daoForkSupport\": true}"
 fi
 
 if [ "$HIVE_FORK_TANGERINE" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"eip150Block\": $HIVE_FORK_TANGERINE}"`
+	JQPARAMS="$JQPARAMS + {\"eip150Block\": $HIVE_FORK_TANGERINE}"
 fi
 if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"`
-	chainconfig=`echo $chainconfig | jq ". + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"`
+	JQPARAMS="$JQPARAMS + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"
+	JQPARAMS="$JQPARAMS + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"
 fi
 if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"`
+	JQPARAMS="$JQPARAMS + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"
 fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
+	JQPARAMS="$JQPARAMS + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"
 fi
 if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
-	chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
+	JQPARAMS="$JQPARAMS + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"
 fi
-
+chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
 
 genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
