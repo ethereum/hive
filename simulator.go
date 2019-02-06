@@ -136,6 +136,7 @@ func simulate(daemon *docker.Client, clients map[string]string, simulator string
 		},
 		HostConfig: hostConfig,
 	})
+
 	if err != nil {
 		logger.Error("failed to create simulator", "error", err)
 		return err
@@ -419,6 +420,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			}
 			containerID := container.ID[:8]
 			containerIP := ""
+			containerMAC := ""
 			logger = logger.New("client started with id", containerID)
 
 			logfile := fmt.Sprintf("client-%s.log", containerID)
@@ -455,7 +457,10 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 					http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
 					return
 				}
+
 				containerIP = c.NetworkSettings.IPAddress
+				containerMAC = c.NetworkSettings.MacAddress
+
 				// Container seems to be alive, check whether the RPC is accepting connections
 				if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", containerIP, 8545)); err == nil {
 					logger.Debug("client container online", "time", time.Since(start))
@@ -471,8 +476,8 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				timeout:   time.Now().Add(dockerTimeoutDuration),
 			}
 			h.lock.Unlock()
-			//  Container online and responsive, return its ID and IP for later reference
-			fmt.Fprintf(w, "%s@%s", containerID, containerIP)
+			//  Container online and responsive, return its ID, IP and MAC for later reference
+			fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)
 			return
 
 		case "/logs":
@@ -546,6 +551,14 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+
+		case "networks":
+			//TODO - we need to allow the simulator to create networks , leave those to be
+			//automatically destroyed at the end of the simulation, ignore duplicate networks,
+			//and offer only basic config.
+			//The client creation call above will offer the option of joining a client
+			//to a named network by passing in a parameter.
+
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
 		}

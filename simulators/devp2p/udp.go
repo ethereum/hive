@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/google/gopacket/pcap"
 )
 
 // Errors
@@ -189,6 +190,7 @@ type packet interface {
 type conn interface {
 	ReadFromUDP(b []byte) (n int, addr *net.UDPAddr, err error)
 	WriteToUDP(b []byte, addr *net.UDPAddr) (n int, err error)
+	//WriteToUDPSpoofed(b []byte, addr *net.UDPAddr, from *net.UDPAddr) (n int, err error)
 	Close() error
 	LocalAddr() net.Addr
 }
@@ -279,6 +281,7 @@ func ListenUDP(c conn, cfg Config, l common.Logger) (*V4Udp, error) {
 
 func newUDP(c conn, cfg Config, l common.Logger) (*V4Udp, error) {
 	realaddr := c.LocalAddr().(*net.UDPAddr)
+
 	if cfg.AnnounceAddr != nil {
 		realaddr = cfg.AnnounceAddr
 	}
@@ -304,6 +307,59 @@ func (t *V4Udp) close() {
 	close(t.closing)
 	t.conn.Close()
 	//t.db.Close()
+
+}
+
+//PingSpoofed sends a ping message to the given node and waits for a reply.
+func (t *V4Udp) PingSpoofed(toid enode.ID, tomac string, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+
+	to := makeEndpoint(toaddr, 0)
+
+	req := &ping{
+		Version:    4,
+		From:       t.ourEndpoint,
+		To:         to, // TODO: maybe use known TCP port from DB
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+	packet, hash, err := encodePacket(t.priv, pingPacket, req)
+	if err != nil {
+		return err
+	}
+
+	t.l.Log("Establishing criteria: Will succeed only if a valid pong is received.")
+	callback := func(p reply) error {
+
+		if p.ptype == pongPacket {
+			inPacket := p.data.(incomingPacket)
+
+			if !bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash) {
+				return ErrUnsolicitedReply
+			}
+
+			if validateEnodeID && toid != inPacket.recoveredID.id() {
+				return ErrUnknownNode
+			}
+
+			if recoveryCallback != nil {
+				key, err := decodePubkey(inPacket.recoveredID)
+				if err != nil {
+					recoveryCallback(key)
+				}
+			}
+			return nil
+
+		}
+		return ErrPacketMismatch
+
+	}
+
+	spoofedSource := &net.UDPAddr{
+		IP:   t.ourEndpoint.IP.To16(),
+		Port: int(t.ourEndpoint.UDP),
+	}
+
+	return <-t.sendSpoofedPacket(toid, toaddr, spoofedSource, req, packet, tomac, callback)
 
 }
 
@@ -779,6 +835,15 @@ func (t *V4Udp) sendPacket(toid enode.ID, toaddr *net.UDPAddr, req packet, packe
 	return errc
 }
 
+func (t *V4Udp) sendSpoofedPacket(toid enode.ID, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, req packet, packet []byte, macaddr string, callback func(reply) error) <-chan error {
+
+	t.l.Logf("Sending spoofed packet %s to enode %s with target endpoint %v from %v", req.name(), toid, toaddr, fromaddr)
+	errc := t.pending(toid, callback)
+	t.spoofedWrite(toaddr, fromaddr, req.name(), packet, macaddr)
+
+	return errc
+}
+
 // pending adds a reply callback to the pending reply queue.
 // see the documentation of type pending for a detailed explanation.
 func (t *V4Udp) pending(id enode.ID, callback func(reply) error) <-chan error {
@@ -942,7 +1007,85 @@ func (t *V4Udp) send(toaddr *net.UDPAddr, ptype byte, req packet) ([]byte, error
 
 func (t *V4Udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
 	_, err := t.conn.WriteToUDP(packet, toaddr)
+	//_, err := t.conn.WriteToUDPSpoofed(packet, toaddr, toaddr)
 	log.Trace(">> "+what, "addr", toaddr, "err", err)
+	return err
+}
+
+func (t *V4Udp) spoofedWrite(toaddr *net.UDPAddr, fromaddr *net.UDPAddr, what string, packet []byte, macAddr string) error {
+
+	mac, err := net.ParseMAC(macAddr)
+	if err != nil {
+		return err
+	}
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+
+		return err
+
+	}
+
+	//TODO - for now this code makes the assumption
+	//that eth0 is the interface name, but for greater
+	//robustness, this should be obtained from docker
+	//by adding a new method to the http API
+
+	//look for eth0
+	var iface *net.Interface
+	for _, i := range ifaces {
+		if i.Name == "eth0" {
+			iface = &i
+		}
+	}
+
+	if nil == iface {
+		return errors.New("eth0 interface missing")
+	}
+
+	addrs, err := iface.Addrs()
+	for _, addr := range addrs {
+		var ip net.IP
+		switch v := addr.(type) {
+		case *net.IPNet:
+			ip = v.IP
+		case *net.IPAddr:
+			ip = v.IP
+		}
+		log.Trace(string(ip))
+	}
+
+	//temp test:
+	fromaddr.IP = net.IPv4(172, 17, 17, 17)
+
+	opts := udpFrameOptions{
+		sourceIP:     fromaddr.IP.To4(),
+		destIP:       toaddr.IP.To4(),
+		sourcePort:   uint16(fromaddr.Port),
+		destPort:     uint16(toaddr.Port),
+		sourceMac:    iface.HardwareAddr,
+		destMac:      mac,
+		isIPv6:       false,
+		payloadBytes: packet,
+	}
+
+	handle, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever)
+	if err != nil {
+		return err
+	}
+
+	defer handle.Close()
+
+	rawPacket, err := createSerializedUDPFrame(opts)
+	if err != nil {
+		return err
+	}
+
+	if err := handle.WritePacketData(rawPacket); err != nil {
+		return err
+	}
+
+	log.Trace(">> "+what, "from", fromaddr, "addr", toaddr, "err", err)
 	return err
 }
 

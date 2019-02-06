@@ -14,6 +14,12 @@ import (
 	"github.com/fsouza/go-dockerclient"
 )
 
+//MacENREntry a type of ENR record for holding mac addresses
+type MacENREntry string
+
+//ENRKey the key for this type of ENR record
+func (v MacENREntry) ENRKey() string { return "mac" }
+
 //SimulatorHost A simulator host
 type SimulatorHost struct {
 	HostURI *string
@@ -35,8 +41,8 @@ type SimulatorAPI interface {
 	//One parameter must be named CLIENT and should contain one of the
 	//returned client types from GetClientTypes
 	//The input is used as environment variables in the new container
-	//Returns container id
-	StartNewNode(map[string]string) (string, net.IP, error)
+	//Returns container id, ip and mac
+	StartNewNode(map[string]string) (string, net.IP, string, error)
 	//Submit log info to the simulator log
 	Log(string) error
 	//Submit node test results
@@ -119,19 +125,19 @@ func (sim SimulatorHost) GetClientTypes() (availableClients []string, err error)
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
 //Returns container id and ip
-func (sim SimulatorHost) StartNewNode(parms map[string]string) (string, net.IP, error) {
+func (sim SimulatorHost) StartNewNode(parms map[string]string) (string, net.IP, string, error) {
 	vals := make(url.Values)
 	for k, v := range parms {
 		vals.Add(k, v)
 	}
 	data, err := wrapHttpErrorsPost(*sim.HostURI+"/nodes", vals)
 	if err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	if idip := strings.Split(data, "@"); len(idip) > 1 {
-		return idip[0], net.ParseIP(idip[1]), nil
+		return idip[0], net.ParseIP(idip[1]), idip[2], nil
 	}
-	return data, net.IP{}, fmt.Errorf("no ip address returned: %v", data)
+	return data, net.IP{}, "", fmt.Errorf("no ip address returned: %v", data)
 }
 
 //Log Submit log info to the simulator log
