@@ -106,9 +106,11 @@ func main() {
 func makeTestOutputDirectory(testName string, testCategory string, clientTypes map[string]string) (string, error) {
 
 	testName = strings.Replace(testName, string(filepath.Separator), "_", -1)
+	log15.Info("mk test output dir", "testName", testName)
 
 	//<WORKSPACE/LOGS>/20191803261015/validator_devp2p/
 	testRoot := filepath.Join(*testResultsRoot, runPath, testCategory+"_"+testName)
+	log15.Info("mk test output dir", "testRoot", testRoot)
 
 	clientNames := make([]string, 0, len(clientTypes))
 
@@ -117,7 +119,9 @@ func makeTestOutputDirectory(testName string, testCategory string, clientTypes m
 		clientNames = append(clientNames, client)
 
 		client = strings.Replace(client, string(filepath.Separator), "_", -1)
+
 		outputDir := filepath.Join(testRoot, client)
+
 		log15.Info("Creating output folder", "folder", outputDir)
 		if err := os.MkdirAll(outputDir, os.ModePerm); err != nil {
 			return "", err
@@ -135,6 +139,14 @@ func makeTestOutputDirectory(testName string, testCategory string, clientTypes m
 	if err != nil {
 		log15.Crit("failed to report results", "error", err)
 		return "", err
+	}
+
+	if _, er := os.Stat(testRoot); er != nil && os.IsNotExist(er) {
+		log15.Warn("mk test output dir", "testRoot DNE", testRoot)
+		err := os.MkdirAll(testRoot, os.ModePerm)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	testInfoJSONFileName := filepath.Join(testRoot, "testInfo.json")
