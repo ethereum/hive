@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -60,7 +59,7 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 		return nil, err
 	}
 	if len(clients) == 0 {
-		return nil, errors.New("pattern did not match any clients")
+		return nil, errNoMatchingClients
 	}
 
 	// Build all the simulators known to the test harness

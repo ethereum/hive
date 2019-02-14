@@ -38,7 +38,7 @@ func validateClients(daemon *docker.Client, clientPattern, validatorPattern stri
 		return nil, err
 	}
 	if len(clients) == 0 {
-		return nil, errors.New("pattern did not match any clients")
+		return nil, errNoMatchingClients
 	}
 
 	// Build all the validators known to the test harness
