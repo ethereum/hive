@@ -36,6 +36,7 @@ ADD common /go/src/github.com/ethereum/hive/simulators/common
 RUN apk add --update bash curl jq
 # Add the entry script
 ADD /devp2p/basic/tests.sh /tests.sh
+RUN chmod +x /tests.sh
 #TODO - check is this needed: mandatory init file
 ADD /devp2p/basic/genesis.json /genesis.json
 
