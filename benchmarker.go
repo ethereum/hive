@@ -43,6 +43,9 @@ func benchmarkClients(daemon *docker.Client, clientPattern, benchmarkerPattern s
 	if err != nil {
 		return nil, err
 	}
+	if len(clients) == 0 {
+		return nil, errors.New("pattern did not match any clients")
+	}
 
 	// Build all the benchmarkers known to the harness
 	log15.Info("building benchmarkers for measurements", "pattern", benchmarkerPattern)
