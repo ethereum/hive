@@ -95,14 +95,14 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 				errorMessage = fmt.Sprintf("FATAL: Unable to parse enode: %v", err)
 				ok = false
 			}
-
-			//replace the ip with what docker says it is
-			targetNode = enode.NewV4(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303) //targetNode.UDP())
 			if targetNode == nil {
 				errorMessage = fmt.Sprintf("FATAL: Unable to generate targetNode: %v", err)
 				ok = false
 			}
+
 			if ok {
+				//replace the ip with what docker says it is
+				targetNode = enode.NewV4(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303) //targetNode.UDP())
 				errorMessage, ok = testFunc(t, targetNode)
 			}
 		}
