@@ -32,6 +32,7 @@ var (
 	err          error
 	restrictList *netutil.Netlist
 	v4udp        devp2p.V4Udp
+	relayIP      net.IP //the ip address of the relay node, used for relaying spoofed traffic
 
 	//targetnode       *enode.Node // parsed Node
 	//targetIP         net.IP      //targetIP
@@ -176,6 +177,21 @@ func TestDiscovery(t *testing.T) {
 			t.Fatalf("Simulator error. Cannot get client types. %v", err)
 		}
 
+		//add a UDP relay for spoof tests
+		//the UDP relay plays the role of a 'victim' of an attack
+		//where we impersonate their IP. Responses from other nodes, sent to spoofed source IPs
+		//are relayed back to us so we can know how other nodes are communicating.
+		parms := map[string]string{
+			"CLIENT":         "pseudo/relay",
+			"HIVE_RELAY_IP":  string(v4udp.OurEndpoint.IP),
+			"HIVE_RELAY_UDP": string(v4udp.OurEndpoint.UDP),
+		}
+
+		_, relayIP, _, err = host.StartNewNode(parms)
+		if err != nil {
+			t.Errorf("FATAL: Unable to start relay node: %v", err)
+		}
+
 		//get all available tests
 		availableTests := map[string]func(common.Logger, *enode.Node) (string, bool){
 			"spoofTest": SpoofTest,
@@ -215,7 +231,7 @@ func SpoofTest(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4013")
 	var mac common.MacENREntry
 	targetnode.Load(&mac)
-	if err := v4udp.PingSpoofed(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, true, nil); err != nil {
+	if err := v4udp.PingSpoofed(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, nil); err != nil {
 		return fmt.Sprintf("Ping test failed: %v", err), false
 	}
 	return "", true

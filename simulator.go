@@ -552,13 +552,6 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 				return
 			}
 
-		case "networks":
-			//TODO - we need to allow the simulator to create networks , leave those to be
-			//automatically destroyed at the end of the simulation, ignore duplicate networks,
-			//and offer only basic config.
-			//The client creation call above will offer the option of joining a client
-			//to a named network by passing in a parameter.
-
 		default:
 			http.Error(w, "not found", http.StatusNotFound)
 		}

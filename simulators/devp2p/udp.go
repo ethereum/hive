@@ -200,7 +200,7 @@ type V4Udp struct {
 	conn        conn
 	netrestrict *netutil.Netlist
 	priv        *ecdsa.PrivateKey
-	ourEndpoint rpcEndpoint
+	OurEndpoint rpcEndpoint
 
 	addpending chan *pending
 	gotreply   chan reply
@@ -296,7 +296,7 @@ func newUDP(c conn, cfg Config, l common.Logger) (*V4Udp, error) {
 		l:           l,
 	}
 
-	udp.ourEndpoint = makeEndpoint(realaddr, uint16(realaddr.Port))
+	udp.OurEndpoint = makeEndpoint(realaddr, uint16(realaddr.Port))
 
 	go udp.loop()
 	go udp.readLoop(cfg.Unhandled)
@@ -311,13 +311,13 @@ func (t *V4Udp) close() {
 }
 
 //PingSpoofed sends a ping message to the given node and waits for a reply.
-func (t *V4Udp) PingSpoofed(toid enode.ID, tomac string, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+func (t *V4Udp) PingSpoofed(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
 
 	to := makeEndpoint(toaddr, 0)
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
@@ -355,8 +355,8 @@ func (t *V4Udp) PingSpoofed(toid enode.ID, tomac string, toaddr *net.UDPAddr, va
 	}
 
 	spoofedSource := &net.UDPAddr{
-		IP:   t.ourEndpoint.IP.To16(),
-		Port: int(t.ourEndpoint.UDP),
+		IP:   fromaddr.IP.To16(),
+		Port: int(fromaddr.Port),
 	}
 
 	return <-t.sendSpoofedPacket(toid, toaddr, spoofedSource, req, packet, tomac, callback)
@@ -370,7 +370,7 @@ func (t *V4Udp) Ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, r
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
@@ -466,7 +466,7 @@ func (t *V4Udp) PingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID 
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
@@ -494,7 +494,7 @@ func (t *V4Udp) PingExtraData(toid enode.ID, toaddr *net.UDPAddr, validateEnodeI
 
 	req := &pingExtra{
 		Version:   4,
-		From:      t.ourEndpoint,
+		From:      t.OurEndpoint,
 		To:        to,
 		JunkData1: 42,
 		JunkData2: []byte{9, 8, 7, 6, 5, 4, 3, 2, 1},
@@ -595,7 +595,7 @@ func (t *V4Udp) PingTargetWrongPacketType(toid enode.ID, toaddr *net.UDPAddr, va
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
@@ -768,7 +768,7 @@ func (t *V4Udp) PingPastExpiration(toid enode.ID, toaddr *net.UDPAddr, validateE
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(-expiration).Unix()),
 	}
