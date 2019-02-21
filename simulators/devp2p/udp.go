@@ -310,8 +310,8 @@ func (t *V4Udp) close() {
 
 }
 
-//PingSpoofed sends a ping message to the given node and waits for a reply.
-func (t *V4Udp) PingSpoofed(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+//SpoofingSanityCheck - verify that the faked udp packets are being sent, received, and responses relayed correctly.
+func (t *V4Udp) SpoofingSanityCheck(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
 
 	to := makeEndpoint(toaddr, 0)
 
@@ -1012,21 +1012,14 @@ func (t *V4Udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
 	return err
 }
 
-func (t *V4Udp) spoofedWrite(toaddr *net.UDPAddr, fromaddr *net.UDPAddr, what string, packet []byte, macAddr string) error {
-
-	mac, err := net.ParseMAC(macAddr)
-	if err != nil {
-		return err
-	}
-
+//GetNetworkInterface - Get the docker image's network interface
+func GetNetworkInterface() (*net.Interface, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-
-		return err
-
+		return nil, err
 	}
 
-	//TODO - for now this code makes the assumption
+	//TBD - for now this code makes the assumption
 	//that eth0 is the interface name, but for greater
 	//robustness, this should be obtained from docker
 	//by adding a new method to the http API
@@ -1038,25 +1031,43 @@ func (t *V4Udp) spoofedWrite(toaddr *net.UDPAddr, fromaddr *net.UDPAddr, what st
 			iface = &i
 		}
 	}
+	return iface, nil
+}
+
+//GetInterfaceIP returns the IP address of the (usually eth0) interface (see above)
+func GetInterfaceIP(iface *net.Interface) (*net.IP, error) {
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, addr := range addrs {
+		switch v := addr.(type) {
+		case *net.IPNet:
+			return &v.IP, nil
+		case *net.IPAddr:
+			return &v.IP, nil
+		}
+
+	}
+	return nil, nil
+}
+
+func (t *V4Udp) spoofedWrite(toaddr *net.UDPAddr, fromaddr *net.UDPAddr, what string, packet []byte, macAddr string) error {
+
+	mac, err := net.ParseMAC(macAddr)
+	if err != nil {
+		return err
+	}
+
+	iface, err := GetNetworkInterface()
+	if err != nil {
+		return err
+	}
 
 	if nil == iface {
 		return errors.New("eth0 interface missing")
 	}
-
-	addrs, err := iface.Addrs()
-	for _, addr := range addrs {
-		var ip net.IP
-		switch v := addr.(type) {
-		case *net.IPNet:
-			ip = v.IP
-		case *net.IPAddr:
-			ip = v.IP
-		}
-		log.Trace(string(ip))
-	}
-
-	//temp test:
-	fromaddr.IP = net.IPv4(172, 17, 17, 17)
 
 	opts := udpFrameOptions{
 		sourceIP:     fromaddr.IP.To4(),

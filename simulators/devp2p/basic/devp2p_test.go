@@ -48,7 +48,7 @@ func TestMain(m *testing.M) {
 	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
 
 	listenPort = flag.String("listenPort", ":30303", "")
-	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
+	natdesc = flag.String("nat", "any", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 	hostURI = flag.String("simulatorHost", "", "url of simulator host api")
 	dockerHost = flag.String("dockerHost", "", "docker host api endpoint")
 
@@ -181,13 +181,24 @@ func TestDiscovery(t *testing.T) {
 		//the UDP relay plays the role of a 'victim' of an attack
 		//where we impersonate their IP. Responses from other nodes, sent to spoofed source IPs
 		//are relayed back to us so we can know how other nodes are communicating.
-		parms := map[string]string{
-			"CLIENT":         "pseudo/relay",
-			"HIVE_RELAY_IP":  string(v4udp.OurEndpoint.IP),
-			"HIVE_RELAY_UDP": string(v4udp.OurEndpoint.UDP),
+
+		iface, err := devp2p.GetNetworkInterface()
+		if err != nil {
+			t.Fatalf("Simulator error. Cannot get local interface. %v ", err)
 		}
 
-		_, relayIP, _, err = host.StartNewNode(parms)
+		localIP, err := devp2p.GetInterfaceIP(iface)
+		if err != nil {
+			t.Fatalf("Simulator error. Cannot get local ip. %v ", err)
+		}
+
+		parms := map[string]string{
+			"CLIENT":         "relay",
+			"HIVE_RELAY_IP":  localIP.String(),
+			"HIVE_RELAY_UDP": "30303",
+		}
+
+		_, relayIP, _, err = host.StartNewPseudo(parms)
 		if err != nil {
 			t.Errorf("FATAL: Unable to start relay node: %v", err)
 		}
@@ -231,7 +242,7 @@ func SpoofTest(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4013")
 	var mac common.MacENREntry
 	targetnode.Load(&mac)
-	if err := v4udp.PingSpoofed(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, nil); err != nil {
+	if err := v4udp.SpoofingSanityCheck(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, nil); err != nil {
 		return fmt.Sprintf("Ping test failed: %v", err), false
 	}
 	return "", true

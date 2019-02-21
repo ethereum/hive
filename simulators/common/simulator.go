@@ -43,6 +43,12 @@ type SimulatorAPI interface {
 	//The input is used as environment variables in the new container
 	//Returns container id, ip and mac
 	StartNewNode(map[string]string) (string, net.IP, string, error)
+	//Start a new pseudo-client with the specified parameters
+	//One parameter must be named CLIENT and should contain one of the
+	//returned client types from GetClientTypes
+	//The input is used as environment variables in the new container
+	//Returns container id, ip and mac
+	StartNewPseudo(map[string]string) (string, net.IP, string, error)
 	//Submit log info to the simulator log
 	Log(string) error
 	//Submit node test results
@@ -130,7 +136,27 @@ func (sim SimulatorHost) StartNewNode(parms map[string]string) (string, net.IP, 
 	for k, v := range parms {
 		vals.Add(k, v)
 	}
-	data, err := wrapHttpErrorsPost(*sim.HostURI+"/nodes", vals)
+	data, err := wrapHTTPErrorsPost(*sim.HostURI+"/nodes", vals)
+	if err != nil {
+		return "", nil, "", err
+	}
+	if idip := strings.Split(data, "@"); len(idip) > 1 {
+		return idip[0], net.ParseIP(idip[1]), idip[2], nil
+	}
+	return data, net.IP{}, "", fmt.Errorf("no ip address returned: %v", data)
+}
+
+//StartNewPseudo Start a new pseudo-client with the specified parameters
+//One parameter must be named CLIENT and should contain one of the
+//returned client types from GetClientTypes
+//The input is used as environment variables in the new container
+//Returns container id and ip
+func (sim SimulatorHost) StartNewPseudo(parms map[string]string) (string, net.IP, string, error) {
+	vals := make(url.Values)
+	for k, v := range parms {
+		vals.Add(k, v)
+	}
+	data, err := wrapHTTPErrorsPost(*sim.HostURI+"/pseudos", vals)
 	if err != nil {
 		return "", nil, "", err
 	}
@@ -153,7 +179,7 @@ type resultDetails struct {
 }
 
 // wrapHttpErrorsPost wraps http.PostForm to convert responses that are not 200 OK into errors
-func wrapHttpErrorsPost(url string, data url.Values) (string, error) {
+func wrapHTTPErrorsPost(url string, data url.Values) (string, error) {
 
 	resp, err := http.PostForm(url, data)
 	if err != nil {
@@ -197,7 +223,7 @@ func (sim SimulatorHost) AddResults(success bool, nodeID string, name string, er
 	}
 	vals.Add("details", string(detailsBytes))
 
-	_, error := wrapHttpErrorsPost(*sim.HostURI+"/subresults", vals)
+	_, error := wrapHTTPErrorsPost(*sim.HostURI+"/subresults", vals)
 	return error
 
 }
