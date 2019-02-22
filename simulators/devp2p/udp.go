@@ -190,7 +190,6 @@ type packet interface {
 type conn interface {
 	ReadFromUDP(b []byte) (n int, addr *net.UDPAddr, err error)
 	WriteToUDP(b []byte, addr *net.UDPAddr) (n int, err error)
-	//WriteToUDPSpoofed(b []byte, addr *net.UDPAddr, from *net.UDPAddr) (n int, err error)
 	Close() error
 	LocalAddr() net.Addr
 }
@@ -310,8 +309,8 @@ func (t *V4Udp) close() {
 
 }
 
-//SpoofingSanityCheck - verify that the faked udp packets are being sent, received, and responses relayed correctly.
-func (t *V4Udp) SpoofingSanityCheck(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+//SpoofedPing - verify that the faked udp packets are being sent, received, and responses relayed correctly.
+func (t *V4Udp) SpoofedPing(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
 
 	to := makeEndpoint(toaddr, 0)
 
@@ -360,6 +359,76 @@ func (t *V4Udp) SpoofingSanityCheck(toid enode.ID, tomac string, toaddr *net.UDP
 	}
 
 	return <-t.sendSpoofedPacket(toid, toaddr, spoofedSource, req, packet, tomac, callback)
+
+}
+
+//SpoofingFindNodeCheck tests if a client is susceptible to being used
+//as an attack vector for findnode amplification attacks
+func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool) error {
+
+	//send ping
+	err := t.SpoofedPing(toid, tomac, toaddr, fromaddr, false, nil)
+	if err != nil {
+		return err
+	}
+
+	spoofedSource := &net.UDPAddr{
+		IP:   fromaddr.IP.To16(),
+		Port: int(fromaddr.Port),
+	}
+
+	//wait for a tiny bit
+	//NB: in a real scenario the 'victim' will have responded with a v4 pong
+	//message to our ping recipient. in the attack scenario, the pong
+	//will have been ignored because the source id is different than
+	//expected. (to be more authentic, an improvement to this test
+	//could be to send a fake pong from a second node id)
+	time.Sleep(200 * time.Millisecond)
+
+	//send spoofed pong from this node id but with junk replytok
+	//because the replytok will not be available to a real attacker
+	to := makeEndpoint(toaddr, 0)
+	pongreq := &pong{
+		To:         to,
+		ReplyTok:   make([]byte, macSize),
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+	packet, _, err := encodePacket(t.priv, pingPacket, pongreq)
+	if err != nil {
+		return err
+	}
+	t.spoofedWrite(toaddr, fromaddr, pongreq.name(), packet, tomac)
+
+	//consider the target 'bonded' , as it has received the expected pong
+	//send a findnode request for a random 'target' (target there being the
+	//node to find)
+	var fakeKey *ecdsa.PrivateKey
+	if fakeKey, err = crypto.GenerateKey(); err != nil {
+		return err
+	}
+	fakePub := fakeKey.PublicKey
+	lookupTarget := EncodePubkey(&fakePub)
+
+	findreq := &findnode{
+		Target:     lookupTarget,
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+	findpacket, _, err := encodePacket(t.priv, findnodePacket, findreq)
+	if err != nil {
+		return err
+	}
+
+	//if we receive a neighbours request, then we are done
+	t.l.Log("Establishing criteria: Fail if any packet received. Succeed if nothing received within timeouts.")
+	callback := func(p reply) error {
+		if p.ptype == neighborsPacket {
+			return ErrUnsolicitedReply
+		}
+		return nil
+	}
+
+	return <-t.sendSpoofedPacket(toid, toaddr, spoofedSource, findreq, findpacket, tomac, callback)
 
 }
 

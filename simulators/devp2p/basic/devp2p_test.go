@@ -205,7 +205,7 @@ func TestDiscovery(t *testing.T) {
 
 		//get all available tests
 		availableTests := map[string]func(common.Logger, *enode.Node) (string, bool){
-			"spoofTest": SpoofTest,
+			"spoofTest": SpoofSanityCheck,
 			// "pingTest(v4001)":                             SourceUnknownPingKnownEnode,
 			// "SourceUnknownPingWrongTo(v4002)":             SourceUnknownPingWrongTo,
 			// "SourceUnknownPingWrongFrom(v4003)":           SourceUnknownPingWrongFrom,
@@ -238,28 +238,27 @@ func TestDiscovery(t *testing.T) {
 
 }
 
-func SpoofTest(t common.Logger, targetnode *enode.Node) (string, bool) {
+//v4013 just makes sure that the network setup works for spoofing
+func SpoofSanityCheck(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4013")
 	var mac common.MacENREntry
 	targetnode.Load(&mac)
-	if err := v4udp.SpoofingSanityCheck(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, nil); err != nil {
-		return fmt.Sprintf("Ping test failed: %v", err), false
+	if err := v4udp.SpoofedPing(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, nil); err != nil {
+		return fmt.Sprintf("Spoofing sanity check failed: %v", err), false
 	}
 	return "", true
 }
 
-//v4001a - Temporarily removing as this case no longer acceptable?
-// func SourceUnknownPingUnknownEnode(t common.Logger, targetIP net.IP) (bool, string) {
-
-// 	t.Log("Pinging unknown node id.")
-// 	if err := v4udp.Ping(enode.ID{}, &net.UDPAddr{IP: targetIP, Port: 30303}, false, func(e *ecdsa.PublicKey) {
-
-// 		targetnode = enode.NewV4(e, targetIP, 30303, 30303)
-// 		t.Log("Discovered node id " + targetnode.String())
-// 	}); err != nil {
-// 		t.Fatalf("Unable to v4 ping: %v", err)
-// 	}
-// }
+//v4014 amplification attack test
+func SpoofAmplificationAttackCheck(t common.Logger, targetnode *enode.Node) (string, bool) {
+	t.Log("Test v4014")
+	var mac common.MacENREntry
+	targetnode.Load(&mac)
+	if err := v4udp.SpoofingFindNodeCheck(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true); err != nil {
+		return fmt.Sprintf("Spoofing ping test failed: %v", err), false
+	}
+	return "", true
+}
 
 //v4001b
 func SourceUnknownPingKnownEnode(t common.Logger, targetnode *enode.Node) (string, bool) {
