@@ -102,11 +102,28 @@ Fail:
 - Client responds with neighbours.
 
 
+#### v4013
+This tests the spoofing mechanism. "Spoofing" is where
+the simulator sends a message appearing to originate from
+a different 'victim' ip. The recipient responds to the 
+'victim'. The mechanism here involves a socat udp relay
+playing the role of the victim, sending traffic back to the 
+simulator.
+
+This test works by sending a ping from simulator (S) 
+with a spoofed origin, the relay (R), to a client (C).
+If a pong is received the test succeeds.
+
+Fail:
+- No pong received
+
+#### v4014
+Tests for FindNode amplification attacks using spoofing.
+
+Fail:
+- A neighbours packet is received via relay.
 
 
-
-## RLPx
-<TBD>
 
 
 

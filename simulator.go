@@ -221,9 +221,10 @@ func startSimulatorAPI(daemon *docker.Client, clients map[string]string, pseudos
 }
 
 type containerInfo struct {
-	container *docker.Container
-	name      string
-	timeout   time.Time
+	container  *docker.Container
+	name       string
+	timeout    time.Time
+	useTimeout bool
 }
 
 // simulatorAPIHandler is the HTTP request handler directing the docker engine
@@ -254,7 +255,15 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 	for {
 		h.lock.Lock()
 		for id, cInfo := range h.nodes {
-			if !cInfo.container.State.Running || (time.Now().After(cInfo.timeout)) {
+			var err error
+
+			//check if the container is running
+			cInfo.container, err = h.daemon.InspectContainer(id)
+			if err != nil {
+				h.logger.Error("failed to inspect client", "id", id, "error", err)
+			}
+
+			if !cInfo.container.State.Running || (time.Now().After(cInfo.timeout) && cInfo.useTimeout) {
 				h.timeoutContainer(id, nil)
 				// remember this container, for when the subresult comes in later
 				h.timedOutNodes[id] = cInfo
@@ -306,7 +315,7 @@ func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWrite
 	}
 }
 
-func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, logger log15.Logger, available map[string]string, checkliveness bool) {
+func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, logger log15.Logger, available map[string]string, checkliveness bool, useTimeout bool) {
 	// A new node startup was requested, fetch any envvar overrides from simulators
 	r.ParseForm()
 	envs := make(map[string]string)
@@ -366,21 +375,21 @@ func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, lo
 	// Wait for the HTTP/RPC socket to open or the container to fail
 	start := time.Now()
 	for {
-		// If the container died, bail out
-		c, err := h.daemon.InspectContainer(container.ID)
+		// Update the container state
+		container, err = h.daemon.InspectContainer(container.ID)
 		if err != nil {
 			logger.Error("failed to inspect client", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		if !c.State.Running {
+		if !container.State.Running {
 			logger.Error("client container terminated")
 			http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
 			return
 		}
 
-		containerIP = c.NetworkSettings.IPAddress
-		containerMAC = c.NetworkSettings.MacAddress
+		containerIP = container.NetworkSettings.IPAddress
+		containerMAC = container.NetworkSettings.MacAddress
 		if checkliveness {
 			// Container seems to be alive, check whether the RPC is accepting connections
 			if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", containerIP, 8545)); err == nil {
@@ -396,9 +405,10 @@ func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, lo
 	}
 	h.lock.Lock()
 	h.nodes[containerID] = &containerInfo{
-		container: container,
-		name:      clientName,
-		timeout:   time.Now().Add(dockerTimeoutDuration),
+		container:  container,
+		name:       clientName,
+		timeout:    time.Now().Add(dockerTimeoutDuration),
+		useTimeout: useTimeout,
 	}
 	h.lock.Unlock()
 	//  Container online and responsive, return its ID, IP and MAC for later reference
@@ -498,11 +508,11 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		switch r.URL.Path {
 		case "/nodes":
 
-			h.newNode(w, r, logger, h.availableClients, true)
+			h.newNode(w, r, logger, h.availableClients, true, true)
 			return
 		case "/pseudos":
 
-			h.newNode(w, r, logger, h.availablePseudos, false)
+			h.newNode(w, r, logger, h.availablePseudos, false, false)
 			return
 		case "/logs":
 			body, _ := ioutil.ReadAll(r.Body)

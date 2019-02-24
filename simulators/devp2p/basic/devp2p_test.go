@@ -205,18 +205,19 @@ func TestDiscovery(t *testing.T) {
 
 		//get all available tests
 		availableTests := map[string]func(common.Logger, *enode.Node) (string, bool){
-			"spoofTest": SpoofSanityCheck,
-			// "pingTest(v4001)":                             SourceUnknownPingKnownEnode,
-			// "SourceUnknownPingWrongTo(v4002)":             SourceUnknownPingWrongTo,
-			// "SourceUnknownPingWrongFrom(v4003)":           SourceUnknownPingWrongFrom,
-			// "SourceUnknownPingExtraData(v4004)":           SourceUnknownPingExtraData,
-			// "SourceUnknownPingExtraDataWrongFrom(v4005)":  SourceUnknownPingExtraDataWrongFrom,
-			// "SourceUnknownWrongPacketType(v4006)":         SourceUnknownWrongPacketType,
-			// "SourceUnknownFindNeighbours(v4007)":          SourceUnknownFindNeighbours,
-			// "SourceKnownPingFromSignatureMismatch(v4009)": SourceKnownPingFromSignatureMismatch,
-			// "FindNeighboursOnRecentlyBondedTarget(v4010)": FindNeighboursOnRecentlyBondedTarget,
-			// "PingPastExpiration(v4011)":                   PingPastExpiration,
-			// "FindNeighboursPastExpiration(v4012)":         FindNeighboursPastExpiration,
+			"spoofTest(v4013)":                            SpoofSanityCheck,
+			"spoofAmplificiation(v4014)":                  SpoofAmplificationAttackCheck,
+			"pingTest(v4001)":                             SourceUnknownPingKnownEnode,
+			"SourceUnknownPingWrongTo(v4002)":             SourceUnknownPingWrongTo,
+			"SourceUnknownPingWrongFrom(v4003)":           SourceUnknownPingWrongFrom,
+			"SourceUnknownPingExtraData(v4004)":           SourceUnknownPingExtraData,
+			"SourceUnknownPingExtraDataWrongFrom(v4005)":  SourceUnknownPingExtraDataWrongFrom,
+			"SourceUnknownWrongPacketType(v4006)":         SourceUnknownWrongPacketType,
+			"SourceUnknownFindNeighbours(v4007)":          SourceUnknownFindNeighbours,
+			"SourceKnownPingFromSignatureMismatch(v4009)": SourceKnownPingFromSignatureMismatch,
+			"FindNeighboursOnRecentlyBondedTarget(v4010)": FindNeighboursOnRecentlyBondedTarget,
+			"PingPastExpiration(v4011)":                   PingPastExpiration,
+			"FindNeighboursPastExpiration(v4012)":         FindNeighboursPastExpiration,
 		}
 
 		//for every client type
@@ -254,8 +255,8 @@ func SpoofAmplificationAttackCheck(t common.Logger, targetnode *enode.Node) (str
 	t.Log("Test v4014")
 	var mac common.MacENREntry
 	targetnode.Load(&mac)
-	if err := v4udp.SpoofingFindNodeCheck(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true); err != nil {
-		return fmt.Sprintf("Spoofing ping test failed: %v", err), false
+	if err := v4udp.SpoofingFindNodeCheck(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true); err != devp2p.ErrTimeout {
+		return fmt.Sprintf(" test failed: %v", err), false
 	}
 	return "", true
 }

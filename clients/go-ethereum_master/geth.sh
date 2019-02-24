@@ -136,5 +136,9 @@ echo "Running go-ethereum with flags $FLAGS"
 =======
 echo "Running go-ethereum..."
 echo "$FLAGS"
+<<<<<<< HEAD
 /geth $FLAGS  --verbosity=7 --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
 >>>>>>> stashing - spoofed source udp packets
+=======
+/geth $FLAGS  --verbosity=3 --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
+>>>>>>> Spoofing tests complete

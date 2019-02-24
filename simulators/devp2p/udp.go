@@ -372,6 +372,7 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 		return err
 	}
 
+	//the 'victim' source
 	spoofedSource := &net.UDPAddr{
 		IP:   fromaddr.IP.To16(),
 		Port: int(fromaddr.Port),
@@ -382,11 +383,14 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 	//message to our ping recipient. in the attack scenario, the pong
 	//will have been ignored because the source id is different than
 	//expected. (to be more authentic, an improvement to this test
-	//could be to send a fake pong from a second node id)
+	//could be to send a fake pong from the node id - but this is not
+	//essential because the following pong may be received prior to the
+	//real pong)
 	time.Sleep(200 * time.Millisecond)
 
 	//send spoofed pong from this node id but with junk replytok
 	//because the replytok will not be available to a real attacker
+	//TODO- send a best reply tok guess?
 	to := makeEndpoint(toaddr, 0)
 	pongreq := &pong{
 		To:         to,
@@ -419,7 +423,7 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 		return err
 	}
 
-	//if we receive a neighbours request, then we are done
+	//if we receive a neighbours request, then the attack worked and the test should fail
 	t.l.Log("Establishing criteria: Fail if any packet received. Succeed if nothing received within timeouts.")
 	callback := func(p reply) error {
 		if p.ptype == neighborsPacket {
