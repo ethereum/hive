@@ -58,12 +58,13 @@ func ProduceSimpleTestChain(path string, blockCount uint) error {
 
 	gspec := &core.Genesis{
 		Config: &params.ChainConfig{
-			HomesteadBlock:      new(big.Int),
-			ChainID:             big.NewInt(1),
-			DAOForkBlock:        big.NewInt(0),
-			DAOForkSupport:      true,
-			EIP150Block:         big.NewInt(0),
-			EIP150Hash:          ethcommon.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			HomesteadBlock: new(big.Int),
+			ChainID:        big.NewInt(1),
+			DAOForkBlock:   big.NewInt(0),
+			DAOForkSupport: false,
+			EIP150Block:    big.NewInt(0),
+			//Do not set EIP150Hash because Parity cannot peer with it
+			//EIP150Hash:          ethcommon.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
 			EIP155Block:         big.NewInt(0),
 			EIP158Block:         big.NewInt(0),
 			ByzantiumBlock:      big.NewInt(0),
