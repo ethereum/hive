@@ -58,6 +58,9 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 	if err != nil {
 		return nil, err
 	}
+	if len(clients) == 0 {
+		return nil, errNoMatchingClients
+	}
 
 	// Build all the simulators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
