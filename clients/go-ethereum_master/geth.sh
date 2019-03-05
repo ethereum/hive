@@ -63,7 +63,7 @@ fi
 
 
 
-if [ "$HIVE_USE_GENESIS_CONFIG" == ""]; then
+if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 
 	# Override any chain configs in the go-ethereum specific way
 	chainconfig="{}"
