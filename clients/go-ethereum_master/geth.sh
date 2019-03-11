@@ -52,49 +52,57 @@ fi
 
 # Handle any client mode or operation requests
 if [ "$HIVE_NODETYPE" == "full" ]; then
-	FLAGS="$FLAGS --fast"
+	FLAGS="$FLAGS --syncmode fast "
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
-	FLAGS="$FLAGS --light"
+	FLAGS="$FLAGS --syncmode light "
 fi
 
-# Override any chain configs in the go-ethereum specific way
-chainconfig="{}"
 
-JQPARAMS=". "
-if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-	JQPARAMS="$JQPARAMS + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"
-fi
-if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
-	JQPARAMS="$JQPARAMS + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"
-fi
-if [ "$HIVE_FORK_DAO_VOTE" == "0" ]; then
-	JQPARAMS="$JQPARAMS + {\"daoForkSupport\": false}"
-fi
-if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
-	JQPARAMS="$JQPARAMS + {\"daoForkSupport\": true}"
-fi
 
-if [ "$HIVE_FORK_TANGERINE" != "" ]; then
-	JQPARAMS="$JQPARAMS + {\"eip150Block\": $HIVE_FORK_TANGERINE}"
-fi
-if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
-	JQPARAMS="$JQPARAMS + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"
-	JQPARAMS="$JQPARAMS + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"
-fi
-if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
-	JQPARAMS="$JQPARAMS + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"
-fi
-if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
-	JQPARAMS="$JQPARAMS + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"
-fi
-if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
-	JQPARAMS="$JQPARAMS + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"
-fi
-chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
 
-genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
+
+if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
+
+	# Override any chain configs in the go-ethereum specific way
+	chainconfig="{}"
+	JQPARAMS=". "
+	if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"
+	fi
+	if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"
+	fi
+	if [ "$HIVE_FORK_DAO_VOTE" == "0" ]; then
+		JQPARAMS="$JQPARAMS + {\"daoForkSupport\": false}"
+	fi
+	if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
+		JQPARAMS="$JQPARAMS + {\"daoForkSupport\": true}"
+	fi
+
+	if [ "$HIVE_FORK_TANGERINE" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"eip150Block\": $HIVE_FORK_TANGERINE}"
+	fi
+	if [ "$HIVE_FORK_TANGERINE_HASH" != "" ]; then
+		chainconfig=`echo $chainconfig | jq ". + {\"eip150Hash\": $HIVE_FORK_TANGERINE_HASH}"`
+	fi
+	if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"
+		JQPARAMS="$JQPARAMS + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"
+	fi
+	if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"
+	fi
+	if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"
+	fi
+	if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"
+	fi
+	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
+	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
+fi
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
 /geth $FLAGS init /genesis.json

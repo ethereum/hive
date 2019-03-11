@@ -58,6 +58,9 @@ func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern stri
 	if err != nil {
 		return nil, err
 	}
+	if len(clients) == 0 {
+		return nil, errNoMatchingClients
+	}
 
 	// Build all pseudo clients. pseudo-clients need to be available
 	// to simulators. pseudo-clients play the role of special types
@@ -257,17 +260,23 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 		for id, cInfo := range h.nodes {
 			var err error
 
-			//check if the container is running
-			cInfo.container, err = h.daemon.InspectContainer(id)
+			cInfo.container, err = h.daemon.InspectContainer(cInfo.container.ID)
 			if err != nil {
-				h.logger.Error("failed to inspect client", "id", id, "error", err)
+				//container already gone
+				h.logger.Info("Container already deleted. ", "Container", cInfo.container.ID)
+
+			} else {
+				if !cInfo.container.State.Running || (time.Now().Sub(cInfo.timeout) >= 0 && cInfo.useTimeout) {
+
+					h.logger.Info("Timing out. ", "Running", cInfo.container.State.Running)
+					h.timeoutContainer(id, nil)
+
+					// remember this container, for when the subresult comes in later
+					h.timedOutNodes[id] = cInfo
+				}
+
 			}
 
-			if !cInfo.container.State.Running || (time.Now().After(cInfo.timeout) && cInfo.useTimeout) {
-				h.timeoutContainer(id, nil)
-				// remember this container, for when the subresult comes in later
-				h.timedOutNodes[id] = cInfo
-			}
 		}
 		h.lock.Unlock()
 		time.Sleep(timeoutCheckDuration)
