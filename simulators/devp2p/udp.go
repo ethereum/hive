@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/google/gopacket/pcap"
 )
 
 // Errors
@@ -198,7 +199,7 @@ type V4Udp struct {
 	conn        conn
 	netrestrict *netutil.Netlist
 	priv        *ecdsa.PrivateKey
-	ourEndpoint rpcEndpoint
+	OurEndpoint rpcEndpoint
 
 	addpending chan *pending
 	gotreply   chan reply
@@ -279,6 +280,7 @@ func ListenUDP(c conn, cfg Config, l common.Logger) (*V4Udp, error) {
 
 func newUDP(c conn, cfg Config, l common.Logger) (*V4Udp, error) {
 	realaddr := c.LocalAddr().(*net.UDPAddr)
+
 	if cfg.AnnounceAddr != nil {
 		realaddr = cfg.AnnounceAddr
 	}
@@ -293,7 +295,7 @@ func newUDP(c conn, cfg Config, l common.Logger) (*V4Udp, error) {
 		l:           l,
 	}
 
-	udp.ourEndpoint = makeEndpoint(realaddr, uint16(realaddr.Port))
+	udp.OurEndpoint = makeEndpoint(realaddr, uint16(realaddr.Port))
 
 	go udp.loop()
 	go udp.readLoop(cfg.Unhandled)
@@ -307,6 +309,133 @@ func (t *V4Udp) close() {
 
 }
 
+//SpoofedPing - verify that the faked udp packets are being sent, received, and responses relayed correctly.
+func (t *V4Udp) SpoofedPing(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+
+	to := makeEndpoint(toaddr, 0)
+
+	req := &ping{
+		Version:    4,
+		From:       t.OurEndpoint,
+		To:         to, // TODO: maybe use known TCP port from DB
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+	packet, hash, err := encodePacket(t.priv, pingPacket, req)
+	if err != nil {
+		return err
+	}
+
+	t.l.Log("Establishing criteria: Will succeed only if a valid pong is received.")
+	callback := func(p reply) error {
+
+		if p.ptype == pongPacket {
+			inPacket := p.data.(incomingPacket)
+
+			if !bytes.Equal(inPacket.packet.(*pong).ReplyTok, hash) {
+				return ErrUnsolicitedReply
+			}
+
+			if validateEnodeID && toid != inPacket.recoveredID.id() {
+				return ErrUnknownNode
+			}
+
+			if recoveryCallback != nil {
+				key, err := decodePubkey(inPacket.recoveredID)
+				if err != nil {
+					recoveryCallback(key)
+				}
+			}
+			return nil
+
+		}
+		return ErrPacketMismatch
+
+	}
+
+	spoofedSource := &net.UDPAddr{
+		IP:   fromaddr.IP.To16(),
+		Port: int(fromaddr.Port),
+	}
+
+	return <-t.sendSpoofedPacket(toid, toaddr, spoofedSource, req, packet, tomac, callback)
+
+}
+
+//SpoofingFindNodeCheck tests if a client is susceptible to being used
+//as an attack vector for findnode amplification attacks
+func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool) error {
+
+	//send ping
+	err := t.SpoofedPing(toid, tomac, toaddr, fromaddr, false, nil)
+	if err != nil {
+		return err
+	}
+
+	//the 'victim' source
+	spoofedSource := &net.UDPAddr{
+		IP:   fromaddr.IP.To16(),
+		Port: int(fromaddr.Port),
+	}
+
+	//wait for a tiny bit
+	//NB: in a real scenario the 'victim' will have responded with a v4 pong
+	//message to our ping recipient. in the attack scenario, the pong
+	//will have been ignored because the source id is different than
+	//expected. (to be more authentic, an improvement to this test
+	//could be to send a fake pong from the node id - but this is not
+	//essential because the following pong may be received prior to the
+	//real pong)
+	time.Sleep(200 * time.Millisecond)
+
+	//send spoofed pong from this node id but with junk replytok
+	//because the replytok will not be available to a real attacker
+	//TODO- send a best reply tok guess?
+	to := makeEndpoint(toaddr, 0)
+	pongreq := &pong{
+		To:         to,
+		ReplyTok:   make([]byte, macSize),
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+	packet, _, err := encodePacket(t.priv, pingPacket, pongreq)
+	if err != nil {
+		return err
+	}
+	t.spoofedWrite(toaddr, fromaddr, pongreq.name(), packet, tomac)
+
+	//consider the target 'bonded' , as it has received the expected pong
+	//send a findnode request for a random 'target' (target there being the
+	//node to find)
+	var fakeKey *ecdsa.PrivateKey
+	if fakeKey, err = crypto.GenerateKey(); err != nil {
+		return err
+	}
+	fakePub := fakeKey.PublicKey
+	lookupTarget := EncodePubkey(&fakePub)
+
+	findreq := &findnode{
+		Target:     lookupTarget,
+		Expiration: uint64(time.Now().Add(expiration).Unix()),
+	}
+
+	findpacket, _, err := encodePacket(t.priv, findnodePacket, findreq)
+	if err != nil {
+		return err
+	}
+
+	//if we receive a neighbours request, then the attack worked and the test should fail
+	t.l.Log("Establishing criteria: Fail if any packet received. Succeed if nothing received within timeouts.")
+	callback := func(p reply) error {
+		if p.ptype == neighborsPacket {
+			return ErrUnsolicitedReply
+		}
+		return nil
+	}
+
+	return <-t.sendSpoofedPacket(toid, toaddr, spoofedSource, findreq, findpacket, tomac, callback)
+
+}
+
 //Ping sends a ping message to the given node and waits for a reply.
 func (t *V4Udp) Ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
 
@@ -314,7 +443,7 @@ func (t *V4Udp) Ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, r
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
@@ -410,7 +539,7 @@ func (t *V4Udp) PingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID 
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
@@ -438,7 +567,7 @@ func (t *V4Udp) PingExtraData(toid enode.ID, toaddr *net.UDPAddr, validateEnodeI
 
 	req := &pingExtra{
 		Version:   4,
-		From:      t.ourEndpoint,
+		From:      t.OurEndpoint,
 		To:        to,
 		JunkData1: 42,
 		JunkData2: []byte{9, 8, 7, 6, 5, 4, 3, 2, 1},
@@ -539,7 +668,7 @@ func (t *V4Udp) PingTargetWrongPacketType(toid enode.ID, toaddr *net.UDPAddr, va
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
@@ -712,7 +841,7 @@ func (t *V4Udp) PingPastExpiration(toid enode.ID, toaddr *net.UDPAddr, validateE
 
 	req := &ping{
 		Version:    4,
-		From:       t.ourEndpoint,
+		From:       t.OurEndpoint,
 		To:         to, // TODO: maybe use known TCP port from DB
 		Expiration: uint64(time.Now().Add(-expiration).Unix()),
 	}
@@ -776,6 +905,15 @@ func (t *V4Udp) sendPacket(toid enode.ID, toaddr *net.UDPAddr, req packet, packe
 	t.l.Logf("Sending packet %s to enode %s with target endpoint %v", req.name(), toid, toaddr)
 	errc := t.pending(toid, callback)
 	t.write(toaddr, req.name(), packet)
+	return errc
+}
+
+func (t *V4Udp) sendSpoofedPacket(toid enode.ID, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, req packet, packet []byte, macaddr string, callback func(reply) error) <-chan error {
+
+	t.l.Logf("Sending spoofed packet %s to enode %s with target endpoint %v from %v", req.name(), toid, toaddr, fromaddr)
+	errc := t.pending(toid, callback)
+	t.spoofedWrite(toaddr, fromaddr, req.name(), packet, macaddr)
+
 	return errc
 }
 
@@ -942,7 +1080,96 @@ func (t *V4Udp) send(toaddr *net.UDPAddr, ptype byte, req packet) ([]byte, error
 
 func (t *V4Udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
 	_, err := t.conn.WriteToUDP(packet, toaddr)
+	//_, err := t.conn.WriteToUDPSpoofed(packet, toaddr, toaddr)
 	log.Trace(">> "+what, "addr", toaddr, "err", err)
+	return err
+}
+
+//GetNetworkInterface - Get the docker image's network interface
+func GetNetworkInterface() (*net.Interface, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	//TBD - for now this code makes the assumption
+	//that eth0 is the interface name, but for greater
+	//robustness, this should be obtained from docker
+	//by adding a new method to the http API
+
+	//look for eth0
+	var iface *net.Interface
+	for _, i := range ifaces {
+		if i.Name == "eth0" {
+			iface = &i
+		}
+	}
+	return iface, nil
+}
+
+//GetInterfaceIP returns the IP address of the (usually eth0) interface (see above)
+func GetInterfaceIP(iface *net.Interface) (*net.IP, error) {
+	addrs, err := iface.Addrs()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, addr := range addrs {
+		switch v := addr.(type) {
+		case *net.IPNet:
+			return &v.IP, nil
+		case *net.IPAddr:
+			return &v.IP, nil
+		}
+
+	}
+	return nil, nil
+}
+
+func (t *V4Udp) spoofedWrite(toaddr *net.UDPAddr, fromaddr *net.UDPAddr, what string, packet []byte, macAddr string) error {
+
+	mac, err := net.ParseMAC(macAddr)
+	if err != nil {
+		return err
+	}
+
+	iface, err := GetNetworkInterface()
+	if err != nil {
+		return err
+	}
+
+	if nil == iface {
+		return errors.New("eth0 interface missing")
+	}
+
+	opts := udpFrameOptions{
+		sourceIP:     fromaddr.IP.To4(),
+		destIP:       toaddr.IP.To4(),
+		sourcePort:   uint16(fromaddr.Port),
+		destPort:     uint16(toaddr.Port),
+		sourceMac:    iface.HardwareAddr,
+		destMac:      mac,
+		isIPv6:       false,
+		payloadBytes: packet,
+	}
+
+	handle, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever)
+	if err != nil {
+		return err
+	}
+
+	defer handle.Close()
+
+	rawPacket, err := createSerializedUDPFrame(opts)
+	if err != nil {
+		return err
+	}
+
+	if err := handle.WritePacketData(rawPacket); err != nil {
+		return err
+	}
+
+	log.Trace(">> "+what, "from", fromaddr, "addr", toaddr, "err", err)
 	return err
 }
 

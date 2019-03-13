@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/go-ethereum/p2p/enr"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/hive/simulators/common"
@@ -31,6 +32,7 @@ var (
 	err          error
 	restrictList *netutil.Netlist
 	v4udp        devp2p.V4Udp
+	relayIP      net.IP //the ip address of the relay node, used for relaying spoofed traffic
 
 	//targetnode       *enode.Node // parsed Node
 	//targetIP         net.IP      //targetIP
@@ -46,7 +48,7 @@ func TestMain(m *testing.M) {
 	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
 
 	listenPort = flag.String("listenPort", ":30303", "")
-	natdesc = flag.String("nat", "none", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
+	natdesc = flag.String("nat", "any", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 	hostURI = flag.String("simulatorHost", "", "url of simulator host api")
 	dockerHost = flag.String("dockerHost", "", "docker host api endpoint")
 
@@ -75,7 +77,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 			"HIVE_BOOTNODE": "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@1.2.3.4:30303",
 		}
 
-		nodeID, ipAddr, err := host.StartNewNode(parms)
+		nodeID, ipAddr, macAddr, err := host.StartNewNode(parms)
 		if err != nil {
 			errorMessage = fmt.Sprintf("FATAL: Unable to start node: %v", err)
 			ok = false
@@ -97,14 +99,16 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 			}
 
 			//replace the ip with what docker says it is
-			targetNode = enode.NewV4(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303) //targetNode.UDP())
+			targetNode = MakeNode(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303, macAddr)
 			if targetNode == nil {
 				errorMessage = fmt.Sprintf("FATAL: Unable to generate targetNode: %v", err)
 				ok = false
 			}
+
 			if ok {
 				errorMessage, ok = testFunc(t, targetNode)
 			}
+
 		}
 
 		host.AddResults(ok, nodeID, testName, errorMessage, time.Since(startTime))
@@ -114,6 +118,47 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 		}
 
 	})
+
+}
+
+type v4CompatID struct {
+	enode.V4ID
+}
+
+func (v4CompatID) Verify(r *enr.Record, sig []byte) error {
+	var pubkey enode.Secp256k1
+	return r.Load(&pubkey)
+}
+
+//ripped out from the urlv4 code
+func signV4Compat(r *enr.Record, pubkey *ecdsa.PublicKey) {
+	r.Set((*enode.Secp256k1)(pubkey))
+	if err := r.SetSig(v4CompatID{}, []byte{}); err != nil {
+		panic(err)
+	}
+}
+
+//Make a v4 node based on some info
+func MakeNode(pubkey *ecdsa.PublicKey, ip net.IP, tcp, udp int, mac string) *enode.Node {
+	var r enr.Record
+	if ip != nil {
+		r.Set(enr.IP(ip))
+	}
+	if udp != 0 {
+		r.Set(enr.UDP(udp))
+	}
+	if tcp != 0 {
+		r.Set(enr.TCP(tcp))
+	}
+
+	r.Set(common.MacENREntry(mac))
+
+	signV4Compat(&r, pubkey)
+	n, err := enode.New(v4CompatID{}, &r)
+	if err != nil {
+		panic(err)
+	}
+	return n
 
 }
 
@@ -132,8 +177,36 @@ func TestDiscovery(t *testing.T) {
 			t.Fatalf("Simulator error. Cannot get client types. %v", err)
 		}
 
+		//add a UDP relay for spoof tests
+		//the UDP relay plays the role of a 'victim' of an attack
+		//where we impersonate their IP. Responses from other nodes, sent to spoofed source IPs
+		//are relayed back to us so we can know how other nodes are communicating.
+
+		iface, err := devp2p.GetNetworkInterface()
+		if err != nil {
+			t.Fatalf("Simulator error. Cannot get local interface. %v ", err)
+		}
+
+		localIP, err := devp2p.GetInterfaceIP(iface)
+		if err != nil {
+			t.Fatalf("Simulator error. Cannot get local ip. %v ", err)
+		}
+
+		parms := map[string]string{
+			"CLIENT":         "relay",
+			"HIVE_RELAY_IP":  localIP.String(),
+			"HIVE_RELAY_UDP": "30303",
+		}
+
+		_, relayIP, _, err = host.StartNewPseudo(parms)
+		if err != nil {
+			t.Errorf("FATAL: Unable to start relay node: %v", err)
+		}
+
 		//get all available tests
 		availableTests := map[string]func(common.Logger, *enode.Node) (string, bool){
+			"spoofTest(v4013)":                            SpoofSanityCheck,
+			"spoofAmplificiation(v4014)":                  SpoofAmplificationAttackCheck,
 			"pingTest(v4001)":                             SourceUnknownPingKnownEnode,
 			"SourceUnknownPingWrongTo(v4002)":             SourceUnknownPingWrongTo,
 			"SourceUnknownPingWrongFrom(v4003)":           SourceUnknownPingWrongFrom,
@@ -166,18 +239,27 @@ func TestDiscovery(t *testing.T) {
 
 }
 
-//v4001a - Temporarily removing as this case no longer acceptable?
-// func SourceUnknownPingUnknownEnode(t common.Logger, targetIP net.IP) (bool, string) {
+//v4013 just makes sure that the network setup works for spoofing
+func SpoofSanityCheck(t common.Logger, targetnode *enode.Node) (string, bool) {
+	t.Log("Test v4013")
+	var mac common.MacENREntry
+	targetnode.Load(&mac)
+	if err := v4udp.SpoofedPing(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, nil); err != nil {
+		return fmt.Sprintf("Spoofing sanity check failed: %v", err), false
+	}
+	return "", true
+}
 
-// 	t.Log("Pinging unknown node id.")
-// 	if err := v4udp.Ping(enode.ID{}, &net.UDPAddr{IP: targetIP, Port: 30303}, false, func(e *ecdsa.PublicKey) {
-
-// 		targetnode = enode.NewV4(e, targetIP, 30303, 30303)
-// 		t.Log("Discovered node id " + targetnode.String())
-// 	}); err != nil {
-// 		t.Fatalf("Unable to v4 ping: %v", err)
-// 	}
-// }
+//v4014 amplification attack test
+func SpoofAmplificationAttackCheck(t common.Logger, targetnode *enode.Node) (string, bool) {
+	t.Log("Test v4014")
+	var mac common.MacENREntry
+	targetnode.Load(&mac)
+	if err := v4udp.SpoofingFindNodeCheck(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true); err != devp2p.ErrTimeout {
+		return fmt.Sprintf(" test failed: %v", err), false
+	}
+	return "", true
+}
 
 //v4001b
 func SourceUnknownPingKnownEnode(t common.Logger, targetnode *enode.Node) (string, bool) {
@@ -292,6 +374,9 @@ func setupv4UDP(l common.Logger) devp2p.V4Udp {
 	}
 
 	//Create a UDP connection
+
+	//wrap this 'listener' into a conn
+	//but
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
 		utils.Fatalf("-ListenUDP: %v", err)

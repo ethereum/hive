@@ -66,6 +66,11 @@ func buildClients(daemon *docker.Client, pattern string, cacher *buildCacher) (m
 	return buildNestedImages(daemon, "clients", pattern, "client", cacher, false)
 }
 
+// buildPseudoClients iterates over all the known pseudo-clients and builds a docker image for
+func buildPseudoClients(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
+	return buildNestedImages(daemon, "pseudoclients", pattern, "pseudoclient", cacher, false)
+}
+
 // fetchClientVersions downloads the version json specs from all clients that
 // match the given patten.
 func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]map[string]string, error) {
