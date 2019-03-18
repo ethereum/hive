@@ -7,13 +7,14 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ethereum/go-ethereum/core/rawdb"
+
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/params"
 	log15 "gopkg.in/inconshreveable/log15.v2"
 )
@@ -58,12 +59,13 @@ func ProduceSimpleTestChain(path string, blockCount uint) error {
 
 	gspec := &core.Genesis{
 		Config: &params.ChainConfig{
-			HomesteadBlock:      new(big.Int),
-			ChainID:             big.NewInt(1),
-			DAOForkBlock:        big.NewInt(0),
-			DAOForkSupport:      true,
-			EIP150Block:         big.NewInt(0),
-			EIP150Hash:          ethcommon.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
+			HomesteadBlock: new(big.Int),
+			ChainID:        big.NewInt(1),
+			DAOForkBlock:   big.NewInt(0),
+			DAOForkSupport: false,
+			EIP150Block:    big.NewInt(0),
+			//Do not set EIP150Hash because Parity cannot peer with it
+			//EIP150Hash:          ethcommon.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
 			EIP155Block:         big.NewInt(0),
 			EIP158Block:         big.NewInt(0),
 			ByzantiumBlock:      big.NewInt(0),
@@ -156,7 +158,7 @@ func WriteChain(chain *core.BlockChain, filename string) error {
 func GenerateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blockModifier func(i int, gen *core.BlockGen)) error {
 
 	// Use an in memory db
-	db := ethdb.NewMemDatabase()
+	db := rawdb.NewMemoryDatabase()
 
 	// Initialise the state with the genesis specification and return the genesis block
 	genesis := gspec.MustCommit(db)

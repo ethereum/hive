@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -14,6 +15,11 @@ import (
 	"github.com/ethereum/hive/chaintools"
 	"github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
+)
+
+var (
+	// errNoMatchingClients is returned when no matching clients are found for a given --client regexp value
+	errNoMatchingClients = errors.New("no matching clients found")
 )
 
 var (
