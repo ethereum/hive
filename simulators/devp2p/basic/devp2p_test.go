@@ -98,14 +98,14 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 				ok = false
 			}
 
-			//replace the ip with what docker says it is
-			targetNode = MakeNode(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303, macAddr)
 			if targetNode == nil {
 				errorMessage = fmt.Sprintf("FATAL: Unable to generate targetNode: %v", err)
 				ok = false
 			}
 
 			if ok {
+				//replace the ip with what docker says it is
+				targetNode = enode.NewV4(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303) //targetNode.UDP())
 				errorMessage, ok = testFunc(t, targetNode)
 			}
 
