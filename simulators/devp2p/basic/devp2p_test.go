@@ -105,7 +105,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testFunc fun
 
 			if ok {
 				//replace the ip with what docker says it is
-				targetNode = enode.NewV4(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303) //targetNode.UDP())
+				targetNode = MakeNode(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303, macAddr)
 				errorMessage, ok = testFunc(t, targetNode)
 			}
 
