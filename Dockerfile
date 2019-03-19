@@ -24,15 +24,24 @@ ENV PATH   $GOPATH/bin:$PATH
 ADD vendor $GOPATH/src/github.com/ethereum/hive/vendor
 RUN (cd $GOPATH/src/github.com/ethereum/hive && go install ./...)
 
+# We need geth
+# Build go-ethereum on the fly and delete all build tools afterwards
+RUN \
+  	apk add --update  git         && \
+   	git clone https://github.com/ethereum/go-ethereum $GOPATH/src/github.com/ethereum/go-ethereum && \
+	apk del git 
+
 # Inject and build hive itself (modified during hive dev only, cache builds)
 ADD *.go $GOPATH/src/github.com/ethereum/hive/
+ADD chaintools $GOPATH/src/github.com/ethereum/hive/chaintools
+
 
 WORKDIR $GOPATH/src/github.com/ethereum/hive
 RUN go install
 
 # Define the tiny startup script to boot docker and hive afterwards
 RUN \
-  echo '#!/bin/sh'  > $GOPATH/bin/hive.sh && \
+   echo '#!/bin/sh'  > $GOPATH/bin/hive.sh && \
 	echo 'set -e'    >> $GOPATH/bin/hive.sh && \
 	\
 	echo 'dockerd-entrypoint.sh --storage-driver=aufs 2>/dev/null &' >> $GOPATH/bin/hive.sh && \
