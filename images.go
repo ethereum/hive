@@ -22,6 +22,9 @@ import (
 // to avoid name collisions with local images.
 const hiveImageNamespace = "hive"
 
+// branchDelimiter is what separates the client name from the branch, eg: aleth_nightly, go-ethereum_master
+const branchDelimiter = "_"
+
 // buildCacher defines the image building caching rules to allow requesting the
 // rebuild of certain images once per run, while omitting rebuilding others.
 type buildCacher struct {
@@ -50,20 +53,20 @@ func newBuildCacher(pattern string) (*buildCacher, error) {
 // within an all encompassing container.
 func buildShell(daemon *docker.Client, cacher *buildCacher) (string, error) {
 	image := hiveImageNamespace + "/shell"
-	return image, buildImage(daemon, image, ".", cacher, log15.Root(), "")
+	return image, buildImage(daemon, image, "", ".", cacher, log15.Root(), "")
 }
 
 // buildEthash builds the ethash DAG generator docker image to run before any real
 // simulation needing it takes place.
 func buildEthash(daemon *docker.Client, cacher *buildCacher) (string, error) {
 	image := hiveImageNamespace + "/internal/ethash"
-	return image, buildImage(daemon, image, filepath.Join("internal", "ethash"), cacher, log15.Root(), "")
+	return image, buildImage(daemon, image, "", filepath.Join("internal", "ethash"), cacher, log15.Root(), "")
 }
 
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
-func buildClients(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages(daemon, "clients", pattern, "client", cacher, false)
+func buildClients(daemon *docker.Client, clientList []string, cacher *buildCacher) (map[string]string, error) {
+	return buildListedImages(daemon, "clients", clientList, "client", cacher, false)
 }
 
 // buildPseudoClients iterates over all the known pseudo-clients and builds a docker image for
@@ -73,9 +76,9 @@ func buildPseudoClients(daemon *docker.Client, pattern string, cacher *buildCach
 
 // fetchClientVersions downloads the version json specs from all clients that
 // match the given patten.
-func fetchClientVersions(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]map[string]string, error) {
+func fetchClientVersions(daemon *docker.Client, clientList []string, cacher *buildCacher) (map[string]map[string]string, error) {
 	// Build all the client that we need the versions of
-	clients, err := buildClients(daemon, pattern, cacher)
+	clients, err := buildClients(daemon, clientList, cacher)
 	if err != nil {
 		return nil, err
 	}
@@ -167,13 +170,98 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 			image               = strings.Replace(filepath.Join(hiveImageNamespace, root, name), string(os.PathSeparator), "/", -1)
 			logger              = log15.New(kind, name)
 		)
-		if err := buildImage(daemon, image, context, cacher, logger, dockerfile); err != nil {
+		if err := buildImage(daemon, image, "", context, cacher, logger, dockerfile); err != nil {
 			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
 			return nil, berr
 		}
 		images[name] = image
 	}
 	return images, nil
+}
+
+// buildListedImages iterates over a directory containing arbitrarilly nested
+// docker image definitions and builds those whose directory names contain the
+// image name string in the client List, with one image per branch.
+// For example, if the clientList contained geth_master, geth_beta and
+// the clients folder contained a dockerfile for clients\geth, then this
+// will created two images, one for clients\geth_master and one for clients\geth_beta
+func buildListedImages(daemon *docker.Client, root string, clientList []string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
+
+	var contextBuilder func(root string, path string) (string, string, string)
+
+	if rootContext {
+		contextBuilder = func(root string, path string) (string, string, string) {
+			branch := getBranch(path)
+			path = strings.TrimSuffix(path, branchDelimiter+branch)
+			return root, branch, strings.Replace(path+string(filepath.Separator)+"Dockerfile", "\\", "/", -1)
+		}
+	} else {
+		contextBuilder = func(root string, path string) (string, string, string) {
+			branch := getBranch(path)
+			path = strings.TrimSuffix(path, branchDelimiter+branch)
+			return filepath.Join(root, path), branch, ""
+		}
+	}
+
+	names := []string{}
+	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		// If walking the images failed, bail out
+		if err != nil {
+			return err
+		}
+		// Otherwise if we've found a Dockerfile, add the parent
+		if strings.HasSuffix(path, "Dockerfile") {
+			name := filepath.Dir(path)
+
+			//get a list of matching clients, including a branch suffix after '_' (branchDelimiter)
+			//TODO - update docs to say that folders under 'clients' should not use _ underscore
+			matchNames(name, clientList, &names)
+
+		}
+		// Continue walking the path
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	// Iterate over all the matched specs and build their docker images
+	images := make(map[string]string)
+	for _, name := range names {
+		var (
+			context, branch, dockerfile = contextBuilder(root, name)
+			image                       = strings.Replace(filepath.Join(hiveImageNamespace, root, name), string(os.PathSeparator), "/", -1)
+			logger                      = log15.New(kind, name)
+		)
+		if err := buildImage(daemon, image, branch, context, cacher, logger, dockerfile); err != nil {
+			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
+			return nil, berr
+		}
+		images[name] = image
+	}
+	return images, nil
+}
+
+func getBranch(name string) string {
+	branch := ""
+	if branchIndex := strings.LastIndex(name, branchDelimiter); branchIndex > 0 && branchIndex < len(name) {
+		branch = name[branchIndex+1:]
+	}
+	return branch
+}
+
+func matchNames(name string, clientList []string, names *[]string) {
+
+	for _, client := range clientList {
+
+		branch := getBranch(client)
+		if len(branch) > 0 {
+			branch = branchDelimiter + branch
+		}
+		clientWithoutBranch := strings.TrimSuffix(client, branch)
+
+		if strings.Contains(name, clientWithoutBranch) {
+			*names = append(*names, filepath.Join(strings.Split(name, string(filepath.Separator))[1:]...)+branch)
+		}
+	}
 }
 
 type buildError struct {
@@ -190,7 +278,8 @@ func (b *buildError) Client() string {
 }
 
 // buildImage builds a single docker image from the specified context.
-func buildImage(daemon *docker.Client, image, context string, cacher *buildCacher, logger log15.Logger, dockerfile string) error {
+// branch specifes a build argument to use a specific base image branch or github source branch
+func buildImage(daemon *docker.Client, image, branch, context string, cacher *buildCacher, logger log15.Logger, dockerfile string) error {
 	var nocache bool
 	if cacher != nil && cacher.pattern.MatchString(image) && !cacher.rebuilt[image] {
 		cacher.rebuilt[image] = true
@@ -213,6 +302,7 @@ func buildImage(daemon *docker.Client, image, context string, cacher *buildCache
 		Dockerfile:   dockerfile,
 		OutputStream: stream,
 		NoCache:      nocache,
+		BuildArgs:    []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}},
 	}
 	if err := daemon.BuildImage(opts); err != nil {
 		logger.Error("failed to build docker image", "error", err)

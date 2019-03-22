@@ -1,6 +1,7 @@
 # Docker container spec for building the master branch of parity.
-FROM ubuntu:16.04
 
+FROM ubuntu:16.04
+ARG branch=master
 # Build parity on the fly and delete all build tools afterwards
 RUN \
   # Install parity from sources
@@ -9,7 +10,7 @@ RUN \
   binutils pkg-config openssl libssl-dev libudev-dev       && \
   curl https://sh.rustup.rs -sSf | sh -s --  -y            && \
   export PATH="$HOME/.cargo/bin:$PATH"                     && \
-  git clone --depth 1 https://github.com/paritytech/parity && \
+  git clone --depth 1 --branch $branch https://github.com/paritytech/parity && \
 	cd parity && cargo build --release                    && \
   echo "{}"                                                      \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \

@@ -3,13 +3,16 @@
 # The build process it potentially longer running but every effort was made to
 # produce a very minimalistic container that can be reused many times without
 # needing to constantly rebuild.
+
+
 FROM alpine:latest
+ARG branch=master
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
   apk add --update bash curl jq go git make gcc musl-dev              \
   	  ca-certificates linux-headers                           && \
-  git clone --depth 1 https://github.com/ethereum/go-ethereum && \
+  git clone --depth 1 --branch $branch  https://github.com/ethereum/go-ethereum && \
   (cd go-ethereum && make geth)                               && \
   (cd go-ethereum                                             && \
   echo "{}"                                                      \

@@ -87,7 +87,7 @@ func TestSyncsWithGeth(t *testing.T) {
 		}
 
 		t.Log("Starting main node (geth)")
-		_, mainNodeIP, err := host.StartNewNode(mainParms)
+		_, mainNodeIP, _, err := host.StartNewNode(mainParms)
 		if err != nil {
 			t.Fatalf("Unable to start node: %v", err)
 		}
@@ -111,7 +111,7 @@ func TestSyncsWithGeth(t *testing.T) {
 					"HIVE_FORK_BYZANTIUM": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
-				clientID, nodeIP, err := host.StartNewNode(parms)
+				clientID, nodeIP, _, err := host.StartNewNode(parms)
 				if err != nil {
 					t.Fatalf("Unable to start node: %v", err)
 				}
@@ -162,7 +162,7 @@ func TestSyncsWithGeth(t *testing.T) {
 		}
 
 		t.Log("Starting main node (geth)")
-		_, mainNodeIP, err := host.StartNewNode(mainParms)
+		_, mainNodeIP, _, err := host.StartNewNode(mainParms)
 		if err != nil {
 			t.Fatalf("Unable to start node: %v", err)
 		}
@@ -190,7 +190,7 @@ func TestSyncsWithGeth(t *testing.T) {
 					"HIVE_FORK_BYZANTIUM": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
-				clientID, nodeIP, err := host.StartNewNode(parms)
+				clientID, nodeIP, _, err := host.StartNewNode(parms)
 				if err != nil {
 					t.Fatalf("Unable to start node: %v", err)
 				}
