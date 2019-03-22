@@ -105,7 +105,7 @@ those passed. If you wish to explore the reasons of failure, full logs from all 
 are pushed into the `workspace/logs` folder.
 
 ```
-$ hive --client=go-ethereum:master --test=.
+$ hive --client=go-ethereum_master --test=.
 ...
 Validation results:
 {
@@ -122,9 +122,9 @@ Validation results:
 }
 ```
 
-You may request a different set of clients to be validated via the `--client` regexp flag (e.g.
-validating all `go-ethereum` versions would be `--client=go-ethereum:`). Similarly you may request
-only a subset of validation tests to be run via the `--test` regexp flag (e.g. running only the
+You may request a different set of clients to be validated via the `--client` flag. 
+
+You may request only a subset of validation tests to be run via the `--test` regexp flag (e.g. running only the
 smoke validation tests would be `--test=smoke`).
 
 # Simulating clients
@@ -135,10 +135,17 @@ smoke validation tests would be `--test=smoke`).
 of clients are run concurrently under various circumstances and their behavior monitored and checked.
 
 Running network simulations is completely analogous to validations from the user's perspective: you
-can specify which clients to simulate with the `--client` regexp flag, and you can specify which
+can specify which clients to simulate with the `--client` flag, and you can specify which
 simulations to run via the `--sim` regexp flag. By default simulations aren't being run as they can
 be quite lengthy.
 
+
+`--client` is now an explicit list of permitted clients, where the desired client is of the format
+clientname_branch. For example `go-ethereum_master` and `parity_beta`. Previously this was a regex. 
+Other parameters such as the sim or validator still use regexp. This change was introduced to allow
+for branches to be specified as parameters without the need for creating a dedicated client subfolder 
+for that branch. `go-ethereum` and `parity` in this example need to be subfolders of the Hive `clients`
+folder with their own dockerfile. The branch is parsed out and passed as a docker build arg.
 
 
 Simulators now offer a golang client framework, that allows them to call into the Hive Simulator 
@@ -168,7 +175,7 @@ client the list of simulations failed and those passed. Likewise, if you wish to
 of failure, full logs from all clients and testers are pushed into the `log.txt` log file.
 
 ```
-$ hive --client=go-ethereum:master --test=NONE --sim=.
+$ hive --client=go-ethereum_master --test=NONE --sim=.
 ...
 Simulation results:
 {
@@ -288,7 +295,7 @@ validations and simulations that just initialize clients with some pre-configure
 it from the various RPC endpoints.
 
 ```
-$ hive --client=go-ethereum:master --smoke
+$ hive --client=go-ethereum_master --smoke
 ...
 Validation results:
 {

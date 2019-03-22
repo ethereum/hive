@@ -2,12 +2,12 @@ FROM python:3.6
 # Set up code directory
 RUN mkdir -p /usr/src/app
 WORKDIR /usr/src/app
-
+ARG branch=master
 RUN \
   apt-get -y update                                        && \
   apt-get install -y bash  bc curl git make cmake netcat file      
 
-RUN git clone --recursive https://github.com/ethereum/py-evm.git .
+RUN git clone --recursive --branch ${branch} https://github.com/ethereum/py-evm.git .
 RUN pip install -e .[dev]  --no-cache-dir
 RUN pip install -U trinity --no-cache-dir
 

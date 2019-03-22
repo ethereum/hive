@@ -6,8 +6,8 @@
 #
 # docker build --target builder -t aleth_base
 #
-
-FROM ethereum/aleth:nightly
+ARG branch=master
+FROM ethereum/aleth:$branch
 
 # Genesis template
 ADD config.json /config.json

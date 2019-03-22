@@ -34,7 +34,10 @@ var (
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
-	clientPattern = flag.String("client", "_master", "Regexp selecting the client(s) to run against")
+	clientListFlag = flag.String("client", "go-ethereum_master", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_master and the client name is a subfolder of the clients directory")
+	clientList     []string
+
+	//clientPattern = flag.String("client", "_master", "Regexp selecting the client(s) to run against")
 	overrideFiles = flag.String("override", "", "Comma separated regexp:files to override in client containers")
 	smokeFlag     = flag.Bool("smoke", false, "Whether to only smoke test or run full test suite")
 
@@ -74,6 +77,13 @@ func main() {
 		chaintools.ProduceTestChainFromGenesisFile(*chainGenesis, *chainOutputPath, *chainLength, *chainBlockTime)
 		return
 	}
+
+	//Get the client list
+	clientList = strings.Split(*clientListFlag, ",")
+	for i := range clientList {
+		clientList[i] = strings.TrimSpace(clientList[i])
+	}
+
 	// Connect to the local docker daemon and make sure it works
 	daemon, err := docker.NewClient(*dockerEndpoint)
 	if err != nil {
@@ -282,7 +292,7 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 	var err error
 
 	// Retrieve the versions of all clients being tested
-	if results.Clients, err = fetchClientVersions(daemon, *clientPattern, cacher); err != nil {
+	if results.Clients, err = fetchClientVersions(daemon, clientList, cacher); err != nil {
 		log15.Crit("failed to retrieve client versions", "error", err)
 		b, ok := err.(*buildError)
 		if ok {
@@ -303,22 +313,22 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 	}
 	// Smoke tests are exclusive with all other flags
 	if *smokeFlag {
-		if results.Validations, err = validateClients(daemon, *clientPattern, "smoke", overrides, cacher); err != nil {
+		if results.Validations, err = validateClients(daemon, clientList, "smoke", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-validate client images", "error", err)
 			return err
 		}
-		if results.Simulations, err = simulateClients(daemon, *clientPattern, "smoke", overrides, cacher); err != nil {
+		if results.Simulations, err = simulateClients(daemon, clientList, "smoke", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-simulate client images", "error", err)
 			return err
 		}
-		if results.Benchmarks, err = benchmarkClients(daemon, *clientPattern, "smoke", overrides, cacher); err != nil {
+		if results.Benchmarks, err = benchmarkClients(daemon, clientList, "smoke", overrides, cacher); err != nil {
 			log15.Crit("failed to smoke-benchmark client images", "error", err)
 			return err
 		}
 	} else {
 		// Otherwise run all requested validation and simulation tests
 		if *validatorPattern != "" {
-			if results.Validations, err = validateClients(daemon, *clientPattern, *validatorPattern, overrides, cacher); err != nil {
+			if results.Validations, err = validateClients(daemon, clientList, *validatorPattern, overrides, cacher); err != nil {
 				log15.Crit("failed to validate clients", "error", err)
 				return err
 			}
@@ -328,13 +338,13 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 				log15.Crit("failed generate DAG for simulations", "error", err)
 				return err
 			}
-			if results.Simulations, err = simulateClients(daemon, *clientPattern, *simulatorPattern, overrides, cacher); err != nil {
+			if results.Simulations, err = simulateClients(daemon, clientList, *simulatorPattern, overrides, cacher); err != nil {
 				log15.Crit("failed to simulate clients", "error", err)
 				return err
 			}
 		}
 		if *benchmarkPattern != "" {
-			if results.Benchmarks, err = benchmarkClients(daemon, *clientPattern, *benchmarkPattern, overrides, cacher); err != nil {
+			if results.Benchmarks, err = benchmarkClients(daemon, clientList, *benchmarkPattern, overrides, cacher); err != nil {
 				log15.Crit("failed to benchmark clients", "error", err)
 				return err
 			}

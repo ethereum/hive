@@ -3,12 +3,13 @@
 # The build process it potentially longer running but every effort was made to
 # produce a very minimalistic container that can be reused many times without
 # needing to constantly rebuild.
-FROM anapsix/alpine-java:8_jdk_unlimited
 
+FROM anapsix/alpine-java:8_jdk_unlimited
+ARG branch=master
 # Build Harmony on the fly and delete all build tools afterwards
 RUN \
   apk add --update git jq                                                               && \
-  git clone --depth 1 -b develop https://github.com/ether-camp/ethereum-harmony.git     && \
+  git clone --depth 1 -branch $branch https://github.com/ether-camp/ethereum-harmony.git     && \
   (cd ethereum-harmony && git checkout develop  && git pull                             && \
   echo "{}"                                                                  \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}"             \

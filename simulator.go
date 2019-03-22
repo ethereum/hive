@@ -51,10 +51,10 @@ type simulationSubresult struct {
 // simulateClients runs a batch of simulation tests matched by simulatorPattern
 // against a set of clients matching clientPattern, where  the simulator decides
 // which of those clients to invoke
-func simulateClients(daemon *docker.Client, clientPattern, simulatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*simulationResult, error) {
+func simulateClients(daemon *docker.Client, clientList []string, simulatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*simulationResult, error) {
 	// Build all the clients matching the validation pattern
-	log15.Info("building clients for simulation", "pattern", clientPattern)
-	clients, err := buildClients(daemon, clientPattern, cacher)
+	log15.Info("building clients for simulation", "pattern", clientList)
+	clients, err := buildClients(daemon, clientList, cacher)
 	if err != nil {
 		return nil, err
 	}
