@@ -29,16 +29,77 @@ $ go get github.com/ethereum/hive
 of resource files to build the corrent docker images and containers. This requirement will be removed
 in the future.*
 
+# Quickstart command lines
+
+This section is a quickstart of command line options covering typical Hive usage scenarios.
+
+For additional Windows-specific command line options please check the section following.
+
+## Consensus test
+To execute the consensus tests on parity run the latest simulator:
+
+```text
+   --docker-noshell
+   --client parity_master
+   --sim ethereum/consensus2
+   --results-root /mytests/test
+```
+
+## Devp2p tests
+
+These run devp2p tests, mainly Discovery tests.
+
+```text
+    --sim devp2p
+    --sim-rootcontext
+    --test none
+    --loglevel 6
+    --docker-noshell
+    --results-root /mytests/test
+    --client go-ethereum_master
+    --sim-parallelism 1
+```
+
+## Sync simulation
+
+These run a test verifying that a blockchain can be synced between differing implementations.
+
+      --sim ethereum\\\\sync
+      --sim-rootcontext
+      --test none
+      --loglevel 6
+      --docker-noshell
+      --results-root /mytests/test
+      --client go-ethereum_master,parity_master
+      --sim-parallelism 1
+
+## Generate a blockchain
+
+This uses Hive to generate a blockchain based on a genesis file for subsequent testing in sync simulations.
+
+      --loglevel 6
+      --chainGenerate
+      --chainLength 10
+      --chainOutputPath C:\\Ethereum\\OutputPath
+      --chainGenesis C:\\Ethereum\\Input\\Genesis.json
+      --chainBlockTime 30
+
 # Running on Windows
 
 The following information assumes Docker for Windows (CE) is installed on Windows 10 Pro. 
 
 ## Docker daemon
-`hive` uses the Docker API to connect to the Docker Daemon to dynamically create and run containers. At the time of writing, the daemon is disabled by default. This must be enabled. 
+`hive` uses the Docker API to connect to the Docker Daemon to dynamically create and run containers. At the time of writing, the daemon is disabled by default. This must be enabled.
 
-To enable the daemon, right click on the Docker Whale in the system tray and press Settings. Under 'General' select "Expose daemon on tcp.... without TLS".
+To enable the daemon, right click on the Docker icon in the system tray and press Settings. Under 'General' select "Expose daemon on tcp.... without TLS".
 
-To run `hive`, use the following command line option --docker-endpoint tcp://localhost:2375 Alternatively, if using VSCode simply run using the supplied launch.json (see below)
+To run `hive`, use the following command line option 
+
+```text
+  --docker-endpoint tcp://localhost:2375 
+```
+
+Alternatively, if using VSCode simply run using the supplied launch.json (see below)
 
 ## Shell container
 Currently, the Windows version must be run from the Host. To achieve this run with the --docker-noshell command line option. 
