@@ -36,7 +36,7 @@ ADD /ethereum/sync/simplechain /simplechain
 RUN apk add --update bash curl jq
 # Add the entry script
 ADD /ethereum/sync/tests.sh /tests.sh
-
+RUN chmod +x /tests.sh
 
 EXPOSE 2345 8545 8546 8080 30303 30303/udp 
 
