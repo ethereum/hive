@@ -164,8 +164,8 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 fi
 
 # Run the client with the requested flags
-echo "Running Aleth... "
-
+echo "Running Aleth..."
+# FLAGS="$FLAGS --admin 0000"
 RUNCMD="python3 /usr/bin/aleth.py --rpc http://0.0.0.0:8545 --aleth-exec $ETHEXEC $FLAGS"
 echo "cmd: $RUNCMD"
 $RUNCMD
