@@ -353,12 +353,7 @@ func (t *V4Udp) SpoofedPing(toid enode.ID, tomac string, toaddr *net.UDPAddr, fr
 
 	}
 
-	spoofedSource := &net.UDPAddr{
-		IP:   fromaddr.IP.To16(),
-		Port: int(fromaddr.Port),
-	}
-
-	return <-t.sendSpoofedPacket(toid, toaddr, spoofedSource, req, packet, tomac, callback)
+	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, req, packet, tomac, callback)
 
 }
 
@@ -373,10 +368,6 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 	}
 
 	//the 'victim' source
-	spoofedSource := &net.UDPAddr{
-		IP:   fromaddr.IP.To16(),
-		Port: int(fromaddr.Port),
-	}
 
 	//wait for a tiny bit
 	//NB: in a real scenario the 'victim' will have responded with a v4 pong
@@ -432,7 +423,7 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 		return nil
 	}
 
-	return <-t.sendSpoofedPacket(toid, toaddr, spoofedSource, findreq, findpacket, tomac, callback)
+	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, findreq, findpacket, tomac, callback)
 
 }
 

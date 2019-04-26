@@ -16,7 +16,12 @@ ADD config.json /config.json
 ADD aleth.sh /aleth.sh
 RUN chmod +x /aleth.sh
 
-RUN apk add --no-cache jq bc bash
+# Inject the enode id retriever script
+ADD enode.sh /enode.sh
+RUN chmod +x /enode.sh
+
+RUN apk add --no-cache jq bc bash curl
+
 
 # Copy buildinfo into version.json, and also remove the 'bool' field is_prerelease
 
