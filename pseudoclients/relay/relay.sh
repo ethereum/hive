@@ -11,6 +11,6 @@ set -e
 
 echo "Starting UDP relay from 30303 to $HIVE_RELAY_IP:$HIVE_RELAY_UDP"
 
-socat -v UDP4-RECVFROM:30303,fork UDP4-SENDTO:$HIVE_RELAY_IP:$HIVE_RELAY_UDP 
+socat -x -u UDP4-RECVFROM:30303,fork UDP4-SENDTO:$HIVE_RELAY_IP:$HIVE_RELAY_UDP 
 
 echo "Shutting down UDP relay"

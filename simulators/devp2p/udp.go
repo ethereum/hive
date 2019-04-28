@@ -384,11 +384,12 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 	//TODO- send a best reply tok guess?
 	to := makeEndpoint(toaddr, 0)
 	pongreq := &pong{
+
 		To:         to,
 		ReplyTok:   make([]byte, macSize),
 		Expiration: uint64(time.Now().Add(expiration).Unix()),
 	}
-	packet, _, err := encodePacket(t.priv, pingPacket, pongreq)
+	packet, _, err := encodePacket(t.priv, pongPacket, pongreq)
 	if err != nil {
 		return err
 	}
