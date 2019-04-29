@@ -109,6 +109,7 @@ func TestSyncsWithGeth(t *testing.T) {
 					"HIVE_FORK_TANGERINE": "0",
 					"HIVE_FORK_SPURIOUS":  "0",
 					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_FORK_DAO_BLOCK": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
 				clientID, nodeIP, _, err := host.StartNewNode(parms)
@@ -188,6 +189,7 @@ func TestSyncsWithGeth(t *testing.T) {
 					"HIVE_FORK_TANGERINE": "0",
 					"HIVE_FORK_SPURIOUS":  "0",
 					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_FORK_DAO_BLOCK": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
 				clientID, nodeIP, _, err := host.StartNewNode(parms)
@@ -223,7 +225,11 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 		t.Fatalf("Unable to parse enode: %v", err)
 	}
 	//replace the ip with what docker says it is
-	peerNode = enode.NewV4(peerNode.Pubkey(), nodeIP, peerNode.TCP(), 30303)
+	tcpPort := peerNode.TCP()
+	if tcpPort == 0 {
+		tcpPort = 30303
+	}
+	peerNode = enode.NewV4(peerNode.Pubkey(), nodeIP, tcpPort, 30303)
 	if peerNode == nil {
 		t.Fatalf("Unable to make enode: %v", err)
 	}
