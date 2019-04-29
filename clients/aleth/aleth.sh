@@ -36,7 +36,7 @@ set -e
 if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --peerset required:$HIVE_BOOTNODE"
 else
-	FLAGS="$FLAGS --no-discovery"
+	FLAGS="$FLAGS --no-bootstrap"
 fi
 
 # If a specific network ID is requested, use that
@@ -64,7 +64,9 @@ if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"homesteadForkBlock\"]; \"0x$HIVE_FORK_HOMESTEAD\")"`
 fi
 
+
 if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+	
 	HIVE_FORK_DAO_BLOCK=`echo "obase=16; $HIVE_FORK_DAO_BLOCK" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"daoHardforkBlock\"]; \"0x$HIVE_FORK_DAO_BLOCK\")"`
 fi
@@ -104,7 +106,9 @@ if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 	HIVE_FORK_PETERSBURG=`echo "obase=16; $HIVE_FORK_PETERSBURG" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"constantinopleFixForkBlock\"]; \"0x$HIVE_FORK_PETERSBURG\")"`
 fi
-
+if [ "$HIVE_CHAIN_ID" != "" ]; then
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainID\"]; \"0x$HIVE_CHAIN_ID\")"`
+fi
 if [ "$accounts" != "" ]; then
 	# In some cases, the 'alloc' portion can be extremely large.
 	# Because of this, it can't be handled via cmd line parameters,
@@ -133,19 +137,22 @@ echo $chainconfig > /chain2.json
 FLAGS="$FLAGS --config /chain2.json"
 ETHEXEC=/usr/bin/aleth
 echo "Flags: $FLAGS"
-#echo "Initializing database with genesis state and loading inital blockchain"
-#if [ -f /chain.rlp ]; then
-#	eth $FLAGS import /chain.rlp
-#fi
+
 
 # Don't immediately abort, some imports are meant to fail
 set +e
+
+echo "loading test chain if present"
+if [ -f /chain.rlp ]; then
+	echo "Command: $ETHEXEC $FLAGS --import /chain.rlp"
+	$ETHEXEC $FLAGS --import /chain.rlp
+fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
 	for block in `ls /blocks | sort -n`; do
-		echo "Command: eth $FLAGS --import /blocks/$block"
+		echo "Command: aleth $FLAGS --import /blocks/$block"
 		$ETHEXEC $FLAGS --import /blocks/$block
 		#valgrind --leak-check=yes $ETHEXEC $FLAGS import /blocks/$block
 		#gdb -q -n -ex r -ex bt --args eth $FLAGS import /blocks/$block
