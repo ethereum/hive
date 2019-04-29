@@ -34,7 +34,7 @@ set -e
 
 # It doesn't make sense to dial out, use only a pre-set bootnode
 if [ "$HIVE_BOOTNODE" != "" ]; then
-	FLAGS="$FLAGS --peerset $HIVE_BOOTNODE"
+	FLAGS="$FLAGS --no-bootstrap"
 else
 	FLAGS="$FLAGS --no-discovery"
 fi
@@ -165,7 +165,7 @@ fi
 
 # Run the client with the requested flags
 echo "Running Aleth..."
-# FLAGS="$FLAGS --admin 0000"
+ 
 RUNCMD="python3 /usr/bin/aleth.py --rpc http://0.0.0.0:8545 --aleth-exec $ETHEXEC $FLAGS"
 echo "cmd: $RUNCMD"
 $RUNCMD
