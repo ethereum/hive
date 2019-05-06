@@ -109,7 +109,7 @@ func TestSyncsWithGeth(t *testing.T) {
 					"HIVE_FORK_TANGERINE": "0",
 					"HIVE_FORK_SPURIOUS":  "0",
 					"HIVE_FORK_BYZANTIUM": "0",
-					"HIVE_FORK_DAO_BLOCK": "0",
+					//	"HIVE_FORK_DAO_BLOCK": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
 				clientID, nodeIP, _, err := host.StartNewNode(parms)
@@ -189,7 +189,7 @@ func TestSyncsWithGeth(t *testing.T) {
 					"HIVE_FORK_TANGERINE": "0",
 					"HIVE_FORK_SPURIOUS":  "0",
 					"HIVE_FORK_BYZANTIUM": "0",
-					"HIVE_FORK_DAO_BLOCK": "0",
+					//	"HIVE_FORK_DAO_BLOCK": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
 				clientID, nodeIP, _, err := host.StartNewNode(parms)

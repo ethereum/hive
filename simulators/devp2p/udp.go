@@ -421,7 +421,7 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 		if p.ptype == neighborsPacket {
 			return ErrUnsolicitedReply
 		}
-		return nil
+		return ErrTimeout
 	}
 
 	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, findreq, findpacket, tomac, callback)
@@ -703,8 +703,12 @@ func (t *V4Udp) FindnodeWithoutBond(toid enode.ID, toaddr *net.UDPAddr, target e
 	//expect nothing
 	t.l.Log("Establishing criteria: Fail if any packet received. Succeed if nothing received within timeouts.")
 	callback := func(p reply) error {
-
+		if p.ptype == pingPacket {
+			t.l.Log("Warning: Node attempting to bond in response to FindNode.")
+			return ErrTimeout
+		}
 		return ErrUnsolicitedReply
+
 	}
 
 	return <-t.sendPacket(toid, toaddr, req, packet, callback)
