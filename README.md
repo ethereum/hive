@@ -14,6 +14,11 @@ adherence to official specs or behaviours under different circumstances.
 Most importantly, it is essential to be able to run this test suite as part of the CI workflow! To
 this effect the entire suite is based on docker containers.
 
+# Public test results
+
+An Ethereum Foundation server often runs Hive to check for consensus, p2p and blockchain compatibility.
+Test results are made public [here](http://hivetests.ethstats.net/)
+
 # Installing the hive validator
 
 The `hive` project is based on Go. Although there are plans to make running `hive` possible using
