@@ -132,6 +132,8 @@ if [ "$HIVE_SKIP_POW" != "" ]; then
 fi
 
 echo $chainconfig > /chain2.json
+echo "Config:"
+echo $chainconfig
 
 # Initialize the local testchain with the genesis state
 FLAGS="$FLAGS --config /chain2.json"
