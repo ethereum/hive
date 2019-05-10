@@ -81,4 +81,4 @@ fi
 
 echo "Running Nethermind..."
 
-dotnet Nethermind.Runner.dll
+dotnet Nethermind.Runner.dll 2>&1 | tee \log.txt
