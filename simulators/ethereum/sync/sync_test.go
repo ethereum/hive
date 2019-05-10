@@ -50,6 +50,8 @@ func TestMain(m *testing.M) {
 
 func TestSyncsWithGeth(t *testing.T) {
 
+	//Test a fastmode sync by creating a geth client and one each of any other type of client
+	//and ask the other client to load the chain
 	t.Run("fastmodes", func(t *testing.T) {
 
 		startTime := time.Now()
@@ -126,6 +128,8 @@ func TestSyncsWithGeth(t *testing.T) {
 
 	})
 
+	//Test sync compatibility by creating a geth node and load the chain there,
+	//then create one each of each remaining type of node and sync from geth
 	t.Run("compatibility", func(t *testing.T) {
 
 		startTime := time.Now()
