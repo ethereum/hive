@@ -23,6 +23,7 @@
 set -e
 
 # It doesn't make sense to dial out, use only a pre-set bootnode
+# TODO - 
 if [ "$HIVE_BOOTNODE" != "" ]; then
 	export NETHERMIND_HIVECONFIG_BOOTNODE=$HIVE_BOOTNODE
 fi
@@ -60,23 +61,27 @@ genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig
 # Don't immediately abort, some imports are meant to fail
 set +e
 
-# Load the test chain if present
-echo "Loading initial blockchain..."
-if [ -f /chain.rlp ]; then
-	export NETHERMIND_HIVECONFIG_CHAINFILE=chain.rlp
-fi
 
-# Load the remainder of the test chain
-echo "Loading remaining individual blocks..."
-if [ -d /blocks ]; then
-	export NETHERMIND_HIVECONFIG_BLOCKSDIR=blocks
-fi
-
+# Configure and set the chain definition for the node
+configoverride=`jq -f /mapper.jq /genesis.json`
+echo ".*$configoverride">/tempscript.jq
+mergedconfig=`jq -f /tempscript.jq /chainspec/foundation.json`
+echo $mergedconfig>/chainspec/foundation.json
+echo "Nethermind config"
+echo $mergedconfig
 set -e
 
 # Load any keys explicitly added to the node
-if [ -d /keys ]; then
-	export NETHERMIND_HIVECONFIG_KEYSDIR=keys
+#if [ -d /keys ]; then
+#	export NETHERMIND_HIVECONFIG_KEYSDIR=keys
+#fi
+
+
+# Load the test chain if present
+
+if [ -f /chain.rlp ]; then
+	echo "Loading initial blockchain if pre..."
+	dotnet /ChainLoader/ChainLoader.dll --config /configs/mainnet.cfg 2>&1
 fi
 
 echo "Running Nethermind..."
