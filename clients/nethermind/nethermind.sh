@@ -58,18 +58,14 @@ if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 fi
 genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
-# Don't immediately abort, some imports are meant to fail
-set +e
 
 
 # Configure and set the chain definition for the node
 configoverride=`jq -f /mapper.jq /genesis.json`
 echo ".*$configoverride">/tempscript.jq
-mergedconfig=`jq -f /tempscript.jq /chainspec/foundation.json`
-echo $mergedconfig>/chainspec/foundation.json
-echo "Nethermind config"
-echo $mergedconfig
-set -e
+mergedconfig=`jq -f /tempscript.jq /chainspec/test.json`
+echo $mergedconfig>/chainspec/test.json
+
 
 # Load any keys explicitly added to the node
 #if [ -d /keys ]; then
@@ -78,11 +74,13 @@ set -e
 
 
 # Load the test chain if present
-
+set +e
 if [ -f /chain.rlp ]; then
-	echo "Loading initial blockchain if pre..."
-	dotnet /ChainLoader/ChainLoader.dll --config /configs/mainnet.cfg 2>&1
+	echo "Loading initial blockchain"
+	cp /chain.rlp /chainspec/chain.rlp
+	dotnet /ChainLoader/ChainLoader.dll --config /configs/test.cfg 2>&1
 fi
+set -e
 
 echo "Running Nethermind..."
 

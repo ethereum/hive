@@ -34,7 +34,7 @@ def infixzerostolength(s;l):
         "Ethash": {
             "params": {
             
-                "homesteadTransition": .config.homesteadBlock|addashex,
+                "homesteadTransition": .config.homesteadBlock,
                 "daoHardforkTransition": env.HIVE_FORK_DAO_BLOCK|addashex,
                 "eip100bTransition": env.HIVE_FORK_BYZANTIUM|addashex,
               

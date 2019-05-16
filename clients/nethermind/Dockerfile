@@ -1,7 +1,7 @@
 FROM ubuntu:18.04 AS clone
 ARG branch=master
 WORKDIR /src
-RUN apt update -y && apt install -y  curl git jq && \ 
+RUN apt update -y && apt install -y  curl git jq  && \ 
     git clone  --branch $branch https://github.com/NethermindEth/nethermind && \
     cd nethermind && git submodule update --init && \
     (echo "{}"                                                      \
@@ -9,7 +9,7 @@ RUN apt update -y && apt install -y  curl git jq && \
     | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
     | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
 	    > /version.json)
-ADD ChainLoader nethermind/src/ChainLoader
+ADD ChainLoader nethermind/src/Nethermind/ChainLoader
 
 FROM microsoft/dotnet:2.2-sdk AS build
 COPY --from=clone /src .
@@ -20,15 +20,21 @@ RUN cd nethermind/src/Nethermind/Nethermind.Runner && \
 RUN cd nethermind/src/Nethermind/ChainLoader && \
     dotnet publish -c release -o out
 FROM microsoft/dotnet:2.2-aspnetcore-runtime
-RUN apt update -y && apt install -y libsnappy-dev libc6-dev libc6 unzip jq
+RUN apt update -y && apt install -y libsnappy-dev libc6-dev libc6 unzip jq wget
 
 COPY --from=build /nethermind/src/Nethermind/Nethermind.Runner/out .
 COPY --from=build /nethermind/src/Nethermind/ChainLoader/out /ChainLoader
 COPY --from=build /version.json .
 
+RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /usr/local/bin/jq && \
+    echo 'af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44  /usr/local/bin/jq' | sha256sum -c && \
+    chmod +x /usr/local/bin/jq
+
 ADD enode.sh /enode.sh
 ADD nethermind.sh /nethermind.sh
 ADD mapper.jq /mapper.jq
+COPY test.json /chainspec/test.json
+COPY test.cfg /configs/test.cfg
 RUN chmod +x /nethermind.sh
 RUN chmod +x /enode.sh
 
