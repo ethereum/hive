@@ -25,11 +25,16 @@ func NewSealingEthash(config ethash.Config, notify []string, noverify bool) *Sea
 	return sealingEthash
 }
 
-// Finalize implements consensus.Engine, accumulating the block and uncle rewards,
-// setting the final state and assembling the block.
-func (e *SealingEthash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+// Finalize wraps ethhash engine
+func (e *SealingEthash) Finalize(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header) {
+	e.EthashEngine.Finalize(chain, header, state, txs, uncles)
+}
 
-	finalizedBlock, err := e.EthashEngine.Finalize(chain, header, state, txs, uncles, receipts)
+// FinalizeAndAssemble implements consensus.Engine, accumulating the block and uncle rewards,
+// setting the final state and assembling the block.
+func (e *SealingEthash) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+
+	finalizedBlock, err := e.EthashEngine.FinalizeAndAssemble(chain, header, state, txs, uncles, receipts)
 	if err != nil {
 		return nil, err
 	}
