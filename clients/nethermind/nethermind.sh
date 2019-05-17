@@ -65,8 +65,8 @@ configoverride=`jq -f /mapper.jq /genesis.json`
 echo ".*$configoverride">/tempscript.jq
 mergedconfig=`jq -f /tempscript.jq /chainspec/test.json`
 echo $mergedconfig>/chainspec/test.json
-
-
+echo "Chainspec:"
+cat /chainspec/test.json
 # Load any keys explicitly added to the node
 #if [ -d /keys ]; then
 #	export NETHERMIND_HIVECONFIG_KEYSDIR=keys
@@ -83,5 +83,4 @@ fi
 set -e
 
 echo "Running Nethermind..."
-
-dotnet Nethermind.Runner.dll 2>&1 | tee \log.txt
+dotnet Nethermind.Runner.dll --config /configs/test.cfg  2>&1 | tee /log.txt
