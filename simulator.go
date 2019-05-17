@@ -400,6 +400,7 @@ func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, lo
 		containerIP = container.NetworkSettings.IPAddress
 		containerMAC = container.NetworkSettings.MacAddress
 		if checkliveness {
+			logger.Debug("Checking container online....")
 			// Container seems to be alive, check whether the RPC is accepting connections
 			if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", containerIP, 8545)); err == nil {
 				logger.Debug("client container online", "time", time.Since(start))
