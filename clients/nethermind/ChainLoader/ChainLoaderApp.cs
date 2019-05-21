@@ -38,7 +38,9 @@ using Nethermind.Core.Encoding;
 using Nethermind.Core.Json;
 using Nethermind.Core.Logging;
 using Nethermind.Core.Specs;
-using Nethermind.Core.Specs.ChainSpec;
+
+using Nethermind.Core.Specs.ChainSpecStyle;
+using Nethermind.Core.Specs.Forks;
 using Nethermind.Core.Utils;
 using Nethermind.Db;
 using Nethermind.Db.Config;
@@ -274,12 +276,13 @@ namespace ChainLoader
 
             _stateProvider = stateProvider;
 
-       
-             
+
+
 
 
             /* blockchain processing */
 
+         
             if (_chainSpec.ChainId == RopstenSpecProvider.Instance.ChainId)
             {
                 _specProvider = RopstenSpecProvider.Instance;
@@ -296,13 +299,9 @@ namespace ChainLoader
             {
                 _specProvider = GoerliSpecProvider.Instance;
             }
-            else if (_chainSpec.ChainId == SturebySpecProvider.Instance.ChainId)
-            {
-                _specProvider = SturebySpecProvider.Instance;
-            }
             else
             {
-                _specProvider = new SingleReleaseSpecProvider(LatestRelease.Instance, _chainSpec.ChainId);
+                _specProvider = new SingleReleaseSpecProvider(Latest.Release, _chainSpec.ChainId);
             }
 
             _ethereumEcdsa = new EthereumEcdsa(_specProvider, _logManager);
@@ -334,8 +333,8 @@ namespace ChainLoader
                 case SealEngineType.Clique:
                     _rewardCalculator = NoBlockRewards.Instance;
                     cliqueConfig = new CliqueConfig();
-                    cliqueConfig.BlockPeriod = _chainSpec.CliquePeriod;
-                    cliqueConfig.Epoch = _chainSpec.CliqueEpoch;
+                    cliqueConfig.BlockPeriod = _chainSpec.Clique.Period;
+                    cliqueConfig.Epoch = _chainSpec.Clique.Epoch;
                     _snapshotManager = new SnapshotManager(cliqueConfig, _dbProvider.BlocksDb, _blockTree, _ethereumEcdsa, _logManager);
                     _sealValidator = new CliqueSealValidator(cliqueConfig, _snapshotManager, _logManager);
                     _recoveryStep = new CompositeDataRecoveryStep(_recoveryStep, new AuthorRecoveryStep(_snapshotManager));
@@ -468,6 +467,7 @@ namespace ChainLoader
         {
             try
             {
+                _logger.Info($"Loading block: {block.Number}");
                 _blockTree.SuggestBlock(block);
             }
             catch (InvalidBlockException e)
