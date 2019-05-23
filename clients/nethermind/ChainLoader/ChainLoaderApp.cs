@@ -36,7 +36,7 @@ using Nethermind.Core;
 using Nethermind.Core.Crypto;
 using Nethermind.Core.Encoding;
 using Nethermind.Core.Json;
-using Nethermind.Core.Logging;
+using Nethermind.Logging;
 using Nethermind.Core.Specs;
 
 using Nethermind.Core.Specs.ChainSpecStyle;
