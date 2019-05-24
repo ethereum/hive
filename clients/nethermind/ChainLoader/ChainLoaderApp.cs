@@ -36,12 +36,12 @@ using Nethermind.Core;
 using Nethermind.Core.Crypto;
 using Nethermind.Core.Encoding;
 using Nethermind.Core.Json;
-using Nethermind.Core.Logging;
+using Nethermind.Logging;
 using Nethermind.Core.Specs;
 
 using Nethermind.Core.Specs.ChainSpecStyle;
 using Nethermind.Core.Specs.Forks;
-using Nethermind.Core.Utils;
+
 using Nethermind.Db;
 using Nethermind.Db.Config;
 using Nethermind.Evm;
@@ -282,27 +282,8 @@ namespace ChainLoader
 
             /* blockchain processing */
 
-         
-            if (_chainSpec.ChainId == RopstenSpecProvider.Instance.ChainId)
-            {
-                _specProvider = RopstenSpecProvider.Instance;
-            }
-            else if (_chainSpec.ChainId == MainNetSpecProvider.Instance.ChainId)
-            {
-                _specProvider = MainNetSpecProvider.Instance;
-            }
-            else if (_chainSpec.ChainId == RinkebySpecProvider.Instance.ChainId)
-            {
-                _specProvider = RinkebySpecProvider.Instance;
-            }
-            else if (_chainSpec.ChainId == GoerliSpecProvider.Instance.ChainId)
-            {
-                _specProvider = GoerliSpecProvider.Instance;
-            }
-            else
-            {
-                _specProvider = new SingleReleaseSpecProvider(Latest.Release, _chainSpec.ChainId);
-            }
+
+            _specProvider = new ChainSpecBasedSpecProvider(_chainSpec);
 
             _ethereumEcdsa = new EthereumEcdsa(_specProvider, _logManager);
             _txPool = new TxPool(

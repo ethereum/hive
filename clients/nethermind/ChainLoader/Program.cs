@@ -1,7 +1,7 @@
 ﻿
 
 using System;
-using Nethermind.Core.Logging;
+using Nethermind.Logging;
 using Nethermind.Runner;
 
 namespace ChainLoader
