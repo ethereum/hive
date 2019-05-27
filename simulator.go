@@ -167,7 +167,7 @@ func simulate(daemon *docker.Client, clients map[string]string, pseudos map[stri
 
 	// Start the tester container and wait until it finishes
 	slogger.Debug("running simulator container")
-	waiter, err := runContainer(daemon, sc.ID, slogger, filepath.Join(logdir, "simulator.log"), false)
+	waiter, err := runContainer(daemon, sc.ID, slogger, filepath.Join(logdir, "simulator.log"), false, *loglevelFlag)
 	if err != nil {
 		slogger.Error("failed to run simulator", "error", err)
 		return err
@@ -340,6 +340,18 @@ func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, lo
 		return
 	}
 
+	//default the loglevel to the simulator log level setting (different from the sysem log level setting)
+	logLevel := *simloglevelFlag
+	logLevelString, in := envs["HIVE_LOGLEVEL"]
+	if !in {
+		envs["HIVE_LOGLEVEL"] = strconv.Itoa(logLevel)
+	} else {
+		var err error
+		if logLevel, err = strconv.Atoi(logLevelString); err != nil {
+			logger.Error("Simulator client HIVE_LOGLEVEL is not an integer", "error", nil)
+		}
+	}
+
 	//the simulation host may prevent or be unaware of the simulation controller's requested client
 	imageName, in := available[clientName]
 	if !in {
@@ -363,7 +375,7 @@ func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, lo
 
 	logfile := fmt.Sprintf("client-%s.log", containerID)
 
-	waiter, err := runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), logfile), false)
+	waiter, err := runContainer(h.daemon, container.ID, logger, filepath.Join(h.logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), logfile), false, logLevel)
 	if err != nil {
 		logger.Error("failed to start client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

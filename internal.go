@@ -37,7 +37,7 @@ func makeGenesisDAG(daemon *docker.Client, cacher *buildCacher) error {
 	// Start generating the genesis ethash DAG
 	log15.Info("generating genesis DAG")
 
-	waiter, err := runContainer(daemon, ethash.ID, log15.Root(), "", true)
+	waiter, err := runContainer(daemon, ethash.ID, log15.Root(), "", true, *loglevelFlag)
 	if err != nil {
 		log15.Error("failed to execute ethash", "error", err)
 		return err

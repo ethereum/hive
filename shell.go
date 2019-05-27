@@ -38,7 +38,7 @@ func mainInShell(daemon *docker.Client, overrides []string, cacher *buildCacher)
 	// Start up a hive instance within the shell
 	log15.Info("starting outer shell container")
 
-	waiter, err := runContainer(daemon, shell.ID, log15.Root(), "", true)
+	waiter, err := runContainer(daemon, shell.ID, log15.Root(), "", true, *loglevelFlag)
 	if err != nil {
 		log15.Error("failed to execute hive shell", "error", err)
 		return err
