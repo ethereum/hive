@@ -300,7 +300,7 @@ func copyBetweenContainers(daemon *docker.Client, dest, src string, path, target
 	if path == "" {
 		path = target
 	}
-	if path == "ignore"{
+	if path == "ignore" {
 		return nil
 	}
 	// Download a tarball of the file from the source container
@@ -349,7 +349,7 @@ func copyBetweenContainers(daemon *docker.Client, dest, src string, path, target
 // runContainer attaches to the output streams of an existing container, then
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
-func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile string, shell bool) (docker.CloseWaiter, error) {
+func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile string, shell bool, logLevel int) (docker.CloseWaiter, error) {
 	// If we're the outer shell, log straight to stderr, nothing fancy
 	stdout := io.Writer(os.Stdout)
 	stream := io.Writer(os.Stderr)
@@ -367,7 +367,7 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 		fdsToClose = append(fdsToClose, log)
 
 		// If console logging was requested, tee the output and tag it with the container id
-		if *loglevelFlag > 5 {
+		if logLevel > 0 {
 			// Hook into the containers output stream and tee it out
 			hookedR, hookedW, err := os.Pipe()
 			if err != nil {

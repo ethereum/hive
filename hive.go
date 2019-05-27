@@ -56,7 +56,8 @@ var (
 	chainGenesis    = flag.String("chainGenesis", "", "The path and filename to the source genesis.json")
 	chainBlockTime  = flag.Uint("chainBlockTime", 30, "The desired block time in seconds")
 
-	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
+	loglevelFlag    = flag.Int("loglevel", 3, "Log level to use for displaying system events")
+	simloglevelFlag = flag.Int("simloglevel", 3, "The base log level for simulator client instances. This number from 0-6 is interpreted differently depending on the client type.")
 
 	dockerTimeout         = flag.Int("dockertimeout", 10, "Time to wait for container to finish before stopping it")
 	dockerTimeoutDuration = time.Duration(*dockerTimeout) * time.Minute
