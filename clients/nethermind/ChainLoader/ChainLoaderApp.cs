@@ -284,15 +284,14 @@ namespace ChainLoader
 
 
             _specProvider = new ChainSpecBasedSpecProvider(_chainSpec);
-
             _ethereumEcdsa = new EthereumEcdsa(_specProvider, _logManager);
             _txPool = new TxPool(
-                new PersistentTransactionStorage(_dbProvider.PendingTxsDb, _specProvider),
-                new PendingTransactionThresholdValidator(_initConfig.ObsoletePendingTransactionInterval,
+                new PersistentTxStorage(_dbProvider.PendingTxsDb, _specProvider),
+                new PendingTxThresholdValidator(_initConfig.ObsoletePendingTransactionInterval,
                     _initConfig.RemovePendingTransactionInterval), new Timestamp(),
                 _ethereumEcdsa, _specProvider, _logManager, _initConfig.RemovePendingTransactionInterval,
                 _initConfig.PeerNotificationThreshold);
-            _receiptStorage = new PersistentReceiptStorage(_dbProvider.ReceiptsDb, _specProvider);
+            _receiptStorage = new PersistentReceiptStorage(_dbProvider.ReceiptsDb, _specProvider, _logManager);
 
             _blockTree = new BlockTree(
               _dbProvider.BlocksDb,
