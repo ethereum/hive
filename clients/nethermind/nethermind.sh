@@ -72,15 +72,5 @@ cat /chainspec/test.json
 #	export NETHERMIND_HIVECONFIG_KEYSDIR=keys
 #fi
 
-
-# Load the test chain if present
-set +e
-if [ -f /chain.rlp ]; then
-	echo "Loading initial blockchain"
-	cp /chain.rlp /chainspec/chain.rlp
-	dotnet /ChainLoader/ChainLoader.dll --config /configs/test.cfg 2>&1
-fi
-set -e
-
 echo "Running Nethermind..."
 dotnet Nethermind.Runner.dll --config /configs/test.cfg  2>&1 | tee /log.txt
