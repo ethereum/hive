@@ -133,7 +133,8 @@ def infixzerostolength(s;l):
         "eip145Transition": env.HIVE_FORK_CONSTANTINOPLE|addashex,
         "eip1014Transition": env.HIVE_FORK_CONSTANTINOPLE|addashex,
         "eip1052Transition": env.HIVE_FORK_CONSTANTINOPLE|addashex,
-        "eip1283Transition": env.HIVE_FORK_CONSTANTINOPLE|addashex
+        "eip1283Transition": env.HIVE_FORK_CONSTANTINOPLE|addashex,
+        "eip1283DisableTransition": env.HIVE_FORK_PETERSBURG|addashex
     
     
   
