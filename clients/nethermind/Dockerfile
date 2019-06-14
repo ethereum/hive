@@ -1,6 +1,8 @@
 FROM ubuntu:18.04 AS clone
 ARG branch=master
 WORKDIR /src
+
+RUN echo "Cloning branch $branch from https://github.com/NethermindEth/nethermind"
 RUN apt update -y && apt install -y  curl git jq  && \ 
     git clone  --branch $branch https://github.com/NethermindEth/nethermind && \
     cd nethermind && git submodule update --init && \
