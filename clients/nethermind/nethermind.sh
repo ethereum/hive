@@ -10,14 +10,22 @@
 #  - `keys` folder is located in the filesystem root (optional)
 #
 # This script assumes the following environment variables:
-#  - HIVE_BOOTNODE       enode URL of the remote bootstrap node
-#  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
-#  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
-#  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
-#  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
-#  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
-#  - HIVE_MINER          address to credit with mining rewards (single thread)
-#  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
+#  - HIVE_BOOTNODE             enode URL of the remote bootstrap node
+#  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
+#  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
+#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
+#  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
+#  - HIVE_FORK_HOMESTEAD       block number of the DAO hard-fork transition
+#  - HIVE_FORK_DAO_BLOCK       block number of the DAO hard-fork transitionnsition
+#  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
+#  - HIVE_FORK_TANGERINE       block number of TangerineWhistle
+#  - HIVE_FORK_SPURIOUS        block number of SpuriousDragon
+#  - HIVE_FORK_BYZANTIUM       block number for Byzantium transition
+#  - HIVE_FORK_CONSTANTINOPLE  block number for Constantinople transition
+#  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/PetersBurg transition
+#  - HIVE_MINER                address to credit with mining rewards (single thread)
+#  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
+#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
 
 # Immediately abort the script on any error encountered
 set -e
@@ -42,7 +50,6 @@ fi
 if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": true}"`
 fi
-
 if [ "$HIVE_FORK_TANGERINE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"eip150Block\": $HIVE_FORK_TANGERINE}"`
 fi
@@ -56,9 +63,14 @@ fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
 fi
+if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
+        chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
+fi
+
 genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 
-
+echo "Before mapper.jq"
+cat /genesis.json
 
 # Configure and set the chain definition for the node
 configoverride=`jq -f /mapper.jq /genesis.json`
