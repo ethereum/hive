@@ -133,7 +133,7 @@ func ProduceTestChainFromGenesisFile(sourceGenesis string, outputPath string, bl
 }
 
 // WriteChain - save blockchain to file
-func WriteChain(chain *core.BlockChain, filename string) error {
+func WriteChain(chain *core.BlockChain, filename string, start uint64) error {
 
 	// Make sure we can create the file to export into
 	out, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
@@ -145,7 +145,7 @@ func WriteChain(chain *core.BlockChain, filename string) error {
 	var writer io.Writer = out
 
 	// Export the blockchain
-	if err := chain.Export(writer); err != nil {
+	if err := chain.ExportN(writer, start, chain.CurrentBlock().NumberU64()); err != nil {
 		return err
 	}
 
@@ -182,7 +182,12 @@ func GenerateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blo
 	}
 
 	// Write out the generated blockchain
-	if err := WriteChain(blockchain, filepath.Join(path, "chain.rlp")); err != nil {
+	if err := WriteChain(blockchain, filepath.Join(path, "chain.rlp"), 0); err != nil {
+		log15.Crit("error writing chain to file", "error", err)
+		return err
+	}
+
+	if err := WriteChain(blockchain, filepath.Join(path, "chain_nogenesis.rlp"), 1); err != nil {
 		log15.Crit("error writing chain to file", "error", err)
 		return err
 	}
