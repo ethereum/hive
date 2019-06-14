@@ -37,15 +37,12 @@ var (
 	clientListFlag = flag.String("client", "go-ethereum_master", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_master and the client name is a subfolder of the clients directory")
 	clientList     []string
 
-	//clientPattern = flag.String("client", "_master", "Regexp selecting the client(s) to run against")
 	overrideFiles = flag.String("override", "", "Comma separated regexp:files to override in client containers")
 	smokeFlag     = flag.Bool("smoke", false, "Whether to only smoke test or run full test suite")
 
 	simLimiterFlag = flag.Int("simlimiter", -1, "Run all simulators with a time limit in seconds, -1 being unlimited")
 
-	validatorPattern = flag.String("test", "", "Regexp selecting the validation tests to run")
 	simulatorPattern = flag.String("sim", "", "Regexp selecting the simulation tests to run")
-	benchmarkPattern = flag.String("bench", "", "Regexp selecting the benchmarks to run")
 
 	simulatorParallelism = flag.Int("sim-parallelism", 1, "Max number of parallel clients/containers to run tests against")
 	hiveDebug            = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
@@ -179,16 +176,12 @@ type summaryData struct {
 
 type resultSet struct {
 	Clients     map[string]map[string]string            `json:"clients,omitempty"`
-	Validations map[string]map[string]*validationResult `json:"validations,omitempty"`
 	Simulations map[string]map[string]*simulationResult `json:"simulations,omitempty"`
-	Benchmarks  map[string]map[string]*benchmarkResult  `json:"benchmarks,omitempty"`
 }
 
 type resultSetSummary struct {
 	Clients     map[string]map[string]string                   `json:"clients,omitempty"`
-	Validations map[string]map[string]*validationResultSummary `json:"validations,omitempty"`
 	Simulations map[string]map[string]*simulationResultSummary `json:"simulations,omitempty"`
-	Benchmarks  map[string]map[string]*benchmarkResultSummary  `json:"benchmarks,omitempty"`
 	FileName    string                                         `json:"filename"`
 }
 
@@ -197,56 +190,6 @@ type summaryFile struct {
 }
 
 func summariseResults(results *resultSet, detailFile string) resultSetSummary {
-
-	valSummary := make(map[string]map[string]*validationResultSummary)
-
-	for k, v := range results.Validations {
-
-		valSummary[k] = make(map[string]*validationResultSummary)
-
-		for k2, v2 := range v {
-
-			valResultSummary := validationResultSummary{
-				validationResult{Start: v2.Start,
-					End:     v2.End,
-					Success: v2.Success,
-					Error:   v2.Error},
-				summaryData{Successes: 0, Fails: 0, Subresults: 1},
-			}
-
-			if v2.Success {
-				valResultSummary.Successes = 1
-			} else {
-				valResultSummary.Successes = 0
-			}
-
-			valSummary[k][k2] = &valResultSummary
-		}
-	}
-
-	benchSummary := make(map[string]map[string]*benchmarkResultSummary)
-	for k, b := range results.Benchmarks {
-
-		benchSummary[k] = make(map[string]*benchmarkResultSummary)
-
-		for k2, b2 := range b {
-
-			benchResultSummary := benchmarkResultSummary{
-				benchmarkResult{Start: b2.Start,
-					End:     b2.End,
-					Success: b2.Success,
-					Error:   b2.Error},
-				summaryData{Successes: 0, Fails: 0, Subresults: 1},
-			}
-
-			if b2.Success {
-				benchResultSummary.Successes = 1
-			} else {
-				benchResultSummary.Fails = 1
-			}
-			benchSummary[k][k2] = &benchResultSummary
-		}
-	}
 
 	simSummary := make(map[string]map[string]*simulationResultSummary)
 	for k, s := range results.Simulations {
@@ -277,8 +220,6 @@ func summariseResults(results *resultSet, detailFile string) resultSetSummary {
 	}
 
 	res := resultSetSummary{
-		Benchmarks:  benchSummary,
-		Validations: valSummary,
 		Simulations: simSummary,
 		FileName:    detailFile,
 		Clients:     results.Clients,
@@ -314,43 +255,16 @@ func mainInHost(daemon *docker.Client, overrides []string, cacher *buildCacher) 
 		}
 		return err
 	}
-	// Smoke tests are exclusive with all other flags
-	if *smokeFlag {
-		if results.Validations, err = validateClients(daemon, clientList, "smoke", overrides, cacher); err != nil {
-			log15.Crit("failed to smoke-validate client images", "error", err)
+
+	// Run all simulation tests
+	if *simulatorPattern != "" {
+		if err = makeGenesisDAG(daemon, cacher); err != nil {
+			log15.Crit("failed generate DAG for simulations", "error", err)
 			return err
 		}
-		if results.Simulations, err = simulateClients(daemon, clientList, "smoke", overrides, cacher); err != nil {
-			log15.Crit("failed to smoke-simulate client images", "error", err)
+		if results.Simulations, err = simulateClients(daemon, clientList, *simulatorPattern, overrides, cacher); err != nil {
+			log15.Crit("failed to simulate clients", "error", err)
 			return err
-		}
-		if results.Benchmarks, err = benchmarkClients(daemon, clientList, "smoke", overrides, cacher); err != nil {
-			log15.Crit("failed to smoke-benchmark client images", "error", err)
-			return err
-		}
-	} else {
-		// Otherwise run all requested validation and simulation tests
-		if *validatorPattern != "" {
-			if results.Validations, err = validateClients(daemon, clientList, *validatorPattern, overrides, cacher); err != nil {
-				log15.Crit("failed to validate clients", "error", err)
-				return err
-			}
-		}
-		if *simulatorPattern != "" {
-			if err = makeGenesisDAG(daemon, cacher); err != nil {
-				log15.Crit("failed generate DAG for simulations", "error", err)
-				return err
-			}
-			if results.Simulations, err = simulateClients(daemon, clientList, *simulatorPattern, overrides, cacher); err != nil {
-				log15.Crit("failed to simulate clients", "error", err)
-				return err
-			}
-		}
-		if *benchmarkPattern != "" {
-			if results.Benchmarks, err = benchmarkClients(daemon, clientList, *benchmarkPattern, overrides, cacher); err != nil {
-				log15.Crit("failed to benchmark clients", "error", err)
-				return err
-			}
 		}
 	}
 
