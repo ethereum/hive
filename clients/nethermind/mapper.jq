@@ -41,6 +41,7 @@ def infixzerostolength(s;l):
                 "daoHardforkTransition": env.HIVE_FORK_DAO_BLOCK|addashex,
                 "eip100bTransition": env.HIVE_FORK_BYZANTIUM|addashex,
                 "blockReward": {
+		  "0x0": "0x4563918244F40000",
                   (env.HIVE_FORK_BYZANTIUM//""): "0x29A2241AF62C0000",
                   (env.HIVE_FORK_CONSTANTINOPLE//""): "0x1BC16D674EC80000"
                 },
@@ -55,7 +56,7 @@ def infixzerostolength(s;l):
       "0x0000000000000000000000000000000000000005": {
       "builtin": {
         "name": "modexp",
-        "activate_at": "0x42ae50",
+        "activate_at": env.HIVE_FORK_BYZANTIUM|addashex,
         "pricing": {
           "modexp": {
             "divisor": 20
@@ -66,7 +67,7 @@ def infixzerostolength(s;l):
     "0x0000000000000000000000000000000000000006": {
       "builtin": {
         "name": "alt_bn128_add",
-        "activate_at": "0x42ae50",
+        "activate_at": env.HIVE_FORK_BYZANTIUM|addashex,
         "pricing": {
           "linear": {
             "base": 500,
@@ -78,7 +79,7 @@ def infixzerostolength(s;l):
     "0x0000000000000000000000000000000000000007": {
       "builtin": {
         "name": "alt_bn128_mul",
-        "activate_at": "0x42ae50",
+        "activate_at": env.HIVE_FORK_BYZANTIUM|addashex,
         "pricing": {
           "linear": {
             "base": 40000,
@@ -90,7 +91,7 @@ def infixzerostolength(s;l):
     "0x0000000000000000000000000000000000000008": {
       "builtin": {
         "name": "alt_bn128_pairing",
-        "activate_at": "0x42ae50",
+        "activate_at": env.HIVE_FORK_BYZANTIUM|addashex,
         "pricing": {
           "alt_bn128_pairing": {
             "base": 100000,
