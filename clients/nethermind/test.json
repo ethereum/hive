@@ -9,7 +9,7 @@
 				"difficultyBoundDivisor": "0x0800",
 				"durationLimit": "0x0d",
 				"blockReward": {
-					"0": "0x4563918244F40000"
+					"0x0": "0x4563918244F40000"
 	
 				},
 				"homesteadTransition": "0x118c30",
