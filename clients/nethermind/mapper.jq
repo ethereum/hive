@@ -41,12 +41,13 @@ def infixzerostolength(s;l):
                 "daoHardforkTransition": env.HIVE_FORK_DAO_BLOCK|addashex,
                 "eip100bTransition": env.HIVE_FORK_BYZANTIUM|addashex,
                 "blockReward": {
-                  (env.HIVE_FORK_BYZANTIUM//""): "0x29A2241AF62C0000",
-                  (env.HIVE_FORK_CONSTANTINOPLE//""): "0x1BC16D674EC80000"
+		  "0x0": "0x4563918244F40000",
+                  (env.HIVE_FORK_BYZANTIUM|addashex//""): "0x29A2241AF62C0000",
+                  (env.HIVE_FORK_CONSTANTINOPLE|addashex//""): "0x1BC16D674EC80000"
                 },
                 "difficultyBombDelays": {
-                  (env.HIVE_FORK_BYZANTIUM//""): 3000000,
-                  (env.HIVE_FORK_CONSTANTINOPLE//""): 2000000
+                  (env.HIVE_FORK_BYZANTIUM|addashex//""): 3000000,
+                  (env.HIVE_FORK_CONSTANTINOPLE|addashex//""): 2000000
                 }
             }
         }
