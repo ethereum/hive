@@ -41,7 +41,9 @@ var (
 	overrideFiles = flag.String("override", "", "Comma separated regexp:files to override in client containers")
 	smokeFlag     = flag.Bool("smoke", false, "Whether to only smoke test or run full test suite")
 
-	validatorPattern = flag.String("test", ".", "Regexp selecting the validation tests to run")
+	simLimiterFlag = flag.Int("simlimiter", -1, "Run all simulators with a time limit in seconds, -1 being unlimited")
+
+	validatorPattern = flag.String("test", "", "Regexp selecting the validation tests to run")
 	simulatorPattern = flag.String("sim", "", "Regexp selecting the simulation tests to run")
 	benchmarkPattern = flag.String("bench", "", "Regexp selecting the benchmarks to run")
 

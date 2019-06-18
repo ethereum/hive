@@ -110,7 +110,7 @@ func simulateClients(daemon *docker.Client, clientList []string, simulatorPatter
 
 		}
 
-		err = simulate(daemon, clients, pseudos, simulatorImage, simulator, overrides, logger, logdir, results) //filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)))
+		err = simulate(daemon, *simLimiterFlag, clients, pseudos, simulatorImage, simulator, overrides, logger, logdir, results) //filepath.Join(logdir, strings.Replace(client, string(filepath.Separator), "_", -1)))
 		if err != nil {
 			return nil, err
 		}
@@ -122,7 +122,7 @@ func simulateClients(daemon *docker.Client, clientList []string, simulatorPatter
 // simulate starts a simulator service locally, starts a controlling container
 // and executes its commands until torn down. The exit status of the controller
 // container will signal whether the simulation passed or failed.
-func simulate(daemon *docker.Client, clients map[string]string, pseudos map[string]string, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string, results map[string]map[string]*simulationResult) error {
+func simulate(daemon *docker.Client, simDuration int, clients map[string]string, pseudos map[string]string, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string, results map[string]map[string]*simulationResult) error {
 	logger.Info("running client simulation")
 
 	// Start the simulator HTTP API
@@ -172,7 +172,29 @@ func simulate(daemon *docker.Client, clients map[string]string, pseudos map[stri
 		slogger.Error("failed to run simulator", "error", err)
 		return err
 	}
-	waiter.Wait()
+
+	// if we have a simulation time limiter, then timeout the simulation using the usual go pattern
+	if simDuration != -1 {
+		//make a timeout channel
+		timeoutchan := make(chan error, 1)
+		//wait for the simulator in a go routine, then push to the channel
+		go func() {
+			e := waiter.Wait()
+			timeoutchan <- e
+		}()
+		//work out what the timeout is as a duration
+		simTimeoutDuration := time.Duration(simDuration) * time.Second
+		//wait for either the waiter or the timeout
+		select {
+		case err := <-timeoutchan:
+			return err
+		case <-time.After(simTimeoutDuration):
+			err := waiter.Close()
+			return err
+		}
+	} else {
+		waiter.Wait()
+	}
 
 	return nil
 

@@ -38,36 +38,51 @@ fi
 
 # Override any chain configs in the go-ethereum specific way
 chainconfig="{}"
+
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
+	echo "Setting homestead block:$HIVE_FORK_HOMESTEAD"
 	chainconfig=`echo $chainconfig | jq ". + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"`
 fi
 if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+	echo "Setting DAO block:$HIVE_FORK_DAO_BLOCK"
 	chainconfig=`echo $chainconfig | jq ". + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"`
 fi
 if [ "$HIVE_FORK_DAO_VOTE" == "0" ]; then
+	echo "Setting dao vote block:$HIVE_FORK_DAO_VOTE"
 	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": false}"`
 fi
 if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
+	echo "Setting dao vot block:$HIVE_FORK_DAO_VOTE"
 	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": true}"`
 fi
 if [ "$HIVE_FORK_TANGERINE" != "" ]; then
+	echo "Setting tangerine block:$HIVE_FORK_TANGERINE"
 	chainconfig=`echo $chainconfig | jq ". + {\"eip150Block\": $HIVE_FORK_TANGERINE}"`
 fi
 if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
+	echo "Setting spurious block:$HIVE_FORK_SPURIOUS"
 	chainconfig=`echo $chainconfig | jq ". + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"`
 	chainconfig=`echo $chainconfig | jq ". + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"`
 fi
 if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
+	echo "Setting byzantium block:$HIVE_FORK_BYZANTIUM"
 	chainconfig=`echo $chainconfig | jq ". + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"`
 fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
+	echo "Setting constantinople block:$HIVE_FORK_CONSTANTINOPLE"
 	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
 fi
 if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
-        chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
+    echo "Setting petersburg block:$HIVE_FORK_PETERSBURG"
+	chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
 fi
 
-genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
+genesis=`cat /genesis.json` 
+echo "Genesis:"
+echo $genesis
+echo $genesis | jq ". * {\"config\": $chainconfig}" > /genesis.json
+
+
 
 echo "Before mapper.jq"
 cat /genesis.json
