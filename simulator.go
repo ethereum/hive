@@ -280,14 +280,13 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 	for {
 		h.lock.Lock()
 		for id, cInfo := range h.nodes {
-			var err error
 
-			cInfo.container, err = h.daemon.InspectContainer(cInfo.container.ID)
+			cont, err := h.daemon.InspectContainer(cInfo.container.ID)
 			if err != nil {
 				//container already gone
 				h.logger.Info("Container already deleted. ", "Container", cInfo.container.ID)
-
 			} else {
+				cInfo.container = cont
 				if !cInfo.container.State.Running || (time.Now().Sub(cInfo.timeout) >= 0 && cInfo.useTimeout) {
 
 					h.logger.Info("Timing out. ", "Running", cInfo.container.State.Running)
