@@ -112,7 +112,7 @@ def infixzerostolength(s;l):
     "author":.coinbase,
     "timestamp":.timestamp,
     "parentHash": .parentHash,
-    "extraData":.extraData|infixzerostolength(2;66),
+    "extraData":.extraData,
     "gasLimit":.gasLimit,
     
   },
