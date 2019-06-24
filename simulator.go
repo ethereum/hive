@@ -126,7 +126,7 @@ func simulate(daemon *docker.Client, simDuration int, clients map[string]string,
 	logger.Info("running client simulation")
 
 	// Start the simulator HTTP API
-	sim, err := startSimulatorAPI(daemon, clients, pseudos, simulator, simulatorLabel, overrides, logger, logdir, results)
+	sim, err := startTestSuiteAPI(daemon, clients, pseudos, simulator, simulatorLabel, overrides, logger, logdir, results)
 	if err != nil {
 		logger.Error("failed to start simulator API", "error", err)
 		return err
@@ -200,9 +200,9 @@ func simulate(daemon *docker.Client, simDuration int, clients map[string]string,
 
 }
 
-// startSimulatorAPI starts an HTTP webserver listening for simulator commands
+// startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startSimulatorAPI(daemon *docker.Client, clients map[string]string, pseudos map[string]string, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string, results map[string]map[string]*simulationResult) (*simulatorAPIHandler, error) {
+func startTestSuiteAPI(daemon *docker.Client, clients map[string]string, pseudos map[string]string, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string, results map[string]map[string]*simulationResult) (*testSuiteAPIHandler, error) {
 	// Find the IP address of the host container
 	logger.Debug("looking up docker bridge IP")
 	bridge, err := lookupBridgeIP(logger)
@@ -225,7 +225,7 @@ func startSimulatorAPI(daemon *docker.Client, clients map[string]string, pseudos
 
 	// Serve connections until the listener is terminated
 	logger.Debug("starting simulator API server")
-	sim := &simulatorAPIHandler{
+	sim := &testSuiteAPIHandler{
 		listener:         listener,
 		daemon:           daemon,
 		logger:           logger,
@@ -252,9 +252,9 @@ type containerInfo struct {
 	useTimeout bool
 }
 
-// simulatorAPIHandler is the HTTP request handler directing the docker engine
+// testSuiteAPIHandler is the HTTP request handler directing the docker engine
 // with the commands from the simulator runner.
-type simulatorAPIHandler struct {
+type testSuiteAPIHandler struct {
 	listener *net.TCPListener
 
 	daemon           *docker.Client
@@ -276,7 +276,7 @@ type simulatorAPIHandler struct {
 
 // CheckTimeout is a goroutine that checks if the timeout has passed and stops
 // container if it has.
-func (h *simulatorAPIHandler) CheckTimeout() {
+func (h *testSuiteAPIHandler) CheckTimeout() {
 	for {
 		h.lock.Lock()
 		for id, cInfo := range h.nodes {
@@ -305,7 +305,7 @@ func (h *simulatorAPIHandler) CheckTimeout() {
 }
 
 // timeoutContainer terminates a container. OBS! It assumes that the caller already holds h.lock
-func (h *simulatorAPIHandler) timeoutContainer(id string, w http.ResponseWriter) {
+func (h *testSuiteAPIHandler) timeoutContainer(id string, w http.ResponseWriter) {
 	containerInfo, ok := h.nodes[id]
 
 	if !ok {
@@ -326,7 +326,7 @@ func (h *simulatorAPIHandler) timeoutContainer(id string, w http.ResponseWriter)
 }
 
 // terminateContainer terminates a container. OBS! It assumes that the caller already holds h.lock
-func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
+func (h *testSuiteAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
 	containerInfo, ok := h.nodes[id]
 	if !ok {
 		h.logger.Error("unknown client deletion requested", "id", id)
@@ -345,7 +345,7 @@ func (h *simulatorAPIHandler) terminateContainer(id string, w http.ResponseWrite
 	}
 }
 
-func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, logger log15.Logger, available map[string]string, checkliveness bool, useTimeout bool) {
+func (h *testSuiteAPIHandler) newNode(w http.ResponseWriter, r *http.Request, logger log15.Logger, available map[string]string, checkliveness bool, useTimeout bool) {
 	// A new node startup was requested, fetch any envvar overrides from simulators
 	r.ParseForm()
 	envs := make(map[string]string)
@@ -460,7 +460,7 @@ func (h *simulatorAPIHandler) newNode(w http.ResponseWriter, r *http.Request, lo
 }
 
 // ServeHTTP handles all the simulator API requests and executes them.
-func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *testSuiteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logger := h.logger.New("req-id", atomic.AddUint32(&h.autoID, 1))
 	logger.Debug("new simulator request", "from", r.RemoteAddr, "method", r.Method, "endpoint", r.URL.Path)
 
@@ -654,7 +654,7 @@ func (h *simulatorAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 // Close terminates all running containers and tears down the API server.
-func (h *simulatorAPIHandler) Close() {
+func (h *testSuiteAPIHandler) Close() {
 	h.logger.Debug("terminating simulator server")
 	h.listener.Close()
 

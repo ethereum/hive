@@ -25,14 +25,17 @@ type SimulatorHost struct {
 	HostURI *string
 }
 
-//SimulatorAPI The simulator host remote API
-type SimulatorAPI interface {
-	//Retrieve docker daemon info
-	GetDockerInfo() (*docker.DockerInfo, error)
+//TestSuiteAPI The test suite host remote API
+type TestSuiteAPI interface {
+	StartTest(name string, description string) TestCase
+
+	EndTest(test TestCase, summaryResult TestResult, clientResults map[string]TestResult)
+
+	AddResults(success bool, nodeID string, name string, errMsg string, duration time.Duration) error
 	//Get a specific client's IP
-	GetClientIP(string) (*string, error)
+	GetClientIP(TestCase, string) (*string, error)
 	//Get a specific client's enode
-	GetClientEnode(string) (*string, error)
+	GetClientEnode(TestCase, string) (*string, error)
 	//Get all client types available to this simulator run
 	//this depends on both the available client set
 	//and the command line filters
@@ -42,22 +45,17 @@ type SimulatorAPI interface {
 	//returned client types from GetClientTypes
 	//The input is used as environment variables in the new container
 	//Returns container id, ip and mac
-	StartNewNode(map[string]string) (string, net.IP, string, error)
+	StartNewNode(TestCase, map[string]string) (string, net.IP, string, error)
 	//Start a new pseudo-client with the specified parameters
-	//One parameter must be named CLIENT and should contain one of the
-	//returned client types from GetClientTypes
+	//One parameter must be named CLIENT
 	//The input is used as environment variables in the new container
 	//Returns container id, ip and mac
-	StartNewPseudo(map[string]string) (string, net.IP, string, error)
-	//Submit log info to the simulator log
+	StartNewPseudo(TestCase, map[string]string) (string, net.IP, string, error)
+	// Log sends a message to the testcase log
 	Log(string) error
-	//Submit node test results
-	//	Success flag
-	//	Node id
-	//  Details
-	AddResults(success bool, nodeID string, name string, errMsg string, duration time.Duration) error
-	//Stop and delete the specified container
-	KillNode(string) error
+
+	//Signal that the node is no longer required
+	KillNode(TestCase, string) error
 }
 
 //Logger a general logger interface
