@@ -21,7 +21,7 @@ import (
 var (
 	dockerHost  *string //docker host api endpoint
 	hostURI     *string //simulator host endpoint
-	host        common.TestSuiteAPI
+	host        common.TestSuiteHost
 	daemon      *docker.Client //docker daemon proxy
 	err         error
 	syncTimeout = 60 * time.Second //the number of seconds before a sync is considered stalled or failed
