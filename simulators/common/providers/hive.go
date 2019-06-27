@@ -1,4 +1,4 @@
-package providers
+package hive
 
 import (
 	"encoding/json"
@@ -9,25 +9,27 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 )
 
-//SimulatorHost A simulator host
-type hiveSimulatorProxy struct {
+type hiveHost struct {
 	hostURI *string
 }
 
-var hiveSimulatorProxy *hiveSimulatorProxy
+var hostProxy *hiveHost
+var once sync.Once
 
-// GetInstance returns the instance of a proxy to the simulator host, giving a single opportunity to specify its URI
-func GetInstance(hostURI string) hiveSimulatorProxy {
-	once.Do(func() {}
-		hiveSimulatorProxy := &hiveSimulatorProxy{}
+// GetHiveInstance returns the instance of a proxy to the Hive simulator host, giving a single opportunity to specify its URI.
+// Clients are generated as docker instances
+func GetHiveInstance(hostURI string) TestSuiteHost {
+	once.Do(func() {
+		hostProxy := &hiveHost{hostURI: hostURI}
 	})
-	return hiveSimulatorProxy
+	return hostProxy
 }
 
 //GetClientEnode Get the client enode for the specified container id
-func (sim SimulatorHost) GetClientEnode(test TestCase, node string) (*string, error) {
+func (sim hiveHost) GetClientEnode(test TestCase, node string) (*string, error) {
 	resp, err := http.Get(*sim.HostURI + "/enodes/" + strconv.Itoa(test.ID()) + "/" + node)
 	if err != nil {
 		return nil, err
@@ -41,7 +43,7 @@ func (sim SimulatorHost) GetClientEnode(test TestCase, node string) (*string, er
 }
 
 // EndTest finishes the test case, cleaning up everything, logging results, and returning an error if the process could not be completed
-func (sim SimulatorHost) EndTest(test int, summaryResult TestResult, clientResults map[string]TestResult) error {
+func (sim hiveHost) EndTest(test int, summaryResult TestResult, clientResults map[string]TestResult) error {
 
 	// post results (which deletes the test case - because DELETE message body is not always supported)
 	summaryResultData, err := json.Marshal(summaryResult)
@@ -65,7 +67,7 @@ func (sim SimulatorHost) EndTest(test int, summaryResult TestResult, clientResul
 }
 
 //StartTest starts a new test case, returning the testcase id as a context identifier
-func (sim SimulatorHost) StartTest(name string, description string) (int, error) {
+func (sim hiveHost) StartTest(name string, description string) (int, error) {
 	var testID int
 	resp, err := http.Get(*sim.HostURI + "/tests")
 	if err != nil {
@@ -86,7 +88,7 @@ func (sim SimulatorHost) StartTest(name string, description string) (int, error)
 //GetClientTypes Get all client types available to this simulator run
 //this depends on both the available client set
 //and the command line filters
-func (sim SimulatorHost) GetClientTypes() (availableClients []string, err error) {
+func (sim hiveHost) GetClientTypes() (availableClients []string, err error) {
 	resp, err := http.Get(*sim.HostURI + "/clients")
 	if err != nil {
 		return nil, err
@@ -108,7 +110,7 @@ func (sim SimulatorHost) GetClientTypes() (availableClients []string, err error)
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
 //Returns container id and ip
-func (sim SimulatorHost) StartNewNode(test int, parms map[string]string) (string, net.IP, string, error) {
+func (sim hiveHost) GetNode(test int, parms map[string]string) (string, net.IP, string, error) {
 	vals := make(url.Values)
 	for k, v := range parms {
 		vals.Add(k, v)
@@ -129,7 +131,7 @@ func (sim SimulatorHost) StartNewNode(test int, parms map[string]string) (string
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
 //Returns container id and ip
-func (sim SimulatorHost) StartNewPseudo(test int, parms map[string]string) (string, net.IP, string, error) {
+func (sim hiveHost) GetPseudo(test int, parms map[string]string) (string, net.IP, string, error) {
 	vals := make(url.Values)
 	for k, v := range parms {
 		vals.Add(k, v)
@@ -146,7 +148,7 @@ func (sim SimulatorHost) StartNewPseudo(test int, parms map[string]string) (stri
 }
 
 // KillNode signals to the host that the node is no longer required
-func (sim SimulatorHost) KillNode(test int, nodeid string) error {
+func (sim hiveHost) KillNode(test int, nodeid string) error {
 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/delete/%s/%s", strconv.Itoa(test), *sim.HostURI, nodeid), nil)
 	if err != nil {
 		return err
