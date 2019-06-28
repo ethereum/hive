@@ -24,6 +24,15 @@ import (
 // method.
 //
 type LocalHostConfiguration struct {
+	AvailableHosts []HostDescription `json:"hostDescription"`
+}
+
+type HostDescription struct {
+	IsPseudo   bool              `json:"isPseudo"`
+	ClientType string            `json:"clientType"`
+	Parameters map[string]string `json:"parameters,omitempty"`
+	Enode      string            `json:"Enode,omitempty"`
+	IP         net.URI           `json:"IP"`
 }
 
 type localHost struct {
@@ -35,9 +44,13 @@ var once sync.Once
 
 // GetLocalInstance returns the instance of a local provider, which uses presupplied node instances and creates logs to a local destination,
 // and provides a single opportunity to configure it during initialisation.
-func GetLocalInstance(localHostConfiguration *LocalHostConfiguration) TestSuiteHost {
+// The configuration is supplied as a byte representation, obtained from a file usually.
+func GetInstance(config []byte) TestSuiteHost {
+
 	once.Do(func() {
-		hostProxy := &hiveHost{}
+		var result LocalHostConfiguration
+		json.Unmarshal(config, &result)
+		hostProxy = &result
 	})
 	return hostProxy
 }

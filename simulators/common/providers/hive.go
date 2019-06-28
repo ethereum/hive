@@ -12,18 +12,23 @@ import (
 	"sync"
 )
 
-type hiveHost struct {
-	hostURI *string
+type HiveHostConfiguration struct {
+	hostURI string `json:"hostURI"`
 }
 
-var hostProxy *hiveHost
+var hostProxy *HiveHostConfiguration
 var once sync.Once
 
-// GetHiveInstance returns the instance of a proxy to the Hive simulator host, giving a single opportunity to specify its URI.
-// Clients are generated as docker instances
-func GetHiveInstance(hostURI string) TestSuiteHost {
+// GetInstance returns the instance of a proxy to the Hive simulator host, giving a single opportunity to configure it.
+// The configuration is supplied as a byte representation, obtained from a file usually.
+// Clients are generated as docker instances.
+func GetInstance(config []byte) TestSuiteHost {
+
 	once.Do(func() {
-		hostProxy := &hiveHost{hostURI: hostURI}
+		var result HiveHostConfiguration
+		json.Unmarshal(config, &result)
+		hostProxy = &result
+
 	})
 	return hostProxy
 }
