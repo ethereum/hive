@@ -2,6 +2,7 @@ package local
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -10,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"math"
 )
 
 // LocalHostConfiguration is used to set up the local provider.
@@ -32,11 +34,16 @@ type HostDescription struct {
 	ClientType string            `json:"clientType"`
 	Parameters map[string]string `json:"parameters,omitempty"`
 	Enode      string            `json:"Enode,omitempty"`
-	IP         net.URI           `json:"IP"`
+	IP         net.IP            `json:"IP"`
+	Mac		   string			 `json:"Mac"`
+	selectedCount int
 }
 
 type localHost struct {
-	localHostConfiguration *LocalHostConfiguration
+	configuration *LocalHostConfiguration
+	clientsByType  map[string][]int
+	clientTypes []string
+	mux sync.Mutex
 }
 
 var hostProxy *localHost
@@ -48,29 +55,65 @@ var once sync.Once
 func GetInstance(config []byte) TestSuiteHost {
 
 	once.Do(func() {
+
+
 		var result LocalHostConfiguration
 		json.Unmarshal(config, &result)
-		hostProxy = &result
+		
+		clientsByType, clientTypes = mapClients(result)
+
+		hostProxy = &localHost{
+			configuration : result,
+			clientsByType: clientsByType
+			clientTypes: clientTypes
+		}
+		
 	})
 	return hostProxy
 }
 
-//GetClientEnode Get the client enode for the specified container id
+func mapClients()  (map[string][]int,[]string ){
+
+	clientsByType:= make(map[string][]int)
+	clientTypes:= make([]string],0)
+
+	for i,v:= range(hostProxy.configuration.AvailableHosts){
+		clientsByType[v.ClientType]= append(clientsByType[v.ClientType],i)
+	}
+
+	for k,v := range(clientsByType){
+		clientTypes= append(clientTypes,k)
+	}
+
+	return clientsByType,clientTypes
+}
+
+
+
+//GetClientEnode Get the client enode for the specified node id, which in this case is just the index
 func (sim localHost) GetClientEnode(test TestCase, node string) (*string, error) {
-	resp, err := http.Get(*sim.HostURI + "/enodes/" + strconv.Itoa(test.ID()) + "/" + node)
+	//local nodes are identified by their index
+	nodeIndex, err := strconv.Atoi(node)
 	if err != nil {
-		return nil, err
+		return _, err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+	// make sure it is within the bounds of the node list
+	if nodeIndex < 0 || nodeIndex > len(AvailableHosts) {
+		return _, errors.New("no such node")
 	}
-	res := strings.TrimRight(string(body), "\r\n")
-	return &res, nil
+	//return the enode
+	return hostProxy.configuration.AvailableHosts[nodeIndex].Enode, nil
 }
 
 // EndTest finishes the test case, cleaning up everything, logging results, and returning an error if the process could not be completed
 func (sim localHost) EndTest(test int, summaryResult TestResult, clientResults map[string]TestResult) error {
+
+//TODO ---------------
+
+
+	//TODO ----------------
+
+
 
 	// post results (which deletes the test case - because DELETE message body is not always supported)
 	summaryResultData, err := json.Marshal(summaryResult)
@@ -95,6 +138,15 @@ func (sim localHost) EndTest(test int, summaryResult TestResult, clientResults m
 
 //StartTest starts a new test case, returning the testcase id as a context identifier
 func (sim localHost) StartTest(name string, description string) (int, error) {
+
+//TODO ---------------
+
+
+	//TODO ----------------
+
+
+
+
 	var testID int
 	resp, err := http.Get(*sim.HostURI + "/tests")
 	if err != nil {
@@ -113,48 +165,54 @@ func (sim localHost) StartTest(name string, description string) (int, error) {
 }
 
 //GetClientTypes Get all client types available to this simulator run
-//this depends on both the available client set
-//and the command line filters
 func (sim localHost) GetClientTypes() (availableClients []string, err error) {
-	resp, err := http.Get(*sim.HostURI + "/clients")
-	if err != nil {
-		return nil, err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(body, &availableClients)
-	if err != nil {
-		return nil, err
-	}
-	return
+	return hostProxy.clientTypes
 }
 
-//StartNewNode Start a new node (or other container) with the specified parameters
-//One parameter must be named CLIENT and should contain one of the
-//returned client types from GetClientTypes
-//The input is used as environment variables in the new container
-//Returns container id and ip
+//StartNewNode attempts to acquire a new node matching the given parameters
+//One parameter must be named CLIENT and should be a known type returned by GetClientTypes
+//If there are multiple nodes, they will be selected round-robin  
+//Returns container id, ip, mac
 func (sim localHost) GetNode(test int, parms map[string]string) (string, net.IP, string, error) {
-	vals := make(url.Values)
-	for k, v := range parms {
-		vals.Add(k, v)
+	hostProxy.mux.Lock()
+	defer hostProxy.mux.Unlock()
+
+	client,ok:= parms["CLIENT"]
+	if !ok {
+		return _,_,_,errors.New("Unknown client")
 	}
-	vals.Add("testcase", strconv.Itoa(test))
-	data, err := wrapHTTPErrorsPost(*sim.HostURI+"/nodes", vals)
-	if err != nil {
-		return "", nil, "", err
+
+	availableClients,ok:= hostProxy.clientsByType[client]
+	if !ok || len(availableClients)==0 {
+		return _,_,_,errors.New("No available clients")
 	}
-	if idip := strings.Split(data, "@"); len(idip) > 1 {
-		return idip[0], net.ParseIP(idip[1]), idip[2], nil
+
+	leastUsedCt:= math.MaxUint32
+	var leastUsed *HostDescription
+	var leastUsedIndex int
+	for _,v := range(availableClients){
+		node:= &hostProxy.configuration.AvailableHosts[v]
+		if node.selectedCount < leastUsedCt{
+			leastUsed = node
+			leastUserCt= node.selectedCount
+			leastUsedIndex= v
+		}
 	}
-	return data, net.IP{}, "", fmt.Errorf("no ip address returned: %v", data)
+
+	
+	return strconv.Itoa(leastUsedIndex),leastUsed.IP,leastUsed.Mac,nil
+	
+
 }
 
 // GetPseudo
 func (sim localHost) GetPseudo(test int, parms map[string]string) (string, net.IP, string, error) {
+	//TODO ---------------
+
+
+	//TODO ----------------
+
+
 	vals := make(url.Values)
 	for k, v := range parms {
 		vals.Add(k, v)
