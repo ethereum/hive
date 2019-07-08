@@ -59,12 +59,15 @@ var once sync.Once
 // GetInstance returns the instance of a local provider, which uses presupplied node instances and creates logs to a local destination,
 // and provides a single opportunity to configure it during initialisation.
 // The configuration is supplied as a byte representation, obtained from a file usually.
-func GetInstance(config []byte) common.TestSuiteHost {
-
+func GetInstance(config []byte) (common.TestSuiteHost, error) {
+	var err error
 	once.Do(func() {
 
 		var result HostConfiguration
-		json.Unmarshal(config, &result)
+		err = json.Unmarshal(config, &result)
+		if err != nil {
+			return
+		}
 
 		clientsByType, clientTypes, pseudosByType, pseudoTypes := mapClients()
 
@@ -77,7 +80,7 @@ func GetInstance(config []byte) common.TestSuiteHost {
 		}
 
 	})
-	return hostProxy
+	return hostProxy, err
 }
 
 func mapClients() (map[string][]int, []string, map[string][]int, []string) {
