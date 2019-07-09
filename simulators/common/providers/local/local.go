@@ -12,6 +12,20 @@ import (
 	"github.com/ethereum/hive/simulators/common"
 )
 
+var (
+	// ErrNoSuchNode no node with the requested id
+	ErrNoSuchNode = errors.New("no such node")
+
+	// ErrNoSuchTestSuite is that the test suite does not exist
+	ErrNoSuchTestSuite = errors.New("no such test suite context")
+
+	// ErrMissingClientType is that the operation was expecting a CLIENT parameter
+	ErrMissingClientType = errors.New("missing client type")
+
+	// ErrNoAvailableClients is the error that no pre-supplied clients of the requested type are available
+	ErrNoAvailableClients = errors.New("no available clients")
+)
+
 // HostConfiguration is used to set up the local provider.
 // It describes pre-supplied nodes. During tests and when nodes are requested,
 // these pre-supplied nodes are selected
@@ -129,7 +143,7 @@ func (sim *host) GetClientEnode(test common.TestID, node string) (*string, error
 	}
 	// make sure it is within the bounds of the node list
 	if nodeIndex < 0 || nodeIndex > len(sim.configuration.AvailableClients) {
-		return nil, errors.New("no such node")
+		return nil, ErrNoSuchNode
 	}
 	//return the enode
 	return &sim.configuration.AvailableClients[nodeIndex].Enode, nil
@@ -163,7 +177,7 @@ func (sim *host) StartTest(testSuiteID common.TestSuiteID, name string, descript
 	// check if the testsuite exists
 	testSuite, ok := sim.runningTestSuites[testSuiteID]
 	if !ok {
-		return 0, errors.New("no such test suite context")
+		return 0, ErrNoSuchTestSuite
 	}
 
 	// increment the testcasecounter
@@ -223,12 +237,12 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 
 	client, ok := parameters["CLIENT"]
 	if !ok {
-		return "", nil, "", errors.New("unknown client")
+		return "", nil, "", ErrMissingClientType
 	}
 
 	availableClients, ok := sim.clientsByType[client]
 	if !ok || len(availableClients) == 0 {
-		return "", nil, "", errors.New("No available clients")
+		return "", nil, "", ErrNoAvailableClients
 	}
 
 	//select a node round-robin based on which is least used
@@ -253,12 +267,12 @@ func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (st
 
 	client, ok := parameters["CLIENT"]
 	if !ok {
-		return "", nil, "", errors.New("Unknown pseudo")
+		return "", nil, "", ErrMissingClientType
 	}
 
 	availablePseudos, ok := sim.pseudosByType[client]
 	if !ok || len(availablePseudos) == 0 {
-		return "", nil, "", errors.New("No available pseudos")
+		return "", nil, "", ErrNoAvailableClients
 	}
 
 	//The id is just the index in the list of all pseudos of the first pseudo of this type (we don't support
