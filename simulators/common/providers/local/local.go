@@ -1,4 +1,4 @@
-package providers
+package local
 
 import (
 	"encoding/json"
@@ -38,7 +38,7 @@ var (
 // method.
 //
 type HostConfiguration struct {
-	AvailableClients []ClientDescription `json:"clientDescription"`
+	AvailableClients []ClientDescription `json:"availableClients"`
 }
 
 // ClientDescription is metadata about the pre-supplied clients
@@ -47,8 +47,8 @@ type ClientDescription struct {
 	ClientType    string            `json:"clientType"`
 	Parameters    map[string]string `json:"parameters,omitempty"`
 	Enode         string            `json:"Enode,omitempty"`
-	IP            net.IP            `json:"IP"`
-	Mac           string            `json:"Mac"`
+	IP            net.IP            `json:"ip"`
+	Mac           string            `json:"mac"`
 	selectedCount int
 }
 
@@ -83,21 +83,17 @@ func GetInstance(config []byte) (common.TestSuiteHost, error) {
 			return
 		}
 
-		clientsByType, clientTypes, pseudosByType, pseudoTypes := mapClients()
-
 		hostProxy = &host{
 			configuration: &result,
-			clientsByType: clientsByType,
-			clientTypes:   clientTypes,
-			pseudosByType: pseudosByType,
-			pseudoTypes:   pseudoTypes,
 		}
+
+		mapClients()
 
 	})
 	return hostProxy, err
 }
 
-func mapClients() (map[string][]int, []string, map[string][]int, []string) {
+func mapClients() {
 
 	clientsByType := make(map[string][]int)
 	clientTypes := make([]string, 0)
@@ -124,7 +120,10 @@ func mapClients() (map[string][]int, []string, map[string][]int, []string) {
 		pseudoTypes = append(clientTypes, k)
 	}
 
-	return clientsByType, clientTypes, pseudosByType, pseudoTypes
+	hostProxy.clientsByType = clientsByType
+	hostProxy.clientTypes = clientTypes
+	hostProxy.pseudosByType = pseudosByType
+	hostProxy.pseudoTypes = pseudoTypes
 }
 
 // EndTestSuite end
