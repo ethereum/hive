@@ -76,21 +76,29 @@ var once sync.Once
 func GetInstance(config []byte) (common.TestSuiteHost, error) {
 	var err error
 	once.Do(func() {
-
-		var result HostConfiguration
-		err = json.Unmarshal(config, &result)
-		if err != nil {
-			return
-		}
-
-		hostProxy = &host{
-			configuration: &result,
-		}
-
-		mapClients()
-
+		err = generateInstance(config)
 	})
 	return hostProxy, err
+}
+
+//used in unit testin
+func generateInstance(config []byte) error {
+	var result HostConfiguration
+	err := json.Unmarshal(config, &result)
+	if err != nil {
+		return err
+	}
+
+	hostProxy = &host{
+		configuration:     &result,
+		runningTestSuites: make(map[common.TestSuiteID]*common.TestSuite),
+		runningTestCases:  make(map[common.TestID]*common.TestCase),
+		clientsByType:     make(map[string][]int),
+		pseudosByType:     make(map[string][]int),
+	}
+
+	mapClients()
+	return nil
 }
 
 func mapClients() {
