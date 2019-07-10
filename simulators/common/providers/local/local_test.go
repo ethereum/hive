@@ -22,6 +22,45 @@ func setupBasicInstance(t *testing.T) common.TestSuiteHost {
 					"HIVE_FORK_CONSTANTINOPLE_BLOCK":"0"
 				}
 			}
+		,
+		
+			{
+				"clientType":"go-ethereum_master",
+				"enode":"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301",
+				"ip":"10.3.58.0",
+				"isPseudo":false,
+				"mac":"00:0a:95:9d:68:00",
+				"parameters":{
+					"HIVE_FORK_DAO_BLOCK":"0",
+					"HIVE_FORK_CONSTANTINOPLE_BLOCK":"10"
+				}
+			}
+		,
+		
+			{
+				"clientType":"nethermind_master",
+				"enode":"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301",
+				"ip":"10.3.58.7",
+				"isPseudo":false,
+				"mac":"00:0a:95:9d:68:17",
+				"parameters":{
+					"HIVE_FORK_DAO_BLOCK":"1",
+					"HIVE_FORK_CONSTANTINOPLE_BLOCK":"1"
+				}
+			}
+		,
+		
+			{
+				"clientType":"parity_master",
+				"enode":"enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301",
+				"ip":"10.3.58.8",
+				"isPseudo":false,
+				"mac":"00:0a:95:9d:68:18",
+				"parameters":{
+					"HIVE_FORK_DAO_BLOCK":"2",
+					"HIVE_FORK_CONSTANTINOPLE_BLOCK":"2"
+				}
+			}
 		]
 	}`
 
@@ -125,27 +164,29 @@ func TestStartTestSuite(t *testing.T) {
 	}
 }
 
-func TestStartTest(t *testing.T) {
-
-	//just rely on there being a working StartTestSuite as set up:
+func setupTestSuite(t *testing.T) (common.TestSuiteHost, *common.TestSuite) {
 	testSuiteHost := setupBasicInstance(t)
-
 	suiteID := testSuiteHost.StartTestSuite("consensus", "consensus tests")
-
 	suite := hostProxy.runningTestSuites[suiteID]
-
 	if suite == nil {
 		t.Fatalf("Test setup failed, test suite not found")
 	}
+	return testSuiteHost, suite
+}
 
-	randomID := suiteID + 10
+func TestStartTest(t *testing.T) {
 
-	_, err := hostProxy.StartTest(randomID, "notest", "notest description")
+	//just rely on there being a working StartTestSuite as set up:
+	host, suite := setupTestSuite(t)
+
+	randomID := suite.ID + 10
+
+	_, err := host.StartTest(randomID, "notest", "notest description")
 	if err == nil {
 		t.Fatalf("Test was started without a valid test suite context")
 	}
 
-	testCase, err := hostProxy.StartTest(suiteID, "atest", "atest description")
+	testCase, err := host.StartTest(suite.ID, "atest", "atest description")
 	if err != nil {
 		t.Fatalf("Test creation failed: %s", err.Error())
 	}
@@ -162,6 +203,36 @@ func TestStartTest(t *testing.T) {
 	if tcase.Start.IsZero() {
 		t.Fatalf("Test has missing start time")
 	}
+
+}
+
+func TestGetNode(t *testing.T) {
+	// just use the suite and case functions for set up
+	host, suite := setupTestSuite(t)
+
+	testCaseID, err := host.StartTest(suite.ID, "notest", "notest description")
+	if err != nil {
+		t.Fatalf("Test setup failed: testCase could not be created.")
+	}
+
+	// test that it gets a node and that parameter selection is used
+	parms := map[string]string{
+		"CLIENT":                         "go-ethereum_master",
+		"HIVE_FORK_CONSTANTINOPLE_BLOCK": "10",
+	}
+	_, _, mac, err := host.GetNode(testCaseID, parms)
+	if err != nil {
+		t.Fatalf("Unable to get a node from pre-supplied list: %s", err.Error())
+	}
+
+	// test that the node matches the requested client type
+	if mac != "00:0a:95:9d:68:00" {
+		t.Fatalf("Incorrect node supplied")
+	}
+
+	// test that the node selected is the least used
+
+	// test that nodes are rejected if there is a parameter mismatch
 
 }
 
