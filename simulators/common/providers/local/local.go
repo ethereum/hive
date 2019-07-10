@@ -168,6 +168,7 @@ func (sim *host) StartTestSuite(name string, description string) common.TestSuit
 		ID:          newSuiteID,
 		Name:        name,
 		Description: description,
+		TestCases:   make(map[common.TestID]*common.TestCase),
 	}
 
 	sim.testSuiteCounter++

@@ -29,10 +29,10 @@ func setupBasicInstance(t *testing.T) common.TestSuiteHost {
 
 	err := generateInstance(configBytes)
 	if err != nil {
-		t.Errorf("Error executing get instance %s", err.Error())
+		t.Fatalf("Error executing get instance %s", err.Error())
 	}
 	if hostProxy == nil {
-		t.Errorf("No test suite host returned")
+		t.Fatalf("No test suite host returned")
 	}
 	return hostProxy
 }
@@ -61,10 +61,10 @@ func TestGetInstance(t *testing.T) {
 	host, err := GetInstance(configBytes)
 
 	if err != nil {
-		t.Errorf("Error executing get instance %s", err.Error())
+		t.Fatalf("Error executing get instance %s", err.Error())
 	}
 	if host == nil {
-		t.Errorf("No test suite host returned")
+		t.Fatalf("No test suite host returned")
 	}
 
 	config = `
@@ -88,7 +88,7 @@ func TestGetInstance(t *testing.T) {
 
 	//check the underlying unexported instance
 	if hostProxy == nil || hostProxy.configuration == nil || len(hostProxy.configuration.AvailableClients) != 1 {
-		t.Errorf("Wrong configuration")
+		t.Fatalf("Wrong configuration")
 	}
 
 	if hostProxy.configuration.AvailableClients[0].IP.String() != "10.3.58.6" ||
@@ -98,7 +98,7 @@ func TestGetInstance(t *testing.T) {
 		hostProxy.configuration.AvailableClients[0].Parameters["HIVE_FORK_CONSTANTINOPLE_BLOCK"] != "0" ||
 		hostProxy.configuration.AvailableClients[0].Mac != "00:0a:95:9d:68:16" ||
 		hostProxy.configuration.AvailableClients[0].ClientType != "go-ethereum_master" {
-		t.Errorf("Wrong configuration")
+		t.Fatalf("Wrong configuration")
 	}
 }
 
@@ -113,16 +113,56 @@ func TestStartTestSuite(t *testing.T) {
 	suite2, ok2 := hostProxy.runningTestSuites[suite2ID]
 
 	if ok1 == false || ok2 == false {
-		t.Errorf("Test suites not registered as running")
+		t.Fatalf("Test suites not registered as running")
 	}
 
 	if suite1.Name != "consensus" || suite2.Name != "p2p" {
-		t.Errorf("Test suite names not registered")
+		t.Fatalf("Test suite names not registered")
 	}
 
 	if suite1.Description != "consensus tests" || suite2.Description != "p2p tests" {
-		t.Errorf("Test suite description not registered")
+		t.Fatalf("Test suite description not registered")
 	}
+}
+
+func TestStartTest(t *testing.T) {
+
+	//just rely on there being a working StartTestSuite as set up:
+	testSuiteHost := setupBasicInstance(t)
+
+	suiteID := testSuiteHost.StartTestSuite("consensus", "consensus tests")
+
+	suite := hostProxy.runningTestSuites[suiteID]
+
+	if suite == nil {
+		t.Fatalf("Test setup failed, test suite not found")
+	}
+
+	randomID := suiteID + 10
+
+	_, err := hostProxy.StartTest(randomID, "notest", "notest description")
+	if err == nil {
+		t.Fatalf("Test was started without a valid test suite context")
+	}
+
+	testCase, err := hostProxy.StartTest(suiteID, "atest", "atest description")
+	if err != nil {
+		t.Fatalf("Test creation failed: %s", err.Error())
+	}
+
+	tcase, ok := suite.TestCases[testCase]
+	if !ok {
+		t.Fatalf("Test creation failed: test does not exist")
+	}
+
+	if tcase.Name != "atest" || tcase.Description != "atest description" {
+		t.Fatalf("Test has incorrect data")
+	}
+
+	if tcase.Start.IsZero() {
+		t.Fatalf("Test has missing start time")
+	}
+
 }
 
 func TestGetClientEnode(t *testing.T) {
