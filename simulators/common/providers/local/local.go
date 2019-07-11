@@ -1,3 +1,8 @@
+// Package local offers a Hive provider that allows users to run tests against
+// a list of presupplied nodes and pseudo-nodes. This can be used to run
+// p2p and rpc tests against running nodes without the need for Docker or other
+// potential Hive provider dependencies. The responsibility of resetting node state
+// between tests is placed on the user.
 package local
 
 import (
@@ -35,7 +40,7 @@ var (
 // 3. Does a configuration parameter exist in the supplied descriptor that is also
 // in the request descriptor, and do they match?
 // If multiple nodes are pre-supplied that fulfil requests, these are selected in round-robin
-// method.
+// method. Pseudos are not treated in this way.
 //
 type HostConfiguration struct {
 	AvailableClients []ClientDescription `json:"availableClients"`

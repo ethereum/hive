@@ -61,6 +61,13 @@ func setupBasicInstance(t *testing.T) common.TestSuiteHost {
 					"HIVE_FORK_CONSTANTINOPLE_BLOCK":"2"
 				}
 			}
+			,
+			{
+				"clientType":"relay",
+				"ip":"10.3.58.99",
+				"isPseudo":true,
+				"mac":"00:0a:95:9d:68:99"
+			}
 		]
 	}`
 
@@ -264,5 +271,26 @@ func TestGetClientEnode(t *testing.T) {
 	}
 	if *enode != "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301" {
 		t.Fatalf("Incorrect enode")
+	}
+}
+
+func TestGetPseudo(t *testing.T) {
+	// just use the suite and case functions for set up
+	host, suite := setupTestSuite(t)
+
+	testCaseID, err := host.StartTest(suite.ID, "notest", "notest description")
+	if err != nil {
+		t.Fatalf("Test setup failed: testCase could not be created.")
+	}
+
+	parms := map[string]string{
+		"CLIENT": "relay",
+	}
+	_, _, mac, err := host.GetPseudo(testCaseID, parms)
+	if err != nil {
+		t.Fatalf("Error getting pseudo %s", err.Error())
+	}
+	if *mac != "00:0a:95:9d:68:99" {
+		t.Fatalf("Incorrect node supplied getting least used")
 	}
 }
