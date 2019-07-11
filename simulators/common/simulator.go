@@ -32,12 +32,12 @@ type TestSuiteHost interface {
 	//returned client types from GetClientTypes
 	//The input is used as environment variables in the new container
 	//Returns container id, ip and mac
-	GetNode(test TestID, parameters map[string]string) (string, net.IP, string, error)
+	GetNode(test TestID, parameters map[string]string) (string, net.IP, *string, error)
 	//GetPseudo gets a new (or pre-supplied) pseudo-client with the specified parameters
 	//One parameter must be named CLIENT
 	//The input is used as environment variables in the new container
 	//Returns container id, ip and mac
-	GetPseudo(test TestID, parameters map[string]string) (string, net.IP, string, error)
+	GetPseudo(test TestID, parameters map[string]string) (string, net.IP, *string, error)
 	//Signal that a node is no longer required
 	KillNode(test TestID, node string) error
 }

@@ -46,9 +46,9 @@ type ClientDescription struct {
 	IsPseudo      bool              `json:"isPseudo"`
 	ClientType    string            `json:"clientType"`
 	Parameters    map[string]string `json:"parameters,omitempty"`
-	Enode         string            `json:"Enode,omitempty"`
+	Enode         *string           `json:"Enode,omitempty"`
 	IP            net.IP            `json:"ip"`
-	Mac           string            `json:"mac"`
+	Mac           *string           `json:"mac"`
 	selectedCount int
 }
 
@@ -153,7 +153,7 @@ func (sim *host) GetClientEnode(test common.TestID, node string) (*string, error
 		return nil, ErrNoSuchNode
 	}
 	//return the enode
-	return &sim.configuration.AvailableClients[nodeIndex].Enode, nil
+	return sim.configuration.AvailableClients[nodeIndex].Enode, nil
 }
 
 // StartTestSuite starts a test suite and returns the context id
@@ -235,52 +235,69 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 	return sim.clientTypes, nil
 }
 
-//StartNewNode attempts to acquire a new node matching the given parameters
-//One parameter must be named CLIENT and should be a known type returned by GetClientTypes
-//If there are multiple nodes, they will be selected round-robin
-//Returns container id, ip, mac
-func (sim *host) GetNode(test common.TestID, parameters map[string]string) (string, net.IP, string, error) {
+// GetNode attempts to acquire a new node matching the given parameters
+// One parameter must be named CLIENT and should be a known type returned by GetClientTypes
+// If there are multiple nodes, they will be selected round-robin
+// Returns node id, ip, mac
+func (sim *host) GetNode(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 	sim.nodeMutex.Lock()
 	defer sim.nodeMutex.Unlock()
 
 	client, ok := parameters["CLIENT"]
 	if !ok {
-		return "", nil, "", ErrMissingClientType
+		return "", nil, nil, ErrMissingClientType
 	}
 
 	availableClients, ok := sim.clientsByType[client]
 	if !ok || len(availableClients) == 0 {
-		return "", nil, "", ErrNoAvailableClients
+		return "", nil, nil, ErrNoAvailableClients
 	}
 
-	//select a node round-robin based on which is least used
+	//select a node round-robin based on the parameters filter
+	//and then the least used if multiple are returned
 	leastUsedCt := math.MaxUint32
 	var leastUsed *ClientDescription
 	var leastUsedIndex int
 	for _, v := range availableClients {
 		node := &sim.configuration.AvailableClients[v]
-		if node.selectedCount < leastUsedCt {
+		if matchFilter(node.Parameters, parameters) &&
+			node.selectedCount < leastUsedCt {
 			leastUsed = node
 			leastUsedCt = node.selectedCount
 			leastUsedIndex = v
 		}
 	}
 
-	return strconv.Itoa(leastUsedIndex), leastUsed.IP, leastUsed.Mac, nil
+	if leastUsed == nil {
+		return "", nil, nil, ErrNoAvailableClients
+	}
 
+	return strconv.Itoa(leastUsedIndex), leastUsed.IP, leastUsed.Mac, nil
+}
+
+// matchFilter checks if the node description contains the specified key
+// and if so rejects the node if the values do not match
+func matchFilter(nodeDescription map[string]string, filter map[string]string) bool {
+	for k, v := range filter {
+		matched, ok := nodeDescription[k]
+		if ok && matched != v {
+			return false
+		}
+	}
+	return true
 }
 
 // GetPseudo - just return a pseudo client , such as a relay
-func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (string, net.IP, string, error) {
+func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 
 	client, ok := parameters["CLIENT"]
 	if !ok {
-		return "", nil, "", ErrMissingClientType
+		return "", nil, nil, ErrMissingClientType
 	}
 
 	availablePseudos, ok := sim.pseudosByType[client]
 	if !ok || len(availablePseudos) == 0 {
-		return "", nil, "", ErrNoAvailableClients
+		return "", nil, nil, ErrNoAvailableClients
 	}
 
 	//The id is just the index in the list of all pseudos of the first pseudo of this type (we don't support

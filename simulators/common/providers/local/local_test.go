@@ -132,10 +132,10 @@ func TestGetInstance(t *testing.T) {
 
 	if hostProxy.configuration.AvailableClients[0].IP.String() != "10.3.58.6" ||
 		hostProxy.configuration.AvailableClients[0].IsPseudo != false ||
-		hostProxy.configuration.AvailableClients[0].Enode != "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301" ||
+		*hostProxy.configuration.AvailableClients[0].Enode != "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301" ||
 		hostProxy.configuration.AvailableClients[0].Parameters["HIVE_FORK_DAO_BLOCK"] != "0" ||
 		hostProxy.configuration.AvailableClients[0].Parameters["HIVE_FORK_CONSTANTINOPLE_BLOCK"] != "0" ||
-		hostProxy.configuration.AvailableClients[0].Mac != "00:0a:95:9d:68:16" ||
+		*hostProxy.configuration.AvailableClients[0].Mac != "00:0a:95:9d:68:16" ||
 		hostProxy.configuration.AvailableClients[0].ClientType != "go-ethereum_master" {
 		t.Fatalf("Wrong configuration")
 	}
@@ -226,18 +226,43 @@ func TestGetNode(t *testing.T) {
 	}
 
 	// test that the node matches the requested client type
-	if mac != "00:0a:95:9d:68:00" {
+	if *mac != "00:0a:95:9d:68:00" {
 		t.Fatalf("Incorrect node supplied")
 	}
 
 	// test that the node selected is the least used
-
-	// test that nodes are rejected if there is a parameter mismatch
+	parms = map[string]string{
+		"CLIENT": "go-ethereum_master",
+	}
+	_, _, mac, err = host.GetNode(testCaseID, parms)
+	if *mac != "00:0a:95:9d:68:16" {
+		t.Fatalf("Incorrect node supplied getting least used")
+	}
 
 }
 
 func TestGetClientEnode(t *testing.T) {
 
-	//testSuiteHost := setupBasicInstance(t)
+	// just use the suite and case functions for set up
+	host, suite := setupTestSuite(t)
+	testCaseID, err := host.StartTest(suite.ID, "notest", "notest description")
+	if err != nil {
+		t.Fatalf("Test setup failed: testCase could not be created.")
+	}
+	parms := map[string]string{
+		"CLIENT":                         "go-ethereum_master",
+		"HIVE_FORK_CONSTANTINOPLE_BLOCK": "10",
+	}
+	nodeID, _, _, err := host.GetNode(testCaseID, parms)
+	if err != nil {
+		t.Fatalf("Test setup failed: unable to get a node from pre-supplied list: %s", err.Error())
+	}
 
+	enode, err := host.GetClientEnode(testCaseID, nodeID)
+	if err != nil {
+		t.Fatalf("Error in GetClientEnode %s", err.Error())
+	}
+	if *enode != "enode://6f8a80d14311c39f35f516fa664deaaaa13e85b2f7493f37f6144d86991ec012937307647bd3b9a82abe2974e1407241d54947bbb39763a4cac9f77166ad92a0@10.3.58.6:30303?discport=30301" {
+		t.Fatalf("Incorrect enode")
+	}
 }

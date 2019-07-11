@@ -136,7 +136,7 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
 //Returns container id and ip
-func (sim *host) GetNode(test common.TestID, parameters map[string]string) (string, net.IP, string, error) {
+func (sim *host) GetNode(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 	vals := make(url.Values)
 	for k, v := range parameters {
 		vals.Add(k, v)
@@ -144,12 +144,12 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 	vals.Add("testcase", test.String())
 	data, err := wrapHTTPErrorsPost(sim.configuration.HostURI+"/nodes", vals)
 	if err != nil {
-		return "", nil, "", err
+		return "", nil, nil, err
 	}
 	if idip := strings.Split(data, "@"); len(idip) > 1 {
-		return idip[0], net.ParseIP(idip[1]), idip[2], nil
+		return idip[0], net.ParseIP(idip[1]), &idip[2], nil
 	}
-	return data, net.IP{}, "", fmt.Errorf("no ip address returned: %v", data)
+	return data, net.IP{}, nil, fmt.Errorf("no ip address returned: %v", data)
 }
 
 //StartNewPseudo Start a new pseudo-client with the specified parameters
