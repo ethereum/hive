@@ -7,7 +7,6 @@ package local
 
 import (
 	"encoding/json"
-	"errors"
 	"io"
 	"math"
 	"net"
@@ -16,20 +15,6 @@ import (
 	"time"
 
 	"github.com/ethereum/hive/simulators/common"
-)
-
-var (
-	// ErrNoSuchNode no node with the requested id
-	ErrNoSuchNode = errors.New("no such node")
-
-	// ErrNoSuchTestSuite is that the test suite does not exist
-	ErrNoSuchTestSuite = errors.New("no such test suite context")
-
-	// ErrMissingClientType is that the operation was expecting a CLIENT parameter
-	ErrMissingClientType = errors.New("missing client type")
-
-	// ErrNoAvailableClients is the error that no pre-supplied clients of the requested type are available
-	ErrNoAvailableClients = errors.New("no available clients")
 )
 
 // HostConfiguration is used to set up the local provider.
@@ -71,6 +56,7 @@ type host struct {
 	testSuiteMutex    sync.Mutex
 	testSuiteCounter  uint32
 	testCaseCounter   uint32
+	outputStream      io.Writer
 }
 
 var hostProxy *host
@@ -83,6 +69,7 @@ func GetInstance(config []byte, output io.Writer) (common.TestSuiteHost, error) 
 	var err error
 	once.Do(func() {
 		err = generateInstance(config)
+		hostProxy.outputStream = output
 	})
 	return hostProxy, err
 }
@@ -143,9 +130,23 @@ func mapClients() {
 // EndTestSuite ends the test suite by writing the test suite results to the supplied
 // stream and removing the test suite from the running list
 func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
+	sim.testSuiteMutex.Lock()
+	defer sim.testSuiteMutex.Unlock()
+
+	//Check the test suite exists
+	suite, ok := host.runningTestSuites[testSuite]
+	if !ok {
+		return common.ErrNoSuchTestSuite
+	}
+
+	if len(suite.TestCases) > 0 {
+		return common.ErrTestSuiteRunning
+	}
 
 	//Ending the test suite must write the data out to the supplied stream (io.Writer)
-	//
+
+	//remove the test suite
+	delete(sim.runningTestSuites, testSuite)
 
 	return nil
 
@@ -160,7 +161,7 @@ func (sim *host) GetClientEnode(test common.TestID, node string) (*string, error
 	}
 	// make sure it is within the bounds of the node list
 	if nodeIndex < 0 || nodeIndex > len(sim.configuration.AvailableClients) {
-		return nil, ErrNoSuchNode
+		return nil, common.ErrNoSuchNode
 	}
 	//return the enode
 	return sim.configuration.AvailableClients[nodeIndex].Enode, nil

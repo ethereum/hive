@@ -21,35 +21,35 @@ func (tsID TestID) String() string {
 
 // TestSuite is a single run of a simulator, a collection of testcases
 type TestSuite struct {
-	ID          TestSuiteID
-	Name        string
-	Description string
-	TestCases   map[TestID]*TestCase
+	ID          TestSuiteID          `json:"id"`
+	Name        string               `json:"name"`
+	Description string               `json:"description"`
+	TestCases   map[TestID]*TestCase `json:"testCases"`
 }
 
 // TestCase represents a single test case in a test suite
 type TestCase struct {
-	ID            TestID // Test case reference number.
-	Name          string // Test case short name.
-	Description   string // Test case long description in MD.
-	Start         time.Time
-	End           time.Time
-	SummaryResult TestResult                 // The result of the whole test case.
-	ClientResults map[string]*TestResult     // Client specific results, if this test case supports this concept. Not all test cases will identify a specific client as a test failure reason.
-	ClientInfo    map[string]*TestClientInfo // Info about each client.
+	ID            TestID                     `json:"id"`          // Test case reference number.
+	Name          string                     `json:"name"`        // Test case short name.
+	Description   string                     `json:"description"` // Test case long description in MD.
+	Start         time.Time                  `json:"start"`
+	End           time.Time                  `json:"end"`
+	SummaryResult TestResult                 `json:"summaryResult"` // The result of the whole test case.
+	ClientResults map[string]*TestResult     `json:"clientResults"` // Client specific results, if this test case supports this concept. Not all test cases will identify a specific client as a test failure reason.
+	ClientInfo    map[string]*TestClientInfo `json:"clientInfo"`    // Info about each client.
 }
 
 // TestResult describes the results of a test at the level of the overall test case and for each client involved in a test case
 type TestResult struct {
-	Pass    bool
-	Details string
+	Pass    bool   `json:"pass"`
+	Details string `json:"details"`
 }
 
 // TestClientInfo describes a client that participated in a test case
 type TestClientInfo struct {
-	ID             string
-	Name           string
-	VersionInfo    string //URL to github repo + branch.
-	InstantiatedAt time.Time
-	LogFile        string //Absolute path to the logfile.
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	VersionInfo    string    `json:"versionInfo"` //URL to github repo + branch.
+	InstantiatedAt time.Time `json:"instantiatedAt"`
+	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
 }

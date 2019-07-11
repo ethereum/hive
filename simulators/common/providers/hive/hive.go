@@ -23,6 +23,7 @@ type HostConfiguration struct {
 
 type host struct {
 	configuration *HostConfiguration
+	outputStream  io.Writer
 }
 
 var hostProxy *host
@@ -39,6 +40,7 @@ func GetInstance(config []byte, output io.Writer) common.TestSuiteHost {
 
 		hostProxy = &host{
 			configuration: &result,
+			outputStream: output
 		}
 
 	})
