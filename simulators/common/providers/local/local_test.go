@@ -294,3 +294,35 @@ func TestGetPseudo(t *testing.T) {
 		t.Fatalf("Incorrect node supplied getting least used")
 	}
 }
+
+func TestGetClientTypes(t *testing.T) {
+	host := setupBasicInstance(t)
+
+	actualTypes, err := host.GetClientTypes()
+	if err != nil {
+
+	}
+
+	expectedTypes := []string{
+		"go-ethereum_master",
+		"nethermind_master",
+		"parity_master",
+		"relay",
+	}
+
+	if len(expectedTypes) != len(actualTypes) {
+		t.Fatalf("Incorrect number of types returned")
+	}
+
+	for _, ty := range expectedTypes {
+		found := false
+		for _, a := range actualTypes {
+			if ty == a {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("Expected client type missing %s", ty)
+		}
+	}
+}

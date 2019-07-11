@@ -130,7 +130,7 @@ func mapClients() {
 	}
 
 	for k := range pseudosByType {
-		pseudoTypes = append(clientTypes, k)
+		pseudoTypes = append(pseudoTypes, k)
 	}
 
 	hostProxy.clientsByType = clientsByType
@@ -235,9 +235,9 @@ func (sim *host) EndTest(testID common.TestID, summaryResult *common.TestResult,
 	return nil
 }
 
-//GetClientTypes Get all client types available to this simulator run
+//GetClientTypes Get all client types available
 func (sim *host) GetClientTypes() (availableClients []string, err error) {
-	return sim.clientTypes, nil
+	return append(sim.clientTypes, sim.pseudoTypes...), nil
 }
 
 // GetNode attempts to acquire a new node matching the given parameters
