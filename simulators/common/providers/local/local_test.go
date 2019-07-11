@@ -1,6 +1,7 @@
 package local
 
 import (
+	"io/ioutil"
 	"testing"
 
 	"github.com/ethereum/hive/simulators/common"
@@ -104,7 +105,7 @@ func TestGetInstance(t *testing.T) {
 
 	configBytes := []byte(config)
 
-	host, err := GetInstance(configBytes)
+	host, err := GetInstance(configBytes, ioutil.Discard)
 
 	if err != nil {
 		t.Fatalf("Error executing get instance %s", err.Error())
@@ -130,7 +131,7 @@ func TestGetInstance(t *testing.T) {
 		]
 	}`
 	configBytes = []byte(config)
-	GetInstance(configBytes)
+	GetInstance(configBytes, ioutil.Discard)
 
 	//check the underlying unexported instance
 	if hostProxy == nil || hostProxy.configuration == nil || len(hostProxy.configuration.AvailableClients) != 1 {

@@ -3,6 +3,7 @@ package hive
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -30,7 +31,7 @@ var once sync.Once
 // GetInstance returns the instance of a proxy to the Hive simulator host, giving a single opportunity to configure it.
 // The configuration is supplied as a byte representation, obtained from a file usually.
 // Clients are generated as docker instances.
-func GetInstance(config []byte) common.TestSuiteHost {
+func GetInstance(config []byte, output io.Writer) common.TestSuiteHost {
 
 	once.Do(func() {
 		var result HostConfiguration
@@ -157,7 +158,7 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
 //Returns container id and ip
-func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (string, net.IP, string, error) {
+func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 	vals := make(url.Values)
 	for k, v := range parameters {
 		vals.Add(k, v)
@@ -165,12 +166,12 @@ func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (st
 	vals.Add("testcase", test.String())
 	data, err := wrapHTTPErrorsPost(sim.configuration.HostURI+"/pseudos", vals)
 	if err != nil {
-		return "", nil, "", err
+		return "", nil, nil, err
 	}
 	if idip := strings.Split(data, "@"); len(idip) > 1 {
-		return idip[0], net.ParseIP(idip[1]), idip[2], nil
+		return idip[0], net.ParseIP(idip[1]), &idip[2], nil
 	}
-	return data, net.IP{}, "", fmt.Errorf("no ip address returned: %v", data)
+	return data, net.IP{}, nil, fmt.Errorf("no ip address returned: %v", data)
 }
 
 // KillNode signals to the host that the node is no longer required

@@ -4,8 +4,6 @@ import (
 	"net"
 )
 
-//SimulatorHost A simulator host
-
 //MacENREntry a type of ENR record for holding mac addresses
 type MacENREntry string
 
@@ -47,3 +45,4 @@ type Logger interface {
 	Log(args ...interface{})
 	Logf(format string, args ...interface{})
 }
+

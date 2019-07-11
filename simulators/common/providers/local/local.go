@@ -8,6 +8,7 @@ package local
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"math"
 	"net"
 	"strconv"
@@ -78,7 +79,7 @@ var once sync.Once
 // GetInstance returns the instance of a local provider, which uses presupplied node instances and creates logs to a local destination,
 // and provides a single opportunity to configure it during initialisation.
 // The configuration is supplied as a byte representation, obtained from a file usually.
-func GetInstance(config []byte) (common.TestSuiteHost, error) {
+func GetInstance(config []byte, output io.Writer) (common.TestSuiteHost, error) {
 	var err error
 	once.Do(func() {
 		err = generateInstance(config)
@@ -86,7 +87,7 @@ func GetInstance(config []byte) (common.TestSuiteHost, error) {
 	return hostProxy, err
 }
 
-//used in unit testin
+//used in unit testing
 func generateInstance(config []byte) error {
 	var result HostConfiguration
 	err := json.Unmarshal(config, &result)
@@ -139,9 +140,13 @@ func mapClients() {
 	hostProxy.pseudoTypes = pseudoTypes
 }
 
-// EndTestSuite end
+// EndTestSuite ends the test suite by writing the test suite results to the supplied
+// stream and removing the test suite from the running list
 func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
-	//TODO -
+
+	//Ending the test suite must write the data out to the supplied stream (io.Writer)
+	//
+
 	return nil
 
 }
