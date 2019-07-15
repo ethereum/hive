@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -21,11 +22,11 @@ import (
 )
 
 var (
-	listenPort   *string //udp listen port
-	natdesc      *string //nat mode
-	dockerHost   *string //docker host api endpoint
-	hostURI      *string //simulator host endpoint
-	host         common.SimulatorAPI
+	listenPort *string //udp listen port
+	natdesc    *string //nat mode
+	//dockerHost   *string //docker host api endpoint
+	//hostURI      *string //simulator host endpoint
+	host         common.TestSuiteHost
 	daemon       *docker.Client //docker daemon proxy
 	targetID     *string        //docker client id
 	nodeKey      *ecdsa.PrivateKey
@@ -49,14 +50,20 @@ func TestMain(m *testing.M) {
 
 	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "any", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
-	hostURI = flag.String("simulatorHost", "", "url of simulator host api")
-	dockerHost = flag.String("dockerHost", "", "docker host api endpoint")
+
+	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
+	providerconfigFile := flag.String("providerConfig", "", "the config json file for the provider")
 
 	flag.Parse()
 
-	//Try to connect to the simulator host and get the client list
-	host = &common.SimulatorHost{
-		HostURI: hostURI,
+	hostProvider, err := common.GetProvider(simProviderType)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to get provider: ", err.Error())
+	}
+
+	configFileBytes, err := ioutil.ReadFile(providerconfigFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to read provider config: ", err.Error())
 	}
 
 	os.Exit(m.Run())

@@ -6,6 +6,9 @@ var (
 	// ErrNoSuchNode no node with the requested id
 	ErrNoSuchNode = errors.New("no such node")
 
+	// ErrNoSuchProviderType the provider type does not exist
+	ErrNoSuchProviderType = errors.New("no such provider type")
+
 	// ErrNoSuchTestSuite is that the test suite does not exist
 	ErrNoSuchTestSuite = errors.New("no such test suite")
 
@@ -21,8 +24,8 @@ var (
 	// ErrTestSuiteRunning is that the test suite is still running and cannot be ended
 	ErrTestSuiteRunning = errors.New("test suite still has running tests")
 
-	// ErrMissingOutputWriter is that the test suite is missing an output stream writer
-	ErrMissingOutputWriter = errors.New("test suite requires an output stream writer")
+	// ErrMissingOutputDestination is that the test suite is missing an output definition
+	ErrMissingOutputDestination = errors.New("test suite requires an output")
 
 	// ErrNoSummaryResult is that the mandatory test case summary result during test case completion is missing
 	ErrNoSummaryResult = errors.New("test case must be ended with a summary result")

@@ -131,7 +131,7 @@ func TestGetInstance(t *testing.T) {
 		]
 	}`
 	configBytes = []byte(config)
-	GetInstance(configBytes, ioutil.Discard)
+	GetInstance(configBytes)
 
 	//check the underlying unexported instance
 	if hostProxy == nil || hostProxy.configuration == nil || len(hostProxy.configuration.AvailableClients) != 1 {

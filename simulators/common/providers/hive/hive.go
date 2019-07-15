@@ -32,15 +32,15 @@ var once sync.Once
 // GetInstance returns the instance of a proxy to the Hive simulator host, giving a single opportunity to configure it.
 // The configuration is supplied as a byte representation, obtained from a file usually.
 // Clients are generated as docker instances.
-func GetInstance(config []byte, output io.Writer) common.TestSuiteHost {
+func GetInstance(config []byte) common.TestSuiteHost {
 
 	once.Do(func() {
 		var result HostConfiguration
 		json.Unmarshal(config, &result)
 
 		hostProxy = &host{
-			configuration: &result,
-			outputStream: output
+			configuration: &result
+			//TODO - output stream
 		}
 
 	})

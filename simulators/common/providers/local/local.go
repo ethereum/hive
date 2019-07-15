@@ -30,6 +30,7 @@ import (
 //
 type HostConfiguration struct {
 	AvailableClients []ClientDescription `json:"availableClients"`
+	OutputFile       string              `json:"outputFile"`
 }
 
 // ClientDescription is metadata about the pre-supplied clients
@@ -65,15 +66,12 @@ var once sync.Once
 // GetInstance returns the instance of a local provider, which uses presupplied node instances and creates logs to a local destination,
 // and provides a single opportunity to configure it during initialisation.
 // The configuration is supplied as a byte representation, obtained from a file usually.
-func GetInstance(config []byte, output io.Writer) (common.TestSuiteHost, error) {
+func GetInstance(config []byte) (common.TestSuiteHost, error) {
 	var err error
 
-	if output == nil {
-		return common.ErrMissingOutputWriter
-	}
 	once.Do(func() {
 		err = generateInstance(config)
-		hostProxy.outputStream = output
+
 	})
 	return hostProxy, err
 }
