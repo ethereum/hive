@@ -17,4 +17,7 @@ var (
 
 	// ErrTestSuiteRunning is that the test suite is still running and cannot be ended
 	ErrTestSuiteRunning = errors.New("test suite still has running tests")
+
+	// ErrMissingOutputWriter is that the test suite is missing an output stream writer
+	ErrMissingOutputWriter = errors.New("test suite requires an output stream writer")
 )

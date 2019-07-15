@@ -67,6 +67,10 @@ var once sync.Once
 // The configuration is supplied as a byte representation, obtained from a file usually.
 func GetInstance(config []byte, output io.Writer) (common.TestSuiteHost, error) {
 	var err error
+
+	if output == nil {
+		return common.ErrMissingOutputWriter
+	}
 	once.Do(func() {
 		err = generateInstance(config)
 		hostProxy.outputStream = output
@@ -144,6 +148,14 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 	}
 
 	//Ending the test suite must write the data out to the supplied stream (io.Writer)
+	bytes, err := json.Marshal(*suite)
+	if err != nil {
+		return err
+	}
+	_, err := hostProxy.outputStream.Write(bytes)
+	if err != nil {
+		return err
+	}
 
 	//remove the test suite
 	delete(sim.runningTestSuites, testSuite)
