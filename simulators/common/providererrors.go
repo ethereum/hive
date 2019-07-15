@@ -7,7 +7,10 @@ var (
 	ErrNoSuchNode = errors.New("no such node")
 
 	// ErrNoSuchTestSuite is that the test suite does not exist
-	ErrNoSuchTestSuite = errors.New("no such test suite context")
+	ErrNoSuchTestSuite = errors.New("no such test suite")
+
+	// ErrNoSuchTestCase is that the test case does not exist
+	ErrNoSuchTestCase = errors.New("no such test case")
 
 	// ErrMissingClientType is that the operation was expecting a CLIENT parameter
 	ErrMissingClientType = errors.New("missing client type")
@@ -20,4 +23,7 @@ var (
 
 	// ErrMissingOutputWriter is that the test suite is missing an output stream writer
 	ErrMissingOutputWriter = errors.New("test suite requires an output stream writer")
+
+	// ErrNoSummaryResult is that the mandatory test case summary result during test case completion is missing
+	ErrNoSummaryResult = errors.New("test case must be ended with a summary result")
 )

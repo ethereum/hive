@@ -138,13 +138,17 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 	defer sim.testSuiteMutex.Unlock()
 
 	//Check the test suite exists
-	suite, ok := host.runningTestSuites[testSuite]
+	suite, ok := sim.runningTestSuites[testSuite]
 	if !ok {
 		return common.ErrNoSuchTestSuite
 	}
 
-	if len(suite.TestCases) > 0 {
-		return common.ErrTestSuiteRunning
+	//Check the suite has no running test cases
+	for k, v := range suite.TestCases {
+		_, ok := sim.runningTestCases[k]
+		if ok {
+			return common.ErrTestSuiteRunning
+		}
 	}
 
 	//Ending the test suite must write the data out to the supplied stream (io.Writer)
@@ -158,10 +162,9 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 	}
 
 	//remove the test suite
-	delete(sim.runningTestSuites, testSuite)
+	delete(sim.runningTestSuites, testSuite.ID)
 
 	return nil
-
 }
 
 // GetClientEnode Get the client enode for the specified node id, which in this case is just the index
@@ -234,21 +237,37 @@ func (sim *host) StartTest(testSuiteID common.TestSuiteID, name string, descript
 
 // EndTest finishes the test case
 func (sim *host) EndTest(testID common.TestID, summaryResult *common.TestResult, clientResults map[string]*common.TestResult) error {
-	//	testCase := sim.runningTestCases[testID]
+
+	sim.testCaseMutex.Lock()
+	defer sim.testCaseMutex.Unlock()
+
+	// Check if the test case is running
+	testCase, ok := sim.runningTestCases[testID]
+	if !ok {
+		return common.ErrNoSuchTestCase
+	}
+
+	/// Make sure there is at least a result summary
+	if summaryResult == nil {
+		return common.ErrNoSummaryResult
+	}
+
+	// Add the results to the test case
+	testCase.End = time.Now
+	testCase.SummaryResult = *summaryResult
+	testCase.ClientResults = clientResults
+
+	delete(sim.runningTestCases, testCase.ID)
+
 	// A local configuration might want to be informed
 	// of the fact that the test case has ended in order to
 	// reset state.
 	// The main Hive Docker provider achieves this by killing
 	// containers. The Local provider specifies pre-existing clients.
 	// Signal that state should be reset by using the Kill message.
-
-	// Check if the test case is running
-
-	// Append the results to the test case
-
-	// Signal that the nodes here should be reset
-
-	//TODO:
+	for k := range testCase.ClientInfo {
+		sim.KillNode(testID, k)
+	}
 
 	return nil
 }
