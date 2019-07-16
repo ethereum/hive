@@ -1,19 +1,14 @@
 package common
 
-import (
-	"github.com/ethereum/hive/simulators/common"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
-	"github.com/ethereum/hive/simulators/common/providers/local"
-)
-
 // TestSuiteHostProvider returns a singleton testsuitehost given an
 // initial configuration
-type TestSuiteHostProvider func(config []byte) (common.TestSuiteHost, error)
+type TestSuiteHostProvider func(config []byte) (TestSuiteHost, error)
 
 // TestSuiteHostProviders is the dictionary of test suit host providers
-var testSuiteHostProviders = map[string]TestSuiteHostProvider{
-	"local": local.GetInstance,
-	"hive":  hive.GetInstance,
+var testSuiteHostProviders map[string]TestSuiteHostProvider
+
+func RegisterProvider(key string, provider TestSuiteHostProvider) {
+	testSuiteHostProviders[key] = provider
 }
 
 // GetProvider selects the provider singleton configurator for a simulation backend

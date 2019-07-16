@@ -7,9 +7,9 @@ package local
 
 import (
 	"encoding/json"
-	"io"
 	"math"
 	"net"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -57,11 +57,14 @@ type host struct {
 	testSuiteMutex    sync.Mutex
 	testSuiteCounter  uint32
 	testCaseCounter   uint32
-	outputStream      io.Writer
 }
 
 var hostProxy *host
 var once sync.Once
+
+func init() {
+	common.RegisterProvider("local", GetInstance)
+}
 
 // GetInstance returns the instance of a local provider, which uses presupplied node instances and creates logs to a local destination,
 // and provides a single opportunity to configure it during initialisation.
@@ -149,12 +152,18 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 		}
 	}
 
-	//Ending the test suite must write the data out to the supplied stream (io.Writer)
+	//Ending the test suite must write the result data out
 	bytes, err := json.Marshal(*suite)
 	if err != nil {
 		return err
 	}
-	_, err := hostProxy.outputStream.Write(bytes)
+	f, err := os.OpenFile(sim.configuration.OutputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err := f.Write(bytes)
 	if err != nil {
 		return err
 	}
