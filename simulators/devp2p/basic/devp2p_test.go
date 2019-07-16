@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"testing"
-	"time"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -35,9 +34,11 @@ var (
 	v4udp        devp2p.V4Udp
 	relayIP      net.IP //the ip address of the relay node, used for relaying spoofed traffic
 
-	//targetnode       *enode.Node // parsed Node
-	//targetIP         net.IP      //targetIP
-
+	TestSuiteName        = "devp2p basic tests"
+	TestSuiteDescription = "A suite of p2p discovery v4 and security tests"
+	testSuite            common.TestSuiteID
+	iFace                *net.Interface
+	localIP              *net.IP
 )
 
 type testCase struct {
@@ -56,73 +57,103 @@ func TestMain(m *testing.M) {
 
 	flag.Parse()
 
-	hostProvider, err := common.GetProvider(simProviderType)
+	hostProvider, err := common.GetProvider(*simProviderType)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to get provider: ", err.Error())
+		fmt.Fprintf(os.Stderr, "Unable to get provider: %s", err.Error())
 	}
 
-	configFileBytes, err := ioutil.ReadFile(providerconfigFile)
+	configFileBytes, err := ioutil.ReadFile(*providerconfigFile)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to read provider config: ", err.Error())
+		fmt.Fprintf(os.Stderr, "Unable to read provider config: %s", err.Error())
 	}
 
-	os.Exit(m.Run())
+	host, err = hostProvider(configFileBytes)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
+	}
+
+	os.Exit(RunTestSuite(m))
 }
 
-func ClientTestRunner(t *testing.T, client string, testName string, testFunc func(common.Logger, *enode.Node) (string, bool)) {
+func RunTestSuite(m *testing.M) int {
+
+	testSuite = host.StartTestSuite(TestSuiteName, TestSuiteDescription)
+
+	return m.Run()
+}
+
+func ClientTestRunner(t *testing.T, client string, testName string, testDescription string, testFunc func(common.Logger, *enode.Node) (string, bool)) {
 
 	t.Run(testName, func(t *testing.T) {
 
 		t.Parallel()
 
-		var startTime = time.Now()
-		var errorMessage string
-		var ok = true
+		// Ask the host to start a new test
+		testID, err := host.StartTest(testSuite, testName, testDescription)
+		if err != nil {
+			t.Fatalf("Unable to start test: %s", err.Error())
+		}
+		// declare empty test results
+		var summaryResult common.TestResult
+		var clientResults map[string]*common.TestResult
+		//make sure the test ends
+		defer func() {
+			host.EndTest(testID, &summaryResult, clientResults)
+			//send test failures to standard outputs too
+			if !summaryResult.Pass {
+				t.Errorf("Test failed %s", summaryResult.Details)
+			}
+		}()
 
+		// get a relay pseudo-client
 		parms := map[string]string{
+			"CLIENT":         "relay",
+			"HIVE_RELAY_IP":  localIP.String(),
+			"HIVE_RELAY_UDP": "30303",
+		}
+		_, relayIP, _, err = host.GetPseudo(testID, parms)
+		if err != nil {
+			summaryResult.Pass = false
+			summaryResult.AddDetail(fmt.Sprintf("Unable to get pseudo: %s", err.Error()))
+			return
+		}
+		// get a client node
+		parms = map[string]string{
 			"CLIENT":        client,
 			"HIVE_BOOTNODE": "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@1.2.3.4:30303",
 		}
-
-		nodeID, ipAddr, macAddr, err := host.StartNewNode(parms)
+		nodeID, ipAddr, macAddr, err := host.GetNode(testID, parms)
 		if err != nil {
-			errorMessage = fmt.Sprintf("FATAL: Unable to start node: %v", err)
-			ok = false
+			summaryResult.Pass = false
+			summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))
+			return
 		}
 
-		if ok {
-
-			enodeID, err := host.GetClientEnode(nodeID)
-			if err != nil || enodeID == nil || *enodeID == "" {
-				errorMessage = fmt.Sprintf("FATAL: Unable to get node: %v", err)
-				ok = false
-			}
-			t.Logf("Got enode for test %s", *enodeID)
-
-			targetNode, err := enode.ParseV4(*enodeID)
-			if err != nil {
-				errorMessage = fmt.Sprintf("FATAL: Unable to parse enode: %v", err)
-				ok = false
-			}
-
-			if targetNode == nil {
-				errorMessage = fmt.Sprintf("FATAL: Unable to generate targetNode: %v", err)
-				ok = false
-			}
-
-			if ok {
-				//replace the ip with what docker says it is
-				targetNode = MakeNode(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303, macAddr)
-				errorMessage, ok = testFunc(t, targetNode)
-			}
-
+		enodeID, err := host.GetClientEnode(testID, nodeID)
+		if err != nil || enodeID == nil || *enodeID == "" {
+			summaryResult.Pass = false
+			summaryResult.AddDetail(fmt.Sprintf("Unable to get enode: %s", err.Error()))
+			return
 		}
 
-		host.AddResults(ok, nodeID, testName, errorMessage, time.Since(startTime))
-
-		if !ok {
-			t.Errorf("Test failed: %s", errorMessage)
+		targetNode, err := enode.ParseV4(*enodeID)
+		if err != nil {
+			summaryResult.Pass = false
+			summaryResult.AddDetail(fmt.Sprintf("Unable to get enode: %s", err.Error()))
+			return
 		}
+
+		if targetNode == nil {
+			summaryResult.Pass = false
+			summaryResult.AddDetail(fmt.Sprintf("Unable to generate targetNode %s", err.Error()))
+			return
+		}
+
+		//replace the ip with what docker says it is
+		targetNode = MakeNode(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303, *macAddr)
+		resultMessage, ok := testFunc(t, targetNode)
+		summaryResult.Pass = ok
+		summaryResult.AddDetail(resultMessage)
 
 	})
 
@@ -184,30 +215,19 @@ func TestDiscovery(t *testing.T) {
 			t.Fatalf("Simulator error. Cannot get client types. %v", err)
 		}
 
-		//add a UDP relay for spoof tests
+		//configure a UDP relay for spoof tests
 		//the UDP relay plays the role of a 'victim' of an attack
 		//where we impersonate their IP. Responses from other nodes, sent to spoofed source IPs
 		//are relayed back to us so we can know how other nodes are communicating.
 
-		iface, err := devp2p.GetNetworkInterface()
+		iFace, err = devp2p.GetNetworkInterface()
 		if err != nil {
 			t.Fatalf("Simulator error. Cannot get local interface. %v ", err)
 		}
 
-		localIP, err := devp2p.GetInterfaceIP(iface)
+		localIP, err = devp2p.GetInterfaceIP(iFace)
 		if err != nil {
 			t.Fatalf("Simulator error. Cannot get local ip. %v ", err)
-		}
-
-		parms := map[string]string{
-			"CLIENT":         "relay",
-			"HIVE_RELAY_IP":  localIP.String(),
-			"HIVE_RELAY_UDP": "30303",
-		}
-
-		_, relayIP, _, err = host.StartNewPseudo(parms)
-		if err != nil {
-			t.Errorf("FATAL: Unable to start relay node: %v", err)
 		}
 
 		//get all available tests
@@ -236,7 +256,7 @@ func TestDiscovery(t *testing.T) {
 				//we have a testcase of client-type+test
 				//run that testcase with a helper function (client, testfunc)
 				//the testcase will be run with max concurrency specified by the test parallel flag
-				ClientTestRunner(t, i, testName, testFunc)
+				ClientTestRunner(t, i, testName, "TODO", testFunc)
 
 			}
 

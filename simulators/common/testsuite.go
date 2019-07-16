@@ -1,6 +1,7 @@
 package common
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -43,6 +44,11 @@ type TestCase struct {
 type TestResult struct {
 	Pass    bool   `json:"pass"`
 	Details string `json:"details"`
+}
+
+// AddDetail adds test result info using a standard text formatting
+func (t TestResult) AddDetail(detail string) {
+	t.Details = fmt.Sprintf("%s %s\n", t.Details, detail)
 }
 
 // TestClientInfo describes a client that participated in a test case
