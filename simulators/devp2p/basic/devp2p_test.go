@@ -35,12 +35,10 @@ var (
 	restrictList *netutil.Netlist
 	v4udp        devp2p.V4Udp
 	relayIP      net.IP //the ip address of the relay node, used for relaying spoofed traffic
-
-	TestSuiteName        = "devp2p basic tests"
-	TestSuiteDescription = "A suite of p2p discovery v4 and security tests"
-	testSuite            common.TestSuiteID
-	iFace                *net.Interface
-	localIP              *net.IP
+	testSuite    common.TestSuiteID
+	iFace        *net.Interface
+	localIP      *net.IP
+	netInterface *string
 )
 
 type testCase struct {
@@ -56,7 +54,7 @@ func TestMain(m *testing.M) {
 
 	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "any", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
-
+	netInterface = flag.String("interface", "eth0", "the network interface name to use for spoofing traffic (eg: eth0 on docker) or the IP address identifying the network adapter")
 	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
 	providerconfigFile := flag.String("providerConfig", "", "the config json file for the provider")
 
@@ -84,8 +82,6 @@ func TestMain(m *testing.M) {
 }
 
 func RunTestSuite(m *testing.M) int {
-
-	testSuite = host.StartTestSuite(TestSuiteName, TestSuiteDescription)
 
 	return m.Run()
 }
@@ -210,7 +206,9 @@ func MakeNode(pubkey *ecdsa.PublicKey, ip net.IP, tcp, udp int, mac string) *eno
 
 // TestDiscovery tests the set of discovery protocols
 func TestDiscovery(t *testing.T) {
-
+	//start the test suite
+	testSuite = host.StartTestSuite("devp2p discovery v4 test suite", "This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.")
+	defer host.EndTestSuite(testSuite)
 	// discovery v4 test suites
 	t.Run("discoveryv4", func(t *testing.T) {
 
@@ -228,7 +226,7 @@ func TestDiscovery(t *testing.T) {
 		//where we impersonate their IP. Responses from other nodes, sent to spoofed source IPs
 		//are relayed back to us so we can know how other nodes are communicating.
 
-		iFace, err = devp2p.GetNetworkInterface()
+		iFace, err = devp2p.GetNetworkInterface(*netInterface)
 		if err != nil {
 			t.Fatalf("Simulator error. Cannot get local interface. %v ", err)
 		}
@@ -279,7 +277,7 @@ func SpoofSanityCheck(t common.Logger, targetnode *enode.Node) (string, bool) {
 	t.Log("Test v4013")
 	var mac common.MacENREntry
 	targetnode.Load(&mac)
-	if err := v4udp.SpoofedPing(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, nil); err != nil {
+	if err := v4udp.SpoofedPing(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, nil, *netInterface); err != nil {
 		return fmt.Sprintf("Spoofing sanity check failed: %v", err), false
 	}
 	return "", true
@@ -290,7 +288,7 @@ func SpoofAmplificationAttackCheck(t common.Logger, targetnode *enode.Node) (str
 	t.Log("Test v4014")
 	var mac common.MacENREntry
 	targetnode.Load(&mac)
-	if err := v4udp.SpoofingFindNodeCheck(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true); err != devp2p.ErrTimeout {
+	if err := v4udp.SpoofingFindNodeCheck(targetnode.ID(), string(mac), &net.UDPAddr{IP: targetnode.IP(), Port: targetnode.UDP()}, &net.UDPAddr{IP: relayIP, Port: 30303}, true, *netInterface); err != devp2p.ErrTimeout {
 		return fmt.Sprintf(" test failed: %v", err), false
 	}
 	return "", true

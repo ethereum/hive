@@ -289,6 +289,7 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 // One parameter must be named CLIENT and should be a known type returned by GetClientTypes
 // If there are multiple nodes, they will be selected round-robin
 // Returns node id, ip, mac
+// The node is registered as being part of the test.
 func (sim *host) GetNode(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 	sim.nodeMutex.Lock()
 	defer sim.nodeMutex.Unlock()
@@ -321,6 +322,8 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 	if leastUsed == nil {
 		return "", nil, nil, common.ErrNoAvailableClients
 	}
+
+	//add the client to the client info list for this test
 
 	return strconv.Itoa(leastUsedIndex), leastUsed.IP, leastUsed.Mac, nil
 }

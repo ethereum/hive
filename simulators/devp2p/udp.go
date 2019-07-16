@@ -310,7 +310,7 @@ func (t *V4Udp) close() {
 }
 
 //SpoofedPing - verify that the faked udp packets are being sent, received, and responses relayed correctly.
-func (t *V4Udp) SpoofedPing(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey)) error {
+func (t *V4Udp) SpoofedPing(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, recoveryCallback func(e *ecdsa.PublicKey), netInterface string) error {
 
 	to := makeEndpoint(toaddr, 0)
 
@@ -353,16 +353,16 @@ func (t *V4Udp) SpoofedPing(toid enode.ID, tomac string, toaddr *net.UDPAddr, fr
 
 	}
 
-	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, req, packet, tomac, callback)
+	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, req, packet, tomac, callback, netInterface)
 
 }
 
 //SpoofingFindNodeCheck tests if a client is susceptible to being used
 //as an attack vector for findnode amplification attacks
-func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool) error {
+func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, netInterface string) error {
 
 	//send ping
-	err := t.SpoofedPing(toid, tomac, toaddr, fromaddr, false, nil)
+	err := t.SpoofedPing(toid, tomac, toaddr, fromaddr, false, nil, netInterface)
 	if err != nil {
 		return err
 	}
@@ -393,7 +393,7 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 	if err != nil {
 		return err
 	}
-	t.spoofedWrite(toaddr, fromaddr, pongreq.name(), packet, tomac)
+	t.spoofedWrite(toaddr, fromaddr, pongreq.name(), packet, tomac, netInterface)
 
 	//consider the target 'bonded' , as it has received the expected pong
 	//send a findnode request for a random 'target' (target there being the
@@ -424,7 +424,7 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 		return ErrTimeout
 	}
 
-	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, findreq, findpacket, tomac, callback)
+	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, findreq, findpacket, tomac, callback, netInterface)
 
 }
 
@@ -904,11 +904,11 @@ func (t *V4Udp) sendPacket(toid enode.ID, toaddr *net.UDPAddr, req packet, packe
 	return errc
 }
 
-func (t *V4Udp) sendSpoofedPacket(toid enode.ID, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, req packet, packet []byte, macaddr string, callback func(reply) error) <-chan error {
+func (t *V4Udp) sendSpoofedPacket(toid enode.ID, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, req packet, packet []byte, macaddr string, callback func(reply) error, netInterface string) <-chan error {
 
 	t.l.Logf("Sending spoofed packet %s to enode %s with target endpoint %v from %v", req.name(), toid, toaddr, fromaddr)
 	errc := t.pending(toid, callback)
-	t.spoofedWrite(toaddr, fromaddr, req.name(), packet, macaddr)
+	t.spoofedWrite(toaddr, fromaddr, req.name(), packet, macaddr, netInterface)
 
 	return errc
 }
@@ -1082,24 +1082,37 @@ func (t *V4Udp) write(toaddr *net.UDPAddr, what string, packet []byte) error {
 }
 
 //GetNetworkInterface - Get the docker image's network interface
-func GetNetworkInterface() (*net.Interface, error) {
+func GetNetworkInterface(netInterface string) (*net.Interface, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
 		return nil, err
 	}
-
-	//TBD - for now this code makes the assumption
-	//that eth0 is the interface name, but for greater
-	//robustness, this should be obtained from docker
-	//by adding a new method to the http API
-
-	//look for eth0
 	var iface *net.Interface
-	for _, i := range ifaces {
-		if i.Name == "eth0" {
-			iface = &i
+	ip := net.ParseIP(netInterface)
+	if ip == nil {
+		//look for eth0 or the specified override
+		for _, i := range ifaces {
+			if i.Name == netInterface {
+				iface = &i
+			}
+		}
+	} else {
+
+		for _, i := range ifaces {
+			addrs, err := i.Addrs()
+			if err == nil && addrs != nil {
+				for _, addr := range addrs {
+					ip, _, err = net.ParseCIDR(addr.String())
+					fmt.Println(ip.String())
+					if err == nil && ip.String() == netInterface {
+
+						iface = &i
+					}
+				}
+			}
 		}
 	}
+
 	return iface, nil
 }
 
@@ -1122,20 +1135,20 @@ func GetInterfaceIP(iface *net.Interface) (*net.IP, error) {
 	return nil, nil
 }
 
-func (t *V4Udp) spoofedWrite(toaddr *net.UDPAddr, fromaddr *net.UDPAddr, what string, packet []byte, macAddr string) error {
+func (t *V4Udp) spoofedWrite(toaddr *net.UDPAddr, fromaddr *net.UDPAddr, what string, packet []byte, macAddr string, netInterface string) error {
 
 	mac, err := net.ParseMAC(macAddr)
 	if err != nil {
 		return err
 	}
 
-	iface, err := GetNetworkInterface()
+	iface, err := GetNetworkInterface(netInterface)
 	if err != nil {
 		return err
 	}
 
 	if nil == iface {
-		return errors.New("eth0 interface missing")
+		return errors.New("interface not found: " + netInterface)
 	}
 
 	opts := udpFrameOptions{
