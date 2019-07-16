@@ -69,7 +69,7 @@ func setupBasicInstance(t *testing.T) common.TestSuiteHost {
 				"mac":"00:0a:95:9d:68:99"
 			}
 		],
-		"outputFile":"c:\mytests\newtests\testResults.json"
+		"outputFile":"c:\\mytests\\newtests\\testResults.json"
 	}`
 
 	configBytes := []byte(config)
@@ -100,7 +100,8 @@ func TestGetInstance(t *testing.T) {
 					"HIVE_FORK_CONSTANTINOPLE_BLOCK":"0"
 				}
 			}
-		]
+		],
+		"outputFile":"c:\\mytests\\newtests\\testResults.json"
 	}`
 
 	configBytes := []byte(config)
