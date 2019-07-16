@@ -146,7 +146,7 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 	}
 
 	//Check the suite has no running test cases
-	for k, v := range suite.TestCases {
+	for k := range suite.TestCases {
 		_, ok := sim.runningTestCases[k]
 		if ok {
 			return common.ErrTestSuiteRunning
