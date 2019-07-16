@@ -1,7 +1,6 @@
 package local
 
 import (
-	"io/ioutil"
 	"testing"
 
 	"github.com/ethereum/hive/simulators/common"
@@ -106,7 +105,7 @@ func TestGetInstance(t *testing.T) {
 
 	configBytes := []byte(config)
 
-	host, err := GetInstance(configBytes, ioutil.Discard)
+	host, err := GetInstance(configBytes)
 
 	if err != nil {
 		t.Fatalf("Error executing get instance %s", err.Error())

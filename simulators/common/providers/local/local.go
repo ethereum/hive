@@ -62,7 +62,8 @@ type host struct {
 var hostProxy *host
 var once sync.Once
 
-func init() {
+// Support this provider type to register it
+func Support() {
 	common.RegisterProvider("local", GetInstance)
 }
 
@@ -163,13 +164,13 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 	}
 	defer f.Close()
 
-	_, err := f.Write(bytes)
+	_, err = f.Write(bytes)
 	if err != nil {
 		return err
 	}
 
 	//remove the test suite
-	delete(sim.runningTestSuites, testSuite.ID)
+	delete(sim.runningTestSuites, testSuite)
 
 	return nil
 }
@@ -218,7 +219,7 @@ func (sim *host) StartTest(testSuiteID common.TestSuiteID, name string, descript
 	// check if the testsuite exists
 	testSuite, ok := sim.runningTestSuites[testSuiteID]
 	if !ok {
-		return 0, ErrNoSuchTestSuite
+		return 0, common.ErrNoSuchTestSuite
 	}
 
 	// increment the testcasecounter
@@ -260,7 +261,7 @@ func (sim *host) EndTest(testID common.TestID, summaryResult *common.TestResult,
 	}
 
 	// Add the results to the test case
-	testCase.End = time.Now
+	testCase.End = time.Now()
 	testCase.SummaryResult = *summaryResult
 	testCase.ClientResults = clientResults
 
@@ -294,12 +295,12 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 
 	client, ok := parameters["CLIENT"]
 	if !ok {
-		return "", nil, nil, ErrMissingClientType
+		return "", nil, nil, common.ErrMissingClientType
 	}
 
 	availableClients, ok := sim.clientsByType[client]
 	if !ok || len(availableClients) == 0 {
-		return "", nil, nil, ErrNoAvailableClients
+		return "", nil, nil, common.ErrNoAvailableClients
 	}
 
 	//select a node round-robin based on the parameters filter
@@ -318,7 +319,7 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 	}
 
 	if leastUsed == nil {
-		return "", nil, nil, ErrNoAvailableClients
+		return "", nil, nil, common.ErrNoAvailableClients
 	}
 
 	return strconv.Itoa(leastUsedIndex), leastUsed.IP, leastUsed.Mac, nil
@@ -341,12 +342,12 @@ func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (st
 
 	client, ok := parameters["CLIENT"]
 	if !ok {
-		return "", nil, nil, ErrMissingClientType
+		return "", nil, nil, common.ErrMissingClientType
 	}
 
 	availablePseudos, ok := sim.pseudosByType[client]
 	if !ok || len(availablePseudos) == 0 {
-		return "", nil, nil, ErrNoAvailableClients
+		return "", nil, nil, common.ErrNoAvailableClients
 	}
 
 	//The id is just the index in the list of all pseudos of the first pseudo of this type (we don't support

@@ -29,7 +29,8 @@ type host struct {
 var hostProxy *host
 var once sync.Once
 
-func init() {
+// Support this provider type to register it
+func Support() {
 	common.RegisterProvider("hive", GetInstance)
 }
 

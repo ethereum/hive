@@ -16,6 +16,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
+	"github.com/ethereum/hive/simulators/common/providers/local"
 	"github.com/ethereum/hive/simulators/devp2p"
 	docker "github.com/fsouza/go-dockerclient"
 )
@@ -45,9 +47,12 @@ type testCase struct {
 	Client string
 }
 
-func TestMain(m *testing.M) {
+func init() {
+	hive.Support()
+	local.Support()
+}
 
-	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
+func TestMain(m *testing.M) {
 
 	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "any", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
@@ -60,16 +65,19 @@ func TestMain(m *testing.M) {
 	hostProvider, err := common.GetProvider(*simProviderType)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to get provider: %s", err.Error())
+		os.Exit(1)
 	}
 
 	configFileBytes, err := ioutil.ReadFile(*providerconfigFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to read provider config: %s", err.Error())
+		os.Exit(1)
 	}
 
 	host, err = hostProvider(configFileBytes)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
+		os.Exit(1)
 	}
 
 	os.Exit(RunTestSuite(m))
