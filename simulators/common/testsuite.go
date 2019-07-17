@@ -47,7 +47,7 @@ type TestResult struct {
 }
 
 // AddDetail adds test result info using a standard text formatting
-func (t TestResult) AddDetail(detail string) {
+func (t *TestResult) AddDetail(detail string) {
 	t.Details = fmt.Sprintf("%s %s\n", t.Details, detail)
 }
 

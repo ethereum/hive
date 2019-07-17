@@ -297,6 +297,7 @@ func TestGetPseudo(t *testing.T) {
 	}
 }
 
+// TestGetClientTypes - return client types (not pseudos)
 func TestGetClientTypes(t *testing.T) {
 	host := setupBasicInstance(t)
 
@@ -309,7 +310,6 @@ func TestGetClientTypes(t *testing.T) {
 		"go-ethereum_master",
 		"nethermind_master",
 		"parity_master",
-		"relay",
 	}
 
 	if len(expectedTypes) != len(actualTypes) {

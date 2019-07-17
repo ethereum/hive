@@ -154,7 +154,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testDescript
 		}
 
 		//replace the ip with what docker says it is
-		targetNode = MakeNode(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303, *macAddr)
+		targetNode = MakeNode(targetNode.Pubkey(), ipAddr, targetNode.TCP(), 30303, macAddr)
 		resultMessage, ok := testFunc(t, targetNode)
 		summaryResult.Pass = ok
 		summaryResult.AddDetail(resultMessage)
@@ -181,7 +181,7 @@ func signV4Compat(r *enr.Record, pubkey *ecdsa.PublicKey) {
 }
 
 //Make a v4 node based on some info
-func MakeNode(pubkey *ecdsa.PublicKey, ip net.IP, tcp, udp int, mac string) *enode.Node {
+func MakeNode(pubkey *ecdsa.PublicKey, ip net.IP, tcp, udp int, mac *string) *enode.Node {
 	var r enr.Record
 	if ip != nil {
 		r.Set(enr.IP(ip))
@@ -192,8 +192,9 @@ func MakeNode(pubkey *ecdsa.PublicKey, ip net.IP, tcp, udp int, mac string) *eno
 	if tcp != 0 {
 		r.Set(enr.TCP(tcp))
 	}
-
-	r.Set(common.MacENREntry(mac))
+	if mac != nil {
+		r.Set(common.MacENREntry(*mac))
+	}
 
 	signV4Compat(&r, pubkey)
 	n, err := enode.New(v4CompatID{}, &r)

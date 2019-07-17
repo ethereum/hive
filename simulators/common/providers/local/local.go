@@ -282,7 +282,7 @@ func (sim *host) EndTest(testID common.TestID, summaryResult *common.TestResult,
 
 //GetClientTypes Get all client types available
 func (sim *host) GetClientTypes() (availableClients []string, err error) {
-	return append(sim.clientTypes, sim.pseudoTypes...), nil
+	return sim.clientTypes, nil
 }
 
 // GetNode attempts to acquire a new node matching the given parameters
