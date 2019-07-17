@@ -233,6 +233,7 @@ func (sim *host) StartTest(testSuiteID common.TestSuiteID, name string, descript
 		Name:        name,
 		Description: description,
 		Start:       time.Now(),
+		ClientInfo:  make(map[string]*common.TestClientInfo),
 	}
 
 	// add the test case to the test suite
@@ -294,6 +295,12 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 	sim.nodeMutex.Lock()
 	defer sim.nodeMutex.Unlock()
 
+	// Check if the test case is running
+	testCase, ok := sim.runningTestCases[test]
+	if !ok {
+		return "", nil, nil, common.ErrNoSuchTestCase
+	}
+
 	client, ok := parameters["CLIENT"]
 	if !ok {
 		return "", nil, nil, common.ErrMissingClientType
@@ -323,9 +330,17 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 		return "", nil, nil, common.ErrNoAvailableClients
 	}
 
-	//add the client to the client info list for this test
+	//now add the node to the test case
+	nodeID := strconv.Itoa(leastUsedIndex)
+	testCase.ClientInfo[nodeID] = &common.TestClientInfo{
+		ID:             nodeID,
+		Name:           leastUsed.ClientType,
+		VersionInfo:    "TODO",
+		InstantiatedAt: time.Now(),
+		LogFile:        "",
+	}
 
-	return strconv.Itoa(leastUsedIndex), leastUsed.IP, leastUsed.Mac, nil
+	return nodeID, leastUsed.IP, leastUsed.Mac, nil
 }
 
 // matchFilter checks if the node description contains the specified key
