@@ -1,0 +1,283 @@
+[
+    {
+    "id": 0,
+    "name": "devp2p discovery v4 test suite",
+    "description": "This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.",
+    "testCases": {
+      "1": {
+        "id": 1,
+        "name": "SourceUnknownPingExtraData(v4004)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:02.079578+02:00",
+        "end": "2019-07-17T15:52:02.0835789+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:02.079578+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "10": {
+        "id": 10,
+        "name": "spoofAmplificiation(v4014)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:10.065507+02:00",
+        "end": "2019-07-17T15:52:10.5750273+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:10.065507+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "11": {
+        "id": 11,
+        "name": "SourceUnknownWrongPacketType(v4006)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:10.5750273+02:00",
+        "end": "2019-07-17T15:52:11.0771905+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:10.5750273+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "12": {
+        "id": 12,
+        "name": "SourceUnknownFindNeighbours(v4007)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:11.0771905+02:00",
+        "end": "2019-07-17T15:52:11.0821751+02:00",
+        "summaryResult": {
+          "pass": false,
+          "details": " Test failed: unsolicited reply\n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:11.0771905+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "13": {
+        "id": 13,
+        "name": "SourceUnknownPingExtraDataWrongFrom(v4005)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:11.0831756+02:00",
+        "end": "2019-07-17T15:52:11.1331659+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:11.0831756+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "2": {
+        "id": 2,
+        "name": "SourceUnknownPingWrongFrom(v4003)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:02.0835789+02:00",
+        "end": "2019-07-17T15:52:02.1095743+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:02.0835789+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "3": {
+        "id": 3,
+        "name": "SourceKnownPingFromSignatureMismatch(v4009)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:02.1095743+02:00",
+        "end": "2019-07-17T15:52:04.1573094+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:02.1095743+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "4": {
+        "id": 4,
+        "name": "pingTest(v4001)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:04.1573094+02:00",
+        "end": "2019-07-17T15:52:04.2185348+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:04.1573094+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "5": {
+        "id": 5,
+        "name": "spoofTest(v4013)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:04.2185348+02:00",
+        "end": "2019-07-17T15:52:04.7206752+02:00",
+        "summaryResult": {
+          "pass": false,
+          "details": " Spoofing sanity check failed: RPC timeout\n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:04.2185348+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "6": {
+        "id": 6,
+        "name": "PingPastExpiration(v4011)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:04.7206752+02:00",
+        "end": "2019-07-17T15:52:05.2236482+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:04.7206752+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "7": {
+        "id": 7,
+        "name": "FindNeighboursPastExpiration(v4012)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:05.2236482+02:00",
+        "end": "2019-07-17T15:52:07.7341394+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:05.2236482+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "8": {
+        "id": 8,
+        "name": "FindNeighboursOnRecentlyBondedTarget(v4010)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:07.7351259+02:00",
+        "end": "2019-07-17T15:52:09.9548987+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:07.7351259+02:00",
+            "logFile": ""
+          }
+        }
+      },
+      "9": {
+        "id": 9,
+        "name": "SourceUnknownPingWrongTo(v4002)",
+        "description": "TODO",
+        "start": "2019-07-17T15:52:09.9548987+02:00",
+        "end": "2019-07-17T15:52:10.065507+02:00",
+        "summaryResult": {
+          "pass": true,
+          "details": " \n"
+        },
+        "clientResults": null,
+        "clientInfo": {
+          "0": {
+            "id": "0",
+            "name": "go-ethereum_master",
+            "versionInfo": "TODO",
+            "instantiatedAt": "2019-07-17T15:52:09.9548987+02:00",
+            "logFile": ""
+          }
+        }
+      }
+    }
+  }
+
+]

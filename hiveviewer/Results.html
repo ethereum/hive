@@ -1,0 +1,41 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hive</title>
+    <link href="Content/bootstrap.min.css" rel="stylesheet" />
+    <script src="Scripts/jquery-3.4.1.min.js"></script>
+    <script src="Scripts/bootstrap.min.js"></script>
+    <script src="Scripts/knockout-3.5.0.js"></script>
+    <script src="Scripts/app/app.js"></script>
+</head>
+<body>
+    <script>
+        $(function () {
+            var hiveViewer = new app();
+            hiveViewer.LoadTestSuites("/TestResults/testResults.json");
+            ko.applyBindings(hiveViewer);
+        }
+        );
+    </script>
+    <div id="accordion">
+        <div class="card" data-bind="foreach: testSuites">
+            <div class="card-header" data-bind="id: suiteLabel">
+                <h5 class="mb-0">
+                    <button class="btn btn-link" data-toggle="collapse" data-bind="text: name" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
+                      
+                    </button>
+                </h5>
+            </div>
+
+            <div id="collapseOne" class="collapse show" data-bind="aria-labelledby: suiteLabel"  data-parent="#accordion">
+                <div class="card-body" data-bind="text: description" >
+                    
+                </div>
+            </div>
+        </div>
+ 
+    </div>
+</body>
+</html>
