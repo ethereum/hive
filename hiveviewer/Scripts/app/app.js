@@ -46,20 +46,39 @@ function testCase(data) {
     this.id = ko.observable(data.id);
     this.name = ko.observable(data.name);
     this.description = ko.observable(data.description);
-    this.start = ko.observable(data.start);
-    this.end = ko.observable(data.end);
+    this.start = ko.observable(Date.parse(data.start));
+    this.end = ko.observable(Date.parse(data.end));
     this.summaryResult = ko.observable(new testResult(data.summaryResult));
     this.clientResults = ko.observableArray(makeClientResults(data.clientResults, data.clientInfo));
 }
 
+function calcDuration(duration) {
+    var ret = ""
+    if (duration.hours() > 0) { ret = ret + duration.hours() + "hr "; }
+    if (duration.minutes() > 0) { ret = ret + duration.minutes() + "min "; }
+    ret = ret + duration.seconds() + "s "; 
+    return ret;
+}
+
 function testSuite(data) {
     var self = this;
-    this.id = ko.observable(data.id);
-    this.suiteLabel = ko.computed(function () { return "Suite"+self.id()})
-    this.name = ko.observable(data.name);
-    this.description = ko.observable(data.description);
+    self.id = ko.observable(data.id);
+    self.suiteLabel = ko.computed(function () { return "Suite" + self.id(); })
+    self.suiteDetailLabel = ko.computed(function () { return "CollapseSuite" + self.id(); })
+    self.name = ko.observable(data.name);
+    self.description = ko.observable(data.description);
     var testCases = $.map(data.testCases, function (item) { return new testCase(item) });
-    this.testCases = ko.observableArray(testCases)
+    self.testCases = ko.observableArray(testCases)
+    var earliest = Math.min.apply(Math, testCases.map(function (tc) { return tc.start(); }));
+    var latest = Math.max.apply(Math, testCases.map(function (tc) { return tc.end(); }));
+    var fails = testCases.map(function (tc) { if (!tc.summaryResult().pass()) return 1; else return 0; }).reduce(function (a, b) { return a + b; },0);
+    var successes = testCases.map(function (tc) { if (tc.summaryResult().pass()) return 1; else return 0; }).reduce(function (a, b) { return a + b; }, 0);
+    self.started = ko.observable(earliest);
+    self.ended = ko.observable(latest);
+    self.passes = ko.observable(successes);
+    self.fails = ko.observable(fails);
+    var dur= moment.duration(  moment(self.ended()).diff(moment(self.started())));
+    self.duration = ko.observable(calcDuration(dur));
 
 }
 

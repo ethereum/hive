@@ -9,6 +9,8 @@
     <script src="Scripts/bootstrap.min.js"></script>
     <script src="Scripts/knockout-3.5.0.js"></script>
     <script src="Scripts/app/app.js"></script>
+    <script src="Scripts/moment.min.js"></script>
+    
 </head>
 <body>
     <script>
@@ -21,17 +23,69 @@
     </script>
     <div id="accordion">
         <div class="card" data-bind="foreach: testSuites">
-            <div class="card-header" data-bind="id: suiteLabel">
-                <h5 class="mb-0">
-                    <button class="btn btn-link" data-toggle="collapse" data-bind="text: name" data-target="#collapseOne" aria-expanded="true" aria-controls="collapseOne">
-                      
-                    </button>
-                </h5>
+            <div class="card-header" data-toggle="collapse" aria-expanded="true"  data-bind="attr:{id: suiteLabel, 'data-target': '#'+suiteDetailLabel(), 'aria-controls': suiteDetailLabel}">
+                <div class="row ">
+                    <div class="col text-left my-auto font-weight-bold " data-bind="text: name">
+                    </div>
+                    <div class="col text-right my-auto" data-bind="text: moment(started()).format('MMMM Do YYYY, h:mm:ss a')">
+                    </div>
+                </div>
             </div>
+            <div  class="collapse show" data-bind="attr:{'aria-labelledby': suiteLabel, id: suiteDetailLabel}"  data-parent="#accordion">
+                <div class="card-body">
 
-            <div id="collapseOne" class="collapse show" data-bind="aria-labelledby: suiteLabel"  data-parent="#accordion">
-                <div class="card-body" data-bind="text: description" >
-                    
+                    <div class="row">
+                        <div class="col-sm-4">
+                            <div class="card text-white bg-info h-100">
+                                <div class="card-body" data-bind="text: description">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="card text-center text-white bg-success h-100">
+                                <div class="card-body">
+                                    <h1 class="card-title" data-bind="text: passes"></h1>
+                                    <p class="card-text">Passes</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="card text-center text-white bg-danger h-100">
+                                <div class="card-body">
+                                    <h1 class="card-title" data-bind="text: fails"></h1>
+                                    <p class="card-text">Failures</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                    </div>
+
+                    <div class="row mt-3">
+                        <div class="col-sm-4">
+                            <div class="card text-center  text-white bg-dark h-100">
+                                <div class="card-body">
+                                    <h1 class="card-title" data-bind="text: testCases().length"></h1>
+                                    <p class="card-text">Tests total</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="card text-center  bg-light h-100">
+                                <div class="card-body">
+                                    <h1 class="card-title" data-bind="text:moment(started()).format('h:mm:ss a')"></h1>
+                                    <p class="card-text">Started</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="card text-center bg-light h-100">
+                                <div class="card-body">
+                                    <h1 class="card-title"  data-bind="text: duration()     "></h1>
+                                    <p class="card-text">Duration</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
