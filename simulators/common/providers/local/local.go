@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"math"
 	"net"
-	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -30,7 +29,7 @@ import (
 //
 type HostConfiguration struct {
 	AvailableClients []ClientDescription `json:"availableClients"`
-	OutputFile       string              `json:"outputFile"`
+	OutputPath       string              `json:"outputFile"`
 }
 
 // ClientDescription is metadata about the pre-supplied clients
@@ -139,13 +138,13 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 	sim.testSuiteMutex.Lock()
 	defer sim.testSuiteMutex.Unlock()
 
-	//Check the test suite exists
+	// check the test suite exists
 	suite, ok := sim.runningTestSuites[testSuite]
 	if !ok {
 		return common.ErrNoSuchTestSuite
 	}
 
-	//Check the suite has no running test cases
+	// check the suite has no running test cases
 	for k := range suite.TestCases {
 		_, ok := sim.runningTestCases[k]
 		if ok {
@@ -153,18 +152,8 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 		}
 	}
 
-	//Ending the test suite must write the result data out
-	bytes, err := json.Marshal(*suite)
-	if err != nil {
-		return err
-	}
-	f, err := os.OpenFile(sim.configuration.OutputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	_, err = f.Write(bytes)
+	// update the db
+	err := suite.UpdateDB(sim.configuration.OutputPath)
 	if err != nil {
 		return err
 	}

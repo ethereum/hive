@@ -45,4 +45,3 @@ type Logger interface {
 	Log(args ...interface{})
 	Logf(format string, args ...interface{})
 }
-

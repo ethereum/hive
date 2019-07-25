@@ -29,4 +29,7 @@ var (
 
 	// ErrNoSummaryResult is that the mandatory test case summary result during test case completion is missing
 	ErrNoSummaryResult = errors.New("test case must be ended with a summary result")
+
+	// ErrDBUpdateFailed indicates that the output set could not be backed up or updated
+	ErrDBUpdateFailed = errors.New("could not update results set")
 )
