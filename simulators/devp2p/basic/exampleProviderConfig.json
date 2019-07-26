@@ -13,5 +13,5 @@
             "mac":"00:0a:95:9d:68:99"
         }
     ],
-    "outputFile":"c:\\mytests\\newtests\\testResults.json"
+    "outputPath":"c:\\mytests\\newtests"
 }

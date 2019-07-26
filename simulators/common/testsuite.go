@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// IndexFileName is the main index file of the test suite execution database
 const IndexFileName string = "index.json"
 
 // TestSuiteID identifies a test suite context
@@ -46,6 +47,36 @@ type TestSuite struct {
 	TestCases   map[TestID]*TestCase `json:"testCases"`
 }
 
+func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
+
+	summary := &TestSummary{
+		FileName: suiteFileName,
+		Name:     testSuite.Name,
+	}
+
+	pass := true
+	earliest := time.Now()
+	clients := make([]string, 0)
+	for _, testCase := range testSuite.TestCases {
+		pass = pass && testCase.SummaryResult.Pass
+		if testCase.Start.Before(earliest) {
+			earliest = testCase.Start
+		}
+		for _, clientInfo := range testCase.ClientInfo {
+			clients = append(clients, clientInfo.Name)
+		}
+	}
+	summary.Pass = pass
+	summary.Start = earliest
+	//if the test was for a single client, indicate it
+	if len(clients) > 0 {
+		summary.PrimaryClient = "Multiple"
+	} else {
+		summary.PrimaryClient = clients[0]
+	}
+	return summary
+}
+
 // UpdateDB should be called on TestSuite completion to
 // write out the test results and update indexes.
 // NB Concurrent Hive processes should be able to safely update the index file
@@ -53,28 +84,51 @@ type TestSuite struct {
 func (testSuite *TestSuite) UpdateDB(outputPath string) error {
 
 	// write out the test suite as a json file of its own
-
 	bytes, err := json.Marshal(*testSuite)
 	if err != nil {
 		return err
 	}
-
-	fileName := uuid.NewUUID()
-
-	f, err := os.OpenFile(fileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	fileID, err := uuid.NewUUID()
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-
+	suiteFileName := fileID.String() + ".json"
+	suiteFilePath := filepath.Join(outputPath, suiteFileName)
+	f, err := os.OpenFile(suiteFilePath, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		f.Close()
+		if err != nil {
+			os.Remove(suiteFilePath)
+		}
+	}()
 	_, err = f.Write(bytes)
 	if err != nil {
 		return err
 	}
-
-	// now update indexes:
-	indexName := filepath.Join(outputPath, IndexFileName)
-
+	err = f.Sync()
+	if err != nil {
+		return err
+	}
+	testSummary := testSuite.summarise(suiteFileName)
+	summaryBytes, err := json.Marshal(*testSummary)
+	if err != nil {
+		return err
+	}
+	//now append the index file with atomic write
+	indexPathName := filepath.Join(outputPath, IndexFileName)
+	i, err := os.OpenFile(indexPathName, os.O_APPEND|os.O_WRONLY, 0644)
+	defer i.Close()
+	_, err = i.Write(summaryBytes)
+	if err != nil {
+		return err
+	}
+	err = i.Sync()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 

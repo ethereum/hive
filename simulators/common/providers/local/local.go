@@ -29,7 +29,7 @@ import (
 //
 type HostConfiguration struct {
 	AvailableClients []ClientDescription `json:"availableClients"`
-	OutputPath       string              `json:"outputFile"`
+	OutputPath       string              `json:"outputPath"`
 }
 
 // ClientDescription is metadata about the pre-supplied clients
@@ -143,7 +143,6 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 	if !ok {
 		return common.ErrNoSuchTestSuite
 	}
-
 	// check the suite has no running test cases
 	for k := range suite.TestCases {
 		_, ok := sim.runningTestCases[k]
@@ -151,13 +150,11 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 			return common.ErrTestSuiteRunning
 		}
 	}
-
 	// update the db
 	err := suite.UpdateDB(sim.configuration.OutputPath)
 	if err != nil {
 		return err
 	}
-
 	//remove the test suite
 	delete(sim.runningTestSuites, testSuite)
 
