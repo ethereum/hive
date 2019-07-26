@@ -119,9 +119,9 @@ func (testSuite *TestSuite) UpdateDB(outputPath string) error {
 	}
 	//now append the index file with atomic write
 	indexPathName := filepath.Join(outputPath, IndexFileName)
-	i, err := os.OpenFile(indexPathName, os.O_APPEND|os.O_WRONLY, 0644)
+	i, err := os.OpenFile(indexPathName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	defer i.Close()
-	_, err = i.Write(summaryBytes)
+	_, err = i.WriteString(string(summaryBytes) + "\n")
 	if err != nil {
 		return err
 	}
