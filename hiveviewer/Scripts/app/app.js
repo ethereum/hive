@@ -4,15 +4,10 @@ function app() {
     self.errorState = ko.observable(false);
     self.errorMessage = ko.observable("");
     self.testSuites = ko.observableArray([]);
-    
 }
-
-
 
 app.prototype.LoadTestSuites = function(path, file) {
     var self = this;
-    
-    
     $.ajax({
         url: path+"/"+file,
         data: null,
@@ -44,6 +39,9 @@ function testSuiteSummary(data) {
     self.started = ko.observable(Date.parse(data.start));
     self.primaryClient = ko.observable(data.primaryClient);
     self.pass = ko.observable(data.pass);
+    self.passStyle = ko.computed(function () {
+        return self.pass() ? "border-light" : "border-danger";
+    });
     self.suiteLabel = ko.computed(function () { return "Suite" + self.fileName().slice(0,-5); })
     self.suiteDetailLabel = ko.computed(function () { return "CollapseSuite" + self.fileName().slice(0,-5); })
     self.testSuite = ko.observable();
