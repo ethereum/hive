@@ -15,9 +15,11 @@
 <body>
     <script>
         $(function () {
+
             var hiveViewer = new app();
-            hiveViewer.LoadTestSuites("/TestResults/testResults.json");
+            hiveViewer.LoadTestSuites("TestResults","index.json");
             ko.applyBindings(hiveViewer);
+          
         }
         );
     </script>
@@ -31,60 +33,66 @@
                     </div>
                 </div>
             </div>
-            <div  class="collapse show" data-bind="attr:{'aria-labelledby': suiteLabel, id: suiteDetailLabel}"  data-parent="#accordion">
+            <div  class="collapse show" data-bind="attr:{'aria-labelledby': suiteLabel, id: suiteDetailLabel}, event:{'show.bs.collapse': ShowSuite}"  data-parent="#accordion">
                 <div class="card-body">
+                    <div data-bind="if:loaded">
+                        <div data-bind="with: testSuite">
+                   
+                            <div class="row">
+                                <div class="col-sm-4">
+                                    <div class="card text-white bg-info h-100">
+                                        <div class="card-body" data-bind="text: description">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="card text-center text-white bg-success h-100">
+                                        <div class="card-body">
+                                            <h1 class="card-title" data-bind="text: passes"></h1>
+                                            <p class="card-text">Passes</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="card text-center text-white bg-danger h-100">
+                                        <div class="card-body">
+                                            <h1 class="card-title" data-bind="text: fails"></h1>
+                                            <p class="card-text">Failures</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
-                    <div class="row">
-                        <div class="col-sm-4">
-                            <div class="card text-white bg-info h-100">
-                                <div class="card-body" data-bind="text: description">
+                            <div class="row mt-3">
+                                <div class="col-sm-4">
+                                    <div class="card text-center  text-white bg-dark h-100">
+                                        <div class="card-body">
+                                            <h1 class="card-title" data-bind="text: testCases().length"></h1>
+                                            <p class="card-text">Tests total</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="card text-center  bg-light h-100">
+                                        <div class="card-body">
+                                            <h1 class="card-title" data-bind="text:moment(started()).format('h:mm:ss a')"></h1>
+                                            <p class="card-text">Started</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-sm-4">
+                                    <div class="card text-center bg-light h-100">
+                                        <div class="card-body">
+                                            <h1 class="card-title" data-bind="text: duration()     "></h1>
+                                            <p class="card-text">Duration</p>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-sm-4">
-                            <div class="card text-center text-white bg-success h-100">
-                                <div class="card-body">
-                                    <h1 class="card-title" data-bind="text: passes"></h1>
-                                    <p class="card-text">Passes</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="card text-center text-white bg-danger h-100">
-                                <div class="card-body">
-                                    <h1 class="card-title" data-bind="text: fails"></h1>
-                                    <p class="card-text">Failures</p>
-                                </div>
-                            </div>
-                        </div>
-                        
                     </div>
-
-                    <div class="row mt-3">
-                        <div class="col-sm-4">
-                            <div class="card text-center  text-white bg-dark h-100">
-                                <div class="card-body">
-                                    <h1 class="card-title" data-bind="text: testCases().length"></h1>
-                                    <p class="card-text">Tests total</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="card text-center  bg-light h-100">
-                                <div class="card-body">
-                                    <h1 class="card-title" data-bind="text:moment(started()).format('h:mm:ss a')"></h1>
-                                    <p class="card-text">Started</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-sm-4">
-                            <div class="card text-center bg-light h-100">
-                                <div class="card-body">
-                                    <h1 class="card-title"  data-bind="text: duration()     "></h1>
-                                    <p class="card-text">Duration</p>
-                                </div>
-                            </div>
-                        </div>
+                    <div data-bind="ifnot:loaded">
+                        Hello
                     </div>
                 </div>
             </div>

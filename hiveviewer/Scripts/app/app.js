@@ -4,7 +4,82 @@ function app() {
     self.errorState = ko.observable(false);
     self.errorMessage = ko.observable("");
     self.testSuites = ko.observableArray([]);
+    
 }
+
+
+
+app.prototype.LoadTestSuites = function(path, file) {
+    var self = this;
+    
+    
+    $.ajax({
+        url: path+"/"+file,
+        data: null,
+        success: function (allData) {
+            var lines = allData.split("\n").filter(function (line) { return line.length > 0; });
+            var testSuiteSummaries = $.map(lines, function (item)
+            {
+                var summary = new testSuiteSummary(JSON.parse(item));
+                summary.path = path;
+                return summary;
+            });
+            self.testSuites(testSuiteSummaries);
+        },
+        dataType: "text"
+    }
+    ).
+    fail(function (e) {
+        alert("error");
+    });
+}
+
+
+// test suite summary
+function testSuiteSummary(data) {
+    self = this;
+    self.path = "";
+    self.fileName = ko.observable(data.fileName);
+    self.name = ko.observable(data.name);
+    self.started = ko.observable(Date.parse(data.start));
+    self.primaryClient = ko.observable(data.primaryClient);
+    self.pass = ko.observable(data.pass);
+    self.suiteLabel = ko.computed(function () { return "Suite" + self.fileName().slice(0,-5); })
+    self.suiteDetailLabel = ko.computed(function () { return "CollapseSuite" + self.fileName().slice(0,-5); })
+    self.testSuite = ko.observable();
+    self.loading = ko.observable(false);
+    self.loaded = ko.observable(false);
+    self.loadingError = ko.observable(false);
+
+}
+
+testSuiteSummary.prototype.ShowSuite = function () {
+    var suitePath = this.path + "/" + this.fileName();
+    self = this;
+    if (!self.loaded()) {
+        self.loading(true);
+        self.loadingError(false);
+        $.getJSON(
+            suitePath,
+            function (suiteData) {
+                self.testSuite(new testSuite(suiteData));
+                self.loaded(true);
+            }
+
+        )
+            .fail(function () {
+                self.loadingError(true);
+            })
+            .always(function () {
+                self.loading(false);
+
+            })
+            ;
+    }
+    return true;
+
+}
+
 
 // test result for a client
 function testClientResult(pass,details,name,version,instantiated,log) {
@@ -63,8 +138,7 @@ function calcDuration(duration) {
 function testSuite(data) {
     var self = this;
     self.id = ko.observable(data.id);
-    self.suiteLabel = ko.computed(function () { return "Suite" + self.id(); })
-    self.suiteDetailLabel = ko.computed(function () { return "CollapseSuite" + self.id(); })
+   
     self.name = ko.observable(data.name);
     self.description = ko.observable(data.description);
     var testCases = $.map(data.testCases, function (item) { return new testCase(item) });
@@ -82,10 +156,5 @@ function testSuite(data) {
 
 }
 
-app.prototype.LoadTestSuites = function (src) {
-    var self = this;
-    $.getJSON(src, function (allData) {
-        var testSuites = $.map(allData, function (item) { return new testSuite(item) });
-        self.testSuites(testSuites);
-    });    
-}
+
+
