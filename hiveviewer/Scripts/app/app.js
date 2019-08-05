@@ -1,4 +1,13 @@
-﻿//app constructor function
+﻿/**************************************************************************************************************/
+
+/* App Class
+ * 
+ * The app class is the main entity to which the 
+ * single-page-app is bound. It is a view-model
+ * maintaining the test-suites to view and the
+ * filter/sorting toggles.
+ */
+//app constructor function
 function app() {
     var self = this;
     self.errorState = ko.observable(false);
@@ -100,8 +109,17 @@ app.prototype.LoadTestSuites = function(path, file) {
     });
 }
 
+/**************************************************************************************************************/
 
-// test suite summary
+/* TestSuiteSummary Class
+ *
+ * A test suite summary contains metadata
+ * about a test suite execution, including
+ * for example if the test suite passed
+ * and what its purpose is.
+ */
+
+// test suite summary ctor function
 function testSuiteSummary(data) {
     self = this;
     self.path = "";
@@ -111,7 +129,7 @@ function testSuiteSummary(data) {
     self.primaryClient = ko.observable(data.primaryClient);
     self.pass = ko.observable(data.pass);
     self.passStyle = ko.computed(function () {
-        return self.pass() ? "border-light" : "border-danger";
+        return self.pass() ? "border-success" : "border-danger";
     });
     self.suiteLabel = ko.computed(function () { return "Suite" + self.fileName().slice(0,-5); })
     self.suiteDetailLabel = ko.computed(function () { return "CollapseSuite" + self.fileName().slice(0,-5); })
@@ -124,7 +142,7 @@ function testSuiteSummary(data) {
 
 testSuiteSummary.prototype.ShowSuite = function () {
     var suitePath = this.path + "/" + this.fileName();
-    self = this;
+    var self = this;
     if (!self.loaded()) {
         self.loading(true);
         self.loadingError(false);
@@ -147,9 +165,15 @@ testSuiteSummary.prototype.ShowSuite = function () {
     return true;
 
 }
+/**************************************************************************************************************/
 
+/* testClientResult Class
+ *
+ * This describes a specific test result in a test case
+ * for a specific client type
+ */
 
-// test result for a client
+// testClientResult ctor
 function testClientResult(pass,details,name,version,instantiated,log) {
     this.pass = ko.observable(pass);
     this.details = ko.observable(details);
@@ -157,6 +181,53 @@ function testClientResult(pass,details,name,version,instantiated,log) {
     this.clientVersion = ko.observable(version);
     this.clientInstantiated = ko.observable(instantiated);
     this.logfile = ko.observable(log);
+}
+/**************************************************************************************************************/
+
+/* testResult Class
+ *
+ *  A test result, including if it passed
+ *  and some descriptive information
+ */
+
+// test case result ctor
+function testResult(data) {
+    var self = this;
+    this.pass = ko.observable(data.pass);
+    this.details = ko.observable(data.details);
+    this.passLabel = ko.computed(function () {
+        return self.pass() ? "pass" : "fail";
+    });
+
+}
+/**************************************************************************************************************/
+
+
+/* testCase Class
+ *
+ *  A test case, which could involve
+ *  one or more clients, with name and
+ *  description of the intended purpose,
+ *  an overall test result and list of
+ *  per client results.
+ */
+
+// testCase ctor
+function testCase(data) {
+    var self = this;
+    this.id = ko.observable(data.id);
+    this.name = ko.observable(data.name);
+    this.description = ko.observable(data.description);
+    this.start = ko.observable(Date.parse(data.start));
+    this.end = ko.observable(Date.parse(data.end));
+    this.summaryResult = ko.observable(new testResult(data.summaryResult));
+    this.clientResults = ko.observableArray(makeClientResults(data.clientResults, data.clientInfo));
+    var dur = moment.duration(moment(self.end()).diff(moment(self.start())));
+    self.duration = ko.observable(calcFineDuration(dur));
+    self.passTextStyle = ko.computed(function () {
+        return self.summaryResult().pass() ? "text-success" : "text-danger";
+    });
+    
 }
 
 function makeClientResults(clientResults, clientInfos) {
@@ -166,7 +237,7 @@ function makeClientResults(clientResults, clientInfos) {
         var name = "Missing client info.";
         var version = "";
         var instantiated;
-        var log="";
+        var log = "";
         if (clientInfos.hasOwnProperty(clientName)) {
             var clientInfo = clientInfos[clientName];
             name = clientInfo.name;
@@ -178,23 +249,6 @@ function makeClientResults(clientResults, clientInfos) {
     });
 }
 
-// test case result 
-function testResult(data) {
-    this.pass = ko.observable(data.pass);
-    this.details = ko.observable(data.details);
-
-}
-
-function testCase(data) {
-    this.id = ko.observable(data.id);
-    this.name = ko.observable(data.name);
-    this.description = ko.observable(data.description);
-    this.start = ko.observable(Date.parse(data.start));
-    this.end = ko.observable(Date.parse(data.end));
-    this.summaryResult = ko.observable(new testResult(data.summaryResult));
-    this.clientResults = ko.observableArray(makeClientResults(data.clientResults, data.clientInfo));
-}
-
 function calcDuration(duration) {
     var ret = ""
     if (duration.hours() > 0) { ret = ret + duration.hours() + "hr "; }
@@ -203,6 +257,27 @@ function calcDuration(duration) {
     return ret;
 }
 
+function calcFineDuration(duration) {
+    var ret = ""
+    var hours = 0;
+    
+    if (duration.minutes() > 0 || duration.hours()>0) { ret = ret + duration.minutes()+(durations.hours()*60) + "min "; }
+    ret = ret + duration.seconds() + "s ";
+    ret = ret + duration.milliseconds() + "ms ";
+    
+    return ret;
+}
+/**************************************************************************************************************/
+
+
+/* testSuite Class
+ *
+ *  A test suite, with name and description,
+ *  covers a specific functional area, such
+ *  as p2p discovery, consensus etc. It is 
+ *  a single execution and contains a list of 
+ *  testCase results.
+ */
 function testSuite(data) {
     var self = this;
     self.id = ko.observable(data.id);
@@ -221,8 +296,15 @@ function testSuite(data) {
     self.fails = ko.observable(fails);
     var dur= moment.duration(  moment(self.ended()).diff(moment(self.started())));
     self.duration = ko.observable(calcDuration(dur));
-
+    self.showStateFlag = ko.observable(false);
+    self.showState = ko.computed(function () {
+        return self.showStateFlag() ? "Hide" : "Show";
+    });
 }
 
+testSuite.prototype.ToggleTestCases = function () {
+    var self = this;
+    self.showStateFlag(!self.showStateFlag());
+}
 
 

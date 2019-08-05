@@ -90,13 +90,13 @@
                                 <div class="card-body">
                                     <div class="row">
                                         <div class="col-6 ">
-                                            <button type="button" class="btn btn-primary btn-block"  data-bind="event:{'click': ToggleFilterPasses}">
+                                            <button type="button" class="btn btn-primary btn-block"  >
                                                 JSON
                                             </button>
                                             
                                         </div>
                                         <div class="col-6">
-                                            <button type="button" class="btn btn-primary btn-block"  data-bind="event:{'click': ToggleFilterFailures}">
+                                            <button type="button" class="btn btn-primary btn-block"  >
                                                 CSV
                                             </button>
                                         </div>
@@ -176,7 +176,7 @@
                                                 <div class="card-body">
                                                     <div class=" my-auto d-flex flex-column h-100">
 
-                                                        <button type="button" class="btn btn-block btn-primary h-100">Show</button>
+                                                        <button type="button" class="btn btn-block btn-primary h-100" data-bind="event:{'click': ToggleTestCases}, text: showState">Show</button>
 
                                                         <button type="button" class="btn   btn-block btn-info h-100">JSON</button>
                                                         <button type="button" class="btn   btn-block btn-info h-100">CSV</button>
@@ -187,6 +187,67 @@
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    
+                                    <div data-bind="if:showStateFlag">
+                                        <div class="row mt-4">
+                                            <div class="col-12">
+                                                <div class="card  bg-dark text-white">
+                                                    <div class="card-header">
+                                                        <div class="row">
+                                                            <div class="col-sm-3">Name</div>
+                                                            <div class="col-sm-3">Start</div>
+                                                            <div class="col-sm-3">Duration</div>
+                                                            <div class="col-sm-3">Pass</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div data-bind="foreach: testCases">
+                                                    <div  class="card" >
+                                                        <div class="card-header" data-toggle="collapse" aria-expanded="false" data-bind="attr:{id: $parents[1].suiteLabel()+id(), 'data-target': '#'+$parents[1].suiteLabel()+id()+'detail', 'aria-controls': '#'+$parents[1].suiteLabel()+id()+'detail' }">
+                                                            <div class="row">
+                                                                <div class="col-sm-3 font-weight-bold" data-bind="text: name"></div>
+                                                                <div class="col-sm-3" data-bind="text: moment(start()).format('h:mm:ss a')"></div>
+                                                                <div class="col-sm-3" data-bind="text: duration()"></div>
+                                                                <div class="col-sm-3" data-bind="text: summaryResult().passLabel(), class:passTextStyle"></div>
+                                                            </div>
+                                                        </div>
+                                                        <div class="collapse" data-bind="attr:{'aria-labelledby': $parents[1].suiteLabel()+id(), id: $parents[1].suiteLabel()+id()+'detail'}">
+                                                            <div class="card-body">
+
+                                                                <p data-bind="text: summaryResult().details()"></p>
+                                                                <div data-bind="ifnot: clientResults().length==0">
+                                                                    <div data-bind="foreach: clientResults">
+                                                                        <div class="row">
+                                                                            <div class="col-3" data-bind="text:details">
+
+                                                                            </div>
+                                                                            <div class="col-3" data-bind="text:clientName">
+
+                                                                            </div>
+                                                                            <div class="col-3" data-bind="text:clientVersion">
+
+                                                                            </div>
+                                                                            <div class="col-3" data-bind="text:logfile">
+
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                </div>
+                                                                <div data-bind="if: clientResults().length==0">
+                                                                    <p>No client specific results available</p>
+
+                                                                </div>
+
+
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                         </div>
                                     </div>
                                 </div>
                             </div>
