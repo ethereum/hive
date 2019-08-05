@@ -4,7 +4,78 @@ function app() {
     self.errorState = ko.observable(false);
     self.errorMessage = ko.observable("");
     self.testSuites = ko.observableArray([]);
+   
+    self.showPasses = ko.observable(true);
+    self.showFails = ko.observable(true);
+    self.sortDateAsc = ko.observable(true);
+    self.sortedFilteredSuites = ko.computed(function () {
+        var a = -1;
+        var b = 1;
+        if (!self.sortDateAsc()) {
+            a = 1;
+            b = -1;
+        }
+        var res = self.testSuites().sort(function (l, r) {
+            return l.started() == r.started() ? 0
+                : l.started() < r.started() ? a
+                    : b;
+        }).filter(function (t) {
+            
+            return (t.pass() && self.showPasses())||(!t.pass() && self.showFails());
+            }
+        );
+        return res;
+    });
+    self.passFilter = ko.computed(function() {
+        if (self.showPasses()) {
+            return "Passes";
+        } else {
+            return "No passes";
+        }
+    });
+    self.failFilter = ko.computed(function () {
+        if (self.showFails()) {
+            return "Fails";
+        } else {
+            return "No fails";
+        }
+    });
+    self.sortMode = ko.computed(function () {
+        if (self.sortDateAsc()) {
+            return "Oldest";
+        } else {
+            return "Newest";
+        }
+    });
+    self.clients = ko.computed(function () {
+        var clientList= self.testSuites().map(function (t) {
+            return t.primaryClient();
+        });
+
+        var uniqueClientList = $.grep(clientList, function (v, k) {
+            return $.inArray(v, clientList) === k;
+        });
+
+        return uniqueClientList;
+
+    });
 }
+
+app.prototype.ToggleFilterPasses = function () {
+    var self = this;
+    self.showPasses(!self.showPasses());
+}
+
+app.prototype.ToggleFilterFailures = function () {
+    var self = this;
+    self.showFails(!self.showFails());
+}
+
+app.prototype.ToggleDateSort = function () {
+    var self = this;
+    self.sortDateAsc(!self.sortDateAsc());
+ }
+
 
 app.prototype.LoadTestSuites = function(path, file) {
     var self = this;
@@ -65,14 +136,13 @@ testSuiteSummary.prototype.ShowSuite = function () {
             }
 
         )
-            .fail(function () {
-                self.loadingError(true);
-            })
-            .always(function () {
-                self.loading(false);
-
-            })
-            ;
+        .fail(function () {
+            self.loadingError(true);
+        })
+        .always(function () {
+            self.loading(false);
+        })
+        ;
     }
     return true;
 
