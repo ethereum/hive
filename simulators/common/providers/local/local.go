@@ -1,4 +1,4 @@
-// Package local offers a Hive provider that allows users to run tests against
+// Package local offers a services provider that allows users to run tests against
 // a list of presupplied nodes and pseudo-nodes. This can be used to run
 // p2p and rpc tests against running nodes without the need for Docker or other
 // potential Hive provider dependencies. The responsibility of resetting node state
@@ -162,7 +162,7 @@ func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
 }
 
 // GetClientEnode Get the client enode for the specified node id, which in this case is just the index
-func (sim *host) GetClientEnode(test common.TestID, node string) (*string, error) {
+func (sim *host) GetClientEnode(testSuite common.TestSuiteID, test common.TestID, node string) (*string, error) {
 	//local nodes are identified by their index
 	nodeIndex, err := strconv.Atoi(node)
 	if err != nil {
@@ -177,7 +177,7 @@ func (sim *host) GetClientEnode(test common.TestID, node string) (*string, error
 }
 
 // StartTestSuite starts a test suite and returns the context id
-func (sim *host) StartTestSuite(name string, description string) common.TestSuiteID {
+func (sim *host) StartTestSuite(name string, description string) (common.TestSuiteID, error) {
 
 	sim.testSuiteMutex.Lock()
 	defer sim.testSuiteMutex.Unlock()
@@ -193,7 +193,7 @@ func (sim *host) StartTestSuite(name string, description string) common.TestSuit
 
 	sim.testSuiteCounter++
 
-	return newSuiteID
+	return newSuiteID, nil
 }
 
 //StartTest starts a new test case, returning the testcase id as a context identifier
@@ -231,7 +231,7 @@ func (sim *host) StartTest(testSuiteID common.TestSuiteID, name string, descript
 }
 
 // EndTest finishes the test case
-func (sim *host) EndTest(testID common.TestID, summaryResult *common.TestResult, clientResults map[string]*common.TestResult) error {
+func (sim *host) EndTest(testSuiteRun common.TestSuiteID, testID common.TestID, summaryResult *common.TestResult, clientResults map[string]*common.TestResult) error {
 
 	sim.testCaseMutex.Lock()
 	defer sim.testCaseMutex.Unlock()
@@ -261,7 +261,7 @@ func (sim *host) EndTest(testID common.TestID, summaryResult *common.TestResult,
 	// containers. The Local provider specifies pre-existing clients.
 	// Signal that state should be reset by using the Kill message.
 	for k := range testCase.ClientInfo {
-		sim.KillNode(testID, k)
+		sim.KillNode(testSuiteRun, testID, k)
 	}
 
 	return nil
@@ -277,7 +277,7 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 // If there are multiple nodes, they will be selected round-robin
 // Returns node id, ip, mac
 // The node is registered as being part of the test.
-func (sim *host) GetNode(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
+func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 	sim.nodeMutex.Lock()
 	defer sim.nodeMutex.Unlock()
 
@@ -342,7 +342,7 @@ func matchFilter(nodeDescription map[string]string, filter map[string]string) bo
 }
 
 // GetPseudo - just return a pseudo client , such as a relay
-func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
+func (sim *host) GetPseudo(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 
 	client, ok := parameters["CLIENT"]
 	if !ok {
@@ -363,7 +363,7 @@ func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (st
 }
 
 // KillNode signals to the host that the node is no longer required
-func (sim *host) KillNode(test common.TestID, node string) error {
+func (sim *host) KillNode(testSuite common.TestSuiteID, test common.TestID, node string) error {
 	//Doing nothing for now.
 
 	//todo

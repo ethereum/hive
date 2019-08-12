@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -45,16 +46,15 @@ func GetInstance(config []byte) (common.TestSuiteHost, error) {
 
 		hostProxy = &host{
 			configuration: &result,
-			//TODO - output stream
 		}
 
 	})
 	return hostProxy, err
 }
 
-//GetClientEnode Get the client enode for the specified container id
-func (sim *host) GetClientEnode(test common.TestID, node string) (*string, error) {
-	resp, err := http.Get(sim.configuration.HostURI + "/enodes/" + test.String() + "/" + node)
+//GetClientEnode Get the client enode for the specified node id
+func (sim *host) GetClientEnode(testSuite common.TestSuiteID, test common.TestID, node string) (*string, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.configuration.HostURI, testSuite.String(), test.String(), node))
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (sim *host) GetClientEnode(test common.TestID, node string) (*string, error
 }
 
 // EndTest finishes the test case, cleaning up everything, logging results, and returning an error if the process could not be completed
-func (sim *host) EndTest(test common.TestID, summaryResult *common.TestResult, clientResults map[string]*common.TestResult) error {
+func (sim *host) EndTest(testSuite common.TestSuiteID, test common.TestID, summaryResult *common.TestResult, clientResults map[string]*common.TestResult) error {
 
 	// post results (which deletes the test case - because DELETE message body is not always supported)
 	summaryResultData, err := json.Marshal(summaryResult)
@@ -78,52 +78,62 @@ func (sim *host) EndTest(test common.TestID, summaryResult *common.TestResult, c
 	if err != nil {
 		return err
 	}
+
 	vals := make(url.Values)
 	vals.Add("testcase", test.String())
 	vals.Add("summaryresult", string(summaryResultData))
 	vals.Add("clientresults", string(clientResultData))
-	_, err = wrapHTTPErrorsPost(sim.configuration.HostURI+"/tests", vals)
-	if err != nil {
-		return err
-	}
+	_, err = wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s", sim.configuration.HostURI, testSuite.String(), test.String()), vals)
 
 	return err
 }
 
-func (sim *host) StartTestSuite(name string, description string) common.TestSuiteID {
-	//TODO
-	return 0
+func (sim *host) StartTestSuite(name string, description string) (common.TestSuiteID, error) {
+	vals := make(url.Values)
+	vals.Add("name", name)
+	vals.Add("description", description)
+	idstring, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite", sim.configuration.HostURI), vals)
+	if err != nil {
+		return 0, err
+	}
+	id, err := strconv.Atoi(idstring)
+	if err != nil {
+		return 0, err
+	}
+	return common.TestSuiteID(id), nil
 }
 
 func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
-	//TODO
-	return nil
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%s", sim.configuration.HostURI, testSuite.String()), nil)
+	if err != nil {
+		return err
+	}
+	_, err = http.DefaultClient.Do(req)
+	return err
 }
 
 //StartTest starts a new test case, returning the testcase id as a context identifier
-func (sim *host) StartTest(testSuiteRun common.TestSuiteID, name string, description string) (common.TestID, error) {
-	var testID common.TestID
-	resp, err := http.Get(sim.configuration.HostURI + "/tests")
-	if err != nil {
-		return testID, err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return testID, err
-	}
+func (sim *host) StartTest(testSuite common.TestSuiteID, name string, description string) (common.TestID, error) {
+	vals := make(url.Values)
+	vals.Add("name", name)
+	vals.Add("description", description)
 
-	err = json.Unmarshal(body, &testID)
+	idstring, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test", sim.configuration.HostURI, testSuite.String()), vals)
 	if err != nil {
-		return testID, err
+		return 0, err
 	}
-	return testID, nil
+	testID, err := strconv.Atoi(idstring)
+	if err != nil {
+		return 0, err
+	}
+	return common.TestID(testID), nil
 }
 
 //GetClientTypes Get all client types available to this simulator run
 //this depends on both the available client set
 //and the command line filters
 func (sim *host) GetClientTypes() (availableClients []string, err error) {
-	resp, err := http.Get(sim.configuration.HostURI + "/clients")
+	resp, err := http.Get(fmt.Sprintf("%s/clients", sim.configuration.HostURI))
 	if err != nil {
 		return nil, err
 	}
@@ -139,18 +149,18 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 	return
 }
 
-//StartNewNode Start a new node (or other container) with the specified parameters
+//GetNode starts a new node (or other container) with the specified parameters
 //One parameter must be named CLIENT and should contain one of the
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
 //Returns container id and ip
-func (sim *host) GetNode(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
+func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 	vals := make(url.Values)
 	for k, v := range parameters {
 		vals.Add(k, v)
 	}
 	vals.Add("testcase", test.String())
-	data, err := wrapHTTPErrorsPost(sim.configuration.HostURI+"/nodes", vals)
+	data, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s/node", sim.configuration.HostURI, testSuite.String(), test.String()), vals)
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -160,18 +170,18 @@ func (sim *host) GetNode(test common.TestID, parameters map[string]string) (stri
 	return data, net.IP{}, nil, fmt.Errorf("no ip address returned: %v", data)
 }
 
-//StartNewPseudo Start a new pseudo-client with the specified parameters
+//GetPseudo starts a new pseudo-client with the specified parameters
 //One parameter must be named CLIENT and should contain one of the
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
-//Returns container id and ip
-func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
+//Returns container id , ip and mac
+func (sim *host) GetPseudo(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
 	vals := make(url.Values)
 	for k, v := range parameters {
 		vals.Add(k, v)
 	}
 	vals.Add("testcase", test.String())
-	data, err := wrapHTTPErrorsPost(sim.configuration.HostURI+"/pseudos", vals)
+	data, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s/pseudo", sim.configuration.HostURI, testSuite.String(), test.String()), vals)
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -182,8 +192,8 @@ func (sim *host) GetPseudo(test common.TestID, parameters map[string]string) (st
 }
 
 // KillNode signals to the host that the node is no longer required
-func (sim *host) KillNode(test common.TestID, nodeid string) error {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/delete/%s/%s", test.String(), sim.configuration.HostURI, nodeid), nil)
+func (sim *host) KillNode(testSuite common.TestSuiteID, test common.TestID, nodeid string) error {
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.configuration.HostURI, testSuite.String(), test.String(), nodeid), nil)
 	if err != nil {
 		return err
 	}
@@ -193,7 +203,6 @@ func (sim *host) KillNode(test common.TestID, nodeid string) error {
 
 // wrapHttpErrorsPost wraps http.PostForm to convert responses that are not 200 OK into errors
 func wrapHTTPErrorsPost(url string, data url.Values) (string, error) {
-
 	resp, err := http.PostForm(url, data)
 	if err != nil {
 		return "", err
@@ -202,7 +211,6 @@ func wrapHTTPErrorsPost(url string, data url.Values) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	if resp.StatusCode >= 200 && resp.StatusCode <= 300 {
 		return string(body), nil
 	}

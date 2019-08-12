@@ -154,8 +154,8 @@ func TestStartTestSuite(t *testing.T) {
 
 	testSuiteHost := setupBasicInstance(t)
 
-	suite1ID := testSuiteHost.StartTestSuite("consensus", "consensus tests")
-	suite2ID := testSuiteHost.StartTestSuite("p2p", "p2p tests")
+	suite1ID, _ := testSuiteHost.StartTestSuite("consensus", "consensus tests")
+	suite2ID, _ := testSuiteHost.StartTestSuite("p2p", "p2p tests")
 
 	suite1, ok1 := hostProxy.runningTestSuites[suite1ID]
 	suite2, ok2 := hostProxy.runningTestSuites[suite2ID]
@@ -175,7 +175,7 @@ func TestStartTestSuite(t *testing.T) {
 
 func setupTestSuite(t *testing.T) (common.TestSuiteHost, *common.TestSuite) {
 	testSuiteHost := setupBasicInstance(t)
-	suiteID := testSuiteHost.StartTestSuite("consensus", "consensus tests")
+	suiteID, _ := testSuiteHost.StartTestSuite("consensus", "consensus tests")
 	suite := hostProxy.runningTestSuites[suiteID]
 	if suite == nil {
 		t.Fatalf("Test setup failed, test suite not found")
@@ -229,7 +229,7 @@ func TestGetNode(t *testing.T) {
 		"CLIENT":                         "go-ethereum_master",
 		"HIVE_FORK_CONSTANTINOPLE_BLOCK": "10",
 	}
-	_, _, mac, err := host.GetNode(testCaseID, parms)
+	_, _, mac, err := host.GetNode(suite.ID, testCaseID, parms)
 	if err != nil {
 		t.Fatalf("Unable to get a node from pre-supplied list: %s", err.Error())
 	}
@@ -243,7 +243,7 @@ func TestGetNode(t *testing.T) {
 	parms = map[string]string{
 		"CLIENT": "go-ethereum_master",
 	}
-	_, _, mac, err = host.GetNode(testCaseID, parms)
+	_, _, mac, err = host.GetNode(suite.ID, testCaseID, parms)
 	if *mac != "00:0a:95:9d:68:16" {
 		t.Fatalf("Incorrect node supplied getting least used")
 	}
@@ -262,12 +262,12 @@ func TestGetClientEnode(t *testing.T) {
 		"CLIENT":                         "go-ethereum_master",
 		"HIVE_FORK_CONSTANTINOPLE_BLOCK": "10",
 	}
-	nodeID, _, _, err := host.GetNode(testCaseID, parms)
+	nodeID, _, _, err := host.GetNode(suite.ID, testCaseID, parms)
 	if err != nil {
 		t.Fatalf("Test setup failed: unable to get a node from pre-supplied list: %s", err.Error())
 	}
 
-	enode, err := host.GetClientEnode(testCaseID, nodeID)
+	enode, err := host.GetClientEnode(suite.ID, testCaseID, nodeID)
 	if err != nil {
 		t.Fatalf("Error in GetClientEnode %s", err.Error())
 	}
@@ -288,7 +288,7 @@ func TestGetPseudo(t *testing.T) {
 	parms := map[string]string{
 		"CLIENT": "relay",
 	}
-	_, _, mac, err := host.GetPseudo(testCaseID, parms)
+	_, _, mac, err := host.GetPseudo(suite.ID, testCaseID, parms)
 	if err != nil {
 		t.Fatalf("Error getting pseudo %s", err.Error())
 	}

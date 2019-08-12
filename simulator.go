@@ -13,46 +13,19 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/fsouza/go-dockerclient"
+	"github.com/ethereum/hive/simulators/common"
+
+	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
-// simulationResult represents the results of a simulation run, containing
-// various metadata as well as possibly multiple sub-results in case where
-// the same simulator tested multiple things in one go.
-type simulationResult struct {
-	Start   time.Time `json:"start"`           // Time instance when the simulation ended
-	End     time.Time `json:"end"`             // Time instance when the simulation ended
-	Success bool      `json:"success"`         // Whether the entire simulation succeeded
-	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
-
-	Subresults []simulationSubresult `json:"subresults,omitempty"` // Optional list of subresults to report
-
-}
-
-type simulationResultSummary struct {
-	Start   time.Time `json:"start"`           // Time instance when the simulation ended
-	End     time.Time `json:"end"`             // Time instance when the simulation ended
-	Success bool      `json:"success"`         // Whether the entire simulation succeeded
-	Error   error     `json:"error,omitempty"` // Potential hive failure during simulation
-
-	summaryData
-}
-
-// simulationSubresult represents a sub-test a simulation may run and report.
-type simulationSubresult struct {
-	Name string `json:"name"` // Unique name for a sub-test within a simulation
-
-	Success bool            `json:"success"`           // Whether the sub-test succeeded or not
-	Error   string          `json:"error,omitempty"`   // Textual details to explain a failure
-	Details json.RawMessage `json:"details,omitempty"` // Structured infos a tester mightw wish to surface
-}
+var testSuite common.TestSuite
 
 // simulateClients runs a batch of simulation tests matched by simulatorPattern
 // against a set of clients matching clientPattern, where  the simulator decides
 // which of those clients to invoke
 func simulateClients(daemon *docker.Client, clientList []string, simulatorPattern string, overrides []string, cacher *buildCacher) (map[string]map[string]*simulationResult, error) {
-	// Build all the clients matching the validation pattern
+	// Build all the clients matching the pattern
 	log15.Info("building clients for simulation", "pattern", clientList)
 	clients, err := buildClients(daemon, clientList, cacher)
 	if err != nil {

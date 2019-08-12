@@ -4,7 +4,6 @@ import (
 	"crypto/ecdsa"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"testing"
@@ -41,10 +40,6 @@ var (
 	netInterface *string
 )
 
-type testCase struct {
-	Client string
-}
-
 func init() {
 	hive.Support()
 	local.Support()
@@ -56,23 +51,11 @@ func TestMain(m *testing.M) {
 	natdesc = flag.String("nat", "any", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 	netInterface = flag.String("interface", "eth0", "the network interface name to use for spoofing traffic (eg: eth0 on docker) or the IP address identifying the network adapter")
 	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
-	providerconfigFile := flag.String("providerConfig", "", "the config json file for the provider")
+	providerConfigFile := flag.String("providerConfig", "", "the config json file for the provider")
 
 	flag.Parse()
 
-	hostProvider, err := common.GetProvider(*simProviderType)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to get provider: %s", err.Error())
-		os.Exit(1)
-	}
-
-	configFileBytes, err := ioutil.ReadFile(*providerconfigFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to read provider config: %s", err.Error())
-		os.Exit(1)
-	}
-
-	host, err = hostProvider(configFileBytes)
+	host, err = common.InitProvider(*simProviderType, *providerConfigFile)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
 		os.Exit(1)
@@ -102,7 +85,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testDescript
 		var clientResults map[string]*common.TestResult
 		//make sure the test ends
 		defer func() {
-			host.EndTest(testID, &summaryResult, clientResults)
+			host.EndTest(testSuite, testID, &summaryResult, clientResults)
 			//send test failures to standard outputs too
 			if !summaryResult.Pass {
 				t.Errorf("Test failed %s", summaryResult.Details)
@@ -115,7 +98,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testDescript
 			"HIVE_RELAY_IP":  localIP.String(),
 			"HIVE_RELAY_UDP": "30303",
 		}
-		_, relayIP, _, err = host.GetPseudo(testID, parms)
+		_, relayIP, _, err = host.GetPseudo(testSuite, testID, parms)
 		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get pseudo: %s", err.Error()))
@@ -126,14 +109,14 @@ func ClientTestRunner(t *testing.T, client string, testName string, testDescript
 			"CLIENT":        client,
 			"HIVE_BOOTNODE": "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@1.2.3.4:30303",
 		}
-		nodeID, ipAddr, macAddr, err := host.GetNode(testID, parms)
+		nodeID, ipAddr, macAddr, err := host.GetNode(testSuite, testID, parms)
 		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))
 			return
 		}
 
-		enodeID, err := host.GetClientEnode(testID, nodeID)
+		enodeID, err := host.GetClientEnode(testSuite, testID, nodeID)
 		if err != nil || enodeID == nil || *enodeID == "" {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get enode: %s", err.Error()))
@@ -208,7 +191,10 @@ func MakeNode(pubkey *ecdsa.PublicKey, ip net.IP, tcp, udp int, mac *string) *en
 // TestDiscovery tests the set of discovery protocols
 func TestDiscovery(t *testing.T) {
 	//start the test suite
-	testSuite = host.StartTestSuite("devp2p discovery v4 test suite", "This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.")
+	testSuite, err := host.StartTestSuite("devp2p discovery v4 test suite", "This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.")
+	if err != nil {
+		t.Fatalf("Simulator error. Failed to start test suite. %v ", err)
+	}
 	defer host.EndTestSuite(testSuite)
 	// discovery v4 test suites
 	t.Run("discoveryv4", func(t *testing.T) {

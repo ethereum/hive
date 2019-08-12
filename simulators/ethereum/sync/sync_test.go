@@ -7,6 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/hive/simulators/common/providers/local"
+
+	"github.com/ethereum/hive/simulators/common/providers/hive"
+
 	"os"
 	"strings"
 	"testing"
@@ -15,58 +19,67 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/common"
-	docker "github.com/fsouza/go-dockerclient"
 )
 
 var (
-	dockerHost  *string //docker host api endpoint
-	hostURI     *string //simulator host endpoint
 	host        common.TestSuiteHost
-	daemon      *docker.Client //docker daemon proxy
-	err         error
 	syncTimeout = 60 * time.Second //the number of seconds before a sync is considered stalled or failed
+	testSuite   common.TestSuiteID
 )
 
 type testCase struct {
 	Client string
 }
 
+func init() {
+	hive.Support()
+	local.Support() // note this can be supported because the different geth instances are identified by their HIVE_NODETYPE parameter
+}
+
 func TestMain(m *testing.M) {
 
 	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
 
-	hostURI = flag.String("simulatorHost", "", "url of simulator host api")
-	dockerHost = flag.String("dockerHost", "", "docker host api endpoint")
+	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
+	providerConfigFile := flag.String("providerConfig", "", "the config json file for the provider")
 
 	flag.Parse()
-
-	//Try to connect to the simulator host and get the client list
-	host = &common.SimulatorHost{
-		HostURI: hostURI,
+	var err error
+	host, err = common.InitProvider(*simProviderType, *providerConfigFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
+		os.Exit(1)
 	}
 
-	os.Exit(m.Run())
+	os.Exit(RunTestSuite(m))
+}
+
+func RunTestSuite(m *testing.M) int {
+	return m.Run()
 }
 
 func TestSyncsWithGeth(t *testing.T) {
 
+	//start the test suite
+	testSuite, err := host.StartTestSuite("Sync test suite", "This suite of tests verifies that clients can sync from each other in different modes.")
+	if err != nil {
+		t.Fatalf("Simulator error. Failed to start test suite. %v ", err)
+	}
+	defer host.EndTestSuite(testSuite)
+
 	//Test a fastmode sync by creating a geth client and one each of any other type of client
 	//and ask the other client to load the chain
 	t.Run("fastmodes", func(t *testing.T) {
-
-		startTime := time.Now()
 
 		//get all client types required to test
 		availableClients, err := host.GetClientTypes()
 		if err != nil {
 			t.Fatalf("Simulator error. Cannot get client types. %v", err)
 		}
-
 		//there needs to be only 2 types of client
 		if len(availableClients) < 2 {
 			t.Fatal("Cannot execute test with less than 2 types available. This test tries to sync from each other peer to geth.")
 		}
-
 		//start with the first geth
 		var firstGeth = -1
 		for i, clientType := range availableClients {
@@ -75,11 +88,27 @@ func TestSyncsWithGeth(t *testing.T) {
 				break
 			}
 		}
-
 		if firstGeth == -1 {
-			t.Fatal("Cannot execute test. No geth client available.")
+			t.Fatal("Missing geth instance. This test requires a geth.")
 		}
+		startTime := time.Now()
 
+		testID, err := host.StartTest(testSuite, "From geth", "This test initialises an instance of geth with a predefined chain and genesis (configured to run in fast-sync) and then attempts to sync multiple clients from that one.")
+		if err != nil {
+			t.Fatalf("Unable to start test: %s", err.Error())
+		}
+		// declare empty test results
+		var summaryResult common.TestResult
+		summaryResult.Pass = true
+		clientResults := make(common.TestClientResults)
+		//make sure the test ends
+		defer func() {
+			host.EndTest(testSuite, testID, &summaryResult, clientResults)
+			//send test failures to standard outputs too
+			if !summaryResult.Pass {
+				t.Errorf("Test failed %s", summaryResult.Details)
+			}
+		}()
 		//and load the genesis without a chain
 		mainParms := map[string]string{
 			"CLIENT":                  availableClients[firstGeth],
@@ -87,11 +116,11 @@ func TestSyncsWithGeth(t *testing.T) {
 			"HIVE_USE_GENESIS_CONFIG": "1",
 			"HIVE_NODETYPE":           "full", //fast sync
 		}
-
-		t.Log("Starting main node (geth)")
-		_, mainNodeIP, _, err := host.StartNewNode(mainParms)
+		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms)
 		if err != nil {
-			t.Fatalf("Unable to start node: %v", err)
+			summaryResult.Pass = false
+			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
+			return
 		}
 		mainNodeURL := fmt.Sprintf("http://%s:8545", mainNodeIP.String())
 
@@ -114,12 +143,14 @@ func TestSyncsWithGeth(t *testing.T) {
 					//	"HIVE_FORK_DAO_BLOCK": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
-				clientID, nodeIP, _, err := host.StartNewNode(parms)
+				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms)
 				if err != nil {
-					t.Fatalf("Unable to start node: %v", err)
+					summaryResult.Pass = false
+					summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))
+					return
 				}
 
-				syncClient(nil, mainNodeURL, clientID, nodeIP, t, 10, startTime, true)
+				syncClient(nil, mainNodeURL, clientID, nodeIP, t, 10, startTime, true, testID, &summaryResult, clientResults)
 
 			}
 		}
@@ -132,19 +163,15 @@ func TestSyncsWithGeth(t *testing.T) {
 	//then create one each of each remaining type of node and sync from geth
 	t.Run("compatibility", func(t *testing.T) {
 
-		startTime := time.Now()
-
 		//get all client types required to test
 		availableClients, err := host.GetClientTypes()
 		if err != nil {
 			t.Fatalf("Simulator error. Cannot get client types. %v", err)
 		}
-
 		//there needs to be at least 2 types of client
 		if len(availableClients) < 2 {
 			t.Fatal("Cannot execute test. There needs to be at least 2 types of client available.")
 		}
-
 		//start with the first geth
 		var firstGeth = -1
 		for i, clientType := range availableClients {
@@ -153,9 +180,14 @@ func TestSyncsWithGeth(t *testing.T) {
 				break
 			}
 		}
-
 		if firstGeth == -1 {
 			t.Fatal("Cannot execute test. No geth client available.")
+		}
+
+		startTime := time.Now()
+		testID, err := host.StartTest(testSuite, "From geth", "This test initialises an instance of geth with a predefined chain and genesis (configured to run in fast-sync) and then attempts to sync multiple clients from that one.")
+		if err != nil {
+			t.Fatalf("Unable to start test: %s", err.Error())
 		}
 
 		//and load the genesis + chain
@@ -166,10 +198,14 @@ func TestSyncsWithGeth(t *testing.T) {
 			"HIVE_USE_GENESIS_CONFIG": "1",
 		}
 
-		t.Log("Starting main node (geth)")
-		_, mainNodeIP, _, err := host.StartNewNode(mainParms)
+		var summaryResult common.TestResult
+		summaryResult.Pass = true
+		clientResults := make(common.TestClientResults)
+		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms)
 		if err != nil {
-			t.Fatalf("Unable to start node: %v", err)
+			summaryResult.Pass = false
+			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
+			return
 		}
 		mainNodeURL := fmt.Sprintf("http://%s:8545", mainNodeIP.String())
 
@@ -196,63 +232,67 @@ func TestSyncsWithGeth(t *testing.T) {
 					//	"HIVE_FORK_DAO_BLOCK": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
-				clientID, nodeIP, _, err := host.StartNewNode(parms)
+				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms)
 				if err != nil {
-					t.Fatalf("Unable to start node: %v", err)
+					summaryResult.Pass = false
+					summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
+					return
 				}
 
 				wg.Add(1)
-				go syncClient(&wg, mainNodeURL, clientID, nodeIP, t, 10, startTime, false)
+				go syncClient(&wg, mainNodeURL, clientID, nodeIP, t, 10, startTime, false, testID, &summaryResult, clientResults)
 
 			}
 		}
-		t.Log("Waiting for client sync.")
+
 		wg.Wait()
-		t.Log("Terminating.")
 
 	})
 
 }
 
-func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *testing.T, chainLength int, startTime time.Time, checkMainForSync bool) {
+func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *testing.T, chainLength int, startTime time.Time, checkMainForSync bool, testID common.TestID, summaryResult *common.TestResult, clientResults common.TestClientResults) {
 	if wg != nil {
 		defer wg.Done()
 	}
-
-	peerEnodeID, err := host.GetClientEnode(clientID)
+	peerEnodeID, err := host.GetClientEnode(testSuite, testID, clientID)
 	if err != nil || peerEnodeID == nil || *peerEnodeID == "" {
-		t.Fatalf("Unable to get enode: %v", err)
+		summaryResult.Pass = false
+		clientResults.AddResult(clientID, false, "Enode could not be obtained.")
+		return
 	}
-
 	peerNode, err := enode.ParseV4(*peerEnodeID)
 	if err != nil {
-		t.Fatalf("Unable to parse enode: %v", err)
+		summaryResult.Pass = false
+		clientResults.AddResult(clientID, false, "Enode could not be parsed.")
+		return
 	}
-	//replace the ip with what docker says it is
+	//replace the ip with what the provider says it is
 	tcpPort := peerNode.TCP()
 	if tcpPort == 0 {
 		tcpPort = 30303
 	}
 	peerNode = enode.NewV4(peerNode.Pubkey(), nodeIP, tcpPort, 30303)
 	if peerNode == nil {
-		t.Fatalf("Unable to make enode: %v", err)
+		summaryResult.Pass = false
+		clientResults.AddResult(clientID, false, "Enode could not be created.")
+		return
 	}
 
 	*peerEnodeID = peerNode.String()
 
-	t.Logf("Attempting to add peer %s ", *peerEnodeID)
-
 	//connect over rpc to the main node to add the peer (the mobile client does not have the admin function)
 	rpcClient, err := rpc.Dial(mainURL)
 	if err != nil {
-
-		t.Fatalf("Unable to connect to node via rpc: %v", err)
+		summaryResult.Pass = false
+		clientResults.AddResult(clientID, false, "Enode could not be created.")
+		return
 	}
 	var res = false
 	if err := rpcClient.Call(&res, "admin_addPeer", *peerEnodeID); err != nil {
-		t.Fatalf("Unable to add peer via rpc: %v", err)
-	} else {
-		t.Logf("Add peer result %v", res)
+		summaryResult.Pass = false
+		clientResults.AddResult(clientID, false, "Admin add peer failed.")
+		return
 	}
 
 	var clientURL string
@@ -265,7 +305,9 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 	//connect (over rpc) to the peer using the mobile interface
 	ethClient, err := geth.NewEthereumClient(clientURL)
 	if err != nil {
-		t.Fatalf("Unable to connect to node: %v", err)
+		summaryResult.Pass = false
+		clientResults.AddResult(clientID, false, "Could not connect to client.")
+		return
 	}
 
 	//loop until done or timeout
@@ -273,9 +315,10 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 		select {
 
 		case <-timeout:
-			host.AddResults(false, clientID, t.Name(), "Sync timed out.", time.Since(startTime))
-			t.Errorf("Client sync timed out %s", clientURL)
+			summaryResult.Pass = false
+			clientResults.AddResult(clientID, false, "Sync timeout.")
 			return
+
 		default:
 
 			ctx := geth.NewContext().WithTimeout(int64(1 * time.Second))
@@ -289,16 +332,12 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 				t.Logf("Block number: %d", block.GetNumber())
 				if blockNumber == int64(chainLength) {
 					//Success
-					host.AddResults(true, clientID, t.Name(), "", time.Since(startTime))
+					clientResults.AddResult(clientID, true, "Sync succeeded.")
 					return
 				}
 			}
-
 			//check in a little while....
 			time.Sleep(1000 * time.Millisecond)
-
 		}
-
 	}
-
 }

@@ -132,6 +132,20 @@ func (testSuite *TestSuite) UpdateDB(outputPath string) error {
 	return nil
 }
 
+// TestClientResults is the set of per-client results for a test-case
+type TestClientResults map[string]*TestResult
+
+// AddResult adds a test result for a client
+func (t TestClientResults) AddResult(clientID string, pass bool, detail string) {
+	tcr, in := t[clientID]
+	if !in {
+		tcr = &TestResult{}
+		t[clientID] = tcr
+	}
+	tcr.Pass = pass
+	tcr.AddDetail(detail)
+}
+
 // TestCase represents a single test case in a test suite
 type TestCase struct {
 	ID            TestID                     `json:"id"`          // Test case reference number.
@@ -140,7 +154,7 @@ type TestCase struct {
 	Start         time.Time                  `json:"start"`
 	End           time.Time                  `json:"end"`
 	SummaryResult TestResult                 `json:"summaryResult"` // The result of the whole test case.
-	ClientResults map[string]*TestResult     `json:"clientResults"` // Client specific results, if this test case supports this concept. Not all test cases will identify a specific client as a test failure reason.
+	ClientResults TestClientResults          `json:"clientResults"` // Client specific results, if this test case supports this concept. Not all test cases will identify a specific client as a test failure reason.
 	ClientInfo    map[string]*TestClientInfo `json:"clientInfo"`    // Info about each client.
 }
 
