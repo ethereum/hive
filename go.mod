@@ -20,6 +20,9 @@ require (
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/gopacket v1.1.17
 	github.com/google/uuid v1.1.1
+	github.com/gorilla/context v1.1.1 // indirect
+	github.com/gorilla/mux v1.7.3 // indirect
+	github.com/gorilla/pat v1.0.1
 	github.com/gorilla/websocket v1.4.0 // indirect
 	github.com/graph-gophers/graphql-go v0.0.0-20190724201507-010347b5f9e6 // indirect
 	github.com/hashicorp/go-cleanhttp v0.0.0-20160407174126-ad28ea4487f0

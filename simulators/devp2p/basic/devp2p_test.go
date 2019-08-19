@@ -18,7 +18,6 @@ import (
 	"github.com/ethereum/hive/simulators/common/providers/hive"
 	"github.com/ethereum/hive/simulators/common/providers/local"
 	"github.com/ethereum/hive/simulators/devp2p"
-	docker "github.com/fsouza/go-dockerclient"
 )
 
 var (
@@ -26,9 +25,9 @@ var (
 	natdesc    *string //nat mode
 	//dockerHost   *string //docker host api endpoint
 	//hostURI      *string //simulator host endpoint
-	host         common.TestSuiteHost
-	daemon       *docker.Client //docker daemon proxy
-	targetID     *string        //docker client id
+	host common.TestSuiteHost
+
+	targetID     *string //docker client id
 	nodeKey      *ecdsa.PrivateKey
 	err          error
 	restrictList *netutil.Netlist

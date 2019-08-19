@@ -11,16 +11,16 @@ import (
 
 // makeGenesisDAG runs the ethash DAG generator to ensure that the genesis epochs
 // DAG is created prior to it being needed by simulations.
-func makeGenesisDAG(daemon *docker.Client, cacher *buildCacher) error {
+func makeGenesisDAG(cacher *buildCacher) error {
 	// Build the image for the DAG generator
 	log15.Info("creating ethash container")
 
-	image, err := buildEthash(daemon, cacher)
+	image, err := buildEthash( cacher)
 	if err != nil {
 		return err
 	}
 	// Create the ethash container container and make sure it's deleted afterwards
-	ethash, err := createEthashContainer(daemon, image)
+	ethash, err := createEthashContainer( image)
 	if err != nil {
 		log15.Error("failed to create ethash container", "error", err)
 		return err
@@ -29,7 +29,7 @@ func makeGenesisDAG(daemon *docker.Client, cacher *buildCacher) error {
 	log15.Debug("created ethash container")
 	defer func() {
 		log15.Debug("deleting ethash container")
-		err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: ethash.ID, Force: true})
+		err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: ethash.ID, Force: true})
 		if err != nil {
 			log15.Error("failed to delete ethash container ", "error", err)
 		}
@@ -37,7 +37,7 @@ func makeGenesisDAG(daemon *docker.Client, cacher *buildCacher) error {
 	// Start generating the genesis ethash DAG
 	log15.Info("generating genesis DAG")
 
-	waiter, err := runContainer(daemon, ethash.ID, log15.Root(), "", true, *loglevelFlag)
+	waiter, err := runContainer( ethash.ID, log15.Root(), "", true, *loglevelFlag)
 	if err != nil {
 		log15.Error("failed to execute ethash", "error", err)
 		return err
@@ -50,7 +50,7 @@ func makeGenesisDAG(daemon *docker.Client, cacher *buildCacher) error {
 	go func() {
 		<-interrupt
 		errc <- errors.New("interrupted")
-		err := daemon.StopContainer(ethash.ID, 0)
+		err := dockerClient.StopContainer(ethash.ID, 0)
 		if err != nil {
 			log15.Error("failed to stop ethash", "error", err)
 		}

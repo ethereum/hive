@@ -14,7 +14,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -51,43 +51,39 @@ func newBuildCacher(pattern string) (*buildCacher, error) {
 
 // buildShell builds the outer shell docker image for running the entirety of hive
 // within an all encompassing container.
-func buildShell(daemon *docker.Client, cacher *buildCacher) (string, error) {
+func buildShell(cacher *buildCacher) (string, error) {
 	image := hiveImageNamespace + "/shell"
-	return image, buildImage(daemon, image, "", ".", cacher, log15.Root(), "")
+	return image, buildImage(dockerClient, image, "", ".", cacher, log15.Root(), "")
 }
 
 // buildEthash builds the ethash DAG generator docker image to run before any real
 // simulation needing it takes place.
-func buildEthash(daemon *docker.Client, cacher *buildCacher) (string, error) {
+func buildEthash(cacher *buildCacher) (string, error) {
 	image := hiveImageNamespace + "/internal/ethash"
-	return image, buildImage(daemon, image, "", filepath.Join("internal", "ethash"), cacher, log15.Root(), "")
+	return image, buildImage(dockerClient, image, "", filepath.Join("internal", "ethash"), cacher, log15.Root(), "")
 }
 
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
-func buildClients(daemon *docker.Client, clientList []string, cacher *buildCacher) (map[string]string, error) {
-	return buildListedImages(daemon, "clients", clientList, "client", cacher, false)
+func buildClients(clientList []string, cacher *buildCacher) (map[string]string, error) {
+	return buildListedImages(dockerClient, "clients", clientList, "client", cacher, false)
 }
 
 // buildPseudoClients iterates over all the known pseudo-clients and builds a docker image for
-func buildPseudoClients(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages(daemon, "pseudoclients", pattern, "pseudoclient", cacher, false)
+func buildPseudoClients(pattern string, cacher *buildCacher) (map[string]string, error) {
+	return buildNestedImages(dockerClient, "pseudoclients", pattern, "pseudoclient", cacher, false)
 }
 
 // fetchClientVersions downloads the version json specs from all clients that
 // match the given patten.
-func fetchClientVersions(daemon *docker.Client, clientList []string, cacher *buildCacher) (map[string]map[string]string, error) {
-	// Build all the client that we need the versions of
-	clients, err := buildClients(daemon, clientList, cacher)
-	if err != nil {
-		return nil, err
-	}
+func fetchClientVersions(clientList []string, cacher *buildCacher) (map[string]map[string]string, error) {
+
 	// Iterate over the images and collect the versions
 	versions := make(map[string]map[string]string)
 	for client, image := range clients {
 		logger := log15.New("client", client)
 
-		blob, err := downloadFromImage(daemon, image, "/version.json", logger)
+		blob, err := downloadFromImage(dockerClient, image, "/version.json", logger)
 		if err != nil {
 			berr := &buildError{err: err, client: client}
 			return nil, berr
@@ -102,30 +98,16 @@ func fetchClientVersions(daemon *docker.Client, clientList []string, cacher *bui
 	return versions, nil
 }
 
-// buildValidators iterates over all the known validators and builds a docker image
-// for all unknown ones matching the given pattern.
-func buildValidators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages(daemon, "validators", pattern, "validator", cacher, false)
-	return images, err
-}
-
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
-func buildSimulators(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages(daemon, "simulators", pattern, "simulator", cacher, *simRootContext)
-	return images, err
-}
-
-// buildBenchmarkers iterates over all the known benchmarkers and builds a docker image
-// for all unknown ones matching the given pattern.
-func buildBenchmarkers(daemon *docker.Client, pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages(daemon, "benchmarkers", pattern, "benchmarker", cacher, false)
+func buildSimulators(pattern string, cacher *buildCacher) (map[string]string, error) {
+	images, err := buildNestedImages(dockerClient, "simulators", pattern, "simulator", cacher, *simRootContext)
 	return images, err
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested
 // docker image definitions and builds all of them matching the provided pattern.
-func buildNestedImages(daemon *docker.Client, root string, pattern string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
+func buildNestedImages(root string, pattern string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
 
 	var contextBuilder func(root string, path string) (string, string)
 
@@ -170,7 +152,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 			image               = strings.Replace(filepath.Join(hiveImageNamespace, root, name), string(os.PathSeparator), "/", -1)
 			logger              = log15.New(kind, name)
 		)
-		if err := buildImage(daemon, image, "", context, cacher, logger, dockerfile); err != nil {
+		if err := buildImage(dockerClient, image, "", context, cacher, logger, dockerfile); err != nil {
 			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
 			return nil, berr
 		}
@@ -185,7 +167,7 @@ func buildNestedImages(daemon *docker.Client, root string, pattern string, kind 
 // For example, if the clientList contained geth_master, geth_beta and
 // the clients folder contained a dockerfile for clients\geth, then this
 // will created two images, one for clients\geth_master and one for clients\geth_beta
-func buildListedImages(daemon *docker.Client, root string, clientList []string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
+func buildListedImages(root string, clientList []string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
 
 	var contextBuilder func(root string, path string) (string, string, string)
 
@@ -231,7 +213,7 @@ func buildListedImages(daemon *docker.Client, root string, clientList []string, 
 			image                       = strings.Replace(filepath.Join(hiveImageNamespace, root, name), string(os.PathSeparator), "/", -1)
 			logger                      = log15.New(kind, name)
 		)
-		if err := buildImage(daemon, image, branch, context, cacher, logger, dockerfile); err != nil {
+		if err := buildImage(dockerClient, image, branch, context, cacher, logger, dockerfile); err != nil {
 			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
 			return nil, berr
 		}
@@ -279,7 +261,7 @@ func (b *buildError) Client() string {
 
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch
-func buildImage(daemon *docker.Client, image, branch, context string, cacher *buildCacher, logger log15.Logger, dockerfile string) error {
+func buildImage(image, branch, context string, cacher *buildCacher, logger log15.Logger, dockerfile string) error {
 	var nocache bool
 	if cacher != nil && cacher.pattern.MatchString(image) && !cacher.rebuilt[image] {
 		cacher.rebuilt[image] = true
@@ -304,7 +286,7 @@ func buildImage(daemon *docker.Client, image, branch, context string, cacher *bu
 		NoCache:      nocache,
 		BuildArgs:    []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}},
 	}
-	if err := daemon.BuildImage(opts); err != nil {
+	if err := dockerClient.BuildImage(opts); err != nil {
 		logger.Error("failed to build docker image", "error", err)
 		return err
 	}
@@ -313,20 +295,20 @@ func buildImage(daemon *docker.Client, image, branch, context string, cacher *bu
 
 // downloadFromImage retrieves a file from a docker image. To do so it creates a
 // temporary container, downloads the file from it and destroys the container.
-func downloadFromImage(daemon *docker.Client, image, path string, logger log15.Logger) ([]byte, error) {
+func downloadFromImage(image, path string, logger log15.Logger) ([]byte, error) {
 	// Create the temporary container and ensure it's cleaned up
-	cont, err := daemon.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: image}})
+	cont, err := dockerClient.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: image}})
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID, Force: true}); err != nil {
+		if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: cont.ID, Force: true}); err != nil {
 			logger.Error("failed to delete temporary container", "id", cont.ID[:8], "error", err)
 		}
 	}()
 	// Download a tarball of the file from the container
 	download := new(bytes.Buffer)
-	if err := daemon.DownloadFromContainer(cont.ID, docker.DownloadFromContainerOptions{
+	if err := dockerClient.DownloadFromContainer(cont.ID, docker.DownloadFromContainerOptions{
 		Path:         path,
 		OutputStream: download,
 	}); err != nil {
