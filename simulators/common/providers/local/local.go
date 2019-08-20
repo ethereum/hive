@@ -44,18 +44,22 @@ type ClientDescription struct {
 }
 
 type host struct {
-	configuration     *HostConfiguration
-	clientsByType     map[string][]int
-	pseudosByType     map[string][]int
-	clientTypes       []string
-	pseudoTypes       []string
-	nodeMutex         sync.Mutex
-	runningTestSuites map[common.TestSuiteID]*common.TestSuite
-	runningTestCases  map[common.TestID]*common.TestCase
-	testCaseMutex     sync.Mutex
-	testSuiteMutex    sync.Mutex
-	testSuiteCounter  uint32
-	testCaseCounter   uint32
+	configuration *HostConfiguration
+	clientsByType map[string][]int
+	pseudosByType map[string][]int
+	clientTypes   []string
+	pseudoTypes   []string
+	// runningTestSuites map[common.TestSuiteID]*common.TestSuite
+	// runningTestCases  map[common.TestID]*common.TestCase
+
+	*common.TestManager
+
+	//	nodeMutex         sync.Mutex
+
+	// testCaseMutex     sync.Mutex
+	// testSuiteMutex    sync.Mutex
+	// testSuiteCounter  uint32
+	// testCaseCounter   uint32
 }
 
 var hostProxy *host
@@ -74,7 +78,6 @@ func GetInstance(config []byte) (common.TestSuiteHost, error) {
 
 	once.Do(func() {
 		err = generateInstance(config)
-
 	})
 	return hostProxy, err
 }
@@ -88,12 +91,17 @@ func generateInstance(config []byte) error {
 	}
 
 	hostProxy = &host{
-		configuration:     &result,
-		runningTestSuites: make(map[common.TestSuiteID]*common.TestSuite),
-		runningTestCases:  make(map[common.TestID]*common.TestCase),
-		clientsByType:     make(map[string][]int),
-		pseudosByType:     make(map[string][]int),
+		configuration: &result,
+		clientsByType: make(map[string][]int),
+		pseudosByType: make(map[string][]int),
 	}
+
+	var testManager = common.NewTestManager(
+		result.OutputPath,
+		hostProxy.KillNode,
+	)
+
+	hostProxy.TestManager = &testManager
 
 	mapClients()
 	return nil
@@ -134,35 +142,36 @@ func mapClients() {
 
 // EndTestSuite ends the test suite by writing the test suite results to the supplied
 // stream and removing the test suite from the running list
-func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
-	sim.testSuiteMutex.Lock()
-	defer sim.testSuiteMutex.Unlock()
+// func (sim *host) EndTestSuite(testSuite common.TestSuiteID) error {
+// 	sim.testSuiteMutex.Lock()
+// 	defer sim.testSuiteMutex.Unlock()
 
-	// check the test suite exists
-	suite, ok := sim.runningTestSuites[testSuite]
-	if !ok {
-		return common.ErrNoSuchTestSuite
-	}
-	// check the suite has no running test cases
-	for k := range suite.TestCases {
-		_, ok := sim.runningTestCases[k]
-		if ok {
-			return common.ErrTestSuiteRunning
-		}
-	}
-	// update the db
-	err := suite.UpdateDB(sim.configuration.OutputPath)
-	if err != nil {
-		return err
-	}
-	//remove the test suite
-	delete(sim.runningTestSuites, testSuite)
+// 	// check the test suite exists
+// 	suite, ok := sim.runningTestSuites[testSuite]
+// 	if !ok {
+// 		return common.ErrNoSuchTestSuite
+// 	}
+// 	// check the suite has no running test cases
+// 	for k := range suite.TestCases {
+// 		_, ok := sim.runningTestCases[k]
+// 		if ok {
+// 			return common.ErrTestSuiteRunning
+// 		}
+// 	}
+// 	// update the db
+// 	err := suite.UpdateDB(sim.configuration.OutputPath)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	//remove the test suite
+// 	delete(sim.runningTestSuites, testSuite)
 
-	return nil
-}
+// 	return nil
+// }
 
 // GetClientEnode Get the client enode for the specified node id, which in this case is just the index
 func (sim *host) GetClientEnode(testSuite common.TestSuiteID, test common.TestID, node string) (*string, error) {
+
 	//local nodes are identified by their index
 	nodeIndex, err := strconv.Atoi(node)
 	if err != nil {
@@ -177,95 +186,97 @@ func (sim *host) GetClientEnode(testSuite common.TestSuiteID, test common.TestID
 }
 
 // StartTestSuite starts a test suite and returns the context id
-func (sim *host) StartTestSuite(name string, description string) (common.TestSuiteID, error) {
+// func (sim *host) StartTestSuite(name string, description string) (common.TestSuiteID, error) {
 
-	sim.testSuiteMutex.Lock()
-	defer sim.testSuiteMutex.Unlock()
+// 	sim.testSuiteMutex.Lock()
+// 	defer sim.testSuiteMutex.Unlock()
 
-	var newSuiteID = common.TestSuiteID(sim.testSuiteCounter)
+// 	var newSuiteID = common.TestSuiteID(sim.testSuiteCounter)
 
-	sim.runningTestSuites[newSuiteID] = &common.TestSuite{
-		ID:          newSuiteID,
-		Name:        name,
-		Description: description,
-		TestCases:   make(map[common.TestID]*common.TestCase),
-	}
+// 	sim.runningTestSuites[newSuiteID] = &common.TestSuite{
+// 		ID:          newSuiteID,
+// 		Name:        name,
+// 		Description: description,
+// 		TestCases:   make(map[common.TestID]*common.TestCase),
+// 	}
 
-	sim.testSuiteCounter++
+// 	sim.testSuiteCounter++
 
-	return newSuiteID, nil
-}
+// 	return newSuiteID, nil
+// }
 
 //StartTest starts a new test case, returning the testcase id as a context identifier
-func (sim *host) StartTest(testSuiteID common.TestSuiteID, name string, description string) (common.TestID, error) {
+// func (sim *host) StartTest(testSuiteID common.TestSuiteID, name string, description string) (common.TestID, error) {
 
-	sim.testCaseMutex.Lock()
-	defer sim.testCaseMutex.Unlock()
+// 	//TODO - StartTest goes onto the TestSuiteManager
 
-	// check if the testsuite exists
-	testSuite, ok := sim.runningTestSuites[testSuiteID]
-	if !ok {
-		return 0, common.ErrNoSuchTestSuite
-	}
+// 	sim.testCaseMutex.Lock()
+// 	defer sim.testCaseMutex.Unlock()
 
-	// increment the testcasecounter
-	sim.testCaseCounter++
+// 	// check if the testsuite exists
+// 	testSuite, ok := sim.runningTestSuites[testSuiteID]
+// 	if !ok {
+// 		return 0, common.ErrNoSuchTestSuite
+// 	}
 
-	var newCaseID = common.TestID(sim.testCaseCounter)
+// 	// increment the testcasecounter
+// 	sim.testCaseCounter++
 
-	// create a new test case and add it to the test suite
-	newTestCase := &common.TestCase{
-		ID:          newCaseID,
-		Name:        name,
-		Description: description,
-		Start:       time.Now(),
-		ClientInfo:  make(map[string]*common.TestClientInfo),
-	}
+// 	var newCaseID = common.TestID(sim.testCaseCounter)
 
-	// add the test case to the test suite
-	testSuite.TestCases[newCaseID] = newTestCase
-	// and to the general map of id:testcases
-	sim.runningTestCases[newCaseID] = newTestCase
+// 	// create a new test case and add it to the test suite
+// 	newTestCase := &common.TestCase{
+// 		ID:          newCaseID,
+// 		Name:        name,
+// 		Description: description,
+// 		Start:       time.Now(),
+// 		ClientInfo:  make(map[string]*common.TestClientInfo),
+// 	}
 
-	return newTestCase.ID, nil
-}
+// 	// add the test case to the test suite
+// 	testSuite.TestCases[newCaseID] = newTestCase
+// 	// and to the general map of id:testcases
+// 	sim.runningTestCases[newCaseID] = newTestCase
+
+// 	return newTestCase.ID, nil
+// }
 
 // EndTest finishes the test case
-func (sim *host) EndTest(testSuiteRun common.TestSuiteID, testID common.TestID, summaryResult *common.TestResult, clientResults map[string]*common.TestResult) error {
+// func (sim *host) EndTest(testSuiteRun common.TestSuiteID, testID common.TestID, summaryResult *common.TestResult, clientResults map[string]*common.TestResult) error {
 
-	sim.testCaseMutex.Lock()
-	defer sim.testCaseMutex.Unlock()
+// 	sim.testCaseMutex.Lock()
+// 	defer sim.testCaseMutex.Unlock()
 
-	// Check if the test case is running
-	testCase, ok := sim.runningTestCases[testID]
-	if !ok {
-		return common.ErrNoSuchTestCase
-	}
+// 	// Check if the test case is running
+// 	testCase, ok := sim.runningTestCases[testID]
+// 	if !ok {
+// 		return common.ErrNoSuchTestCase
+// 	}
 
-	/// Make sure there is at least a result summary
-	if summaryResult == nil {
-		return common.ErrNoSummaryResult
-	}
+// 	/// Make sure there is at least a result summary
+// 	if summaryResult == nil {
+// 		return common.ErrNoSummaryResult
+// 	}
 
-	// Add the results to the test case
-	testCase.End = time.Now()
-	testCase.SummaryResult = *summaryResult
-	testCase.ClientResults = clientResults
+// 	// Add the results to the test case
+// 	testCase.End = time.Now()
+// 	testCase.SummaryResult = *summaryResult
+// 	testCase.ClientResults = clientResults
 
-	delete(sim.runningTestCases, testCase.ID)
+// 	delete(sim.runningTestCases, testCase.ID)
 
-	// A local configuration might want to be informed
-	// of the fact that the test case has ended in order to
-	// reset state.
-	// The main Hive Docker provider achieves this by killing
-	// containers. The Local provider specifies pre-existing clients.
-	// Signal that state should be reset by using the Kill message.
-	for k := range testCase.ClientInfo {
-		sim.KillNode(testSuiteRun, testID, k)
-	}
+// 	// A local configuration might want to be informed
+// 	// of the fact that the test case has ended in order to
+// 	// reset state.
+// 	// The main Hive Docker provider achieves this by killing
+// 	// containers. The Local provider specifies pre-existing clients.
+// 	// Signal that state should be reset by using the Kill message.
+// 	for k := range testCase.ClientInfo {
+// 		sim.KillNode(testSuiteRun, testID, k)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
 //GetClientTypes Get all client types available
 func (sim *host) GetClientTypes() (availableClients []string, err error) {
@@ -278,14 +289,8 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 // Returns node id, ip, mac
 // The node is registered as being part of the test.
 func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
-	sim.nodeMutex.Lock()
-	defer sim.nodeMutex.Unlock()
 
-	// Check if the test case is running
-	testCase, ok := sim.runningTestCases[test]
-	if !ok {
-		return "", nil, nil, common.ErrNoSuchTestCase
-	}
+	//removed nodemutex lock
 
 	client, ok := parameters["CLIENT"]
 	if !ok {
@@ -318,13 +323,22 @@ func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, param
 
 	//now add the node to the test case
 	nodeID := strconv.Itoa(leastUsedIndex)
-	testCase.ClientInfo[nodeID] = &common.TestClientInfo{
+
+	sim.RegisterNode(test, nodeID, &common.TestClientInfo{
 		ID:             nodeID,
 		Name:           leastUsed.ClientType,
 		VersionInfo:    "TODO",
 		InstantiatedAt: time.Now(),
 		LogFile:        "",
-	}
+	})
+
+	// testCase.ClientInfo[nodeID] = &common.TestClientInfo{
+	// 	ID:             nodeID,
+	// 	Name:           leastUsed.ClientType,
+	// 	VersionInfo:    "TODO",
+	// 	InstantiatedAt: time.Now(),
+	// 	LogFile:        "",
+	// }
 
 	return nodeID, leastUsed.IP, leastUsed.Mac, nil
 }
