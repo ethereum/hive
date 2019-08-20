@@ -332,14 +332,6 @@ func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, param
 		LogFile:        "",
 	})
 
-	// testCase.ClientInfo[nodeID] = &common.TestClientInfo{
-	// 	ID:             nodeID,
-	// 	Name:           leastUsed.ClientType,
-	// 	VersionInfo:    "TODO",
-	// 	InstantiatedAt: time.Now(),
-	// 	LogFile:        "",
-	// }
-
 	return nodeID, leastUsed.IP, leastUsed.Mac, nil
 }
 

@@ -37,6 +37,32 @@ func (manager *TestManager) IsTestSuiteRunning(testSuite TestSuiteID) (*TestSuit
 	return suite, ok
 }
 
+// IsTestRunning checks if the testis still running and returns it if so
+func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
+	testCase, ok := manager.runningTestCases[test]
+	return testCase, ok
+}
+
+// GetNode gets some node info belonging to some tests
+func (manager *TestManager) GetNode(testSuite TestSuiteID, test TestID, nodeID string) (*TestClientInfo, error) {
+	manager.nodeMutex.Lock()
+	defer manager.nodeMutex.Unlock()
+
+	_, ok := manager.IsTestSuiteRunning(testSuite)
+	if !ok {
+		return nil, ErrNoSuchTestSuite
+	}
+	testCase, ok := manager.IsTestRunning(test)
+	if !ok {
+		return nil, ErrNoSuchTestCase
+	}
+	nodeInfo, ok := testCase.ClientInfo[nodeID]
+	if !ok {
+		return nil, ErrNoSuchNode
+	}
+	return nodeInfo, nil
+}
+
 // EndTestSuite ends the test suite by writing the test suite results to the supplied
 // stream and removing the test suite from the running list
 func (manager *TestManager) EndTestSuite(testSuite TestSuiteID) error {

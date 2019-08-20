@@ -19,6 +19,7 @@ import (
 )
 
 var simListenerAddress string
+var testManager *common.TestManager
 
 
 // runSimulations runs each 'simulation' container, which are hosts for executing one or more test-suites
@@ -30,6 +31,9 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 	if err != nil {
 		return nil, err
 	}
+
+	// Create a testcase manager
+	testManager=common.NewTestManager(*testResultsRoot,killNodeCallbackHandler)
 
 	// Start the simulator HTTP API
 	simAPI, err := startTestSuiteAPI()
@@ -178,11 +182,50 @@ func startTestSuiteAPI() {
 	return sim, nil
 }
 
-
+// nodeInfoGet tries to execute the mandatory enode.sh , which returns the enode id
 func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 	testSuiteString := request.URL.Query().Get(":suite")
 	testString := request.URL.Query().Get(":test")
 	node := request.URL.Query().Get(":node")
+
+	testSuite,err := strconv.Atoi(testSuiteString)
+	if err!=nil {
+		log15.Error("invalid test suite.")	
+		http.Error(w, "invalid test suite", http.StatusBadRequest)
+		return
+	}
+	testCase,err := strconv.Atoi(testString)
+	if err!=nil {
+		log15.Error("invalid test case.")	
+		http.Error(w, "invalid test case", http.StatusBadRequest)
+		return
+	}
+	nodeInfo, err:= testManager.GetNode(common.TestSuiteID(testSuite), common.TestID(testCase), node )
+	if err!=nil {
+		log15.Errorf("unable to get node: %s", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+	}
+	exec, err := dockerClient.CreateExec(docker.CreateExecOptions{
+		AttachStdout: true,
+		AttachStderr: false,
+		Tty:          false,
+		Cmd:          []string{"/enode.sh"},
+		Container:    nodeInfo.ID, //id is the container id
+	})
+	if err != nil {
+		log15.Error("failed to create target enode exec", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = dockerClient.StartExec(exec.ID, docker.StartExecOptions{
+		Detach:       false,
+		OutputStream: w,
+	})
+	if err != nil {
+		log15.Error("failed to start target enode exec", "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
     
 }
 
@@ -229,7 +272,7 @@ func suiteStart(w http.ResponseWriter, request *http.Request) {
     
 }
 func clients(w http.ResponseWriter, request *http.Request){
-	
+
 }
 
 // ServeHTTP handles all the simulator API requests and executes them.
@@ -272,39 +315,8 @@ func (h *testSuiteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 			fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
 
 		case strings.HasPrefix(r.URL.Path, "/enodes/"):
-			// Node IP retrieval requested
-			id := strings.TrimPrefix(r.URL.Path, "/enodes/")
-			h.lock.Lock()
-			containerInfo, ok := h.nodes[id]
-			h.lock.Unlock()
-			if !ok {
-				logger.Error("unknown client for enode", "id", id)
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-
-			exec, err := dockerClient.CreateExec(docker.CreateExecOptions{
-				AttachStdout: true,
-				AttachStderr: false,
-				Tty:          false,
-				Cmd:          []string{"/enode.sh"},
-				Container:    containerInfo.container.ID,
-			})
-			if err != nil {
-				logger.Error("failed to create target enode exec", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			err = dockerClient.StartExec(exec.ID, docker.StartExecOptions{
-				Detach:       false,
-				OutputStream: w,
-			})
-			if err != nil {
-				logger.Error("failed to start target enode exec", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+			
+			
 
 		case strings.HasPrefix(r.URL.Path, "/clients"):
 			w.Header().Set("Content-Type", "application/json")
