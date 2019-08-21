@@ -182,24 +182,66 @@ func startTestSuiteAPI() {
 	return sim, nil
 }
 
-// nodeInfoGet tries to execute the mandatory enode.sh , which returns the enode id
-func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
+func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID,  bool) {
+
 	testSuiteString := request.URL.Query().Get(":suite")
-	testString := request.URL.Query().Get(":test")
-	node := request.URL.Query().Get(":node")
+	
 
 	testSuite,err := strconv.Atoi(testSuiteString)
 	if err!=nil {
 		log15.Error("invalid test suite.")	
 		http.Error(w, "invalid test suite", http.StatusBadRequest)
-		return
+		return -1,false
 	}
+	
+
+	if 	!testManager.IsTestSuiteRunning(testSuite) ||
+	
+			log15.Error("test suite not running")	
+			http.Error(w, "test suite not running", http.StatusBadRequest)
+			return -1,false
+	}
+	
+	return testSuite,true	
+} 
+
+func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.TestID,  bool) {
+
+	
+	testString := request.URL.Query().Get(":test")
+
+	
 	testCase,err := strconv.Atoi(testString)
 	if err!=nil {
 		log15.Error("invalid test case.")	
 		http.Error(w, "invalid test case", http.StatusBadRequest)
+		return -1,false
+	}
+
+	
+	if !testManager.IsTestRunning(testCase)	{
+			log15.Error("test case not running")	
+			http.Error(w, "test case not running", http.StatusBadRequest)
+			return -1,false
+	}
+	
+	return testCase,true	
+
+
+}
+
+// nodeInfoGet tries to execute the mandatory enode.sh , which returns the enode id
+func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
+	testSuite, ok := checkSuiteRequest(r,w)
+	if !ok {
 		return
 	}
+	testCase, ok := checkTestRequest(r,w)
+	if !ok {
+		return
+	}
+	node := request.URL.Query().Get(":node")
+
 	nodeInfo, err:= testManager.GetNode(common.TestSuiteID(testSuite), common.TestID(testCase), node )
 	if err!=nil {
 		log15.Errorf("unable to get node: %s", err.Error())
@@ -230,37 +272,78 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 }
 
 func nodeStart(w http.ResponseWriter, request *http.Request) {
-	testSuiteString := request.URL.Query().Get(":suite")
-	testString := request.URL.Query().Get(":test")
+	testSuite, ok := checkSuiteRequest(r,w)
+	if !ok {
+		return
+	}
+	testCase, ok := checkTestRequest(r,w)
+	if !ok {
+		return
+	}
+	// parse any envvar overrides from simulators
+	r.ParseForm()
+	envs := make(map[string]string)
+	for key, vals := range r.Form {
+		envs[key] = vals[0]
+	}
+	//TODO logdir
+	logdir:="C:\\mytests"
+	nodeInfo, nodeID, ok := newNode(w, envs, true, true, logdir)
+	if ok {
+		testManager.RegisterNode(testCase,nodeID,nodeInfo)
+	}
 	
-    
 }
 func pseudoStart(w http.ResponseWriter, request *http.Request) {
-	testSuiteString := request.URL.Query().Get(":suite")
-	testString := request.URL.Query().Get(":test")
-	
+	testSuite, ok := checkSuiteRequest(r,w)
+	if !ok {
+		return
+	}
+	testCase, ok := checkTestRequest(r,w)
+	if !ok {
+		return
+	}
     
 }
 func nodeKill(w http.ResponseWriter, request *http.Request) {
-	testSuiteString := request.URL.Query().Get(":suite")
-	testString := request.URL.Query().Get(":test")
+	testSuite, ok := checkSuiteRequest(r,w)
+	if !ok {
+		return
+	}
+	testCase, ok := checkTestRequest(r,w)
+	if !ok {
+		return
+	}
 	node := request.URL.Query().Get(":node")
-    
+	
+	
 }
 func testDelete(w http.ResponseWriter, request *http.Request) {
-	testSuiteString := request.URL.Query().Get(":suite")
-	testString := request.URL.Query().Get(":test")
+	testSuite, ok := checkSuiteRequest(r,w)
+	if !ok {
+		return
+	}
+	testCase, ok := checkTestRequest(r,w)
+	if !ok {
+		return
+	}
 	
     
 }
 func testStart(w http.ResponseWriter, request *http.Request) {
-	testSuiteString := request.URL.Query().Get(":suite")
-	
-	
+	testSuite, ok := checkSuiteRequest(r,w)
+	if !ok {
+		return
+	}
+
     
 }
 func suiteEnd(w http.ResponseWriter, request *http.Request) {
-	testSuiteString := request.URL.Query().Get(":suite")
+	testSuite, ok := checkSuiteRequest(r,w)
+	if !ok {
+		return
+	}
+	
 	
 	
     
@@ -520,23 +603,19 @@ func (h *testSuiteAPIHandler) terminateContainer(id string, w http.ResponseWrite
 	}
 }
 
-func (h *testSuiteAPIHandler) newNode(w http.ResponseWriter, r *http.Request, logger log15.Logger, checkliveness bool, useTimeout bool) {
-	// A new node startup was requested, fetch any envvar overrides from simulators
-	r.ParseForm()
-	envs := make(map[string]string)
-	for key, vals := range r.Form {
-		envs[key] = vals[0]
-	}
+func  newNode(w http.ResponseWriter, envs map[string]string, r *http.Request,  checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool){
+
+	var ok bool
 
 	//the simulation controller needs to tell us now what client to run for the test
 	clientName, in := envs["CLIENT"]
 	if !in {
-		logger.Error("Missing client type", "error", nil)
+		log15.Error("Missing client type", "error", nil)
 		http.Error(w, "Missing client type", http.StatusBadRequest)
-		return
+		return nil,"",false
 	}
 
-	//default the loglevel to the simulator log level setting (different from the sysem log level setting)
+	//default the loglevel to the simulator log level setting (different from the system log level setting)
 	logLevel := *simloglevelFlag
 	logLevelString, in := envs["HIVE_LOGLEVEL"]
 	if !in {
@@ -544,43 +623,48 @@ func (h *testSuiteAPIHandler) newNode(w http.ResponseWriter, r *http.Request, lo
 	} else {
 		var err error
 		if logLevel, err = strconv.Atoi(logLevelString); err != nil {
-			logger.Error("Simulator client HIVE_LOGLEVEL is not an integer", "error", nil)
+			log15.Error("Simulator client HIVE_LOGLEVEL is not an integer", "error", nil)
+			http.Error(w, "HIVE_LOGLEVEL not an integer", http.StatusBadRequest)
+			return nil,"",false
 		}
 	}
-
 	//the simulation host may prevent or be unaware of the simulation controller's requested client
 	imageName, in := allClients[clientName]
 	if !in {
-		logger.Error("Unknown or forbidden client type", "error", nil)
+		log15.Error("Unknown or forbidden client type", "error", nil)
 		http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)
-		return
+		return nil,"",false
 	}
-
-	// Create and start the requested client container
-	logger.Debug("starting new client")
+	//create and start the requested client container
+	log15.Debug("starting new client")
 	container, err := createClientContainer(imageName,  envs)
 	if err != nil {
-		logger.Error("failed to create client", "error", err)
+		log15.Error("failed to create client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	containerID := container.ID[:8]
 	containerIP := ""
 	containerMAC := ""
-	logger = logger.New("client started with id", containerID)
-
-	logfile := fmt.Sprintf("client-%s.log", containerID)
-
-	waiter, err := runContainer(container.ID, logger, filepath.Join(h.logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), logfile), false, logLevel)
+	
+	//start a new client logger	
+	logger := log15.New("client started with id", containerID)
+	
+	logfile = filepath.Join(logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
+	//run the new client
+	waiter, err := runContainer(container.ID, logger, logfile, false, logLevel)
 	if err != nil {
 		logger.Error("failed to start client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil,"",false
 	}
 	go func() {
 		// Ensure the goroutine started by runContainer exits, so that
 		// its resources (e.g. the logfile it creates) can be garbage
 		// collected.
+
+		//TODO: add the timeout here
+
 		err := waiter.Wait()
 		if err == nil {
 			logger.Debug("client container finished cleanly")
@@ -621,21 +705,16 @@ func (h *testSuiteAPIHandler) newNode(w http.ResponseWriter, r *http.Request, lo
 
 		time.Sleep(100 * time.Millisecond)
 	}
-	h.lock.Lock()
-
-
-	// TODO - replace this with adding into the test case structure
-
-	// h.nodes[containerID] = &containerInfo{
-	// 	container:  container,
-	// 	name:       clientName,
-	// 	timeout:    time.Now().Add(dockerTimeoutDuration),
-	// 	useTimeout: useTimeout,
-	// }
-	h.lock.Unlock()
+	testClientInfo := &common.TestClientInfo{
+		ID: container.ID,
+		Name: clientName,
+		VersionInfo: "",
+		InstantiatedAt: time.Now(),
+		LogFile: logfile,
+	}
 	//  Container online and responsive, return its ID, IP and MAC for later reference
 	fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)
-	return
+	return &testClientInfo, containerID, true
 }
 
 

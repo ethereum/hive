@@ -327,7 +327,7 @@ func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, param
 	sim.RegisterNode(test, nodeID, &common.TestClientInfo{
 		ID:             nodeID,
 		Name:           leastUsed.ClientType,
-		VersionInfo:    "TODO",
+		VersionInfo:    "Local version",
 		InstantiatedAt: time.Now(),
 		LogFile:        "",
 	})
