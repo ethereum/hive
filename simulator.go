@@ -33,7 +33,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 	}
 
 	// Create a testcase manager
-	testManager=common.NewTestManager(*testResultsRoot,killNodeCallbackHandler)
+	testManager=common.NewTestManager(*testResultsRoot,killNodeHandler)
 
 	// Start the simulator HTTP API
 	simAPI, err := startTestSuiteAPI()
@@ -183,51 +183,35 @@ func startTestSuiteAPI() {
 }
 
 func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID,  bool) {
-
 	testSuiteString := request.URL.Query().Get(":suite")
-	
-
 	testSuite,err := strconv.Atoi(testSuiteString)
 	if err!=nil {
 		log15.Error("invalid test suite.")	
 		http.Error(w, "invalid test suite", http.StatusBadRequest)
 		return -1,false
 	}
-	
-
-	if 	!testManager.IsTestSuiteRunning(testSuite) ||
-	
+	if !testManager.IsTestSuiteRunning(testSuite) {
 			log15.Error("test suite not running")	
 			http.Error(w, "test suite not running", http.StatusBadRequest)
 			return -1,false
 	}
-	
 	return testSuite,true	
 } 
 
 func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.TestID,  bool) {
-
-	
 	testString := request.URL.Query().Get(":test")
-
-	
 	testCase,err := strconv.Atoi(testString)
 	if err!=nil {
 		log15.Error("invalid test case.")	
 		http.Error(w, "invalid test case", http.StatusBadRequest)
 		return -1,false
 	}
-
-	
 	if !testManager.IsTestRunning(testCase)	{
 			log15.Error("test case not running")	
 			http.Error(w, "test case not running", http.StatusBadRequest)
 			return -1,false
 	}
-	
 	return testCase,true	
-
-
 }
 
 // nodeInfoGet tries to execute the mandatory enode.sh , which returns the enode id
@@ -242,7 +226,7 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 	}
 	node := request.URL.Query().Get(":node")
 
-	nodeInfo, err:= testManager.GetNode(common.TestSuiteID(testSuite), common.TestID(testCase), node )
+	nodeInfo, err:= testManager.GetNodeInfo(common.TestSuiteID(testSuite), common.TestID(testCase), node )
 	if err!=nil {
 		log15.Errorf("unable to get node: %s", err.Error())
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -268,9 +252,9 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-    
 }
 
+//start a new node as part of a test 
 func nodeStart(w http.ResponseWriter, request *http.Request) {
 	testSuite, ok := checkSuiteRequest(r,w)
 	if !ok {
@@ -288,12 +272,13 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 	}
 	//TODO logdir
 	logdir:="C:\\mytests"
-	nodeInfo, nodeID, ok := newNode(w, envs, true, true, logdir)
+	nodeInfo, nodeID, ok := newNode(w, envs, allClients, true, true, logdir)
 	if ok {
 		testManager.RegisterNode(testCase,nodeID,nodeInfo)
 	}
-	
 }
+
+//start a pseudo client and register it as part of a test
 func pseudoStart(w http.ResponseWriter, request *http.Request) {
 	testSuite, ok := checkSuiteRequest(r,w)
 	if !ok {
@@ -303,8 +288,26 @@ func pseudoStart(w http.ResponseWriter, request *http.Request) {
 	if !ok {
 		return
 	}
-    
+	//TODO logdir
+	logdir:="C:\\mytests"
+	nodeInfo, nodeID, ok := newNode(w, envs, allPseudos, false, false, logdir)
+	if ok {
+		testManager.RegisterPseudo(testCase,nodeID,nodeInfo)
+	}
 }
+func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node string) error {
+	//attempt to get the client or pseudo
+	nodeInfo, err:= testManager.GetNodeInfo(testSuite, test, node )
+	if err!=nil {
+		log15.Errorf("unable to get node: %s", err.Error())
+		http.Error(w, err.Error(), http.StatusNotFound)
+	}
+	clientName:=nodeInfo.Name
+	containerID:= nodeInfo.ID //using the ID as 'container id'
+	err=terminateContainer(clientName,containerID)
+	return err
+}
+
 func nodeKill(w http.ResponseWriter, request *http.Request) {
 	testSuite, ok := checkSuiteRequest(r,w)
 	if !ok {
@@ -315,8 +318,12 @@ func nodeKill(w http.ResponseWriter, request *http.Request) {
 		return
 	}
 	node := request.URL.Query().Get(":node")
-	
-	
+	err:= killNodeHandler(testSuite,testCase,node)
+	if err!=nil {
+		msg:= fmt.Sprintf("unable to delete node: %s", err.Error())
+		log15.Error(msg)
+		http.Error(w, msg, http.StatusInternalServerError)
+	}
 }
 func testDelete(w http.ResponseWriter, request *http.Request) {
 	testSuite, ok := checkSuiteRequest(r,w)
@@ -327,35 +334,63 @@ func testDelete(w http.ResponseWriter, request *http.Request) {
 	if !ok {
 		return
 	}
-	
-    
+	err:=testManager.EndTest(testSuite,testCase)
+	if err!=nil {
+		msg:= fmt.Sprintf("unable to end test case: %s", err.Error())
+		log15.Error(msg)
+		http.Error(w, msg, http.StatusInternalServerError)
+	}
 }
+
+func parseForm(r *http.Request) map[string]string{
+	r.ParseForm()
+	dict := make(map[string]string)
+	for key, vals := range r.Form {
+		dict[key] = vals[0]
+	}
+	return dict
+}
+
 func testStart(w http.ResponseWriter, request *http.Request) {
 	testSuite, ok := checkSuiteRequest(r,w)
 	if !ok {
 		return
 	}
+	dict:= parseForm(request)
+	testID,err:=testManager.StartTest(testSuite,dict["name"],dict["description"])
+	if err!=nil {
+		msg:= fmt.Sprintf("unable to start test case: %s", err.Error())
+		log15.Error(msg)
+		http.Error(w, msg, http.StatusInternalServerError)
+	}
+	fmt.Fprintf(w, "%s", testID)
+}
+func suiteStart(w http.ResponseWriter, request *http.Request) {
 
-    
+	dict:= parseForm(request)
+	suiteID,err:=testManager.StartTestSuite(testSuite,dict["name"],dict["description"])
+	if err!=nil {
+		msg:= fmt.Sprintf("unable to start test case: %s", err.Error())
+		log15.Error(msg)
+		http.Error(w, msg, http.StatusInternalServerError)
+	}
+	fmt.Fprintf(w, "%s",suiteID)
 }
 func suiteEnd(w http.ResponseWriter, request *http.Request) {
 	testSuite, ok := checkSuiteRequest(r,w)
 	if !ok {
 		return
 	}
-	
-	
-	
-    
+	err:=testManager.EndTestSuite(testSuite)
+	if err!=nil {
+		msg:= fmt.Sprintf("unable to end test suite: %s", err.Error())
+		log15.Error(msg)
+		http.Error(w, msg, http.StatusInternalServerError)
+	}
 }
-func suiteStart(w http.ResponseWriter, request *http.Request) {
 
-	
-	
-    
-}
 func clients(w http.ResponseWriter, request *http.Request){
-
+	
 }
 
 // ServeHTTP handles all the simulator API requests and executes them.
@@ -521,14 +556,6 @@ func (h *testSuiteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 }
 
 
-//TODO: revisit :
-
-type containerInfo struct {
-	container  *docker.Container
-	name       string
-	timeout    time.Time
-	useTimeout bool
-}
 
 //TODO: revisit :
 
@@ -582,28 +609,14 @@ func (h *testSuiteAPIHandler) timeoutContainer(id string, w http.ResponseWriter)
 		}
 	}
 }
-
-// terminateContainer terminates a container. OBS! It assumes that the caller already holds h.lock
-func (h *testSuiteAPIHandler) terminateContainer(id string, w http.ResponseWriter) {
-	containerInfo, ok := h.nodes[id]
-	if !ok {
-		h.logger.Error("unknown client deletion requested", "id", id)
-		if w != nil {
-			http.Error(w, "not found", http.StatusNotFound)
-		}
-		return
-	}
-	delete(h.nodes, id)
-	h.logger.Debug("deleting client container", "id", id)
-	if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
-		h.logger.Error("failed to delete client ", "id", id, "error", err)
-		if w != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
+// terminate a docker container running a client or pseudo
+func terminateContainer(clientName string, containerID string) error {
+	log15.Debug("deleting client container", "name/id", clientName+"/"+containerID)
+	err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
+	return err
 }
 
-func  newNode(w http.ResponseWriter, envs map[string]string, r *http.Request,  checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool){
+func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]string , r *http.Request,  checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool){
 
 	var ok bool
 
@@ -629,7 +642,7 @@ func  newNode(w http.ResponseWriter, envs map[string]string, r *http.Request,  c
 		}
 	}
 	//the simulation host may prevent or be unaware of the simulation controller's requested client
-	imageName, in := allClients[clientName]
+	imageName, in := clients[clientName]
 	if !in {
 		log15.Error("Unknown or forbidden client type", "error", nil)
 		http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)

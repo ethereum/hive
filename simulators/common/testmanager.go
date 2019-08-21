@@ -17,6 +17,7 @@ type TestManager struct {
 	testCaseMutex     sync.Mutex
 	testSuiteMutex    sync.Mutex
 	nodeMutex         sync.Mutex
+	pseudoMutex       sync.Mutex
 	testSuiteCounter  uint32
 	testCaseCounter   uint32
 }
@@ -43,8 +44,8 @@ func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
 	return testCase, ok
 }
 
-// GetNode gets some node info belonging to some tests
-func (manager *TestManager) GetNode(testSuite TestSuiteID, test TestID, nodeID string) (*TestClientInfo, error) {
+// GetNodeInfo gets some info on a client or pseudo belonging to some test
+func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*TestClientInfo, error) {
 	manager.nodeMutex.Lock()
 	defer manager.nodeMutex.Unlock()
 
@@ -58,7 +59,10 @@ func (manager *TestManager) GetNode(testSuite TestSuiteID, test TestID, nodeID s
 	}
 	nodeInfo, ok := testCase.ClientInfo[nodeID]
 	if !ok {
-		return nil, ErrNoSuchNode
+		nodeInfo, ok = testCase.pseudoInfo[nodeID]
+		if !ok {
+			return nil, ErrNoSuchNode
+		}
 	}
 	return nodeInfo, nil
 }
@@ -179,4 +183,17 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 	return nil
 }
 
-//TODO - consider RegisterPseudo
+// RegisterPseudo is used by test suite hosts to register the creation of a node in the context of a test
+func (manager *TestManager) RegisterPseudo(testID TestID, nodeID string, nodeInfo *TestClientInfo) error {
+	manager.pseudoMutex.Lock()
+	defer manager.pseudoMutex.Unlock()
+
+	// Check if the test case is running
+	testCase, ok := manager.runningTestCases[testID]
+	if !ok {
+		return ErrNoSuchTestCase
+	}
+
+	testCase.pseudoInfo[nodeID] = nodeInfo
+	return nil
+}
