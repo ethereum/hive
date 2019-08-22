@@ -148,7 +148,7 @@ func startTestSuiteAPI() error {
 		log15.Error("failed to lookup bridge IP", "error", err)
 		return err
 	}
-	simListenerAddress = fmt.Sprintf("%s:0", bridge)
+
 	log15.Debug("docker bridge IP found", "ip", bridge)
 
 	// Serve connections until the listener is terminated
@@ -165,11 +165,20 @@ func startTestSuiteAPI() error {
 	mux.Post("/testsuite", suiteStart)
 	mux.Get("/clients", clientTypesGet)
 	// Start the API webserver for simulators to coordinate with
-	//	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
+	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
 	//	log15.Info(addr.String())
-	simListenerAddress = fmt.Sprintf("%s:0", bridge)
-	server = &http.Server{Addr: simListenerAddress, Handler: mux}
-	go server.ListenAndServe()
+	// simListenerAddress = fmt.Sprintf("%s:52000", bridge)
+
+	listener, err := net.ListenTCP("tcp4", addr)
+	if err != nil {
+		log15.Error("failed to listen on bridge adapter", "error", err)
+		return err
+	}
+	simListenerAddress = listener.Addr().String()
+	log15.Debug("listening for simulator commands", "ip", bridge, "port", listener.Addr().(*net.TCPAddr).Port)
+	server = &http.Server{Handler: mux}
+
+	go server.Serve(listener)
 
 	return nil
 }
