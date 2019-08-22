@@ -44,6 +44,34 @@ func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
 	return testCase, ok
 }
 
+// Terminate forces the termination of any running tests with
+// an error message. This can be called as a cleanup method.
+// If there are no running tests, there is no effect.
+func (manager *TestManager) Terminate() error {
+
+	terminationSummary := &TestResult{
+		Pass:    false,
+		Details: "Test was terminated by host",
+	}
+
+	for suiteID, suite := range manager.runningTestSuites {
+		for testID := range suite.TestCases {
+			_, in := manager.runningTestCases[testID]
+			if in {
+				//kill any running tests and ensure that the host is
+				//notified to clean up any resources (eg docker containers)
+				err := manager.EndTest(suiteID, testID, terminationSummary, nil)
+				if err != nil {
+					return err
+				}
+			}
+		}
+		//ensure the db is updated with results
+		manager.EndTestSuite(suiteID)
+	}
+	return nil
+}
+
 // GetNodeInfo gets some info on a client or pseudo belonging to some test
 func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*TestClientInfo, error) {
 	manager.nodeMutex.Lock()

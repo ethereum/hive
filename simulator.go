@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -18,12 +17,18 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
-var simListenerAddress string
-var testManager *common.TestManager
+var (
+	simListenerAddress string
+	testManager *common.TestManager
+	server *http.Server
+)
 
 
 // runSimulations runs each 'simulation' container, which are hosts for executing one or more test-suites
 func runSimulations(simulatorPattern string, overrides []string, cacher *buildCacher) error {
+	
+	// Clean up
+	defer terminateAndUpdate()
 
 	// Build all the simulators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
@@ -41,7 +46,6 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 		logger.Error("failed to start simulator API", "error", err)
 		return err
 	}
-	defer simApi.Close()
 
 	for simulator, simulatorImage := range simulators {
 		logger := log15.New("simulator", simulator)
@@ -64,13 +68,11 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 	return results, nil
 }
 
-// simulate starts a simulator service locally, starts a controlling container
-// and executes its commands until torn down. The exit status of the controller
-// container will signal whether the simulation passed or failed.
+// simulate runs a simulator container, which is a host for one or more testsuite 
+// runners. These communicate with this hive testsuite provider and host via
+// a client API to run testsuites and their testcases.
 func simulate(simDuration int, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string) error {
 	logger.Info(fmt.Fprintf("running client simulation: %s", simulatorLabel))
-
-
 
 	// Start the simulator controller container
 	logger.Debug("creating simulator container")
@@ -175,11 +177,10 @@ func startTestSuiteAPI() {
 	mux.Delete("/testsuite/{suite}",suiteEnd)
 	mux.Post("/testsuite", suiteStart)
 	mux.Get("/clients", clientTypesGet)
-	go CheckTimeout()
-	go http.ListenAndServe(addr, sim)
-	
+	server=&http.Server{Addr: addr, Handler: handler}
+	go server.ListenAndServe(addr, sim)
 
-	return sim, nil
+	return nil
 }
 
 func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID,  bool) {
@@ -295,6 +296,7 @@ func pseudoStart(w http.ResponseWriter, request *http.Request) {
 		testManager.RegisterPseudo(testCase,nodeID,nodeInfo)
 	}
 }
+
 func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node string) error {
 	//attempt to get the client or pseudo
 	nodeInfo, err:= testManager.GetNodeInfo(testSuite, test, node )
@@ -304,9 +306,12 @@ func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node stri
 	}
 	clientName:=nodeInfo.Name
 	containerID:= nodeInfo.ID //using the ID as 'container id'
-	err=terminateContainer(clientName,containerID)
+	log15.Debug("deleting client container", "name/id", clientName+"/"+containerID)
+	err = dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
 	return err
 }
+
+
 
 func nodeKill(w http.ResponseWriter, request *http.Request) {
 	testSuite, ok := checkSuiteRequest(r,w)
@@ -334,7 +339,7 @@ func testDelete(w http.ResponseWriter, request *http.Request) {
 	if !ok {
 		return
 	}
-	err:=testManager.EndTest(testSuite,testCase)
+	err:=testManager.EndTest(testSuite,testCase) //nb! endtest invokes the kill node handler indirectly
 	if err!=nil {
 		msg:= fmt.Sprintf("unable to end test case: %s", err.Error())
 		log15.Error(msg)
@@ -390,231 +395,17 @@ func suiteEnd(w http.ResponseWriter, request *http.Request) {
 }
 
 func clients(w http.ResponseWriter, request *http.Request){
-	
-}
-
-// ServeHTTP handles all the simulator API requests and executes them.
-func (h *testSuiteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	
-	log15.Debug("new simulator request", "from", r.RemoteAddr, "method", r.Method, "endpoint", r.URL.Path)
-
-	switch r.Method {
-	case "GET":
-		// Information retrieval, fetch whatever's needed and return it
-		switch {
-		case r.URL.Path == "/docker":
-			// Docker infos requested, gather and send them back
-			info, err := dockerClient.Info()
-			if err != nil {
-				logger.Error("failed to gather docker infos", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			out, _ := json.MarshalIndent(info, "", "  ")
-			fmt.Fprintf(w, "%s\n", out)
-
-		case strings.HasPrefix(r.URL.Path, "/nodes/"):
-			// Node IP retrieval requested
-			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
-			h.lock.Lock()
-			containerInfo, ok := h.nodes[id]
-			h.lock.Unlock()
-			if !ok {
-				logger.Error("unknown client requested", "id", id)
-				http.Error(w, "not found", http.StatusNotFound)
-				return
-			}
-			container, err := dockerClient.InspectContainer(containerInfo.container.ID)
-			if err != nil {
-				logger.Error("failed to inspect client", "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
-
-		case strings.HasPrefix(r.URL.Path, "/enodes/"):
-			
-			
-
-		case strings.HasPrefix(r.URL.Path, "/clients"):
-			w.Header().Set("Content-Type", "application/json")
-			clients := make([]string, 0, len(h.availableClients))
-			for client := range h.availableClients {
-				clients = append(clients, client)
-			}
-			json.NewEncoder(w).Encode(clients)
-
-		default:
-			http.Error(w, "not found", http.StatusNotFound)
-		}
-
-	case "POST":
-		// Data mutation, execute the request and return the results
-		switch r.URL.Path {
-		case "/nodes":
-
-			h.newNode(w, r, logger, h.availableClients, true, true)
-			return
-		case "/pseudos":
-
-			h.newNode(w, r, logger, h.availablePseudos, false, false)
-			return
-		case "/logs":
-			body, _ := ioutil.ReadAll(r.Body)
-			h.logger.Info("message from simulator", "log", string(body))
-
-		case "/subresults":
-			// Parse the subresult field into a hive struct
-			r.ParseMultipartForm(1024 * 1024)
-
-			success, err := strconv.ParseBool(r.Form.Get("success"))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-
-			//If there has been a failure, update the whole test result
-			//which at present means updating the result set for each
-			//known client. TODO: the output format should be
-			//re-arranged so that it is grouped first by test and then by client instance type
-			if !success {
-				for _, resultset := range h.result {
-					resultset[h.simulatorLabel].Success = false
-				}
-			}
-
-			nodeid := r.Form.Get("nodeid")
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-				return
-			}
-			var details json.RawMessage
-			if blob := r.Form.Get("details"); blob != "" {
-				if err := json.Unmarshal([]byte(blob), &details); err != nil {
-					http.Error(w, err.Error(), http.StatusBadRequest)
-					return
-				}
-			}
-			// If everything parsed correctly, append the subresult
-			h.lock.Lock()
-			containerInfo, exist := h.nodes[nodeid]
-			if !exist {
-				// Add an error even so
-				if containerInfo, exist := h.timedOutNodes[nodeid]; exist {
-					delete(h.timedOutNodes, nodeid)
-					res := h.result[containerInfo.name][h.simulatorLabel]
-					res.Subresults = append(res.Subresults, simulationSubresult{
-						Name:    r.Form.Get("name"),
-						Success: success,
-						Error:   fmt.Sprintf("%s (killed after timeout by Hive)", r.Form.Get("error")),
-						Details: details,
-					})
-				}
-				h.lock.Unlock()
-				http.Error(w, fmt.Sprintf("unknown node %v", nodeid), http.StatusBadRequest)
-				return
-			}
-			res := h.result[containerInfo.name][h.simulatorLabel]
-			res.Subresults = append(res.Subresults, simulationSubresult{
-				Name:    r.Form.Get("name"),
-				Success: success,
-				Error:   r.Form.Get("error"),
-				Details: details,
-			})
-			// Also terminate the container now
-			delete(h.nodes, nodeid)
-			logger.Debug("deleting client container", "id", nodeid)
-			h.lock.Unlock()
-			if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
-				logger.Error("failed to delete client ", "id", nodeid, "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-		default:
-			http.Error(w, "not found", http.StatusNotFound)
-		}
-
-	case "DELETE":
-		// Data deletion, execute the request and return the results
-		switch {
-		case strings.HasPrefix(r.URL.Path, "/nodes/"):
-			// Node deletion requested
-			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
-
-			h.lock.Lock()
-			h.terminateContainer(id, w)
-			h.lock.Unlock()
-
-		default:
-			http.Error(w, "not found", http.StatusNotFound)
-		}
-
-	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	w.Header().Set("Content-Type", "application/json")
+	clients := make([]string, 0, len(allClients))
+	for client := range allClients {
+		clients = append(clients, client)
 	}
+	json.NewEncoder(w).Encode(clients)
 }
 
 
 
-//TODO: revisit :
 
-// CheckTimeout is a goroutine that checks if the timeout has passed and stops
-// container if it has.
-func  CheckTimeout() {
-	for {
-		h.lock.Lock()
-		for id, cInfo := range h.nodes {
-
-			cont, err := dockerClient.InspectContainer(cInfo.container.ID)
-			if err != nil {
-				//container already gone
-				h.logger.Info("Container already deleted. ", "Container", cInfo.container.ID)
-			} else {
-				cInfo.container = cont
-				if !cInfo.container.State.Running || (time.Now().Sub(cInfo.timeout) >= 0 && cInfo.useTimeout) {
-
-					h.logger.Info("Timing out. ", "Running", cInfo.container.State.Running)
-					h.timeoutContainer(id, nil)
-
-					// remember this container, for when the subresult comes in later
-					h.timedOutNodes[id] = cInfo
-				}
-
-			}
-
-		}
-		h.lock.Unlock()
-		time.Sleep(timeoutCheckDuration)
-	}
-}
-
-// timeoutContainer terminates a container. OBS! It assumes that the caller already holds h.lock
-func (h *testSuiteAPIHandler) timeoutContainer(id string, w http.ResponseWriter) {
-	containerInfo, ok := h.nodes[id]
-
-	if !ok {
-		h.logger.Error("unknown client deletion requested", "id", id)
-		if w != nil {
-			http.Error(w, "not found", http.StatusNotFound)
-		}
-		return
-	}
-	delete(h.nodes, id)
-	h.logger.Debug("deleting client container on timeout", "id", id)
-	if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
-		h.logger.Error("failed to delete client ", "id", id, "error", err)
-		if w != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		}
-	}
-}
-// terminate a docker container running a client or pseudo
-func terminateContainer(clientName string, containerID string) error {
-	log15.Debug("deleting client container", "name/id", clientName+"/"+containerID)
-	err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
-	return err
-}
 
 func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]string , r *http.Request,  checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool){
 
@@ -731,17 +522,243 @@ func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]s
 }
 
 
-
-// Close terminates all running containers and tears down the API server.
-func (h *testSuiteAPIHandler) Close() {
+// terminates http server, any running tests, and updates the results
+// database
+func terminateAndUpdate() {
 	h.logger.Debug("terminating simulator server")
-	h.listener.Close()
 
-	for _, containerInfo := range h.nodes {
-		id := containerInfo.container.ID
-		h.logger.Debug("deleting client container", "id", id[:8])
-		if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: id, Force: true}); err != nil {
-			h.logger.Error("failed to delete client container", "id", id[:8], "error", err)
-		}
+	//NB! Kill this first to make sure no further testsuites are started
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := server.Shutdown(ctx); err != nil {
+		log15.Fatalf("Could not gracefully shutdown the server: %v\n", err)
 	}
+	// Cleanup any tests that might be still running and make sure
+	// the test results are updated with the fact that the 
+	// host terminated for those that were prematurely ended.
+	// NB!: this indirectly kills client containers. There is 
+	// no need for client container timeouts. 
+	if err = testManager.Terminate(); err!=nil {
+		log15.Fatalf("Could not terminate tests: %v\n", err)
+	}
+	
 }
+
+
+
+// ServeHTTP handles all the simulator API requests and executes them.
+// func (h *testSuiteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	
+// 	log15.Debug("new simulator request", "from", r.RemoteAddr, "method", r.Method, "endpoint", r.URL.Path)
+
+// 	switch r.Method {
+// 	case "GET":
+// 		// Information retrieval, fetch whatever's needed and return it
+// 		switch {
+// 		case r.URL.Path == "/docker":
+// 			// Docker infos requested, gather and send them back
+// 			info, err := dockerClient.Info()
+// 			if err != nil {
+// 				logger.Error("failed to gather docker infos", "error", err)
+// 				http.Error(w, err.Error(), http.StatusInternalServerError)
+// 				return
+// 			}
+// 			out, _ := json.MarshalIndent(info, "", "  ")
+// 			fmt.Fprintf(w, "%s\n", out)
+
+		// case strings.HasPrefix(r.URL.Path, "/nodes/"):
+		// 	// Node IP retrieval requested
+		// 	id := strings.TrimPrefix(r.URL.Path, "/nodes/")
+		// 	h.lock.Lock()
+		// 	containerInfo, ok := h.nodes[id]
+		// 	h.lock.Unlock()
+		// 	if !ok {
+		// 		logger.Error("unknown client requested", "id", id)
+		// 		http.Error(w, "not found", http.StatusNotFound)
+		// 		return
+		// 	}
+		// 	container, err := dockerClient.InspectContainer(containerInfo.container.ID)
+		// 	if err != nil {
+		// 		logger.Error("failed to inspect client", "error", err)
+		// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		// 		return
+		// 	}
+		// 	fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
+
+		// case strings.HasPrefix(r.URL.Path, "/enodes/"):
+			
+			
+
+		// case strings.HasPrefix(r.URL.Path, "/clients"):
+		// 	w.Header().Set("Content-Type", "application/json")
+		// 	clients := make([]string, 0, len(h.availableClients))
+		// 	for client := range h.availableClients {
+		// 		clients = append(clients, client)
+		// 	}
+		// 	json.NewEncoder(w).Encode(clients)
+
+		// default:
+		// 	http.Error(w, "not found", http.StatusNotFound)
+		// }
+
+// 	case "POST":
+// 		// Data mutation, execute the request and return the results
+// 		switch r.URL.Path {
+// 		case "/nodes":
+
+// 			h.newNode(w, r, logger, h.availableClients, true, true)
+// 			return
+// 		case "/pseudos":
+
+// 			h.newNode(w, r, logger, h.availablePseudos, false, false)
+// 			return
+// 		case "/logs":
+// 			body, _ := ioutil.ReadAll(r.Body)
+// 			h.logger.Info("message from simulator", "log", string(body))
+
+// 		case "/subresults":
+// 			// Parse the subresult field into a hive struct
+// 			r.ParseMultipartForm(1024 * 1024)
+
+// 			success, err := strconv.ParseBool(r.Form.Get("success"))
+// 			if err != nil {
+// 				http.Error(w, err.Error(), http.StatusBadRequest)
+// 				return
+// 			}
+
+// 			//If there has been a failure, update the whole test result
+// 			//which at present means updating the result set for each
+// 			//known client. TODO: the output format should be
+// 			//re-arranged so that it is grouped first by test and then by client instance type
+// 			if !success {
+// 				for _, resultset := range h.result {
+// 					resultset[h.simulatorLabel].Success = false
+// 				}
+// 			}
+
+// 			nodeid := r.Form.Get("nodeid")
+// 			if err != nil {
+// 				http.Error(w, err.Error(), http.StatusBadRequest)
+// 				return
+// 			}
+// 			var details json.RawMessage
+// 			if blob := r.Form.Get("details"); blob != "" {
+// 				if err := json.Unmarshal([]byte(blob), &details); err != nil {
+// 					http.Error(w, err.Error(), http.StatusBadRequest)
+// 					return
+// 				}
+// 			}
+// 			// If everything parsed correctly, append the subresult
+// 			h.lock.Lock()
+// 			containerInfo, exist := h.nodes[nodeid]
+// 			if !exist {
+// 				// Add an error even so
+// 				if containerInfo, exist := h.timedOutNodes[nodeid]; exist {
+// 					delete(h.timedOutNodes, nodeid)
+// 					res := h.result[containerInfo.name][h.simulatorLabel]
+// 					res.Subresults = append(res.Subresults, simulationSubresult{
+// 						Name:    r.Form.Get("name"),
+// 						Success: success,
+// 						Error:   fmt.Sprintf("%s (killed after timeout by Hive)", r.Form.Get("error")),
+// 						Details: details,
+// 					})
+// 				}
+// 				h.lock.Unlock()
+// 				http.Error(w, fmt.Sprintf("unknown node %v", nodeid), http.StatusBadRequest)
+// 				return
+// 			}
+// 			res := h.result[containerInfo.name][h.simulatorLabel]
+// 			res.Subresults = append(res.Subresults, simulationSubresult{
+// 				Name:    r.Form.Get("name"),
+// 				Success: success,
+// 				Error:   r.Form.Get("error"),
+// 				Details: details,
+// 			})
+// 			// Also terminate the container now
+// 			delete(h.nodes, nodeid)
+// 			logger.Debug("deleting client container", "id", nodeid)
+// 			h.lock.Unlock()
+// 			if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
+// 				logger.Error("failed to delete client ", "id", nodeid, "error", err)
+// 				http.Error(w, err.Error(), http.StatusInternalServerError)
+// 				return
+// 			}
+
+// 		default:
+// 			http.Error(w, "not found", http.StatusNotFound)
+// 		}
+
+// 	case "DELETE":
+// 		// Data deletion, execute the request and return the results
+// 		switch {
+// 		case strings.HasPrefix(r.URL.Path, "/nodes/"):
+// 			// Node deletion requested
+// 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
+
+// 			h.lock.Lock()
+// 			h.terminateContainer(id, w)
+// 			h.lock.Unlock()
+
+// 		default:
+// 			http.Error(w, "not found", http.StatusNotFound)
+// 		}
+
+// 	default:
+// 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+// 	}
+// }
+
+
+
+
+
+// CheckTimeout is a goroutine that checks if the timeout has passed and stops
+// container if it has.
+// func  CheckTimeout() {
+// 	for {
+// 		h.lock.Lock()
+// 		for id, cInfo := range h.nodes {
+
+// 			cont, err := dockerClient.InspectContainer(cInfo.container.ID)
+// 			if err != nil {
+// 				//container already gone
+// 				h.logger.Info("Container already deleted. ", "Container", cInfo.container.ID)
+// 			} else {
+// 				cInfo.container = cont
+// 				if !cInfo.container.State.Running || (time.Now().Sub(cInfo.timeout) >= 0 && cInfo.useTimeout) {
+
+// 					h.logger.Info("Timing out. ", "Running", cInfo.container.State.Running)
+// 					h.timeoutContainer(id, nil)
+
+// 					// remember this container, for when the subresult comes in later
+// 					h.timedOutNodes[id] = cInfo
+// 				}
+
+// 			}
+
+// 		}
+// 		h.lock.Unlock()
+// 		time.Sleep(timeoutCheckDuration)
+// 	}
+// }
+
+// // timeoutContainer terminates a container. OBS! It assumes that the caller already holds h.lock
+// func (h *testSuiteAPIHandler) timeoutContainer(id string, w http.ResponseWriter) {
+// 	containerInfo, ok := h.nodes[id]
+
+// 	if !ok {
+// 		h.logger.Error("unknown client deletion requested", "id", id)
+// 		if w != nil {
+// 			http.Error(w, "not found", http.StatusNotFound)
+// 		}
+// 		return
+// 	}
+// 	delete(h.nodes, id)
+// 	h.logger.Debug("deleting client container on timeout", "id", id)
+// 	if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
+// 		h.logger.Error("failed to delete client ", "id", id, "error", err)
+// 		if w != nil {
+// 			http.Error(w, err.Error(), http.StatusInternalServerError)
+// 		}
+// 	}
+// }
