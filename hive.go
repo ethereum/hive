@@ -85,8 +85,8 @@ func main() {
 		clientList[i] = strings.TrimSpace(clientList[i])
 	}
 	// Connect to the local docker daemon and make sure it works
-	dockerClient, err = docker.NewClient(*dockerEndpoint)
 	var err error
+	dockerClient, err = docker.NewClient(*dockerEndpoint)
 	if err != nil {
 		log15.Crit("failed to connect to docker deamon", "error", err)
 		return
@@ -108,6 +108,8 @@ func main() {
 		log15.Crit("failed to parse nocache regexp", "error", err)
 		return
 	}
+	//set up clients and get their versions
+	initClients(cacher)
 	// Depending on the flags, either run hive in place or in an outer container shell
 	var fail error
 	if *noShellContainer {
@@ -124,7 +126,7 @@ func main() {
 // host machine itself. This is usually the path executed within an outer shell
 // container, but can be also requested directly.
 func mainInHost(overrides []string, cacher *buildCacher) error {
-	results := resultSet{}
+	var err error
 
 	// create or use the specified rootpath
 	log15.Info("Creating output folder if necessary", "folder", *testResultsRoot)
@@ -135,12 +137,12 @@ func mainInHost(overrides []string, cacher *buildCacher) error {
 	// Run all testsuites
 	if *simulatorPattern != "" {
 		//TODO: review this DAG part
-		if err = makeGenesisDAG(dockerClient, cacher); err != nil {
+		if err = makeGenesisDAG(cacher); err != nil {
 			log15.Crit("failed generating DAG for simulations", "error", err)
 			return err
 		}
 		//execute testsuites
-		if err = runSimulations(dockerClient, *simulatorPattern, overrides, cacher); err != nil {
+		if err = runSimulations(*simulatorPattern, overrides, cacher); err != nil {
 			log15.Crit("failed to run simulations", "error", err)
 			return err
 		}
@@ -152,12 +154,12 @@ func mainInHost(overrides []string, cacher *buildCacher) error {
 
 // initClients builds any docker images needed and maps
 // client name_branchs
-func initClients() error {
+func initClients(cacher *buildCacher) error {
 	var err error
 	// Build all the clients that we need and make a map of
 	// names (eg: geth_master, in the format client_branch )
 	// against image names in the docker image name format
-	allClients, err = buildClients(dockerClient, clientList, cacher)
+	allClients, err = buildClients(clientList, cacher)
 	if err != nil {
 		log15.Crit("failed to build client images", "error", err)
 		return err
@@ -165,14 +167,15 @@ func initClients() error {
 	// Build all pseudo clients. pseudo-clients need to be available
 	// to simulators. pseudo-clients play the role of special types
 	// of actor in a network, such as network relay for example
-	allPseudos, err := buildPseudoClients(dockerClient, "pseudo", cacher)
+	allPseudos, err = buildPseudoClients("pseudo", cacher)
 	if err != nil {
 		log15.Crit("failed to build client images", "error", err)
 		return err
 	}
 	// Retrieve the version information of all clients being tested
-	if allClientVersions, err = fetchClientVersions(dockerClient, clientList, cacher); err != nil {
+	if allClientVersions, err = fetchClientVersions(cacher); err != nil {
 		log15.Crit("failed to retrieve client versions", "error", err)
 		return err
 	}
+	return nil
 }

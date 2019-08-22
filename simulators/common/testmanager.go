@@ -23,8 +23,8 @@ type TestManager struct {
 }
 
 // NewTestManager is a constructor returning a TestManager
-func NewTestManager(outputPath string, killNodeCallback func(testSuite TestSuiteID, test TestID, node string) error) TestManager {
-	return TestManager{
+func NewTestManager(outputPath string, killNodeCallback func(testSuite TestSuiteID, test TestID, node string) error) *TestManager {
+	return &TestManager{
 		OutputPath:        outputPath,
 		KillNodeCallback:  killNodeCallback,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -19,31 +20,30 @@ import (
 
 var (
 	simListenerAddress string
-	testManager *common.TestManager
-	server *http.Server
+	testManager        *common.TestManager
+	server             *http.Server
 )
-
 
 // runSimulations runs each 'simulation' container, which are hosts for executing one or more test-suites
 func runSimulations(simulatorPattern string, overrides []string, cacher *buildCacher) error {
-	
+
 	// Clean up
 	defer terminateAndUpdate()
 
 	// Build all the simulators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
-	simulators, err := buildSimulators(dockerClient, simulatorPattern, cacher)
+	simulators, err := buildSimulators(simulatorPattern, cacher)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Create a testcase manager
-	testManager=common.NewTestManager(*testResultsRoot,killNodeHandler)
+	testManager = common.NewTestManager(*testResultsRoot, killNodeHandler)
 
 	// Start the simulator HTTP API
-	simAPI, err := startTestSuiteAPI()
+	err = startTestSuiteAPI()
 	if err != nil {
-		logger.Error("failed to start simulator API", "error", err)
+		log15.Error("failed to start simulator API", "error", err)
 		return err
 	}
 
@@ -58,21 +58,21 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 		// Possible solution: list executions on a separate page, link from testsuites to executions where possible,
 		// and have the execution details including duration, hive logs, and sim logs displayed.
 		// logdir will be the execution folder. ie executiondir.
-
+		logdir := "C:\\mytests"
 		err = simulate(*simLimiterFlag, simulatorImage, simulator, overrides, logger, logdir)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 	}
-	return results, nil
+	return nil
 }
 
-// simulate runs a simulator container, which is a host for one or more testsuite 
+// simulate runs a simulator container, which is a host for one or more testsuite
 // runners. These communicate with this hive testsuite provider and host via
 // a client API to run testsuites and their testcases.
 func simulate(simDuration int, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string) error {
-	logger.Info(fmt.Fprintf("running client simulation: %s", simulatorLabel))
+	logger.Info(fmt.Sprintf("running client simulation: %s", simulatorLabel))
 
 	// Start the simulator controller container
 	logger.Debug("creating simulator container")
@@ -80,7 +80,7 @@ func simulate(simDuration int, simulator string, simulatorLabel string, override
 	sc, err := dockerClient.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: simulator,
-			Env: []string{"HIVE_SIMULATOR=http://" + sim.listener.Addr().String(),
+			Env: []string{"HIVE_SIMULATOR=http://" + simListenerAddress,
 				"HIVE_DEBUG=" + strconv.FormatBool(*hiveDebug),
 				"HIVE_PARALLELISM=" + fmt.Sprintf("%d", *simulatorParallelism),
 			},
@@ -140,96 +140,88 @@ func simulate(simDuration int, simulator string, simulatorLabel string, override
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI() {
+func startTestSuiteAPI() error {
 	// Find the IP address of the host container
 	log15.Debug("looking up docker bridge IP")
-	bridge, err := lookupBridgeIP(log15)
+	bridge, err := lookupBridgeIP(log15.Root())
 	if err != nil {
 		log15.Error("failed to lookup bridge IP", "error", err)
-		return nil, err
+		return err
 	}
-	simListenerAddress= fmt.Sprintf("%s:0", bridge)
+	simListenerAddress = fmt.Sprintf("%s:0", bridge)
 	log15.Debug("docker bridge IP found", "ip", bridge)
-	
-	
-	// Start the API webserver for simulators to coordinate with
-	
-//	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
-
-	// listener, err := net.ListenTCP("tcp4", addr)
-	// if err != nil {
-	// 	logger.Error("failed to listen on bridge adapter", "error", err)
-	// 	return nil, err
-	// }
-	
-	
 
 	// Serve connections until the listener is terminated
 	log15.Debug("starting simulator API server")
-	
+
 	var mux *pat.Router = pat.New()
 	mux.Get("/testsuite/{suite}/test/{test}/node/{node}", nodeInfoGet)
 	mux.Post("/testsuite/{suite}/test/{test}/node", nodeStart)
 	mux.Post("/testsuite/{suite}/test/{test}/pseudo", pseudoStart)
 	mux.Delete("/testsuite/{suite}/test/{test}/node/{node}", nodeKill)
 	mux.Post("/testsuite/{suite}/test/{test}", testDelete) //post because the delete http verb does not always support a message body
-	mux.Post("/testsuite/{suite}/test",testStart) 
-	mux.Delete("/testsuite/{suite}",suiteEnd)
+	mux.Post("/testsuite/{suite}/test", testStart)
+	mux.Delete("/testsuite/{suite}", suiteEnd)
 	mux.Post("/testsuite", suiteStart)
 	mux.Get("/clients", clientTypesGet)
-	server=&http.Server{Addr: addr, Handler: handler}
-	go server.ListenAndServe(addr, sim)
+	// Start the API webserver for simulators to coordinate with
+	//addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
+	simListenerAddress = fmt.Sprintf("%s:0", bridge)
+	server = &http.Server{Addr: simListenerAddress, Handler: mux}
+	go server.ListenAndServe()
 
 	return nil
 }
 
-func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID,  bool) {
+func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID, bool) {
 	testSuiteString := request.URL.Query().Get(":suite")
-	testSuite,err := strconv.Atoi(testSuiteString)
-	if err!=nil {
-		log15.Error("invalid test suite.")	
+	testSuite, err := strconv.Atoi(testSuiteString)
+	if err != nil {
+		log15.Error("invalid test suite.")
 		http.Error(w, "invalid test suite", http.StatusBadRequest)
-		return -1,false
+		return 0, false
 	}
-	if !testManager.IsTestSuiteRunning(testSuite) {
-			log15.Error("test suite not running")	
-			http.Error(w, "test suite not running", http.StatusBadRequest)
-			return -1,false
+	testSuiteID := common.TestSuiteID(testSuite)
+	if _, running := testManager.IsTestSuiteRunning(testSuiteID); !running {
+		log15.Error("test suite not running")
+		http.Error(w, "test suite not running", http.StatusBadRequest)
+		return 0, false
 	}
-	return testSuite,true	
-} 
+	return testSuiteID, true
+}
 
-func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.TestID,  bool) {
+func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.TestID, bool) {
 	testString := request.URL.Query().Get(":test")
-	testCase,err := strconv.Atoi(testString)
-	if err!=nil {
-		log15.Error("invalid test case.")	
+	testCase, err := strconv.Atoi(testString)
+	if err != nil {
+		log15.Error("invalid test case.")
 		http.Error(w, "invalid test case", http.StatusBadRequest)
-		return -1,false
+		return 0, false
 	}
-	if !testManager.IsTestRunning(testCase)	{
-			log15.Error("test case not running")	
-			http.Error(w, "test case not running", http.StatusBadRequest)
-			return -1,false
+	testCaseID := common.TestID(testCase)
+	if _, running := testManager.IsTestRunning(testCaseID); !running {
+		log15.Error("test case not running")
+		http.Error(w, "test case not running", http.StatusBadRequest)
+		return 0, false
 	}
-	return testCase,true	
+	return testCaseID, true
 }
 
 // nodeInfoGet tries to execute the mandatory enode.sh , which returns the enode id
 func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
-	testSuite, ok := checkSuiteRequest(r,w)
+	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
 	}
-	testCase, ok := checkTestRequest(r,w)
+	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return
 	}
 	node := request.URL.Query().Get(":node")
 
-	nodeInfo, err:= testManager.GetNodeInfo(common.TestSuiteID(testSuite), common.TestID(testCase), node )
-	if err!=nil {
-		log15.Errorf("unable to get node: %s", err.Error())
+	nodeInfo, err := testManager.GetNodeInfo(common.TestSuiteID(testSuite), common.TestID(testCase), node)
+	if err != nil {
+		log15.Error(fmt.Sprintf("unable to get node: %s", err.Error()))
 		http.Error(w, err.Error(), http.StatusNotFound)
 	}
 	exec, err := dockerClient.CreateExec(docker.CreateExecOptions{
@@ -255,99 +247,124 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 	}
 }
 
-//start a new node as part of a test 
+//start a new node as part of a test
 func nodeStart(w http.ResponseWriter, request *http.Request) {
-	testSuite, ok := checkSuiteRequest(r,w)
+	_, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
 	}
-	testCase, ok := checkTestRequest(r,w)
+	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return
 	}
 	// parse any envvar overrides from simulators
-	r.ParseForm()
+	request.ParseForm()
 	envs := make(map[string]string)
-	for key, vals := range r.Form {
+	for key, vals := range request.Form {
 		envs[key] = vals[0]
 	}
 	//TODO logdir
-	logdir:="C:\\mytests"
-	nodeInfo, nodeID, ok := newNode(w, envs, allClients, true, true, logdir)
+	logdir := "C:\\mytests"
+	nodeInfo, nodeID, ok := newNode(w, envs, allClients, request, true, true, logdir)
 	if ok {
-		testManager.RegisterNode(testCase,nodeID,nodeInfo)
+		testManager.RegisterNode(testCase, nodeID, nodeInfo)
 	}
 }
 
 //start a pseudo client and register it as part of a test
 func pseudoStart(w http.ResponseWriter, request *http.Request) {
-	testSuite, ok := checkSuiteRequest(r,w)
+	_, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
 	}
-	testCase, ok := checkTestRequest(r,w)
+	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return
+	}
+	// parse any envvar overrides from simulators
+	request.ParseForm()
+	envs := make(map[string]string)
+	for key, vals := range request.Form {
+		envs[key] = vals[0]
 	}
 	//TODO logdir
-	logdir:="C:\\mytests"
-	nodeInfo, nodeID, ok := newNode(w, envs, allPseudos, false, false, logdir)
+	logdir := "C:\\mytests"
+	nodeInfo, nodeID, ok := newNode(w, envs, allPseudos, request, false, false, logdir)
 	if ok {
-		testManager.RegisterPseudo(testCase,nodeID,nodeInfo)
+		testManager.RegisterPseudo(testCase, nodeID, nodeInfo)
 	}
 }
 
 func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node string) error {
 	//attempt to get the client or pseudo
-	nodeInfo, err:= testManager.GetNodeInfo(testSuite, test, node )
-	if err!=nil {
-		log15.Errorf("unable to get node: %s", err.Error())
-		http.Error(w, err.Error(), http.StatusNotFound)
+	nodeInfo, err := testManager.GetNodeInfo(testSuite, test, node)
+	if err != nil {
+		log15.Error(fmt.Sprintf("unable to get node: %s", err.Error()))
 	}
-	clientName:=nodeInfo.Name
-	containerID:= nodeInfo.ID //using the ID as 'container id'
+	clientName := nodeInfo.Name
+	containerID := nodeInfo.ID //using the ID as 'container id'
 	log15.Debug("deleting client container", "name/id", clientName+"/"+containerID)
 	err = dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
 	return err
 }
 
-
-
 func nodeKill(w http.ResponseWriter, request *http.Request) {
-	testSuite, ok := checkSuiteRequest(r,w)
+	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
 	}
-	testCase, ok := checkTestRequest(r,w)
+	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return
 	}
 	node := request.URL.Query().Get(":node")
-	err:= killNodeHandler(testSuite,testCase,node)
-	if err!=nil {
-		msg:= fmt.Sprintf("unable to delete node: %s", err.Error())
+	err := killNodeHandler(testSuite, testCase, node)
+	if err != nil {
+		msg := fmt.Sprintf("unable to delete node: %s", err.Error())
 		log15.Error(msg)
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
 }
 func testDelete(w http.ResponseWriter, request *http.Request) {
-	testSuite, ok := checkSuiteRequest(r,w)
+	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
 	}
-	testCase, ok := checkTestRequest(r,w)
+	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return
 	}
-	err:=testManager.EndTest(testSuite,testCase) //nb! endtest invokes the kill node handler indirectly
-	if err!=nil {
-		msg:= fmt.Sprintf("unable to end test case: %s", err.Error())
+	dict := parseForm(request)
+	summaryResultData, in := dict["summaryresult"]
+	if !in {
+		msg := fmt.Sprintf("missing summary result")
+		log15.Error(msg)
+		http.Error(w, msg, http.StatusBadRequest)
+	}
+	clientResultsData, crIn := dict["clientresults"] //clientResults are optional
+
+	var summaryResult common.TestResult
+	var clientResults map[string]*common.TestResult
+
+	err := json.Unmarshal([]byte(summaryResultData), &summaryResult)
+	if err != nil {
+		msg := fmt.Sprintf("summary result could not be unmarshalled")
+		log15.Error(msg)
+		http.Error(w, msg, http.StatusBadRequest)
+	}
+	if crIn {
+		json.Unmarshal([]byte(clientResultsData), &clientResults)
+	}
+
+	err = testManager.EndTest(testSuite, testCase, &summaryResult, clientResults) //nb! endtest invokes the kill node handler indirectly
+	if err != nil {
+		msg := fmt.Sprintf("unable to end test case: %s", err.Error())
 		log15.Error(msg)
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
 }
 
-func parseForm(r *http.Request) map[string]string{
+func parseForm(r *http.Request) map[string]string {
 	r.ParseForm()
 	dict := make(map[string]string)
 	for key, vals := range r.Form {
@@ -357,14 +374,14 @@ func parseForm(r *http.Request) map[string]string{
 }
 
 func testStart(w http.ResponseWriter, request *http.Request) {
-	testSuite, ok := checkSuiteRequest(r,w)
+	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
 	}
-	dict:= parseForm(request)
-	testID,err:=testManager.StartTest(testSuite,dict["name"],dict["description"])
-	if err!=nil {
-		msg:= fmt.Sprintf("unable to start test case: %s", err.Error())
+	dict := parseForm(request)
+	testID, err := testManager.StartTest(testSuite, dict["name"], dict["description"])
+	if err != nil {
+		msg := fmt.Sprintf("unable to start test case: %s", err.Error())
 		log15.Error(msg)
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
@@ -372,29 +389,29 @@ func testStart(w http.ResponseWriter, request *http.Request) {
 }
 func suiteStart(w http.ResponseWriter, request *http.Request) {
 
-	dict:= parseForm(request)
-	suiteID,err:=testManager.StartTestSuite(testSuite,dict["name"],dict["description"])
-	if err!=nil {
-		msg:= fmt.Sprintf("unable to start test case: %s", err.Error())
+	dict := parseForm(request)
+	suiteID, err := testManager.StartTestSuite(dict["name"], dict["description"])
+	if err != nil {
+		msg := fmt.Sprintf("unable to start test case: %s", err.Error())
 		log15.Error(msg)
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
-	fmt.Fprintf(w, "%s",suiteID)
+	fmt.Fprintf(w, "%s", suiteID)
 }
 func suiteEnd(w http.ResponseWriter, request *http.Request) {
-	testSuite, ok := checkSuiteRequest(r,w)
+	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
 	}
-	err:=testManager.EndTestSuite(testSuite)
-	if err!=nil {
-		msg:= fmt.Sprintf("unable to end test suite: %s", err.Error())
+	err := testManager.EndTestSuite(testSuite)
+	if err != nil {
+		msg := fmt.Sprintf("unable to end test suite: %s", err.Error())
 		log15.Error(msg)
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
 }
 
-func clients(w http.ResponseWriter, request *http.Request){
+func clientTypesGet(w http.ResponseWriter, request *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	clients := make([]string, 0, len(allClients))
 	for client := range allClients {
@@ -403,20 +420,14 @@ func clients(w http.ResponseWriter, request *http.Request){
 	json.NewEncoder(w).Encode(clients)
 }
 
-
-
-
-
-func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]string , r *http.Request,  checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool){
-
-	var ok bool
+func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]string, r *http.Request, checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool) {
 
 	//the simulation controller needs to tell us now what client to run for the test
 	clientName, in := envs["CLIENT"]
 	if !in {
 		log15.Error("Missing client type", "error", nil)
 		http.Error(w, "Missing client type", http.StatusBadRequest)
-		return nil,"",false
+		return nil, "", false
 	}
 
 	//default the loglevel to the simulator log level setting (different from the system log level setting)
@@ -429,7 +440,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]s
 		if logLevel, err = strconv.Atoi(logLevelString); err != nil {
 			log15.Error("Simulator client HIVE_LOGLEVEL is not an integer", "error", nil)
 			http.Error(w, "HIVE_LOGLEVEL not an integer", http.StatusBadRequest)
-			return nil,"",false
+			return nil, "", false
 		}
 	}
 	//the simulation host may prevent or be unaware of the simulation controller's requested client
@@ -437,30 +448,30 @@ func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]s
 	if !in {
 		log15.Error("Unknown or forbidden client type", "error", nil)
 		http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)
-		return nil,"",false
+		return nil, "", false
 	}
 	//create and start the requested client container
 	log15.Debug("starting new client")
-	container, err := createClientContainer(imageName,  envs)
+	container, err := createClientContainer(imageName, envs)
 	if err != nil {
 		log15.Error("failed to create client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, "", false
 	}
 	containerID := container.ID[:8]
 	containerIP := ""
 	containerMAC := ""
-	
-	//start a new client logger	
+
+	//start a new client logger
 	logger := log15.New("client started with id", containerID)
-	
-	logfile = filepath.Join(logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
+
+	logfile := filepath.Join(logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
 	//run the new client
 	waiter, err := runContainer(container.ID, logger, logfile, false, logLevel)
 	if err != nil {
 		logger.Error("failed to start client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return nil,"",false
+		return nil, "", false
 	}
 	go func() {
 		// Ensure the goroutine started by runContainer exits, so that
@@ -485,12 +496,12 @@ func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]s
 		if err != nil {
 			logger.Error("failed to inspect client", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return nil, "", false
 		}
 		if !container.State.Running {
 			logger.Error("client container terminated")
 			http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
-			return
+			return nil, "", false
 		}
 
 		containerIP = container.NetworkSettings.IPAddress
@@ -510,45 +521,42 @@ func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]s
 		time.Sleep(100 * time.Millisecond)
 	}
 	testClientInfo := &common.TestClientInfo{
-		ID: container.ID,
-		Name: clientName,
-		VersionInfo: "",
+		ID:             container.ID,
+		Name:           clientName,
+		VersionInfo:    "",
 		InstantiatedAt: time.Now(),
-		LogFile: logfile,
+		LogFile:        logfile,
 	}
 	//  Container online and responsive, return its ID, IP and MAC for later reference
 	fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)
-	return &testClientInfo, containerID, true
+	return testClientInfo, containerID, true
 }
-
 
 // terminates http server, any running tests, and updates the results
 // database
 func terminateAndUpdate() {
-	h.logger.Debug("terminating simulator server")
+	log15.Debug("terminating simulator server")
 
 	//NB! Kill this first to make sure no further testsuites are started
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		log15.Fatalf("Could not gracefully shutdown the server: %v\n", err)
+		log15.Error(fmt.Sprintf("Could not gracefully shutdown the server: %s", err.Error()))
 	}
 	// Cleanup any tests that might be still running and make sure
-	// the test results are updated with the fact that the 
+	// the test results are updated with the fact that the
 	// host terminated for those that were prematurely ended.
-	// NB!: this indirectly kills client containers. There is 
-	// no need for client container timeouts. 
-	if err = testManager.Terminate(); err!=nil {
-		log15.Fatalf("Could not terminate tests: %v\n", err)
+	// NB!: this indirectly kills client containers. There is
+	// no need for client container timeouts.
+	if err := testManager.Terminate(); err != nil {
+		log15.Error("Could not terminate tests: %s\n", err.Error())
 	}
-	
+
 }
-
-
 
 // ServeHTTP handles all the simulator API requests and executes them.
 // func (h *testSuiteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	
+
 // 	log15.Debug("new simulator request", "from", r.RemoteAddr, "method", r.Method, "endpoint", r.URL.Path)
 
 // 	switch r.Method {
@@ -566,40 +574,38 @@ func terminateAndUpdate() {
 // 			out, _ := json.MarshalIndent(info, "", "  ")
 // 			fmt.Fprintf(w, "%s\n", out)
 
-		// case strings.HasPrefix(r.URL.Path, "/nodes/"):
-		// 	// Node IP retrieval requested
-		// 	id := strings.TrimPrefix(r.URL.Path, "/nodes/")
-		// 	h.lock.Lock()
-		// 	containerInfo, ok := h.nodes[id]
-		// 	h.lock.Unlock()
-		// 	if !ok {
-		// 		logger.Error("unknown client requested", "id", id)
-		// 		http.Error(w, "not found", http.StatusNotFound)
-		// 		return
-		// 	}
-		// 	container, err := dockerClient.InspectContainer(containerInfo.container.ID)
-		// 	if err != nil {
-		// 		logger.Error("failed to inspect client", "error", err)
-		// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		// 		return
-		// 	}
-		// 	fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
+// case strings.HasPrefix(r.URL.Path, "/nodes/"):
+// 	// Node IP retrieval requested
+// 	id := strings.TrimPrefix(r.URL.Path, "/nodes/")
+// 	h.lock.Lock()
+// 	containerInfo, ok := h.nodes[id]
+// 	h.lock.Unlock()
+// 	if !ok {
+// 		logger.Error("unknown client requested", "id", id)
+// 		http.Error(w, "not found", http.StatusNotFound)
+// 		return
+// 	}
+// 	container, err := dockerClient.InspectContainer(containerInfo.container.ID)
+// 	if err != nil {
+// 		logger.Error("failed to inspect client", "error", err)
+// 		http.Error(w, err.Error(), http.StatusInternalServerError)
+// 		return
+// 	}
+// 	fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
 
-		// case strings.HasPrefix(r.URL.Path, "/enodes/"):
-			
-			
+// case strings.HasPrefix(r.URL.Path, "/enodes/"):
 
-		// case strings.HasPrefix(r.URL.Path, "/clients"):
-		// 	w.Header().Set("Content-Type", "application/json")
-		// 	clients := make([]string, 0, len(h.availableClients))
-		// 	for client := range h.availableClients {
-		// 		clients = append(clients, client)
-		// 	}
-		// 	json.NewEncoder(w).Encode(clients)
+// case strings.HasPrefix(r.URL.Path, "/clients"):
+// 	w.Header().Set("Content-Type", "application/json")
+// 	clients := make([]string, 0, len(h.availableClients))
+// 	for client := range h.availableClients {
+// 		clients = append(clients, client)
+// 	}
+// 	json.NewEncoder(w).Encode(clients)
 
-		// default:
-		// 	http.Error(w, "not found", http.StatusNotFound)
-		// }
+// default:
+// 	http.Error(w, "not found", http.StatusNotFound)
+// }
 
 // 	case "POST":
 // 		// Data mutation, execute the request and return the results
@@ -707,10 +713,6 @@ func terminateAndUpdate() {
 // 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 // 	}
 // }
-
-
-
-
 
 // CheckTimeout is a goroutine that checks if the timeout has passed and stops
 // container if it has.

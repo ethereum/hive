@@ -101,7 +101,7 @@ func generateInstance(config []byte) error {
 		hostProxy.KillNode,
 	)
 
-	hostProxy.TestManager = &testManager
+	hostProxy.TestManager = testManager
 
 	mapClients()
 	return nil

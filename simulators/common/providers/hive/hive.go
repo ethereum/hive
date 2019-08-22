@@ -80,7 +80,7 @@ func (sim *host) EndTest(testSuite common.TestSuiteID, test common.TestID, summa
 	}
 
 	vals := make(url.Values)
-	vals.Add("testcase", test.String())
+
 	vals.Add("summaryresult", string(summaryResultData))
 	vals.Add("clientresults", string(clientResultData))
 	_, err = wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s", sim.configuration.HostURI, testSuite.String(), test.String()), vals)

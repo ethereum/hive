@@ -53,37 +53,36 @@ func newBuildCacher(pattern string) (*buildCacher, error) {
 // within an all encompassing container.
 func buildShell(cacher *buildCacher) (string, error) {
 	image := hiveImageNamespace + "/shell"
-	return image, buildImage(dockerClient, image, "", ".", cacher, log15.Root(), "")
+	return image, buildImage(image, "", ".", cacher, log15.Root(), "")
 }
 
 // buildEthash builds the ethash DAG generator docker image to run before any real
 // simulation needing it takes place.
 func buildEthash(cacher *buildCacher) (string, error) {
 	image := hiveImageNamespace + "/internal/ethash"
-	return image, buildImage(dockerClient, image, "", filepath.Join("internal", "ethash"), cacher, log15.Root(), "")
+	return image, buildImage(image, "", filepath.Join("internal", "ethash"), cacher, log15.Root(), "")
 }
 
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
 func buildClients(clientList []string, cacher *buildCacher) (map[string]string, error) {
-	return buildListedImages(dockerClient, "clients", clientList, "client", cacher, false)
+	return buildListedImages("clients", clientList, "client", cacher, false)
 }
 
 // buildPseudoClients iterates over all the known pseudo-clients and builds a docker image for
 func buildPseudoClients(pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages(dockerClient, "pseudoclients", pattern, "pseudoclient", cacher, false)
+	return buildNestedImages("pseudoclients", pattern, "pseudoclient", cacher, false)
 }
 
 // fetchClientVersions downloads the version json specs from all clients that
 // match the given patten.
-func fetchClientVersions(clientList []string, cacher *buildCacher) (map[string]map[string]string, error) {
+func fetchClientVersions(cacher *buildCacher) (map[string]map[string]string, error) {
 
 	// Iterate over the images and collect the versions
 	versions := make(map[string]map[string]string)
-	for client, image := range clients {
+	for client, image := range allClients {
 		logger := log15.New("client", client)
-
-		blob, err := downloadFromImage(dockerClient, image, "/version.json", logger)
+		blob, err := downloadFromImage(image, "/version.json", logger)
 		if err != nil {
 			berr := &buildError{err: err, client: client}
 			return nil, berr
@@ -101,7 +100,7 @@ func fetchClientVersions(clientList []string, cacher *buildCacher) (map[string]m
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildSimulators(pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages(dockerClient, "simulators", pattern, "simulator", cacher, *simRootContext)
+	images, err := buildNestedImages("simulators", pattern, "simulator", cacher, *simRootContext)
 	return images, err
 }
 
@@ -152,7 +151,7 @@ func buildNestedImages(root string, pattern string, kind string, cacher *buildCa
 			image               = strings.Replace(filepath.Join(hiveImageNamespace, root, name), string(os.PathSeparator), "/", -1)
 			logger              = log15.New(kind, name)
 		)
-		if err := buildImage(dockerClient, image, "", context, cacher, logger, dockerfile); err != nil {
+		if err := buildImage(image, "", context, cacher, logger, dockerfile); err != nil {
 			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
 			return nil, berr
 		}
@@ -213,7 +212,7 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 			image                       = strings.Replace(filepath.Join(hiveImageNamespace, root, name), string(os.PathSeparator), "/", -1)
 			logger                      = log15.New(kind, name)
 		)
-		if err := buildImage(dockerClient, image, branch, context, cacher, logger, dockerfile); err != nil {
+		if err := buildImage(image, branch, context, cacher, logger, dockerfile); err != nil {
 			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
 			return nil, berr
 		}

@@ -106,7 +106,7 @@ func createEthashContainer(image string) (*docker.Container, error) {
 // A batch of environment variables may be specified to override from originating
 // from the tester image. This is useful in particular during simulations where
 // the tester itself can fine tune parameters for individual nodes.
-func createClientContainer(client string, overrideFiles []string, overrideEnvs map[string]string) (*docker.Container, error) {
+func createClientContainer(client string, overrideEnvs map[string]string) (*docker.Container, error) {
 	// Configure the client for ethash consumption
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -186,73 +186,73 @@ func uploadToContainer(dockerClient *docker.Client, id string, files []string) e
 	})
 }
 
-func copyFromTempContainer(srcContainer **docker.Container, dest, srcName string, path, target string, optional bool) error {
-	if *srcContainer == nil {
-		t, err := dockerClient.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: srcName}})
-		if err != nil {
-			return err
-		}
-		*srcContainer = t
-	}
+// func copyFromTempContainer(srcContainer **docker.Container, dest, srcName string, path, target string, optional bool) error {
+// 	if *srcContainer == nil {
+// 		t, err := dockerClient.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: srcName}})
+// 		if err != nil {
+// 			return err
+// 		}
+// 		*srcContainer = t
+// 	}
 
-	err := copyBetweenContainers(dockerClient, dest, (*srcContainer).ID, path, target, optional)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// 	err := copyBetweenContainers(dockerClient, dest, (*srcContainer).ID, path, target, optional)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // copyBetweenContainers copies a file from one docker container to another one.
-func copyBetweenContainers(dest, src string, path, target string, optional bool) error {
-	// If no path was specified, use the target as the default
-	if path == "" {
-		path = target
-	}
-	if path == "ignore" {
-		return nil
-	}
-	// Download a tarball of the file from the source container
-	download, upload := new(bytes.Buffer), new(bytes.Buffer)
-	if err := dockerClient.DownloadFromContainer(src, docker.DownloadFromContainerOptions{
-		Path:         path,
-		OutputStream: download,
-	}); err != nil {
-		// Check whether we're missing an optional file only
-		if err.(*docker.Error).Status == 404 && optional {
-			return nil
-		}
-		return err
-	}
-	// Rewrite all the paths in the tarball to the default ones
-	in, out := tar.NewReader(download), tar.NewWriter(upload)
-	for {
-		// Fetch the next file header from the download archive
-		header, err := in.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		// Rewrite the path and push into the upload archive
-		header.Name = strings.Replace(header.Name, path[1:], target[1:], -1)
-		if err := out.WriteHeader(header); err != nil {
-			return err
-		}
-		// Copy the file content over from the download to the upload archive
-		if _, err := io.Copy(out, in); err != nil {
-			return err
-		}
-	}
-	// Upload the tarball into the destination container
-	if err := dockerClient.UploadToContainer(dest, docker.UploadToContainerOptions{
-		InputStream: upload,
-		Path:        "/",
-	}); err != nil {
-		return err
-	}
-	return nil
-}
+// func copyBetweenContainers(dest, src string, path, target string, optional bool) error {
+// 	// If no path was specified, use the target as the default
+// 	if path == "" {
+// 		path = target
+// 	}
+// 	if path == "ignore" {
+// 		return nil
+// 	}
+// 	// Download a tarball of the file from the source container
+// 	download, upload := new(bytes.Buffer), new(bytes.Buffer)
+// 	if err := dockerClient.DownloadFromContainer(src, docker.DownloadFromContainerOptions{
+// 		Path:         path,
+// 		OutputStream: download,
+// 	}); err != nil {
+// 		// Check whether we're missing an optional file only
+// 		if err.(*docker.Error).Status == 404 && optional {
+// 			return nil
+// 		}
+// 		return err
+// 	}
+// 	// Rewrite all the paths in the tarball to the default ones
+// 	in, out := tar.NewReader(download), tar.NewWriter(upload)
+// 	for {
+// 		// Fetch the next file header from the download archive
+// 		header, err := in.Next()
+// 		if err == io.EOF {
+// 			break
+// 		}
+// 		if err != nil {
+// 			return err
+// 		}
+// 		// Rewrite the path and push into the upload archive
+// 		header.Name = strings.Replace(header.Name, path[1:], target[1:], -1)
+// 		if err := out.WriteHeader(header); err != nil {
+// 			return err
+// 		}
+// 		// Copy the file content over from the download to the upload archive
+// 		if _, err := io.Copy(out, in); err != nil {
+// 			return err
+// 		}
+// 	}
+// 	// Upload the tarball into the destination container
+// 	if err := dockerClient.UploadToContainer(dest, docker.UploadToContainerOptions{
+// 		InputStream: upload,
+// 		Path:        "/",
+// 	}); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // runContainer attaches to the output streams of an existing container, then
 // starts executing the container and returns the CloseWaiter to allow the caller
