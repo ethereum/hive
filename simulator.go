@@ -166,9 +166,6 @@ func startTestSuiteAPI() error {
 	mux.Get("/clients", clientTypesGet)
 	// Start the API webserver for simulators to coordinate with
 	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
-	//	log15.Info(addr.String())
-	// simListenerAddress = fmt.Sprintf("%s:52000", bridge)
-
 	listener, err := net.ListenTCP("tcp4", addr)
 	if err != nil {
 		log15.Error("failed to listen on bridge adapter", "error", err)
