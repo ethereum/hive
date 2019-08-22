@@ -165,7 +165,8 @@ func startTestSuiteAPI() error {
 	mux.Post("/testsuite", suiteStart)
 	mux.Get("/clients", clientTypesGet)
 	// Start the API webserver for simulators to coordinate with
-	//addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
+	//	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
+	//	log15.Info(addr.String())
 	simListenerAddress = fmt.Sprintf("%s:0", bridge)
 	server = &http.Server{Addr: simListenerAddress, Handler: mux}
 	go server.ListenAndServe()
@@ -209,6 +210,7 @@ func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.Test
 
 // nodeInfoGet tries to execute the mandatory enode.sh , which returns the enode id
 func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
+	log15.Info("Server - node info get")
 	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
@@ -249,6 +251,7 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 
 //start a new node as part of a test
 func nodeStart(w http.ResponseWriter, request *http.Request) {
+	log15.Info("Server - node start request")
 	_, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
@@ -273,6 +276,7 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 
 //start a pseudo client and register it as part of a test
 func pseudoStart(w http.ResponseWriter, request *http.Request) {
+	log15.Info("Server - pseudo start request")
 	_, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
@@ -309,6 +313,7 @@ func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node stri
 }
 
 func nodeKill(w http.ResponseWriter, request *http.Request) {
+	log15.Info("Server - node kill request")
 	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
@@ -326,6 +331,7 @@ func nodeKill(w http.ResponseWriter, request *http.Request) {
 	}
 }
 func testDelete(w http.ResponseWriter, request *http.Request) {
+	log15.Info("Server - test end request")
 	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
@@ -374,6 +380,7 @@ func parseForm(r *http.Request) map[string]string {
 }
 
 func testStart(w http.ResponseWriter, request *http.Request) {
+	log15.Info("Server - test start request")
 	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
@@ -388,7 +395,7 @@ func testStart(w http.ResponseWriter, request *http.Request) {
 	fmt.Fprintf(w, "%s", testID)
 }
 func suiteStart(w http.ResponseWriter, request *http.Request) {
-
+	log15.Info("Server - suites start request")
 	dict := parseForm(request)
 	suiteID, err := testManager.StartTestSuite(dict["name"], dict["description"])
 	if err != nil {
@@ -399,6 +406,7 @@ func suiteStart(w http.ResponseWriter, request *http.Request) {
 	fmt.Fprintf(w, "%s", suiteID)
 }
 func suiteEnd(w http.ResponseWriter, request *http.Request) {
+	log15.Info("Server - end suite request")
 	testSuite, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
@@ -412,6 +420,7 @@ func suiteEnd(w http.ResponseWriter, request *http.Request) {
 }
 
 func clientTypesGet(w http.ResponseWriter, request *http.Request) {
+	log15.Info("Server - client types request")
 	w.Header().Set("Content-Type", "application/json")
 	clients := make([]string, 0, len(allClients))
 	for client := range allClients {
@@ -477,8 +486,6 @@ func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]s
 		// Ensure the goroutine started by runContainer exits, so that
 		// its resources (e.g. the logfile it creates) can be garbage
 		// collected.
-
-		//TODO: add the timeout here
 
 		err := waiter.Wait()
 		if err == nil {
