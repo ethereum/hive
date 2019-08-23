@@ -161,6 +161,7 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 		Description: description,
 		Start:       time.Now(),
 		ClientInfo:  make(map[string]*TestClientInfo),
+		pseudoInfo:  make(map[string]*TestClientInfo),
 	}
 	// add the test case to the test suite
 	testSuite.TestCases[newCaseID] = newTestCase
@@ -184,14 +185,15 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 	if summaryResult == nil {
 		return ErrNoSummaryResult
 	}
+
+	for k := range testCase.ClientInfo {
+		manager.KillNodeCallback(testSuiteRun, testID, k)
+	}
 	// Add the results to the test case
 	testCase.End = time.Now()
 	testCase.SummaryResult = *summaryResult
 	testCase.ClientResults = clientResults
 	delete(manager.runningTestCases, testCase.ID)
-	for k := range testCase.ClientInfo {
-		manager.KillNodeCallback(testSuiteRun, testID, k)
-	}
 
 	return nil
 }

@@ -72,7 +72,11 @@ func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
 	if len(clients) > 0 {
 		summary.PrimaryClient = "Multiple"
 	} else {
-		summary.PrimaryClient = clients[0]
+		if len(clients) == 0 {
+			summary.PrimaryClient = "None"
+		} else {
+			summary.PrimaryClient = clients[0]
+		}
 	}
 	return summary
 }

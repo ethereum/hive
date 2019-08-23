@@ -310,6 +310,7 @@ func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node stri
 	nodeInfo, err := testManager.GetNodeInfo(testSuite, test, node)
 	if err != nil {
 		log15.Error(fmt.Sprintf("unable to get node: %s", err.Error()))
+		return err
 	}
 	clientName := nodeInfo.Name
 	containerID := nodeInfo.ID //using the ID as 'container id'
