@@ -108,7 +108,7 @@ func ClientTestRunner(t *testing.T, client string, testName string, testDescript
 			"CLIENT":        client,
 			"HIVE_BOOTNODE": "enode://158f8aab45f6d19c6cbf4a089c2670541a8da11978a2f90dbf6a502a4a3bab80d288afdbeb7ec0ef6d92de563767f3b1ea9e8e334ca711e9f8e2df5a0385e8e6@1.2.3.4:30303",
 		}
-		nodeID, ipAddr, macAddr, err := host.GetNode(testSuite, testID, parms)
+		nodeID, ipAddr, macAddr, err := host.GetNode(testSuite, testID, parms, nil)
 		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))

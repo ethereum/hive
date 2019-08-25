@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
@@ -106,7 +107,7 @@ func createEthashContainer(image string) (*docker.Container, error) {
 // A batch of environment variables may be specified to override from originating
 // from the tester image. This is useful in particular during simulations where
 // the tester itself can fine tune parameters for individual nodes.
-func createClientContainer(client string, overrideEnvs map[string]string) (*docker.Container, error) {
+func createClientContainer(client string, overrideEnvs map[string]string, files map[string]*multipart.FileHeader) (*docker.Container, error) {
 	// Configure the client for ethash consumption
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -134,11 +135,13 @@ func createClientContainer(client string, overrideEnvs map[string]string) (*dock
 		return nil, err
 	}
 
+	//
+
 	return c, nil
 }
 
 // uploadToContainer injects a batch of files into the target container.
-func uploadToContainer(dockerClient *docker.Client, id string, files []string) error {
+func uploadToContainer(dockerClient *docker.Client, id string, files map[string]multipart.FileHeader) error {
 	// Short circuit if there are no files to upload
 	if len(files) == 0 {
 		return nil
@@ -146,10 +149,10 @@ func uploadToContainer(dockerClient *docker.Client, id string, files []string) e
 	// Create a tarball archive with all the data files
 	tarball := new(bytes.Buffer)
 	tw := tar.NewWriter(tarball)
-
-	for _, path := range files {
+	//TODO - eventually we will want to use the key name to modify the file upload path
+	for _, fileHeader := range files {
 		// Fetch the next file to inject into the container
-		file, err := os.Open(path)
+		file, err := fileHeader.Open()
 		if err != nil {
 			return err
 		}
@@ -159,14 +162,10 @@ func uploadToContainer(dockerClient *docker.Client, id string, files []string) e
 		if err != nil {
 			return err
 		}
-		info, err := file.Stat()
-		if err != nil {
-			return err
-		}
 		// Insert the file into the tarball archive
 		header := &tar.Header{
-			Name: filepath.Base(file.Name()),
-			Mode: int64(info.Mode()),
+			Name: filepath.Base(fileHeader.Filename),
+			Mode: int64(0777),
 			Size: int64(len(data)),
 		}
 		if err := tw.WriteHeader(header); err != nil {

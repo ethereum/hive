@@ -229,7 +229,7 @@ func TestGetNode(t *testing.T) {
 		"CLIENT":                         "go-ethereum_master",
 		"HIVE_FORK_CONSTANTINOPLE_BLOCK": "10",
 	}
-	_, _, mac, err := host.GetNode(suite.ID, testCaseID, parms)
+	_, _, mac, err := host.GetNode(suite.ID, testCaseID, parms, nil)
 	if err != nil {
 		t.Fatalf("Unable to get a node from pre-supplied list: %s", err.Error())
 	}
@@ -243,7 +243,7 @@ func TestGetNode(t *testing.T) {
 	parms = map[string]string{
 		"CLIENT": "go-ethereum_master",
 	}
-	_, _, mac, err = host.GetNode(suite.ID, testCaseID, parms)
+	_, _, mac, err = host.GetNode(suite.ID, testCaseID, parms, nil)
 	if *mac != "00:0a:95:9d:68:16" {
 		t.Fatalf("Incorrect node supplied getting least used")
 	}
@@ -262,7 +262,7 @@ func TestGetClientEnode(t *testing.T) {
 		"CLIENT":                         "go-ethereum_master",
 		"HIVE_FORK_CONSTANTINOPLE_BLOCK": "10",
 	}
-	nodeID, _, _, err := host.GetNode(suite.ID, testCaseID, parms)
+	nodeID, _, _, err := host.GetNode(suite.ID, testCaseID, parms, nil)
 	if err != nil {
 		t.Fatalf("Test setup failed: unable to get a node from pre-supplied list: %s", err.Error())
 	}

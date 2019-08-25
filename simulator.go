@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -258,6 +259,7 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 //start a new node as part of a test
 func nodeStart(w http.ResponseWriter, request *http.Request) {
 	log15.Info("Server - node start request")
+
 	_, ok := checkSuiteRequest(request, w)
 	if !ok {
 		return
@@ -266,15 +268,50 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 	if !ok {
 		return
 	}
-	// parse any envvar overrides from simulators
-	request.ParseForm()
+	var err error
+	if err = request.ParseMultipartForm((1 << 10) * 4); nil != err {
+		log15.Error("Could not parse node request", "error", nil)
+		http.Error(w, "Could not parse node request", http.StatusBadRequest)
+		return
+	}
+
+	files := make(map[string]*multipart.FileHeader)
+	for key, fheaders := range request.MultipartForm.File {
+		if len(fheaders) > 0 {
+			files[key] = fheaders[0]
+		}
+
+		//for _, hdr := range fheaders {
+		// open uploaded
+		//	var infile multipart.File
+		// if infile, err = hdr.Open(); nil != err {
+		// 	log15.Error("Could not read file", "error", nil)
+		// 	http.Error(w, "Could not read file", http.StatusBadRequest)
+		// 	return
+		// }
+		// open destination
+		//   var outfile *os.File
+		//   if outfile, err = os.Create("./uploaded/" + hdr.Filename); nil != err {
+		// 	   status = http.StatusInternalServerError
+		// 	   return
+		//   }
+		//   // 32K buffer copy
+		//   var written int64
+		//   if written, err = io.Copy(outfile, infile); nil != err {
+		// 	   status = http.StatusInternalServerError
+		// 	   return
+		//   }
+		//   res.Write([]byte("uploaded file:" + hdr.Filename + ";length:" + strconv.Itoa(int(written))))
+
+	}
+
 	envs := make(map[string]string)
-	for key, vals := range request.Form {
+	for key, vals := range request.MultipartForm.Value {
 		envs[key] = vals[0]
 	}
 	//TODO logdir
 	logdir := "C:\\mytests"
-	nodeInfo, nodeID, ok := newNode(w, envs, allClients, request, true, true, logdir)
+	nodeInfo, nodeID, ok := newNode(w, envs, files, allClients, request, true, true, logdir)
 	if ok {
 		testManager.RegisterNode(testCase, nodeID, nodeInfo)
 	}
@@ -299,7 +336,7 @@ func pseudoStart(w http.ResponseWriter, request *http.Request) {
 	}
 	//TODO logdir
 	logdir := "C:\\mytests"
-	nodeInfo, nodeID, ok := newNode(w, envs, allPseudos, request, false, false, logdir)
+	nodeInfo, nodeID, ok := newNode(w, envs, nil, allPseudos, request, false, false, logdir)
 	if ok {
 		testManager.RegisterPseudo(testCase, nodeID, nodeInfo)
 	}
@@ -436,7 +473,7 @@ func clientTypesGet(w http.ResponseWriter, request *http.Request) {
 	json.NewEncoder(w).Encode(clients)
 }
 
-func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]string, r *http.Request, checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool) {
+func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*multipart.FileHeader, clients map[string]string, r *http.Request, checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool) {
 
 	//the simulation controller needs to tell us now what client to run for the test
 	clientName, in := envs["CLIENT"]
@@ -468,7 +505,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]s
 	}
 	//create and start the requested client container
 	log15.Debug("starting new client")
-	container, err := createClientContainer(imageName, envs)
+	container, err := createClientContainer(imageName, envs, files)
 	if err != nil {
 		log15.Error("failed to create client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -477,10 +514,10 @@ func newNode(w http.ResponseWriter, envs map[string]string, clients map[string]s
 	containerID := container.ID[:8]
 	containerIP := ""
 	containerMAC := ""
+	//and now initialise it with supplied files
 
 	//start a new client logger
 	logger := log15.New("client started with id", containerID)
-
 	logfile := filepath.Join(logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
 	//run the new client
 	waiter, err := runContainer(container.ID, logger, logfile, false, logLevel)

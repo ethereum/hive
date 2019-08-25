@@ -1,13 +1,16 @@
 package hive
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -154,13 +157,14 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 //returned client types from GetClientTypes
 //The input is used as environment variables in the new container
 //Returns container id and ip
-func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
-	vals := make(url.Values)
-	for k, v := range parameters {
-		vals.Add(k, v)
-	}
-	vals.Add("testcase", test.String())
-	data, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s/node", sim.configuration.HostURI, testSuite.String(), test.String()), vals)
+func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, *string, error) {
+	// vals := make(url.Values)
+	// for k, v := range parameters {
+	// 	vals.Add(k, v)
+	// }
+	//vals.Add("testcase", test.String())
+	//	parameters["testcase"] = test.String()
+	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%s/test/%s/node", sim.configuration.HostURI, testSuite.String(), test.String()), parameters, initFiles)
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -180,7 +184,7 @@ func (sim *host) GetPseudo(testSuite common.TestSuiteID, test common.TestID, par
 	for k, v := range parameters {
 		vals.Add(k, v)
 	}
-	vals.Add("testcase", test.String())
+	//vals.Add("testcase", test.String())
 	data, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s/pseudo", sim.configuration.HostURI, testSuite.String(), test.String()), vals)
 	if err != nil {
 		return "", nil, nil, err
@@ -199,6 +203,69 @@ func (sim *host) KillNode(testSuite common.TestSuiteID, test common.TestID, node
 	}
 	_, err = http.DefaultClient.Do(req)
 	return err
+}
+
+func postWithFiles(url string, values map[string]string, files map[string]string) (string, error) {
+	var err error
+	//make a dictionary of readers
+	formValues := make(map[string]io.Reader)
+	for key, s := range values {
+		formValues[key] = strings.NewReader(s)
+	}
+	for key, filename := range files {
+		filereader, err := os.Open(filename)
+		if err != nil {
+			return "", err
+		}
+		formValues[key] = filereader
+	}
+
+	//send them
+	var b bytes.Buffer
+	w := multipart.NewWriter(&b)
+	for key, r := range formValues {
+
+		var fw io.Writer
+		if x, ok := r.(io.Closer); ok {
+			defer x.Close()
+		}
+		if x, ok := r.(*os.File); ok {
+			if fw, err = w.CreateFormFile(key, x.Name()); err != nil {
+				return "", err
+			}
+		} else {
+			if fw, err = w.CreateFormField(key); err != nil {
+				return "", err
+			}
+		}
+		if _, err = io.Copy(fw, r); err != nil {
+			return "", err
+		}
+	}
+	// this must be closed or the request will be missing the terminating boundary
+	w.Close()
+
+	// Can't use http.PostForm because we need to change the content header
+	req, err := http.NewRequest("POST", url, &b)
+	if err != nil {
+		return "", err
+	}
+	// Set the content type, this will contain the boundary.
+	req.Header.Set("Content-Type", w.FormDataContentType())
+
+	// Submit the request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	if resp.StatusCode >= 200 && resp.StatusCode <= 300 {
+		return string(body), nil
+	}
+	return "", fmt.Errorf("request failed (%d): %v", resp.StatusCode, string(body))
 }
 
 // wrapHttpErrorsPost wraps http.PostForm to convert responses that are not 200 OK into errors

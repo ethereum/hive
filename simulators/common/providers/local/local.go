@@ -288,9 +288,9 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 // If there are multiple nodes, they will be selected round-robin
 // Returns node id, ip, mac
 // The node is registered as being part of the test.
-func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
+func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, *string, error) {
 
-	//removed nodemutex lock
+	//initFiles ignored in local
 
 	client, ok := parameters["CLIENT"]
 	if !ok {

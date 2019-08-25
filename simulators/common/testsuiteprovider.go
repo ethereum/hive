@@ -41,8 +41,9 @@ type TestSuiteHost interface {
 	//One parameter must be named CLIENT and should contain one of the
 	//returned client types from GetClientTypes
 	//The input is used as environment variables in the new container
+	//initFiles is a dictionary of initialising files (eg: chain.rlp, blocks, genesis etc).
 	//Returns container id, ip and mac
-	GetNode(testSuite TestSuiteID, test TestID, parameters map[string]string) (string, net.IP, *string, error)
+	GetNode(testSuite TestSuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, *string, error)
 	//GetPseudo gets a new (or pre-supplied) pseudo-client with the specified parameters
 	//One parameter must be named CLIENT
 	//The input is used as environment variables in the new container
