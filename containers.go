@@ -135,13 +135,14 @@ func createClientContainer(client string, overrideEnvs map[string]string, files 
 		return nil, err
 	}
 
-	//
+	//now upload files
+	uploadToContainer(c.ID, files)
 
 	return c, nil
 }
 
 // uploadToContainer injects a batch of files into the target container.
-func uploadToContainer(dockerClient *docker.Client, id string, files map[string]multipart.FileHeader) error {
+func uploadToContainer(id string, files map[string]*multipart.FileHeader) error {
 	// Short circuit if there are no files to upload
 	if len(files) == 0 {
 		return nil

@@ -112,11 +112,13 @@ func TestSyncsWithGeth(t *testing.T) {
 		//and load the genesis without a chain
 		mainParms := map[string]string{
 			"CLIENT":                  availableClients[firstGeth],
-			"HIVE_INIT_GENESIS":       "/simplechain/genesis.json",
 			"HIVE_USE_GENESIS_CONFIG": "1",
 			"HIVE_NODETYPE":           "full", //fast sync
 		}
-		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms)
+		mainFiles := map[string]string{
+			"HIVE_INIT_GENESIS": "/simplechain/genesis.json",
+		}
+		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms, mainFiles)
 		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
@@ -131,9 +133,8 @@ func TestSyncsWithGeth(t *testing.T) {
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node
 				parms := map[string]string{
-					"CLIENT":              clientType,
-					"HIVE_INIT_GENESIS":   "/simplechain/genesis.json",
-					"HIVE_INIT_CHAIN":     "/simplechain/chain.rlp",
+					"CLIENT": clientType,
+
 					"HIVE_NETWORK_ID":     "1",
 					"HIVE_CHAIN_ID":       "1",
 					"HIVE_FORK_HOMESTEAD": "0",
@@ -143,7 +144,11 @@ func TestSyncsWithGeth(t *testing.T) {
 					//	"HIVE_FORK_DAO_BLOCK": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
-				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms)
+				files := map[string]string{
+					"HIVE_INIT_GENESIS": "/simplechain/genesis.json",
+					"HIVE_INIT_CHAIN":   "/simplechain/chain.rlp",
+				}
+				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms, files)
 				if err != nil {
 					summaryResult.Pass = false
 					summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))
@@ -189,19 +194,30 @@ func TestSyncsWithGeth(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Unable to start test: %s", err.Error())
 		}
-
-		//and load the genesis + chain
-		mainParms := map[string]string{
-			"CLIENT":                  availableClients[firstGeth],
-			"HIVE_INIT_GENESIS":       "/simplechain/genesis.json",
-			"HIVE_INIT_CHAIN":         "/simplechain/chain.rlp",
-			"HIVE_USE_GENESIS_CONFIG": "1",
-		}
-
+		// declare empty test results
 		var summaryResult common.TestResult
 		summaryResult.Pass = true
 		clientResults := make(common.TestClientResults)
-		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms)
+		//make sure the test ends
+		defer func() {
+			host.EndTest(testSuite, testID, &summaryResult, clientResults)
+			//send test failures to standard outputs too
+			if !summaryResult.Pass {
+				t.Errorf("Test failed %s", summaryResult.Details)
+			}
+		}()
+		//and load the genesis + chain
+		mainParms := map[string]string{
+			"CLIENT":                  availableClients[firstGeth],
+			"HIVE_USE_GENESIS_CONFIG": "1",
+		}
+
+		mainFiles := map[string]string{
+			"HIVE_INIT_GENESIS": "/simplechain/genesis.json",
+			"HIVE_INIT_CHAIN":   "/simplechain/chain.rlp",
+		}
+
+		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms, mainFiles)
 		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
@@ -221,8 +237,8 @@ func TestSyncsWithGeth(t *testing.T) {
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node with genesis and no chain
 				parms := map[string]string{
-					"CLIENT":              clientType,
-					"HIVE_INIT_GENESIS":   "/simplechain/genesis.json",
+					"CLIENT": clientType,
+
 					"HIVE_NETWORK_ID":     "1",
 					"HIVE_CHAIN_ID":       "1",
 					"HIVE_FORK_HOMESTEAD": "0",
@@ -232,7 +248,12 @@ func TestSyncsWithGeth(t *testing.T) {
 					//	"HIVE_FORK_DAO_BLOCK": "0",
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
-				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms)
+
+				files := map[string]string{
+					"HIVE_INIT_GENESIS": "/simplechain/genesis.json",
+				}
+
+				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms, files)
 				if err != nil {
 					summaryResult.Pass = false
 					summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))

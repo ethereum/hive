@@ -21,6 +21,7 @@ RUN (git clone -b master https://github.com/fsouza/go-dockerclient /go/src/githu
 RUN (cd /go/src/github.com/fsouza/go-dockerclient && GOPATH=/go go get)
 
 RUN go get -u -v github.com/derekparker/delve/cmd/dlv
+RUN go get -u -v github.com/google/uuid
 
 #RUN (cd / && GOPATH=/go go get github.com/fsouza/go-dockerclient)
 
