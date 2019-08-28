@@ -22,6 +22,7 @@
 #  - HIVE_FORK_BYZANTIUM block number for Byzantium transition
 #  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
 #  - HIVE_FORK_PETERSBURG  block number for ConstantinopleFix/PetersBurg transition
+#  - HIVE_FORK_ISTANBUL  block number for Istanbul transition
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW       If set, skip PoW verification during block import
@@ -100,6 +101,9 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 	fi
 	if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"
+	fi
+	if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"istanbulBlock\": $HIVE_FORK_ISTANBUL}"
 	fi
 	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
 	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
