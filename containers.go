@@ -150,8 +150,8 @@ func uploadToContainer(id string, files map[string]*multipart.FileHeader) error 
 	// Create a tarball archive with all the data files
 	tarball := new(bytes.Buffer)
 	tw := tar.NewWriter(tarball)
-	//TODO - eventually we will want to use the key name to modify the file upload path
-	for _, fileHeader := range files {
+
+	for fileName, fileHeader := range files {
 		// Fetch the next file to inject into the container
 		file, err := fileHeader.Open()
 		if err != nil {
@@ -165,7 +165,7 @@ func uploadToContainer(id string, files map[string]*multipart.FileHeader) error 
 		}
 		// Insert the file into the tarball archive
 		header := &tar.Header{
-			Name: filepath.Base(fileHeader.Filename),
+			Name: fileName, //filepath.Base(fileHeader.Filename),
 			Mode: int64(0777),
 			Size: int64(len(data)),
 		}

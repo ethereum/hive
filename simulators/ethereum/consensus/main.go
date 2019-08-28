@@ -241,33 +241,35 @@ func toGethGenesis(test *btJSON) *core.Genesis {
 	return genesis
 }
 
-func (t *testcase) artefacts() (string, string, string, error) {
-
+func (t *testcase) artefacts() (string, string, string, []string, error) {
+	var blocks []string
 	key := fmt.Sprintf("%x", sha1.Sum([]byte(fmt.Sprintf("%s%s", t.filepath, t.name))))
-	blockFolder := fmt.Sprintf("./%s/blocks", key)
+	rootFolder := fmt.Sprintf("./%s/", key)
+	blockFolder := fmt.Sprintf("%s/blocks", rootFolder)
 
 	if err := os.Mkdir(fmt.Sprintf("./%s", key), 0700); err != nil {
-		return "", "", "", err
+		return "", "", "", nil, err
 	}
 	if err := os.Mkdir(blockFolder, 0700); err != nil {
-		return "", "", "", err
+		return "", "", "", nil, err
 	}
 	genesis := toGethGenesis(&(t.blockTest.json))
 	genBytes, _ := json.Marshal(genesis)
 	genesisFile := fmt.Sprintf("./%v/genesis.json", key)
 	if err := ioutil.WriteFile(genesisFile, genBytes, 0777); err != nil {
-		return "", "", "", fmt.Errorf("failed writing genesis: %v", err)
+		return "", "", "", nil, fmt.Errorf("failed writing genesis: %v", err)
 	}
 
 	for i, block := range t.blockTest.json.Blocks {
 		rlpdata := common2.FromHex(block.Rlp)
 		fname := fmt.Sprintf("%s/%04d.rlp", blockFolder, i+1)
+		blocks = append(blocks, fname)
 		if err := ioutil.WriteFile(fname, rlpdata, 0777); err != nil {
-			return "", "", "", fmt.Errorf("failed writing block %d: %v", i, err)
+			return "", "", "", nil, fmt.Errorf("failed writing block %d: %v", i, err)
 		}
 	}
 	//log.Info("Test artefacts", "testname", t.name, "testfile", t.filepath, "blockfolder", blockFolder)
-	return genesisFile, "", blockFolder, nil
+	return rootFolder, genesisFile, "", blocks, nil
 }
 
 func (t *testcase) verifyGenesis(got []byte) error {
@@ -297,7 +299,7 @@ func (be *blocktestExecutor) run(testChan chan *testcase) {
 }
 
 func (be *blocktestExecutor) runTest(t *testcase) error {
-	// get the artefacts
+
 	log.Info("Starting test", "name", t.name, "file", t.filepath)
 	start := time.Now()
 	testname := fmt.Sprintf("%s:%s", t.filepath, t.name)
@@ -321,7 +323,8 @@ func (be *blocktestExecutor) runTest(t *testcase) error {
 	}
 	defer done()
 
-	genesis, _, blocks, err := t.artefacts()
+	root, genesis, _, blocks, err := t.artefacts()
+	genesisTarget := strings.Replace(genesis, root, "", 1)
 	if err != nil {
 		return err
 	}
@@ -330,9 +333,18 @@ func (be *blocktestExecutor) runTest(t *testcase) error {
 		"HIVE_FORK_DAO_VOTE": "1",
 	}
 	files := map[string]string{
-		"HIVE_INIT_GENESIS": genesis,
-		"HIVE_INIT_CHAIN":   blocks,
+		genesisTarget: genesis,
 	}
+
+
+	for _, filename := range blocks {
+		fileTarget := strings.Replace(filename, root, "", 1)
+		files[fileTarget] = filename
+	}
+
+
+	
+
 	// update the parameters with test-specific stuff
 	t.updateEnv(env)
 	t1 := time.Now()
