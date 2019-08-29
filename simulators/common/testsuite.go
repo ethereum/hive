@@ -55,15 +55,17 @@ func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
 	}
 
 	pass := true
+	primaryName := ""
 	earliest := time.Now()
-	clients := make([]string, 0)
+	clients := make(map[string]bool, 0)
 	for _, testCase := range testSuite.TestCases {
 		pass = pass && testCase.SummaryResult.Pass
 		if testCase.Start.Before(earliest) {
 			earliest = testCase.Start
 		}
 		for _, clientInfo := range testCase.ClientInfo {
-			clients = append(clients, clientInfo.Name)
+			clients[clientInfo.Name] = true
+			primaryName = clientInfo.Name
 		}
 	}
 	summary.Pass = pass
@@ -75,7 +77,8 @@ func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
 		if len(clients) == 0 {
 			summary.PrimaryClient = "None"
 		} else {
-			summary.PrimaryClient = clients[0]
+
+			summary.PrimaryClient = primaryName
 		}
 	}
 	return summary

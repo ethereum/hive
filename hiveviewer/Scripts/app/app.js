@@ -261,7 +261,7 @@ function calcFineDuration(duration) {
     var ret = ""
     var hours = 0;
     
-    if (duration.minutes() > 0 || duration.hours()>0) { ret = ret + duration.minutes()+(durations.hours()*60) + "min "; }
+    if (duration.minutes() > 0 || duration.hours()>0) { ret = ret + duration.minutes()+(duration.hours()*60) + "min "; }
     ret = ret + duration.seconds() + "s ";
     ret = ret + duration.milliseconds() + "ms ";
     
