@@ -36,6 +36,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"Homestead": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -45,6 +46,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"EIP150": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -54,6 +56,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"EIP158": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -63,6 +66,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"Byzantium": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -72,6 +76,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      0,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"Constantinople": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -81,6 +86,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      0,
 		"HIVE_FORK_CONSTANTINOPLE": 0,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"ConstantinopleFix": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -90,6 +96,17 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      0,
 		"HIVE_FORK_CONSTANTINOPLE": 0,
 		"HIVE_FORK_PETERSBURG":     0,
+		"HIVE_FORK_ISTANBUL":       2000,
+	},
+	"Istanbul": {
+		"HIVE_FORK_HOMESTEAD":      0,
+		"HIVE_FORK_TANGERINE":      0,
+		"HIVE_FORK_SPURIOUS":       0,
+		"HIVE_FORK_DAO_BLOCK":      2000,
+		"HIVE_FORK_BYZANTIUM":      0,
+		"HIVE_FORK_CONSTANTINOPLE": 0,
+		"HIVE_FORK_PETERSBURG":     0,
+		"HIVE_FORK_ISTANBUL":       0,
 	},
 	"FrontierToHomesteadAt5": {
 		"HIVE_FORK_HOMESTEAD":      5,
@@ -99,6 +116,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"HomesteadToEIP150At5": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -108,6 +126,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"HomesteadToDaoAt5": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -117,6 +136,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"EIP158ToByzantiumAt5": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -126,6 +146,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      5,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"ByzantiumToConstantinopleAt5": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -135,6 +156,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      0,
 		"HIVE_FORK_CONSTANTINOPLE": 5,
 		"HIVE_FORK_PETERSBURG":     2000,
+		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"ByzantiumToConstantinopleFixAt5": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -144,6 +166,17 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BYZANTIUM":      0,
 		"HIVE_FORK_CONSTANTINOPLE": 5,
 		"HIVE_FORK_PETERSBURG":     5,
+		"HIVE_FORK_ISTANBUL":       2000,
+	},
+	"ConstantinopleFixToIstanbulAt5": {
+		"HIVE_FORK_HOMESTEAD":      0,
+		"HIVE_FORK_TANGERINE":      0,
+		"HIVE_FORK_SPURIOUS":       0,
+		"HIVE_FORK_DAO_BLOCK":      2000,
+		"HIVE_FORK_BYZANTIUM":      0,
+		"HIVE_FORK_CONSTANTINOPLE": 0,
+		"HIVE_FORK_PETERSBURG":     0,
+		"HIVE_FORK_ISTANBUL":       5,
 	},
 }
 
