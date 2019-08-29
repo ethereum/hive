@@ -336,15 +336,10 @@ func (be *blocktestExecutor) runTest(t *testcase) error {
 		genesisTarget: genesis,
 	}
 
-
 	for _, filename := range blocks {
 		fileTarget := strings.Replace(filename, root, "", 1)
 		files[fileTarget] = filename
 	}
-
-
-	
-
 	// update the parameters with test-specific stuff
 	t.updateEnv(env)
 	t1 := time.Now()

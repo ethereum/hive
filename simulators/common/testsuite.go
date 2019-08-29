@@ -69,7 +69,7 @@ func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
 	summary.Pass = pass
 	summary.Start = earliest
 	//if the test was for a single client, indicate it
-	if len(clients) > 0 {
+	if len(clients) > 1 {
 		summary.PrimaryClient = "Multiple"
 	} else {
 		if len(clients) == 0 {
