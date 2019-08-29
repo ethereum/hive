@@ -518,7 +518,9 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 
 	//start a new client logger
 	logger := log15.New("client started with id", containerID)
-	logfile := filepath.Join(logdir, strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
+	logfileRelative := filepath.Join(strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
+	logfile := filepath.Join(logdir, logfileRelative)
+
 	//run the new client
 	waiter, err := runContainer(container.ID, logger, logfile, false, logLevel)
 	if err != nil {
@@ -576,7 +578,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		Name:           clientName,
 		VersionInfo:    "",
 		InstantiatedAt: time.Now(),
-		LogFile:        logfile,
+		LogFile:        logfileRelative,
 	}
 	//  Container online and responsive, return its ID, IP and MAC for later reference
 	fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)

@@ -167,6 +167,21 @@ testSuiteSummary.prototype.ShowSuite = function () {
 }
 /**************************************************************************************************************/
 
+/* testClientInfo Class
+ *
+ * This describes a client type
+ */
+
+// testClientInfo ctor
+function testClientInfo( name, version,  log) {
+
+    this.clientName = ko.observable(name);
+    this.clientVersion = ko.observable(version);
+    this.logfile = ko.observable(log);
+}
+
+/**************************************************************************************************************/
+
 /* testClientResult Class
  *
  * This describes a specific test result in a test case
@@ -222,6 +237,8 @@ function testCase(data) {
     this.end = ko.observable(Date.parse(data.end));
     this.summaryResult = ko.observable(new testResult(data.summaryResult));
     this.clientResults = ko.observableArray(makeClientResults(data.clientResults, data.clientInfo));
+    var clientInfos = makeClientInfo(data.clientInfo);
+    this.clients = ko.observableArray(clientInfos);
     var dur = moment.duration(moment(self.end()).diff(moment(self.start())));
     self.duration = ko.observable(calcFineDuration(dur));
     self.passTextStyle = ko.computed(function () {
@@ -231,7 +248,7 @@ function testCase(data) {
 }
 
 function makeClientResults(clientResults, clientInfos) {
-    $.map(clientResults, function (clientName, testResult) {
+    return $.map(clientResults, function (testResult,clientName) {
         var pass = testResult.pass;
         var details = testResult.details;
         var name = "Missing client info.";
@@ -248,6 +265,12 @@ function makeClientResults(clientResults, clientInfos) {
         return new testClientResult(pass, details, name, version, instantiated, log);
     });
 }
+function makeClientInfo( clientInfos) {
+    return $.map(clientInfos, function (info, infoId) {
+        return new testClientInfo(info.name, info.versionInfo, info.logFile);
+    });
+}
+
 
 function calcDuration(duration) {
     var ret = ""
