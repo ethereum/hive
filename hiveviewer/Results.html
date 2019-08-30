@@ -6,10 +6,13 @@
     <title>Hive</title>
     <link href="Content/bootstrap.min.css" rel="stylesheet" />
     <link href="Content/app.css" rel="stylesheet" />
+    <script src="Scripts/FileSaver.min.js"></script>
     <script src="Scripts/jquery-3.4.1.min.js"></script>
+    <script src="Scripts/popper.min.js"></script>
     <script src="Scripts/bootstrap.min.js"></script>
     <script src="Scripts/knockout-3.5.0.js"></script>
     <script src="Scripts/app/app.js"></script>
+
     <script src="Scripts/moment.min.js"></script>
 
 </head>
@@ -17,13 +20,30 @@
     <script>
         $(function () {
 
-            var hiveViewer = new app();
+             hiveViewer = new app();
             hiveViewer.LoadTestSuites("TestResults", "index.txt");
             ko.applyBindings(hiveViewer);
 
         }
         );
     </script>
+    <div class="modal fade bd-example-modal-lg" data-backdrop="static" data-keyboard="false" tabindex="-1">
+        <div class="modal-dialog modal-sm">
+            <div class="modal-content" style="width: 48px">
+                <!--<span class="fa fa-spinner fa-spin fa-3x"></span>-->
+                <!--<div class="spinner-border text-primary" role="status">
+        <span class="sr-only">Loading...</span>
+    </div>-->
+                <div class="row">
+                    <div class="col-sm-12">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
     <div class="container-fluid">
         <div id="hive" class="card hive-header">
             <div id="hiveHeader" class="card-header" data-toggle="collapse" aria-expanded="true" data-target="#hiveHeaderBody" aria-controls="#hiveHeaderBody">
@@ -46,10 +66,8 @@
                                     <div class="row">
                                         <div class="col-6">
                                             <button type="button" class="btn btn-primary btn-block" data-toggle="button" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleFilterPasses}, text: passFilter">
-                                               
                                             </button>
                                             <button type="button" class="btn btn-primary btn-block" data-toggle="button" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleFilterFailures}, text: failFilter">
-                                               
                                             </button>
                                         </div>
                                         <div class="col-6">
@@ -72,7 +90,6 @@
                                 <div class="card-body">
 
                                     <button type="button" class="btn btn-primary btn-block" data-toggle="button" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleDateSort}, text: sortMode">
-                                        
                                     </button>
 
                                 </div>
@@ -88,13 +105,13 @@
                                 <div class="card-body">
                                     <div class="row">
                                         <div class="col-6 ">
-                                            <button type="button" class="btn btn-primary btn-block"  >
+                                            <button type="button" class="btn btn-primary btn-block" data-bind="event:{'click': ExportSuiteJSON}">
                                                 JSON
                                             </button>
-                                            
+
                                         </div>
                                         <div class="col-6">
-                                            <button type="button" class="btn btn-primary btn-block"  >
+                                            <button type="button" class="btn btn-primary btn-block" data-bind="event:{'click': ExportSuiteCSV}">
                                                 CSV
                                             </button>
                                         </div>
@@ -102,7 +119,7 @@
                                 </div>
                             </div>
                         </div>
-                       
+
                     </div>
                 </div>
             </div>
@@ -187,7 +204,7 @@
                                         </div>
                                     </div>
 
-                                    
+
                                     <div data-bind="if:showStateFlag">
                                         <div class="row mt-4">
                                             <div class="col-12">
@@ -202,7 +219,7 @@
                                                     </div>
                                                 </div>
                                                 <div data-bind="foreach: testCases">
-                                                    <div  class="card" >
+                                                    <div class="card">
                                                         <div class="card-header" data-toggle="collapse" aria-expanded="false" data-bind="attr:{id: $parents[1].suiteLabel()+id(), 'data-target': '#'+$parents[1].suiteLabel()+id()+'detail', 'aria-controls': '#'+$parents[1].suiteLabel()+id()+'detail' }">
                                                             <div class="row">
                                                                 <div class="col-sm-3 font-weight-bold" data-bind="text: name"></div>
@@ -241,11 +258,11 @@
                                                                             <div class="col-4" data-bind="text:clientName">
 
                                                                             </div>
-                                                                            <div class="col-4" >
+                                                                            <div class="col-4">
                                                                                 <a data-bind="attr: {href:clientVersion}">Version</a>
                                                                             </div>
-                                                                            <div class="col-4" >
-                                                                                <a  data-bind="attr: {href:logfile}">Log</a>
+                                                                            <div class="col-4">
+                                                                                <a data-bind="attr: {href:logfile}">Log</a>
                                                                             </div>
                                                                         </div>
                                                                     </div>
@@ -257,7 +274,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                         </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

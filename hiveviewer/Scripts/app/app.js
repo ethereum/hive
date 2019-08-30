@@ -8,6 +8,9 @@
  * filter/sorting toggles.
  */
 //app constructor function
+
+var hiveViewer;
+
 function app() {
     var self = this;
     self.errorState = ko.observable(false);
@@ -17,6 +20,15 @@ function app() {
     self.showPasses = ko.observable(true);
     self.showFails = ko.observable(true);
     self.sortDateAsc = ko.observable(false);
+    self.loading = ko.observable(false);
+    self.modalVisible = ko.computed(function () {
+        var loading = self.loading();
+        if (loading) {
+            $('.modal').modal('show')
+        } else {
+            $('.modal').modal('hide')
+        }
+    });
     self.sortedFilteredSuites = ko.computed(function () {
         var a = -1;
         var b = 1;
@@ -72,7 +84,7 @@ function app() {
             return $.inArray(v, clientList) === k;
         });
 
-        uniqueClientList.push("All")
+        uniqueClientList.push("All");
         
 
         return uniqueClientList;
@@ -94,7 +106,58 @@ app.prototype.ToggleDateSort = function () {
     var self = this;
     self.sortDateAsc(!self.sortDateAsc());
  }
+app.prototype.ExportSuiteJSON = function () {
+    var self = this;
+    
+    self.loading(true);
 
+    var outputArray = [];
+    var suitesToExport = ko.toJS(self.sortedFilteredSuites());
+    for (var i = 0; i < suitesToExport.length; i++) {
+        var suitePath = suitesToExport[i].path + "/" + suitesToExport[i].fileName;
+        suitesToExport[i].data.filepath = suitePath;
+
+        outputArray.push(suitesToExport[i].data);
+
+        $.ajax({
+            url: suitePath,
+            dataType: 'json',
+            async: false,
+            success: function (suiteData) {
+                suitesToExport[i].data.suite = suiteData;
+                suitesToExport[i].data.info = "";
+            },
+            error: function () {
+                suitesToExport[i].data.info = "failed to load suite data";
+            }
+
+        });
+            
+    }
+    
+    var output = JSON.stringify(outputArray);
+
+    self.loading(false);
+    
+
+
+    var blob = new Blob([output], { type: "application/json" });
+
+   
+    var saveAs = window.saveAs;
+
+    saveAs(blob, "testSuites.json");
+    
+}
+
+app.prototype.ExportSuiteCSV = function () {
+    //var self = this;
+    //var blob = new Blob(self.testSuites(), { type: "application/json" });
+
+    //var saveAs = window.saveAs;
+    //saveAs(blob, "testSuites.json");
+
+}
 
 app.prototype.LoadTestSuites = function(path, file) {
     var self = this;
@@ -132,6 +195,7 @@ app.prototype.LoadTestSuites = function(path, file) {
 // test suite summary ctor function
 function testSuiteSummary(data) {
     self = this;
+    self.data = data;
     self.path = "";
     self.fileName = ko.observable(data.fileName);
     self.name = ko.observable(data.name);
@@ -337,7 +401,9 @@ function testSuite(data) {
 
 testSuite.prototype.ToggleTestCases = function () {
     var self = this;
+
     self.showStateFlag(!self.showStateFlag());
+  
 }
 
 
