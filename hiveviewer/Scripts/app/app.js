@@ -13,7 +13,7 @@ function app() {
     self.errorState = ko.observable(false);
     self.errorMessage = ko.observable("");
     self.testSuites = ko.observableArray([]);
-   
+    self.selectedClient = ko.observable("");
     self.showPasses = ko.observable(true);
     self.showFails = ko.observable(true);
     self.sortDateAsc = ko.observable(true);
@@ -30,7 +30,14 @@ function app() {
                     : b;
         }).filter(function (t) {
             
-            return (t.pass() && self.showPasses())||(!t.pass() && self.showFails());
+            return            (
+                (t.pass() && self.showPasses()) ||
+                (!t.pass() && self.showFails())
+            ) &&
+            (
+                self.selectedClient() == "All" ||
+                t.primaryClient() == self.selectedClient()
+            );
             }
         );
         return res;
@@ -64,6 +71,9 @@ function app() {
         var uniqueClientList = $.grep(clientList, function (v, k) {
             return $.inArray(v, clientList) === k;
         });
+
+        uniqueClientList.push("All")
+        
 
         return uniqueClientList;
 
