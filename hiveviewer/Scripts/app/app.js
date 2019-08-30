@@ -16,7 +16,7 @@ function app() {
     self.selectedClient = ko.observable("");
     self.showPasses = ko.observable(true);
     self.showFails = ko.observable(true);
-    self.sortDateAsc = ko.observable(true);
+    self.sortDateAsc = ko.observable(false);
     self.sortedFilteredSuites = ko.computed(function () {
         var a = -1;
         var b = 1;
