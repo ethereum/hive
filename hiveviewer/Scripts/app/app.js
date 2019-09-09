@@ -24,9 +24,12 @@ function app() {
     self.modalVisible = ko.computed(function () {
         var loading = self.loading();
         if (loading) {
-            $('.modal').modal('show')
+            $('#modalSpinner').modal('show');
         } else {
-            $('.modal').modal('hide')
+            $('#modalSpinner').on('shown.bs.modal', function (e) {
+                $("#modalSpinner").modal('hide');
+            });
+         
         }
     });
     self.sortedFilteredSuites = ko.computed(function () {
@@ -110,6 +113,7 @@ app.prototype.ExportSuiteJSON = function () {
     var self = this;
     
     self.loading(true);
+    //$('#modalSpinner').modal('show');
 
     var outputArray = [];
     var suitesToExport = ko.toJS(self.sortedFilteredSuites());
@@ -138,8 +142,8 @@ app.prototype.ExportSuiteJSON = function () {
     var output = JSON.stringify(outputArray);
 
     self.loading(false);
-    
-
+  //  $('#modalSpinner').modal('hide');
+   
 
     var blob = new Blob([output], { type: "application/json" });
 
