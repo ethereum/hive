@@ -12,7 +12,7 @@ import (
 )
 
 // IndexFileName is the main index file of the test suite execution database
-const IndexFileName string = "index.json"
+const IndexFileName string = "index.txt"
 
 // TestSuiteID identifies a test suite context
 type TestSuiteID uint32
