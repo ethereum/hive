@@ -59,7 +59,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 		// Possible solution: list executions on a separate page, link from testsuites to executions where possible,
 		// and have the execution details including duration, hive logs, and sim logs displayed.
 		// logdir will be the execution folder. ie executiondir.
-		logdir := "C:\\mytests"
+		logdir := *testResultsRoot
 		err = simulate(*simLimiterFlag, simulatorImage, simulator, overrides, logger, logdir)
 		if err != nil {
 			return err
@@ -310,7 +310,7 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 		envs[key] = vals[0]
 	}
 	//TODO logdir
-	logdir := "C:\\mytests"
+	logdir := *testResultsRoot
 	nodeInfo, nodeID, ok := newNode(w, envs, files, allClients, request, true, true, logdir)
 	if ok {
 		testManager.RegisterNode(testCase, nodeID, nodeInfo)
@@ -335,7 +335,7 @@ func pseudoStart(w http.ResponseWriter, request *http.Request) {
 		envs[key] = vals[0]
 	}
 	//TODO logdir
-	logdir := "C:\\mytests"
+	logdir := *testResultsRoot
 	nodeInfo, nodeID, ok := newNode(w, envs, nil, allPseudos, request, false, false, logdir)
 	if ok {
 		testManager.RegisterPseudo(testCase, nodeID, nodeInfo)
