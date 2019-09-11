@@ -49,11 +49,15 @@
             <div id="hiveHeader" class="card-header" >
                 <div class="row ">
                    
-                    <div class="col-lg-10 col-md-10 col-sm-8 col-xl-11   text-center my-auto font-weight-bold h1 ">
+                    <div class="col-lg-10 col-md-10 col-sm-8 col-xl-11 col-10  text-center my-auto font-weight-bold h1 ">
                         <img src="Content/HiveLogo.png" class="img-fluid" alt="Hive logo">
                     </div>
-                    <div class="col-lg-2 col-md-2 col-sm-4 col-xl-1  text-center my-auto  ">
+                    <div class="d-none d-sm-block col-lg-2 col-md-2 col-sm-4 col-xl-1  text-center my-auto  ">
                         <button type="button" class="btn btn-primary btn-block" data-toggle="collapse" aria-expanded="true" data-target="#hiveHeaderBody" aria-controls="#hiveHeaderBody" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleFilterMenu}, text: filterMenu">
+                        </button>
+                    </div>
+                    <div class="d-sm-none col-2 mt-3">
+                        <button type="button" class="btn btn-primary btn-block text-center font-weight-bold justify-content-center align-self-center" data-toggle="collapse" aria-expanded="true" data-target="#hiveHeaderBody" aria-controls="#hiveHeaderBody" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleFilterMenu}, text: filterMenuMin">
                         </button>
                     </div>
                    

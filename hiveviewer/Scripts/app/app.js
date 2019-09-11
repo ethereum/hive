@@ -60,9 +60,16 @@ function app() {
     });
     self.filterMenu = ko.computed(function () {
         if (self.showFilters()) {
-            return "Hide filters";
+            return "Hide controls";
         } else {
-            return "Show filters";
+            return "Show controls";
+        }
+    });
+    self.filterMenuMin = ko.computed(function () {
+        if (self.showFilters()) {
+            return "-";
+        } else {
+            return "+";
         }
     });
     self.passFilter = ko.computed(function() {
