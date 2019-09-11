@@ -13,6 +13,7 @@ var hiveViewer;
 
 function app() {
     var self = this;
+    self.showFilters = ko.observable(false);
     self.errorState = ko.observable(false);
     self.errorMessage = ko.observable("");
     self.testSuites = ko.observableArray([]);
@@ -57,6 +58,13 @@ function app() {
         );
         return res;
     });
+    self.filterMenu = ko.computed(function () {
+        if (self.showFilters()) {
+            return "Hide filters";
+        } else {
+            return "Show filters";
+        }
+    });
     self.passFilter = ko.computed(function() {
         if (self.showPasses()) {
             return "Passes";
@@ -93,6 +101,11 @@ function app() {
         return uniqueClientList;
 
     });
+}
+
+app.prototype.ToggleFilterMenu = function () {
+    var self = this;
+    self.showFilters(!self.showFilters());
 }
 
 app.prototype.ToggleFilterPasses = function () {
