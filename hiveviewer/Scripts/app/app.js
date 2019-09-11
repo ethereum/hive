@@ -113,6 +113,7 @@ function app() {
 app.prototype.ToggleFilterMenu = function () {
     var self = this;
     self.showFilters(!self.showFilters());
+    return true;
 }
 
 app.prototype.ToggleFilterPasses = function () {
@@ -235,12 +236,14 @@ function testSuiteSummary(data) {
     self.loading = ko.observable(false);
     self.loaded = ko.observable(false);
     self.loadingError = ko.observable(false);
+    self.expanded = ko.observable(false);
 
 }
 
 testSuiteSummary.prototype.ShowSuite = function () {
     var suitePath = this.path + "/" + this.fileName();
     var self = this;
+    self.expanded(true);
     if (!self.loaded()) {
         self.loading(true);
         self.loadingError(false);
@@ -263,6 +266,15 @@ testSuiteSummary.prototype.ShowSuite = function () {
     return true;
 
 }
+
+testSuiteSummary.prototype.HideSuite = function () {
+    
+    self.expanded(false);
+   
+    return true;
+
+}
+
 /**************************************************************************************************************/
 
 /* testClientInfo Class

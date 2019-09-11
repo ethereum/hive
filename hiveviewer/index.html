@@ -4,6 +4,8 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Hive</title>
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.13/css/all.css" integrity="sha384-DNOHZ68U8hZfKXOrtjWvjxusGo9WQnrNx2sqG0tfsghAvtVlRW3tvkXWZh58N9jp"
+          crossorigin="anonymous">
     <link href="Content/bootstrap.min.css" rel="stylesheet" />
     <link href="Content/app.css" rel="stylesheet" />
     <script src="Scripts/FileSaver.min.js"></script>
@@ -45,33 +47,25 @@
 
     <!-- Main Container -->
     <div class="container-fluid">
-        <div id="hive" class="card hive-header">
-            <div id="hiveHeader" class="card-header" >
-                <div class="row ">
+        <div id="hive" class="card hive-header  accordion-head">
+            <div id="hiveHeader" class="card-header collapsed" data-toggle="collapse" aria-expanded="true" data-target="#hiveHeaderBody" aria-controls="#hiveHeaderBody" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleFilterMenu}" >
+                <div class="row">
                    
-                    <div class="col-lg-10 col-md-10 col-sm-8 col-xl-11 col-10  text-center my-auto font-weight-bold h1 ">
+                    <div class="col-lg-10 col-md-10 col-sm-8 col-xl-11 col-10  text-center my-auto font-weight-bold h1">
                         <img src="Content/HiveLogo.png" class="img-fluid" alt="Hive logo">
                     </div>
-                    <div class="d-none d-sm-block col-lg-2 col-md-2 col-sm-4 col-xl-1  text-center my-auto  ">
-                        <button type="button" class="btn btn-primary btn-block" data-toggle="collapse" aria-expanded="true" data-target="#hiveHeaderBody" aria-controls="#hiveHeaderBody" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleFilterMenu}, text: filterMenu">
-                        </button>
+                    <div class=" col-lg-2 col-md-2 col-sm-4 col-xl-1 col-2  text-center my-auto ">
+                        <!-- ko if: showFilters -->
+                        <i class="fa fa-angle-right" aria-hidden="true"></i>
+                        <!-- /ko -->
+                        <!-- ko ifnot: showFilters -->
+                        <i class="fa fa-angle-down" aria-hidden="true"></i>
+                        <!-- /ko -->
                     </div>
-                    <div class="d-sm-none col-2 mt-3">
-                        <button type="button" class="btn btn-primary btn-block text-center font-weight-bold justify-content-center align-self-center" data-toggle="collapse" aria-expanded="true" data-target="#hiveHeaderBody" aria-controls="#hiveHeaderBody" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleFilterMenu}, text: filterMenuMin">
-                        </button>
-                    </div>
+       
                    
                 </div>
-                <!--<div class="row ">
-                    <div class="col-md-1  text-center my-auto  ">
-                        <button type="button" class="btn btn-primary btn-block" data-toggle="collapse" aria-expanded="true" data-target="#hiveHeaderBody" aria-controls="#hiveHeaderBody" aria-pressed="false" autocomplete="off" data-bind="event:{'click': ToggleFilterMenu}, text: filterMenu">
-                        </button>
-                    </div>
-                
-                    <div class="col-1  text-center my-auto  ">
-                        Right
-                    </div>
-                </div>-->
+            
             </div>
 
             <div class="collapse" aria-labelledby="#hiveHeader" id="hiveHeaderBody" data-parent="#hive">
@@ -146,19 +140,27 @@
         </div>
         <div id="accordion">
             <div data-bind="foreach: sortedFilteredSuites">
-                <div data-bind="class: passStyle()+' card'">
+                <div data-bind="class: passStyle()+' card accordion-head'" >
                     <div class="card-header" data-toggle="collapse" aria-expanded="true" data-bind="attr:{id: suiteLabel, 'data-target': '#'+suiteDetailLabel(), 'aria-controls': suiteDetailLabel }">
                         <div class="row ">
-                            <div class="col-sm-4  text-left my-auto font-weight-bold " data-bind="text: name ">
+                            <div class="col-4  text-left my-auto font-weight-bold " data-bind="text: name ">
                             </div>
-                            <div class="col-sm-4  text-left my-auto" data-bind="text: primaryClient()+' clients'">
+                            <div class="col-4  text-left my-auto" data-bind="text: primaryClient()+' clients'">
                             </div>
-                            <div class="col-sm-4  text-left my-auto" data-bind="text: moment(started()).format('MMMM Do YYYY, h:mm:ss a')">
+                            <div class="col-3  text-left my-auto" data-bind="text: moment(started()).format('MMMM Do YYYY, h:mm:ss a')">
+                            </div>
+                            <div class="col-1  text-left my-auto">
+                                <!-- ko if: expanded -->
+                                <i class="fa fa-angle-right" aria-hidden="true"></i>
+                                <!-- /ko -->
+                                <!-- ko ifnot: expanded -->
+                                <i class="fa fa-angle-down" aria-hidden="true"></i>
+                                <!-- /ko -->
                             </div>
                         </div>
                     </div>
 
-                    <div class="collapse" data-bind="attr:{'aria-labelledby': suiteLabel, id: suiteDetailLabel}, event:{'show.bs.collapse': ShowSuite}" data-parent="#accordion">
+                    <div class="collapse" data-bind="attr:{'aria-labelledby': suiteLabel, id: suiteDetailLabel}, event:{'show.bs.collapse': ShowSuite, 'hide.bs.collapse': HideSuite}" data-parent="#accordion">
                         <div class="card-body">
                             <div data-bind="if:loaded">
                                 <div data-bind="with: testSuite">

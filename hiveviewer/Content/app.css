@@ -18,3 +18,9 @@
     background-color: transparent;
     border: none;
 }
+
+.accordion-head i {
+    font-size: 2.5em;
+    float: right;
+}
+
