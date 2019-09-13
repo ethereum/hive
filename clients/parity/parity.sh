@@ -146,9 +146,9 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 	# Also new precompiles
 
 	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\", \"builtin\"]; { \"name\": \"modexp\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"modexp\": { \"divisor\": 20 }  } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"linear\": { \"base\": 500, \"word\": 0 } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"linear\": { \"base\": 40000, \"word\": 0 } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"eip1108_transition\": \"0x7fffffffffffff\", \"pricing\": { \"alt_bn128_const_operations\": { \"price\": 500, \"eip1108_transition_price\": 150 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"eip1108_transition\": \"0x7fffffffffffff\", \"pricing\": { \"alt_bn128_const_operations\": { \"price\": 40000, \"eip1108_transition_price\": 6000 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\",\"eip1108_transition\": \"0x7fffffffffffff\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 , \"eip1108_transition_base\": 100000, \"eip1108_transition_pair\": 80000 } } })"`
 fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	# New shift instructions
