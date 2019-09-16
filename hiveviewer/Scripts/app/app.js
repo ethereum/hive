@@ -230,8 +230,8 @@ function testSuiteSummary(data) {
     self.passStyle = ko.computed(function () {
         return self.pass() ? "border-success" : "border-danger";
     });
-    self.suiteLabel = ko.computed(function () { return "Suite" + self.fileName().slice(0,-5); })
-    self.suiteDetailLabel = ko.computed(function () { return "CollapseSuite" + self.fileName().slice(0,-5); })
+    self.suiteLabel = ko.computed(function () { return "Suite" + self.fileName().slice(0, -5); });
+    self.suiteDetailLabel = ko.computed(function () { return "CollapseSuite" + self.fileName().slice(0, -5); });
     self.testSuite = ko.observable();
     self.loading = ko.observable(false);
     self.loaded = ko.observable(false);
@@ -239,6 +239,11 @@ function testSuiteSummary(data) {
     self.expanded = ko.observable(false);
 
 }
+
+//testSuiteSummary.prototype.ToggleSuiteState = function () {
+//    self = this;
+//    self.expanded(!self.expanded());
+//}
 
 testSuiteSummary.prototype.ShowSuite = function () {
     var suitePath = this.path + "/" + this.fileName();
@@ -268,7 +273,7 @@ testSuiteSummary.prototype.ShowSuite = function () {
 }
 
 testSuiteSummary.prototype.HideSuite = function () {
-    
+    self = this;
     self.expanded(false);
    
     return true;

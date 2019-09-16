@@ -125,7 +125,7 @@
 
                                         </div>
                                         <div class="col-6">
-                                            <button type="button" class="btn btn-primary btn-block" data-bind="event:{'click': ExportSuiteCSV}">
+                                            <button type="button" class="btn btn-primary btn-block" disabled="disabled" data-bind="event:{'click': ExportSuiteCSV}">
                                                 CSV
                                             </button>
                                         </div>
@@ -151,10 +151,10 @@
                             </div>
                             <div class="col-1  text-left my-auto">
                                 <!-- ko if: expanded -->
-                                <i class="fa fa-angle-right" aria-hidden="true"></i>
+                                <i class="fa fa-angle-right"></i>
                                 <!-- /ko -->
                                 <!-- ko ifnot: expanded -->
-                                <i class="fa fa-angle-down" aria-hidden="true"></i>
+                                <i class="fa fa-angle-down" ></i>
                                 <!-- /ko -->
                             </div>
                         </div>
@@ -215,8 +215,8 @@
 
                                                         <button type="button" class="btn btn-block btn-primary h-100" data-bind="event:{'click': ToggleTestCases}, text: showState">Show</button>
 
-                                                        <button type="button" class="btn   btn-block btn-info h-100">JSON</button>
-                                                        <button type="button" class="btn   btn-block btn-info h-100">CSV</button>
+                                                        <button type="button"  disabled="disabled" class="btn   btn-block btn-info h-100">JSON</button>
+                                                        <button type="button"  disabled="disabled" class="btn   btn-block btn-info h-100">CSV</button>
 
 
 
