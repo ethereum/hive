@@ -199,23 +199,26 @@ func deliverTests(root string) chan *testcase {
 			tests := make(map[string]BlockTest)
 			data, err := ioutil.ReadFile(path)
 			if err = json.Unmarshal(data, &tests); err != nil {
+				fmt.Println("ERROR:" + path)
+				fmt.Println(err)
 				log.Error("error", "err", err)
-				return err
-			}
-			j = j + 1
-			for name, blocktest := range tests {
-				// t is declared explicitly here, if implicit := - declaration is used,
-				// golang will reuse the underlying object, and overwrite the object while it's being tested
-				// by a separate thread.
-				// That is also the reason that blocktest within the struct is by-value instead of by-reference
-				var t testcase
-				t = testcase{blockTest: blocktest, name: name, filepath: path}
-				if err := t.validate(); err != nil {
-					log.Error("error", "err", err, "test", t.name)
-					continue
+				//return err
+			} else {
+				j = j + 1
+				for name, blocktest := range tests {
+					// t is declared explicitly here, if implicit := - declaration is used,
+					// golang will reuse the underlying object, and overwrite the object while it's being tested
+					// by a separate thread.
+					// That is also the reason that blocktest within the struct is by-value instead of by-reference
+					var t testcase
+					t = testcase{blockTest: blocktest, name: name, filepath: path}
+					if err := t.validate(); err != nil {
+						log.Error("error", "err", err, "test", t.name)
+						continue
+					}
+					i = i + 1
+					out <- &t
 				}
-				i = i + 1
-				out <- &t
 			}
 			return nil
 		})

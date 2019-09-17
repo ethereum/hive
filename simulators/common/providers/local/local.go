@@ -325,11 +325,12 @@ func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, param
 	nodeID := strconv.Itoa(leastUsedIndex)
 
 	sim.RegisterNode(test, nodeID, &common.TestClientInfo{
-		ID:             nodeID,
-		Name:           leastUsed.ClientType,
-		VersionInfo:    "Local version",
-		InstantiatedAt: time.Now(),
-		LogFile:        "",
+		ID:              nodeID,
+		Name:            leastUsed.ClientType,
+		VersionInfo:     "Local version",
+		InstantiatedAt:  time.Now(),
+		LogFile:         "",
+		WasInstantiated: true,
 	})
 
 	return nodeID, leastUsed.IP, leastUsed.Mac, nil

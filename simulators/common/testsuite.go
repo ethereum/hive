@@ -179,9 +179,10 @@ func (t *TestResult) AddDetail(detail string) {
 
 // TestClientInfo describes a client that participated in a test case
 type TestClientInfo struct {
-	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	VersionInfo    string    `json:"versionInfo"` //URL to github repo + branch.
-	InstantiatedAt time.Time `json:"instantiatedAt"`
-	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
+	ID              string    `json:"id"`
+	Name            string    `json:"name"`
+	VersionInfo     string    `json:"versionInfo"` //URL to github repo + branch.
+	InstantiatedAt  time.Time `json:"instantiatedAt"`
+	LogFile         string    `json:"logFile"` //Absolute path to the logfile.
+	WasInstantiated bool
 }

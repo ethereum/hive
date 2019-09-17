@@ -18,8 +18,6 @@ RUN apk add --no-cache ca-certificates git
 
 RUN git clone --depth 1 https://github.com/ethereum/tests.git /tests
 
-
-
 ENV TESTPATH /tests
 
 # Add the entry script

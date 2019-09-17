@@ -186,8 +186,10 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 		return ErrNoSummaryResult
 	}
 
-	for k := range testCase.ClientInfo {
-		manager.KillNodeCallback(testSuiteRun, testID, k)
+	for k, v := range testCase.ClientInfo {
+		if v.WasInstantiated {
+			manager.KillNodeCallback(testSuiteRun, testID, k)
+		}
 	}
 	for k := range testCase.pseudoInfo {
 		manager.KillNodeCallback(testSuiteRun, testID, k)

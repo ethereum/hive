@@ -12,7 +12,7 @@ echo "{ \"hostURI\":\"$HIVE_SIMULATOR\" }" >hiveProviderConfig.json
 go install 
 
 if [ "${HIVE_DEBUG}" = true ]; then
-    dlv debug  	--headless  --listen=:2345 --log=true  --api-version=2 -simProvider="hive" -providerConfig="hiveProviderConfig.json" 
+    dlv debug  	--headless  --listen=:2345 --log=true  --api-version=2 -- -simProvider="hive" --providerConfig="hiveProviderConfig.json" 
 else
    
     /go/bin/consensus  -simProvider="hive" -providerConfig="hiveProviderConfig.json" 

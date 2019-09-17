@@ -25,7 +25,7 @@ type btJSON struct {
 	Blocks     []btBlock              `json:"blocks"`
 	Genesis    btHeader               `json:"genesisBlockHeader"`
 	Pre        core.GenesisAlloc      `json:"pre"`
-	Post       core.GenesisAlloc      `json:"postState"`
+	Post       core.GenesisAlloc      `json:"-"`
 	BestBlock  common2.UnprefixedHash `json:"lastblockhash"`
 	Network    string                 `json:"network"`
 	SealEngine string                 `json:"sealEngine"`

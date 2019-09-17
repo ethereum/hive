@@ -312,9 +312,10 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 	//TODO logdir
 	logdir := *testResultsRoot
 	nodeInfo, nodeID, ok := newNode(w, envs, files, allClients, request, true, true, logdir)
-	if ok {
-		testManager.RegisterNode(testCase, nodeID, nodeInfo)
-	}
+	nodeInfo.WasInstantiated = ok
+
+	testManager.RegisterNode(testCase, nodeID, nodeInfo)
+
 }
 
 //start a pseudo client and register it as part of a test
@@ -483,6 +484,15 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		return nil, "", false
 	}
 
+	testClientInfo := &common.TestClientInfo{
+		ID:              "",
+		Name:            clientName,
+		VersionInfo:     "",
+		InstantiatedAt:  time.Now(),
+		LogFile:         "",
+		WasInstantiated: false,
+	}
+
 	//default the loglevel to the simulator log level setting (different from the system log level setting)
 	logLevel := *simloglevelFlag
 	logLevelString, in := envs["HIVE_LOGLEVEL"]
@@ -493,7 +503,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		if logLevel, err = strconv.Atoi(logLevelString); err != nil {
 			log15.Error("Simulator client HIVE_LOGLEVEL is not an integer", "error", nil)
 			http.Error(w, "HIVE_LOGLEVEL not an integer", http.StatusBadRequest)
-			return nil, "", false
+			return testClientInfo, "", false
 		}
 	}
 	//the simulation host may prevent or be unaware of the simulation controller's requested client
@@ -501,7 +511,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	if !in {
 		log15.Error("Unknown or forbidden client type", "error", nil)
 		http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)
-		return nil, "", false
+		return testClientInfo, "", false
 	}
 	//create and start the requested client container
 	log15.Debug("starting new client")
@@ -509,7 +519,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	if err != nil {
 		log15.Error("failed to create client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return nil, "", false
+		return testClientInfo, "", false
 	}
 	containerID := container.ID[:8]
 	containerIP := ""
@@ -526,7 +536,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	if err != nil {
 		logger.Error("failed to start client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return nil, "", false
+		return testClientInfo, "", false
 	}
 	go func() {
 		// Ensure the goroutine started by runContainer exits, so that
@@ -549,12 +559,12 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		if err != nil {
 			logger.Error("failed to inspect client", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return nil, "", false
+			return testClientInfo, "", false
 		}
 		if !container.State.Running {
 			logger.Error("client container terminated")
 			http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
-			return nil, "", false
+			return testClientInfo, "", false
 		}
 
 		containerIP = container.NetworkSettings.IPAddress
@@ -573,12 +583,13 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 
 		time.Sleep(100 * time.Millisecond)
 	}
-	testClientInfo := &common.TestClientInfo{
-		ID:             container.ID,
-		Name:           clientName,
-		VersionInfo:    "",
-		InstantiatedAt: time.Now(),
-		LogFile:        logfileRelative,
+	testClientInfo = &common.TestClientInfo{
+		ID:              container.ID,
+		Name:            clientName,
+		VersionInfo:     "",
+		InstantiatedAt:  time.Now(),
+		LogFile:         logfileRelative,
+		WasInstantiated: true,
 	}
 	//  Container online and responsive, return its ID, IP and MAC for later reference
 	fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)
