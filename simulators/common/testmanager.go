@@ -189,6 +189,9 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 	for k := range testCase.ClientInfo {
 		manager.KillNodeCallback(testSuiteRun, testID, k)
 	}
+	for k := range testCase.pseudoInfo {
+		manager.KillNodeCallback(testSuiteRun, testID, k)
+	}
 	// Add the results to the test case
 	testCase.End = time.Now()
 	testCase.SummaryResult = *summaryResult
