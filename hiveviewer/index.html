@@ -212,14 +212,9 @@
                                             <div class="card text-center  text-white hive-header h-100">
                                                 <div class="card-body">
                                                     <div class=" my-auto d-flex flex-column h-100">
-
                                                         <button type="button" class="btn btn-block btn-primary h-100" data-bind="event:{'click': ToggleTestCases}, text: showState">Show</button>
-
                                                         <button type="button"  disabled="disabled" class="btn   btn-block btn-info h-100">JSON</button>
                                                         <button type="button"  disabled="disabled" class="btn   btn-block btn-info h-100">CSV</button>
-
-
-
                                                     </div>
                                                 </div>
                                             </div>
@@ -240,7 +235,7 @@
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div data-bind="foreach: testCases">
+                                                <div data-bind="foreach: pageEntries">
                                                     <div class="card">
                                                         <div class="card-header" data-toggle="collapse" aria-expanded="false" data-bind="attr:{id: $parents[1].suiteLabel()+id(), 'data-target': '#'+$parents[1].suiteLabel()+id()+'detail', 'aria-controls': '#'+$parents[1].suiteLabel()+id()+'detail' }">
                                                             <div class="row">
@@ -297,6 +292,27 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="row mt-4">
+                                            <div class="col-4"></div>
+                                            <div class="col-4">
+                                                <nav aria-label="...">
+                                                    <ul class="pagination justify-content-center">
+                                                        <li class="page-item " data-bind="class: hasPrevious">
+                                                            <a class="page-link" href="#" data-bind="click: Previous">Previous</a>
+                                                        </li>
+                                                        <li class="page-item">
+                                                            <a class="page-link" data-bind="text: pageNumber" href="#"> <span class="sr-only">(current)</span></a>
+                                                        </li>
+                                                        <li class="page-item" data-bind="class: hasNext">
+                                                            <a class="page-link" href="#" data-bind="click: Next">Next</a>
+                                                        </li>
+                                                    </ul>
+                                                </nav>
+                                            </div>
+                                            <div class="col-4"></div>
+                                        </div>
+                                            
+                                    </div>
                                     </div>
                                 </div>
                             </div>

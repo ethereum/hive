@@ -423,7 +423,11 @@ function testSuite(data) {
     self.name = ko.observable(data.name);
     self.description = ko.observable(data.description);
     var testCases = $.map(data.testCases, function (item) { return new testCase(item) });
-    self.testCases = ko.observableArray(testCases)
+    self.testCases = ko.observableArray(testCases.sort(function (l, r) {
+        return l.summaryResult().pass() == r.summaryResult().pass() ? 0
+            : l.summaryResult().pass() < r.summaryResult().pass() ? a
+                : b;
+    }));
     var earliest = Math.min.apply(Math, testCases.map(function (tc) { return tc.start(); }));
     var latest = Math.max.apply(Math, testCases.map(function (tc) { return tc.end(); }));
     var fails = testCases.map(function (tc) { if (!tc.summaryResult().pass()) return 1; else return 0; }).reduce(function (a, b) { return a + b; },0);
@@ -438,13 +442,50 @@ function testSuite(data) {
     self.showState = ko.computed(function () {
         return self.showStateFlag() ? "Hide" : "Show";
     });
+
+    self.pageNumber = ko.observable(0);
+    self.maxPerPage = ko.observable(25);
+    self.totalPages = ko.computed(function () {
+        return Math.ceil(self.testCases().length / self.maxPerPage());
+    });
+    self.pageEntries = ko.computed(function () {
+        var start = self.pageNumber() * self.maxPerPage();
+        return self.testCases.slice(start, start + self.maxPerPage());
+    });
+
+    this.hasPrevious = ko.computed(function () {
+        return (self.pageNumber() !== 0) ? "" : "disabled";
+    });
+
+    this.hasNext = ko.computed(function () {
+        return (self.pageNumber() !== self.totalPages()) ? "" : "disabled";
+    });
+
+   
+
+   
+
+}
+
+testSuite.prototype.Next = function () {
+    var self = this;
+    if (self.pageNumber() < self.totalPages()) {
+        self.pageNumber(self.pageNumber() + 1);
+    }
+}
+
+testSuite.prototype.Previous = function () {
+    var self = this;
+    if (self.pageNumber() != 0) {
+        self.pageNumber(self.pageNumber() - 1);
+    }
 }
 
 testSuite.prototype.ToggleTestCases = function () {
     var self = this;
 
     self.showStateFlag(!self.showStateFlag());
-  
+
 }
 
 
