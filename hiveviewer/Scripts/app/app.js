@@ -425,8 +425,8 @@ function testSuite(data) {
     var testCases = $.map(data.testCases, function (item) { return new testCase(item) });
     self.testCases = ko.observableArray(testCases.sort(function (l, r) {
         return l.summaryResult().pass() == r.summaryResult().pass() ? 0
-            : l.summaryResult().pass() < r.summaryResult().pass() ? a
-                : b;
+            : l.summaryResult().pass() < r.summaryResult().pass() ? -1
+                : 1;
     }));
     var earliest = Math.min.apply(Math, testCases.map(function (tc) { return tc.start(); }));
     var latest = Math.max.apply(Math, testCases.map(function (tc) { return tc.end(); }));
