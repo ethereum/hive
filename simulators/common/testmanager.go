@@ -12,6 +12,7 @@ type TestManager struct {
 	OutputPath       string
 	KillNodeCallback func(testSuite TestSuiteID, test TestID, node string) error
 
+	testLimiter       int
 	runningTestSuites map[TestSuiteID]*TestSuite
 	runningTestCases  map[TestID]*TestCase
 	testCaseMutex     sync.Mutex
@@ -23,9 +24,11 @@ type TestManager struct {
 }
 
 // NewTestManager is a constructor returning a TestManager
-func NewTestManager(outputPath string, killNodeCallback func(testSuite TestSuiteID, test TestID, node string) error) *TestManager {
+func NewTestManager(outputPath string, testLimiter int, killNodeCallback func(testSuite TestSuiteID, test TestID, node string) error) *TestManager {
+
 	return &TestManager{
 		OutputPath:        outputPath,
+		testLimiter:       testLimiter,
 		KillNodeCallback:  killNodeCallback,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
@@ -150,6 +153,10 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 	testSuite, ok := manager.runningTestSuites[testSuiteID]
 	if !ok {
 		return 0, ErrNoSuchTestSuite
+	}
+	// check for a limiter
+	if manager.testLimiter >= 0 && len(testSuite.TestCases) >= manager.testLimiter {
+		return 0, ErrTestSuiteLimited
 	}
 	// increment the testcasecounter
 	manager.testCaseCounter++

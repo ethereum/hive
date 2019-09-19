@@ -32,4 +32,7 @@ var (
 
 	// ErrDBUpdateFailed indicates that the output set could not be backed up or updated
 	ErrDBUpdateFailed = errors.New("could not update results set")
+
+	// ErrTestSuiteLimited warns that the testsuite max test count is limited
+	ErrTestSuiteLimited = errors.New("testsuite test count is limited")
 )

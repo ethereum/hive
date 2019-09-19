@@ -38,6 +38,8 @@ var (
 
 	simLimiterFlag = flag.Int("simlimiter", -1, "Run all simulators with a time limit in seconds, -1 being unlimited")
 
+	hiveMaxTestsFlag = flag.Int("hivemaxtestcount", -1, "Limit the number of tests the simulator is permitted to generate in a testsuite for the Hive provider. Used for smoke testing consensus tests themselves.")
+
 	simulatorPattern = flag.String("sim", "", "Regexp selecting the simulation tests to run")
 
 	simulatorParallelism = flag.Int("sim-parallelism", 1, "Max number of parallel clients/containers to run tests against")

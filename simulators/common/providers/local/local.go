@@ -98,6 +98,7 @@ func generateInstance(config []byte) error {
 
 	var testManager = common.NewTestManager(
 		result.OutputPath,
+		-1, //TODO - no test limiter for local tests for now
 		hostProxy.KillNode,
 	)
 
