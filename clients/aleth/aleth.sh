@@ -106,6 +106,10 @@ if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 	HIVE_FORK_PETERSBURG=`echo "obase=16; $HIVE_FORK_PETERSBURG" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"constantinopleFixForkBlock\"]; \"0x$HIVE_FORK_PETERSBURG\")"`
 fi
+if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+	HIVE_FORK_ISTANBUL=`echo "obase=16; $HIVE_FORK_ISTANBUL" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"istanbulForkBlock\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+fi
 if [ "$HIVE_CHAIN_ID" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainID\"]; \"0x$HIVE_CHAIN_ID\")"`
 fi
