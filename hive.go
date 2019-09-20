@@ -55,19 +55,15 @@ var (
 
 	loglevelFlag    = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 	simloglevelFlag = flag.Int("simloglevel", 3, "The base log level for simulator client instances. This number from 0-6 is interpreted differently depending on the client type.")
-
-	dockerTimeout         = flag.Int("dockertimeout", 10, "Time to wait for container to finish before stopping it")
-	dockerTimeoutDuration = time.Duration(*dockerTimeout) * time.Minute
-	timeoutCheck          = flag.Int("timeoutcheck", 30, "Seconds to check for timeouts of containers")
-	timeoutCheckDuration  = time.Duration(*timeoutCheck) * time.Second
 )
 
 var (
-	clientList        []string                     //the list of permitted clients specified by the user
-	allClients        map[string]string            //map of client names (name_branch format) to docker image names
-	allPseudos        map[string]string            //map of pseudo names to docker image names
-	allClientVersions map[string]map[string]string //map of client names (name_branch format) to a general json struct (map[string]string) containing the version info
-	dockerClient      *docker.Client               //the web client to the docker api
+	clientList           []string                          //the list of permitted clients specified by the user
+	allClients           map[string]string                 //map of client names (name_branch format) to docker image names
+	allPseudos           map[string]string                 //map of pseudo names to docker image names
+	allClientVersions    map[string]map[string]string      //map of client names (name_branch format) to a general json struct (map[string]string) containing the version info
+	dockerClient         *docker.Client                    //the web client to the docker api
+	timeoutCheckDuration = time.Duration(60 * time.Second) //liveness check timeout
 )
 
 func main() {

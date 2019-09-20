@@ -553,6 +553,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 
 	// Wait for the HTTP/RPC socket to open or the container to fail
 	start := time.Now()
+
 	for {
 		// Update the container state
 		container, err = dockerClient.InspectContainer(container.ID)
@@ -582,6 +583,12 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		}
 
 		time.Sleep(100 * time.Millisecond)
+		timeout := container.Created.Add(timeoutCheckDuration)
+		if time.Now().After(timeout) {
+			logger.Error("client container terminated due to unresponsive RPC ")
+			http.Error(w, "client container terminated due to unresponsive RPC", http.StatusInternalServerError)
+			return testClientInfo, "", false
+		}
 	}
 	testClientInfo = &common.TestClientInfo{
 		ID:              container.ID,

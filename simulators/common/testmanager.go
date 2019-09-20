@@ -37,12 +37,16 @@ func NewTestManager(outputPath string, testLimiter int, killNodeCallback func(te
 
 // IsTestSuiteRunning checks if the test suite is still running and returns it if so
 func (manager *TestManager) IsTestSuiteRunning(testSuite TestSuiteID) (*TestSuite, bool) {
+	// manager.testSuiteMutex.Lock()
+	// defer manager.testSuiteMutex.Unlock()
 	suite, ok := manager.runningTestSuites[testSuite]
 	return suite, ok
 }
 
 // IsTestRunning checks if the testis still running and returns it if so
 func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
+	// manager.testCaseMutex.Lock()
+	// defer manager.testCaseMutex.Unlock()
 	testCase, ok := manager.runningTestCases[test]
 	return testCase, ok
 }
