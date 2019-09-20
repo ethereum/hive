@@ -168,6 +168,14 @@ if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 	# EIP 1283 disabling
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283DisableTransition\"]; \"0x$HIVE_FORK_PETERSBURG\")"`
 fi
+if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283ReenableTransition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1344Transition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1706Transition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1884Transition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip2028Transition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+		
+fi
 
 echo $chainconfig > /chain.json
 echo "Chain config: "
