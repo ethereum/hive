@@ -585,9 +585,17 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		time.Sleep(100 * time.Millisecond)
 		timeout := container.Created.Add(timeoutCheckDuration)
 		if time.Now().After(timeout) {
-			logger.Error("client container terminated due to unresponsive RPC ")
-			http.Error(w, "client container terminated due to unresponsive RPC", http.StatusInternalServerError)
+			log15.Debug("deleting client container", "name/id", clientName+"/"+containerID)
+			err = dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
+			if err != nil {
+				logger.Error("client container terminated due to unresponsive RPC ")
+				http.Error(w, "client container terminated due to unresponsive RPC", http.StatusInternalServerError)
+			} else {
+				logger.Error("failed to terminate client container due to unresponsive RPC")
+				http.Error(w, "failed to terminate client container due to unresponsive RPC", http.StatusInternalServerError)
+			}
 			return testClientInfo, "", false
+
 		}
 	}
 	testClientInfo = &common.TestClientInfo{
