@@ -272,11 +272,12 @@
                                                                             <div class="col-3 font-weight-bold font-italic " data-bind="text:clientName">
 
                                                                             </div>
+                                                                            <!-- ko if: clientInstantiated -->
                                                                             <div class="col-3">
                                                                                 <button type="button" class="btn btn-primary btn-block" data-bind="event:{'click': ShowLogs}">
                                                                                     Show Logs
                                                                                 </button>
-                                                                                <!--<a data-bind="attr: {href:clientVersion}">Version</a>-->
+
                                                                             </div>
 
                                                                             <div class="col-3">
@@ -286,6 +287,12 @@
                                                                             <div class="col-3">
 
                                                                             </div>
+                                                                            <!-- /ko -->
+                                                                            <!-- ko ifnot: clientInstantiated -->
+                                                                            <div class="col-9">
+                                                                                Client was not instantiated, no logs available.
+                                                                            </div>
+                                                                            <!-- /ko -->
                                                                         </div>
                                                                     </div>
                                                                 </div>

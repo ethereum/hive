@@ -290,11 +290,12 @@ testSuiteSummary.prototype.HideSuite = function () {
  */
 
 // testClientInfo ctor
-function testClientInfo( name, version,  log) {
+function testClientInfo( name, version,  log, instantiated) {
 
     this.clientName = ko.observable(name);
     this.clientVersion = ko.observable(version);
     this.logfile = ko.observable(log);
+    this.clientInstantiated = ko.observable(instantiated);
 }
 
 testClientInfo.prototype.ShowLogs = function () {
@@ -414,7 +415,7 @@ function makeClientResults(clientResults, clientInfos) {
 }
 function makeClientInfo( clientInfos) {
     return $.map(clientInfos, function (info, infoId) {
-        return new testClientInfo(info.name, info.versionInfo, getFilePath(info.logFile));
+        return new testClientInfo(info.name, info.versionInfo, getFilePath(info.logFile) , info.WasInstantiated) ;
     });
 }
 
