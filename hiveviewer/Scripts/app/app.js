@@ -307,7 +307,7 @@ testClientInfo.prototype.ShowLogs = function () {
   
 
     $(popup).ready(function () {
-        setTimeout(function () { popup.initPopup(ko, self); },500);
+        setTimeout(function () { popup.initPopup(ko, self); },1000);
 
     });
 
