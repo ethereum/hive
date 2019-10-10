@@ -298,6 +298,10 @@ function testClientInfo( name, version,  log, instantiated) {
     this.clientInstantiated = ko.observable(instantiated);
 }
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 testClientInfo.prototype.ShowLogs = function () {
     self = this;
     
@@ -306,9 +310,25 @@ testClientInfo.prototype.ShowLogs = function () {
 
     var popup = window.open("popup.html", "_blank", 'toolbar=no, menubar=no, resizable=yes');
   
+  
 
-    $(popup).ready(function () {
-        setTimeout(function () { popup.initPopup(ko, self); },1000);
+    $(popup).ready(async function () {
+
+        var counter = 30;
+        var success = false;
+        for (i = counter; i >= 0; i--) {
+            
+            try {
+                popup.initPopup(ko, self);
+                success = true;
+            }
+            catch{
+                
+            }
+            await sleep(200);
+            if (success) break;
+        }
+        
 
     });
 
