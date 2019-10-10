@@ -299,7 +299,7 @@ function testClientInfo( name, version,  log, instantiated) {
 }
 
 function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise(function (resolve) { setTimeout(resolve, ms) });
 }
 
 testClientInfo.prototype.ShowLogs = function () {
@@ -322,9 +322,9 @@ testClientInfo.prototype.ShowLogs = function () {
                 popup.initPopup(ko, self);
                 success = true;
             }
-            catch{
-                
-            }
+            catch (e) { };
+            
+            
             await sleep(200);
             if (success) break;
         }
