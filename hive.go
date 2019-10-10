@@ -58,12 +58,12 @@ var (
 )
 
 var (
-	clientList           []string                          //the list of permitted clients specified by the user
-	allClients           map[string]string                 //map of client names (name_branch format) to docker image names
-	allPseudos           map[string]string                 //map of pseudo names to docker image names
-	allClientVersions    map[string]map[string]string      //map of client names (name_branch format) to a general json struct (map[string]string) containing the version info
-	dockerClient         *docker.Client                    //the web client to the docker api
-	timeoutCheckDuration = time.Duration(60 * time.Second) //liveness check timeout
+	clientList           []string                           //the list of permitted clients specified by the user
+	allClients           map[string]string                  //map of client names (name_branch format) to docker image names
+	allPseudos           map[string]string                  //map of pseudo names to docker image names
+	allClientVersions    map[string]map[string]string       //map of client names (name_branch format) to a general json struct (map[string]string) containing the version info
+	dockerClient         *docker.Client                     //the web client to the docker api
+	timeoutCheckDuration = time.Duration(180 * time.Second) //liveness check timeout
 )
 
 func main() {
