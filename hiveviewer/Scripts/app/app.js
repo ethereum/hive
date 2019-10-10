@@ -13,6 +13,7 @@ var hiveViewer;
 
 function app() {
     var self = this;
+    self.rootFolder = "";
     self.showFilters = ko.observable(false);
     self.errorState = ko.observable(false);
     self.errorMessage = ko.observable("");
@@ -186,6 +187,7 @@ app.prototype.ExportSuiteCSV = function () {
 
 app.prototype.LoadTestSuites = function(path, file) {
     var self = this;
+    self.rootFolder = path;
     $.ajax({
         url: path+"/"+file,
         data: null,
@@ -295,6 +297,23 @@ function testClientInfo( name, version,  log) {
     this.logfile = ko.observable(log);
 }
 
+testClientInfo.prototype.ShowLogs = function () {
+    self = this;
+    
+  
+   
+
+    var popup = window.open("popup.html", "_blank", 'toolbar=no, menubar=no, resizable=yes');
+  
+
+    $(popup).ready(function () {
+        setTimeout(function () { popup.initPopup(ko, self); },500);
+
+    });
+
+    return true;
+
+}
 /**************************************************************************************************************/
 
 /* testClientResult Class
@@ -362,6 +381,19 @@ function testCase(data) {
     
 }
 
+function getFilePath(file) {
+    if (!file) {
+        return "";
+    }
+    file = file.replace(/\\/g,"/");
+    var files = file.split('/');
+    if (files[0].toLowerCase() != hiveViewer.rootFolder.toLowerCase()) {
+        return hiveViewer.rootFolder + "/" + file;
+    } else {
+        return file;
+    }
+}
+
 function makeClientResults(clientResults, clientInfos) {
     return $.map(clientResults, function (testResult,clientName) {
         var pass = testResult.pass;
@@ -375,14 +407,14 @@ function makeClientResults(clientResults, clientInfos) {
             name = clientInfo.name;
             version = clientInfo.versionInfo;
             instantiated = clientInfo.instantiatedAt;
-            log = clientInfo.logFile;
+            log = getFilePath(clientInfo.logFile);
         }
         return new testClientResult(pass, details, name, version, instantiated, log);
     });
 }
 function makeClientInfo( clientInfos) {
     return $.map(clientInfos, function (info, infoId) {
-        return new testClientInfo(info.name, info.versionInfo, info.logFile);
+        return new testClientInfo(info.name, info.versionInfo, getFilePath(info.logFile));
     });
 }
 

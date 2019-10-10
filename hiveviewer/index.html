@@ -25,7 +25,7 @@
             hiveViewer = new app();
             hiveViewer.LoadTestSuites("TestResults", "index.txt");
             ko.applyBindings(hiveViewer);
-
+            
         }
         );
     </script>
@@ -62,10 +62,7 @@
                         <i class="fa fa-angle-down" aria-hidden="true"></i>
                         <!-- /ko -->
                     </div>
-       
-                   
                 </div>
-            
             </div>
 
             <div class="collapse" aria-labelledby="#hiveHeader" id="hiveHeaderBody" data-parent="#hive">
@@ -246,7 +243,7 @@
                                                             </div>
                                                         </div>
                                                         <div class="collapse" data-bind="attr:{'aria-labelledby': $parents[1].suiteLabel()+id(), id: $parents[1].suiteLabel()+id()+'detail'}">
-                                                            <div class="card-body">
+                                                            <div class="card-body hive-header">
 
                                                                 <p data-bind="text: summaryResult().details()"></p>
                                                                 <div data-bind="ifnot: clientResults().length==0">
@@ -268,18 +265,26 @@
                                                                     </div>
                                                                 </div>
                                                                 <div data-bind="if: clientResults().length==0">
-                                                                    <p>No client specific results available.</p>
-                                                                    <p>Client Info:</p>
+                                                                    <p>Test has summary results only. No per-client test results involved.</p>
+                                                                    <p>Participating clients:</p>
                                                                     <div data-bind="foreach: clients">
                                                                         <div class="row">
-                                                                            <div class="col-4" data-bind="text:clientName">
+                                                                            <div class="col-3 font-weight-bold font-italic " data-bind="text:clientName">
 
                                                                             </div>
-                                                                            <div class="col-4">
-                                                                                <a data-bind="attr: {href:clientVersion}">Version</a>
+                                                                            <div class="col-3">
+                                                                                <button type="button" class="btn btn-primary btn-block" data-bind="event:{'click': ShowLogs}">
+                                                                                    Show Logs
+                                                                                </button>
+                                                                                <!--<a data-bind="attr: {href:clientVersion}">Version</a>-->
                                                                             </div>
-                                                                            <div class="col-4">
-                                                                                <a data-bind="attr: {href:logfile}">Log</a>
+
+                                                                            <div class="col-3">
+                                                                                <a data-bind="attr: {href:logfile}" download class="btn btn-primary btn-block  " role="button" aria-pressed="true">Download</a>
+
+                                                                            </div>
+                                                                            <div class="col-3">
+
                                                                             </div>
                                                                         </div>
                                                                     </div>
