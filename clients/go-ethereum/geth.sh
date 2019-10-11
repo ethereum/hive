@@ -107,6 +107,11 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
 	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 fi
+
+# Dump genesis
+echo "Supplied genesis state:"
+cat /genesis.json
+
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
 /geth $FLAGS init /genesis.json
@@ -118,12 +123,16 @@ set +e
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
 	/geth $FLAGS --gcmode=archive import /chain.rlp
+else
+	echo "Warning: chain.rlp not found."
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-	(cd blocks && ../geth $FLAGS --gcmode=archive --nocompaction import `ls | sort -n`)
+	(cd blocks && ../geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL --nocompaction import `ls | sort -n`)
+else
+	echo "Warning: blocks folder not found."
 fi
 
 set -e
