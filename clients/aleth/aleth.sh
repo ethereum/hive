@@ -93,9 +93,22 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_add\", \"linear\": { \"base\": 500, \"word\": 0 } } })"`
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\"]; { \"precompiled\": { \"name\": \"alt_bn128_G1_mul\", \"linear\": { \"base\": 40000, \"word\": 0 } } })"`
 		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"precompiled\": { \"name\": \"alt_bn128_pairing_product\" } })"`
+			
 	fi
 
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
+fi
+
+if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+	HIVE_FORK_ISTANBUL=`echo "obase=16; $HIVE_FORK_ISTANBUL" | bc`
+
+	if [ "$((16#$HIVE_FORK_ISTANBUL))" -eq "0" ]; then
+		# Also new precompiles
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"precompiled\": { \"name\": \"blake2_compression\" } })"`
+		
+	fi
+
+	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"istanbulForkBlock\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
 fi
 
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
@@ -106,10 +119,7 @@ if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 	HIVE_FORK_PETERSBURG=`echo "obase=16; $HIVE_FORK_PETERSBURG" | bc`
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"constantinopleFixForkBlock\"]; \"0x$HIVE_FORK_PETERSBURG\")"`
 fi
-if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
-	HIVE_FORK_ISTANBUL=`echo "obase=16; $HIVE_FORK_ISTANBUL" | bc`
-	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"istanbulForkBlock\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
-fi
+
 if [ "$HIVE_CHAIN_ID" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainID\"]; \"0x$HIVE_CHAIN_ID\")"`
 fi

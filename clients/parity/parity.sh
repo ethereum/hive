@@ -90,7 +90,7 @@ if [ "$HIVE_TESTNET" == "1" ]; then
 	done
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; \"0x789b0\")"`
 fi
-if [ "$HIVE_CHAIN_ID" == "1" ]; then
+if [ "$HIVE_CHAIN_ID" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainID\"]; \"0x$HIVE_CHAIN_ID\")"`
 fi
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
@@ -146,9 +146,10 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 	# Also new precompiles
 
 	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\", \"builtin\"]; { \"name\": \"modexp\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"modexp\": { \"divisor\": 20 }  } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"eip1108_transition\": \"0x7fffffffffffff\", \"pricing\": { \"alt_bn128_const_operations\": { \"price\": 500, \"eip1108_transition_price\": 150 } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"eip1108_transition\": \"0x7fffffffffffff\", \"pricing\": { \"alt_bn128_const_operations\": { \"price\": 40000, \"eip1108_transition_price\": 6000 } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\",\"eip1108_transition\": \"0x7fffffffffffff\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 , \"eip1108_transition_base\": 100000, \"eip1108_transition_pair\": 80000 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"eip1108_transition\": \"0x$HIVE_FORK_ISTANBUL\", \"pricing\": { \"alt_bn128_const_operations\": { \"price\": 500, \"eip1108_transition_price\": 150 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"eip1108_transition\": \"0x$HIVE_FORK_ISTANBUL\", \"pricing\": { \"alt_bn128_const_operations\": { \"price\": 40000, \"eip1108_transition_price\": 6000 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\",\"eip1108_transition\": \"0x$HIVE_FORK_ISTANBUL\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 , \"eip1108_transition_base\": 45000, \"eip1108_transition_pair\": 34000 } } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000009\", \"builtin\"]; { \"name\": \"blake2_f\", \"activate_at\": \"0x$HIVE_FORK_ISTANBUL\", \"pricing\": { \"blake2_f\": { \"gas_per_round\": 1} } })"`
 fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	# New shift instructions

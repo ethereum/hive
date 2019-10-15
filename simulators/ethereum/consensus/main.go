@@ -367,6 +367,7 @@ func (be *blocktestExecutor) runTest(t *testcase) error {
 	env := map[string]string{
 		"CLIENT":             be.client,
 		"HIVE_FORK_DAO_VOTE": "1",
+		"HIVE_CHAIN_ID":"1",
 	}
 	files := map[string]string{
 		genesisTarget: genesis,
