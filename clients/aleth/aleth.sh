@@ -104,7 +104,7 @@ if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
 
 	if [ "$((16#$HIVE_FORK_ISTANBUL))" -eq "0" ]; then
 		# Also new precompiles
-		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\"]; { \"precompiled\": { \"name\": \"blake2_compression\" } })"`
+		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000009\"]; { \"precompiled\": { \"name\": \"blake2_compression\" } })"`
 		
 	fi
 
