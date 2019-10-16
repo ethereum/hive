@@ -105,7 +105,7 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 		JQPARAMS="$JQPARAMS + {\"istanbulBlock\": $HIVE_FORK_ISTANBUL}"
 	fi
 	if [ "$HIVE_CHAIN_ID" != "" ]; then
-		chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainId\"]; \"0x$HIVE_CHAIN_ID\")"`
+		JQPARAMS="$JQPARAMS + {\"chainId\": $HIVE_CHAIN_ID}"
 	fi
 	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
 	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
