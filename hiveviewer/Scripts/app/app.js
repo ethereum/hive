@@ -242,6 +242,8 @@ function testSuiteSummary(data) {
 
 }
 
+
+
 //testSuiteSummary.prototype.ToggleSuiteState = function () {
 //    self = this;
 //    self.expanded(!self.expanded());
@@ -301,6 +303,34 @@ function testClientInfo( name, version,  log, instantiated) {
 function sleep(ms) {
     return new Promise(function (resolve) { setTimeout(resolve, ms) });
 }
+//this function repeatedly attempts to call
+// initPopup on the popup window, as there
+// does not seem to be any reliable way
+// of waiting on the definition of the function
+// to be ready.
+function provokePopup(popup,self) {
+    $(popup).ready(async function () {
+
+        var counter = 30;
+        var success = false;
+        for (i = counter; i >= 0; i--) {
+
+            try {
+                popup.initPopup(ko, self);
+                success = true;
+            }
+            catch (e) {
+                console.error("Exception thrown", e.stack);
+            };
+
+
+            await sleep(200);
+            if (success) break;
+        }
+
+
+    });
+}
 
 testClientInfo.prototype.ShowLogs = function () {
     self = this;
@@ -310,27 +340,9 @@ testClientInfo.prototype.ShowLogs = function () {
 
     var popup = window.open("popup.html", "_blank", 'toolbar=no, menubar=no, resizable=yes');
   
-  
+    provokePopup(popup,self);
 
-    $(popup).ready(async function () {
-
-        var counter = 30;
-        var success = false;
-        for (i = counter; i >= 0; i--) {
-            
-            try {
-                popup.initPopup(ko, self);
-                success = true;
-            }
-            catch (e) { };
-            
-            
-            await sleep(200);
-            if (success) break;
-        }
-        
-
-    });
+   
 
     return true;
 
@@ -394,8 +406,8 @@ function testCase(data) {
     this.clientResults = ko.observableArray(makeClientResults(data.clientResults, data.clientInfo));
     var clientInfos = makeClientInfo(data.clientInfo);
     this.clients = ko.observableArray(clientInfos);
-    var dur = moment.duration(moment(self.end()).diff(moment(self.start())));
-    self.duration = ko.observable(calcFineDuration(dur));
+    self.dur = ko.observable(moment.duration(moment(self.end()).diff(moment(self.start()))));
+    self.duration = ko.observable(calcFineDuration(self.dur()));
     self.passTextStyle = ko.computed(function () {
         return self.summaryResult().pass() ? "text-success" : "text-danger";
     });
@@ -471,6 +483,7 @@ function calcFineDuration(duration) {
  */
 function testSuite(data) {
     var self = this;
+    self.original = data;
     self.id = ko.observable(data.id);
    
     self.name = ko.observable(data.name);
@@ -493,7 +506,7 @@ function testSuite(data) {
     self.duration = ko.observable(calcDuration(dur));
     self.showStateFlag = ko.observable(false);
     self.showState = ko.computed(function () {
-        return self.showStateFlag() ? "Hide" : "Show";
+        return self.showStateFlag() ? "Hide" : "Preview";
     });
 
     self.pageNumber = ko.observable(0);
@@ -505,20 +518,77 @@ function testSuite(data) {
         var start = self.pageNumber() * self.maxPerPage();
         return self.testCases.slice(start, start + self.maxPerPage());
     });
-
-    this.hasPrevious = ko.computed(function () {
+    self.hasPrevious = ko.computed(function () {
         return (self.pageNumber() !== 0) ? "" : "disabled";
     });
 
-    this.hasNext = ko.computed(function () {
+    self.hasNext = ko.computed(function () {
         return (self.pageNumber() !== self.totalPages()) ? "" : "disabled";
     });
+    self.nameSortAsc = ko.observable(true);
+    self.nameSort = ko.computed(function () { return self.nameSortAsc() ? "fa-angle-down" : "fa-angle-up" });
+    self.startSortAsc = ko.observable(true);
+    self.startSort = ko.computed(function () { return self.startSortAsc() ? "fa-angle-down" : "fa-angle-up" });
+    self.durationSortAsc = ko.observable(true);
+    self.durationSort = ko.computed(function () { return self.durationSortAsc() ? "fa-angle-down" : "fa-angle-up" });
+    self.passSortAsc = ko.observable(true);
+    self.passSort = ko.computed(function () { return self.passSortAsc() ? "fa-angle-down" : "fa-angle-up" });
+}
 
-   
 
-   
+testSuite.prototype.nameSortToggle = function () {
+    self = this;
+    self.nameSortAsc(!self.nameSortAsc());
+    //implemented here on the toggle event, which is not recommended,
+    //as a way of implementing 'sort this, then that', depending on
+    //click order
+    self.testCases.sort(function (l, r) {
+        if (!self.nameSortAsc()) { var s = r; r = l; l = s;}
+        return l.name() == r.name() ? 0
+            : l.name() < r.name() ? -1
+                : 1;
+    });
 
 }
+
+testSuite.prototype.durationSortToggle = function () {
+    self = this;
+    self.durationSortAsc(!self.durationSortAsc());
+    
+    self.testCases.sort(function (l, r) {
+        if (!self.durationSortAsc()) { var s = r; r = l; l = s; }
+        return l.dur().asMilliseconds() == r.dur().asMilliseconds() ? 0
+            : l.dur().asMilliseconds() < r.dur().asMilliseconds() ? -1
+                : 1;
+    });
+
+}
+
+testSuite.prototype.startSortToggle = function () {
+    self = this;
+    self.startSortAsc(!self.startSortAsc());
+
+    self.testCases.sort(function (l, r) {
+        if (!self.startSortAsc()) { var s = r; r = l; l = s; }
+        return l.start() == r.start() ? 0
+            : l.start() < r.start() ? -1
+                : 1;
+    });
+}
+
+
+testSuite.prototype.passSortToggle = function () {
+    self = this;
+    self.passSortAsc(!self.passSortAsc());
+
+    self.testCases.sort(function (l, r) {
+        if (!self.passSortAsc()) { var s = r; r = l; l = s; }
+        return l.summaryResult().pass() == r.summaryResult().pass() ? 0
+            : l.summaryResult().pass() < r.summaryResult().pass() ? -1
+                : 1;
+    });
+}
+
 
 testSuite.prototype.Next = function () {
     var self = this;
@@ -540,5 +610,21 @@ testSuite.prototype.ToggleTestCases = function () {
     self.showStateFlag(!self.showStateFlag());
 
 }
+
+testSuite.prototype.OpenTestSuite = function (vm,e) {
+    var context = ko.contextFor(e.target);
+    var summary= context.$parent;
+    var clonedSummary = new testSuiteSummary(ko.utils.parseJson(ko.toJSON(summary)));
+    //var clonedSuite = new testSuite(ko.utils.parseJson(ko.toJSON(this)));
+    var clonedSuite = new testSuite(ko.utils.parseJson(ko.toJSON(this.original)));
+    clonedSummary.testSuite(clonedSuite);
+    clonedSuite.maxPerPage(100);
+    var popup = window.open("testsuite.html", "_blank", 'toolbar=no, menubar=no, resizable=yes');
+
+    provokePopup(popup, clonedSummary);
+
+
+}
+
 
 

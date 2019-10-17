@@ -1,0 +1,103 @@
+﻿<div class="row mt-4">
+    <div class="col-12">
+        <div class="card  bg-dark text-white">
+            <div class="card-header">
+                <div class="row">
+                    <div class="col-sm-3" data-bind="event:{'click': nameSortToggle}">Name<i class="fa float-right" data-bind="class: nameSort" ></i></div>
+                    <div class="col-sm-3" data-bind="event:{'click': startSortToggle}">Start<i class="fa float-right" data-bind="class: startSort"></i></div>
+                    <div class="col-sm-3" data-bind="event:{'click': durationSortToggle}">Duration<i class="fa float-right" data-bind="class: durationSort"></i></div>
+                    <div class="col-sm-3" data-bind="event:{'click': passSortToggle}">Pass<i class="fa float-right" data-bind="class: passSort"></i></div>
+                </div>
+            </div>
+        </div>
+        <div data-bind="foreach: pageEntries">
+            <div class="card">
+                <div class="card-header" data-toggle="collapse" aria-expanded="false" data-bind="attr:{id: $parents[1].suiteLabel()+id(), 'data-target': '#'+$parents[1].suiteLabel()+id()+'detail', 'aria-controls': '#'+$parents[1].suiteLabel()+id()+'detail' }">
+                    <div class="row">
+                        <div class="col-sm-3 font-weight-bold" data-bind="text: name"></div>
+                        <div class="col-sm-3" data-bind="text: moment(start()).format('h:mm:ss a')"></div>
+                        <div class="col-sm-3" data-bind="text: duration()"></div>
+                        <div class="col-sm-3" data-bind="text: summaryResult().passLabel(), class:passTextStyle"></div>
+                    </div>
+                </div>
+                <div class="collapse" data-bind="attr:{'aria-labelledby': $parents[1].suiteLabel()+id(), id: $parents[1].suiteLabel()+id()+'detail'}">
+                    <div class="card-body hive-header">
+
+                        <p data-bind="text: summaryResult().details()"></p>
+                        <div data-bind="ifnot: clientResults().length==0">
+                            <div data-bind="foreach: clientResults">
+                                <div class="row">
+                                    <div class="col-3" data-bind="text:details">
+
+                                    </div>
+                                    <div class="col-3" data-bind="text:clientName">
+
+                                    </div>
+                                    <div class="col-3" data-bind="text:clientVersion">
+
+                                    </div>
+                                    <div class="col-3" data-bind="text:logfile">
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div data-bind="if: clientResults().length==0">
+                            <p>Test has summary results only. No per-client test results involved, or the test only involves one client.</p>
+                            <p>Participating clients:</p>
+                            <div data-bind="foreach: clients">
+                                <div class="row">
+                                    <div class="col-3 font-weight-bold font-italic " data-bind="text:clientName">
+
+                                    </div>
+                                    <!-- ko if: clientInstantiated -->
+                                    <div class="col-3">
+                                        <button type="button" class="btn btn-primary btn-block" data-bind="event:{'click': ShowLogs}">
+                                            Show Logs
+                                        </button>
+
+                                    </div>
+
+                                    <div class="col-3">
+                                        <a data-bind="attr: {href:logfile}" download class="btn btn-primary btn-block  " role="button" aria-pressed="true">Download</a>
+
+                                    </div>
+                                    <div class="col-3">
+
+                                    </div>
+                                    <!-- /ko -->
+                                    <!-- ko ifnot: clientInstantiated -->
+                                    <div class="col-9">
+                                        Client was not instantiated, no logs available.
+                                    </div>
+                                    <!-- /ko -->
+                                </div>
+                            </div>
+                        </div>
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<div class="row mt-4">
+    <div class="col-4"></div>
+    <div class="col-4">
+        <nav aria-label="...">
+            <ul class="pagination justify-content-center">
+                <li class="page-item " data-bind="class: hasPrevious">
+                    <a class="page-link" href="#" data-bind="click: Previous">Previous</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" data-bind="text: pageNumber" href="#"> <span class="sr-only">(current)</span></a>
+                </li>
+                <li class="page-item" data-bind="class: hasNext">
+                    <a class="page-link" href="#" data-bind="click: Next">Next</a>
+                </li>
+            </ul>
+        </nav>
+    </div>
+    <div class="col-4"></div>
+</div>
