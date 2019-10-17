@@ -494,37 +494,29 @@ function testSuite(data) {
             : l.summaryResult().pass() < r.summaryResult().pass() ? -1
                 : 1;
     }));
+
+    //some properties
     var earliest = Math.min.apply(Math, testCases.map(function (tc) { return tc.start(); }));
     var latest = Math.max.apply(Math, testCases.map(function (tc) { return tc.end(); }));
-    var fails = testCases.map(function (tc) { if (!tc.summaryResult().pass()) return 1; else return 0; }).reduce(function (a, b) { return a + b; },0);
+    var fails = testCases.map(function (tc) { if (!tc.summaryResult().pass()) return 1; else return 0; }).reduce(function (a, b) { return a + b; }, 0);
     var successes = testCases.map(function (tc) { if (tc.summaryResult().pass()) return 1; else return 0; }).reduce(function (a, b) { return a + b; }, 0);
     self.started = ko.observable(earliest);
     self.ended = ko.observable(latest);
     self.passes = ko.observable(successes);
     self.fails = ko.observable(fails);
-    var dur= moment.duration(  moment(self.ended()).diff(moment(self.started())));
+    var dur = moment.duration(moment(self.ended()).diff(moment(self.started())));
     self.duration = ko.observable(calcDuration(dur));
     self.showStateFlag = ko.observable(false);
     self.showState = ko.computed(function () {
         return self.showStateFlag() ? "Hide" : "Inline";
     });
+    //end of some properties
 
-    self.pageNumber = ko.observable(0);
-    self.maxPerPage = ko.observable(25);
-    self.totalPages = ko.computed(function () {
-        return Math.ceil(self.testCases().length / self.maxPerPage());
-    });
-    self.pageEntries = ko.computed(function () {
-        var start = self.pageNumber() * self.maxPerPage();
-        return self.testCases.slice(start, start + self.maxPerPage());
-    });
-    self.hasPrevious = ko.computed(function () {
-        return (self.pageNumber() !== 0) ? "" : "disabled";
-    });
 
-    self.hasNext = ko.computed(function () {
-        return (self.pageNumber() !== self.totalPages()) ? "" : "disabled";
-    });
+    //sorty-filtery stuff
+    self.nameFilterNow = ko.observable("");
+    self.nameFilterDelayed = ko.pureComputed(this.nameFilterNow).extend({ rateLimit: { method: "notifyWhenChangesStop", timeout: 300 } }); //observable with rate limiter
+
     self.nameSortAsc = ko.observable(true);
     self.nameSort = ko.computed(function () { return self.nameSortAsc() ? "fa-angle-down" : "fa-angle-up" });
     self.startSortAsc = ko.observable(true);
@@ -533,6 +525,39 @@ function testSuite(data) {
     self.durationSort = ko.computed(function () { return self.durationSortAsc() ? "fa-angle-down" : "fa-angle-up" });
     self.passSortAsc = ko.observable(true);
     self.passSort = ko.computed(function () { return self.passSortAsc() ? "fa-angle-down" : "fa-angle-up" });
+    self.filteredCases = ko.computed(function () {
+        return self.testCases().filter(function (t) {
+
+            return (
+                (self.nameFilterDelayed() === "") ||
+                (t.name().includes(self.nameFilterDelayed()))
+            );
+        });
+    }
+        
+    );
+    //end sorty-filtery stuff
+
+    //pagey stuff
+    self.pageNumber = ko.observable(0);
+    self.maxPerPage = ko.observable(25);
+    self.totalPages = ko.computed(function () {
+        return Math.ceil(self.filteredCases().length / self.maxPerPage());
+    });
+    self.pageEntries = ko.computed(function () {
+        var start = self.pageNumber() * self.maxPerPage();
+        return self.filteredCases().slice(start, start + self.maxPerPage());
+    });
+    self.hasPrevious = ko.computed(function () {
+        return (self.pageNumber() !== 0) ? "" : "disabled";
+    });
+
+    self.hasNext = ko.computed(function () {
+        return (self.pageNumber() !== self.totalPages()) ? "" : "disabled";
+    });
+    //end of pagey stuff
+
+   
 }
 
 

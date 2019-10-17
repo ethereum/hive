@@ -2,11 +2,21 @@
     <div class="col-12">
         <div class="card  bg-dark text-white">
             <div class="card-header">
+
                 <div class="row">
-                    <div class="col-sm-3" data-bind="event:{'click': nameSortToggle}">Name<i class="fa float-right" data-bind="class: nameSort" ></i></div>
+                    <div class="col-sm-3" data-bind="event:{'click': nameSortToggle}">Name<i class="fa float-right" data-bind="class: nameSort"></i></div>
                     <div class="col-sm-3" data-bind="event:{'click': startSortToggle}">Start<i class="fa float-right" data-bind="class: startSort"></i></div>
                     <div class="col-sm-3" data-bind="event:{'click': durationSortToggle}">Duration<i class="fa float-right" data-bind="class: durationSort"></i></div>
                     <div class="col-sm-3" data-bind="event:{'click': passSortToggle}">Pass<i class="fa float-right" data-bind="class: passSort"></i></div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-3">
+                        <div class="input-group">
+
+                            <input type="text" class="form-control" aria-label="Default" aria-describedby="filterName" data-bind='textInput: nameFilterNow'>
+                        </div>
+                    </div>
+                    <div class="col-6"></div>
                 </div>
             </div>
         </div>
