@@ -506,7 +506,7 @@ function testSuite(data) {
     self.duration = ko.observable(calcDuration(dur));
     self.showStateFlag = ko.observable(false);
     self.showState = ko.computed(function () {
-        return self.showStateFlag() ? "Hide" : "Preview";
+        return self.showStateFlag() ? "Hide" : "Inline";
     });
 
     self.pageNumber = ko.observable(0);
@@ -614,14 +614,14 @@ testSuite.prototype.ToggleTestCases = function () {
 testSuite.prototype.OpenTestSuite = function (vm,e) {
     var context = ko.contextFor(e.target);
     var summary= context.$parent;
-    var clonedSummary = new testSuiteSummary(ko.utils.parseJson(ko.toJSON(summary)));
-    //var clonedSuite = new testSuite(ko.utils.parseJson(ko.toJSON(this)));
-    var clonedSuite = new testSuite(ko.utils.parseJson(ko.toJSON(this.original)));
-    clonedSummary.testSuite(clonedSuite);
-    clonedSuite.maxPerPage(100);
+   // var clonedSummary = new testSuiteSummary(ko.utils.parseJson(ko.toJSON(summary)));
+ 
+ //   var clonedSuite = new testSuite(ko.utils.parseJson(ko.toJSON(this.original)));
+  //  clonedSummary.testSuite(clonedSuite);
+  //  clonedSuite.maxPerPage(100);
     var popup = window.open("testsuite.html", "_blank", 'toolbar=no, menubar=no, resizable=yes');
 
-    provokePopup(popup, clonedSummary);
+    provokePopup(popup, summary);
 
 
 }

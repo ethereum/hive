@@ -216,7 +216,7 @@
                                                                 <button type="button" class="btn btn-block btn-primary h-100" data-bind="event:{'click': OpenTestSuite}">Open</button>
                                                             </div>
                                                             <div class="col-6">
-                                                                <button type="button" class="btn btn-block btn-primary h-100" data-bind="event:{'click': ToggleTestCases}, text: showState">Preview</button>
+                                                                <button type="button" class="btn btn-block btn-primary h-100" data-bind="event:{'click': ToggleTestCases}, text: showState">Inline</button>
                                                             </div>
                                                             
                                                         </div>
@@ -254,7 +254,7 @@
                                                             <div class="row">
                                                                 <div class="col-sm-3 font-weight-bold" data-bind="text: name"></div>
                                                                 <div class="col-sm-3" data-bind="text: moment(start()).format('h:mm:ss a')"></div>
-                                                                <div class="col-sm-3" data-bind="text: duration()"></div>
+                                                                <div class="col-sm-3" data-bind="text: dur().humanize()"></div>
                                                                 <div class="col-sm-3" data-bind="text: summaryResult().passLabel(), class:passTextStyle"></div>
                                                             </div>
                                                         </div>
