@@ -116,7 +116,7 @@ func TestSyncsWithGeth(t *testing.T) {
 			"HIVE_NODETYPE":           "full", //fast sync
 		}
 		mainFiles := map[string]string{
-			"HIVE_INIT_GENESIS": "/simplechain/genesis.json",
+			"genesis.json": "/simplechain/genesis.json",
 		}
 		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms, mainFiles)
 		if err != nil {
@@ -145,8 +145,8 @@ func TestSyncsWithGeth(t *testing.T) {
 					// "HIVE_FORK_CONSTANTINOPLE": "0",
 				}
 				files := map[string]string{
-					"HIVE_INIT_GENESIS": "/simplechain/genesis.json",
-					"HIVE_INIT_CHAIN":   "/simplechain/chain.rlp",
+					"genesis.json": "/simplechain/genesis.json",
+					"chain.rlp":    "/simplechain/chain.rlp",
 				}
 				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms, files)
 				if err != nil {
@@ -213,8 +213,8 @@ func TestSyncsWithGeth(t *testing.T) {
 		}
 
 		mainFiles := map[string]string{
-			"HIVE_INIT_GENESIS": "/simplechain/genesis.json",
-			"HIVE_INIT_CHAIN":   "/simplechain/chain.rlp",
+			"genesis.json": "/simplechain/genesis.json",
+			"chain.rlp":    "/simplechain/chain.rlp",
 		}
 
 		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms, mainFiles)
@@ -250,7 +250,7 @@ func TestSyncsWithGeth(t *testing.T) {
 				}
 
 				files := map[string]string{
-					"HIVE_INIT_GENESIS": "/simplechain/genesis.json",
+					"genesis.json": "/simplechain/genesis.json",
 				}
 
 				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms, files)

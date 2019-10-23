@@ -15,8 +15,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/log"
-
 	"github.com/ethereum/hive/simulators/common"
 )
 
@@ -220,10 +218,7 @@ func postWithFiles(url string, values map[string]string, files map[string]string
 		if err != nil {
 			return "", err
 		}
-		fi, err := filereader.Stat()
-		if err == nil {
-			log.Info("filename ", filename, " size:", fi.Size)
-		}
+		//fi, err := filereader.Stat()
 
 		formValues[key] = filereader
 	}
