@@ -156,5 +156,5 @@ fi
 # Run the go-ethereum implementation with the requested flags
 
 echo "Running go-ethereum with flags $FLAGS"
-/geth $FLAGS  --verbosity=$HIVE_LOGLEVEL --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
+/geth $FLAGS  --verbosity=$HIVE_LOGLEVEL --nat=none --rpc --rpcaddr "0.0.0.0"  --graphql --graphql.addr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
 

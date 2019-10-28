@@ -40,7 +40,7 @@ ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh 
 
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 30303 30303/udp
+EXPOSE 8545 8547 30303 30303/udp
 
 ADD genesis.json /genesis.json
 
