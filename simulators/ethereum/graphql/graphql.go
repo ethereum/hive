@@ -46,6 +46,7 @@ func deliverTests() chan *testcase {
 				log.Error("error", "err", err)
 				return nil
 			}
+
 			testname := strings.TrimSuffix(info.Name(), path.Ext(info.Name()))
 			expectedfn := strings.TrimSuffix(filepath, path.Ext(filepath)) + ".json"
 			expected, err := ioutil.ReadFile(expectedfn)
@@ -125,8 +126,9 @@ func runTest(t *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID,
 	if err != nil {
 		return err
 	}
+	graphql := strings.ReplaceAll(strings.ReplaceAll(string(t.graphql), "\r", ""), "\n", "") //the newlines either work or don't depending on the executing platform. remove.
 
-	nodeQuery := fmt.Sprintf("http://%s:8547/graphql/query=%s", ip.String(), string(t.graphql))
+	nodeQuery := fmt.Sprintf("http://%s:8547/graphql/query=%s", ip.String(), graphql)
 	resp, err := http.Get(nodeQuery)
 	if err != nil {
 		return err

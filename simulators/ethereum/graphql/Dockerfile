@@ -1,5 +1,5 @@
 # This simulation runs various graphql tests
-FROM golang:1.11-alpine as builder
+FROM golang:1.13-alpine as builder
 RUN apk add --no-cache git make gcc musl-dev linux-headers bash
 RUN GOPATH=/go 
 RUN go get -u -v github.com/derekparker/delve/cmd/dlv
