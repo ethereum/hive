@@ -2,7 +2,7 @@
 
 FROM golang:1-alpine
 
-
+ENV GO111MODULE=on
 
 # Build a geth bootnode, regular node from the develop branch and unit test binary
 RUN apk add --update git make gcc musl-dev curl jq linux-headers
@@ -10,8 +10,9 @@ RUN apk add --update git make gcc musl-dev curl jq linux-headers
 # Get master branch of geth
 RUN (git clone -b master --single-branch https://github.com/ethereum/go-ethereum /go/src/github.com/ethereum/go-ethereum)
 
-RUN (cd /go/src/github.com/ethereum/go-ethereum )
+RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go go get )
 
+ENV GO111MODULE=off
 # Build geth
 #RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go make all)
 #RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go go get)
@@ -23,7 +24,8 @@ RUN (cd /go/src/github.com/fsouza/go-dockerclient && GOPATH=/go go get)
 
 RUN go get -u -v github.com/derekparker/delve/cmd/dlv
 RUN go get -u -v github.com/google/uuid
-RUN go get -u -v github.com/VictoriaMetrics/fastcache
+# RUN go get -u -v github.com/VictoriaMetrics/fastcache
+# RUN go get -u -v github.com/aristanetworks/goarista/monotime
 #RUN (cd / && GOPATH=/go go get github.com/fsouza/go-dockerclient)
 
 
