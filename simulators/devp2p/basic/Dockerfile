@@ -13,8 +13,8 @@ RUN (git clone -b master --single-branch https://github.com/ethereum/go-ethereum
 RUN (cd /go/src/github.com/ethereum/go-ethereum )
 
 # Build geth
-RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go make all)
-RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go go get)
+#RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go make all)
+#RUN (cd /go/src/github.com/ethereum/go-ethereum && GOPATH=/go go get)
 
 # Add the docker client
 RUN (git clone -b master https://github.com/fsouza/go-dockerclient /go/src/github.com/fsouza/go-dockerclient)
