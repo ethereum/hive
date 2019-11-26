@@ -23,6 +23,7 @@ RUN (cd /go/src/github.com/fsouza/go-dockerclient && GOPATH=/go go get)
 
 RUN go get -u -v github.com/derekparker/delve/cmd/dlv
 RUN go get -u -v github.com/google/uuid
+RUN go get -u -v github.com/VictoriaMetrics/fastcache
 #RUN (cd / && GOPATH=/go go get github.com/fsouza/go-dockerclient)
 
 
