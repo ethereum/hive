@@ -4,6 +4,8 @@
 echo "Starting simulator."
 cd /go/src/github.com/ethereum/hive/simulators/devp2p/basic/
 
+
+
 echo "Simulator endpoint: $HIVE_SIMULATOR"
 echo "Simulator parallelism: $HIVE_PARALLELISM"
 

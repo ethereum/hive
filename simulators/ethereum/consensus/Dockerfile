@@ -3,11 +3,11 @@ FROM golang:1.11-alpine as builder
 
 RUN apk add --no-cache git make gcc musl-dev linux-headers bash
 RUN GOPATH=/go 
-RUN go get -u -v github.com/derekparker/delve/cmd/dlv
-RUN go get -u -v github.com/google/uuid
 
-# Get master branch of geth
-RUN (git clone -b master --single-branch https://github.com/ethereum/go-ethereum /go/src/github.com/ethereum/go-ethereum)
+ENV GO111MODULE=off
+RUN go get -u -v github.com/derekparker/delve/cmd/dlv
+ENV GO111MODULE=on
+
 
 # Add the local test stuff, preserving paths for remote debugger
 ADD /ethereum/consensus/main.go /go/src/github.com/ethereum/hive/simulators/ethereum/consensus/main.go
@@ -19,6 +19,9 @@ RUN apk add --no-cache ca-certificates git
 RUN git clone --depth 1 https://github.com/ethereum/tests.git /tests
 
 ENV TESTPATH /tests
+
+# Use modules (temp fix until sims are sub modules)
+RUN (cd /go/src/github.com/ethereum/hive/simulators/ && go mod init)
 
 # Add the entry script
 ADD /ethereum/consensus/tests.sh /tests.sh
