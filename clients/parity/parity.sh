@@ -47,9 +47,9 @@ if [ "$HIVE_NETWORK_ID" != "" ]; then
 fi
 
 # Configure and set the chain definition for the node
-chainconfig=`cat ./chain.json`
+chainconfig=`cat /chain.json`
 
-genesis=`cat ./genesis.json`
+genesis=`cat /genesis.json`
 genesis="${genesis/coinbase/author}"
 
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
@@ -210,15 +210,15 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	/parity $FLAGS import /chain.rlp
+	parity $FLAGS import /chain.rlp
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
 	for block in `ls /blocks | sort -n`; do
-		echo "/parity $FLAGS import /blocks/$block"
-		/parity $FLAGS import /blocks/$block
+		echo "parity $FLAGS import /blocks/$block"
+		parity $FLAGS import /blocks/$block
 	done
 fi
 
@@ -241,4 +241,4 @@ fi
 
 # Run the parity implementation with the requested flags
 echo "Running parity..."
-/parity $FLAGS  --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all
+parity $FLAGS  --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all
