@@ -1,0 +1,137 @@
+#!/bin/bash
+
+# Startup script to initialize and boot a peer instance.
+#
+# This script assumes the following files:
+#  - `genesis.json` file is located at /etc/besu/genesis.json (mandatory)
+#
+# This script assumes the following environment variables:
+#  - HIVE_BOOTNODE             enode URL of the remote bootstrap node
+#  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
+#  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
+#  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
+#  - HIVE_FORK_HOMESTEAD       block number of the DAO hard-fork transition
+#  - HIVE_FORK_DAO_BLOCK       block number of the DAO hard-fork transitionnsition
+#  - HIVE_FORK_TANGERINE       block number of TangerineWhistle
+#  - HIVE_FORK_SPURIOUS        block number of SpuriousDragon
+#  - HIVE_FORK_BYZANTIUM       block number for Byzantium transition
+#  - HIVE_FORK_CONSTANTINOPLE  block number for Constantinople transition
+#  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/Petersburg transition
+#  - HIVE_FORK_ISTANBUL        block number for Istanbul transition
+#  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
+#  - HIVE_FORK_BERLIN          block number for Berlin transition
+#  - HIVE_FORK_LONDON          block number for London transition
+#  - HIVE_FORK_SHANGHAI        block number for Shanghai transition
+#  - HIVE_FORK_CANCUN          block number for Cancun transition
+#  - HIVE_FORK_PRAGUE          block number for Prague transition
+#  - HIVE_FORK_OSAKA           block number for Osaka transition
+#  - HIVE_MINER                address to credit with mining rewards (single thread)
+#  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
+#  - HIVE_LOGLEVEL		       Simulator loglevel
+
+# These flags are not supported by the Besu hive client
+#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
+#  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
+#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
+
+if [ "$HIVE_BOOTNODE" != "" ]; then
+  FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+fi
+
+if [ "$HIVE_NETWORK_ID" != "" ]; then
+	FLAGS="$FLAGS --network-id=$HIVE_NETWORK_ID"
+fi
+
+if [ "$HIVE_NODETYPE" == "full" ]; then
+	FLAGS="$FLAGS --sync-mode=FAST"
+fi
+if [ "$HIVE_NODETYPE" == "light" ]; then
+    echo "Pantheon does not support light nodes"
+fi
+
+if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
+	# Override any chain configs fron ENV vars into json
+	chainconfig="{\"ethash\": {}}"
+	JQPARAMS=". "
+	if [ "$HIVE_CHAIN_ID" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"chainID\": $HIVE_CHAIN_ID}"
+	fi
+	if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"
+	fi
+	if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"
+	fi
+	if [ "$HIVE_FORK_TANGERINE" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"eip150Block\": $HIVE_FORK_TANGERINE}"
+	fi
+	if [ "$HIVE_FORK_TANGERINE_HASH" != "" ]; then
+		chainconfig=`echo $chainconfig | jq ". + {\"eip150Hash\": $HIVE_FORK_TANGERINE_HASH}"`
+	fi
+	if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"
+		JQPARAMS="$JQPARAMS + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"
+	fi
+	if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"
+	fi
+	if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"
+	fi
+	if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_PETERSBURG}"
+	fi
+	if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_ISTANBUL}"
+	fi
+	if [ "$HIVE_FORK_MUIR_GLACIER" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_MUIR_GLACIER}"
+	fi
+	if [ "$HIVE_FORK_BERLIN" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"berlinBlock\": $HIVE_FORK_MUIR_BERLIN}"
+	fi
+	if [ "$HIVE_FORK_LONDON" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"londonBlock\": $HIVE_FORK_MUIR_LONDON}"
+	fi
+	if [ "$HIVE_FORK_SHANGHAI" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"shanghaiBlock\": $HIVE_FORK_MUIR_SHANGHAI}"
+	fi
+	if [ "$HIVE_FORK_CANCUN" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"cancunBlock\": $HIVE_FORK_MUIR_CANCUN}"
+	fi
+	if [ "$HIVE_FORK_PRAGUE" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"pragueBlock\": $HIVE_FORK_MUIR_PRAGUE}"
+	fi
+	if [ "$HIVE_FORK_OSAKA" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"osakaBlock\": $HIVE_FORK_MUIR_OSAKA}"
+	fi
+	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
+	genesis=`cat /etc/besu/genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /etc/besu/genesis.json
+fi
+
+
+if [ "$HIVE_MINER" != "" ]; then
+  FLAGS="$FLAGE --miner-enabled --miner-coinbase=$HIVE_MINER"
+fi
+if [ "$HIVE_MINER_EXTRA" != "" ]; then
+  FLAGS="$FLAGS --miner-extra-data=$HIVE_MINER_EXTRA"
+fi
+
+if [ "$HIVE_LOGLEVEL" == "0" ]; then
+  FLAGS="$FLAGS --logging=OFF"
+elif [ "$HIVE_LOGLEVEL" == "1" ]; then
+  FLAGS="$FLAGS --logging=ERROR"
+elif [ "$HIVE_LOGLEVEL" == "2" ]; then
+  FLAGS="$FLAGS --logging=WARN"
+elif [ "$HIVE_LOGLEVEL" == "3" ]; then
+  FLAGS="$FLAGS --logging=INFO"
+elif [ "$HIVE_LOGLEVEL" == "4" ]; then
+  FLAGS="$FLAGS --logging=DEBUG"
+elif [ "$HIVE_LOGLEVEL" == "5" ]; then
+  FLAGS="$FLAGS --logging=TRACE"
+  env
+  echo $FLAGS
+  cat /etc/besu/genesis.json
+fi
+
+/opt/besu/bin/besu --genesis-file=/etc/besu/genesis.json $FLAGS
