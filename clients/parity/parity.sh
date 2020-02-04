@@ -47,9 +47,9 @@ if [ "$HIVE_NETWORK_ID" != "" ]; then
 fi
 
 # Configure and set the chain definition for the node
-chainconfig=`cat ./chain.json`
+chainconfig=`cat /chain.json`
 
-genesis=`cat ./genesis.json`
+genesis=`cat /genesis.json`
 genesis="${genesis/coinbase/author}"
 
 accounts=`echo $genesis | jq ".alloc"` && genesis=`echo $genesis | jq "del(.alloc)"`
@@ -90,7 +90,7 @@ if [ "$HIVE_TESTNET" == "1" ]; then
 	done
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"homesteadTransition\"]; \"0x789b0\")"`
 fi
-if [ "$HIVE_CHAIN_ID" == "1" ]; then
+if [ "$HIVE_CHAIN_ID" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainID\"]; \"0x$HIVE_CHAIN_ID\")"`
 fi
 if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
@@ -121,6 +121,15 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip161dTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"maxCodeSizeTransition\"]; \"0x$HIVE_FORK_SPURIOUS\")"`
 fi
+
+# independent of the forks
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\",  \"pricing\": {  } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\",  \"pricing\": {  } })"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\",  \"pricing\": { } })"`
+	
+
+	
+
 if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 	# Based on 
 	# https://github.com/paritytech/parity/blob/metropolis-update/ethcore/res/ethereum/byzantium_test.json
@@ -134,8 +143,6 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 	# difficulty calculation -- aka bomb delay
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"eip100bTransition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 
-	
-	
 	# General params
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip140Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip211Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
@@ -143,12 +150,16 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip658Transition\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 
 
-	# Also new precompiles
-
+	# Precompiles
 	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000005\", \"builtin\"]; { \"name\": \"modexp\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"modexp\": { \"divisor\": 20 }  } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"linear\": { \"base\": 500, \"word\": 0 } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"linear\": { \"base\": 40000, \"word\": 0 } } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\", \"activate_at\": \"0x$HIVE_FORK_BYZANTIUM\", \"pricing\": { \"alt_bn128_pairing\": { \"base\": 100000, \"pair\": 80000 } } })"`
+
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\", \"pricing\", \"0x$HIVE_FORK_BYZANTIUM\" ]; { \"price\": { \"alt_bn128_const_operations\": { \"price\": 500 }}   } )"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\", \"pricing\", \"0x$HIVE_FORK_BYZANTIUM\" ]; { \"price\": { \"alt_bn128_const_operations\": { \"price\": 40000 }}   } )"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\",\"pricing\", \"0x$HIVE_FORK_BYZANTIUM\" ]; { \"price\": { \"alt_bn128_pairing\":  { \"base\": 100000, \"pair\": 80000 }}   } )"`
+
+
+
+
 fi
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	# New shift instructions
@@ -156,7 +167,7 @@ if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	# EXTCODEHASH
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1052Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
 	# EIP 1283, net gas metering version 2
-	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
+	
 	# Skinny create 2
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1014Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
 	# Ethash params
@@ -164,9 +175,26 @@ if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"engine\", \"Ethash\", \"params\", \"blockReward\",\"0x$HIVE_FORK_CONSTANTINOPLE\"]; \"0x1BC16D674EC80000\")"`
 
 fi
-if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
-	# EIP 1283 disabling
-	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283DisableTransition\"]; \"0x$HIVE_FORK_PETERSBURG\")"`
+# if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
+# 	# EIP 1283 disabling
+# 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283DisableTransition\"]; \"0x$HIVE_FORK_PETERSBURG\")"`
+# fi
+if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283DisableTransition\"]; \"0x0\")"`
+	 chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283ReenableTransition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1283Transition\"]; \"0x0\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1344Transition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1706Transition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1884Transition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip2028Transition\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\", \"pricing\", \"0x$HIVE_FORK_ISTANBUL\" ]; { \"price\": { \"alt_bn128_const_operations\": { \"price\": 150 }}   } )"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\", \"pricing\", \"0x$HIVE_FORK_ISTANBUL\" ]; { \"price\": { \"alt_bn128_const_operations\": { \"price\": 6000 }}   } )"`
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\",\"pricing\", \"0x$HIVE_FORK_ISTANBUL\" ]; { \"price\": { \"alt_bn128_pairing\":  { \"base\": 45000, \"pair\": 34000 }}   } )"`
+
+
+	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000009\", \"builtin\"]; { \"name\": \"blake2_f\", \"activate_at\": \"0x$HIVE_FORK_ISTANBUL\", \"pricing\": { \"blake2_f\": { \"gas_per_round\": 1} } })"`
+		
 fi
 
 echo $chainconfig > /chain.json
@@ -182,15 +210,15 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	/parity $FLAGS import /chain.rlp
+	parity $FLAGS import /chain.rlp
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
 	for block in `ls /blocks | sort -n`; do
-		echo "/parity $FLAGS import /blocks/$block"
-		/parity $FLAGS import /blocks/$block
+		echo "parity $FLAGS import /blocks/$block"
+		parity $FLAGS import /blocks/$block
 	done
 fi
 
@@ -213,4 +241,4 @@ fi
 
 # Run the parity implementation with the requested flags
 echo "Running parity..."
-/parity $FLAGS  --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all
+parity $FLAGS  --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all

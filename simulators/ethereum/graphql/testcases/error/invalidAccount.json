@@ -1,0 +1,18 @@
+{
+  "errors": [
+    {
+      "message": "Invalid account address: \"0xdeadbeef\"",
+      "locations": [
+        {
+          "line": 1,
+          "column": 2
+        }
+      ],
+      "path": ["account"],
+      "extensions": {
+        "classification": "DataFetchingException"
+      }
+    }
+  ],
+  "data": null
+}

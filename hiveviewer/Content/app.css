@@ -1,0 +1,26 @@
+﻿.hive-header {
+    background-color: #FFF8E5 !important;
+}
+
+
+.hive-header-darker {
+    background-color: #EAE3D3 !important;
+}
+
+.bd-example-modal-lg .modal-dialog {
+    display: table;
+    position: relative;
+    margin: 0 auto;
+    top: calc(50% - 24px);
+}
+
+.bd-example-modal-lg .modal-dialog .modal-content {
+    background-color: transparent;
+    border: none;
+}
+
+.accordion-head i {
+    font-size: 2.5em;
+    float: right;
+}
+

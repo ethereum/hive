@@ -101,12 +101,23 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 	if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"
 	fi
+	if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"istanbulBlock\": $HIVE_FORK_ISTANBUL}"
+	fi
+	if [ "$HIVE_CHAIN_ID" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"chainId\": $HIVE_CHAIN_ID}"
+	fi
 	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
 	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
 fi
+
+# Dump genesis
+echo "Supplied genesis state:"
+cat /genesis.json
+
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
-/geth $FLAGS init /genesis.json
+/usr/local/bin/geth $FLAGS init /genesis.json
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -115,12 +126,16 @@ set +e
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
 	/geth $FLAGS --gcmode=archive import /chain.rlp
+else
+	echo "Warning: chain.rlp not found."
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-	(cd blocks && ../geth $FLAGS --gcmode=archive --nocompaction import `ls | sort -n`)
+	(cd blocks && ../usr/local/bin/geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL --nocompaction import `ls | sort -n`)
+else
+	echo "Warning: blocks folder not found."
 fi
 
 set -e
@@ -141,5 +156,5 @@ fi
 # Run the go-ethereum implementation with the requested flags
 
 echo "Running go-ethereum with flags $FLAGS"
-/geth $FLAGS  --verbosity=$HIVE_LOGLEVEL --nat=none --rpc --rpcaddr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
+/usr/local/bin/geth $FLAGS  --verbosity=$HIVE_LOGLEVEL --nat=none --rpc --rpcaddr "0.0.0.0"  --graphql --graphql.addr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
 

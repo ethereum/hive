@@ -1,16 +1,30 @@
-# Docker container spec defining and running a simple smoke test consisting of
-# starting a single client node and retrieving some data from it.
-FROM jfloff/alpine-python:2.7-onbuild
+# Build Geth in a stock Go builder container
+FROM golang:1.11-alpine as builder
 
-# Install curl to allow controlling the simulator as well as to interact with the
-# client via HTTP-RPC.
-RUN apk add --update curl git && \
-  git clone --depth 1 https://github.com/ethereum/tests.git && echo "cacheoff6"
+RUN apk add --no-cache git make gcc musl-dev linux-headers bash
+RUN GOPATH=/go 
+
+ENV GO111MODULE=off
+RUN go get -u -v github.com/derekparker/delve/cmd/dlv
+ENV GO111MODULE=on
 
 
-# Add the simulation controller
-ADD simulator.sh /simulator.sh
-RUN chmod +x /simulator.sh
-COPY *.py /
+# Add the local test stuff, preserving paths for remote debugger
+ADD /ethereum/consensus/main.go /go/src/github.com/ethereum/hive/simulators/ethereum/consensus/main.go
+ADD /ethereum/consensus/simulator_test.go  /go/src/github.com/ethereum/hive/simulators/ethereum/consensus/simulator_test.go
+ADD /ethereum/consensus/types.go  /go/src/github.com/ethereum/hive/simulators/ethereum/consensus/types.go
+ADD common /go/src/github.com/ethereum/hive/simulators/common
+RUN apk add --no-cache ca-certificates git
 
-ENTRYPOINT ["python","/simulator.py"]
+RUN git clone --depth 1 https://github.com/ethereum/tests.git /tests
+
+ENV TESTPATH /tests
+
+# Use modules (temp fix until sims are sub modules)
+RUN (cd /go/src/github.com/ethereum/hive/simulators/ && go mod init)
+
+# Add the entry script
+ADD /ethereum/consensus/tests.sh /tests.sh
+RUN chmod +x /tests.sh
+
+ENTRYPOINT ["/tests.sh"]

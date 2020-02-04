@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
-	"github.com/fsouza/go-dockerclient"
+	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -26,7 +26,7 @@ const hiveEnvvarPrefix = "HIVE_"
 // the docker containers.
 
 // createShellContainer creates a docker container from the hive shell's image.
-func createShellContainer(daemon *docker.Client, image string, overrides []string) (*docker.Container, error) {
+func createShellContainer(image string, overrides []string) (*docker.Container, error) {
 	// Configure any workspace requirements for the container
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -60,7 +60,7 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 	}
 
 	// Create and return the actual docker container
-	return daemon.CreateContainer(docker.CreateContainerOptions{
+	return dockerClient.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: image,
 			Env:   []string{fmt.Sprintf("UID=%d", uid)}, // Forward the user ID for the workspace permissions
@@ -74,7 +74,7 @@ func createShellContainer(daemon *docker.Client, image string, overrides []strin
 }
 
 // createEthashContainer creates a docker container to generate ethash DAGs.
-func createEthashContainer(daemon *docker.Client, image string) (*docker.Container, error) {
+func createEthashContainer(image string) (*docker.Container, error) {
 	// Configure the workspace for ethash generation
 	pwd, err := os.Getwd()
 	if err != nil {
@@ -91,7 +91,7 @@ func createEthashContainer(daemon *docker.Client, image string) (*docker.Contain
 	}
 
 	// Create and return the actual docker container
-	return daemon.CreateContainer(docker.CreateContainerOptions{
+	return dockerClient.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: image,
 			Env:   []string{fmt.Sprintf("UID=%d", uid)}, // Forward the user ID for the workspace permissions
@@ -102,46 +102,27 @@ func createEthashContainer(daemon *docker.Client, image string) (*docker.Contain
 	})
 }
 
-// createClientContainer creates a docker container from a client image and moves
-// any hive environment variables and initial chain configuration files from the
-// tester image into the new client. Dynamic chain configs may also be pulled from
-// a live container.
+// createClientContainer creates a docker container from a client image
 //
 // A batch of environment variables may be specified to override from originating
 // from the tester image. This is useful in particular during simulations where
 // the tester itself can fine tune parameters for individual nodes.
-//
-// Also a batch of files may be specified to override either the chain configs or
-// the client binaries. This is useful in particular during client development as
-// local executables may be injected into a client docker container without them
-// needing to be rebuilt inside hive.
-func createClientContainer(daemon *docker.Client, client string, tester string, live *docker.Container, overrideFiles []string, overrideEnvs map[string]string) (*docker.Container, error) {
+func createClientContainer(client string, overrideEnvs map[string]string, files map[string]*multipart.FileHeader) (*docker.Container, error) {
 	// Configure the client for ethash consumption
 	pwd, err := os.Getwd()
 	if err != nil {
 		return nil, err
 	}
 	ethash := filepath.Join(pwd, "workspace", "ethash")
-
-	// Gather all the hive environment variables from the tester
-	ti, err := daemon.InspectImage(tester)
-	if err != nil {
-		return nil, err
-	}
-	vars := []string{}
-	for _, envvar := range ti.Config.Env {
-		if strings.HasPrefix(envvar, hiveEnvvarPrefix) && overrideEnvs[envvar] == "" {
-			vars = append(vars, envvar)
-		}
-	}
 	// Inject any explicit envvar overrides
+	vars := []string{}
 	for key, val := range overrideEnvs {
 		if strings.HasPrefix(key, hiveEnvvarPrefix) {
 			vars = append(vars, key+"="+val)
 		}
 	}
-	// Create the client container with tester envvars injected
-	c, err := daemon.CreateContainer(docker.CreateContainerOptions{
+	// Create the client container with envvars injected
+	c, err := dockerClient.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: client,
 			Env:   vars,
@@ -154,83 +135,14 @@ func createClientContainer(daemon *docker.Client, client string, tester string, 
 		return nil, err
 	}
 
-	// Remove the temp container t, if it gets created. The temp container is only used to copy default
-	// files from when the live container is not 'trusted' to supply it at runtime.
-	var t *docker.Container
-	defer func() {
-		if t != nil {
-			if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: t.ID, Force: true}); err != nil {
-				log15.Error("failed to cleanup tester container", "id", t.ID[:8], "error", err)
-			}
-		}
-	}()
+	//now upload files
+	uploadToContainer(c.ID, files)
 
-	// Inject all the chain configuration files from the tester (or live container) into the client
-
-	if path := overrideEnvs["HIVE_INIT_GENESIS"]; path != "" {
-		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/genesis.json", false)
-	} else {
-		err = copyFromTempContainer(&t, daemon, c.ID, tester, "", "/genesis.json", false)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if path := overrideEnvs["HIVE_INIT_CHAIN"]; path != "" {
-		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/chain.rlp", true)
-	} else {
-
-		err = copyFromTempContainer(&t, daemon, c.ID, tester, "", "/chain.rlp", true)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if path := overrideEnvs["HIVE_INIT_BLOCKS"]; path != "" {
-		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/blocks", true)
-	} else {
-
-		err = copyFromTempContainer(&t, daemon, c.ID, tester, "", "/blocks", true)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if path := overrideEnvs["HIVE_INIT_KEYS"]; path != "" {
-		err = copyBetweenContainers(daemon, c.ID, live.ID, path, "/keys", true)
-	} else {
-
-		err = copyFromTempContainer(&t, daemon, c.ID, tester, "", "/keys", true)
-	}
-	if err != nil {
-		return nil, err
-	}
-	// Inject any explicit file overrides into the client container
-	overrides := make([]string, 0, len(overrideFiles))
-	for _, override := range overrideFiles {
-		// Split the override into a pattern/path combo
-		pattern, file := ".", override
-		if strings.Contains(override, ":") {
-			pattern = override[:strings.LastIndex(override, ":")]
-			file = override[strings.LastIndex(override, ":")+1:]
-		}
-		// If the pattern matches the client image, override the file
-		re, err := regexp.Compile(pattern)
-		if err != nil {
-			return nil, err
-		}
-		if re.MatchString(client) {
-			overrides = append(overrides, file)
-		}
-	}
-	if err := uploadToContainer(daemon, c.ID, overrides); err != nil {
-		if err := daemon.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true}); err != nil {
-			log15.Error("failed to cleanup client container", "id", c.ID[:8], "error", err)
-		}
-		return nil, err
-	}
 	return c, nil
 }
 
 // uploadToContainer injects a batch of files into the target container.
-func uploadToContainer(daemon *docker.Client, id string, files []string) error {
+func uploadToContainer(id string, files map[string]*multipart.FileHeader) error {
 	// Short circuit if there are no files to upload
 	if len(files) == 0 {
 		return nil
@@ -239,9 +151,9 @@ func uploadToContainer(daemon *docker.Client, id string, files []string) error {
 	tarball := new(bytes.Buffer)
 	tw := tar.NewWriter(tarball)
 
-	for _, path := range files {
+	for fileName, fileHeader := range files {
 		// Fetch the next file to inject into the container
-		file, err := os.Open(path)
+		file, err := fileHeader.Open()
 		if err != nil {
 			return err
 		}
@@ -251,14 +163,10 @@ func uploadToContainer(daemon *docker.Client, id string, files []string) error {
 		if err != nil {
 			return err
 		}
-		info, err := file.Stat()
-		if err != nil {
-			return err
-		}
 		// Insert the file into the tarball archive
 		header := &tar.Header{
-			Name: filepath.Base(file.Name()),
-			Mode: int64(info.Mode()),
+			Name: fileName, //filepath.Base(fileHeader.Filename),
+			Mode: int64(0777),
 			Size: int64(len(data)),
 		}
 		if err := tw.WriteHeader(header); err != nil {
@@ -272,84 +180,84 @@ func uploadToContainer(daemon *docker.Client, id string, files []string) error {
 		return err
 	}
 	// Upload the tarball into the destination container
-	return daemon.UploadToContainer(id, docker.UploadToContainerOptions{
+	return dockerClient.UploadToContainer(id, docker.UploadToContainerOptions{
 		InputStream: tarball,
 		Path:        "/",
 	})
 }
 
-func copyFromTempContainer(srcContainer **docker.Container, daemon *docker.Client, dest, srcName string, path, target string, optional bool) error {
-	if *srcContainer == nil {
-		t, err := daemon.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: srcName}})
-		if err != nil {
-			return err
-		}
-		*srcContainer = t
-	}
+// func copyFromTempContainer(srcContainer **docker.Container, dest, srcName string, path, target string, optional bool) error {
+// 	if *srcContainer == nil {
+// 		t, err := dockerClient.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: srcName}})
+// 		if err != nil {
+// 			return err
+// 		}
+// 		*srcContainer = t
+// 	}
 
-	err := copyBetweenContainers(daemon, dest, (*srcContainer).ID, path, target, optional)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// 	err := copyBetweenContainers(dockerClient, dest, (*srcContainer).ID, path, target, optional)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // copyBetweenContainers copies a file from one docker container to another one.
-func copyBetweenContainers(daemon *docker.Client, dest, src string, path, target string, optional bool) error {
-	// If no path was specified, use the target as the default
-	if path == "" {
-		path = target
-	}
-	if path == "ignore" {
-		return nil
-	}
-	// Download a tarball of the file from the source container
-	download, upload := new(bytes.Buffer), new(bytes.Buffer)
-	if err := daemon.DownloadFromContainer(src, docker.DownloadFromContainerOptions{
-		Path:         path,
-		OutputStream: download,
-	}); err != nil {
-		// Check whether we're missing an optional file only
-		if err.(*docker.Error).Status == 404 && optional {
-			return nil
-		}
-		return err
-	}
-	// Rewrite all the paths in the tarball to the default ones
-	in, out := tar.NewReader(download), tar.NewWriter(upload)
-	for {
-		// Fetch the next file header from the download archive
-		header, err := in.Next()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		// Rewrite the path and push into the upload archive
-		header.Name = strings.Replace(header.Name, path[1:], target[1:], -1)
-		if err := out.WriteHeader(header); err != nil {
-			return err
-		}
-		// Copy the file content over from the download to the upload archive
-		if _, err := io.Copy(out, in); err != nil {
-			return err
-		}
-	}
-	// Upload the tarball into the destination container
-	if err := daemon.UploadToContainer(dest, docker.UploadToContainerOptions{
-		InputStream: upload,
-		Path:        "/",
-	}); err != nil {
-		return err
-	}
-	return nil
-}
+// func copyBetweenContainers(dest, src string, path, target string, optional bool) error {
+// 	// If no path was specified, use the target as the default
+// 	if path == "" {
+// 		path = target
+// 	}
+// 	if path == "ignore" {
+// 		return nil
+// 	}
+// 	// Download a tarball of the file from the source container
+// 	download, upload := new(bytes.Buffer), new(bytes.Buffer)
+// 	if err := dockerClient.DownloadFromContainer(src, docker.DownloadFromContainerOptions{
+// 		Path:         path,
+// 		OutputStream: download,
+// 	}); err != nil {
+// 		// Check whether we're missing an optional file only
+// 		if err.(*docker.Error).Status == 404 && optional {
+// 			return nil
+// 		}
+// 		return err
+// 	}
+// 	// Rewrite all the paths in the tarball to the default ones
+// 	in, out := tar.NewReader(download), tar.NewWriter(upload)
+// 	for {
+// 		// Fetch the next file header from the download archive
+// 		header, err := in.Next()
+// 		if err == io.EOF {
+// 			break
+// 		}
+// 		if err != nil {
+// 			return err
+// 		}
+// 		// Rewrite the path and push into the upload archive
+// 		header.Name = strings.Replace(header.Name, path[1:], target[1:], -1)
+// 		if err := out.WriteHeader(header); err != nil {
+// 			return err
+// 		}
+// 		// Copy the file content over from the download to the upload archive
+// 		if _, err := io.Copy(out, in); err != nil {
+// 			return err
+// 		}
+// 	}
+// 	// Upload the tarball into the destination container
+// 	if err := dockerClient.UploadToContainer(dest, docker.UploadToContainerOptions{
+// 		InputStream: upload,
+// 		Path:        "/",
+// 	}); err != nil {
+// 		return err
+// 	}
+// 	return nil
+// }
 
 // runContainer attaches to the output streams of an existing container, then
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
-func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile string, shell bool, logLevel int) (docker.CloseWaiter, error) {
+func runContainer(id string, logger log15.Logger, logfile string, shell bool, logLevel int) (docker.CloseWaiter, error) {
 	// If we're the outer shell, log straight to stderr, nothing fancy
 	stdout := io.Writer(os.Stdout)
 	stream := io.Writer(os.Stderr)
@@ -390,7 +298,7 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 		stdout = stream
 	}
 	logger.Debug("attaching to container")
-	waiter, err := daemon.AttachToContainerNonBlocking(docker.AttachToContainerOptions{
+	waiter, err := dockerClient.AttachToContainerNonBlocking(docker.AttachToContainerOptions{
 		Container:    id,
 		OutputStream: stdout,
 		ErrorStream:  stream,
@@ -406,7 +314,7 @@ func runContainer(daemon *docker.Client, id string, logger log15.Logger, logfile
 	logger.Debug("starting container")
 
 	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
-	if err := daemon.StartContainer(id, hostConfig); err != nil {
+	if err := dockerClient.StartContainer(id, hostConfig); err != nil {
 		logger.Error("failed to start container", "error", err)
 		return nil, err
 	}

@@ -1,0 +1,61 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title></title>
+    <link href="Content/bootstrap.min.css" rel="stylesheet" />
+    <link href="Content/app.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.13/css/all.css" integrity="sha384-DNOHZ68U8hZfKXOrtjWvjxusGo9WQnrNx2sqG0tfsghAvtVlRW3tvkXWZh58N9jp"
+          crossorigin="anonymous">
+
+    <script src="Scripts/jquery-3.4.1.min.js"></script>
+    <script src="Scripts/popper.min.js"></script>
+    <script src="Scripts/bootstrap.min.js"></script>
+    <script src="Scripts/knockout-3.5.0.js"></script>
+    <script src="Scripts/moment.min.js"></script>
+
+</head>
+<body>
+    <script>
+        $(function () {
+            $( "#content" ).load( "testsuitecomponent.html" );
+
+            window.initPopup = function (ko, viewmodel) {
+
+                window.ko = ko;
+                ko.applyBindings(viewmodel, document.body);
+
+               
+
+
+
+            };
+
+        }
+        );
+
+    </script>
+    <div class="container-fluid">
+        <div class="card">
+            <div class=" hive-header">
+                <div class="card-header">
+                    <div class="row ">
+                        <div class="col-12  text-center my-auto font-weight-bold h1" data-bind="text: name">
+                          
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div data-bind="with: testSuite">
+                    <div id="content" >
+                        Loading....
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

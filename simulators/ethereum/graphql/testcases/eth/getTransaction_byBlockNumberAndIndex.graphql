@@ -1,0 +1,10 @@
+query getTransaction_byBlockNumberAndIndex {
+  block(number: "0x1e") {
+    transactionAt(index: 0) {
+      block {
+        hash
+      }
+      hash
+    }
+  }
+}
