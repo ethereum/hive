@@ -6,13 +6,13 @@ quality or validating that clients can play nicely together in a multi client en
 simple.
 
 This project is meant to serve as an easily expandable test harness where **anyone** can add tests in
-**any** programming language felt comfortable with and it should simultaneously be able to run those
-tests against all potential clients. As such the harness is meant to do black box testing where no
-client specific internal details/state can be tested and/or inspected, rather emphasis being put on
+**any** programming language they feel comfortable with, and it should simultaneously be able to run
+those tests against all potential clients. The harness is meant to do black box testing where no
+client specific internal details/state is tested and/or inspected. Instead, the emphasis is put on
 adherence to official specs or behaviours under different circumstances.
 
-Most importantly, it is essential to be able to run this test suite as part of the CI workflow! To
-this effect the entire suite is based on docker containers.
+Most importantly, it is essential to be able to run this test suite as part of the CI workflow!
+Therefore, the entire suite is based on docker containers.
 
 # Public test results
 
@@ -260,7 +260,7 @@ Simulation results:
 
 The `hive` test harness can validate arbitrary implementations of the [Ethereum yellow paper](http://gavwood.com/paper.pdf).
 
-Being based on docker containers, `hive` is pretty liberal on pretty much all aspects of a client
+Since `hive` is based on docker containers, it is pretty liberal on most aspects of a client
 implementation:
 
  * `hive` doesn't care what dependencies a client has: language, libraries or otherwise.
@@ -279,7 +279,7 @@ The client definition(s) should reside in the `clients` folder, each named `<pro
 arbitrary id up to the client maintainers to make the best use of. `hive` will automatically pick
 up all clients from this folder.
 
-There are little contraints on the image itself, though a few required caveats are:
+There aren't many contraints on the image itself, though a few required caveats exist:
 
  * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
  * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
@@ -315,7 +315,7 @@ longer blockchain and then import possibly numerous individual blocks. The reaso
 different block sources is that specifying a single chain is more optimal, but tests requiring forking
 chains cannot create a single chain.
 
-Beside the standardized chain configurations, clients can in general be modified behavior-wise in
+Besides the standardized chain configurations, clients can in general be modified behavior-wise in
 quite a few ways that are mostly supported by all clients, yet are implemented differently in each.
 As such, each possible behavioral change required by some validator or simulator is characterized by
 an environment variable, which clients should interpret as best as they can.
@@ -357,7 +357,7 @@ suite completion and all related data purged. A new instance will be started for
 ### Smoke testing new clients
 
 To quickly check if a client adheres to the requirements of `hive`, there is a suite of smoke test
-validations and simulations that just initialize clients with some pre-configured states and query
+validations and simulations that just initialize clients with some pre-configured states and queries
 it from the various RPC endpoints.
 
 ```
@@ -537,7 +537,7 @@ should create and organize the simulated network. This API is exposed at the HTT
 Overriding environmental variables that change client behaviors via HTTP parameters is easy to do in
 any HTTP client utility and/or library, but uploading files needed for chain initializations is much
 more complex, especially if multiple files are needed. As long as all clients run with the same set
-of init files this is not an issue (they can be placed in the default locations). However if instances
+of init files, this is not an issue (they can be placed in the default locations). However if instances
 need to run with different initial chain setups, a simulator needs to be able to specify these per
 client. To avoid file uploads, `hive` solves this by defining a set of API variables that allow a
 simulator to specify the source paths to use for specific init files which will be extracted from the
@@ -617,10 +617,6 @@ improved in the future to offer generation of chains that exhibit different char
 *	`chainBlockTime`  Uint    (30)    The desired block time in seconds. OBS: It's recommended to set this value to somwhere above 20s to keep the mining difficulty low.
 
 For example   `hive --loglevel 6 --chainGenerate --chainLength 2 --chainOutputPath "C:\Ethereum\Path" --chainGenesis "C:\Ethereum\Path\Genesis.json" --chainBlockTime 30`
-
-
-
-
 
 # Continuous integration
 
@@ -746,7 +742,7 @@ a useful tool for validating Ethereum client implementations.
 # Contributions
 
 This project takes a different approach to code contributions than your usual FOSS project with well
-ingrained maintainers and relatively few external contributors. It is an experiment, whether it will
+ingrained maintainers and relatively few external contributors. It is an experiment. Whether it will
 work out or not is for the future to decide.
 
 We follow the [Collective Code Construction Contract (C4)](http://rfc.zeromq.org/spec:22/C4/), code
