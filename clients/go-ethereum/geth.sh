@@ -29,7 +29,7 @@
 
 # Immediately abort the script on any error encountered
 set -e
-
+FLAGS="--nousb --pcscdpath=\"\""
 #It doesn't make sense to dial out, use only a pre-set bootnode
 if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
@@ -155,6 +155,6 @@ fi
 
 # Run the go-ethereum implementation with the requested flags
 
+FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL --nat=none --rpc --rpcaddr=0.0.0.0  --graphql --graphql.addr=0.0.0.0 --rpcapi=admin,debug,eth,miner,net,personal,txpool,web3 --ws --wsaddr=0.0.0.0 --wsapi=admin,debug,eth,miner,net,personal,txpool,web3 --wsorigins \"*\""
 echo "Running go-ethereum with flags $FLAGS"
-/usr/local/bin/geth $FLAGS  --verbosity=$HIVE_LOGLEVEL --nat=none --rpc --rpcaddr "0.0.0.0"  --graphql --graphql.addr "0.0.0.0" --rpcapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --ws --wsaddr "0.0.0.0" --wsapi "admin,debug,eth,miner,net,personal,shh,txpool,web3" --wsorigins "*"
-
+/usr/local/bin/geth $FLAGS

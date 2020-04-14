@@ -1,12 +1,20 @@
+# To build this in itself, it needs to be built from a parent
+# folder, in order to obtain common tools: 
+#
+# [~/go/src/github.com/ethereum/hive/simulators]
+# docker build -f ./ethereum/consensus/Dockerfile  .
+
 # Build Geth in a stock Go builder container
-FROM golang:1.11-alpine as builder
+FROM golang:1.14-alpine as builder
 
 RUN apk add --no-cache git make gcc musl-dev linux-headers bash
 RUN GOPATH=/go 
 
-ENV GO111MODULE=off
-RUN go get -u -v github.com/derekparker/delve/cmd/dlv
 ENV GO111MODULE=on
+
+#ENV GO111MODULE=off
+#RUN go get -u -v github.com/go-delve/delve/cmd/dlv
+#ENV GO111MODULE=on
 
 
 # Add the local test stuff, preserving paths for remote debugger
