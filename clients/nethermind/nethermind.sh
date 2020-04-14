@@ -100,4 +100,4 @@ cat /chainspec/test.json
 #fi
 
 echo "Running Nethermind..."
-dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg  2>&1 | tee /log.txt
+dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg  2>&1
