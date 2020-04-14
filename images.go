@@ -266,11 +266,13 @@ func buildImage(image, branch, context string, cacher *buildCacher, logger log15
 		cacher.rebuilt[image] = true
 		nocache = true
 	}
-	logger.Info("building new docker image", "nocache", nocache)
+	logger.Info("building new docker image", "image", image, "context", context, "dockerfile", dockerfile,
+		"branch", branch, "nocache", nocache)
 
 	context, err := filepath.Abs(context)
 	if err != nil {
-		logger.Error("failed to build docker image", "error", err)
+		logger.Error("failed to build docker image", "image", image, "context", context, "dockerfile", dockerfile,
+			"branch", branch, "error", err)
 		return err
 	}
 	stream := io.Writer(new(bytes.Buffer))
@@ -286,7 +288,9 @@ func buildImage(image, branch, context string, cacher *buildCacher, logger log15
 		BuildArgs:    []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}},
 	}
 	if err := dockerClient.BuildImage(opts); err != nil {
-		logger.Error("failed to build docker image", "error", err)
+		logger.Error("failed to build docker image",
+			"image", image, "context", context, "dockerfile", dockerfile,
+			"branch", branch, "error", err)
 		return err
 	}
 	return nil
