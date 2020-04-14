@@ -188,7 +188,7 @@ fi
 
 # Run the client with the requested flags
 echo "Running Aleth..."
- FLAGS="$FLAGS --allow-local-discovery"
+# FLAGS="$FLAGS --allow-local-discovery"
 RUNCMD="python3 /usr/bin/aleth.py --rpc http://0.0.0.0:8545 --aleth-exec $ETHEXEC $FLAGS"
 echo "cmd: $RUNCMD"
 $RUNCMD
