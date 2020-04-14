@@ -19,25 +19,24 @@ FROM docker:dind
 RUN apk add --update musl-dev go && rm -rf /var/cache/apk/*
 ENV GOPATH /gopath
 ENV PATH   $GOPATH/bin:$PATH
-
-# Inject and build the hive dependencies (modified very rarely, cache builds)
-ADD vendor $GOPATH/src/github.com/ethereum/hive/vendor
-RUN (cd $GOPATH/src/github.com/ethereum/hive && go install ./...)
+ENV GO111MODULE=on
 
 # We need geth
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN \
-  	apk add --update  git         && \
-   	git clone https://github.com/ethereum/go-ethereum $GOPATH/src/github.com/ethereum/go-ethereum && \
-	apk del git 
+	apk add --update  git	&& \
+	go get github.com/ethereum/go-ethereum && \
+        apk del git
+
+#        git clone https://github.com/ethereum/go-ethereum $GOPATH/src/github.com/ethereum/go-ethereum && \
+
 
 # Inject and build hive itself (modified during hive dev only, cache builds)
-ADD *.go $GOPATH/src/github.com/ethereum/hive/
-ADD chaintools $GOPATH/src/github.com/ethereum/hive/chaintools
-
+ADD . $GOPATH/src/github.com/ethereum/hive
 
 WORKDIR $GOPATH/src/github.com/ethereum/hive
 RUN go install
+RUN go install ./chaintools
 
 # Define the tiny startup script to boot docker and hive afterwards
 RUN \

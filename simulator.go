@@ -619,8 +619,10 @@ func terminateAndUpdate() {
 	//NB! Kill this first to make sure no further testsuites are started
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log15.Error(fmt.Sprintf("Could not gracefully shutdown the server: %s", err.Error()))
+	if server != nil {
+		if err := server.Shutdown(ctx); err != nil {
+			log15.Error(fmt.Sprintf("Could not gracefully shutdown the server: %s", err.Error()))
+		}
 	}
 	// Cleanup any tests that might be still running and make sure
 	// the test results are updated with the fact that the

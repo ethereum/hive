@@ -15,8 +15,8 @@ type TestManager struct {
 	testLimiter       int
 	runningTestSuites map[TestSuiteID]*TestSuite
 	runningTestCases  map[TestID]*TestCase
-	testCaseMutex     sync.Mutex
-	testSuiteMutex    sync.Mutex
+	testCaseMutex     sync.RWMutex
+	testSuiteMutex    sync.RWMutex
 	nodeMutex         sync.Mutex
 	pseudoMutex       sync.Mutex
 	testSuiteCounter  uint32
@@ -37,16 +37,16 @@ func NewTestManager(outputPath string, testLimiter int, killNodeCallback func(te
 
 // IsTestSuiteRunning checks if the test suite is still running and returns it if so
 func (manager *TestManager) IsTestSuiteRunning(testSuite TestSuiteID) (*TestSuite, bool) {
-	// manager.testSuiteMutex.Lock()
-	// defer manager.testSuiteMutex.Unlock()
+	manager.testSuiteMutex.RLock()
+	defer manager.testSuiteMutex.RUnlock()
 	suite, ok := manager.runningTestSuites[testSuite]
 	return suite, ok
 }
 
 // IsTestRunning checks if the testis still running and returns it if so
 func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
-	// manager.testCaseMutex.Lock()
-	// defer manager.testCaseMutex.Unlock()
+	manager.testCaseMutex.RLock()
+	defer manager.testCaseMutex.RUnlock()
 	testCase, ok := manager.runningTestCases[test]
 	return testCase, ok
 }
@@ -60,11 +60,12 @@ func (manager *TestManager) Terminate() error {
 		Pass:    false,
 		Details: "Test was terminated by host",
 	}
+	manager.testSuiteMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
 
 	for suiteID, suite := range manager.runningTestSuites {
 		for testID := range suite.TestCases {
-			_, in := manager.runningTestCases[testID]
-			if in {
+			if _, running := manager.IsTestRunning(testID); running {
 				//kill any running tests and ensure that the host is
 				//notified to clean up any resources (eg docker containers)
 				err := manager.EndTest(suiteID, testID, terminationSummary, nil)
