@@ -29,6 +29,10 @@ RUN    apk add --update bash curl jq
 #   apk del go git make gcc musl-dev linux-headers              && \
 #   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
+# TODO, make this work again
+
+RUN echo "{\"repo\":\"\", \"branch\":\"\", \"commit\":\"\"}" > /version.json
+
 # Inject the startup script
 ADD geth.sh /geth.sh
 RUN chmod +x /geth.sh
