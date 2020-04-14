@@ -1,31 +1,34 @@
-FROM ubuntu:18.04 AS clone
-ARG branch=master
-WORKDIR /src
+from nethermind/nethermind:alpine
+#FROM ubuntu:18.04 AS clone
+#ARG branch=master
+#WORKDIR /src
 
-RUN echo "Cloning branch $branch from https://github.com/NethermindEth/nethermind"
-RUN apt update -y && apt install -y  curl git jq  && \ 
-    git clone  --branch $branch https://github.com/NethermindEth/nethermind && \
-    cd nethermind && git submodule update --init && \
-    (echo "{}"                                                      \
-    | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-    | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
-    | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
-	    > /version.json)
-FROM microsoft/dotnet:2.2-sdk AS build
-COPY --from=clone /src .
-COPY --from=clone /version.json .
+#RUN echo "Cloning branch $branch from https://github.com/NethermindEth/nethermind"
+#RUN apt update -y && apt install -y  curl git jq  && \ 
+#    git clone  --branch $branch https://github.com/NethermindEth/nethermind && \
+#    cd nethermind && git submodule update --init && \
+#    (echo "{}"                                                      \
+#    | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
+#    | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
+#    | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
+#	    > /version.json)
+#FROM microsoft/dotnet:2.2-sdk AS build
+#COPY --from=clone /src .
+#COPY --from=clone /version.json .
+#
+#RUN cd nethermind/src/Nethermind/Nethermind.Runner && \
+#    dotnet publish -c release -o out
+#FROM microsoft/dotnet:2.2-aspnetcore-runtime
+#RUN apt update -y && apt install -y libsnappy-dev libc6-dev libc6 unzip jq wget
+#
+#COPY --from=build /nethermind/src/Nethermind/Nethermind.Runner/out .
+#COPY --from=build /version.json .
 
-RUN cd nethermind/src/Nethermind/Nethermind.Runner && \
-    dotnet publish -c release -o out
-FROM microsoft/dotnet:2.2-aspnetcore-runtime
-RUN apt update -y && apt install -y libsnappy-dev libc6-dev libc6 unzip jq wget
+RUN apk add jq bash
 
-COPY --from=build /nethermind/src/Nethermind/Nethermind.Runner/out .
-COPY --from=build /version.json .
-
-RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /usr/local/bin/jq && \
-    echo 'af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44  /usr/local/bin/jq' | sha256sum -c && \
-    chmod +x /usr/local/bin/jq
+#RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /usr/local/bin/jq && \
+#    echo 'af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44  /usr/local/bin/jq' | sha256sum -c && \
+#    chmod +x /usr/local/bin/jq
 
 ADD enode.sh /enode.sh
 ADD nethermind.sh /nethermind.sh
