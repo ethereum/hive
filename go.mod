@@ -23,7 +23,6 @@ require (
 	github.com/gballet/go-libpcsclite v0.0.0-20190607065134-2772fd86a8ff // indirect
 	github.com/golang/protobuf v1.3.2 // indirect
 	github.com/google/gopacket v1.1.17
-	github.com/google/pprof v0.0.0-20200413000643-b1a96885c1c6
 	github.com/google/uuid v1.1.1
 	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.7.3 // indirect
@@ -54,10 +53,8 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.0 // indirect
 	github.com/wsddn/go-ecdh v0.0.0-20161211032359-48726bab9208 // indirect
-	golang.org/x/arch v0.0.0-20200312215426-ff8b605520f4
-	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
 	golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3
-	golang.org/x/text v0.3.0
+	golang.org/x/sys v0.0.0-20191204072324-ce4227a45e2e // indirect
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20150921213854-b105bd37f74e
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/olebedev/go-duktape.v3 v3.0.0-20190709231704-1e4459ed25ff // indirect
