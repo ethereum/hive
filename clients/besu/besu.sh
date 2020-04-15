@@ -34,6 +34,12 @@
 #  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
 #  - HIVE_SKIP_POW             If set, skip PoW verification during block import
 
+besu=/opt/besu/bin/besu
+RPCFLAGS="--graphql-http-enabled --graphql-http-host=0.0.0.0"
+RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
+
+set -e
+
 if [ "$HIVE_BOOTNODE" != "" ]; then
   FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 fi
@@ -46,7 +52,7 @@ if [ "$HIVE_NODETYPE" == "full" ]; then
 	FLAGS="$FLAGS --sync-mode=FAST"
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
-    echo "Pantheon does not support light nodes"
+    echo "Besu does not support light nodes"
 fi
 
 if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
@@ -59,7 +65,9 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 	if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"
 	fi
-	if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
+	# Besu requires forks to be in order. Hive tries to put the dao fork at block 2K when it's 
+	# not activated, but besu rejects that 
+	if [ "$HIVE_FORK_DAO_BLOCK" != "" ] && [ "$HIVE_FORK_DAO_BLOCK" != "2000" ]; then
 		JQPARAMS="$JQPARAMS + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"
 	fi
 	if [ "$HIVE_FORK_TANGERINE" != "" ]; then
@@ -133,5 +141,34 @@ elif [ "$HIVE_LOGLEVEL" == "5" ]; then
   echo $FLAGS
   cat /etc/besu/genesis.json
 fi
+echo "Using the following genesis"
+cat /etc/besu/genesis.json
 
-/opt/besu/bin/besu --genesis-file=/etc/besu/genesis.json $FLAGS
+FLAGS="$FLAGS --genesis-file=/etc/besu/genesis.json"
+
+set -e
+# Load the test chain if present
+if [ -f /chain.rlp ]; then
+	echo "Loading initial blockchain..."
+	cmd="$besu $FLAGS blocks import --from=/chain.rlp"
+	echo "invoking $cmd"
+	$cmd
+fi
+
+
+# Load the remainder of the test chain
+if [ -d /blocks ]; then
+	echo "Loading remaining individual blocks..."
+	for block in `ls /blocks | sort -n`; do
+		cmd="$besu $FLAGS blocks import --from=/blocks/$block"
+		echo "invoking $cmd"
+		$cmd
+	done
+fi
+
+
+# After block import, we also open for RPC
+cmd="$besu $FLAGS $RPCFLAGS"
+echo "starting main client: $cmd"
+$cmd
+
