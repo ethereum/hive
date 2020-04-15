@@ -29,7 +29,10 @@
 
 # Immediately abort the script on any error encountered
 set -e
+
+geth=/usr/local/bin/geth
 FLAGS="--nousb --pcscdpath=\"\""
+
 #It doesn't make sense to dial out, use only a pre-set bootnode
 if [ "$HIVE_BOOTNODE" != "" ]; then
 	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
@@ -58,9 +61,6 @@ fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
 	FLAGS="$FLAGS --syncmode light "
 fi
-
-
-
 
 
 
@@ -117,7 +117,7 @@ cat /genesis.json
 
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
-/usr/local/bin/geth $FLAGS init /genesis.json
+$geth $FLAGS init /genesis.json
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -125,15 +125,16 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	/geth $FLAGS --gcmode=archive import /chain.rlp
+	$geth $FLAGS --gcmode=archive import /chain.rlp
 else
 	echo "Warning: chain.rlp not found."
+	ls -la /
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-	(cd blocks && ../usr/local/bin/geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL --nocompaction import `ls | sort -n`)
+	(cd /blocks && $geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL --nocompaction import `ls | sort -n`)
 else
 	echo "Warning: blocks folder not found."
 fi
@@ -157,4 +158,4 @@ fi
 
 FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL --nat=none --rpc --rpcaddr=0.0.0.0  --graphql --graphql.addr=0.0.0.0 --rpcapi=admin,debug,eth,miner,net,personal,txpool,web3 --ws --wsaddr=0.0.0.0 --wsapi=admin,debug,eth,miner,net,personal,txpool,web3 --wsorigins \"*\""
 echo "Running go-ethereum with flags $FLAGS"
-/usr/local/bin/geth $FLAGS
+$geth $FLAGS

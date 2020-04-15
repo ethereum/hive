@@ -77,27 +77,32 @@ if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
 fi
 
-genesis=`cat /genesis.json` 
-echo "Genesis:"
-echo $genesis
-echo $genesis | jq ". * {\"config\": $chainconfig}" > /genesis.json
+if [ -f /genesis.json ]; then
+
+	genesis=`cat /genesis.json` 
+	echo "Genesis:"
+	echo $genesis
+	echo $genesis | jq ". * {\"config\": $chainconfig}" > /genesis.json
+	echo "Before mapper.jq"
+	cat /genesis.json
+
+	# Configure and set the chain definition for the node
+	configoverride=`jq -f /mapper.jq /genesis.json`
+	echo ".*$configoverride">/tempscript.jq
+	mergedconfig=`jq -f /tempscript.jq /chainspec/test.json`
+	echo $mergedconfig>/chainspec/test.json
+	echo "Chainspec:"
+	cat /chainspec/test.json
+else
+	echo "No genesis supplied"
+fi
 
 
-
-echo "Before mapper.jq"
-cat /genesis.json
-
-# Configure and set the chain definition for the node
-configoverride=`jq -f /mapper.jq /genesis.json`
-echo ".*$configoverride">/tempscript.jq
-mergedconfig=`jq -f /tempscript.jq /chainspec/test.json`
-echo $mergedconfig>/chainspec/test.json
-echo "Chainspec:"
-cat /chainspec/test.json
 # Load any keys explicitly added to the node
-#if [ -d /keys ]; then
+#if [ -d ]; then
 #	export NETHERMIND_HIVECONFIG_KEYSDIR=keys
 #fi
 
 echo "Running Nethermind..."
-dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg  2>&1
+# The output is tee:d, via /log.txt, because the enode script uses that logfile to parse out the enode id
+dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg 2>&1 | tee /log.txt
