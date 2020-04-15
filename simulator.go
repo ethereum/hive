@@ -542,7 +542,6 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		// Ensure the goroutine started by runContainer exits, so that
 		// its resources (e.g. the logfile it creates) can be garbage
 		// collected.
-
 		err := waiter.Wait()
 		if err == nil {
 			logger.Debug("client container finished cleanly")
@@ -553,7 +552,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 
 	// Wait for the HTTP/RPC socket to open or the container to fail
 	start := time.Now()
-
+	checkTime := 100 * time.Millisecond
 	for {
 		// Update the container state
 		container, err = dockerClient.InspectContainer(container.ID)
@@ -571,7 +570,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		containerIP = container.NetworkSettings.IPAddress
 		containerMAC = container.NetworkSettings.MacAddress
 		if checkliveness {
-			logger.Debug("Checking container online....")
+			logger.Debug("Checking container online....", "checktime", checkTime, "state", container.State.String())
 			// Container seems to be alive, check whether the RPC is accepting connections
 			if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", containerIP, 8545)); err == nil {
 				logger.Debug("client container online", "time", time.Since(start))
@@ -582,9 +581,13 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 			break
 		}
 
-		time.Sleep(100 * time.Millisecond)
-		timeout := container.Created.Add(timeoutCheckDuration)
-		if time.Now().After(timeout) {
+		time.Sleep(checkTime)
+		checkTime = checkTime * 2
+		if checkTime > time.Second {
+			checkTime = time.Second
+		}
+
+		if time.Since(container.Created) > timeoutCheckDuration {
 			log15.Debug("deleting client container", "name/id", clientName+"/"+containerID)
 			err = dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
 			if err == nil {
