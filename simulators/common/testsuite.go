@@ -1,11 +1,15 @@
 package common
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -45,6 +49,7 @@ type TestSuite struct {
 	Name        string               `json:"name"`
 	Description string               `json:"description"`
 	TestCases   map[TestID]*TestCase `json:"testCases"`
+	indexMu     sync.Mutex
 }
 
 func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
@@ -91,7 +96,7 @@ func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
 func (testSuite *TestSuite) UpdateDB(outputPath string) error {
 
 	// write out the test suite as a json file of its own
-	bytes, err := json.Marshal(*testSuite)
+	suiteData, err := json.Marshal(*testSuite)
 	if err != nil {
 		return err
 	}
@@ -99,44 +104,70 @@ func (testSuite *TestSuite) UpdateDB(outputPath string) error {
 	if err != nil {
 		return err
 	}
-	suiteFileName := fileID.String() + ".json"
+	suiteFileName := fmt.Sprintf("%s.json", fileID.String())
 	suiteFilePath := filepath.Join(outputPath, suiteFileName)
-	f, err := os.OpenFile(suiteFilePath, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		f.Close()
-		if err != nil {
-			os.Remove(suiteFilePath)
-		}
-	}()
-	_, err = f.Write(bytes)
-	if err != nil {
-		return err
-	}
-	err = f.Sync()
-	if err != nil {
-		return err
-	}
-	testSummary := testSuite.summarise(suiteFileName)
-	summaryBytes, err := json.Marshal(*testSummary)
-	if err != nil {
-		return err
-	}
-	//now append the index file with atomic write
+	ioutil.WriteFile(suiteFilePath, suiteData, 0644)
+
+	// Before writing the summary, perhaps crop the index file
+	// We cap it at 400KB in size down to 200KB, roughly 1000 lines
+	testSuite.indexMu.Lock()
+	defer testSuite.indexMu.Unlock()
 	indexPathName := filepath.Join(outputPath, IndexFileName)
-	i, err := os.OpenFile(indexPathName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	defer i.Close()
-	_, err = i.WriteString(string(summaryBytes) + "\n")
+	stat, err := os.Stat(indexPathName)
+	if err == nil && stat.Size() > 400000 {
+		truncateHead(indexPathName, 200000)
+	}
+	// write out the summary
+	testSummary := testSuite.summarise(suiteFileName)
+	summaryData, err := json.Marshal(*testSummary)
 	if err != nil {
 		return err
 	}
-	err = i.Sync()
+	//now append the index file
+	i, err := os.OpenFile(indexPathName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
+		return err
+	}
+	defer i.Close()
+	if _, err = i.WriteString(string(summaryData) + "\n"); err != nil {
 		return err
 	}
 	return nil
+}
+
+// truncateHead truncates the head lines, leaving somewhere slightly below 'size' bytes,
+// and ensures that lines are kept intact.
+func truncateHead(path string, size int64) error {
+	var tmpFileName = fmt.Sprintf("%s.tmp", path)
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	// seek N bytes from the end (whence=2)
+	if _, err := file.Seek(-size, 2); err != nil {
+		file.Close()
+		return err
+	}
+	reader := bufio.NewReader(file)
+	// read until a line-break
+	if _, err = reader.ReadString('\n'); err != nil {
+		file.Close()
+		return fmt.Errorf("seek failed: %v", err)
+	}
+	// reader is now positioned correctly, we can shove all remaining data into the next index-file
+	newFile, err := os.OpenFile(tmpFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		file.Close()
+		return err
+	}
+	io.Copy(newFile, reader)
+	newFile.Close()
+	file.Close()
+	// Now, delete the old one, and swap in the new one
+	if err = os.Remove(path); err != nil {
+		return err
+	}
+	return os.Rename(tmpFileName, path)
 }
 
 // TestClientResults is the set of per-client results for a test-case
