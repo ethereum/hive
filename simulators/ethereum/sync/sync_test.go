@@ -124,7 +124,7 @@ func TestSyncsWithGeth(t *testing.T) {
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
 			return
 		}
-		defer func(){
+		defer func() {
 			t.Log("Stopping client", mainId)
 			host.KillNode(testSuite, testID, mainId)
 		}()
@@ -158,7 +158,7 @@ func TestSyncsWithGeth(t *testing.T) {
 					summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))
 					return
 				}
-				doneFn := func(){
+				doneFn := func() {
 					t.Log("Stopping client", clientID)
 					host.KillNode(testSuite, testID, clientID)
 				}
@@ -266,7 +266,7 @@ func TestSyncsWithGeth(t *testing.T) {
 					return
 				}
 				wg.Add(1)
-				doneFn := func(){
+				doneFn := func() {
 					wg.Done()
 					t.Log("Stopping client", clientID)
 					host.KillNode(testSuite, testID, clientID)
