@@ -11,6 +11,6 @@
 
 set -e
 
-TARGET_ENODE=$(sed -n -e 's/^.*This node.*: //p' \log.txt)
+TARGET_ENODE=$(sed -n -e 's/^.*This node.*: //p' /log.txt)
 echo ${TARGET_ENODE/|/}
 

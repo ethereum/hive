@@ -15,12 +15,12 @@ func makeGenesisDAG(cacher *buildCacher) error {
 	// Build the image for the DAG generator
 	log15.Info("creating ethash container")
 
-	image, err := buildEthash( cacher)
+	image, err := buildEthash(cacher)
 	if err != nil {
 		return err
 	}
 	// Create the ethash container container and make sure it's deleted afterwards
-	ethash, err := createEthashContainer( image)
+	ethash, err := createEthashContainer(image)
 	if err != nil {
 		log15.Error("failed to create ethash container", "error", err)
 		return err
@@ -37,7 +37,7 @@ func makeGenesisDAG(cacher *buildCacher) error {
 	// Start generating the genesis ethash DAG
 	log15.Info("generating genesis DAG")
 
-	waiter, err := runContainer( ethash.ID, log15.Root(), "", true, *loglevelFlag)
+	waiter, err := runContainer(ethash.ID, log15.Root(), "", true, *loglevelFlag)
 	if err != nil {
 		log15.Error("failed to execute ethash", "error", err)
 		return err

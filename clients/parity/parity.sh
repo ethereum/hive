@@ -123,12 +123,10 @@ if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
 fi
 
 # independent of the forks
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\",  \"pricing\": {  } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\",  \"pricing\": {  } })"`
-	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\",  \"pricing\": { } })"`
-	
+chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000006\", \"builtin\"]; { \"name\": \"alt_bn128_add\",  \"pricing\": {  } })"`
+chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000007\", \"builtin\"]; { \"name\": \"alt_bn128_mul\",  \"pricing\": {  } })"`
+chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000008\", \"builtin\"]; { \"name\": \"alt_bn128_pairing\",  \"pricing\": { } })"`
 
-	
 
 if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 	# Based on 
@@ -167,7 +165,7 @@ if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	# EXTCODEHASH
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1052Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
 	# EIP 1283, net gas metering version 2
-	
+
 	# Skinny create 2
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"eip1014Transition\"]; \"0x$HIVE_FORK_CONSTANTINOPLE\")"`
 	# Ethash params
@@ -194,7 +192,7 @@ if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
 
 
 	chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000009\", \"builtin\"]; { \"name\": \"blake2_f\", \"activate_at\": \"0x$HIVE_FORK_ISTANBUL\", \"pricing\": { \"blake2_f\": { \"gas_per_round\": 1} } })"`
-		
+
 fi
 
 echo $chainconfig > /chain.json

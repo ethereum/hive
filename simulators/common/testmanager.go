@@ -61,7 +61,7 @@ func (manager *TestManager) Terminate() error {
 		Details: "Test was terminated by host",
 	}
 	manager.testSuiteMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
+	defer manager.testSuiteMutex.Unlock()
 
 	for suiteID, suite := range manager.runningTestSuites {
 		for testID := range suite.TestCases {
@@ -187,16 +187,24 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, summaryResult *TestResult, clientResults map[string]*TestResult) error {
 
 	manager.testCaseMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
 	// Check if the test case is running
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
+		manager.testCaseMutex.Unlock()
 		return ErrNoSuchTestCase
 	}
 	// Make sure there is at least a result summary
 	if summaryResult == nil {
+		manager.testCaseMutex.Unlock()
 		return ErrNoSummaryResult
 	}
+
+	// Add the results to the test case
+	testCase.End = time.Now()
+	testCase.SummaryResult = *summaryResult
+	testCase.ClientResults = clientResults
+
+	manager.testCaseMutex.Unlock()
 
 	for k, v := range testCase.ClientInfo {
 		if v.WasInstantiated {
@@ -206,11 +214,13 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 	for k := range testCase.pseudoInfo {
 		manager.KillNodeCallback(testSuiteRun, testID, k)
 	}
-	// Add the results to the test case
-	testCase.End = time.Now()
-	testCase.SummaryResult = *summaryResult
-	testCase.ClientResults = clientResults
-	delete(manager.runningTestCases, testCase.ID)
+
+	// Delete from running, if it's still there
+	manager.testCaseMutex.Lock()
+	if tc, ok := manager.runningTestCases[testID]; ok {
+		delete(manager.runningTestCases, tc.ID)
+	}
+	manager.testCaseMutex.Unlock()
 
 	return nil
 }

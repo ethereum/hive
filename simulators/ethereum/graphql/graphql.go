@@ -161,8 +161,15 @@ func runTest(t *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID,
 }
 
 func main() {
-
-	log.Info("Hive simulator started.")
+	paralellism := 16
+	if val, ok := os.LookupEnv("HIVE_PARALLELISM"); ok {
+		if p, err := strconv.Atoi(val); err != nil {
+			log.Warn("Hive paralellism could not be converted to int", "error", err)
+		} else {
+			paralellism = p
+		}
+	}
+	log.Info("Hive simulator started.", "paralellism", paralellism)
 
 	// get the test suite engine provider and initialise
 	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
@@ -192,10 +199,9 @@ func main() {
 
 		testCh := deliverTests()
 		var wg sync.WaitGroup
-		for i := 0; i < 16; i++ {
+		for i := 0; i < paralellism; i++ {
 			wg.Add(1)
 			go func() {
-
 				run(testCh, host, testSuiteID, client)
 				wg.Done()
 			}()

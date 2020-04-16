@@ -116,12 +116,16 @@ func ClientTestRunner(t *testing.T, client string, testName string, testDescript
 		}
 
 		enodeID, err := host.GetClientEnode(testSuite, testID, nodeID)
-		if err != nil || enodeID == nil || *enodeID == "" {
+		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get enode: %s", err.Error()))
 			return
 		}
+		if enodeID == nil || *enodeID == "" {
+			summaryResult.Pass = false
+			summaryResult.AddDetail(fmt.Sprintf("Unable to get enode - client reported blank enodeID"))
 
+		}
 		targetNode, err := enode.ParseV4(*enodeID)
 		if err != nil {
 			summaryResult.Pass = false

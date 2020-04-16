@@ -118,12 +118,16 @@ func TestSyncsWithGeth(t *testing.T) {
 		mainFiles := map[string]string{
 			"genesis.json": "/simplechain/genesis.json",
 		}
-		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms, mainFiles)
+		mainId, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms, mainFiles)
 		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
 			return
 		}
+		defer func() {
+			t.Log("Stopping client", mainId)
+			host.KillNode(testSuite, testID, mainId)
+		}()
 		mainNodeURL := fmt.Sprintf("http://%s:8545", mainNodeIP.String())
 
 		//the main client will be asked to sync with the other client.
@@ -154,9 +158,11 @@ func TestSyncsWithGeth(t *testing.T) {
 					summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))
 					return
 				}
-
-				syncClient(nil, mainNodeURL, clientID, nodeIP, t, 10, startTime, true, testID, &summaryResult, clientResults)
-
+				doneFn := func() {
+					t.Log("Stopping client", clientID)
+					host.KillNode(testSuite, testID, clientID)
+				}
+				syncClient(doneFn, mainNodeURL, clientID, nodeIP, t, 10, startTime, true, testID, &summaryResult, clientResults)
 			}
 		}
 
@@ -259,9 +265,13 @@ func TestSyncsWithGeth(t *testing.T) {
 					summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
 					return
 				}
-
 				wg.Add(1)
-				go syncClient(&wg, mainNodeURL, clientID, nodeIP, t, 10, startTime, false, testID, &summaryResult, clientResults)
+				doneFn := func() {
+					wg.Done()
+					t.Log("Stopping client", clientID)
+					host.KillNode(testSuite, testID, clientID)
+				}
+				go syncClient(doneFn, mainNodeURL, clientID, nodeIP, t, 10, startTime, false, testID, &summaryResult, clientResults)
 
 			}
 		}
@@ -272,9 +282,9 @@ func TestSyncsWithGeth(t *testing.T) {
 
 }
 
-func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *testing.T, chainLength int, startTime time.Time, checkMainForSync bool, testID common.TestID, summaryResult *common.TestResult, clientResults common.TestClientResults) {
-	if wg != nil {
-		defer wg.Done()
+func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testing.T, chainLength int, startTime time.Time, checkMainForSync bool, testID common.TestID, summaryResult *common.TestResult, clientResults common.TestClientResults) {
+	if doneFn != nil {
+		defer doneFn()
 	}
 	peerEnodeID, err := host.GetClientEnode(testSuite, testID, clientID)
 	if err != nil || peerEnodeID == nil || *peerEnodeID == "" {
@@ -333,6 +343,7 @@ func syncClient(wg *sync.WaitGroup, mainURL, clientID string, nodeIP net.IP, t *
 
 	//loop until done or timeout
 	for timeout := time.After(syncTimeout); ; {
+		t.Log("Checking sync progress, remaining time:")
 		select {
 
 		case <-timeout:
