@@ -275,7 +275,7 @@ func runContainer(id string, logger log15.Logger, logfile string, shell bool, lo
 		fdsToClose = append(fdsToClose, log)
 
 		// If console logging was requested, tee the output and tag it with the container id
-		if logLevel > 0 {
+		if logLevel > 3 {
 			// Hook into the containers output stream and tee it out
 			hookedR, hookedW, err := os.Pipe()
 			if err != nil {
