@@ -96,6 +96,7 @@ func simulate(simDuration int, simulator string, simulatorLabel string, override
 				fmt.Sprintf("HIVE_SIMULATOR=http://%v", simListenerAddress),
 				fmt.Sprintf("HIVE_DEBUG=%v", strconv.FormatBool(*hiveDebug)),
 				fmt.Sprintf("HIVE_PARALLELISM=%d", *simulatorParallelism),
+				fmt.Sprintf("HIVE_SIMLIMIT=%d", *simulatorTestLimit),
 				fmt.Sprintf("HIVE_SIMLOG=%v", logName),
 			},
 		},

@@ -43,8 +43,10 @@ var (
 	simulatorPattern = flag.String("sim", "", "Regexp selecting the simulation tests to run")
 
 	simulatorParallelism = flag.Int("sim-parallelism", 1, "Max number of parallel clients/containers to run tests against")
-	hiveDebug            = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
-	simRootContext       = flag.Bool("sim-rootcontext", false, "Indicates if the simulation should build the dockerfile with root (simulator) or local context. Needed for access to sibling folders like simulators/common")
+	simulatorTestLimit   = flag.Int("sim-testlimit", -1, "Max number of tests to execute per client (interpreted by simulators)")
+
+	hiveDebug      = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
+	simRootContext = flag.Bool("sim-rootcontext", false, "Indicates if the simulation should build the dockerfile with root (simulator) or local context. Needed for access to sibling folders like simulators/common")
 
 	chainGenerate   = flag.Bool("chainGenerate", false, "Tell Hive to generate a blockchain on the basis of a supplied genesis and terminate")
 	chainLength     = flag.Uint("chainLength", 2, "The length of the chain to generate")
