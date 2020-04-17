@@ -32,8 +32,14 @@
                 </div>
                 <div class="collapse" data-bind="attr:{'aria-labelledby': $parents[1].suiteLabel()+id(), id: $parents[1].suiteLabel()+id()+'detail'}">
                     <div class="card-body hive-header">
-
-                        <p data-bind="text: summaryResult().details()"></p>
+                        <p>
+                            <span class="col-sm-3 font-weight-bold">Test description:</span>
+                            <span data-bind="text: description"></span>
+                        </p>
+                        <p>
+                            <span class="col-sm-3 font-weight-bold">Test Results</span>
+                        <pre data-bind="text: summaryResult().details()"></pre>
+                        </p>
                         <div data-bind="ifnot: clientResults().length==0">
                             <div data-bind="foreach: clientResults">
                                 <div class="row">
@@ -46,8 +52,10 @@
                                     <div class="col-3" data-bind="text:clientVersion">
 
                                     </div>
-                                    <div class="col-3" data-bind="text:logfile">
-
+                                    <div class="col-3">
+                                        <a data-bind="attr: {href:logfile}" download class="btn btn-primary btn-block  " role="button" aria-pressed="true">
+                                            <span data-bind="text:logfile"></span>
+                                        </a>
                                     </div>
                                 </div>
                             </div>

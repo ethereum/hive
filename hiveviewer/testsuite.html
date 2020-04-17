@@ -20,18 +20,10 @@
     <script>
         $(function () {
             $( "#content" ).load( "testsuitecomponent.html" );
-
             window.initPopup = function (ko, viewmodel) {
-
                 window.ko = ko;
                 ko.applyBindings(viewmodel, document.body);
-
-               
-
-
-
             };
-
         }
         );
 
@@ -41,8 +33,12 @@
             <div class=" hive-header">
                 <div class="card-header">
                     <div class="row ">
-                        <div class="col-12  text-center my-auto font-weight-bold h1" data-bind="text: name">
-                          
+                        <div class="col-12  my-auto font-weight-bold h1">
+                            <span data-bind="text: name"></span>
+                            <span data-bind="text: primaryClient()"></span>
+                            <!-- ko if: simLog-->
+                            <a data-bind="attr: {href:simLog}" download role="button" aria-pressed="true">[simulator log]</a>
+                            <!-- /ko -->
                         </div>
 
                     </div>

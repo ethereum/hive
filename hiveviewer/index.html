@@ -143,9 +143,13 @@
                 <div data-bind="class: passStyle()+' card accordion-head mt-1'" >
                     <div class="card-header" data-toggle="collapse" aria-expanded="true" data-bind="attr:{id: suiteLabel, 'data-target': '#'+suiteDetailLabel(), 'aria-controls': suiteDetailLabel }">
                         <div class="row ">
-                            <div class="col-4  text-left my-auto font-weight-bold " data-bind="text: name ">
+                            <div class="col-4  text-left my-auto font-weight-bold " >
+                            <span data-bind="text: name "></span>
+                                <!-- ko if: simLog-->
+                                <a data-bind="attr: {href:simLog}" download xlass="btn btn-primary btn-block  " role="button" aria-pressed="true">[simulator log]</a>
+                                <!-- /ko -->
                             </div>
-                            <div class="col-4  text-left my-auto" data-bind="text: primaryClient()+' clients'">
+                            <div class="col-4  text-left my-auto" data-bind="text: primaryClient()">
                             </div>
                             <div class="col-3  text-left my-auto" data-bind="text: moment(started()).format('MMMM Do YYYY, h:mm:ss a')">
                             </div>
@@ -157,6 +161,7 @@
                                 <i class="fa fa-angle-down" ></i>
                                 <!-- /ko -->
                             </div>
+
                         </div>
                     </div>
 
@@ -260,8 +265,14 @@
                                                         </div>
                                                         <div class="collapse" data-bind="attr:{'aria-labelledby': $parents[1].suiteLabel()+id(), id: $parents[1].suiteLabel()+id()+'detail'}">
                                                             <div class="card-body hive-header">
-
-                                                                <p data-bind="text: summaryResult().details()"></p>
+                                                                <p>
+                                                                    <span class="col-sm-3 font-weight-bold">Test description:</span>
+                                                                    <span data-bind="text: description"></span>
+                                                                </p>
+                                                                <p>
+                                                                    <span class="col-sm-3 font-weight-bold">Test Results</span>
+                                                                    <pre data-bind="text: summaryResult().details()"></pre>
+                                                                </p>
                                                                 <div data-bind="ifnot: clientResults().length==0">
                                                                     <div data-bind="foreach: clientResults">
                                                                         <div class="row">
@@ -274,14 +285,15 @@
                                                                             <div class="col-3" data-bind="text:clientVersion">
 
                                                                             </div>
-                                                                            <div class="col-3" data-bind="text:logfile">
-
+                                                                            <div class="col-3">
+                                                                                <a data-bind="attr: {href:logfile}" download class="btn btn-primary btn-block  " role="button" aria-pressed="true">
+                                                                                    <span data-bind="text:logfile"></span>
+                                                                                </a>
                                                                             </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                                 <div data-bind="if: clientResults().length==0">
-                                                                    <p>Test has summary results only. No per-client test results involved, or the test only involves one client.</p>
                                                                     <p>Participating clients:</p>
                                                                     <div data-bind="foreach: clients">
                                                                         <div class="row">
