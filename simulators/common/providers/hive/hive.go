@@ -91,10 +91,11 @@ func (sim *host) EndTest(testSuite common.TestSuiteID, test common.TestID, summa
 	return err
 }
 
-func (sim *host) StartTestSuite(name string, description string) (common.TestSuiteID, error) {
+func (sim *host) StartTestSuite(name, description, simlog string) (common.TestSuiteID, error) {
 	vals := make(url.Values)
 	vals.Add("name", name)
 	vals.Add("description", description)
+	vals.Add("simlog", simlog)
 	idstring, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite", sim.configuration.HostURI), vals)
 	if err != nil {
 		return 0, err

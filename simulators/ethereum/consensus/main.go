@@ -467,10 +467,11 @@ func main() {
 	availableClients, _ := host.GetClientTypes()
 
 	log.Info("Got clients", "clients", availableClients)
+	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 
 	fileRoot := fmt.Sprintf("%s/BlockchainTests/", testpath)
 	for _, client := range availableClients {
-		testSuiteID, err := host.StartTestSuite("consensus", "consensus test suite blockchain tests for a single client type")
+		testSuiteID, err := host.StartTestSuite("consensus", "consensus test suite blockchain tests for a single client type", logFile)
 		if err != nil {
 			log.Error(fmt.Sprintf("Unable to start test suite: %s", err.Error()), err.Error())
 			os.Exit(1)

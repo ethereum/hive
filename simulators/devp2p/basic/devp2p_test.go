@@ -45,7 +45,6 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
-
 	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "any", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 	netInterface = flag.String("interface", "eth0", "the network interface name to use for spoofing traffic (eg: eth0 on docker) or the IP address identifying the network adapter")
@@ -68,7 +67,11 @@ func RunTestSuite(m *testing.M) int {
 	return m.Run()
 }
 
-func ClientTestRunner(t *testing.T, client string, testName string, testDescription string, testFunc func(common.Logger, *enode.Node) (string, bool)) {
+type testFn func(common.Logger, *enode.Node) (string, bool)
+
+func ClientTestRunner(t *testing.T, client string, testName string, testDescription string, testFunc testFn) {
+	id, _ := os.LookupEnv("HIVE_CONTAINER_ID")
+	fmt.Fprintf(os.Stderr, "Environment container id: %s\n", id)
 
 	t.Run(testName, func(t *testing.T) {
 
@@ -193,8 +196,11 @@ func MakeNode(pubkey *ecdsa.PublicKey, ip net.IP, tcp, udp int, mac *string) *en
 
 // TestDiscovery tests the set of discovery protocols
 func TestDiscovery(t *testing.T) {
+	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 	//start the test suite
-	testSuite, err := host.StartTestSuite("devp2p discovery v4 test suite", "This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.")
+	testSuite, err := host.StartTestSuite("Devp2p discovery v4 test suite",
+		"This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.",
+		logFile)
 	if err != nil {
 		t.Fatalf("Simulator error. Failed to start test suite. %v ", err)
 	}
@@ -227,37 +233,70 @@ func TestDiscovery(t *testing.T) {
 		}
 
 		//get all available tests
-		availableTests := map[string]func(common.Logger, *enode.Node) (string, bool){
-			"spoofTest(v4013)":                            SpoofSanityCheck,
-			"spoofAmplificiation(v4014)":                  SpoofAmplificationAttackCheck,
-			"pingTest(v4001)":                             SourceUnknownPingKnownEnode,
-			"SourceUnknownPingWrongTo(v4002)":             SourceUnknownPingWrongTo,
-			"SourceUnknownPingWrongFrom(v4003)":           SourceUnknownPingWrongFrom,
-			"SourceUnknownPingExtraData(v4004)":           SourceUnknownPingExtraData,
-			"SourceUnknownPingExtraDataWrongFrom(v4005)":  SourceUnknownPingExtraDataWrongFrom,
-			"SourceUnknownWrongPacketType(v4006)":         SourceUnknownWrongPacketType,
-			"SourceUnknownFindNeighbours(v4007)":          SourceUnknownFindNeighbours,
-			"SourceKnownPingFromSignatureMismatch(v4009)": SourceKnownPingFromSignatureMismatch,
-			"FindNeighboursOnRecentlyBondedTarget(v4010)": FindNeighboursOnRecentlyBondedTarget,
-			"PingPastExpiration(v4011)":                   PingPastExpiration,
-			"FindNeighboursPastExpiration(v4012)":         FindNeighboursPastExpiration,
+		type test struct {
+			name        string
+			testFunc    testFn
+			description string
+		}
+		availableTests := []test{
+			{"SpoofSanityCheck(v4013)",
+				SpoofSanityCheck,
+				"A sanity check to make sure that the network setup works for spoofing"},
+			{"SpoofAmplification(v4014)",
+				SpoofAmplificationAttackCheck,
+				`v4014 amplification attack test: The test spoofs a ping from a different ip address('victim ip'),and later on sends a spoofed 'pong'. 
+
+The spoofed 'pong' will have an invalid reply-token (since the target will send the 'pong' to 'victim ip'), and should thus be ignored by the target.
+If the target fails to verify reply-token, it will believe to now be bonded with a node at 'victim ip'. 
+
+The test then sends a spoofed 'findnode' request. 
+If the 'target' responds to the findnode-request, sending a large'neighbours'-packet to 'victim ip', it can be used for DoS attacks.`},
+			{"Ping-BasicTest(v4001)",
+				SourceUnknownPingKnownEnode,
+				"Sends a 'ping' from an unknown source, expects a 'pong' back"},
+			{"Ping-SourceUnknownrongTo(v4002)",
+				SourceUnknownPingWrongTo,
+				"Does a ping with incorrect 'to', expects a pong back"},
+			{"Ping-SourceUnknownWrongFrom(v4003)",
+				SourceUnknownPingWrongFrom,
+				"Sends a 'ping' with incorrect from field. Expect a valid 'pong' back - a bad 'from' should be ignored"},
+			{"Ping-SourceUnknownExtraData(v4004)",
+				SourceUnknownPingExtraData,
+				"Sends a 'ping' with a 'future format' packet containing extra fields. Expects a valid 'pong' back"},
+			{"Ping-SourceUnknownExtraDataWrongFrom(v4005)",
+				SourceUnknownPingExtraDataWrongFrom,
+				"Sends 'ping' with a 'future format' packet containing extra fields and make sure it works even with the wrong 'from' field. Expects a valid 'pong' back"},
+			{"Ping-SourceUnknownWrongPacketType(v4006)",
+				SourceUnknownWrongPacketType,
+				"PingTargetWrongPacketType send a packet (a ping packet, though it could be something else) with an unknown packet type to the client and" +
+					"see how the target behaves. Expects the target to not send any kind of response."},
+			{"Findnode-UnbondedFindNeighbours(v4007)",
+				SourceUnknownFindNeighbours,
+				"Queries neighbours, from a node without a previous bond. This tests expects no response to be sent from the target."},
+			{"Ping-BondedFromSignatureMismatch(v4009)",
+				SourceKnownPingFromSignatureMismatch,
+				"Ping node under test, from an already bonded node, but the 'ping' has a bad from-field. " +
+					"Expects the target to ignore the bad 'from' and respond with a valid pong."},
+			{"FindNode-UnsolicitedPollution(v4010)",
+				FindNeighboursOnRecentlyBondedTarget,
+				"Node A bonds with the target. The target receives an unsolicited 'neighbours' packet, containing junk information. When node A" +
+					"queries neighbours('findnode'), we expect to get back a response which is not polluted."},
+			{"Ping-PastExpiration(v4011)",
+				PingPastExpiration,
+				"Sends a 'ping' with past expiration, expects no response from the target."},
+			{"FindNode-PastExpiration(v4012)",
+				FindNeighboursPastExpiration,
+				"Sends a 'findnode' with past expiration, expects no response from the target."},
 		}
 
 		//for every client type
 		for _, i := range availableClients {
-
 			//for every test
-			for testName, testFunc := range availableTests {
-
-				//we have a testcase of client-type+test
-				//run that testcase with a helper function (client, testfunc)
+			for _, test := range availableTests {
 				//the testcase will be run with max concurrency specified by the test parallel flag
-				ClientTestRunner(t, i, testName, "TODO", testFunc)
-
+				ClientTestRunner(t, i, test.name, test.description, test.testFunc)
 			}
-
 		}
-
 	})
 
 }

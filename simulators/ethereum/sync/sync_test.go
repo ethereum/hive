@@ -60,8 +60,15 @@ func RunTestSuite(m *testing.M) int {
 
 func TestSyncsWithGeth(t *testing.T) {
 
+	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 	//start the test suite
-	testSuite, err := host.StartTestSuite("Sync test suite", "This suite of tests verifies that clients can sync from each other in different modes.")
+	testSuite, err := host.StartTestSuite("Sync test suite",
+		`This suite of tests verifies that clients can sync from each other in different modes.
+ It consists of two specific tests, both using geth as the reference client, testing these two aspects: 
+
+- Whether the client-under-test can sync from geth
+- Whether geth can sync from the client-under-test'
+`, logFile)
 	if err != nil {
 		t.Fatalf("Simulator error. Failed to start test suite. %v ", err)
 	}
@@ -93,7 +100,9 @@ func TestSyncsWithGeth(t *testing.T) {
 		}
 		startTime := time.Now()
 
-		testID, err := host.StartTest(testSuite, "From geth", "This test initialises an instance of geth with a predefined chain and genesis (configured to run in fast-sync) and then attempts to sync multiple clients from that one.")
+		testID, err := host.StartTest(testSuite, "Serve as sync source",
+			`This test initialises each client-under-test with a predefined chain, 
+and attempts to sync up a geth-node against the client-under-test.`)
 		if err != nil {
 			t.Fatalf("Unable to start test: %s", err.Error())
 		}
@@ -196,7 +205,9 @@ func TestSyncsWithGeth(t *testing.T) {
 		}
 
 		startTime := time.Now()
-		testID, err := host.StartTest(testSuite, "From geth", "This test initialises an instance of geth with a predefined chain and genesis (configured to run in fast-sync) and then attempts to sync multiple clients from that one.")
+		testID, err := host.StartTest(testSuite, "Sync from geth",
+			`This test initialises an instance of geth with a predefined chain and genesis and attempts to 
+sync each client-under-test from the geth master.`)
 		if err != nil {
 			t.Fatalf("Unable to start test: %s", err.Error())
 		}

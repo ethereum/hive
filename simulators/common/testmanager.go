@@ -133,16 +133,17 @@ func (manager *TestManager) EndTestSuite(testSuite TestSuiteID) error {
 }
 
 // StartTestSuite starts a test suite and returns the context id
-func (manager *TestManager) StartTestSuite(name string, description string) (TestSuiteID, error) {
+func (manager *TestManager) StartTestSuite(name string, description string, simlog string) (TestSuiteID, error) {
 
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
 	var newSuiteID = TestSuiteID(manager.testSuiteCounter)
 	manager.runningTestSuites[newSuiteID] = &TestSuite{
-		ID:          newSuiteID,
-		Name:        name,
-		Description: description,
-		TestCases:   make(map[TestID]*TestCase),
+		ID:           newSuiteID,
+		Name:         name,
+		Description:  description,
+		TestCases:    make(map[TestID]*TestCase),
+		SimulatorLog: simlog,
 	}
 	manager.testSuiteCounter++
 

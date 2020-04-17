@@ -183,9 +183,10 @@ func main() {
 
 	availableClients, _ := host.GetClientTypes()
 	log.Info("Got clients", "clients", availableClients)
+	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 
 	for _, client := range availableClients {
-		testSuiteID, err := host.StartTestSuite("graphql", "graphql test suite covering the graphql API surface")
+		testSuiteID, err := host.StartTestSuite("graphql", "graphql test suite covering the graphql API surface", logFile)
 		if err != nil {
 			log.Error(fmt.Sprintf("Unable to start test suite: %s", err.Error()), err.Error())
 			os.Exit(1)
