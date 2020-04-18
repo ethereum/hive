@@ -77,31 +77,7 @@ type testcase struct {
 }
 
 func run(testChan chan *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, client string) {
-	// TODO!
-	// The graphql tests can all execute on the same client container, no need to spin up new ones for every test
-	// We could save quite some time there
-	// However, the API to StartTest(.., testID , ... ) wants a test-id, so we need to ensure that we can indeed reuse
-	// an existing container and it doesn't get torn down by the call to host.EndTest
-	// See simulator.go: 398. 
-	var i = 0
-	for t := range testChan {
-		if err := prepareRunTest(t, host, suiteID, client); err != nil {
-			log.Error("error", "err", err)
-		}
-		i++
-	}
-	log.Info("executor finished", "num_executed", i)
-}
 
-// prepareRunTest administers the hive-specific test stuff, registering the suite and reporting back the suite results
-func prepareRunTest(t *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, client string) error {
-
-	log.Info("Starting test", "name", t.name)
-
-	testID, err := host.StartTest(suiteID, t.name, "")
-	if err != nil {
-		return err
-	}
 	// The graphql chain comes from the Besu codebase, and is built on Frontier
 	env := map[string]string{
 		"CLIENT":             client,
@@ -112,7 +88,48 @@ func prepareRunTest(t *testcase, host common.TestSuiteHost, suiteID common.TestS
 		"genesis.json": "/init/testGenesis.json",
 		"chain.rlp":    "/init/testBlockchain.blocks",
 	}
-	_, ip, _, err := host.GetNode(suiteID, testID, env, files)
+	// The graphql tests can all execute on the same client container, no need to spin up new ones for every test
+	//
+	// However, the API to StartTest(.., testID , ... ) wants a test-id, so we need to ensure that we can indeed reuse
+	// an existing container and it doesn't get torn down by the call to host.EndTest
+	// See simulator.go: 398.
+	//
+	// To get around the quirk above, we use a meta-test
+	metaTestId, err := host.StartTest(suiteID, "1. Client Instantiation and container logs", "This is a meta-test, which only checks that "+
+		"the client-under-test can be instantiated. \n\nIf this fails, no other tests are executed. "+
+		"This test contains all docker logs pertaining to the client-under-test, since the graphql tests"+
+		" are all executed against the same instance")
+	metaTestResult := &common.TestResult{Pass: false}
+	defer host.EndTest(suiteID, metaTestId, metaTestResult, nil)
+	if err != nil {
+		log.Error("error", "err", err)
+		return
+	}
+	_, ip, _, err := host.GetNode(suiteID, metaTestId, env, files)
+	if err != nil {
+		log.Error("error", "err", err)
+		metaTestResult.Details = fmt.Sprintf("Error occurred: %v", err)
+		return
+	}
+
+	var i = 0
+	for t := range testChan {
+		if err := prepareRunTest(t, host, suiteID, ip); err != nil {
+			log.Error("error", "err", err)
+		}
+		i++
+	}
+	metaTestResult.Pass = true
+	metaTestResult.Details = "Client instantiated OK"
+	log.Info("executor finished", "num_executed", i)
+}
+
+// prepareRunTest administers the hive-specific test stuff, registering the suite and reporting back the suite results
+func prepareRunTest(t *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, ip net.IP) error {
+
+	log.Info("Starting test", "name", t.name)
+
+	testID, err := host.StartTest(suiteID, t.name, "")
 	if err != nil {
 		host.EndTest(suiteID, testID, &common.TestResult{false, err.Error()}, nil)
 		return err
