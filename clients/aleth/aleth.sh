@@ -22,9 +22,15 @@
 #  - HIVE_FORK_BYZANTIUM block number for Byzantium transition
 #  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
 #  - HIVE_FORK_PETERSBURG  block number for ConstantinopleFix/PetersBurg transition
+#  - HIVE_FORK_ISTANBUL block number for Istanbul
+#  - HIVE_FORK_MUIRGLACIER block number for Muir Glacier
+#  - HIVE_FORK_BERLIN block number for Berlin
+#
+# Other:
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW       If set, skip PoW verification during block import
+#  - HIVE_LOGLEVEL		 Simulator loglevel
 
 # Immediately abort the script on any error encountered
 set -e
@@ -99,17 +105,6 @@ if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"byzantiumForkBlock\"]; \"0x$HIVE_FORK_BYZANTIUM\")"`
 fi
 
-if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
-	HIVE_FORK_ISTANBUL=`echo "obase=16; $HIVE_FORK_ISTANBUL" | bc`
-
-	if [ "$((16#$HIVE_FORK_ISTANBUL))" -eq "0" ]; then
-		# Also new precompiles
-		chainconfig=`echo $chainconfig | jq "setpath([\"accounts\", \"0000000000000000000000000000000000000009\"]; { \"precompiled\": { \"name\": \"blake2_compression\" } })"`
-		
-	fi
-
-	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"istanbulForkBlock\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
-fi
 
 if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
 	HIVE_FORK_CONSTANTINOPLE=`echo "obase=16; $HIVE_FORK_CONSTANTINOPLE" | bc`
@@ -120,6 +115,15 @@ if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"constantinopleFixForkBlock\"]; \"0x$HIVE_FORK_PETERSBURG\")"`
 fi
 
+if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+	HIVE_FORK_ISTANBUL=`echo "obase=16; $HIVE_FORK_ISTANBUL" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"istanbulForkBlock\"]; \"0x$HIVE_FORK_ISTANBUL\")"`
+fi
+
+if [ "$HIVE_FORK_MUIRGLACIER" != "" ]; then
+	HIVE_FORK_MUIRGLACIER=`echo "obase=16; $HIVE_FORK_MUIRGLACIER" | bc`
+	chainconfig=`echo $chainconfig | jq "setpath([ \"params\", \"muirGlacierForkBlock\"]; \"$HIVE_FORK_MUIRGLACIER\")"`
+fi
 if [ "$HIVE_CHAIN_ID" != "" ]; then
 	chainconfig=`echo $chainconfig | jq "setpath([\"params\", \"chainID\"]; \"0x$HIVE_CHAIN_ID\")"`
 fi

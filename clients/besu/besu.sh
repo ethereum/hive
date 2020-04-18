@@ -35,7 +35,7 @@
 #  - HIVE_SKIP_POW             If set, skip PoW verification during block import
 
 besu=/opt/besu/bin/besu
-RPCFLAGS="--graphql-http-enabled --graphql-http-host=0.0.0.0"
+RPCFLAGS="--graphql-http-enabled --graphql-http-host=0.0.0.0 --host-whitelist=*"
 RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
 
 set -e
@@ -46,6 +46,8 @@ fi
 
 if [ "$HIVE_NETWORK_ID" != "" ]; then
 	FLAGS="$FLAGS --network-id=$HIVE_NETWORK_ID"
+else
+    FLAGS="$FLAGS --network-id=1337"
 fi
 
 if [ "$HIVE_NODETYPE" == "full" ]; then
