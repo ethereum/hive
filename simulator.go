@@ -294,29 +294,6 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 		if len(fheaders) > 0 {
 			files[key] = fheaders[0]
 		}
-
-		//for _, hdr := range fheaders {
-		// open uploaded
-		//	var infile multipart.File
-		// if infile, err = hdr.Open(); nil != err {
-		// 	log15.Error("Could not read file", "error", nil)
-		// 	http.Error(w, "Could not read file", http.StatusBadRequest)
-		// 	return
-		// }
-		// open destination
-		//   var outfile *os.File
-		//   if outfile, err = os.Create("./uploaded/" + hdr.Filename); nil != err {
-		// 	   status = http.StatusInternalServerError
-		// 	   return
-		//   }
-		//   // 32K buffer copy
-		//   var written int64
-		//   if written, err = io.Copy(outfile, infile); nil != err {
-		// 	   status = http.StatusInternalServerError
-		// 	   return
-		//   }
-		//   res.Write([]byte("uploaded file:" + hdr.Filename + ";length:" + strconv.Itoa(int(written))))
-
 	}
 
 	envs := make(map[string]string)
@@ -326,10 +303,7 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 	//TODO logdir
 	logdir := *testResultsRoot
 	nodeInfo, nodeID, ok := newNode(w, envs, files, allClients, request, true, true, logdir)
-	nodeInfo.WasInstantiated = ok
-
 	testManager.RegisterNode(testCase, nodeID, nodeInfo)
-
 }
 
 //start a pseudo client and register it as part of a test
@@ -525,12 +499,12 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	//the simulation host may prevent or be unaware of the simulation controller's requested client
 	imageName, in := clients[clientName]
 	if !in {
-		log15.Error("Unknown or forbidden client type", "error", nil)
+		log15.Error("Unknown or forbidden client type", "clientName", clientName)
 		http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)
 		return testClientInfo, "", false
 	}
 	//create and start the requested client container
-	log15.Debug("starting new client")
+	log15.Debug("starting new client", "imagename", imageName, "clientName", clientName)
 	container, err := createClientContainer(imageName, envs, files)
 	if err != nil {
 		log15.Error("failed to create client", "error", err)
@@ -545,13 +519,15 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	logger := log15.New("client started with id", containerID)
 	logfileRelative := filepath.Join(strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
 	logfile := filepath.Join(logdir, logfileRelative)
-
+	testClientInfo.LogFile = logfileRelative
+	testClientInfo.WasInstantiated = true
+	testClientInfo.InstantiatedAt = time.Now()
 	//run the new client
 	waiter, err := runContainer(container.ID, logger, logfile, false, logLevel)
 	if err != nil {
 		logger.Error("failed to start client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return testClientInfo, "", false
+		return testClientInfo, containerID, false
 	}
 	go func() {
 		// Ensure the goroutine started by runContainer exits, so that
@@ -574,12 +550,12 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		if err != nil {
 			logger.Error("failed to inspect client", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return testClientInfo, "", false
+			return testClientInfo, containerID, false
 		}
 		if !container.State.Running {
 			logger.Error("client container terminated")
 			http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
-			return testClientInfo, "", false
+			return testClientInfo, containerID, false
 		}
 
 		containerIP = container.NetworkSettings.IPAddress
@@ -598,7 +574,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 
 		time.Sleep(checkTime)
 		checkTime = checkTime * 2
-		if checkTime > time.Second {
+		if checkTime > 2*time.Second {
 			checkTime = time.Second
 		}
 
@@ -612,17 +588,9 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 				logger.Error("failed to terminate client container due to unresponsive RPC")
 				http.Error(w, "failed to terminate client container due to unresponsive RPC", http.StatusInternalServerError)
 			}
-			return testClientInfo, "", false
+			return testClientInfo, containerID, false
 
 		}
-	}
-	testClientInfo = &common.TestClientInfo{
-		ID:              container.ID,
-		Name:            clientName,
-		VersionInfo:     "",
-		InstantiatedAt:  time.Now(),
-		LogFile:         logfileRelative,
-		WasInstantiated: true,
 	}
 	//  Container online and responsive, return its ID, IP and MAC for later reference
 	fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)
