@@ -77,6 +77,12 @@ type testcase struct {
 }
 
 func run(testChan chan *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, client string) {
+	// TODO!
+	// The graphql tests can all execute on the same client container, no need to spin up new ones for every test
+	// We could save quite some time there
+	// However, the API to StartTest(.., testID , ... ) wants a test-id, so we need to ensure that we can indeed reuse
+	// an existing container and it doesn't get torn down by the call to host.EndTest
+	// See simulator.go: 398. 
 	var i = 0
 	for t := range testChan {
 		if err := prepareRunTest(t, host, suiteID, client); err != nil {
@@ -141,16 +147,16 @@ func runTest(ip net.IP, t *testcase) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	//verify the response matches expected
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Node HTTP response not 200 OK, got: %v, response: %v", resp.Status, string(respBytes))
-	}
+	resp.Body.Close()
+	// The response status code can be other than 200 for some tests, but still pass, so don't abort early here
+	//if resp.StatusCode != http.StatusOK {
+	//	return fmt.Errorf("Node HTTP response not 200 OK, got: %v, response: %v", resp.Status, string(respBytes))
+	//}
 	exp, got := string(t.expected), string(respBytes)
 	if res, err := areEqualJSON(got, exp); err != nil {
 		return err
 	} else if !res {
-		return fmt.Errorf("Test failed. Query:\n```\n%v\n```\nexpected: \n```\n%s\n```\n got:\n```\n%s\n```\n", string(t.graphql), exp, got)
+		return fmt.Errorf("Test failed. Query:\n```\n%v\n```\nexpected: \n```\n%s\n```\n got:\n```\n%s\n```\n. HTTP response status: %s", string(t.graphql), exp, got, resp.Status)
 	}
 	return nil
 }
@@ -193,7 +199,8 @@ func main() {
 	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 
 	for _, client := range availableClients {
-		testSuiteID, err := host.StartTestSuite("graphql", "graphql test suite covering the graphql API surface", logFile)
+		testSuiteID, err := host.StartTestSuite("graphql", "Test suite covering the graphql API surface."+
+			"The GraphQL tests were initially imported from the Besu codebase.", logFile)
 		if err != nil {
 			log.Error(fmt.Sprintf("Unable to start test suite: %s", err.Error()), err.Error())
 			os.Exit(1)
