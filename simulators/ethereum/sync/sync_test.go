@@ -369,8 +369,7 @@ func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testi
 			block, err := ethClient.GetBlockByNumber(ctx, -1)
 			if err != nil {
 				t.Errorf("Error getting block from %s ", clientURL)
-			}
-			if block != nil {
+			} else {
 				blockNumber := block.GetNumber()
 				t.Logf("Block number: %d", block.GetNumber())
 				if blockNumber == int64(chainLength) {
