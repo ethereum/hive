@@ -7,7 +7,6 @@
 # and should thus complete in tens of minutes
 #
 
-
 HIVEHOME="./"
 
 # Store results in temp
@@ -18,44 +17,40 @@ FLAGS="--docker-noshell --loglevel 4"
 FLAGS="$FLAGS --results-root $RESULTS "
 FLAGS="$FLAGS --sim.parallelism 1 --sim.rootcontext --client.checktimelimit=20s"
 
+echo "Running the quick'n'dirty version of the Hive tests, for local development"
+echo "To the the hive viewer up, you can do"
+echo ""
+echo "  cd $HIVEHOME/hiveviewer && ln -s /tmp/TestResults/ Results && python -m SimpleHTTPServer"
+echo ""
+echo "And then visit http://localhost:8000/ with your browser. "
+echo "Log-files and stuff is availalbe in $RESULTS."
+echo ""
+echo ""
+
+
+function run {
+  echo "$HIVEHOME> $1"
+  (cd $HIVEHOME && $1)
+}
+
 function testconsensus {
   client=$1
-  cd $HIVEHOME;
-
-  echo "$(date) Starting hive consensus simulation [$client], check progress at output.log"
-  hive --sim ethereum/consensus \
-  --client $client --sim.loglevel 6 --sim.testlimit 2 $FLAGS
-
+  echo "$(date) Starting hive consensus simulation [$client]"
+  run "hive --sim ethereum/consensus --client $client --sim.loglevel 6 --sim.testlimit 2 $FLAGS"
+}
+function testgraphql {
+  echo "$(date) Starting graphql simulation [$1]"
+  run "hive --sim ethereum/graphql --client $1 $FLAGS"
 }
 
 function testsync {
-  client1=$1
-  client2=$2
-  cd $HIVEHOME;
-
-  echo "$(date) Starting hive sync simulation [$client<->$client2], check progress at output.log"
-
-  hive --sim ethereum/sync --client "$client1,$client2" $FLAGS
-
+  echo "$(date) Starting hive sync simulation [$1<->$2]"
+  run "hive --sim ethereum/sync --client=\"$1,$2\" $FLAGS"
 }
 
 function testdevp2p {
-  client=$1
-  cd $HIVEHOME;
-
-  echo "$(date) Starting p2p simulation [$client], check progress at output.log"
-
-  hive --sim devp2p --client $client $FLAGS
-}
-
-
-function testgraphql {
-  client=$1
-  cd $HIVEHOME;
-
-  echo "$(date) Starting graphql simulation [$client], check progress at output.log"
-
-  hive --sim ethereum/graphql --sim.testlimit 5 --client $client $FLAGS
+  echo "$(date) Starting p2p simulation [$1]"
+  run "hive --sim devp2p --client $1 $FLAGS"
 }
 
 mkdir $RESULTS
