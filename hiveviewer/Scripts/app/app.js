@@ -205,7 +205,7 @@ app.prototype.LoadTestSuites = function(path, file) {
     }
     ).
     fail(function (e) {
-        alert("error");
+        alert("Failed to load test suites:" + e.status);
     });
 }
 
@@ -225,6 +225,8 @@ function testSuiteSummary(data) {
     self.data = data;
     self.path = "";
     self.fileName = ko.observable(data.fileName);
+    //self.simLog = ko.observable(data.simLog)
+    self.simLog = ko.observable(getFilePath(data.simLog))
     self.name = ko.observable(data.name);
     self.started = ko.observable(Date.parse(data.start));
     self.primaryClient = ko.observable(data.primaryClient);
@@ -334,15 +336,9 @@ function provokePopup(popup,self) {
 
 testClientInfo.prototype.ShowLogs = function () {
     self = this;
-    
-  
-   
 
-    var popup = window.open("popup.html", "_blank", 'toolbar=no, menubar=no, resizable=yes');
-  
+    var popup = window.open("popup.html", "", "");
     provokePopup(popup,self);
-
-   
 
     return true;
 
@@ -356,9 +352,10 @@ testClientInfo.prototype.ShowLogs = function () {
  */
 
 // testClientResult ctor
-function testClientResult(pass,details,name,version,instantiated,log) {
+function testClientResult(pass,details,name,desc,version,instantiated,log) {
     this.pass = ko.observable(pass);
     this.details = ko.observable(details);
+    this.description = ko.observable(desc);
     this.clientName = ko.observable(name);
     this.clientVersion = ko.observable(version);
     this.clientInstantiated = ko.observable(instantiated);
@@ -431,6 +428,7 @@ function makeClientResults(clientResults, clientInfos) {
     return $.map(clientResults, function (testResult,clientName) {
         var pass = testResult.pass;
         var details = testResult.details;
+        var desc = testResult.description
         var name = "Missing client info.";
         var version = "";
         var instantiated;
@@ -442,7 +440,7 @@ function makeClientResults(clientResults, clientInfos) {
             instantiated = clientInfo.instantiatedAt;
             log = getFilePath(clientInfo.logFile);
         }
-        return new testClientResult(pass, details, name, version, instantiated, log);
+        return new testClientResult(pass, details, name, desc, version, instantiated, log);
     });
 }
 function makeClientInfo( clientInfos) {
@@ -644,7 +642,7 @@ testSuite.prototype.OpenTestSuite = function (vm,e) {
  //   var clonedSuite = new testSuite(ko.utils.parseJson(ko.toJSON(this.original)));
   //  clonedSummary.testSuite(clonedSuite);
   //  clonedSuite.maxPerPage(100);
-    var popup = window.open("testsuite.html", "_blank", 'toolbar=no, menubar=no, resizable=yes');
+    var popup = window.open("testsuite.html", "", "");
 
     provokePopup(popup, summary);
 

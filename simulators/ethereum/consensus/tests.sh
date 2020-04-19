@@ -5,6 +5,7 @@ cd /go/src/github.com/ethereum/hive/simulators/ethereum/consensus/
 
 echo "Simulator endpoint: $HIVE_SIMULATOR"
 echo "Simulator parallelism: $HIVE_PARALLELISM"
+echo "Simulator test limit: $HIVE_SIMLIMIT"
 
 #generate the config file for a hive provider
 echo "{ \"hostURI\":\"$HIVE_SIMULATOR\" }" >hiveProviderConfig.json

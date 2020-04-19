@@ -44,6 +44,8 @@ fi
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
 	FLAGS="$FLAGS --network-id $HIVE_NETWORK_ID"
+else
+    FLAGS="$FLAGS --network-id 1337"
 fi
 
 # Configure and set the chain definition for the node

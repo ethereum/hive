@@ -14,6 +14,9 @@
 #  - HIVE_NETWORK_ID     network ID number to use for the eth protocol
 #  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
+#
+# Forks
+#
 #  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
@@ -22,6 +25,11 @@
 #  - HIVE_FORK_BYZANTIUM block number for Byzantium transition
 #  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
 #  - HIVE_FORK_PETERSBURG  block number for ConstantinopleFix/PetersBurg transition
+#  - HIVE_FORK_ISTANBUL block number for Istanbul
+#  - HIVE_FORK_MUIRGLACIER block number for Muir Glacier
+#  - HIVE_FORK_BERLIN block number for Berlin
+#
+# Other:
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW       If set, skip PoW verification during block import
@@ -47,7 +55,12 @@ fi
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
 	FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
+else
+    # Unless otherwise specified by hive, we try to avoid mainnet networkid. If geth detects mainnet network id,
+    # then it tries to bump memory quite a lot
+    FLAGS="$FLAGS --networkid 1337"
 fi
+
 
 # If the client is to be run in testnet mode, flag it as such
 if [ "$HIVE_TESTNET" == "1" ]; then
@@ -104,6 +117,12 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 	if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"istanbulBlock\": $HIVE_FORK_ISTANBUL}"
 	fi
+	if [ "$HIVE_FORK_MUIRGLACIER" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"muirGlacierBlock\": $HIVE_FORK_MUIRGLACIER}"
+	fi
+	if [ "$HIVE_FORK_BERLIN" != "" ]; then
+		JQPARAMS="$JQPARAMS + {\"berlinBlock\": $HIVE_FORK_BERLIN}"
+	fi
 	if [ "$HIVE_CHAIN_ID" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"chainId\": $HIVE_CHAIN_ID}"
 	fi
@@ -128,7 +147,6 @@ if [ -f /chain.rlp ]; then
 	$geth $FLAGS --gcmode=archive import /chain.rlp
 else
 	echo "Warning: chain.rlp not found."
-	ls -la /
 fi
 
 # Load the remainder of the test chain

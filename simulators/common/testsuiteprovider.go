@@ -24,7 +24,7 @@ func RegisterProvider(key string, provider TestSuiteProviderInitialiser) {
 
 //TestSuiteHost The test suite host the simulator communicates with to manage test cases and their resources
 type TestSuiteHost interface {
-	StartTestSuite(name string, description string) (TestSuiteID, error)
+	StartTestSuite(string, description, simlog string) (TestSuiteID, error)
 	// StartTest starts a test case, which provides a context for clients and results, returning the test case identifier
 	StartTest(testSuiteRun TestSuiteID, name string, description string) (TestID, error)
 	// EndTest ends a test case, cleaning up client instances created for the test and writing out results

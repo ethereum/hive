@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -75,15 +76,28 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 func simulate(simDuration int, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string) error {
 	logger.Info(fmt.Sprintf("running client simulation: %s", simulatorLabel))
 
+	// The simulator creates the testŕesult files, aswell as updates the index file. However, it needs to also
+	// be aware of the location of it's own logfile, which should also be placed into the index.
+	// We generate a unique name here, and pass it to the simulator via ENV vars
+	var logName string
+	{
+		b := make([]byte, 16)
+		rand.Read(b)
+		logName = fmt.Sprintf("%d-%x-simulator.log", time.Now().Unix(), b)
+	}
+
 	// Start the simulator controller container
 	logger.Debug("creating simulator container")
 	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
 	sc, err := dockerClient.CreateContainer(docker.CreateContainerOptions{
 		Config: &docker.Config{
 			Image: simulator,
-			Env: []string{"HIVE_SIMULATOR=http://" + simListenerAddress,
-				"HIVE_DEBUG=" + strconv.FormatBool(*hiveDebug),
-				"HIVE_PARALLELISM=" + fmt.Sprintf("%d", *simulatorParallelism),
+			Env: []string{
+				fmt.Sprintf("HIVE_SIMULATOR=http://%v", simListenerAddress),
+				fmt.Sprintf("HIVE_DEBUG=%v", strconv.FormatBool(*hiveDebug)),
+				fmt.Sprintf("HIVE_PARALLELISM=%d", *simulatorParallelism),
+				fmt.Sprintf("HIVE_SIMLIMIT=%d", *simulatorTestLimit),
+				fmt.Sprintf("HIVE_SIMLOG=%v", logName),
 			},
 		},
 		HostConfig: hostConfig,
@@ -105,8 +119,8 @@ func simulate(simDuration int, simulator string, simulatorLabel string, override
 
 	// Start the tester container and wait until it finishes
 	slogger.Debug("running simulator container")
-	//TODO - Simulator.log? Need to decide how to organise the execution logs.
-	waiter, err := runContainer(sc.ID, slogger, filepath.Join(logdir, "simulator.log"), false, *loglevelFlag)
+
+	waiter, err := runContainer(sc.ID, slogger, filepath.Join(logdir, logName), false, *loglevelFlag)
 	if err != nil {
 		slogger.Error("failed to run simulator", "error", err)
 		return err
@@ -280,29 +294,6 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 		if len(fheaders) > 0 {
 			files[key] = fheaders[0]
 		}
-
-		//for _, hdr := range fheaders {
-		// open uploaded
-		//	var infile multipart.File
-		// if infile, err = hdr.Open(); nil != err {
-		// 	log15.Error("Could not read file", "error", nil)
-		// 	http.Error(w, "Could not read file", http.StatusBadRequest)
-		// 	return
-		// }
-		// open destination
-		//   var outfile *os.File
-		//   if outfile, err = os.Create("./uploaded/" + hdr.Filename); nil != err {
-		// 	   status = http.StatusInternalServerError
-		// 	   return
-		//   }
-		//   // 32K buffer copy
-		//   var written int64
-		//   if written, err = io.Copy(outfile, infile); nil != err {
-		// 	   status = http.StatusInternalServerError
-		// 	   return
-		//   }
-		//   res.Write([]byte("uploaded file:" + hdr.Filename + ";length:" + strconv.Itoa(int(written))))
-
 	}
 
 	envs := make(map[string]string)
@@ -312,10 +303,7 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 	//TODO logdir
 	logdir := *testResultsRoot
 	nodeInfo, nodeID, ok := newNode(w, envs, files, allClients, request, true, true, logdir)
-	nodeInfo.WasInstantiated = ok
-
 	testManager.RegisterNode(testCase, nodeID, nodeInfo)
-
 }
 
 //start a pseudo client and register it as part of a test
@@ -439,10 +427,11 @@ func testStart(w http.ResponseWriter, request *http.Request) {
 	}
 	fmt.Fprintf(w, "%s", testID)
 }
+
 func suiteStart(w http.ResponseWriter, request *http.Request) {
 	log15.Info("Server - suites start request")
 	dict := parseForm(request)
-	suiteID, err := testManager.StartTestSuite(dict["name"], dict["description"])
+	suiteID, err := testManager.StartTestSuite(dict["name"], dict["description"], dict["simlog"])
 	if err != nil {
 		msg := fmt.Sprintf("unable to start test case: %s", err.Error())
 		log15.Error(msg)
@@ -450,6 +439,7 @@ func suiteStart(w http.ResponseWriter, request *http.Request) {
 	}
 	fmt.Fprintf(w, "%s", suiteID)
 }
+
 func suiteEnd(w http.ResponseWriter, request *http.Request) {
 	log15.Info("Server - end suite request")
 	testSuite, ok := checkSuiteRequest(request, w)
@@ -509,12 +499,12 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	//the simulation host may prevent or be unaware of the simulation controller's requested client
 	imageName, in := clients[clientName]
 	if !in {
-		log15.Error("Unknown or forbidden client type", "error", nil)
+		log15.Error("Unknown or forbidden client type", "clientName", clientName)
 		http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)
 		return testClientInfo, "", false
 	}
 	//create and start the requested client container
-	log15.Debug("starting new client")
+	log15.Debug("starting new client", "imagename", imageName, "clientName", clientName)
 	container, err := createClientContainer(imageName, envs, files)
 	if err != nil {
 		log15.Error("failed to create client", "error", err)
@@ -525,18 +515,19 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	containerIP := ""
 	containerMAC := ""
 	//and now initialise it with supplied files
-
 	//start a new client logger
 	logger := log15.New("client started with id", containerID)
 	logfileRelative := filepath.Join(strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
 	logfile := filepath.Join(logdir, logfileRelative)
-
+	testClientInfo.LogFile = logfileRelative
+	testClientInfo.WasInstantiated = true
+	testClientInfo.InstantiatedAt = time.Now()
 	//run the new client
 	waiter, err := runContainer(container.ID, logger, logfile, false, logLevel)
 	if err != nil {
 		logger.Error("failed to start client", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return testClientInfo, "", false
+		return testClientInfo, containerID, false
 	}
 	go func() {
 		// Ensure the goroutine started by runContainer exits, so that
@@ -559,12 +550,12 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		if err != nil {
 			logger.Error("failed to inspect client", "error", err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return testClientInfo, "", false
+			return testClientInfo, containerID, false
 		}
 		if !container.State.Running {
 			logger.Error("client container terminated")
 			http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
-			return testClientInfo, "", false
+			return testClientInfo, containerID, false
 		}
 
 		containerIP = container.NetworkSettings.IPAddress
@@ -583,7 +574,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 
 		time.Sleep(checkTime)
 		checkTime = checkTime * 2
-		if checkTime > time.Second {
+		if checkTime > 2*time.Second {
 			checkTime = time.Second
 		}
 
@@ -597,17 +588,9 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 				logger.Error("failed to terminate client container due to unresponsive RPC")
 				http.Error(w, "failed to terminate client container due to unresponsive RPC", http.StatusInternalServerError)
 			}
-			return testClientInfo, "", false
+			return testClientInfo, containerID, false
 
 		}
-	}
-	testClientInfo = &common.TestClientInfo{
-		ID:              container.ID,
-		Name:            clientName,
-		VersionInfo:     "",
-		InstantiatedAt:  time.Now(),
-		LogFile:         logfileRelative,
-		WasInstantiated: true,
 	}
 	//  Container online and responsive, return its ID, IP and MAC for later reference
 	fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)
@@ -637,214 +620,3 @@ func terminateAndUpdate() {
 	}
 
 }
-
-// ServeHTTP handles all the simulator API requests and executes them.
-// func (h *testSuiteAPIHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
-// 	log15.Debug("new simulator request", "from", r.RemoteAddr, "method", r.Method, "endpoint", r.URL.Path)
-
-// 	switch r.Method {
-// 	case "GET":
-// 		// Information retrieval, fetch whatever's needed and return it
-// 		switch {
-// 		case r.URL.Path == "/docker":
-// 			// Docker infos requested, gather and send them back
-// 			info, err := dockerClient.Info()
-// 			if err != nil {
-// 				logger.Error("failed to gather docker infos", "error", err)
-// 				http.Error(w, err.Error(), http.StatusInternalServerError)
-// 				return
-// 			}
-// 			out, _ := json.MarshalIndent(info, "", "  ")
-// 			fmt.Fprintf(w, "%s\n", out)
-
-// case strings.HasPrefix(r.URL.Path, "/nodes/"):
-// 	// Node IP retrieval requested
-// 	id := strings.TrimPrefix(r.URL.Path, "/nodes/")
-// 	h.lock.Lock()
-// 	containerInfo, ok := h.nodes[id]
-// 	h.lock.Unlock()
-// 	if !ok {
-// 		logger.Error("unknown client requested", "id", id)
-// 		http.Error(w, "not found", http.StatusNotFound)
-// 		return
-// 	}
-// 	container, err := dockerClient.InspectContainer(containerInfo.container.ID)
-// 	if err != nil {
-// 		logger.Error("failed to inspect client", "error", err)
-// 		http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		return
-// 	}
-// 	fmt.Fprintf(w, "%s", container.NetworkSettings.IPAddress)
-
-// case strings.HasPrefix(r.URL.Path, "/enodes/"):
-
-// case strings.HasPrefix(r.URL.Path, "/clients"):
-// 	w.Header().Set("Content-Type", "application/json")
-// 	clients := make([]string, 0, len(h.availableClients))
-// 	for client := range h.availableClients {
-// 		clients = append(clients, client)
-// 	}
-// 	json.NewEncoder(w).Encode(clients)
-
-// default:
-// 	http.Error(w, "not found", http.StatusNotFound)
-// }
-
-// 	case "POST":
-// 		// Data mutation, execute the request and return the results
-// 		switch r.URL.Path {
-// 		case "/nodes":
-
-// 			h.newNode(w, r, logger, h.availableClients, true, true)
-// 			return
-// 		case "/pseudos":
-
-// 			h.newNode(w, r, logger, h.availablePseudos, false, false)
-// 			return
-// 		case "/logs":
-// 			body, _ := ioutil.ReadAll(r.Body)
-// 			h.logger.Info("message from simulator", "log", string(body))
-
-// 		case "/subresults":
-// 			// Parse the subresult field into a hive struct
-// 			r.ParseMultipartForm(1024 * 1024)
-
-// 			success, err := strconv.ParseBool(r.Form.Get("success"))
-// 			if err != nil {
-// 				http.Error(w, err.Error(), http.StatusBadRequest)
-// 				return
-// 			}
-
-// 			//If there has been a failure, update the whole test result
-// 			//which at present means updating the result set for each
-// 			//known client. TODO: the output format should be
-// 			//re-arranged so that it is grouped first by test and then by client instance type
-// 			if !success {
-// 				for _, resultset := range h.result {
-// 					resultset[h.simulatorLabel].Success = false
-// 				}
-// 			}
-
-// 			nodeid := r.Form.Get("nodeid")
-// 			if err != nil {
-// 				http.Error(w, err.Error(), http.StatusBadRequest)
-// 				return
-// 			}
-// 			var details json.RawMessage
-// 			if blob := r.Form.Get("details"); blob != "" {
-// 				if err := json.Unmarshal([]byte(blob), &details); err != nil {
-// 					http.Error(w, err.Error(), http.StatusBadRequest)
-// 					return
-// 				}
-// 			}
-// 			// If everything parsed correctly, append the subresult
-// 			h.lock.Lock()
-// 			containerInfo, exist := h.nodes[nodeid]
-// 			if !exist {
-// 				// Add an error even so
-// 				if containerInfo, exist := h.timedOutNodes[nodeid]; exist {
-// 					delete(h.timedOutNodes, nodeid)
-// 					res := h.result[containerInfo.name][h.simulatorLabel]
-// 					res.Subresults = append(res.Subresults, simulationSubresult{
-// 						Name:    r.Form.Get("name"),
-// 						Success: success,
-// 						Error:   fmt.Sprintf("%s (killed after timeout by Hive)", r.Form.Get("error")),
-// 						Details: details,
-// 					})
-// 				}
-// 				h.lock.Unlock()
-// 				http.Error(w, fmt.Sprintf("unknown node %v", nodeid), http.StatusBadRequest)
-// 				return
-// 			}
-// 			res := h.result[containerInfo.name][h.simulatorLabel]
-// 			res.Subresults = append(res.Subresults, simulationSubresult{
-// 				Name:    r.Form.Get("name"),
-// 				Success: success,
-// 				Error:   r.Form.Get("error"),
-// 				Details: details,
-// 			})
-// 			// Also terminate the container now
-// 			delete(h.nodes, nodeid)
-// 			logger.Debug("deleting client container", "id", nodeid)
-// 			h.lock.Unlock()
-// 			if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
-// 				logger.Error("failed to delete client ", "id", nodeid, "error", err)
-// 				http.Error(w, err.Error(), http.StatusInternalServerError)
-// 				return
-// 			}
-
-// 		default:
-// 			http.Error(w, "not found", http.StatusNotFound)
-// 		}
-
-// 	case "DELETE":
-// 		// Data deletion, execute the request and return the results
-// 		switch {
-// 		case strings.HasPrefix(r.URL.Path, "/nodes/"):
-// 			// Node deletion requested
-// 			id := strings.TrimPrefix(r.URL.Path, "/nodes/")
-
-// 			h.lock.Lock()
-// 			h.terminateContainer(id, w)
-// 			h.lock.Unlock()
-
-// 		default:
-// 			http.Error(w, "not found", http.StatusNotFound)
-// 		}
-
-// 	default:
-// 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-// 	}
-// }
-
-// CheckTimeout is a goroutine that checks if the timeout has passed and stops
-// container if it has.
-// func  CheckTimeout() {
-// 	for {
-// 		h.lock.Lock()
-// 		for id, cInfo := range h.nodes {
-
-// 			cont, err := dockerClient.InspectContainer(cInfo.container.ID)
-// 			if err != nil {
-// 				//container already gone
-// 				h.logger.Info("Container already deleted. ", "Container", cInfo.container.ID)
-// 			} else {
-// 				cInfo.container = cont
-// 				if !cInfo.container.State.Running || (time.Now().Sub(cInfo.timeout) >= 0 && cInfo.useTimeout) {
-
-// 					h.logger.Info("Timing out. ", "Running", cInfo.container.State.Running)
-// 					h.timeoutContainer(id, nil)
-
-// 					// remember this container, for when the subresult comes in later
-// 					h.timedOutNodes[id] = cInfo
-// 				}
-
-// 			}
-
-// 		}
-// 		h.lock.Unlock()
-// 		time.Sleep(timeoutCheckDuration)
-// 	}
-// }
-
-// // timeoutContainer terminates a container. OBS! It assumes that the caller already holds h.lock
-// func (h *testSuiteAPIHandler) timeoutContainer(id string, w http.ResponseWriter) {
-// 	containerInfo, ok := h.nodes[id]
-
-// 	if !ok {
-// 		h.logger.Error("unknown client deletion requested", "id", id)
-// 		if w != nil {
-// 			http.Error(w, "not found", http.StatusNotFound)
-// 		}
-// 		return
-// 	}
-// 	delete(h.nodes, id)
-// 	h.logger.Debug("deleting client container on timeout", "id", id)
-// 	if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerInfo.container.ID, Force: true}); err != nil {
-// 		h.logger.Error("failed to delete client ", "id", id, "error", err)
-// 		if w != nil {
-// 			http.Error(w, err.Error(), http.StatusInternalServerError)
-// 		}
-// 	}
-// }

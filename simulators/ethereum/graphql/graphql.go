@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"path"
@@ -14,14 +16,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/ethereum/hive/simulators/common/providers/hive"
-	"github.com/ethereum/hive/simulators/common/providers/local"
-
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
+	"github.com/ethereum/hive/simulators/common/providers/local"
 )
-
-type envvars map[string]int
 
 func init() {
 	//support providers
@@ -29,11 +28,14 @@ func init() {
 	local.Support()
 }
 
-func deliverTests() chan *testcase {
+func deliverTests(limit int) chan *testcase {
 	out := make(chan *testcase)
 	var i = 0
 	go func() {
 		filepath.Walk("/testcases", func(filepath string, info os.FileInfo, err error) error {
+			if limit >= 0 && i >= limit {
+				return nil
+			}
 			if info.IsDir() {
 				return nil
 			}
@@ -75,93 +77,114 @@ type testcase struct {
 }
 
 func run(testChan chan *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, client string) {
-	var i = 0
-	for t := range testChan {
-		if err := runTest(t, host, suiteID, client); err != nil {
-			log.Error("error", "err", err)
-		}
-		i++
-	}
-	log.Info("executor finished", "num_executed", i)
-}
 
-func runTest(t *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, client string) error {
-
-	log.Info("Starting test", "name", t.name)
-
-	testID, err := host.StartTest(suiteID, t.name, "")
-	if err != nil {
-		return err
-	}
-
-	var done = func() {
-		var (
-			errString = ""
-			success   = (err == nil)
-		)
-		if !success {
-			errString = err.Error()
-		}
-		host.EndTest(suiteID, testID, &common.TestResult{success, errString}, nil)
-	}
-	defer done()
-
+	// The graphql chain comes from the Besu codebase, and is built on Frontier
 	env := map[string]string{
-		"CLIENT":                   client,
-		"HIVE_FORK_DAO_VOTE":       "1",
-		"HIVE_CHAIN_ID":            "1",
-		"HIVE_FORK_HOMESTEAD":      "0",
-		"HIVE_FORK_TANGERINE":      "0",
-		"HIVE_FORK_SPURIOUS":       "0",
-		"HIVE_FORK_BYZANTIUM":      "0",
-		"HIVE_FORK_CONSTANTINOPLE": "0",
-		"HIVE_FORK_PETERSBURG":     "0",
+		"CLIENT":             client,
+		"HIVE_FORK_DAO_VOTE": "1",
+		"HIVE_CHAIN_ID":      "1",
 	}
 	files := map[string]string{
 		"genesis.json": "/init/testGenesis.json",
 		"chain.rlp":    "/init/testBlockchain.blocks",
 	}
+	// The graphql tests can all execute on the same client container, no need to spin up new ones for every test
+	//
+	// However, the API to StartTest(.., testID , ... ) wants a test-id, so we need to ensure that we can indeed reuse
+	// an existing container and it doesn't get torn down by the call to host.EndTest
+	// See simulator.go: 398.
+	//
+	// To get around the quirk above, we use a meta-test
+	metaTestId, err := host.StartTest(suiteID, "1. Client Instantiation and container logs", "This is a meta-test, which only checks that "+
+		"the client-under-test can be instantiated. \n\nIf this fails, no other tests are executed. "+
+		"This test contains all docker logs pertaining to the client-under-test, since the graphql tests"+
+		" are all executed against the same instance")
+	metaTestResult := &common.TestResult{Pass: false}
+	defer host.EndTest(suiteID, metaTestId, metaTestResult, nil)
+	if err != nil {
+		log.Error("error", "err", err)
+		return
+	}
+	_, ip, _, err := host.GetNode(suiteID, metaTestId, env, files)
+	if err != nil {
+		log.Error("error", "err", err)
+		metaTestResult.Details = fmt.Sprintf("Error occurred: %v", err)
+		return
+	}
 
-	_, ip, _, err := host.GetNode(suiteID, testID, env, files)
+	var i = 0
+	for t := range testChan {
+		if err := prepareRunTest(t, host, suiteID, ip); err != nil {
+			log.Error("error", "err", err)
+		}
+		i++
+	}
+	metaTestResult.Pass = true
+	metaTestResult.Details = "Client instantiated OK"
+	log.Info("executor finished", "num_executed", i)
+}
+
+// prepareRunTest administers the hive-specific test stuff, registering the suite and reporting back the suite results
+func prepareRunTest(t *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, ip net.IP) error {
+
+	log.Info("Starting test", "name", t.name)
+
+	testID, err := host.StartTest(suiteID, t.name, "")
+	if err != nil {
+		host.EndTest(suiteID, testID, &common.TestResult{false, err.Error()}, nil)
+		return err
+	}
+	if testErr := runTest(ip, t); testErr != nil {
+		host.EndTest(suiteID, testID, &common.TestResult{false, testErr.Error()}, nil)
+		return testErr
+	}
+	host.EndTest(suiteID, testID, &common.TestResult{Pass: true}, nil)
+	return nil
+}
+
+// runTest does the actual testing: querying the client-under-test. It executes after a client has been
+// successfully instantiated
+func runTest(ip net.IP, t *testcase) error {
+	type qlQuery struct {
+		Query string `json:"query"`
+	}
+
+	// Example of working queries:
+	// curl 'http://127.0.0.1:8547/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n"}'
+	// curl 'http://127.0.0.1:8547/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n","variables":null,"operationName":"blockNumber"}'
+
+	postData, err := json.Marshal(qlQuery{string(t.graphql)})
 	if err != nil {
 		return err
 	}
-	graphql := strings.ReplaceAll(strings.ReplaceAll(string(t.graphql), "\r", ""), "\n", "") //the newlines either work or don't depending on the executing platform. remove.
-
-	nodeQuery := fmt.Sprintf("http://%s:8547/graphql/query=%s", ip.String(), graphql)
-	resp, err := http.Get(nodeQuery)
+	resp, err := http.Post(fmt.Sprintf("http://%s:8547/graphql", ip.String()),
+		"application/json",
+		bytes.NewReader(postData))
+	respBytes, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-
-	//verify the response matches expected
-	if resp.StatusCode == http.StatusOK {
-		jsonbytes, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return err
-		}
-		jsonstring := string(jsonbytes)
-
-		expected := string(t.expected)
-
-		res, err := areEqualJSON(jsonstring, string(t.expected))
-		if err != nil {
-			return err
-		}
-		if !res {
-			return fmt.Errorf("Test failed, expected %s ...got.. %s  ", expected, jsonstring)
-		}
-
-	} else {
-		return fmt.Errorf("Error sending request %s", strconv.Itoa(resp.StatusCode))
+	resp.Body.Close()
+	// The response status code can be other than 200 for some tests, but still pass, so don't abort early here
+	//if resp.StatusCode != http.StatusOK {
+	//	return fmt.Errorf("Node HTTP response not 200 OK, got: %v, response: %v", resp.Status, string(respBytes))
+	//}
+	exp, got := string(t.expected), string(respBytes)
+	if res, err := areEqualJSON(got, exp); err != nil {
+		return err
+	} else if !res {
+		return fmt.Errorf("Test failed. Query:\n```\n%v\n```\nexpected: \n```\n%s\n```\n got:\n```\n%s\n```\n. HTTP response status: %s", string(t.graphql), exp, got, resp.Status)
 	}
-
 	return nil
 }
 
 func main() {
-	paralellism := 16
+	var (
+		paralellism = 16
+		testLimit   = -1
+	)
+
+	log.Root().SetHandler(log.StdoutHandler)
 	if val, ok := os.LookupEnv("HIVE_PARALLELISM"); ok {
 		if p, err := strconv.Atoi(val); err != nil {
 			log.Warn("Hive paralellism could not be converted to int", "error", err)
@@ -169,7 +192,14 @@ func main() {
 			paralellism = p
 		}
 	}
-	log.Info("Hive simulator started.", "paralellism", paralellism)
+	if val, ok := os.LookupEnv("HIVE_SIMLIMIT"); ok {
+		if p, err := strconv.Atoi(val); err != nil {
+			log.Warn("Simulator test limit could not be converted to int", "error", err)
+		} else {
+			testLimit = p
+		}
+	}
+	log.Info("Hive simulator started.", "paralellism", paralellism, "testlimit", testLimit)
 
 	// get the test suite engine provider and initialise
 	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
@@ -183,9 +213,11 @@ func main() {
 
 	availableClients, _ := host.GetClientTypes()
 	log.Info("Got clients", "clients", availableClients)
+	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 
 	for _, client := range availableClients {
-		testSuiteID, err := host.StartTestSuite("graphql", "graphql test suite covering the graphql API surface")
+		testSuiteID, err := host.StartTestSuite("graphql", "Test suite covering the graphql API surface."+
+			"The GraphQL tests were initially imported from the Besu codebase.", logFile)
 		if err != nil {
 			log.Error(fmt.Sprintf("Unable to start test suite: %s", err.Error()), err.Error())
 			os.Exit(1)
@@ -197,7 +229,7 @@ func main() {
 			}
 		}()
 
-		testCh := deliverTests()
+		testCh := deliverTests(testLimit)
 		var wg sync.WaitGroup
 		for i := 0; i < paralellism; i++ {
 			wg.Add(1)

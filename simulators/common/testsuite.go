@@ -1,18 +1,16 @@
 package common
 
 import (
-	"bufio"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // IndexFileName is the main index file of the test suite execution database
@@ -41,6 +39,8 @@ type TestSummary struct {
 	Start         time.Time `json:"start"`
 	PrimaryClient string    `json:"primaryClient"`
 	Pass          bool      `json:"pass"`
+	// the log-file pertaining to the simulator. (may encompass more than just one TestSuite)
+	SimulatorLog string `json:"simLog"`
 }
 
 // TestSuite is a single run of a simulator, a collection of testcases
@@ -49,18 +49,20 @@ type TestSuite struct {
 	Name        string               `json:"name"`
 	Description string               `json:"description"`
 	TestCases   map[TestID]*TestCase `json:"testCases"`
-	indexMu     sync.Mutex
+	// the log-file pertaining to the simulator. (may encompass more than just one TestSuite)
+	SimulatorLog string `json:"simLog"`
+	indexMu      sync.Mutex
 }
 
-func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
+func (testSuite *TestSuite) summarise(suiteFileName string) TestSummary {
 
-	summary := &TestSummary{
-		FileName: suiteFileName,
-		Name:     testSuite.Name,
+	summary := TestSummary{
+		FileName:     suiteFileName,
+		Name:         testSuite.Name,
+		SimulatorLog: testSuite.SimulatorLog,
 	}
 
 	pass := true
-	primaryName := ""
 	earliest := time.Now()
 	clients := make(map[string]bool, 0)
 	for _, testCase := range testSuite.TestCases {
@@ -70,104 +72,62 @@ func (testSuite *TestSuite) summarise(suiteFileName string) *TestSummary {
 		}
 		for _, clientInfo := range testCase.ClientInfo {
 			clients[clientInfo.Name] = true
-			primaryName = clientInfo.Name
 		}
 	}
 	summary.Pass = pass
 	summary.Start = earliest
-	//if the test was for a single client, indicate it
-	if len(clients) > 1 {
-		summary.PrimaryClient = "Multiple"
-	} else {
-		if len(clients) == 0 {
-			summary.PrimaryClient = "None"
-		} else {
 
-			summary.PrimaryClient = primaryName
-		}
+	var clientNames []string
+	for k, _ := range clients {
+		clientNames = append(clientNames, k)
+	}
+	if len(clientNames) > 0 {
+		summary.PrimaryClient = strings.Join(clientNames, ",")
+	} else {
+		summary.PrimaryClient = "None"
 	}
 	return summary
 }
 
-// UpdateDB should be called on TestSuite completion to
-// write out the test results and update indexes.
-// NB Concurrent Hive processes should be able to safely update the index file
-// as long as the file system supports POSIX-like atomic writes.
+// UpdateDB should be called on TestSuite completion to write out the test results and update indexes.
 func (testSuite *TestSuite) UpdateDB(outputPath string) error {
 
+	var (
+		suiteFileName          string                                     // The name of a json file with test data
+		indexPathName          = filepath.Join(outputPath, IndexFileName) // Path to the global index file, listing all files
+		summaryData, suiteData []byte
+		err                    error
+	)
+
 	// write out the test suite as a json file of its own
-	suiteData, err := json.Marshal(*testSuite)
-	if err != nil {
+	if suiteData, err = json.Marshal(*testSuite); err != nil {
 		return err
 	}
-	fileID, err := uuid.NewUUID()
-	if err != nil {
+
+	{
+		// Randomize the name, but make it so that it's ordered by date - makes cleanups easier
+		b := make([]byte, 16)
+		rand.Read(b)
+		suiteFileName = fmt.Sprintf("%v-%x.json", time.Now().Unix(), b)
+	}
+	// marshall the summary
+	if summaryData, err = json.Marshal(testSuite.summarise(suiteFileName)); err != nil {
 		return err
 	}
-	suiteFileName := fmt.Sprintf("%s.json", fileID.String())
-	suiteFilePath := filepath.Join(outputPath, suiteFileName)
-	ioutil.WriteFile(suiteFilePath, suiteData, 0644)
+	// write the file
+	ioutil.WriteFile(filepath.Join(outputPath, suiteFileName), suiteData, 0644)
 
 	// Before writing the summary, perhaps crop the index file
 	// We cap it at 400KB in size down to 200KB, roughly 1000 lines
 	testSuite.indexMu.Lock()
 	defer testSuite.indexMu.Unlock()
-	indexPathName := filepath.Join(outputPath, IndexFileName)
 	stat, err := os.Stat(indexPathName)
 	if err == nil && stat.Size() > 400000 {
 		truncateHead(indexPathName, 200000)
 	}
-	// write out the summary
-	testSummary := testSuite.summarise(suiteFileName)
-	summaryData, err := json.Marshal(*testSummary)
-	if err != nil {
-		return err
-	}
-	//now append the index file
-	i, err := os.OpenFile(indexPathName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer i.Close()
-	if _, err = i.WriteString(string(summaryData) + "\n"); err != nil {
-		return err
-	}
-	return nil
-}
 
-// truncateHead truncates the head lines, leaving somewhere slightly below 'size' bytes,
-// and ensures that lines are kept intact.
-func truncateHead(path string, size int64) error {
-	var tmpFileName = fmt.Sprintf("%s.tmp", path)
-	file, err := os.Open(path)
-	if err != nil {
-		return err
-	}
-	// seek N bytes from the end (whence=2)
-	if _, err := file.Seek(-size, 2); err != nil {
-		file.Close()
-		return err
-	}
-	reader := bufio.NewReader(file)
-	// read until a line-break
-	if _, err = reader.ReadString('\n'); err != nil {
-		file.Close()
-		return fmt.Errorf("seek failed: %v", err)
-	}
-	// reader is now positioned correctly, we can shove all remaining data into the next index-file
-	newFile, err := os.OpenFile(tmpFileName, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		file.Close()
-		return err
-	}
-	io.Copy(newFile, reader)
-	newFile.Close()
-	file.Close()
-	// Now, delete the old one, and swap in the new one
-	if err = os.Remove(path); err != nil {
-		return err
-	}
-	return os.Rename(tmpFileName, path)
+	//now append the index file
+	return appendLine(indexPathName, summaryData)
 }
 
 // TestClientResults is the set of per-client results for a test-case

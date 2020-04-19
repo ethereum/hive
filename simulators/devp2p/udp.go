@@ -359,6 +359,12 @@ func (t *V4Udp) SpoofedPing(toid enode.ID, tomac string, toaddr *net.UDPAddr, fr
 
 //SpoofingFindNodeCheck tests if a client is susceptible to being used
 //as an attack vector for findnode amplification attacks
+//
+// The test spoofs a ping from a different ip address('victim ip'), and later on sends a spoofed 'pong'. The spoofed 'pong' will have
+// an invalid reply-token (since the target will send the 'pong' to 'victim ip'), and should thus be ignored by the target.
+// If the target fails to verify reply-token, it will believe to now be bonded with a node at 'victim ip'.
+// The test then sends a spoofed 'findnode' request. If the 'target' responds to the findnode-request, sending a large
+// 'neighbours'-packet to 'victim ip', it can be used for DoS attacks.
 func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, validateEnodeID bool, netInterface string) error {
 
 	//send ping

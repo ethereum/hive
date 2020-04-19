@@ -186,11 +186,14 @@ func init() {
 	hive.Support()
 }
 
-func deliverTests(root string) chan *testcase {
+func deliverTests(root string, limit int) chan *testcase {
 	out := make(chan *testcase)
 	var i, j = 0, 0
 	go func() {
 		filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if limit >= 0 && i >= limit {
+				return nil
+			}
 			if info.IsDir() {
 				return nil
 			}
@@ -439,6 +442,7 @@ func getHash(rawClient *rpc.Client, arg string) ([]byte, error) {
 }
 func main() {
 	paralellism := 16
+	log.Root().SetHandler(log.StdoutHandler)
 	if val, ok := os.LookupEnv("HIVE_PARALLELISM"); ok {
 		if p, err := strconv.Atoi(val); err != nil {
 			log.Warn("Hive paralellism could not be converted to int", "error", err)
@@ -446,7 +450,15 @@ func main() {
 			paralellism = p
 		}
 	}
-	log.Info("Hive simulator started.", "paralellism", paralellism)
+	testLimit := -1
+	if val, ok := os.LookupEnv("HIVE_SIMLIMIT"); ok {
+		if p, err := strconv.Atoi(val); err != nil {
+			log.Warn("Simulator test limit could not be converted to int", "error", err)
+		} else {
+			testLimit = p
+		}
+	}
+	log.Info("Hive simulator started.", "paralellism", paralellism, "testlimit", testLimit)
 
 	// get the test suite engine provider and initialise
 	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
@@ -467,22 +479,23 @@ func main() {
 	availableClients, _ := host.GetClientTypes()
 
 	log.Info("Got clients", "clients", availableClients)
+	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 
 	fileRoot := fmt.Sprintf("%s/BlockchainTests/", testpath)
 	for _, client := range availableClients {
-		testSuiteID, err := host.StartTestSuite("consensus", "consensus test suite blockchain tests for a single client type")
+		testSuiteID, err := host.StartTestSuite("consensus", "consensus test suite blockchain tests for a single client type", logFile)
 		if err != nil {
-			log.Error(fmt.Sprintf("Unable to start test suite: %s", err.Error()), err.Error())
+			log.Error("Unable to start test suite", "error", err)
 			os.Exit(1)
 		}
 		defer func() {
 			if err := host.EndTestSuite(testSuiteID); err != nil {
-				log.Error(fmt.Sprintf("Unable to end test suite: %s", err.Error()), err.Error())
+				log.Error("Unable to end test suite", "error", err)
 				os.Exit(1)
 			}
 		}()
 
-		testCh := deliverTests(fileRoot)
+		testCh := deliverTests(fileRoot, testLimit)
 		var wg sync.WaitGroup
 		for i := 0; i < paralellism; i++ {
 			wg.Add(1)
@@ -492,7 +505,7 @@ func main() {
 				wg.Done()
 			}()
 		}
-		log.Info("Tests started", "num threads", 16)
+		log.Info("Tests started", "num threads", paralellism)
 		wg.Wait()
 	}
 }

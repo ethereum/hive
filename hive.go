@@ -31,20 +31,27 @@ var (
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
-	clientListFlag = flag.String("client", "go-ethereum_master", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_master and the client name is a subfolder of the clients directory")
+	clientListFlag     = flag.String("client", "go-ethereum_master", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_master and the client name is a subfolder of the clients directory")
+	checkTimeLimitFlag = flag.Duration("client.checktimelimit", 3*time.Minute, "The timeout to wait for a newly "+
+		"instantiated client to open up the RPC port. If a very long chain is imported, this timeout may need to be quite large. "+
+		"A lower value means that hive won't wait as long for in case node crashes and never opens the RPC port.")
 
 	overrideFiles = flag.String("override", "", "Comma separated regexp:files to override in client containers")
 	smokeFlag     = flag.Bool("smoke", false, "Whether to only smoke test or run full test suite")
 
-	simLimiterFlag = flag.Int("simlimiter", -1, "Run all simulators with a time limit in seconds, -1 being unlimited")
+	simulatorPattern     = flag.String("sim", "", "Regexp selecting the simulation tests to run")
+	simulatorParallelism = flag.Int("sim.parallelism", 1, "Max number of parallel clients/containers to run tests against")
+	simulatorTestLimit   = flag.Int("sim.testlimit", -1, "Max number of tests to execute per client (interpreted by simulators)")
+	simRootContext       = flag.Bool("sim.rootcontext", false, "Indicates if the simulation should build "+
+		"the dockerfile with root (simulator) or local context. Needed for access to sibling folders like simulators/common")
+	simLimiterFlag  = flag.Int("sim.timelimit", -1, "Run all simulators with a time limit in seconds, -1 being unlimited")
+	simloglevelFlag = flag.Int("sim.loglevel", 3, "The base log level for simulator client instances. "+
+		"This number from 0-6 is interpreted differently depending on the client type.")
 
-	hiveMaxTestsFlag = flag.Int("hivemaxtestcount", -1, "Limit the number of tests the simulator is permitted to generate in a testsuite for the Hive provider. Used for smoke testing consensus tests themselves.")
+	hiveMaxTestsFlag = flag.Int("hivemaxtestcount", -1, "Limit the number of tests the simulator is permitted to generate in a testsuite for the Hive provider. "+
+		"Used for smoke testing consensus tests themselves.")
 
-	simulatorPattern = flag.String("sim", "", "Regexp selecting the simulation tests to run")
-
-	simulatorParallelism = flag.Int("sim-parallelism", 1, "Max number of parallel clients/containers to run tests against")
-	hiveDebug            = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
-	simRootContext       = flag.Bool("sim-rootcontext", false, "Indicates if the simulation should build the dockerfile with root (simulator) or local context. Needed for access to sibling folders like simulators/common")
+	hiveDebug = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
 
 	chainGenerate   = flag.Bool("chainGenerate", false, "Tell Hive to generate a blockchain on the basis of a supplied genesis and terminate")
 	chainLength     = flag.Uint("chainLength", 2, "The length of the chain to generate")
@@ -53,8 +60,7 @@ var (
 	chainGenesis    = flag.String("chainGenesis", "", "The path and filename to the source genesis.json")
 	chainBlockTime  = flag.Uint("chainBlockTime", 30, "The desired block time in seconds")
 
-	loglevelFlag    = flag.Int("loglevel", 3, "Log level to use for displaying system events")
-	simloglevelFlag = flag.Int("simloglevel", 3, "The base log level for simulator client instances. This number from 0-6 is interpreted differently depending on the client type.")
+	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 )
 
 var (
@@ -63,7 +69,7 @@ var (
 	allPseudos           map[string]string                  //map of pseudo names to docker image names
 	allClientVersions    map[string]map[string]string       //map of client names (name_branch format) to a general json struct (map[string]string) containing the version info
 	dockerClient         *docker.Client                     //the web client to the docker api
-	timeoutCheckDuration = time.Duration(180 * time.Second) //liveness check timeout
+	timeoutCheckDuration = time.Duration(120 * time.Second) //liveness check timeout
 )
 
 func main() {
@@ -72,6 +78,7 @@ func main() {
 
 	// Parse the flags and configure the logger
 	flag.Parse()
+	timeoutCheckDuration = *checkTimeLimitFlag
 	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
 	if *chainGenerate {
 		chaintools.ProduceTestChainFromGenesisFile(*chainGenesis, *chainOutputPath, *chainLength, *chainBlockTime)

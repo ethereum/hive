@@ -154,8 +154,8 @@ func TestStartTestSuite(t *testing.T) {
 
 	testSuiteHost := setupBasicInstance(t)
 
-	suite1ID, _ := testSuiteHost.StartTestSuite("consensus", "consensus tests")
-	suite2ID, _ := testSuiteHost.StartTestSuite("p2p", "p2p tests")
+	suite1ID, _ := testSuiteHost.StartTestSuite("consensus", "consensus tests", "")
+	suite2ID, _ := testSuiteHost.StartTestSuite("p2p", "p2p tests", "")
 
 	suite1, ok1 := hostProxy.TestManager.IsTestSuiteRunning(suite1ID)
 	suite2, ok2 := hostProxy.TestManager.IsTestSuiteRunning(suite2ID)
@@ -169,13 +169,14 @@ func TestStartTestSuite(t *testing.T) {
 	}
 
 	if suite1.Description != "consensus tests" || suite2.Description != "p2p tests" {
-		t.Fatalf("Test suite description not registered")
+		t.Fatalf(
+			"Test suite description not registered")
 	}
 }
 
 func setupTestSuite(t *testing.T) (common.TestSuiteHost, *common.TestSuite) {
 	testSuiteHost := setupBasicInstance(t)
-	suiteID, _ := testSuiteHost.StartTestSuite("consensus", "consensus tests")
+	suiteID, _ := testSuiteHost.StartTestSuite("consensus", "consensus tests", "foo")
 	suite, ok := hostProxy.TestManager.IsTestSuiteRunning(suiteID)
 	if !ok {
 		t.Fatalf("Test setup failed, test suite not found")
