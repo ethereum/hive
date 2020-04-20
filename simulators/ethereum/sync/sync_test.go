@@ -1,31 +1,43 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
-	"github.com/ethereum/go-ethereum/log"
-	"net"
-	"sync"
+	"os"
+	//"sync"
+	"testing"
 	"time"
 
-	"github.com/ethereum/hive/simulators/common/providers/local"
-
-	"github.com/ethereum/hive/simulators/common/providers/hive"
-
-	"os"
-	"strings"
-	"testing"
-
-	geth "github.com/ethereum/go-ethereum/mobile"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
+	"github.com/ethereum/hive/simulators/common/providers/local"
 )
 
 var (
 	host        common.TestSuiteHost
 	syncTimeout = 30 * time.Second //the number of seconds before a sync is considered stalled or failed
 	testSuite   common.TestSuiteID
+	params      = map[string]string{
+		"HIVE_NETWORK_ID":     "1",
+		"HIVE_CHAIN_ID":       "1",
+		"HIVE_FORK_HOMESTEAD": "0",
+		"HIVE_FORK_TANGERINE": "0",
+		"HIVE_FORK_SPURIOUS":  "0",
+		"HIVE_FORK_BYZANTIUM": "0",
+		"HIVE_NODETYPE":       "full", //fast sync
+	}
+	sourceFiles = map[string]string{
+		"genesis.json": "/simplechain/genesis.json",
+		"chain.rlp":    "/simplechain/chain.rlp",
+	}
+	sinkFiles = map[string]string{
+		"genesis.json": "/simplechain/genesis.json",
+	}
 )
 
 type testCase struct {
@@ -38,12 +50,9 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
-
 	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
-
 	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
 	providerConfigFile := flag.String("providerConfig", "", "the config json file for the provider")
-
 	flag.Parse()
 	var err error
 	host, err = common.InitProvider(*simProviderType, *providerConfigFile)
@@ -51,7 +60,6 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
 		os.Exit(1)
 	}
-
 	os.Exit(RunTestSuite(m))
 }
 
@@ -59,285 +67,209 @@ func RunTestSuite(m *testing.M) int {
 	return m.Run()
 }
 
-func TestSyncsWithGeth(t *testing.T) {
+func copyMap(a map[string]string) map[string]string {
+	var b = make(map[string]string)
+	for k, v := range a {
+		b[k] = v
+	}
+	return b
+}
+
+func TestSync(t *testing.T) {
+	log.Root().SetHandler(log.StdoutHandler)
 	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 	//start the test suite
 	testSuite, err := host.StartTestSuite("Sync test suite",
 		`This suite of tests verifies that clients can sync from each other in different modes.
- It consists of two specific tests, both using geth as the reference client, testing these two aspects: 
-
-- Whether the client-under-test can sync from geth
-- Whether geth can sync from the client-under-test'
+For each client, we test if it can serve as a sync source for all other clients (including itself)
 `, logFile)
 	if err != nil {
 		t.Fatalf("Simulator error. Failed to start test suite. %v ", err)
 	}
 	defer host.EndTestSuite(testSuite)
-
 	//get all client types required to test
 	availableClients, err := host.GetClientTypes()
 	if err != nil {
 		t.Fatalf("Simulator error. Cannot get client types. %v", err)
 	}
-	//there needs to be only 2 types of client
-	if len(availableClients) < 2 {
-		t.Fatalf("Test requires at least two client types, got %v", availableClients)
-	}
-	//find the first geth to use as a reference node
-	var firstGeth = -1
-	for i, clientType := range availableClients {
-		if strings.Contains(clientType, "go-ethereum") {
-			firstGeth = i
-			break
-		}
-	}
-	if firstGeth == -1 {
-		t.Fatal("Missing geth instance. This test requires a geth.")
-	}
 
-	var (
-		commonParams = map[string]string{
-			"HIVE_NETWORK_ID":     "1",
-			"HIVE_CHAIN_ID":       "1",
-			"HIVE_FORK_HOMESTEAD": "0",
-			"HIVE_FORK_TANGERINE": "0",
-			"HIVE_FORK_SPURIOUS":  "0",
-			"HIVE_FORK_BYZANTIUM": "0",
-			"HIVE_NODETYPE":       "full", //fast sync
-		}
-		servefiles = map[string]string{
-			"genesis.json": "/simplechain/genesis.json",
-			"chain.rlp":    "/simplechain/chain.rlp",
-		}
-		clientFiles = map[string]string{
-			"genesis.json": "/simplechain/genesis.json",
-		}
-	)
-
-	//Test a fastmode sync by creating a geth client and one each of any other type of client
-	//and ask the other client to load the chain
-	t.Run("fastmodes", func(t *testing.T) {
-		startTime := time.Now()
-		testID, err := host.StartTest(testSuite, "Serve as sync source",
-			`This test initialises each client-under-test with a predefined chain, 
-and attempts to sync up a geth-node against the client-under-test.`)
-		if err != nil {
-			t.Fatalf("Unable to start test: %s", err.Error())
-		}
-		// declare empty test results
-		var summaryResult common.TestResult
-		summaryResult.Pass = true
-		clientResults := make(common.TestClientResults)
-		//make sure the test ends
-		defer func() {
-			host.EndTest(testSuite, testID, &summaryResult, clientResults)
-			//send test failures to standard outputs too
-			if !summaryResult.Pass {
-				t.Errorf("Test failed %s", summaryResult.Details)
+	for _, sourceType := range availableClients {
+		// Load source with chain
+		sourceTestID, _ := host.StartTest(testSuite, fmt.Sprintf("%v as sync-source", sourceType),
+			fmt.Sprintf("Tests that %v can do a block import and serve as sync source", sourceType))
+		sourceNode, err := getClient(sourceType, testSuite, sourceTestID, params, sourceFiles, "")
+		endSourceTest := func(err error) {
+			if err != nil {
+				t.Errorf("Test failed %s", err.Error())
+				host.EndTest(testSuite, sourceTestID, &common.TestResult{Pass: false},
+					common.TestClientResults{
+						sourceType: {Pass: false, Details: err.Error()},
+					})
+				return
 			}
-		}()
-		var gethParams = make(map[string]string)
-		for k, v := range commonParams {
-			gethParams[k] = v
+			host.EndTest(testSuite, sourceTestID, &common.TestResult{Pass: true}, nil)
 		}
-		gethParams["CLIENT"] = availableClients[firstGeth]
-		//and load the genesis without a chain
-		mainId, mainNodeIP, _, err := host.GetNode(testSuite, testID, gethParams, clientFiles)
 		if err != nil {
-			summaryResult.Pass = false
-			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
-			return
+			endSourceTest(fmt.Errorf("Unable to instantiate source-node %v: %s", sourceType, err.Error()))
+			continue
 		}
-		defer func() {
-			t.Log("Stopping client", mainId)
-			host.KillNode(testSuite, testID, mainId)
-		}()
-		mainNodeURL := fmt.Sprintf("http://%s:8545", mainNodeIP.String())
+		// TODO: Verify that the source-node is indeed at the expected block num.
 
-		//the main client will be asked to sync with the other client.
-		for i, clientType := range availableClients {
-			if i != firstGeth {
-
-				t.Logf("Starting peer node (%s)", clientType)
-				// create the other node
-				var otherParams = make(map[string]string)
-				for k, v := range commonParams {
-					otherParams[k] = v
-				}
-				otherParams["CLIENT"] = clientType
-				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, otherParams, servefiles)
+		for _, sinkType := range availableClients {
+			testName := fmt.Sprintf("fast-sync %v -> %v", sourceType, sinkType)
+			desc := fmt.Sprintf("This test initialises the client-under-test (%v) "+
+				"with a predefined chain, and attempts to sync up another "+
+				"node (%v) against the it.", sourceType, sinkType)
+			sinkType := sinkType
+			t.Run(testName, func(t *testing.T) {
+				var (
+					summaryResult = &common.TestResult{Pass: true}
+					clientResults = make(common.TestClientResults)
+				)
+				testID, err := host.StartTest(testSuite, testName, desc)
 				if err != nil {
-					summaryResult.Pass = false
-					summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))
+					t.Errorf("Unable to start test: %s", err.Error())
 					return
 				}
-				doneFn := func() {
-					t.Log("Stopping client", clientID)
-					host.KillNode(testSuite, testID, clientID)
-				}
-				syncClient(doneFn, mainNodeURL, clientID, nodeIP, t, 10, startTime, true, testID, &summaryResult, clientResults)
-			}
-		}
-		t.Log("Terminating.")
-	})
-
-	//Test sync compatibility by creating a geth node and load the chain there,
-	//then create one each of each remaining type of node and sync from geth
-	t.Run("compatibility", func(t *testing.T) {
-		startTime := time.Now()
-		testID, err := host.StartTest(testSuite, "Sync from geth",
-			`This test initialises an instance of geth with a predefined chain and genesis and attempts to 
-sync each client-under-test from the geth master.`)
-		if err != nil {
-			t.Fatalf("Unable to start test: %s", err.Error())
-		}
-		// declare empty test results
-		var summaryResult common.TestResult
-		summaryResult.Pass = true
-		clientResults := make(common.TestClientResults)
-		//make sure the test ends
-		defer func() {
-			host.EndTest(testSuite, testID, &summaryResult, clientResults)
-			//send test failures to standard outputs too
-			if !summaryResult.Pass {
-				t.Errorf("Test failed %s", summaryResult.Details)
-			}
-		}()
-
-		var gethParams = make(map[string]string)
-		for k, v := range commonParams {
-			gethParams[k] = v
-		}
-		gethParams["CLIENT"] = availableClients[firstGeth]
-
-		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, gethParams, servefiles)
-		if err != nil {
-			summaryResult.Pass = false
-			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
-			return
-		}
-		mainNodeURL := fmt.Sprintf("http://%s:8545", mainNodeIP.String())
-
-		//the remaining clients will be asked to sync with the initial
-		//client. this waitgroup is for the concurrent syncprogress checks.
-		//the test will continue after all the clients have finished syncing.
-		var wg sync.WaitGroup
-
-		// for all others
-		for i, clientType := range availableClients {
-			if i != firstGeth {
-
-				t.Logf("Starting peer node (%s)", clientType)
-				// create the other node with genesis and no chain
-				var otherParams = make(map[string]string)
-				for k, v := range commonParams {
-					otherParams[k] = v
-				}
-				otherParams["CLIENT"] = clientType
-				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, otherParams, clientFiles)
+				defer func() {
+					host.EndTest(testSuite, testID, summaryResult, clientResults)
+					//send test failures to standard outputs too
+					if !summaryResult.Pass {
+						t.Errorf("Test failed %s", summaryResult.Details)
+					}
+				}()
+				var bootnode = sourceNode.enodeId.String()
+				sinkNode, err := getClient(sinkType, testSuite, testID, params, sinkFiles, bootnode)
 				if err != nil {
-					summaryResult.Pass = false
-					summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
+					msg := fmt.Sprintf("Unable to instantiate sink-node %v: %s", sinkType, err.Error())
+					log.Error(msg)
+					summaryResult.AddDetail(msg)
+					// If the sink doesn't even start, that doesn't affect the test for the source-client
+					clientResults.AddResult(sinkNode.id, false, msg)
 					return
 				}
-				wg.Add(1)
-				doneFn := func() {
-					wg.Done()
-					t.Log("Stopping client", clientID)
-					host.KillNode(testSuite, testID, clientID)
+
+				if err := syncNodes(sourceNode, sinkNode, 10); err != nil {
+					summaryResult.Pass = false
+					clientResults.AddResult(sourceNode.id, false, err.Error())
+					clientResults.AddResult(sinkNode.id, false, err.Error())
+					t.Error(err.Error())
+				} else {
+					clientResults.AddResult(sourceNode.id, true, "synk-sink ok")
+					clientResults.AddResult(sinkNode.id, true, "synk-source ok")
 				}
-				go syncClient(doneFn, mainNodeURL, clientID, nodeIP, t, 10, startTime, false, testID, &summaryResult, clientResults)
-
-			}
+				// This should not be needed:
+				//host.KillNode(testSuite, testID, sinkNodeId)
+			})
 		}
-
-		wg.Wait()
-
-	})
-
+		// This will signal that the source node is done for deletion
+		endSourceTest(nil)
+	}
 }
 
-func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testing.T, chainLength int, startTime time.Time, checkMainForSync bool, testID common.TestID, summaryResult *common.TestResult, clientResults common.TestClientResults) {
-	if doneFn != nil {
-		defer doneFn()
+// node represents an instantiated client, which has successfully spun up RPC,
+// and delivered enode enodeId
+type node struct {
+	name      string
+	enodeId   enode.Node
+	rpcClient *rpc.Client
+	id        string
+}
+
+// getClient instantiates a client, and fetches ip, enode enodeId etc.
+// Any error during this process is returned
+func getClient(clientType string, testSuite common.TestSuiteID, testID common.TestID, params, files map[string]string, bootnode string) (*node, error) {
+	n := &node{
+		name: clientType,
+		id:   "",
 	}
-	peerEnodeIDPtr, err := host.GetClientEnode(testSuite, testID, clientID)
-	if err != nil || peerEnodeIDPtr == nil || *peerEnodeIDPtr == "" {
-		summaryResult.Pass = false
-		clientResults.AddResult(clientID, false, "Enode could not be obtained.")
-		return
+	params = copyMap(params)
+	params["CLIENT"] = clientType
+	if bootnode != "" {
+		params["HIVE_BOOTNODE"] = bootnode
 	}
-	peerEnodeID := *peerEnodeIDPtr
-	peerNode, err := enode.ParseV4(peerEnodeID)
+	id, ip, _, err := host.GetNode(testSuite, testID, params, files)
 	if err != nil {
-		summaryResult.Pass = false
-		clientResults.AddResult(clientID, false, "Enode could not be parsed.")
-		return
+		return n, fmt.Errorf("Unable to create node: %v", err)
 	}
-	//replace the ip with what the provider says it is
-	tcpPort := peerNode.TCP()
+	n.id = id
+	enodeIDPtr, err := host.GetClientEnode(testSuite, testID, id)
+	if err != nil {
+		return n, fmt.Errorf("Client (%v) enode ID could not be obtained: %v", clientType, err)
+	}
+	if enodeIDPtr == nil {
+		return n, fmt.Errorf("Client (%v) enode ID could not be obtained: (nil)", clientType)
+	}
+	enodeId, err := enode.ParseV4(*enodeIDPtr)
+	if err != nil {
+		return n, fmt.Errorf("Client (%v) enode ID could not be parsed. Got: '%v', error: %v", clientType, *enodeIDPtr, err)
+	}
+	tcpPort := enodeId.TCP()
 	if tcpPort == 0 {
 		tcpPort = 30303
 	}
-	peerNode = enode.NewV4(peerNode.Pubkey(), nodeIP, tcpPort, 30303)
-	if peerNode == nil {
-		summaryResult.Pass = false
-		clientResults.AddResult(clientID, false, "Enode could not be created.")
-		return
+	//replace the ip with what the provider says it is
+	if enodeId = enode.NewV4(enodeId.Pubkey(), ip, tcpPort, 30303); enodeId != nil {
+		n.enodeId = *enodeId
 	}
-
-	peerEnodeID = peerNode.String()
-
 	//connect over rpc to the main node to add the peer (the mobile client does not have the admin function)
-	rpcClient, err := rpc.Dial(mainURL)
+	n.rpcClient, err = rpc.Dial(fmt.Sprintf("http://%s:8545", ip))
 	if err != nil {
-		summaryResult.Pass = false
-		clientResults.AddResult(clientID, false, "Enode could not be created.")
-		return
+		return n, fmt.Errorf("Client (%v), rpc cli could not be created: %v", clientType, err)
 	}
-	var res = false
-	if err := rpcClient.Call(&res, "admin_addPeer", peerEnodeID); err != nil {
-		summaryResult.Pass = false
-		clientResults.AddResult(clientID, false, "Admin add peer failed.")
-		return
-	}
-	log.Info("Peer added", "main", mainURL, "peer", peerEnodeID)
-	var clientURL string
-	if !checkMainForSync {
-		clientURL = fmt.Sprintf("http://%s:8545", nodeIP.String())
-	} else {
-		clientURL = mainURL
-	}
+	// yay, all goood
+	return n, nil
+}
 
-	//connect (over rpc) to the peer using the mobile interface
-	ethClient, err := geth.NewEthereumClient(clientURL)
-	if err != nil {
-		summaryResult.Pass = false
-		clientResults.AddResult(clientID, false, "Could not connect to client.")
-		return
-	}
-	//loop until done or timeout
-	for timeout := time.After(syncTimeout); ; {
-		t.Log("Checking sync progress")
+// sync peers the two nodes, and returns either when
+// - an error occurs
+// - the sink is synced or
+// - the sync times out, or
+func syncNodes(source, sink *node, headblock uint64) error {
+
+	// The code below to add peers via RPC is not needed, since we use
+	// the HIVE_BOOTNODES env var to configure the peering
+	//
+	// Peer the with eachother (hopefully one of them has admin_addPeer)
+	//var res bool
+	//if err := source.rpcClient.Call(&res, "admin_addPeer", sink.enodeId.String()); err != nil {
+	//	log.Info("RPC call [1] to source.addPeer(sink) failed", "error", err)
+	//	// Some nodes (parity) uses another format
+	//	if err := source.rpcClient.Call(&res, "parity_addReservedPeer", sink.enodeId.String()); err != nil {
+	//		log.Info("RPC call [2] to source.addReservedPeer(sink) failed", "error", err)
+	//	}
+	//}
+	//if err := sink.rpcClient.Call(&res, "admin_addPeer", source.enodeId.String()); err != nil {
+	//	log.Info("RPC call [1] to sink.addPeer(source) failed", "error", err)
+	//	if err := sink.rpcClient.Call(&res, "parity_addReservedPeer", source.enodeId.String()); err != nil {
+	//		log.Info("RPC call [2] to sink.addReservedPeer(source) failed", "error", err)
+	//	}
+	//}
+	//log.Info("Peering done", "source", source.enodeId.String(), "sink", sink.enodeId.String())
+	var (
+		timeout = time.After(syncTimeout)
+		ethCli  = ethclient.NewClient(sink.rpcClient)
+		current = uint64(0)
+	)
+	for {
+		log.Debug("Checking sync progress", "current", current)
 		select {
-
 		case <-timeout:
-			summaryResult.Pass = false
-			clientResults.AddResult(clientID, false, "Sync timeout.")
-			return
-
+			return fmt.Errorf("Sync timeout (%v elapsed)", syncTimeout)
 		default:
-			ctx := geth.NewContext().WithTimeout(int64(1 * time.Second))
-			block, err := ethClient.GetBlockByNumber(ctx, -1)
-			if err != nil {
-				t.Errorf("error getting block, url=%v", clientURL)
+			ctx, _ := context.WithTimeout(context.Background(), time.Second)
+			if block, err := ethCli.BlockByNumber(ctx, nil); err != nil {
+				log.Error("Error getting block", "sink", sink.name, "error", err)
+				return err
 			} else {
-				blockNumber := block.GetNumber()
-				t.Logf("got block number: %d", block.GetNumber())
-				if blockNumber == int64(chainLength) {
+				blockNumber := block.NumberU64()
+				if current != blockNumber {
+					log.Info("Block progressed", "sink", sink.name, "at", blockNumber)
+				}
+				current := blockNumber
+				if current == headblock {
 					//Success
-					clientResults.AddResult(clientID, true, "Sync succeeded.")
-					return
+					return nil
 				}
 			}
 			//check in a little while....
