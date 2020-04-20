@@ -195,34 +195,32 @@ func startTestSuiteAPI() error {
 	return nil
 }
 
-func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID, bool) {
+func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID, error) {
 	testSuiteString := request.URL.Query().Get(":suite")
 	testSuite, err := strconv.Atoi(testSuiteString)
 	if err != nil {
-		log15.Error("invalid test suite.")
 		http.Error(w, "invalid test suite", http.StatusBadRequest)
-		return 0, false
+		return 0, fmt.Errorf("invalid test suite: %v", testSuiteString)
 	}
 	testSuiteID := common.TestSuiteID(testSuite)
 	if _, running := testManager.IsTestSuiteRunning(testSuiteID); !running {
-		log15.Error("test suite not running")
 		http.Error(w, "test suite not running", http.StatusBadRequest)
-		return 0, false
+		return 0, fmt.Errorf("test suite not running: %d", testSuite)
 	}
-	return testSuiteID, true
+	return testSuiteID, nil
 }
 
 func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.TestID, bool) {
 	testString := request.URL.Query().Get(":test")
 	testCase, err := strconv.Atoi(testString)
 	if err != nil {
-		log15.Error("invalid test case.")
+		log15.Error("invalid test case", "identifier", testString)
 		http.Error(w, "invalid test case", http.StatusBadRequest)
 		return 0, false
 	}
 	testCaseID := common.TestID(testCase)
 	if _, running := testManager.IsTestRunning(testCaseID); !running {
-		log15.Error("test case not running")
+		log15.Error("test case not running", "testId", testCaseID)
 		http.Error(w, "test case not running", http.StatusBadRequest)
 		return 0, false
 	}
@@ -231,21 +229,24 @@ func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.Test
 
 // nodeInfoGet tries to execute the mandatory enode.sh , which returns the enode id
 func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - node info get")
-	testSuite, ok := checkSuiteRequest(request, w)
-	if !ok {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("nodeInfoGet failed", "error", err)
 		return
 	}
 	testCase, ok := checkTestRequest(request, w)
 	if !ok {
+		log15.Info("Server - node info get, test request failed")
 		return
 	}
 	node := request.URL.Query().Get(":node")
+	log15.Info("Server - node info get")
 
 	nodeInfo, err := testManager.GetNodeInfo(common.TestSuiteID(testSuite), common.TestID(testCase), node)
 	if err != nil {
-		log15.Error(fmt.Sprintf("unable to get node: %s", err.Error()))
+		log15.Error("nodeInfoGet unable to get node", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusNotFound)
+		return
 	}
 	exec, err := dockerClient.CreateExec(docker.CreateExecOptions{
 		AttachStdout: true,
@@ -255,7 +256,7 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 		Container:    nodeInfo.ID, //id is the container id
 	})
 	if err != nil {
-		log15.Error("failed to create target enode exec", "error", err)
+		log15.Error("nodeInfoGet unable to create enode exec", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -264,7 +265,7 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 		OutputStream: w,
 	})
 	if err != nil {
-		log15.Error("failed to start target enode exec", "error", err)
+		log15.Error("nodeInfoGet unable to start enode exec", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -272,30 +273,25 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 
 //start a new node as part of a test
 func nodeStart(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - node start request")
-
-	_, ok := checkSuiteRequest(request, w)
-	if !ok {
+	if _, err := checkSuiteRequest(request, w); err != nil {
+		log15.Error("nodeStart failed", "error", err)
 		return
 	}
 	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return
 	}
-	var err error
-	if err = request.ParseMultipartForm((1 << 10) * 4); nil != err {
-		log15.Error("Could not parse node request", "error", nil)
+	if err := request.ParseMultipartForm((1 << 10) * 4); err != nil {
+		log15.Error("nodeStart: Could not parse node request", "error", err)
 		http.Error(w, "Could not parse node request", http.StatusBadRequest)
 		return
 	}
-
 	files := make(map[string]*multipart.FileHeader)
 	for key, fheaders := range request.MultipartForm.File {
 		if len(fheaders) > 0 {
 			files[key] = fheaders[0]
 		}
 	}
-
 	envs := make(map[string]string)
 	for key, vals := range request.MultipartForm.Value {
 		envs[key] = vals[0]
@@ -304,19 +300,20 @@ func nodeStart(w http.ResponseWriter, request *http.Request) {
 	logdir := *testResultsRoot
 	nodeInfo, nodeID, ok := newNode(w, envs, files, allClients, request, true, true, logdir)
 	testManager.RegisterNode(testCase, nodeID, nodeInfo)
+	log15.Debug("nodeStart", "nodeID", nodeID, "ok", ok)
 }
 
 //start a pseudo client and register it as part of a test
 func pseudoStart(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - pseudo start request")
-	_, ok := checkSuiteRequest(request, w)
-	if !ok {
+	if _, err := checkSuiteRequest(request, w); err != nil {
+		log15.Error("pseudoStart failed", "error", err)
 		return
 	}
 	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return
 	}
+	log15.Info("Server - pseudo start request")
 	// parse any envvar overrides from simulators
 	request.ParseForm()
 	envs := make(map[string]string)
@@ -340,66 +337,85 @@ func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node stri
 	}
 	clientName := nodeInfo.Name
 	containerID := nodeInfo.ID //using the ID as 'container id'
-	log15.Debug("deleting client container", "name/id", clientName+"/"+containerID)
+	log15.Debug("deleting client container", "name", clientName, "id", containerID)
 	err = dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
 	return err
 }
 
 func nodeKill(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - node kill request")
-	testSuite, ok := checkSuiteRequest(request, w)
-	if !ok {
+
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Debug("nodeKill failed", "error", err)
 		return
 	}
 	testCase, ok := checkTestRequest(request, w)
 	if !ok {
+		log15.Error("nodeKill failed")
 		return
 	}
 	node := request.URL.Query().Get(":node")
-	err := killNodeHandler(testSuite, testCase, node)
+	err = killNodeHandler(testSuite, testCase, node)
 	if err != nil {
+		log15.Error("nodeKill unable to delete node", "node", node, "error", err)
 		msg := fmt.Sprintf("unable to delete node: %s", err.Error())
-		log15.Error(msg)
 		http.Error(w, msg, http.StatusInternalServerError)
+		return
 	}
+	log15.Debug("nodeKill Ok", "node", node)
 }
+
 func testDelete(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - test end request")
-	testSuite, ok := checkSuiteRequest(request, w)
-	if !ok {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("testDelete: test end request failed", "error", err)
 		return
 	}
 	testCase, ok := checkTestRequest(request, w)
 	if !ok {
+		log15.Error("testDelete: test end request failed, checkTestRequest failed")
 		return
 	}
-	dict := parseForm(request)
-	summaryResultData, in := dict["summaryresult"]
-	if !in {
-		msg := fmt.Sprintf("missing summary result")
-		log15.Error(msg)
-		http.Error(w, msg, http.StatusBadRequest)
-	}
-	clientResultsData, crIn := dict["clientresults"] //clientResults are optional
 
+	// Regardless of earlier errors, we need to at least try to end the test, to
+	// clean up resources
 	var summaryResult common.TestResult
 	var clientResults map[string]*common.TestResult
+	var responseWritten = false // Have we already committed a response?
+	defer func() {
+		//nb! endtest invokes the kill node handler indirectly
+		err := testManager.EndTest(testSuite, testCase, &summaryResult, clientResults)
+		if err == nil {
+			return
+		}
+		log15.Error("testDelete: request failed, unable to end testcase", "error", err)
+		if !responseWritten {
+			http.Error(w, fmt.Sprintf("unable to end test case: %s", err.Error()), http.StatusInternalServerError)
+		}
+	}()
 
-	err := json.Unmarshal([]byte(summaryResultData), &summaryResult)
-	if err != nil {
-		msg := fmt.Sprintf("summary result could not be unmarshalled")
-		log15.Error(msg)
+	dict := parseForm(request)
+	summaryResultData, ok := dict["summaryresult"]
+	if !ok {
+		log15.Error("testDelete: request failed, missing summary result")
+		msg := fmt.Sprintf("missing summary result")
+		responseWritten = true
 		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
-	if crIn {
-		json.Unmarshal([]byte(clientResultsData), &clientResults)
+	// Summary result is required
+	if err = json.Unmarshal([]byte(summaryResultData), &summaryResult); err != nil {
+		log15.Error("testDelete: request failed, unmarshalling failed", "error", err)
+		msg := fmt.Sprintf("summary result could not be unmarshalled")
+		responseWritten = true
+		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
-
-	err = testManager.EndTest(testSuite, testCase, &summaryResult, clientResults) //nb! endtest invokes the kill node handler indirectly
-	if err != nil {
-		msg := fmt.Sprintf("unable to end test case: %s", err.Error())
-		log15.Error(msg)
-		http.Error(w, msg, http.StatusInternalServerError)
+	//clientResults are optional
+	if clientResultsData, ok := dict["clientresults"]; ok {
+		if err := json.Unmarshal([]byte(clientResultsData), &clientResults); err != nil {
+			log15.Error("testDelete: client result unmarhalling failed", "error", err)
+		}
 	}
 }
 
@@ -413,18 +429,19 @@ func parseForm(r *http.Request) map[string]string {
 }
 
 func testStart(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - test start request")
-	testSuite, ok := checkSuiteRequest(request, w)
-	if !ok {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("testStart fail", "error", err)
 		return
 	}
 	dict := parseForm(request)
 	testID, err := testManager.StartTest(testSuite, dict["name"], dict["description"])
 	if err != nil {
+		log15.Error("testStart unable to start test case", "name", dict["name"], "error", err)
 		msg := fmt.Sprintf("unable to start test case: %s", err.Error())
-		log15.Error(msg)
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
+	log15.Debug("testStart ok", "testId", testID, "name", dict["name"])
 	fmt.Fprintf(w, "%s", testID)
 }
 
@@ -441,17 +458,17 @@ func suiteStart(w http.ResponseWriter, request *http.Request) {
 }
 
 func suiteEnd(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - end suite request")
-	testSuite, ok := checkSuiteRequest(request, w)
-	if !ok {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("suiteEnd fail", "error", err)
 		return
 	}
-	err := testManager.EndTestSuite(testSuite)
+	err = testManager.EndTestSuite(testSuite)
 	if err != nil {
-		msg := fmt.Sprintf("unable to end test suite: %s", err.Error())
-		log15.Error(msg)
-		http.Error(w, msg, http.StatusInternalServerError)
+		log15.Error("suiteEnd unable to end suite", "error", err)
+		http.Error(w, fmt.Sprintf("unable to end test suite: %s", err.Error()), http.StatusInternalServerError)
 	}
+	log15.Debug("suiteEnd ok", "testSuite", testSuite)
 }
 
 func clientTypesGet(w http.ResponseWriter, request *http.Request) {
@@ -516,9 +533,11 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	containerMAC := ""
 	//and now initialise it with supplied files
 	//start a new client logger
-	logger := log15.New("client started with id", containerID)
+	logger := log15.New("id", containerID)
 	logfileRelative := filepath.Join(strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
 	logfile := filepath.Join(logdir, logfileRelative)
+	// Update the test-suite with the info we have
+	testClientInfo.ID = containerID
 	testClientInfo.LogFile = logfileRelative
 	testClientInfo.WasInstantiated = true
 	testClientInfo.InstantiatedAt = time.Now()
@@ -526,6 +545,10 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 	waiter, err := runContainer(container.ID, logger, logfile, false, logLevel)
 	if err != nil {
 		logger.Error("failed to start client", "error", err)
+		// Clean up the underlying container too
+		if removeErr := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true}); removeErr != nil {
+			logger.Error("failed to remove container", "error", removeErr)
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return testClientInfo, containerID, false
 	}
@@ -579,7 +602,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		}
 
 		if time.Since(container.Created) > timeoutCheckDuration {
-			log15.Debug("deleting client container", "name/id", clientName+"/"+containerID)
+			log15.Debug("deleting client container", "name", clientName, "id", containerID)
 			err = dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
 			if err == nil {
 				logger.Error("client container terminated due to unresponsive RPC ")
