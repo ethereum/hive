@@ -14,6 +14,10 @@ ADD config.json /config.json
 
 # Inject the startup script
 ADD aleth.sh /aleth.sh
+# The aleth base docker image uses 'aleth' user. The ADD operation above,
+# however, adds the file with root ownership. So in order to chmod, we need
+# to switch to root.
+USER root
 RUN chmod +x /aleth.sh
 
 # Inject the enode id retriever script

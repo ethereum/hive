@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/ethereum/go-ethereum/log"
 	"net"
 	"sync"
 	"time"
@@ -23,7 +24,7 @@ import (
 
 var (
 	host        common.TestSuiteHost
-	syncTimeout = 60 * time.Second //the number of seconds before a sync is considered stalled or failed
+	syncTimeout = 30 * time.Second //the number of seconds before a sync is considered stalled or failed
 	testSuite   common.TestSuiteID
 )
 
@@ -59,7 +60,6 @@ func RunTestSuite(m *testing.M) int {
 }
 
 func TestSyncsWithGeth(t *testing.T) {
-
 	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
 	//start the test suite
 	testSuite, err := host.StartTestSuite("Sync test suite",
@@ -74,32 +74,50 @@ func TestSyncsWithGeth(t *testing.T) {
 	}
 	defer host.EndTestSuite(testSuite)
 
+	//get all client types required to test
+	availableClients, err := host.GetClientTypes()
+	if err != nil {
+		t.Fatalf("Simulator error. Cannot get client types. %v", err)
+	}
+	//there needs to be only 2 types of client
+	if len(availableClients) < 2 {
+		t.Fatalf("Test requires at least two client types, got %v", availableClients)
+	}
+	//find the first geth to use as a reference node
+	var firstGeth = -1
+	for i, clientType := range availableClients {
+		if strings.Contains(clientType, "go-ethereum") {
+			firstGeth = i
+			break
+		}
+	}
+	if firstGeth == -1 {
+		t.Fatal("Missing geth instance. This test requires a geth.")
+	}
+
+	var (
+		commonParams = map[string]string{
+			"HIVE_NETWORK_ID":     "1",
+			"HIVE_CHAIN_ID":       "1",
+			"HIVE_FORK_HOMESTEAD": "0",
+			"HIVE_FORK_TANGERINE": "0",
+			"HIVE_FORK_SPURIOUS":  "0",
+			"HIVE_FORK_BYZANTIUM": "0",
+			"HIVE_NODETYPE":       "full", //fast sync
+		}
+		servefiles = map[string]string{
+			"genesis.json": "/simplechain/genesis.json",
+			"chain.rlp":    "/simplechain/chain.rlp",
+		}
+		clientFiles = map[string]string{
+			"genesis.json": "/simplechain/genesis.json",
+		}
+	)
+
 	//Test a fastmode sync by creating a geth client and one each of any other type of client
 	//and ask the other client to load the chain
 	t.Run("fastmodes", func(t *testing.T) {
-
-		//get all client types required to test
-		availableClients, err := host.GetClientTypes()
-		if err != nil {
-			t.Fatalf("Simulator error. Cannot get client types. %v", err)
-		}
-		//there needs to be only 2 types of client
-		if len(availableClients) < 2 {
-			t.Fatal("Cannot execute test with less than 2 types available. This test tries to sync from each other peer to geth.")
-		}
-		//start with the first geth
-		var firstGeth = -1
-		for i, clientType := range availableClients {
-			if strings.Contains(clientType, "go-ethereum") {
-				firstGeth = i
-				break
-			}
-		}
-		if firstGeth == -1 {
-			t.Fatal("Missing geth instance. This test requires a geth.")
-		}
 		startTime := time.Now()
-
 		testID, err := host.StartTest(testSuite, "Serve as sync source",
 			`This test initialises each client-under-test with a predefined chain, 
 and attempts to sync up a geth-node against the client-under-test.`)
@@ -118,16 +136,13 @@ and attempts to sync up a geth-node against the client-under-test.`)
 				t.Errorf("Test failed %s", summaryResult.Details)
 			}
 		}()
+		var gethParams = make(map[string]string)
+		for k, v := range commonParams {
+			gethParams[k] = v
+		}
+		gethParams["CLIENT"] = availableClients[firstGeth]
 		//and load the genesis without a chain
-		mainParms := map[string]string{
-			"CLIENT":                  availableClients[firstGeth],
-			"HIVE_USE_GENESIS_CONFIG": "1",
-			"HIVE_NODETYPE":           "full", //fast sync
-		}
-		mainFiles := map[string]string{
-			"genesis.json": "/simplechain/genesis.json",
-		}
-		mainId, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms, mainFiles)
+		mainId, mainNodeIP, _, err := host.GetNode(testSuite, testID, gethParams, clientFiles)
 		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
@@ -145,23 +160,12 @@ and attempts to sync up a geth-node against the client-under-test.`)
 
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node
-				parms := map[string]string{
-					"CLIENT": clientType,
-
-					"HIVE_NETWORK_ID":     "1",
-					"HIVE_CHAIN_ID":       "1",
-					"HIVE_FORK_HOMESTEAD": "0",
-					"HIVE_FORK_TANGERINE": "0",
-					"HIVE_FORK_SPURIOUS":  "0",
-					"HIVE_FORK_BYZANTIUM": "0",
-					//	"HIVE_FORK_DAO_BLOCK": "0",
-					// "HIVE_FORK_CONSTANTINOPLE": "0",
+				var otherParams = make(map[string]string)
+				for k, v := range commonParams {
+					otherParams[k] = v
 				}
-				files := map[string]string{
-					"genesis.json": "/simplechain/genesis.json",
-					"chain.rlp":    "/simplechain/chain.rlp",
-				}
-				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms, files)
+				otherParams["CLIENT"] = clientType
+				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, otherParams, servefiles)
 				if err != nil {
 					summaryResult.Pass = false
 					summaryResult.AddDetail(fmt.Sprintf("Unable to get node: %s", err.Error()))
@@ -174,36 +178,12 @@ and attempts to sync up a geth-node against the client-under-test.`)
 				syncClient(doneFn, mainNodeURL, clientID, nodeIP, t, 10, startTime, true, testID, &summaryResult, clientResults)
 			}
 		}
-
 		t.Log("Terminating.")
-
 	})
 
 	//Test sync compatibility by creating a geth node and load the chain there,
 	//then create one each of each remaining type of node and sync from geth
 	t.Run("compatibility", func(t *testing.T) {
-
-		//get all client types required to test
-		availableClients, err := host.GetClientTypes()
-		if err != nil {
-			t.Fatalf("Simulator error. Cannot get client types. %v", err)
-		}
-		//there needs to be at least 2 types of client
-		if len(availableClients) < 2 {
-			t.Fatal("Cannot execute test. There needs to be at least 2 types of client available.")
-		}
-		//start with the first geth
-		var firstGeth = -1
-		for i, clientType := range availableClients {
-			if strings.Contains(clientType, "go-ethereum") {
-				firstGeth = i
-				break
-			}
-		}
-		if firstGeth == -1 {
-			t.Fatal("Cannot execute test. No geth client available.")
-		}
-
 		startTime := time.Now()
 		testID, err := host.StartTest(testSuite, "Sync from geth",
 			`This test initialises an instance of geth with a predefined chain and genesis and attempts to 
@@ -223,18 +203,14 @@ sync each client-under-test from the geth master.`)
 				t.Errorf("Test failed %s", summaryResult.Details)
 			}
 		}()
-		//and load the genesis + chain
-		mainParms := map[string]string{
-			"CLIENT":                  availableClients[firstGeth],
-			"HIVE_USE_GENESIS_CONFIG": "1",
-		}
 
-		mainFiles := map[string]string{
-			"genesis.json": "/simplechain/genesis.json",
-			"chain.rlp":    "/simplechain/chain.rlp",
+		var gethParams = make(map[string]string)
+		for k, v := range commonParams {
+			gethParams[k] = v
 		}
+		gethParams["CLIENT"] = availableClients[firstGeth]
 
-		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, mainParms, mainFiles)
+		_, mainNodeIP, _, err := host.GetNode(testSuite, testID, gethParams, servefiles)
 		if err != nil {
 			summaryResult.Pass = false
 			summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
@@ -253,24 +229,12 @@ sync each client-under-test from the geth master.`)
 
 				t.Logf("Starting peer node (%s)", clientType)
 				// create the other node with genesis and no chain
-				parms := map[string]string{
-					"CLIENT": clientType,
-
-					"HIVE_NETWORK_ID":     "1",
-					"HIVE_CHAIN_ID":       "1",
-					"HIVE_FORK_HOMESTEAD": "0",
-					"HIVE_FORK_TANGERINE": "0",
-					"HIVE_FORK_SPURIOUS":  "0",
-					"HIVE_FORK_BYZANTIUM": "0",
-					//	"HIVE_FORK_DAO_BLOCK": "0",
-					// "HIVE_FORK_CONSTANTINOPLE": "0",
+				var otherParams = make(map[string]string)
+				for k, v := range commonParams {
+					otherParams[k] = v
 				}
-
-				files := map[string]string{
-					"genesis.json": "/simplechain/genesis.json",
-				}
-
-				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, parms, files)
+				otherParams["CLIENT"] = clientType
+				clientID, nodeIP, _, err := host.GetNode(testSuite, testID, otherParams, clientFiles)
 				if err != nil {
 					summaryResult.Pass = false
 					summaryResult.AddDetail(fmt.Sprintf("Unable to get main node: %s", err.Error()))
@@ -297,13 +261,14 @@ func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testi
 	if doneFn != nil {
 		defer doneFn()
 	}
-	peerEnodeID, err := host.GetClientEnode(testSuite, testID, clientID)
-	if err != nil || peerEnodeID == nil || *peerEnodeID == "" {
+	peerEnodeIDPtr, err := host.GetClientEnode(testSuite, testID, clientID)
+	if err != nil || peerEnodeIDPtr == nil || *peerEnodeIDPtr == "" {
 		summaryResult.Pass = false
 		clientResults.AddResult(clientID, false, "Enode could not be obtained.")
 		return
 	}
-	peerNode, err := enode.ParseV4(*peerEnodeID)
+	peerEnodeID := *peerEnodeIDPtr
+	peerNode, err := enode.ParseV4(peerEnodeID)
 	if err != nil {
 		summaryResult.Pass = false
 		clientResults.AddResult(clientID, false, "Enode could not be parsed.")
@@ -321,7 +286,7 @@ func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testi
 		return
 	}
 
-	*peerEnodeID = peerNode.String()
+	peerEnodeID = peerNode.String()
 
 	//connect over rpc to the main node to add the peer (the mobile client does not have the admin function)
 	rpcClient, err := rpc.Dial(mainURL)
@@ -331,12 +296,12 @@ func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testi
 		return
 	}
 	var res = false
-	if err := rpcClient.Call(&res, "admin_addPeer", *peerEnodeID); err != nil {
+	if err := rpcClient.Call(&res, "admin_addPeer", peerEnodeID); err != nil {
 		summaryResult.Pass = false
 		clientResults.AddResult(clientID, false, "Admin add peer failed.")
 		return
 	}
-
+	log.Info("Peer added", "main", mainURL, "peer", peerEnodeID)
 	var clientURL string
 	if !checkMainForSync {
 		clientURL = fmt.Sprintf("http://%s:8545", nodeIP.String())
@@ -351,10 +316,9 @@ func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testi
 		clientResults.AddResult(clientID, false, "Could not connect to client.")
 		return
 	}
-
 	//loop until done or timeout
 	for timeout := time.After(syncTimeout); ; {
-		t.Log("Checking sync progress, remaining time:")
+		t.Log("Checking sync progress")
 		select {
 
 		case <-timeout:
@@ -363,15 +327,13 @@ func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testi
 			return
 
 		default:
-
 			ctx := geth.NewContext().WithTimeout(int64(1 * time.Second))
-
 			block, err := ethClient.GetBlockByNumber(ctx, -1)
 			if err != nil {
-				t.Errorf("Error getting block from %s ", clientURL)
+				t.Errorf("error getting block, url=%v", clientURL)
 			} else {
 				blockNumber := block.GetNumber()
-				t.Logf("Block number: %d", block.GetNumber())
+				t.Logf("got block number: %d", block.GetNumber())
 				if blockNumber == int64(chainLength) {
 					//Success
 					clientResults.AddResult(clientID, true, "Sync succeeded.")

@@ -45,7 +45,7 @@ function testgraphql {
 
 function testsync {
   echo "$(date) Starting hive sync simulation [$1<->$2]"
-  run "hive --sim ethereum/sync --client=\"$1,$2\" $FLAGS"
+  run "hive --sim ethereum/sync --client=$1,$2 $FLAGS"
 }
 
 function testdevp2p {
