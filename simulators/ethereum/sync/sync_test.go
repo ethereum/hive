@@ -354,7 +354,7 @@ func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testi
 
 	//loop until done or timeout
 	for timeout := time.After(syncTimeout); ; {
-		t.Log("Checking sync progress, remaining time:")
+		t.Log("Checking sync progress")
 		select {
 
 		case <-timeout:
@@ -363,15 +363,13 @@ func syncClient(doneFn func(), mainURL, clientID string, nodeIP net.IP, t *testi
 			return
 
 		default:
-
 			ctx := geth.NewContext().WithTimeout(int64(1 * time.Second))
-
 			block, err := ethClient.GetBlockByNumber(ctx, -1)
 			if err != nil {
-				t.Errorf("Error getting block from %s ", clientURL)
+				t.Errorf("error getting block, url=%v", clientURL)
 			} else {
 				blockNumber := block.GetNumber()
-				t.Logf("Block number: %d", block.GetNumber())
+				t.Logf("got block number: %d", block.GetNumber())
 				if blockNumber == int64(chainLength) {
 					//Success
 					clientResults.AddResult(clientID, true, "Sync succeeded.")
