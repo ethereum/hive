@@ -116,7 +116,7 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 		JQPARAMS="$JQPARAMS + {\"osakaBlock\": $HIVE_FORK_MUIR_OSAKA}"
 	fi
 	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
-	genesis=`cat /etc/besu/genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /etc/besu/genesis.json
+	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /etc/besu/genesis.json
 fi
 
 
