@@ -44,8 +44,8 @@ function testgraphql {
 }
 
 function testsync {
-  echo "$(date) Starting hive sync simulation [$1<->$2]"
-  run "hive --sim ethereum/sync --client=$1,$2 $FLAGS"
+  echo "$(date) Starting hive sync simulation [$1]"
+  run "hive --sim ethereum/sync --client=$1 $FLAGS"
 }
 
 function testdevp2p {
@@ -57,6 +57,18 @@ mkdir $RESULTS
 
 # Sync are quick tests
 #
+
+# These three can succsessfully sync with themselves
+#testsync parity_latest
+#testsync go-ethereum_latest
+testsync aleth_nightly,parity_latest,go-ethereum_latest
+
+# These two are failing - even against themselves
+testsync besu_latest       # fails
+testsync nethermind_latest # fails
+
+#testsync besu_latest,nethermind_latest
+
 #testsync go-ethereum_latest go-ethereum_stable
 #testsync go-ethereum_latest parity_latest
 #testsync go-ethereum_latest aleth_nightly
