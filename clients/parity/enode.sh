@@ -10,8 +10,9 @@
 set -e
 
 
-
-
+# This script errors at times, so we add a little sleep here to
+# give the node some more time
+sleep 1
 TARGET_RESPONSE=$(curl --data '{"method":"parity_enode","params":[],"id":1,"jsonrpc":"2.0"}' -H "Content-Type: application/json" -X POST "localhost:8545" )
 
 

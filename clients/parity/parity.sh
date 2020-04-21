@@ -240,5 +240,6 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 fi
 
 # Run the parity implementation with the requested flags
-echo "Running parity..."
-parity $FLAGS  --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all
+FLAGS="$FLAGS --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all  --jsonrpc-apis all"
+echo "running parity $FLAGS"
+parity $FLAGS

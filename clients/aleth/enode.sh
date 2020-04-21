@@ -9,7 +9,7 @@
 # Immediately abort the script on any error encountered
 set -e
 
-
+sleep 1
 TARGET_RESPONSE=$(curl -s -X POST  -H "Content-Type: application/json"  --data '{"jsonrpc":"2.0","method":"admin_nodeInfo","params":[],"id":1}' "localhost:8545" )
 
 
