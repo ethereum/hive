@@ -13,7 +13,7 @@ RUN chmod +x /enode.sh
 RUN apt-get update && \
     apt-get install -y jq curl
 
-ADD genesis.json /etc/besu/genesis.json
+ADD genesis.json /genesis.json
 
 ARG branch=master
 RUN echo "{\
