@@ -146,7 +146,7 @@
                             <div class="col-4  text-left my-auto font-weight-bold " >
                             <span data-bind="text: name "></span>
                                 <!-- ko if: simLog-->
-                                <a data-bind="attr: {href:simLog}" download xlass="btn btn-primary btn-block  " role="button" aria-pressed="true">[simulator log]</a>
+                                <a data-bind="attr: {href:'viewer.html?file='+simLog()}" role="button" aria-pressed="true" target="_blank">[simulator log]</a>
                                 <!-- /ko -->
                             </div>
                             <div class="col-4  text-left my-auto" data-bind="text: primaryClient()">
