@@ -57,71 +57,69 @@ if [ "$HIVE_NODETYPE" == "light" ]; then
     echo "Besu does not support light nodes"
 fi
 
-if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
-	# Override any chain configs fron ENV vars into json
-	chainconfig="{\"ethash\": {}}"
-	JQPARAMS=". "
-	if [ "$HIVE_CHAIN_ID" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"chainID\": $HIVE_CHAIN_ID}"
-	fi
-	if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"
-	fi
-	# Besu requires forks to be in order. Hive tries to put the dao fork at block 2K when it's 
-	# not activated, but besu rejects that 
-	if [ "$HIVE_FORK_DAO_BLOCK" != "" ] && [ "$HIVE_FORK_DAO_BLOCK" != "2000" ]; then
-		JQPARAMS="$JQPARAMS + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"
-	fi
-	if [ "$HIVE_FORK_TANGERINE" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"eip150Block\": $HIVE_FORK_TANGERINE}"
-	fi
-	if [ "$HIVE_FORK_TANGERINE_HASH" != "" ]; then
-		chainconfig=`echo $chainconfig | jq ". + {\"eip150Hash\": $HIVE_FORK_TANGERINE_HASH}"`
-	fi
-	if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"
-		JQPARAMS="$JQPARAMS + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"
-	fi
-	if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"
-	fi
-	if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"
-	fi
-	if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_PETERSBURG}"
-	fi
-	if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_ISTANBUL}"
-	fi
-	if [ "$HIVE_FORK_MUIR_GLACIER" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_MUIR_GLACIER}"
-	fi
-	if [ "$HIVE_FORK_BERLIN" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"berlinBlock\": $HIVE_FORK_MUIR_BERLIN}"
-	fi
-	if [ "$HIVE_FORK_LONDON" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"londonBlock\": $HIVE_FORK_MUIR_LONDON}"
-	fi
-	if [ "$HIVE_FORK_SHANGHAI" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"shanghaiBlock\": $HIVE_FORK_MUIR_SHANGHAI}"
-	fi
-	if [ "$HIVE_FORK_CANCUN" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"cancunBlock\": $HIVE_FORK_MUIR_CANCUN}"
-	fi
-	if [ "$HIVE_FORK_PRAGUE" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"pragueBlock\": $HIVE_FORK_MUIR_PRAGUE}"
-	fi
-	if [ "$HIVE_FORK_OSAKA" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"osakaBlock\": $HIVE_FORK_MUIR_OSAKA}"
-	fi
-	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
-	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /etc/besu/genesis.json
+# Override any chain configs fron ENV vars into json
+chainconfig="{\"ethash\": {}}"
+JQPARAMS=". "
+if [ "$HIVE_CHAIN_ID" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"chainID\": $HIVE_CHAIN_ID}"
+fi
+if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"
+fi
+# Besu requires forks to be in order. Hive tries to put the dao fork at block 2K when it's
+# not activated, but besu rejects that
+if [ "$HIVE_FORK_DAO_BLOCK" != "" ] && [ "$HIVE_FORK_DAO_BLOCK" != "2000" ]; then
+  JQPARAMS="$JQPARAMS + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"
+fi
+if [ "$HIVE_FORK_TANGERINE" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"eip150Block\": $HIVE_FORK_TANGERINE}"
+fi
+if [ "$HIVE_FORK_TANGERINE_HASH" != "" ]; then
+  chainconfig=`echo $chainconfig | jq ". + {\"eip150Hash\": $HIVE_FORK_TANGERINE_HASH}"`
+fi
+if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"
+  JQPARAMS="$JQPARAMS + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"
+fi
+if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"
+fi
+if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"
+fi
+if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_PETERSBURG}"
+fi
+if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_ISTANBUL}"
+fi
+if [ "$HIVE_FORK_MUIR_GLACIER" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_MUIR_GLACIER}"
+fi
+if [ "$HIVE_FORK_BERLIN" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"berlinBlock\": $HIVE_FORK_MUIR_BERLIN}"
+fi
+if [ "$HIVE_FORK_LONDON" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"londonBlock\": $HIVE_FORK_MUIR_LONDON}"
+fi
+if [ "$HIVE_FORK_SHANGHAI" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"shanghaiBlock\": $HIVE_FORK_MUIR_SHANGHAI}"
+fi
+if [ "$HIVE_FORK_CANCUN" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"cancunBlock\": $HIVE_FORK_MUIR_CANCUN}"
+fi
+if [ "$HIVE_FORK_PRAGUE" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"pragueBlock\": $HIVE_FORK_MUIR_PRAGUE}"
+fi
+if [ "$HIVE_FORK_OSAKA" != "" ]; then
+  JQPARAMS="$JQPARAMS + {\"osakaBlock\": $HIVE_FORK_MUIR_OSAKA}"
 fi
 
+chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
+cat /genesis.json | jq ". + {\"config\": $chainconfig}" > /besugenesis.json
 
 if [ "$HIVE_MINER" != "" ]; then
-  FLAGS="$FLAGE --miner-enabled --miner-coinbase=$HIVE_MINER"
+  FLAGS="$FLAGS --miner-enabled --miner-coinbase=$HIVE_MINER"
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
   FLAGS="$FLAGS --miner-extra-data=$HIVE_MINER_EXTRA"
@@ -144,9 +142,9 @@ elif [ "$HIVE_LOGLEVEL" == "5" ]; then
   cat /etc/besu/genesis.json
 fi
 echo "Using the following genesis"
-cat /etc/besu/genesis.json
+cat /besugenesis.json
 
-FLAGS="$FLAGS --genesis-file=/etc/besu/genesis.json"
+FLAGS="$FLAGS --genesis-file=/besugenesis.json"
 
 set -e
 # Load the test chain if present
