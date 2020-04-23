@@ -335,13 +335,8 @@ function provokePopup(popup,self) {
 }
 
 testClientInfo.prototype.ShowLogs = function () {
-    self = this;
-
-    var popup = window.open("popup.html", "", "");
-    provokePopup(popup,self);
-
+    window.open("viewer.html?file="+escape(this.logfile()), "", "");
     return true;
-
 }
 /**************************************************************************************************************/
 
