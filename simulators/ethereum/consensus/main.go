@@ -249,7 +249,7 @@ type testcase struct {
 func (t *testcase) validate() error {
 	net := t.blockTest.json.Network
 	if _, exist := ruleset[net]; !exist {
-		return fmt.Errorf("network %v not defined in ruleset", net)
+		return fmt.Errorf("network `%v` not defined in ruleset", net)
 	}
 	return nil
 }
@@ -297,7 +297,7 @@ func (t *testcase) artefacts() (string, string, string, []string, error) {
 	genBytes, _ := json.Marshal(genesis)
 	genesisFile := fmt.Sprintf("./%v/genesis.json", key)
 	if err := ioutil.WriteFile(genesisFile, genBytes, 0777); err != nil {
-		return "", "", "", nil, fmt.Errorf("failed writing genesis: %v", err)
+		return "", "", "", nil, fmt.Errorf("Failed writing genesis: `%v`", err)
 	}
 
 	for i, block := range t.blockTest.json.Blocks {
@@ -314,13 +314,13 @@ func (t *testcase) artefacts() (string, string, string, []string, error) {
 
 func (t *testcase) verifyGenesis(got []byte) error {
 	if exp := t.blockTest.json.Genesis.Hash; bytes.Compare(exp[:], got) != 0 {
-		return fmt.Errorf("genesis mismatch, expectd 0x%x got 0x%x", exp, got)
+		return fmt.Errorf("Genesis mismatch, expected `0x%x` got `0x%x`", exp, got)
 	}
 	return nil
 }
 func (t *testcase) verifyBestblock(got []byte) error {
 	if exp := t.blockTest.json.BestBlock; bytes.Compare(exp[:], got) != 0 {
-		return fmt.Errorf("last block mismatch, expectd 0x%x got 0x%x (%v %v)", exp, got, t.name, t.filepath)
+		return fmt.Errorf("Last block mismatch, expected `0x%x` got `0x%x` (`%v` `%v`)", exp, got)
 	}
 	return nil
 }
@@ -342,11 +342,19 @@ func (be *blocktestExecutor) runTest(t *testcase) error {
 
 	log.Info("Starting test", "name", t.name, "file", t.filepath)
 	start := time.Now()
-	testname := fmt.Sprintf("%s:%s", t.filepath, t.name)
-	if strings.HasPrefix(testname, "/tests/") {
-		testname = fmt.Sprintf(".%s", testname)
-	}
-	testID, err := be.api.StartTest(be.testSuiteID, t.name, testname)
+	// Convert ./tests/BlockchainTests/InvalidBlocks/bcExpectSection/lastblockhash.json
+	// into
+	// BlockchainTests/InvalidBlocks/bcExpectSection/lastblockhash.json
+	filePath := strings.TrimPrefix(t.filepath, ".")
+	filePath = strings.TrimPrefix(filepath, "/tests/")
+	// Link to
+	// https://github.com/ethereum/tests/blob/develop/BlockchainTests/InvalidBlocks/bcExpectSection/lastblockhash.json
+	//testID, err := be.api.StartTest(be.testSuiteID, t.name, testname)
+	description = fmt.Sprintf("Test source:[`%v`](https://github.com/ethereum/tests/blob/develop/%v)",
+		t.name,
+		filePath)
+
+	testID, err := be.api.StartTest(be.testSuiteID, t.name, description)
 	if err != nil {
 		return err
 	}
@@ -393,12 +401,12 @@ func (be *blocktestExecutor) runTest(t *testcase) error {
 	ctx := context.Background()
 	rawClient, err := rpc.DialContext(ctx, fmt.Sprintf("http://%s:8545", ip.String()))
 	if err != nil {
-		err = fmt.Errorf("failed to start client: %v", err)
+		err = fmt.Errorf("Failed to start client: `%v`", err)
 		return err
 	}
 	genesisHash, err := getHash(rawClient, hexutil.EncodeBig(new(big.Int)))
 	if err != nil {
-		err = fmt.Errorf("failed to check genesis: %v", err)
+		err = fmt.Errorf("Failed to check genesis: `%v`", err)
 		return err
 	}
 	t3 := time.Now()
@@ -431,10 +439,10 @@ func getHash(rawClient *rpc.Client, arg string) ([]byte, error) {
 		}
 	}
 	if hash, exist := blockData["hash"]; !exist {
-		return nil, fmt.Errorf("no hash found in response")
+		return nil, fmt.Errorf("No hash found in response")
 	} else {
 		if hexHash, ok := hash.(string); !ok {
-			return nil, fmt.Errorf("error: string conversion failed for %v", hash)
+			return nil, fmt.Errorf("error: string conversion failed for `%v`", hash)
 		} else {
 			return common2.HexToHash(hexHash).Bytes(), nil
 		}
@@ -483,7 +491,11 @@ func main() {
 
 	fileRoot := fmt.Sprintf("%s/BlockchainTests/", testpath)
 	for _, client := range availableClients {
-		testSuiteID, err := host.StartTestSuite("consensus", "consensus test suite blockchain tests for a single client type", logFile)
+		testSuiteID, err := host.StartTestSuite("Consensus",
+			fmt.Sprintf("The `consensus` test suite executes BlockchainTests from the "+
+				"offical test repository: [here](https://github.com/ethereum/tests). For every test, it starts an instance of the client-under-test, "+
+				"(in this case, `%v`), and makes it import the RLP blocks. After import phase, the node is queried about it's latest blocks, which is matched"+
+				"to the expected last blockhash according to the test.", client), logFile)
 		if err != nil {
 			log.Error("Unable to start test suite", "error", err)
 			os.Exit(1)
