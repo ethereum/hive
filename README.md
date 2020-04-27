@@ -17,7 +17,7 @@ Therefore, the entire suite is based on docker containers.
 # Public test results
 
 An Ethereum Foundation server often runs Hive to check for consensus, p2p and blockchain compatibility.
-Test results are made public [here](http://hivetests.ethstats.net/)
+Test results are made public [here](https://hivetests.ethdevops.io/)
 
 # Installing the hive validator
 
