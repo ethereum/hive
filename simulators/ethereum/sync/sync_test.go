@@ -95,8 +95,8 @@ For each client, we test if it can serve as a sync source for all other clients 
 
 	for _, sourceType := range availableClients {
 		// Load source with chain
-		sourceTestID, _ := host.StartTest(testSuite, fmt.Sprintf("%v as sync-source", sourceType),
-			fmt.Sprintf("Tests that %v can do a block import and serve as sync source", sourceType))
+		sourceTestID, _ := host.StartTest(testSuite, fmt.Sprintf("`%v` as sync-source", sourceType),
+			fmt.Sprintf("Tests that `%v` can do a block import and serve as sync source", sourceType))
 		sourceNode, err := getClient(sourceType, testSuite, sourceTestID, params, sourceFiles, "")
 		endSourceTest := func(err error) {
 			if err != nil {
@@ -110,16 +110,16 @@ For each client, we test if it can serve as a sync source for all other clients 
 			host.EndTest(testSuite, sourceTestID, &common.TestResult{Pass: true}, nil)
 		}
 		if err != nil {
-			endSourceTest(fmt.Errorf("Unable to instantiate source-node %v: %s", sourceType, err.Error()))
+			endSourceTest(fmt.Errorf("Unable to instantiate source-node `%v`: %s", sourceType, err.Error()))
 			continue
 		}
 		// TODO: Verify that the source-node is indeed at the expected block num.
 
 		for _, sinkType := range availableClients {
 			testName := fmt.Sprintf("fast-sync %v -> %v", sourceType, sinkType)
-			desc := fmt.Sprintf("This test initialises the client-under-test (%v) "+
+			desc := fmt.Sprintf("This test initialises the client-under-test (`%v`) "+
 				"with a predefined chain, and attempts to sync up another "+
-				"node (%v) against the it.", sourceType, sinkType)
+				"node (`%v`) against the it.", sourceType, sinkType)
 			sinkType := sinkType
 			t.Run(testName, func(t *testing.T) {
 				var (
@@ -195,14 +195,14 @@ func getClient(clientType string, testSuite common.TestSuiteID, testID common.Te
 	n.id = id
 	enodeIDPtr, err := host.GetClientEnode(testSuite, testID, id)
 	if err != nil {
-		return n, fmt.Errorf("Client (%v) enode ID could not be obtained: %v", clientType, err)
+		return n, fmt.Errorf("Client (`%v`) enode ID could not be obtained: %v", clientType, err)
 	}
 	if enodeIDPtr == nil {
-		return n, fmt.Errorf("Client (%v) enode ID could not be obtained: (nil)", clientType)
+		return n, fmt.Errorf("Client (`%v`) enode ID could not be obtained: (nil)", clientType)
 	}
 	enodeId, err := enode.ParseV4(*enodeIDPtr)
 	if err != nil {
-		return n, fmt.Errorf("Client (%v) enode ID could not be parsed. Got: '%v', error: %v", clientType, *enodeIDPtr, err)
+		return n, fmt.Errorf("Client (`%v`) enode ID could not be parsed. Got: `%v`, error: `%v`", clientType, *enodeIDPtr, err)
 	}
 	tcpPort := enodeId.TCP()
 	if tcpPort == 0 {
@@ -215,7 +215,7 @@ func getClient(clientType string, testSuite common.TestSuiteID, testID common.Te
 	//connect over rpc to the main node to add the peer (the mobile client does not have the admin function)
 	n.rpcClient, err = rpc.Dial(fmt.Sprintf("http://%s:8545", ip))
 	if err != nil {
-		return n, fmt.Errorf("Client (%v), rpc cli could not be created: %v", clientType, err)
+		return n, fmt.Errorf("Client (`%v`), rpc cli could not be created: %v", clientType, err)
 	}
 	// yay, all goood
 	return n, nil
