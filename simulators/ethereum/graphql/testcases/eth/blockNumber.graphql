@@ -1,5 +1,0 @@
-query blockNumber {
-  block {
-    number
-  }
-}

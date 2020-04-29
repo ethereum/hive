@@ -1,5 +1,0 @@
-query blocks_byFrom {
-  blocks(from: 30) {
-    number
-  }
-}

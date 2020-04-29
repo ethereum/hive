@@ -1,9 +1,0 @@
-query syncing {
-  syncing {
-    startingBlock
-    currentBlock
-    highestBlock
-    pulledStates
-    knownStates
-  }
-}

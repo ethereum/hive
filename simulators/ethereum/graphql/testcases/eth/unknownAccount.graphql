@@ -1,7 +1,0 @@
-query unknownAccount {
-  block {
-    account(address: "0xdeaff00ddeaff00ddeaff00ddeaff00ddeaff00d") {
-      balance
-    }
-  }
-}
