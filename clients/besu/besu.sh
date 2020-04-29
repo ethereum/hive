@@ -40,6 +40,9 @@ RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-h
 
 set -e
 
+if [ "$HIVE_SKIP_POW" != "" ]; then
+	IMPORTFLAGS="--skip-pow-validation-enabled"
+fi
 if [ "$HIVE_BOOTNODE" != "" ]; then
   FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 fi
@@ -139,7 +142,7 @@ elif [ "$HIVE_LOGLEVEL" == "5" ]; then
   FLAGS="$FLAGS --logging=TRACE"
   env
   echo $FLAGS
-  cat /etc/besu/genesis.json
+  cat /besugenesis.json
 fi
 echo "Using the following genesis"
 cat /besugenesis.json
@@ -150,7 +153,7 @@ set -e
 # Load the test chain if present
 if [ -f /chain.rlp ]; then
 	echo "Loading initial blockchain..."
-	cmd="$besu $FLAGS blocks import --from=/chain.rlp"
+	cmd="$besu $FLAGS blocks $IMPORTFLAGS import --from=/chain.rlp"
 	echo "invoking $cmd"
 	$cmd
 fi
@@ -160,7 +163,7 @@ fi
 if [ -d /blocks ]; then
 	echo "Loading remaining individual blocks..."
 	for block in `ls /blocks | sort -n`; do
-		cmd="$besu $FLAGS blocks import --from=/blocks/$block"
+		cmd="$besu $FLAGS blocks $IMPORTFLAGS import --from=/blocks/$block"
 		echo "invoking $cmd"
 		$cmd
 	done
