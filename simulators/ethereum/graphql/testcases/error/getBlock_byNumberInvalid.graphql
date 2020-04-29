@@ -1,5 +1,0 @@
-query getBlock_byNumberInvalid {
-  block(number: 88888888) {
-    number
-  }
-}

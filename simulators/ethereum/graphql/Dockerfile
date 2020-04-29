@@ -14,8 +14,7 @@ ADD /ethereum/graphql/graphql.go /go/src/github.com/ethereum/hive/simulators/eth
 ADD common /go/src/github.com/ethereum/hive/simulators/common
 
 # Add the tests and intended test chain
-ADD /ethereum/graphql/testcases/error /testcases/error
-ADD /ethereum/graphql/testcases/eth /testcases/eth
+ADD /ethereum/graphql/testcases /testcases
 ADD /ethereum/graphql/init /init
 
 

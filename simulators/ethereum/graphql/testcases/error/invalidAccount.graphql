@@ -1,7 +1,0 @@
-query invalidAccount {
-  block {
-    account(address: "0xdeadbeef") {
-      balance
-    }
-  }
-}

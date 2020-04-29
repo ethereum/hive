@@ -16,7 +16,7 @@ if [ "${HIVE_DEBUG}" = true ]; then
     dlv debug  	--headless  --listen=:2345 --log=true  --api-version=2 -- -simProvider="hive" -providerConfig="hiveProviderConfig.json"  
 else
    
-   /go/bin/graphql -simProvider="hive" -providerConfig="hiveProviderConfig.json" -test.timeout 0
+   /go/bin/graphql -simProvider="hive" -providerConfig="hiveProviderConfig.json"
 fi
 
 

@@ -39,29 +39,26 @@ func deliverTests(limit int) chan *testcase {
 			if info.IsDir() {
 				return nil
 			}
-			if fname := info.Name(); !strings.HasSuffix(fname, ".graphql") {
+			if fname := info.Name(); !strings.HasSuffix(fname, ".json") {
 				return nil
 			}
 
-			graphql, err := ioutil.ReadFile(filepath)
+			data, err := ioutil.ReadFile(filepath)
 			if err != nil {
 				log.Error("error", "err", err)
 				return nil
 			}
-
-			testname := strings.TrimSuffix(info.Name(), path.Ext(info.Name()))
-			expectedfn := strings.TrimSuffix(filepath, path.Ext(filepath)) + ".json"
-			expected, err := ioutil.ReadFile(expectedfn)
-			if err != nil {
-				log.Error("error", "err", err)
+			var gqlTest graphQLTest
+			if err = json.Unmarshal(data, &gqlTest); err != nil {
+				log.Error("failed to unmarshal", "name", info.Name(), "error", err)
 				return nil
 			}
-
-			t := testcase{name: testname, graphql: graphql, expected: expected}
-
 			i = i + 1
+			t := testcase{
+				name:    strings.TrimSuffix(info.Name(), path.Ext(info.Name())),
+				gqlTest: &gqlTest,
+			}
 			out <- &t
-
 			return nil
 		})
 		log.Info("test iterator done", "tests", i)
@@ -71,9 +68,13 @@ func deliverTests(limit int) chan *testcase {
 }
 
 type testcase struct {
-	name     string
-	graphql  []byte
-	expected []byte
+	name    string
+	gqlTest *graphQLTest
+}
+type graphQLTest struct {
+	Request    string      `json:"request"`
+	Response   interface{} `json:"response"`
+	StatusCode int         `json:"statusCode"`
 }
 
 func run(testChan chan *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, client string) {
@@ -96,11 +97,21 @@ func run(testChan chan *testcase, host common.TestSuiteHost, suiteID common.Test
 	//
 	// To get around the quirk above, we use a meta-test
 	metaTestId, err := host.StartTest(suiteID, "1. Client Instantiation and container logs", "This is a meta-test, which only checks that "+
-		"the client-under-test can be instantiated. \n\nIf this fails, no other tests are executed. "+
-		"This test contains all docker logs pertaining to the client-under-test, since the graphql tests"+
-		" are all executed against the same instance")
+		"the *client-under-test* can be instantiated. \n\nIf this fails, no other tests are executed. "+
+		"This test contains all docker logs pertaining to the *client-under-test*, since the graphql tests"+
+		" are all executed against the same instance(s)")
+	var testsOnThisMetaTest []string
 	metaTestResult := &common.TestResult{Pass: false}
-	defer host.EndTest(suiteID, metaTestId, metaTestResult, nil)
+	defer func() {
+		var info = "The following tests were made against this instance:\n"
+		for i := 0; i < len(testsOnThisMetaTest); i++ {
+			info = fmt.Sprintf("%s\n  * `%v`", info, testsOnThisMetaTest[i])
+		}
+		metaTestResult.AddDetail(info)
+		host.EndTest(suiteID, metaTestId, metaTestResult, nil)
+	}()
+	// The hive parallelism determines how many instances are used. We should make note, in the meta-test,
+	// which ones were executed against this particular instance
 	if err != nil {
 		log.Error("error", "err", err)
 		return
@@ -114,6 +125,7 @@ func run(testChan chan *testcase, host common.TestSuiteHost, suiteID common.Test
 
 	var i = 0
 	for t := range testChan {
+		testsOnThisMetaTest = append(testsOnThisMetaTest, t.name)
 		if err := prepareRunTest(t, host, suiteID, ip); err != nil {
 			log.Error("error", "err", err)
 		}
@@ -129,12 +141,13 @@ func prepareRunTest(t *testcase, host common.TestSuiteHost, suiteID common.TestS
 
 	log.Info("Starting test", "name", t.name)
 
-	testID, err := host.StartTest(suiteID, t.name, "")
+	testID, err := host.StartTest(suiteID, t.name,
+		fmt.Sprintf("Testcase [source](https://github.com/ethereum/hive/blob/master/simulators/ethereum/graphql/testcases/%v.json)", t.name))
 	if err != nil {
 		host.EndTest(suiteID, testID, &common.TestResult{false, err.Error()}, nil)
 		return err
 	}
-	if testErr := runTest(ip, t); testErr != nil {
+	if testErr := runTest(ip, t.gqlTest); testErr != nil {
 		host.EndTest(suiteID, testID, &common.TestResult{false, testErr.Error()}, nil)
 		return testErr
 	}
@@ -144,16 +157,14 @@ func prepareRunTest(t *testcase, host common.TestSuiteHost, suiteID common.TestS
 
 // runTest does the actual testing: querying the client-under-test. It executes after a client has been
 // successfully instantiated
-func runTest(ip net.IP, t *testcase) error {
+func runTest(ip net.IP, t *graphQLTest) error {
 	type qlQuery struct {
 		Query string `json:"query"`
 	}
-
 	// Example of working queries:
 	// curl 'http://127.0.0.1:8547/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n"}'
 	// curl 'http://127.0.0.1:8547/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n","variables":null,"operationName":"blockNumber"}'
-
-	postData, err := json.Marshal(qlQuery{string(t.graphql)})
+	postData, err := json.Marshal(qlQuery{Query: t.Request})
 	if err != nil {
 		return err
 	}
@@ -165,15 +176,25 @@ func runTest(ip net.IP, t *testcase) error {
 		return err
 	}
 	resp.Body.Close()
-	// The response status code can be other than 200 for some tests, but still pass, so don't abort early here
-	//if resp.StatusCode != http.StatusOK {
-	//	return fmt.Errorf("Node HTTP response not 200 OK, got: %v, response: %v", resp.Status, string(respBytes))
-	//}
-	exp, got := string(t.expected), string(respBytes)
-	if res, err := areEqualJSON(got, exp); err != nil {
-		return err
-	} else if !res {
-		return fmt.Errorf("Test failed. Query:\n```\n%v\n```\nexpected: \n```\n%s\n```\n got:\n```\n%s\n```\n. HTTP response status: %s", string(t.graphql), exp, got, resp.Status)
+
+	if resp.StatusCode != t.StatusCode {
+		return fmt.Errorf("Node HTTP response was `%d`, expected `%d`", resp.StatusCode, t.StatusCode)
+	}
+	if resp.StatusCode != 200 {
+		// We don't bother to check the exact error messages, those aren't fully specified
+		return nil
+	}
+	var got interface{}
+	if err = json.Unmarshal(respBytes, &got); err != nil {
+		return fmt.Errorf("Error marshalling response :: %s", err.Error())
+	}
+	if !reflect.DeepEqual(t.Response, got) {
+		expResponse, _ := json.MarshalIndent(t.Response, "", "  ")
+
+		return fmt.Errorf("Test failed. Query:\n```\n%v\n```\n"+
+			"Expected: \n```\n%s\n```\n"+
+			"Got:\n```\n%s\n```\n"+
+			"HTTP response status: `%s`", t.Request, expResponse, respBytes, resp.Status)
 	}
 	return nil
 }
@@ -241,21 +262,4 @@ func main() {
 		log.Info("Tests started", "num threads", 16)
 		wg.Wait()
 	}
-}
-
-func areEqualJSON(s1, s2 string) (bool, error) {
-	var o1 interface{}
-	var o2 interface{}
-
-	var err error
-	err = json.Unmarshal([]byte(s1), &o1)
-	if err != nil {
-		return false, fmt.Errorf("Error mashalling string 1 :: %s", err.Error())
-	}
-	err = json.Unmarshal([]byte(s2), &o2)
-	if err != nil {
-		return false, fmt.Errorf("Error mashalling string 2 :: %s", err.Error())
-	}
-
-	return reflect.DeepEqual(o1, o2), nil
 }
