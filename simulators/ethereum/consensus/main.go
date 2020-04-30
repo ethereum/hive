@@ -346,11 +346,11 @@ func (be *blocktestExecutor) runTest(t *testcase) error {
 	// into
 	// BlockchainTests/InvalidBlocks/bcExpectSection/lastblockhash.json
 	filePath := strings.TrimPrefix(t.filepath, ".")
-	filePath = strings.TrimPrefix(filepath, "/tests/")
+	filePath = strings.TrimPrefix(filePath, "/tests/")
 	// Link to
 	// https://github.com/ethereum/tests/blob/develop/BlockchainTests/InvalidBlocks/bcExpectSection/lastblockhash.json
 	//testID, err := be.api.StartTest(be.testSuiteID, t.name, testname)
-	description = fmt.Sprintf("Test source:[`%v`](https://github.com/ethereum/tests/blob/develop/%v)",
+	description := fmt.Sprintf("Test source:[`%v`](https://github.com/ethereum/tests/blob/develop/%v)",
 		t.name,
 		filePath)
 
