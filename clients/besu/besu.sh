@@ -94,10 +94,10 @@ if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
   JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_PETERSBURG}"
 fi
 if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
-  JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_ISTANBUL}"
+  JQPARAMS="$JQPARAMS + {\"istanbulBlock\": $HIVE_FORK_ISTANBUL}"
 fi
 if [ "$HIVE_FORK_MUIR_GLACIER" != "" ]; then
-  JQPARAMS="$JQPARAMS + {\"constantinopleFixBlock\": $HIVE_FORK_MUIR_GLACIER}"
+  JQPARAMS="$JQPARAMS + {\"muirGlacierBlock\": $HIVE_FORK_MUIR_GLACIER}"
 fi
 if [ "$HIVE_FORK_BERLIN" != "" ]; then
   JQPARAMS="$JQPARAMS + {\"berlinBlock\": $HIVE_FORK_MUIR_BERLIN}"
