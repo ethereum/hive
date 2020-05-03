@@ -149,7 +149,8 @@ cat /besugenesis.json
 
 FLAGS="$FLAGS --genesis-file=/besugenesis.json"
 
-set -e
+# Allow import to fail
+set +e
 # Load the test chain if present
 if [ -f /chain.rlp ]; then
 	echo "Loading initial blockchain..."
@@ -169,6 +170,7 @@ if [ -d /blocks ]; then
 	done
 fi
 
+set -e
 
 # After block import, we also open for RPC
 cmd="$besu $FLAGS $RPCFLAGS"
