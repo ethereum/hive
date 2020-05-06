@@ -638,6 +638,9 @@ func terminateAndUpdate() {
 	// host terminated for those that were prematurely ended.
 	// NB!: this indirectly kills client containers. There is
 	// no need for client container timeouts.
+	if testManager == nil {
+		return
+	}
 	if err := testManager.Terminate(); err != nil {
 		log15.Error("Could not terminate tests: %s\n", err.Error())
 	}
