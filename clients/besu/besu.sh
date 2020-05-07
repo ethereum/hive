@@ -54,7 +54,8 @@ else
 fi
 
 if [ "$HIVE_NODETYPE" == "full" ]; then
-	FLAGS="$FLAGS --sync-mode=FAST"
+	FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0"
+
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
     echo "Besu does not support light nodes"
