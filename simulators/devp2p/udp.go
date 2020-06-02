@@ -353,7 +353,7 @@ func (t *V4Udp) SpoofedPing(toid enode.ID, tomac string, toaddr *net.UDPAddr, fr
 
 	}
 
-	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, req, packet, tomac, callback, netInterface)
+	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, req.name(), packet, tomac, callback, netInterface)
 
 }
 
@@ -430,7 +430,7 @@ func (t *V4Udp) SpoofingFindNodeCheck(toid enode.ID, tomac string, toaddr *net.U
 		return ErrTimeout
 	}
 
-	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, findreq, findpacket, tomac, callback, netInterface)
+	return <-t.sendSpoofedPacket(toid, toaddr, fromaddr, findreq.name(), findpacket, tomac, callback, netInterface)
 
 }
 
@@ -478,7 +478,7 @@ func (t *V4Udp) Ping(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID bool, r
 
 	}
 
-	return <-t.sendPacket(toid, toaddr, req, packet, callback)
+	return <-t.sendPacket(toid, toaddr, req.name(), packet, callback)
 
 }
 
@@ -526,7 +526,7 @@ func (t *V4Udp) PingWrongFrom(toid enode.ID, toaddr *net.UDPAddr, validateEnodeI
 		return ErrPacketMismatch
 
 	}
-	return <-t.sendPacket(toid, toaddr, req, packet, callback)
+	return <-t.sendPacket(toid, toaddr, req.name(), packet, callback)
 
 }
 
@@ -554,7 +554,7 @@ func (t *V4Udp) PingWrongTo(toid enode.ID, toaddr *net.UDPAddr, validateEnodeID 
 
 		return ErrPacketMismatch
 	}
-	return <-t.sendPacket(toid, toaddr, req, packet, callback)
+	return <-t.sendPacket(toid, toaddr, req.name(), packet, callback)
 
 }
 
@@ -603,7 +603,8 @@ func (t *V4Udp) PingExtraData(toid enode.ID, toaddr *net.UDPAddr, validateEnodeI
 		return ErrPacketMismatch
 
 	}
-	return <-t.sendPacket(toid, toaddr, &ping{}, packet, callback) //the dummy ping is just to get the name
+	dummyPing := ping{} // just to get the name
+	return <-t.sendPacket(toid, toaddr, dummyPing.name(), packet, callback)
 
 }
 
@@ -654,7 +655,8 @@ func (t *V4Udp) PingExtraDataWrongFrom(toid enode.ID, toaddr *net.UDPAddr, valid
 		return ErrPacketMismatch
 
 	}
-	return <-t.sendPacket(toid, toaddr, &ping{}, packet, callback) //the dummy ping is just to get the name
+	dummyPing := ping{} //the dummy ping is just to get the name
+	return <-t.sendPacket(toid, toaddr, dummyPing.name(), packet, callback)
 
 }
 
@@ -689,7 +691,7 @@ func (t *V4Udp) PingTargetWrongPacketType(toid enode.ID, toaddr *net.UDPAddr, va
 
 		return ErrPacketMismatch
 	}
-	return <-t.sendPacket(toid, toaddr, req, packet, callback)
+	return <-t.sendPacket(toid, toaddr, req.name(), packet, callback)
 
 }
 
@@ -717,7 +719,7 @@ func (t *V4Udp) FindnodeWithoutBond(toid enode.ID, toaddr *net.UDPAddr, target e
 
 	}
 
-	return <-t.sendPacket(toid, toaddr, req, packet, callback)
+	return <-t.sendPacket(toid, toaddr, req.name(), packet, callback)
 
 }
 
@@ -773,7 +775,7 @@ func (t *V4Udp) PingBondedWithMangledFromField(toid enode.ID, toaddr *net.UDPAdd
 		return ErrPacketMismatch
 
 	}
-	return <-t.sendPacket(toid, toaddr, req, packet, callback)
+	return <-t.sendPacket(toid, toaddr, req.name(), packet, callback)
 
 }
 
@@ -832,7 +834,7 @@ func (t *V4Udp) BondedSourceFindNeighbours(toid enode.ID, toaddr *net.UDPAddr, t
 		return ErrUnsolicitedReply
 	}
 
-	return <-t.sendPacket(toid, toaddr, findReq, packet, callback)
+	return <-t.sendPacket(toid, toaddr, findReq.name(), packet, callback)
 
 }
 
@@ -862,7 +864,7 @@ func (t *V4Udp) PingPastExpiration(toid enode.ID, toaddr *net.UDPAddr, validateE
 		return ErrPacketMismatch
 
 	}
-	return <-t.sendPacket(toid, toaddr, req, packet, callback)
+	return <-t.sendPacket(toid, toaddr, req.name(), packet, callback)
 
 }
 
@@ -898,23 +900,23 @@ func (t *V4Udp) BondedSourceFindNeighboursPastExpiration(toid enode.ID, toaddr *
 		return ErrPacketMismatch
 	}
 
-	return <-t.sendPacket(toid, toaddr, findReq, packet, callback)
+	return <-t.sendPacket(toid, toaddr, findReq.name(), packet, callback)
 
 }
 
-func (t *V4Udp) sendPacket(toid enode.ID, toaddr *net.UDPAddr, req packet, packet []byte, callback func(reply) error) <-chan error {
+func (t *V4Udp) sendPacket(toid enode.ID, toaddr *net.UDPAddr, reqName string, packet []byte, callback func(reply) error) <-chan error {
 
-	t.l.Logf("Sending packet %s to enode %s with target endpoint %v", req.name(), toid, toaddr)
+	t.l.Logf("Sending packet %s to enode %s with target endpoint %v", reqName, toid, toaddr)
 	errc := t.pending(toid, callback)
-	t.write(toaddr, req.name(), packet)
+	t.write(toaddr, reqName, packet)
 	return errc
 }
 
-func (t *V4Udp) sendSpoofedPacket(toid enode.ID, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, req packet, packet []byte, macaddr string, callback func(reply) error, netInterface string) <-chan error {
+func (t *V4Udp) sendSpoofedPacket(toid enode.ID, toaddr *net.UDPAddr, fromaddr *net.UDPAddr, reqName string, packet []byte, macaddr string, callback func(reply) error, netInterface string) <-chan error {
 
-	t.l.Logf("Sending spoofed packet %s to enode %s with target endpoint %v from %v", req.name(), toid, toaddr, fromaddr)
+	t.l.Logf("Sending spoofed packet %s to enode %s with target endpoint %v from %v", reqName, toid, toaddr, fromaddr)
 	errc := t.pending(toid, callback)
-	t.spoofedWrite(toaddr, fromaddr, req.name(), packet, macaddr, netInterface)
+	t.spoofedWrite(toaddr, fromaddr, reqName, packet, macaddr, netInterface)
 
 	return errc
 }
