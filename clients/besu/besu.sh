@@ -27,12 +27,12 @@
 #  - HIVE_FORK_OSAKA           block number for Osaka transition
 #  - HIVE_MINER                address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
-#  - HIVE_LOGLEVEL		       Simulator loglevel
+#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
+#  - HIVE_LOGLEVEL		         Simulator loglevel
 
 # These flags are not supported by the Besu hive client
 #  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 #  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
-#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
 
 besu=/opt/besu/bin/besu
 RPCFLAGS="--graphql-http-enabled --graphql-http-host=0.0.0.0 --host-whitelist=*"
@@ -163,12 +163,14 @@ fi
 
 # Load the remainder of the test chain
 if [ -d /blocks ]; then
-	echo "Loading remaining individual blocks..."
-	for block in `ls /blocks | sort -n`; do
-		cmd="$besu $FLAGS blocks import $IMPORTFLAGS --from=/blocks/$block"
-		echo "invoking $cmd"
-		$cmd
-	done
+        echo "Loading remaining individual blocks..."
+  blocks=`ls /blocks | sort -n`
+  home=`pwd`
+  pushd /blocks
+  cmd="$besu $FLAGS --data-path=$home blocks import $IMPORTFLAGS `ls /blocks | sort -n`"
+  echo "in `pwd` invoking $cmd"
+  $cmd
+  popd
 fi
 
 set -e
