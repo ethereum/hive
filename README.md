@@ -89,6 +89,15 @@ This uses Hive to generate a blockchain based on a genesis file for subsequent t
       --chainGenesis C:\\Ethereum\\Input\\Genesis.json
       --chainBlockTime 30
 
+## Iterating on bugfixes locally
+
+Often, after reproducing a failure with a hive run on your machine, you'll want to build a docker container with code changes and see if it fixes the issue. Enabling this sort of workflow will require a couple of steps:
+
+* Build your client's docker image locally with a different tag to the one in your client's dockerfile.
+* Edit the FROM field in the dockerfile for your client, found in `clients/[your_client_name_here]/dockerfile`, to point to your newly created image
+* Run hive again with the flag `--docker-nocache <regexp>`, where `<regexp>` is a regular expression matching your client's name, such as `besu`
+
+
 # Running on Windows
 
 The following information assumes Docker for Windows (CE) is installed on Windows 10 Pro. 
