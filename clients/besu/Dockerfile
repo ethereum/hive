@@ -1,6 +1,7 @@
 # Hyperledger publihes regular developer 'head' images, just use that one
 FROM hyperledger/besu:develop
 
+USER root
 # Inject the startup script
 ADD besu.sh /opt/besu/bin/besu-hive.sh
 RUN chmod +x /opt/besu/bin/besu-hive.sh
