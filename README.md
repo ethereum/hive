@@ -27,10 +27,16 @@ only docker, for now you'll need a valid Go (1.6 and upwards) installation avail
 You can install `hive` via:
 
 ```
-$ go get github.com/ethereum/hive
+$ go get -v github.com/ethereum/hive
 ```
+or if you don't have GO111MODULE set: 
+```
+$ GO111MODULE=on go get -v github.com/ethereum/hive
+```
+After installing add hive binary (default path `~go/bin`) to PATH and clone the `Hive` repository
+to your local folder.
 
-*Note: For now `hive` requires running from the repository root as it needs access to quite a number
+ *Note: For now `hive` requires running from the repository root as it needs access to quite a number
 of resource files to build the corrent docker images and containers. This requirement will be removed
 in the future.*
 
@@ -47,6 +53,7 @@ To execute the consensus tests on parity run the latest simulator:
    --docker-noshell
    --client parity_master
    --sim ethereum/consensus2
+   --sim.rootcontext
    --results-root /mytests/test
 ```
 
@@ -56,7 +63,7 @@ These run devp2p tests, mainly Discovery tests.
 
 ```text
     --sim devp2p
-    --sim-rootcontext
+    --sim.rootcontext
     --test none
     --loglevel 6
     --docker-noshell
@@ -70,7 +77,7 @@ These run devp2p tests, mainly Discovery tests.
 These run a test verifying that a blockchain can be synced between differing implementations.
 
       --sim ethereum\\\\sync
-      --sim-rootcontext
+      --sim.rootcontext
       --test none
       --loglevel 6
       --docker-noshell
@@ -227,11 +234,11 @@ Simulators now offer a golang client framework, that allows them to call into th
 API and create different types of client. The simulator can run tests or other experiments written in 
 Golang against one or more instances of clients. To achieve this, a number of new options are added:
 
-`--sim-rootcontext` a boolean, which when set tells the compiler to build the docker image with 'simulators'
+`--sim.rootcontext` a boolean, which when set tells the compiler to build the docker image with 'simulators'
 as the root of the context, allowing the simulators\common and simulators\devp2p common code to be included
 in the simulator. 
 
-Sim-rootcontext needs to be set differently depending on the type of simulation being run. For the consensus tests
+Sim.rootcontext needs to be set differently depending on the type of simulation being run. For the consensus tests
 the base simulator image relies on files to be added from a folder local to the image. For developing new simulations,
 or extending the existing ones, it is recommended to use sim-rootcontext as true. 
 
@@ -747,6 +754,8 @@ a useful tool for validating Ethereum client implementations.
    * Genesis chain config couldn't handle present but empty settings: [#2790](https://github.com/ethereum/go-ethereum/pull/2790)
    * Data race between remote block import and local block mining: [#2793](https://github.com/ethereum/go-ethereum/pull/2793)
    * Downloader didn't penalize incompatible forks hashly enough: [#2801](https://github.com/ethereum/go-ethereum/pull/2801)
+ * Nethermind
+   * Bug in p2p whith bonding nodes algorithm found by Hive: [#1894](https://github.com/NethermindEth/nethermind/pull/1894)
 
 # Contributions
 
