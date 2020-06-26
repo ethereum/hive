@@ -77,6 +77,11 @@ if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
 	chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
 fi
 
+if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
+    echo "Setting instabul block:$HIVE_FORK_ISTANBUL"
+        chainconfig=`echo $chainconfig | jq ". + {\"istabulBlock\": $HIVE_FORK_ISTANBUL}"`
+fi
+
 if [ -f /genesis.json ]; then
 
 	genesis=`cat /genesis.json` 

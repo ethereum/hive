@@ -6,7 +6,7 @@ def remove_empty:
           .value != null and
           .value != "" and
           .value != [] and
-          .value != {} and 
+          .value != {} and
           .key != null and
           .key != "" and
           .key != [] and
@@ -18,7 +18,7 @@ def remove_empty:
   );
 
 def addashex:
-  if . != null  and startswith("0x") then . else 
+  if . != null  and startswith("0x") then . else
     if (. !=null and . !="") then "0x"+. else . end
   end
 ;
@@ -114,13 +114,13 @@ def infixzerostolength(s;l):
     "parentHash": .parentHash,
     "extraData":.extraData,
     "gasLimit":.gasLimit,
-    
+
   },
  	"params": {
-      
-     
+
+
         "forkBlock":  env.HIVE_FORK_DAO_BLOCK|addashex,
-       
+
         "eip150Transition":env.HIVE_FORK_TANGERINE|addashex,
         "eip160Transition": env.HIVE_FORK_SPURIOUS|addashex,
         "eip161abcTransition": env.HIVE_FORK_SPURIOUS|addashex,
@@ -136,20 +136,15 @@ def infixzerostolength(s;l):
         "eip1052Transition": env.HIVE_FORK_CONSTANTINOPLE|addashex,
         "eip1283Transition": env.HIVE_FORK_CONSTANTINOPLE|addashex,
         "eip1283DisableTransition": env.HIVE_FORK_PETERSBURG|addashex,
+	"eip152Transition": env.HIVE_FORK_ISTANBUL|addashex,
+	"eip1108Transition": env.HIVE_FORK_ISTANBUL|addashex,
+	"eip1344Transition": env.HIVE_FORK_ISTANBUL|addashex,
+	"eip1884Transition": env.HIVE_FORK_ISTANBUL|addashex,
+	"eip2028Transition": env.HIVE_FORK_ISTANBUL|addashex,
+	"eip2200Transition": env.HIVE_FORK_ISTANBUL|addashex,
         "networkID": env.HIVE_NETWORK_ID|addashex
-  
+
    },
-  
+
 	"version": "1"
 }|remove_empty
-
-
-
-
-
-
-
-
-
-
-  
