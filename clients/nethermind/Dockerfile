@@ -1,4 +1,4 @@
-from nethermind/nethermind:alpine
+from nethermindeth/nethermind-hive:alpine
 #FROM ubuntu:18.04 AS clone
 #ARG branch=master
 #WORKDIR /src
