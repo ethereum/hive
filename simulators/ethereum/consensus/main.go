@@ -111,9 +111,9 @@ var ruleset = map[string]envvars{
 	},
 	"FrontierToHomesteadAt5": {
 		"HIVE_FORK_HOMESTEAD":      5,
+		"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_TANGERINE":      2000,
 		"HIVE_FORK_SPURIOUS":       2000,
-		"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
@@ -121,9 +121,9 @@ var ruleset = map[string]envvars{
 	},
 	"HomesteadToEIP150At5": {
 		"HIVE_FORK_HOMESTEAD":      0,
+//		"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_TANGERINE":      5,
 		"HIVE_FORK_SPURIOUS":       2000,
-		"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_BYZANTIUM":      2000,
 		"HIVE_FORK_CONSTANTINOPLE": 2000,
 		"HIVE_FORK_PETERSBURG":     2000,
