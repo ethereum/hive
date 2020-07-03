@@ -1,4 +1,4 @@
-FROM ethereum/client-go:latest
+FROM golang:1-alpine
 
 # Add the local test stuff
 ADD /devp2p/simple/devp2p_test.go /go/src/github.com/ethereum/hive/simulators/devp2p/simple/devp2p_test.go
