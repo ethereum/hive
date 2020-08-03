@@ -149,6 +149,7 @@ echo "Using the following genesis"
 cat /besugenesis.json
 
 FLAGS="$FLAGS --genesis-file=/besugenesis.json"
+FLAGS="$FLAGS --min-gas-price=16"
 
 # Allow import to fail
 set +e
