@@ -35,7 +35,7 @@
 #  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
 
 besu=/opt/besu/bin/besu
-RPCFLAGS="--graphql-http-enabled --graphql-http-host=0.0.0.0 --host-whitelist=*"
+RPCFLAGS="--graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8545 --host-whitelist=*"
 RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
 
 set -e
