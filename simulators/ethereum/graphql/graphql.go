@@ -81,9 +81,10 @@ func run(testChan chan *testcase, host common.TestSuiteHost, suiteID common.Test
 
 	// The graphql chain comes from the Besu codebase, and is built on Frontier
 	env := map[string]string{
-		"CLIENT":             client,
-		"HIVE_FORK_DAO_VOTE": "1",
-		"HIVE_CHAIN_ID":      "1",
+		"CLIENT":               client,
+		"HIVE_FORK_DAO_VOTE":   "1",
+		"HIVE_CHAIN_ID":        "1",
+		"HIVE_GRAPHQL_ENABLED": "1",
 	}
 	files := map[string]string{
 		"genesis.json": "/init/testGenesis.json",

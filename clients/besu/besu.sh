@@ -29,14 +29,18 @@
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW             If set, skip PoW verification during block import
 #  - HIVE_LOGLEVEL		         Simulator loglevel
-
+#
+#  - HIVE_GRAPHQL_ENABLED      If set, make sure graphql is accessible on port 8550
 # These flags are not supported by the Besu hive client
 #  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 #  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
 
 besu=/opt/besu/bin/besu
-RPCFLAGS="--graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8545 --host-whitelist=*"
-RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
+
+RPCFLAGS=" --host-whitelist=* --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
+if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
+	RPCFLAGS="$RPCFLAGS --graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8550"
+fi
 
 set -e
 
