@@ -202,6 +202,7 @@ echo "Chain config: "
 cat /chain.json
 echo "----------"
 
+OE="/home/openethereum/openethereum"
 FLAGS="$FLAGS --chain /chain.json"
 
 # Don't immediately abort, some imports are meant to fail
@@ -210,7 +211,7 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	parity $FLAGS import /chain.rlp
+	$OE $FLAGS import /chain.rlp
 fi
 
 # Load the remainder of the test chain
@@ -218,7 +219,7 @@ echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
 	for block in `ls /blocks | sort -n`; do
 		echo "parity $FLAGS import /blocks/$block"
-		parity $FLAGS import /blocks/$block
+		$OE $FLAGS import /blocks/$block
 	done
 fi
 
@@ -241,5 +242,5 @@ fi
 
 # Run the parity implementation with the requested flags
 FLAGS="$FLAGS --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all  --jsonrpc-apis all"
-echo "running parity $FLAGS"
-parity $FLAGS
+echo "running $OE $FLAGS"
+$OE $FLAGS

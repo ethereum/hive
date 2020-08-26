@@ -4,9 +4,9 @@ ARG branch=latest
 FROM openethereum/openethereum:$branch
 
 USER root
-RUN apk add --no-cache bc jq curl
-ADD parity.sh /parity.sh
-RUN chmod +x /parity.sh
+RUN apk add --no-cache bash bc jq curl
+ADD openethereum.sh /openethereum.sh
+RUN chmod +x /openethereum.sh
 ADD chain.json /chain.json
 RUN chmod 777 /chain.json
 
@@ -21,4 +21,4 @@ EXPOSE 8545 8547 30303 30303/udp
 ADD genesis.json /genesis.json
 RUN chmod 777 /genesis.json
 
-ENTRYPOINT ["/parity.sh"]
+ENTRYPOINT ["/openethereum.sh"]
