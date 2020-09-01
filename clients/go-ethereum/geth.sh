@@ -34,6 +34,7 @@
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW       If set, skip PoW verification during block import
 #  - HIVE_LOGLEVEL		 Simulator loglevel
+#  - HIVE_GRAPHQL_ENABLED      If set, make sure graphql is accessible on port 8550
 
 # Immediately abort the script on any error encountered
 set -e
@@ -174,6 +175,10 @@ fi
 
 # Run the go-ethereum implementation with the requested flags
 
-FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL --nat=none --http --http.addr=0.0.0.0  --graphql --http.api=admin,debug,eth,miner,net,personal,txpool,web3 --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,miner,net,personal,txpool,web3 --ws.origins \"*\""
+if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
+	FLAGS="$FLAGS --graphql --http.port=8550"
+fi
+
+FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL --nat=none --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,miner,net,personal,txpool,web3 --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,miner,net,personal,txpool,web3 --ws.origins \"*\""
 echo "Running go-ethereum with flags $FLAGS"
 $geth $FLAGS
