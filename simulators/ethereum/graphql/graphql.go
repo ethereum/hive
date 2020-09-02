@@ -169,7 +169,7 @@ func runTest(ip net.IP, t *graphQLTest) error {
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(fmt.Sprintf("http://%s:8545/graphql", ip.String()),
+	resp, err := http.Post(fmt.Sprintf("http://%s:8550/graphql", ip.String()),
 		"application/json",
 		bytes.NewReader(postData))
 	if err != nil {
