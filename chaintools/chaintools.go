@@ -1,6 +1,7 @@
 package chaintools
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -105,31 +106,31 @@ func ProduceTestChainFromGenesisFile(sourceGenesis string, outputPath string, bl
 
 	gspec := &core.Genesis{}
 
-	var err error
-	if sourceGenesisBytes, err := ioutil.ReadFile(sourceGenesis); err == nil {
-
-		err = gspec.UnmarshalJSON(sourceGenesisBytes)
-		if err != nil {
-			log15.Crit("failed to deserialize genesis json", "error", err)
-			return err
-		}
-
-		blockModifier := func(i int, gen *core.BlockGen) {
-			gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
-
-		}
-
-		err = GenerateChainAndSave(gspec, blockCount, outputPath, blockModifier)
-		if err != nil {
-			log15.Crit("generate chain error", "error", err)
-			return err
-		}
-
-		return nil
+	sourceGenesisBytes, err := ioutil.ReadFile(sourceGenesis)
+	if err != nil {
+		log15.Crit("failed to read genesis json", "error", err)
+		return err
 	}
-	log15.Crit("failed to read genesis json", "error", err)
-	return err
 
+	err = gspec.UnmarshalJSON(sourceGenesisBytes)
+	if err != nil {
+		log15.Crit("failed to deserialize genesis json", "error", err)
+		return err
+	}
+
+	blockModifier := func(i int, gen *core.BlockGen) {
+		fmt.Println("generating block....", i)
+		gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
+
+	}
+
+	err = GenerateChainAndSave(gspec, blockCount, outputPath, blockModifier)
+	if err != nil {
+		log15.Crit("generate chain error", "error", err)
+		return err
+	}
+
+	return nil
 }
 
 // WriteChain - save blockchain to file
