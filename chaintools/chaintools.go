@@ -102,34 +102,32 @@ func ProduceSimpleTestChain(path string, blockCount uint) error {
 // based on an externally specified genesis file. The blockTimeInSeconds is used to manipulate
 // the block difficulty
 func ProduceTestChainFromGenesisFile(sourceGenesis string, outputPath string, blockCount uint, blockTimeInSeconds uint) error {
-
 	gspec := &core.Genesis{}
 
-	var err error
-	if sourceGenesisBytes, err := ioutil.ReadFile(sourceGenesis); err == nil {
-
-		err = gspec.UnmarshalJSON(sourceGenesisBytes)
-		if err != nil {
-			log15.Crit("failed to deserialize genesis json", "error", err)
-			return err
-		}
-
-		blockModifier := func(i int, gen *core.BlockGen) {
-			gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
-
-		}
-
-		err = GenerateChainAndSave(gspec, blockCount, outputPath, blockModifier)
-		if err != nil {
-			log15.Crit("generate chain error", "error", err)
-			return err
-		}
-
-		return nil
+	sourceGenesisBytes, err := ioutil.ReadFile(sourceGenesis)
+	if err != nil {
+		log15.Crit("failed to read genesis json", "error", err)
+		return err
 	}
-	log15.Crit("failed to read genesis json", "error", err)
-	return err
 
+	err = gspec.UnmarshalJSON(sourceGenesisBytes)
+	if err != nil {
+		log15.Crit("failed to deserialize genesis json", "error", err)
+		return err
+	}
+
+	blockModifier := func(i int, gen *core.BlockGen) {
+		gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
+
+	}
+
+	err = GenerateChainAndSave(gspec, blockCount, outputPath, blockModifier)
+	if err != nil {
+		log15.Crit("generate chain error", "error", err)
+		return err
+	}
+
+	return nil
 }
 
 // WriteChain - save blockchain to file
