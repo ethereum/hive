@@ -103,7 +103,6 @@ func ProduceSimpleTestChain(path string, blockCount uint) error {
 // based on an externally specified genesis file. The blockTimeInSeconds is used to manipulate
 // the block difficulty
 func ProduceTestChainFromGenesisFile(sourceGenesis string, outputPath string, blockCount uint, blockTimeInSeconds uint) error {
-
 	gspec := &core.Genesis{}
 
 	sourceGenesisBytes, err := ioutil.ReadFile(sourceGenesis)
