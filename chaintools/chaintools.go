@@ -1,7 +1,6 @@
 package chaintools
 
 import (
-	"fmt"
 	"io"
 	"io/ioutil"
 	"math/big"
@@ -118,7 +117,6 @@ func ProduceTestChainFromGenesisFile(sourceGenesis string, outputPath string, bl
 	}
 
 	blockModifier := func(i int, gen *core.BlockGen) {
-		fmt.Println("generating block....", i)
 		gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
 
 	}
