@@ -51,7 +51,7 @@ To execute the consensus tests on parity run the latest simulator:
 
 ```text
    --docker-noshell
-   --client parity_master
+   --client parity_latest
    --sim ethereum/consensus2
    --sim.rootcontext
    --results-root /mytests/test
@@ -82,7 +82,7 @@ These run a test verifying that a blockchain can be synced between differing imp
       --loglevel 6
       --docker-noshell
       --results-root /mytests/test
-      --client go-ethereum_latest,parity_master
+      --client go-ethereum_master,parity_latest
       --sim-parallelism 1
 
 ## Generate a blockchain
