@@ -31,7 +31,7 @@ var (
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
-	clientListFlag     = flag.String("client", "go-ethereum_master", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_master and the client name is a subfolder of the clients directory")
+	clientListFlag     = flag.String("client", "go-ethereum_latest", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_latest and the client name is a subfolder of the clients directory")
 	checkTimeLimitFlag = flag.Duration("client.checktimelimit", 3*time.Minute, "The timeout to wait for a newly "+
 		"instantiated client to open up the RPC port. If a very long chain is imported, this timeout may need to be quite large. "+
 		"A lower value means that hive won't wait as long for in case node crashes and never opens the RPC port.")
@@ -162,7 +162,7 @@ func mainInHost(overrides []string, cacher *buildCacher) error {
 func initClients(cacher *buildCacher) error {
 	var err error
 	// Build all the clients that we need and make a map of
-	// names (eg: geth_master, in the format client_branch )
+	// names (eg: geth_latest, in the format client_branch )
 	// against image names in the docker image name format
 	allClients, err = buildClients(clientList, cacher)
 	if err != nil {
