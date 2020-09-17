@@ -68,7 +68,7 @@ These run devp2p tests, mainly Discovery tests.
     --loglevel 6
     --docker-noshell
     --results-root /mytests/test
-    --client go-ethereum_master
+    --client go-ethereum_latest
     --sim-parallelism 1
 ```
 
@@ -82,7 +82,7 @@ These run a test verifying that a blockchain can be synced between differing imp
       --loglevel 6
       --docker-noshell
       --results-root /mytests/test
-      --client go-ethereum_master,parity_master
+      --client go-ethereum_latest,parity_master
       --sim-parallelism 1
 
 ## Generate a blockchain
@@ -148,7 +148,7 @@ When VS Code is configured for general go development, `hive` may be run simply 
                 
                 "--docker-endpoint","tcp://localhost:2375",
                 "--docker-noshell",
-                "--client","go-ethereum_master" , 
+                "--client","go-ethereum_latest" , 
                 "--loglevel","6",
                 "--smoke"
                 
@@ -179,7 +179,7 @@ An administrator level command prompt must be opened and the target IPs of the c
 UPDATE: Unless we hear a desire to keep them, Validators will be deprecated. Please see `Simulators` for updates.
 
 You can run the full suite of `hive` validation tests against all the known implementations tagged
-`master` by simply running `hive` from the repository root. It will build a docker image for every
+`latest` by simply running `hive` from the repository root. It will build a docker image for every
 known client as well as one for every known validation test.
 
 The end result should be a JSON report, detailing for each client the list of validations failed and
@@ -187,11 +187,11 @@ those passed. If you wish to explore the reasons of failure, full logs from all 
 are pushed into the `workspace/logs` folder.
 
 ```
-$ hive --client=go-ethereum_master --test=.
+$ hive --client=go-ethereum_latest --test=.
 ...
 Validation results:
 {
-  "go-ethereum:master": {
+  "go-ethereum:latest": {
     "fail": [
       "ethereum/rpc-tests"
     ],
@@ -223,7 +223,7 @@ be quite lengthy.
 
 
 `--client` is now an explicit list of permitted clients, where the desired client is of the format
-clientname_branch. For example `go-ethereum_master` and `parity_beta`. Previously this was a regex. 
+clientname_branch. For example `go-ethereum_latest` and `parity_beta`. Previously this was a regex. 
 Other parameters such as the sim or validator still use regexp. This change was introduced to allow
 for branches to be specified as parameters without the need for creating a dedicated client subfolder 
 for that branch. `go-ethereum` and `parity` in this example need to be subfolders of the Hive `clients`
@@ -257,11 +257,11 @@ client the list of simulations failed and those passed. Likewise, if you wish to
 of failure, full logs from all clients and testers are pushed into the `log.txt` log file.
 
 ```
-$ hive --client=go-ethereum_master --test=NONE --sim=.
+$ hive --client=go-ethereum_latest --test=NONE --sim=.
 ...
 Simulation results:
 {
-  "go-ethereum:master": {
+  "go-ethereum:latest": {
     "pass": [
       "dao-hard-fork",
       "smoke/single-node"
@@ -310,7 +310,7 @@ to its own local genesis format and command line flags. To assist in this, Hive 
 in the `clients/trinity_master` folder using `mapper.jq`, which is invoked in `trinity.sh` This 
 technique can be replicated for other clients.
 
-For guidance, check out the reference [`go-ethereum:master`](https://github.com/karalabe/hive/tree/master/clients/go-ethereum:master/Dockerfile) client.
+For guidance, check out the reference [`go-ethereum:latest`](https://github.com/karalabe/hive/tree/master/clients/go-ethereum:master/Dockerfile) client.
 
 ### Initializing the client
 
@@ -377,11 +377,11 @@ validations and simulations that just initialize clients with some pre-configure
 it from the various RPC endpoints.
 
 ```
-$ hive --client=go-ethereum_master --smoke
+$ hive --client=go-ethereum_latest --smoke
 ...
 Validation results:
 {
-  "go-ethereum:master": {
+  "go-ethereum:latest": {
     "pass": [
       "smoke/genesis-chain",
       "smoke/genesis-chain-blocks",
@@ -392,7 +392,7 @@ Validation results:
 ...
 Simulation results:
 {
-  "go-ethereum:master": {
+  "go-ethereum:latest": {
     "smoke/lifecycle": {
       "start": "2017-01-31T09:20:16.975219924Z",
       "end": "2017-01-31T09:20:18.705302536Z",
