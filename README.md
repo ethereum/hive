@@ -82,7 +82,7 @@ These run a test verifying that a blockchain can be synced between differing imp
       --loglevel 6
       --docker-noshell
       --results-root /mytests/test
-      --client go-ethereum_master,parity_latest
+      --client go-ethereum_latest,parity_latest
       --sim-parallelism 1
 
 ## Generate a blockchain
