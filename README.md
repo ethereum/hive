@@ -307,10 +307,10 @@ by the Hive host remotely to get the id.
 
 The client has the responsibility of mapping the Hive genesis.json and Hive environment variables
 to its own local genesis format and command line flags. To assist in this, Hive illustrates a technique
-in the `clients/trinity_master` folder using `mapper.jq`, which is invoked in `trinity.sh` This 
+in the `clients/trinity_latest` folder using `mapper.jq`, which is invoked in `trinity.sh` This 
 technique can be replicated for other clients.
 
-For guidance, check out the reference [`go-ethereum:latest`](https://github.com/karalabe/hive/tree/master/clients/go-ethereum:master/Dockerfile) client.
+For guidance, check out the reference [`go-ethereum:latest`](https://github.com/ethereum/hive/blob/master/clients/go-ethereum/Dockerfile) client.
 
 ### Initializing the client
 

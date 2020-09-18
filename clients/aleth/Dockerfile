@@ -6,7 +6,7 @@
 #
 # docker build --target builder -t aleth_base
 #
-ARG branch=master
+ARG branch=latest
 FROM ethereum/aleth:$branch
 
 # Genesis template
