@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net"
 	"net/http"
@@ -13,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/hive/simulators/common"
 	"github.com/gorilla/pat"
 
@@ -260,15 +263,26 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	outputBuf := new(bytes.Buffer)
 	err = dockerClient.StartExec(exec.ID, docker.StartExecOptions{
 		Detach:       false,
-		OutputStream: w,
+		OutputStream: outputBuf,
 	})
 	if err != nil {
 		log15.Error("nodeInfoGet unable to start enode exec", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Check that the script returned a valid enode URL.
+	n, err := enode.ParseV4(strings.TrimSpace(outputBuf.String()))
+	if err != nil {
+		log15.Error("nodeInfoGet enode.sh returned bad URL", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), 30303, 30303)
+	io.WriteString(w, fixedIP.URLv4())
 }
 
 //start a new node as part of a test
@@ -616,6 +630,7 @@ func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*mu
 		}
 	}
 	//  Container online and responsive, return its ID, IP and MAC for later reference
+	testClientInfo.IP = containerIP
 	fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)
 	return testClientInfo, containerID, true
 }
