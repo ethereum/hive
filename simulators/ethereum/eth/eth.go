@@ -2,24 +2,24 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
-	"github.com/ethereum/go-ethereum/log"
+
 	"github.com/ethereum/hive/simulators/common"
 	"github.com/ethereum/hive/simulators/common/providers/hive"
-	"github.com/ethereum/hive/simulators/common/providers/local"
-	"os"
 )
 
 func init() {
 	hive.Support()
-	local.Support()
 }
 
 func main() {
-	host, err := common.InitProvider("hive", "")
+	// Don't ask...
+	ioutil.WriteFile("hiveProviderConfig.json", []byte(fmt.Sprintf(`{"hostURI":%q}`, os.Getenv("HIVE_SIMULATOR"))), 0644)
+	host, err := common.InitProvider("hive", "hiveProviderConfig.json")
 	if err != nil {
-		log.Error(fmt.Sprintf("Unable to initialise provider %s", err.Error()))
-		os.Exit(1)
+		fatal(fmt.Errorf("unable to initialise provider %s", err.Error()))
 	}
 
 	//	get clients
@@ -36,52 +36,64 @@ func main() {
 
 	clients, err := host.GetClientTypes()
 	if err != nil {
-		log.Error("could not get clients", "error: ", err)
-		return
+		fatal(fmt.Errorf("could not get clients: %v", err))
 	}
 
-	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
+	logFile := os.Getenv("HIVE_SIMLOG")
 
 	for _, client := range clients {
 		env := map[string]string{
-			"CLIENT": client,
+			"CLIENT":              client,
+			"HIVE_NETWORK_ID":     "1",
+			"HIVE_CHAIN_ID":       "1",
+			"HIVE_FORK_HOMESTEAD": "0",
+			"HIVE_FORK_TANGERINE": "0",
+			"HIVE_FORK_SPURIOUS":  "0",
+			"HIVE_FORK_BYZANTIUM": "0",
+			"HIVE_LOGLEVEL":       "5",
 		}
 
 		suite, err := host.StartTestSuite("eth", "eth protocol test", logFile)
 		if err != nil {
-			log.Error("could not start test suite", "error: ", err)
-			return
+			fatalf("could not start test suite: %v", err)
 		}
-
 		testID, err := host.StartTest(suite, "eth protocol test", "TODO!!!!!!!") // TODO description
 		if err != nil {
-			log.Error("could not start test", "error: ", err)
-			return
+			fatalf("could not start test: %v", err)
 		}
-
 		containerID, _, _, err := host.GetNode(suite, testID, env, files)
 		if err != nil {
-			log.Error("error getting node", "err", err)
-			return
+			fatalf("error getting node: %v", err)
 		}
-
 		enode, err := host.GetClientEnode(suite, testID, containerID)
 		if err != nil {
-			log.Error("error getting enode id", "err", err)
-			return
+			fatalf("error getting node peer-to-peer endpoint: %v", err)
 		}
 
 		err = runEthTest(*enode)
+		result := &common.TestResult{Pass: err == nil}
 		if err != nil {
-			log.Error("error running eth test", "node", client, "err", err)
-			return
+			result.Details = err.Error()
 		}
 
+		host.KillNode(suite, testID, containerID)
+		host.EndTest(suite, testID, result, nil)
 		host.EndTestSuite(suite)
 	}
 }
 
 func runEthTest(enode string) error {
-	cmd := exec.Command("devp2p", "rlpx", "eth-test", enode, "/init/genesis.json", "/init/fullchain.rlp")
+	cmd := exec.Command("./devp2p", "rlpx", "eth-test", enode, "/init/fullchain.rlp", "/init/genesis.json")
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func fatalf(format string, args ...interface{}) {
+	fatal(fmt.Errorf(format, args...))
+}
+
+func fatal(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
 }
