@@ -16,6 +16,6 @@ RUN cp /go/src/github.com/ethereum/hive/simulators/eth .
 RUN cd
 
 RUN git clone https://github.com/ethereum/go-ethereum.git
-RUN cd go-ethereum && go build ./cmd/devp2p -o ../devp2p
+RUN cd go-ethereum && go build -o ../devp2p ./cmd/devp2p
 
 ENTRYPOINT ["./eth"]
