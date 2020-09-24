@@ -13,52 +13,44 @@ def remove_empty:
     end
   );
 
-def addashex:
-  if . != null  and startswith("0x") then . else 
-    if . !=null then "0x"+. else . end
+def to_hex:
+  if . != null and startswith("0x") then . else
+    if . != null then "0x"+. else . end
   end
 ;
 
-def infixzerostolength(s;l):
+def infix_zeros_to_length(s;l):
    if . != null then
      (.[0:s])+("0"*(l-(.|length)))+(.[s:l])
    else .
    end
 ;
 
-
 .|
 .alloc|=with_entries(.key|="0x"+.) |
-{"accounts": .alloc,
+{
+  "accounts": .alloc,
   "genesis": {
     "author":.coinbase,
     "difficulty":.difficulty,
-    "extraData":.extraData|infixzerostolength(2;66),
+    "extraData":.extraData|infix_zeros_to_length(2;66),
     "gasLimit":.gasLimit,
-    "nonce": .nonce,
+    "nonce": .nonce|infix_zeros_to_length(2;18),
     "timestamp":.timestamp,
-    
   },
- 	"params": {
-     
-    "DAOForkBlock": env.HIVE_FORK_DAO_BLOCK|addashex,
-		"EIP150ForkBlock": env.HIVE_FORK_TANGERINE|addashex,
-		"EIP158ForkBlock": env.HIVE_FORK_SPURIOUS|addashex,
-		"byzantiumForkBlock": env.HIVE_FORK_BYZANTIUM|addashex,
-		"homesteadForkBlock": env.HIVE_FORK_HOMESTEAD|addashex,
-		"miningMethod": (if env.HIVE_SKIP_POW!=null then "ethash" else "NoProof" end)
-   },
-  
-	"version": "1"
+  "params": {
+    "miningMethod": (if env.HIVE_SKIP_POW!=null then "ethash" else "NoProof" end),
+    "chainId": env.HIVE_CHAIN_ID|to_hex,
+    "homesteadForkBlock": env.HIVE_FORK_HOMESTEAD|to_hex,
+    "DAOForkBlock": env.HIVE_FORK_DAO_BLOCK|to_hex,
+    "EIP150ForkBlock": env.HIVE_FORK_TANGERINE|to_hex,
+    "EIP158ForkBlock": env.HIVE_FORK_SPURIOUS|to_hex,
+    "byzantiumForkBlock": env.HIVE_FORK_BYZANTIUM|to_hex,
+    "constantinopleForkBlock": env.HIVE_FORK_CONSTANTINOPLE|to_hex,
+    "petersburgForkBlock": env.HIVE_FORK_PETERSBURG|to_hex,
+    "istanbulForkBlock": env.HIVE_FORK_ISTANBUL|to_hex,
+    "muirglacierForkBlock": env.HIVE_FORK_MUIR_GLACIER|to_hex,
+  },
+  "version": "1"
 }|remove_empty
 
-
-
-
-
-
-
-
-
-
-  

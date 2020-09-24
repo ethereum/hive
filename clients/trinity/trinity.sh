@@ -1,46 +1,113 @@
 #!/bin/bash
 
-# Startup script 
+# Startup script to initialize and boot a peer instance.
+#
+# This script assumes the following files:
+#  - `genesis.json` file is located in the filesystem root (mandatory)
+#  - `chain.rlp` file is located in the filesystem root (optional)
+#  - `blocks` folder is located in the filesystem root (optional)
+#  - `keys` folder is located in the filesystem root (optional)
 
-
+# This script can be configured using the following environment variables:
+#
+#  - HIVE_BOOTNODE             enode URL of the remote bootstrap node
+#  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
+#  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
+#  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
+#  - HIVE_FORK_HOMESTEAD       block number of the homestead transition
+#  - HIVE_FORK_DAO_BLOCK       block number of the DAO hard-fork transition
+#  - HIVE_FORK_TANGERINE       block number of TangerineWhistle
+#  - HIVE_FORK_SPURIOUS        block number of SpuriousDragon
+#  - HIVE_FORK_BYZANTIUM       block number for Byzantium transition
+#  - HIVE_FORK_CONSTANTINOPLE  block number for Constantinople transition
+#  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/Petersburg transition
+#  - HIVE_FORK_ISTANBUL        block number for Istanbul transition
+#  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
+#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
+#  - HIVE_LOGLEVEL             client log level
+#
+# These flags are NOT supported by Trinity
+#
+#  - HIVE_FORK_BERLIN          block number for Berlin transition
+#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
+#  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
+#  - HIVE_MINER                address to credit with mining rewards (single thread)
+#  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
+#  - HIVE_GRAPHQL_ENABLED      turns on GraphQL server
 
 # Immediately abort the script on any error encountered
 set -e
 
-if [ "$HIVE_BOOTNODE" != "" ]; then
-	FLAGS="$FLAGS --preferred-node $HIVE_BOOTNODE"
-fi
+# Configure log level.
+level="DEBUG"
+case "$HIVE_LOGLEVEL" in
+    0) level=CRITICAL ;;
+    1) level=ERROR    ;;
+    2) level=WARN     ;;
+    3) level=INFO     ;;
+    4) level=DEBUG    ;;
+    5) level=DEBUG2   ;;
+esac
+FLAGS="$FLAGS --log-level $level"
+
+# Create the data directory.
+mkdir /dd /dd/logs /dd/logs-eth1
+FLAGS="$FLAGS --data-dir /dd"
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
-	FLAGS="$FLAGS --network-id $HIVE_NETWORK_ID"
+    FLAGS="$FLAGS --network-id $HIVE_NETWORK_ID"
 else
-	#default it to ropsten
-	FLAGS="$FLAGS --network-id 3"
+    FLAGS="$FLAGS --network-id 1337"
 fi
 
-# Configure and set the chain definition for the node
-#chainconfig=`cat /config.json`
+# Configure and set the chain definition.
 configoverride=`jq -f /mapper.jq /genesis.json`
-
 echo ".*$configoverride">/tempscript.jq
-
 mergedconfig=`jq -f /tempscript.jq /config.json`
-
 echo $mergedconfig>/newconfig.json
+FLAGS="$FLAGS --genesis /newconfig.json"
 
-mkdir /dd
-mkdir /dd/logs
-cd /
-#we need something to indicate to Hive that the client container is alive
-#nc –l 8545 &
+# Disable TxPool. Trinity won't start with a custom genesis unless
+# this option is also given.
+FLAGS="$FLAGS --disable-tx-pool"
 
-(sleep 2 ; python -m http.server 8545 )&
+# Don't immediately abort, some imports are meant to fail.
+set +e
 
-# Run the client with the requested flags
+# Import blockchain from /chain.rlp and /blocks.
+if [ -f /chain.rlp ]; then
+    echo "Loading initial blockchain..."
+    trinity $FLAGS import /chain.rlp
+fi
+if [ -d /blocks ]; then
+    echo "Loading remaining individual blocks..."
+    for file in $(ls /blocks | sort -n); do
+        echo "Importing " $file
+        trinity $FLAGS import /blocks/$file
+    done
+fi
+
+set -e
+
+# Enable the HTTP server.
+FLAGS="$FLAGS --http-listen-address 127.0.0.1 --http-port 8545 --enable-http-apis '*'"
+
+# Configure peer-to-peer networking.
+if [ "$HIVE_BOOTNODE" != "" ]; then
+    FLAGS="$FLAGS --preferred-node $HIVE_BOOTNODE"
+fi
+FLAGS="$FLAGS --disable-upnp"
+
+# Configure sync mode.
+mode="full"
+case "$HIVE_NODETYPE" in
+    full|archive) mode=full  ;;
+    light)        mode=light ;;
+esac
+FLAGS="$FLAGS --sync-mode $mode"
+
+# Run the client.
 echo "Running Trinity... "
-
-RUNCMD="trinity --data-dir /dd $FLAGS --genesis /newconfig.json"
-echo "cmd: $RUNCMD"
-$RUNCMD
-
+echo "flags: $FLAGS"
+trinity $FLAGS
