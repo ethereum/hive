@@ -26,6 +26,7 @@
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW       If set, skip PoW verification during block import
+#  - HIVE_LOGLEVEL       Sets the log level
 
 # Immediately abort the script on any error encountered
 set -e
@@ -228,6 +229,17 @@ set -e
 if [ -d /keys ]; then
 	FLAGS="$FLAGS --keys-path /keys"
 fi
+
+LOG=info
+case "$HIVE_LOGLEVEL" in
+    0|1) LOG=error ;;
+    2)   LOG=warn  ;;
+    3)   LOG=info  ;;
+    4|5) LOG=debug ;;
+    # OpenEthereum trace logging is INSANE, that's why it's disabled here.
+    # 5) LOG=trace ;;
+esac
+FLAGS="$FLAGS -l $LOG"
 
 # If mining was requested, fire up an ethminer instance
 if [ "$HIVE_MINER" != "" ]; then
