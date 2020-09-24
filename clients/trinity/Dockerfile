@@ -15,15 +15,11 @@ RUN git clone --branch $branch https://github.com/ethereum/trinity .
 RUN pip install -e .[dev]  --no-cache-dir
 RUN pip install -U trinity --no-cache-dir
 
-ADD config.json /config.json
 ADD mapper.jq /mapper.jq
 ADD trinity.sh /trinity.sh
 RUN chmod +x /trinity.sh
 ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
-
-#debug genesis, overriden at runtime:
-ADD genesis.json /genesis.json
 
 # Write the version file.
 RUN \
