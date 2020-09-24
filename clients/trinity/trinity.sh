@@ -6,7 +6,6 @@
 #  - `genesis.json` file is located in the filesystem root (mandatory)
 #  - `chain.rlp` file is located in the filesystem root (optional)
 #  - `blocks` folder is located in the filesystem root (optional)
-#  - `keys` folder is located in the filesystem root (optional)
 
 # This script can be configured using the following environment variables:
 #
@@ -62,10 +61,7 @@ else
 fi
 
 # Configure and set the chain definition.
-configoverride=`jq -f /mapper.jq /genesis.json`
-echo ".*$configoverride">/tempscript.jq
-mergedconfig=`jq -f /tempscript.jq /config.json`
-echo $mergedconfig>/newconfig.json
+jq -f /mapper.jq /genesis.json > /newconfig.json
 FLAGS="$FLAGS --genesis /newconfig.json"
 
 # Disable TxPool. Trinity won't start with a custom genesis unless
@@ -91,7 +87,7 @@ fi
 set -e
 
 # Enable the HTTP server.
-FLAGS="$FLAGS --http-listen-address 127.0.0.1 --http-port 8545 --enable-http-apis '*'"
+FLAGS="$FLAGS --http-listen-address 0.0.0.0 --http-port 8545 --enable-http-apis eth,net,admin"
 
 # Configure peer-to-peer networking.
 if [ "$HIVE_BOOTNODE" != "" ]; then

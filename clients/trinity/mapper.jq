@@ -33,13 +33,13 @@ def infix_zeros_to_length(s;l):
   "genesis": {
     "author":.coinbase,
     "difficulty":.difficulty,
-    "extraData":.extraData|infix_zeros_to_length(2;66),
+    "extraData":.extraData,
     "gasLimit":.gasLimit,
     "nonce": .nonce|infix_zeros_to_length(2;18),
     "timestamp":.timestamp,
   },
   "params": {
-    "miningMethod": (if env.HIVE_SKIP_POW!=null then "ethash" else "NoProof" end),
+    "miningMethod": (if env.HIVE_SKIP_POW != null then "NoProof" else "ethash" end),
     "chainId": env.HIVE_CHAIN_ID|to_hex,
     "homesteadForkBlock": env.HIVE_FORK_HOMESTEAD|to_hex,
     "DAOForkBlock": env.HIVE_FORK_DAO_BLOCK|to_hex,
