@@ -57,7 +57,8 @@ func main() {
 		if err != nil {
 			fatalf("could not start test suite: %v", err)
 		}
-		testID, err := host.StartTest(suite, "eth protocol test", "TODO!!!!!!!") // TODO description
+		testID, err := host.StartTest(suite, "eth protocol test", "This test suite manually tests a " +
+			"client's ability to accurately respond to basic eth protocol messages.")
 		if err != nil {
 			fatalf("could not start test: %v", err)
 		}
