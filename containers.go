@@ -50,7 +50,6 @@ func createShellContainer(image string, overrides []string) (*docker.Container, 
 	}
 	binds = append(binds, []string{
 		fmt.Sprintf("%s/workspace/docker:/var/lib/docker", pwd),                                       // Surface any docker-in-docker data caches
-		fmt.Sprintf("%s/workspace/ethash:/gopath/src/github.com/ethereum/hive/workspace/ethash", pwd), // Surface any generated DAGs from the shell
 		fmt.Sprintf("%s/workspace/logs:/gopath/src/github.com/ethereum/hive/workspace/logs", pwd),     // Surface all the log files from the shell
 	}...)
 
@@ -69,35 +68,6 @@ func createShellContainer(image string, overrides []string) (*docker.Container, 
 		HostConfig: &docker.HostConfig{
 			Privileged: true, // Docker in docker requires privileged mode
 			Binds:      binds,
-		},
-	})
-}
-
-// createEthashContainer creates a docker container to generate ethash DAGs.
-func createEthashContainer(image string) (*docker.Container, error) {
-	// Configure the workspace for ethash generation
-	pwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	ethash := filepath.Join(pwd, "workspace", "ethash")
-	if err := os.MkdirAll(ethash, os.ModePerm); err != nil {
-		return nil, err
-	}
-
-	uid := os.Getuid()
-	if uid == -1 {
-		uid = 0 //hack for windows
-	}
-
-	// Create and return the actual docker container
-	return dockerClient.CreateContainer(docker.CreateContainerOptions{
-		Config: &docker.Config{
-			Image: image,
-			Env:   []string{fmt.Sprintf("UID=%d", uid)}, // Forward the user ID for the workspace permissions
-		},
-		HostConfig: &docker.HostConfig{
-			Binds: []string{fmt.Sprintf("%s:/root/.ethash", ethash)},
 		},
 	})
 }
