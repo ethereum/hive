@@ -33,11 +33,6 @@ type host struct {
 var hostProxy *host
 var once sync.Once
 
-// Support this provider type to register it
-func Support() {
-	common.RegisterProvider("hive", GetInstance)
-}
-
 // New takes the value of the environment variable "HIVE_SIMULATOR"
 // and returns a new common.TestSuiteHost
 func New() (common.TestSuiteHost, error) {

@@ -1,7 +1,6 @@
 package common
 
 import (
-	"io/ioutil"
 	"net"
 )
 
@@ -10,17 +9,6 @@ type MacENREntry string
 
 //ENRKey the key for this type of ENR record
 func (v MacENREntry) ENRKey() string { return "mac" }
-
-//TestSuiteProviderInitialiser is the singleton getter initialising or returning the provider
-type TestSuiteProviderInitialiser func(config []byte) (TestSuiteHost, error)
-
-// TestSuiteHostProviders is the dictionary of test suit host providers
-var testSuiteHostProviders = make(map[string]TestSuiteProviderInitialiser)
-
-// RegisterProvider allows a test suite host provider to be supported
-func RegisterProvider(key string, provider TestSuiteProviderInitialiser) {
-	testSuiteHostProviders[key] = provider
-}
 
 //TestSuiteHost The test suite host the simulator communicates with to manage test cases and their resources
 type TestSuiteHost interface {
@@ -57,24 +45,4 @@ type TestSuiteHost interface {
 type Logger interface {
 	Log(args ...interface{})
 	Logf(format string, args ...interface{})
-}
-
-//InitProvider initialises and returns a testsuite provider singleton. Testsuite providers
-//deliver the test suite and case maintenance services needed for simulations to run.
-func InitProvider(providerName string, providerConfigFileName string) (TestSuiteHost, error) {
-	providerIniter, ok := testSuiteHostProviders[providerName]
-	if !ok {
-		return nil, ErrNoSuchProviderType
-	}
-
-	configFileBytes, err := ioutil.ReadFile(providerConfigFileName)
-	if err != nil {
-		return nil, err
-	}
-
-	host, err := providerIniter(configFileBytes)
-	if err != nil {
-		return nil, err
-	}
-	return host, nil
 }
