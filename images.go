@@ -66,12 +66,12 @@ func buildEthash(cacher *buildCacher) (string, error) {
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
 func buildClients(clientList []string, cacher *buildCacher) (map[string]string, error) {
-	return buildListedImages("clients", clientList, "client", cacher, false)
+	return buildListedImages("clients", clientList, "client", cacher)
 }
 
 // buildPseudoClients iterates over all the known pseudo-clients and builds a docker image for
 func buildPseudoClients(pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages("pseudoclients", pattern, "pseudoclient", cacher, false)
+	return buildNestedImages("pseudoclients", pattern, "pseudoclient", cacher)
 }
 
 // fetchClientVersions downloads the version json specs from all clients that
@@ -100,24 +100,18 @@ func fetchClientVersions(cacher *buildCacher) (map[string]map[string]string, err
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildSimulators(pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages("simulators", pattern, "simulator", cacher, true)
+	images, err := buildNestedImages("simulators", pattern, "simulator", cacher)
 	return images, err
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested
 // docker image definitions and builds all of them matching the provided pattern.
-func buildNestedImages(root string, pattern string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
+func buildNestedImages(root string, pattern string, kind string, cacher *buildCacher) (map[string]string, error) {
 
 	var contextBuilder func(root string, path string) (string, string)
 
-	if rootContext {
-		contextBuilder = func(root string, path string) (string, string) {
-			return root, strings.Replace(path+string(filepath.Separator)+"Dockerfile", "\\", "/", -1)
-		}
-	} else {
-		contextBuilder = func(root string, path string) (string, string) {
-			return filepath.Join(root, path), ""
-		}
+	contextBuilder = func(root string, path string) (string, string) {
+		return root, strings.Replace(path+string(filepath.Separator)+"Dockerfile", "\\", "/", -1)
 	}
 
 	// Gather all the folders with Dockerfiles within them
@@ -166,22 +160,14 @@ func buildNestedImages(root string, pattern string, kind string, cacher *buildCa
 // For example, if the clientList contained geth_master, geth_beta and
 // the clients folder contained a dockerfile for clients\geth, then this
 // will created two images, one for clients\geth_master and one for clients\geth_beta
-func buildListedImages(root string, clientList []string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
+func buildListedImages(root string, clientList []string, kind string, cacher *buildCacher) (map[string]string, error) {
 
 	var contextBuilder func(root string, path string) (string, string, string)
 
-	if rootContext {
-		contextBuilder = func(root string, path string) (string, string, string) {
-			branch := getBranch(path)
-			path = strings.TrimSuffix(path, branchDelimiter+branch)
-			return root, branch, strings.Replace(path+string(filepath.Separator)+"Dockerfile", "\\", "/", -1)
-		}
-	} else {
-		contextBuilder = func(root string, path string) (string, string, string) {
-			branch := getBranch(path)
-			path = strings.TrimSuffix(path, branchDelimiter+branch)
-			return filepath.Join(root, path), branch, ""
-		}
+	contextBuilder = func(root string, path string) (string, string, string) {
+		branch := getBranch(path)
+		path = strings.TrimSuffix(path, branchDelimiter+branch)
+		return root, branch, strings.Replace(path+string(filepath.Separator)+"Dockerfile", "\\", "/", -1)
 	}
 
 	names := []string{}
