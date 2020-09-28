@@ -53,7 +53,6 @@ To execute the consensus tests on parity run the latest simulator:
    --docker-noshell
    --client parity_latest
    --sim ethereum/consensus2
-   --sim.rootcontext
    --results-root /mytests/test
 ```
 
@@ -63,7 +62,6 @@ These run devp2p tests, mainly Discovery tests.
 
 ```text
     --sim devp2p
-    --sim.rootcontext
     --test none
     --loglevel 6
     --docker-noshell
@@ -77,7 +75,6 @@ These run devp2p tests, mainly Discovery tests.
 These run a test verifying that a blockchain can be synced between differing implementations.
 
       --sim ethereum\\\\sync
-      --sim.rootcontext
       --test none
       --loglevel 6
       --docker-noshell
@@ -233,15 +230,6 @@ folder with their own dockerfile. The branch is parsed out and passed as a docke
 Simulators now offer a golang client framework, that allows them to call into the Hive Simulator 
 API and create different types of client. The simulator can run tests or other experiments written in 
 Golang against one or more instances of clients. To achieve this, a number of new options are added:
-
-`--sim.rootcontext` a boolean, which when set tells the compiler to build the docker image with 'simulators'
-as the root of the context, allowing the simulators\common and simulators\devp2p common code to be included
-in the simulator. 
-
-Sim.rootcontext needs to be set differently depending on the type of simulation being run. For the consensus tests
-the base simulator image relies on files to be added from a folder local to the image. For developing new simulations,
-or extending the existing ones, it is recommended to use sim-rootcontext as true. 
-
 
 `--debug` allows a flag to be set that is passed into the simulator as an environment variable, allowing the 
 simulator to be run as a delve 'headless server. The go simulator can then be remote debugged by attaching to 
