@@ -696,7 +696,6 @@ section called `override`, which will do a couple things:
 
     # Pull in and hive, and do a dry run
     - go get -u github.com/karalabe/hive
-    - (cd ~/.go_workspace/src/github.com/karalabe/hive && cp -r ~/.ethash/. workspace/ethash/)
     - (cd ~/.go_workspace/src/github.com/karalabe/hive && hive --docker-noshell --client=NONE --test=. --sim=. --loglevel=6)
 
     # Cache all the docker images

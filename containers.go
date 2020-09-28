@@ -32,7 +32,7 @@ func createShellContainer(image string, overrides []string) (*docker.Container, 
 	if err != nil {
 		return nil, err
 	}
-	for _, dir := range []string{"docker", "ethash", "logs"} {
+	for _, dir := range []string{"docker", "logs"} {
 		if err := os.MkdirAll(filepath.Join(pwd, "workspace", dir), os.ModePerm); err != nil {
 			return nil, err
 		}
@@ -78,12 +78,6 @@ func createShellContainer(image string, overrides []string) (*docker.Container, 
 // from the tester image. This is useful in particular during simulations where
 // the tester itself can fine tune parameters for individual nodes.
 func createClientContainer(client string, overrideEnvs map[string]string, files map[string]*multipart.FileHeader) (*docker.Container, error) {
-	// Configure the client for ethash consumption
-	pwd, err := os.Getwd()
-	if err != nil {
-		return nil, err
-	}
-	ethash := filepath.Join(pwd, "workspace", "ethash")
 	// Inject any explicit envvar overrides
 	vars := []string{}
 	for key, val := range overrideEnvs {
@@ -96,9 +90,6 @@ func createClientContainer(client string, overrideEnvs map[string]string, files 
 		Config: &docker.Config{
 			Image: client,
 			Env:   vars,
-		},
-		HostConfig: &docker.HostConfig{
-			Binds: []string{fmt.Sprintf("%s:/root/.ethash", ethash)},
 		},
 	})
 	if err != nil {
