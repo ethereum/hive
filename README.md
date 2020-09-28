@@ -7,7 +7,9 @@ simple.
 
 This project is meant to serve as an easily expandable test harness where **anyone** can add tests in
 **any** programming language they feel comfortable with, and it should simultaneously be able to run
-those tests against all potential clients. The harness is meant to do black box testing where no
+those tests against all potential clients. 
+
+The harness is meant to do black box testing where no
 client specific internal details/state is tested and/or inspected. Instead, the emphasis is put on
 adherence to official specs or behaviours under different circumstances.
 
@@ -17,7 +19,7 @@ Therefore, the entire suite is based on docker containers.
 # Public test results
 
 An Ethereum Foundation server often runs Hive to check for consensus, p2p and blockchain compatibility.
-Test results are made public [here](https://hivetests.ethdevops.io/)
+Test results are made public [here](https://hivetests.ethdevops.io/).
 
 # Installing the hive validator
 
@@ -37,7 +39,7 @@ After installing add hive binary (default path `~go/bin`) to PATH and clone the 
 to your local folder.
 
  *Note: For now `hive` requires running from the repository root as it needs access to quite a number
-of resource files to build the corrent docker images and containers. This requirement will be removed
+of resource files to build the current docker images and containers. This requirement will be removed
 in the future.*
 
 # Quickstart command lines
@@ -78,7 +80,6 @@ These run a test verifying that a blockchain can be synced between differing imp
 
       --sim ethereum\\\\sync
       --sim.rootcontext
-      --test none
       --loglevel 6
       --docker-noshell
       --results-root /mytests/test
@@ -238,9 +239,9 @@ Golang against one or more instances of clients. To achieve this, a number of ne
 as the root of the context, allowing the simulators\common and simulators\devp2p common code to be included
 in the simulator. 
 
-Sim.rootcontext needs to be set differently depending on the type of simulation being run. For the consensus tests
+`--sim.rootcontext` needs to be set differently depending on the type of simulation being run. For the consensus tests,
 the base simulator image relies on files to be added from a folder local to the image. For developing new simulations,
-or extending the existing ones, it is recommended to use sim-rootcontext as true. 
+or extending the existing ones, it is recommended to use `--sim-rootcontext `as true. 
 
 
 `--debug` allows a flag to be set that is passed into the simulator as an environment variable, allowing the 
@@ -286,26 +287,34 @@ implementation:
 As long as a client can run on Linux, and you can package it up into a Docker image, `hive` can test it!
 
 ## Creating a client image
+To add a new client implementation to `hive`, create a new directory for the client under the `clients/` directory. In the new directory, create a Dockerfile that assembles all necessary resources to run the client. Place any additional resources necessary to run the client in the same directory.
 
-Adding a new client implementation to `hive` entails creating a Dockerfile (and related resources),
-based on which `hive` will assemble the docker image to use as the blueprint for testing.
+```
+clients/
+    new_client/
+        Dockerfile
+        clientStartScript.sh
+        additionalResource.json
+        additionalResource.txt
+```
 
-The client definition(s) should reside in the `clients` folder, each named `<project>_<tag>` where
-`<project>` is the official name of the client (lowercase, no fancy characters), and `<tag>` is an
-arbitrary id up to the client maintainers to make the best use of. `hive` will automatically pick
-up all clients from this folder.
+`hive` will automatically pick up the client from this directory.
 
-There aren't many contraints on the image itself, though a few required caveats exist:
+There aren't many constraints on the image itself, though a few required caveats exist:
 
  * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
- * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
+ * It should expose the following ports: `8545 (HTTP RPC)`, `8546 (WS RPC)`, `30303 (devp2p)`.
  * It should have a single entrypoint (script?) defined, which can initialize and run the client.
 
-For devp2p tests or other simulations that require to know the specific enode of the client instance, 
-the client must provide an `enode.sh` that echoes the enode of the running instance. This is executed
-by the Hive host remotely to get the id. 
+The Dockerfile can also specify a branch from which to pull as an argument, as such:
 
-The client has the responsibility of mapping the Hive genesis.json and Hive environment variables
+```Dockerfile
+ARG branch=latest
+FROM openethereum/openethereum:$branch
+```
+When running `hive`, the branch can then be specified after the client name, as such:  `--client openethereum_<branch_name>`.
+
+The client has the responsibility of mapping the Hive `genesis.json` and Hive environment variables
 to its own local genesis format and command line flags. To assist in this, Hive illustrates a technique
 in the `clients/trinity` folder using `mapper.jq`, which is invoked in `trinity.sh` This 
 technique can be replicated for other clients.
@@ -319,6 +328,8 @@ injects all the required configurations into the Linux containers prior to launc
 `entrypoint` script. It is then left to this script to interpret all the environmental configs and
 initialize the client appropriately.
 
+#### Config files
+
 The chain configurations files:
 
  * `/genesis.json` contains the JSON specification of the Ethereum genesis states
@@ -326,17 +337,15 @@ The chain configurations files:
  * `/blocks/` folder with numbered singleton blocks to import before startup
  * `/keys/` contains account keys that should be imported before startup
 
-Client startup scripts need to ensure that they load the genesis state first, then import a possibly
-longer blockchain and then import possibly numerous individual blocks. The reason for requiring two
-different block sources is that specifying a single chain is more optimal, but tests requiring forking
-chains cannot create a single chain.
+Client startup scripts need to ensure that they can
+* load the genesis state
+* import a blockchain via a `chain.rlp` file or via the `/blocks/` folder with numbered blocks
 
-Besides the standardized chain configurations, clients can in general be modified behavior-wise in
-quite a few ways that are mostly supported by all clients, yet are implemented differently in each.
-As such, each possible behavioral change required by some validator or simulator is characterized by
-an environment variable, which clients should interpret as best as they can.
+*(The reason for requiring the ability to import blocks from two different block sources is that specifying a single chain is more optimal, but tests requiring forking chains cannot create a single chain.)*
 
-The behavioral configuration variables:
+#### Environment variables
+
+Besides the standard chain configurations, clients can in general be modified behavior-wise via environment variables, which clients should be able to interpret. Below is a list of such environment variables:
 
   * `HIVE_BOOTNODE` enode URL of the discovery-only node to bootstrap the client
   * `HIVE_TESTNET` whether clients should run with modified starting nonces (`2^20`)
@@ -404,140 +413,80 @@ Simulation results:
 
 *Note: All smoke tests must pass for a client to be included into `hive`.*
 
-# Adding new validators
+# Adding new test suites
 
-Validators are `hive` testers whose sole purpose is to check that a client implementation conforms to
-some standardized specifications (e.g. RPC API conformance, Mist compatibility, consensus tests, etc).
-They are not meant to check a client's behavior in complex network environment, rather that given a
-single client instance, it seems to function correctly from the **users** perspective.
+Test suites (called `simulations` in this repository) usually check that a client implementation conforms to
+some standardized specifications (e.g. RPC API conformance, eth protocol adherence, consensus tests, etc).
+They are not meant to check a client's behavior in complex network environment, but rather that given a
+single client instance, it seems to function correctly from the **user's** perspective.
 
-Similar to client implementations inside `hive`, validators themselves are also based on docker images
-and containers:
+Similar to client implementations inside `hive`, test suites are also based on docker images and containers:
 
  * `hive` doesn't care what dependencies a validator has: language, libraries or otherwise.
  * `hive` doesn't care how the validator is built: environment, tooling or otherwise.
  * `hive` doesn't care what garbage a validator generates during execution.
 
-As long as a validator can run on Linux, and you can package it up into a Docker image, `hive` can
-use it to test every client implementation with it!
+As long as a validator can run on Linux, and you can package it up into a Docker image, `hive` can use it to test every client implementation with it!
 
-## Creating a validator image
+## Creating a test suite image
 
-Adding a new client validator to `hive` entails creating a Dockerfile (and related resources), based
-on which `hive` will assemble the docker image to use as the blueprint for validation.
+Adding a new test suite to `hive` entails creating a Dockerfile that assembles all necessary resources to test client implementations.
 
-The validator definition(s) should reside in the `validators` folder, each nested as `<group>/<test>`,
-where `<group>` is a higher level collection of similar tests (e.g. `mist`, `consensus`), and `<test>`
-is an individual validator. Contributors are free to define new groups as long as it makes sense from
+The test suite Dockerfile should reside in the `simulators` directory, each nested as `<group>/<test>`,
+where `<group>` is a higher level collection of similar tests (e.g. `ethereum`, `consensus`), and `<test>` is an individual test suite. 
+
+Contributors are free to define new groups as long as it makes sense from
 a cross-client perspective. A few existing ones are:
 
  * `ethereum` contains ports of old test frameworks from the Ethereum repositories
  * `issues` contains interesting corner cases from clients that may affect others too
- * `mist` contains API conformance tests to validate if a client can be a [Mist](https://github.com/ethereum/mist) backend
+ * `devp2p` contains networking tests
  * `smoke` contains general smoke tests to insta-check if a client image is correct
 
-There are little contraints on the image itself, though a few required caveats are:
+There are a few constraints on the image itself:
 
  * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
  * It should have a single entrypoint (script?) defined, which can initialize and run the test.
 
 For guidance, check out the [genesis-only](https://github.com/karalabe/hive/blob/master/validators/smoke/genesis-only/Dockerfile) smoke test.
 
-### Defining the validator
+### Defining the test suite
 
 > Since `hive` does not want to enforce any CLI parameterization scheme on client implementations, it
 injects all the required configurations into the Linux containers prior to launching the client's
 `entrypoint` script. It is then left to this script to interpret all the environmental configs and
 initialize the client appropriately.
 
-What this means from a validator's perspective is, that validators themselves must define these
-initial chain configurations files and client behavioral modifier environment variables that will
-be loaded into the client images.
-
-To prevent duplicating the list of config files and env vars that need to be implemented to cross
-over from validators to clients, we'll refer the reader to the readme's [*"Initializing the client"*](#initializing-the-client)
-section which lists all of them, also detailing what each means.
-
-In short, a validator must create all of the above linked chain configuration files and define some
-subset of behavioral environmental variables **in the validator's docker image**. This is important
-as the validator is always started **after** the client, so all information needs to be already ready
-for client initialization prior to running the validator entrypoint.
+This means that the test suite must define all chain configuration files and environment variables that will be loaded into the client containers. The `graphql` test suite provides a good example for defining the [chain configuration files](https://github.com/ethereum/hive/blob/e17fd70515785ae82fb4d341425a6506610ca0a8/simulators/ethereum/graphql/graphql.go#L89) and [environment variables](https://github.com/ethereum/hive/blob/e17fd70515785ae82fb4d341425a6506610ca0a8/simulators/ethereum/graphql/graphql.go#L83).
 
 *Trick: If you don't want to initialize a tested client with a starting chain, only the genesis file,
-you can specify `RUN touch chain.rlp && mkdir /blocks` in the validator Dockerfile, which will create
+you can specify `RUN touch chain.rlp && mkdir /blocks` in the test suite Dockerfile, which will create
 an empy initial chain and empty set of blocks.*
 
-### Executing the validation
+#### Getting node information
 
-After `hive` creates and initializes a client implementation based on the docker **image** of the
-chosen validator, it will extract the IP address of the running client and boot up the validator
-with the client's IP address injected as the `HIVE_CLIENT_IP` environmental variable.
+ If the test suite needs some sort of node information, such as the IP address or the enode of the client instance, it is possible to get this information from the node by asking the `hive` provider. 
+ 
+To get the `hive` provider (or "host"), it is possible to use the `common` package (written in `go`), as such:
+```go
+host, err := common.InitProvider(*simProviderType, *providerConfigFile)
+```
+@TODO need to change the way this works anyway.
 
-From this point onward the validator may execute arbitrary code against the running clients:
+To get the client's IP address from the `hive` provider, it is possible to call `GetNode` on the `host`, as such: 
 
- * HTTP RPC endpoint exposed at `HIVE_CLIENT_IP:8545`
- * WebSocket RPC (if supported) at `HIVE_CLIENT_IP:8546`
- * devp2p TCP and UDP endpoints at `HIVE_CLIENT_IP:30303`
+```go
+_, ip, _, err := host.GetNode(suiteID, metaTestId, env, files)
+```
 
-The validation will be considered successful if and only if the exit code of the entrypoint script
-is zero! Any output that the validator generates will be saved to an appropriate log file in the `hive`
-workspace folder and also echoed out to the console on `--loglevel=6`.
-
-*Note: There is no constraint on how much a validation may run, but please be considerate.*
-
-# Adding new simulators
-
-Simulators are `hive` testers whose purpose is to check that client implementations conform to some
-desired behavior when running in both multi-node network environments, as well as for scenarios where
-participant nodes perform live mining using the full `ethash` DAG. The goal of a simulator is to try
-and test a node in an almost-live way: don't take testing shortcuts like fake PoW, smaller DAGs, less
-secure key encryption schemas.
-
-Similar to all other entities inside `hive`, simulators too are based on docker images and containers:
-
- * `hive` doesn't care what dependencies a simulator has: language, libraries or otherwise.
- * `hive` doesn't care how the simulator is built: environment, tooling or otherwise.
- * `hive` doesn't care what garbage a simulator generates during execution.
-
-As long as a simulator can run on Linux, and you can package it up into a Docker image, `hive` can
-use it to test every client implementation with it!
-
-## Creating a simulator image
-
-Adding a new client simulator to `hive` entails creating a Dockerfile (and related resources), based
-on which `hive` will assemble the docker image to use as the blueprint for simulation.
-
-The simulator definition(s) should reside in the `simulators` folder, each nested as `<group>/<sim>`,
-where `<group>` is a higher level collection of similar tests (e.g. `dao-hard-fork`), and `<sim>` is
-an individual simulator. Contributors are free to define new groups as long as it makes sense from a
-cross-client perspective. A few existing ones are:
-
- * `dao-hard-fork` contains network simulations/tests with regard to the DAO hard-fork
- * `smoke` contains general smoke tests to insta-check if a client image is correct
-
-There are little contraints on the image itself, though a few required caveats are:
-
- * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
- * It should have a single entrypoint (script?) defined, which can initialize and run the test.
-
-For guidance, check out the [lifecycle](https://github.com/karalabe/hive/blob/master/simulators/smoke/lifecycle/Dockerfile) smoke test.
-
-### Defining the simulator
-
-Defining a simulator is **exactly** the same as defining the docker image of a validator with regard
-to every aspect of `hive` (chain configs, behavioral envvars), As such, we refer the user to the readme's
-[*"Defining the validator"*](#defining-the-validator) section. Apart from what the `entrypoint` script
-is allowed to do, validator and simulator images are equivalent.
+Similarly, to get the enode from the client, call `GetClientEnode` on the `host`, as such:  (@TODO maybe link the eth test suite here once merged)
+ 
+```go
+enode, err := host.GetClientEnode(testSuite, testID, containerID)
+```
 
 ### Executing the simulation
-
-As detailed in the readme's [*"Executing the validation"*](#executing-the-validation) section, during
-validation `hive` starts a client node first, and then the validator itself. This is **not** true in
-the case of simulations however. Since it is impossible to define arbitrary networking scenarios with
-simple configuration files, `hive` will instead boot up only the simulator instance, and will provide
-it with the necessary mechanisms to create any scenario it wants.
-
-To this effect, `hive` exposes a RESTful HTTP API that all simulators can use to direct how `hive`
+`hive` exposes a RESTful HTTP API that all simulators can use to direct how `hive`
 should create and organize the simulated network. This API is exposed at the HTTP endpoint set in the
 `HIVE_SIMULATOR` environmental variable. The currently available topology endpoints are:
 
@@ -550,33 +499,23 @@ should create and organize the simulated network. This API is exposed at the HTT
  * `/log` with method `POST` sends a logging message from the simulator to the main process.
  
 
-Overriding environmental variables that change client behaviors via HTTP parameters is easy to do in
-any HTTP client utility and/or library, but uploading files needed for chain initializations is much
-more complex, especially if multiple files are needed. As long as all clients run with the same set
-of init files, this is not an issue (they can be placed in the default locations). However if instances
-need to run with different initial chain setups, a simulator needs to be able to specify these per
-client. To avoid file uploads, `hive` solves this by defining a set of API variables that allow a
-simulator to specify the source paths to use for specific init files which will be extracted from the
-live container:
+Uploading files needed for chain initializations can be complex, especially if multiple files are needed. As long as all clients run with the same set of init files, this is not an issue (they can be placed in the default locations). 
+
+However if instances need to run with different initial chain setups, a simulator needs to be able to specify these per client. To avoid file uploads, `hive` solves this by defining a set of API variables that allow a simulator to specify the source paths to use for specific init files which will be extracted from the live container:
 
  * `HIVE_INIT_GENESIS` path to the genesis file to seed the client with (default = "/genesis.json")
  * `HIVE_INIT_CHAIN` path to an initial blockchain to seed the client with (default = "/chain.rlp")
  * `HIVE_INIT_BLOCKS` path to a folder of blocks to import after seeding (default = "/blocks/")
  * `HIVE_INIT_KEYS` path to a folder of account keys to import after init (default = "/keys/")
 
-*Note: It is up to simulators to wire the clients together. The simplest way to do this is to start
-a bootnode inside the simulator and specify it for new clients via the documented `HIVE_BOOTNODE`
-environment variable. This is required to make simulators fully self contained, also enabling much
+*Note: It is up to simulators to wire the clients together. The simplest way to do this is to start a bootnode inside the simulator and specify it for new clients via the documented `HIVE_BOOTNODE` environment variable. This is required to make simulators fully self contained, also enabling much
 more complex networking scenarios not doable with forced fixed topologies.*
 
-The simulation will be considered successful if and only if the exit code of the entrypoint script
-is zero! Any output that the simulator generates will be saved to an appropriate log file in the `hive`
-workspace folder and also echoed out to the console on `--loglevel=6`.
+The simulation will be considered successful if and only if the exit code of the entrypoint script is zero! Any output that the simulator generates will be saved to an appropriate log file in the `hive` workspace folder and also echoed out to the console on `--loglevel=6`.
 
 #### Reporting sub-results
 
-It may happen that the setup/teardown cost of a simulation be large enough to warrant validating not
-just one, but perhaps multiple invariants in the same test. Although the results for these subtests
+It may happen that the setup/teardown cost of a simulation be large enough to warrant validating not just one, but perhaps multiple invariants in the same test. Although the results for these subtests
 could be reported in the log file, retrieving them would become unwieldy. As such, `hive` exposes a
 special HTTP endpoint on its RESTful API that can add sub-results to a single simulation. The endpoint
 resides at `/subresults` and has the following parameters:
@@ -617,7 +556,7 @@ will result a `subresults` field
 
 # Generating test blockchains
 
-`Hive` allows you to create rlp encoded blockchains for inclusion into sync tests 
+`Hive` allows you to create RLP encoded blockchains for inclusion into sync tests 
 
 ## To generate a blockchain offline
 
@@ -755,7 +694,7 @@ a useful tool for validating Ethereum client implementations.
    * Data race between remote block import and local block mining: [#2793](https://github.com/ethereum/go-ethereum/pull/2793)
    * Downloader didn't penalize incompatible forks hashly enough: [#2801](https://github.com/ethereum/go-ethereum/pull/2801)
  * Nethermind
-   * Bug in p2p whith bonding nodes algorithm found by Hive: [#1894](https://github.com/NethermindEth/nethermind/pull/1894)
+   * Bug in p2p with bonding nodes algorithm found by Hive: [#1894](https://github.com/NethermindEth/nethermind/pull/1894)
 
 # Contributions
 
