@@ -38,9 +38,10 @@ func Support() {
 	common.RegisterProvider("hive", GetInstance)
 }
 
-// New // TODO document
-func New(url string) (common.TestSuiteHost, error) {
-	config := []byte(fmt.Sprintf(`{"hostURI":%q}`, url))
+// New takes the value of the environment variable "HIVE_SIMULATOR"
+// and returns a new common.TestSuiteHost
+func New() (common.TestSuiteHost, error) {
+	config := []byte(fmt.Sprintf(`{"hostURI":%q}`, os.Getenv("HIVE_SIMULATOR")))
 	return GetInstance(config)
 }
 

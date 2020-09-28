@@ -10,7 +10,7 @@ import (
 )
 
 func main() {
-	host, err := hive.New(os.Getenv("HIVE_SIMULATOR"))
+	host, err := hive.New()
 	if err != nil {
 		fatal(fmt.Errorf("unable to initialise provider %s", err.Error()))
 	}
