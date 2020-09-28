@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/ethereum/hive/simulators/common"
 	"github.com/ethereum/hive/simulators/common/providers/hive"
-	"github.com/ethereum/hive/simulators/common/providers/local"
 	"github.com/ethereum/hive/simulators/devp2p"
 )
 
@@ -39,21 +38,14 @@ var (
 	netInterface *string
 )
 
-func init() {
-	hive.Support()
-	local.Support()
-}
-
 func TestMain(m *testing.M) {
 	listenPort = flag.String("listenPort", ":30303", "")
 	natdesc = flag.String("nat", "any", "port mapping mechanism (any|none|upnp|pmp|extip:<IP>)")
 	netInterface = flag.String("interface", "eth0", "the network interface name to use for spoofing traffic (eg: eth0 on docker) or the IP address identifying the network adapter")
-	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
-	providerConfigFile := flag.String("providerConfig", "", "the config json file for the provider")
 
 	flag.Parse()
 
-	host, err = common.InitProvider(*simProviderType, *providerConfigFile)
+	host, err = hive.New()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
 		os.Exit(1)

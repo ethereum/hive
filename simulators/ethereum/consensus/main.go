@@ -5,8 +5,8 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/json"
-	"flag"
 	"fmt"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -16,13 +16,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
-
 	common2 "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/common"
 )
 
@@ -179,11 +177,6 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     0,
 		"HIVE_FORK_ISTANBUL":       5,
 	},
-}
-
-func init() {
-	//support the hive testsuite engine provider
-	hive.Support()
 }
 
 func deliverTests(root string, limit int) chan *testcase {
@@ -469,10 +462,7 @@ func main() {
 	log.Info("Hive simulator started.", "paralellism", paralellism, "testlimit", testLimit)
 
 	// get the test suite engine provider and initialise
-	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
-	providerConfigFile := flag.String("providerConfig", "", "the config json file for the provider")
-	flag.Parse()
-	host, err := common.InitProvider(*simProviderType, *providerConfigFile)
+	host, err := hive.New()
 	if err != nil {
 		log.Error(fmt.Sprintf("Unable to initialise provider %s", err.Error()))
 		os.Exit(1)

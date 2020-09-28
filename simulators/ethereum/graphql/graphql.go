@@ -3,8 +3,8 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"flag"
 	"fmt"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -18,15 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/hive/simulators/common"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
-	"github.com/ethereum/hive/simulators/common/providers/local"
 )
-
-func init() {
-	//support providers
-	hive.Support()
-	local.Support()
-}
 
 func deliverTests(limit int) chan *testcase {
 	out := make(chan *testcase)
@@ -227,10 +219,7 @@ func main() {
 	log.Info("Hive simulator started.", "paralellism", paralellism, "testlimit", testLimit)
 
 	// get the test suite engine provider and initialise
-	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
-	providerConfigFile := flag.String("providerConfig", "", "the config json file for the provider")
-	flag.Parse()
-	host, err := common.InitProvider(*simProviderType, *providerConfigFile)
+	host, err := hive.New()
 	if err != nil {
 		log.Error(fmt.Sprintf("Unable to initialise provider %s", err.Error()))
 		os.Exit(1)
