@@ -42,8 +42,6 @@ var (
 	simulatorPattern     = flag.String("sim", "", "Regexp selecting the simulation tests to run")
 	simulatorParallelism = flag.Int("sim.parallelism", 1, "Max number of parallel clients/containers to run tests against")
 	simulatorTestLimit   = flag.Int("sim.testlimit", -1, "Max number of tests to execute per client (interpreted by simulators)")
-	simRootContext       = flag.Bool("sim.rootcontext", false, "Indicates if the simulation should build "+
-		"the dockerfile with root (simulator) or local context. Needed for access to sibling folders like simulators/common")
 	simLimiterFlag  = flag.Int("sim.timelimit", -1, "Run all simulators with a time limit in seconds, -1 being unlimited")
 	simloglevelFlag = flag.Int("sim.loglevel", 3, "The base log level for simulator client instances. "+
 		"This number from 0-6 is interpreted differently depending on the client type.")
