@@ -40,7 +40,7 @@ func Support() {
 
 // New // TODO document
 func New(url string) (common.TestSuiteHost, error) {
-	config := []byte(fmt.Sprintf(`{"hostURI":%s}`, url))
+	config := []byte(fmt.Sprintf(`{"hostURI":%q}`, url))
 	return GetInstance(config)
 }
 
