@@ -2,22 +2,15 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
 	"os"
 	"os/exec"
 
 	"github.com/ethereum/hive/simulators/common"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
 )
 
-func init() {
-	hive.Support()
-}
-
 func main() {
-	// Don't ask...
-	ioutil.WriteFile("hiveProviderConfig.json", []byte(fmt.Sprintf(`{"hostURI":%q}`, os.Getenv("HIVE_SIMULATOR"))), 0644)
-	host, err := common.InitProvider("hive", "hiveProviderConfig.json")
+	host, err := hive.New(os.Getenv("HIVE_SIMULATOR"))
 	if err != nil {
 		fatal(fmt.Errorf("unable to initialise provider %s", err.Error()))
 	}

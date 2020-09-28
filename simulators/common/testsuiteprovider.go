@@ -62,7 +62,6 @@ type Logger interface {
 //InitProvider initialises and returns a testsuite provider singleton. Testsuite providers
 //deliver the test suite and case maintenance services needed for simulations to run.
 func InitProvider(providerName string, providerConfigFileName string) (TestSuiteHost, error) {
-
 	providerIniter, ok := testSuiteHostProviders[providerName]
 	if !ok {
 		return nil, ErrNoSuchProviderType

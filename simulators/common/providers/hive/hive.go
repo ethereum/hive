@@ -38,6 +38,12 @@ func Support() {
 	common.RegisterProvider("hive", GetInstance)
 }
 
+// New // TODO document
+func New(url string) (common.TestSuiteHost, error) {
+	config := []byte(fmt.Sprintf(`{"hostURI":%s}`, url))
+	return GetInstance(config)
+}
+
 // GetInstance returns the instance of a proxy to the Hive simulator host, giving a single opportunity to configure it.
 // The configuration is supplied as a byte representation, obtained from a file usually.
 // Clients are generated as docker instances.
