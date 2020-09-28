@@ -30,78 +30,15 @@
 # Immediately abort the script on any error encountered
 set -e
 
-# It doesn't make sense to dial out, use only a pre-set bootnode
-# TODO - 
-if [ "$HIVE_BOOTNODE" != "" ]; then
-	export NETHERMIND_HIVECONFIG_BOOTNODE=$HIVE_BOOTNODE
-fi
+# Configure the chain.
+mkdir -p /chainspec
+jq -f /mapper.jq /genesis.json > /chainspec/test.json
 
-# Override any chain configs in the go-ethereum specific way
-chainconfig="{}"
-
-if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-	echo "Setting homestead block:$HIVE_FORK_HOMESTEAD"
-	chainconfig=`echo $chainconfig | jq ". + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"`
+# Set bootnode.
+if [ -n "$HIVE_BOOTNODE" ]; then
+    mkdir -p /nethermind/Data
+    echo "[\"$HIVE_BOOTNODE\"]" > /nethermind/Data/static-nodes.json
 fi
-if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
-	echo "Setting DAO block:$HIVE_FORK_DAO_BLOCK"
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"`
-fi
-if [ "$HIVE_FORK_DAO_VOTE" == "0" ]; then
-	echo "Setting dao vote block:$HIVE_FORK_DAO_VOTE"
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": false}"`
-fi
-if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
-	echo "Setting dao vot block:$HIVE_FORK_DAO_VOTE"
-	chainconfig=`echo $chainconfig | jq ". + {\"daoForkSupport\": true}"`
-fi
-if [ "$HIVE_FORK_TANGERINE" != "" ]; then
-	echo "Setting tangerine block:$HIVE_FORK_TANGERINE"
-	chainconfig=`echo $chainconfig | jq ". + {\"eip150Block\": $HIVE_FORK_TANGERINE}"`
-fi
-if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
-	echo "Setting spurious block:$HIVE_FORK_SPURIOUS"
-	chainconfig=`echo $chainconfig | jq ". + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"`
-	chainconfig=`echo $chainconfig | jq ". + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"`
-fi
-if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
-	echo "Setting byzantium block:$HIVE_FORK_BYZANTIUM"
-	chainconfig=`echo $chainconfig | jq ". + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"`
-fi
-if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
-	echo "Setting constantinople block:$HIVE_FORK_CONSTANTINOPLE"
-	chainconfig=`echo $chainconfig | jq ". + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"`
-fi
-if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
-    echo "Setting petersburg block:$HIVE_FORK_PETERSBURG"
-	chainconfig=`echo $chainconfig | jq ". + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"`
-fi
-
-if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
-    echo "Setting instabul block:$HIVE_FORK_ISTANBUL"
-        chainconfig=`echo $chainconfig | jq ". + {\"istabulBlock\": $HIVE_FORK_ISTANBUL}"`
-fi
-
-if [ -f /genesis.json ]; then
-
-	genesis=`cat /genesis.json` 
-	echo "Genesis:"
-	echo $genesis
-	echo $genesis | jq ". * {\"config\": $chainconfig}" > /genesis.json
-	echo "Before mapper.jq"
-	cat /genesis.json
-
-	# Configure and set the chain definition for the node
-	configoverride=`jq -f /mapper.jq /genesis.json`
-	echo ".*$configoverride">/tempscript.jq
-	mergedconfig=`jq -f /tempscript.jq /chainspec/test.json`
-	echo $mergedconfig>/chainspec/test.json
-	echo "Chainspec:"
-	cat /chainspec/test.json
-else
-	echo "No genesis supplied"
-fi
-
 
 # Load any keys explicitly added to the node
 #if [ -d ]; then
