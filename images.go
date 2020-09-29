@@ -111,7 +111,7 @@ func buildNestedImages(root string, pattern string, kind string, cacher *buildCa
 	var contextBuilder func(root string, path string) (string, string)
 
 	contextBuilder = func(root string, path string) (string, string) {
-		return root, strings.Replace(path+string(filepath.Separator)+"Dockerfile", "\\", "/", -1)
+		return filepath.Join(root, path), ""
 	}
 
 	// Gather all the folders with Dockerfiles within them
@@ -167,7 +167,7 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 	contextBuilder = func(root string, path string) (string, string, string) {
 		branch := getBranch(path)
 		path = strings.TrimSuffix(path, branchDelimiter+branch)
-		return root, branch, strings.Replace(path+string(filepath.Separator)+"Dockerfile", "\\", "/", -1)
+		return filepath.Join(root, path), branch, ""
 	}
 
 	names := []string{}
