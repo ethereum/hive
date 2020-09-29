@@ -11,7 +11,7 @@ echo "{ \"hostURI\":\"$HIVE_SIMULATOR\" }" >hiveProviderConfig.json
 
 
 if [ "${HIVE_DEBUG}" = true ]; then
-    dlv test  	--headless  --listen=:2345 --log=true  --api-version=2 -simProvider="hive" -providerConfig="hiveProviderConfig.json"  -test.parallel "$HIVE_PARALLELISM" -test.v
+    dlv test  	--headless  --listen=:2345 --log=true  --api-version=2 -providerConfig="hiveProviderConfig.json"  -test.parallel "$HIVE_PARALLELISM" -test.v
 else
     go test  -simProvider="hive" -providerConfig="hiveProviderConfig.json"  -test.parallel $HIVE_PARALLELISM  -test.v -test.timeout 0
 fi
