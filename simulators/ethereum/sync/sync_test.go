@@ -44,12 +44,7 @@ type testCase struct {
 
 func TestMain(m *testing.M) {
 	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
-	var err error
-	host, err = hive.New()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
-		os.Exit(1)
-	}
+	host = hive.New()
 	os.Exit(RunTestSuite(m))
 }
 

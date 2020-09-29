@@ -45,11 +45,7 @@ func TestMain(m *testing.M) {
 
 	flag.Parse()
 
-	host, err = hive.New()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
-		os.Exit(1)
-	}
+	host = hive.New()
 
 	os.Exit(RunTestSuite(m))
 }

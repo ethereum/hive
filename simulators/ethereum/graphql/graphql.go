@@ -219,11 +219,7 @@ func main() {
 	log.Info("Hive simulator started.", "paralellism", paralellism, "testlimit", testLimit)
 
 	// get the test suite engine provider and initialise
-	host, err := hive.New()
-	if err != nil {
-		log.Error(fmt.Sprintf("Unable to initialise provider %s", err.Error()))
-		os.Exit(1)
-	}
+	host := hive.New()
 
 	availableClients, _ := host.GetClientTypes()
 	log.Info("Got clients", "clients", availableClients)
