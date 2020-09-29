@@ -25,7 +25,7 @@ RUN \
 RUN apk add --update bash jq
 
 # Inject the startup script
-ADD harmony.sh /harmony.sh
+ADD ./ethereumj/harmony.sh /harmony.sh
 RUN chmod +x /harmony.sh
 
 # Export the usual networking ports to allow outside access to the node

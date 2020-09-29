@@ -34,14 +34,14 @@ RUN    apk add --update bash curl jq
 RUN echo "{\"repo\":\"\", \"branch\":\"\", \"commit\":\"\"}" > /version.json
 
 # Inject the startup script
-ADD geth.sh /geth.sh
+ADD ./go-ethereum/geth.sh /geth.sh
 RUN chmod +x /geth.sh
 
 # Inject the enode id retriever script
-ADD enode.sh /enode.sh
+ADD ./go-ethereum/enode.sh /enode.sh
 RUN chmod +x /enode.sh
 
-ADD genesis.json /genesis.json
+ADD ./go-ethereum/genesis.json /genesis.json
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8546 8547 30303 30303/udp

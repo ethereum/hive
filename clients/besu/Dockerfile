@@ -3,18 +3,18 @@ FROM hyperledger/besu:develop
 
 USER root
 # Inject the startup script
-ADD besu.sh /opt/besu/bin/besu-hive.sh
+ADD ./besu/besu.sh /opt/besu/bin/besu-hive.sh
 RUN chmod +x /opt/besu/bin/besu-hive.sh
 
 # Inject the enode id retriever script
-ADD enode.sh /enode.sh
+ADD ./besu/enode.sh /enode.sh
 RUN chmod +x /enode.sh
 
 # The enode retriever script requires curl
 RUN apt-get update && \
     apt-get install -y jq curl
 
-ADD genesis.json /genesis.json
+ADD ./besu/genesis.json /genesis.json
 
 ARG branch=master
 RUN echo "{\

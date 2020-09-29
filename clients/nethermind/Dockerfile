@@ -6,11 +6,11 @@ RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /
     echo 'af986793a515d500ab2d35f8d2aecd656e764504b789b66d7e1a0b727a124c44  /usr/local/bin/jq' | sha256sum -c && \
     chmod +x /usr/local/bin/jq
 
-ADD enode.sh /enode.sh
-ADD nethermind.sh /nethermind.sh
-ADD mapper.jq /mapper.jq
-ADD test.json /chainspec/test.json
-ADD test.cfg /configs/test.cfg
+ADD ./nethermind/enode.sh /enode.sh
+ADD ./nethermind/nethermind.sh /nethermind.sh
+ADD ./nethermind/mapper.jq /mapper.jq
+ADD ./nethermind/test.json /chainspec/test.json
+ADD ./nethermind/test.cfg /configs/test.cfg
 RUN chmod +x /nethermind.sh
 RUN chmod +x /enode.sh
 
