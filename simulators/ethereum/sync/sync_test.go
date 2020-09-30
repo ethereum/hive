@@ -2,10 +2,8 @@ package main
 
 import (
 	"context"
-	"flag"
 	"fmt"
 	"os"
-	//"sync"
 	"testing"
 	"time"
 
@@ -15,7 +13,6 @@ import (
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/common"
 	"github.com/ethereum/hive/simulators/common/providers/hive"
-	"github.com/ethereum/hive/simulators/common/providers/local"
 )
 
 var (
@@ -44,22 +41,9 @@ type testCase struct {
 	Client string
 }
 
-func init() {
-	hive.Support()
-	local.Support() // note this can be supported because the different geth instances are identified by their HIVE_NODETYPE parameter
-}
-
 func TestMain(m *testing.M) {
 	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
-	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
-	providerConfigFile := flag.String("providerConfig", "", "the config json file for the provider")
-	flag.Parse()
-	var err error
-	host, err = common.InitProvider(*simProviderType, *providerConfigFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to initialise provider %s", err.Error())
-		os.Exit(1)
-	}
+	host = hive.New()
 	os.Exit(RunTestSuite(m))
 }
 

@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha1"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -16,14 +15,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
-
 	common2 "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/log"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
 )
 
 type envvars map[string]int
@@ -50,7 +48,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"EIP150": {
-		"HIVE_FORK_HOMESTEAD":      0,
+		"HIVE_FORK_HOMESTEAD": 0,
 		//"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       2000,
@@ -60,7 +58,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"EIP158": {
-		"HIVE_FORK_HOMESTEAD":      0,
+		"HIVE_FORK_HOMESTEAD": 0,
 		//"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       0,
@@ -120,8 +118,8 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"HomesteadToEIP150At5": {
-		"HIVE_FORK_HOMESTEAD":      0,
-//		"HIVE_FORK_DAO_BLOCK":      2000,
+		"HIVE_FORK_HOMESTEAD": 0,
+		//		"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_TANGERINE":      5,
 		"HIVE_FORK_SPURIOUS":       2000,
 		"HIVE_FORK_BYZANTIUM":      2000,
@@ -179,11 +177,6 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     0,
 		"HIVE_FORK_ISTANBUL":       5,
 	},
-}
-
-func init() {
-	//support the hive testsuite engine provider
-	hive.Support()
 }
 
 func deliverTests(root string, limit int) chan *testcase {
@@ -469,14 +462,7 @@ func main() {
 	log.Info("Hive simulator started.", "paralellism", paralellism, "testlimit", testLimit)
 
 	// get the test suite engine provider and initialise
-	simProviderType := flag.String("simProvider", "", "the simulation provider type (local|hive)")
-	providerConfigFile := flag.String("providerConfig", "", "the config json file for the provider")
-	flag.Parse()
-	host, err := common.InitProvider(*simProviderType, *providerConfigFile)
-	if err != nil {
-		log.Error(fmt.Sprintf("Unable to initialise provider %s", err.Error()))
-		os.Exit(1)
-	}
+	host := hive.New()
 
 	testpath, isset := os.LookupEnv("TESTPATH")
 	if !isset {

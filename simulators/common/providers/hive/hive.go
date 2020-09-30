@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/hive/simulators/common"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -13,9 +14,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
-
-	"github.com/ethereum/hive/simulators/common"
 )
 
 // HostConfiguration describes the json configuration for
@@ -30,29 +28,20 @@ type host struct {
 	outputStream  io.Writer
 }
 
-var hostProxy *host
-var once sync.Once
+// New looks up the hive host URI using the HIVE_SIMULATOR environment variable
+// and returns a new common.TestSuiteHost. It will panic if HIVE_SIMULATOR is not
+// set.
+func New() common.TestSuiteHost {
+	simulator, isSet := os.LookupEnv("HIVE_SIMULATOR")
+	if !isSet {
+		panic("HIVE_SIMULATOR environment variable not set")
+	}
 
-// Support this provider type to register it
-func Support() {
-	common.RegisterProvider("hive", GetInstance)
-}
-
-// GetInstance returns the instance of a proxy to the Hive simulator host, giving a single opportunity to configure it.
-// The configuration is supplied as a byte representation, obtained from a file usually.
-// Clients are generated as docker instances.
-func GetInstance(config []byte) (common.TestSuiteHost, error) {
-	var err error
-	once.Do(func() {
-		var result HostConfiguration
-		err = json.Unmarshal(config, &result)
-
-		hostProxy = &host{
-			configuration: &result,
-		}
-
-	})
-	return hostProxy, err
+	return &host{
+		configuration: &HostConfiguration{
+			HostURI: simulator,
+		},
+	}
 }
 
 //GetClientEnode Get the client enode for the specified node id
