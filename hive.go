@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -114,7 +115,10 @@ func main() {
 		return
 	}
 	//set up clients and get their versions
-	initClients(cacher)
+	if err := initClients(cacher); err != nil {
+		log15.Crit(fmt.Sprintf("failed to initialize clients: %v", err))
+		os.Exit(1)
+	}
 	// Depending on the flags, either run hive in place or in an outer container shell
 	var fail error
 	if *noShellContainer {
@@ -162,6 +166,7 @@ func initClients(cacher *buildCacher) error {
 	allClients, err = buildClients(clientList, cacher)
 	if err != nil {
 		log15.Crit("failed to build client images", "error", err)
+
 		return err
 	}
 	// Build all pseudo clients. pseudo-clients need to be available
