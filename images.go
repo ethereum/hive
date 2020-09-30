@@ -200,7 +200,9 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 
 	notFound := notFound(names, clientList)
 	if len(notFound) > 0 {
-		log15.Crit("WE GOT SOME UNFOUND IMAGES") // TODO REMOVE
+		for _, notFoundDockerfile := range notFound {
+			log15.Crit("Could not find client image", "image", notFoundDockerfile)
+		}
 	}
 
 	// Iterate over all the matched specs and build their docker images
