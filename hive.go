@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"flag"
-	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -116,8 +115,7 @@ func main() {
 	}
 	//set up clients and get their versions
 	if err := initClients(cacher); err != nil {
-		log15.Crit(fmt.Sprintf("failed to initialize clients: %v", err))
-		os.Exit(1)
+		panic("WAT HAPPENE") // TODO REMOVE
 	}
 	// Depending on the flags, either run hive in place or in an outer container shell
 	var fail error

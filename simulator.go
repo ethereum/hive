@@ -176,7 +176,7 @@ func startTestSuiteAPI() error {
 	mux.Delete("/testsuite/{suite}/test/{test}/node/{node}", nodeKill)
 	mux.Post("/testsuite/{suite}/test/{test}", testDelete) //post because the delete http verb does not always support a message body
 	mux.Post("/testsuite/{suite}/test", testStart)
-	mux.Delete("/testsuite/{suite}", suiteEnd) // TODO call this if any container fails
+	mux.Delete("/testsuite/{suite}", suiteEnd)
 	mux.Post("/testsuite", suiteStart)
 	mux.Get("/clients", clientTypesGet)
 	// Start the API webserver for simulators to coordinate with

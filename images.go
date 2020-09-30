@@ -197,6 +197,9 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 	}); err != nil {
 		return nil, err
 	}
+
+	notFound := notFound(names, clientList)
+
 	// Iterate over all the matched specs and build their docker images
 	images := make(map[string]string)
 	for _, name := range names {
@@ -214,6 +217,23 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 	return images, nil
 }
 
+func notFound(names []string, all []string) []string {
+	found := make(map[string]string, len(names))
+	for _, name := range names {
+		log15.Crit(fmt.Sprintf("name: %s", name)) // TODO REMOVE
+		found[name] = name
+	}
+
+	var notFound []string
+	for _, client := range all {
+		if _, exists := found[client]; !exists {
+			notFound = append(notFound, client)
+		}
+	}
+
+	return notFound
+}
+
 func getBranch(name string) string {
 	branch := ""
 	if branchIndex := strings.LastIndex(name, branchDelimiter); branchIndex > 0 && branchIndex < len(name) {
@@ -223,8 +243,9 @@ func getBranch(name string) string {
 }
 
 func matchNames(name string, clientList []string, names *[]string) {
-
+	log15.Crit("looping inside matchNames") // TODO REMOVE
 	for _, client := range clientList {
+		log15.Crit(fmt.Sprintf("client name: %s", client))
 
 		branch := getBranch(client)
 		if len(branch) > 0 {
