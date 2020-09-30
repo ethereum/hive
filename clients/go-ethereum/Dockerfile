@@ -48,9 +48,7 @@ EXPOSE 8545 8546 8547 30303 30303/udp
 
 # Generate the ethash verification caches
 RUN \
-  /usr/local/bin/geth makecache     1 ~/.ethereum/geth/ethash && \
-  /usr/local/bin/geth makecache 30001 ~/.ethereum/geth/ethash
-
-
+ /usr/local/bin/geth makecache     1 ~/.ethereum/geth/ethash && \
+ /usr/local/bin/geth makecache 30001 ~/.ethereum/geth/ethash
 
 ENTRYPOINT ["/geth.sh"]

@@ -141,11 +141,6 @@ func mainInHost(overrides []string, cacher *buildCacher) error {
 	}
 	// Run all testsuites
 	if *simulatorPattern != "" {
-		//TODO: review this DAG part
-		if err = makeGenesisDAG(cacher); err != nil {
-			log15.Crit("failed generating DAG for simulations", "error", err)
-			return err
-		}
 		//execute testsuites
 		if err = runSimulations(*simulatorPattern, overrides, cacher); err != nil {
 			log15.Crit("failed to run simulations", "error", err)
