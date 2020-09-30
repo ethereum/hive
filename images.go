@@ -246,7 +246,8 @@ func getBranch(name string) string {
 }
 
 func matchNames(name string, clientList []string, names *[]string) {
-	log15.Crit("looping inside matchNames") // TODO REMOVE
+	log15.Crit("looping inside matchNames")                             // TODO REMOVE
+	log15.Crit(fmt.Sprintf("len of clientList... %d", len(clientList))) // TODO REMOVE
 	for _, client := range clientList {
 		log15.Crit(fmt.Sprintf("client name: %s", client))
 
