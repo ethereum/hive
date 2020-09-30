@@ -6,7 +6,6 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
 	"io/ioutil"
 	"math/big"
 	"os"
@@ -22,6 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
 )
 
 type envvars map[string]int
@@ -48,7 +48,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"EIP150": {
-		"HIVE_FORK_HOMESTEAD":      0,
+		"HIVE_FORK_HOMESTEAD": 0,
 		//"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       2000,
@@ -58,7 +58,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"EIP158": {
-		"HIVE_FORK_HOMESTEAD":      0,
+		"HIVE_FORK_HOMESTEAD": 0,
 		//"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       0,
@@ -118,8 +118,8 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_ISTANBUL":       2000,
 	},
 	"HomesteadToEIP150At5": {
-		"HIVE_FORK_HOMESTEAD":      0,
-//		"HIVE_FORK_DAO_BLOCK":      2000,
+		"HIVE_FORK_HOMESTEAD": 0,
+		//		"HIVE_FORK_DAO_BLOCK":      2000,
 		"HIVE_FORK_TANGERINE":      5,
 		"HIVE_FORK_SPURIOUS":       2000,
 		"HIVE_FORK_BYZANTIUM":      2000,

@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
 	"os"
-	//"sync"
 	"testing"
 	"time"
 
@@ -14,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
 )
 
 var (

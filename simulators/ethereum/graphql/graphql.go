@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/hive/simulators/common/providers/hive"
 )
 
 func deliverTests(limit int) chan *testcase {
