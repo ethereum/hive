@@ -225,7 +225,6 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 func notFound(names []string, all []string) []string {
 	found := make(map[string]string, len(names))
 	for _, name := range names {
-		log15.Crit(fmt.Sprintf("name: %s", name)) // TODO REMOVE
 		found[name] = name
 	}
 
