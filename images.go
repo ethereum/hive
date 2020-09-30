@@ -197,12 +197,16 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 	}); err != nil {
 		return nil, err
 	}
-
+	// list all given client names that were not found in the `clients` directory
 	notFound := notFound(names, clientList)
 	if len(notFound) > 0 {
 		for _, notFoundDockerfile := range notFound {
 			log15.Crit("Could not find client image", "image", notFoundDockerfile)
 		}
+	}
+	// if no clients were found, error out
+	if len(names) < 1 {
+		return nil, fmt.Errorf("no client images to build") // TODO fix err message
 	}
 
 	// Iterate over all the matched specs and build their docker images
