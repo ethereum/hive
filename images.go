@@ -136,6 +136,11 @@ func buildNestedImages(root string, pattern string, kind string, cacher *buildCa
 	}); err != nil {
 		return nil, err
 	}
+
+	if len(names) < 1 {
+		return nil, fmt.Errorf("could not find simulation %s", pattern)
+	}
+
 	// Iterate over all the matched specs and build their docker images
 	images := make(map[string]string)
 	for _, name := range names {

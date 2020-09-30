@@ -115,8 +115,8 @@ func main() {
 	}
 	//set up clients and get their versions
 	if err := initClients(cacher); err != nil {
-		log15.Crit("failed to initialize client(s), exiting...")
-		os.Exit(1)
+		log15.Crit("failed to initialize client(s), terminating test...")
+		os.Exit(-1)
 	}
 	// Depending on the flags, either run hive in place or in an outer container shell
 	var fail error
