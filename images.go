@@ -210,6 +210,7 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 		for _, notFoundDockerfile := range notFound {
 			log15.Crit("Could not find client image", "image", notFoundDockerfile)
 		}
+		return nil, fmt.Errorf("invalid client image(s) specified") // TODO fix err message
 	}
 	// if no clients were found, error out
 	if len(names) < 1 {
@@ -226,7 +227,12 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 		)
 		if err := buildImage(image, branch, context, cacher, logger, dockerfile); err != nil {
 			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
-			return nil, berr
+			// if there is only one client to test and it fails, error out,
+			// otherwise proceed building other clients and log error
+			if len(names) < 2 {
+				return nil, berr
+			}
+			log15.Crit("image failed to build", "error", berr)
 		}
 		images[name] = image
 	}
