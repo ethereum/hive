@@ -56,13 +56,6 @@ func buildShell(cacher *buildCacher) (string, error) {
 	return image, buildImage(image, "", ".", cacher, log15.Root(), "")
 }
 
-// buildEthash builds the ethash DAG generator docker image to run before any real
-// simulation needing it takes place.
-func buildEthash(cacher *buildCacher) (string, error) {
-	image := hiveImageNamespace + "/internal/ethash"
-	return image, buildImage(image, "", filepath.Join("internal", "ethash"), cacher, log15.Root(), "")
-}
-
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
 func buildClients(clientList []string, cacher *buildCacher) (map[string]string, error) {
