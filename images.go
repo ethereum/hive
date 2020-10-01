@@ -233,8 +233,9 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 				return nil, berr
 			}
 			log15.Crit("image failed to build", "error", berr)
+		} else {
+			images[name] = image
 		}
-		images[name] = image
 	}
 	return images, nil
 }
