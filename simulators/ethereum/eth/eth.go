@@ -2,25 +2,16 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 
-	"github.com/ethereum/hive/simulators/common"
 	"github.com/ethereum/hive/simulators/common/providers/hive"
+
+	"github.com/ethereum/hive/simulators/common"
 )
 
-func init() {
-	hive.Support()
-}
-
 func main() {
-	// Don't ask...
-	ioutil.WriteFile("hiveProviderConfig.json", []byte(fmt.Sprintf(`{"hostURI":%q}`, os.Getenv("HIVE_SIMULATOR"))), 0644)
-	host, err := common.InitProvider("hive", "hiveProviderConfig.json")
-	if err != nil {
-		fatal(fmt.Errorf("unable to initialise provider %s", err.Error()))
-	}
+	host := hive.New()
 
 	//	get clients
 	// for loop that runs tests against each client type
@@ -57,7 +48,7 @@ func main() {
 		if err != nil {
 			fatalf("could not start test suite: %v", err)
 		}
-		testID, err := host.StartTest(suite, "eth protocol test", "This test suite manually tests a " +
+		testID, err := host.StartTest(suite, "eth protocol test", "This test suite manually tests a "+
 			"client's ability to accurately respond to basic eth protocol messages.")
 		if err != nil {
 			fatalf("could not start test: %v", err)
