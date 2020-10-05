@@ -165,7 +165,6 @@ func initClients(cacher *buildCacher) error {
 	allClients, err = buildClients(clientList, cacher)
 	if err != nil {
 		log15.Crit("failed to build client images", "error", err)
-
 		return err
 	}
 	// Build all pseudo clients. pseudo-clients need to be available
