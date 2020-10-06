@@ -117,7 +117,7 @@ func main() {
 	// create hive error reporter
 	errorReport := NewHiveErrorReport()
 	//set up clients and get their versions
-	if err := initClients(cacher, NewHiveErrorReport()); err != nil {
+	if err := initClients(cacher, errorReport); err != nil {
 		log15.Crit("failed to initialize client(s), terminating test...")
 		errorReport.WriteReport(fmt.Sprintf("%s/errorReport.json", *testResultsRoot))
 		os.Exit(-1)

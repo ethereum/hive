@@ -234,13 +234,15 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 			logger                      = log15.New(kind, name)
 		)
 		if err := buildImage(image, branch, context, cacher, logger, dockerfile); err != nil {
-			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
-			// if there is only one client to test and it fails, error out,
-			// otherwise proceed building other clients and log error
+			errorDetails := fmt.Errorf("%s: %v", context, err)
+			berr := &buildError{err: errorDetails, client: name}
+			// report error
 			errorReport.AddErrorReport(ContainerError{
 				Name:    image,
-				Details: berr.Error(),
+				Details: errorDetails.Error(),
 			})
+			// if there is only one client to test and it fails, error out,
+			// otherwise proceed building other clients and log error
 			if len(names) < 2 {
 				return nil, berr
 			}
