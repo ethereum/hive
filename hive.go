@@ -129,7 +129,7 @@ func main() {
 	} else {
 		fail = mainInShell(overrides, cacher, errorReport)
 	}
-	if err := errorReport.WriteReport(fmt.Sprintf("%s/errorReport.json", *testResultsRoot)); err != nil {
+	if err := errorReport.WriteReport(fmt.Sprintf("%s/containerErrorReport.json", *testResultsRoot)); err != nil {
 		log15.Crit("could not write error report", "error", err)
 	}
 	if fail != nil {
