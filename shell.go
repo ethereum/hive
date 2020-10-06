@@ -14,7 +14,7 @@ import (
 //
 // The end goal of this mechanism is preventing any leakage of junk (be that file
 // system, docker images and/or containers, network traffic) into the host system.
-func mainInShell(overrides []string, cacher *buildCacher) error {
+func mainInShell(overrides []string, cacher *buildCacher, errorReport *HiveErrorReport) error { // TODO include error reporting here..
 	// Build the image for the outer shell container and the container itself
 	log15.Info("creating outer shell container")
 
