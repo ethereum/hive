@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -118,6 +119,7 @@ func main() {
 	//set up clients and get their versions
 	if err := initClients(cacher, NewHiveErrorReport()); err != nil {
 		log15.Crit("failed to initialize client(s), terminating test...")
+		errorReport.WriteReport(fmt.Sprintf("%s/errorReport.json", *testResultsRoot))
 		os.Exit(-1)
 	}
 	// Depending on the flags, either run hive in place or in an outer container shell
@@ -127,7 +129,9 @@ func main() {
 	} else {
 		fail = mainInShell(overrides, cacher, errorReport)
 	}
-	errorReport.WriteReport(*testResultsRoot)
+	if err := errorReport.WriteReport(fmt.Sprintf("%s/errorReport.json", *testResultsRoot)); err != nil {
+		log15.Crit("could not write error report", "error", err)
+	}
 	if fail != nil {
 		os.Exit(-1)
 	}
