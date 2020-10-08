@@ -43,7 +43,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 	}
 
 	// Create a testcase manager
-	testManager = common.NewTestManager(*testResultsRoot, *hiveMaxTestsFlag, killNodeHandler)
+	testManager = common.NewTestManager(*testResultsRoot, *hiveMaxTestsFlag, killNodeHandler, dockerClient)
 
 	// Start the simulator HTTP API
 	err = startTestSuiteAPI()
@@ -64,7 +64,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 		// and have the execution details including duration, hive logs, and sim logs displayed.
 		// logdir will be the execution folder. ie executiondir.
 		logdir := *testResultsRoot
-		err = simulate(*simLimiterFlag, simulatorImage, simulator, overrides, logger, logdir)
+		err = simulate(*simLimiterFlag, simulatorImage, simulator, logger, logdir)
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 // simulate runs a simulator container, which is a host for one or more testsuite
 // runners. These communicate with this hive testsuite provider and host via
 // a client API to run testsuites and their testcases.
-func simulate(simDuration int, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string) error {
+func simulate(simDuration int, simulator string, simulatorLabel string, logger log15.Logger, logdir string) error {
 	logger.Info(fmt.Sprintf("running client simulation: %s", simulatorLabel))
 
 	// The simulator creates the testŕesult files, aswell as updates the index file. However, it needs to also
@@ -105,6 +105,8 @@ func simulate(simDuration int, simulator string, simulatorLabel string, override
 		},
 		HostConfig: hostConfig,
 	})
+	// store simulation container details for later access
+	testManager.AddSimContainer(sc)
 
 	if err != nil {
 		logger.Error("failed to create simulator", "error", err)
@@ -118,6 +120,12 @@ func simulate(simDuration int, simulator string, simulatorLabel string, override
 		if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: sc.ID, Force: true}); err != nil {
 			slogger.Error("failed to delete simulator container", "error", err)
 		}
+		if errs := testManager.PruneNetworks(); len(errs) > 0 {
+			for _, err := range errs {
+				slogger.Error("failed to remove network", "err", err)
+			}
+		}
+		slogger.Debug("docker networks pruned")
 	}()
 
 	// Start the tester container and wait until it finishes
@@ -180,6 +188,10 @@ func startTestSuiteAPI() error {
 	mux.Post("/testsuite/{suite}/test/{test}", testDelete) //post because the delete http verb does not always support a message body
 	mux.Post("/testsuite/{suite}/test", testStart)
 	mux.Delete("/testsuite/{suite}", suiteEnd)
+	mux.Get("/testsuite/{suite}/simulator", getSimulatorID)
+	mux.Post("/testsuite/{suite}/network/{network}", networkCreate)
+	mux.Get("/testsuite/{suite}/network/{network}/node/{node}", nodeNetworkIPGet)
+	mux.Post("/testsuite/{suite}/node/{node}/network/{network}", networkConnect) // TODO weird endpoint, but I guess the length of the network ID was making it hit the networkCreate path?
 	mux.Post("/testsuite", suiteStart)
 	mux.Get("/clients", clientTypesGet)
 	// Start the API webserver for simulators to coordinate with
@@ -285,12 +297,98 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 	io.WriteString(w, fixedIP.URLv4())
 }
 
+// getSimulatorID gets the container ID of the simulation container.
+func getSimulatorID(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("getSimulatorID failed", "error", err)
+		return
+	}
+	id, err := testManager.GetSimID(testSuite)
+	if err != nil {
+		log15.Error("getSimulatorID failed", "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log15.Debug("sim container id", "id", id)
+	fmt.Fprint(w, id)
+}
+
+// networkCreate creates a docker network.
+func networkCreate(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("networkCreate failed", "error", err)
+		return
+	}
+
+	networkName := request.URL.Query().Get(":network")
+	log15.Info("Server - network create")
+
+	id, err := testManager.CreateNetwork(testSuite, networkName)
+	if err != nil {
+		log15.Error("networkCreate unable to create network", "network", networkName, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest) // TODO right err?
+		return
+	}
+	log15.Debug("network created", "network id", id, "network name", networkName)
+
+	fmt.Fprint(w, id) // TODO ??
+}
+
+// networkConnect connects a container to a network.
+func networkConnect(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("networkConnect failed", "error", err)
+		return
+	}
+
+	networkName := request.URL.Query().Get(":network")
+	containerName := request.URL.Query().Get(":node")
+	log15.Info("Server - network connect")
+
+	if err := testManager.ConnectContainerToNetwork(testSuite, networkName, containerName); err != nil {
+		log15.Error("networkCreate unable to connect container to network", "network", networkName, "container", containerName, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest) // TODO right err?
+		return
+	}
+	log15.Debug("container connected to network", "network", networkName, "container", containerName)
+
+	fmt.Fprint(w, "success") // TODO ?
+}
+
+// nodeNetworkIPGet gets the IP address of a container on a network.
+func nodeNetworkIPGet(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("nodeNetworkIPGet failed", "error", err)
+		return
+	}
+
+	node := request.URL.Query().Get(":node")
+	networkID := request.URL.Query().Get(":network")
+	log15.Info("Server - node network IP get", "network", networkID)
+
+	ipAddr, err := testManager.GetNodeNetworkIP(common.TestSuiteID(testSuite), networkID, node)
+	if err != nil {
+		log15.Error("nodeNetworkIPGet unable to get networkIPs", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	log15.Debug("got node IP", "node", node, "ip addr", ipAddr)
+
+	fmt.Fprint(w, ipAddr)
+}
+
 //start a new node as part of a test
 func nodeStart(w http.ResponseWriter, request *http.Request) {
 	if _, err := checkSuiteRequest(request, w); err != nil {
 		log15.Error("nodeStart failed", "error", err)
 		return
 	}
+
 	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return

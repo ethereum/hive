@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/hive/simulators/common"
+
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -14,6 +14,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	"github.com/ethereum/hive/simulators/common"
 )
 
 // HostConfiguration describes the json configuration for
@@ -42,6 +44,52 @@ func New() common.TestSuiteHost {
 			HostURI: simulator,
 		},
 	}
+}
+
+// CreateNetwork sends a request to the hive server to create a docker network by
+// the given name.
+func (sim *host) CreateNetwork(testSuite common.TestSuiteID, networkName string) (string, error) {
+	resp, err := http.Post(fmt.Sprintf("%s/testsuite/%s/network/%s", sim.configuration.HostURI, testSuite.String(), networkName), "application/json", nil)
+	if err != nil {
+		return "", err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}
+
+// ConnectContainerToNetwork sends a request to the hive server to connect the given
+// container to the given network.
+func (sim *host) ConnectContainerToNetwork(testSuite common.TestSuiteID, networkName, containerName string) error {
+	endpoint := fmt.Sprintf("%s/testsuite/%s/node/%s/network/%s", sim.configuration.HostURI, testSuite, containerName, networkName)
+	resp, err := http.Post(endpoint, "application/json", nil)
+	if err != nil {
+		return err
+	}
+	if resp.StatusCode != 200 { // TODO better err check?
+		return fmt.Errorf("error posting connect container to network request, status code %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// GetContainerNetworkIP sends a request to the hive server to get the IP address
+// of the given container on the given network.
+func (sim *host) GetContainerNetworkIP(testSuite common.TestSuiteID, networkID, node string) (string, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/network/%s/node/%s", sim.configuration.HostURI, testSuite.String(), networkID, node))
+	if err != nil {
+		return "", err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
 }
 
 //GetClientEnode Get the client enode for the specified node id
@@ -148,12 +196,6 @@ func (sim *host) GetClientTypes() (availableClients []string, err error) {
 //The input is used as environment variables in the new container
 //Returns container id and ip
 func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, *string, error) {
-	// vals := make(url.Values)
-	// for k, v := range parameters {
-	// 	vals.Add(k, v)
-	// }
-	//vals.Add("testcase", test.String())
-	//	parameters["testcase"] = test.String()
 	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%s/test/%s/node", sim.configuration.HostURI, testSuite.String(), test.String()), parameters, initFiles)
 	if err != nil {
 		return "", nil, nil, err
@@ -162,6 +204,20 @@ func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, param
 		return idip[0], net.ParseIP(idip[1]), &idip[2], nil
 	}
 	return data, net.IP{}, nil, fmt.Errorf("no ip address returned: %v", data)
+}
+
+// GetSimContainerID sends a request to the hive server to get the
+// container ID of the simulation container.
+func (sim *host) GetSimContainerID(testSuite common.TestSuiteID) (string, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/simulator", sim.configuration.HostURI, testSuite))
+	if err != nil {
+		return "", err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
 }
 
 //GetPseudo starts a new pseudo-client with the specified parameters

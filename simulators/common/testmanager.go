@@ -1,8 +1,11 @@
 package common
 
 import (
+	"fmt"
 	"sync"
 	"time"
+
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 // TestManager offers providers a common implementation for
@@ -11,6 +14,10 @@ import (
 type TestManager struct {
 	OutputPath       string
 	KillNodeCallback func(testSuite TestSuiteID, test TestID, node string) error
+
+	dockerClient        *docker.Client
+	simulationContainer *docker.Container
+	networks            []string // list of all networks started by the test.
 
 	testLimiter       int
 	runningTestSuites map[TestSuiteID]*TestSuite
@@ -24,14 +31,14 @@ type TestManager struct {
 }
 
 // NewTestManager is a constructor returning a TestManager
-func NewTestManager(outputPath string, testLimiter int, killNodeCallback func(testSuite TestSuiteID, test TestID, node string) error) *TestManager {
-
+func NewTestManager(outputPath string, testLimiter int, killNodeCallback func(testSuite TestSuiteID, test TestID, node string) error, client *docker.Client) *TestManager {
 	return &TestManager{
 		OutputPath:        outputPath,
 		testLimiter:       testLimiter,
 		KillNodeCallback:  killNodeCallback,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
+		dockerClient:      client,
 	}
 }
 
@@ -101,6 +108,117 @@ func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, node
 		}
 	}
 	return nodeInfo, nil
+}
+
+// AddSimContainer adds the given simulation container to the test manager
+// for later access.
+func (manager *TestManager) AddSimContainer(container *docker.Container) {
+	manager.testSuiteMutex.RLock()
+	defer manager.testSuiteMutex.RUnlock()
+	manager.simulationContainer = container
+}
+
+// GetSimID returns the container ID for the test manager's simulation
+// container.
+func (manager *TestManager) GetSimID(testSuite TestSuiteID) (string, error) {
+	_, ok := manager.IsTestSuiteRunning(testSuite)
+	if !ok {
+		return "", ErrNoSuchTestSuite
+	}
+	// error out if simulation container not found
+	if manager.simulationContainer == nil {
+		return "", ErrNoSuchNode
+	}
+
+	return manager.simulationContainer.ID, nil
+}
+
+// CreateNetwork creates a docker network with the given network name, returning
+// the network ID upon success.
+func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, networkName string) (string, error) {
+	_, ok := manager.IsTestSuiteRunning(testSuite)
+	if !ok {
+		return "", ErrNoSuchTestSuite
+	}
+	// list networks to make sure not to duplicate
+	existing, err := manager.dockerClient.ListNetworks()
+	if err != nil {
+		return "", err
+	}
+	// check for existing networks with same name, and if exists, remove
+	for _, exists := range existing {
+		if exists.Name == networkName {
+			if err := manager.dockerClient.RemoveNetwork(exists.ID); err != nil {
+				return "", err
+			}
+		}
+	}
+	// create network
+	network, err := manager.dockerClient.CreateNetwork(docker.CreateNetworkOptions{
+		Name:           networkName,
+		CheckDuplicate: true,
+		Attachable:     true,
+	})
+	manager.networks = append(manager.networks, network.ID)
+	return network.ID, err
+}
+
+// PruneNetworks prunes all unused docker networks.
+func (manager *TestManager) PruneNetworks() []error {
+	var errs []error
+	for _, network := range manager.networks {
+		if err := manager.dockerClient.RemoveNetwork(network); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errs
+}
+
+// ConnectContainerToNetwork connects the given container to the given network.
+func (manager *TestManager) ConnectContainerToNetwork(testSuite TestSuiteID, networkID, containerID string) error {
+	_, ok := manager.IsTestSuiteRunning(testSuite)
+	if !ok {
+		return ErrNoSuchTestSuite
+	}
+	return manager.dockerClient.ConnectNetwork(networkID, docker.NetworkConnectionOptions{
+		Container:      containerID,
+		EndpointConfig: nil, // TODO ?
+	})
+}
+
+// GetNodeNetworkIP gets the IP address of the given container on the given network.
+func (manager *TestManager) GetNodeNetworkIP(testSuite TestSuiteID, networkID, nodeID string) (string, error) {
+	manager.nodeMutex.Lock()
+	defer manager.nodeMutex.Unlock()
+
+	_, ok := manager.IsTestSuiteRunning(testSuite)
+	if !ok {
+		return "", ErrNoSuchTestSuite
+	}
+
+	ipAddr, err := getContainerIP(manager.dockerClient, networkID, nodeID)
+	if err != nil {
+		return "", err
+	}
+
+	return ipAddr, nil
+}
+
+func getContainerIP(dockerClient *docker.Client, networkID, container string) (string, error) {
+	details, err := dockerClient.InspectContainerWithOptions(docker.InspectContainerOptions{
+		ID: container,
+	})
+	if err != nil {
+		return "", err
+	}
+	// range over all networks to which the container is connected
+	// and get network-specific IPs
+	for _, network := range details.NetworkSettings.Networks {
+		if network.NetworkID == networkID {
+			return network.IPAddress, nil
+		}
+	}
+	return "", fmt.Errorf("network not found")
 }
 
 // EndTestSuite ends the test suite by writing the test suite results to the supplied
