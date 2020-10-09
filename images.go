@@ -58,13 +58,13 @@ func buildShell(cacher *buildCacher) (string, error) {
 
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
-func buildClients(clientList []string, cacher *buildCacher) (map[string]string, error) {
-	return buildListedImages("clients", clientList, "client", cacher, false)
+func buildClients(clientList []string, cacher *buildCacher, errorReport *HiveErrorReport) (map[string]string, error) {
+	return buildListedImages("clients", clientList, "client", cacher, false, errorReport)
 }
 
 // buildPseudoClients iterates over all the known pseudo-clients and builds a docker image for
-func buildPseudoClients(pattern string, cacher *buildCacher) (map[string]string, error) {
-	return buildNestedImages("pseudoclients", pattern, "pseudoclient", cacher, false)
+func buildPseudoClients(pattern string, cacher *buildCacher, errorReport *HiveErrorReport) (map[string]string, error) {
+	return buildNestedImages("pseudoclients", pattern, "pseudoclient", cacher, false, errorReport)
 }
 
 // fetchClientVersions downloads the version json specs from all clients that
@@ -92,14 +92,14 @@ func fetchClientVersions(cacher *buildCacher) (map[string]map[string]string, err
 
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
-func buildSimulators(pattern string, cacher *buildCacher) (map[string]string, error) {
-	images, err := buildNestedImages("simulators", pattern, "simulator", cacher, *simRootContext)
+func buildSimulators(pattern string, cacher *buildCacher, errorReport *HiveErrorReport) (map[string]string, error) {
+	images, err := buildNestedImages("simulators", pattern, "simulator", cacher, *simRootContext, errorReport)
 	return images, err
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested
 // docker image definitions and builds all of them matching the provided pattern.
-func buildNestedImages(root string, pattern string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
+func buildNestedImages(root string, pattern string, kind string, cacher *buildCacher, rootContext bool, errorReport *HiveErrorReport) (map[string]string, error) {
 
 	var contextBuilder func(root string, path string) (string, string)
 
@@ -136,6 +136,15 @@ func buildNestedImages(root string, pattern string, kind string, cacher *buildCa
 	}); err != nil {
 		return nil, err
 	}
+
+	if len(names) < 1 {
+		errorReport.AddErrorReport(ContainerError{
+			Name:    pattern,
+			Details: "could not find simulation",
+		})
+		return nil, fmt.Errorf("could not find simulation %s", pattern)
+	}
+
 	// Iterate over all the matched specs and build their docker images
 	images := make(map[string]string)
 	for _, name := range names {
@@ -159,7 +168,7 @@ func buildNestedImages(root string, pattern string, kind string, cacher *buildCa
 // For example, if the clientList contained geth_master, geth_beta and
 // the clients folder contained a dockerfile for clients\geth, then this
 // will created two images, one for clients\geth_master and one for clients\geth_beta
-func buildListedImages(root string, clientList []string, kind string, cacher *buildCacher, rootContext bool) (map[string]string, error) {
+func buildListedImages(root string, clientList []string, kind string, cacher *buildCacher, rootContext bool, errorReport *HiveErrorReport) (map[string]string, error) {
 
 	var contextBuilder func(root string, path string) (string, string, string)
 
@@ -197,6 +206,25 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 	}); err != nil {
 		return nil, err
 	}
+	// list all given client names that were not found in the `clients` directory
+	notFound := notFound(names, clientList)
+	// only throw error if the given client pattern was not found (e.g. "bes" is technically incorrect,
+	// but the pattern matches "besu", so the client is still found)
+	if len(notFound) > 0 && len(names) != len(clientList) {
+		for _, notFoundDockerfile := range notFound {
+			log15.Crit("Could not find client image", "image", notFoundDockerfile)
+			errorReport.AddErrorReport(ContainerError{
+				Name:    notFoundDockerfile,
+				Details: "could not find client image",
+			})
+		}
+		return nil, fmt.Errorf("invalid client image(s) specified") // TODO fix err message
+	}
+	// if no clients were found, error out
+	if len(names) < 1 {
+		return nil, fmt.Errorf("no client images to build") // TODO fix err message
+	}
+
 	// Iterate over all the matched specs and build their docker images
 	images := make(map[string]string)
 	for _, name := range names {
@@ -206,12 +234,40 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 			logger                      = log15.New(kind, name)
 		)
 		if err := buildImage(image, branch, context, cacher, logger, dockerfile); err != nil {
-			berr := &buildError{err: fmt.Errorf("%s: %v", context, err), client: name}
-			return nil, berr
+			errorDetails := fmt.Errorf("%s: %v", context, err)
+			berr := &buildError{err: errorDetails, client: name}
+			// report error
+			errorReport.AddErrorReport(ContainerError{
+				Name:    image,
+				Details: errorDetails.Error(),
+			})
+			// if there is only one client to test and it fails, error out,
+			// otherwise proceed building other clients and log error
+			if len(names) < 2 {
+				return nil, berr
+			}
+			log15.Crit("image failed to build", "error", berr)
+		} else {
+			images[name] = image
 		}
-		images[name] = image
 	}
 	return images, nil
+}
+
+func notFound(names []string, all []string) []string {
+	found := make(map[string]string, len(names))
+	for _, name := range names {
+		found[name] = name
+	}
+
+	var notFound []string
+	for _, client := range all {
+		if _, exists := found[client]; !exists {
+			notFound = append(notFound, client)
+		}
+	}
+
+	return notFound
 }
 
 func getBranch(name string) string {
@@ -223,7 +279,6 @@ func getBranch(name string) string {
 }
 
 func matchNames(name string, clientList []string, names *[]string) {
-
 	for _, client := range clientList {
 
 		branch := getBranch(client)
