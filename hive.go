@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -113,14 +114,23 @@ func main() {
 		log15.Crit("failed to parse nocache regexp", "error", err)
 		return
 	}
+	// create hive error reporter
+	errorReport := NewHiveErrorReport()
 	//set up clients and get their versions
-	initClients(cacher)
+	if err := initClients(cacher, errorReport); err != nil {
+		log15.Crit("failed to initialize client(s), terminating test...")
+		errorReport.WriteReport(fmt.Sprintf("%s/errorReport.json", *testResultsRoot))
+		os.Exit(-1)
+	}
 	// Depending on the flags, either run hive in place or in an outer container shell
 	var fail error
 	if *noShellContainer {
-		fail = mainInHost(overrides, cacher)
+		fail = mainInHost(overrides, cacher, errorReport)
 	} else {
-		fail = mainInShell(overrides, cacher)
+		fail = mainInShell(overrides, cacher, errorReport)
+	}
+	if err := errorReport.WriteReport(fmt.Sprintf("%s/containerErrorReport.json", *testResultsRoot)); err != nil {
+		log15.Crit("could not write error report", "error", err)
 	}
 	if fail != nil {
 		os.Exit(-1)
@@ -130,7 +140,7 @@ func main() {
 // mainInHost runs the actual hive testsuites on the
 // host machine itself. This is usually the path executed within an outer shell
 // container, but can be also requested directly.
-func mainInHost(overrides []string, cacher *buildCacher) error {
+func mainInHost(overrides []string, cacher *buildCacher, errorReport *HiveErrorReport) error {
 	var err error
 
 	// create or use the specified rootpath
@@ -142,7 +152,7 @@ func mainInHost(overrides []string, cacher *buildCacher) error {
 	// Run all testsuites
 	if *simulatorPattern != "" {
 		//execute testsuites
-		if err = runSimulations(*simulatorPattern, overrides, cacher); err != nil {
+		if err = runSimulations(*simulatorPattern, overrides, cacher, errorReport); err != nil {
 			log15.Crit("failed to run simulations", "error", err)
 			return err
 		}
@@ -154,12 +164,12 @@ func mainInHost(overrides []string, cacher *buildCacher) error {
 
 // initClients builds any docker images needed and maps
 // client name_branchs
-func initClients(cacher *buildCacher) error {
+func initClients(cacher *buildCacher, errorReport *HiveErrorReport) error {
 	var err error
 	// Build all the clients that we need and make a map of
 	// names (eg: geth_latest, in the format client_branch )
 	// against image names in the docker image name format
-	allClients, err = buildClients(clientList, cacher)
+	allClients, err = buildClients(clientList, cacher, errorReport)
 	if err != nil {
 		log15.Crit("failed to build client images", "error", err)
 		return err
@@ -167,7 +177,7 @@ func initClients(cacher *buildCacher) error {
 	// Build all pseudo clients. pseudo-clients need to be available
 	// to simulators. pseudo-clients play the role of special types
 	// of actor in a network, such as network relay for example
-	allPseudos, err = buildPseudoClients("pseudo", cacher)
+	allPseudos, err = buildPseudoClients("pseudo", cacher, errorReport)
 	if err != nil {
 		log15.Crit("failed to build client images", "error", err)
 		return err

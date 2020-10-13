@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"os/signal"
 
@@ -14,7 +15,7 @@ import (
 //
 // The end goal of this mechanism is preventing any leakage of junk (be that file
 // system, docker images and/or containers, network traffic) into the host system.
-func mainInShell(overrides []string, cacher *buildCacher) error {
+func mainInShell(overrides []string, cacher *buildCacher, errorReport *HiveErrorReport) error {
 	// Build the image for the outer shell container and the container itself
 	log15.Info("creating outer shell container")
 
@@ -25,6 +26,10 @@ func mainInShell(overrides []string, cacher *buildCacher) error {
 	// Create the shell container and make sure it's deleted afterwards
 	shell, err := createShellContainer(image, overrides)
 	if err != nil {
+		errorReport.AddErrorReport(ContainerError{
+			Name:    image,
+			Details: fmt.Sprintf("failed to create shell container: %v", err),
+		})
 		log15.Error("failed to create shell container", "error", err)
 		return err
 	}
@@ -32,6 +37,10 @@ func mainInShell(overrides []string, cacher *buildCacher) error {
 	defer func() {
 		log15.Debug("deleting shell container")
 		if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: shell.ID, Force: true}); err != nil {
+			errorReport.AddErrorReport(ContainerError{
+				Name:    shell.Name,
+				Details: fmt.Sprintf("failed to delete shell container: %v", err),
+			})
 			log15.Error("failed to delete shell container", "error", err)
 		}
 	}()
@@ -40,6 +49,10 @@ func mainInShell(overrides []string, cacher *buildCacher) error {
 
 	waiter, err := runContainer(shell.ID, log15.Root(), "", true, *loglevelFlag)
 	if err != nil {
+		errorReport.AddErrorReport(ContainerError{
+			Name:    shell.Name,
+			Details: fmt.Sprintf("failed to execute hive shell: %v", err),
+		})
 		log15.Error("failed to execute hive shell", "error", err)
 		return err
 	}
@@ -52,6 +65,10 @@ func mainInShell(overrides []string, cacher *buildCacher) error {
 		log15.Error("shell interrupted, stopping")
 		err := dockerClient.StopContainer(shell.ID, 0)
 		if err != nil {
+			errorReport.AddErrorReport(ContainerError{
+				Name:    shell.Name,
+				Details: fmt.Sprintf("failed to stop hive shell: %v", err),
+			})
 			log15.Error("failed to stop hive shell", "error", err)
 		}
 	}()

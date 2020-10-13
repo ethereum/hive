@@ -27,14 +27,14 @@ var (
 )
 
 // runSimulations runs each 'simulation' container, which are hosts for executing one or more test-suites
-func runSimulations(simulatorPattern string, overrides []string, cacher *buildCacher) error {
+func runSimulations(simulatorPattern string, overrides []string, cacher *buildCacher, errorReport *HiveErrorReport) error {
 
 	// Clean up
 	defer terminateAndUpdate()
 
 	// Build all the simulators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
-	simulators, err := buildSimulators(simulatorPattern, cacher)
+	simulators, err := buildSimulators(simulatorPattern, cacher, errorReport)
 	if err != nil {
 		return err
 	}
