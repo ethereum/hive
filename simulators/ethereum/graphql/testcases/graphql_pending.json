@@ -8,12 +8,12 @@
         "transactionCount": 2,
         "transactions": [
           {
-            "nonce": 55,
-            "gas": 140000
-          },
-          {
             "nonce": 50,
             "gas": 1048575
+          },
+          {
+            "nonce": 55,
+            "gas": 140000
           }
         ],
         "account": {
