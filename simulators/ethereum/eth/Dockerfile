@@ -1,4 +1,4 @@
-# This simulation runs various graphql tests
+# This simulation runs various eth-protocol tests
 FROM golang:1.15-alpine as builder
 RUN apk add --no-cache git make gcc musl-dev linux-headers bash  curl jq
 
