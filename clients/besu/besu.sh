@@ -37,6 +37,9 @@
 
 besu=/opt/besu/bin/besu
 
+# See https://github.com/hyperledger/besu/issues/1464
+export BESU_OPTS="-Dsecp256k1.randomize=false"
+
 RPCFLAGS=" --host-whitelist=* --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
 	RPCFLAGS="$RPCFLAGS --graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8550"
