@@ -206,6 +206,7 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 	}); err != nil {
 		return nil, err
 	}
+
 	// list all given client names that were not found in the `clients` directory
 	notFound := notFound(names, clientList)
 	// only throw error if the given client pattern was not found (e.g. "bes" is technically incorrect,
@@ -280,13 +281,11 @@ func getBranch(name string) string {
 
 func matchNames(name string, clientList []string, names *[]string) {
 	for _, client := range clientList {
-
 		branch := getBranch(client)
 		if len(branch) > 0 {
 			branch = branchDelimiter + branch
 		}
 		clientWithoutBranch := strings.TrimSuffix(client, branch)
-
 		if strings.Contains(name, clientWithoutBranch) {
 			*names = append(*names, filepath.Join(strings.Split(name, string(filepath.Separator))[1:]...)+branch)
 		}
@@ -333,7 +332,9 @@ func buildImage(image, branch, context string, cacher *buildCacher, logger log15
 		Dockerfile:   dockerfile,
 		OutputStream: stream,
 		NoCache:      nocache,
-		BuildArgs:    []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}},
+	}
+	if branch != "" {
+		opts.BuildArgs = []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}}
 	}
 	if err := dockerClient.BuildImage(opts); err != nil {
 		logger.Error("failed to build docker image",
