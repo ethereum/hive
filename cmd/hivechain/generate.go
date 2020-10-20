@@ -2,17 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"os"
 	"path/filepath"
 
-	"github.com/ethereum/go-ethereum/core/rawdb"
-	"gopkg.in/inconshreveable/log15.v2"
-
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -92,14 +91,11 @@ func produceSimpleTestChain(path string, blockCount uint) error {
 func produceTestChainFromGenesisFile(sourceGenesis string, outputPath string, blockCount uint, blockTimeInSeconds uint) error {
 	sourceBytes, err := ioutil.ReadFile(sourceGenesis)
 	if err != nil {
-		log15.Crit("failed to read genesis json", "error", err)
 		return err
 	}
-
 	var gspec core.Genesis
-	if err = json.Unmarshal(sourceBytes, &gspec); err != nil {
-		log15.Crit("failed to deserialize genesis json", "error", err)
-		return err
+	if err := json.Unmarshal(sourceBytes, &gspec); err != nil {
+		return fmt.Errorf("invalid genesis JSON: %v", err)
 	}
 	blockModifier := func(i int, gen *core.BlockGen) {
 		gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
@@ -123,7 +119,6 @@ func writeChain(chain *core.BlockChain, filename string, start uint64) error {
 func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blockModifier func(i int, gen *core.BlockGen)) error {
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
-
 	eng := newSealingEthash(ethash.Config{PowMode: ethash.ModeNormal}, nil, false)
 
 	// Generate a chain where each block is created, modified, and immediately sealed.
@@ -132,22 +127,18 @@ func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blo
 	// Import the chain. This runs all block validation rules.
 	blockchain, err := core.NewBlockChain(db, nil, gspec.Config, eng, vm.Config{}, nil)
 	if err != nil {
-		log15.Crit("new chain error", "error", err)
-		return err
+		return fmt.Errorf("can't create blockchain: %v", err)
 	}
 	defer blockchain.Stop()
 	if _, err := blockchain.InsertChain(chain); err != nil {
-		log15.Crit("insert chain error", "error", err)
-		return err
+		return fmt.Errorf("chain validation error: %v", err)
 	}
 
 	// Write out the generated blockchain
 	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 0); err != nil {
-		log15.Crit("error writing chain to file", "error", err)
 		return err
 	}
 	if err := writeChain(blockchain, filepath.Join(path, "chain_nogenesis.rlp"), 1); err != nil {
-		log15.Crit("error writing chain to file", "error", err)
 		return err
 	}
 	return nil
