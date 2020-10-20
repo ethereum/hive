@@ -36,7 +36,6 @@ ADD . $GOPATH/src/github.com/ethereum/hive
 
 WORKDIR $GOPATH/src/github.com/ethereum/hive
 RUN go install
-RUN go install ./chaintools
 
 # Define the tiny startup script to boot docker and hive afterwards
 RUN \
