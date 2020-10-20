@@ -1,14 +1,14 @@
-// The hive-chain command assists with generating blockchain data for testing purposes.
+// The hivechain command assists with generating blockchain data for testing purposes.
 //
 // The 'generate' subcommand mines a new chain:
 //
 //     hivechain generate -length 10 -genesis ./genesis.json -blocktime 30 -output .
 //
-// The 'print' subcommand displays the blocks in the given chain.rlp file:
+// The 'print' subcommand displays blocks in a chain.rlp file:
 //
-//     hivechain print chain.rlp
+//     hivechain print -v chain.rlp
 //
-// The 'trim' subcommand modifies a chain.rlp file to contain a subset of blocks:
+// The 'trim' subcommand extracts a range of blocks from a chain.rlp file:
 //
 //     hivechain trim -from 10 -to 100 chain.rlp newchain.rlp
 //
