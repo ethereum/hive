@@ -135,10 +135,10 @@ func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blo
 	}
 
 	// Write out the generated blockchain
-	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 0); err != nil {
+	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 1); err != nil {
 		return err
 	}
-	if err := writeChain(blockchain, filepath.Join(path, "chain_nogenesis.rlp"), 1); err != nil {
+	if err := writeChain(blockchain, filepath.Join(path, "chain_genesis.rlp"), 0); err != nil {
 		return err
 	}
 	return nil
