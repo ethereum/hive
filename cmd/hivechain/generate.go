@@ -9,9 +9,11 @@ import (
 	"path/filepath"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -119,13 +121,14 @@ func writeChain(chain *core.BlockChain, filename string, start uint64) error {
 func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blockModifier func(i int, gen *core.BlockGen)) error {
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
-	eng := newSealingEthash(ethash.Config{PowMode: ethash.ModeNormal}, nil, false)
+	engine := ethash.New(ethash.Config{PowMode: ethash.ModeNormal}, nil, false)
+	insta := instaSeal{engine}
 
 	// Generate a chain where each block is created, modified, and immediately sealed.
-	chain, _ := core.GenerateChain(gspec.Config, genesis, eng, db, int(blockCount), blockModifier)
+	chain, _ := core.GenerateChain(gspec.Config, genesis, insta, db, int(blockCount), blockModifier)
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, err := core.NewBlockChain(db, nil, gspec.Config, eng, vm.Config{}, nil)
+	blockchain, err := core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{}, nil)
 	if err != nil {
 		return fmt.Errorf("can't create blockchain: %v", err)
 	}
@@ -142,4 +145,22 @@ func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blo
 		return err
 	}
 	return nil
+}
+
+// instaSeal wraps a consensus engine with instant block sealing. When a block is produced
+// using FinalizeAndAssemble, it also applies Seal.
+type instaSeal struct{ consensus.Engine }
+
+// FinalizeAndAssemble implements consensus.Engine, accumulating the block and uncle rewards,
+// setting the final state and assembling the block.
+func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+	block, err := e.Engine.FinalizeAndAssemble(chain, header, state, txs, uncles, receipts)
+	if err != nil {
+		return nil, err
+	}
+	sealedBlock := make(chan *types.Block, 1)
+	if err = e.Engine.Seal(nil, block, sealedBlock, nil); err != nil {
+		return nil, err
+	}
+	return <-sealedBlock, nil
 }
