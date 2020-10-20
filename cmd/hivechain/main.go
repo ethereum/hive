@@ -10,7 +10,7 @@
 //
 // The 'trim' subcommand modifies a chain.rlp file to contain a subset of blocks:
 //
-//     hivechain trim chain.rlp newchain.rlp
+//     hivechain trim -from 10 -to 100 chain.rlp newchain.rlp
 //
 package main
 
@@ -91,6 +91,9 @@ func trimCommand(args []string) {
 	flag.CommandLine.Parse(args)
 	if flag.NArg() != 2 {
 		fatalf("Usage: hivechain trim [ options ] <chain.rlp> <newchain.rlp>")
+	}
+	if *to > 0 && *to <= *from {
+		fatalf("-to must be greater than -from")
 	}
 
 	input, err := os.Open(flag.Arg(0))
