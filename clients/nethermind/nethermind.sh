@@ -33,6 +33,7 @@ set -e
 # Configure the chain.
 mkdir -p /chainspec
 jq -f /mapper.jq /genesis.json > /chainspec/test.json
+jq . /chainspec/test.json
 
 # Set bootnode.
 if [ -n "$HIVE_BOOTNODE" ]; then
