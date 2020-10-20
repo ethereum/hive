@@ -105,7 +105,7 @@ func produceTestChainFromGenesisFile(sourceGenesis string, outputPath string, bl
 
 // writeChain exports the given chain to a file.
 func writeChain(chain *core.BlockChain, filename string, start uint64) error {
-	out, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.ModePerm)
+	out, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
