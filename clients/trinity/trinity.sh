@@ -62,6 +62,7 @@ fi
 
 # Configure and set the chain definition.
 jq -f /mapper.jq /genesis.json > /newconfig.json
+cat /newconfig.json
 FLAGS="$FLAGS --genesis /newconfig.json"
 
 # Disable TxPool. Trinity won't start with a custom genesis unless
@@ -74,6 +75,7 @@ set +e
 # Import blockchain from /chain.rlp and /blocks.
 if [ -f /chain.rlp ]; then
     echo "Loading initial blockchain..."
+    echo trinity $FLAGS import /chain.rlp
     trinity $FLAGS import /chain.rlp
 fi
 if [ -d /blocks ]; then
