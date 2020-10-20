@@ -24,7 +24,7 @@ def int_to_hex:
   def stream:
     recurse(if . > 0 then ./16|floor else empty end) | . % 16 ;
   if . == 0 then "0x0"
-  else "0x" + ([stream] | reverse | .[1:] | map(tostring) | join(""))
+  else "0x" + ([stream] | reverse | .[1:] | map(if .<10 then 48+. else 87+. end) | implode)
   end
 ;
 
