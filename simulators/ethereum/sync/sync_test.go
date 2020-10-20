@@ -7,9 +7,10 @@ import (
 	"testing"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	rpc "github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/common"
 	"github.com/ethereum/hive/simulators/common/providers/hive"
@@ -20,13 +21,13 @@ var (
 	syncTimeout = 30 * time.Second //the number of seconds before a sync is considered stalled or failed
 	testSuite   common.TestSuiteID
 	params      = map[string]string{
-		"HIVE_NETWORK_ID":     "1",
-		"HIVE_CHAIN_ID":       "1",
+		"HIVE_NETWORK_ID":     "19763",
+		"HIVE_CHAIN_ID":       "19763",
 		"HIVE_FORK_HOMESTEAD": "0",
 		"HIVE_FORK_TANGERINE": "0",
 		"HIVE_FORK_SPURIOUS":  "0",
 		"HIVE_FORK_BYZANTIUM": "0",
-		"HIVE_NODETYPE":       "full", //fast sync
+		"HIVE_NODETYPE":       "full",
 	}
 	sourceFiles = map[string]string{
 		"genesis.json": "/simplechain/genesis.json",
@@ -37,12 +38,12 @@ var (
 	}
 )
 
-type testCase struct {
-	Client string
-}
+var (
+	testchainHeadNumber = uint64(10)
+	testchainHeadHash   = ethcommon.HexToHash("0x27ad5014b2a18fab49357f9b42e79f22298d00fd3d1da4f1bd7d109f44065596")
+)
 
 func TestMain(m *testing.M) {
-	//Max Concurrency is specified in the parallel flag, which is supplied to the simulator container
 	host = hive.New()
 	os.Exit(RunTestSuite(m))
 }
@@ -62,7 +63,8 @@ func copyMap(a map[string]string) map[string]string {
 func TestSync(t *testing.T) {
 	log.Root().SetHandler(log.StdoutHandler)
 	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
-	//start the test suite
+
+	// start the test suite
 	testSuite, err := host.StartTestSuite("Sync test suite",
 		`This suite of tests verifies that clients can sync from each other in different modes.
 For each client, we test if it can serve as a sync source for all other clients (including itself)
@@ -71,36 +73,20 @@ For each client, we test if it can serve as a sync source for all other clients 
 		t.Fatalf("Simulator error. Failed to start test suite. %v ", err)
 	}
 	defer host.EndTestSuite(testSuite)
-	//get all client types required to test
+
 	availableClients, err := host.GetClientTypes()
 	if err != nil {
 		t.Fatalf("Simulator error. Cannot get client types. %v", err)
 	}
 
 	for _, sourceType := range availableClients {
-		// Load source with chain
-		sourceTestID, _ := host.StartTest(testSuite, fmt.Sprintf("`%v` as sync-source", sourceType),
-			fmt.Sprintf("Tests that `%v` can do a block import and serve as sync source", sourceType))
-		sourceNode, err := getClient(sourceType, testSuite, sourceTestID, params, sourceFiles, "")
-		endSourceTest := func(err error) {
-			if err != nil {
-				t.Errorf("Test failed %s", err.Error())
-				host.EndTest(testSuite, sourceTestID, &common.TestResult{Pass: false},
-					common.TestClientResults{
-						sourceType: {Pass: false, Details: err.Error()},
-					})
-				return
-			}
-			host.EndTest(testSuite, sourceTestID, &common.TestResult{Pass: true}, nil)
-		}
-		if err != nil {
-			endSourceTest(fmt.Errorf("Unable to instantiate source-node `%v`: %s", sourceType, err.Error()))
+		sourceNode, endSourceTest := startSourceNode(t, testSuite, sourceType)
+		if sourceNode == nil {
 			continue
 		}
-		// TODO: Verify that the source-node is indeed at the expected block num.
 
 		for _, sinkType := range availableClients {
-			testName := fmt.Sprintf("fast-sync %v -> %v", sourceType, sinkType)
+			testName := fmt.Sprintf("sync %v -> %v", sourceType, sinkType)
 			desc := fmt.Sprintf("This test initialises the client-under-test (`%v`) "+
 				"with a predefined chain, and attempts to sync up another "+
 				"node (`%v`) against the it.", sourceType, sinkType)
@@ -122,7 +108,7 @@ For each client, we test if it can serve as a sync source for all other clients 
 						t.Errorf("Test failed %s", summaryResult.Details)
 					}
 				}()
-				var bootnode = sourceNode.enodeId.String()
+				var bootnode = sourceNode.enode
 				sinkNode, err := getClient(sinkType, testSuite, testID, params, sinkFiles, bootnode)
 				if err != nil {
 					msg := fmt.Sprintf("Unable to instantiate sink-node %v: %s", sinkType, err.Error())
@@ -133,7 +119,7 @@ For each client, we test if it can serve as a sync source for all other clients 
 					return
 				}
 
-				if err := syncNodes(sourceNode, sinkNode, 10); err != nil {
+				if err := syncNodes(sourceNode, sinkNode, testchainHeadNumber, testchainHeadHash); err != nil {
 					summaryResult.Pass = false
 					clientResults.AddResult(sourceNode.id, false, err.Error())
 					clientResults.AddResult(sinkNode.id, false, err.Error())
@@ -146,27 +132,53 @@ For each client, we test if it can serve as a sync source for all other clients 
 				//host.KillNode(testSuite, testID, sinkNodeId)
 			})
 		}
+
 		// This will signal that the source node is done for deletion
 		endSourceTest(nil)
 	}
+}
+
+func startSourceNode(t *testing.T, testSuite common.TestSuiteID, sourceType string) (*node, func(error)) {
+	desc := fmt.Sprintf("Tests that `%v` can do a block import and serve as sync source", sourceType)
+	sourceTestID, _ := host.StartTest(testSuite, fmt.Sprintf("`%v` as sync-source", sourceType), desc)
+	sourceNode, err := getClient(sourceType, testSuite, sourceTestID, params, sourceFiles, "")
+	endSourceTest := func(err error) {
+		if err == nil {
+			host.EndTest(testSuite, sourceTestID, &common.TestResult{Pass: true}, nil)
+		} else {
+			t.Error("Test failed:", err)
+			host.EndTest(testSuite, sourceTestID,
+				&common.TestResult{Pass: false},
+				common.TestClientResults{
+					sourceType: {Pass: false, Details: err.Error()},
+				},
+			)
+		}
+	}
+	if err != nil {
+		endSourceTest(fmt.Errorf("unable to instantiate source-node `%v`: %s", sourceType, err.Error()))
+		return nil, nil
+	}
+	if err := sourceNode.checkHead(testchainHeadNumber, testchainHeadHash); err != nil {
+		endSourceTest(err)
+		return nil, nil
+	}
+	return sourceNode, endSourceTest
 }
 
 // node represents an instantiated client, which has successfully spun up RPC,
 // and delivered enode enodeId
 type node struct {
 	name      string
-	enodeId   enode.Node
+	enode     string
 	rpcClient *rpc.Client
 	id        string
 }
 
-// getClient instantiates a client, and fetches ip, enode enodeId etc.
-// Any error during this process is returned
+// getClient instantiates a client, and fetches ip, enode etc.
+// Any error during this process is returned.
 func getClient(clientType string, testSuite common.TestSuiteID, testID common.TestID, params, files map[string]string, bootnode string) (*node, error) {
-	n := &node{
-		name: clientType,
-		id:   "",
-	}
+	n := &node{name: clientType}
 	params = copyMap(params)
 	params["CLIENT"] = clientType
 	if bootnode != "" {
@@ -177,26 +189,14 @@ func getClient(clientType string, testSuite common.TestSuiteID, testID common.Te
 		return n, fmt.Errorf("Unable to create node: %v", err)
 	}
 	n.id = id
-	enodeIDPtr, err := host.GetClientEnode(testSuite, testID, id)
+	enodePtr, err := host.GetClientEnode(testSuite, testID, id)
 	if err != nil {
-		return n, fmt.Errorf("Client (`%v`) enode ID could not be obtained: %v", clientType, err)
+		return n, fmt.Errorf("Client (`%v`) enode could not be obtained: %v", clientType, err)
 	}
-	if enodeIDPtr == nil {
-		return n, fmt.Errorf("Client (`%v`) enode ID could not be obtained: (nil)", clientType)
+	if enodePtr == nil {
+		return n, fmt.Errorf("Client (`%v`) enode could not be obtained: (nil)", clientType)
 	}
-	enodeId, err := enode.ParseV4(*enodeIDPtr)
-	if err != nil {
-		return n, fmt.Errorf("Client (`%v`) enode ID could not be parsed. Got: `%v`, error: `%v`", clientType, *enodeIDPtr, err)
-	}
-	tcpPort := enodeId.TCP()
-	if tcpPort == 0 {
-		tcpPort = 30303
-	}
-	//replace the ip with what the provider says it is
-	if enodeId = enode.NewV4(enodeId.Pubkey(), ip, tcpPort, 30303); enodeId != nil {
-		n.enodeId = *enodeId
-	}
-	//connect over rpc to the main node to add the peer (the mobile client does not have the admin function)
+	n.enode = *enodePtr
 	n.rpcClient, err = rpc.Dial(fmt.Sprintf("http://%s:8545", ip))
 	if err != nil {
 		return n, fmt.Errorf("Client (`%v`), rpc cli could not be created: %v", clientType, err)
@@ -209,30 +209,9 @@ func getClient(clientType string, testSuite common.TestSuiteID, testID common.Te
 // - an error occurs
 // - the sink is synced or
 // - the sync times out, or
-func syncNodes(source, sink *node, headblock uint64) error {
-
-	// The code below to add peers via RPC is not needed, since we use
-	// the HIVE_BOOTNODES env var to configure the peering
-	//
-	// Peer the with eachother (hopefully one of them has admin_addPeer)
-	//var res bool
-	//if err := source.rpcClient.Call(&res, "admin_addPeer", sink.enodeId.String()); err != nil {
-	//	log.Info("RPC call [1] to source.addPeer(sink) failed", "error", err)
-	//	// Some nodes (parity) uses another format
-	//	if err := source.rpcClient.Call(&res, "parity_addReservedPeer", sink.enodeId.String()); err != nil {
-	//		log.Info("RPC call [2] to source.addReservedPeer(sink) failed", "error", err)
-	//	}
-	//}
-	//if err := sink.rpcClient.Call(&res, "admin_addPeer", source.enodeId.String()); err != nil {
-	//	log.Info("RPC call [1] to sink.addPeer(source) failed", "error", err)
-	//	if err := sink.rpcClient.Call(&res, "parity_addReservedPeer", source.enodeId.String()); err != nil {
-	//		log.Info("RPC call [2] to sink.addReservedPeer(source) failed", "error", err)
-	//	}
-	//}
-	//log.Info("Peering done", "source", source.enodeId.String(), "sink", sink.enodeId.String())
+func syncNodes(source, sink *node, wantNumber uint64, wantHash ethcommon.Hash) error {
 	var (
 		timeout = time.After(syncTimeout)
-		ethCli  = ethclient.NewClient(sink.rpcClient)
 		current = uint64(0)
 	)
 	for {
@@ -241,23 +220,42 @@ func syncNodes(source, sink *node, headblock uint64) error {
 		case <-timeout:
 			return fmt.Errorf("Sync timeout (%v elapsed)", syncTimeout)
 		default:
-			ctx, _ := context.WithTimeout(context.Background(), time.Second)
-			if block, err := ethCli.BlockByNumber(ctx, nil); err != nil {
+			block, err := sink.head()
+			if err != nil {
 				log.Error("Error getting block", "sink", sink.name, "error", err)
 				return err
-			} else {
-				blockNumber := block.NumberU64()
-				if current != blockNumber {
-					log.Info("Block progressed", "sink", sink.name, "at", blockNumber)
-				}
-				current := blockNumber
-				if current == headblock {
-					//Success
-					return nil
-				}
 			}
-			//check in a little while....
+			blockNumber := block.Number.Uint64()
+			if blockNumber != current {
+				log.Info("Block progressed", "sink", sink.name, "at", blockNumber)
+			}
+			if current == wantNumber {
+				if block.Hash() != wantHash {
+					return fmt.Errorf("wrong head hash %x, want %x", block.Hash(), wantHash)
+				}
+				return nil // success
+			}
+			// check in a little while....
+			current = blockNumber
 			time.Sleep(1000 * time.Millisecond)
 		}
 	}
+}
+
+// head returns the node's chain head.
+func (n *node) head() (*types.Header, error) {
+	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	return ethclient.NewClient(n.rpcClient).HeaderByNumber(ctx, nil)
+}
+
+// checkHead checks whether the remote chain head matches the given values.
+func (n *node) checkHead(num uint64, hash ethcommon.Hash) error {
+	head, err := n.head()
+	if err != nil {
+		return fmt.Errorf("can't query chain head: %v", err)
+	}
+	if head.Hash() != hash {
+		return fmt.Errorf("wrong chain head %d (%x), want %d (%x)", head.Number, head.Hash(), num, hash)
+	}
+	return nil
 }

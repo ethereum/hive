@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -162,14 +163,14 @@ func buildNestedImages(root string, pattern string, kind string, cacher *buildCa
 	return images, nil
 }
 
-// buildListedImages iterates over a directory containing arbitrarilly nested
-// docker image definitions and builds those whose directory names contain the
-// image name string in the client List, with one image per branch.
-// For example, if the clientList contained geth_master, geth_beta and
-// the clients folder contained a dockerfile for clients\geth, then this
-// will created two images, one for clients\geth_master and one for clients\geth_beta
+// buildListedImages iterates over a directory containing docker image definitions and
+// builds those whose directory names contain the image name string in the client List,
+// with one image per branch.
+//
+// For example, if the clientList contains geth_master,geth_beta and the directory
+// contains a Dockerfile in clients/geth, this will create two images: clients/geth_master
+// and clients/geth_beta.
 func buildListedImages(root string, clientList []string, kind string, cacher *buildCacher, rootContext bool, errorReport *HiveErrorReport) (map[string]string, error) {
-
 	var contextBuilder func(root string, path string) (string, string, string)
 
 	if rootContext {
@@ -186,30 +187,23 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 		}
 	}
 
-	names := []string{}
-	if err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		// If walking the images failed, bail out
+	// Get a list of matching clients, including a branch suffix after '_' (branchDelimiter).
+	var names []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		// Otherwise if we've found a Dockerfile, add the parent
-		if strings.HasSuffix(path, "Dockerfile") {
-			name := filepath.Dir(path)
-
-			//get a list of matching clients, including a branch suffix after '_' (branchDelimiter)
-			//TODO - update docs to say that folders under 'clients' should not use _ underscore
-			matchNames(name, clientList, &names)
-
+		if filepath.Base(path) == "Dockerfile" {
+			names = append(names, matchNames(path, clientList)...)
 		}
-		// Continue walking the path
 		return nil
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, err
 	}
+
 	// list all given client names that were not found in the `clients` directory
 	notFound := notFound(names, clientList)
-	// only throw error if the given client pattern was not found (e.g. "bes" is technically incorrect,
-	// but the pattern matches "besu", so the client is still found)
 	if len(notFound) > 0 && len(names) != len(clientList) {
 		for _, notFoundDockerfile := range notFound {
 			log15.Crit("Could not find client image", "image", notFoundDockerfile)
@@ -218,11 +212,10 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 				Details: "could not find client image",
 			})
 		}
-		return nil, fmt.Errorf("invalid client image(s) specified") // TODO fix err message
+		return nil, fmt.Errorf("invalid client image(s) specified")
 	}
-	// if no clients were found, error out
-	if len(names) < 1 {
-		return nil, fmt.Errorf("no client images to build") // TODO fix err message
+	if len(names) == 0 {
+		return nil, fmt.Errorf("no client images to build")
 	}
 
 	// Iterate over all the matched specs and build their docker images
@@ -230,7 +223,7 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 	for _, name := range names {
 		var (
 			context, branch, dockerfile = contextBuilder(root, name)
-			image                       = strings.Replace(filepath.Join(hiveImageNamespace, root, name), string(os.PathSeparator), "/", -1)
+			image                       = path.Join(hiveImageNamespace, root, name)
 			logger                      = log15.New(kind, name)
 		)
 		if err := buildImage(image, branch, context, cacher, logger, dockerfile); err != nil {
@@ -254,43 +247,49 @@ func buildListedImages(root string, clientList []string, kind string, cacher *bu
 	return images, nil
 }
 
+// notFound returns the elements of 'all' which are not contained in 'names'.
 func notFound(names []string, all []string) []string {
 	found := make(map[string]string, len(names))
 	for _, name := range names {
 		found[name] = name
 	}
-
 	var notFound []string
 	for _, client := range all {
 		if _, exists := found[client]; !exists {
 			notFound = append(notFound, client)
 		}
 	}
-
 	return notFound
 }
 
+// getBranch returns the branch name component of 'name'.
 func getBranch(name string) string {
 	branch := ""
-	if branchIndex := strings.LastIndex(name, branchDelimiter); branchIndex > 0 && branchIndex < len(name) {
-		branch = name[branchIndex+1:]
+	if ix := strings.LastIndex(name, branchDelimiter); ix > 0 {
+		branch = name[ix+1:]
 	}
 	return branch
 }
 
-func matchNames(name string, clientList []string, names *[]string) {
-	for _, client := range clientList {
+// matchNames matches a Dockerfile path against all specified client names. Note that
+// clients may be given multiple times with different branch names. The returned slice
+// contains the matching client names.
+func matchNames(dockerfile string, clientList []string) []string {
+	dir := filepath.Dir(dockerfile)
+	base := filepath.Base(dir)
 
+	var m []string
+	for _, client := range clientList {
 		branch := getBranch(client)
 		if len(branch) > 0 {
 			branch = branchDelimiter + branch
 		}
 		clientWithoutBranch := strings.TrimSuffix(client, branch)
-
-		if strings.Contains(name, clientWithoutBranch) {
-			*names = append(*names, filepath.Join(strings.Split(name, string(filepath.Separator))[1:]...)+branch)
+		if base == clientWithoutBranch {
+			m = append(m, client)
 		}
 	}
+	return m
 }
 
 type buildError struct {
@@ -333,7 +332,9 @@ func buildImage(image, branch, context string, cacher *buildCacher, logger log15
 		Dockerfile:   dockerfile,
 		OutputStream: stream,
 		NoCache:      nocache,
-		BuildArgs:    []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}},
+	}
+	if branch != "" {
+		opts.BuildArgs = []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}}
 	}
 	if err := dockerClient.BuildImage(opts); err != nil {
 		logger.Error("failed to build docker image",
