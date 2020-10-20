@@ -20,6 +20,19 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+// loadGenesis loads genesis.json.
+func loadGenesis(file string) (*core.Genesis, error) {
+	source, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	var gspec core.Genesis
+	if err := json.Unmarshal(source, &gspec); err != nil {
+		return nil, fmt.Errorf("invalid genesis JSON: %v", err)
+	}
+	return &gspec, nil
+}
+
 // writeGenesis writes the given genesis specification to <path>/genesis.json.
 func writeGenesis(gspec *core.Genesis, path string) error {
 	bytes, err := json.MarshalIndent(gspec, "", "  ")
@@ -90,19 +103,15 @@ func produceSimpleTestChain(path string, blockCount uint) error {
 // produceTestChainFromGenesisFile creates a test chain with no transactions or other
 // modifications based on an externally specified genesis file. The blockTimeInSeconds is
 // used to manipulate the block difficulty.
-func produceTestChainFromGenesisFile(sourceGenesis string, outputPath string, blockCount uint, blockTimeInSeconds uint) error {
-	sourceBytes, err := ioutil.ReadFile(sourceGenesis)
+func produceTestChainFromGenesisFile(genesis string, outputPath string, blockCount uint, blockTimeInSeconds uint) error {
+	gspec, err := loadGenesis(genesis)
 	if err != nil {
 		return err
-	}
-	var gspec core.Genesis
-	if err := json.Unmarshal(sourceBytes, &gspec); err != nil {
-		return fmt.Errorf("invalid genesis JSON: %v", err)
 	}
 	blockModifier := func(i int, gen *core.BlockGen) {
 		gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
 	}
-	return generateChainAndSave(&gspec, blockCount, outputPath, blockModifier)
+	return generateChainAndSave(gspec, blockCount, outputPath, blockModifier)
 }
 
 // writeChain exports the given chain to a file.

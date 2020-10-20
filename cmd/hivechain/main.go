@@ -8,6 +8,10 @@
 //
 //     hivechain print -v chain.rlp
 //
+// The 'print-genesis' subcommand displays the block header fields of a genesis.json file:
+//
+//     hivechain print-genesis genesis.json
+//
 // The 'trim' subcommand extracts a range of blocks from a chain.rlp file:
 //
 //     hivechain trim -from 10 -to 100 chain.rlp newchain.rlp
@@ -41,6 +45,8 @@ func main() {
 		generateCommand(os.Args[2:])
 	case "print":
 		printCommand(os.Args[2:])
+	case "print-genesis":
+		printGenesisCommand(os.Args[2:])
 	case "trim":
 		trimCommand(os.Args[2:])
 	default:
@@ -80,6 +86,21 @@ func printCommand(args []string) {
 			fmt.Printf("%d: number %d, %x\n", i, block.Number(), block.Hash())
 		}
 	}
+}
+
+func printGenesisCommand(args []string) {
+	flag.CommandLine.Parse(args)
+	if flag.NArg() != 1 {
+		fatalf("Usage: hivechain print-genesis <genesis.json>")
+	}
+
+	gspec, err := loadGenesis(flag.Arg(0))
+	if err != nil {
+		fatal(err)
+	}
+	block := gspec.ToBlock(nil)
+	js, _ := json.MarshalIndent(block.Header(), "", "  ")
+	fmt.Println(string(js))
 }
 
 // trimCommand exports a subset of chain.rlp to a new file.
