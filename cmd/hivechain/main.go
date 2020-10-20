@@ -23,12 +23,16 @@ import (
 	"os"
 
 	"github.com/ethereum/go-ethereum/core/types"
+	ethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const usage = "Usage: hivechain generate|print|trim [ options ] ..."
 
 func main() {
+	handler := ethlog.StreamHandler(os.Stderr, ethlog.TerminalFormat(false))
+	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlDebug, handler))
+
 	if len(os.Args) < 2 {
 		fatalf(usage)
 	}
