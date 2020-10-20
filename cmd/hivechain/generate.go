@@ -121,7 +121,13 @@ func writeChain(chain *core.BlockChain, filename string, start uint64) error {
 func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blockModifier func(i int, gen *core.BlockGen)) error {
 	db := rawdb.NewMemoryDatabase()
 	genesis := gspec.MustCommit(db)
-	engine := ethash.New(ethash.Config{PowMode: ethash.ModeNormal}, nil, false)
+	config := ethash.Config{
+		PowMode:        ethash.ModeNormal,
+		CachesInMem:    2,
+		DatasetsOnDisk: 2,
+		DatasetDir:     ethashDir(),
+	}
+	engine := ethash.New(config, nil, false)
 	insta := instaSeal{engine}
 
 	// Generate a chain where each block is created, modified, and immediately sealed.
@@ -145,6 +151,14 @@ func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blo
 		return err
 	}
 	return nil
+}
+
+func ethashDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".ethash")
 }
 
 // instaSeal wraps a consensus engine with instant block sealing. When a block is produced
