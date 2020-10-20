@@ -131,6 +131,9 @@ func generateCommand(args []string) {
 	)
 	flag.CommandLine.Parse(args)
 
+	if *genesis == "" {
+		fatalf("Missing -genesis option, please supply a genesis.json file.")
+	}
 	err := produceTestChainFromGenesisFile(*genesis, *outdir, *length, *blocktime)
 	if err != nil {
 		fatal(err)
