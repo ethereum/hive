@@ -1,7 +1,8 @@
-# Hyperledger publihes regular developer 'head' images, just use that one
-FROM hyperledger/besu:develop
+ARG branch=develop
+FROM hyperledger/besu:$branch
 
 USER root
+
 # Inject the startup script
 ADD besu.sh /opt/besu/bin/besu-hive.sh
 RUN chmod +x /opt/besu/bin/besu-hive.sh
@@ -16,7 +17,6 @@ RUN apt-get update && \
 
 ADD genesis.json /genesis.json
 
-ARG branch=master
 RUN echo "{\
   \"repo\":\"https://github.com/hyperledger/besu\",\
   \"branch\":\"${branch:-detached}\", \
@@ -27,5 +27,3 @@ RUN echo "{\
 EXPOSE 8545 8546 8547 30303 30303/udp
 
 ENTRYPOINT ["/opt/besu/bin/besu-hive.sh"]
-
-#EOF
