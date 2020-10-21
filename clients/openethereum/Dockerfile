@@ -1,5 +1,3 @@
-# Docker container spec for building the master branch of parity.
-
 ARG branch=latest
 FROM openethereum/openethereum:$branch
 
@@ -14,6 +12,9 @@ RUN chmod 777 /chain.json
 ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh 
 RUN chmod 777 /enode.sh
+
+# Add dummy /version.json
+RUN echo "{\"repo\":\"\", \"branch\":\"\", \"commit\":\"\"}" > /version.json
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8547 30303 30303/udp

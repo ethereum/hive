@@ -1,12 +1,4 @@
-# Multistage Dockerfile for the Aleth Ethereum node.
-# Build stage
-
-# This can be run separately, as a standalone image, 
-# to obtain a cache and save rebuilding all the time (during development)
-#
-# docker build --target builder -t aleth_base
-#
-ARG branch=latest
+ARG branch=nightly
 FROM ethereum/aleth:$branch
 
 # Genesis template
@@ -20,17 +12,14 @@ ADD aleth.sh /aleth.sh
 USER root
 RUN chmod +x /aleth.sh
 
-# Inject the enode id retriever script
+# Inject the enode retriever script
 ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
 
 RUN apk add --no-cache jq bc bash curl
 
-
 # Copy buildinfo into version.json, and also remove the 'bool' field is_prerelease
-
-# remove softlink
-RUN cat /usr/share/aleth/buildinfo.json |jq "del(.is_prerelease)"  > /version.json
+RUN jq "del(.is_prerelease)" /usr/share/aleth/buildinfo.json > /version.json
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8547 30303 30303/udp

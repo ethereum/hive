@@ -15,6 +15,7 @@ RUN git clone --branch $branch https://github.com/ethereum/trinity .
 RUN pip install -e .[dev]  --no-cache-dir
 RUN pip install -U trinity --no-cache-dir
 
+ADD genesis.json /genesis.json
 ADD mapper.jq /mapper.jq
 ADD trinity.sh /trinity.sh
 RUN chmod +x /trinity.sh
