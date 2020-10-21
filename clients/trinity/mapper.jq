@@ -7,11 +7,8 @@ def remove_empty:
           .value != null and
           .value != "" and
           .value != [] and
-          .value != {} and
           .key != null and
-          .key != "" and
-          .key != [] and
-          .key != {}
+          .key != ""
         )
       )
     else .
