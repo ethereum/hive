@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/hive/chaintools"
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -52,15 +51,7 @@ var (
 	hiveMaxTestsFlag = flag.Int("hivemaxtestcount", -1, "Limit the number of tests the simulator is permitted to generate in a testsuite for the Hive provider. "+
 		"Used for smoke testing consensus tests themselves.")
 
-	hiveDebug = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
-
-	chainGenerate   = flag.Bool("chainGenerate", false, "Tell Hive to generate a blockchain on the basis of a supplied genesis and terminate")
-	chainLength     = flag.Uint("chainLength", 2, "The length of the chain to generate")
-	chainConfig     = flag.String("chainConfig", "", "Reserved for future usage. Will allow Hive to generate test chains of different types")
-	chainOutputPath = flag.String("chainOutputPath", ".", "Chain destination folder")
-	chainGenesis    = flag.String("chainGenesis", "", "The path and filename to the source genesis.json")
-	chainBlockTime  = flag.Uint("chainBlockTime", 30, "The desired block time in seconds")
-
+	hiveDebug    = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
 	loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
 )
 
@@ -81,10 +72,7 @@ func main() {
 	flag.Parse()
 	timeoutCheckDuration = *checkTimeLimitFlag
 	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
-	if *chainGenerate {
-		chaintools.ProduceTestChainFromGenesisFile(*chainGenesis, *chainOutputPath, *chainLength, *chainBlockTime)
-		return
-	}
+
 	// Get the list of clients
 	clientList = strings.Split(*clientListFlag, ",")
 	for i := range clientList {
