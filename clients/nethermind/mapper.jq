@@ -7,11 +7,8 @@ def remove_empty:
           .value != null and
           .value != "" and
           .value != [] and
-          .value != {} and
           .key != null and
-          .key != "" and
-          .key != [] and
-          .key != {}
+          .key != ""
         )
       )
     else .
@@ -47,14 +44,13 @@ def infix_zeros_to_length(s;l):
   "engine": {
     "Ethash": {
       "params": {
-        "minimumDifficulty": "0x020000",
-        "difficultyBoundDivisor": "0x0800",
+        "minimumDifficulty": "0x20000",
+        "difficultyBoundDivisor": "0x800",
         "durationLimit": "0x0d",
         "homesteadTransition": env.HIVE_FORK_HOMESTEAD|to_hex,
         "eip100bTransition": env.HIVE_FORK_BYZANTIUM|to_hex,
         "daoHardforkTransition": env.HIVE_FORK_DAO_BLOCK|to_hex,
         "daoHardforkBeneficiary": "0xbf4ed7b27f1d666546e30d74d50d173d20bca754",
-        "daoHardforkAccounts": [],
         "blockReward": {
           "0x0": "0x4563918244F40000",
           (env.HIVE_FORK_BYZANTIUM|to_hex//""): "0x29A2241AF62C0000",
