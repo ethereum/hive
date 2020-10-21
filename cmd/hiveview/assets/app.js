@@ -53,7 +53,6 @@ utils = {
         var a = document.createElement('a');
         a.setAttribute("href", url);
         a.text = text;
-        a.setAttribute("target", "_blank");
         return a.outerHTML;
     },
     get_js_link: function(js, text) {
