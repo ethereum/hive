@@ -90,6 +90,7 @@ func suiteToEntry(file os.FileInfo, s *common.TestSuite) listingEntry {
 		FileName:    file.Name(),
 		Size:        file.Size(),
 		SimLog:      s.SimulatorLog,
+		Clients:     make([]string, 0),
 	}
 	for _, test := range s.TestCases {
 		e.NTests++
