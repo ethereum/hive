@@ -87,29 +87,20 @@
 	}
 	</style>
 
-	<!-- 
-		jquery mininfied, but not slim version. If we use the slim version, 
-		then .ajax() is gone. 88K (min) versus 71K (slim min). 
-	-->	
-	<script src="https://code.jquery.com/jquery-3.5.0.min.js"
-	integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="
-	crossorigin="anonymous"></script>
+	<script
+				  src="https://code.jquery.com/jquery-3.5.0.min.js"
+				  integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="
+				  crossorigin="anonymous"></script>
 	<script type="text/javascript">
 
 // The app, more or less. No frameworks neede other than a splash of jquery
-// ... and we really could get rid of jquery too. The ready-function is really
-// the only truly useful feature of it, the rest is just candy
-// 
-// Lovingly crafted by @holiman (mhswende) in 2020
 var hacks = {
-	/** 
-	<!--
+	/**
 	makeLine Creates an element like the template here:
 	    <tr>
 	        <td id="L{{ line }}" class="num" line="{{ line }} "></td>
 	        <td>{{ content }}</td>
 	     </tr>
-	--> 
 	**/
 	makeLine : function(number, text){
 		let tr = document.createElement("tr")	

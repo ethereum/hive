@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+		<!--
+	Scripts are jquery, bootstrap and datatables
+		-->
+	<script src="https://code.jquery.com/jquery-3.5.0.min.js" integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="  crossorigin="anonymous"></script>	 
+	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
+	<script src="//cdn.datatables.net/1.10.20/js/jquery.dataTables.min.js"></script>
+
+	<script src="showdown.min.js"></script>
+
+	<!-- 
+	CSS resources are bootstrap default, plus datatables default
+	-->
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+	<link rel="stylesheet" href="//cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">	
+</head>
+<style>
+.replaceme{
+	max-width: 1000px;
+}
+td.details-control {
+    background: url('/details_open.png') no-repeat center center;
+    cursor: pointer;
+}
+tr.shown td.details-control {
+    background: url('/details_close.png') no-repeat center center;
+}
+</style>
+
+<body>
+	<div class="container-fluid">
+		<h1>Hive</h1><hr/>
+
+		<div class="row">
+			<div class="col-1">
+				<div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+					<a class="nav-link active" id="v-pills-home-tab" data-toggle="pill" href="#v-pills-home" role="tab" aria-controls="v-pills-home" aria-selected="true">Test suites</a>
+					<a class="nav-link" id="v-pills-results-tab" data-toggle="pill" href="#v-pills-results" role="tab" aria-controls="v-pills-results" aria-selected="false">Tests</a>
+					<a class="nav-link" id="v-pills-messages-tab" data-toggle="pill" href="#v-pills-messages" role="tab" aria-controls="v-pills-messages" aria-selected="false">About</a>
+				</div>
+			</div>
+			<div class="col-10">
+				<div class="tab-content" id="v-pills-tabContent">
+					<div class="tab-pane fade show active" id="v-pills-home" role="tabpanel" aria-labelledby="v-pills-home-tab">
+
+						<h2>Executed testsuites</h2>
+						<p>These testsuites are available, and can be loaded. Click on 'Load' to load a certain suite.</p>
+						<p>If you load several suites, you can compare individual testcases on different runs/suites/clients</p>
+						<table class="table table-bordered" id="filetable"></table>
+
+					</div>
+					<div class="tab-pane fade" id="v-pills-results" role="tabpanel" aria-labelledby="v-pills-results-tab">
+						
+						<h2>Execution results: <span id="testsuite_name">Nothing loaded yet</span></p></h2>
+						<p><span id="testsuite_desc">Nothing loaded yet</span></p>
+						<table id="execresults" class="table table-striped table-bordered" width="100%"></table>
+
+					</div>
+					<div class="tab-pane fade" id="v-pills-messages" role="tabpanel" aria-labelledby="v-pills-messages-tab">
+						
+						<h2>About Hive</h2>
+						<p>Before Hive, we did have consensus-tests, in mainly two forms -- statetests and blockchain tests (yeah there are a few more). 
+						The tests were generated via aleth/testeth, and put on a repository. From that repo, it was expected that client teams import
+						the tests and execute within their own custom test-harnesses.</p> 
+						<p>Now, that didn't work out perfectly. Client teams didn't always pull in the latest tests, and whether they actually executed the 
+						tests as intended was not sure. Did they correctly verify everything? It was especially troublesome when hardforks were approaching, 
+						and "oops, hey, we commented out test XX because it was failing". </p>
+						<p>Then Péter Szilágyi (@karalabe)  had this idea, to run clients totally black box. You spin up a node inside a docker container, start it with the client-specific config, 
+						and feed it the blocks. Another docker container 'orchestrates' the test, and downloads the entire test repo from github (blockchain tests 
+						contain the RLP-blocks). So, after asking the client to import the blocks, all the 'orchestrator' needs to do is query "what's your latest block?", and 
+						verify it aginst the expected lastblock from the testcase.</p>
+						<p>Those tests are what one normally talks about when talking about "hive-tests". However, Hive is even more versatile, since another "orchestrator" can do 
+						other things -- they can send any network message they want to the node-under-test. So far, we also have tests that verify that fast-sync can be performed, 
+						and tests to check that the p2p implementation does not make it possible to do DoS via amplification attacks. So those are also hive-tests. </p>
+						<p>However, an important distinction: Hive is, in essence, a tool to 
+							<ul>
+								<li>execute tests</li>
+								<li>in an automated way,</li> 
+								<li>treating the clients as black boxes as far as possible.</li>
+							</ul>
+						</p>
+						<h2>About the EF Hive executor</h2>
+						<p>For the last ~3 years, we have had a hive-server running in production. https://hivetests.ethdevops.io/. It runs 24/7, and always fetches the latest tests 
+						from ethereum/tests repo.
+						</p>
+					<hr/>
+					<h3>Debug log</h3>
+						<pre id="debug"></pre> 
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+<script>
+
+const resultsRoot="/results/"
+
+utils = {
+
+	/*
+	* HTML-encoding
+	*/
+	html_encode : function (str){
+		//Let the DOM do it for us. 
+		var d = document.createElement('textarea');
+		d.innerText = str;
+		//Yes, I'm aware of 
+		// http://stackoverflow.com/questions/1219860/html-encoding-in-javascript-jquery
+		// I just don't agree. 
+		return d.innerHTML;
+	},
+	// encapsulate data inside a tag
+	tag : function (typ, str){
+		//Let the DOM do it for us. 
+		var d = document.createElement(typ);
+		d.innerText = (""+str);
+		return d.outerHTML;
+	},
+	/*
+	* HTML Attribute encoding
+	*/
+	attr_encode : function (str){	
+		x = document.createElement("x");
+		x.setAttribute("b",str);
+		var all = x.outerHTML;
+		return all.substring(6,all.length-6);
+	},
+	/*
+	* Dirty url-parsing of the url hash segment
+	*/
+	get_hash_params : function() {
+		var retval = {}
+		var query = window.location.hash.substring(1);
+		var vars = query.split('&');
+		for (var i = 0; i < vars.length; i++) {
+			var pair = vars[i].split('=');
+			retval[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1])
+		}
+		return retval;
+	},
+	/*
+	* Creates an anchor-element from 'untrusted' link 'data'
+	*/
+	get_link : function(url, text){
+		var a = document.createElement('a');
+		a.setAttribute("href",url);
+		a.text = text;
+		a.setAttribute("target", "_blank");
+		return a.outerHTML;
+	},
+	get_js_link : function(js, text){
+		var a = document.createElement('a');
+		a.setAttribute("href","javascript:"+js);
+		a.text = text;
+		return a.outerHTML;
+	},
+
+	/*
+	* Creates
+	* <button type="button" class="btn btn-default">Default</button>
+	*/
+	get_button: function(onclick, text){
+		var a = document.createElement('button');
+		a.setAttribute("type","button");
+		a.setAttribute("class","btn btn-primary btn-xs")
+		a.textContent = text;
+		a.setAttribute("onclick", onclick)
+		return a.outerHTML;
+	},
+
+	format_timespan: function(d1,d2){
+
+		var diff = d2-d1;var _s="";
+		if (diff < 0) {
+			_s = "-";
+			diff = -diff;
+		}
+		var d = Math.floor(diff / 86400000);
+		diff %= 86400000;
+		var h = Math.floor(diff / 3600000);
+		diff %= 3600000;
+		var m = Math.floor(diff / 60000) ;
+		diff %= 60000;
+		var s = Math.floor(diff / 1000);
+
+		var a =    d ? ( d + "d") : "";
+		a += ((a||h) ? ( h + "h") : "");
+		a += ((a||m) ? ( m + "m") : "") + s + "s";
+		return _s+a;
+	},
+	// human readable units
+	units: function(loc){
+		if (loc < 1024){
+			return loc + "B"
+		}
+		loc = loc / 1024
+		if (loc < 1024){
+			return loc.toFixed(2)+"KB";
+		}
+		loc = loc/1024
+		return loc.toFixed(2)+"MB";
+	},
+
+	/**
+	Expects an object like 
+		{
+			"repo": "https://github.com/ethereum/go-ethereum",
+			"commit": "021c3c281629baf2eae967dc2f0a7532ddfdc1fb",
+			"branch": "release/1.6"
+		}
+	Will return a link to the right place in the repo
+
+	link : https://github.com/ethereum/go-ethereum/tree/021c3c281629baf2eae967dc2f0a7532ddfdc1fb
+	text : ethereum/go-ethereum@021c3c2 [⎇ release/1.6]
+	**/
+	githubRepoLink: function(data){
+		if (data.repo == "" ) {return "";}		
+		if (data.commit == "" ) {return data.repo;}
+		if (data.branch == "" ) {return data.repo+"@"+data.commit.slice(0,7);}
+
+		var text = data.repo+"@"+data.commit.slice(0,7)+" [⎇ "+data.branch+"]";
+
+		if (!data.repo.startsWith("https://")){
+			//Not github
+			return utils.html_encode(text);
+		}
+
+		var a = document.createElement('a');
+		a.setAttribute("target", "_blank");
+		// Set just repo first
+		a.setAttribute("href",data.repo);
+		// Use path for text
+		a.text = a.pathname.slice(1)+"@"+data.commit.slice(0,7)+" [\u2387 "+data.branch+"]";
+		// Set both repo and tree/commit version
+		a.setAttribute("href", data.repo+"/tree/"+data.commit);
+
+		return a.outerHTML;
+
+	}
+
+}
+
+// nav is a little utility to store things in the url, so that people can link into stuff. 
+var nav = {
+	load: function(key){
+		if (!URLSearchParams){
+			progress("Error: browser doesn't support URLSearchParams. IE or what? ")
+			return null
+		}
+		return new URLSearchParams(location.search).get(key);
+	},
+	// store stores the key/val combo in the url query
+	// this overwrites any previous key
+	store: function(key, val){
+		// get current location
+		let old = new URLSearchParams(location.search)
+		old.set(key, val)
+		history.pushState(null, null, "?"+old.toString())
+	},
+}
+
+
+function progress(message){
+	console.log(message)
+	let  a = $("#debug").text(); 
+	$("#debug").text((new Date()).toLocaleTimeString()+ " | " +message+"\n" +a );
+}
+
+
+function resultStats(fails, success, total)
+{
+	f = parseInt(fails), s = parseInt(success); t = parseInt(total);
+
+	f = isNaN(f) ?  "?": f ;
+	s = isNaN(s) ?  "?": s ;
+	t = isNaN(t) ?  "?": t ;
+
+	return '<b><span class="text-danger">'+f
+		+'</span>&nbsp;:&nbsp;<span class="text-success">'+s
+		+'</span> &nbsp;/&nbsp;'+t+'</b>';
+}
+function logview(data, name){
+	if (!name){
+		name = "log"
+	}
+	return utils.get_link("viewer.html?file="+escape(data),name)
+}
+function onFileListing(data, error){
+
+	progress("Got file list")
+
+	// the data is jsonlines
+	/*
+		{
+			"fileName": "./1587325327-fa7ec3c7d09a8cfb754097f79df82118.json",
+			"name": "Sync test suite",
+			"start": "",
+			"simLog": "1587325280-00befe48086b1ef74fbb19b9b7d43e4d-simulator.log",
+			"passes": 0,
+			"fails": 0,
+			"size": 435,	
+			"clients": [],
+			"description": "This suite of tests verifies that clients can sync from each other in different modes.\n It consists of two specific tests, both using geth as the reference client, testing these two aspects: \n\n- Whether the client-under-test can sync from geth\n- Whether geth can sync from the client-under-test'\n",
+			"ntests": 0
+	}
+
+	*/
+	let table = $("#filetable")
+	suites = []
+	data.split("\n").forEach(function(elem, index){
+		if (!elem){ return; }
+		obj = JSON.parse(elem)
+		//suites.push([  obj.start,obj.name , obj.simLog, obj.primaryClient, obj.pass, obj.fileName])
+		suites.push(obj)
+		})
+	filetable = $("#filetable").DataTable({
+		data : suites,
+		pageLength: 50,
+		columns: [
+			{title: "Start time", 
+				data:"start",
+				type:"date",
+				render: function(data){ return new Date(data).toLocaleString();}
+			},
+			{ title:"Test suite", data:"name"},
+			{ title: "Suite log", data: "simLog", render: function(file){ return logview("results/"+file)} },
+			{ title: "Clients" , data: "clients", render: function(data){
+				return data.join(",")
+			}},
+			{ title: "Pass", data: null, 
+				render: function(data){
+					if (data.fails > 0){ return "&#x2715; <b>Fail (" + data.fails+" / "+(data.fails+data.passes)+")</b>"}
+					return "&#x2713 ("+data.passes+")"
+				}  
+			},
+			// { title: "Number of tests"},
+			{ title: "Load?", data:null, 
+				render: function(data){ 
+					let size=utils.units(data.size)
+					btn = '<button type="button" class="btn btn-sm btn-primary"><span class="loader" role="status" aria-hidden="true"></span><span class="txt">Load ('+size+')</span></button>'
+					raw = logview("results/"+data.fileName, "[json]")
+					return btn +"&nbsp;"+ raw
+				},
+			},
+			],
+		order: [[0, 'desc']],    	
+	});
+
+
+	$('#filetable tbody').on( 'click', 'button', function () {
+		// Documentation about spinners: https://getbootstrap.com/docs/4.4/components/spinners/ 
+		let spinClasses = "spinner-border spinner-border-sm"
+		let data = filetable.row( $(this).parents('tr') ).data();
+		let fname =  data.fileName ;
+		let button = $(this).prop("disabled",true)
+		let spinner = button.children(".loader").addClass(spinClasses)
+		let label = button.children(".txt").text("Loading")
+		let onDone = function(status, errmsg){
+			if(status){
+				label.text("Loaded OK");
+				button.prop("title","")
+				spinner.removeClass(spinClasses)
+				return
+			}
+			label.text("Loading failed")
+			spinner.removeClass(spinClasses)
+			button.prop("title","Computer says no: "+errmsg).prop("disabled",false);
+		}
+		loadTestSuite(fname, onDone);
+	} );
+}
+
+$(document).ready(function() {
+
+	// Retrieve the list of files
+	progress("Loading file list...")
+	$.ajax("listing.jsonl", {
+		success: onFileListing,
+		failure: function(status, err){ alert(err); },
+	})
+
+	// Lastly, check any URL directives
+	let suite=nav.load("suite")
+	if (suite){
+		// TODO: fix it so we show Loading spinner, and status 'Loaded' (unselectable) once it's loaded
+		loadTestSuite(suite, function(ok){
+		})
+	}
+
+});
+
+// loadTestSuite loads the given testsuite file
+function loadTestSuite(suitefile, doneFn){
+	//let filename = "results/"+suitefile
+	let filename = suitefile
+	progress("Loading " +filename);
+
+
+	var jqxhr = $.getJSON( resultsRoot+"/"+ filename, function(data) {
+			doneFn(true);
+			// store in url query
+			nav.store("suite",suitefile);
+			onSuiteData(data, filename);
+			$('#v-pills-results-tab').tab('show')
+
+	})
+	.fail(function(x, status, err) {
+			progress("error fetching "+filename+" : "+ err)
+			doneFn(false, err); 
+	});
+}
+
+/*
+* Performs filtering on the "Execution Result" datatable
+*/
+function execfilter(str){
+	$('#execresults').dataTable().api().search(str).draw();
+}
+
+var converter = new showdown.Converter()
+    
+
+//The datatables
+var overallresults  = null; // Overall results
+var execresults     = null; // Execution results
+var failuresummary  = null; // Failure summary
+
+
+var logfile_root = "simulations/ethereum:consensus"
+
+// Contains all the data that we load
+var alldata = {};
+
+
+function logFolder(jsonsource, client)
+{
+	return jsonsource.split(".")[0];
+}
+
+/* Formatting function for row details */
+function format ( d ) {
+    // `d` is the original data object for the row
+	let txt = ""
+  txt += "<b>Name</b>"+utils.tag('p',d.name)
+	txt += "<b>Description</b>"+converter.makeHtml(d.description)
+	txt += "<br/><b>Details</b>"+converter.makeHtml(d.summaryResult.details)
+	return txt
+}
+
+function onSuiteData(data, jsonsource){
+
+	/** data structure of suite data:
+{ 
+	"id": 0,
+	"name": "Devp2p discovery v4 test suite",
+	"description": "This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.",
+	"testCases": {
+		"1": {
+			"id": 1,
+			"name": "SpoofSanityCheck(v4013)",
+			"description": "A sanity check to make sure that the network setup works for spoofing",
+			"start": "2020-04-22T17:12:13.018490141Z",
+			"end": "2020-04-22T17:12:17.169151639Z",
+			"summaryResult": {
+				"pass": true,
+				"details": " \n"
+			},
+			"clientResults": null,
+			"clientInfo": {
+				"a46beeb9": {
+					"id": "a46beeb9",
+					"name": "parity_latest",
+					"versionInfo": "",
+					"instantiatedAt": "2020-04-22T17:12:14.275491827Z",
+					"logFile": "parity_latest/client-a46beeb9.log",
+					"WasInstantiated": true
+				}
+			}
+		},
+	**/
+	// Set title info
+	$("#testsuite_name").text(data.name)
+	$("#testsuite_desc").text(data.description)
+
+	// Convert to list 
+	let cases = []
+	for(var k in data.testCases){
+		cases.push(data.testCases[k])
+	}
+	progress("got "+cases.length+" testcases")
+
+	//datatables can't be reinitalized, we need to destroy them if they exist
+	if(execresults != null ){ 
+			execresults.clear().destroy();
+			$("#execresults").html("")
+	} 
+
+	// Init the datatable
+	var thetable = $('#execresults').DataTable( {
+		data: cases,
+		pageLength: 100,
+		columns: [
+			// First column is an 'expand'-button
+			 {
+				"className":      'details-control',
+				"orderable":      false,
+				"data":           null,
+				"defaultContent": ''
+       },
+       // Second column: Name
+			{ 
+				title: "Name", 
+				data: "name" },
+			//  Status: pass or not
+			{ 
+				title: "Status", 
+				data: "summaryResult", 
+				render: function(summaryResult){
+					if (summaryResult.pass){ return "&#x2713"} ;
+					return "&#x2715; <b>Fail</b>";
+				} 
+			},
+			// The logs for clients related to the test
+			{ 
+				title: "Logs", 
+				data: "clientInfo", 
+				render: function(clientInfo){
+
+					let logs = []
+					for( let instanceID in clientInfo){
+						let instanceInfo = clientInfo[instanceID]
+						logs.push(logview("results/"+instanceInfo.logFile, instanceInfo.name))
+					}
+					return logs.join(",")
+				}
+			},
+		],
+	});
+
+// This sets up the expanded info on click
+// https://www.datatables.net/examples/api/row_details.html 
+$('#execresults tbody').on('click', 'td.details-control', function () {
+        var tr = $(this).closest('tr');
+        var row = thetable.row( tr );
+        if ( row.child.isShown() ) {
+            // This row is already open - close it
+            row.child.hide();
+            tr.removeClass('shown');
+        }
+        else {
+            // Open this row
+            row.child( format(row.data()) ).show();
+            tr.addClass('shown');
+        }
+    } );
+	execresults = thetable
+	return
+
+/*	if(params.execfilter){
+		execfilter(params.execfilter);
+	}
+	if(params.summaryfilter){
+		$('#summary').dataTable().api()
+			.search(params.summaryfilter).draw();
+	}
+	*/
+
+}
+</script>
+</html>
+
+<!-- 
+Lovingly handcrafted by Martin Holst Swende @mhswende in 2017, updated in 2020
+-->
