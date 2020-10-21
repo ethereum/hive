@@ -286,6 +286,7 @@ function onFileListing(data, error) {
                 label.text("Loaded OK");
                 button.prop("title", "")
                 spinner.removeClass(spinClasses)
+                openTestSuitePage(fname);
                 return
             }
             label.text("Loading failed")
@@ -306,31 +307,50 @@ $(document).ready(function() {
         },
     })
 
-    // Lastly, check any URL directives
-    let suite = nav.load("suite")
-    if (suite) {
-        // TODO: fix it so we show Loading spinner, and status 'Loaded' (unselectable) once it's loaded
-        loadTestSuite(suite, function(ok) {})
-    }
+    // Handle navigation clicks.
+    $(".nav-link").on("click", function(ev) {
+        nav.store('page', ev.target.id);
+    });
+    window.addEventListener('popstate', navigationDispatch);
+    navigationDispatch();
 });
 
-// loadTestSuite loads the given testsuite file
+// navigationDispatch switches to the tab selected by the URL.
+function navigationDispatch() {
+    let suite = nav.load("suite")
+    if (suite) {
+        // TODO: fix it so we show Loading spinner, and status 'Loaded' (unselectable) once it's loaded.
+        loadTestSuite(suite, function(ok) {});
+    }
+    let page = nav.load("page");
+    if (page) {
+        let elem = $("#" + page);
+        if (elem && elem.tab) {
+            elem.tab("show");
+        }
+    }
+}
+
+// openTestSuitePage navigates to the test suite tab.
+function openTestSuitePage(suitefile) {
+    // store in url query
+    nav.store("suite", suitefile);
+    nav.store("page", "v-pills-results-tab");
+    $("#v-pills-results-tab").tab("show")
+}
+
+// loadTestSuite loads the given testsuite file.
 function loadTestSuite(suitefile, doneFn) {
     //let filename = "results/"+suitefile
     let filename = suitefile
     progress("Loading " + filename);
     var jqxhr = $.getJSON(resultsRoot + "/" + filename, function(data) {
-            doneFn(true);
-            // store in url query
-            nav.store("suite", suitefile);
-            onSuiteData(data, filename);
-            $('#v-pills-results-tab').tab('show')
-
-        })
-        .fail(function(x, status, err) {
-            progress("error fetching " + filename + " : " + err)
-            doneFn(false, err);
-        });
+        doneFn(true);
+        onSuiteData(data, filename);
+    }).fail(function(x, status, err) {
+        progress("error fetching " + filename + " : " + err)
+        doneFn(false, err);
+    });
 }
 
 /*
