@@ -55,7 +55,7 @@ def infix_zeros_to_length(s;l):
   },
   "params": {
     "miningMethod": (if env.HIVE_SKIP_POW != null then "NoProof" else "ethash" end),
-    "chainId": (if env.HIVE_CHAIN_ID != null then env.HIVE_CHAIN_ID|to_hex else "0x1" end),
+    "chainId": (env.HIVE_CHAIN_ID|to_hex // "0x1"),
     "frontierForkBlock": "0x0",
     "homesteadForkBlock": env.HIVE_FORK_HOMESTEAD|to_hex,
     "DAOForkBlock": env.HIVE_FORK_DAO_BLOCK|to_hex,
