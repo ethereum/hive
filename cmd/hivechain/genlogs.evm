@@ -3,7 +3,6 @@
 
     ;; initialize random generator:
     ;; block number at offset 0, counter at 32
-    push 0
     number
     push 0
     mstore
