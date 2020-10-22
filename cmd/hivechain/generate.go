@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 
 	"github.com/ethereum/go-ethereum/common"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
@@ -26,9 +25,9 @@ import (
 
 func init() {
 	// If any of these accounts have balance in the genesis block, it will be spent on random transactions.
-	addr1 := ethcommon.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7")
-	addr2 := ethcommon.HexToAddress("0x703c4b2bD70c169f5717101CaeE543299Fc946C7")
-	addr3 := ethcommon.HexToAddress("0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e")
+	addr1 := common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7")
+	addr2 := common.HexToAddress("0x703c4b2bD70c169f5717101CaeE543299Fc946C7")
+	addr3 := common.HexToAddress("0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e")
 	key1, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
 	key2, _ := crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
 	key3, _ := crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
@@ -38,7 +37,7 @@ func init() {
 }
 
 var (
-	knownAccounts = make(map[ethcommon.Address]*ecdsa.PrivateKey)
+	knownAccounts = make(map[common.Address]*ecdsa.PrivateKey)
 	genstorage    = hexutil.MustDecode("0x60015b8080556001015a6161a81063000000025700")
 	genlogs       = hexutil.MustDecode("0x4360005260006020525b63000000156300000027565b60206020a15a61271010630000000957005b60205160010160205260406000209056")
 	gencode       = hexutil.MustDecode("0x630000001960010138038063000000196001016000396000f35b")
@@ -55,7 +54,7 @@ type generatorConfig struct {
 // loadGenesis loads genesis.json.
 func loadGenesis(file string) (*core.Genesis, error) {
 	var gspec core.Genesis
-	err := ethcommon.LoadJSON(file, &gspec)
+	err := common.LoadJSON(file, &gspec)
 	return &gspec, err
 }
 
