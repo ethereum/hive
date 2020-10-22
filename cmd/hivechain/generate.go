@@ -41,6 +41,7 @@ var (
 	knownAccounts = make(map[ethcommon.Address]*ecdsa.PrivateKey)
 	genstorage    = hexutil.MustDecode("0x60015b8080556001015a6161a81063000000025700")
 	genlogs       = hexutil.MustDecode("0x60004360005260006020525b63000000176300000029565b60206020a15a61271010630000000b57005b60205160010160205260406000209056")
+	gencode       = hexutil.MustDecode("0x630000001960010138038063000000196001016000396000f35b")
 )
 
 // loadGenesis loads genesis.json.
@@ -50,12 +51,21 @@ func loadGenesis(file string) (*core.Genesis, error) {
 	return &gspec, err
 }
 
+const (
+	txTypeValue = iota
+	txTypeStorage
+	txTypeLogs
+	txTypeCode
+	txTypeMax
+)
+
 // addTxForKnownAccounts adds a transaction to the generated chain if the genesis block
 // contains certain known accounts.
 func addTxForKnownAccounts(genesis *core.Genesis, i int, gen *core.BlockGen) {
 	if i%txInterval != 0 {
 		return
 	}
+	txType := (i / txInterval) % txTypeMax
 	for addr, key := range knownAccounts {
 		if a, ok := genesis.Alloc[addr]; ok {
 			// It exists, check remaining balance. Would be nice if BlockGen had a way to
@@ -68,35 +78,43 @@ func addTxForKnownAccounts(genesis *core.Genesis, i int, gen *core.BlockGen) {
 				continue // no funds left in this account
 			}
 			// Add transaction.
-			log.Printf("adding tx from %s in block %d", addr.String(), i)
-			gen.AddTx(generateTx(key, genesis, i, gen))
+			tx := generateTx(txType, key, genesis, gen)
+			log.Printf("adding tx (type %d) from %s in block %d", txType, addr.String(), gen.Number())
+			log.Printf("0x%x (%d gas)", tx.Hash(), tx.Gas())
+			gen.AddTx(tx)
 			return
 		}
 	}
 }
 
 // generateTx creates a random transaction signed by the given account.
-func generateTx(key *ecdsa.PrivateKey, genesis *core.Genesis, i int, gen *core.BlockGen) *types.Transaction {
+func generateTx(txType int, key *ecdsa.PrivateKey, genesis *core.Genesis, gen *core.BlockGen) *types.Transaction {
 	var (
 		src      = crypto.PubkeyToAddress(key.PublicKey)
 		gasprice = big.NewInt(0)
 		tx       *types.Transaction
 	)
-	switch (i / txInterval) % 3 {
-	case 0:
-		// Simple value transfer.
+	// Generate according to type.
+	switch txType {
+	case txTypeValue:
 		amount := big.NewInt(1)
 		var dst common.Address
 		rand.Read(dst[:])
 		tx = types.NewTransaction(gen.TxNonce(src), dst, amount, params.TxGas, gasprice, nil)
-	case 1:
-		// Storage generator.
-		gas := createTxGasLimit(genstorage, 30000)
+	case txTypeStorage:
+		gas := createTxGasLimit(genstorage, 80000)
 		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, genstorage)
-	case 2:
-		// Log generator.
+	case txTypeLogs:
 		gas := createTxGasLimit(genlogs, 20000)
 		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, genlogs)
+	case txTypeCode:
+		// The code generator contract deploys any data given after its own bytecode.
+		codesize := 128
+		input := make([]byte, len(gencode)+codesize)
+		copy(input, gencode)
+		rand.Read(input[len(gencode):])
+		gas := createTxGasLimit(gencode, 10000+params.CreateDataGas*uint64(codesize))
+		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, input)
 	}
 	// Sign the transaction.
 	signer := types.MakeSigner(genesis.Config, gen.Number())
