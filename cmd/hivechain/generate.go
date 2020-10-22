@@ -92,7 +92,7 @@ func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 			// check balance, but it doesn't, so we need to estimate the remaining
 			// balance.
 			txCost := big.NewInt(1)
-			spent := new(big.Int).Mul(txCost, big.NewInt(int64(i)))
+			spent := new(big.Int).Mul(txCost, big.NewInt(int64(i*cfg.txInterval)))
 			gbal := new(big.Int).Set(a.Balance)
 			if gbal.Sub(gbal, spent).Cmp(txCost) < 0 {
 				continue // no funds left in this account
