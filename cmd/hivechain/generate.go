@@ -59,10 +59,10 @@ func loadGenesis(file string) (*core.Genesis, error) {
 	return &gspec, err
 }
 
-// produceTestChainFromGenesisFile creates a test chain with no transactions or other
+// writeTestChain creates a test chain with no transactions or other
 // modifications based on an externally specified genesis file. The blockTimeInSeconds is
 // used to manipulate the block difficulty.
-func (cfg generatorConfig) makeTestChain(outputPath string) error {
+func (cfg generatorConfig) writeTestChain(outputPath string) error {
 	blockModifier := func(i int, gen *core.BlockGen) {
 		log.Println("generating block", gen.Number())
 		gen.OffsetTime(int64((i+1)*int(cfg.blockTimeSec) - 10))

@@ -180,7 +180,7 @@ func generateCommand(args []string) {
 	}
 	cfg.genesis = *gspec
 
-	if err := cfg.makeTestChain(*outdir); err != nil {
+	if err := cfg.writeTestChain(*outdir); err != nil {
 		fatal(err)
 	}
 }
