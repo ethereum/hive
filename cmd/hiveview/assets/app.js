@@ -150,6 +150,7 @@ utils = {
 
 // nav is a little utility to store things in the url, so that people can link into stuff.
 var nav = {
+    // load returns the value of 'key' in the URL query.
     load: function(key) {
         if (!URLSearchParams) {
             progress("Error: browser doesn't support URLSearchParams. IE or what? ")
@@ -157,13 +158,16 @@ var nav = {
         }
         return new URLSearchParams(location.search).get(key);
     },
-    // store stores the key/val combo in the url query
-    // this overwrites any previous key
-    store: function(key, val) {
-        // get current location
-        let old = new URLSearchParams(location.search)
-        old.set(key, val)
-        history.pushState(null, null, "?" + old.toString())
+    // store stores the given keys and values in the URL query.
+    store: function(keys) {
+        let params = new URLSearchParams(location.search);
+        for (key in keys) {
+            params.set(key, keys[key]);
+        }
+        let newsearch = "?" + params.toString();
+        if (newsearch != location.search) {
+            history.pushState(null, null, newsearch);
+        }
     },
 }
 
@@ -309,33 +313,33 @@ $(document).ready(function() {
 
     // Handle navigation clicks.
     $(".nav-link").on("click", function(ev) {
-        nav.store('page', ev.target.id);
+        nav.store({"page": ev.target.id});
     });
-    window.addEventListener('popstate', navigationDispatch);
+    window.addEventListener("popstate", navigationDispatch);
     navigationDispatch();
 });
 
 // navigationDispatch switches to the tab selected by the URL.
 function navigationDispatch() {
-    let suite = nav.load("suite")
+    let suite = nav.load("suite");
     if (suite) {
         // TODO: fix it so we show Loading spinner, and status 'Loaded' (unselectable) once it's loaded.
         loadTestSuite(suite, function(ok) {});
     }
-    let page = nav.load("page");
-    if (page) {
-        let elem = $("#" + page);
-        if (elem && elem.tab) {
-            elem.tab("show");
-        }
+    let page = nav.load("page") || "v-pills-home-tab";
+    let elem = $("#" + page);
+    if (elem && elem.tab) {
+        elem.tab("show");
     }
 }
 
 // openTestSuitePage navigates to the test suite tab.
 function openTestSuitePage(suitefile) {
     // store in url query
-    nav.store("suite", suitefile);
-    nav.store("page", "v-pills-results-tab");
+    nav.store({
+        "page": "v-pills-results-tab",
+        "suite": suitefile,
+    });
     $("#v-pills-results-tab").tab("show")
 }
 
