@@ -1,5 +1,8 @@
 ;;; -*- mode: asm -*-
-;;; initialize random generator: put block number at offset 0, counter at 32
+;;; creates random logs until less than 10k gas remaining.
+
+    ;; initialize random generator:
+    ;; block number at offset 0, counter at 32
     push 0
     number
     push 0
@@ -8,7 +11,6 @@
     push 32
     mstore
 
-;;; creates random logs until less than 10k gas remaining.
 genlogs:
     push @genlogs_emit
     jump @random
