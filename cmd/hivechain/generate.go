@@ -39,7 +39,7 @@ func init() {
 var (
 	txInterval    = 10 // tx will be added every interval block
 	knownAccounts = make(map[ethcommon.Address]*ecdsa.PrivateKey)
-	genstorage    = hexutil.MustDecode("0x60005b8080556001015a6161a810630000000257")
+	genstorage    = hexutil.MustDecode("0x60015b8080556001015a6161a81063000000025700")
 	genlogs       = hexutil.MustDecode("0x60004360005260006020525b63000000176300000029565b60206020a15a61271010630000000b57005b60205160010160205260406000209056")
 )
 
