@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
@@ -183,12 +184,17 @@ func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blo
 	if _, err := blockchain.InsertChain(chain); err != nil {
 		return fmt.Errorf("chain validation error: %v", err)
 	}
+	headstate, _ := blockchain.State()
+	dump := headstate.Dump(false, false, false)
 
 	// Write out the generated blockchain
 	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 1); err != nil {
 		return err
 	}
 	if err := writeChain(blockchain, filepath.Join(path, "chain_genesis.rlp"), 0); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(filepath.Join(path, "chain_poststate.json"), dump, 0644); err != nil {
 		return err
 	}
 	return nil
