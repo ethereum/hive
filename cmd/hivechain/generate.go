@@ -38,18 +38,37 @@ func init() {
 }
 
 var (
-	txInterval    = 10 // tx will be added every interval block
 	knownAccounts = make(map[ethcommon.Address]*ecdsa.PrivateKey)
 	genstorage    = hexutil.MustDecode("0x60015b8080556001015a6161a81063000000025700")
 	genlogs       = hexutil.MustDecode("0x60004360005260006020525b63000000176300000029565b60206020a15a61271010630000000b57005b60205160010160205260406000209056")
 	gencode       = hexutil.MustDecode("0x630000001960010138038063000000196001016000396000f35b")
 )
 
+type generatorConfig struct {
+	txInterval   int // frequency of blocks containing transactions
+	blockCount   int // number of generated blocks
+	blockTimeSec int // block time in seconds, influences difficulty
+	powMode      ethash.Mode
+	genesis      core.Genesis
+}
+
 // loadGenesis loads genesis.json.
 func loadGenesis(file string) (*core.Genesis, error) {
 	var gspec core.Genesis
 	err := ethcommon.LoadJSON(file, &gspec)
 	return &gspec, err
+}
+
+// produceTestChainFromGenesisFile creates a test chain with no transactions or other
+// modifications based on an externally specified genesis file. The blockTimeInSeconds is
+// used to manipulate the block difficulty.
+func (cfg generatorConfig) makeTestChain(outputPath string) error {
+	blockModifier := func(i int, gen *core.BlockGen) {
+		log.Println("generating block", i)
+		gen.OffsetTime(int64((i+1)*int(cfg.blockTimeSec) - 10))
+		cfg.addTxForKnownAccounts(i, gen)
+	}
+	return cfg.generateAndSave(outputPath, blockModifier)
 }
 
 const (
@@ -62,13 +81,14 @@ const (
 
 // addTxForKnownAccounts adds a transaction to the generated chain if the genesis block
 // contains certain known accounts.
-func addTxForKnownAccounts(genesis *core.Genesis, i int, gen *core.BlockGen) {
-	if i%txInterval != 0 {
+func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
+	if cfg.txInterval == 0 || i%cfg.txInterval != 0 {
 		return
 	}
-	txType := (i / txInterval) % txTypeMax
+
+	txType := (i / cfg.txInterval) % txTypeMax
 	for addr, key := range knownAccounts {
-		if a, ok := genesis.Alloc[addr]; ok {
+		if a, ok := cfg.genesis.Alloc[addr]; ok {
 			// It exists, check remaining balance. Would be nice if BlockGen had a way to
 			// check balance, but it doesn't, so we need to estimate the remaining
 			// balance.
@@ -79,7 +99,7 @@ func addTxForKnownAccounts(genesis *core.Genesis, i int, gen *core.BlockGen) {
 				continue // no funds left in this account
 			}
 			// Add transaction.
-			tx := generateTx(txType, key, genesis, gen)
+			tx := generateTx(txType, key, &cfg.genesis, gen)
 			log.Printf("adding tx (type %d) from %s in block %d", txType, addr.String(), gen.Number())
 			log.Printf("0x%x (%d gas)", tx.Hash(), tx.Gas())
 			gen.AddTx(tx)
@@ -131,52 +151,24 @@ func createTxGasLimit(data []byte, extra uint64) uint64 {
 	return igas + extra
 }
 
-// produceTestChainFromGenesisFile creates a test chain with no transactions or other
-// modifications based on an externally specified genesis file. The blockTimeInSeconds is
-// used to manipulate the block difficulty.
-func produceTestChainFromGenesisFile(genesis string, outputPath string, blockCount uint, blockTimeInSeconds uint) error {
-	gspec, err := loadGenesis(genesis)
-	if err != nil {
-		return err
-	}
-	blockModifier := func(i int, gen *core.BlockGen) {
-		log.Println("generating block", i)
-		gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
-		addTxForKnownAccounts(gspec, i, gen)
-	}
-	return generateChainAndSave(gspec, blockCount, outputPath, blockModifier)
-}
-
-// writeChain exports the given chain to a file.
-func writeChain(chain *core.BlockChain, filename string, start uint64) error {
-	out, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	return chain.ExportN(out, start, chain.CurrentBlock().NumberU64())
-}
-
-// GenerateChainAndSave produces a chain based on the genesis-config with
-// valid proof of work, and block difficulty modified by the OffsetTime function
-// in the per-block post-processing function.
-func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blockModifier func(i int, gen *core.BlockGen)) error {
+// generateAndSave produces a chain based on the config.
+func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int, gen *core.BlockGen)) error {
 	db := rawdb.NewMemoryDatabase()
-	genesis := gspec.MustCommit(db)
+	genesis := cfg.genesis.MustCommit(db)
 	config := ethash.Config{
-		PowMode:        ethash.ModeNormal,
+		PowMode:        cfg.powMode,
 		CachesInMem:    2,
 		DatasetsOnDisk: 2,
 		DatasetDir:     ethashDir(),
 	}
 	engine := ethash.New(config, nil, false)
-	insta := instaSeal{engine}
 
 	// Generate a chain where each block is created, modified, and immediately sealed.
-	chain, _ := core.GenerateChain(gspec.Config, genesis, insta, db, int(blockCount), blockModifier)
+	insta := instaSeal{engine}
+	chain, _ := core.GenerateChain(cfg.genesis.Config, genesis, insta, db, cfg.blockCount, blockModifier)
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, err := core.NewBlockChain(db, nil, gspec.Config, engine, vm.Config{}, nil)
+	blockchain, err := core.NewBlockChain(db, nil, cfg.genesis.Config, engine, vm.Config{}, nil)
 	if err != nil {
 		return fmt.Errorf("can't create blockchain: %v", err)
 	}
@@ -200,12 +192,23 @@ func generateChainAndSave(gspec *core.Genesis, blockCount uint, path string, blo
 	return nil
 }
 
+// ethashDir returns the directory for storing ethash datasets.
 func ethashDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return ""
 	}
 	return filepath.Join(home, ".ethash")
+}
+
+// writeChain exports the given chain to a file.
+func writeChain(chain *core.BlockChain, filename string, start uint64) error {
+	out, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+	return chain.ExportN(out, start, chain.CurrentBlock().NumberU64())
 }
 
 // instaSeal wraps a consensus engine with instant block sealing. When a block is produced
