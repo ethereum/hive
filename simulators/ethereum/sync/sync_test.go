@@ -39,8 +39,8 @@ var (
 )
 
 var (
-	testchainHeadNumber = uint64(10)
-	testchainHeadHash   = ethcommon.HexToHash("0x27ad5014b2a18fab49357f9b42e79f22298d00fd3d1da4f1bd7d109f44065596")
+	testchainHeadNumber = uint64(3000)
+	testchainHeadHash   = ethcommon.HexToHash("0xc95596f4707fb382554b660b4847c599eb5f8fdcf99be2c5654aaadd4ec97840")
 )
 
 func TestMain(m *testing.M) {
@@ -244,7 +244,7 @@ func syncNodes(source, sink *node, wantNumber uint64, wantHash ethcommon.Hash) e
 
 // head returns the node's chain head.
 func (n *node) head() (*types.Header, error) {
-	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	return ethclient.NewClient(n.rpcClient).HeaderByNumber(ctx, nil)
 }
 
