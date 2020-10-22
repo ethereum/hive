@@ -22,15 +22,9 @@ import (
 
 // loadGenesis loads genesis.json.
 func loadGenesis(file string) (*core.Genesis, error) {
-	source, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, err
-	}
 	var gspec core.Genesis
-	if err := json.Unmarshal(source, &gspec); err != nil {
-		return nil, fmt.Errorf("invalid genesis JSON: %v", err)
-	}
-	return &gspec, nil
+	err := ethcommon.LoadJSON(file, &gspec)
+	return &gspec, err
 }
 
 // writeGenesis writes the given genesis specification to <path>/genesis.json.
