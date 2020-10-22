@@ -64,7 +64,7 @@ func loadGenesis(file string) (*core.Genesis, error) {
 // used to manipulate the block difficulty.
 func (cfg generatorConfig) makeTestChain(outputPath string) error {
 	blockModifier := func(i int, gen *core.BlockGen) {
-		log.Println("generating block", i)
+		log.Println("generating block", gen.Number())
 		gen.OffsetTime(int64((i+1)*int(cfg.blockTimeSec) - 10))
 		cfg.addTxForKnownAccounts(i, gen)
 	}
