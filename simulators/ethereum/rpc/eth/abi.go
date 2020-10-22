@@ -1,13 +1,13 @@
+// +build none
+
 package main
 
 import (
 	"context"
 	"math/big"
 	"math/rand"
-	"testing"
-
 	"strings"
-
+	"testing"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -16,13 +16,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 )
 
 // callContractTest uses the generated ABI binding to call methods in the
 // pre-deployed contract.
-func callContractTest(t *testing.T, client *TestClient) {
-	t.Parallel()
-
+func callContractTest(t *TestEnv) {
 	contract, err := NewTestContractCaller(predeployedContractAddr, client)
 	if err != nil {
 		t.Fatalf("Unable to instantiate contract caller: %v", err)
@@ -71,12 +70,12 @@ func transactContractTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		account = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		account = createAndFundAccount(t, big.NewInt(params.Ether), client)
 		address = account.Address
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
-		gasPrice                = new(big.Int).Mul(big.NewInt(30), common.Shannon)
+		gasPrice                = big.NewInt(30 * params.EtQher)
 		gasLimit                = big.NewInt(1200000)
 
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
@@ -119,7 +118,7 @@ func transactContractTest(t *testing.T, client *TestClient) {
 		t.Fatalf("Unable to prepare tx payload: %v", err)
 	}
 
-	eventsTx := types.NewTransaction(nonce, predeployedContractAddr, common.Big0, big.NewInt(500000), gasPrice, payload)
+	eventsTx := types.NewTransaction(nonce, predeployedContractAddr, common.Big0, 500000, gasPrice, payload)
 	tx, err := SignTransaction(eventsTx, account)
 	nonce++
 	if err != nil {
@@ -162,7 +161,7 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 	t.Parallel()
 
 	var (
-		account = createAndFundAccountWithSubscription(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		account = createAndFundAccountWithSubscription(t, big.NewInt(common.Ether), client)
 		address = account.Address
 		nonce   = uint64(0)
 

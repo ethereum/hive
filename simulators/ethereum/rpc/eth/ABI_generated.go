@@ -1,6 +1,8 @@
 // This file is an automatically generated Go binding. Do not modify as any
 // change will likely be lost upon the next re-generation!
 
+// +build none
+
 package main
 
 import (
