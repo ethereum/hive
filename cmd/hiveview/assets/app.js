@@ -282,16 +282,16 @@ function onFileListing(data, error) {
         let spinner = button.children(".loader").addClass(spinClasses)
         let label = button.children(".txt").text("Loading")
         let onDone = function(status, errmsg) {
+            button.prop("disabled", false);
+            spinner.removeClass(spinClasses);
             if (status) {
                 label.text("Loaded OK");
-                button.prop("title", "")
-                spinner.removeClass(spinClasses)
+                button.prop("title", "");
                 openTestSuitePage(fname);
-                return
+            } else {
+                label.text("Loading failed");
+                button.prop("title", "Computer says no: " + errmsg);
             }
-            label.text("Loading failed")
-            spinner.removeClass(spinClasses)
-            button.prop("title", "Computer says no: " + errmsg).prop("disabled", false);
         }
         loadTestSuite(fname, onDone);
     });
@@ -366,9 +366,6 @@ var converter = new showdown.Converter()
 var overallresults = null; // Overall results
 var execresults = null; // Execution results
 var failuresummary = null; // Failure summary
-
-// Contains all the data that we load
-var alldata = {};
 
 function logFolder(jsonsource, client) {
     return jsonsource.split(".")[0];
