@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/hive/simulators/common/providers/hive"
 )
 
-var tests = []hive.Spec{{
+var tests = []hive.SingleClientTest{{
 	Name:        "eth protocol",
 	Description: "This tests a client's ability to accurately respond to basic eth protocol messages.",
 	Run:         runEthTest,
@@ -36,13 +36,15 @@ func main() {
 	}
 }
 
-func runEthTest(c *hive.ClientTest) error {
-	enode, err := c.EnodeURL()
+func runEthTest(t *hive.ClientTest) {
+	enode, err := t.EnodeURL()
 	if err != nil {
-		return err
+		t.Fatal(err)
 	}
 	cmd := exec.Command("./devp2p", "rlpx", "eth-test", enode, "/init/fullchain.rlp", "/init/genesis.json")
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		t.Fatal(err)
+	}
 }
