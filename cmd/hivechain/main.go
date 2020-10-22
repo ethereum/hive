@@ -31,11 +31,13 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-const usage = "Usage: hivechain generate|print|trim [ options ] ..."
+const usage = "Usage: hivechain generate|print|print-genesis|trim [ options ] ..."
 
 func main() {
+	// Initialize go-ethereum logging.
+	// This is mostly for displaying the DAG generator progress.
 	handler := ethlog.StreamHandler(os.Stderr, ethlog.TerminalFormat(false))
-	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlDebug, handler))
+	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlInfo, handler))
 
 	if len(os.Args) < 2 {
 		fatalf(usage)

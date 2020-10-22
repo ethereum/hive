@@ -1,14 +1,17 @@
 package main
 
 import (
-	"encoding/json"
+	"crypto/ecdsa"
+	"crypto/rand"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"math/big"
 	"os"
 	"path/filepath"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -20,6 +23,26 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+func init() {
+	// If any of these accounts have balance in the genesis block, it will be spent on random transactions.
+	addr1 := ethcommon.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7")
+	addr2 := ethcommon.HexToAddress("0x703c4b2bD70c169f5717101CaeE543299Fc946C7")
+	addr3 := ethcommon.HexToAddress("0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e")
+	key1, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
+	key2, _ := crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
+	key3, _ := crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
+	knownAccounts[addr1] = key1
+	knownAccounts[addr2] = key2
+	knownAccounts[addr3] = key3
+}
+
+var (
+	txInterval    = 10 // tx will be added every interval block
+	knownAccounts = make(map[ethcommon.Address]*ecdsa.PrivateKey)
+	genstorage    = hexutil.MustDecode("0x60005b8080556001015a6161a810630000000257")
+	genlogs       = hexutil.MustDecode("0x60004360005260006020525b63000000176300000029565b60206020a15a61271010630000000b57005b60205160010160205260406000209056")
+)
+
 // loadGenesis loads genesis.json.
 func loadGenesis(file string) (*core.Genesis, error) {
 	var gspec core.Genesis
@@ -27,71 +50,66 @@ func loadGenesis(file string) (*core.Genesis, error) {
 	return &gspec, err
 }
 
-// writeGenesis writes the given genesis specification to <path>/genesis.json.
-func writeGenesis(gspec *core.Genesis, path string) error {
-	bytes, err := json.MarshalIndent(gspec, "", "  ")
-	if err != nil {
-		return err
+// addTxForKnownAccounts adds a transaction to the generated chain if the genesis block
+// contains certain known accounts.
+func addTxForKnownAccounts(genesis *core.Genesis, i int, gen *core.BlockGen) {
+	if i%txInterval != 0 {
+		return
 	}
-	filename := filepath.Join(path, "genesis.json")
-	return ioutil.WriteFile(filename, bytes, 0644)
-}
-
-// produceSimpleTestChain creates a chain containing some value transfer transactions.
-//
-// The first of multiple chains exhibiting different characteristics for differing test
-// purposes. This chain involves two accounts that transfer funds to each other in
-// alternating blocks. These functions save the chain.rlp and genesis.json to the
-// specified path. blockCount indicates the desired chain length in blocks.
-func produceSimpleTestChain(path string, blockCount uint) error {
-	var (
-		key1, _ = crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-		key2, _ = crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-		addr1   = crypto.PubkeyToAddress(key1.PublicKey)
-		addr2   = crypto.PubkeyToAddress(key2.PublicKey)
-	)
-
-	signer := types.HomesteadSigner{}
-	blockModifier := func(i int, gen *core.BlockGen) {
-		gen.OffsetTime(int64((i + 1) * 30))
-		if i%2 == 0 {
-			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr1), addr2, big.NewInt(10000), params.TxGas, nil, nil), signer, key1)
-			gen.AddTx(tx)
-		} else {
-			tx, _ := types.SignTx(types.NewTransaction(gen.TxNonce(addr2), addr1, big.NewInt(10000), params.TxGas, nil, nil), signer, key2)
-			gen.AddTx(tx)
+	for addr, key := range knownAccounts {
+		if a, ok := genesis.Alloc[addr]; ok {
+			// It exists, check remaining balance. Would be nice if BlockGen had a way to
+			// check balance, but it doesn't, so we need to estimate the remaining
+			// balance.
+			txCost := big.NewInt(1)
+			spent := new(big.Int).Mul(txCost, big.NewInt(int64(i)))
+			gbal := new(big.Int).Set(a.Balance)
+			if gbal.Sub(gbal, spent).Cmp(txCost) < 0 {
+				continue // no funds left in this account
+			}
+			// Add transaction.
+			log.Printf("adding tx from %s in block %d", addr.String(), i)
+			gen.AddTx(generateTx(key, genesis, i, gen))
+			return
 		}
 	}
+}
 
-	gspec := &core.Genesis{
-		Config: &params.ChainConfig{
-			HomesteadBlock: new(big.Int),
-			ChainID:        big.NewInt(1),
-			DAOForkBlock:   big.NewInt(0),
-			DAOForkSupport: false,
-			EIP150Block:    big.NewInt(0),
-			//Do not set EIP150Hash because Parity cannot peer with it
-			//EIP150Hash:          ethcommon.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
-			EIP155Block:         big.NewInt(0),
-			EIP158Block:         big.NewInt(0),
-			ByzantiumBlock:      big.NewInt(0),
-			ConstantinopleBlock: nil,
-			EWASMBlock:          nil,
-			Ethash:              new(params.EthashConfig),
-		},
-		Nonce:      0xdeadbeefdeadbeef,
-		Timestamp:  0x0,
-		GasLimit:   0x8000000,
-		Difficulty: big.NewInt(0x10),
-		Mixhash:    ethcommon.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000"),
-		Coinbase:   ethcommon.HexToAddress("0x0000000000000000000000000000000000000000"),
-		Alloc:      core.GenesisAlloc{addr1: {Balance: big.NewInt(1000000)}},
+// generateTx creates a random transaction signed by the given account.
+func generateTx(key *ecdsa.PrivateKey, genesis *core.Genesis, i int, gen *core.BlockGen) *types.Transaction {
+	var (
+		src      = crypto.PubkeyToAddress(key.PublicKey)
+		gasprice = big.NewInt(0)
+		tx       *types.Transaction
+	)
+	switch (i / txInterval) % 3 {
+	case 0:
+		// Simple value transfer.
+		amount := big.NewInt(1)
+		var dst common.Address
+		rand.Read(dst[:])
+		tx = types.NewTransaction(gen.TxNonce(src), dst, amount, params.TxGas, gasprice, nil)
+	case 1:
+		// Storage generator.
+		gas := createTxGasLimit(genstorage, 30000)
+		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, genstorage)
+	case 2:
+		// Log generator.
+		gas := createTxGasLimit(genlogs, 20000)
+		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, genlogs)
 	}
+	// Sign the transaction.
+	signer := types.MakeSigner(genesis.Config, gen.Number())
+	signedTx, err := types.SignTx(tx, signer, key)
+	if err != nil {
+		panic(err)
+	}
+	return signedTx
+}
 
-	if err := writeGenesis(gspec, path); err != nil {
-		return err
-	}
-	return generateChainAndSave(gspec, blockCount, path, blockModifier)
+func createTxGasLimit(data []byte, extra uint64) uint64 {
+	igas, _ := core.IntrinsicGas(data, true, true)
+	return igas + extra
 }
 
 // produceTestChainFromGenesisFile creates a test chain with no transactions or other
@@ -103,7 +121,9 @@ func produceTestChainFromGenesisFile(genesis string, outputPath string, blockCou
 		return err
 	}
 	blockModifier := func(i int, gen *core.BlockGen) {
+		log.Println("generating block", i)
 		gen.OffsetTime(int64((i+1)*int(blockTimeInSeconds) - 10))
+		addTxForKnownAccounts(gspec, i, gen)
 	}
 	return generateChainAndSave(gspec, blockCount, outputPath, blockModifier)
 }
