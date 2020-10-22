@@ -57,63 +57,84 @@ var hacks = {
             hacks.setHL($(this).attr("line"))
             history.pushState(null, null, "#" + $(this).attr("id"));
         });
-        // return LOC
+
+        // Set meta-info.
+        let meta = lines.length + " Lines, " + hacks.units(bunchaText.length);
+        document.getElementById("meta").innerText = meta;
         return lines.length
     },
 
-    // fetchFile loads up a new file to view
-    fetchFile: function(line /* optional jump to line */ ) {
-        let url = $("#fileload").val()
-        $.ajax({
-            url: url,
-            success: function(data) {
-                history.pushState(null, null, "?file=" + url)
-                hacks.setContent(data, url)
-                hacks.setHL(line)
-                if (line) {
-                    window.location.hash = "L" + line;
-                }
-            },
-            dataType: "text",
-            error: function(jq, status, error) {
-                alert("Failed to load " + url + "\nstatus:" + status + "\nerror:" + error)
-            },
-        });
+    showSpinner: function(spin) {
+        let spinner = $("#main .loader");
+        let spinClasses = "spinner-border spinner-border-sm";
+        if (spin) {
+            spinner.addClass(spinClasses);
+        } else {
+            spinner.removeClass(spinClasses);
+        }
     },
 
     // setContent shows a file + fileinfo
     // should be called by the loader, after successfull fetch
     setContent: function(text, filename) {
-        document.getElementById("viewer").innerHTML = ""
-        nLines = hacks.showText("viewer", text)
+        document.getElementById("viewer").innerHTML = "";
+        nLines = hacks.showText("viewer", text);
         // Set the raw dest
-        document.getElementById("raw-url").setAttribute("href", filename)
-        // Set meta-info
-        let meta = nLines + " Lines, " + hacks.units(text.length)
-        document.getElementById("meta").innerText = meta
-
+        document.getElementById("raw-url").setAttribute("href", filename);
     },
 }
 
-$.when($.ready).then(function() {
-    // default text
-    hacks.showText("viewer", document.getElementById("exampletext").innerHTML)
+// fetchFile loads up a new file to view
+function fetchFile(line /* optional jump to line */ ) {
+    let url = $("#fileload").val()
+    hacks.showSpinner(true);
+    $.ajax({
+        url: url,
+        dataType: "text",
+        success: function(data) {
+            hacks.showSpinner(false);
+            let newsearch = "?file=" + url;
+            if (window.location.search != newsearch) {
+                history.pushState(null, null, newsearch);
+            }
+            document.title = url;
+            hacks.setContent(data, url)
+            hacks.setHL(line)
+            if (line) {
+                window.location.hash = "L" + line;
+            }
+        },
+        error: function(jq, status, error) {
+            hacks.showSpinner(false);
+            alert("Failed to load " + url + "\nstatus:" + status + "\nerror:" + error);
+        },
+    });
+}
 
-    // Check the hash
-    let h = window.location.hash
-    let num = null
+function navigate() {
+    // Check for line number in hash.
+    var num = null;
     if (window.location.hash.substr(1, 1) == "L") {
-        num = parseInt(window.location.hash.substr(2))
+        num = parseInt(window.location.hash.substr(2));
     }
-
-    // Check the query
+    // Check for file name.
     let params = new URLSearchParams(location.search);
     if (params) {
         let f = params.get("file");
         if (f) {
             $("#fileload").val(f)
-            hacks.fetchFile(num)
-            return
+            hacks.showText("viewer", "Loading file...");
+            fetchFile(num);
+            return true;
         }
     }
+    return false;
+}
+
+$(document).ready(function() {
+    if (!navigate()) {
+        // Show default text because nothing was loaded.
+        hacks.showText("viewer", document.getElementById("exampletext").innerHTML);
+    }
+    window.addEventListener('popstate', function() { navigate() });
 });
