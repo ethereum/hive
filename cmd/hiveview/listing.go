@@ -24,7 +24,7 @@ func generateListing(output io.Writer, logdir string) error {
 		return err
 	}
 	entries := convertSummaryFiles(logdir, logfiles)
-	sort.Slice(entries, func(i, j int) bool { return entries[i].SimLog < entries[j].SimLog })
+	sort.Slice(entries, func(i, j int) bool { return entries[i].SimLog > entries[j].SimLog })
 	if len(entries) > listLimit {
 		entries = entries[:listLimit]
 	}
