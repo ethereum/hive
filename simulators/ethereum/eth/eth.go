@@ -35,8 +35,8 @@ func main() {
 	for _, client := range clients {
 		env := map[string]string{
 			"CLIENT":              client,
-			"HIVE_NETWORK_ID":     "1",
-			"HIVE_CHAIN_ID":       "1",
+			"HIVE_NETWORK_ID":     "19763",
+			"HIVE_CHAIN_ID":       "19763",
 			"HIVE_FORK_HOMESTEAD": "0",
 			"HIVE_FORK_TANGERINE": "0",
 			"HIVE_FORK_SPURIOUS":  "0",
