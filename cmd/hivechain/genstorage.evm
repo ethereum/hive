@@ -1,0 +1,16 @@
+;;; -*- mode: asm -*-
+;;; creates storage slots until less than 25k gas remaining.
+
+    push 1
+genstorage:
+    dup1
+    dup1
+    sstore
+    push 1
+    add
+    ;; enough gas left? loop!
+    gas
+    push 25000
+    lt
+    jumpi @genstorage
+    stop

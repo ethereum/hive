@@ -1,0 +1,42 @@
+;;; -*- mode: asm -*-
+;;; creates random logs until less than 10k gas remaining.
+
+    ;; initialize random generator:
+    ;; block number at offset 0, counter at 32
+    number
+    push 0
+    mstore
+    push 0
+    push 32
+    mstore
+
+genlogs:
+    push @genlogs_emit
+    jump @random
+genlogs_emit:
+    push 32
+    push 32
+    log1
+    ;; enough gas left? loop!
+    gas
+    push 10000
+    lt
+    jumpi @genlogs
+    stop
+
+;;; ( rdest -- x ) creates random numbers based on block number
+random:
+    ;; increment
+    push 32
+    mload
+    push 1
+    add
+    push 32
+    mstore
+    ;; compute
+    push 64
+    push 0
+    sha3
+    ;; return to caller
+    swap1
+    jump

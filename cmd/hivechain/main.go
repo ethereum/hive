@@ -26,16 +26,19 @@ import (
 	"io"
 	"os"
 
+	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-const usage = "Usage: hivechain generate|print|trim [ options ] ..."
+const usage = "Usage: hivechain generate|print|print-genesis|trim [ options ] ..."
 
 func main() {
+	// Initialize go-ethereum logging.
+	// This is mostly for displaying the DAG generator progress.
 	handler := ethlog.StreamHandler(os.Stderr, ethlog.TerminalFormat(false))
-	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlDebug, handler))
+	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlInfo, handler))
 
 	if len(os.Args) < 2 {
 		fatalf(usage)
@@ -88,6 +91,7 @@ func printCommand(args []string) {
 	}
 }
 
+// printGenesisCommand displays the genesis post-state.
 func printGenesisCommand(args []string) {
 	flag.CommandLine.Parse(args)
 	if flag.NArg() != 1 {
@@ -152,18 +156,31 @@ func trimCommand(args []string) {
 // generateCommand generates a test chain.
 func generateCommand(args []string) {
 	var (
-		length    = flag.Uint("length", 2, "The length of the chain to generate")
-		blocktime = flag.Uint("blocktime", 30, "The desired block time in seconds")
-		genesis   = flag.String("genesis", "", "The path and filename to the source genesis.json")
-		outdir    = flag.String("output", ".", "Chain destination folder")
+		cfg     generatorConfig
+		genesis = flag.String("genesis", "", "The path and filename to the source genesis.json")
+		outdir  = flag.String("output", ".", "Chain destination folder")
+		mine    = flag.Bool("mine", false, "Enables ethash mining")
 	)
+	flag.IntVar(&cfg.blockCount, "length", 2, "The length of the chain to generate")
+	flag.IntVar(&cfg.blockTimeSec, "blocktime", 30, "The desired block time in seconds")
+	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transaction to chain every n blocks")
 	flag.CommandLine.Parse(args)
 
 	if *genesis == "" {
 		fatalf("Missing -genesis option, please supply a genesis.json file.")
 	}
-	err := produceTestChainFromGenesisFile(*genesis, *outdir, *length, *blocktime)
+	if *mine {
+		cfg.powMode = ethash.ModeNormal
+	} else {
+		cfg.powMode = ethash.ModeFullFake
+	}
+	gspec, err := loadGenesis(*genesis)
 	if err != nil {
+		fatal(err)
+	}
+	cfg.genesis = *gspec
+
+	if err := cfg.writeTestChain(*outdir); err != nil {
 		fatal(err)
 	}
 }

@@ -1,0 +1,19 @@
+;;; -*- mode: asm -*-
+;;; puts any data after @end into new contract
+
+    push @end
+    push 1
+    add
+    codesize
+    sub
+    ;; copy to memory
+    dup1
+    push @end
+    push 1
+    add
+    push 0
+    codecopy
+    ;; return memory content
+    push 0
+    return
+end:
