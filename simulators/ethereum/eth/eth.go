@@ -1,7 +1,6 @@
 package main
 
 import (
-	"os"
 	"os/exec"
 
 	"github.com/fjl/hiveclient/hivesim"
@@ -23,8 +22,8 @@ var test = hivesim.ClientTestSpec{
 		"HIVE_LOGLEVEL":       "5",
 	},
 	Files: map[string]string{
-		"genesis.json": "/init/genesis.json",
-		"chain.rlp":    "/init/halfchain.rlp",
+		"genesis.json": "./init/genesis.json",
+		"chain.rlp":    "./init/halfchain.rlp",
 	},
 	Run: runEthTest,
 }
@@ -40,10 +39,10 @@ func runEthTest(t *hivesim.T, c *hivesim.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	cmd := exec.Command("./devp2p", "rlpx", "eth-test", enode, "/init/fullchain.rlp", "/init/genesis.json")
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		t.Fatal(err)
+	cmd := exec.Command("/devp2p", "rlpx", "eth-test", enode, "./init/fullchain.rlp", "./init/genesis.json")
+	output, err := cmd.CombinedOutput()
+	t.Log(string(output))
+	if err != nil {
+		t.Error(err)
 	}
 }
