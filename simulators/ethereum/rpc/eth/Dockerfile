@@ -1,8 +1,3 @@
-# This simulation tests the RPC interface on a "live" chain using
-# the go RPC client that is part of the go-ethereum repo.
-#
-# The simulation starts a bootnode with multipe client nodes that find each
-# other through the bootnode.
 FROM golang:1-alpine
 
 # Build a geth bootnode, regular node from the develop branch and unit test binary
@@ -27,6 +22,6 @@ ADD /ethereum/rpc/eth/keys/c5065c9eeebe6df2c2284d046bfc906501846c51 /keystores5/
 # Build the simulator.
 ADD /ethereum/rpc/eth /source
 WORKDIR /source
-RUN go build
+RUN go build -v
 
 ENTRYPOINT ["./eth"]

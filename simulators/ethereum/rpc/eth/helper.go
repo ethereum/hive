@@ -11,7 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/hive/simulators/ethereum/rpc/eth/common/providers/hive"
+	"github.com/fjl/hiveclient/hivesim"
 )
 
 var (
@@ -25,17 +25,19 @@ var (
 // This allows for calling custom RPC methods that are not exposed
 // by the ethclient.
 type TestEnv struct {
-	*hive.ClientTest
+	*hivesim.T
+	*hivesim.Client
 	Eth *ethclient.Client
 }
 
-func runHTTP(fn func(*TestEnv)) func(*hive.ClientTest) {
-	return func(ct *hive.ClientTest) {
-		t := &TestEnv{
-			ClientTest: ct,
-			Eth:        ethclient.NewClient(ct.RPC()),
+func runHTTP(fn func(*TestEnv)) func(*hivesim.T, *hivesim.Client) {
+	return func(t *hivesim.T, c *hivesim.Client) {
+		env := &TestEnv{
+			T:      t,
+			Client: c,
+			Eth:    ethclient.NewClient(c.RPC()),
 		}
-		fn(t)
+		fn(env)
 	}
 }
 

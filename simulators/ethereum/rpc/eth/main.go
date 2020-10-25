@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/ethereum/hive/simulators/ethereum/rpc/eth/common/providers/hive"
+	"github.com/fjl/hiveclient/hivesim"
 )
 
-var clientEnv = map[string]string{
+var clientEnv = hivesim.Params{
 	"HIVE_NETWORK_ID":     "7",
 	"HIVE_CHAIN_ID":       "7",
 	"HIVE_FORK_HOMESTEAD": "0",
@@ -21,7 +18,7 @@ var files = map[string]string{
 	"/genesis.json": "genesis.json",
 }
 
-var tests = []hive.SingleClientTest{
+var tests = []hivesim.ClientTestSpec{
 	// HTTP RPC tests.
 	{Name: "http/BalanceAndNonceAt", Run: runHTTP(balanceAndNonceAtTest)},
 	{Name: "http/BlockByHash", Run: runHTTP(blockByHashTest)},
@@ -46,24 +43,17 @@ var tests = []hive.SingleClientTest{
 	// WebSocket ABI tests.
 }
 
-func withEnvAndFiles(tests []hive.SingleClientTest) []hive.SingleClientTest {
-	out := make([]hive.SingleClientTest, len(tests))
-	for i, test := range tests {
-		out[i] = test
-		out[i].Parameters = clientEnv
-		out[i].Files = files
-	}
-	return out
-}
-
 func main() {
-	host := hive.New()
-	tests := withEnvAndFiles(tests)
-	err := hive.RunAllClients(host, "JSON-RPC tests", tests)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+	suite := hivesim.Suite{
+		Name: "JSON-RPC tests",
 	}
+	for _, test := range tests {
+		test.Parameters = clientEnv
+		test.Files = files
+		suite.Add(test)
+	}
+	host := hivesim.New()
+	hivesim.MustRunSuite(host, suite)
 }
 
 // func TestEth(t *testing.T) {
