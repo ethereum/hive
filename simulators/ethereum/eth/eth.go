@@ -1,18 +1,19 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 
-	"github.com/ethereum/hive/simulators/common/providers/hive"
+	"github.com/fjl/hiveclient/hivesim"
 )
 
-var tests = []hive.SingleClientTest{{
+var suite = hivesim.Suite{
 	Name:        "eth protocol",
 	Description: "This tests a client's ability to accurately respond to basic eth protocol messages.",
-	Run:         runEthTest,
-	Parameters: map[string]string{
+}
+
+var test = hivesim.ClientTestSpec{
+	Parameters: hivesim.Params{
 		"HIVE_NETWORK_ID":     "19763",
 		"HIVE_CHAIN_ID":       "19763",
 		"HIVE_FORK_HOMESTEAD": "0",
@@ -25,19 +26,17 @@ var tests = []hive.SingleClientTest{{
 		"genesis.json": "/init/genesis.json",
 		"chain.rlp":    "/init/halfchain.rlp",
 	},
-}}
-
-func main() {
-	host := hive.New()
-	err := hive.RunAllClients(host, "eth protocol test suite", tests)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
+	Run: runEthTest,
 }
 
-func runEthTest(t *hive.ClientTest) {
-	enode, err := t.EnodeURL()
+func main() {
+	suite.Add(test)
+	host := hivesim.New()
+	hivesim.MustRunSuite(host, suite)
+}
+
+func runEthTest(t *hivesim.T, c *hivesim.Client) {
+	enode, err := c.EnodeURL()
 	if err != nil {
 		t.Fatal(err)
 	}
