@@ -13,7 +13,7 @@ import (
 
 var (
 	// the number of seconds before a sync is considered stalled or failed
-	syncTimeout = 30 * time.Second
+	syncTimeout = 45 * time.Second
 	params      = hivesim.Params{
 		"HIVE_NETWORK_ID":     "19763",
 		"HIVE_CHAIN_ID":       "19763",
@@ -24,17 +24,17 @@ var (
 		"HIVE_NODETYPE":       "full",
 	}
 	sourceFiles = map[string]string{
-		"genesis.json": "/simplechain/genesis.json",
-		"chain.rlp":    "/simplechain/chain.rlp",
+		"genesis.json": "./simplechain/genesis.json",
+		"chain.rlp":    "./simplechain/chain.rlp",
 	}
 	sinkFiles = map[string]string{
-		"genesis.json": "/simplechain/genesis.json",
+		"genesis.json": "./simplechain/genesis.json",
 	}
 )
 
 var (
-	testchainHeadNumber = uint64(10)
-	testchainHeadHash   = common.HexToHash("0x27ad5014b2a18fab49357f9b42e79f22298d00fd3d1da4f1bd7d109f44065596")
+	testchainHeadNumber = uint64(3000)
+	testchainHeadHash   = common.HexToHash("0xc95596f4707fb382554b660b4847c599eb5f8fdcf99be2c5654aaadd4ec97840")
 )
 
 func main() {
@@ -44,14 +44,17 @@ func main() {
 For each client, we test if it can serve as a sync source for all other clients (including itself).`,
 	}
 	suite.Add(hivesim.ClientTestSpec{
-		Name:        "sync source",
+		Name:        "CLIENT as sync source",
 		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
+		Parameters:  params,
+		Files:       sourceFiles,
 		Run:         runSourceTest,
 	})
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
 func runSourceTest(t *hivesim.T, c *hivesim.Client) {
+	// Check whether the source has imported its chain.rlp correctly.
 	source := &node{c}
 	if err := source.checkHead(testchainHeadNumber, testchainHeadHash); err != nil {
 		t.Fatal(err)
@@ -64,8 +67,9 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client) {
 	}
 	sinkParams := params.Set("HIVE_BOOTNODE", enode)
 
+	// Sync all sink nodes against the source.
 	t.RunAllClients(hivesim.ClientTestSpec{
-		Name: fmt.Sprintf("sync from %s", c.Type),
+		Name: fmt.Sprintf("sync CLIENT from %s", source.Type),
 		Description: fmt.Sprintf("This test initialises the client under test "+
 			"with a predefined chain, and attempts to sync the chain from "+
 			"a %s node.", source.Type),
@@ -77,11 +81,12 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client) {
 
 func runSyncTest(t *hivesim.T, c *hivesim.Client) {
 	node := &node{c}
-	node.checkSync(t, testchainHeadNumber, testchainHeadHash)
+	err := node.checkSync(t, testchainHeadNumber, testchainHeadHash)
+	if err != nil {
+		t.Fatal("sync failed:", err)
+	}
 }
 
-// node represents an instantiated client, which has successfully spun up RPC,
-// and delivered enode enodeId
 type node struct {
 	*hivesim.Client
 }
@@ -96,7 +101,7 @@ func (n *node) checkSync(t *hivesim.T, wantNumber uint64, wantHash common.Hash) 
 		t.Logf("checking sync progress...")
 		select {
 		case <-timeout:
-			return fmt.Errorf("Sync timeout (%v elapsed)", syncTimeout)
+			return fmt.Errorf("timeout (%v elapsed)", syncTimeout)
 		default:
 			block, err := n.head()
 			if err != nil {
@@ -122,7 +127,7 @@ func (n *node) checkSync(t *hivesim.T, wantNumber uint64, wantHash common.Hash) 
 
 // head returns the node's chain head.
 func (n *node) head() (*types.Header, error) {
-	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	return ethclient.NewClient(n.RPC()).HeaderByNumber(ctx, nil)
 }
 
