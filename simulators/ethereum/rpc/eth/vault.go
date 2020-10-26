@@ -13,8 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 var (
@@ -48,27 +48,15 @@ contract Vault {
 	defaultPassword = ""
 )
 
+var (
+	testChainID      = big.NewInt(7)
+	vaultAccountAddr = common.HexToAddress("0xcf49fda3be353c69b41ed96333cd24302da4556f")
+	vaultKey, _      = crypto.HexToECDSA("63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376")
+)
+
 func init() {
 	keyStore = keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
 	accountsManager = accounts.NewManager(&accounts.Config{}, keyStore)
-}
-
-// nodeAddress returns the first account from the node and unlocks it.
-func nodeAddress(t *TestEnv) common.Address {
-	var accounts []common.Address
-	if err := t.CallContext(t.Ctx(), &accounts, "eth_accounts"); err != nil {
-		panic(err)
-	}
-	addr := accounts[0]
-
-	var success bool
-	if err := t.CallContext(t.Ctx(), &success, "personal_unlockAccount", addr, "", 3600); err != nil {
-		t.Fatalf("Unable to unlock account 0x%x: %v", addr, err)
-	}
-	if !success {
-		t.Fatalf("Unable to unlock node account 0x%x", addr)
-	}
-	return addr
 }
 
 // createAndFundAccount creates a new account that is funded from the vault contract.
@@ -80,7 +68,6 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 	}
 
 	// each node has at least one 1 key with some of pre-allocated ether
-	fromAddr := nodeAddress(t)
 	if amount == nil {
 		amount = common.Big0
 	}
@@ -114,20 +101,9 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 	defer logsSub.Unsubscribe()
 
 	// order the vault to send some ether
-	payload, err := vault.Pack("sendSome", account.Address, amount)
-	if err != nil {
-		t.Fatalf("Unable to send some ether to new account: %v", err)
-	}
-	txPayload := map[string]interface{}{
-		"from": fromAddr,
-		"to":   predeployedVaultAddr,
-		"data": hexutil.Bytes(payload),
-		"gas":  hexutil.EncodeBig(big.NewInt(75000)),
-	}
-
-	var txHash common.Hash
-	if err := t.CallContext(t.Ctx(), &txHash, "eth_sendTransaction", txPayload); err != nil {
-		t.Fatalf("Unable to send funding transaction: %v", err)
+	tx := vaultSendSome(t, account.Address, amount)
+	if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
+		t.Fatalf("unable to send funding transaction: %v", err)
 	}
 	var (
 		latestHeader *types.Header
@@ -143,15 +119,16 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 		case log := <-logs:
 			if !log.Removed {
 				receivedLog = &log
-			} else if log.Removed && receivedLog != nil && receivedLog.BlockHash == log.BlockHash { // chain reorg
+			} else if log.Removed && receivedLog != nil && receivedLog.BlockHash == log.BlockHash {
+				// chain reorg!
 				receivedLog = nil
 			}
 		case err := <-headsSub.Err():
 			t.Fatalf("Could not fund new account: %v", err)
 		case err := <-logsSub.Err():
-			t.Fatalf("Could not not fund new account: %v", err)
+			t.Fatalf("Could not fund new account: %v", err)
 		case <-timeout.C:
-			t.Fatal("Could not not fund new account: timeout")
+			t.Fatal("Could not fund new account: timeout")
 		}
 
 		if latestHeader != nil && receivedLog != nil {
@@ -164,6 +141,14 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 	return account
 }
 
+func nextNonce(t *TestEnv, account common.Address) uint64 {
+	nonce, err := t.Eth.NonceAt(t.Ctx(), account, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return nonce
+}
+
 // createAndFundAccount creates a new account that is funded from the vault contract.
 // It will panic when the account could not be created and funded.
 func createAndFundAccount(t *TestEnv, amount *big.Int) accounts.Account {
@@ -171,29 +156,14 @@ func createAndFundAccount(t *TestEnv, amount *big.Int) accounts.Account {
 	if err != nil {
 		panic(err)
 	}
-
-	// each node has at least one 1 key with some of pre-allocated ether
-	fromAddr := nodeAddress(t)
 	if amount == nil {
 		amount = common.Big0
 	}
 
 	// order the vault to send some ether
-	vault, _ := abi.JSON(strings.NewReader(predeployedVaultABI))
-	payload, err := vault.Pack("sendSome", account.Address, amount)
-	if err != nil {
-		t.Fatalf("Unable to send some ether to new account: %v", err)
-	}
-	txPayload := map[string]interface{}{
-		"from": fromAddr,
-		"to":   predeployedVaultAddr,
-		"data": hexutil.Bytes(payload),
-		"gas":  hexutil.EncodeBig(big.NewInt(75000)),
-	}
-
-	var txHash common.Hash
-	if err := t.CallContext(t.Ctx(), &txHash, "eth_sendTransaction", txPayload); err != nil {
-		t.Fatalf("Unable to send funding transaction: %v", err)
+	tx := vaultSendSome(t, account.Address, amount)
+	if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
+		t.Fatalf("unable to send funding transaction: %v", err)
 	}
 
 	// wait for vaultTxConfirmationCount confirmation by checking the balance vaultTxConfirmationCount blocks back.
@@ -214,5 +184,26 @@ func createAndFundAccount(t *TestEnv, amount *big.Int) accounts.Account {
 		}
 		time.Sleep(time.Second)
 	}
-	panic(fmt.Sprintf("Could not fund account 0x%x in transaction 0x%x", account.Address, txHash))
+	panic(fmt.Sprintf("Could not fund account 0x%x in transaction 0x%x", account.Address, tx.Hash()))
+}
+
+func vaultSendSome(t *TestEnv, recipient common.Address, amount *big.Int) *types.Transaction {
+	vault, _ := abi.JSON(strings.NewReader(predeployedVaultABI))
+	payload, err := vault.Pack("sendSome", recipient, amount)
+	if err != nil {
+		t.Fatalf("can't pack pack vault tx input: %v", err)
+	}
+	var (
+		nonce    = nextNonce(t, vaultAccountAddr)
+		gasLimit = uint64(75000)
+		gasPrice = new(big.Int)
+		txAmount = new(big.Int)
+	)
+	tx := types.NewTransaction(nonce, predeployedVaultAddr, txAmount, gasLimit, gasPrice, payload)
+	signer := types.NewEIP155Signer(testChainID)
+	signedTx, err := types.SignTx(tx, signer, vaultKey)
+	if err != nil {
+		t.Fatal("can't sign vault funding tx:", err)
+	}
+	return signedTx
 }

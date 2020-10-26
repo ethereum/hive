@@ -11,7 +11,7 @@ var clientEnv = hivesim.Params{
 	"HIVE_FORK_TANGERINE": "0",
 	"HIVE_FORK_SPURIOUS":  "0",
 	"HIVE_MINER":          "0xc5065c9eeebe6df2c2284d046bfc906501846c51",
-	"HIVE_FAKE_POW":       "1",
+	"HIVE_SKIP_POW":       "1",
 }
 
 var files = map[string]string{
