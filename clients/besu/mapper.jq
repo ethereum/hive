@@ -23,8 +23,8 @@ def to_int:
 
 # Replace config in input.
 . + {
-    "ethash": {},
     "config": {
+        "ethash": {},
         "chainID": env.HIVE_CHAIN_ID|to_int,
         "homesteadBlock": env.HIVE_FORK_HOMESTEAD|to_int,
         "daoForkBlock": env.HIVE_FORK_DAO_BLOCK|to_int,
