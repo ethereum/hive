@@ -38,8 +38,6 @@ besu=/opt/besu/bin/besu
 # See https://github.com/hyperledger/besu/issues/1464
 export BESU_OPTS="-Dsecp256k1.randomize=false"
 
-FLAGS=""
-
 # Configure logging.
 LOG=info
 case "$HIVE_LOGLEVEL" in
@@ -49,18 +47,16 @@ case "$HIVE_LOGLEVEL" in
     4)   LOG=DEBUG ;;
     5)   LOG=TRACE ;;
 esac
-FLAGS="$FLAGS --logging=$LOG"
+FLAGS="--logging=$LOG"
 
 # Configure the chain.
 jq -f /mapper.jq /genesis.json > /besugenesis.json
 echo -n "Genesis: "; cat /besugenesis.json
-
 FLAGS="$FLAGS --genesis-file=/besugenesis.json"
-FLAGS="$FLAGS --min-gas-price=16 --tx-pool-price-bump=0"
 
 # Disable PoW check if requested.
 if [ "$HIVE_SKIP_POW" != "" ]; then
-    FLAGS="$FLAGS --skip-pow-validation-enabled"
+    IMPORTFLAGS="--skip-pow-validation-enabled"
 fi
 
 # Allow import to fail.
@@ -95,6 +91,7 @@ fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner-extra-data=$HIVE_MINER_EXTRA"
 fi
+FLAGS="$FLAGS --min-gas-price=16 --tx-pool-price-bump=0"
 
 # Configure peer-to-peer networking.
 if [ "$HIVE_BOOTNODE" != "" ]; then
@@ -119,6 +116,7 @@ RPCFLAGS="--host-whitelist=*"
 if [ "$HIVE_GRAPHQL_ENABLED" == "" ]; then
     RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
 else
+    RPCFLAGS="$RPCFLAGS --rpc-http-port=8550" # work around duplicate port error
     RPCFLAGS="$RPCFLAGS --graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8545"
 fi
 
