@@ -119,6 +119,7 @@ def start_nonce:
     "eip2028Transition": env.HIVE_FORK_ISTANBUL|to_hex,
     "eip2200Transition": env.HIVE_FORK_ISTANBUL|to_hex,
 
+    # Other chain parameters.
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
     "accountStartNonce": start_nonce,
