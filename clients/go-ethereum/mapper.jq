@@ -30,21 +30,22 @@ def to_bool:
 
 # Replace config in input.
 . + {
+    "ethash": {},
     "config": {
+        "chainId": env.HIVE_CHAIN_ID|to_int,
         "homesteadBlock": env.HIVE_FORK_HOMESTEAD|to_int,
         "daoForkBlock": env.HIVE_FORK_DAO_BLOCK|to_int,
         "daoForkSupport": env.HIVE_FORK_DAO_VOTE|to_bool,
         "eip150Block": env.HIVE_FORK_TANGERINE|to_int,
-        "eip150Hash": env.HIVE_FORK_TANGERINE_HASH|to_int,
+        "eip150Hash": env.HIVE_FORK_TANGERINE_HASH,
         "eip155Block": env.HIVE_FORK_SPURIOUS|to_int,
         "eip158Block": env.HIVE_FORK_SPURIOUS|to_int,
         "byzantiumBlock": env.HIVE_FORK_BYZANTIUM|to_int,
-        "contantinopleBlock": env.HIVE_FORK_CONSTANTINOPLE|to_int,
+        "constantinopleBlock": env.HIVE_FORK_CONSTANTINOPLE|to_int,
         "petersburgBlock": env.HIVE_FORK_PETERSBURG|to_int,
         "istanbulBlock": env.HIVE_FORK_ISTANBUL|to_int,
         "muirGlacierBlock": env.HIVE_FORK_MUIR_GLACIER|to_int,
         "berlinBlock": env.HIVE_FORK_BERLIN|to_int,
         "yolov2Block": env.HIVE_FORK_BERLIN|to_int,
-        "chainId": env.HIVE_CHAIN_ID|to_int,
     }|remove_empty
 }
