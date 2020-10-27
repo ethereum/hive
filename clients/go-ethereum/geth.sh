@@ -42,10 +42,8 @@ set -e
 geth=/usr/local/bin/geth
 FLAGS="--nousb --pcscdpath=\"\""
 
-#It doesn't make sense to dial out, use only a pre-set bootnode
-if [ "$HIVE_BOOTNODE" != "" ]; then
-	FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
-fi
+# It doesn't make sense to dial out, use only a pre-set bootnode.
+FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 
 if [ "$HIVE_SKIP_POW" != "" ]; then
 	FLAGS="$FLAGS --fakepow"
@@ -60,7 +58,6 @@ else
     FLAGS="$FLAGS --networkid 1337"
 fi
 
-
 # If the client is to be run in testnet mode, flag it as such
 if [ "$HIVE_TESTNET" == "1" ]; then
 	FLAGS="$FLAGS --testnet"
@@ -74,61 +71,9 @@ if [ "$HIVE_NODETYPE" == "light" ]; then
 	FLAGS="$FLAGS --syncmode light "
 fi
 
-
-
-if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
-
-	# Override any chain configs in the go-ethereum specific way
-	chainconfig="{}"
-	JQPARAMS=". "
-	if [ "$HIVE_FORK_HOMESTEAD" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"homesteadBlock\": $HIVE_FORK_HOMESTEAD}"
-	fi
-	if [ "$HIVE_FORK_DAO_BLOCK" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"daoForkBlock\": $HIVE_FORK_DAO_BLOCK}"
-	fi
-	if [ "$HIVE_FORK_DAO_VOTE" == "0" ]; then
-		JQPARAMS="$JQPARAMS + {\"daoForkSupport\": false}"
-	fi
-	if [ "$HIVE_FORK_DAO_VOTE" == "1" ]; then
-		JQPARAMS="$JQPARAMS + {\"daoForkSupport\": true}"
-	fi
-
-	if [ "$HIVE_FORK_TANGERINE" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"eip150Block\": $HIVE_FORK_TANGERINE}"
-	fi
-	if [ "$HIVE_FORK_TANGERINE_HASH" != "" ]; then
-		chainconfig=`echo $chainconfig | jq ". + {\"eip150Hash\": $HIVE_FORK_TANGERINE_HASH}"`
-	fi
-	if [ "$HIVE_FORK_SPURIOUS" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"eip158Block\": $HIVE_FORK_SPURIOUS}"
-		JQPARAMS="$JQPARAMS + {\"eip155Block\": $HIVE_FORK_SPURIOUS}"
-	fi
-	if [ "$HIVE_FORK_BYZANTIUM" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"byzantiumBlock\": $HIVE_FORK_BYZANTIUM}"
-	fi
-	if [ "$HIVE_FORK_CONSTANTINOPLE" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"constantinopleBlock\": $HIVE_FORK_CONSTANTINOPLE}"
-	fi
-	if [ "$HIVE_FORK_PETERSBURG" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"petersburgBlock\": $HIVE_FORK_PETERSBURG}"
-	fi
-	if [ "$HIVE_FORK_ISTANBUL" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"istanbulBlock\": $HIVE_FORK_ISTANBUL}"
-	fi
-	if [ "$HIVE_FORK_MUIRGLACIER" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"muirGlacierBlock\": $HIVE_FORK_MUIRGLACIER}"
-	fi
-	if [ "$HIVE_FORK_BERLIN" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"berlinBlock\": $HIVE_FORK_BERLIN}"
-		JQPARAMS="$JQPARAMS + {\"yolov2Block\": $HIVE_FORK_BERLIN}"
-	fi
-	if [ "$HIVE_CHAIN_ID" != "" ]; then
-		JQPARAMS="$JQPARAMS + {\"chainId\": $HIVE_CHAIN_ID}"
-	fi
-	chainconfig=`echo $chainconfig | jq "$JQPARAMS"`
-	genesis=`cat /genesis.json` && echo $genesis | jq ". + {\"config\": $chainconfig}" > /genesis.json
-fi
+# Configure the chain.
+mv /genesis.json /genesis-input.json
+jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis
 echo "Supplied genesis state:"
@@ -172,12 +117,14 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
 fi
 
-# Run the go-ethereum implementation with the requested flags
-
+# Configure RPC.
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,personal,txpool,web3"
+FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,personal,txpool,web3"
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
-	FLAGS="$FLAGS --graphql --http.port=8550"
+	FLAGS="$FLAGS --graphql"
 fi
 
-FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL --nat=none --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,miner,net,personal,txpool,web3 --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,miner,net,personal,txpool,web3 --ws.origins \"*\""
+# Run the go-ethereum implementation with the requested flags.
+FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL --nat=none"
 echo "Running go-ethereum with flags $FLAGS"
 $geth $FLAGS
