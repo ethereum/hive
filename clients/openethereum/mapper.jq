@@ -112,10 +112,11 @@ def start_nonce:
     "eip1283DisableTransition": (if env.HIVE_FORK_ISTANBUL then "0x0" else env.HIVE_FORK_PETERSBURG|to_hex end),
 
     # Istanbul
+    "eip1283ReenableTransition": env.HIVE_FORK_ISTANBUL|to_hex,
     "eip1344Transition": env.HIVE_FORK_ISTANBUL|to_hex,
     "eip1884Transition": env.HIVE_FORK_ISTANBUL|to_hex,
     "eip2028Transition": env.HIVE_FORK_ISTANBUL|to_hex,
-    "eip2200Transition": env.HIVE_FORK_ISTANBUL|to_hex,
+    "eip2200AdvanceTransition": env.HIVE_FORK_ISTANBUL|to_hex,
 
     # Other chain parameters.
     "networkID": env.HIVE_NETWORK_ID|to_hex,
