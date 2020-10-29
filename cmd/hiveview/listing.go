@@ -43,9 +43,8 @@ func generateListing(output io.Writer, logdir string) error {
 
 type listingEntry struct {
 	// Test suite information.
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	NTests      int    `json:"ntests"`
+	Name   string `json:"name"`
+	NTests int    `json:"ntests"`
 	// Info about this run.
 	Passes   int       `json:"passes"`
 	Fails    int       `json:"fails"`
@@ -85,12 +84,11 @@ func skipFile(f string) bool {
 
 func suiteToEntry(file os.FileInfo, s *common.TestSuite) listingEntry {
 	e := listingEntry{
-		Name:        s.Name,
-		Description: s.Description,
-		FileName:    file.Name(),
-		Size:        file.Size(),
-		SimLog:      s.SimulatorLog,
-		Clients:     make([]string, 0),
+		Name:     s.Name,
+		FileName: file.Name(),
+		Size:     file.Size(),
+		SimLog:   s.SimulatorLog,
+		Clients:  make([]string, 0),
 	}
 	for _, test := range s.TestCases {
 		e.NTests++
