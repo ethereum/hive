@@ -6,7 +6,6 @@ def remove_empty:
         select(
           .value != null and
           .value != "" and
-          .value != [] and
           .key != null and
           .key != ""
         )
@@ -45,36 +44,61 @@ def un0x_keys:
   with_entries({key: .key|ltrimstr("0x"), value})
 ;
 
-def precompiles_homestead:
+# This returns the known precompiles.
+#
+# Aleth doesn't like it when precompiles have code/storage/nonce
+# so these fields need to be set to the empty string in order to
+# override any such fields in the input genesis. The empty fields
+# are then dropped in the final remove_empty pass.
+def precompiles:
   {
     "0000000000000000000000000000000000000001": {
-      "precompiled": {"name": "ecrecover", "linear": {"base": 3000, "word": 0}}
+      "precompiled": {"name": "ecrecover", "linear": {"base": 3000, "word": 0}},
+      "code": "",
+      "storage": "",
+      "nonce": "",
     },
-	"0000000000000000000000000000000000000002": {
-      "precompiled": {"name": "sha256", "linear": {"base": 60, "word": 12}}
+    "0000000000000000000000000000000000000002": {
+      "precompiled": {"name": "sha256", "linear": {"base": 60, "word": 12}},
+      "code": "",
+      "storage": "",
+      "nonce": "",
     },
-	"0000000000000000000000000000000000000003": {
-      "precompiled": {"name": "ripemd160", "linear": {"base": 600, "word": 120}}
+    "0000000000000000000000000000000000000003": {
+      "precompiled": {"name": "ripemd160", "linear": {"base": 600, "word": 120}},
+      "code": "",
+      "storage": "",
+      "nonce": "",
     },
-	"0000000000000000000000000000000000000004": {
-      "precompiled": {"name": "identity", "linear": {"base": 15, "word": 3}}
+    "0000000000000000000000000000000000000004": {
+      "precompiled": {"name": "identity", "linear": {"base": 15, "word": 3}},
+      "code": "",
+      "storage": "",
+      "nonce": "",
     },
-  }
-;
-
-def precompiles_byzantium:
-  {
     "0000000000000000000000000000000000000005": {
-      "precompiled": {"name": "modexp"}
+      "precompiled": {"name": "modexp"},
+      "code": "",
+      "storage": "",
+      "nonce": "",
     },
-	"0000000000000000000000000000000000000006": {
-      "precompiled": {"name": "alt_bn128_G1_add", "linear": {"base": 500, "word": 0}}
+    "0000000000000000000000000000000000000006": {
+      "precompiled": {"name": "alt_bn128_G1_add", "linear": {"base": 500, "word": 0}},
+      "code": "",
+      "storage": "",
+      "nonce": "",
     },
-	"0000000000000000000000000000000000000007": {
-      "precompiled": {"name": "alt_bn128_G1_mul", "linear": {"base": 40000, "word": 0}}
+    "0000000000000000000000000000000000000007": {
+      "precompiled": {"name": "alt_bn128_G1_mul", "linear": {"base": 40000, "word": 0}},
+      "code": "",
+      "storage": "",
+      "nonce": "",
     },
-	"0000000000000000000000000000000000000008": {
-      "precompiled": {"name": "alt_bn128_pairing_product"}
+    "0000000000000000000000000000000000000008": {
+      "precompiled": {"name": "alt_bn128_pairing_product"},
+      "code": "",
+      "storage": "",
+      "nonce": "",
     },
   }
 ;
@@ -116,9 +140,5 @@ def precompiles_byzantium:
     "extraData": .extraData,
     "gasLimit": .gasLimit,
   },
-  "accounts": (
-    (.alloc|un0x_keys) +
-    precompiles_homestead +
-    (if env.HIVE_FORK_BYZANTIUM then precompiles_byzantium else {} end)
-  ),
+  "accounts": ((.alloc|un0x_keys) * precompiles),
 }|remove_empty
