@@ -119,7 +119,7 @@ def start_nonce:
     "eip2200AdvanceTransition": env.HIVE_FORK_ISTANBUL|to_hex,
 
     # Other chain parameters.
-    "networkID": env.HIVE_NETWORK_ID|to_hex,
+    "networkID": (env.HIVE_NETWORK_ID|to_hex // env.HIVE_CHAIN_ID|to_hex),
     "chainID": env.HIVE_CHAIN_ID|to_hex,
     "accountStartNonce": start_nonce,
     "maximumExtraDataSize": "0xffff",
