@@ -36,6 +36,7 @@ require (
 	github.com/shirou/gopsutil v2.20.9+incompatible // indirect
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
+	github.com/syndtr/goleveldb v1.0.0 // indirect
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897 // indirect
 	golang.org/x/net v0.0.0-20201026091529-146b70c837a4
 	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9 // indirect

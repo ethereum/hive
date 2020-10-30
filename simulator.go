@@ -193,9 +193,9 @@ func startTestSuiteAPI() error {
 	router.HandleFunc("/testsuite/{suite}", suiteEnd).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/network/{network}", networkCreate).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/network/{network}", networkRemove).Methods("DELETE")
-	router.HandleFunc("/testsuite/{suite}/network/{network}/node/{node}", networkIPGet).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/network/{network}/node/{node}", networkConnect).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/network/{network}/node/{node}", networkDisconnect).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkIPGet).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkConnect).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkDisconnect).Methods("DELETE")
 	// Start the API webserver for simulators to coordinate with
 	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
 	listener, err := net.ListenTCP("tcp4", addr)
