@@ -39,10 +39,6 @@ def infix_zeros_to_length(s;l):
   end
 ;
 
-def start_nonce:
-  if env.HIVE_TESTNET == "1" then "0x0100000" else "0x0" end
-;
-
 
 {
   "name": "Hive",
@@ -122,7 +118,7 @@ def start_nonce:
     # Other chain parameters.
     "networkID": (env.HIVE_NETWORK_ID|to_hex // env.HIVE_CHAIN_ID|to_hex),
     "chainID": env.HIVE_CHAIN_ID|to_hex,
-    "accountStartNonce": start_nonce,
+    "accountStartNonce": "0x0",
     "maximumExtraDataSize": "0xffffffff",
     "minGasLimit": "0x0",
     "gasLimitBoundDivisor": "0x400",
