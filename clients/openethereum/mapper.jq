@@ -123,7 +123,7 @@ def start_nonce:
     "networkID": (env.HIVE_NETWORK_ID|to_hex // env.HIVE_CHAIN_ID|to_hex),
     "chainID": env.HIVE_CHAIN_ID|to_hex,
     "accountStartNonce": start_nonce,
-    "maximumExtraDataSize": "0xffff",
+    "maximumExtraDataSize": "0xffffffff",
     "minGasLimit": "0x0",
     "gasLimitBoundDivisor": "0x400",
     "registrar": "0x0000000000000000000000000000000000000000",
