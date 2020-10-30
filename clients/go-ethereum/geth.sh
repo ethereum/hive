@@ -121,6 +121,7 @@ if [ "$HIVE_USE_GENESIS_CONFIG" == "" ]; then
 	fi
 	if [ "$HIVE_FORK_BERLIN" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"berlinBlock\": $HIVE_FORK_BERLIN}"
+		JQPARAMS="$JQPARAMS + {\"yolov2Block\": $HIVE_FORK_BERLIN}"
 	fi
 	if [ "$HIVE_CHAIN_ID" != "" ]; then
 		JQPARAMS="$JQPARAMS + {\"chainId\": $HIVE_CHAIN_ID}"
