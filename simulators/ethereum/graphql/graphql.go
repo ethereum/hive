@@ -70,11 +70,9 @@ type graphQLTest struct {
 }
 
 func run(testChan chan *testcase, host common.TestSuiteHost, suiteID common.TestSuiteID, client string) {
-
 	// The graphql chain comes from the Besu codebase, and is built on Frontier
 	env := map[string]string{
 		"CLIENT":               client,
-		"HIVE_FORK_DAO_VOTE":   "1",
 		"HIVE_CHAIN_ID":        "1",
 		"HIVE_GRAPHQL_ENABLED": "1",
 	}
@@ -155,13 +153,13 @@ func runTest(ip net.IP, t *graphQLTest) error {
 		Query string `json:"query"`
 	}
 	// Example of working queries:
-	// curl 'http://127.0.0.1:8547/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n"}'
-	// curl 'http://127.0.0.1:8547/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n","variables":null,"operationName":"blockNumber"}'
+	// curl 'http://127.0.0.1:8545/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n"}'
+	// curl 'http://127.0.0.1:8545/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n","variables":null,"operationName":"blockNumber"}'
 	postData, err := json.Marshal(qlQuery{Query: t.Request})
 	if err != nil {
 		return err
 	}
-	resp, err := http.Post(fmt.Sprintf("http://%s:8550/graphql", ip.String()),
+	resp, err := http.Post(fmt.Sprintf("http://%s:8545/graphql", ip.String()),
 		"application/json",
 		bytes.NewReader(postData))
 	if err != nil {
