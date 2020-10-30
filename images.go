@@ -94,8 +94,7 @@ func fetchClientVersions(cacher *buildCacher) (map[string]map[string]string, err
 // buildSimulators iterates over all the known simulators and builds a docker image
 // for all unknown ones matching the given pattern.
 func buildSimulators(pattern string, cacher *buildCacher, errorReport *HiveErrorReport) (map[string]string, error) {
-	images, err := buildNestedImages("simulators", pattern, "simulator", cacher, *simRootContext, errorReport)
-	return images, err
+	return buildNestedImages("simulators", pattern, "simulator", cacher, *simRootContext, errorReport)
 }
 
 // buildNestedImages iterates over a directory containing arbitrarilly nested

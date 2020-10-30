@@ -17,7 +17,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/hive/simulators/common"
-	"github.com/gorilla/pat"
+	"github.com/gorilla/mux"
 
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -43,7 +43,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 	}
 
 	// Create a testcase manager
-	testManager = common.NewTestManager(*testResultsRoot, *hiveMaxTestsFlag, killNodeHandler)
+	testManager = common.NewTestManager(*testResultsRoot, *hiveMaxTestsFlag, killNodeHandler, dockerClient)
 
 	// Start the simulator HTTP API
 	err = startTestSuiteAPI()
@@ -64,7 +64,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 		// and have the execution details including duration, hive logs, and sim logs displayed.
 		// logdir will be the execution folder. ie executiondir.
 		logdir := *testResultsRoot
-		err = simulate(*simLimiterFlag, simulatorImage, simulator, overrides, logger, logdir)
+		err = simulate(*simLimiterFlag, simulatorImage, simulator, logger, logdir)
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 // simulate runs a simulator container, which is a host for one or more testsuite
 // runners. These communicate with this hive testsuite provider and host via
 // a client API to run testsuites and their testcases.
-func simulate(simDuration int, simulator string, simulatorLabel string, overrides []string, logger log15.Logger, logdir string) error {
+func simulate(simDuration int, simulator string, simulatorLabel string, logger log15.Logger, logdir string) error {
 	logger.Info(fmt.Sprintf("running client simulation: %s", simulatorLabel))
 
 	// The simulator creates the testŕesult files, aswell as updates the index file. However, it needs to also
@@ -105,6 +105,8 @@ func simulate(simDuration int, simulator string, simulatorLabel string, override
 		},
 		HostConfig: hostConfig,
 	})
+	// store simulation container details for later access
+	testManager.AddSimContainer(sc)
 
 	if err != nil {
 		logger.Error("failed to create simulator", "error", err)
@@ -117,6 +119,13 @@ func simulate(simDuration int, simulator string, simulatorLabel string, override
 		slogger.Debug("deleting simulator container")
 		if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: sc.ID, Force: true}); err != nil {
 			slogger.Error("failed to delete simulator container", "error", err)
+		}
+		if errs := testManager.PruneNetworks(); len(errs) > 0 {
+			for _, err := range errs {
+				slogger.Error("failed to remove network", "err", err)
+			}
+		} else {
+			slogger.Debug("docker networks pruned")
 		}
 	}()
 
@@ -172,16 +181,21 @@ func startTestSuiteAPI() error {
 	// Serve connections until the listener is terminated
 	log15.Debug("starting simulator API server")
 
-	var mux *pat.Router = pat.New()
-	mux.Get("/testsuite/{suite}/test/{test}/node/{node}", nodeInfoGet)
-	mux.Post("/testsuite/{suite}/test/{test}/node", nodeStart)
-	mux.Post("/testsuite/{suite}/test/{test}/pseudo", pseudoStart)
-	mux.Delete("/testsuite/{suite}/test/{test}/node/{node}", nodeKill)
-	mux.Post("/testsuite/{suite}/test/{test}", testDelete) //post because the delete http verb does not always support a message body
-	mux.Post("/testsuite/{suite}/test", testStart)
-	mux.Delete("/testsuite/{suite}", suiteEnd)
-	mux.Post("/testsuite", suiteStart)
-	mux.Get("/clients", clientTypesGet)
+	router := mux.NewRouter()
+	router.HandleFunc("/clients", clientTypesGet).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", nodeInfoGet).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node", nodeStart).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", nodeKill).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/pseudo", pseudoStart).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/test", testStart).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/test/{test}", testDelete).Methods("POST") //post because the delete http verb does not always support a message body
+	router.HandleFunc("/testsuite", suiteStart).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}", suiteEnd).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/network/{network}", networkCreate).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/network/{network}", networkRemove).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkIPGet).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkConnect).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkDisconnect).Methods("DELETE")
 	// Start the API webserver for simulators to coordinate with
 	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
 	listener, err := net.ListenTCP("tcp4", addr)
@@ -191,7 +205,7 @@ func startTestSuiteAPI() error {
 	}
 	simListenerAddress = listener.Addr().String()
 	log15.Debug("listening for simulator commands", "ip", bridge, "port", listener.Addr().(*net.TCPAddr).Port)
-	server = &http.Server{Handler: mux}
+	server = &http.Server{Handler: router}
 
 	go server.Serve(listener)
 
@@ -199,11 +213,12 @@ func startTestSuiteAPI() error {
 }
 
 func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID, error) {
-	testSuiteString := request.URL.Query().Get(":suite")
-	testSuite, err := strconv.Atoi(testSuiteString)
+	suite := mux.Vars(request)["suite"]
+
+	testSuite, err := strconv.Atoi(suite)
 	if err != nil {
 		http.Error(w, "invalid test suite", http.StatusBadRequest)
-		return 0, fmt.Errorf("invalid test suite: %v", testSuiteString)
+		return 0, fmt.Errorf("invalid test suite: %v", suite)
 	}
 	testSuiteID := common.TestSuiteID(testSuite)
 	if _, running := testManager.IsTestSuiteRunning(testSuiteID); !running {
@@ -214,7 +229,8 @@ func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.Tes
 }
 
 func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.TestID, bool) {
-	testString := request.URL.Query().Get(":test")
+	testString := mux.Vars(request)["test"]
+
 	testCase, err := strconv.Atoi(testString)
 	if err != nil {
 		log15.Error("invalid test case", "identifier", testString)
@@ -242,7 +258,8 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 		log15.Info("Server - node info get, test request failed")
 		return
 	}
-	node := request.URL.Query().Get(":node")
+
+	node := mux.Vars(request)["node"]
 	log15.Info("Server - node info get")
 
 	nodeInfo, err := testManager.GetNodeInfo(common.TestSuiteID(testSuite), common.TestID(testCase), node)
@@ -285,12 +302,122 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 	io.WriteString(w, fixedIP.URLv4())
 }
 
+// networkCreate creates a docker network.
+func networkCreate(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("networkCreate failed", "error", err)
+		return
+	}
+
+	networkName := mux.Vars(request)["network"]
+	log15.Info("Server - network create")
+
+	id, err := testManager.CreateNetwork(testSuite, networkName)
+	if err != nil {
+		log15.Error("failed to create network", "network", networkName, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log15.Debug("network created", "name", networkName, "id", id)
+
+	fmt.Fprint(w, id)
+}
+
+// networkRemove removes a docker network.
+func networkRemove(w http.ResponseWriter, request *http.Request) {
+	_, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("networkRemove failed", "error", err)
+		return
+	}
+
+	networkID := mux.Vars(request)["network"]
+	log15.Info("Server - network remove")
+
+	err = testManager.RemoveNetwork(networkID)
+	if err != nil {
+		log15.Error("failed to remove network", "network", networkID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log15.Debug("network removed", "id", networkID)
+
+	fmt.Fprint(w, "success")
+}
+
+// networkIPGet gets the IP address of a container on a network.
+func networkIPGet(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("networkIPGet failed", "error", err)
+		return
+	}
+
+	node := mux.Vars(request)["node"]
+	networkID := mux.Vars(request)["network"]
+	log15.Info("Server - node network IP get", "network", networkID)
+
+	ipAddr, err := testManager.ContainerIP(testSuite, networkID, node)
+	if err != nil {
+		log15.Error("failed to get networkIPs", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log15.Debug("got node IP", "node", node, "ip addr", ipAddr)
+	fmt.Fprint(w, ipAddr)
+}
+
+// networkConnect connects a container to a network.
+func networkConnect(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("networkConnect failed", "error", err)
+		return
+	}
+
+	networkID := mux.Vars(request)["network"]
+	containerID := mux.Vars(request)["node"]
+	log15.Info("Server - network connect")
+
+	if err := testManager.ConnectContainer(testSuite, networkID, containerID); err != nil {
+		log15.Error("failed to connect container to network", "network", networkID, "container", containerID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log15.Debug("container connected to network", "network", networkID, "container", containerID)
+	fmt.Fprint(w, "success")
+}
+
+// networkDisconnect disconnects a container from a network.
+func networkDisconnect(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("networkDisconnect failed", "error", err)
+		return
+	}
+
+	networkID := mux.Vars(request)["network"]
+	containerID := mux.Vars(request)["node"]
+	log15.Info("Server - network disconnect")
+
+	if err := testManager.DisconnectContainer(testSuite, networkID, containerID); err != nil {
+		log15.Error("failed to disconnect container from network", "network", networkID, "container", containerID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log15.Debug("container disconnected from network", "network", networkID, "container", containerID)
+	fmt.Fprint(w, "success")
+}
+
 //start a new node as part of a test
 func nodeStart(w http.ResponseWriter, request *http.Request) {
 	if _, err := checkSuiteRequest(request, w); err != nil {
 		log15.Error("nodeStart failed", "error", err)
 		return
 	}
+
 	testCase, ok := checkTestRequest(request, w)
 	if !ok {
 		return
@@ -357,7 +484,6 @@ func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node stri
 }
 
 func nodeKill(w http.ResponseWriter, request *http.Request) {
-
 	testSuite, err := checkSuiteRequest(request, w)
 	if err != nil {
 		log15.Debug("nodeKill failed", "error", err)
@@ -368,7 +494,7 @@ func nodeKill(w http.ResponseWriter, request *http.Request) {
 		log15.Error("nodeKill failed")
 		return
 	}
-	node := request.URL.Query().Get(":node")
+	node := mux.Vars(request)["node"]
 	err = killNodeHandler(testSuite, testCase, node)
 	if err != nil {
 		log15.Error("nodeKill unable to delete node", "node", node, "error", err)

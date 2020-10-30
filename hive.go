@@ -147,7 +147,6 @@ func mainInHost(overrides []string, cacher *buildCacher, errorReport *HiveErrorR
 	}
 
 	return nil
-
 }
 
 // initClients builds any docker images needed and maps
