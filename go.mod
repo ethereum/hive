@@ -13,16 +13,14 @@ require (
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
-	github.com/ethereum/go-ethereum v1.9.23
+	github.com/ethereum/go-ethereum v1.9.1
 	github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 // indirect
 	github.com/fsouza/go-dockerclient v1.6.6
 	github.com/go-ole/go-ole v1.2.4 // indirect
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/golang/snappy v0.0.2 // indirect
 	github.com/google/gopacket v1.1.17
-	github.com/gorilla/context v1.1.1 // indirect
 	github.com/gorilla/mux v1.8.0
-	github.com/gorilla/pat v1.0.1
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/influxdata/influxdb v1.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.8 // indirect
