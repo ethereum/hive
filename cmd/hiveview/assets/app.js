@@ -440,6 +440,7 @@ function onSuiteData(data, jsonsource) {
     var thetable = $('#execresults').DataTable({
         data: cases,
         pageLength: 100,
+        order: [[2, 'desc']],
         columns: [
             // First column is an 'expand'-button
             {
