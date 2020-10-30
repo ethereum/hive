@@ -54,8 +54,13 @@ jq -f /mapper.jq /genesis.json > /besugenesis.json
 echo -n "Genesis: "; cat /besugenesis.json
 FLAGS="$FLAGS --genesis-file=/besugenesis.json"
 
+# Enable experimental 'berlin' hard-fork features if configured.
+if [ -n "$HIVE_FORK_BERLIN" ]; then
+    FLAGS="$FLAGS --Xberlin-enabled=true"
+fi
+
 # Disable PoW check if requested.
-if [ "$HIVE_SKIP_POW" != "" ]; then
+if [ -n "$HIVE_SKIP_POW" ]; then
     IMPORTFLAGS="--skip-pow-validation-enabled"
 fi
 
