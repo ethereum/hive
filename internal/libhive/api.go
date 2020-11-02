@@ -69,7 +69,7 @@ func (api *simAPI) startSuite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 	log15.Info("API: suite started", "id", suiteID, "name", name)
-	fmt.Fprintf(w, "%d\n", suiteID)
+	fmt.Fprintf(w, "%d", suiteID)
 }
 
 // endSuite ends a suite.
@@ -106,7 +106,7 @@ func (api *simAPI) startTest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
 	log15.Info("API: test started", "id", testID, "name", name)
-	fmt.Fprintf(w, "%d\n", testID)
+	fmt.Fprintf(w, "%d", testID)
 }
 
 // endTest signals the end of a test case. It also shuts down all clients
