@@ -105,7 +105,7 @@ func (api *simAPI) startTest(w http.ResponseWriter, r *http.Request) {
 		msg := fmt.Sprintf("can't start test case: %s", err.Error())
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
-	log15.Info("API: test started", "suite", suiteID, "id", testID, "name", name)
+	log15.Info("API: test started", "suite", suiteID, "test", testID, "name", name)
 	fmt.Fprintf(w, "%d", testID)
 }
 
@@ -130,10 +130,10 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		err := api.tm.EndTest(suiteID, testID, &summary, clientResults)
 		if err == nil {
-			log15.Info("API: test ended", "suite", suiteID, "id", testID, "pass", summary.Pass)
+			log15.Info("API: test ended", "suite", suiteID, "test", testID, "pass", summary.Pass)
 			return
 		}
-		log15.Error("API: EndTest failed", "suite", suiteID, "id", testID, "error", err)
+		log15.Error("API: EndTest failed", "suite", suiteID, "test", testID, "error", err)
 		if !responseWritten {
 			msg := fmt.Sprintf("can't end test case: %v", err)
 			http.Error(w, msg, http.StatusInternalServerError)
@@ -148,7 +148,7 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err = json.Unmarshal([]byte(summaryData), &summary); err != nil {
-		log15.Error("API: invalid summary data in endTest", "id", testID, "error", err)
+		log15.Error("API: invalid summary data in endTest", "test", testID, "error", err)
 		msg := fmt.Sprintf("can't unmarshal 'summaryresult': %v", err)
 		http.Error(w, msg, http.StatusBadRequest)
 		responseWritten = true
@@ -157,7 +157,7 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 	// Client results are optional.
 	if crdata := r.Form.Get("clientresults"); crdata != "" {
 		if err := json.Unmarshal([]byte(crdata), &clientResults); err != nil {
-			log15.Error("API: invalid 'clientresults'", "id", testID, "error", err)
+			log15.Error("API: invalid 'clientresults'", "test", testID, "error", err)
 		}
 	}
 }
@@ -279,7 +279,7 @@ func (api *simAPI) networkCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log15.Info("API: network created", "name", networkName, "id", id)
+	log15.Info("API: network created", "name", networkName, "network", id)
 	fmt.Fprint(w, id)
 }
 
@@ -292,7 +292,7 @@ func (api *simAPI) networkRemove(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: docker network removed", "id", networkID)
+	log15.Info("API: docker network removed", "network", networkID)
 	fmt.Fprint(w, "success")
 }
 
