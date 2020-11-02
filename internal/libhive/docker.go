@@ -126,6 +126,7 @@ func (b *dockerBackend) StartClient(name string, env map[string]string, files ma
 
 	// Wait for the HTTP/RPC socket to open or the container to fail
 	containerIP := ""
+	containerMAC := ""
 	start := time.Now()
 	checkTime := 100 * time.Millisecond
 	for {
@@ -141,6 +142,7 @@ func (b *dockerBackend) StartClient(name string, env map[string]string, files ma
 		}
 
 		containerIP = container.NetworkSettings.IPAddress
+		containerMAC = container.NetworkSettings.MacAddress
 		if checklive {
 			logger.Debug("checking container online....", "checktime", checkTime, "state", container.State.String())
 			// Container seems to be alive, check whether the RPC is accepting connections
@@ -171,6 +173,7 @@ func (b *dockerBackend) StartClient(name string, env map[string]string, files ma
 
 	// Container online and responsive.
 	info.IP = containerIP
+	info.MAC = containerMAC
 	return info, nil
 }
 

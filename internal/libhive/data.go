@@ -81,6 +81,7 @@ type TestResult struct {
 type ClientInfo struct {
 	ID              string    `json:"id"`
 	IP              string    `json:"ip"`
+	MAC             string    `json:"mac"` // TODO: remove this
 	Name            string    `json:"name"`
 	VersionInfo     string    `json:"versionInfo"` //URL to github repo + branch.
 	InstantiatedAt  time.Time `json:"instantiatedAt"`

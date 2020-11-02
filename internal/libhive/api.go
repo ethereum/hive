@@ -204,6 +204,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	}
 	api.tm.RegisterNode(testID, info.ID, info)
 	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", info.ID)
+	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
 }
 
 // stopClient terminates a client container.
