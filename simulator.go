@@ -1,54 +1,26 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/json"
 	"fmt"
-	"io"
-	"mime/multipart"
 	"net"
 	"net/http"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
-	"github.com/ethereum/hive/simulators/common"
-	"github.com/gorilla/mux"
-
+	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
-var (
-	simListenerAddress string
-	testManager        *common.TestManager
-	server             *http.Server
-)
-
 // runSimulations runs each 'simulation' container, which are hosts for executing one or more test-suites
 func runSimulations(simulatorPattern string, overrides []string, cacher *buildCacher, errorReport *HiveErrorReport) error {
-
-	// Clean up
-	defer terminateAndUpdate()
-
 	// Build all the simulators known to the test harness
 	log15.Info("building simulators for testing", "pattern", simulatorPattern)
 	simulators, err := buildSimulators(simulatorPattern, cacher, errorReport)
 	if err != nil {
-		return err
-	}
-
-	// Create a testcase manager
-	testManager = common.NewTestManager(*testResultsRoot, *hiveMaxTestsFlag, killNodeHandler, dockerClient)
-
-	// Start the simulator HTTP API
-	err = startTestSuiteAPI()
-	if err != nil {
-		log15.Error("failed to start simulator API", "error", err)
 		return err
 	}
 
@@ -89,6 +61,30 @@ func simulate(simDuration int, simulator string, simulatorLabel string, logger l
 		logName = fmt.Sprintf("%d-%x-simulator.log", time.Now().Unix(), b)
 	}
 
+	// Create the test manager.
+	env := libhive.SimEnv{
+		ClientTypes:          clientList,
+		Images:               allClients,
+		LogDir:               logdir,
+		SimLogLevel:          *simloglevelFlag,
+		PrintContainerOutput: *simloglevelFlag > 3,
+	}
+	backend := libhive.NewDockerBackend(env, dockerClient)
+	tm := libhive.NewTestManager(env, backend, *hiveMaxTestsFlag)
+	defer func() {
+		if err := tm.Terminate(); err != nil {
+			log15.Error("could not terminate test manager", "error", err)
+		}
+	}()
+
+	// Start the simulator HTTP API
+	addr, server, err := startTestSuiteAPI(tm)
+	if err != nil {
+		log15.Error("failed to start simulator API", "error", err)
+		return err
+	}
+	defer shutdownServer(server)
+
 	// Start the simulator controller container
 	logger.Debug("creating simulator container")
 	hostConfig := &docker.HostConfig{Privileged: true, CapAdd: []string{"SYS_PTRACE"}, SecurityOpt: []string{"seccomp=unconfined"}}
@@ -96,7 +92,7 @@ func simulate(simDuration int, simulator string, simulatorLabel string, logger l
 		Config: &docker.Config{
 			Image: simulator,
 			Env: []string{
-				fmt.Sprintf("HIVE_SIMULATOR=http://%v", simListenerAddress),
+				fmt.Sprintf("HIVE_SIMULATOR=http://%v", addr),
 				fmt.Sprintf("HIVE_DEBUG=%v", strconv.FormatBool(*hiveDebug)),
 				fmt.Sprintf("HIVE_PARALLELISM=%d", *simulatorParallelism),
 				fmt.Sprintf("HIVE_SIMLIMIT=%d", *simulatorTestLimit),
@@ -105,27 +101,13 @@ func simulate(simDuration int, simulator string, simulatorLabel string, logger l
 		},
 		HostConfig: hostConfig,
 	})
-	// store simulation container details for later access
-	testManager.AddSimContainer(sc)
-
-	if err != nil {
-		logger.Error("failed to create simulator", "error", err)
-		return err
-	}
-
+	tm.SetSimContainerID(sc.ID)
 	slogger := logger.New("id", sc.ID[:8])
 	slogger.Debug("created simulator container")
 	defer func() {
 		slogger.Debug("deleting simulator container")
 		if err := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: sc.ID, Force: true}); err != nil {
 			slogger.Error("failed to delete simulator container", "error", err)
-		}
-		if errs := testManager.PruneNetworks(); len(errs) > 0 {
-			for _, err := range errs {
-				slogger.Error("failed to remove network", "err", err)
-			}
-		} else {
-			slogger.Debug("docker networks pruned")
 		}
 	}()
 
@@ -167,623 +149,41 @@ func simulate(simDuration int, simulator string, simulatorLabel string, logger l
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI() error {
+func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
 	// Find the IP address of the host container
-	log15.Debug("looking up docker bridge IP")
 	bridge, err := lookupBridgeIP(log15.Root())
 	if err != nil {
 		log15.Error("failed to lookup bridge IP", "error", err)
-		return err
+		return nil, nil, err
 	}
-
 	log15.Debug("docker bridge IP found", "ip", bridge)
 
 	// Serve connections until the listener is terminated
 	log15.Debug("starting simulator API server")
 
-	router := mux.NewRouter()
-	router.HandleFunc("/clients", clientTypesGet).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", nodeInfoGet).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node", nodeStart).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", nodeKill).Methods("DELETE")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/pseudo", pseudoStart).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/test", testStart).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/test/{test}", testDelete).Methods("POST") //post because the delete http verb does not always support a message body
-	router.HandleFunc("/testsuite", suiteStart).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}", suiteEnd).Methods("DELETE")
-	router.HandleFunc("/testsuite/{suite}/network/{network}", networkCreate).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/network/{network}", networkRemove).Methods("DELETE")
-	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkIPGet).Methods("GET")
-	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkConnect).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkDisconnect).Methods("DELETE")
 	// Start the API webserver for simulators to coordinate with
 	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
 	listener, err := net.ListenTCP("tcp4", addr)
 	if err != nil {
 		log15.Error("failed to listen on bridge adapter", "error", err)
-		return err
+		return nil, nil, err
 	}
-	simListenerAddress = listener.Addr().String()
-	log15.Debug("listening for simulator commands", "ip", bridge, "port", listener.Addr().(*net.TCPAddr).Port)
-	server = &http.Server{Handler: router}
+	laddr := listener.Addr()
+	log15.Debug("listening for simulator commands", "addr", laddr)
+	server := &http.Server{Handler: tm.API()}
 
 	go server.Serve(listener)
-
-	return nil
+	return laddr, server, nil
 }
 
-func checkSuiteRequest(request *http.Request, w http.ResponseWriter) (common.TestSuiteID, error) {
-	suite := mux.Vars(request)["suite"]
-
-	testSuite, err := strconv.Atoi(suite)
-	if err != nil {
-		http.Error(w, "invalid test suite", http.StatusBadRequest)
-		return 0, fmt.Errorf("invalid test suite: %v", suite)
-	}
-	testSuiteID := common.TestSuiteID(testSuite)
-	if _, running := testManager.IsTestSuiteRunning(testSuiteID); !running {
-		http.Error(w, "test suite not running", http.StatusBadRequest)
-		return 0, fmt.Errorf("test suite not running: %d", testSuite)
-	}
-	return testSuiteID, nil
-}
-
-func checkTestRequest(request *http.Request, w http.ResponseWriter) (common.TestID, bool) {
-	testString := mux.Vars(request)["test"]
-
-	testCase, err := strconv.Atoi(testString)
-	if err != nil {
-		log15.Error("invalid test case", "identifier", testString)
-		http.Error(w, "invalid test case", http.StatusBadRequest)
-		return 0, false
-	}
-	testCaseID := common.TestID(testCase)
-	if _, running := testManager.IsTestRunning(testCaseID); !running {
-		log15.Error("test case not running", "testId", testCaseID)
-		http.Error(w, "test case not running", http.StatusBadRequest)
-		return 0, false
-	}
-	return testCaseID, true
-}
-
-// nodeInfoGet tries to execute the mandatory enode.sh , which returns the enode id
-func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("nodeInfoGet failed", "error", err)
-		return
-	}
-	testCase, ok := checkTestRequest(request, w)
-	if !ok {
-		log15.Info("Server - node info get, test request failed")
-		return
-	}
-
-	node := mux.Vars(request)["node"]
-	log15.Info("Server - node info get")
-
-	nodeInfo, err := testManager.GetNodeInfo(common.TestSuiteID(testSuite), common.TestID(testCase), node)
-	if err != nil {
-		log15.Error("nodeInfoGet unable to get node", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	exec, err := dockerClient.CreateExec(docker.CreateExecOptions{
-		AttachStdout: true,
-		AttachStderr: false,
-		Tty:          false,
-		Cmd:          []string{"/enode.sh"},
-		Container:    nodeInfo.ID, //id is the container id
-	})
-	if err != nil {
-		log15.Error("nodeInfoGet unable to create enode exec", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	outputBuf := new(bytes.Buffer)
-	err = dockerClient.StartExec(exec.ID, docker.StartExecOptions{
-		Detach:       false,
-		OutputStream: outputBuf,
-	})
-	if err != nil {
-		log15.Error("nodeInfoGet unable to start enode exec", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Check that the script returned a valid enode URL.
-	n, err := enode.ParseV4(strings.TrimSpace(outputBuf.String()))
-	if err != nil {
-		log15.Error("nodeInfoGet enode.sh returned bad URL", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), 30303, 30303)
-	io.WriteString(w, fixedIP.URLv4())
-}
-
-// networkCreate creates a docker network.
-func networkCreate(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("networkCreate failed", "error", err)
-		return
-	}
-
-	networkName := mux.Vars(request)["network"]
-	log15.Info("Server - network create")
-
-	id, err := testManager.CreateNetwork(testSuite, networkName)
-	if err != nil {
-		log15.Error("failed to create network", "network", networkName, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	log15.Debug("network created", "name", networkName, "id", id)
-
-	fmt.Fprint(w, id)
-}
-
-// networkRemove removes a docker network.
-func networkRemove(w http.ResponseWriter, request *http.Request) {
-	_, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("networkRemove failed", "error", err)
-		return
-	}
-
-	networkID := mux.Vars(request)["network"]
-	log15.Info("Server - network remove")
-
-	err = testManager.RemoveNetwork(networkID)
-	if err != nil {
-		log15.Error("failed to remove network", "network", networkID, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	log15.Debug("network removed", "id", networkID)
-
-	fmt.Fprint(w, "success")
-}
-
-// networkIPGet gets the IP address of a container on a network.
-func networkIPGet(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("networkIPGet failed", "error", err)
-		return
-	}
-
-	node := mux.Vars(request)["node"]
-	networkID := mux.Vars(request)["network"]
-	log15.Info("Server - node network IP get", "network", networkID)
-
-	ipAddr, err := testManager.ContainerIP(testSuite, networkID, node)
-	if err != nil {
-		log15.Error("failed to get networkIPs", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	log15.Debug("got node IP", "node", node, "ip addr", ipAddr)
-	fmt.Fprint(w, ipAddr)
-}
-
-// networkConnect connects a container to a network.
-func networkConnect(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("networkConnect failed", "error", err)
-		return
-	}
-
-	networkID := mux.Vars(request)["network"]
-	containerID := mux.Vars(request)["node"]
-	log15.Info("Server - network connect")
-
-	if err := testManager.ConnectContainer(testSuite, networkID, containerID); err != nil {
-		log15.Error("failed to connect container to network", "network", networkID, "container", containerID, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	log15.Debug("container connected to network", "network", networkID, "container", containerID)
-	fmt.Fprint(w, "success")
-}
-
-// networkDisconnect disconnects a container from a network.
-func networkDisconnect(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("networkDisconnect failed", "error", err)
-		return
-	}
-
-	networkID := mux.Vars(request)["network"]
-	containerID := mux.Vars(request)["node"]
-	log15.Info("Server - network disconnect")
-
-	if err := testManager.DisconnectContainer(testSuite, networkID, containerID); err != nil {
-		log15.Error("failed to disconnect container from network", "network", networkID, "container", containerID, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	log15.Debug("container disconnected from network", "network", networkID, "container", containerID)
-	fmt.Fprint(w, "success")
-}
-
-//start a new node as part of a test
-func nodeStart(w http.ResponseWriter, request *http.Request) {
-	if _, err := checkSuiteRequest(request, w); err != nil {
-		log15.Error("nodeStart failed", "error", err)
-		return
-	}
-
-	testCase, ok := checkTestRequest(request, w)
-	if !ok {
-		return
-	}
-	if err := request.ParseMultipartForm((1 << 10) * 4); err != nil {
-		log15.Error("nodeStart: Could not parse node request", "error", err)
-		http.Error(w, "Could not parse node request", http.StatusBadRequest)
-		return
-	}
-	files := make(map[string]*multipart.FileHeader)
-	for key, fheaders := range request.MultipartForm.File {
-		if len(fheaders) > 0 {
-			files[key] = fheaders[0]
-		}
-	}
-	envs := make(map[string]string)
-	for key, vals := range request.MultipartForm.Value {
-		envs[key] = vals[0]
-	}
-	//TODO logdir
-	logdir := *testResultsRoot
-	nodeInfo, nodeID, ok := newNode(w, envs, files, allClients, request, true, true, logdir)
-	testManager.RegisterNode(testCase, nodeID, nodeInfo)
-	log15.Debug("nodeStart", "nodeID", nodeID, "ok", ok)
-}
-
-//start a pseudo client and register it as part of a test
-func pseudoStart(w http.ResponseWriter, request *http.Request) {
-	if _, err := checkSuiteRequest(request, w); err != nil {
-		log15.Error("pseudoStart failed", "error", err)
-		return
-	}
-	testCase, ok := checkTestRequest(request, w)
-	if !ok {
-		return
-	}
-	log15.Info("Server - pseudo start request")
-	// parse any envvar overrides from simulators
-	request.ParseForm()
-	envs := make(map[string]string)
-	for key, vals := range request.Form {
-		envs[key] = vals[0]
-	}
-	//TODO logdir
-	logdir := *testResultsRoot
-	nodeInfo, nodeID, ok := newNode(w, envs, nil, allPseudos, request, false, false, logdir)
-	if ok {
-		testManager.RegisterPseudo(testCase, nodeID, nodeInfo)
-	}
-}
-
-func killNodeHandler(testSuite common.TestSuiteID, test common.TestID, node string) error {
-	//attempt to get the client or pseudo
-	nodeInfo, err := testManager.GetNodeInfo(testSuite, test, node)
-	if err != nil {
-		log15.Error(fmt.Sprintf("unable to get node: %s", err.Error()))
-		return err
-	}
-	clientName := nodeInfo.Name
-	containerID := nodeInfo.ID //using the ID as 'container id'
-	log15.Debug("deleting client container", "name", clientName, "id", containerID)
-	err = dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
-	return err
-}
-
-func nodeKill(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Debug("nodeKill failed", "error", err)
-		return
-	}
-	testCase, ok := checkTestRequest(request, w)
-	if !ok {
-		log15.Error("nodeKill failed")
-		return
-	}
-	node := mux.Vars(request)["node"]
-	err = killNodeHandler(testSuite, testCase, node)
-	if err != nil {
-		log15.Error("nodeKill unable to delete node", "node", node, "error", err)
-		msg := fmt.Sprintf("unable to delete node: %s", err.Error())
-		http.Error(w, msg, http.StatusInternalServerError)
-		return
-	}
-	log15.Debug("nodeKill Ok", "node", node)
-}
-
-func testDelete(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("testDelete: test end request failed", "error", err)
-		return
-	}
-	testCase, ok := checkTestRequest(request, w)
-	if !ok {
-		log15.Error("testDelete: test end request failed, checkTestRequest failed")
-		return
-	}
-
-	// Regardless of earlier errors, we need to at least try to end the test, to
-	// clean up resources
-	var summaryResult common.TestResult
-	var clientResults map[string]*common.TestResult
-	var responseWritten = false // Have we already committed a response?
-	defer func() {
-		//nb! endtest invokes the kill node handler indirectly
-		err := testManager.EndTest(testSuite, testCase, &summaryResult, clientResults)
-		if err == nil {
-			return
-		}
-		log15.Error("testDelete: request failed, unable to end testcase", "error", err)
-		if !responseWritten {
-			http.Error(w, fmt.Sprintf("unable to end test case: %s", err.Error()), http.StatusInternalServerError)
-		}
-	}()
-
-	dict := parseForm(request)
-	summaryResultData, ok := dict["summaryresult"]
-	if !ok {
-		log15.Error("testDelete: request failed, missing summary result")
-		msg := fmt.Sprintf("missing summary result")
-		responseWritten = true
-		http.Error(w, msg, http.StatusBadRequest)
-		return
-	}
-	// Summary result is required
-	if err = json.Unmarshal([]byte(summaryResultData), &summaryResult); err != nil {
-		log15.Error("testDelete: request failed, unmarshalling failed", "error", err)
-		msg := fmt.Sprintf("summary result could not be unmarshalled")
-		responseWritten = true
-		http.Error(w, msg, http.StatusBadRequest)
-		return
-	}
-	//clientResults are optional
-	if clientResultsData, ok := dict["clientresults"]; ok {
-		if err := json.Unmarshal([]byte(clientResultsData), &clientResults); err != nil {
-			log15.Error("testDelete: client result unmarhalling failed", "error", err)
-		}
-	}
-}
-
-func parseForm(r *http.Request) map[string]string {
-	r.ParseForm()
-	dict := make(map[string]string)
-	for key, vals := range r.Form {
-		dict[key] = vals[0]
-	}
-	return dict
-}
-
-func testStart(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("testStart fail", "error", err)
-		return
-	}
-	dict := parseForm(request)
-	testID, err := testManager.StartTest(testSuite, dict["name"], dict["description"])
-	if err != nil {
-		log15.Error("testStart unable to start test case", "name", dict["name"], "error", err)
-		msg := fmt.Sprintf("unable to start test case: %s", err.Error())
-		http.Error(w, msg, http.StatusInternalServerError)
-	}
-	log15.Debug("testStart ok", "testId", testID, "name", dict["name"])
-	fmt.Fprintf(w, "%s", testID)
-}
-
-func suiteStart(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - suites start request")
-	dict := parseForm(request)
-	suiteID, err := testManager.StartTestSuite(dict["name"], dict["description"], dict["simlog"])
-	if err != nil {
-		msg := fmt.Sprintf("unable to start test case: %s", err.Error())
-		log15.Error(msg)
-		http.Error(w, msg, http.StatusInternalServerError)
-	}
-	fmt.Fprintf(w, "%s", suiteID)
-}
-
-func suiteEnd(w http.ResponseWriter, request *http.Request) {
-	testSuite, err := checkSuiteRequest(request, w)
-	if err != nil {
-		log15.Error("suiteEnd fail", "error", err)
-		return
-	}
-	err = testManager.EndTestSuite(testSuite)
-	if err != nil {
-		log15.Error("suiteEnd unable to end suite", "error", err)
-		http.Error(w, fmt.Sprintf("unable to end test suite: %s", err.Error()), http.StatusInternalServerError)
-	}
-	log15.Debug("suiteEnd ok", "testSuite", testSuite)
-}
-
-func clientTypesGet(w http.ResponseWriter, request *http.Request) {
-	log15.Info("Server - client types request")
-	w.Header().Set("Content-Type", "application/json")
-	clients := make([]string, 0, len(allClients))
-	for client := range allClients {
-		clients = append(clients, client)
-	}
-	json.NewEncoder(w).Encode(clients)
-}
-
-func newNode(w http.ResponseWriter, envs map[string]string, files map[string]*multipart.FileHeader, clients map[string]string, r *http.Request, checkliveness bool, useTimeout bool, logdir string) (*common.TestClientInfo, string, bool) {
-
-	//the simulation controller needs to tell us now what client to run for the test
-	clientName, in := envs["CLIENT"]
-	if !in {
-		log15.Error("Missing client type", "error", nil)
-		http.Error(w, "Missing client type", http.StatusBadRequest)
-		return nil, "", false
-	}
-
-	testClientInfo := &common.TestClientInfo{
-		ID:              "",
-		Name:            clientName,
-		VersionInfo:     "",
-		InstantiatedAt:  time.Now(),
-		LogFile:         "",
-		WasInstantiated: false,
-	}
-
-	//default the loglevel to the simulator log level setting (different from the system log level setting)
-	logLevel := *simloglevelFlag
-	logLevelString, in := envs["HIVE_LOGLEVEL"]
-	if !in {
-		envs["HIVE_LOGLEVEL"] = strconv.Itoa(logLevel)
-	} else {
-		var err error
-		if logLevel, err = strconv.Atoi(logLevelString); err != nil {
-			log15.Error("Simulator client HIVE_LOGLEVEL is not an integer", "error", nil)
-			http.Error(w, "HIVE_LOGLEVEL not an integer", http.StatusBadRequest)
-			return testClientInfo, "", false
-		}
-	}
-	//the simulation host may prevent or be unaware of the simulation controller's requested client
-	imageName, in := clients[clientName]
-	if !in {
-		log15.Error("Unknown or forbidden client type", "clientName", clientName)
-		http.Error(w, "Unknown or forbidden client type", http.StatusBadRequest)
-		return testClientInfo, "", false
-	}
-	//create and start the requested client container
-	log15.Debug("starting new client", "imagename", imageName, "clientName", clientName)
-	container, err := createClientContainer(imageName, envs, files)
-	if err != nil {
-		log15.Error("failed to create client", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return testClientInfo, "", false
-	}
-	containerID := container.ID[:8]
-	containerIP := ""
-	containerMAC := ""
-	//and now initialise it with supplied files
-	//start a new client logger
-	logger := log15.New("id", containerID)
-	logfileRelative := filepath.Join(strings.Replace(clientName, string(filepath.Separator), "_", -1), fmt.Sprintf("client-%s.log", containerID))
-	logfile := filepath.Join(logdir, logfileRelative)
-	// Update the test-suite with the info we have
-	testClientInfo.ID = containerID
-	testClientInfo.LogFile = logfileRelative
-	testClientInfo.WasInstantiated = true
-	testClientInfo.InstantiatedAt = time.Now()
-	//run the new client
-	waiter, err := runContainer(container.ID, logger, logfile, false, logLevel)
-	if err != nil {
-		logger.Error("failed to start client", "error", err)
-		// Clean up the underlying container too
-		if removeErr := dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true}); removeErr != nil {
-			logger.Error("failed to remove container", "error", removeErr)
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return testClientInfo, containerID, false
-	}
-	go func() {
-		// Ensure the goroutine started by runContainer exits, so that
-		// its resources (e.g. the logfile it creates) can be garbage
-		// collected.
-		err := waiter.Wait()
-		if err == nil {
-			logger.Debug("client container finished cleanly")
-		} else {
-			logger.Error("client container finished with error", "error", err)
-		}
-	}()
-
-	// Wait for the HTTP/RPC socket to open or the container to fail
-	start := time.Now()
-	checkTime := 100 * time.Millisecond
-	for {
-		// Update the container state
-		container, err = dockerClient.InspectContainer(container.ID)
-		if err != nil {
-			logger.Error("failed to inspect client", "error", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return testClientInfo, containerID, false
-		}
-		if !container.State.Running {
-			logger.Error("client container terminated")
-			http.Error(w, "terminated unexpectedly", http.StatusInternalServerError)
-			return testClientInfo, containerID, false
-		}
-
-		containerIP = container.NetworkSettings.IPAddress
-		containerMAC = container.NetworkSettings.MacAddress
-		if checkliveness {
-			logger.Debug("Checking container online....", "checktime", checkTime, "state", container.State.String())
-			// Container seems to be alive, check whether the RPC is accepting connections
-			if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", containerIP, 8545)); err == nil {
-				logger.Debug("client container online", "time", time.Since(start))
-				conn.Close()
-				break
-			}
-		} else {
-			break
-		}
-
-		time.Sleep(checkTime)
-		checkTime = checkTime * 2
-		if checkTime > 2*time.Second {
-			checkTime = time.Second
-		}
-
-		if time.Since(container.Created) > timeoutCheckDuration {
-			log15.Debug("deleting client container", "name", clientName, "id", containerID)
-			err = dockerClient.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
-			if err == nil {
-				logger.Error("client container terminated due to unresponsive RPC ")
-				http.Error(w, "client container terminated due to unresponsive RPC", http.StatusInternalServerError)
-			} else {
-				logger.Error("failed to terminate client container due to unresponsive RPC")
-				http.Error(w, "failed to terminate client container due to unresponsive RPC", http.StatusInternalServerError)
-			}
-			return testClientInfo, containerID, false
-
-		}
-	}
-	//  Container online and responsive, return its ID, IP and MAC for later reference
-	testClientInfo.IP = containerIP
-	fmt.Fprintf(w, "%s@%s@%s", containerID, containerIP, containerMAC)
-	return testClientInfo, containerID, true
-}
-
-// terminates http server, any running tests, and updates the results
-// database
-func terminateAndUpdate() {
+// shutdownServer gracefully terminates the HTTP server.
+func shutdownServer(server *http.Server) {
 	log15.Debug("terminating simulator server")
 
 	//NB! Kill this first to make sure no further testsuites are started
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if server != nil {
-		if err := server.Shutdown(ctx); err != nil {
-			log15.Error(fmt.Sprintf("Could not gracefully shutdown the server: %s", err.Error()))
-		}
+	if err := server.Shutdown(ctx); err != nil {
+		log15.Error("simulation API server shutdown failed", "error", err)
 	}
-	// Cleanup any tests that might be still running and make sure
-	// the test results are updated with the fact that the
-	// host terminated for those that were prematurely ended.
-	// NB!: this indirectly kills client containers. There is
-	// no need for client container timeouts.
-	if testManager == nil {
-		return
-	}
-	if err := testManager.Terminate(); err != nil {
-		log15.Error("Could not terminate tests: %s\n", err.Error())
-	}
-
 }
