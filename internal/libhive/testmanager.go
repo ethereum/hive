@@ -24,8 +24,9 @@ var (
 
 // TestManager collects test results during a simulation run.
 type TestManager struct {
-	config  SimEnv
-	backend Backend
+	config      SimEnv
+	backend     Backend
+	testLimiter int
 
 	simContainerID string
 
@@ -33,15 +34,16 @@ type TestManager struct {
 	networks     map[string]string
 	networkMutex sync.RWMutex
 
-	testLimiter       int
-	runningTestSuites map[TestSuiteID]*TestSuite
-	runningTestCases  map[TestID]*TestCase
 	testCaseMutex     sync.RWMutex
 	testSuiteMutex    sync.RWMutex
-	nodeMutex         sync.Mutex
-	pseudoMutex       sync.Mutex
+	runningTestSuites map[TestSuiteID]*TestSuite
+	runningTestCases  map[TestID]*TestCase
 	testSuiteCounter  uint32
 	testCaseCounter   uint32
+	results           map[TestSuiteID]*TestSuite
+
+	nodeMutex   sync.Mutex
+	pseudoMutex sync.Mutex
 }
 
 func NewTestManager(config SimEnv, b Backend, testLimiter int) *TestManager {
@@ -51,12 +53,28 @@ func NewTestManager(config SimEnv, b Backend, testLimiter int) *TestManager {
 		testLimiter:       testLimiter,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
+		results:           make(map[TestSuiteID]*TestSuite),
 		networks:          make(map[string]string),
 	}
 }
 
+// SetSimContainerID sets the container ID of the simulation container. This must be called
+// after creating the simulation container.
 func (manager *TestManager) SetSimContainerID(id string) {
 	manager.simContainerID = id
+}
+
+// Results returns the results for all suites that have already ended.
+func (manager *TestManager) Results() map[TestSuiteID]*TestSuite {
+	manager.testSuiteMutex.RLock()
+	defer manager.testSuiteMutex.RUnlock()
+
+	// Copy results.
+	r := make(map[TestSuiteID]*TestSuite)
+	for id, suite := range manager.results {
+		r[id] = suite
+	}
+	return r
 }
 
 // API returns the simulation API handler.
@@ -240,25 +258,27 @@ func (manager *TestManager) EndTestSuite(testSuite TestSuiteID) error {
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
 
-	// check the test suite exists
 	suite, ok := manager.runningTestSuites[testSuite]
 	if !ok {
 		return ErrNoSuchTestSuite
 	}
-	// check the suite has no running test cases
+	// Check the suite has no running test cases.
 	for k := range suite.TestCases {
 		_, ok := manager.runningTestCases[k]
 		if ok {
 			return ErrTestSuiteRunning
 		}
 	}
-	// update the db
-	err := suite.updateDB(manager.config.LogDir)
-	if err != nil {
-		return err
+	// Write the result.
+	if manager.config.LogDir != "" {
+		err := suite.updateDB(manager.config.LogDir)
+		if err != nil {
+			return err
+		}
 	}
-	// remove the test suite
+	// Move the suite to results.
 	delete(manager.runningTestSuites, testSuite)
+	manager.results[testSuite] = suite
 	return nil
 }
 
@@ -335,6 +355,7 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 	testCase.ClientResults = clientResults
 	manager.testCaseMutex.Unlock()
 
+	// Stop running clients.
 	for _, v := range testCase.ClientInfo {
 		if v.WasInstantiated {
 			manager.backend.StopContainer(v.ID)
@@ -346,13 +367,10 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 		}
 	}
 
-	// Delete from running, if it's still there
+	// Delete from running, if it's still there.
 	manager.testCaseMutex.Lock()
-	if tc, ok := manager.runningTestCases[testID]; ok {
-		delete(manager.runningTestCases, tc.ID)
-	}
+	delete(manager.runningTestCases, testID)
 	manager.testCaseMutex.Unlock()
-
 	return nil
 }
 
