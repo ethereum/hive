@@ -197,7 +197,7 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkID, contai
 	if containerID == "simulation" {
 		containerID = manager.simContainerID
 	}
-	ipAddr, err := manager.backend.ContainerIP(networkID, containerID)
+	ipAddr, err := manager.backend.ContainerIP(containerID, networkID)
 	if err != nil {
 		return "", err
 	}
