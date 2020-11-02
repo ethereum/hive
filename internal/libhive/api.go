@@ -68,7 +68,7 @@ func (api *simAPI) startSuite(w http.ResponseWriter, r *http.Request) {
 		log15.Error("API: StartTestSuite failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	log15.Info("API: suite started", "id", suiteID, "name", name)
+	log15.Info("API: suite started", "suite", suiteID, "name", name)
 	fmt.Fprintf(w, "%d", suiteID)
 }
 
@@ -80,11 +80,11 @@ func (api *simAPI) endSuite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := api.tm.EndTestSuite(suiteID); err != nil {
-		log15.Error("API: EndTestSuite failed", "id", suiteID, "error", err)
+		log15.Error("API: EndTestSuite failed", "suite", suiteID, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: suite ended", "id", suiteID)
+	log15.Info("API: suite ended", "suite", suiteID)
 }
 
 // startTest signals the start of a test case.
@@ -105,7 +105,7 @@ func (api *simAPI) startTest(w http.ResponseWriter, r *http.Request) {
 		msg := fmt.Sprintf("can't start test case: %s", err.Error())
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
-	log15.Info("API: test started", "id", testID, "name", name)
+	log15.Info("API: test started", "suite", suiteID, "id", testID, "name", name)
 	fmt.Fprintf(w, "%d", testID)
 }
 
@@ -130,10 +130,10 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 	defer func() {
 		err := api.tm.EndTest(suiteID, testID, &summary, clientResults)
 		if err == nil {
-			log15.Info("API: test ended", "id", testID)
+			log15.Info("API: test ended", "suite", suiteID, "id", testID, "pass", summary.Pass)
 			return
 		}
-		log15.Error("API: EndTest failed", "id", testID, "error", err)
+		log15.Error("API: EndTest failed", "suite", suiteID, "id", testID, "error", err)
 		if !responseWritten {
 			msg := fmt.Sprintf("can't end test case: %v", err)
 			http.Error(w, msg, http.StatusInternalServerError)
@@ -278,8 +278,7 @@ func (api *simAPI) networkCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log15.Debug("network created", "name", networkName, "id", id)
-
+	log15.Info("API: network created", "name", networkName, "id", id)
 	fmt.Fprint(w, id)
 }
 
@@ -293,7 +292,6 @@ func (api *simAPI) networkRemove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	log15.Info("API: docker network removed", "id", networkID)
-
 	fmt.Fprint(w, "success")
 }
 
@@ -309,10 +307,11 @@ func (api *simAPI) networkIPGet(w http.ResponseWriter, r *http.Request) {
 	networkID := mux.Vars(r)["network"]
 	ipAddr, err := api.tm.ContainerIP(suiteID, networkID, node)
 	if err != nil {
-		log15.Error("API: failed to get container IP", "node", node, "error", err)
+		log15.Error("API: failed to get container IP", "container", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	log15.Info("API: container IP requested", "network", networkID, "container", node, "ip", ipAddr)
 	fmt.Fprint(w, ipAddr)
 }
 
@@ -331,7 +330,7 @@ func (api *simAPI) networkConnect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Debug("API: container connected to network", "network", networkID, "container", containerID)
+	log15.Info("API: container connected to network", "network", networkID, "container", containerID)
 }
 
 // networkDisconnect disconnects a container from a network.
@@ -344,7 +343,6 @@ func (api *simAPI) networkDisconnect(w http.ResponseWriter, r *http.Request) {
 
 	networkID := mux.Vars(r)["network"]
 	containerID := mux.Vars(r)["node"]
-
 	if err := api.tm.DisconnectContainer(suiteID, networkID, containerID); err != nil {
 		log15.Error("API: disconnecting container failed", "network", networkID, "container", containerID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
