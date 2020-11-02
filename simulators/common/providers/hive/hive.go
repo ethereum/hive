@@ -46,8 +46,21 @@ func New() common.TestSuiteHost {
 	}
 }
 
+// GetNetworkID returns the network ID of a given network if it exists.
+func (sim *host) GetNetworkID(testSuite common.TestSuiteID, networkName string) (string, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/network/%s", sim.configuration.HostURI, testSuite.String(), networkName))
+	if err != nil {
+		return "", err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	return string(body), nil
+}
+
 // CreateNetwork sends a request to the hive server to create a docker network by
-// the given name.
+// the given name, returning its network ID
 func (sim *host) CreateNetwork(testSuite common.TestSuiteID, networkName string) (string, error) {
 	resp, err := http.Post(fmt.Sprintf("%s/testsuite/%s/network/%s", sim.configuration.HostURI, testSuite.String(), networkName), "application/json", nil)
 	if err != nil {

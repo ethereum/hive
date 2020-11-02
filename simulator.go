@@ -191,6 +191,7 @@ func startTestSuiteAPI() error {
 	router.HandleFunc("/testsuite/{suite}/test/{test}", testDelete).Methods("POST") //post because the delete http verb does not always support a message body
 	router.HandleFunc("/testsuite", suiteStart).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}", suiteEnd).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/network/{network}", networkIDGet).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/network/{network}", networkCreate).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/network/{network}", networkRemove).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/network/{network}/{node}", networkIPGet).Methods("GET")
@@ -300,6 +301,27 @@ func nodeInfoGet(w http.ResponseWriter, request *http.Request) {
 	}
 	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), 30303, 30303)
 	io.WriteString(w, fixedIP.URLv4())
+}
+
+// networkIDGet returns the network ID of a given docker network if it exists.
+func networkIDGet(w http.ResponseWriter, request *http.Request) {
+	testSuite, err := checkSuiteRequest(request, w)
+	if err != nil {
+		log15.Error("networkIDGet failed", "error", err)
+		return
+	}
+
+	networkName := mux.Vars(request)["network"]
+	log15.Info("Server - get network ID")
+
+	id, err := testManager.GetNetworkID(testSuite, networkName)
+	if err != nil {
+		log15.Error("failed to get network id", "network", networkName, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log15.Debug("got network id", "name", networkName, "id", id)
+	fmt.Fprint(w, id)
 }
 
 // networkCreate creates a docker network.

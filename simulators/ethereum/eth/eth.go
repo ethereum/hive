@@ -14,7 +14,7 @@ func main() {
 	host := hive.New()
 
 	//	get clients
-	// for loop that runs tests against each client type
+	// loop that runs tests against each client type
 	// get node
 	// start test
 	// run tests against node

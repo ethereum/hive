@@ -120,6 +120,25 @@ func (manager *TestManager) AddSimContainer(container *docker.Container) {
 	manager.simulationContainer = container
 }
 
+// GetNetworkID returns the network ID of a given network if it exists.
+func (manager *TestManager) GetNetworkID(testSuite TestSuiteID, networkName string) (string, error) {
+	_, ok := manager.IsTestSuiteRunning(testSuite)
+	if !ok {
+		return "", ErrNoSuchTestSuite
+	}
+	// range through networks, return ID if names match
+	existing, err := manager.dockerClient.ListNetworks()
+	if err != nil {
+		return "", err
+	}
+	for _, exists := range existing {
+		if exists.Name == networkName {
+			return exists.ID, nil
+		}
+	}
+	return "", fmt.Errorf("network not found")
+}
+
 // CreateNetwork creates a docker network with the given network name, returning
 // the network ID upon success.
 func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, networkName string) (string, error) {
@@ -143,6 +162,7 @@ func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, networkName str
 	// create network
 	network, err := manager.dockerClient.CreateNetwork(docker.CreateNetworkOptions{
 		Name:           networkName,
+		Driver:         "bridge",
 		CheckDuplicate: true,
 		Attachable:     true,
 	})
