@@ -36,20 +36,6 @@ func NewAt(url string) *Simulation {
 	return &Simulation{url: url}
 }
 
-// ClientEnodeURL returns the enode URL of a running client.
-func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.url, testSuite.String(), test.String(), node))
-	if err != nil {
-		return "", err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	res := strings.TrimRight(string(body), "\r\n")
-	return res, nil
-}
-
 // EndTest finishes the test case, cleaning up everything, logging results, and returning
 // an error if the process could not be completed.
 func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, summaryResult TestResult, clientResults map[string]TestResult) error {
@@ -162,6 +148,20 @@ func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string)
 	}
 	_, err = http.DefaultClient.Do(req)
 	return err
+}
+
+// ClientEnodeURL returns the enode URL of a running client.
+func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
+	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.url, testSuite.String(), test.String(), node))
+	if err != nil {
+		return "", err
+	}
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	res := strings.TrimRight(string(body), "\r\n")
+	return res, nil
 }
 
 func postWithFiles(url string, values map[string]string, files map[string]string) (string, error) {
