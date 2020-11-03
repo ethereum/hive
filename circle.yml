@@ -9,14 +9,14 @@ jobs:
       - go/mod-download
       - go/save-cache
       - go/test:
-          failfast: true
           packages:
             - .
             - ./hivesim
             - ./cmd/hivechain
             - ./cmd/hiveview
+
 orbs:
-  go: circleci/go@x.y
+  go: circleci/go@1.5.0
 version: 2.1
 workflows:
   main:
