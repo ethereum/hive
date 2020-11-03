@@ -1,0 +1,42 @@
+{
+  "nonce": "0x0000000000000042",
+  "difficulty": "0x2123456",
+  "mixHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "coinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "timestamp": "0x123456",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "extraData": "0xfafbfcfd",
+  "gasLimit": "0x2fefd8",
+  "alloc": {
+    "dbdbdb2cbd23b783741e8d7fcf51e459b497e4a6": {
+      "balance": "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    },
+    "e6716f9544a56c530d868e4bfbacb172315bdead": {
+      "balance": "0x11",
+      "code": "0x12"
+    },
+    "b9c015918bdaba24b4ff057a92a3873d6eb201be": {
+      "balance": "0x21",
+      "storage": {
+        "0x0000000000000000000000000000000000000000000000000000000000000001": "0x22"
+      }
+    },
+    "1a26338f0d905e295fccb71fa9ea849ffa12aaf4": {
+      "balance": "0x31",
+      "nonce": "0x32"
+    },
+    "0000000000000000000000000000000000000001": {
+      "balance": "0x41"
+    },
+    "0000000000000000000000000000000000000002": {
+      "balance": "0x51"
+    },
+    "0000000000000000000000000000000000000003": {
+      "balance": "0x61"
+    },
+    "0000000000000000000000000000000000000004": {
+      "balance": "0x71"
+    }
+  }
+}
