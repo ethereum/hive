@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/hive/simulators/common"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/hive/internal/hive"
 )
 
 const listLimit = 200 // number of runs reported
@@ -58,8 +58,8 @@ type listingEntry struct {
 func convertSummaryFiles(logdir string, logfiles []os.FileInfo) (es []listingEntry) {
 	for _, file := range logfiles {
 		if strings.HasSuffix(file.Name(), ".json") && !skipFile(file.Name()) {
-			info := new(common.TestSuite)
-			err := ethcommon.LoadJSON(filepath.Join(logdir, file.Name()), info)
+			info := new(hive.TestSuite)
+			err := common.LoadJSON(filepath.Join(logdir, file.Name()), info)
 			if err != nil {
 				log.Printf("Skipping invalid summary file: %v", err)
 				continue
@@ -74,7 +74,7 @@ func convertSummaryFiles(logdir string, logfiles []os.FileInfo) (es []listingEnt
 	return es
 }
 
-func suiteValid(s *common.TestSuite) bool {
+func suiteValid(s *hive.TestSuite) bool {
 	return s.SimulatorLog != ""
 }
 
@@ -82,7 +82,7 @@ func skipFile(f string) bool {
 	return f == "errorReport.json" || f == "containerErrorReport.json" || strings.HasPrefix(f, ".")
 }
 
-func suiteToEntry(file os.FileInfo, s *common.TestSuite) listingEntry {
+func suiteToEntry(file os.FileInfo, s *hive.TestSuite) listingEntry {
 	e := listingEntry{
 		Name:     s.Name,
 		FileName: file.Name(),
