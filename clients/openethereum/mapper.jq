@@ -116,8 +116,8 @@ def infix_zeros_to_length(s;l):
     # "eip2200AdvanceTransition": env.HIVE_FORK_ISTANBUL|to_hex,
 
     # Other chain parameters.
-    "networkID": (env.HIVE_NETWORK_ID|to_hex // "0x539")
-    "chainID": env.HIVE_CHAIN_ID|to_hex,
+    "networkID": (env.HIVE_NETWORK_ID|to_hex // "0x539"),
+    "chainID": (env.HIVE_CHAIN_ID|to_hex // "0x539"),
     "accountStartNonce": "0x0",
     "maximumExtraDataSize": "0xffffffff",
     "minGasLimit": "0x0",
