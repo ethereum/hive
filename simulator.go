@@ -49,7 +49,7 @@ func runSimulations(simulatorPattern string, overrides []string, cacher *buildCa
 // runners. These communicate with this hive testsuite provider and host via
 // a client API to run testsuites and their testcases.
 func simulate(simDuration int, simulator string, simulatorLabel string, logger log15.Logger, logdir string) error {
-	logger.Info(fmt.Sprintf("running client simulation: %s", simulatorLabel))
+	log15.Info(fmt.Sprintf("running client simulation: %s", simulatorLabel))
 
 	// The simulator creates the testŕesult files, aswell as updates the index file. However, it needs to also
 	// be aware of the location of it's own logfile, which should also be placed into the index.
