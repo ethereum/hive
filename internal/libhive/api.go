@@ -276,7 +276,7 @@ func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
 	}
 	// Switch out the IP with the container's IP on the primary network.
 	// This is required because the client usually doesn't know its own IP.
-	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), 30303, 30303)
+	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), n.TCP(), n.UDP())
 	io.WriteString(w, fixedIP.URLv4())
 }
 
