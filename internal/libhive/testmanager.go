@@ -142,7 +142,7 @@ func (manager *TestManager) Terminate() error {
 	return nil
 }
 
-// GetNodeInfo gets some info on a client or pseudo belonging to some test
+// GetNodeInfo gets some info on a client belonging to some test
 func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*ClientInfo, error) {
 	manager.testCaseMutex.RLock()
 	defer manager.testCaseMutex.RUnlock()
@@ -153,10 +153,7 @@ func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, node
 	}
 	nodeInfo, ok := testCase.ClientInfo[nodeID]
 	if !ok {
-		nodeInfo, ok = testCase.PseudoInfo[nodeID]
-		if !ok {
-			return nil, ErrNoSuchNode
-		}
+		return nil, ErrNoSuchNode
 	}
 	return nodeInfo, nil
 }
@@ -380,11 +377,6 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 			manager.backend.StopContainer(v.ID)
 		}
 	}
-	for _, v := range testCase.PseudoInfo {
-		if v.WasInstantiated {
-			manager.backend.StopContainer(v.ID)
-		}
-	}
 
 	// Delete from running, if it's still there.
 	manager.testCaseMutex.Lock()
@@ -407,23 +399,6 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 		testCase.ClientInfo = make(map[string]*ClientInfo)
 	}
 	testCase.ClientInfo[nodeID] = nodeInfo
-	return nil
-}
-
-// RegisterPseudo is used by test suite hosts to register the creation of a node in the context of a test
-func (manager *TestManager) RegisterPseudo(testID TestID, nodeID string, nodeInfo *ClientInfo) error {
-	manager.testCaseMutex.Lock()
-	defer manager.testCaseMutex.Unlock()
-
-	// Check if the test case is running
-	testCase, ok := manager.runningTestCases[testID]
-	if !ok {
-		return ErrNoSuchTestCase
-	}
-	if testCase.PseudoInfo == nil {
-		testCase.PseudoInfo = make(map[string]*ClientInfo)
-	}
-	testCase.PseudoInfo[nodeID] = nodeInfo
 	return nil
 }
 
