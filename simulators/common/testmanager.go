@@ -120,25 +120,6 @@ func (manager *TestManager) AddSimContainer(container *docker.Container) {
 	manager.simulationContainer = container
 }
 
-// GetNetworkID returns the network ID of a given network if it exists.
-func (manager *TestManager) GetNetworkID(testSuite TestSuiteID, networkName string) (string, error) {
-	_, ok := manager.IsTestSuiteRunning(testSuite)
-	if !ok {
-		return "", ErrNoSuchTestSuite
-	}
-	// range through networks, return ID if names match
-	existing, err := manager.dockerClient.ListNetworks()
-	if err != nil {
-		return "", err
-	}
-	for _, exists := range existing {
-		if exists.Name == networkName {
-			return exists.ID, nil
-		}
-	}
-	return "", fmt.Errorf("network not found")
-}
-
 // CreateNetwork creates a docker network with the given network name, returning
 // the network ID upon success.
 func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, networkName string) (string, error) {
@@ -209,17 +190,39 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkID, contai
 		return "", ErrNoSuchTestSuite
 	}
 	// if the containerID is "simulation", use simulation container ID
-	containerID, err := manager.isSimulation(containerID)
+	var err error
+	containerID, err = manager.isSimulation(containerID)
 	if err != nil {
 		return "", err
 	}
-
+	// if the networkID is "bridge", use bridge networkID
+	networkID, err = manager.isBridge(networkID)
+	if err != nil {
+		return "", err
+	}
 	ipAddr, err := getContainerIP(manager.dockerClient, networkID, containerID)
 	if err != nil {
 		return "", err
 	}
 
 	return ipAddr, nil
+}
+
+func (manager *TestManager) isBridge(network string) (string, error) {
+	if network != "bridge" {
+		return network, nil
+	}
+	// range through networks, return ID if bridge network
+	existing, err := manager.dockerClient.ListNetworks()
+	if err != nil {
+		return "", err
+	}
+	for _, exists := range existing {
+		if exists.Name == network {
+			return exists.ID, nil
+		}
+	}
+	return "", fmt.Errorf("network not found")
 }
 
 func getContainerIP(dockerClient *docker.Client, networkID, container string) (string, error) {

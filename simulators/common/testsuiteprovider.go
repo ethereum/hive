@@ -34,8 +34,6 @@ type TestSuiteHost interface {
 	GetNode(testSuite TestSuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, *string, error)
 	// GetContainerNetworkIP gets the given container's IP address on the given network.
 	GetContainerNetworkIP(testSuite TestSuiteID, networkID, containerID string) (string, error)
-	// GetNetworkID returns the network ID of a given network if it exists.
-	GetNetworkID(testSuite TestSuiteID, networkName string) (string, error)
 	// ConnectContainer connects the given container to the given network.
 	ConnectContainer(testSuite TestSuiteID, networkID, containerID string) error
 	// DisconnectContainer disconnects the given container from the given network.

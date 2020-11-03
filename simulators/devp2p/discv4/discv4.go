@@ -6,7 +6,6 @@ import (
 	"os/exec"
 
 	"github.com/ethereum/hive/simulators/common"
-
 	"github.com/ethereum/hive/simulators/common/providers/hive"
 )
 
@@ -99,17 +98,8 @@ func main() {
 			})
 			fatalf("could not connect container to network: %v", err)
 		}
-		// get bridge network ID
-		bridgeID, err := host.GetNetworkID(suiteID, "bridge")
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: err.Error(),
-			})
-			fatalf("could not get ID of network: %v", err)
-		}
 		// get client IP from bridge and network1
-		simIPBridge, err := host.GetContainerNetworkIP(suiteID, bridgeID, "simulation")
+		simIPBridge, err := host.GetContainerNetworkIP(suiteID, "bridge", "simulation")
 		simIPNetwork1, err := host.GetContainerNetworkIP(suiteID, networkID, "simulation")
 		if err != nil {
 			endTest(&common.TestResult{
