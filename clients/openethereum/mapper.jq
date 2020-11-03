@@ -69,8 +69,8 @@ def infix_zeros_to_length(s;l):
   "genesis": {
     "seal": {
       "ethereum":{
-         "nonce": .nonce|infix_zeros_to_length(2;18),
-         "mixHash": .mixHash,
+         "nonce": (.nonce|infix_zeros_to_length(2;18) // "0x0000000000000000"),
+         "mixHash": (.mixHash // "0x0000000000000000000000000000000000000000000000000000000000000000"),
       },
     },
     "difficulty": .difficulty,
