@@ -222,27 +222,6 @@ func (sim *host) GetNode(testSuite common.TestSuiteID, test common.TestID, param
 	return data, net.IP{}, nil, fmt.Errorf("no ip address returned: %v", data)
 }
 
-//GetPseudo starts a new pseudo-client with the specified parameters
-//One parameter must be named CLIENT and should contain one of the
-//returned client types from GetClientTypes
-//The input is used as environment variables in the new container
-//Returns container id , ip and mac
-func (sim *host) GetPseudo(testSuite common.TestSuiteID, test common.TestID, parameters map[string]string) (string, net.IP, *string, error) {
-	vals := make(url.Values)
-	for k, v := range parameters {
-		vals.Add(k, v)
-	}
-	//vals.Add("testcase", test.String())
-	data, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s/pseudo", sim.configuration.HostURI, testSuite.String(), test.String()), vals)
-	if err != nil {
-		return "", nil, nil, err
-	}
-	if idip := strings.Split(data, "@"); len(idip) > 1 {
-		return idip[0], net.ParseIP(idip[1]), &idip[2], nil
-	}
-	return data, net.IP{}, nil, fmt.Errorf("no ip address returned: %v", data)
-}
-
 // KillNode signals to the host that the node is no longer required
 func (sim *host) KillNode(testSuite common.TestSuiteID, test common.TestID, nodeid string) error {
 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.configuration.HostURI, testSuite.String(), test.String(), nodeid), nil)

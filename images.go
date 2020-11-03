@@ -63,11 +63,6 @@ func buildClients(clientList []string, cacher *buildCacher, errorReport *HiveErr
 	return buildListedImages("clients", clientList, "client", cacher, false, errorReport)
 }
 
-// buildPseudoClients iterates over all the known pseudo-clients and builds a docker image for
-func buildPseudoClients(pattern string, cacher *buildCacher, errorReport *HiveErrorReport) (map[string]string, error) {
-	return buildNestedImages("pseudoclients", pattern, "pseudoclient", cacher, false, errorReport)
-}
-
 // fetchClientVersions downloads the version json specs from all clients that
 // match the given patten.
 func fetchClientVersions(cacher *buildCacher) (map[string]map[string]string, error) {

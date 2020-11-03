@@ -42,11 +42,6 @@ type TestSuiteHost interface {
 	CreateNetwork(testSuite TestSuiteID, networkName string) (string, error)
 	// RemoveNetwork removes a network by the given networkID.
 	RemoveNetwork(testSuite TestSuiteID, networkID string) error
-	//GetPseudo gets a new (or pre-supplied) pseudo-client with the specified parameters
-	//One parameter must be named CLIENT
-	//The input is used as environment variables in the new container
-	//Returns container id, ip and mac
-	GetPseudo(testSuite TestSuiteID, test TestID, parameters map[string]string) (string, net.IP, *string, error)
 	//Signal that a node is no longer required
 	KillNode(testSuite TestSuiteID, test TestID, node string) error
 }

@@ -40,7 +40,6 @@ type TestCase struct {
 	SummaryResult TestResult             `json:"summaryResult"` // The result of the whole test case.
 	ClientResults map[string]*TestResult `json:"clientResults"` // Client specific results, if this test case supports this concept. Not all test cases will identify a specific client as a test failure reason.
 	ClientInfo    map[string]*ClientInfo `json:"clientInfo"`    // Info about each client.
-	PseudoInfo    map[string]*ClientInfo `json:"-"`             // registry of participating pseudos maintained for client maintenance and not part of the result database
 }
 
 // TestResult is the payload submitted to the EndTest endpoint.

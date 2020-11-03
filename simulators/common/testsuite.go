@@ -154,7 +154,6 @@ type TestCase struct {
 	SummaryResult TestResult                 `json:"summaryResult"` // The result of the whole test case.
 	ClientResults TestClientResults          `json:"clientResults"` // Client specific results, if this test case supports this concept. Not all test cases will identify a specific client as a test failure reason.
 	ClientInfo    map[string]*TestClientInfo `json:"clientInfo"`    // Info about each client.
-	pseudoInfo    map[string]*TestClientInfo // registry of participating pseudos maintained for client maintenance and not part of the result database
 }
 
 // TestResult describes the results of a test at the level of the overall test case and for each client involved in a test case

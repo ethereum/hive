@@ -32,7 +32,6 @@ func newSimulationAPI(b Backend, env SimEnv, tm *TestManager) http.Handler {
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getEnodeURL).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
-	// router.HandleFunc("/testsuite/{suite}/test/{test}/pseudo", api.startPseudo).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test", api.startTest).Methods("POST")
 	// post because the delete http verb does not always support a message body
 	router.HandleFunc("/testsuite/{suite}/test/{test}", api.endTest).Methods("POST")
@@ -372,31 +371,6 @@ func (api *simAPI) networkDisconnect(w http.ResponseWriter, r *http.Request) {
 	}
 	log15.Info("API: container disconnected", "network", networkID, "container", containerID)
 }
-
-// //start a pseudo client and register it as part of a test
-// func pseudoStart(w http.ResponseWriter, request *http.Request) {
-// 	if _, err := checkSuiteRequest(request, w); err != nil {
-// 		log15.Error("pseudoStart failed", "error", err)
-// 		return
-// 	}
-// 	testCase, ok := checkTestRequest(request, w)
-// 	if !ok {
-// 		return
-// 	}
-// 	log15.Info("Server - pseudo start request")
-// 	// parse any envvar overrides from simulators
-// 	request.ParseForm()
-// 	envs := make(map[string]string)
-// 	for key, vals := range request.Form {
-// 		envs[key] = vals[0]
-// 	}
-// 	//TODO logdir
-// 	logdir := *testResultsRoot
-// 	nodeInfo, nodeID, ok := newNode(w, envs, nil, allPseudos, request, false, false, logdir)
-// 	if ok {
-// 		testManager.RegisterPseudo(testCase, nodeID, nodeInfo)
-// 	}
-// }
 
 // requestSuite returns the suite ID from the request body and checks that
 // it corresponds to a running suite.

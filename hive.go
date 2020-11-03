@@ -58,7 +58,6 @@ var (
 var (
 	clientList           []string                          //the list of permitted clients specified by the user
 	allClients           map[string]string                 //map of client names (name_branch format) to docker image names
-	allPseudos           map[string]string                 //map of pseudo names to docker image names
 	allClientVersions    map[string]map[string]string      //map of client names (name_branch format) to a general json struct (map[string]string) containing the version info
 	dockerClient         *docker.Client                    //the web client to the docker api
 	timeoutCheckDuration = time.Duration(60 * time.Second) //liveness check timeout
@@ -157,14 +156,6 @@ func initClients(cacher *buildCacher, errorReport *HiveErrorReport) error {
 	// names (eg: geth_latest, in the format client_branch )
 	// against image names in the docker image name format
 	allClients, err = buildClients(clientList, cacher, errorReport)
-	if err != nil {
-		log15.Crit("failed to build client images", "error", err)
-		return err
-	}
-	// Build all pseudo clients. pseudo-clients need to be available
-	// to simulators. pseudo-clients play the role of special types
-	// of actor in a network, such as network relay for example
-	allPseudos, err = buildPseudoClients("pseudo", cacher, errorReport)
 	if err != nil {
 		log15.Crit("failed to build client images", "error", err)
 		return err
