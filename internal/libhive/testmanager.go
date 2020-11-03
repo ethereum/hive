@@ -118,7 +118,7 @@ func (manager *TestManager) Terminate() error {
 			}
 		}
 		// ensure the db is updated with results
-		manager.EndTestSuite(suiteID)
+		manager.doEndSuite(suiteID)
 	}
 
 	// Remove left-over docker networks.
@@ -250,7 +250,10 @@ func (manager *TestManager) DisconnectContainer(testSuite TestSuiteID, networkID
 func (manager *TestManager) EndTestSuite(testSuite TestSuiteID) error {
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
+	return manager.doEndSuite(testSuite)
+}
 
+func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	suite, ok := manager.runningTestSuites[testSuite]
 	if !ok {
 		return ErrNoSuchTestSuite
