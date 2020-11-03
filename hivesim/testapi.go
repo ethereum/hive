@@ -265,10 +265,13 @@ func (spec ClientTestSpec) runTest(host *Simulation, suite SuiteID) error {
 	}
 	for _, clientType := range clients {
 		name := clientTestName(spec.Name, clientType)
-		err = runTest(host, suite, name, spec.Description, func(t *T) {
+		err := runTest(host, suite, name, spec.Description, func(t *T) {
 			client := t.StartClient(clientType, spec.Parameters, spec.Files)
 			spec.Run(t, client)
 		})
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
