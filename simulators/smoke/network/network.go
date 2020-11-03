@@ -3,155 +3,75 @@ package main
 import (
 	"fmt"
 	"net"
-	"os"
 
-	"github.com/ethereum/hive/simulators/common"
-
-	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
-)
-
-var (
-	host        common.TestSuiteHost
-	suiteID     common.TestSuiteID
-	testID      common.TestID
-	containerID string
+	"github.com/ethereum/hive/hivesim"
 )
 
 func main() {
-	host = hive.New()
+	suite := hivesim.Suite{
+		Name:        "network",
+		Description: "This suite tests the simulation API endpoints related to docker networks.",
+	}
+	suite.Add(hivesim.TestSpec{
+		Name: "connection on network1",
+		Description: `In this test, the client is created, then added to a new docker network.
+The test then tries to connect to the client container via TCP on the new network.`,
+		Run: iptest,
+	})
+	hivesim.MustRunSuite(hivesim.New(), suite)
+}
 
-	availableClients, err := host.GetClientTypes()
+func iptest(t *hivesim.T) {
+	clients, err := t.Sim.ClientTypes()
 	if err != nil {
-		fatalf("failed to get client types: %s", err.Error())
+		t.Fatal(err)
 	}
-	log.Info("Got clients", "clients", availableClients)
-
-	logFile, _ := os.LookupEnv("HIVE_SIMLOG")
-
-	for _, client := range availableClients {
-		var err error
-		suiteID, err = host.StartTestSuite("iptest", "ip test", logFile)
-		if err != nil {
-			fatalf("failed to start test suite: %s", err.Error())
-		}
-		testID, err = host.StartTest(suiteID, "iptest", "iptest")
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("failed to start test: %s", err.Error())
-		}
-
-		env := map[string]string{
-			"CLIENT": client,
-		}
-		files := map[string]string{}
-		// get client
-		containerID, _, _, err = host.GetNode(suiteID, testID, env, files)
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not get node: %s", err.Error())
-		}
-
-		// create network1
-		networkID, err := host.CreateNetwork(suiteID, "network1")
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not create network: %s", err.Error())
-		}
-		// connect client to network1
-		if err := host.ConnectContainer(suiteID, networkID, containerID); err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not connect container to network: %s", err.Error())
-		}
-		// connect sim to network
-		if err := host.ConnectContainer(suiteID, networkID, "simulation"); err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not connect container to network: %s", err.Error())
-		}
-		// get client ip
-		clientIP, err := host.GetContainerNetworkIP(suiteID, networkID, containerID)
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not get client network ip address: %s", err.Error())
-		}
-		// make sure get container IP endpoint works with simulation container
-		_, err = host.GetContainerNetworkIP(suiteID, networkID, "simulation")
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not get client network ip address for simulation container: %s", err.Error())
-		}
-		// dial client
-		_, err = net.Dial("tcp", fmt.Sprintf("%s:%d", clientIP, 8545))
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("failed to dial client: %s", err.Error())
-		}
-		// disconnect client from network1
-		if err := host.DisconnectContainer(suiteID, networkID, containerID); err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not disconnect container from network: %s", err.Error())
-		}
-		// disconnect simulation from network1
-		if err := host.DisconnectContainer(suiteID, networkID, "simulation"); err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not disconnect container from network: %s", err.Error())
-		}
-		// remove network1
-		if err := host.RemoveNetwork(suiteID, networkID); err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: fmt.Sprintf("error: %s", err.Error()),
-			})
-			fatalf("could not remove network: %s", err.Error())
-		}
-		endTest(&common.TestResult{
-			Pass:    true,
-			Details: "success",
-		})
+	if len(clients) == 0 {
+		t.Fatal("no clients available")
 	}
-}
+	clientName := clients[0]
+	client := t.StartClient(clientName, nil, nil)
 
-func endTest(result *common.TestResult) {
-	host.KillNode(suiteID, testID, containerID)
-	host.EndTest(suiteID, testID, result, nil)
-	host.EndTestSuite(suiteID)
-}
+	// This creates a network and connects both the client and the simulation container to it.
+	networkID, err := t.Sim.CreateNetwork(t.SuiteID, "network1")
+	if err != nil {
+		t.Fatal("can't not create network:", err)
+	}
+	if err := t.Sim.ConnectContainer(t.SuiteID, networkID, client.Container); err != nil {
+		t.Fatal("can't connect container to network:", err)
+	}
+	if err := t.Sim.ConnectContainer(t.SuiteID, networkID, "simulation"); err != nil {
+		t.Fatal("can't connect simulation container to network:", err)
+	}
 
-func fatalf(format string, args ...interface{}) {
-	fatal(fmt.Errorf(format, args...))
-}
+	// Now get the IP of the client and connect to it via TCP.
+	clientIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, networkID, client.Container)
+	if err != nil {
+		t.Fatal("can't get client network IP:", err)
+	}
+	t.Log("client IP", clientIP)
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", clientIP, 8545))
+	if err != nil {
+		t.Fatal("can't dial client:", err)
+	}
+	conn.Close()
 
-func fatal(err error) {
-	fmt.Fprintln(os.Stderr, err)
-	os.Exit(1)
+	// Make sure ContainerNetworkIP works with the simulation container as well.
+	simIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, networkID, "simulation")
+	if err != nil {
+		t.Fatal("can't get IP of simulation container:", err)
+	}
+	t.Log("simulation container IP", simIP)
+
+	// Disconnect client and simulation from network1.
+	if err := t.Sim.DisconnectContainer(t.SuiteID, networkID, client.Container); err != nil {
+		t.Fatal("can't disconnect client from network:", err)
+	}
+	if err := t.Sim.DisconnectContainer(t.SuiteID, networkID, "simulation"); err != nil {
+		t.Fatalf("can't disconnect simulation from network:", err)
+	}
+	// Remove network1.
+	if err := t.Sim.RemoveNetwork(t.SuiteID, networkID); err != nil {
+		t.Fatal("could not remove network:", err)
+	}
 }
