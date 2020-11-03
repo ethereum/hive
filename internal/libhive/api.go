@@ -188,10 +188,8 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the client name.
-	name, ok := envs["CLIENT"]
+	name, ok := api.checkClient(envs, w)
 	if !ok {
-		log15.Error("API: missing client name in start node request")
-		http.Error(w, "missing 'CLIENT' in request", http.StatusBadRequest)
 		return
 	}
 
@@ -205,6 +203,24 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	api.tm.RegisterNode(testID, info.ID, info)
 	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", info.ID)
 	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
+}
+
+func (api *simAPI) checkClient(env map[string]string, w http.ResponseWriter) (string, bool) {
+	name, ok := env["CLIENT"]
+	if !ok {
+		log15.Error("API: missing client name in start node request")
+		http.Error(w, "missing 'CLIENT' in request", http.StatusBadRequest)
+		return "", false
+	}
+	for _, cn := range api.clientTypes {
+		if cn == name {
+			return name, true
+		}
+	}
+	// Client name not found.
+	log15.Error("API: unknown client name in start node request")
+	http.Error(w, "unknown 'CLIENT' type in request", http.StatusBadRequest)
+	return "", false
 }
 
 // stopClient terminates a client container.
