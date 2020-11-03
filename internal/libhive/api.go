@@ -17,11 +17,14 @@ import (
 
 // newSimulationAPI creates handlers for the simulation API.
 func newSimulationAPI(b Backend, env SimEnv, tm *TestManager) http.Handler {
-	api := &simAPI{
-		clientTypes: env.ClientTypes,
-		backend:     b,
-		tm:          tm,
+	api := &simAPI{backend: b, tm: tm}
+
+	// Collect client types.
+	for name, _ := range env.Images {
+		api.clientTypes = append(api.clientTypes, name)
 	}
+
+	// API routes.
 	router := mux.NewRouter()
 	router.HandleFunc("/clients", api.getClientTypes).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getEnodeURL).Methods("GET")

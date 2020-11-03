@@ -16,7 +16,6 @@ type SimEnv struct {
 	LogDir               string
 	PrintContainerOutput bool
 	Images               map[string]string // client name -> image name
-	ClientTypes          []string
 }
 
 // TestSuiteID identifies a test suite context.
