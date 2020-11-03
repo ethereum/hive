@@ -1,6 +1,7 @@
 package fakes
 
 import (
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net"
@@ -10,9 +11,11 @@ import (
 
 // BackendHooks can be used to override the behavior of the fake backend.
 type BackendHooks struct {
-	StartClient         func(name string, env map[string]string) (*hive.ClientInfo, error)
-	StopContainer       func(string) error
-	RunEnodeSh          func(string) (string, error)
+	StartClient   func(name string, env map[string]string) (*hive.ClientInfo, error)
+	StopContainer func(string) error
+	RunEnodeSh    func(string) (string, error)
+
+	NetworkNameToID     func(string) (string, error)
 	CreateNetwork       func(string) (string, error)
 	RemoveNetwork       func(networkID string) error
 	ContainerIP         func(containerID, networkID string) (net.IP, error)
@@ -70,6 +73,13 @@ func (b *fakeBackend) RunEnodeSh(containerID string) (string, error) {
 		return b.hooks.RunEnodeSh(containerID)
 	}
 	return "enode://a61215641fb8714a373c80edbfa0ea8878243193f57c96eeb44d0bc019ef295abd4e044fd619bfc4c59731a73fb79afe84e9ab6da0c743ceb479cbb6d263fa91@192.0.2.1:30303", nil
+}
+
+func (b *fakeBackend) NetworkNameToID(name string) (string, error) {
+	if b.hooks.NetworkNameToID != nil {
+		return b.hooks.NetworkNameToID(name)
+	}
+	return "", errors.New("network not found")
 }
 
 func (b *fakeBackend) CreateNetwork(name string) (string, error) {

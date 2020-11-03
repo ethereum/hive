@@ -16,6 +16,7 @@ type Backend interface {
 	RunEnodeSh(containerID string) (string, error)
 
 	// These methods configure docker networks.
+	NetworkNameToID(name string) (string, error)
 	CreateNetwork(name string) (networkID string, err error)
 	RemoveNetwork(networkID string) error
 	ContainerIP(containerID, networkID string) (net.IP, error)

@@ -223,6 +223,16 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkID, contai
 	if containerID == "simulation" {
 		containerID = manager.simContainerID
 	}
+
+	// networkID "bridge" is special.
+	if networkID == "bridge" {
+		var err error
+		networkID, err = manager.backend.NetworkNameToID(networkID)
+		if err != nil {
+			return "", err
+		}
+	}
+
 	ipAddr, err := manager.backend.ContainerIP(containerID, networkID)
 	if err != nil {
 		return "", err

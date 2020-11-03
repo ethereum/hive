@@ -211,6 +211,20 @@ func (b *dockerBackend) CreateNetwork(name string) (networkID string, err error)
 	return net.ID, nil
 }
 
+// NetworkNameToID finds the network ID of the given name.
+func (b *dockerBackend) NetworkNameToID(name string) (string, error) {
+	networks, err := b.client.ListNetworks()
+	if err != nil {
+		return "", err
+	}
+	for _, net := range networks {
+		if net.Name == name {
+			return net.ID, nil
+		}
+	}
+	return "", fmt.Errorf("network not found")
+}
+
 // RemoveNetwork deletes a docker network.
 func (b *dockerBackend) RemoveNetwork(networkID string) error {
 	return b.client.RemoveNetwork(networkID)
