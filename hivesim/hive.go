@@ -124,12 +124,6 @@ func (sim *Simulation) ClientTypes() (availableClients []string, err error) {
 // GetClientTypes. The input is used as environment variables in the new container.
 // Returns container id and ip.
 func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
-	// vals := make(url.Values)
-	// for k, v := range parameters {
-	// 	vals.Add(k, v)
-	// }
-	//vals.Add("testcase", test.String())
-	//	parameters["testcase"] = test.String()
 	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%s/test/%s/node", sim.url, testSuite.String(), test.String()), parameters, initFiles)
 	if err != nil {
 		return "", nil, err
