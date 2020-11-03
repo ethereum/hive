@@ -346,10 +346,10 @@ func (b *dockerBackend) runContainer(logger log15.Logger, id, logfile string) (d
 	// Redirect container output to logfile.
 	var fdsToClose []io.Closer
 	if logfile != "" {
-		if err := os.MkdirAll(filepath.Dir(logfile), os.ModePerm); err != nil {
+		if err := os.MkdirAll(filepath.Dir(logfile), 0755); err != nil {
 			return nil, err
 		}
-		log, err := os.OpenFile(logfile, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, os.ModePerm)
+		log, err := os.OpenFile(logfile, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0644)
 		if err != nil {
 			return nil, err
 		}

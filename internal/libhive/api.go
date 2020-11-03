@@ -199,12 +199,14 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 
 	// Start it!
 	info, err := api.backend.StartClient(name, envs, files, true)
+	if info != nil {
+		api.tm.RegisterNode(testID, info.ID, info)
+	}
 	if err != nil {
 		log15.Error("API: could not start client", "client", name, "error", err)
 		http.Error(w, "client did not start: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	api.tm.RegisterNode(testID, info.ID, info)
 	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", info.ID)
 	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
 }
