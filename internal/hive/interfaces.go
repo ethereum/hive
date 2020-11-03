@@ -1,4 +1,4 @@
-package libhive
+package hive
 
 import (
 	"mime/multipart"

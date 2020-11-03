@@ -1,22 +1,10 @@
-package libhive
+// Package hive contains shared types for hive.
+package hive
 
 import (
-	"crypto/rand"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"path/filepath"
 	"strconv"
 	"time"
 )
-
-// SimEnv contains the simulation parameters.
-type SimEnv struct {
-	SimLogLevel          int
-	LogDir               string
-	PrintContainerOutput bool
-	Images               map[string]string // client name -> image name
-}
 
 // TestSuiteID identifies a test suite context.
 type TestSuiteID uint32
@@ -40,21 +28,6 @@ type TestSuite struct {
 	TestCases   map[TestID]*TestCase `json:"testCases"`
 	// the log-file pertaining to the simulator. (may encompass more than just one TestSuite)
 	SimulatorLog string `json:"simLog"`
-}
-
-// updateDB writes the simulation result to the log directory.
-func (s *TestSuite) updateDB(logdir string) error {
-	suiteData, err := json.Marshal(s)
-	if err != nil {
-		return err
-	}
-	// Randomize the name, but make it so that it's ordered by date - makes cleanups easier
-	b := make([]byte, 16)
-	rand.Read(b)
-	suiteFileName := fmt.Sprintf("%v-%x.json", time.Now().Unix(), b)
-	suiteFile := filepath.Join(logdir, suiteFileName)
-	// Write it.
-	return ioutil.WriteFile(suiteFile, suiteData, 0644)
 }
 
 // TestCase represents a single test case in a test suite.

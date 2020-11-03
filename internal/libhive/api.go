@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/gorilla/mux"
 	"gopkg.in/inconshreveable/log15.v2"
+
+	. "github.com/ethereum/hive/internal/hive"
 )
 
 // newSimulationAPI creates handlers for the simulation API.

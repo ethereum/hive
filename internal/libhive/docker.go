@@ -18,6 +18,8 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
+
+	. "github.com/ethereum/hive/internal/hive"
 )
 
 var (

@@ -1,12 +1,19 @@
 package libhive
 
 import (
+	"crypto/rand"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"gopkg.in/inconshreveable/log15.v2"
+
+	. "github.com/ethereum/hive/internal/hive"
 )
 
 var (
@@ -21,6 +28,14 @@ var (
 	ErrDBUpdateFailed           = errors.New("could not update results set")
 	ErrTestSuiteLimited         = errors.New("testsuite test count is limited")
 )
+
+// SimEnv contains the simulation parameters.
+type SimEnv struct {
+	SimLogLevel          int
+	LogDir               string
+	PrintContainerOutput bool
+	Images               map[string]string // client name -> image name
+}
 
 // TestManager collects test results during a simulation run.
 type TestManager struct {
@@ -267,7 +282,7 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	}
 	// Write the result.
 	if manager.config.LogDir != "" {
-		err := suite.updateDB(manager.config.LogDir)
+		err := writeSuiteFile(suite, manager.config.LogDir)
 		if err != nil {
 			return err
 		}
@@ -400,4 +415,19 @@ func (manager *TestManager) RegisterPseudo(testID TestID, nodeID string, nodeInf
 	}
 	testCase.PseudoInfo[nodeID] = nodeInfo
 	return nil
+}
+
+// writeSuiteFile writes the simulation result to the log directory.
+func writeSuiteFile(s *TestSuite, logdir string) error {
+	suiteData, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	// Randomize the name, but make it so that it's ordered by date - makes cleanups easier
+	b := make([]byte, 16)
+	rand.Read(b)
+	suiteFileName := fmt.Sprintf("%v-%x.json", time.Now().Unix(), b)
+	suiteFile := filepath.Join(logdir, suiteFileName)
+	// Write it.
+	return ioutil.WriteFile(suiteFile, suiteData, 0644)
 }
