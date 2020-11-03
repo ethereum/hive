@@ -3,6 +3,8 @@ jobs:
     executor:
       name: go/default
       tag: '1.15'
+    environment:
+      CIRCLE_REPOSITORY_URL: https://github.com/ethereum/hive
     steps:
       - checkout
       - go/load-cache
@@ -18,3 +20,4 @@ workflows:
   main:
     jobs:
       - test
+      - 
