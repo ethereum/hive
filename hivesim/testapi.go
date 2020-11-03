@@ -32,11 +32,11 @@ type AnyTest interface {
 // RunSuite runs all tests in a suite.
 func RunSuite(host *Simulation, suite Suite) error {
 	logfile := os.Getenv("HIVE_SIMLOG") // TODO: remove this
-	suiteID, err := host.StartTestSuite(suite.Name, suite.Description, logfile)
+	suiteID, err := host.StartSuite(suite.Name, suite.Description, logfile)
 	if err != nil {
 		return err
 	}
-	defer host.EndTestSuite(suiteID)
+	defer host.EndSuite(suiteID)
 
 	for _, test := range suite.Tests {
 		if err := test.runTest(host, suiteID); err != nil {
@@ -100,11 +100,7 @@ type Client struct {
 
 // EnodeURL returns the peer-to-peer endpoint of the client.
 func (c *Client) EnodeURL() (string, error) {
-	enodePtr, err := c.test.Sim.GetClientEnode(c.test.SuiteID, c.test.TestID, c.Container)
-	if err != nil {
-		return "", err
-	}
-	return *enodePtr, nil
+	return c.test.Sim.ClientEnodeURL(c.test.SuiteID, c.test.TestID, c.Container)
 }
 
 // RPC returns an RPC client connected to the client's RPC server.
@@ -133,7 +129,7 @@ type T struct {
 // Client starts a client. If the client cannot by started, the test fails immediately.
 func (t *T) StartClient(clientType string, parameters Params, files map[string]string) *Client {
 	params := parameters.Set("CLIENT", clientType)
-	container, ip, _, err := t.Sim.GetNode(t.SuiteID, t.TestID, params, files)
+	container, ip, err := t.Sim.StartClient(t.SuiteID, t.TestID, params, files)
 	if err != nil {
 		t.Fatalf("can't launch node (type %s): %v", clientType, err)
 	}
@@ -263,7 +259,7 @@ func runTest(host *Simulation, s SuiteID, name, desc string, runit func(t *T)) e
 }
 
 func (spec ClientTestSpec) runTest(host *Simulation, suite SuiteID) error {
-	clients, err := host.GetClientTypes()
+	clients, err := host.ClientTypes()
 	if err != nil {
 		return err
 	}

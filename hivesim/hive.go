@@ -36,18 +36,18 @@ func NewAt(url string) *Simulation {
 	return &Simulation{url: url}
 }
 
-// GetClientEnode returns the enode URL of a running client.
-func (sim *Simulation) GetClientEnode(testSuite SuiteID, test TestID, node string) (*string, error) {
+// ClientEnodeURL returns the enode URL of a running client.
+func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
 	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.url, testSuite.String(), test.String(), node))
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	res := strings.TrimRight(string(body), "\r\n")
-	return &res, nil
+	return res, nil
 }
 
 // EndTest finishes the test case, cleaning up everything, logging results, and returning
@@ -70,8 +70,8 @@ func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, summaryResult Tes
 	return err
 }
 
-// StartTestSuite signals the start of a test suite.
-func (sim *Simulation) StartTestSuite(name, description, simlog string) (SuiteID, error) {
+// StartSuite signals the start of a test suite.
+func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, error) {
 	vals := make(url.Values)
 	vals.Add("name", name)
 	vals.Add("description", description)
@@ -87,8 +87,8 @@ func (sim *Simulation) StartTestSuite(name, description, simlog string) (SuiteID
 	return SuiteID(id), nil
 }
 
-// EndTestSuite signals the end of a test suite.
-func (sim *Simulation) EndTestSuite(testSuite SuiteID) error {
+// EndSuite signals the end of a test suite.
+func (sim *Simulation) EndSuite(testSuite SuiteID) error {
 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%s", sim.url, testSuite.String()), nil)
 	if err != nil {
 		return err
@@ -114,9 +114,9 @@ func (sim *Simulation) StartTest(testSuite SuiteID, name string, description str
 	return TestID(testID), nil
 }
 
-// GetClientTypes returns all client types available to this simulator run. This depends on
+// ClientTypes returns all client types available to this simulator run. This depends on
 // both the available client set and the command line filters.
-func (sim *Simulation) GetClientTypes() (availableClients []string, err error) {
+func (sim *Simulation) ClientTypes() (availableClients []string, err error) {
 	resp, err := http.Get(fmt.Sprintf("%s/clients", sim.url))
 	if err != nil {
 		return nil, err
@@ -133,11 +133,11 @@ func (sim *Simulation) GetClientTypes() (availableClients []string, err error) {
 	return
 }
 
-// GetNode starts a new node (or other container) with the specified parameters. One
+// StartClient starts a new node (or other container) with the specified parameters. One
 // parameter must be named CLIENT and should contain one of the client types from
 // GetClientTypes. The input is used as environment variables in the new container.
 // Returns container id and ip.
-func (sim *Simulation) GetNode(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, *string, error) {
+func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
 	// vals := make(url.Values)
 	// for k, v := range parameters {
 	// 	vals.Add(k, v)
@@ -146,36 +146,16 @@ func (sim *Simulation) GetNode(testSuite SuiteID, test TestID, parameters map[st
 	//	parameters["testcase"] = test.String()
 	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%s/test/%s/node", sim.url, testSuite.String(), test.String()), parameters, initFiles)
 	if err != nil {
-		return "", nil, nil, err
+		return "", nil, err
 	}
-	if idip := strings.Split(data, "@"); len(idip) > 1 {
-		return idip[0], net.ParseIP(idip[1]), &idip[2], nil
+	if idip := strings.Split(data, "@"); len(idip) >= 1 {
+		return idip[0], net.ParseIP(idip[1]), nil
 	}
-	return data, net.IP{}, nil, fmt.Errorf("no ip address returned: %v", data)
+	return data, net.IP{}, fmt.Errorf("no ip address returned: %v", data)
 }
 
-// GetPseudo starts a new pseudo-client with the specified parameters One parameter must be
-// named CLIENT and should contain one of the returned client types from GetClientTypes
-// The input is used as environment variables in the new container.
-//
-// Returns container id, ip and mac.
-func (sim *Simulation) GetPseudo(testSuite SuiteID, test TestID, parameters map[string]string) (string, net.IP, *string, error) {
-	vals := make(url.Values)
-	for k, v := range parameters {
-		vals.Add(k, v)
-	}
-	data, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s/pseudo", sim.url, testSuite.String(), test.String()), vals)
-	if err != nil {
-		return "", nil, nil, err
-	}
-	if idip := strings.Split(data, "@"); len(idip) > 1 {
-		return idip[0], net.ParseIP(idip[1]), &idip[2], nil
-	}
-	return data, net.IP{}, nil, fmt.Errorf("no ip address returned: %v", data)
-}
-
-// KillNode signals to the host that the node is no longer required.
-func (sim *Simulation) KillNode(testSuite SuiteID, test TestID, nodeid string) error {
+// StopClient signals to the host that the node is no longer required.
+func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.url, testSuite.String(), test.String(), nodeid), nil)
 	if err != nil {
 		return err
