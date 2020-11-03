@@ -63,7 +63,6 @@ func simulate(simDuration int, simulator string, simulatorLabel string, logger l
 
 	// Create the test manager.
 	env := libhive.SimEnv{
-		ClientTypes:          clientList,
 		Images:               allClients,
 		LogDir:               logdir,
 		SimLogLevel:          *simloglevelFlag,
