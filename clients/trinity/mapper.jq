@@ -43,12 +43,12 @@ def infix_zeros_to_length(s;l):
   "version": "1",
   "accounts": (.alloc|with_entries(.key|="0x"+.)),
   "genesis": {
-    "author": .coinbase,
+    "author": (.coinbase // "0x0000000000000000000000000000000000000000"),
     "difficulty": .difficulty|to_hex,
-    "extraData": .extraData,
+    "extraData": (.extraData // "0x"),
     "gasLimit": .gasLimit|to_hex,
-    "nonce": .nonce|infix_zeros_to_length(2;18),
-    "timestamp": .timestamp|to_hex,
+    "nonce": (.nonce|infix_zeros_to_length(2;18) // "0x0000000000000000"),
+    "timestamp": (.timestamp|to_hex // "0x0"),
   },
   "params": {
     "miningMethod": (if env.HIVE_SKIP_POW != null then "NoProof" else "ethash" end),
