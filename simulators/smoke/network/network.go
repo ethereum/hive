@@ -68,10 +68,10 @@ func iptest(t *hivesim.T) {
 		t.Fatal("can't disconnect client from network:", err)
 	}
 	if err := t.Sim.DisconnectContainer(t.SuiteID, networkID, "simulation"); err != nil {
-		t.Fatalf("can't disconnect simulation from network:", err)
+		t.Fatal("can't disconnect simulation from network:", err)
 	}
 	// Remove network1.
 	if err := t.Sim.RemoveNetwork(t.SuiteID, networkID); err != nil {
-		t.Fatal("could not remove network:", err)
+		t.Fatal("can't remove network:", err)
 	}
 }
