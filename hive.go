@@ -132,8 +132,8 @@ func mainInHost(overrides []string, cacher *buildCacher, errorReport *HiveErrorR
 	var err error
 
 	// create or use the specified rootpath
-	log15.Info("Creating output folder if necessary", "folder", *testResultsRoot)
-	if err := os.MkdirAll(*testResultsRoot, os.ModePerm); err != nil {
+	log15.Info("creating output directory", "folder", *testResultsRoot)
+	if err := os.MkdirAll(*testResultsRoot, 0755); err != nil {
 		log15.Crit("failed to create logs folder", "error", err)
 		return err
 	}

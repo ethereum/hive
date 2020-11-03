@@ -1,47 +1,97 @@
-package common
+package libhive
 
 import (
+	"crypto/rand"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
-	docker "github.com/fsouza/go-dockerclient"
+	"gopkg.in/inconshreveable/log15.v2"
+
+	. "github.com/ethereum/hive/internal/hive"
 )
 
-// TestManager offers providers a common implementation for
-// managing tests. It is a partial implementation of
-// the TestSuiteHost interface
-type TestManager struct {
-	OutputPath       string
-	KillNodeCallback func(testSuite TestSuiteID, test TestID, node string) error
+var (
+	ErrNoSuchNode               = errors.New("no such node")
+	ErrNoSuchTestSuite          = errors.New("no such test suite")
+	ErrNoSuchTestCase           = errors.New("no such test case")
+	ErrMissingClientType        = errors.New("missing client type")
+	ErrNoAvailableClients       = errors.New("no available clients")
+	ErrTestSuiteRunning         = errors.New("test suite still has running tests")
+	ErrMissingOutputDestination = errors.New("test suite requires an output")
+	ErrNoSummaryResult          = errors.New("test case must be ended with a summary result")
+	ErrDBUpdateFailed           = errors.New("could not update results set")
+	ErrTestSuiteLimited         = errors.New("testsuite test count is limited")
+)
 
-	dockerClient        *docker.Client
-	simulationContainer *docker.Container
-	networks            map[string]string // map of all networks started by the test, key is network ID and value is network name.
-	networkMutex        sync.RWMutex
-
-	testLimiter       int
-	runningTestSuites map[TestSuiteID]*TestSuite
-	runningTestCases  map[TestID]*TestCase
-	testCaseMutex     sync.RWMutex
-	testSuiteMutex    sync.RWMutex
-	nodeMutex         sync.Mutex
-	pseudoMutex       sync.Mutex
-	testSuiteCounter  uint32
-	testCaseCounter   uint32
+// SimEnv contains the simulation parameters.
+type SimEnv struct {
+	SimLogLevel          int
+	LogDir               string
+	PrintContainerOutput bool
+	Images               map[string]string // client name -> image name
 }
 
-// NewTestManager is a constructor returning a TestManager
-func NewTestManager(outputPath string, testLimiter int, killNodeCallback func(testSuite TestSuiteID, test TestID, node string) error, client *docker.Client) *TestManager {
+// TestManager collects test results during a simulation run.
+type TestManager struct {
+	config      SimEnv
+	backend     Backend
+	testLimiter int
+
+	simContainerID string
+
+	// map of all networks started by the test, key is network ID and value is network name.
+	networks     map[string]string
+	networkMutex sync.RWMutex
+
+	testCaseMutex     sync.RWMutex
+	testSuiteMutex    sync.RWMutex
+	runningTestSuites map[TestSuiteID]*TestSuite
+	runningTestCases  map[TestID]*TestCase
+	testSuiteCounter  uint32
+	testCaseCounter   uint32
+	results           map[TestSuiteID]*TestSuite
+}
+
+func NewTestManager(config SimEnv, b Backend, testLimiter int) *TestManager {
 	return &TestManager{
-		OutputPath:        outputPath,
+		config:            config,
+		backend:           b,
 		testLimiter:       testLimiter,
-		KillNodeCallback:  killNodeCallback,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
-		dockerClient:      client,
+		results:           make(map[TestSuiteID]*TestSuite),
 		networks:          make(map[string]string),
 	}
+}
+
+// SetSimContainerID sets the container ID of the simulation container. This must be called
+// after creating the simulation container.
+func (manager *TestManager) SetSimContainerID(id string) {
+	manager.simContainerID = id
+}
+
+// Results returns the results for all suites that have already ended.
+func (manager *TestManager) Results() map[TestSuiteID]*TestSuite {
+	manager.testSuiteMutex.RLock()
+	defer manager.testSuiteMutex.RUnlock()
+
+	// Copy results.
+	r := make(map[TestSuiteID]*TestSuite)
+	for id, suite := range manager.results {
+		r[id] = suite
+	}
+	return r
+}
+
+// API returns the simulation API handler.
+func (manager *TestManager) API() http.Handler {
+	return newSimulationAPI(manager.backend, manager.config, manager)
 }
 
 // IsTestSuiteRunning checks if the test suite is still running and returns it if so
@@ -52,7 +102,7 @@ func (manager *TestManager) IsTestSuiteRunning(testSuite TestSuiteID) (*TestSuit
 	return suite, ok
 }
 
-// IsTestRunning checks if the testis still running and returns it if so
+// IsTestRunning checks if the test is still running and returns it if so.
 func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
 	manager.testCaseMutex.RLock()
 	defer manager.testCaseMutex.RUnlock()
@@ -64,7 +114,6 @@ func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
 // an error message. This can be called as a cleanup method.
 // If there are no running tests, there is no effect.
 func (manager *TestManager) Terminate() error {
-
 	terminationSummary := &TestResult{
 		Pass:    false,
 		Details: "Test was terminated by host",
@@ -75,49 +124,41 @@ func (manager *TestManager) Terminate() error {
 	for suiteID, suite := range manager.runningTestSuites {
 		for testID := range suite.TestCases {
 			if _, running := manager.IsTestRunning(testID); running {
-				//kill any running tests and ensure that the host is
-				//notified to clean up any resources (eg docker containers)
+				// end any running tests and ensure that the host is notified to clean up
+				// any resources (e.g. docker containers).
 				err := manager.EndTest(suiteID, testID, terminationSummary, nil)
 				if err != nil {
 					return err
 				}
 			}
 		}
-		//ensure the db is updated with results
-		manager.EndTestSuite(suiteID)
+		// ensure the db is updated with results
+		manager.doEndSuite(suiteID)
 	}
+
+	// Remove left-over docker networks.
+	manager.PruneNetworks()
+
 	return nil
 }
 
 // GetNodeInfo gets some info on a client or pseudo belonging to some test
-func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*TestClientInfo, error) {
-	manager.nodeMutex.Lock()
-	defer manager.nodeMutex.Unlock()
+func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*ClientInfo, error) {
+	manager.testCaseMutex.RLock()
+	defer manager.testCaseMutex.RUnlock()
 
-	_, ok := manager.IsTestSuiteRunning(testSuite)
-	if !ok {
-		return nil, ErrNoSuchTestSuite
-	}
-	testCase, ok := manager.IsTestRunning(test)
+	testCase, ok := manager.runningTestCases[test]
 	if !ok {
 		return nil, ErrNoSuchTestCase
 	}
 	nodeInfo, ok := testCase.ClientInfo[nodeID]
 	if !ok {
-		nodeInfo, ok = testCase.pseudoInfo[nodeID]
+		nodeInfo, ok = testCase.PseudoInfo[nodeID]
 		if !ok {
 			return nil, ErrNoSuchNode
 		}
 	}
 	return nodeInfo, nil
-}
-
-// AddSimContainer adds the given simulation container to the test manager
-// for later access.
-func (manager *TestManager) AddSimContainer(container *docker.Container) {
-	manager.networkMutex.Lock()
-	defer manager.networkMutex.Unlock()
-	manager.simulationContainer = container
 }
 
 // CreateNetwork creates a docker network with the given network name, returning
@@ -127,54 +168,43 @@ func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, networkName str
 	if !ok {
 		return "", ErrNoSuchTestSuite
 	}
-	// list networks to make sure not to duplicate
-	existing, err := manager.dockerClient.ListNetworks()
-	if err != nil {
-		return "", err
-	}
-	// check for existing networks with same name, and if exists, remove
-	for _, exists := range existing {
-		if exists.Name == networkName {
-			if err := manager.dockerClient.RemoveNetwork(exists.ID); err != nil {
-				return "", err
-			}
-		}
-	}
-	// create network
-	network, err := manager.dockerClient.CreateNetwork(docker.CreateNetworkOptions{
-		Name:           networkName,
-		Driver:         "bridge",
-		CheckDuplicate: true,
-		Attachable:     true,
-	})
-	if err != nil {
-		return "", err
-	}
+
 	// add network to network map
 	manager.networkMutex.Lock()
-	manager.networks[network.ID] = network.Name
-	manager.networkMutex.Unlock()
-	return network.ID, err
+	defer manager.networkMutex.Unlock()
+
+	netID, err := manager.backend.CreateNetwork(networkName)
+	if err != nil {
+		manager.networks[netID] = networkName
+	}
+	return netID, err
 }
 
 // CreateNetwork creates a docker network with the given network name, returning
 // the network ID upon success.
 func (manager *TestManager) RemoveNetwork(networkID string) error {
-	if err := manager.dockerClient.RemoveNetwork(networkID); err != nil {
+	manager.networkMutex.Lock()
+	defer manager.networkMutex.Unlock()
+
+	if err := manager.backend.RemoveNetwork(networkID); err != nil {
 		return err
 	}
-	manager.networkMutex.Lock()
 	delete(manager.networks, networkID)
-	manager.networkMutex.Unlock()
 	return nil
 }
 
-// PruneNetworks prunes all unused docker network that were started by the test suite.
+// PruneNetworks removes all created networks.
 func (manager *TestManager) PruneNetworks() []error {
+	manager.networkMutex.Lock()
+	defer manager.networkMutex.Unlock()
+
 	var errs []error
-	for id, _ := range manager.networks {
-		if err := manager.RemoveNetwork(id); err != nil {
+	for id, name := range manager.networks {
+		log15.Info("removing docker network", "id", id, "name", name)
+		if err := manager.backend.RemoveNetwork(id); err != nil {
 			errs = append(errs, err)
+		} else {
+			delete(manager.networks, id)
 		}
 	}
 	return errs
@@ -189,57 +219,25 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkID, contai
 	if !ok {
 		return "", ErrNoSuchTestSuite
 	}
-	// if the containerID is "simulation", use simulation container ID
-	var err error
-	containerID, err = manager.isSimulation(containerID)
-	if err != nil {
-		return "", err
-	}
-	// if the networkID is "bridge", use bridge networkID
-	networkID, err = manager.isBridge(networkID)
-	if err != nil {
-		return "", err
-	}
-	ipAddr, err := getContainerIP(manager.dockerClient, networkID, containerID)
-	if err != nil {
-		return "", err
+
+	if containerID == "simulation" {
+		containerID = manager.simContainerID
 	}
 
-	return ipAddr, nil
-}
-
-func (manager *TestManager) isBridge(network string) (string, error) {
-	if network != "bridge" {
-		return network, nil
-	}
-	// range through networks, return ID if bridge network
-	existing, err := manager.dockerClient.ListNetworks()
-	if err != nil {
-		return "", err
-	}
-	for _, exists := range existing {
-		if exists.Name == network {
-			return exists.ID, nil
+	// networkID "bridge" is special.
+	if networkID == "bridge" {
+		var err error
+		networkID, err = manager.backend.NetworkNameToID(networkID)
+		if err != nil {
+			return "", err
 		}
 	}
-	return "", fmt.Errorf("network not found")
-}
 
-func getContainerIP(dockerClient *docker.Client, networkID, container string) (string, error) {
-	details, err := dockerClient.InspectContainerWithOptions(docker.InspectContainerOptions{
-		ID: container,
-	})
+	ipAddr, err := manager.backend.ContainerIP(containerID, networkID)
 	if err != nil {
 		return "", err
 	}
-	// range over all networks to which the container is connected
-	// and get network-specific IPs
-	for _, network := range details.NetworkSettings.Networks {
-		if network.NetworkID == networkID {
-			return network.IPAddress, nil
-		}
-	}
-	return "", fmt.Errorf("network not found")
+	return ipAddr.String(), nil
 }
 
 // ConnectContainer connects the given container to the given network.
@@ -251,14 +249,10 @@ func (manager *TestManager) ConnectContainer(testSuite TestSuiteID, networkID, c
 	if !ok {
 		return ErrNoSuchTestSuite
 	}
-	// if the containerID is "simulation", use simulation container ID
-	containerID, err := manager.isSimulation(containerID)
-	if err != nil {
-		return err
+	if containerID == "simulation" {
+		containerID = manager.simContainerID
 	}
-	return manager.dockerClient.ConnectNetwork(networkID, docker.NetworkConnectionOptions{
-		Container: containerID,
-	})
+	return manager.backend.ConnectContainer(containerID, networkID)
 }
 
 // DisconnectContainer disconnects the given container from the given network.
@@ -270,24 +264,10 @@ func (manager *TestManager) DisconnectContainer(testSuite TestSuiteID, networkID
 	if !ok {
 		return ErrNoSuchTestSuite
 	}
-	// if the containerID is "simulation", use simulation container ID
-	containerID, err := manager.isSimulation(containerID)
-	if err != nil {
-		return err
+	if containerID == "simulation" {
+		containerID = manager.simContainerID
 	}
-	return manager.dockerClient.DisconnectNetwork(networkID, docker.NetworkConnectionOptions{
-		Container: containerID,
-	})
-}
-
-func (manager *TestManager) isSimulation(nodeID string) (string, error) {
-	if nodeID != "simulation" {
-		return nodeID, nil
-	}
-	if manager.simulationContainer == nil {
-		return "", fmt.Errorf("simulation container not found")
-	}
-	return manager.simulationContainer.ID, nil
+	return manager.backend.DisconnectContainer(containerID, networkID)
 }
 
 // EndTestSuite ends the test suite by writing the test suite results to the supplied
@@ -295,35 +275,39 @@ func (manager *TestManager) isSimulation(nodeID string) (string, error) {
 func (manager *TestManager) EndTestSuite(testSuite TestSuiteID) error {
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
+	return manager.doEndSuite(testSuite)
+}
 
-	// check the test suite exists
+func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	suite, ok := manager.runningTestSuites[testSuite]
 	if !ok {
 		return ErrNoSuchTestSuite
 	}
-	// check the suite has no running test cases
+	// Check the suite has no running test cases.
 	for k := range suite.TestCases {
 		_, ok := manager.runningTestCases[k]
 		if ok {
 			return ErrTestSuiteRunning
 		}
 	}
-	// update the db
-	err := suite.UpdateDB(manager.OutputPath)
-	if err != nil {
-		return err
+	// Write the result.
+	if manager.config.LogDir != "" {
+		err := writeSuiteFile(suite, manager.config.LogDir)
+		if err != nil {
+			return err
+		}
 	}
-	//remove the test suite
+	// Move the suite to results.
 	delete(manager.runningTestSuites, testSuite)
-
+	manager.results[testSuite] = suite
 	return nil
 }
 
 // StartTestSuite starts a test suite and returns the context id
 func (manager *TestManager) StartTestSuite(name string, description string, simlog string) (TestSuiteID, error) {
-
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
+
 	var newSuiteID = TestSuiteID(manager.testSuiteCounter)
 	manager.runningTestSuites[newSuiteID] = &TestSuite{
 		ID:           newSuiteID,
@@ -333,7 +317,6 @@ func (manager *TestManager) StartTestSuite(name string, description string, siml
 		SimulatorLog: simlog,
 	}
 	manager.testSuiteCounter++
-
 	return newSuiteID, nil
 }
 
@@ -360,8 +343,6 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 		Name:        name,
 		Description: description,
 		Start:       time.Now(),
-		ClientInfo:  make(map[string]*TestClientInfo),
-		pseudoInfo:  make(map[string]*TestClientInfo),
 	}
 	// add the test case to the test suite
 	testSuite.TestCases[newCaseID] = newTestCase
@@ -373,8 +354,8 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 
 // EndTest finishes the test case
 func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, summaryResult *TestResult, clientResults map[string]*TestResult) error {
-
 	manager.testCaseMutex.Lock()
+
 	// Check if the test case is running
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
@@ -391,54 +372,72 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 	testCase.End = time.Now()
 	testCase.SummaryResult = *summaryResult
 	testCase.ClientResults = clientResults
-
 	manager.testCaseMutex.Unlock()
 
-	for k, v := range testCase.ClientInfo {
+	// Stop running clients.
+	for _, v := range testCase.ClientInfo {
 		if v.WasInstantiated {
-			manager.KillNodeCallback(testSuiteRun, testID, k)
+			manager.backend.StopContainer(v.ID)
 		}
 	}
-	for k := range testCase.pseudoInfo {
-		manager.KillNodeCallback(testSuiteRun, testID, k)
+	for _, v := range testCase.PseudoInfo {
+		if v.WasInstantiated {
+			manager.backend.StopContainer(v.ID)
+		}
 	}
 
-	// Delete from running, if it's still there
+	// Delete from running, if it's still there.
 	manager.testCaseMutex.Lock()
-	if tc, ok := manager.runningTestCases[testID]; ok {
-		delete(manager.runningTestCases, tc.ID)
-	}
+	delete(manager.runningTestCases, testID)
 	manager.testCaseMutex.Unlock()
-
 	return nil
 }
 
 // RegisterNode is used by test suite hosts to register the creation of a node in the context of a test
-func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo *TestClientInfo) error {
-	manager.nodeMutex.Lock()
-	defer manager.nodeMutex.Unlock()
+func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo *ClientInfo) error {
+	manager.testCaseMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
 
 	// Check if the test case is running
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
 		return ErrNoSuchTestCase
 	}
-
+	if testCase.ClientInfo == nil {
+		testCase.ClientInfo = make(map[string]*ClientInfo)
+	}
 	testCase.ClientInfo[nodeID] = nodeInfo
 	return nil
 }
 
 // RegisterPseudo is used by test suite hosts to register the creation of a node in the context of a test
-func (manager *TestManager) RegisterPseudo(testID TestID, nodeID string, nodeInfo *TestClientInfo) error {
-	manager.pseudoMutex.Lock()
-	defer manager.pseudoMutex.Unlock()
+func (manager *TestManager) RegisterPseudo(testID TestID, nodeID string, nodeInfo *ClientInfo) error {
+	manager.testCaseMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
 
 	// Check if the test case is running
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
 		return ErrNoSuchTestCase
 	}
-
-	testCase.pseudoInfo[nodeID] = nodeInfo
+	if testCase.PseudoInfo == nil {
+		testCase.PseudoInfo = make(map[string]*ClientInfo)
+	}
+	testCase.PseudoInfo[nodeID] = nodeInfo
 	return nil
+}
+
+// writeSuiteFile writes the simulation result to the log directory.
+func writeSuiteFile(s *TestSuite, logdir string) error {
+	suiteData, err := json.Marshal(s)
+	if err != nil {
+		return err
+	}
+	// Randomize the name, but make it so that it's ordered by date - makes cleanups easier
+	b := make([]byte, 16)
+	rand.Read(b)
+	suiteFileName := fmt.Sprintf("%v-%x.json", time.Now().Unix(), b)
+	suiteFile := filepath.Join(logdir, suiteFileName)
+	// Write it.
+	return ioutil.WriteFile(suiteFile, suiteData, 0644)
 }
