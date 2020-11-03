@@ -158,10 +158,6 @@ func (b *dockerBackend) StartClient(name string, env map[string]string, files ma
 		}
 
 		time.Sleep(checkTime)
-		checkTime = checkTime * 2
-		if checkTime > 2*time.Second {
-			checkTime = time.Second
-		}
 
 		if time.Since(container.Created) > timeoutCheckDuration {
 			log15.Debug("deleting client container", "name", name, "id", info.ID)
