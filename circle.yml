@@ -9,11 +9,7 @@ jobs:
       - go/mod-download
       - go/save-cache
       - go/test:
-          packages:
-            - .
-            - ./hivesim
-            - ./cmd/hivechain
-            - ./cmd/hiveview
+          packages: "./hivesim ./cmd/hivechain ./cmd/hiveview"
 
 orbs:
   go: circleci/go@1.5.0
