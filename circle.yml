@@ -3,7 +3,7 @@ jobs:
     docker:
       - image: cimg/go:1.15
     environment:
-        CIRCLE_REPOSITORY_URL: https://github.com/ethereum/hive
+      CIRCLE_REPOSITORY_URL: https://github.com/ethereum/hive
     steps:
       - checkout
       - go/load-cache
