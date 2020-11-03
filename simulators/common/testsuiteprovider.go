@@ -38,7 +38,7 @@ type TestSuiteHost interface {
 	ConnectContainer(testSuite TestSuiteID, networkID, containerID string) error
 	// DisconnectContainer disconnects the given container from the given network.
 	DisconnectContainer(testSuite TestSuiteID, networkID, containerID string) error
-	// CreateNetwork creates a network by the given name.
+	// CreateNetwork creates a network by the given name, returning the network ID.
 	CreateNetwork(testSuite TestSuiteID, networkName string) (string, error)
 	// RemoveNetwork removes a network by the given networkID.
 	RemoveNetwork(testSuite TestSuiteID, networkID string) error

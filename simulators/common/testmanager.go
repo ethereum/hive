@@ -143,6 +143,7 @@ func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, networkName str
 	// create network
 	network, err := manager.dockerClient.CreateNetwork(docker.CreateNetworkOptions{
 		Name:           networkName,
+		Driver:         "bridge",
 		CheckDuplicate: true,
 		Attachable:     true,
 	})
@@ -189,17 +190,39 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkID, contai
 		return "", ErrNoSuchTestSuite
 	}
 	// if the containerID is "simulation", use simulation container ID
-	containerID, err := manager.isSimulation(containerID)
+	var err error
+	containerID, err = manager.isSimulation(containerID)
 	if err != nil {
 		return "", err
 	}
-
+	// if the networkID is "bridge", use bridge networkID
+	networkID, err = manager.isBridge(networkID)
+	if err != nil {
+		return "", err
+	}
 	ipAddr, err := getContainerIP(manager.dockerClient, networkID, containerID)
 	if err != nil {
 		return "", err
 	}
 
 	return ipAddr, nil
+}
+
+func (manager *TestManager) isBridge(network string) (string, error) {
+	if network != "bridge" {
+		return network, nil
+	}
+	// range through networks, return ID if bridge network
+	existing, err := manager.dockerClient.ListNetworks()
+	if err != nil {
+		return "", err
+	}
+	for _, exists := range existing {
+		if exists.Name == network {
+			return exists.ID, nil
+		}
+	}
+	return "", fmt.Errorf("network not found")
 }
 
 func getContainerIP(dockerClient *docker.Client, networkID, container string) (string, error) {
