@@ -1,20 +1,14 @@
 package hivesim
 
-import "strconv"
+import (
+	"github.com/ethereum/hive/internal/hive"
+)
 
 // SuiteID identifies a test suite context.
-type SuiteID uint32
-
-func (id SuiteID) String() string {
-	return strconv.Itoa(int(id))
-}
+type SuiteID = hive.TestSuiteID
 
 // TestID identifies a test case context.
-type TestID uint32
-
-func (id TestID) String() string {
-	return strconv.Itoa(int(id))
-}
+type TestID = hive.TestID
 
 // TestResult describes the outcome of a test.
 type TestResult struct {
