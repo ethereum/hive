@@ -23,6 +23,8 @@ import (
 )
 
 var (
+	ErrNetworkNotFound = fmt.Errorf("network not found")
+
 	defaultStartTimeout = time.Duration(60 * time.Second)
 )
 
@@ -193,22 +195,8 @@ func (b *dockerBackend) StopContainer(containerID string) error {
 }
 
 // CreateNetwork creates a docker network.
-func (b *dockerBackend) CreateNetwork(name string) (networkID string, err error) {
-	// list networks to make sure not to duplicate
-	existing, err := b.client.ListNetworks()
-	if err != nil {
-		return "", err
-	}
-	// check for existing networks with same name, and if exists, remove
-	for _, exists := range existing {
-		if exists.Name == name {
-			if err := b.client.RemoveNetwork(exists.ID); err != nil {
-				return "", err
-			}
-		}
-	}
-	// create network
-	net, err := b.client.CreateNetwork(docker.CreateNetworkOptions{
+func (b *dockerBackend) CreateNetwork(name string) (string, error) {
+	network, err := b.client.CreateNetwork(docker.CreateNetworkOptions{
 		Name:           name,
 		CheckDuplicate: true,
 		Attachable:     true,
@@ -216,10 +204,10 @@ func (b *dockerBackend) CreateNetwork(name string) (networkID string, err error)
 	if err != nil {
 		return "", err
 	}
-	return net.ID, nil
+	return network.ID, nil
 }
 
-// NetworkNameToID finds the network ID of the given name.
+// NetworkNameToID finds the network ID of network by the given name.
 func (b *dockerBackend) NetworkNameToID(name string) (string, error) {
 	networks, err := b.client.ListNetworks()
 	if err != nil {
@@ -230,12 +218,12 @@ func (b *dockerBackend) NetworkNameToID(name string) (string, error) {
 			return net.ID, nil
 		}
 	}
-	return "", fmt.Errorf("network not found")
+	return "", ErrNetworkNotFound
 }
 
 // RemoveNetwork deletes a docker network.
-func (b *dockerBackend) RemoveNetwork(networkID string) error {
-	return b.client.RemoveNetwork(networkID)
+func (b *dockerBackend) RemoveNetwork(id string) error {
+	return b.client.RemoveNetwork(id)
 }
 
 // ContainerIP finds the IP of a container in the given network.

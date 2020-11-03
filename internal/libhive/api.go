@@ -309,26 +309,32 @@ func (api *simAPI) networkCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	networkName := mux.Vars(r)["network"]
-	id, err := api.tm.CreateNetwork(suiteID, networkName)
+	err = api.tm.CreateNetwork(suiteID, networkName)
 	if err != nil {
 		log15.Error("API: failed to create network", "network", networkName, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log15.Info("API: network created", "name", networkName, "network", id)
-	fmt.Fprint(w, id)
+	log15.Info("API: network created", "name", networkName)
+	fmt.Fprint(w, "success")
 }
 
 // networkRemove removes a docker network.
 func (api *simAPI) networkRemove(w http.ResponseWriter, r *http.Request) {
-	networkID := mux.Vars(r)["network"]
-	err := api.tm.RemoveNetwork(networkID)
+	suiteID, err := api.requestSuite(r)
 	if err != nil {
-		log15.Error("API: failed to remove network", "network", networkID, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	network := mux.Vars(r)["network"]
+	err = api.tm.RemoveNetwork(suiteID, network)
+	if err != nil {
+		log15.Error("API: failed to remove network", "network", network, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: docker network removed", "network", networkID)
+	log15.Info("API: docker network removed", "network", network)
 	fmt.Fprint(w, "success")
 }
 
@@ -341,14 +347,14 @@ func (api *simAPI) networkIPGet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	node := mux.Vars(r)["node"]
-	networkID := mux.Vars(r)["network"]
-	ipAddr, err := api.tm.ContainerIP(suiteID, networkID, node)
+	network := mux.Vars(r)["network"]
+	ipAddr, err := api.tm.ContainerIP(suiteID, network, node)
 	if err != nil {
 		log15.Error("API: failed to get container IP", "container", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: container IP requested", "network", networkID, "container", node, "ip", ipAddr)
+	log15.Info("API: container IP requested", "network", network, "container", node, "ip", ipAddr)
 	fmt.Fprint(w, ipAddr)
 }
 
@@ -360,14 +366,14 @@ func (api *simAPI) networkConnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	networkID := mux.Vars(r)["network"]
+	name := mux.Vars(r)["network"]
 	containerID := mux.Vars(r)["node"]
-	if err := api.tm.ConnectContainer(suiteID, networkID, containerID); err != nil {
-		log15.Error("API: failed to connect container", "network", networkID, "container", containerID, "error", err)
+	if err := api.tm.ConnectContainer(suiteID, name, containerID); err != nil {
+		log15.Error("API: failed to connect container", "network", name, "container", containerID, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: container connected to network", "network", networkID, "container", containerID)
+	log15.Info("API: container connected to network", "network", name, "container", containerID)
 }
 
 // networkDisconnect disconnects a container from a network.
@@ -378,14 +384,14 @@ func (api *simAPI) networkDisconnect(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	networkID := mux.Vars(r)["network"]
+	network := mux.Vars(r)["network"]
 	containerID := mux.Vars(r)["node"]
-	if err := api.tm.DisconnectContainer(suiteID, networkID, containerID); err != nil {
-		log15.Error("API: disconnecting container failed", "network", networkID, "container", containerID, "error", err)
+	if err := api.tm.DisconnectContainer(suiteID, network, containerID); err != nil {
+		log15.Error("API: disconnecting container failed", "network", network, "container", containerID, "error", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	log15.Info("API: container disconnected", "network", networkID, "container", containerID)
+	log15.Info("API: container disconnected", "network", network, "container", containerID)
 }
 
 // requestSuite returns the suite ID from the request body and checks that
