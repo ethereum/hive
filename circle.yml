@@ -1,3 +1,5 @@
+version: 2.1
+
 jobs:
   test:
     docker:
@@ -14,9 +16,7 @@ jobs:
 
 orbs:
   go: circleci/go@1.5.0
-version: 2.1
 workflows:
   main:
     jobs:
       - test
-      - 
