@@ -8,5 +8,5 @@ RUN go build .
 # Build the runner container.
 FROM alpine:latest
 ADD . /
-COPY --from=builder /network2 /network
+COPY --from=builder /network /network
 ENTRYPOINT ["./network"]
