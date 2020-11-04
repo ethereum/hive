@@ -364,8 +364,6 @@ function execfilter(str) {
     $('#execresults').dataTable().api().search(str).draw();
 }
 
-var converter = new showdown.Converter()
-
 // The datatables
 var overallresults = null; // Overall results
 var execresults = null; // Execution results
@@ -380,8 +378,16 @@ function format(d) {
     // `d` is the original data object for the row
     let txt = ""
     txt += "<b>Name</b>" + utils.tag('p', d.name)
-    txt += "<b>Description</b>" + converter.makeHtml(d.description)
-    txt += "<br/><b>Details</b>" + converter.makeHtml(d.summaryResult.details)
+    if (d.description != "") {
+        txt += "<b>Description</b><br/>"
+        txt += utils.html_encode(d.description)
+        txt += "<br/>"
+    }
+    if (d.summaryResult.details != "") {
+        txt += "<b>Details</b><pre><code>"
+        txt += utils.html_encode(d.summaryResult.details)
+        txt += "</code></pre>"
+    }
     return txt
 }
 
