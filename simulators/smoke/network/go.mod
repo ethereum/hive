@@ -1,5 +1,5 @@
-module github.com/ethereum/hive/simulators/smoke/network2
+module github.com/ethereum/hive/simulators/smoke/network
 
 go 1.13
 
-require github.com/ethereum/hive v0.0.0-20201103214223-1ce78e24ec32
+require github.com/ethereum/hive v0.0.0-20201104115140-35ee289d2156
