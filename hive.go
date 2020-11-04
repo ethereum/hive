@@ -79,7 +79,7 @@ func main() {
 	}
 	// Connect to the local docker daemon and make sure it works
 	var err error
-	dockerClient, err = newDockerClient(*dockerEndpoint)
+	dockerClient, err = docker.NewClient(*dockerEndpoint)
 	if err != nil {
 		fatal("can't connect to docker:", err)
 	}
@@ -118,16 +118,6 @@ func main() {
 	if fail != nil {
 		os.Exit(1)
 	}
-}
-
-func newDockerClient(endpoint string) (*docker.Client, error) {
-	if endpoint != "" {
-		return docker.NewClient(endpoint)
-	}
-	if os.Getenv("DOCKER_HOST") != "" {
-		return docker.NewClientFromEnv()
-	}
-	return nil, fmt.Errorf("missing --docker-endpoint or DOCKER_HOST environment variable")
 }
 
 // mainInHost runs the actual hive testsuites on the
