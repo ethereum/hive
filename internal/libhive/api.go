@@ -7,6 +7,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -25,6 +26,7 @@ func newSimulationAPI(b Backend, env SimEnv, tm *TestManager) http.Handler {
 	for name, _ := range env.Images {
 		api.clientTypes = append(api.clientTypes, name)
 	}
+	sort.Strings(api.clientTypes)
 
 	// API routes.
 	router := mux.NewRouter()
