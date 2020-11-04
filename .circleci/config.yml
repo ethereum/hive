@@ -48,4 +48,5 @@ workflows:
     jobs:
       - go-test
       - build
-      - smoke-tests
+      - smoke-tests:
+          requires: ["build"]
