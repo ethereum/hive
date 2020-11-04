@@ -26,11 +26,11 @@ jobs:
     machine: true
     steps:
       - checkout
-      - attach_workspace: {at: "/build"}
+      - attach_workspace: {at: "/tmp/build"}
       - run:
-          command: "/build/hive --sim=smoke/genesis --client=go-ethereum --docker-noshell"
+          command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum --docker-noshell"
       - run:
-          command: "/build/hive --sim=smoke/network --client=go-ethereum --docker-noshell"
+          command: "/tmp/build/hive --sim=smoke/network --client=go-ethereum --docker-noshell"
 
   # This job runs the go unit tests.
   go-test:
