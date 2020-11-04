@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -17,6 +18,7 @@ func lookupBridgeIP(logger log15.Logger) (net.IP, error) {
 		logger.Error("failed to list network interfaces", "error", err)
 		return nil, err
 	}
+	spew.Dump(interfaes)
 	// Iterate over all the interfaces and find the docker0 bridge
 	for _, iface := range interfaes {
 		if iface.Name == "docker0" || strings.Contains(iface.Name, "vEthernet") {
