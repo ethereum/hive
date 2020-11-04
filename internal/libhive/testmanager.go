@@ -34,7 +34,16 @@ type SimEnv struct {
 	SimLogLevel          int
 	LogDir               string
 	PrintContainerOutput bool
-	Images               map[string]string // client name -> image name
+
+	// This configures the amount of time the simulation waits
+	// for the client to open port 8545 after launching the container.
+	ClientStartTimeout time.Duration
+
+	// client name -> image name
+	Images map[string]string
+
+	// client name -> version info
+	ClientVersions map[string]string
 }
 
 // TestManager collects test results during a simulation run.

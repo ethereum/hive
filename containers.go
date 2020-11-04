@@ -3,13 +3,9 @@
 package main
 
 import (
-	"archive/tar"
 	"bufio"
-	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"mime/multipart"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,13 +13,6 @@ import (
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
-
-// hiveEnvvarPrefix is the prefix of the environment variables names that should
-// be moved from test images to client container to fine tune their setup.
-const hiveEnvvarPrefix = "HIVE_"
-
-// hiveLogsFolder is the directory in which to place runtime logs from each of
-// the docker containers.
 
 // createShellContainer creates a docker container from the hive shell's image.
 func createShellContainer(image string, overrides []string) (*docker.Container, error) {
@@ -69,81 +58,6 @@ func createShellContainer(image string, overrides []string) (*docker.Container, 
 			Privileged: true, // Docker in docker requires privileged mode
 			Binds:      binds,
 		},
-	})
-}
-
-// createClientContainer creates a docker container from a client image
-//
-// A batch of environment variables may be specified to override from originating
-// from the tester image. This is useful in particular during simulations where
-// the tester itself can fine tune parameters for individual nodes.
-func createClientContainer(client string, overrideEnvs map[string]string, files map[string]*multipart.FileHeader) (*docker.Container, error) {
-	// Inject any explicit envvar overrides
-	vars := []string{}
-	for key, val := range overrideEnvs {
-		if strings.HasPrefix(key, hiveEnvvarPrefix) {
-			vars = append(vars, key+"="+val)
-		}
-	}
-	// Create the client container with envvars injected
-	c, err := dockerClient.CreateContainer(docker.CreateContainerOptions{
-		Config: &docker.Config{
-			Image: client,
-			Env:   vars,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	//now upload files
-	uploadToContainer(c.ID, files)
-
-	return c, nil
-}
-
-// uploadToContainer injects a batch of files into the target container.
-func uploadToContainer(id string, files map[string]*multipart.FileHeader) error {
-	// Short circuit if there are no files to upload
-	if len(files) == 0 {
-		return nil
-	}
-	// Create a tarball archive with all the data files
-	tarball := new(bytes.Buffer)
-	tw := tar.NewWriter(tarball)
-
-	for fileName, fileHeader := range files {
-		// Fetch the next file to inject into the container
-		file, err := fileHeader.Open()
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		data, err := ioutil.ReadAll(file)
-		if err != nil {
-			return err
-		}
-		// Insert the file into the tarball archive
-		header := &tar.Header{
-			Name: fileName, //filepath.Base(fileHeader.Filename),
-			Mode: int64(0777),
-			Size: int64(len(data)),
-		}
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-		if _, err := tw.Write(data); err != nil {
-			return err
-		}
-	}
-	if err := tw.Close(); err != nil {
-		return err
-	}
-	// Upload the tarball into the destination container
-	return dockerClient.UploadToContainer(id, docker.UploadToContainerOptions{
-		InputStream: tarball,
-		Path:        "/",
 	})
 }
 

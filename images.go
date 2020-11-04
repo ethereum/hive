@@ -6,7 +6,6 @@ package main
 import (
 	"archive/tar"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -65,10 +64,8 @@ func buildClients(clientList []string, cacher *buildCacher, errorReport *HiveErr
 
 // fetchClientVersions downloads the version json specs from all clients that
 // match the given patten.
-func fetchClientVersions(cacher *buildCacher) (map[string]map[string]string, error) {
-
-	// Iterate over the images and collect the versions
-	versions := make(map[string]map[string]string)
+func fetchClientVersions(cacher *buildCacher) (map[string]string, error) {
+	versions := make(map[string]string)
 	for client, image := range allClients {
 		logger := log15.New("client", client)
 		blob, err := downloadFromImage(image, "/version.json", logger)
@@ -76,12 +73,7 @@ func fetchClientVersions(cacher *buildCacher) (map[string]map[string]string, err
 			berr := &buildError{err: err, client: client}
 			return nil, berr
 		}
-		var version map[string]string
-		if err := json.Unmarshal(blob, &version); err != nil {
-			berr := &buildError{err: err, client: client}
-			return nil, berr
-		}
-		versions[client] = version
+		versions[client] = string(blob)
 	}
 	return versions, nil
 }

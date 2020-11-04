@@ -63,9 +63,11 @@ func simulate(simDuration int, simulator string, simulatorLabel string, logger l
 
 	// Create the test manager.
 	env := libhive.SimEnv{
-		Images:               allClients,
 		LogDir:               logdir,
+		Images:               allClients,
+		ClientVersions:       allClientVersions,
 		SimLogLevel:          *simloglevelFlag,
+		ClientStartTimeout:   *checkTimeLimitFlag,
 		PrintContainerOutput: *simloglevelFlag > 3,
 	}
 	backend := libhive.NewDockerBackend(env, dockerClient)
@@ -100,6 +102,9 @@ func simulate(simDuration int, simulator string, simulatorLabel string, logger l
 		},
 		HostConfig: hostConfig,
 	})
+	if err != nil {
+		return err
+	}
 	tm.SetSimContainerID(sc.ID)
 	slogger := logger.New("id", sc.ID[:8])
 	slogger.Debug("created simulator container")
