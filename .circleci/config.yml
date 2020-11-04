@@ -27,7 +27,7 @@ jobs:
     steps:
       - attach_workspace: {at: "/tmp/build"}
       - run:
-          - command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum --docker-endpoint= --docker-noshell"
+          command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum --docker-endpoint= --docker-noshell"
 
   # This job runs the go unit tests.
   go-test:
