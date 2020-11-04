@@ -1,4 +1,6 @@
 version: 2.1
+orbs:
+  go: circleci/go@1.5.0
 
 jobs:
   test:
@@ -6,14 +8,23 @@ jobs:
       - image: cimg/go:1.15
     steps:
       - checkout
+
+      # Run go test.
       - go/load-cache
       - go/mod-download
       - go/save-cache
       - go/test:
           packages: "./hivesim ./cmd/hivechain ./cmd/hiveview"
 
-orbs:
-  go: circleci/go@1.5.0
+      # Build the hive command.
+      - command: "go build ."
+
+      # Enable use of docker and run the
+      # smoke tests.
+      - setup_remote_docker:
+        version: 19.03.13
+      - command: "./hive --docker-noshell --sim smoke --client go-ethereum"
+
 workflows:
   main:
     jobs:
