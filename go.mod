@@ -21,7 +21,6 @@ require (
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/golang/protobuf v1.4.3 // indirect
 	github.com/golang/snappy v0.0.2 // indirect
-	github.com/google/gopacket v1.1.17
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/graph-gophers/graphql-go v0.0.0-20201027172035-4c772c181653 // indirect
