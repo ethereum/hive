@@ -98,7 +98,7 @@ func (n *node) checkSync(t *hivesim.T, wantNumber uint64, wantHash common.Hash) 
 	for {
 		select {
 		case <-timeout:
-			return fmt.Errorf("timeout (%v elapsed)", syncTimeout)
+			return fmt.Errorf("timeout (%v elapsed, current head is %d)", syncTimeout, current)
 		default:
 			block, err := n.head()
 			if err != nil {
@@ -135,7 +135,7 @@ func (n *node) checkHead(num uint64, hash common.Hash) error {
 		return fmt.Errorf("can't query chain head: %v", err)
 	}
 	if head.Hash() != hash {
-		return fmt.Errorf("wrong chain head %d (%x), want %d (%x)", head.Number, head.Hash(), num, hash)
+		return fmt.Errorf("wrong chain head %d (%s), want %d (%s)", head.Number, head.Hash().TerminalString(), num, hash.TerminalString())
 	}
 	return nil
 }
