@@ -24,7 +24,7 @@ jobs:
       - setup_remote_docker:
           version: 19.03.13
       - run:
-          command: "./hive --docker-noshell --sim smoke --client go-ethereum"
+          command: "./hive --sim smoke --client go-ethereum --docker-endpoint $DOCKER_HOST --docker-noshell"
 
 workflows:
   main:
