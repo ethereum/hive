@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -11,12 +10,6 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
-)
-
-//errors
-var (
-	// errNoMatchingClients is returned when no matching clients are found for a given --client regexp value
-	errNoMatchingClients = errors.New("no matching clients found")
 )
 
 //flags
@@ -37,7 +30,6 @@ var (
 		"A lower value means that hive won't wait as long for in case node crashes and never opens the RPC port.")
 
 	overrideFiles = flag.String("override", "", "Comma separated regexp:files to override in client containers")
-	smokeFlag     = flag.Bool("smoke", false, "Whether to only smoke test or run full test suite")
 
 	simulatorPattern     = flag.String("sim", "", "Regexp selecting the simulation tests to run")
 	simulatorParallelism = flag.Int("sim.parallelism", 1, "Max number of parallel clients/containers to run tests against")
@@ -56,11 +48,10 @@ var (
 )
 
 var (
-	clientList           []string                          //the list of permitted clients specified by the user
-	allClients           map[string]string                 //map of client names (name_branch format) to docker image names
-	allClientVersions    map[string]map[string]string      //map of client names (name_branch format) to a general json struct (map[string]string) containing the version info
-	dockerClient         *docker.Client                    //the web client to the docker api
-	timeoutCheckDuration = time.Duration(60 * time.Second) //liveness check timeout
+	clientList        []string          // the list of permitted clients specified by the user
+	allClients        map[string]string // map of client names (name_branch format) to docker image names
+	allClientVersions map[string]string // map of client names (name_branch format) to JSON object containing the version info
+	dockerClient      *docker.Client    // the web client to the docker api
 )
 
 func main() {
@@ -69,7 +60,6 @@ func main() {
 
 	// Parse the flags and configure the logger
 	flag.Parse()
-	timeoutCheckDuration = *checkTimeLimitFlag
 	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
 
 	// Get the list of clients
@@ -157,7 +147,8 @@ func initClients(cacher *buildCacher, errorReport *HiveErrorReport) error {
 		return err
 	}
 	// Retrieve the version information of all clients being tested
-	if allClientVersions, err = fetchClientVersions(cacher); err != nil {
+	allClientVersions, err = fetchClientVersions(cacher)
+	if err != nil {
 		log15.Crit("failed to retrieve client versions", "error", err)
 		return err
 	}
