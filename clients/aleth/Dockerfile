@@ -10,6 +10,7 @@ RUN apk add --no-cache jq bc bash curl
 ADD aleth.sh /aleth.sh
 RUN chmod +x /aleth.sh
 ADD mapper.jq /mapper.jq
+ADD genesis.json /genesis.json
 
 # Add the enode URL retriever script.
 ADD enode.sh /enode.sh
