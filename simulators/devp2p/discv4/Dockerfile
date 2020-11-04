@@ -17,5 +17,5 @@ FROM alpine:latest
 ADD . /source
 WORKDIR /source
 COPY --from=builder /go-ethereum/devp2p ./devp2p
-COPY --from=builder /source/discv4_2 ./discv4
+COPY --from=builder /source/discv4 ./discv4
 ENTRYPOINT ["./discv4"]
