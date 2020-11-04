@@ -81,13 +81,11 @@ func main() {
 	var err error
 	dockerClient, err = docker.NewClient(*dockerEndpoint)
 	if err != nil {
-		log15.Crit("failed to connect to docker deamon", "error", err)
-		return
+		fatal("can't connect to docker:", err)
 	}
 	env, err := dockerClient.Version()
 	if err != nil {
-		log15.Crit("failed to retrieve docker version", "error", err)
-		return
+		fatal("can't get docker version:", err)
 	}
 	log15.Info("docker daemon online", "version", env.Get("Version"))
 	//Gather any client files needing overriding and images not caching
@@ -98,16 +96,14 @@ func main() {
 	}
 	cacher, err := newBuildCacher(*noCachePattern)
 	if err != nil {
-		log15.Crit("failed to parse nocache regexp", "error", err)
-		return
+		fatal("bad --docker-nocache regexp:", err)
 	}
 	// create hive error reporter
 	errorReport := NewHiveErrorReport()
 	//set up clients and get their versions
 	if err := initClients(cacher, errorReport); err != nil {
-		log15.Crit("failed to initialize client(s), terminating test...")
 		errorReport.WriteReport(fmt.Sprintf("%s/errorReport.json", *testResultsRoot))
-		os.Exit(-1)
+		fatal("failed to initialize client(s), terminating test...")
 	}
 	// Depending on the flags, either run hive in place or in an outer container shell
 	var fail error
@@ -120,7 +116,7 @@ func main() {
 		log15.Crit("could not write error report", "error", err)
 	}
 	if fail != nil {
-		os.Exit(-1)
+		os.Exit(1)
 	}
 }
 
@@ -166,4 +162,9 @@ func initClients(cacher *buildCacher, errorReport *HiveErrorReport) error {
 		return err
 	}
 	return nil
+}
+
+func fatal(args ...interface{}) {
+	fmt.Fprintln(os.Stderr, args...)
+	os.Exit(1)
 }

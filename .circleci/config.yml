@@ -1,0 +1,55 @@
+version: 2.1
+orbs:
+  go: circleci/go@1.5.0
+
+jobs:
+  # This job builds the hive executable and stores it in the workspace.
+  build:
+    docker:
+      - image: cimg/go:1.15
+    steps:
+      # Build it.
+      - checkout
+      - go/load-cache
+      - go/mod-download
+      - go/save-cache
+      - run: {command: "go build ."}
+      # Store the executable.
+      - persist_to_workspace:
+          root: .
+          paths: ["hive"]
+
+  # This job runs the smoke test simulations. This requires a virtual
+  # machine instead of the container-based build environment because
+  # hive needs to be able to talk to the docker containers it creates.
+  smoke-tests:
+    machine: true
+    steps:
+      - checkout
+      - attach_workspace: {at: "/tmp/build"}
+      - run:
+          command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum --docker-noshell"
+      - run:
+          command: "/tmp/build/hive --sim=smoke/network --client=go-ethereum --docker-noshell"
+
+  # This job runs the go unit tests.
+  go-test:
+    docker:
+      - image: cimg/go:1.15
+    steps:
+      # Get the source.
+      - checkout
+      - go/load-cache
+      - go/mod-download
+      - go/save-cache
+      # Run the tests.
+      - go/test:
+          packages: "./internal/... ./hivesim ./cmd/hivechain ./cmd/hiveview"
+
+workflows:
+  main:
+    jobs:
+      - go-test
+      - build
+      - smoke-tests:
+          requires: ["build"]
