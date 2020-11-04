@@ -3,5 +3,5 @@
 To run this test suite, use the following command:
 
 ```
-hive --sim devp2p/discv4 --client go-ethereum_latest --sim.rootcontext --docker-noshell --loglevel 6
+hive --sim devp2p/discv4 --client go-ethereum --docker-noshell
 ```
