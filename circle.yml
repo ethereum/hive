@@ -17,13 +17,14 @@ jobs:
           packages: "./hivesim ./cmd/hivechain ./cmd/hiveview"
 
       # Build the hive command.
-      - command: "go build ."
+      - run:
+          command: "go build ."
 
-      # Enable use of docker and run the
-      # smoke tests.
+      # Enable use of docker and run the smoke tests.
       - setup_remote_docker:
-        version: 19.03.13
-      - command: "./hive --docker-noshell --sim smoke --client go-ethereum"
+          version: 19.03.13
+      - run:
+          command: "./hive --docker-noshell --sim smoke --client go-ethereum"
 
 workflows:
   main:
