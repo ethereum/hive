@@ -2,140 +2,106 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 
-	"github.com/ethereum/hive/simulators/common"
-	"github.com/ethereum/hive/simulators/common/providers/hive"
-)
-
-var (
-	host     common.TestSuiteHost
-	suiteID  common.TestSuiteID
-	testID   common.TestID
-	clientID string
+	"github.com/ethereum/hive/hivesim"
+	"github.com/shogo82148/go-tap"
 )
 
 func main() {
-	host = hive.New()
+	suite := hivesim.Suite{
+		Name:        "discv4",
+		Description: "This runs the Discovery v4 test suite from go-ethereum.",
+	}
+	suite.Add(hivesim.ClientTestSpec{
+		Run: runDiscoveryTest,
+		Parameters: hivesim.Params{
+			"HIVE_LOGLEVEL": "5",
+		},
+	})
+	hivesim.MustRunSuite(hivesim.New(), suite)
+}
 
-	// get clients
-	// loop over individual clients
-	// get node
-	// start test
-
-	clients, err := host.GetClientTypes()
+func runDiscoveryTest(t *hivesim.T, c *hivesim.Client) {
+	nodeURL, err := c.EnodeURL()
 	if err != nil {
-		fatalf("could not get clients: %v", err)
+		t.Fatal("can't get client enode URL:", err)
 	}
 
-	logFile := os.Getenv("HIVE_SIMLOG")
+	// Create a separate network to be able to send the client traffic from two separate IP addrs.
+	networkID, err := t.Sim.CreateNetwork(t.SuiteID, "network1")
+	if err != nil {
+		t.Fatal("can't create network:", err)
+	}
+	// Connect both simulation and client to this network.
+	if err := t.Sim.ConnectContainer(t.SuiteID, networkID, c.Container); err != nil {
+		t.Fatal("can't connect client to network1:", err)
+	}
+	if err := t.Sim.ConnectContainer(t.SuiteID, networkID, "simulation"); err != nil {
+		t.Fatal("can't connect simulation to network1:", err)
+	}
+	// Find our IPs on the bridge network and network1.
+	bridgeIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
+	if err != nil {
+		t.Fatal("can't get IP of simulation container:", err)
+	}
+	net1IP, err := t.Sim.ContainerNetworkIP(t.SuiteID, networkID, "simulation")
+	if err != nil {
+		t.Fatal("can't get IP of simulation container on network1:", err)
+	}
 
-	for _, client := range clients {
-		env := map[string]string{
-			"CLIENT":              client,
-			"HIVE_NETWORK_ID":     "19763",
-			"HIVE_CHAIN_ID":       "19763",
-			"HIVE_FORK_HOMESTEAD": "0",
-			"HIVE_FORK_TANGERINE": "0",
-			"HIVE_FORK_SPURIOUS":  "0",
-			"HIVE_FORK_BYZANTIUM": "0",
-			"HIVE_LOGLEVEL":       "5",
-		}
-
-		var err error
-		suiteID, err = host.StartTestSuite("discv4", "discovery v4 test", logFile)
-		if err != nil {
-			fatalf("could not start test suite: %v", err)
-		}
-
-		testID, err = host.StartTest(suiteID, "discovery v4", "This test suite tests a "+
-			"client's conformance to the discovery v4 protocol.")
-		if err != nil {
-			fatalf("could not start test: %v", err)
-		}
-		// get container ID and bridge IP of the client
-		clientID, _, _, err := host.GetNode(suiteID, testID, env, nil) // TODO can pass nil for files?
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: err.Error(),
-			})
-			fatalf("error getting node: %v", err)
-		}
-		// get enode ID from client
-		enode, err := host.GetClientEnode(suiteID, testID, clientID)
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: err.Error(),
-			})
-			fatalf("error getting node peer-to-peer endpoint: %v", err)
-		}
-		// create a separate network to be able to send the client traffic from two separate IP addrs
-		networkID, err := host.CreateNetwork(suiteID, "network1")
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: err.Error(),
-			})
-			fatalf("could not create network: %v", err)
-		}
-		// connect both simulation and client to this network
-		err = host.ConnectContainer(suiteID, networkID, clientID)
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: err.Error(),
-			})
-			fatalf("could not connect container to network: %v", err)
-		}
-		err = host.ConnectContainer(suiteID, networkID, "simulation")
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: err.Error(),
-			})
-			fatalf("could not connect container to network: %v", err)
-		}
-		// get client IP from bridge and network1
-		simIPBridge, err := host.GetContainerNetworkIP(suiteID, "bridge", "simulation")
-		simIPNetwork1, err := host.GetContainerNetworkIP(suiteID, networkID, "simulation")
-		if err != nil {
-			endTest(&common.TestResult{
-				Pass:    false,
-				Details: err.Error(),
-			})
-			fatalf("could not connect container IP from network: %v", err)
-		}
-		// run the discovery test
-		err = runDiscTest(*enode, simIPNetwork1, simIPBridge)
-		result := &common.TestResult{Pass: err == nil}
-		if err != nil {
-			result.Details = err.Error()
-		}
-		endTest(result)
+	// Run the test tool.
+	cmd := exec.Command("./devp2p", "discv4", "test", "--tap", "--remote", nodeURL, "--listen1", bridgeIP, "--listen2", net1IP)
+	if err := runTAP(t, c.Type, cmd); err != nil {
+		t.Fatal(err)
 	}
 }
 
-func runDiscTest(enode, networkIP, bridgeIP string) error {
-	cmd := exec.Command("./devp2p", "discv4", "test", "-remote", enode, "-listen1", bridgeIP, "-listen2", networkIP)
-	cmd.Stdout = os.Stderr
+func runTAP(t *hivesim.T, clientName string, cmd *exec.Cmd) error {
+	// Set up output streams.
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	output, err := cmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("can't set up test command stdout pipe: %v", err)
+	}
+	defer output.Close()
+
+	// Forward TAP output to the simulator log.
+	outputTee := io.TeeReader(output, os.Stdout)
+
+	// Run the test command.
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("can't start test command: %v", err)
+	}
+	if err := reportTAP(t, clientName, outputTee); err != nil {
+		cmd.Process.Kill()
+		cmd.Wait()
+		return err
+	}
+	return cmd.Wait()
 }
 
-func endTest(result *common.TestResult) {
-	host.KillNode(suiteID, testID, clientID)
-	host.EndTest(suiteID, testID, result, nil)
-	host.EndTestSuite(suiteID)
-}
-
-func fatalf(format string, args ...interface{}) {
-	fatal(fmt.Errorf(format, args...))
-}
-
-func fatal(err error) {
-	fmt.Fprintln(os.Stderr, err)
-	os.Exit(1)
+func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
+	// Parse the output.
+	parser, err := tap.NewParser(output)
+	if err != nil {
+		return fmt.Errorf("error parsing TAP: %v", err)
+	}
+	suite, err := parser.Suite()
+	if err != nil {
+		return fmt.Errorf("error parsing TAP: %v", err)
+	}
+	// Forward results to hive.
+	for _, test := range suite.Tests {
+		name := fmt.Sprintf("%s (%s)", test.Description, clientName)
+		testID, err := t.Sim.StartTest(t.SuiteID, name, "")
+		if err != nil {
+			return fmt.Errorf("can't report sub-test result: %v", err)
+		}
+		result := hivesim.TestResult{Pass: test.Ok, Details: test.Diagnostic}
+		t.Sim.EndTest(t.SuiteID, testID, result, nil)
+	}
+	return nil
 }
