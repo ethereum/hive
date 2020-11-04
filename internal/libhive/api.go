@@ -276,15 +276,27 @@ func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check that the container returned a valid enode URL.
-	n, err := enode.ParseV4(strings.TrimSpace(output))
+	output = strings.TrimSpace(output)
+	n, err := enode.ParseV4(output)
 	if err != nil {
 		log15.Error("API: enode.sh returned bad URL", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	tcpPort := n.TCP()
+	if tcpPort == 0 {
+		log15.Warn("API: enode.sh returned TCP port zero", "node", node, "client", nodeInfo.Name)
+		tcpPort = 30303
+	}
+	udpPort := n.UDP()
+	if udpPort == 0 {
+		log15.Warn("API: enode.sh returned UDP port zero", "node", node, "client", nodeInfo.Name)
+		udpPort = 30303
+	}
+
 	// Switch out the IP with the container's IP on the primary network.
 	// This is required because the client usually doesn't know its own IP.
-	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), n.TCP(), n.UDP())
+	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), tcpPort, udpPort)
 	io.WriteString(w, fixedIP.URLv4())
 }
 
