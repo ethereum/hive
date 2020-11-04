@@ -129,10 +129,13 @@ func (b *dockerBackend) StartClient(name string, env map[string]string, files ma
 	}()
 
 	// Wait for the HTTP/RPC socket to open or the container to fail
-	containerIP := ""
-	containerMAC := ""
-	start := time.Now()
-	checkTime := 100 * time.Millisecond
+	var (
+		containerIP  = ""
+		containerMAC = ""
+		start        = time.Now()
+		checkTime    = 100 * time.Millisecond
+		lastmsg      time.Time
+	)
 	for {
 		// Update the container state
 		container, err = b.client.InspectContainer(container.ID)
@@ -148,7 +151,10 @@ func (b *dockerBackend) StartClient(name string, env map[string]string, files ma
 		containerIP = container.NetworkSettings.IPAddress
 		containerMAC = container.NetworkSettings.MacAddress
 		if checklive {
-			logger.Debug("checking container online....", "checktime", checkTime, "state", container.State.String())
+			if time.Since(lastmsg) >= time.Second {
+				logger.Debug("checking container online....", "checktime", checkTime, "state", container.State.String())
+				lastmsg = time.Now()
+			}
 			// Container seems to be alive, check whether the RPC is accepting connections
 			if conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", containerIP, 8545)); err == nil {
 				logger.Debug("client container online", "time", time.Since(start))
@@ -398,13 +404,7 @@ func (b *dockerBackend) runContainer(logger log15.Logger, id, logfile string) (d
 	// Start the requested container and wait until it terminates
 	logger.Debug("starting container")
 
-	// TODO: containers run privileged because of delve debugging.
-	// This should be removed.
-	hostConfig := &docker.HostConfig{
-		Privileged:  true,
-		CapAdd:      []string{"SYS_PTRACE"},
-		SecurityOpt: []string{"seccomp=unconfined"},
-	}
+	hostConfig := &docker.HostConfig{}
 	if err := b.client.StartContainer(id, hostConfig); err != nil {
 		logger.Error("failed to start container", "error", err)
 		return nil, err
