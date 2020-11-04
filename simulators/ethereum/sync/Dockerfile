@@ -10,5 +10,5 @@ RUN go build -v .
 FROM alpine:latest
 ADD . /sync
 WORKDIR /sync
-COPY --from=builder /sync/sync2 ./sync
+COPY --from=builder /sync/sync ./sync
 ENTRYPOINT ["./sync"]
