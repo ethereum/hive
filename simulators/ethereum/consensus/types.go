@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"math/big"
 
-	common2 "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
@@ -22,13 +22,13 @@ func (t *BlockTest) UnmarshalJSON(in []byte) error {
 }
 
 type btJSON struct {
-	Blocks     []btBlock              `json:"blocks"`
-	Genesis    btHeader               `json:"genesisBlockHeader"`
-	Pre        core.GenesisAlloc      `json:"pre"`
-	Post       core.GenesisAlloc      `json:"-"`
-	BestBlock  common2.UnprefixedHash `json:"lastblockhash"`
-	Network    string                 `json:"network"`
-	SealEngine string                 `json:"sealEngine"`
+	Blocks     []btBlock             `json:"blocks"`
+	Genesis    btHeader              `json:"genesisBlockHeader"`
+	Pre        core.GenesisAlloc     `json:"pre"`
+	Post       core.GenesisAlloc     `json:"-"`
+	BestBlock  common.UnprefixedHash `json:"lastblockhash"`
+	Network    string                `json:"network"`
+	SealEngine string                `json:"sealEngine"`
 }
 
 type btBlock struct {
@@ -41,16 +41,16 @@ type btBlock struct {
 
 type btHeader struct {
 	Bloom            types.Bloom
-	Coinbase         common2.Address
-	MixHash          common2.Hash
+	Coinbase         common.Address
+	MixHash          common.Hash
 	Nonce            types.BlockNonce
 	Number           *big.Int
-	Hash             common2.Hash
-	ParentHash       common2.Hash
-	ReceiptTrie      common2.Hash
-	StateRoot        common2.Hash
-	TransactionsTrie common2.Hash
-	UncleHash        common2.Hash
+	Hash             common.Hash
+	ParentHash       common.Hash
+	ReceiptTrie      common.Hash
+	StateRoot        common.Hash
+	TransactionsTrie common.Hash
+	UncleHash        common.Hash
 	ExtraData        []byte
 	//	ExtraData        hexutil.Bytes
 	Difficulty *big.Int
@@ -62,16 +62,16 @@ type btHeader struct {
 func (b *btHeader) UnmarshalJSON(input []byte) error {
 	type btHeader struct {
 		Bloom            *types.Bloom
-		Coinbase         *common2.Address
-		MixHash          *common2.Hash
+		Coinbase         *common.Address
+		MixHash          *common.Hash
 		Nonce            *types.BlockNonce
 		Number           *math.HexOrDecimal256
-		Hash             *common2.Hash
-		ParentHash       *common2.Hash
-		ReceiptTrie      *common2.Hash
-		StateRoot        *common2.Hash
-		TransactionsTrie *common2.Hash
-		UncleHash        *common2.Hash
+		Hash             *common.Hash
+		ParentHash       *common.Hash
+		ReceiptTrie      *common.Hash
+		StateRoot        *common.Hash
+		TransactionsTrie *common.Hash
+		UncleHash        *common.Hash
 		ExtraData        *hexutil.Bytes
 		Difficulty       *math.HexOrDecimal256
 		GasLimit         *math.HexOrDecimal64
