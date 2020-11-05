@@ -1,32 +1,15 @@
-# This simulation runs various graphql tests
-FROM golang:1.13-alpine as builder
-RUN apk add --no-cache git make gcc musl-dev linux-headers bash  curl jq
-RUN GOPATH=/go 
+# This simulation runs GraphQL tests.
+FROM golang:1-alpine as builder
+RUN apk add --update git gcc musl-dev linux-headers
 
-ENV GO111MODULE=off
-RUN go get -u -v github.com/derekparker/delve/cmd/dlv
-ENV GO111MODULE=on
+# Build the simulator executable.
+ADD . /source
+WORKDIR /source
+RUN go build -v .
 
-
-
-# Add the local test files
-ADD /ethereum/graphql/graphql.go /go/src/github.com/ethereum/hive/simulators/ethereum/graphql/graphql.go
-ADD common /go/src/github.com/ethereum/hive/simulators/common
-
-# Add the tests and intended test chain
-ADD /ethereum/graphql/testcases /testcases
-ADD /ethereum/graphql/init /init
-
-
-# Use modules (temp fix until sims are sub modules)
-RUN (cd /go/src/github.com/ethereum/hive/simulators/ && go mod init)
-
-
-# Add the entry script
-ADD /ethereum/graphql/tests.sh /tests.sh
-RUN chmod +x /tests.sh
-
-EXPOSE 2345 8545 8546 8080 30303 30303/udp 
-
-ENTRYPOINT ["/tests.sh"]
-
+# Build the simulator run container.
+FROM alpine:latest
+ADD . /source
+WORKDIR /source
+COPY --from=builder /source/graphql2 ./graphql
+ENTRYPOINT ["./graphql"]
