@@ -345,8 +345,8 @@ type testcase struct {
 }
 
 // validate returns error if the test's chain rules are not supported.
-func (t *testcase) validate() error {
-	net := t.blockTest.json.Network
+func (tc *testcase) validate() error {
+	net := tc.blockTest.json.Network
 	if _, exist := ruleset[net]; !exist {
 		return fmt.Errorf("network `%v` not defined in ruleset", net)
 	}
@@ -356,7 +356,7 @@ func (t *testcase) validate() error {
 // run launches the client and runs the test case against it.
 func (tc *testcase) run(t *hivesim.T) {
 	start := time.Now()
-	root, genesis, _, blocks, err := tc.artefacts()
+	root, genesis, blocks, err := tc.artefacts()
 	if err != nil {
 		t.Fatal("can't prepare artefacts:", err)
 	}
@@ -409,14 +409,14 @@ func (tc *testcase) run(t *hivesim.T) {
 }
 
 // updateEnv sets environment variables from the test
-func (t *testcase) updateEnv(env map[string]string) {
+func (tc *testcase) updateEnv(env map[string]string) {
 	// Environment variables for rules.
-	rules := ruleset[t.blockTest.json.Network]
+	rules := ruleset[tc.blockTest.json.Network]
 	for k, v := range rules {
 		env[k] = fmt.Sprintf("%d", v)
 	}
 	// Possibly disable POW.
-	if t.blockTest.json.SealEngine == "NoProof" {
+	if tc.blockTest.json.SealEngine == "NoProof" {
 		env["HIVE_SKIP_POW"] = "1"
 	}
 }
@@ -435,35 +435,32 @@ func toGethGenesis(test *btJSON) *core.Genesis {
 	return genesis
 }
 
-func (t *testcase) artefacts() (string, string, string, []string, error) {
-	var blocks []string
-	key := fmt.Sprintf("%x", sha1.Sum([]byte(fmt.Sprintf("%s%s", t.filepath, t.name))))
-	rootFolder := fmt.Sprintf("./%s/", key)
-	blockFolder := fmt.Sprintf("%s/blocks", rootFolder)
+// artefacts generates the test files which are copied into the client container.
+func (tc *testcase) artefacts() (string, string, []string, error) {
+	key := fmt.Sprintf("%x", sha1.Sum([]byte(tc.filepath+tc.name)))
+	rootDir := filepath.Join(tc.clientType, key)
+	blockDir := filepath.Join(rootDir, "blocks")
 
-	if err := os.Mkdir(fmt.Sprintf("./%s", key), 0700); err != nil {
-		return "", "", "", nil, err
+	if err := os.MkdirAll(blockDir, 0700); err != nil {
+		return "", "", nil, err
 	}
-	if err := os.Mkdir(blockFolder, 0700); err != nil {
-		return "", "", "", nil, err
-	}
-	genesis := toGethGenesis(&(t.blockTest.json))
+	genesis := toGethGenesis(&tc.blockTest.json)
 	genBytes, _ := json.Marshal(genesis)
-	genesisFile := fmt.Sprintf("./%v/genesis.json", key)
+	genesisFile := filepath.Join(rootDir, "./genesis.json")
 	if err := ioutil.WriteFile(genesisFile, genBytes, 0777); err != nil {
-		return "", "", "", nil, fmt.Errorf("failed writing genesis: %v", err)
+		return rootDir, "", nil, fmt.Errorf("failed writing genesis: %v", err)
 	}
 
-	for i, block := range t.blockTest.json.Blocks {
+	var blocks []string
+	for i, block := range tc.blockTest.json.Blocks {
 		rlpdata := common.FromHex(block.Rlp)
-		fname := fmt.Sprintf("%s/%04d.rlp", blockFolder, i+1)
-		blocks = append(blocks, fname)
+		fname := fmt.Sprintf("%s/%04d.rlp", blockDir, i+1)
 		if err := ioutil.WriteFile(fname, rlpdata, 0777); err != nil {
-			return "", "", "", nil, fmt.Errorf("failed writing block %d: %v", i, err)
+			return rootDir, genesisFile, blocks, fmt.Errorf("failed writing block %d: %v", i, err)
 		}
+		blocks = append(blocks, fname)
 	}
-	//log.Info("Test artefacts", "testname", t.name, "testfile", t.filepath, "blockfolder", blockFolder)
-	return rootFolder, genesisFile, "", blocks, nil
+	return rootDir, genesisFile, blocks, nil
 }
 
 func getHash(rawClient *rpc.Client, arg string) ([]byte, error) {
