@@ -446,7 +446,7 @@ func (tc *testcase) artefacts() (string, string, []string, error) {
 	}
 	genesis := toGethGenesis(&tc.blockTest.json)
 	genBytes, _ := json.Marshal(genesis)
-	genesisFile := filepath.Join(rootDir, "./genesis.json")
+	genesisFile := filepath.Join(rootDir, "genesis.json")
 	if err := ioutil.WriteFile(genesisFile, genBytes, 0777); err != nil {
 		return rootDir, "", nil, fmt.Errorf("failed writing genesis: %v", err)
 	}
