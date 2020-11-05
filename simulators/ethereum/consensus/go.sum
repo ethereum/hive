@@ -134,8 +134,8 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/ethereum/go-ethereum v1.9.1/go.mod h1:PwpWDrCLZrV+tfrhqqF6kPknbISMHaJv9Ln3kPCZLwY=
 github.com/ethereum/go-ethereum v1.9.23 h1:SIKhg/z4Q7AbvqcxuPYvMxf36che/Rq/Pp0IdYEkbtw=
 github.com/ethereum/go-ethereum v1.9.23/go.mod h1:JIfVb6esrqALTExdz9hRYvrP0xBDf6wCncIu1hNwHpM=
-github.com/ethereum/hive v0.0.0-20201105104159-83e7ce57ad38 h1:zj9ts/Z2lo1nc26szQoXQ8ETPnjRAs7EOC2sMEuW37I=
-github.com/ethereum/hive v0.0.0-20201105104159-83e7ce57ad38/go.mod h1:2oTDtJ+hKbi+YF0+PS25sIZixHB88M/yUaXi/SRzgSE=
+github.com/ethereum/hive v0.0.0-20201105181315-a9685e29a08a h1:iAySPtC9HSVEyS6Psr5nXKHeJI5YN8NJ0T7dn2sbmEc=
+github.com/ethereum/hive v0.0.0-20201105181315-a9685e29a08a/go.mod h1:2oTDtJ+hKbi+YF0+PS25sIZixHB88M/yUaXi/SRzgSE=
 github.com/fatih/color v1.3.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fjl/memsize v0.0.0-20180418122429-ca190fb6ffbc/go.mod h1:VvhXpOYNQvB+uIk2RvXzuaQtkQJzzIx6lSBe1xv7hi0=
 github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5/go.mod h1:VvhXpOYNQvB+uIk2RvXzuaQtkQJzzIx6lSBe1xv7hi0=

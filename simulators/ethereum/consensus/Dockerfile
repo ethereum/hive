@@ -14,8 +14,8 @@ RUN git clone --depth 1 https://github.com/ethereum/tests.git /tests
 FROM alpine:latest
 ADD . /source
 WORKDIR /source
-COPY --from=builder /source/consensus2 .
+COPY --from=builder /source/consensus .
 COPY --from=builder /tests /tests
 ENV TESTPATH /tests
 
-ENTRYPOINT ["./consensus2"]
+ENTRYPOINT ["./consensus"]
