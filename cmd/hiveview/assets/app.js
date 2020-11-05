@@ -62,6 +62,15 @@ utils = {
         return a.outerHTML;
     },
 
+    // Replaces URLs in input with HTML links.
+    urls_to_links: function(str) {
+        // Thanks, http://urlregex.com/
+        let re = /(((?:http[s]?:\/\/)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/;
+        return String(str).replace(re, function (match) {
+            return utils.get_link(match, match);
+        });
+    },
+
     /*
      * Creates
      * <button type="button" class="btn btn-default">Default</button>
@@ -364,8 +373,6 @@ function execfilter(str) {
     $('#execresults').dataTable().api().search(str).draw();
 }
 
-var converter = new showdown.Converter()
-
 // The datatables
 var overallresults = null; // Overall results
 var execresults = null; // Execution results
@@ -376,13 +383,23 @@ function logFolder(jsonsource, client) {
 }
 
 /* Formatting function for row details */
-function format(d) {
+function formatTestDetails(d) {
     // `d` is the original data object for the row
-    let txt = ""
-    txt += "<b>Name</b>" + utils.tag('p', d.name)
-    txt += "<b>Description</b>" + converter.makeHtml(d.description)
-    txt += "<br/><b>Details</b>" + converter.makeHtml(d.summaryResult.details)
-    return txt
+    var txt = "";
+    txt += "<p><b>Name</b><br/>" + utils.html_encode(d.name) + "</p>";
+
+    if (d.description != "") {
+        txt += "<p>";
+        txt += "<b>Description</b><br/>"
+        txt += utils.urls_to_links(utils.html_encode(d.description));
+        txt += "</p>";
+    }
+    if (d.summaryResult.details != "") {
+        txt += "<p><b>Details</b><pre><code>";
+        txt += utils.urls_to_links(utils.html_encode(d.summaryResult.details));
+        txt += "</code></pre></p>";
+    }
+    return txt;
 }
 
 function onSuiteData(data, jsonsource) {
@@ -492,7 +509,7 @@ function onSuiteData(data, jsonsource) {
             tr.removeClass('shown');
         } else {
             // Open this row
-            row.child(format(row.data())).show();
+            row.child(formatTestDetails(row.data())).show();
             tr.addClass('shown');
         }
     });
