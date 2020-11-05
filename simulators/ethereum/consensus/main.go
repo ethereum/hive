@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -15,7 +14,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
@@ -382,22 +380,24 @@ func (tc *testcase) run(t *hivesim.T) {
 	client := t.StartClient(tc.clientType, env, files)
 
 	t2 := time.Now()
-	genesisHash, err := getHash(client.RPC(), hexutil.EncodeBig(new(big.Int)))
+	genesisHash, err := getHash(client.RPC(), "0x0")
 	if err != nil {
-		t.Fatal("can't check genesis:", err)
+		t.Fatal("can't get genesis:", err)
 	}
-	if err = tc.verifyGenesis(genesisHash); err != nil {
-		t.Fatal(err)
+	wantGenesis := tc.blockTest.json.Genesis.Hash
+	if !bytes.Equal(wantGenesis[:], genesisHash) {
+		t.Fatalf("genesis mismatch:\n  want 0x%x\n   got 0x%x", wantGenesis, genesisHash)
 	}
 
 	// verify postconditions
 	t3 := time.Now()
 	lastHash, err := getHash(client.RPC(), "latest")
 	if err != nil {
-		t.Fatal(err)
+		t.Fatal("can't get latest block:", err)
 	}
-	if err = tc.verifyBestblock(lastHash); err != nil {
-		t.Fatal(err)
+	wantBest := tc.blockTest.json.BestBlock
+	if !bytes.Equal(wantBest[:], lastHash) {
+		t.Fatalf("last block mismatch:\n  want 0x%x\n   got 0x%x", wantBest, lastHash)
 	}
 
 	t4 := time.Now()
@@ -464,20 +464,6 @@ func (t *testcase) artefacts() (string, string, string, []string, error) {
 	}
 	//log.Info("Test artefacts", "testname", t.name, "testfile", t.filepath, "blockfolder", blockFolder)
 	return rootFolder, genesisFile, "", blocks, nil
-}
-
-func (t *testcase) verifyGenesis(got []byte) error {
-	if exp := t.blockTest.json.Genesis.Hash; !bytes.Equal(exp[:], got) {
-		return fmt.Errorf("genesis mismatch:\n  want 0x%x\n   got 0x%x", exp, got)
-	}
-	return nil
-}
-
-func (t *testcase) verifyBestblock(got []byte) error {
-	if exp := t.blockTest.json.BestBlock; !bytes.Equal(exp[:], got) {
-		return fmt.Errorf("last block mismatch:\n  want 0x%x\n   got 0x%x", exp, got)
-	}
-	return nil
 }
 
 func getHash(rawClient *rpc.Client, arg string) ([]byte, error) {
