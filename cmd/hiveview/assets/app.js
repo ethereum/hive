@@ -17,11 +17,11 @@ utils = {
     // Replaces URLs in input with HTML links.
     urls_to_links: function(str) {
         // Thanks, http://urlregex.com/
-        let re = /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/
+        let re = /(((?:http[s]?:\/\/)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/
         return String(str).replace(re, function (match) {
             var link = '<a href="';
             link += utils.attr_encode(match) + '">';
-            link += utils.html_encode(match)
+            link += utils.html_encode(match);
             link += '</a>';
             return link;
         });
