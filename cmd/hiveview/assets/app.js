@@ -437,8 +437,8 @@ function onSuiteData(data, jsonsource) {
     */
 
     // Set title info
-    $("#testsuite_name").text(data.name)
-    $("#testsuite_desc").text(data.description)
+    $("#testsuite_name").text(data.name);
+    $("#testsuite_desc").html(utils.urls_to_links(utils.html_encode(data.description)));
 
     // Convert to list
     let cases = []
