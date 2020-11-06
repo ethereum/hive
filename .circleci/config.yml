@@ -46,7 +46,7 @@ jobs:
       - go/test: {packages: "./..."}
       - run:
           name: "compile Go simulators"
-          command: "./circleci/compile-simulators.sh"
+          command: ".circleci/compile-simulators.sh"
 
 workflows:
   main:
