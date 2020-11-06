@@ -3,6 +3,7 @@
 failed=""
 sims=$(find simulators/ -name go.mod -printf '%h\n')
 for d in $sims; do
+    echo "building $d"
     ( cd $d; go build . )
     if [ $? -ne 0 ]; then
         failed="$d"
