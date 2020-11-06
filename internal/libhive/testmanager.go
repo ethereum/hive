@@ -250,7 +250,7 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkName, cont
 		}
 	} else {
 		var exists bool
-		networkID, exists = manager.networks[testSuite][getUniqueName(testSuite, networkName)]
+		networkID, exists = manager.networks[testSuite][networkName]
 		if !exists {
 			return "", ErrNetworkNotFound
 		}
