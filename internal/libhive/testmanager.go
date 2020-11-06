@@ -55,7 +55,9 @@ type TestManager struct {
 
 	simContainerID string
 
-	networks     map[TestSuiteID]map[string]string // TODO map[TestSuiteID]map[network name]network ID
+	// all networks started by a specific test suite, where key
+	// is network name and value is network ID
+	networks     map[TestSuiteID]map[string]string
 	networkMutex sync.RWMutex
 
 	testCaseMutex     sync.RWMutex
@@ -164,8 +166,7 @@ func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, node
 	return nodeInfo, nil
 }
 
-// CreateNetwork creates a docker network with the given network name, returning
-// the network ID upon success.
+// CreateNetwork creates a docker network with the given network name.
 func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, name string) error {
 	_, ok := manager.IsTestSuiteRunning(testSuite)
 	if !ok {
@@ -210,7 +211,7 @@ func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string)
 	return nil
 }
 
-// PruneNetworks removes all created networks.
+// PruneNetworks removes all networks created by the given test suite.
 func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
 	var errs []error
 	for name, _ := range manager.networks[testSuite] {
