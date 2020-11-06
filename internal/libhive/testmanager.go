@@ -176,9 +176,7 @@ func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, name string) er
 	manager.networkMutex.Lock()
 	defer manager.networkMutex.Unlock()
 
-	unique := getUniqueName(testSuite, name)
-
-	id, err := manager.backend.CreateNetwork(unique)
+	id, err := manager.backend.CreateNetwork(getUniqueName(testSuite, name))
 	if err != nil {
 		return err
 	}
@@ -186,7 +184,7 @@ func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, name string) er
 		// initialize network map for individual test suite
 		manager.networks[testSuite] = make(map[string]string)
 	}
-	manager.networks[testSuite][unique] = id
+	manager.networks[testSuite][name] = id
 	return nil
 }
 
@@ -195,14 +193,12 @@ func getUniqueName(testSuite TestSuiteID, name string) string {
 	return fmt.Sprintf("hive_%d_%d_%s", os.Getpid(), testSuite, name)
 }
 
-// CreateNetwork creates a docker network with the given network name, returning
-// the network ID upon success.
+// RemoveNetwork removes a docker network by the given network name.
 func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string) error {
 	manager.networkMutex.Lock()
 	defer manager.networkMutex.Unlock()
 
 	unique := getUniqueName(testSuite, network)
-
 	id, exists := manager.networks[testSuite][unique]
 	if !exists {
 		return ErrNetworkNotFound
@@ -217,9 +213,6 @@ func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string)
 
 // PruneNetworks removes all created networks.
 func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
-	manager.networkMutex.Lock()
-	defer manager.networkMutex.Unlock()
-
 	var errs []error
 	for name, _ := range manager.networks[testSuite] {
 		log15.Info("removing docker network", "name", name)
@@ -228,7 +221,9 @@ func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
 		}
 	}
 	// delete the test suite from the network map as all its networks have been torn down
+	manager.networkMutex.Lock()
 	delete(manager.networks, testSuite)
+	manager.networkMutex.Unlock()
 	return errs
 }
 
