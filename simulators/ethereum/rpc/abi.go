@@ -4,10 +4,7 @@ import (
 	"context"
 	"math/big"
 	"math/rand"
-	"testing"
-
 	"strings"
-
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -16,14 +13,16 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/hive/simulators/ethereum/rpc/testcontract"
 )
+
+//go:generate abigen -abi ./contractABI.json -pkg testcontract -type Contract -out ./testcontract/contract.go
 
 // callContractTest uses the generated ABI binding to call methods in the
 // pre-deployed contract.
-func callContractTest(t *testing.T, client *TestClient) {
-	t.Parallel()
-
-	contract, err := NewTestContractCaller(predeployedContractAddr, client)
+func callContractTest(t *TestEnv) {
+	contract, err := testcontract.NewContractCaller(predeployedContractAddr, t.Eth)
 	if err != nil {
 		t.Fatalf("Unable to instantiate contract caller: %v", err)
 	}
@@ -67,24 +66,22 @@ func callContractTest(t *testing.T, client *TestClient) {
 
 // transactContractTest deploys a new contract and sends transactions to it and
 // waits for logs.
-func transactContractTest(t *testing.T, client *TestClient) {
-	t.Parallel()
-
+func transactContractTest(t *TestEnv) {
 	var (
-		account = createAndFundAccount(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		account = createAndFundAccount(t, big.NewInt(params.Ether))
 		address = account.Address
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
-		gasPrice                = new(big.Int).Mul(big.NewInt(30), common.Shannon)
-		gasLimit                = big.NewInt(1200000)
+		gasPrice                = big.NewInt(30 * params.GWei)
+		gasLimit                = uint64(1200000)
 
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
 		intArg         = big.NewInt(rand.Int63())
 		addrArg        = address
 	)
 
-	rawTx := types.NewContractCreation(nonce, common.Big0, gasLimit, gasPrice, deployCode)
+	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
 	deployTx, err := SignTransaction(rawTx, account)
 	nonce++
 	if err != nil {
@@ -93,7 +90,7 @@ func transactContractTest(t *testing.T, client *TestClient) {
 
 	// deploy contract
 	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	if err := client.SendTransaction(ctx, deployTx); err != nil {
+	if err := t.Eth.SendTransaction(ctx, deployTx); err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
@@ -101,7 +98,7 @@ func transactContractTest(t *testing.T, client *TestClient) {
 
 	// fetch transaction receipt for contract address
 	var contractAddress common.Address
-	receipt, err := waitForTxConfirmations(client, deployTx.Hash(), 5)
+	receipt, err := waitForTxConfirmations(t, deployTx.Hash(), 5)
 	if err != nil {
 		t.Fatalf("Unable to retrieve receipt: %v", err)
 	}
@@ -119,7 +116,7 @@ func transactContractTest(t *testing.T, client *TestClient) {
 		t.Fatalf("Unable to prepare tx payload: %v", err)
 	}
 
-	eventsTx := types.NewTransaction(nonce, predeployedContractAddr, common.Big0, big.NewInt(500000), gasPrice, payload)
+	eventsTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
 	tx, err := SignTransaction(eventsTx, account)
 	nonce++
 	if err != nil {
@@ -127,14 +124,14 @@ func transactContractTest(t *testing.T, client *TestClient) {
 	}
 
 	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-	if err := client.SendTransaction(ctx, tx); err != nil {
+	if err := t.Eth.SendTransaction(ctx, tx); err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
 	t.Logf("Wait for receipt for events tx 0x%x", tx.Hash())
 
 	// wait for transaction
-	receipt, err = waitForTxConfirmations(client, tx.Hash(), 0)
+	receipt, err = waitForTxConfirmations(t, tx.Hash(), 0)
 	if err != nil {
 		t.Fatalf("Unable to send transaction to events method: %v", err)
 	}
@@ -158,17 +155,15 @@ func transactContractTest(t *testing.T, client *TestClient) {
 
 // transactContractSubscriptionTest deploys a new contract and sends transactions to it and
 // waits for logs. It uses subscription to track logs.
-func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
-	t.Parallel()
-
+func transactContractSubscriptionTest(t *TestEnv) {
 	var (
-		account = createAndFundAccountWithSubscription(t, new(big.Int).Mul(common.Big1, common.Ether), client)
+		account = createAndFundAccountWithSubscription(t, big.NewInt(params.Ether))
 		address = account.Address
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
-		gasPrice                = new(big.Int).Mul(big.NewInt(30), common.Shannon)
-		gasLimit                = big.NewInt(1200000)
+		gasPrice                = big.NewInt(30 * params.GWei)
+		gasLimit                = uint64(1200000)
 
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
 		intArg         = big.NewInt(rand.Int63())
@@ -178,7 +173,7 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 	)
 
 	// deploy contract
-	rawTx := types.NewContractCreation(nonce, common.Big0, gasLimit, gasPrice, deployCode)
+	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
 	deployTx, err := SignTransaction(rawTx, account)
 	nonce++
 	if err != nil {
@@ -186,14 +181,14 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 	}
 
 	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	if err := client.SendTransaction(ctx, deployTx); err != nil {
+	if err := t.Eth.SendTransaction(ctx, deployTx); err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
 	t.Logf("Deploy ABI Test contract transaction: 0x%x", deployTx.Hash())
 
 	// fetch transaction receipt for contract address
-	receipt, err := waitForTxConfirmations(client, deployTx.Hash(), 5)
+	receipt, err := waitForTxConfirmations(t, deployTx.Hash(), 5)
 	if err != nil {
 		t.Fatalf("Unable to retrieve receipt: %v", err)
 	}
@@ -208,7 +203,7 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 	// setup log subscription
 	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
 	q := ethereum.FilterQuery{Addresses: []common.Address{receipt.ContractAddress}}
-	sub, err := client.SubscribeFilterLogs(ctx, q, logs)
+	sub, err := t.Eth.SubscribeFilterLogs(ctx, q, logs)
 	if err != nil {
 		t.Fatalf("Unable to create log subscription: %v", err)
 	}
@@ -218,7 +213,7 @@ func transactContractSubscriptionTest(t *testing.T, client *TestClient) {
 
 	defer sub.Unsubscribe()
 
-	contract, err := NewTestContractTransactor(receipt.ContractAddress, client)
+	contract, err := testcontract.NewContractTransactor(receipt.ContractAddress, t.Eth)
 	if err != nil {
 		t.Fatalf("Could not instantiate contract instance: %v", err)
 	}
