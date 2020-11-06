@@ -48,7 +48,7 @@ func iptest(t *hivesim.T) {
 	// Now get the IP of the client and connect to it via TCP.
 	clientIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, client.Container)
 	if err != nil {
-		t.Fatal("can't get client network IP:", err)
+		t.Fatal("can't get IP address of container:", err)
 	}
 	t.Log("client IP", clientIP)
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", clientIP, 8545))
@@ -60,9 +60,19 @@ func iptest(t *hivesim.T) {
 	// Make sure ContainerNetworkIP works with the simulation container as well.
 	simIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
 	if err != nil {
-		t.Fatal("can't get IP of simulation container:", err)
+		t.Fatal("can't get IP address of container:", err)
 	}
 	t.Log("simulation container IP", simIP)
+
+	// Make sure the IP address of the client container on the bridge network matches
+	// what is returned by StartClient
+	clientBridgeIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", client.Container)
+	if err != nil {
+		t.Fatal("can't get IP address of container:", err)
+	}
+	if clientBridgeIP != client.IP.String() {
+		t.Fatal("ip address mismatch", "expected", client.IP.String(), "got", clientBridgeIP)
+	}
 
 	// Disconnect client and simulation from network1.
 	if err := t.Sim.DisconnectContainer(t.SuiteID, network, client.Container); err != nil {
