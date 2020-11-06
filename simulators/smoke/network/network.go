@@ -35,7 +35,7 @@ func iptest(t *hivesim.T) {
 	// This creates a network and connects both the client and the simulation container to it.
 	_, err = t.Sim.CreateNetwork(t.SuiteID, "network1")
 	if err != nil {
-		t.Fatal("can't not create network:", err)
+		t.Fatal("can't create network:", err)
 	}
 	if err := t.Sim.ConnectContainer(t.SuiteID, "network1", client.Container); err != nil {
 		t.Fatal("can't connect container to network:", err)
