@@ -13,4 +13,4 @@ for d in $sims; do
 done
 
 # Exit with non-zero status code if any build failed.
-[ -n $failed ] && exit 1
+if [ -n $failed ]; then exit 1; fi
