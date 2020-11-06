@@ -198,8 +198,7 @@ func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string)
 	manager.networkMutex.Lock()
 	defer manager.networkMutex.Unlock()
 
-	unique := getUniqueName(testSuite, network)
-	id, exists := manager.networks[testSuite][unique]
+	id, exists := manager.networks[testSuite][network]
 	if !exists {
 		return ErrNetworkNotFound
 	}
@@ -207,7 +206,7 @@ func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string)
 	if err := manager.backend.RemoveNetwork(id); err != nil {
 		return err
 	}
-	delete(manager.networks[testSuite], unique)
+	delete(manager.networks[testSuite], network)
 	return nil
 }
 
@@ -277,7 +276,7 @@ func (manager *TestManager) ConnectContainer(testSuite TestSuiteID, networkName,
 		containerID = manager.simContainerID
 	}
 
-	networkID, exists := manager.networks[testSuite][getUniqueName(testSuite, networkName)]
+	networkID, exists := manager.networks[testSuite][networkName]
 	if !exists {
 		return ErrNetworkNotFound
 	}
@@ -297,7 +296,7 @@ func (manager *TestManager) DisconnectContainer(testSuite TestSuiteID, networkNa
 		containerID = manager.simContainerID
 	}
 
-	networkID, exists := manager.networks[testSuite][getUniqueName(testSuite, networkName)]
+	networkID, exists := manager.networks[testSuite][networkName]
 	if !exists {
 		return ErrNetworkNotFound
 	}
