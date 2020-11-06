@@ -44,7 +44,10 @@ jobs:
       - go/save-cache
       # Run the tests.
       - go/test:
-          packages: "./internal/... ./hivesim ./cmd/hivechain ./cmd/hiveview"
+          packages: "./..."
+      - run:
+          name: "Compile Go simulators"
+          command: ".circleci/compile-simulators.sh"
 
 workflows:
   main:
