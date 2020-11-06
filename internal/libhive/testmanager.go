@@ -221,8 +221,8 @@ func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
 	defer manager.networkMutex.Unlock()
 
 	var errs []error
-	for name, id := range manager.networks[testSuite] {
-		log15.Info("removing docker network", "id", id, "name", name)
+	for name, _ := range manager.networks[testSuite] {
+		log15.Info("removing docker network", "name", name)
 		if err := manager.RemoveNetwork(testSuite, name); err != nil {
 			errs = append(errs, err)
 		}
@@ -337,7 +337,11 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 		}
 	}
 	// remove the test suite's left-over docker networks.
-	manager.PruneNetworks(testSuite)
+	if errs := manager.PruneNetworks(testSuite); len(errs) > 0 {
+		for _, err := range errs {
+			log15.Error("could not remove network", "err", err)
+		}
+	}
 	// Move the suite to results.
 	delete(manager.runningTestSuites, testSuite)
 	manager.results[testSuite] = suite
