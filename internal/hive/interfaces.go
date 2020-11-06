@@ -17,8 +17,8 @@ type Backend interface {
 
 	// These methods configure docker networks.
 	NetworkNameToID(name string) (string, error)
-	CreateNetwork(name string) (networkID string, err error)
-	RemoveNetwork(networkID string) error
+	CreateNetwork(name string) (string, error)
+	RemoveNetwork(id string) error
 	ContainerIP(containerID, networkID string) (net.IP, error)
 	ConnectContainer(containerID, networkID string) error
 	DisconnectContainer(containerID, networkID string) error

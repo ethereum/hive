@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"sync"
 	"time"
@@ -54,8 +55,9 @@ type TestManager struct {
 
 	simContainerID string
 
-	// map of all networks started by the test, key is network ID and value is network name.
-	networks     map[string]string
+	// all networks started by a specific test suite, where key
+	// is network name and value is network ID
+	networks     map[TestSuiteID]map[string]string
 	networkMutex sync.RWMutex
 
 	testCaseMutex     sync.RWMutex
@@ -75,7 +77,7 @@ func NewTestManager(config SimEnv, b Backend, testLimiter int) *TestManager {
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
 		results:           make(map[TestSuiteID]*TestSuite),
-		networks:          make(map[string]string),
+		networks:          make(map[TestSuiteID]map[string]string),
 	}
 }
 
@@ -145,9 +147,6 @@ func (manager *TestManager) Terminate() error {
 		manager.doEndSuite(suiteID)
 	}
 
-	// Remove left-over docker networks.
-	manager.PruneNetworks()
-
 	return nil
 }
 
@@ -167,57 +166,69 @@ func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, node
 	return nodeInfo, nil
 }
 
-// CreateNetwork creates a docker network with the given network name, returning
-// the network ID upon success.
-func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, networkName string) (string, error) {
+// CreateNetwork creates a docker network with the given network name.
+func (manager *TestManager) CreateNetwork(testSuite TestSuiteID, name string) error {
 	_, ok := manager.IsTestSuiteRunning(testSuite)
 	if !ok {
-		return "", ErrNoSuchTestSuite
+		return ErrNoSuchTestSuite
 	}
 
 	// add network to network map
 	manager.networkMutex.Lock()
 	defer manager.networkMutex.Unlock()
 
-	netID, err := manager.backend.CreateNetwork(networkName)
+	id, err := manager.backend.CreateNetwork(getUniqueName(testSuite, name))
 	if err != nil {
-		manager.networks[netID] = networkName
-	}
-	return netID, err
-}
-
-// CreateNetwork creates a docker network with the given network name, returning
-// the network ID upon success.
-func (manager *TestManager) RemoveNetwork(networkID string) error {
-	manager.networkMutex.Lock()
-	defer manager.networkMutex.Unlock()
-
-	if err := manager.backend.RemoveNetwork(networkID); err != nil {
 		return err
 	}
-	delete(manager.networks, networkID)
+	if _, exists := manager.networks[testSuite]; !exists {
+		// initialize network map for individual test suite
+		manager.networks[testSuite] = make(map[string]string)
+	}
+	manager.networks[testSuite][name] = id
 	return nil
 }
 
-// PruneNetworks removes all created networks.
-func (manager *TestManager) PruneNetworks() []error {
+// getUniqueName returns a unique network name to prevent network collisions
+func getUniqueName(testSuite TestSuiteID, name string) string {
+	return fmt.Sprintf("hive_%d_%d_%s", os.Getpid(), testSuite, name)
+}
+
+// RemoveNetwork removes a docker network by the given network name.
+func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string) error {
 	manager.networkMutex.Lock()
 	defer manager.networkMutex.Unlock()
 
+	id, exists := manager.networks[testSuite][network]
+	if !exists {
+		return ErrNetworkNotFound
+	}
+
+	if err := manager.backend.RemoveNetwork(id); err != nil {
+		return err
+	}
+	delete(manager.networks[testSuite], network)
+	return nil
+}
+
+// PruneNetworks removes all networks created by the given test suite.
+func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
 	var errs []error
-	for id, name := range manager.networks {
-		log15.Info("removing docker network", "id", id, "name", name)
-		if err := manager.backend.RemoveNetwork(id); err != nil {
+	for name, _ := range manager.networks[testSuite] {
+		log15.Info("removing docker network", "name", name)
+		if err := manager.RemoveNetwork(testSuite, name); err != nil {
 			errs = append(errs, err)
-		} else {
-			delete(manager.networks, id)
 		}
 	}
+	// delete the test suite from the network map as all its networks have been torn down
+	manager.networkMutex.Lock()
+	delete(manager.networks, testSuite)
+	manager.networkMutex.Unlock()
 	return errs
 }
 
 // ContainerIP gets the IP address of the given container on the given network.
-func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkID, containerID string) (string, error) {
+func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkName, containerID string) (string, error) {
 	manager.networkMutex.RLock()
 	defer manager.networkMutex.RUnlock()
 
@@ -230,12 +241,19 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkID, contai
 		containerID = manager.simContainerID
 	}
 
+	var networkID string
 	// networkID "bridge" is special.
-	if networkID == "bridge" {
+	if networkName == "bridge" {
 		var err error
-		networkID, err = manager.backend.NetworkNameToID(networkID)
+		networkID, err = manager.backend.NetworkNameToID(networkName)
 		if err != nil {
 			return "", err
+		}
+	} else {
+		var exists bool
+		networkID, exists = manager.networks[testSuite][networkName]
+		if !exists {
+			return "", ErrNetworkNotFound
 		}
 	}
 
@@ -247,7 +265,7 @@ func (manager *TestManager) ContainerIP(testSuite TestSuiteID, networkID, contai
 }
 
 // ConnectContainer connects the given container to the given network.
-func (manager *TestManager) ConnectContainer(testSuite TestSuiteID, networkID, containerID string) error {
+func (manager *TestManager) ConnectContainer(testSuite TestSuiteID, networkName, containerID string) error {
 	manager.networkMutex.RLock()
 	defer manager.networkMutex.RUnlock()
 
@@ -257,12 +275,17 @@ func (manager *TestManager) ConnectContainer(testSuite TestSuiteID, networkID, c
 	}
 	if containerID == "simulation" {
 		containerID = manager.simContainerID
+	}
+
+	networkID, exists := manager.networks[testSuite][networkName]
+	if !exists {
+		return ErrNetworkNotFound
 	}
 	return manager.backend.ConnectContainer(containerID, networkID)
 }
 
 // DisconnectContainer disconnects the given container from the given network.
-func (manager *TestManager) DisconnectContainer(testSuite TestSuiteID, networkID, containerID string) error {
+func (manager *TestManager) DisconnectContainer(testSuite TestSuiteID, networkName, containerID string) error {
 	manager.networkMutex.RLock()
 	defer manager.networkMutex.RUnlock()
 
@@ -272,6 +295,11 @@ func (manager *TestManager) DisconnectContainer(testSuite TestSuiteID, networkID
 	}
 	if containerID == "simulation" {
 		containerID = manager.simContainerID
+	}
+
+	networkID, exists := manager.networks[testSuite][networkName]
+	if !exists {
+		return ErrNetworkNotFound
 	}
 	return manager.backend.DisconnectContainer(containerID, networkID)
 }
@@ -301,6 +329,12 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 		err := writeSuiteFile(suite, manager.config.LogDir)
 		if err != nil {
 			return err
+		}
+	}
+	// remove the test suite's left-over docker networks.
+	if errs := manager.PruneNetworks(testSuite); len(errs) > 0 {
+		for _, err := range errs {
+			log15.Error("could not remove network", "err", err)
 		}
 	}
 	// Move the suite to results.
