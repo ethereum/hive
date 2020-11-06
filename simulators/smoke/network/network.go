@@ -33,19 +33,20 @@ func iptest(t *hivesim.T) {
 	client := t.StartClient(clientName, nil, nil)
 
 	// This creates a network and connects both the client and the simulation container to it.
-	networkID, err := t.Sim.CreateNetwork(t.SuiteID, "network1")
+	network := "network1"
+	err = t.Sim.CreateNetwork(t.SuiteID, network)
 	if err != nil {
 		t.Fatal("can't not create network:", err)
 	}
-	if err := t.Sim.ConnectContainer(t.SuiteID, networkID, client.Container); err != nil {
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, client.Container); err != nil {
 		t.Fatal("can't connect container to network:", err)
 	}
-	if err := t.Sim.ConnectContainer(t.SuiteID, networkID, "simulation"); err != nil {
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, "simulation"); err != nil {
 		t.Fatal("can't connect simulation container to network:", err)
 	}
 
 	// Now get the IP of the client and connect to it via TCP.
-	clientIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, networkID, client.Container)
+	clientIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, client.Container)
 	if err != nil {
 		t.Fatal("can't get client network IP:", err)
 	}
@@ -57,21 +58,21 @@ func iptest(t *hivesim.T) {
 	conn.Close()
 
 	// Make sure ContainerNetworkIP works with the simulation container as well.
-	simIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, networkID, "simulation")
+	simIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container:", err)
 	}
 	t.Log("simulation container IP", simIP)
 
 	// Disconnect client and simulation from network1.
-	if err := t.Sim.DisconnectContainer(t.SuiteID, networkID, client.Container); err != nil {
+	if err := t.Sim.DisconnectContainer(t.SuiteID, network, client.Container); err != nil {
 		t.Fatal("can't disconnect client from network:", err)
 	}
-	if err := t.Sim.DisconnectContainer(t.SuiteID, networkID, "simulation"); err != nil {
+	if err := t.Sim.DisconnectContainer(t.SuiteID, network, "simulation"); err != nil {
 		t.Fatal("can't disconnect simulation from network:", err)
 	}
 	// Remove network1.
-	if err := t.Sim.RemoveNetwork(t.SuiteID, networkID); err != nil {
+	if err := t.Sim.RemoveNetwork(t.SuiteID, network); err != nil {
 		t.Fatal("can't remove network:", err)
 	}
 }
