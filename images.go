@@ -49,13 +49,6 @@ func newBuildCacher(pattern string) (*buildCacher, error) {
 	}, nil
 }
 
-// buildShell builds the outer shell docker image for running the entirety of hive
-// within an all encompassing container.
-func buildShell(cacher *buildCacher) (string, error) {
-	image := hiveImageNamespace + "/shell"
-	return image, buildImage(image, "", ".", cacher, log15.Root(), "")
-}
-
 // buildClients iterates over all the known clients and builds a docker image for
 // all unknown ones matching the given pattern.
 func buildClients(clientList []string, cacher *buildCacher, errorReport *HiveErrorReport) (map[string]string, error) {

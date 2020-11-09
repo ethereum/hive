@@ -118,7 +118,7 @@ func simulate(simDuration int, simulator string, simulatorLabel string, logger l
 	// Start the tester container and wait until it finishes
 	slogger.Debug("running simulator container")
 
-	waiter, err := runContainer(sc.ID, slogger, filepath.Join(logdir, logName), false, *loglevelFlag)
+	waiter, err := runContainer(sc.ID, slogger, filepath.Join(logdir, logName), *loglevelFlag)
 	if err != nil {
 		slogger.Error("failed to run simulator", "error", err)
 		return err
