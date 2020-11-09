@@ -7,7 +7,7 @@ hive is a testing rig designed to make it easy to run specification conformance 
 An Ethereum Foundation server often runs Hive to check for consensus, p2p and blockchain compatibility.
 Test results are made public [here](https://hivetests.ethdevops.io/)
 
-# Run hive
+# Running hive
 
 The `hive` project is based on Go. You'll need a valid Go (1.6 and upwards) installation available.
 
@@ -25,11 +25,11 @@ If you want to run the `discv4` test, for example, here is how the command would
 ./hive --sim devp2p/discv4 --client go-ethereum_latest --loglevel 6
 ```
 
-# Quickstart command lines
+## Quickstart command lines
 
 This section is a quick start guide for command line options covering typical hive usage scenarios.
 
-## Consensus test
+### Consensus test
 The following command will run consensus tests on the parity client
 ```text
    --sim consensus
@@ -37,7 +37,7 @@ The following command will run consensus tests on the parity client
    --results-root /mytests/tests
 ```
 
-## Devp2p tests
+### Devp2p tests
 
 The following command will run devp2p tests on geth: 
 
@@ -46,9 +46,11 @@ The following command will run devp2p tests on geth:
     --client go-ethereum_latest
     --loglevel 6
     --results-root /mytests/tests
+    --sim.parallelism 1
 ```
+The `--sim.parallelism` flag will set the maximum number of clients against which to run the simulation in parallel. 
 
-## Sync simulation
+### Sync simulation
 
 The following command will run a test verifying that a blockchain can be synced between differing implementations (in this case, parity and geth):
 
@@ -57,205 +59,155 @@ The following command will run a test verifying that a blockchain can be synced 
       --loglevel 6
       --results-root /mytests/tests
 
-## Generate a blockchain
+### Iterating on bugfixes locally
 
-This uses Hive to generate a blockchain based on a genesis file for subsequent testing in sync simulations.
+If you are testing locally and want to make changes to the simulation or client, run hive with the flag `--docker-nocache <simulation or client name>` so that hive rebuilds the container from scratch.
 
-      --loglevel 6
-      --chainGenerate
-      --chainLength 10
-      --chainOutputPath C:\\Ethereum\\OutputPath
-      --chainGenesis C:\\Ethereum\\Input\\Genesis.json
-      --chainBlockTime 30
-
-## Iterating on bugfixes locally
-
-Often, after reproducing a failure with a hive run on your machine, you'll want to build a docker container with code changes and see if it fixes the issue. Enabling this sort of workflow will require a couple of steps:
-
-* Build your client's docker image locally with a different tag to the one in your client's dockerfile.
-* Edit the FROM field in the dockerfile for your client, found in `clients/[your_client_name_here]/dockerfile`, to point to your newly created image
-* Run hive again with the flag `--docker-nocache <regexp>`, where `<regexp>` is a regular expression matching your client's name, such as `besu`
-
-
-# Running on Windows
-
-The following information assumes Docker for Windows (CE) is installed on Windows 10 Pro. 
-
-## Docker daemon
-`hive` uses the Docker API to connect to the Docker Daemon to dynamically create and run containers. At the time of writing, the daemon is disabled by default. This must be enabled.
-
-To enable the daemon, right click on the Docker icon in the system tray and press Settings. Under 'General' select "Expose daemon on tcp.... without TLS".
-
-To run `hive`, use the following command line option 
-
+If you want to rebuild both, separate the names with a `,` as such: 
 ```text
-  --docker-endpoint tcp://localhost:2375 
+--docker-nocache devp2p,go-ethereum_latest
 ```
 
-Alternatively, if using VSCode simply run using the supplied launch.json (see below)
+# HiveChain Tool
 
-## Shell container
-Currently, the Windows version must be run from the Host. To achieve this run with the --docker-noshell command line option. 
+@TODO
 
-## Debugging or executing from Visual Studio Code
-As described above, golang must be installed on the machine. The golang extension for VSCode is then required, along with Delve and the standard tools recommended by the Golang extension.
 
-When VS Code is configured for general go development, `hive` may be run simply by launching with F5 with the following `launch.json`. This `launch.json` includes example parameters that limit the client to `geth` as the full client suite may take significant time to build initial docker images.
-```json
-{
-   
-    "version": "0.2.0",
-    "configurations": [
-        {
-            "name": "Launch",
-            "type": "go",
-            "request": "launch",
-            "mode": "debug",
-            "remotePath": "",
-            "port": 2345,
-            "host": "127.0.0.1",
-            "program": "${workspaceFolder}",
-            "env": {},
-            "args": [
-                
-                "--docker-endpoint","tcp://localhost:2375",
-                "--docker-noshell",
-                "--client","go-ethereum_latest" , 
-                "--loglevel","6",
-                "--smoke"
-                
-               
-            ],
-            "showLog": true
-        }
-    ]
+# Writing Simulation Tests
+There are two components to a simulation test: 
+1. one or more Go files to coordinate the execution of a test using the `hivesim` test API; and
+2. a Dockefile, dockerizing both the simulation and the tests to be executed against client implementations 
+
+@TODO!!!!!!!!!!!!!!!!!! this section needs work
+
+While the test to be executed against the client implementations itself can be written in any language, the simulation to coordinate the test execution must be written in Go.
+
+## Placement
+If the theme of the test suite can be grouped in one of the directories located in `simulators/`, please place the new simulation in that directory. Otherwise, if the simulation cannot be categorized with the current groupings, create a new directory in `simulators/` and name it according to the theme of the test suite.
+
+## Structure of a simulation test
+hive provides a `hivesim` test API that makes it relatively simple to communicate with the hive server in order to organize the docker containers and networks according to your simulation's needs.
+
+###### Accessing the `hivesim` test API:
+To access the `hivesim` API, create a `Suite` as such:
+```go
+	suite := hivesim.Suite{
+		Name:        "MyTest",
+		Description: "This simulation test does XYZ.",
+	}
+```
+The `Suite` will only execute tests that are added to it using the `Add()` method. 
+
+###### Adding a test to the `Suite`
+
+To add a test to the `Suite`, you must write a function with the following signature:
+
+```go
+func myTestFunction(t *hivesim.T, c *hivesim.Client)
+```
+where 
+
+* `hivesim.T` represents a running test. It behaves similarly to `testing.T` in package `testing` (a Golang standard library for testing), but has some additional methods for launching clients; and
+
+* `hivesim.Client`represents a running client.
+
+The job of `myTestFunction()` is to get any information necessary from the client container to execute the test and to create or modify docker networks in the case that the simulation requires a more complex networking set up.
+
+`myTestFunction()` may be added to the `Suite` using `hivesim.ClientTestSpec`, which represents a test against a single client:
+
+```go
+type ClientTestSpec struct {
+	Name        string // name of the test
+	Description string // description of the test
+	Parameters  Params // parameters necessary to configure the client
+	Files       map[string]string // files to be mounted into the client container
+	Run         func(*T, *Client) // the test function itself
 }
 ```
 
-## Access to the local drive
-Docker will need access to the `workspace` folder. This will either be requested automatically in an Windows notification, or permission can be set in the docker settings in advance.
+where the `Run` field would take `myTestFunction` as the parameter.
 
-To set the permissions to access your drive, right click on the Docker Whale in the system tray and press Settings. Under 'Shared Drives' select the drive where the `workspace` folder is for sharing.
+######  Running the `Suite`
 
-## Host access to the docker network
+To run the `Suite`, you can call either `RunSuite()`or `MustRunSuite()` depending on how you want errors to be handled. 
 
-`hive` requires network access to the docker containers it creates. While this is automatically available on Linux, at the time of writing because of virtualisation there needs to be some further network configuration so that the `hive` host can connect. The following is dependent on your docker configuration, and there may be other ways to achieve the same result, but a typical setting may be:
+* `RunSuite()` will run all tests in the `Suite`, returning an error upon failure. 
 
-'route /P add 172.17.0.0 MASK 255.255.0.0 10.0.75.2'
+* `MustRunSuite()` runs the given suite, exiting the process if there is a problem executing the test.
 
-An administrator level command prompt must be opened and the target IPs of the containers routed to HyperV's IP address for the docker containers.
+Both Run functions take `Suite` as a parameter as well as a pointer to an instance of `hivesim.Simulation`, as such: 
 
-
-# Validating clients
-
-UPDATE: Unless we hear a desire to keep them, Validators will be deprecated. Please see `Simulators` for updates.
-
-You can run the full suite of `hive` validation tests against all the known implementations tagged
-`latest` by simply running `hive` from the repository root. It will build a docker image for every
-known client as well as one for every known validation test.
-
-The end result should be a JSON report, detailing for each client the list of validations failed and
-those passed. If you wish to explore the reasons of failure, full logs from all clients and testers
-are pushed into the `workspace/logs` folder.
-
-```
-$ hive --client=go-ethereum_latest --test=.
-...
-Validation results:
-{
-  "go-ethereum:latest": {
-    "fail": [
-      "ethereum/rpc-tests"
-    ],
-    "pass": [
-      "smoke/genesis-chain-blocks",
-      "smoke/genesis-only",
-      "smoke/genesis-chain"
-    ]
-  }
-}
+```go
+hivesim.MustRunSuite(hivesim.New(), suite)
 ```
 
-You may request a different set of clients to be validated via the `--client` flag. 
-
-You may request only a subset of validation tests to be run via the `--test` regexp flag (e.g. running only the
-smoke validation tests would be `--test=smoke`).
-
-# Simulating clients
+`hivesim.Simulation` is just a wrapper API that can access the hive server. To get a new instance of `hivesim.Simulation`, call `hivesim.New()`. This will look up the hive host server URI and connect to it
 
 
-----
-`hive` supports a more advanced form of client testing called *simulations*, where entire networks
-of clients are run concurrently under various circumstances and their behavior monitored and checked.
+###### Getting information about the client container
 
-Running network simulations is completely analogous to validations from the user's perspective: you
-can specify which clients to simulate with the `--client` flag, and you can specify which
-simulations to run via the `--sim` regexp flag. By default simulations aren't being run as they can
-be quite lengthy.
+To get information about the client that is likely necessary for test execution, you can use `hivesim.Client`within the aforementioned test execution function (`myTestFunction`).
 
+**Enode ID**
 
-`--client` is now an explicit list of permitted clients, where the desired client is of the format
-clientname_branch. For example `go-ethereum_latest` and `parity_beta`. Previously this was a regex. 
-Other parameters such as the sim or validator still use regexp. This change was introduced to allow
-for branches to be specified as parameters without the need for creating a dedicated client subfolder 
-for that branch. `go-ethereum` and `parity` in this example need to be subfolders of the Hive `clients`
-folder with their own dockerfile. The branch is parsed out and passed as a docker build arg.
+To get the client's enode ID, call the `EnodeURL()` method.
 
+**RPC client**
 
-Simulators now offer a golang client framework, that allows them to call into the Hive Simulator 
-API and create different types of client. The simulator can run tests or other experiments written in 
-Golang against one or more instances of clients. To achieve this, a number of new options are added:
+Call `RPC()` to get an RPC client connected to the client's RPC server.
 
-`--sim.rootcontext` a boolean, which when set tells the compiler to build the docker image with 'simulators'
-as the root of the context, allowing the simulators\common and simulators\devp2p common code to be included
-in the simulator. 
+###### Configuring networks
 
-Sim.rootcontext needs to be set differently depending on the type of simulation being run. For the consensus tests
-the base simulator image relies on files to be added from a folder local to the image. For developing new simulations,
-or extending the existing ones, it is recommended to use sim-rootcontext as true. 
+The `hivesim.Simulation` API offers different ways to configure the network set-up for a test. To configure networks within the test execution function (`myTestFunction`), use the methods available on the `Sim` field of the `hivesim.T` parameter.
 
+**Create a network**
 
-`--debug` allows a flag to be set that is passed into the simulator as an environment variable, allowing the 
-simulator to be run as a delve 'headless server. The go simulator can then be remote debugged by attaching to 
-the delve headless server.
-
-`--sim-parallelism` a flag to indicate how many tests or containers should be run concurrently. This can be
-implementation specific. In this version it is used to drive the -test.parallel flag in the devp2p simulation.
-
-
-
-Similarly to validations, end result of simulations should be a JSON report, detailing for each
-client the list of simulations failed and those passed. Likewise, if you wish to explore the reasons
-of failure, full logs from all clients and testers are pushed into the `log.txt` log file.
-
+```go
+err := t.Sim.CreateNetwork(t.SuiteID, "networkName")
 ```
-$ hive --client=go-ethereum_latest --test=NONE --sim=.
-...
-Simulation results:
-{
-  "go-ethereum:latest": {
-    "pass": [
-      "dao-hard-fork",
-      "smoke/single-node"
-    ]
-  }
-}
+
+**Remove a network**
+
+```go
+err := t.Sim.RemoveNetwork(t.SuiteID, "networkName")
+```
+
+**Connect a container to a network**
+
+```go
+err := t.Sim.ConnectContainer(t.SuiteID, "networkName", c.Container)
+```
+
+where `c` is the `hivesim.Client` parameter of the test execution function.
+
+If the simulation container also needs to be connected to a network, you can pass in the string "simulation" to the `ConnnectContainer` method, as such: 
+
+```go
+err := t.Sim.ConnectContainer(t.SuiteID, "networkName", "simulation")
+```
+
+**Disconnect a container from a network**
+
+```go
+err := t.Sim.DisconnectContainer(t.SuiteID, "networkName", c.Container)
+```
+
+**Get a container's IP address on a specific network**
+
+```go
+t.Sim.ContainerNetworkIP(t.SuiteID, "networkName", c.Container)
+```
+
+The default network used by hive is the `bridge` network. The client container's IP address on the bridge network is available as `IP` field of the `hivesim.Client` object.
+
+However, in the case that the simulation container's IP address on the default network is needed, pass `"bridge"` in as the network name, as such: 
+
+```go
+t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
 ```
 
 
-
-# Adding new clients
-
-The `hive` test harness can validate arbitrary implementations of the [Ethereum yellow paper](http://gavwood.com/paper.pdf).
-
-Since `hive` is based on docker containers, it is pretty liberal on most aspects of a client
-implementation:
-
- * `hive` doesn't care what dependencies a client has: language, libraries or otherwise.
- * `hive` doesn't care how the client is built: environment, tooling or otherwise.
- * `hive` doesn't care what garbage a client generates during execution.
-
-As long as a client can run on Linux, and you can package it up into a Docker image, `hive` can test it!
+# Adding a Client
 
 ## Creating a client image
 
@@ -376,86 +328,6 @@ Simulation results:
 
 *Note: All smoke tests must pass for a client to be included into `hive`.*
 
-# Adding new validators
-
-Validators are `hive` testers whose sole purpose is to check that a client implementation conforms to
-some standardized specifications (e.g. RPC API conformance, Mist compatibility, consensus tests, etc).
-They are not meant to check a client's behavior in complex network environment, rather that given a
-single client instance, it seems to function correctly from the **users** perspective.
-
-Similar to client implementations inside `hive`, validators themselves are also based on docker images
-and containers:
-
- * `hive` doesn't care what dependencies a validator has: language, libraries or otherwise.
- * `hive` doesn't care how the validator is built: environment, tooling or otherwise.
- * `hive` doesn't care what garbage a validator generates during execution.
-
-As long as a validator can run on Linux, and you can package it up into a Docker image, `hive` can
-use it to test every client implementation with it!
-
-## Creating a validator image
-
-Adding a new client validator to `hive` entails creating a Dockerfile (and related resources), based
-on which `hive` will assemble the docker image to use as the blueprint for validation.
-
-The validator definition(s) should reside in the `validators` folder, each nested as `<group>/<test>`,
-where `<group>` is a higher level collection of similar tests (e.g. `mist`, `consensus`), and `<test>`
-is an individual validator. Contributors are free to define new groups as long as it makes sense from
-a cross-client perspective. A few existing ones are:
-
- * `ethereum` contains ports of old test frameworks from the Ethereum repositories
- * `issues` contains interesting corner cases from clients that may affect others too
- * `mist` contains API conformance tests to validate if a client can be a [Mist](https://github.com/ethereum/mist) backend
- * `smoke` contains general smoke tests to insta-check if a client image is correct
-
-There are little contraints on the image itself, though a few required caveats are:
-
- * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
- * It should have a single entrypoint (script?) defined, which can initialize and run the test.
-
-For guidance, check out the [genesis-only](https://github.com/karalabe/hive/blob/master/validators/smoke/genesis-only/Dockerfile) smoke test.
-
-### Defining the validator
-
-> Since `hive` does not want to enforce any CLI parameterization scheme on client implementations, it
-injects all the required configurations into the Linux containers prior to launching the client's
-`entrypoint` script. It is then left to this script to interpret all the environmental configs and
-initialize the client appropriately.
-
-What this means from a validator's perspective is, that validators themselves must define these
-initial chain configurations files and client behavioral modifier environment variables that will
-be loaded into the client images.
-
-To prevent duplicating the list of config files and env vars that need to be implemented to cross
-over from validators to clients, we'll refer the reader to the readme's [*"Initializing the client"*](#initializing-the-client)
-section which lists all of them, also detailing what each means.
-
-In short, a validator must create all of the above linked chain configuration files and define some
-subset of behavioral environmental variables **in the validator's docker image**. This is important
-as the validator is always started **after** the client, so all information needs to be already ready
-for client initialization prior to running the validator entrypoint.
-
-*Trick: If you don't want to initialize a tested client with a starting chain, only the genesis file,
-you can specify `RUN touch chain.rlp && mkdir /blocks` in the validator Dockerfile, which will create
-an empy initial chain and empty set of blocks.*
-
-### Executing the validation
-
-After `hive` creates and initializes a client implementation based on the docker **image** of the
-chosen validator, it will extract the IP address of the running client and boot up the validator
-with the client's IP address injected as the `HIVE_CLIENT_IP` environmental variable.
-
-From this point onward the validator may execute arbitrary code against the running clients:
-
- * HTTP RPC endpoint exposed at `HIVE_CLIENT_IP:8545`
- * WebSocket RPC (if supported) at `HIVE_CLIENT_IP:8546`
- * devp2p TCP and UDP endpoints at `HIVE_CLIENT_IP:30303`
-
-The validation will be considered successful if and only if the exit code of the entrypoint script
-is zero! Any output that the validator generates will be saved to an appropriate log file in the `hive`
-workspace folder and also echoed out to the console on `--loglevel=6`.
-
-*Note: There is no constraint on how much a validation may run, but please be considerate.*
 
 # Adding new simulators
 
