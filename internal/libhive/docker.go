@@ -223,6 +223,16 @@ func (b *dockerBackend) NetworkNameToID(name string) (string, error) {
 
 // RemoveNetwork deletes a docker network.
 func (b *dockerBackend) RemoveNetwork(id string) error {
+	info, err := b.client.NetworkInfo(id)
+	if err != nil {
+		return err
+	}
+	for _, container := range info.Containers {
+		err := b.DisconnectContainer(container.Name, id)
+		if err != nil {
+			return err
+		}
+	}
 	return b.client.RemoveNetwork(id)
 }
 

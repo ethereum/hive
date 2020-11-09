@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sync"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/shogo82148/go-tap"
@@ -24,6 +25,8 @@ func main() {
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
+var createNetworkOnce sync.Once
+
 func runDiscoveryTest(t *hivesim.T, c *hivesim.Client) {
 	nodeURL, err := c.EnodeURL()
 	if err != nil {
@@ -31,23 +34,26 @@ func runDiscoveryTest(t *hivesim.T, c *hivesim.Client) {
 	}
 
 	// Create a separate network to be able to send the client traffic from two separate IP addrs.
-	networkID, err := t.Sim.CreateNetwork(t.SuiteID, "network1")
-	if err != nil {
-		t.Fatal("can't create network:", err)
-	}
+	const network = "network1"
+	createNetworkOnce.Do(func() {
+		if err := t.Sim.CreateNetwork(t.SuiteID, network); err != nil {
+			t.Fatal("can't create network:", err)
+		}
+		if err := t.Sim.ConnectContainer(t.SuiteID, network, "simulation"); err != nil {
+			t.Fatal("can't connect simulation to network1:", err)
+		}
+	})
+
 	// Connect both simulation and client to this network.
-	if err := t.Sim.ConnectContainer(t.SuiteID, networkID, c.Container); err != nil {
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
 		t.Fatal("can't connect client to network1:", err)
-	}
-	if err := t.Sim.ConnectContainer(t.SuiteID, networkID, "simulation"); err != nil {
-		t.Fatal("can't connect simulation to network1:", err)
 	}
 	// Find our IPs on the bridge network and network1.
 	bridgeIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container:", err)
 	}
-	net1IP, err := t.Sim.ContainerNetworkIP(t.SuiteID, networkID, "simulation")
+	net1IP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container on network1:", err)
 	}
