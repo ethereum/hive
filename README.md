@@ -17,64 +17,45 @@ Run `go build` inside the root directory.
 
 Then run the following command:
 ```bash
-./hive --sim <simulation> --client <client(s) you want to test against> --docker-noshell --loglevel <preferred log verbosity level>
+./hive --sim <simulation> --client <client(s) you want to test against>  --loglevel <preferred log verbosity level>
 ```
 If you want to run the `discv4` test, for example, here is how the command would look:
 
 ```bash
-./hive --sim devp2p/discv4 --client go-ethereum_latest --docker-noshell --docker-nocache devp2p/discv4 --loglevel 6
+./hive --sim devp2p/discv4 --client go-ethereum_latest --loglevel 6
 ```
-
-
-
- *Note: For now `hive` requires running from the repository root as it needs access to quite a number
-of resource files to build the corrent docker images and containers. This requirement will be removed
-in the future.*
 
 # Quickstart command lines
 
-This section is a quickstart of command line options covering typical Hive usage scenarios.
-
-For additional Windows-specific command line options please check the section following.
+This section is a quick start guide for command line options covering typical hive usage scenarios.
 
 ## Consensus test
-To execute the consensus tests on parity run the latest simulator:
-
+The following command will run consensus tests on the parity client
 ```text
-   --docker-noshell
+   --sim consensus
    --client parity_latest
-   --sim ethereum/consensus2
-   --sim.rootcontext
-   --results-root /mytests/test
+   --results-root /mytests/tests
 ```
 
 ## Devp2p tests
 
-These run devp2p tests, mainly Discovery tests.
+The following command will run devp2p tests on geth: 
 
 ```text
     --sim devp2p
-    --sim.rootcontext
-    --test none
-    --loglevel 6
-    --docker-noshell
-    --results-root /mytests/test
     --client go-ethereum_latest
-    --sim-parallelism 1
+    --loglevel 6
+    --results-root /mytests/tests
 ```
 
 ## Sync simulation
 
-These run a test verifying that a blockchain can be synced between differing implementations.
+The following command will run a test verifying that a blockchain can be synced between differing implementations (in this case, parity and geth):
 
-      --sim ethereum\\\\sync
-      --sim.rootcontext
-      --test none
-      --loglevel 6
-      --docker-noshell
-      --results-root /mytests/test
+      --sim sync
       --client go-ethereum_latest,parity_latest
-      --sim-parallelism 1
+      --loglevel 6
+      --results-root /mytests/tests
 
 ## Generate a blockchain
 
