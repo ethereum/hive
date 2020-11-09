@@ -1,40 +1,31 @@
-# hive - Ethereum end-to-end test harness
+#  hive - Ethereum end-to-end test harness
 
-Ethereum grew large to the point where testing implementations is a huge burden. Unit tests are fine
-for checking various implementation quirks, but validating that a client conforms to some baseline
-quality or validating that clients can play nicely together in a multi client environment is all but
-simple.
-
-This project is meant to serve as an easily expandable test harness where **anyone** can add tests in
-**any** programming language they feel comfortable with, and it should simultaneously be able to run
-those tests against all potential clients. The harness is meant to do black box testing where no
-client specific internal details/state is tested and/or inspected. Instead, the emphasis is put on
-adherence to official specs or behaviours under different circumstances.
-
-Most importantly, it is essential to be able to run this test suite as part of the CI workflow!
-Therefore, the entire suite is based on docker containers.
+hive is a testing rig designed to make it easy to run specification conformance and behavior tests against any eth1 client implementation.
 
 # Public test results
 
 An Ethereum Foundation server often runs Hive to check for consensus, p2p and blockchain compatibility.
 Test results are made public [here](https://hivetests.ethdevops.io/)
 
-# Installing the hive validator
+# Run hive
 
-The `hive` project is based on Go. Although there are plans to make running `hive` possible using
-only docker, for now you'll need a valid Go (1.6 and upwards) installation available.
+The `hive` project is based on Go. You'll need a valid Go (1.6 and upwards) installation available.
 
-You can install `hive` via:
+First, clone this repository.
 
+Run `go build` inside the root directory.
+
+Then run the following command:
+```bash
+./hive --sim <simulation> --client <client(s) you want to test against> --docker-noshell --loglevel <preferred log verbosity level>
 ```
-$ go get -v github.com/ethereum/hive
+If you want to run the `discv4` test, for example, here is how the command would look:
+
+```bash
+./hive --sim devp2p/discv4 --client go-ethereum_latest --docker-noshell --docker-nocache devp2p/discv4 --loglevel 6
 ```
-or if you don't have GO111MODULE set: 
-```
-$ GO111MODULE=on go get -v github.com/ethereum/hive
-```
-After installing add hive binary (default path `~go/bin`) to PATH and clone the `Hive` repository
-to your local folder.
+
+
 
  *Note: For now `hive` requires running from the repository root as it needs access to quite a number
 of resource files to build the corrent docker images and containers. This requirement will be removed
