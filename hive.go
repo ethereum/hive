@@ -22,7 +22,7 @@ var (
 	testResultsRoot = flag.String("results-root", "workspace/logs", "Target folder for results output and historical results aggregation")
 
 	// noShellContainer is a no-op flag, will be removed in the future
-	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
+	noShellContainer = flag.Bool("docker-noshell", false, "This flag has been deprecated and remains for script backwards compatibility. It will be removed in the future.")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
 	clientListFlag     = flag.String("client", "go-ethereum_latest", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_latest and the client name is a subfolder of the clients directory")
