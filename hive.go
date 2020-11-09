@@ -21,6 +21,7 @@ var (
 
 	testResultsRoot = flag.String("results-root", "workspace/logs", "Target folder for results output and historical results aggregation")
 
+	// noShellContainer is a no-op flag, will be removed in the future
 	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
@@ -95,13 +96,8 @@ func main() {
 		errorReport.WriteReport(fmt.Sprintf("%s/errorReport.json", *testResultsRoot))
 		fatal("failed to initialize client(s), terminating test...")
 	}
-	// Depending on the flags, either run hive in place or in an outer container shell
-	var fail error
-	if *noShellContainer {
-		fail = mainInHost(overrides, cacher, errorReport)
-	} else {
-		fail = mainInShell(overrides, cacher, errorReport)
-	}
+	// run hive
+	fail := mainInHost(overrides, cacher, errorReport)
 	if err := errorReport.WriteReport(fmt.Sprintf("%s/containerErrorReport.json", *testResultsRoot)); err != nil {
 		log15.Crit("could not write error report", "error", err)
 	}
