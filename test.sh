@@ -12,8 +12,7 @@ HIVEHOME="./"
 # Store results in temp
 RESULTS="/tmp/TestResults"
 
-#FLAGS="--docker-noshell --docker-nocache ."
-FLAGS="--docker-noshell --loglevel 4"
+FLAGS="--loglevel 4"
 FLAGS="$FLAGS --results-root $RESULTS "
 FLAGS="$FLAGS --sim.parallelism 1 --sim.rootcontext --client.checktimelimit=20s"
 

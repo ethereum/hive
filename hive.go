@@ -21,7 +21,8 @@ var (
 
 	testResultsRoot = flag.String("results-root", "workspace/logs", "Target folder for results output and historical results aggregation")
 
-	noShellContainer = flag.Bool("docker-noshell", false, "Disable outer docker shell, running directly on the host")
+	// noShellContainer is a no-op flag, will be removed in the future
+	noShellContainer = flag.Bool("docker-noshell", false, "This flag has been deprecated and remains for script backwards compatibility. It will be removed in the future.")
 	noCachePattern   = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
 
 	clientListFlag     = flag.String("client", "go-ethereum_latest", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_latest and the client name is a subfolder of the clients directory")
@@ -95,13 +96,8 @@ func main() {
 		errorReport.WriteReport(fmt.Sprintf("%s/errorReport.json", *testResultsRoot))
 		fatal("failed to initialize client(s), terminating test...")
 	}
-	// Depending on the flags, either run hive in place or in an outer container shell
-	var fail error
-	if *noShellContainer {
-		fail = mainInHost(overrides, cacher, errorReport)
-	} else {
-		fail = mainInShell(overrides, cacher, errorReport)
-	}
+	// run hive
+	fail := mainInHost(overrides, cacher, errorReport)
 	if err := errorReport.WriteReport(fmt.Sprintf("%s/containerErrorReport.json", *testResultsRoot)); err != nil {
 		log15.Crit("could not write error report", "error", err)
 	}

@@ -345,7 +345,6 @@ func (b *dockerBackend) uploadFiles(id string, files map[string]*multipart.FileH
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
 func (b *dockerBackend) runContainer(logger log15.Logger, id, logfile string) (docker.CloseWaiter, error) {
-	// If we're the outer shell, log straight to stderr, nothing fancy
 	stdout := io.Writer(os.Stdout)
 	stream := io.Writer(os.Stderr)
 
