@@ -83,6 +83,74 @@ _(This section is relevant if you plan to merge your simulation upstream)_
 
 If the theme of the test suite can be grouped in one of the directories located in `simulators/`, please place the new simulation in that directory. Otherwise, if the simulation cannot be categorized with the current groupings, create a new directory in `simulators/` and name it according to the theme of the test suite.
 
+@TODO-----------------------------------------
+Overriding environmental variables that change client behaviors via HTTP parameters is easy to do in
+any HTTP client utility and/or library, but uploading files needed for chain initializations is much
+more complex, especially if multiple files are needed. As long as all clients run with the same set
+of init files, this is not an issue (they can be placed in the default locations). However if instances
+need to run with different initial chain setups, a simulator needs to be able to specify these per
+client. To avoid file uploads, `hive` solves this by defining a set of API variables that allow a
+simulator to specify the source paths to use for specific init files which will be extracted from the
+live container:
+
+ * `HIVE_INIT_GENESIS` path to the genesis file to seed the client with (default = "/genesis.json")
+ * `HIVE_INIT_CHAIN` path to an initial blockchain to seed the client with (default = "/chain.rlp")
+ * `HIVE_INIT_BLOCKS` path to a folder of blocks to import after seeding (default = "/blocks/")
+ * `HIVE_INIT_KEYS` path to a folder of account keys to import after init (default = "/keys/")
+
+*Note: It is up to simulators to wire the clients together. The simplest way to do this is to start
+a bootnode inside the simulator and specify it for new clients via the documented `HIVE_BOOTNODE`
+environment variable. This is required to make simulators fully self contained, also enabling much
+more complex networking scenarios not doable with forced fixed topologies.*
+
+The simulation will be considered successful if and only if the exit code of the entrypoint script
+is zero! Any output that the simulator generates will be saved to an appropriate log file in the `hive`
+workspace folder and also echoed out to the console on `--loglevel=6`.
+
+#### Reporting sub-results
+
+It may happen that the setup/teardown cost of a simulation be large enough to warrant validating not
+just one, but perhaps multiple invariants in the same test. Although the results for these subtests
+could be reported in the log file, retrieving them would become unwieldy. As such, `hive` exposes a
+special HTTP endpoint on its RESTful API that can add sub-results to a single simulation. The endpoint
+resides at `/subresults` and has the following parameters:
+
+ * `name`: textual name to report for the subtest
+ * `success`: boolean flag (`true` or `false`) representing whether the subtest failed
+ * `error`: textual details for the reason behind the subtest failing
+ * `details`: structured JSON object containing arbitrary extra infos to surface
+
+For example, doing a call to this endpoint with curl:
+
+```
+$ curl -sf -v -X POST -F 'details={"Preconditions failed": ["nonce 1 != 2", "balance 0"]}' \
+  "$HIVE_SIMULATOR/subresults?name=Demo%20error&success=false&error=Something%20went%20wrong..."
+```
+
+will result a `subresults` field
+
+```json
+"subresults": [
+  {
+    "name": "Demo error",
+    "success": false,
+    "error": "Something went wrong...",
+    "details": {
+      "Preconditions failed": [
+        "nonce 1 != 2",
+        "balance 0"
+      ]
+    }
+  }
+]
+```
+### Closing notes
+
+ * There is no constraint on how much time a simulation may run, but please be considerate.
+ * The simulator doesn't have to terminate nodes itself, upon exit all resources are reclaimed.
+
+@TODO ------------------------------------------------------------------
+
 ## Structure of a simulation
 The purpose of the simulation is to coordinate the execution of your desired test by communicating with the hive server.
 
@@ -219,34 +287,19 @@ Create a Dockerfile and place it in the same directory as the simulation. The Do
 Adding a new client implementation to `hive` entails creating a Dockerfile (and related resources),
 based on which `hive` will assemble the docker image to use as the blueprint for testing.
 
-The client definition(s) should reside in the `clients` folder, each named `<project>_<tag>` where
-`<project>` is the official name of the client (lowercase, no fancy characters), and `<tag>` is an
-arbitrary id up to the client maintainers to make the best use of. `hive` will automatically pick
-up all clients from this folder.
+The client definition(s) should reside in the `clients` folder, inside a folder named `<project>` where `<project>` is the official name of the client (lowercase, no fancy characters). `hive` will automatically pick up all clients from this folder.
 
 There aren't many contraints on the image itself, though a few required caveats exist:
 
  * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
  * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
- * It should have a single entrypoint (script?) defined, which can initialize and run the client.
+ * It should have a single entrypoint (or script) defined, which can initialize and run the client.
 
-For devp2p tests or other simulations that require to know the specific enode of the client instance, 
-the client must provide an `enode.sh` that echoes the enode of the running instance. This is executed
-by the Hive host remotely to get the id. 
+For guidance, check out the reference [go-ethereum](https://github.com/ethereum/hive/blob/master/clients/go-ethereum/Dockerfile) client.
 
-The client has the responsibility of mapping the Hive genesis.json and Hive environment variables
-to its own local genesis format and command line flags. To assist in this, Hive illustrates a technique
-in the `clients/trinity` folder using `mapper.jq`, which is invoked in `trinity.sh` This 
-technique can be replicated for other clients.
+## Initializing the client
 
-For guidance, check out the reference [`go-ethereum:latest`](https://github.com/ethereum/hive/blob/master/clients/go-ethereum/Dockerfile) client.
-
-### Initializing the client
-
-Since `hive` does not want to enforce any CLI parameterization scheme on client implementations, it
-injects all the required configurations into the Linux containers prior to launching the client's
-`entrypoint` script. It is then left to this script to interpret all the environmental configs and
-initialize the client appropriately.
+hive injects all the required configurations into the Linux containers prior to launching the client's `entrypoint` script. It is then left to this script to interpret all the environmental configs and initialize the client appropriately.
 
 The chain configurations files:
 
@@ -255,15 +308,9 @@ The chain configurations files:
  * `/blocks/` folder with numbered singleton blocks to import before startup
  * `/keys/` contains account keys that should be imported before startup
 
-Client startup scripts need to ensure that they load the genesis state first, then import a possibly
-longer blockchain and then import possibly numerous individual blocks. The reason for requiring two
-different block sources is that specifying a single chain is more optimal, but tests requiring forking
-chains cannot create a single chain.
+Client startup scripts need to ensure that they load the genesis state first, then import a possibly longer blockchain and then import possibly numerous individual blocks. The reason for requiring two different block sources is that specifying a single chain is more optimal, but tests requiring forking chains cannot create a single chain.
 
-Besides the standardized chain configurations, clients can in general be modified behavior-wise in
-quite a few ways that are mostly supported by all clients, yet are implemented differently in each.
-As such, each possible behavioral change required by some validator or simulator is characterized by
-an environment variable, which clients should interpret as best as they can.
+Besides the standardized chain configurations, clients can in general be modified behavior-wise in quite a few ways that are mostly supported by all clients, yet are implemented differently in each. As such, each possible behavioral change required by some simulator is characterized by an environment variable, which clients should interpret as best as they can.
 
 The behavioral configuration variables:
 
@@ -285,39 +332,29 @@ The behavioral configuration variables:
   * `HIVE_MINER` address to credit with mining rewards (if set, start mining)
   * `HIVE_MINER_EXTRA` extra-data field to set for newly minted blocks
 
+The client has the responsibility of mapping the hive environment variables to its own command line flags. To assist in this, Hive illustrates a technique
+in the `clients/go-ethereum` folder using `mapper.jq`, which is invoked in `geth.sh` This technique can be replicated for other clients.
 
-### Starting the client
+## Enode script
 
-After initializing the client blockchain (genesis, chain, blocks), the last task of the entry script
-is to start up the client itself. The following defaults are required by `hive` to enable automatic
-network assembly and firewall enforcement:
+For devp2p tests or other simulations that require to know the specific enode of the client instance, the client must provide an `enode.sh` that echoes the enode of the running instance. This is executed by the Hive host remotely to get the id. 
+
+## Starting the client
+
+After initializing the client blockchain (genesis, chain, blocks), the last task of the entry script is to start up the client itself. The following defaults are required by `hive` to enable automatic network assembly and firewall enforcement:
 
  * Clients should open their HTTP-RPC endpoint on `0.0.0.0:8545` (mandatory)
  * Clients should open their WS-RPC endpoint on `0.0.0.0:8546` (optional)
  * Clients should open their IPC-RPC endpoints at `/rpc.ipc` (optional)
 
-There is no need to handle graceful client termination. Clients will be forcefully aborted upon test
-suite completion and all related data purged. A new instance will be started for every test.
+There is no need to handle graceful client termination. Clients will be forcefully aborted upon test suite completion and all related data purged. A new instance will be started for every test.
 
 ### Smoke testing new clients
 
-To quickly check if a client adheres to the requirements of `hive`, there is a suite of smoke test
-validations and simulations that just initialize clients with some pre-configured states and queries
-it from the various RPC endpoints.
+To quickly check if a client adheres to the requirements of `hive`, there is a suite of smoke test simulations that just initialize clients with some pre-configured states and queries it from the various RPC endpoints.
 
 ```
-$ hive --client=go-ethereum_latest --smoke
-...
-Validation results:
-{
-  "go-ethereum:latest": {
-    "pass": [
-      "smoke/genesis-chain",
-      "smoke/genesis-chain-blocks",
-      "smoke/genesis-only"
-    ]
-  }
-}
+$ hive --client=go-ethereum_latest --sim smoke
 ...
 Simulation results:
 {
@@ -332,136 +369,6 @@ Simulation results:
 ```
 
 *Note: All smoke tests must pass for a client to be included into `hive`.*
-
-
-# Adding new simulators
-
-Simulators are `hive` testers whose purpose is to check that client implementations conform to some
-desired behavior when running in both multi-node network environments. The goal of a simulator is to try
-and test a node in an almost-live way: don't take testing shortcuts like fake PoW or less
-secure key encryption schemas.
-
-Similar to all other entities inside `hive`, simulators too are based on docker images and containers:
-
- * `hive` doesn't care what dependencies a simulator has: language, libraries or otherwise.
- * `hive` doesn't care how the simulator is built: environment, tooling or otherwise.
- * `hive` doesn't care what garbage a simulator generates during execution.
-
-As long as a simulator can run on Linux, and you can package it up into a Docker image, `hive` can
-use it to test every client implementation with it!
-
-## Creating a simulator image
-
-Adding a new client simulator to `hive` entails creating a Dockerfile (and related resources), based
-on which `hive` will assemble the docker image to use as the blueprint for simulation.
-
-The simulator definition(s) should reside in the `simulators` folder, each nested as `<group>/<sim>`,
-where `<group>` is a higher level collection of similar tests (e.g. `dao-hard-fork`), and `<sim>` is
-an individual simulator. Contributors are free to define new groups as long as it makes sense from a
-cross-client perspective. A few existing ones are:
-
- * `dao-hard-fork` contains network simulations/tests with regard to the DAO hard-fork
- * `smoke` contains general smoke tests to insta-check if a client image is correct
-
-There are little contraints on the image itself, though a few required caveats are:
-
- * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
- * It should have a single entrypoint (script?) defined, which can initialize and run the test.
-
-For guidance, check out the [lifecycle](https://github.com/karalabe/hive/blob/master/simulators/smoke/lifecycle/Dockerfile) smoke test.
-
-### Defining the simulator
-
-Defining a simulator is **exactly** the same as defining the docker image of a validator with regard
-to every aspect of `hive` (chain configs, behavioral envvars), As such, we refer the user to the readme's
-[*"Defining the validator"*](#defining-the-validator) section. Apart from what the `entrypoint` script
-is allowed to do, validator and simulator images are equivalent.
-
-### Executing the simulation
-
-As detailed in the readme's [*"Executing the validation"*](#executing-the-validation) section, during
-validation `hive` starts a client node first, and then the validator itself. This is **not** true in
-the case of simulations however. Since it is impossible to define arbitrary networking scenarios with
-simple configuration files, `hive` will instead boot up only the simulator instance, and will provide
-it with the necessary mechanisms to create any scenario it wants.
-
-To this effect, `hive` exposes a RESTful HTTP API that all simulators can use to direct how `hive`
-should create and organize the simulated network. This API is exposed at the HTTP endpoint set in the
-`HIVE_SIMULATOR` environmental variable. The currently available topology endpoints are:
-
- * `/nodes` with method `POST` boots up a new client instance, returning its unique ID
-   * Simulators may override any [chain init files](#initializing-the-client) via `URL` and `form` parameters (see below)
-   * Simulators may override any [behavioral envvars](#initializing-the-client) directly via `URL` and `form` parameters
- * `/nodes/$ID` with method `GET` retrieves the IP address of an existing client instance
-   * The client's exposed services can be reached via ports `8545`, `8546` and `30303`
- * `/nodes/$ID` with method `DELETE` instantly terminates an existing client instance
- * `/log` with method `POST` sends a logging message from the simulator to the main process.
- 
-
-Overriding environmental variables that change client behaviors via HTTP parameters is easy to do in
-any HTTP client utility and/or library, but uploading files needed for chain initializations is much
-more complex, especially if multiple files are needed. As long as all clients run with the same set
-of init files, this is not an issue (they can be placed in the default locations). However if instances
-need to run with different initial chain setups, a simulator needs to be able to specify these per
-client. To avoid file uploads, `hive` solves this by defining a set of API variables that allow a
-simulator to specify the source paths to use for specific init files which will be extracted from the
-live container:
-
- * `HIVE_INIT_GENESIS` path to the genesis file to seed the client with (default = "/genesis.json")
- * `HIVE_INIT_CHAIN` path to an initial blockchain to seed the client with (default = "/chain.rlp")
- * `HIVE_INIT_BLOCKS` path to a folder of blocks to import after seeding (default = "/blocks/")
- * `HIVE_INIT_KEYS` path to a folder of account keys to import after init (default = "/keys/")
-
-*Note: It is up to simulators to wire the clients together. The simplest way to do this is to start
-a bootnode inside the simulator and specify it for new clients via the documented `HIVE_BOOTNODE`
-environment variable. This is required to make simulators fully self contained, also enabling much
-more complex networking scenarios not doable with forced fixed topologies.*
-
-The simulation will be considered successful if and only if the exit code of the entrypoint script
-is zero! Any output that the simulator generates will be saved to an appropriate log file in the `hive`
-workspace folder and also echoed out to the console on `--loglevel=6`.
-
-#### Reporting sub-results
-
-It may happen that the setup/teardown cost of a simulation be large enough to warrant validating not
-just one, but perhaps multiple invariants in the same test. Although the results for these subtests
-could be reported in the log file, retrieving them would become unwieldy. As such, `hive` exposes a
-special HTTP endpoint on its RESTful API that can add sub-results to a single simulation. The endpoint
-resides at `/subresults` and has the following parameters:
-
- * `name`: textual name to report for the subtest
- * `success`: boolean flag (`true` or `false`) representing whether the subtest failed
- * `error`: textual details for the reason behind the subtest failing
- * `details`: structured JSON object containing arbitrary extra infos to surface
-
-For example, doing a call to this endpoint with curl:
-
-```
-$ curl -sf -v -X POST -F 'details={"Preconditions failed": ["nonce 1 != 2", "balance 0"]}' \
-  "$HIVE_SIMULATOR/subresults?name=Demo%20error&success=false&error=Something%20went%20wrong..."
-```
-
-will result a `subresults` field
-
-```json
-"subresults": [
-  {
-    "name": "Demo error",
-    "success": false,
-    "error": "Something went wrong...",
-    "details": {
-      "Preconditions failed": [
-        "nonce 1 != 2",
-        "balance 0"
-      ]
-    }
-  }
-]
-```
-### Closing notes
-
- * There is no constraint on how much time a simulation may run, but please be considerate.
- * The simulator doesn't have to terminate nodes itself, upon exit all resources are reclaimed.
 
 # Generating test blockchains
 
