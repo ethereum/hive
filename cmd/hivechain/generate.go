@@ -122,10 +122,10 @@ func generateTx(txType int, key *ecdsa.PrivateKey, genesis *core.Genesis, gen *c
 		rand.Read(dst[:])
 		tx = types.NewTransaction(gen.TxNonce(src), dst, amount, params.TxGas, gasprice, nil)
 	case txTypeStorage:
-		gas := createTxGasLimit(genstorage, 80000)
+		gas := createTxGasLimit(gen, genesis, genstorage) + 80000
 		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, genstorage)
 	case txTypeLogs:
-		gas := createTxGasLimit(genlogs, 20000)
+		gas := createTxGasLimit(gen, genesis, genlogs) + 20000
 		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, genlogs)
 	case txTypeCode:
 		// The code generator contract deploys any data given after its own bytecode.
@@ -133,7 +133,8 @@ func generateTx(txType int, key *ecdsa.PrivateKey, genesis *core.Genesis, gen *c
 		input := make([]byte, len(gencode)+codesize)
 		copy(input, gencode)
 		rand.Read(input[len(gencode):])
-		gas := createTxGasLimit(gencode, 10000+params.CreateDataGas*uint64(codesize))
+		extraGas := 10000 + params.CreateDataGas*uint64(codesize)
+		gas := createTxGasLimit(gen, genesis, gencode) + extraGas
 		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, input)
 	}
 	// Sign the transaction.
@@ -145,9 +146,14 @@ func generateTx(txType int, key *ecdsa.PrivateKey, genesis *core.Genesis, gen *c
 	return signedTx
 }
 
-func createTxGasLimit(data []byte, extra uint64) uint64 {
-	igas, _ := core.IntrinsicGas(data, true, true)
-	return igas + extra
+func createTxGasLimit(gen *core.BlockGen, genesis *core.Genesis, data []byte) uint64 {
+	isHomestead := genesis.Config.IsHomestead(gen.Number())
+	isEIP2028 := genesis.Config.IsIstanbul(gen.Number())
+	igas, err := core.IntrinsicGas(data, true, isHomestead, isEIP2028)
+	if err != nil {
+		panic(err)
+	}
+	return igas
 }
 
 // generateAndSave produces a chain based on the config.
@@ -167,7 +173,7 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 	chain, _ := core.GenerateChain(cfg.genesis.Config, genesis, insta, db, cfg.blockCount, blockModifier)
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, err := core.NewBlockChain(db, nil, cfg.genesis.Config, engine, vm.Config{}, nil)
+	blockchain, err := core.NewBlockChain(db, nil, cfg.genesis.Config, engine, vm.Config{}, nil, nil)
 	if err != nil {
 		return fmt.Errorf("can't create blockchain: %v", err)
 	}
@@ -216,7 +222,7 @@ type instaSeal struct{ consensus.Engine }
 
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state and assembling the block.
-func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
+func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
 	block, err := e.Engine.FinalizeAndAssemble(chain, header, state, txs, uncles, receipts)
 	if err != nil {
 		return nil, err
