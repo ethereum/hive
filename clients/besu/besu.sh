@@ -38,6 +38,17 @@ besu=/opt/besu/bin/besu
 # See https://github.com/hyperledger/besu/issues/1464
 export BESU_OPTS="-Dsecp256k1.randomize=false"
 
+# Print touched methods. This is useful for finding
+# the set of modules that benefit from AOT-compilation.
+# export BESU_OPTS="$BESU_OPTS -XX:+UnlockDiagnosticVMOptions -XX:+LogTouchedMethods -XX:+PrintTouchedMethodsAtExit"
+
+# Enable AOT library.
+export BESU_OPTS="$BESU_OPTS -XX:+UnlockExperimentalVMOptions -XX:+UseAOT -XX:AOTLibrary=/opt/besu/besuAOT.so -XX:AOTLibrary=/opt/besu/javaBaseAOT.so"
+
+# Print used AOT code. Uncomment this to check if the AOT library
+# is actually being used.
+# export BESU_OPTS="$BESU_OPTS -XX:+UnlockDiagnosticVMOptions -verbose -XX:+PrintAOT"
+
 # Configure logging.
 LOG=info
 case "$HIVE_LOGLEVEL" in
