@@ -73,20 +73,20 @@ If you want to rebuild both, separate the names with a `,` as such:
 @TODO
 
 
-# Writing Simulation Tests
-There are two components to a simulation test: 
-1. one or more Go files to coordinate the execution of a test using the `hivesim` test API; and
-2. a Dockefile, dockerizing both the simulation and the tests to be executed against client implementations 
-
-@TODO!!!!!!!!!!!!!!!!!! this section needs work
-
-While the test to be executed against the client implementations itself can be written in any language, the simulation to coordinate the test execution must be written in Go.
+# Adding a Simulation
+There are two components to a simulation: 
+1. a **simulation program written in Go** using the `hivesim` test API to coordinate the execution of your desired test; and
+2. a **Dockerfile** to containerize both the simulation and the tests to be executed against client implementations.
 
 ## Placement
+_(This section is relevant if you plan to merge your simulation upstream)_
+
 If the theme of the test suite can be grouped in one of the directories located in `simulators/`, please place the new simulation in that directory. Otherwise, if the simulation cannot be categorized with the current groupings, create a new directory in `simulators/` and name it according to the theme of the test suite.
 
-## Structure of a simulation test
-hive provides a `hivesim` test API that makes it relatively simple to communicate with the hive server in order to organize the docker containers and networks according to your simulation's needs.
+## Structure of a simulation
+The purpose of the simulation is to coordinate the execution of your desired test by communicating with the hive server.
+
+hive provides a `hivesim` test API that makes it relatively simple to communicate with the hive server in order to organize the docker containers and networks according to your test's needs.
 
 ###### Accessing the `hivesim` test API:
 To access the `hivesim` API, create a `Suite` as such:
@@ -205,7 +205,12 @@ However, in the case that the simulation container's IP address on the default n
 ```go
 t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
 ```
+## Dockerizing the Simulation
+Create a Dockerfile and place it in the same directory as the simulation. The Dockerfile should: 
 
+* build the simulation executable
+* build the test tool / executable
+* set the entrypoint as the simulation executable (this will ensure that the simulation handles the communication between the hive server and the test itself)
 
 # Adding a Client
 
