@@ -4,8 +4,9 @@ hive is a testing rig designed to make it easy to run specification conformance 
 
 # Public test results
 
-An Ethereum Foundation server often runs Hive to check for consensus, p2p and blockchain compatibility.
-Test results are made public [here](https://hivetests.ethdevops.io/)
+An Ethereum Foundation server often runs Hive to check for consensus, p2p and blockchain compatibility as part of our CI workflow. This is needed to ensure a baseline quality for eth1 client implementations.
+
+Test results are made public [here](https://hivetests.ethdevops.io/).
 
 # Running hive
 
@@ -372,127 +373,36 @@ Simulation results:
 
 # Generating test blockchains
 
-`Hive` allows you to create rlp encoded blockchains for inclusion into sync tests 
+hive's `hivechain` tool allows you to create RLP-encoded blockchains for inclusion into simulations.
 
-## To generate a blockchain offline
+## Generating a blockchain
 
-`Hive` can be run with the `chainGenerate` setting to generate a blockchain according to specification
-and then exit. The current version only generates blocks with empty transactions, but this will be
+Build the `hivechain` tool, located in the `cmd/` directory.
+
+Then, to generate a chain of a desired length, run the following command: 
+
+```bash
+hivechain generate -genesis <path to genesis file> -length <desired length of chain>
+```
+The current version only generates blocks with empty transactions, but this will be
 improved in the future to offer generation of chains that exhibit different characteristics for testing.
 
-* `chainGenerate`   Bool    (false)  Tell Hive to generate a blockchain on the basis of a supplied genesis and terminate
-* `chainLength`     Uint    (2)     The length of the chain to generate
-* `chainConfig`     String              Reserved for future usage. Will allow Hive to generate test chains of different types
-*	`chainOutputPath` String  (.)   Chain destination folder
-*	`chainGenesis`    String  ("")  The path and filename to the source genesis.json
-*	`chainBlockTime`  Uint    (30)    The desired block time in seconds. OBS: It's recommended to set this value to somwhere above 20s to keep the mining difficulty low.
+### Additional options: 
 
-For example   `hive --loglevel 6 --chainGenerate --chainLength 2 --chainOutputPath "C:\Ethereum\Path" --chainGenesis "C:\Ethereum\Path\Genesis.json" --chainBlockTime 30`
-
-# Continuous integration
-
-As mentioned in the beginning of this document, one of the major goals of `hive` is to support running
-the validators, simulators and benchmarks as part of an Ethereum client's CI workflow. This is needed
-to ensure a baseline quality for implementations, particularly because developers notoriously hate the
-idea of having to do a manual testing step, heaven forbid having to install dependencies of "that"
-language.
-
-Providing detailed configuration description for multiple CI services is out of scope of this project,
-but we did put together a document about configuring it for [`circleci`](https://circleci.com/), leaving
-it up to the user to port it to other platforms. The single most important feature a CI service must
-support for `hive` is docker containers, specifically allowing multiple ones concurrently.
-
-## Integration via [circleci](https://circleci.com/)
-
-Since `hive` is quite an unorthodox test harness, `circleci` has no chance of automatically inferring
-any details on how it should be used. As such all configurations need to be manually specified via a
-`circle.yml` YAML file placed into the repository root. You'll need to add three important sections
-to this.
-
-The first part is easy, we request a machine that has a docker service running:
-
-```yaml
-machine:
-  services:
-    - docker
+```text
+  -blocktime int
+    	The desired block time in seconds (default 30)
+  -genesis string
+    	The path and filename to the source genesis.json
+  -length int
+    	The length of the chain to generate (default 2)
+  -mine
+    	Enables ethash mining
+  -output string
+    	Chain destination folder (default ".")
+  -tx-interval int
+    	Add transaction to chain every n blocks (default 10)
 ```
-
-Now comes the juicy part. Although we could just simply install `hive` and run it as the main test
-step, the `circleci` service offers an interesting concept called *dependencies*. Users can define
-and install various libraries, tools, etc. that will be persisted between test runs. This is a very
-powerful feature as it allows caching all those non-changing dependencies between CI runs and only
-download and rebuild those that have changed.
-
-Since `hive` is both based on docker containers that may take a non-insignificant time to build, we'd
-like to cache as much as possible and only rebuild what changed.
-
-To this effect we will define a special folder we'd like to include in the `circleci` caches to collect 
-all the docker images built by `hive`:
-
-```yaml
-dependencies:
-  cache_directories:
-    - "~/.docker" # Cache all docker images manually to avoid lengthy rebuilds
-```
-
-Of course we also need to tell `circleci` how to populate these caches and how to reload them into
-the live test environment. To do that we'll add an additional sub-section to the top `dependencies`
-section called `override`, which will do a couple things:
-
- * Import all the docker images from the cache into the locally running service
- * Install `hive`
- * Dry run `hive`, to rebuild all docker images, but not run any tests
- * Export all new docker images into the cache
-
-```yaml
-  override:
-    # Restore all previously cached docker images
-    - mkdir -p ~/.docker
-    - for img in `ls ~/.docker`; do docker load -i ~/.docker/$img; done
-
-    # Pull in and hive, and do a dry run
-    - go get -u github.com/karalabe/hive
-    - (cd ~/.go_workspace/src/github.com/karalabe/hive && hive --docker-noshell --client=NONE --test=. --sim=. --loglevel=6)
-
-    # Cache all the docker images
-    - for img in `docker images | grep -v "^<none>" | tail -n +2 | awk '{print $1}'`; do docker save $img > ~/.docker/`echo $img | tr '/' ':'`.tar; done
-  ```
-
-Although it may look a bit overwhelming, all the above code does is it loads the cache contents,
-updates it with a freshly installed version of `hive`, and then pushes everything new back into
-the cache for next time.
-
-With `hive` installed and all optimisations and caches out of the way, the remaining step is to run
-the actual continuous integration: build your project and invoke hive to test it. The first part is
-implementation dependent, but for example `go-ethereum` has a simple `make geth` command for building
-the client.
-
-With the client built, we'll need to start `hive` from its repository root, specify the client image
-we want to use (e.g. `--client=go-ethereum:local`), override any files in the image (i.e. inject our
-freshly built binary `--override=$HOME/geth`) and run the whole suite (`--test=. --sim=.`).
-
-*Note, as `circleci` seems unable to handle multiple docker containers embedded in one another, we'll
-need to specify the `--docker-noshell` flag to omit `hive`'s outer shell container. This is fine as
-we don't care about any junk generated at this point, `circleci` will just discard it after the test.*
-
-```yaml
-test:
-  override:
-    # Build Geth and move into a known folder
-    - make geth
-    - cp ./build/bin/geth $HOME/geth
-
-    # Run hive and move all generated logs into the public artifacts folder
-    - (cd ~/.go_workspace/src/github.com/karalabe/hive && hive --docker-noshell --client=go-ethereum:local --override=$HOME/geth --test=. --sim=.)
-    - cp -r ~/.go_workspace/src/github.com/karalabe/hive/workspace/logs/* $CIRCLE_ARTIFACTS
-```
-
-If all went well, you should see `hive` assembled in the `circleci` dashboard (first run can take a
-bit of time to cache all the tester images) and `hive` should be happily crunching
-through its defined tests with your fresh client binary.
-
-If you get stuck, you can always take a look at the [current live `circle.yml`](https://github.com/ethereum/go-ethereum/blob/develop/circle.yml)
-file being used by the `go-ethereum` client.
 
 # Trophies
 
@@ -509,9 +419,7 @@ a useful tool for validating Ethereum client implementations.
 
 # Contributions
 
-This project takes a different approach to code contributions than your usual FOSS project with well
-ingrained maintainers and relatively few external contributors. It is an experiment. Whether it will
-work out or not is for the future to decide.
+This project takes a different approach to code contributions than your usual FOSS project with well ingrained maintainers and relatively few external contributors. It is an experiment. Whether it will work out or not is for the future to decide.
 
 We follow the [Collective Code Construction Contract (C4)](http://rfc.zeromq.org/spec:22/C4/), code
 contribution model, as expanded and explained in [The ZeroMQ Process](https://hintjens.gitbooks.io/social-architecture/content/chapter4.html).
