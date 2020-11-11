@@ -12,15 +12,13 @@ Test results are made public [here](https://hivetests.ethdevops.io/).
 
 The `hive` project is based on Go. You'll need a valid Go (1.6 and upwards) installation available.
 
-First, clone this repository.
+After cloning the repository,  build the hive executable by running `go build` inside the root directory.
 
-Run `go build` inside the root directory.
-
-Then run the following command:
+Then, to run a simulation, use the following command:
 ```bash
 ./hive --sim <simulation> --client <client(s) you want to test against>  --loglevel <preferred log verbosity level>
 ```
-If you want to run the `discv4` test, for example, here is how the command would look:
+For example, if you want to run the `discv4` test, here is how the command would look:
 
 ```bash
 ./hive --sim devp2p/discv4 --client go-ethereum_latest --loglevel 6
@@ -68,11 +66,6 @@ If you want to rebuild both, separate the names with a `,` as such:
 ```text
 --docker-nocache devp2p,go-ethereum_latest
 ```
-
-# HiveChain Tool
-
-@TODO
-
 
 # Adding a Simulation
 There are two components to a simulation: 
@@ -371,7 +364,7 @@ Simulation results:
 
 *Note: All smoke tests must pass for a client to be included into `hive`.*
 
-# Generating test blockchains
+# Generating test blockchains with the `hivechain` tool
 
 hive's `hivechain` tool allows you to create RLP-encoded blockchains for inclusion into simulations.
 
