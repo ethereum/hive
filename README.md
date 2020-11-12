@@ -58,7 +58,7 @@ The following command will run a test verifying that a blockchain can be synced 
       --loglevel 6
       --results-root /mytests/tests
 
-### Iterating on bugfixes locally
+### Iterating on bug fixes locally
 
 If you are testing locally and want to make changes to the simulation or client, run hive with the flag `--docker-nocache <simulation or client name>` so that hive rebuilds the container from scratch.
 
@@ -76,74 +76,6 @@ There are two components to a simulation:
 _(This section is relevant if you plan to merge your simulation upstream)_
 
 If the theme of the test suite can be grouped in one of the directories located in `simulators/`, please place the new simulation in that directory. Otherwise, if the simulation cannot be categorized with the current groupings, create a new directory in `simulators/` and name it according to the theme of the test suite.
-
-@TODO-----------------------------------------
-Overriding environmental variables that change client behaviors via HTTP parameters is easy to do in
-any HTTP client utility and/or library, but uploading files needed for chain initializations is much
-more complex, especially if multiple files are needed. As long as all clients run with the same set
-of init files, this is not an issue (they can be placed in the default locations). However if instances
-need to run with different initial chain setups, a simulator needs to be able to specify these per
-client. To avoid file uploads, `hive` solves this by defining a set of API variables that allow a
-simulator to specify the source paths to use for specific init files which will be extracted from the
-live container:
-
- * `HIVE_INIT_GENESIS` path to the genesis file to seed the client with (default = "/genesis.json")
- * `HIVE_INIT_CHAIN` path to an initial blockchain to seed the client with (default = "/chain.rlp")
- * `HIVE_INIT_BLOCKS` path to a folder of blocks to import after seeding (default = "/blocks/")
- * `HIVE_INIT_KEYS` path to a folder of account keys to import after init (default = "/keys/")
-
-*Note: It is up to simulators to wire the clients together. The simplest way to do this is to start
-a bootnode inside the simulator and specify it for new clients via the documented `HIVE_BOOTNODE`
-environment variable. This is required to make simulators fully self contained, also enabling much
-more complex networking scenarios not doable with forced fixed topologies.*
-
-The simulation will be considered successful if and only if the exit code of the entrypoint script
-is zero! Any output that the simulator generates will be saved to an appropriate log file in the `hive`
-workspace folder and also echoed out to the console on `--loglevel=6`.
-
-#### Reporting sub-results
-
-It may happen that the setup/teardown cost of a simulation be large enough to warrant validating not
-just one, but perhaps multiple invariants in the same test. Although the results for these subtests
-could be reported in the log file, retrieving them would become unwieldy. As such, `hive` exposes a
-special HTTP endpoint on its RESTful API that can add sub-results to a single simulation. The endpoint
-resides at `/subresults` and has the following parameters:
-
- * `name`: textual name to report for the subtest
- * `success`: boolean flag (`true` or `false`) representing whether the subtest failed
- * `error`: textual details for the reason behind the subtest failing
- * `details`: structured JSON object containing arbitrary extra infos to surface
-
-For example, doing a call to this endpoint with curl:
-
-```
-$ curl -sf -v -X POST -F 'details={"Preconditions failed": ["nonce 1 != 2", "balance 0"]}' \
-  "$HIVE_SIMULATOR/subresults?name=Demo%20error&success=false&error=Something%20went%20wrong..."
-```
-
-will result a `subresults` field
-
-```json
-"subresults": [
-  {
-    "name": "Demo error",
-    "success": false,
-    "error": "Something went wrong...",
-    "details": {
-      "Preconditions failed": [
-        "nonce 1 != 2",
-        "balance 0"
-      ]
-    }
-  }
-]
-```
-### Closing notes
-
- * There is no constraint on how much time a simulation may run, but please be considerate.
- * The simulator doesn't have to terminate nodes itself, upon exit all resources are reclaimed.
-
-@TODO ------------------------------------------------------------------
 
 ## Structure of a simulation
 The purpose of the simulation is to coordinate the execution of your desired test by communicating with the hive server.
@@ -210,9 +142,9 @@ hivesim.MustRunSuite(hivesim.New(), suite)
 
 To get information about the client that is likely necessary for test execution, you can use `hivesim.Client`within the aforementioned test execution function (`myTestFunction`).
 
-**Enode ID**
+**Enode URL**
 
-To get the client's enode ID, call the `EnodeURL()` method.
+To get the client's enode URL, call the `EnodeURL()` method.
 
 **RPC client**
 
@@ -331,7 +263,7 @@ in the `clients/go-ethereum` folder using `mapper.jq`, which is invoked in `geth
 
 ## Enode script
 
-For devp2p tests or other simulations that require to know the specific enode of the client instance, the client must provide an `enode.sh` that echoes the enode of the running instance. This is executed by the Hive host remotely to get the id. 
+For devp2p tests or other simulations that require to know the specific enode URL of the client instance, the client must provide an `enode.sh` that echoes the enode of the running instance. This is executed by the Hive host remotely in order to retrieve the enode URL. 
 
 ## Starting the client
 
@@ -377,8 +309,13 @@ Then, to generate a chain of a desired length, run the following command:
 ```bash
 hivechain generate -genesis <path to genesis file> -length <desired length of chain>
 ```
-The current version only generates blocks with empty transactions, but this will be
-improved in the future to offer generation of chains that exhibit different characteristics for testing.
+The `hivechain` tool will generate blocks with transactions as well if the following accounts are present and have a balance in the genesis block: 
+
+```text
+"0x71562b71999873DB5b286dF957af199Ec94617F7"
+"0x703c4b2bD70c169f5717101CaeE543299Fc946C7"
+"0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e"
+```
 
 ### Additional options: 
 
