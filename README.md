@@ -68,6 +68,67 @@ If you want to rebuild both, separate the names with a `,` as such:
 ```
 
 # Adding a Simulation
+
+A hive simulation is any spec conformance or behavior test that is designed to be executed against an ethereum client implementation using the simulation API provided by hive.
+
+A simulation can be written in any language as long as it is properly dockerized and makes use of the simulation API. 
+
+## Simulation API
+
+The simulation API provided by hive is a simple gateway to communicating with the client container(s).
+
+There are a couple of components that are potentially important to a hive simulation: 
+* test suites
+* test cases
+* networks
+
+A **test suite** is a single run of a simulator. It can contain several **test cases**, which are individual tests.
+
+**Networks** are also useful if your test(s) require a more complex network topology.
+
+### Test Suite Endpoints
+**Create a test suite**
+```
+POST /testsuite
+```
+Response
+```
+1
+```
+**Delete a test suite**
+```
+DELETE /testsuite/{suite}
+```
+### Test Case Endpoints
+**Create a test case**
+```
+POST /testsuite/{suite}/test
+```
+Response
+```
+2
+```
+**Delete a test case**
+
+_Note:_ we use POST as the HTTP method for this request as DELETE does not always support a message body. Hive expects a `summaryresult` in the body / URL form of this request.
+```
+POST /testsuite/{suite}/test/{test}
+```
+**Start a node**
+
+This request requires several form values in the body, such as parameters and files for configuring the client. One parameter must be named `CLIENT` and should contain one of the client types from the `GetClientTypes` endpoint. The parameters are used as environment variables in the new container.
+
+```
+POST /testsuite/{suite}/test/{test}/node
+```
+Response
+```
+
+```
+
+
+
+
 There are two components to a simulation: 
 1. a **simulation program written in Go** using the `hivesim` test API to coordinate the execution of your desired test; and
 2. a **Dockerfile** to containerize both the simulation and the tests to be executed against client implementations.

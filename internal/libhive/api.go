@@ -35,7 +35,7 @@ func newSimulationAPI(b Backend, env SimEnv, tm *TestManager) http.Handler {
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/test", api.startTest).Methods("POST")
-	// post because the delete http verb does not always support a message body
+	// post because the delete http verb does not always support a message body // TODO is this still true ?
 	router.HandleFunc("/testsuite/{suite}/test/{test}", api.endTest).Methods("POST")
 	router.HandleFunc("/testsuite", api.startSuite).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}", api.endSuite).Methods("DELETE")
