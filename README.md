@@ -80,9 +80,10 @@ The simulation API provided by hive is a simple gateway to communicating with th
 There are a couple of components that are potentially important to a hive simulation: 
 * test suites
 * test cases
+* clients
 * networks
 
-A **test suite** is a single run of a simulator. It can contain several **test cases**, which are individual tests.
+A **test suite** is a single run of a simulator. It can contain several **test cases**, which are individual tests against one or more **clients**.
 
 **Networks** are also useful if your test(s) require a more complex network topology.
 
@@ -114,24 +115,86 @@ _Note:_ we use POST as the HTTP method for this request as DELETE does not alway
 ```
 POST /testsuite/{suite}/test/{test}
 ```
-**Start a node**
 
-This request requires several form values in the body, such as parameters and files for configuring the client. One parameter must be named `CLIENT` and should contain one of the client types from the `GetClientTypes` endpoint. The parameters are used as environment variables in the new container.
+### Client endpoints
+
+**Get client types**
+
+```
+GET /clients
+```
+
+Response
+```
+["go-ethereum_latest"]
+```
+
+**Start client**
+
+This request requires several form values in the body, such as parameters and files for configuring the client. One parameter must be named `CLIENT` and should contain one of the client types from the `/clients` endpoint. The parameters are used as environment variables in the new container.
 
 ```
 POST /testsuite/{suite}/test/{test}/node
 ```
 Response
 ```
-
+["<container ID>@<IP addr>@<MAC addr>"]
 ```
 
+**Get client enode URL**
+```
+GET /testsuite/{suite}/test/{test}/node/{node}
+```
+Response
+```
+enode://1ba850b467b3b96eacdcb6c133d2c7907878794dbdfc114269c7f240d278594439f79975f87e43c45152072c9bd68f9311eb15fd37f1fd438812240e82de9ef9@172.17.0.3:30303
+```
 
+**Stop client**
+```
+DELETE /testsuite/{suite}/test/{test}/node/{node}
+```
 
+### Network endpoints
 
-There are two components to a simulation: 
-1. a **simulation program written in Go** using the `hivesim` test API to coordinate the execution of your desired test; and
-2. a **Dockerfile** to containerize both the simulation and the tests to be executed against client implementations.
+**Create a network**
+This endpoint will create a docker network with the given name
+```
+POST /testsuite/{suite}/network/{network}
+```
+Response
+```
+"success"
+```
+**Remove a network**
+
+_Note: this request will fail if containers are still connected to the network._
+```
+DELETE /testsuite/{suite}/network/{network}
+```
+Response
+```
+"success"
+```
+**Connect a container to a network**
+```
+POST /testsuite/{suite}/network/{network}/{node}
+```
+
+**Get a container's IP address on a network**
+
+```
+GET /testsuite/{suite}/network/{network}/{node}
+```
+Response
+```
+172.22.0.2
+```
+
+**Disconnect a container from a network**
+```
+DELETE /testsuite/{suite}/network/{network}/{node}
+```
 
 ## Placement
 _(This section is relevant if you plan to merge your simulation upstream)_
