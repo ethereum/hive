@@ -228,7 +228,7 @@ There aren't many contraints on the image itself, though a few required caveats 
  * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
  * It should have a single entrypoint (or script) defined, which can initialize and run the client.
 
-For guidance, check out the reference [go-ethereum](https://github.com/ethereum/hive/blob/master/clients/go-ethereum/Dockerfile) client.
+For guidance, check out the reference [go-ethereum](/clients/go-ethereum/Dockerfile) client.
 
 ## Initializing the client
 
@@ -265,8 +265,7 @@ The behavioral configuration variables:
   * `HIVE_MINER` address to credit with mining rewards (if set, start mining)
   * `HIVE_MINER_EXTRA` extra-data field to set for newly minted blocks
 
-The client has the responsibility of mapping the hive environment variables to its own command line flags. To assist in this, Hive illustrates a technique
-in the `clients/go-ethereum` folder using `mapper.jq`, which is invoked in `geth.sh` This technique can be replicated for other clients.
+The client has the responsibility of mapping the hive environment variables to its own command line flags. To assist in this, Hive illustrates a technique in the `clients/go-ethereum` folder using `mapper.jq`, which is invoked in `geth.sh` This technique can be replicated for other clients.
 
 ## Enode script
 
