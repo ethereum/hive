@@ -126,7 +126,7 @@ type T struct {
 	result  TestResult
 }
 
-// Client starts a client. If the client cannot by started, the test fails immediately.
+// StartClient starts a client. If the client cannot by started, the test fails immediately.
 func (t *T) StartClient(clientType string, parameters Params, files map[string]string) *Client {
 	params := parameters.Set("CLIENT", clientType)
 	container, ip, err := t.Sim.StartClient(t.SuiteID, t.TestID, params, files)
