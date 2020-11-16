@@ -77,7 +77,7 @@ A simulation can be written in any language as long as it is properly dockerized
 
 The simulation API provided by hive is a simple gateway to communicating with the client container(s).
 
-There are a couple of components that are potentially important to a hive simulation: 
+There are a couple of components that are important to a hive simulation: 
 * test suites
 * test cases
 * clients
@@ -211,7 +211,7 @@ Create a Dockerfile and place it in the same directory as the simulation. The Do
 ## Using the `hivesim` simulation API wrapper
 While it's possible to communicate with the hive simulation server via the API documented above, hive also provides an easy-to-use API wrapper _(written in Go)_.
 
-The documentation is provided [here](/hivesim/README.md).
+The documentation is provided [here](/hivesim/doc.go).
 
 # Adding a Client
 
