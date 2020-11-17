@@ -64,16 +64,18 @@ IMPORTFLAGS="--run"
 
 # Disable PoW check if requested.
 if [ -n "$HIVE_SKIP_POW" ]; then
-    IMPORTFLAGS="--skip-pow-validation-enabled"
+    IMPORTFLAGS="$IMPORTFLAGS --skip-pow-validation-enabled"
 fi
 
 # Load chain.rlp if present.
 if [ -f /chain.rlp ]; then
+    HAS_IMPORT=1
     IMPORTFLAGS="$IMPORTFLAGS --from=/chain.rlp"
 fi
 
 # Load the remaining individual blocks.
 if [ -d /blocks ]; then
+    HAS_IMPORT=1
     blocks=`echo /blocks/* | sort -n`
     IMPORTFLAGS="$IMPORTFLAGS $blocks"
 fi
@@ -115,6 +117,10 @@ else
 fi
 
 # Start Besu.
-cmd="$besu $FLAGS $RPCFLAGS blocks import $IMPORTFLAGS"
+if [ -z "$HAS_IMPORT" ]; then
+    cmd="$besu $FLAGS $RPCFLAGS"
+else
+    cmd="$besu $FLAGS $RPCFLAGS blocks import $IMPORTFLAGS"
+fi
 echo "starting main client: $cmd"
 $cmd
