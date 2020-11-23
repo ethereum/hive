@@ -42,11 +42,11 @@ The following command will run consensus tests on the parity client
 
 ### Devp2p tests
 
-The following command will run devp2p tests on geth: 
+The following command will run devp2p tests on nethermind: 
 
 ```text
     --sim devp2p
-    --client go-ethereum_latest
+    --client nethermind_alpine 
     --loglevel 6
     --results-root /mytests/tests
     --sim.parallelism 1
