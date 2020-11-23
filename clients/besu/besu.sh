@@ -59,35 +59,26 @@ if [ -n "$HIVE_FORK_BERLIN" ]; then
     FLAGS="$FLAGS --Xberlin-enabled=true"
 fi
 
+# The client should start after loading the blocks, this option configures it.
+IMPORTFLAGS="--run"
+
 # Disable PoW check if requested.
 if [ -n "$HIVE_SKIP_POW" ]; then
-    IMPORTFLAGS="--skip-pow-validation-enabled"
+    IMPORTFLAGS="$IMPORTFLAGS --skip-pow-validation-enabled"
 fi
-
-# Allow import to fail.
-set +e
 
 # Load chain.rlp if present.
 if [ -f /chain.rlp ]; then
-    echo "Loading initial blockchain..."
-    cmd="$besu $FLAGS blocks import $IMPORTFLAGS --from=/chain.rlp"
-    echo "invoking $cmd"
-    $cmd
+    HAS_IMPORT=1
+    IMPORTFLAGS="$IMPORTFLAGS --from=/chain.rlp"
 fi
 
 # Load the remaining individual blocks.
 if [ -d /blocks ]; then
-    echo "Loading remaining individual blocks..."
-    blocks=`ls /blocks | sort -n`
-    home=`pwd`
-    pushd /blocks
-    cmd="$besu $FLAGS --data-path=$home blocks import $IMPORTFLAGS $blocks"
-    echo "in `pwd` invoking $cmd"
-    $cmd
-    popd
+    HAS_IMPORT=1
+    blocks=`echo /blocks/* | sort -n`
+    IMPORTFLAGS="$IMPORTFLAGS $blocks"
 fi
-
-set -e
 
 # Configure mining.
 if [ "$HIVE_MINER" != "" ]; then
@@ -126,6 +117,10 @@ else
 fi
 
 # Start Besu.
-cmd="$besu $FLAGS $RPCFLAGS"
+if [ -z "$HAS_IMPORT" ]; then
+    cmd="$besu $FLAGS $RPCFLAGS"
+else
+    cmd="$besu $FLAGS $RPCFLAGS blocks import $IMPORTFLAGS"
+fi
 echo "starting main client: $cmd"
 $cmd
