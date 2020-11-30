@@ -148,7 +148,7 @@ func (tc *testCase) run(t *hivesim.T, c *hivesim.Client) {
 	resp.Body.Close()
 
 	if resp.StatusCode != tc.gqlTest.StatusCode {
-		t.Errorf("HTTP response code is %d, want %d", resp.StatusCode, tc.gqlTest.StatusCode)
+		t.Errorf("HTTP response code is %d, want %d \n response body: %s", resp.StatusCode, tc.gqlTest.StatusCode, string(respBytes))
 	}
 	if resp.StatusCode != 200 {
 		// Test expects HTTP error, and the client sent one, test done.
