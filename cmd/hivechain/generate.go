@@ -178,6 +178,10 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 		return fmt.Errorf("can't create blockchain: %v", err)
 	}
 	defer blockchain.Stop()
+	// error out if blockchain config is nil -- avoid hanging chain generation
+	if blockchain.Config() == nil {
+		return fmt.Errorf("cannot insert chain with nil chain config")
+	}
 	if _, err := blockchain.InsertChain(chain); err != nil {
 		return fmt.Errorf("chain validation error: %v", err)
 	}
