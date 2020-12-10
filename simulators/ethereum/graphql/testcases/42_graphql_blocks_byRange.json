@@ -4,7 +4,7 @@
     "{blocks (from : \"0x1e\", to: \"0x20\") { number gasUsed gasLimit hash nonce  stateRoot receiptsRoot transactionCount }} ",
 
 
-  "response":{
+  "responses":[{
     "data" : {
       "blocks" : [ {
         "number"  : 30,
@@ -35,6 +35,6 @@
         "transactionCount" : 1
       } ]
     }
-  },
+  }],
   "statusCode": 200
 }

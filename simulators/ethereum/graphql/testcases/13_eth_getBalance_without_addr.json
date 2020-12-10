@@ -1,6 +1,6 @@
 {
   "request": "{account { balance } }",
-  "response": {
+  "responses": [{
     "errors": [
       {
         "message": "Validation error of type MissingFieldArgument: Missing field argument address @ 'account'",
@@ -15,7 +15,7 @@
         }
       }
     ]
-  },
+  }],
   "statusCode": 400
 }
 

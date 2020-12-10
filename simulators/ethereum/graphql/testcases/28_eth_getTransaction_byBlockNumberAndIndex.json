@@ -3,7 +3,7 @@
     
   "{ block(number: \"0x1e\") { transactionAt(index: 0) {block{hash}  hash} } }",
 
-  "response":{
+  "responses":[{
     "data" : {
       "block" : {
         "transactionAt" : {
@@ -14,7 +14,7 @@
         }
       }
     }
-  },
+  }],
  
   "statusCode": 200
 }

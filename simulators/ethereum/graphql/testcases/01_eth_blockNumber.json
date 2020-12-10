@@ -2,12 +2,12 @@
   "request":     
     "{ block { number } }",
 
-  "response":  {
+  "responses": [{
     "data" : {
       "block" : {
         "number" : 32
       }
     }
-  },
+  }],
   "statusCode": 200
 }

@@ -1,6 +1,6 @@
 {
   "request": "{blocks (from : \"0x1e\", to: \"0x1c\") { number gasUsed gasLimit hash nonce  stateRoot receiptsRoot transactionCount }} ",
-  "response": {
+  "responses": [{
     "errors": [
       {
         "message": "Exception while fetching data (/blocks) : Invalid params",
@@ -21,6 +21,6 @@
       }
     ],
     "data": null
-  },
+  }],
   "statusCode": 400
 }

@@ -1,6 +1,6 @@
 {
   "request": "{ __schema { types { fields { type { fields { name }}}}}}",
-  "response": {
+  "responses": [{
     "errors": [
       {
         "message": "maximum query complexity exceeded 204 > 200",
@@ -9,6 +9,6 @@
         }
       }
     ]
-  },
+  }],
   "statusCode": 400
 }

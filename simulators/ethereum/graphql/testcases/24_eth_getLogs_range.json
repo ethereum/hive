@@ -1,6 +1,6 @@
 {
   "request": "{ logs( filter: { fromBlock:20, toBlock: 24, topics :  [], addresses : []}) { index  topics  data account{address} transaction{hash block {number}} } }",
-  "response": {
+  "responses": [{
     "data": {
       "logs": [
         {
@@ -35,6 +35,6 @@
         }
       ]
     }
-  },
+  }],
   "statusCode": 200
 }
