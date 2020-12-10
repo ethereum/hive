@@ -46,7 +46,7 @@ func Test_responseMatch(t *testing.T) {
 	}{
 		{
 			resp: testResponse{
-				Data: gasPrice{GasPrice: "0x11"},
+				Data: gasPrice{GasPrice: "0x1"},
 			},
 			status: "200",
 		},

@@ -172,7 +172,6 @@ func (tc *testCase) responseMatch(t *hivesim.T, respStatus string, respBytes []b
 		}
 		if i == len(tc.gqlTest.Responses)-1 {
 			prettyQuery, ok := reindentJSON(tc.gqlTest.Request)
-			prettyExpected, _ := json.MarshalIndent(response, "", "  ")
 			prettyResponse, _ := json.MarshalIndent(got, "", "  ")
 			defer func() {
 				t.Log("Test failed.")
@@ -180,7 +179,12 @@ func (tc *testCase) responseMatch(t *hivesim.T, respStatus string, respBytes []b
 				if ok {
 					t.Log("query:", prettyQuery)
 				}
-				t.Log("expected:", string(prettyExpected))
+				t.Log("expected value(s):")
+				for _, expected := range tc.gqlTest.Responses {
+					prettyExpected, _ := json.MarshalIndent(expected, "", "  ")
+					t.Log(string(prettyExpected), "\n_____________________\n")
+				}
+
 				t.Log("got:", string(prettyResponse))
 				t.Fail()
 			}()
