@@ -6,10 +6,14 @@
 #  - `genesis.json` file is located at /etc/besu/genesis.json (mandatory)
 #
 # This script assumes the following environment variables:
+#
 #  - HIVE_BOOTNODE             enode URL of the remote bootstrap node
 #  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
 #  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
+#
+# Forks:
+#
 #  - HIVE_FORK_HOMESTEAD       block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK       block number of the DAO hard-fork transitionnsition
 #  - HIVE_FORK_TANGERINE       block number of TangerineWhistle
@@ -20,6 +24,9 @@
 #  - HIVE_FORK_ISTANBUL        block number for Istanbul transition
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
 #  - HIVE_FORK_BERLIN          block number for Berlin transition
+#
+# Other:
+#
 #  - HIVE_MINER                address to credit with mining rewards (single thread)
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW             If set, skip PoW verification
@@ -78,6 +85,12 @@ if [ -d /blocks ]; then
     HAS_IMPORT=1
     blocks=`echo /blocks/* | sort -n`
     IMPORTFLAGS="$IMPORTFLAGS $blocks"
+fi
+
+# For clique mining, besu uses the node key as the block signing key.
+if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+    echo "Importing clique signing key as node key..."
+    echo "$HIVE_CLIQUE_PRIVATEKEY" > /opt/besu/key
 fi
 
 # Configure mining.

@@ -21,10 +21,14 @@ def to_int:
   if . == null then . else .|tonumber end
 ;
 
-# Replace config in input.
+# Replace 'config' section in input JSON.
 . + {
     "config": {
-        "ethash": {},
+        "ethash": (if env.HIVE_CLIQUE_PERIOD then null else {} end),
+        "clique": (if env.HIVE_CLIQUE_PERIOD == null then null else {
+          "blockperiodseconds": env.HIVE_CLIQUE_PERIOD|to_int,
+          "epochlength": 30000,
+        } end),
         "chainID": env.HIVE_CHAIN_ID|to_int,
         "homesteadBlock": env.HIVE_FORK_HOMESTEAD|to_int,
         "daoForkBlock": env.HIVE_FORK_DAO_BLOCK|to_int,
