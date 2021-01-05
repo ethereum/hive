@@ -166,30 +166,30 @@ func (tc *testCase) responseMatch(t *hivesim.T, respStatus string, respBytes []b
 		t.Fatal("can't decode response:", err)
 	}
 	// return if a response matches. If not, error out.
-	for i, response := range tc.gqlTest.Responses {
+	for _, response := range tc.gqlTest.Responses {
 		if reflect.DeepEqual(response, got) {
 			return nil
 		}
-		if i == len(tc.gqlTest.Responses)-1 {
-			prettyQuery, ok := reindentJSON(tc.gqlTest.Request)
-			prettyResponse, _ := json.MarshalIndent(got, "", "  ")
-			defer func() {
-				t.Log("Test failed.")
-				t.Log("HTTP response code:", respStatus)
-				if ok {
-					t.Log("query:", prettyQuery)
-				}
-				t.Log("expected value(s):")
-				for _, expected := range tc.gqlTest.Responses {
-					prettyExpected, _ := json.MarshalIndent(expected, "", "  ")
-					t.Log(string(prettyExpected), "\n_____________________\n")
-				}
-
-				t.Log("got:", string(prettyResponse))
-				t.Fail()
-			}()
-		}
 	}
+
+	prettyQuery, ok := reindentJSON(tc.gqlTest.Request)
+	prettyResponse, _ := json.MarshalIndent(got, "", "  ")
+
+	t.Log("Test failed.")
+	t.Log("HTTP response code:", respStatus)
+	if ok {
+		t.Log("query:", prettyQuery)
+	}
+	t.Log("expected value(s):")
+
+	for _, expected := range tc.gqlTest.Responses {
+		prettyExpected, _ := json.MarshalIndent(expected, "", "  ")
+		t.Log(string(prettyExpected), "\n_____________________\n")
+	}
+
+	t.Log("got:", string(prettyResponse))
+	t.Fail()
+
 	return fmt.Errorf("test failed")
 }
 
