@@ -459,9 +459,12 @@ func deployContractOutOfGasTest(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("Unable to fetch tx receipt: %v", err)
 	}
-	// test if receipt contractAddress is empty
+	// test if receipt contract address is empty
 	if receipt.ContractAddress != (common.Address{}) {
 		t.Errorf("Receipt contract address should be empty, got %x", receipt.ContractAddress)
+	}
+	if receipt.BlockHash != (common.Hash{}) {
+		t.Errorf("Receipt block hash should be empty, got %x", receipt.BlockHash)
 	}
 	// test if there is nothing deploy on the calculated contract address
 	code, err := t.Eth.CodeAt(t.Ctx(), contractAddress, nil)
