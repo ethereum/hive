@@ -1,12 +1,21 @@
 package main
 
 import (
+	"math/big"
+
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
 )
 
+var (
+	chainID   = big.NewInt(7) // used for signing transactions
+	networkID = big.NewInt(8)
+	gasPrice  = big.NewInt(50 * params.GWei)
+)
+
 var clientEnv = hivesim.Params{
-	"HIVE_NETWORK_ID":     "7",
-	"HIVE_CHAIN_ID":       "7",
+	"HIVE_NETWORK_ID":     networkID.String(),
+	"HIVE_CHAIN_ID":       chainID.String(),
 	"HIVE_FORK_HOMESTEAD": "0",
 	"HIVE_FORK_TANGERINE": "0",
 	"HIVE_FORK_SPURIOUS":  "0",
@@ -23,15 +32,15 @@ var files = map[string]string{
 var tests = []hivesim.ClientTestSpec{
 	// HTTP RPC tests.
 	{Name: "http/BalanceAndNonceAt", Run: runHTTP(balanceAndNonceAtTest)},
-	{Name: "http/BlockByHash", Run: runHTTP(blockByHashTest)},
-	{Name: "http/BlockByNumber", Run: runHTTP(blockByNumberTest)},
-	{Name: "http/CodeAt", Run: runHTTP(CodeAtTest)},
 	{Name: "http/CanonicalChain", Run: runHTTP(canonicalChainTest)},
+	{Name: "http/CodeAt", Run: runHTTP(CodeAtTest)},
 	{Name: "http/ContractDeployment", Run: runHTTP(deployContractTest)},
 	{Name: "http/ContractDeploymentOutOfGas", Run: runHTTP(deployContractOutOfGasTest)},
 	{Name: "http/EstimateGas", Run: runHTTP(estimateGasTest)},
-	{Name: "http/HeaderByHash", Run: runHTTP(headerByHashTest)},
-	{Name: "http/HeaderByNumber", Run: runHTTP(headerByNumberTest)},
+	{Name: "http/GenesisBlockByHash", Run: runHTTP(genesisBlockByHashTest)},
+	{Name: "http/GenesisBlockByNumber", Run: runHTTP(genesisBlockByNumberTest)},
+	{Name: "http/GenesisHeaderByHash", Run: runHTTP(genesisHeaderByHashTest)},
+	{Name: "http/GenesisHeaderByNumber", Run: runHTTP(genesisHeaderByNumberTest)},
 	{Name: "http/Receipt", Run: runHTTP(receiptTest)},
 	{Name: "http/SyncProgress", Run: runHTTP(syncProgressTest)},
 	{Name: "http/TransactionCount", Run: runHTTP(transactionCountTest)},
@@ -44,15 +53,15 @@ var tests = []hivesim.ClientTestSpec{
 
 	// WebSocket RPC tests.
 	{Name: "ws/BalanceAndNonceAt", Run: runWS(balanceAndNonceAtTest)},
-	{Name: "ws/BlockByHash", Run: runWS(blockByHashTest)},
-	{Name: "ws/BlockByNumber", Run: runWS(blockByNumberTest)},
-	{Name: "ws/CodeAt", Run: runWS(CodeAtTest)},
 	{Name: "ws/CanonicalChain", Run: runWS(canonicalChainTest)},
+	{Name: "ws/CodeAt", Run: runWS(CodeAtTest)},
 	{Name: "ws/ContractDeployment", Run: runWS(deployContractTest)},
 	{Name: "ws/ContractDeploymentOutOfGas", Run: runWS(deployContractOutOfGasTest)},
 	{Name: "ws/EstimateGas", Run: runWS(estimateGasTest)},
-	{Name: "ws/HeaderByHash", Run: runWS(headerByHashTest)},
-	{Name: "ws/HeaderByNumber", Run: runWS(headerByNumberTest)},
+	{Name: "ws/GenesisBlockByHash", Run: runWS(genesisBlockByHashTest)},
+	{Name: "ws/GenesisBlockByNumber", Run: runWS(genesisBlockByNumberTest)},
+	{Name: "ws/GenesisHeaderByHash", Run: runWS(genesisHeaderByHashTest)},
+	{Name: "ws/GenesisHeaderByNumber", Run: runWS(genesisHeaderByNumberTest)},
 	{Name: "ws/Receipt", Run: runWS(receiptTest)},
 	{Name: "ws/SyncProgress", Run: runWS(syncProgressTest)},
 	{Name: "ws/TransactionCount", Run: runWS(transactionCountTest)},

@@ -3,25 +3,24 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
-	"math/big"
+	"io/ioutil"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/kr/pretty"
 )
 
-var (
-	// default timeout for RPC calls
-	rpcTimeout = 5 * time.Second
-	// unique chain identifier used to sign transaction
-	chainID = new(big.Int).SetInt64(7) // used for signing transactions
-)
+// default timeout for RPC calls
+var rpcTimeout = 5 * time.Second
 
 // TestClient is an ethclient that exposed the CallContext function.
 // This allows for calling custom RPC methods that are not exposed
@@ -139,4 +138,25 @@ func signTransaction(tx *types.Transaction, account accounts.Account) (*types.Tr
 		return nil, err
 	}
 	return wallet.SignTxWithPassphrase(account, defaultPassword, tx, chainID)
+}
+
+func loadGenesis() *types.Block {
+	contents, err := ioutil.ReadFile("init/genesis.json")
+	if err != nil {
+		panic(fmt.Errorf("can't to read genesis file: %v", err))
+	}
+	var genesis core.Genesis
+	if err := json.Unmarshal(contents, &genesis); err != nil {
+		panic(fmt.Errorf("can't parse genesis JSON: %v", err))
+	}
+	return genesis.ToBlock(nil)
+}
+
+// diff checks whether x and y are deeply equal, returning a description
+// of their differences if they are not equal.
+func diff(x, y interface{}) (d string) {
+	for _, l := range pretty.Diff(x, y) {
+		d += l + "\n"
+	}
+	return d
 }

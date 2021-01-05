@@ -2,27 +2,20 @@ package main
 
 import (
 	"bytes"
-	"context"
-	"encoding/json"
-	"io/ioutil"
 	"math/big"
 	"math/rand"
-	"reflect"
 	"strings"
 	"time"
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 )
 
 var (
-	// hash of the genesis block
-	genesisHash  = common.HexToHash("0xf74e0678a551515d1746ccf6e3bbdce19775b0b47608c49dd25ac92302b0a376")
 	contractCode = `
 pragma solidity ^0.4.6;
 
@@ -156,8 +149,7 @@ func balanceAndNonceAtTest(t *TestEnv) {
 	)
 
 	// Get current balance
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	sourceAddressBalanceBefore, err := t.Eth.BalanceAt(ctx, sourceAddress, nil)
+	sourceAddressBalanceBefore, err := t.Eth.BalanceAt(t.Ctx(), sourceAddress, nil)
 	if err != nil {
 		t.Fatalf("Unable to retrieve balance: %v", err)
 	}
@@ -167,8 +159,7 @@ func balanceAndNonceAtTest(t *TestEnv) {
 		t.Errorf("Expected balance %d, got %d", expected, sourceAddressBalanceBefore)
 	}
 
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-	nonceBefore, err := t.Eth.NonceAt(ctx, sourceAddress, nil)
+	nonceBefore, err := t.Eth.NonceAt(t.Ctx(), sourceAddress, nil)
 	if err != nil {
 		t.Fatalf("Unable to determine nonce: %v", err)
 	}
@@ -177,10 +168,10 @@ func balanceAndNonceAtTest(t *TestEnv) {
 	}
 
 	// send 1234 wei to target account and verify balances and nonces are updated
-	amount := big.NewInt(1234)
-	gasPrice := big.NewInt(34 * params.GWei)
-	gasLimit := uint64(50000)
-
+	var (
+		amount   = big.NewInt(1234)
+		gasLimit = uint64(50000)
+	)
 	rawTx := types.NewTransaction(sourceNonce, targetAddr, amount, gasLimit, gasPrice, nil)
 	valueTx, err := signTransaction(rawTx, sourceAccount)
 	if err != nil {
@@ -189,16 +180,13 @@ func balanceAndNonceAtTest(t *TestEnv) {
 	sourceNonce++
 
 	t.Logf("BalanceAt: send %d wei from 0x%x to 0x%x in 0x%x", valueTx.Value(), sourceAddress, targetAddr, valueTx.Hash())
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-	if err := t.Eth.SendTransaction(ctx, valueTx); err != nil {
+	if err := t.Eth.SendTransaction(t.Ctx(), valueTx); err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
 	var receipt *types.Receipt
-
 	for {
-		ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-		receipt, err = t.Eth.TransactionReceipt(ctx, valueTx.Hash())
+		receipt, err = t.Eth.TransactionReceipt(t.Ctx(), valueTx.Hash())
 		if receipt != nil {
 			break
 		}
@@ -241,67 +229,63 @@ func balanceAndNonceAtTest(t *TestEnv) {
 	}
 }
 
-// compareAgainstGenesisBlock is a helper function that compares the
-// given header against the known genesis block and errors for mismatches.
-func compareAgainstGenesisBlock(t *TestEnv, head0 *types.Header) {
-	contents, err := ioutil.ReadFile("genesis.json")
-	if err != nil {
-		t.Fatalf("Unable to read genesis file: %v", err)
-	}
-	var genesis core.Genesis
-	if err := json.Unmarshal(contents, &genesis); err != nil {
-		t.Fatalf("Unable to parse genesis file: %v", err)
-	}
-	gblock := genesis.ToBlock(nil)
-	if !reflect.DeepEqual(gblock.Header(), head0) {
-		t.Fatal("genesis header reported by node differs from expected header")
-		// TODO: details
-	}
-
-	// Allocs are tested dynamically when contracts are deployed
-}
-
-// headerByHashTest fetched the known genesis header and compares
+// genesisByHash fetches the known genesis header and compares
 // it against the genesis file to determine if block fields are
 // returned correct.
-func headerByHashTest(t *TestEnv) {
-	headerByHash, err := t.Eth.HeaderByHash(t.Ctx(), genesisHash)
+func genesisHeaderByHashTest(t *TestEnv) {
+	gblock := loadGenesis()
+
+	headerByHash, err := t.Eth.HeaderByHash(t.Ctx(), gblock.Hash())
 	if err != nil {
-		t.Fatalf("Unable to fetch block %x: %v", genesisHash, err)
+		t.Fatalf("Unable to fetch block %x: %v", gblock.Hash(), err)
 	}
-	compareAgainstGenesisBlock(t, headerByHash)
+	if d := diff(gblock.Header(), headerByHash); d != "" {
+		t.Fatal("genesis header reported by node differs from expected header:\n", d)
+	}
 }
 
 // headerByNumberTest fetched the known genesis header and compares
 // it against the genesis file to determine if block fields are
 // returned correct.
-func headerByNumberTest(t *TestEnv) {
+func genesisHeaderByNumberTest(t *TestEnv) {
+	gblock := loadGenesis()
+
 	headerByNum, err := t.Eth.HeaderByNumber(t.Ctx(), big0)
 	if err != nil {
 		t.Fatalf("Unable to fetch genesis block: %v", err)
 	}
-	compareAgainstGenesisBlock(t, headerByNum)
-}
-
-// blockByHashTest fetched the known genesis block and compares it against
-// the genesis file to determine if block fields are returned correct.
-func blockByHashTest(t *TestEnv) {
-	blockByHash, err := t.Eth.BlockByHash(t.Ctx(), genesisHash)
-	if err != nil {
-		t.Fatalf("Unable to fetch block %x: %v", genesisHash, err)
+	if d := diff(gblock.Header(), headerByNum); d != "" {
+		t.Fatal("genesis header reported by node differs from expected header:\n", d)
 	}
-	compareAgainstGenesisBlock(t, blockByHash.Header())
 }
 
-// blockByNumberTest retrieves block 0 since that is the only block
+// genesisBlockByHashTest fetched the known genesis block and compares it against
+// the genesis file to determine if block fields are returned correct.
+func genesisBlockByHashTest(t *TestEnv) {
+	gblock := loadGenesis()
+
+	blockByHash, err := t.Eth.BlockByHash(t.Ctx(), gblock.Hash())
+	if err != nil {
+		t.Fatalf("Unable to fetch block %x: %v", gblock.Hash(), err)
+	}
+	if d := diff(gblock.Header(), blockByHash.Header()); d != "" {
+		t.Fatal("genesis header reported by node differs from expected header:\n", d)
+	}
+}
+
+// genesisBlockByNumberTest retrieves block 0 since that is the only block
 // that is known through the genesis.json file and tests if block
 // fields matches the fields defined in the genesis file.
-func blockByNumberTest(t *TestEnv) {
+func genesisBlockByNumberTest(t *TestEnv) {
+	gblock := loadGenesis()
+
 	blockByNum, err := t.Eth.BlockByNumber(t.Ctx(), big0)
 	if err != nil {
 		t.Fatalf("Unable to fetch genesis block: %v", err)
 	}
-	compareAgainstGenesisBlock(t, blockByNum.Header())
+	if d := diff(gblock.Header(), blockByNum.Header()); d != "" {
+		t.Fatal("genesis header reported by node differs from expected header:\n", d)
+	}
 }
 
 // canonicalChainTest loops over 10 blocks and does some basic validations
@@ -378,7 +362,6 @@ func deployContractTest(t *TestEnv) {
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
-		gasPrice                = big.NewInt(30 * params.GWei)
 		gasLimit                = uint64(1200000)
 	)
 
@@ -454,7 +437,6 @@ func deployContractOutOfGasTest(t *TestEnv) {
 		nonce   = uint64(0)
 
 		contractAddress = crypto.CreateAddress(address, nonce)
-		gasPrice        = big.NewInt(32 * params.GWei)
 		gasLimit        = uint64(240000) // insufficient gas
 	)
 
@@ -508,7 +490,6 @@ func receiptTest(t *TestEnv) {
 		t.Fatalf("Unable to prepare tx payload: %v", err)
 	}
 
-	gasPrice := big.NewInt(30 * params.GWei)
 	rawTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
 	tx, err := signTransaction(rawTx, account)
 	if err != nil {
@@ -598,8 +579,7 @@ func validateLog(t *TestEnv, tx *types.Transaction, log types.Log, contractAddre
 
 // syncProgressTest only tests if this function is supported by the node.
 func syncProgressTest(t *TestEnv) {
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	_, err := t.Eth.SyncProgress(ctx)
+	_, err := t.Eth.SyncProgress(t.Ctx())
 	if err != nil {
 		t.Fatalf("Unable to determine sync progress: %v", err)
 	}
@@ -611,7 +591,6 @@ func transactionInBlockTest(t *TestEnv) {
 	var (
 		key         = createAndFundAccount(t, big.NewInt(params.Ether))
 		nonce       = uint64(0)
-		gasPrice    = big.NewInt(20 * params.GWei)
 		blockNumber = new(big.Int)
 	)
 
@@ -660,7 +639,6 @@ func transactionInBlockSubscriptionTest(t *TestEnv) {
 	}
 
 	key := createAndFundAccount(t, big.NewInt(params.Ether))
-	gasPrice := big.NewInt(20 * params.GWei)
 	for i := 0; i < 5; i++ {
 		rawTx := types.NewTransaction(uint64(i), predeployedVaultAddr, big1, 100000, gasPrice, nil)
 		tx, err := signTransaction(rawTx, key)
@@ -697,11 +675,10 @@ func transactionInBlockSubscriptionTest(t *TestEnv) {
 // newHeadSubscriptionTest tests whether
 func newHeadSubscriptionTest(t *TestEnv) {
 	var (
-		ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-		heads  = make(chan *types.Header)
+		heads = make(chan *types.Header)
 	)
 
-	sub, err := t.Eth.SubscribeNewHead(ctx, heads)
+	sub, err := t.Eth.SubscribeNewHead(t.Ctx(), heads)
 	if err != nil {
 		t.Fatalf("Unable to subscribe to new heads: %v", err)
 	}
@@ -710,8 +687,7 @@ func newHeadSubscriptionTest(t *TestEnv) {
 	for i := 0; i < 10; i++ {
 		select {
 		case newHead := <-heads:
-			ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-			header, err := t.Eth.HeaderByHash(ctx, newHead.Hash())
+			header, err := t.Eth.HeaderByHash(t.Ctx(), newHead.Hash())
 			if err != nil {
 				t.Fatalf("Unable to fetch header: %v", err)
 			}
@@ -726,7 +702,6 @@ func newHeadSubscriptionTest(t *TestEnv) {
 
 func logSubscriptionTest(t *TestEnv) {
 	var (
-		ctx, _   = context.WithTimeout(context.Background(), rpcTimeout)
 		criteria = ethereum.FilterQuery{
 			Addresses: []common.Address{predeployedContractAddr},
 			Topics:    [][]common.Hash{},
@@ -734,7 +709,7 @@ func logSubscriptionTest(t *TestEnv) {
 		logs = make(chan types.Log)
 	)
 
-	sub, err := t.Eth.SubscribeFilterLogs(ctx, criteria, logs)
+	sub, err := t.Eth.SubscribeFilterLogs(t.Ctx(), criteria, logs)
 	if err != nil {
 		t.Fatalf("Unable to create log subscription: %v", err)
 	}
@@ -751,15 +726,13 @@ func logSubscriptionTest(t *TestEnv) {
 	)
 
 	payload, _ := contractABI.Pack("events", arg0, arg1)
-	gasPrice := big.NewInt(30 * params.GWei)
 	rawTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
 	tx, err := signTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
 
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-	if err = t.Eth.SendTransaction(ctx, tx); err != nil {
+	if err = t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
@@ -822,8 +795,7 @@ func validatePredeployContractLogs(t *TestEnv, tx *types.Transaction, logs []typ
 
 func transactionCountTest(t *TestEnv) {
 	var (
-		key      = createAndFundAccount(t, big.NewInt(params.Ether))
-		gasPrice = big.NewInt(20 * params.GWei)
+		key = createAndFundAccount(t, big.NewInt(params.Ether))
 	)
 
 	for i := 0; i < 60; i++ {
@@ -833,19 +805,16 @@ func transactionCountTest(t *TestEnv) {
 			t.Fatalf("Unable to sign deploy tx: %v", err)
 		}
 
-		ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-		if err = t.Eth.SendTransaction(ctx, tx); err != nil {
+		if err = t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 			t.Fatalf("Unable to send transaction: %v", err)
 		}
-
-		ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-		block, err := t.Eth.BlockByNumber(ctx, nil)
+		block, err := t.Eth.BlockByNumber(t.Ctx(), nil)
 		if err != nil {
 			t.Fatalf("Unable to retrieve latest block: %v", err)
 		}
 
 		if len(block.Transactions()) > 0 {
-			count, err := t.Eth.TransactionCount(ctx, block.Hash())
+			count, err := t.Eth.TransactionCount(t.Ctx(), block.Hash())
 			if err != nil {
 				t.Fatalf("Unable to retrieve block transaction count: %v", err)
 			}
@@ -862,8 +831,7 @@ func transactionCountTest(t *TestEnv) {
 // TransactionReceiptTest sends a transaction and tests the receipt fields.
 func TransactionReceiptTest(t *TestEnv) {
 	var (
-		key      = createAndFundAccount(t, big.NewInt(params.Ether))
-		gasPrice = big.NewInt(20 * params.GWei)
+		key = createAndFundAccount(t, big.NewInt(params.Ether))
 	)
 
 	rawTx := types.NewTransaction(uint64(0), common.Address{}, big1, 100000, gasPrice, nil)
@@ -872,45 +840,35 @@ func TransactionReceiptTest(t *TestEnv) {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
 
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	if err = t.Eth.SendTransaction(ctx, tx); err != nil {
+	if err = t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
 	for i := 0; i < 60; i++ {
-		time.Sleep(time.Second)
-
-		ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-		receipt, err := t.Eth.TransactionReceipt(ctx, tx.Hash())
-
+		receipt, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
 		if err == ethereum.NotFound {
+			time.Sleep(time.Second)
 			continue
 		}
 
 		if err != nil {
 			t.Errorf("Unable to fetch receipt: %v", err)
 		}
-
 		if receipt.TxHash != tx.Hash() {
 			t.Errorf("Receipt [tx=%x] contains invalid tx hash, want %x, got %x", tx.Hash(), receipt.TxHash)
 		}
-
 		if receipt.ContractAddress != (common.Address{}) {
 			t.Errorf("Receipt [tx=%x] contains invalid contract address, expected empty address but got %x", tx.Hash(), receipt.ContractAddress)
 		}
-
 		if receipt.Bloom.Big().Cmp(big0) != 0 {
 			t.Errorf("Receipt [tx=%x] bloom not empty, %x", tx.Hash(), receipt.Bloom)
 		}
-
 		if receipt.GasUsed != params.TxGas {
 			t.Errorf("Receipt [tx=%x] has invalid gas used, want %d, got %d", tx.Hash(), params.TxGas, receipt.GasUsed)
 		}
-
 		if len(receipt.Logs) != 0 {
 			t.Errorf("Receipt [tx=%x] should not contain logs but got %d logs", tx.Hash(), len(receipt.Logs))
 		}
-
 		return
 	}
 }
