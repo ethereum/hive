@@ -11,7 +11,7 @@ import (
 var (
 	chainID   = big.NewInt(7) // used for signing transactions
 	networkID = big.NewInt(8)
-	gasPrice  = big.NewInt(50 * params.GWei)
+	gasPrice  = big.NewInt(20 * params.GWei)
 )
 
 var clientEnv = hivesim.Params{
