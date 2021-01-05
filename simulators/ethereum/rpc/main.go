@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/params"
@@ -29,7 +30,13 @@ var files = map[string]string{
 	"/genesis.json": "./init/genesis.json",
 }
 
-var tests = []hivesim.ClientTestSpec{
+type testSpec struct {
+	Name  string
+	About string
+	Run   func(*hivesim.T, *hivesim.Client)
+}
+
+var tests = []testSpec{
 	// HTTP RPC tests.
 	{Name: "http/BalanceAndNonceAt", Run: runHTTP(balanceAndNonceAtTest)},
 	{Name: "http/CanonicalChain", Run: runHTTP(canonicalChainTest)},
@@ -86,10 +93,24 @@ The RPC test suite runs a set of RPC related tests against a running node. It te
 several real-world scenarios such as sending value transactions, deploying a contract or
 interacting with one.`[1:],
 	}
-	for _, test := range tests {
-		test.Parameters = clientEnv
-		test.Files = files
-		suite.Add(test)
-	}
+	suite.Add(&hivesim.ClientTestSpec{
+		Name:        "client launch",
+		Description: `This test launches the client and collects its logs.`,
+		Parameters:  clientEnv,
+		Files:       files,
+		Run:         runAllTests,
+	})
 	hivesim.MustRunSuite(hivesim.New(), suite)
+}
+
+func runAllTests(t *hivesim.T, c *hivesim.Client) {
+	for _, test := range tests {
+		t.Run(hivesim.TestSpec{
+			Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
+			Description: test.About,
+			Run: func(t *hivesim.T) {
+				test.Run(t, c)
+			},
+		})
+	}
 }
