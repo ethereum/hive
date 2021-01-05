@@ -84,7 +84,7 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 
 	headsSub, err = t.Eth.SubscribeNewHead(ctx, heads)
 	if err != nil {
-		panic(fmt.Sprintf("Could not create new head subscription: %v", err))
+		t.Fatal("could not create new head subscription:", err)
 	}
 	defer headsSub.Unsubscribe()
 
@@ -96,7 +96,7 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 	}
 	logsSub, err = t.Eth.SubscribeFilterLogs(ctx, q, logs)
 	if err != nil {
-		panic(fmt.Sprintf("Could not create log filter subscription: %v", err))
+		t.Fatal("could not create log filter subscription:", err)
 	}
 	defer logsSub.Unsubscribe()
 

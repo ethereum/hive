@@ -82,7 +82,7 @@ func transactContractTest(t *TestEnv) {
 	)
 
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, account)
+	deployTx, err := signTransaction(rawTx, account)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -117,7 +117,7 @@ func transactContractTest(t *TestEnv) {
 	}
 
 	eventsTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
-	tx, err := SignTransaction(eventsTx, account)
+	tx, err := signTransaction(eventsTx, account)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -174,7 +174,7 @@ func transactContractSubscriptionTest(t *TestEnv) {
 
 	// deploy contract
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, account)
+	deployTx, err := signTransaction(rawTx, account)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -223,7 +223,7 @@ func transactContractSubscriptionTest(t *TestEnv) {
 		From:  address,
 		Nonce: new(big.Int).SetUint64(nonce),
 		Signer: func(signer types.Signer, addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
-			return SignTransaction(tx, account)
+			return signTransaction(tx, account)
 		},
 	}
 

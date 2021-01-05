@@ -77,7 +77,7 @@ func (t *TestEnv) CallContext(ctx context.Context, result interface{}, method st
 // Ctx returns a context with a 5s timeout.
 func (t *TestEnv) Ctx() context.Context {
 	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	return ctx // TODO: deal with the leak.&
+	return ctx // TODO: deal with the leak.
 }
 
 // Naive generic function that works in all situations.
@@ -131,9 +131,9 @@ func waitForTxConfirmations(t *TestEnv, txHash common.Hash, n uint64) (*types.Re
 	return nil, ethereum.NotFound
 }
 
-// SignTransaction signs the given transaction with the test account and returns it.
+// signTransaction signs the given transaction with the test account and returns it.
 // It uses the EIP155 signing rules.
-func SignTransaction(tx *types.Transaction, account accounts.Account) (*types.Transaction, error) {
+func signTransaction(tx *types.Transaction, account accounts.Account) (*types.Transaction, error) {
 	wallet, err := accountsManager.Find(account)
 	if err != nil {
 		return nil, err

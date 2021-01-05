@@ -118,7 +118,7 @@ func estimateGasTest(t *TestEnv) {
 	// send the actual tx and test gas usage
 	txGas := estimated + 100000
 	rawTx := types.NewTransaction(0, *msg.To, msg.Value, txGas, big.NewInt(32*params.GWei), msg.Data)
-	tx, err := SignTransaction(rawTx, account)
+	tx, err := signTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Could not sign transaction: %v", err)
 	}
@@ -182,7 +182,7 @@ func balanceAndNonceAtTest(t *TestEnv) {
 	gasLimit := uint64(50000)
 
 	rawTx := types.NewTransaction(sourceNonce, targetAddr, amount, gasLimit, gasPrice, nil)
-	valueTx, err := SignTransaction(rawTx, sourceAccount)
+	valueTx, err := signTransaction(rawTx, sourceAccount)
 	if err != nil {
 		t.Fatalf("Unable to sign value tx: %v", err)
 	}
@@ -383,7 +383,7 @@ func deployContractTest(t *TestEnv) {
 	)
 
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, account)
+	deployTx, err := signTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -461,7 +461,7 @@ func deployContractOutOfGasTest(t *TestEnv) {
 	t.Logf("Calculated contract address: %x", contractAddress)
 
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, account)
+	deployTx, err := signTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -510,7 +510,7 @@ func receiptTest(t *TestEnv) {
 
 	gasPrice := big.NewInt(30 * params.GWei)
 	rawTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
-	tx, err := SignTransaction(rawTx, account)
+	tx, err := signTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -623,7 +623,7 @@ func transactionInBlockTest(t *TestEnv) {
 			rawTx := types.NewTransaction(nonce, predeployedVaultAddr, big1, 100000, gasPrice, nil)
 			nonce++
 
-			tx, err := SignTransaction(rawTx, key)
+			tx, err := signTransaction(rawTx, key)
 			if err != nil {
 				t.Fatalf("Unable to sign deploy tx: %v", err)
 			}
@@ -663,7 +663,7 @@ func transactionInBlockSubscriptionTest(t *TestEnv) {
 	gasPrice := big.NewInt(20 * params.GWei)
 	for i := 0; i < 5; i++ {
 		rawTx := types.NewTransaction(uint64(i), predeployedVaultAddr, big1, 100000, gasPrice, nil)
-		tx, err := SignTransaction(rawTx, key)
+		tx, err := signTransaction(rawTx, key)
 		if err != nil {
 			t.Fatalf("Unable to sign deploy tx: %v", err)
 		}
@@ -753,7 +753,7 @@ func logSubscriptionTest(t *TestEnv) {
 	payload, _ := contractABI.Pack("events", arg0, arg1)
 	gasPrice := big.NewInt(30 * params.GWei)
 	rawTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
-	tx, err := SignTransaction(rawTx, account)
+	tx, err := signTransaction(rawTx, account)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -828,7 +828,7 @@ func transactionCountTest(t *TestEnv) {
 
 	for i := 0; i < 60; i++ {
 		rawTx := types.NewTransaction(uint64(i), predeployedVaultAddr, big1, 100000, gasPrice, nil)
-		tx, err := SignTransaction(rawTx, key)
+		tx, err := signTransaction(rawTx, key)
 		if err != nil {
 			t.Fatalf("Unable to sign deploy tx: %v", err)
 		}
@@ -867,7 +867,7 @@ func TransactionReceiptTest(t *TestEnv) {
 	)
 
 	rawTx := types.NewTransaction(uint64(0), common.Address{}, big1, 100000, gasPrice, nil)
-	tx, err := SignTransaction(rawTx, key)
+	tx, err := signTransaction(rawTx, key)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
