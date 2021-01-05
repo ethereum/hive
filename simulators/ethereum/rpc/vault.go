@@ -196,7 +196,6 @@ func vaultSendSome(t *TestEnv, recipient common.Address, amount *big.Int) *types
 	var (
 		nonce    = nextNonce(t, vaultAccountAddr)
 		gasLimit = uint64(75000)
-		gasPrice = new(big.Int)
 		txAmount = new(big.Int)
 	)
 	tx := types.NewTransaction(nonce, predeployedVaultAddr, txAmount, gasLimit, gasPrice, payload)
