@@ -129,6 +129,9 @@ else
     RPCFLAGS="$RPCFLAGS --graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8545"
 fi
 
+# Enable WebSocket.
+RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-host=0.0.0.0"
+
 # Start Besu.
 if [ -z "$HAS_IMPORT" ]; then
     cmd="$besu $FLAGS $RPCFLAGS"
