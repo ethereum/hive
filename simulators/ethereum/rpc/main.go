@@ -10,8 +10,10 @@ var clientEnv = hivesim.Params{
 	"HIVE_FORK_HOMESTEAD": "0",
 	"HIVE_FORK_TANGERINE": "0",
 	"HIVE_FORK_SPURIOUS":  "0",
-	"HIVE_MINER":          "0xc5065c9eeebe6df2c2284d046bfc906501846c51",
-	"HIVE_SKIP_POW":       "1",
+	// All tests use clique PoA to mine new blocks.
+	"HIVE_CLIQUE_PERIOD":     "1",
+	"HIVE_CLIQUE_PRIVATEKEY": "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
+	"HIVE_MINER":             "658bdf435d810c91414ec09147daa6db62406379",
 }
 
 var files = map[string]string{
