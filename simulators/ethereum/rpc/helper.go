@@ -48,7 +48,7 @@ func runHTTP(fn func(*TestEnv)) func(*hivesim.T, *hivesim.Client) {
 			node: c,
 		}
 		fn(env)
-		if env.lastCtx {
+		if env.lastCtx != nil {
 			env.lastCancel()
 		}
 	}
@@ -70,7 +70,7 @@ func runWS(fn func(*TestEnv)) func(*hivesim.T, *hivesim.Client) {
 			node: c,
 		}
 		fn(env)
-		if env.lastCtx {
+		if env.lastCtx != nil {
 			env.lastCancel()
 		}
 	}
@@ -88,7 +88,7 @@ func (t *TestEnv) Ctx() context.Context {
 	if t.lastCtx != nil {
 		t.lastCancel() // Cancel previous context before making a new one.
 	}
-	t.lastCtx, t.lastCancel := context.WithTimeout(context.Background(), rpcTimeout)
+	t.lastCtx, t.lastCancel = context.WithTimeout(context.Background(), rpcTimeout)
 	return t.lastCtx
 }
 
