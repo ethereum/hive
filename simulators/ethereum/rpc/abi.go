@@ -222,7 +222,7 @@ func transactContractSubscriptionTest(t *TestEnv) {
 	opts := &bind.TransactOpts{
 		From:  address,
 		Nonce: new(big.Int).SetUint64(nonce),
-		Signer: func(signer types.Signer, addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
+		Signer: func(addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
 			return signTransaction(tx, account)
 		},
 	}
