@@ -11,8 +11,8 @@ def keystore_config:
 def base_config:
   {
     "Init": {
-      "PubSubEnabled": false,
-      "WebSocketsEnabled": false,
+      "PubSubEnabled": true,
+      "WebSocketsEnabled": true,
       "IsMining": (env.HIVE_MINER != null),
       "UseMemDb": true,
       "ChainSpecPath": "/chainspec/test.json",
@@ -23,6 +23,7 @@ def base_config:
       "Enabled": true,
       "Host": "0.0.0.0",
       "Port": 8545,
+      "WebSocketsPort": 8546,
     },
     "Network": {
       "DiscoveryPort": 30303,
