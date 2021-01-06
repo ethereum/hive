@@ -22,15 +22,19 @@ import (
 // default timeout for RPC calls
 var rpcTimeout = 5 * time.Second
 
-// TestClient is an ethclient that exposed the CallContext function.
-// This allows for calling custom RPC methods that are not exposed
-// by the ethclient.
+// TestClient is the environment of a single test.
 type TestEnv struct {
 	*hivesim.T
 	RPC *rpc.Client
 	Eth *ethclient.Client
 
 	node *hivesim.Client
+
+	// This holds most recent context created by the Ctx method.
+	// Every time Ctx is called, it creates a new context with the default
+	// timeout and cancels the previous one.
+	lastCtx    context.Context
+	lastCancel context.CancelFunc
 }
 
 // runHTTP runs the given test function using the HTTP RPC client.
@@ -44,6 +48,9 @@ func runHTTP(fn func(*TestEnv)) func(*hivesim.T, *hivesim.Client) {
 			node: c,
 		}
 		fn(env)
+		if env.lastCtx {
+			env.lastCancel()
+		}
 	}
 }
 
@@ -63,6 +70,9 @@ func runWS(fn func(*TestEnv)) func(*hivesim.T, *hivesim.Client) {
 			node: c,
 		}
 		fn(env)
+		if env.lastCtx {
+			env.lastCancel()
+		}
 	}
 }
 
@@ -75,8 +85,11 @@ func (t *TestEnv) CallContext(ctx context.Context, result interface{}, method st
 
 // Ctx returns a context with a 5s timeout.
 func (t *TestEnv) Ctx() context.Context {
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	return ctx // TODO: deal with the leak.
+	if t.lastCtx != nil {
+		t.lastCancel() // Cancel previous context before making a new one.
+	}
+	t.lastCtx, t.lastCancel := context.WithTimeout(context.Background(), rpcTimeout)
+	return t.lastCtx
 }
 
 // Naive generic function that works in all situations.
