@@ -9,9 +9,13 @@ import (
 )
 
 var (
-	chainID   = big.NewInt(7) // used for signing transactions
-	networkID = big.NewInt(8)
-	gasPrice  = big.NewInt(20 * params.GWei)
+	// parameters used for signing transactions
+	chainID  = big.NewInt(7)
+	gasPrice = big.NewInt(20 * params.GWei)
+
+	// would be nice to use a networkID that's different from chainID,
+	// but some clients don't support the distinction properly.
+	networkID = big.NewInt(7)
 )
 
 var clientEnv = hivesim.Params{
