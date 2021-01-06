@@ -38,18 +38,19 @@ contract Vault {
 	predeployedVaultAddr = common.HexToAddress("0000000000000000000000000000000000000315")
 	// vault ABI
 	predeployedVaultABI = `[{"constant":false,"inputs":[{"name":"to","type":"address"},{"name":"amount","type":"uint256"}],"name":"sendSome","outputs":[],"payable":false,"type":"function"},{"anonymous":false,"inputs":[{"indexed":true,"name":"","type":"address"},{"indexed":false,"name":"","type":"uint256"}],"name":"Send","type":"event"}]`
-	// wait for vaultTxConfirmationCount before a vault fund tx is considered confirmed
-	vaultTxConfirmationCount = uint64(10)
 	// software based keystore
 	keyStore *keystore.KeyStore
 	// account manager used to create new accounts and sign data
 	accountsManager *accounts.Manager
-	// default password for generated accounts
-	defaultPassword = ""
+)
+
+const (
+	vaultTxConfirmationCount = 5  // number of blocks to wait before vault funding tx is considered valid
+	defaultPassword          = "" // default password for generated accounts
 )
 
 var (
-	testChainID      = big.NewInt(7)
+	// This is the account that sends vault funding transactions.
 	vaultAccountAddr = common.HexToAddress("0xcf49fda3be353c69b41ed96333cd24302da4556f")
 	vaultKey, _      = crypto.HexToECDSA("63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376")
 )
@@ -168,7 +169,7 @@ func createAndFundAccount(t *TestEnv, amount *big.Int) accounts.Account {
 
 	// wait for vaultTxConfirmationCount confirmation by checking the balance vaultTxConfirmationCount blocks back.
 	// createAndFundAccountWithSubscription for a better solution using logs
-	for i := 0; i < 120; i++ {
+	for i := 0; i < vaultTxConfirmationCount*2; i++ {
 		block, err := t.Eth.BlockByNumber(t.Ctx(), nil)
 		if err != nil {
 			panic(err)
@@ -199,7 +200,7 @@ func vaultSendSome(t *TestEnv, recipient common.Address, amount *big.Int) *types
 		txAmount = new(big.Int)
 	)
 	tx := types.NewTransaction(nonce, predeployedVaultAddr, txAmount, gasLimit, gasPrice, payload)
-	signer := types.NewEIP155Signer(testChainID)
+	signer := types.NewEIP155Signer(chainID)
 	signedTx, err := types.SignTx(tx, signer, vaultKey)
 	if err != nil {
 		t.Fatal("can't sign vault funding tx:", err)
