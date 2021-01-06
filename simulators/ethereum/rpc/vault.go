@@ -56,7 +56,7 @@ var (
 )
 
 func init() {
-	keyStore = keystore.NewKeyStore(os.TempDir(), keystore.StandardScryptN, keystore.StandardScryptP)
+	keyStore = keystore.NewKeyStore(os.TempDir(), keystore.LightScryptN, keystore.LightScryptP)
 	accountsManager = accounts.NewManager(&accounts.Config{}, keyStore)
 }
 
