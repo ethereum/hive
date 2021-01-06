@@ -75,7 +75,6 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 
 	// setup subscriptions
 	var (
-		ctx      context.Context
 		headsSub ethereum.Subscription
 		heads    = make(chan *types.Header)
 		logsSub  ethereum.Subscription
@@ -83,12 +82,17 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 		vault, _ = abi.JSON(strings.NewReader(predeployedVaultABI))
 	)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// listen for new heads
 	headsSub, err = t.Eth.SubscribeNewHead(ctx, heads)
 	if err != nil {
 		t.Fatal("could not create new head subscription:", err)
 	}
 	defer headsSub.Unsubscribe()
 
+	// set up the log event subscription
 	eventTopic := vault.Events["Send"].ID
 	addressTopic := common.BytesToHash(common.LeftPadBytes(account.Address[:], 32))
 	q := ethereum.FilterQuery{
@@ -103,16 +107,16 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 
 	// order the vault to send some ether
 	tx := vaultSendSome(t, account.Address, amount)
-	if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
+	if err := t.Eth.SendTransaction(ctx, tx); err != nil {
 		t.Fatalf("unable to send funding transaction: %v", err)
 	}
+
+	// wait for confirmed log
 	var (
 		latestHeader *types.Header
 		receivedLog  *types.Log
 		timeout      = time.NewTimer(120 * time.Second)
 	)
-
-	// wait for confirmed log
 	for {
 		select {
 		case head := <-heads:
@@ -125,11 +129,11 @@ func createAndFundAccountWithSubscription(t *TestEnv, amount *big.Int) accounts.
 				receivedLog = nil
 			}
 		case err := <-headsSub.Err():
-			t.Fatalf("Could not fund new account: %v", err)
+			t.Fatalf("could not fund new account: %v", err)
 		case err := <-logsSub.Err():
-			t.Fatalf("Could not fund new account: %v", err)
+			t.Fatalf("could not fund new account: %v", err)
 		case <-timeout.C:
-			t.Fatal("Could not fund new account: timeout")
+			t.Fatal("could not fund new account: timeout")
 		}
 
 		if latestHeader != nil && receivedLog != nil {
