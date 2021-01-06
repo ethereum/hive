@@ -23,24 +23,24 @@ def to_int:
 
 # Replace 'config' section in input JSON.
 . + {
-    "config": {
-        "ethash": (if env.HIVE_CLIQUE_PERIOD then null else {} end),
-        "clique": (if env.HIVE_CLIQUE_PERIOD == null then null else {
-          "blockperiodseconds": env.HIVE_CLIQUE_PERIOD|to_int,
-          "epochlength": 30000,
-        } end),
-        "chainID": env.HIVE_CHAIN_ID|to_int,
-        "homesteadBlock": env.HIVE_FORK_HOMESTEAD|to_int,
-        "daoForkBlock": env.HIVE_FORK_DAO_BLOCK|to_int,
-        "eip150Block": env.HIVE_FORK_TANGERINE|to_int,
-        "eip150Hash": env.HIVE_FORK_TANGERINE_HASH,
-        "eip155Block": env.HIVE_FORK_SPURIOUS|to_int,
-        "eip158Block": env.HIVE_FORK_SPURIOUS|to_int,
-        "byzantiumBlock": env.HIVE_FORK_BYZANTIUM|to_int,
-        "constantinopleBlock": env.HIVE_FORK_CONSTANTINOPLE|to_int,
-        "constantinopleFixBlock": env.HIVE_FORK_PETERSBURG|to_int,
-        "istanbulBlock": env.HIVE_FORK_ISTANBUL|to_int,
-        "muirGlacierBlock": env.HIVE_FORK_MUIR_GLACIER|to_int,
-        "berlinBlock": env.HIVE_FORK_BERLIN|to_int,
-    }|remove_empty
+  "config": {
+    "ethash": (if env.HIVE_CLIQUE_PERIOD then null else {} end),
+    "clique": (if env.HIVE_CLIQUE_PERIOD == null then null else {
+      "blockperiodseconds": env.HIVE_CLIQUE_PERIOD|to_int,
+      "epochlength": 30000,
+    } end),
+    "chainID": env.HIVE_CHAIN_ID|to_int,
+    "homesteadBlock": env.HIVE_FORK_HOMESTEAD|to_int,
+    "daoForkBlock": env.HIVE_FORK_DAO_BLOCK|to_int,
+    "eip150Block": env.HIVE_FORK_TANGERINE|to_int,
+    "eip150Hash": env.HIVE_FORK_TANGERINE_HASH,
+    "eip155Block": env.HIVE_FORK_SPURIOUS|to_int,
+    "eip158Block": env.HIVE_FORK_SPURIOUS|to_int,
+    "byzantiumBlock": env.HIVE_FORK_BYZANTIUM|to_int,
+    "constantinopleBlock": env.HIVE_FORK_CONSTANTINOPLE|to_int,
+    "constantinopleFixBlock": env.HIVE_FORK_PETERSBURG|to_int,
+    "istanbulBlock": env.HIVE_FORK_ISTANBUL|to_int,
+    "muirGlacierBlock": env.HIVE_FORK_MUIR_GLACIER|to_int,
+    "berlinBlock": env.HIVE_FORK_BERLIN|to_int,
+  }|remove_empty
 }
