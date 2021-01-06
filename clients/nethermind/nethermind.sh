@@ -30,21 +30,20 @@
 # Immediately abort the script on any error encountered
 set -e
 
-# Configure the chain.
+# Generate the genesis and chainspec file.
 mkdir -p /chainspec
 jq -f /mapper.jq /genesis.json > /chainspec/test.json
 jq . /chainspec/test.json
+
+# Generate the config file.
+mkdir /configs
+jq -n -f /mkconfig.jq > /configs/test.cfg
 
 # Set bootnode.
 if [ -n "$HIVE_BOOTNODE" ]; then
     mkdir -p /nethermind/Data
     echo "[\"$HIVE_BOOTNODE\"]" > /nethermind/Data/static-nodes.json
 fi
-
-# Load any keys explicitly added to the node
-#if [ -d ]; then
-#	export NETHERMIND_HIVECONFIG_KEYSDIR=keys
-#fi
 
 echo "Running Nethermind..."
 # The output is tee:d, via /log.txt, because the enode script uses that logfile to parse out the enode id

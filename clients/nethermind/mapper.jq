@@ -34,15 +34,15 @@ def to_hex:
 
 # Zero-pads hex string.
 def infix_zeros_to_length(s;l):
-   if . != null then
-     (.[0:s])+("0"*(l-(.|length)))+(.[s:l])
-   else .
-   end
+  if . != null then
+    (.[0:s])+("0"*(l-(.|length)))+(.[s:l])
+  else .
+  end
 ;
 
-{
-  "version": "1",
-  "engine": {
+# This gives the consensus engine definition for the ethash engine.
+def ethash_engine:
+  {
     "Ethash": {
       "params": {
         "minimumDifficulty": "0x20000",
@@ -61,10 +61,28 @@ def infix_zeros_to_length(s;l):
           (env.HIVE_FORK_BYZANTIUM|to_hex//""): 3000000,
           (env.HIVE_FORK_CONSTANTINOPLE|to_hex//""): 2000000,
           (env.HIVE_FORK_MUIR_GLACIER|to_hex//""): 4000000,
-        },
-      },
-    },
-  },
+        }
+      }
+    }
+  }
+;
+
+# This gives the consensus engine definition for the clique PoA engine.
+def clique_engine:
+  {
+    "clique": {
+       "params": {
+         "period": env.HIVE_CLIQUE_PERIOD|tonumber,
+         "epoch": 30000,
+         "blockReward": "0x0"
+       }
+    }
+  }
+;
+
+{
+  "version": "1",
+  "engine": (if env.HIVE_CLIQUE_PERIOD then clique_engine else ethash_engine end),
   "params": {
     # Tangerine Whistle
     "eip150Transition": env.HIVE_FORK_TANGERINE|to_hex,
