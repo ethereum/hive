@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -141,16 +140,6 @@ func waitForTxConfirmations(t *TestEnv, txHash common.Hash, n uint64) (*types.Re
 	}
 
 	return nil, ethereum.NotFound
-}
-
-// signTransaction signs the given transaction with the test account and returns it.
-// It uses the EIP155 signing rules.
-func signTransaction(tx *types.Transaction, account accounts.Account) (*types.Transaction, error) {
-	wallet, err := accountsManager.Find(account)
-	if err != nil {
-		return nil, err
-	}
-	return wallet.SignTxWithPassphrase(account, defaultPassword, tx, chainID)
 }
 
 func loadGenesis() *types.Block {

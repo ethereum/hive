@@ -107,14 +107,40 @@ interacting with one.`[1:],
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
+// runAllTests runs the tests against a client instance.
+// Most tests simply wait for tx inclusion in a block so we can run many tests concurrently.
 func runAllTests(t *hivesim.T, c *hivesim.Client) {
+	s := newSemaphore(16)
 	for _, test := range tests {
-		t.Run(hivesim.TestSpec{
-			Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
-			Description: test.About,
-			Run: func(t *hivesim.T) {
-				test.Run(t, c)
-			},
-		})
+		test := test
+		s.get()
+		go func() {
+			defer s.put()
+			t.Run(hivesim.TestSpec{
+				Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
+				Description: test.About,
+				Run:         func(t *hivesim.T) { test.Run(t, c) },
+			})
+		}()
+	}
+	s.drain()
+}
+
+type semaphore chan struct{}
+
+func newSemaphore(n int) semaphore {
+	s := make(semaphore, n)
+	for i := 0; i < n; i++ {
+		s <- struct{}{}
+	}
+	return s
+}
+
+func (s semaphore) get() { <-s }
+func (s semaphore) put() { s <- struct{}{} }
+
+func (s semaphore) drain() {
+	for i := 0; i < cap(s); i++ {
+		<-s
 	}
 }
