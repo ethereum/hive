@@ -176,16 +176,21 @@ func (v *vault) createAccount(t *TestEnv, amount *big.Int) common.Address {
 		t.Fatalf("unable to send funding transaction: %v", err)
 	}
 
+	txBlock, err := t.Eth.BlockNumber(t.Ctx())
+	if err != nil {
+		t.Fatalf("can't get block number:", err)
+	}
+
 	// wait for vaultTxConfirmationCount confirmation by checking the balance vaultTxConfirmationCount blocks back.
 	// createAndFundAccountWithSubscription for a better solution using logs
 	for i := uint64(0); i < vaultTxConfirmationCount*2; i++ {
-		block, err := t.Eth.BlockByNumber(t.Ctx(), nil)
+		number, err := t.Eth.BlockNumber(t.Ctx())
 		if err != nil {
-			panic(err)
+			t.Fatalf("can't get block number:", err)
 		}
-		if block.NumberU64() > vaultTxConfirmationCount {
-			bnum := block.NumberU64() - vaultTxConfirmationCount
-			balance, err := t.Eth.BalanceAt(t.Ctx(), address, new(big.Int).SetUint64(bnum))
+		if number > txBlock+vaultTxConfirmationCount {
+			checkBlock := number - vaultTxConfirmationCount
+			balance, err := t.Eth.BalanceAt(t.Ctx(), address, new(big.Int).SetUint64(checkBlock))
 			if err != nil {
 				panic(err)
 			}
