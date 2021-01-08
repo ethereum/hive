@@ -25,9 +25,14 @@
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
 #  - HIVE_FORK_BERLIN          block number for Berlin transition
 #
+# Clique PoA:
+#
+#  - HIVE_CLIQUE_PERIOD        enables clique support. value is block time in seconds.
+#  - HIVE_CLIQUE_PRIVATEKEY    private key for clique mining
+#
 # Other:
 #
-#  - HIVE_MINER                address to credit with mining rewards (single thread)
+#  - HIVE_MINER                enables mining. value is coinbase.
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW             If set, skip PoW verification
 #  - HIVE_LOGLEVEL             Client log level
