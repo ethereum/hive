@@ -39,10 +39,9 @@ def infix_zeros_to_length(s;l):
   end
 ;
 
-
-{
-  "name": "Hive",
-  "engine": {
+# This gives the consensus engine definition for the ethash engine.
+def ethash_engine:
+  {
     "Ethash": {
       "params": {
         "minimumDifficulty": "0x20000",
@@ -52,23 +51,40 @@ def infix_zeros_to_length(s;l):
         "eip100bTransition": env.HIVE_FORK_BYZANTIUM|to_hex,
         "daoHardforkTransition": env.HIVE_FORK_DAO_BLOCK|to_hex,
         "daoHardforkBeneficiary": "0xbf4ed7b27f1d666546e30d74d50d173d20bca754",
-        "daoHardforkAccounts": [],
         "blockReward": {
-          "0x0": "0x4563918244f40000",
-          (env.HIVE_FORK_BYZANTIUM|to_hex//""): "0x29a2241af62c0000",
-          (env.HIVE_FORK_CONSTANTINOPLE|to_hex//""): "0x1bc16d674ec80000",
+          "0x0": "0x4563918244F40000",
+          (env.HIVE_FORK_BYZANTIUM|to_hex//""): "0x29A2241AF62C0000",
+          (env.HIVE_FORK_CONSTANTINOPLE|to_hex//""): "0x1BC16D674EC80000",
         },
         "difficultyBombDelays": {
           (env.HIVE_FORK_BYZANTIUM|to_hex//""): 3000000,
           (env.HIVE_FORK_CONSTANTINOPLE|to_hex//""): 2000000,
           (env.HIVE_FORK_MUIR_GLACIER|to_hex//""): 4000000,
-        },
-      },
-    },
-  },
+        }
+      }
+    }
+  }
+;
+
+# This gives the consensus engine definition for the clique PoA engine.
+def clique_engine:
+  {
+    "clique": {
+       "params": {
+         "period": env.HIVE_CLIQUE_PERIOD|tonumber,
+         "epoch": 30000,
+         "blockReward": "0x0"
+       }
+    }
+  }
+;
+
+{
+  "name": "Hive",
+  "engine": (if env.HIVE_CLIQUE_PERIOD then clique_engine else ethash_engine end),
   "genesis": {
     "seal": {
-      "ethereum":{
+      "ethereum": {
          "nonce": (.nonce|infix_zeros_to_length(2;18) // "0x0000000000000000"),
          "mixHash": (.mixHash // "0x0000000000000000000000000000000000000000000000000000000000000000"),
       },
