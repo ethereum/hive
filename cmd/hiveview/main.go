@@ -49,7 +49,7 @@ func runServer(config serverConfig) {
 	assetHandler := http.FileServer(assets.Dir(config.useLocalAssets, ""))
 	listingHandler := serveListing{dir: config.logdir}
 	mux := mux.NewRouter()
-	mux.Handle("/listing.jsonl", listingHandler).Methods("GET")
+	mux.Handle("/listing.json", listingHandler).Methods("GET")
 	mux.PathPrefix("/results").Handler(http.StripPrefix("/results/", logHandler))
 	mux.PathPrefix("/").Handler(assetHandler)
 
