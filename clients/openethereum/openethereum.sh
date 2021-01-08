@@ -144,7 +144,7 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
 fi
 
 # Configure RPC.
-FLAGS="$FLAGS --jsonrpc-interface all --jsonrpc-hosts all --jsonrpc-apis all"
+FLAGS="$FLAGS --jsonrpc-interface all --jsonrpc-hosts all --jsonrpc-apis all --ws-origins all --ws-interface all"
 
 # Disable eth price lookup.
 FLAGS="$FLAGS --usd-per-eth 1"
