@@ -10,22 +10,41 @@
 #  - `keys` folder is located in the filesystem root (optional)
 #
 # This script assumes the following environment variables:
+#
 #  - HIVE_BOOTNODE             enode URL of the remote bootstrap node
 #  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
 #  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
-#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
+#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
+#
+# Forks:
+#
 #  - HIVE_FORK_HOMESTEAD       block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK       block number of the DAO hard-fork transitionnsition
-#  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
 #  - HIVE_FORK_TANGERINE       block number of TangerineWhistle
 #  - HIVE_FORK_SPURIOUS        block number of SpuriousDragon
 #  - HIVE_FORK_BYZANTIUM       block number for Byzantium transition
 #  - HIVE_FORK_CONSTANTINOPLE  block number for Constantinople transition
 #  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/PetersBurg transition
-#  - HIVE_MINER                address to credit with mining rewards (single thread)
+#  - HIVE_FORK_BERLIN          block number for Berlin transition
+#
+# Clique PoA:
+#
+#  - HIVE_CLIQUE_PERIOD        enables clique support. value is block time in seconds.
+#  - HIVE_CLIQUE_PRIVATEKEY    private key for clique mining
+#
+# Other:
+#
+#  - HIVE_MINER                enables mining. value is coinbase address.
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
-#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
+#  - HIVE_SKIP_POW             If set, skip PoW verification
+#  - HIVE_LOGLEVEL             Client log level
+#
+# These variables are not supported by Nethermind:
+#
+#  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
+#  - HIVE_GRAPHQL_ENABLED      if set, GraphQL is enabled on port 8545
+#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 
 # Immediately abort the script on any error encountered
 set -e
