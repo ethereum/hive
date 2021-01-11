@@ -40,6 +40,8 @@ type TestEnv struct {
 func runHTTP(fn func(*TestEnv)) func(*hivesim.T, *hivesim.Client) {
 	return func(t *hivesim.T, c *hivesim.Client) {
 		rpcClient, _ := rpc.DialHTTP(fmt.Sprintf("http://%v:8545/", c.IP))
+		defer rpcClient.Close()
+
 		env := &TestEnv{
 			T:    t,
 			RPC:  rpcClient,
@@ -62,6 +64,8 @@ func runWS(fn func(*TestEnv)) func(*hivesim.T, *hivesim.Client) {
 		if err != nil {
 			t.Fatal("WebSocket connection failed:", err)
 		}
+		defer rpcClient.Close()
+
 		env := &TestEnv{
 			T:    t,
 			RPC:  rpcClient,
