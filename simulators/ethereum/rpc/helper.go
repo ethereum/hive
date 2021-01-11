@@ -19,7 +19,7 @@ import (
 )
 
 // default timeout for RPC calls
-var rpcTimeout = 5 * time.Second
+var rpcTimeout = 10 * time.Second
 
 // TestClient is the environment of a single test.
 type TestEnv struct {
