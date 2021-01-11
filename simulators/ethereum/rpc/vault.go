@@ -24,9 +24,6 @@ var (
 	predeployedVaultAddr = common.HexToAddress("0000000000000000000000000000000000000315")
 	// Number of blocks to wait before funding tx is considered valid.
 	vaultTxConfirmationCount = uint64(5)
-
-	// Global instance of the vault.
-	theVault = newVault()
 )
 
 // vault creates accounts for testing and funds them. An instance of the vault contract is
@@ -183,7 +180,7 @@ func (v *vault) createAccount(t *TestEnv, amount *big.Int) common.Address {
 
 	// wait for vaultTxConfirmationCount confirmation by checking the balance vaultTxConfirmationCount blocks back.
 	// createAndFundAccountWithSubscription for a better solution using logs
-	for i := uint64(0); i < vaultTxConfirmationCount*2; i++ {
+	for i := uint64(0); i < vaultTxConfirmationCount*4; i++ {
 		number, err := t.Eth.BlockNumber(t.Ctx())
 		if err != nil {
 			t.Fatalf("can't get block number:", err)
@@ -200,7 +197,7 @@ func (v *vault) createAccount(t *TestEnv, amount *big.Int) common.Address {
 		}
 		time.Sleep(time.Second)
 	}
-	panic(fmt.Sprintf("Could not fund account %v in transaction %v", address, tx.Hash()))
+	panic(fmt.Sprintf("could not fund account %v in transaction %v", address, tx.Hash()))
 }
 
 func (v *vault) makeFundingTx(t *TestEnv, recipient common.Address, amount *big.Int) *types.Transaction {

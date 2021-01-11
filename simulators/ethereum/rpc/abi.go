@@ -68,7 +68,7 @@ func callContractTest(t *TestEnv) {
 // waits for logs.
 func transactContractTest(t *TestEnv) {
 	var (
-		address = theVault.createAccount(t, big.NewInt(params.Ether))
+		address = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
@@ -81,7 +81,7 @@ func transactContractTest(t *TestEnv) {
 	)
 
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := theVault.signTransaction(address, rawTx)
+	deployTx, err := t.Vault.signTransaction(address, rawTx)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -115,7 +115,7 @@ func transactContractTest(t *TestEnv) {
 	}
 
 	eventsTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
-	tx, err := theVault.signTransaction(address, eventsTx)
+	tx, err := t.Vault.signTransaction(address, eventsTx)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -153,7 +153,7 @@ func transactContractTest(t *TestEnv) {
 // waits for logs. It uses subscription to track logs.
 func transactContractSubscriptionTest(t *TestEnv) {
 	var (
-		address = theVault.createAccountWithSubscription(t, big.NewInt(params.Ether))
+		address = t.Vault.createAccountWithSubscription(t, big.NewInt(params.Ether))
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
@@ -169,7 +169,7 @@ func transactContractSubscriptionTest(t *TestEnv) {
 
 	// deploy contract
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := theVault.signTransaction(address, rawTx)
+	deployTx, err := t.Vault.signTransaction(address, rawTx)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -217,7 +217,7 @@ func transactContractSubscriptionTest(t *TestEnv) {
 	opts := &bind.TransactOpts{
 		From:   address,
 		Nonce:  new(big.Int).SetUint64(nonce),
-		Signer: theVault.signTransaction,
+		Signer: t.Vault.signTransaction,
 	}
 	tx, err := contract.Events(opts, intArg, addrArg)
 	if err != nil {

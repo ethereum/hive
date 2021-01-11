@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
@@ -37,56 +38,56 @@ var files = map[string]string{
 type testSpec struct {
 	Name  string
 	About string
-	Run   func(*hivesim.T, *hivesim.Client)
+	Run   func(*TestEnv)
 }
 
 var tests = []testSpec{
 	// HTTP RPC tests.
-	{Name: "http/BalanceAndNonceAt", Run: runHTTP(balanceAndNonceAtTest)},
-	{Name: "http/CanonicalChain", Run: runHTTP(canonicalChainTest)},
-	{Name: "http/CodeAt", Run: runHTTP(CodeAtTest)},
-	{Name: "http/ContractDeployment", Run: runHTTP(deployContractTest)},
-	{Name: "http/ContractDeploymentOutOfGas", Run: runHTTP(deployContractOutOfGasTest)},
-	{Name: "http/EstimateGas", Run: runHTTP(estimateGasTest)},
-	{Name: "http/GenesisBlockByHash", Run: runHTTP(genesisBlockByHashTest)},
-	{Name: "http/GenesisBlockByNumber", Run: runHTTP(genesisBlockByNumberTest)},
-	{Name: "http/GenesisHeaderByHash", Run: runHTTP(genesisHeaderByHashTest)},
-	{Name: "http/GenesisHeaderByNumber", Run: runHTTP(genesisHeaderByNumberTest)},
-	{Name: "http/Receipt", Run: runHTTP(receiptTest)},
-	{Name: "http/SyncProgress", Run: runHTTP(syncProgressTest)},
-	{Name: "http/TransactionCount", Run: runHTTP(transactionCountTest)},
-	{Name: "http/TransactionInBlock", Run: runHTTP(transactionInBlockTest)},
-	{Name: "http/TransactionReceipt", Run: runHTTP(TransactionReceiptTest)},
+	{Name: "http/BalanceAndNonceAt", Run: balanceAndNonceAtTest},
+	{Name: "http/CanonicalChain", Run: canonicalChainTest},
+	{Name: "http/CodeAt", Run: CodeAtTest},
+	{Name: "http/ContractDeployment", Run: deployContractTest},
+	{Name: "http/ContractDeploymentOutOfGas", Run: deployContractOutOfGasTest},
+	{Name: "http/EstimateGas", Run: estimateGasTest},
+	{Name: "http/GenesisBlockByHash", Run: genesisBlockByHashTest},
+	{Name: "http/GenesisBlockByNumber", Run: genesisBlockByNumberTest},
+	{Name: "http/GenesisHeaderByHash", Run: genesisHeaderByHashTest},
+	{Name: "http/GenesisHeaderByNumber", Run: genesisHeaderByNumberTest},
+	{Name: "http/Receipt", Run: receiptTest},
+	{Name: "http/SyncProgress", Run: syncProgressTest},
+	{Name: "http/TransactionCount", Run: transactionCountTest},
+	{Name: "http/TransactionInBlock", Run: transactionInBlockTest},
+	{Name: "http/TransactionReceipt", Run: TransactionReceiptTest},
 
 	// HTTP ABI tests.
-	{Name: "http/ABICall", Run: runHTTP(callContractTest)},
-	{Name: "http/ABITransact", Run: runHTTP(transactContractTest)},
+	{Name: "http/ABICall", Run: callContractTest},
+	{Name: "http/ABITransact", Run: transactContractTest},
 
 	// WebSocket RPC tests.
-	{Name: "ws/BalanceAndNonceAt", Run: runWS(balanceAndNonceAtTest)},
-	{Name: "ws/CanonicalChain", Run: runWS(canonicalChainTest)},
-	{Name: "ws/CodeAt", Run: runWS(CodeAtTest)},
-	{Name: "ws/ContractDeployment", Run: runWS(deployContractTest)},
-	{Name: "ws/ContractDeploymentOutOfGas", Run: runWS(deployContractOutOfGasTest)},
-	{Name: "ws/EstimateGas", Run: runWS(estimateGasTest)},
-	{Name: "ws/GenesisBlockByHash", Run: runWS(genesisBlockByHashTest)},
-	{Name: "ws/GenesisBlockByNumber", Run: runWS(genesisBlockByNumberTest)},
-	{Name: "ws/GenesisHeaderByHash", Run: runWS(genesisHeaderByHashTest)},
-	{Name: "ws/GenesisHeaderByNumber", Run: runWS(genesisHeaderByNumberTest)},
-	{Name: "ws/Receipt", Run: runWS(receiptTest)},
-	{Name: "ws/SyncProgress", Run: runWS(syncProgressTest)},
-	{Name: "ws/TransactionCount", Run: runWS(transactionCountTest)},
-	{Name: "ws/TransactionInBlock", Run: runWS(transactionInBlockTest)},
-	{Name: "ws/TransactionReceipt", Run: runWS(TransactionReceiptTest)},
+	{Name: "ws/BalanceAndNonceAt", Run: balanceAndNonceAtTest},
+	{Name: "ws/CanonicalChain", Run: canonicalChainTest},
+	{Name: "ws/CodeAt", Run: CodeAtTest},
+	{Name: "ws/ContractDeployment", Run: deployContractTest},
+	{Name: "ws/ContractDeploymentOutOfGas", Run: deployContractOutOfGasTest},
+	{Name: "ws/EstimateGas", Run: estimateGasTest},
+	{Name: "ws/GenesisBlockByHash", Run: genesisBlockByHashTest},
+	{Name: "ws/GenesisBlockByNumber", Run: genesisBlockByNumberTest},
+	{Name: "ws/GenesisHeaderByHash", Run: genesisHeaderByHashTest},
+	{Name: "ws/GenesisHeaderByNumber", Run: genesisHeaderByNumberTest},
+	{Name: "ws/Receipt", Run: receiptTest},
+	{Name: "ws/SyncProgress", Run: syncProgressTest},
+	{Name: "ws/TransactionCount", Run: transactionCountTest},
+	{Name: "ws/TransactionInBlock", Run: transactionInBlockTest},
+	{Name: "ws/TransactionReceipt", Run: TransactionReceiptTest},
 
 	// WebSocket subscription tests.
-	{Name: "ws/NewHeadSubscription", Run: runWS(newHeadSubscriptionTest)},
-	{Name: "ws/LogSubscription", Run: runWS(logSubscriptionTest)},
-	{Name: "ws/TransactionInBlockSubscription", Run: runWS(transactionInBlockSubscriptionTest)},
+	{Name: "ws/NewHeadSubscription", Run: newHeadSubscriptionTest},
+	{Name: "ws/LogSubscription", Run: logSubscriptionTest},
+	{Name: "ws/TransactionInBlockSubscription", Run: transactionInBlockSubscriptionTest},
 
 	// WebSocket ABI tests.
-	{Name: "ws/ABICall", Run: runWS(callContractTest)},
-	{Name: "ws/ABITransact", Run: runWS(transactContractTest)},
+	{Name: "ws/ABICall", Run: callContractTest},
+	{Name: "ws/ABITransact", Run: transactContractTest},
 }
 
 func main() {
@@ -110,6 +111,8 @@ interacting with one.`[1:],
 // runAllTests runs the tests against a client instance.
 // Most tests simply wait for tx inclusion in a block so we can run many tests concurrently.
 func runAllTests(t *hivesim.T, c *hivesim.Client) {
+	vault := newVault()
+
 	s := newSemaphore(16)
 	for _, test := range tests {
 		test := test
@@ -119,7 +122,16 @@ func runAllTests(t *hivesim.T, c *hivesim.Client) {
 			t.Run(hivesim.TestSpec{
 				Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
 				Description: test.About,
-				Run:         func(t *hivesim.T) { test.Run(t, c) },
+				Run: func(t *hivesim.T) {
+					switch test.Name[:strings.IndexByte(test.Name, '/')] {
+					case "http":
+						runHTTP(t, c, vault, test.Run)
+					case "ws":
+						runWS(t, c, vault, test.Run)
+					default:
+						panic("bad test prefix in name " + test.Name)
+					}
+				},
 			})
 		}()
 	}

@@ -88,7 +88,7 @@ func CodeAtTest(t *TestEnv) {
 // estimateGasTest fetches the estimated gas usage for a call to the events method.
 func estimateGasTest(t *TestEnv) {
 	var (
-		address        = theVault.createAccount(t, big.NewInt(params.Ether))
+		address        = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
 		intArg         = big.NewInt(rand.Int63())
 	)
@@ -110,7 +110,7 @@ func estimateGasTest(t *TestEnv) {
 	// send the actual tx and test gas usage
 	txGas := estimated + 100000
 	rawTx := types.NewTransaction(0, *msg.To, msg.Value, txGas, big.NewInt(32*params.GWei), msg.Data)
-	tx, err := theVault.signTransaction(address, rawTx)
+	tx, err := t.Vault.signTransaction(address, rawTx)
 	if err != nil {
 		t.Fatalf("Could not sign transaction: %v", err)
 	}
@@ -139,9 +139,9 @@ func estimateGasTest(t *TestEnv) {
 // address are updated correct.
 func balanceAndNonceAtTest(t *TestEnv) {
 	var (
-		sourceAddr  = theVault.createAccount(t, big.NewInt(params.Ether))
+		sourceAddr  = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		sourceNonce = uint64(0)
-		targetAddr  = theVault.createAccount(t, nil)
+		targetAddr  = t.Vault.createAccount(t, nil)
 	)
 
 	// Get current balance
@@ -169,7 +169,7 @@ func balanceAndNonceAtTest(t *TestEnv) {
 		gasLimit = uint64(50000)
 	)
 	rawTx := types.NewTransaction(sourceNonce, targetAddr, amount, gasLimit, gasPrice, nil)
-	valueTx, err := theVault.signTransaction(sourceAddr, rawTx)
+	valueTx, err := t.Vault.signTransaction(sourceAddr, rawTx)
 	if err != nil {
 		t.Fatalf("Unable to sign value tx: %v", err)
 	}
@@ -353,7 +353,7 @@ func canonicalChainTest(t *TestEnv) {
 // on the contract address contain the expected values (as set in the ctor).
 func deployContractTest(t *TestEnv) {
 	var (
-		address = theVault.createAccount(t, big.NewInt(params.Ether))
+		address = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
@@ -361,7 +361,7 @@ func deployContractTest(t *TestEnv) {
 	)
 
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := theVault.signTransaction(address, rawTx)
+	deployTx, err := t.Vault.signTransaction(address, rawTx)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -427,7 +427,7 @@ func deployContractTest(t *TestEnv) {
 // the contract address.
 func deployContractOutOfGasTest(t *TestEnv) {
 	var (
-		address         = theVault.createAccount(t, big.NewInt(params.Ether))
+		address         = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		nonce           = uint64(0)
 		contractAddress = crypto.CreateAddress(address, nonce)
 		gasLimit        = uint64(240000) // insufficient gas
@@ -436,7 +436,7 @@ func deployContractOutOfGasTest(t *TestEnv) {
 
 	// Deploy the contract.
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := theVault.signTransaction(address, rawTx)
+	deployTx, err := t.Vault.signTransaction(address, rawTx)
 	if err != nil {
 		t.Fatalf("unable to sign deploy tx: %v", err)
 	}
@@ -478,7 +478,7 @@ func deployContractOutOfGasTest(t *TestEnv) {
 func receiptTest(t *TestEnv) {
 	var (
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
-		address        = theVault.createAccount(t, big.NewInt(params.Ether))
+		address        = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		nonce          = uint64(0)
 
 		intArg = big.NewInt(rand.Int63())
@@ -490,7 +490,7 @@ func receiptTest(t *TestEnv) {
 	}
 
 	rawTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
-	tx, err := theVault.signTransaction(address, rawTx)
+	tx, err := t.Vault.signTransaction(address, rawTx)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -588,7 +588,7 @@ func syncProgressTest(t *TestEnv) {
 // and retrieves transaction details by block hash and position.
 func transactionInBlockTest(t *TestEnv) {
 	var (
-		key         = theVault.createAccount(t, big.NewInt(params.Ether))
+		key         = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		nonce       = uint64(0)
 		blockNumber = new(big.Int)
 	)
@@ -601,7 +601,7 @@ func transactionInBlockTest(t *TestEnv) {
 			rawTx := types.NewTransaction(nonce, predeployedVaultAddr, big1, 100000, gasPrice, nil)
 			nonce++
 
-			tx, err := theVault.signTransaction(key, rawTx)
+			tx, err := t.Vault.signTransaction(key, rawTx)
 			if err != nil {
 				t.Fatalf("Unable to sign deploy tx: %v", err)
 			}
@@ -637,10 +637,10 @@ func transactionInBlockSubscriptionTest(t *TestEnv) {
 		t.Fatalf("Unable to subscribe to new heads: %v", err)
 	}
 
-	key := theVault.createAccount(t, big.NewInt(params.Ether))
+	key := t.Vault.createAccount(t, big.NewInt(params.Ether))
 	for i := 0; i < 5; i++ {
 		rawTx := types.NewTransaction(uint64(i), predeployedVaultAddr, big1, 100000, gasPrice, nil)
-		tx, err := theVault.signTransaction(key, rawTx)
+		tx, err := t.Vault.signTransaction(key, rawTx)
 		if err != nil {
 			t.Fatalf("Unable to sign deploy tx: %v", err)
 		}
@@ -716,7 +716,7 @@ func logSubscriptionTest(t *TestEnv) {
 
 	var (
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
-		address        = theVault.createAccount(t, big.NewInt(params.Ether))
+		address        = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		nonce          = uint64(0)
 
 		arg0 = big.NewInt(rand.Int63())
@@ -725,7 +725,7 @@ func logSubscriptionTest(t *TestEnv) {
 
 	payload, _ := contractABI.Pack("events", arg0, arg1)
 	rawTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
-	tx, err := theVault.signTransaction(address, rawTx)
+	tx, err := t.Vault.signTransaction(address, rawTx)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
@@ -793,12 +793,12 @@ func validatePredeployContractLogs(t *TestEnv, tx *types.Transaction, logs []typ
 
 func transactionCountTest(t *TestEnv) {
 	var (
-		key = theVault.createAccount(t, big.NewInt(params.Ether))
+		key = t.Vault.createAccount(t, big.NewInt(params.Ether))
 	)
 
 	for i := 0; i < 60; i++ {
 		rawTx := types.NewTransaction(uint64(i), predeployedVaultAddr, big1, 100000, gasPrice, nil)
-		tx, err := theVault.signTransaction(key, rawTx)
+		tx, err := t.Vault.signTransaction(key, rawTx)
 		if err != nil {
 			t.Fatalf("Unable to sign deploy tx: %v", err)
 		}
@@ -829,11 +829,11 @@ func transactionCountTest(t *TestEnv) {
 // TransactionReceiptTest sends a transaction and tests the receipt fields.
 func TransactionReceiptTest(t *TestEnv) {
 	var (
-		key = theVault.createAccount(t, big.NewInt(params.Ether))
+		key = t.Vault.createAccount(t, big.NewInt(params.Ether))
 	)
 
 	rawTx := types.NewTransaction(uint64(0), common.Address{}, big1, 100000, gasPrice, nil)
-	tx, err := theVault.signTransaction(key, rawTx)
+	tx, err := t.Vault.signTransaction(key, rawTx)
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
