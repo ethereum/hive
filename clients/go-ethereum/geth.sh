@@ -131,6 +131,7 @@ fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
 	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
 fi
+FLAGS="$FLAGS --miner.gasprice 16000000000"
 
 # Configure RPC.
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,personal,txpool,web3"
