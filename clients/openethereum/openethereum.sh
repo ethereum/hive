@@ -142,6 +142,7 @@ fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --extra-data $HIVE_MINER_EXTRA"
 fi
+FLAGS="$FLAGS --min-gas-price=16000000000"
 
 # Configure RPC.
 FLAGS="$FLAGS --jsonrpc-interface all --jsonrpc-hosts all --jsonrpc-apis all --ws-origins all --ws-interface all"
