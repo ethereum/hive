@@ -422,51 +422,54 @@ func deployContractTest(t *TestEnv) {
 	}
 }
 
-// deployContractOutOfGasTest tries to deploy `contractSrc` with insufficient
-// gas. It checks the receipts reflects the "out of gas" event and node code/
-// state isn't created in the contract address.
+// deployContractOutOfGasTest tries to deploy `contractSrc` with insufficient gas. It
+// checks the receipts reflects the "out of gas" event and code / state isn't created in
+// the contract address.
 func deployContractOutOfGasTest(t *TestEnv) {
 	var (
-		address = theVault.createAccount(t, big.NewInt(params.Ether))
-		nonce   = uint64(0)
-
+		address         = theVault.createAccount(t, big.NewInt(params.Ether))
+		nonce           = uint64(0)
 		contractAddress = crypto.CreateAddress(address, nonce)
 		gasLimit        = uint64(240000) // insufficient gas
 	)
+	t.Logf("calculated contract address: %x", contractAddress)
 
-	t.Logf("Calculated contract address: %x", contractAddress)
-
+	// Deploy the contract.
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
 	deployTx, err := theVault.signTransaction(address, rawTx)
 	if err != nil {
-		t.Fatalf("Unable to sign deploy tx: %v", err)
+		t.Fatalf("unable to sign deploy tx: %v", err)
 	}
-
-	t.Logf("Out of gas tx: %x", deployTx.Hash())
-
-	// deploy contract
+	t.Logf("out of gas tx: %x", deployTx.Hash())
 	if err := t.Eth.SendTransaction(t.Ctx(), deployTx); err != nil {
-		t.Fatalf("Unable to send transaction: %v", err)
+		t.Fatalf("unable to send transaction: %v", err)
 	}
-	// fetch transaction receipt
+
+	// Wait for the transaction receipt.
 	receipt, err := waitForTxConfirmations(t, deployTx.Hash(), 5)
 	if err != nil {
-		t.Fatalf("Unable to fetch tx receipt: %v", err)
+		t.Fatalf("unable to fetch tx receipt: %v", err)
 	}
-	// test if receipt contract address is empty
-	if receipt.ContractAddress != (common.Address{}) {
-		t.Errorf("Receipt contract address should be empty, got %x", receipt.ContractAddress)
+	// Check receipt fields.
+	if receipt.Status != types.ReceiptStatusFailed {
+		t.Errorf("receipt has status %d, want %d", receipt.Status, types.ReceiptStatusFailed)
 	}
-	if receipt.BlockHash != (common.Hash{}) {
-		t.Errorf("Receipt block hash should be empty, got %x", receipt.BlockHash)
+	if receipt.GasUsed != gasLimit {
+		t.Errorf("receipt has gasUsed %d, want %d", receipt.GasUsed, gasLimit)
 	}
-	// test if there is nothing deploy on the calculated contract address
+	if receipt.ContractAddress != contractAddress {
+		t.Errorf("receipt has contract address %x, want %x", receipt.ContractAddress, contractAddress)
+	}
+	if receipt.BlockHash == (common.Hash{}) {
+		t.Errorf("receipt has empty block hash", receipt.BlockHash)
+	}
+	// Check that nothing is deployed at the contract address.
 	code, err := t.Eth.CodeAt(t.Ctx(), contractAddress, nil)
 	if err != nil {
-		t.Fatalf("Unable to fetch code: %v", err)
+		t.Fatalf("unable to fetch code: %v", err)
 	}
 	if len(code) != 0 {
-		t.Errorf("Expected no code deployed but got %x", code)
+		t.Errorf("expected no code deployed but got %x", code)
 	}
 }
 
