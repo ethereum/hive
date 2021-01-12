@@ -17,12 +17,24 @@
   .replaceme{
       max-width: 1000px;
   }
+  #execresults, #filetable {
+      table-layout: fixed;
+      min-width: 900px;
+  }
+  #execresults .details-box {
+      overflow-x: auto;
+  }
   td.details-control {
       background: url('/details_open.png') no-repeat center center;
       cursor: pointer;
   }
   tr.shown td.details-control {
       background: url('/details_close.png') no-repeat center center;
+  }
+  td.ellipsis {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
   }
 </style>
 
@@ -37,18 +49,17 @@
           <a class="nav-link" id="v-pills-messages-tab" data-toggle="pill" href="#v-pills-messages" role="tab" aria-controls="v-pills-messages" aria-selected="false">About</a>
         </div>
       </div>
-      <div class="col-10">
+      <div class="col-11">
         <div class="tab-content" id="v-pills-tabContent">
           <div class="tab-pane fade show active" id="v-pills-home" role="tabpanel" aria-labelledby="v-pills-home-tab">
             <h2>Executed testsuites</h2>
-            <p>These testsuites are available, and can be loaded. Click on 'Load' to load a certain suite.</p>
-            <p>If you load several suites, you can compare individual testcases on different runs/suites/clients</p>
-            <table class="table table-bordered" id="filetable"></table>
+            <p>These test suites are available, and can be loaded. Click on 'Load' to load a certain suite.</p>
+            <table id="filetable" class="hover cell-border"></table>
           </div>
           <div class="tab-pane fade" id="v-pills-results" role="tabpanel" aria-labelledby="v-pills-results-tab">
             <h2>Execution results: <span id="testsuite_name">Nothing loaded yet</span></h2>
             <p><span id="testsuite_desc">Nothing loaded yet</span></p>
-            <table id="execresults" class="table table-striped table-bordered" width="100%"></table>
+            <table id="execresults" class="hover cell-border" width="100%"></table>
           </div>
           <div class="tab-pane fade" id="v-pills-messages" role="tabpanel" aria-labelledby="v-pills-messages-tab">
             <h2>About Hive</h2>
