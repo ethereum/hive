@@ -28,6 +28,6 @@ transactions, retrieving logs and balances.
 ABI, interacts with the pre-deployed events contract. It send transactions, executs calls
 and examines generated logs.
 
-Each test is designed to run in parallel with other tests. In most cases the fist step a
+Each test is designed to run in parallel with other tests. In most cases the first step a
 test performs is to create a new account and fund it from the vault contract. After the
-account is funded the actual test logic is run.
+account is funded the actual test logic runs.
