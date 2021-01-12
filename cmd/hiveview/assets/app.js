@@ -234,47 +234,57 @@ function onFileListing(data, error) {
     filetable = $("#filetable").DataTable({
         data: suites,
         pageLength: 50,
+        autoWidth: false,
+        order: [[0, 'desc']],
         columns: [
             {
                 title: "Start time",
                 data: "start",
                 type: "date",
+                width: "10em",
                 render: function(data) {
                     return new Date(data).toLocaleString();
-                }
+                },
             },
             {
-                title: "Test suite",
-                data: "name"
-            },
-            {
-                title: "Suite log",
-                data: "simLog",
-                render: function(file) {
-                    return logview("results/" + file)
-                }
+                title: "Suite",
+                data: "name",
+                width: "20%",
             },
             {
                 title: "Clients",
                 data: "clients",
+                width: "30%",
+                className: "ellipsis",
                 render: function(data) {
                     return data.join(",")
-                }
+                },
             },
             {
                 title: "Pass",
                 data: null,
+                width: "9em",
                 render: function(data) {
                     if (data.fails > 0) {
                         return "&#x2715; <b>Fail (" + data.fails + " / " + (data.fails + data.passes) + ")</b>"
                     }
                     return "&#x2713 (" + data.passes + ")"
-                }
+                },
             },
-            // { title: "Number of tests"},
+            {
+                title: "Log",
+                data: "simLog",
+                width: "3%",
+                orderable: false,
+                render: function(file) {
+                    return logview("results/" + file)
+                },
+            },
             {
                 title: "Load?",
                 data: null,
+                width: "200px",
+                orderable: false,
                 render: function(data) {
                     let size = utils.units(data.size)
                     btn = '<button type="button" class="btn btn-sm btn-primary"><span class="loader" role="status" aria-hidden="true"></span><span class="txt">Load (' + size + ')</span></button>'
@@ -283,7 +293,6 @@ function onFileListing(data, error) {
                 },
             },
         ],
-        order: [[0, 'desc']],
     });
 
     $('#filetable tbody').on('click', 'button', function() {
@@ -333,7 +342,9 @@ function navigationDispatch() {
     let suite = nav.load("suite");
     if (suite) {
         // TODO: fix it so we show Loading spinner, and status 'Loaded' (unselectable) once it's loaded.
-        loadTestSuite(suite, function(ok) {});
+        loadTestSuite(suite, function(ok) {
+
+        });
     }
     let page = nav.load("page") || "v-pills-home-tab";
     let elem = $("#" + page);
@@ -385,7 +396,7 @@ function logFolder(jsonsource, client) {
 /* Formatting function for row details */
 function formatTestDetails(d) {
     // `d` is the original data object for the row
-    var txt = "";
+    var txt = '<div class="details-box">';
     txt += "<p><b>Name</b><br/>" + utils.html_encode(d.name) + "</p>";
 
     if (d.description != "") {
@@ -399,6 +410,7 @@ function formatTestDetails(d) {
         txt += utils.urls_to_links(utils.html_encode(d.summaryResult.details));
         txt += "</code></pre></p>";
     }
+    txt += "</div>";
     return txt;
 }
 
@@ -457,19 +469,22 @@ function onSuiteData(data, jsonsource) {
     var thetable = $('#execresults').DataTable({
         data: cases,
         pageLength: 100,
+        autoWidth: false,
         order: [[2, 'desc']],
         columns: [
             // First column is an 'expand'-button
             {
-                "className": 'details-control',
-                "orderable": false,
-                "data": null,
-                "defaultContent": ''
+                className: 'details-control',
+                orderable: false,
+                data: null,
+                defaultContent: '',
+                width: "20px",
             },
             // Second column: Name
             {
-                title: "Name",
-                data: "name"
+                title: "Test",
+                data: "name",
+                width: "79%",
             },
             //  Status: pass or not
             {
@@ -480,7 +495,8 @@ function onSuiteData(data, jsonsource) {
                         return "&#x2713"
                     };
                     return "&#x2715; <b>Fail</b>";
-                }
+                },
+                width: "50px",
             },
             // The logs for clients related to the test
             {
@@ -493,7 +509,8 @@ function onSuiteData(data, jsonsource) {
                         logs.push(logview("results/" + instanceInfo.logFile, instanceInfo.name))
                     }
                     return logs.join(",")
-                }
+                },
+                width: "19%",
             },
         ],
     });
