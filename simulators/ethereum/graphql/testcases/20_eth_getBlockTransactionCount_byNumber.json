@@ -4,7 +4,7 @@
     "{block (number : \"0x1e\") {transactions{hash} timestamp difficulty totalDifficulty gasUsed gasLimit hash nonce ommerCount logsBloom mixHash ommerHash extraData stateRoot receiptsRoot transactionCount transactionsRoot}} ",
 
 
-  "response":  {
+  "responses":  [{
     "data" : {
       "block" : {
         "transactions" : [ {
@@ -28,6 +28,6 @@
         "transactionsRoot" : "0x5a8d5d966b48e1331ae19eb459eb28882cdc7654e615d37774b79204e875dc01"
       }
     }
-  },
+  }],
   "statusCode": 200
 }

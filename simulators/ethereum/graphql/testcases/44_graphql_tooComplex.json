@@ -1,6 +1,6 @@
 {
   "request": "{ block { transactions { block { transactions { block { number }}}}}}",
-  "response": {
+  "responses": [{
     "errors": [
       {
         "message": "maximum query complexity exceeded 204 > 200",
@@ -9,6 +9,6 @@
         }
       }
     ]
-  },
+  }],
   "statusCode": 400
 }

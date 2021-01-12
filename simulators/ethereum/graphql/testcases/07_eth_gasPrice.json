@@ -1,11 +1,17 @@
 {
   "request":     
     "{ gasPrice }",
-
-  "response": {
-    "data" : {
-      "gasPrice" : "0x10"
+  "responses": [
+    {
+      "data" : {
+        "gasPrice" : "0x10"
+      }
+    },
+    {
+      "data" : {
+        "gasPrice" : "0x1"
+      }
     }
-  },
+  ],
   "statusCode": 200
 }

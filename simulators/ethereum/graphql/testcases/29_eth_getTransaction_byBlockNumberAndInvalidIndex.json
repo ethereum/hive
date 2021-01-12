@@ -3,12 +3,12 @@
     
   "{ block(number: \"0x1e\") { transactionAt(index: 1) {block{hash}  hash} } }",
 
-  "response":{
+  "responses":[{
     "data" : {
       "block" : {
         "transactionAt" : null
       }
     }
-  },
+  }],
   "statusCode": 200
 }

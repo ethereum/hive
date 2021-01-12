@@ -118,9 +118,9 @@ type testCase struct {
 
 // graphQLTest is the JSON object structure of a test case file.
 type graphQLTest struct {
-	Request    string      `json:"request"`
-	Response   interface{} `json:"response"`
-	StatusCode int         `json:"statusCode"`
+	Request    string        `json:"request"`
+	Responses  []interface{} `json:"responses"`
+	StatusCode int           `json:"statusCode"`
 }
 
 type qlQuery struct {
@@ -156,24 +156,41 @@ func (tc *testCase) run(t *hivesim.T, c *hivesim.Client) {
 		return
 	}
 
+	tc.responseMatch(t, resp.Status, respBytes)
+}
+
+func (tc *testCase) responseMatch(t *hivesim.T, respStatus string, respBytes []byte) error {
 	// Check that the response matches.
 	var got interface{}
 	if err := json.Unmarshal(respBytes, &got); err != nil {
 		t.Fatal("can't decode response:", err)
 	}
-	if !reflect.DeepEqual(tc.gqlTest.Response, got) {
-		prettyQuery, ok := reindentJSON(tc.gqlTest.Request)
-		prettyExpected, _ := json.MarshalIndent(tc.gqlTest.Response, "", "  ")
-		prettyResponse, _ := json.MarshalIndent(got, "", "  ")
-		t.Log("Test failed.")
-		t.Log("HTTP response code:", resp.Status)
-		if ok {
-			t.Log("query:", prettyQuery)
+	// return if a response matches. If not, error out.
+	for _, response := range tc.gqlTest.Responses {
+		if reflect.DeepEqual(response, got) {
+			return nil
 		}
-		t.Log("expected:", string(prettyExpected))
-		t.Log("got:", string(prettyResponse))
-		t.Fail()
 	}
+
+	prettyQuery, ok := reindentJSON(tc.gqlTest.Request)
+	prettyResponse, _ := json.MarshalIndent(got, "", "  ")
+
+	t.Log("Test failed.")
+	t.Log("HTTP response code:", respStatus)
+	if ok {
+		t.Log("query:", prettyQuery)
+	}
+	t.Log("expected value(s):")
+
+	for _, expected := range tc.gqlTest.Responses {
+		prettyExpected, _ := json.MarshalIndent(expected, "", "  ")
+		t.Log(string(prettyExpected), "\n_____________________\n")
+	}
+
+	t.Log("got:", string(prettyResponse))
+	t.Fail()
+
+	return fmt.Errorf("test failed")
 }
 
 func reindentJSON(text string) (string, bool) {

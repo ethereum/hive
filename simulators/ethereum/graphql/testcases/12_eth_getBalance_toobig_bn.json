@@ -1,6 +1,6 @@
 {
   "request": "{account(blockNumber:\"0x21\", address: \"0x6295ee1b4f6dd65047762f924ecd367c17eabf8f\") { balance } }",
-  "response": {
+  "responses": [{
     "errors": [
       {
         "message": "Exception while fetching data (/account) : Invalid params",
@@ -21,7 +21,7 @@
       }
     ],
     "data": null
-  },
+  }],
   "statusCode": 400
 }
 
