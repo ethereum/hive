@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -37,9 +38,16 @@ type TestEnv struct {
 
 // runHTTP runs the given test function using the HTTP RPC client.
 func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, fn func(*TestEnv)) {
-	rpcClient, _ := rpc.DialHTTP(fmt.Sprintf("http://%v:8545/", c.IP))
-	defer rpcClient.Close()
+	// This sets up debug logging of the requests and responses.
+	client := &http.Client{
+		Transport: &loggingRoundTrip{
+			t:     t,
+			inner: http.DefaultTransport,
+		},
+	}
 
+	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
+	defer rpcClient.Close()
 	env := &TestEnv{
 		T:     t,
 		RPC:   rpcClient,
@@ -81,10 +89,11 @@ func (t *TestEnv) CallContext(ctx context.Context, result interface{}, method st
 	return t.RPC.CallContext(ctx, result, method, args...)
 }
 
-// Ctx returns a context with a 5s timeout.
+// Ctx returns a context with the default timeout.
+// For subsequent calls to Ctx, it also cancels the previous context.
 func (t *TestEnv) Ctx() context.Context {
 	if t.lastCtx != nil {
-		t.lastCancel() // Cancel previous context before making a new one.
+		t.lastCancel()
 	}
 	t.lastCtx, t.lastCancel = context.WithTimeout(context.Background(), rpcTimeout)
 	return t.lastCtx
@@ -139,6 +148,41 @@ func waitForTxConfirmations(t *TestEnv, txHash common.Hash, n uint64) (*types.Re
 	}
 
 	return nil, ethereum.NotFound
+}
+
+// loggingRoundTrip writes requests and responses to the test log.
+type loggingRoundTrip struct {
+	t     *hivesim.T
+	inner http.RoundTripper
+}
+
+func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Read and log the request body.
+	reqBytes, err := ioutil.ReadAll(req.Body)
+	req.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	rt.t.Logf(">>  %s", bytes.TrimSpace(reqBytes))
+	reqCopy := *req
+	reqCopy.Body = ioutil.NopCloser(bytes.NewReader(reqBytes))
+
+	// Do the round trip.
+	resp, err := rt.inner.RoundTrip(&reqCopy)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read and log the response bytes.
+	respBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	respCopy := *resp
+	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
+	rt.t.Logf("<<  %s", bytes.TrimSpace(respBytes))
+	return &respCopy, nil
 }
 
 func loadGenesis() *types.Block {
