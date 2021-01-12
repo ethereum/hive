@@ -10,23 +10,41 @@
 #  - `keys` folder is located in the filesystem root (optional)
 #
 # This script assumes the following environment variables:
-#  - HIVE_BOOTNODE       enode URL of the remote bootstrap node
-#  - HIVE_NETWORK_ID     network ID number to use for the eth protocol
-#  - HIVE_CHAIN_ID     network ID number to use for the eth protocol
-#  - HIVE_TESTNET        whether testnet nonces (2^20) are needed
-#  - HIVE_NODETYPE       sync and pruning selector (archive, full, light)
-#  - HIVE_FORK_HOMESTEAD block number of the DAO hard-fork transition
-#  - HIVE_FORK_DAO_BLOCK block number of the DAO hard-fork transition
-#  - HIVE_FORK_DAO_VOTE  whether the node support (or opposes) the DAO fork
-#  - HIVE_FORK_TANGERINE block number of TangerineWhistle
-#  - HIVE_FORK_SPURIOUS  block number of SpuriousDragon
-#  - HIVE_FORK_BYZANTIUM block number for Byzantium transition
-#  - HIVE_FORK_CONSTANTINOPLE block number for Constantinople transition
-#  - HIVE_FORK_PETERSBURG  block number for ConstantinopleFix/PetersBurg transition
-#  - HIVE_MINER          address to credit with mining rewards (single thread)
-#  - HIVE_MINER_EXTRA    extra-data field to set for newly minted blocks
-#  - HIVE_SKIP_POW       If set, skip PoW verification during block import
-#  - HIVE_LOGLEVEL       Sets the log level
+#
+#  - HIVE_BOOTNODE             enode URL of the remote bootstrap node
+#  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
+#  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
+#  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
+#  - HIVE_SKIP_POW             if set, skip PoW verification during block import
+#
+# Forks:
+#
+#  - HIVE_FORK_HOMESTEAD       block number of the DAO hard-fork transition
+#  - HIVE_FORK_DAO_BLOCK       block number of the DAO hard-fork transition
+#  - HIVE_FORK_TANGERINE       block number of TangerineWhistle
+#  - HIVE_FORK_SPURIOUS        block number of SpuriousDragon
+#  - HIVE_FORK_BYZANTIUM       block number for Byzantium transition
+#  - HIVE_FORK_CONSTANTINOPLE  block number for Constantinople transition
+#  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/PetersBurg transition
+#  - HIVE_FORK_BERLIN          block number for Berlin transition
+#
+# Clique PoA:
+#
+#  - HIVE_CLIQUE_PERIOD        enables clique support. value is block time in seconds.
+#  - HIVE_CLIQUE_PRIVATEKEY    private key for clique mining
+#
+# Other:
+#
+#  - HIVE_MINER                enables mining. value is coinbase address.
+#  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
+#  - HIVE_SKIP_POW             If set, skip PoW verification
+#  - HIVE_LOGLEVEL             Client log level
+#
+# These variables are not supported by OpenEthereum:
+#
+#  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
+#  - HIVE_GRAPHQL_ENABLED      if set, GraphQL is enabled on port 8545
+#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 
 # Immediately abort the script on any error encountered
 set -e
@@ -51,7 +69,7 @@ case "$HIVE_LOGLEVEL" in
 esac
 FLAGS="$FLAGS -l $LOG"
 
-# It doesn't make sense to dial out, use only a pre-set bootnode
+# Disable PoW for import if set.
 if [ "$HIVE_SKIP_POW" != "" ]; then
     FLAGS="$FLAGS --no-seal-check"
 fi
@@ -76,7 +94,7 @@ fi
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
     for block in `ls /blocks | sort -n`; do
-        echo "parity $FLAGS import /blocks/$block"
+        echo "openethereum $FLAGS import /blocks/$block"
         $OE $FLAGS import /blocks/$block
     done
 fi
@@ -84,25 +102,54 @@ fi
 # Immediately abort the script on any error encountered
 set -e
 
+# Configure p2p networking.
+FLAGS="$FLAGS --nat none"
 if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
 fi
 
-# Load any keys explicitly added to the node
-if [ -d /keys ]; then
-    FLAGS="$FLAGS --keys-path /keys"
+# Disable warp sync. Not sure why we do this, need to investigate.
+FLAGS="$FLAGS --no-warp"
+
+# Import clique private key.
+if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+    echo "Importing clique private key..."
+
+    # OpenEthereum does not support importing raw private keys directly.
+    # The private key needs to be turned into an encrypted keystore file first.
+    echo "$HIVE_CLIQUE_PRIVATEKEY" > /tmp/clique-key
+    echo "very secret" > /tmp/clique-key-password.txt
+    /ethkey generate --lightkdf --privatekey /tmp/clique-key --passwordfile /tmp/clique-key-password.txt /tmp/clique-key.json
+
+    # Now we can import it.
+    $OE account import --chain /chain.json /tmp/clique-key.json
+
+    # Set the password file flag so OE can decrypt the key later.
+    FLAGS="$FLAGS --password=/tmp/clique-key-password.txt"
 fi
 
-# If mining was requested, fire up an ethminer instance
+# Configure mining.
 if [ "$HIVE_MINER" != "" ]; then
-    FLAGS="$FLAGS --author $HIVE_MINER"
-    ethminer --mining-threads 1 &
+    if [ "$HIVE_CLIQUE_PERIOD" != "" ]; then
+        # Clique mining requested, set signer address.
+        FLAGS="$FLAGS --engine-signer $HIVE_MINER --force-sealing"
+    else
+        # PoW mining requested, run ethminer.
+        FLAGS="$FLAGS --author $HIVE_MINER"
+        ethminer --mining-threads 1 &
+    fi
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --extra-data $HIVE_MINER_EXTRA"
 fi
+FLAGS="$FLAGS --min-gas-price=16000000000"
 
-# Run OpenEthereum with the requested flags.
-FLAGS="$FLAGS --no-warp --usd-per-eth 1 --nat none --jsonrpc-interface all --jsonrpc-hosts all  --jsonrpc-apis all"
+# Configure RPC.
+FLAGS="$FLAGS --jsonrpc-interface all --jsonrpc-hosts all --jsonrpc-apis all --ws-origins all --ws-interface all"
+
+# Disable eth price lookup.
+FLAGS="$FLAGS --usd-per-eth 1"
+
+# Run OpenEthereum!
 echo "running $OE $FLAGS"
 $OE $FLAGS

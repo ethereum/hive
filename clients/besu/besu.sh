@@ -6,10 +6,14 @@
 #  - `genesis.json` file is located at /etc/besu/genesis.json (mandatory)
 #
 # This script assumes the following environment variables:
+#
 #  - HIVE_BOOTNODE             enode URL of the remote bootstrap node
 #  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
 #  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
+#
+# Forks:
+#
 #  - HIVE_FORK_HOMESTEAD       block number of the DAO hard-fork transition
 #  - HIVE_FORK_DAO_BLOCK       block number of the DAO hard-fork transitionnsition
 #  - HIVE_FORK_TANGERINE       block number of TangerineWhistle
@@ -20,7 +24,15 @@
 #  - HIVE_FORK_ISTANBUL        block number for Istanbul transition
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
 #  - HIVE_FORK_BERLIN          block number for Berlin transition
-#  - HIVE_MINER                address to credit with mining rewards (single thread)
+#
+# Clique PoA:
+#
+#  - HIVE_CLIQUE_PERIOD        enables clique support. value is block time in seconds.
+#  - HIVE_CLIQUE_PRIVATEKEY    private key for clique mining
+#
+# Other:
+#
+#  - HIVE_MINER                enables mining. value is coinbase.
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW             If set, skip PoW verification
 #  - HIVE_LOGLEVEL             Client log level
@@ -80,6 +92,12 @@ if [ -d /blocks ]; then
     IMPORTFLAGS="$IMPORTFLAGS $blocks"
 fi
 
+# For clique mining, besu uses the node key as the block signing key.
+if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+    echo "Importing clique signing key as node key..."
+    echo "$HIVE_CLIQUE_PRIVATEKEY" > /opt/besu/key
+fi
+
 # Configure mining.
 if [ "$HIVE_MINER" != "" ]; then
     FLAGS="$FLAGS --miner-enabled --miner-coinbase=$HIVE_MINER"
@@ -115,6 +133,9 @@ else
     RPCFLAGS="$RPCFLAGS --rpc-http-port=8550" # work around duplicate port error
     RPCFLAGS="$RPCFLAGS --graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8545"
 fi
+
+# Enable WebSocket.
+RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-host=0.0.0.0"
 
 # Start Besu.
 if [ -z "$HAS_IMPORT" ]; then

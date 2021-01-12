@@ -68,8 +68,7 @@ func callContractTest(t *TestEnv) {
 // waits for logs.
 func transactContractTest(t *TestEnv) {
 	var (
-		account = createAndFundAccount(t, big.NewInt(params.Ether))
-		address = account.Address
+		address = t.Vault.createAccount(t, big.NewInt(params.Ether))
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
@@ -82,15 +81,14 @@ func transactContractTest(t *TestEnv) {
 	)
 
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, account)
+	deployTx, err := t.Vault.signTransaction(address, rawTx)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
 
 	// deploy contract
-	ctx, _ := context.WithTimeout(context.Background(), rpcTimeout)
-	if err := t.Eth.SendTransaction(ctx, deployTx); err != nil {
+	if err := t.Eth.SendTransaction(t.Ctx(), deployTx); err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
@@ -117,18 +115,16 @@ func transactContractTest(t *TestEnv) {
 	}
 
 	eventsTx := types.NewTransaction(nonce, predeployedContractAddr, big0, 500000, gasPrice, payload)
-	tx, err := SignTransaction(eventsTx, account)
+	tx, err := t.Vault.signTransaction(address, eventsTx)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
 	}
-
-	ctx, _ = context.WithTimeout(context.Background(), rpcTimeout)
-	if err := t.Eth.SendTransaction(ctx, tx); err != nil {
+	if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 		t.Fatalf("Unable to send transaction: %v", err)
 	}
 
-	t.Logf("Wait for receipt for events tx 0x%x", tx.Hash())
+	t.Logf("Waiting for receipt for events tx %v", tx.Hash())
 
 	// wait for transaction
 	receipt, err = waitForTxConfirmations(t, tx.Hash(), 0)
@@ -157,8 +153,7 @@ func transactContractTest(t *TestEnv) {
 // waits for logs. It uses subscription to track logs.
 func transactContractSubscriptionTest(t *TestEnv) {
 	var (
-		account = createAndFundAccountWithSubscription(t, big.NewInt(params.Ether))
-		address = account.Address
+		address = t.Vault.createAccountWithSubscription(t, big.NewInt(params.Ether))
 		nonce   = uint64(0)
 
 		expectedContractAddress = crypto.CreateAddress(address, nonce)
@@ -167,14 +162,14 @@ func transactContractSubscriptionTest(t *TestEnv) {
 
 		contractABI, _ = abi.JSON(strings.NewReader(predeployedContractABI))
 		intArg         = big.NewInt(rand.Int63())
-		addrArg        = account.Address
+		addrArg        = address
 
 		logs = make(chan types.Log)
 	)
 
 	// deploy contract
 	rawTx := types.NewContractCreation(nonce, big0, gasLimit, gasPrice, deployCode)
-	deployTx, err := SignTransaction(rawTx, account)
+	deployTx, err := t.Vault.signTransaction(address, rawTx)
 	nonce++
 	if err != nil {
 		t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -220,13 +215,10 @@ func transactContractSubscriptionTest(t *TestEnv) {
 
 	// send transaction to events method
 	opts := &bind.TransactOpts{
-		From:  address,
-		Nonce: new(big.Int).SetUint64(nonce),
-		Signer: func(signer types.Signer, addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
-			return SignTransaction(tx, account)
-		},
+		From:   address,
+		Nonce:  new(big.Int).SetUint64(nonce),
+		Signer: t.Vault.signTransaction,
 	}
-
 	tx, err := contract.Events(opts, intArg, addrArg)
 	if err != nil {
 		t.Fatalf("Could not send events transaction: %v", err)
