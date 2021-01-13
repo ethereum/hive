@@ -27,11 +27,11 @@ This is an overview of some of the simulators which are currently implemented an
 continuously on the production hive instance:
 
 - `devp2p/eth`, `devp2p/discv4`: These simulators run the 'eth' peer-to-peer protocol
-  compliance and Discovery v4 protocol test suites. The test suites themselves are
-  maintained in the go-ethereum repository. In their hive adaptation, the simulator
-  launches the client with a known test chain, obtains its peer-to-peer endpoint (the
-  `enode://` URL) and sends protocol messages to it. The client's responses are analyzed
-  by the test suite to ensure that they conform to the respective protocol specification.
+  tests and Discovery v4 protocol tests. The test suites themselves are maintained in the
+  go-ethereum repository. In their hive adaptation, the simulator launches the client with
+  a known test chain, obtains its peer-to-peer endpoint (the `enode://` URL) and sends
+  protocol messages to it. The client's responses are analyzed by the test suite to ensure
+  that they conform to the respective protocol specification.
 
 - `ethereum/sync`: This simulator attempts to synchronize the blockchain among all
   clients. For each enabled client implementation, it creates one instance of the client
@@ -70,27 +70,28 @@ While the simulator build must always work without error, it's OK for some clien
 to fail as long as one of them succeeds. This is because client code pulled from the
 respective upstream repositories may occasionally fail to build.
 
+![hive simulation docker containers](hive-simulation.svg)
 
 Once all images are built, the simulator program is launched in a docker container. The
 `HIVE_SIMULATOR` environment variable contains the HTTP server URL of the hive controller.
-The [hive simulation API] can be accessed through this URL. The simulator launches clients
-and reports test results through the HTTP API.
+The [hive simulation API] can be accessed at this URL. The simulator launches clients and
+reports test results through the API.
 
 When the simulator requests a client instance, the hive controller launches a new docker
-container using the built client image. The client entry point receives configuration
-through environment variables and files provided by the simulator. Depending on this
-configuration data, the client entry point configures the client's genesis state and
-imports the test chain (if provided). The client is now expected to launch its network
+container using the built client image. The client container entry point receives
+configuration through environment variables and files provided by the simulator. Depending
+on this configuration data, the client entry point configures the client's genesis state
+and imports the test chain (if provided). The client is now expected to launch its network
 endpoints for RPC and p2p communication.
 
 When the client has finished starting, the simulator program communicates with it on the
 RPC and p2p endpoints. More than one client may be launched, and the clients can also
 communicate with each other.
 
-During the simulation run, information about 'test suites' and 'test cases' must be
-provided by the simulator via the HTTP API. The hive controller collects this information
-in a JSON file. It also collects client logs as well as the output of the simulator
-program. All files are written to the results directory (`./workspace/logs`).
+During the simulation run, information about 'test suites' and their test cases must be
+provided by the simulator via the simulation API. The hive controller collects this
+information in a JSON file. It also collects client logs as well as the output of the
+simulator program. All files are written to the results directory (`./workspace/logs`).
 
 When the simulator program exits, the simulator container and all client containers are
 stopped and removed. The `hive` command then exits as well.
