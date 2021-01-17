@@ -6,7 +6,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"path/filepath"
 
 	"github.com/ethereum/hive/internal/libhive"
@@ -32,8 +31,8 @@ func NewBuilder(client *docker.Client, cfg *Config) *Builder {
 // BuildClientImage builds a docker image of the given client.
 func (b *Builder) BuildClientImage(ctx context.Context, name string) (string, error) {
 	dir := b.config.Inventory.ClientDirectory(name)
-	basename, branch := libhive.SplitClientName(name)
-	tag := fmt.Sprintf("hive/client/%s:%s", basename, branch)
+	_, branch := libhive.SplitClientName(name)
+	tag := fmt.Sprintf("hive/clients/%s:latest", name)
 	err := b.buildImage(ctx, dir, branch, tag)
 	return tag, err
 }
@@ -41,7 +40,7 @@ func (b *Builder) BuildClientImage(ctx context.Context, name string) (string, er
 // BuildSimulatorImage builds a docker image of a simulator.
 func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string, error) {
 	dir := b.config.Inventory.SimulatorDirectory(name)
-	tag := fmt.Sprintf("hive/simulator/%s:latest", name)
+	tag := fmt.Sprintf("hive/simulators/%s:latest", name)
 	err := b.buildImage(ctx, dir, "", tag)
 	return tag, err
 }
@@ -93,31 +92,31 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag s
 	if b.config.NoCachePattern != nil {
 		nocache = b.config.NoCachePattern.MatchString(imageTag)
 	}
+
 	logger := b.logger.New("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
 		logger.Error("failed to build docker image", "err", err)
 		return err
 	}
-	stream := ioutil.Discard
-	if b.config.BuildOutput != nil {
-		stream = b.config.BuildOutput
-	}
 	opts := docker.BuildImageOptions{
 		Context:      ctx,
 		Name:         imageTag,
 		ContextDir:   context,
 		Dockerfile:   "Dockerfile",
-		OutputStream: stream,
 		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
 	}
-	if branch != "" {
-		opts.BuildArgs = []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}}
-		logger.Info("building client image", "dir", contextDir, "branch", branch, "nocache", opts.NoCache, "pull", opts.Pull)
-	} else {
-		logger.Info("building simulator image", "dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull)
+	if b.config.BuildOutput != nil {
+		opts.OutputStream = b.config.BuildOutput
 	}
+	logctx := []interface{}{"dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull}
+	if branch != "" {
+		logctx = append(logctx, "branch", branch)
+		opts.BuildArgs = []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}}
+	}
+
+	logger.Info("building image", logctx...)
 	if err := b.client.BuildImage(opts); err != nil {
 		logger.Error("failed to build docker image", "err", err)
 		return err
