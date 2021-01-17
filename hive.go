@@ -34,7 +34,7 @@ func main() {
 		simulatorPattern     = flag.String("sim", "", "Regexp selecting the simulation tests to run")
 		simulatorParallelism = flag.Int("sim.parallelism", 1, "Max number of parallel clients/containers to run tests against")
 		simulatorTestLimit   = flag.Int("sim.testlimit", -1, "Max number of tests to execute per client (interpreted by simulators)")
-		simLimiterFlag       = flag.Int("sim.timelimit", -1, "Run all simulators with a time limit in seconds, -1 being unlimited")
+		simLimiterFlag       = flag.Int("sim.timelimit", 0, "Run all simulators with a time limit in seconds")
 		simloglevelFlag      = flag.Int("sim.loglevel", 3, "The base log level for simulator client instances. "+
 			"This number from 0-6 is interpreted differently depending on the client type.")
 
@@ -64,6 +64,9 @@ func main() {
 	simList, err := inv.MatchSimulators(*simulatorPattern)
 	if err != nil {
 		fatal("bad --sim regular expression:", err)
+	}
+	if *simulatorPattern != "" && len(simList) == 0 {
+		fatal("no simulators for pattern", *simulatorPattern)
 	}
 
 	// Create the docker backends.
@@ -115,8 +118,11 @@ func main() {
 		fatal(err)
 	}
 	if len(simList) > 0 {
+		if err := runner.initSimulators(ctx, simList); err != nil {
+			fatal(err)
+		}
 		if err := runner.runSimulations(ctx, simList); err != nil {
-			os.Exit(1)
+			fatal(err)
 		}
 	}
 }
@@ -207,7 +213,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 		log15.Error("failed to start simulator API", "error", err)
 		return err
 	}
-	defer shutdownServer(ctx, server)
+	defer shutdownServer(server)
 
 	// Start the simulator container.
 	log15.Debug("starting simulator container")
@@ -260,6 +266,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	case <-timeout:
 		slogger.Info("simulation timed out")
 	case <-ctx.Done():
+		slogger.Info("interrupted, shutting down")
 		return ctx.Err()
 	}
 	return nil
@@ -295,14 +302,14 @@ func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) 
 }
 
 // shutdownServer gracefully terminates the HTTP server.
-func shutdownServer(ctx context.Context, server *http.Server) {
+func shutdownServer(server *http.Server) {
 	log15.Debug("terminating simulator server")
 
 	//NB! Kill this first to make sure no further testsuites are started
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
-		log15.Error("simulation API server shutdown failed", "err", err)
+		log15.Debug("simulation API server shutdown failed", "err", err)
 	}
 }
 
