@@ -89,16 +89,16 @@ func (b *Builder) ReadFile(image, path string) ([]byte, error) {
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch.
 func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag string) error {
-	nocache := b.config.NoCachePattern.MatchString(imageTag)
-	logger := b.logger.New("image", imageTag, "dir", contextDir, "branch", branch, "nocache", nocache)
-	logger.Info("building new docker image", "nocache", true)
-
+	nocache := false
+	if b.config.NoCachePattern != nil {
+		nocache = b.config.NoCachePattern.MatchString(imageTag)
+	}
+	logger := b.logger.New("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
 		logger.Error("failed to build docker image", "err", err)
 		return err
 	}
-	dockerfile := filepath.Join(context, "Dockerfile")
 	stream := ioutil.Discard
 	if b.config.BuildOutput != nil {
 		stream = b.config.BuildOutput
@@ -107,13 +107,16 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag s
 		Context:      ctx,
 		Name:         imageTag,
 		ContextDir:   context,
-		Dockerfile:   dockerfile,
+		Dockerfile:   "Dockerfile",
 		OutputStream: stream,
 		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
 	}
 	if branch != "" {
 		opts.BuildArgs = []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}}
+		logger.Info("building client image", "dir", contextDir, "branch", branch, "nocache", opts.NoCache, "pull", opts.Pull)
+	} else {
+		logger.Info("building simulator image", "dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull)
 	}
 	if err := b.client.BuildImage(opts); err != nil {
 		logger.Error("failed to build docker image", "err", err)
