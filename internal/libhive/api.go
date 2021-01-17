@@ -238,6 +238,7 @@ func (api *simAPI) startClientContainer(name string, env map[string]string, file
 	safeName := strings.Replace(name, string(filepath.Separator), "_", -1)
 	opts := ContainerOptions{
 		LogDir:    filepath.Join(api.env.LogDir, safeName),
+		LogFilePrefix: "client-",
 		CheckLive: true,
 		Env:       env,
 		Files:     files,
