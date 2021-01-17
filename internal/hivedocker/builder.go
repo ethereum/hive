@@ -100,12 +100,12 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag s
 		return err
 	}
 	opts := docker.BuildImageOptions{
-		Context:      ctx,
-		Name:         imageTag,
-		ContextDir:   context,
-		Dockerfile:   "Dockerfile",
-		NoCache:      nocache,
-		Pull:         b.config.PullEnabled,
+		Context:    ctx,
+		Name:       imageTag,
+		ContextDir: context,
+		Dockerfile: "Dockerfile",
+		NoCache:    nocache,
+		Pull:       b.config.PullEnabled,
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput
@@ -113,7 +113,7 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag s
 	logctx := []interface{}{"dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull}
 	if branch != "" {
 		logctx = append(logctx, "branch", branch)
-		opts.BuildArgs = []docker.BuildArg{docker.BuildArg{Name: "branch", Value: branch}}
+		opts.BuildArgs = []docker.BuildArg{{Name: "branch", Value: branch}}
 	}
 
 	logger.Info("building image", logctx...)

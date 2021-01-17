@@ -63,12 +63,12 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, imageName string,
 	if err != nil {
 		return nil, fmt.Errorf("can't create client container: %v", err)
 	}
-	info := &libhive.ContainerInfo{ID: container.ID[:8],}
+	info := &libhive.ContainerInfo{ID: container.ID[:8]}
 	logger := b.logger.New("image", imageName, "container", info.ID)
 
 	// Get the IP of container.
 	logger.Debug("container created")
-	
+
 	// Set up log file.
 	if opt.LogDir != "" {
 		basename := opt.LogFilePrefix + container.ID + ".log"
@@ -99,7 +99,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, imageName string,
 	}
 	info.IP = container.NetworkSettings.IPAddress
 	info.MAC = container.NetworkSettings.MacAddress
-	
+
 	var containerExit = make(chan struct{}, 1)
 	go func() {
 		// Ensure the goroutine started by runContainer exits, so that its resources (e.g.
@@ -151,8 +151,8 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, imageName string,
 // checkPort waits for the given TCP address to accept a connection.
 func checkPort(ctx context.Context, logger log15.Logger, addr string, notify chan<- struct{}) {
 	var (
-		lastMsg      time.Time
-		ticker = time.NewTicker(100 * time.Millisecond)
+		lastMsg time.Time
+		ticker  = time.NewTicker(100 * time.Millisecond)
 	)
 	defer ticker.Stop()
 	for {
@@ -167,7 +167,7 @@ func checkPort(ctx context.Context, logger log15.Logger, addr string, notify cha
 			var dialer net.Dialer
 			conn, err := dialer.DialContext(ctx, "tcp", addr)
 			if err == nil {
-				notify <- struct{}{} 
+				notify <- struct{}{}
 				conn.Close()
 				return
 			}
