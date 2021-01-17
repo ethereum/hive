@@ -63,31 +63,42 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, imageName string,
 	if err != nil {
 		return nil, fmt.Errorf("can't create client container: %v", err)
 	}
-	info := &libhive.ContainerInfo{
-		ID: container.ID[:8],
-		IP: container.NetworkSettings.IPAddress,
-		MAC: container.NetworkSettings.MacAddress,
-	}
+	info := &libhive.ContainerInfo{ID: container.ID[:8],}
 	logger := b.logger.New("image", imageName, "container", info.ID)
 
 	// Get the IP of container.
-	logger.Debug("container created", "ip", info.IP)
+	logger.Debug("container created")
 	
 	// Set up log file.
 	if opt.LogDir != "" {
-		info.LogFile = filepath.Join(opt.LogDir, fmt.Sprintf("client-%s.log", info.ID))
+		basename := opt.LogFilePrefix + container.ID + ".log"
+		info.LogFile = filepath.Join(opt.LogDir, basename)
 	}
 
 	// Run the container.
 	var startTime = time.Now()
 	waiter, err := b.runContainer(logger, container.ID, info.LogFile)
 	if err != nil {
+		waiter.Close()
 		logger.Error("container did not start", "err", err)
 		if removeErr := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: info.ID, Force: true}); removeErr != nil {
 			logger.Error("can't remove container", "err", removeErr)
 		}
 		return info, fmt.Errorf("container did not start: %v", err)
 	}
+
+	// Get the IP. This can only be done after the container has started.
+	inspect := docker.InspectContainerOptions{Context: ctx, ID: info.ID}
+	container, err = b.client.InspectContainerWithOptions(inspect)
+	if err != nil {
+		waiter.Close()
+		if removeErr := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: info.ID, Force: true}); removeErr != nil {
+			logger.Error("can't remove container", "err", removeErr)
+		}
+		return info, err
+	}
+	info.IP = container.NetworkSettings.IPAddress
+	info.MAC = container.NetworkSettings.MacAddress
 	
 	var containerExit = make(chan struct{}, 1)
 	go func() {
@@ -95,6 +106,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, imageName string,
 		// the logfile it creates) can be garbage collected.
 		// TODO: This is not great. If we get an interrupt, the log file might not be flushed correctly.
 		err := waiter.Wait()
+		waiter.Close()
 		containerExit <- struct{}{}
 		if err == nil {
 			logger.Debug("container finished cleanly")
