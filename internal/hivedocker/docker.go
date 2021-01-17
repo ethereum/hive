@@ -45,7 +45,7 @@ func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, e
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't get docker version: %v", err)
 	}
-	log15.Debug("docker daemon online", "version", env.Get("Version"))
+	logger.Debug("docker daemon online", "version", env.Get("Version"))
 	builder := NewBuilder(client, cfg)
 	backend := NewContainerBackend(client, cfg)
 	return builder, backend, nil
