@@ -31,7 +31,7 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Hand
 	api := &simAPI{backend: b, env: env, tm: tm}
 
 	// Collect client types.
-	for name, _ := range env.Images {
+	for name := range env.Images {
 		api.clientTypes = append(api.clientTypes, name)
 	}
 	sort.Strings(api.clientTypes)
@@ -237,11 +237,11 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 func (api *simAPI) startClientContainer(name string, env map[string]string, files map[string]*multipart.FileHeader) (*ContainerInfo, error) {
 	safeName := strings.Replace(name, string(filepath.Separator), "_", -1)
 	opts := ContainerOptions{
-		LogDir:    filepath.Join(api.env.LogDir, safeName),
+		LogDir:        filepath.Join(api.env.LogDir, safeName),
 		LogFilePrefix: "client-",
-		CheckLive: true,
-		Env:       env,
-		Files:     files,
+		CheckLive:     true,
+		Env:           env,
+		Files:         files,
 	}
 
 	// Set up the timeout.

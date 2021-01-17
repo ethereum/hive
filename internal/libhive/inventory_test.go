@@ -6,8 +6,8 @@ import (
 )
 
 func TestSplitClientName(t *testing.T) {
-	tests := []struct{
-		name string
+	tests := []struct {
+		name                   string
 		wantClient, wantBranch string
 	}{
 		{"client", "client", ""},

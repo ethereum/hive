@@ -215,7 +215,7 @@ func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string)
 // PruneNetworks removes all networks created by the given test suite.
 func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
 	var errs []error
-	for name, _ := range manager.networks[testSuite] {
+	for name := range manager.networks[testSuite] {
 		log15.Info("removing docker network", "name", name)
 		if err := manager.RemoveNetwork(testSuite, name); err != nil {
 			errs = append(errs, err)
