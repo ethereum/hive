@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/hive/internal/hivedocker"
+	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -70,7 +70,7 @@ func main() {
 	}
 
 	// Create the docker backends.
-	dockerConfig := &hivedocker.Config{
+	dockerConfig := &libdocker.Config{
 		Inventory:   inv,
 		PullEnabled: *pullEnabled,
 	}
@@ -85,7 +85,7 @@ func main() {
 		dockerConfig.ContainerOutput = os.Stderr
 		dockerConfig.BuildOutput = os.Stderr
 	}
-	builder, containerBackend, err := hivedocker.Connect(*dockerEndpoint, dockerConfig)
+	builder, containerBackend, err := libdocker.Connect(*dockerEndpoint, dockerConfig)
 	if err != nil {
 		fatal(err)
 	}
@@ -279,7 +279,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 // on the docker bridge and executing them until it is torn down.
 func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
 	// Find the IP address of the host container
-	bridge, err := hivedocker.LookupBridgeIP(log15.Root())
+	bridge, err := libdocker.LookupBridgeIP(log15.Root())
 	if err != nil {
 		log15.Error("failed to lookup bridge IP", "error", err)
 		return nil, nil, err

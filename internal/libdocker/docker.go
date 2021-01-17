@@ -1,4 +1,4 @@
-package hivedocker
+package libdocker
 
 import (
 	"errors"
