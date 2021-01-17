@@ -33,7 +33,7 @@ func main() {
 
 		simulatorPattern     = flag.String("sim", "", "Regexp selecting the simulation tests to run")
 		simulatorParallelism = flag.Int("sim.parallelism", 1, "Max number of parallel clients/containers to run tests against")
-		simulatorTestLimit   = flag.Int("sim.testlimit", -1, "Max number of tests to execute per client (interpreted by simulators)")
+		simulatorTestLimit   = flag.Int("sim.testlimit", 0, "Max number of tests to execute per client (interpreted by simulators)")
 		simLimiterFlag       = flag.Int("sim.timelimit", 0, "Run all simulators with a time limit in seconds")
 		simloglevelFlag      = flag.Int("sim.loglevel", 3, "The base log level for simulator client instances. "+
 			"This number from 0-6 is interpreted differently depending on the client type.")
@@ -224,9 +224,12 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 			"HIVE_SIMULATOR":   "http://" + addr.String(),
 			"HIVE_PARALLELISM": strconv.Itoa(r.env.SimParallelism),
 			"HIVE_LOGLEVEL":    strconv.Itoa(r.env.SimLogLevel),
-			"HIVE_SIMLIMIT":    strconv.Itoa(r.env.SimTestLimit),
 		},
 	}
+	if r.env.SimTestLimit != 0 {
+		opts.Env["HIVE_SIMLIMIT"] = strconv.Itoa(r.env.SimTestLimit)
+	}
+
 	sc, err := r.container.StartContainer(ctx, r.simImages[sim], opts)
 	if err != nil {
 		return err
