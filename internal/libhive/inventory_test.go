@@ -5,6 +5,23 @@ import (
 	"testing"
 )
 
+func TestSplitClientName(t *testing.T) {
+	tests := []struct{
+		name string
+		wantClient, wantBranch string
+	}{
+		{"client", "client", ""},
+		{"client_b", "client", "b"},
+		{"the_client_b", "the_client", "b"},
+	}
+	for _, test := range tests {
+		c, b := SplitClientName(test.name)
+		if c != test.wantClient || b != test.wantBranch {
+			t.Errorf("SplitClientName(%q) -> (%q, %q), want (%q, %q)", test.name, c, b, test.wantClient, test.wantBranch)
+		}
+	}
+}
+
 func TestInventory(t *testing.T) {
 	basedir := filepath.FromSlash("../..")
 	inv, err := LoadInventory(basedir)

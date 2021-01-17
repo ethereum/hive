@@ -14,7 +14,7 @@ const branchDelimiter = "_"
 // SplitClientName returns the name and branch components of 'name'.
 func SplitClientName(name string) (string, string) {
 	if ix := strings.LastIndex(name, branchDelimiter); ix > 0 {
-		return name[:ix], name[ix:]
+		return name[:ix], name[ix+1:]
 	}
 	return name, ""
 }
