@@ -1,5 +1,4 @@
-// Package hive contains shared types for hive.
-package hive
+package libhive
 
 import (
 	"strconv"

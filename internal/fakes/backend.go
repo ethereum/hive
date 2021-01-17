@@ -1,19 +1,20 @@
 package fakes
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"mime/multipart"
 	"net"
 
-	"github.com/ethereum/hive/internal/hive"
+	"github.com/ethereum/hive/internal/libhive"
 )
 
 // BackendHooks can be used to override the behavior of the fake backend.
 type BackendHooks struct {
-	StartClient   func(name string, env map[string]string) (*hive.ClientInfo, error)
-	StopContainer func(string) error
-	RunEnodeSh    func(string) (string, error)
+	StartContainer func(name string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
+	WaitContainer  func(context.Context, string) (int, error)
+	StopContainer  func(string) error
+	RunEnodeSh     func(string) (string, error)
 
 	NetworkNameToID     func(string) (string, error)
 	CreateNetwork       func(string) (string, error)
@@ -23,6 +24,8 @@ type BackendHooks struct {
 	DisconnectContainer func(containerID, networkID string) error
 }
 
+var _ = libhive.ContainerBackend(&fakeBackend{})
+
 // fakeBackend implements Backend without docker.
 type fakeBackend struct {
 	hooks         BackendHooks
@@ -31,7 +34,7 @@ type fakeBackend struct {
 }
 
 // NewBackend creates a new fake container backend.
-func NewBackend(hooks *BackendHooks) hive.Backend {
+func NewContainerBackend(hooks *BackendHooks) libhive.ContainerBackend {
 	b := &fakeBackend{}
 	if hooks != nil {
 		b.hooks = *hooks
@@ -39,10 +42,10 @@ func NewBackend(hooks *BackendHooks) hive.Backend {
 	return b
 }
 
-func (b *fakeBackend) StartClient(name string, env map[string]string, files map[string]*multipart.FileHeader, checklive bool) (*hive.ClientInfo, error) {
-	var info hive.ClientInfo
-	if b.hooks.StartClient != nil {
-		info2, err := b.hooks.StartClient(name, env)
+func (b *fakeBackend) StartContainer(ctx context.Context, imageName string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+	var info libhive.ContainerInfo
+	if b.hooks.StartContainer != nil {
+		info2, err := b.hooks.StartContainer(imageName, opt)
 		if err != nil {
 			return nil, err
 		}
@@ -66,6 +69,13 @@ func (b *fakeBackend) StopContainer(containerID string) error {
 		return b.hooks.StopContainer(containerID)
 	}
 	return nil
+}
+
+func (b *fakeBackend) WaitContainer(ctx context.Context, containerID string) (int, error) {
+	if b.hooks.WaitContainer != nil {
+		return b.hooks.WaitContainer(ctx, containerID)
+	}
+	return 0, nil
 }
 
 func (b *fakeBackend) RunEnodeSh(containerID string) (string, error) {

@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"gopkg.in/inconshreveable/log15.v2"
-
-	. "github.com/ethereum/hive/internal/hive"
 )
 
 var (
@@ -32,9 +30,12 @@ var (
 
 // SimEnv contains the simulation parameters.
 type SimEnv struct {
-	SimLogLevel          int
-	LogDir               string
-	PrintContainerOutput bool
+	LogDir string
+
+	// Parameters of simulation.
+	SimLogLevel    int
+	SimParallelism int
+	SimTestLimit   int
 
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
@@ -50,7 +51,7 @@ type SimEnv struct {
 // TestManager collects test results during a simulation run.
 type TestManager struct {
 	config      SimEnv
-	backend     Backend
+	backend     ContainerBackend
 	testLimiter int
 
 	simContainerID string
@@ -69,7 +70,7 @@ type TestManager struct {
 	results           map[TestSuiteID]*TestSuite
 }
 
-func NewTestManager(config SimEnv, b Backend, testLimiter int) *TestManager {
+func NewTestManager(config SimEnv, b ContainerBackend, testLimiter int) *TestManager {
 	return &TestManager{
 		config:            config,
 		backend:           b,

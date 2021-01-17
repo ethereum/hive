@@ -1,26 +1,34 @@
 package libhive
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/gorilla/mux"
 	"gopkg.in/inconshreveable/log15.v2"
-
-	. "github.com/ethereum/hive/internal/hive"
 )
 
+// hiveEnvvarPrefix is the prefix of the environment variables names that should
+// be moved from test images to client container to fine tune their setup.
+const hiveEnvvarPrefix = "HIVE_"
+
+// This is the default timeout for starting clients.
+const defaultStartTimeout = time.Duration(60 * time.Second)
+
 // newSimulationAPI creates handlers for the simulation API.
-func newSimulationAPI(b Backend, env SimEnv, tm *TestManager) http.Handler {
-	api := &simAPI{backend: b, tm: tm}
+func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Handler {
+	api := &simAPI{backend: b, env: env, tm: tm}
 
 	// Collect client types.
 	for name, _ := range env.Images {
@@ -49,7 +57,8 @@ func newSimulationAPI(b Backend, env SimEnv, tm *TestManager) http.Handler {
 
 type simAPI struct {
 	clientTypes []string
-	backend     Backend
+	backend     ContainerBackend
+	env         SimEnv
 	tm          *TestManager
 }
 
@@ -190,19 +199,31 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	}
 	envs := make(map[string]string)
 	for key, vals := range r.MultipartForm.Value {
-		envs[key] = vals[0]
+		if strings.HasPrefix(key, hiveEnvvarPrefix) {
+			envs[key] = vals[0]
+		}
 	}
 
 	// Get the client name.
-	name, ok := api.checkClient(envs, w)
+	name, ok := api.checkClient(r, w)
 	if !ok {
 		return
 	}
 
 	// Start it!
-	info, err := api.backend.StartClient(name, envs, files, true)
+	info, err := api.startClientContainer(name, envs, files)
 	if info != nil {
-		api.tm.RegisterNode(testID, info.ID, info)
+		clientInfo := &ClientInfo{
+			ID:              info.ID,
+			IP:              info.IP,
+			MAC:             info.MAC,
+			Name:            name,
+			VersionInfo:     api.env.ClientVersions[name],
+			InstantiatedAt:  time.Now(),
+			LogFile:         info.LogFile,
+			WasInstantiated: true, // ???
+		}
+		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {
 		log15.Error("API: could not start client", "client", name, "error", err)
@@ -213,9 +234,29 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
 }
 
-func (api *simAPI) checkClient(env map[string]string, w http.ResponseWriter) (string, bool) {
-	name, ok := env["CLIENT"]
-	if !ok {
+func (api *simAPI) startClientContainer(name string, env map[string]string, files map[string]*multipart.FileHeader) (*ContainerInfo, error) {
+	safeName := strings.Replace(name, string(filepath.Separator), "_", -1)
+	opts := ContainerOptions{
+		LogDir:    filepath.Join(api.env.LogDir, safeName),
+		CheckLive: true,
+		Env:       env,
+		Files:     files,
+	}
+
+	// Set up the timeout.
+	timeout := api.env.ClientStartTimeout
+	if timeout == 0 {
+		timeout = defaultStartTimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	return api.backend.StartContainer(ctx, api.env.Images[name], opts)
+}
+
+func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (string, bool) {
+	name := r.FormValue("CLIENT")
+	if name == "" {
 		log15.Error("API: missing client name in start node request")
 		http.Error(w, "missing 'CLIENT' in request", http.StatusBadRequest)
 		return "", false

@@ -52,7 +52,7 @@ func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, summaryResult Tes
 	vals := make(url.Values)
 	vals.Add("summaryresult", string(summaryResultData))
 	vals.Add("clientresults", string(clientResultData))
-	_, err = wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test/%s", sim.url, testSuite.String(), test.String()), vals)
+	_, err = wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%d/test/%d", sim.url, testSuite, test), vals)
 	return err
 }
 
@@ -75,7 +75,7 @@ func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, er
 
 // EndSuite signals the end of a test suite.
 func (sim *Simulation) EndSuite(testSuite SuiteID) error {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%s", sim.url, testSuite.String()), nil)
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d", sim.url, testSuite), nil)
 	if err != nil {
 		return err
 	}
@@ -89,7 +89,7 @@ func (sim *Simulation) StartTest(testSuite SuiteID, name string, description str
 	vals.Add("name", name)
 	vals.Add("description", description)
 
-	idstring, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%s/test", sim.url, testSuite.String()), vals)
+	idstring, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%d/test", sim.url, testSuite), vals)
 	if err != nil {
 		return 0, err
 	}
@@ -124,7 +124,7 @@ func (sim *Simulation) ClientTypes() (availableClients []string, err error) {
 // GetClientTypes. The input is used as environment variables in the new container.
 // Returns container id and ip.
 func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
-	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%s/test/%s/node", sim.url, testSuite.String(), test.String()), parameters, initFiles)
+	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test), parameters, initFiles)
 	if err != nil {
 		return "", nil, err
 	}
@@ -136,7 +136,7 @@ func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters ma
 
 // StopClient signals to the host that the node is no longer required.
 func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.url, testSuite.String(), test.String(), nodeid), nil)
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s", sim.url, testSuite, test, nodeid), nil)
 	if err != nil {
 		return err
 	}
@@ -146,7 +146,7 @@ func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string)
 
 // ClientEnodeURL returns the enode URL of a running client.
 func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/test/%s/node/%s", sim.url, testSuite.String(), test.String(), node))
+	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s", sim.url, testSuite, test, node))
 	if err != nil {
 		return "", err
 	}
@@ -161,13 +161,13 @@ func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node strin
 // CreateNetwork sends a request to the hive server to create a docker network by
 // the given name.
 func (sim *Simulation) CreateNetwork(testSuite SuiteID, networkName string) error {
-	_, err := http.Post(fmt.Sprintf("%s/testsuite/%s/network/%s", sim.url, testSuite.String(), networkName), "application/json", nil)
+	_, err := http.Post(fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, networkName), "application/json", nil)
 	return err
 }
 
 // RemoveNetwork sends a request to the hive server to remove the given network.
 func (sim *Simulation) RemoveNetwork(testSuite SuiteID, network string) error {
-	endpoint := fmt.Sprintf("%s/testsuite/%s/network/%s", sim.url, testSuite.String(), network)
+	endpoint := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, network)
 	req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return err
@@ -179,7 +179,7 @@ func (sim *Simulation) RemoveNetwork(testSuite SuiteID, network string) error {
 // ConnectContainer sends a request to the hive server to connect the given
 // container to the given network.
 func (sim *Simulation) ConnectContainer(testSuite SuiteID, network, containerID string) error {
-	endpoint := fmt.Sprintf("%s/testsuite/%s/network/%s/%s", sim.url, testSuite, network, containerID)
+	endpoint := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 	_, err := http.Post(endpoint, "application/json", nil)
 	return err
 }
@@ -187,7 +187,7 @@ func (sim *Simulation) ConnectContainer(testSuite SuiteID, network, containerID 
 // DisconnectContainer sends a request to the hive server to disconnect the given
 // container from the given network.
 func (sim *Simulation) DisconnectContainer(testSuite SuiteID, network, containerID string) error {
-	endpoint := fmt.Sprintf("%s/testsuite/%s/network/%s/%s", sim.url, testSuite, network, containerID)
+	endpoint := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 	req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
 	if err != nil {
 		return err
@@ -199,7 +199,7 @@ func (sim *Simulation) DisconnectContainer(testSuite SuiteID, network, container
 // ContainerNetworkIP returns the IP address of a container on the given network. If the
 // container ID is "simulation", it returns the IP address of the simulator container.
 func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerID string) (string, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%s/network/%s/%s", sim.url, testSuite.String(), network, containerID))
+	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID))
 	if err != nil {
 		return "", err
 	}
