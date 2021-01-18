@@ -237,7 +237,7 @@ func runTest(host *Simulation, s SuiteID, name, desc string, runit func(t *T)) e
 	defer func() {
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		host.EndTest(s, testID, t.result, nil)
+		host.EndTest(s, testID, t.result)
 	}()
 
 	// Run the test function.

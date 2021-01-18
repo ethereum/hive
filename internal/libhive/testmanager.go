@@ -140,7 +140,7 @@ func (manager *TestManager) Terminate() error {
 			if _, running := manager.IsTestRunning(testID); running {
 				// end any running tests and ensure that the host is notified to clean up
 				// any resources (e.g. docker containers).
-				err := manager.EndTest(suiteID, testID, terminationSummary, nil)
+				err := manager.EndTest(suiteID, testID, terminationSummary)
 				if err != nil {
 					return err
 				}
@@ -396,7 +396,7 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 }
 
 // EndTest finishes the test case
-func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, summaryResult *TestResult, clientResults map[string]*TestResult) error {
+func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, summaryResult *TestResult) error {
 	manager.testCaseMutex.Lock()
 
 	// Check if the test case is running
@@ -414,7 +414,6 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 	// Add the results to the test case
 	testCase.End = time.Now()
 	testCase.SummaryResult = *summaryResult
-	testCase.ClientResults = clientResults
 	manager.testCaseMutex.Unlock()
 
 	// Stop running clients.

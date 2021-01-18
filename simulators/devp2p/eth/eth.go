@@ -90,7 +90,7 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 			return fmt.Errorf("can't report sub-test result: %v", err)
 		}
 		result := hivesim.TestResult{Pass: test.Ok, Details: test.Diagnostic}
-		t.Sim.EndTest(t.SuiteID, testID, result, nil)
+		t.Sim.EndTest(t.SuiteID, testID, result)
 	}
 	return nil
 }
