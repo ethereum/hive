@@ -97,7 +97,7 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag s
 	logger := b.logger.New("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
-		logger.Error("failed to build docker image", "err", err)
+		logger.Error("can't find path to context directory", "err", err)
 		return err
 	}
 	opts := docker.BuildImageOptions{
@@ -120,7 +120,7 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag s
 
 	logger.Info("building image", logctx...)
 	if err := b.client.BuildImage(opts); err != nil {
-		logger.Error("failed to build docker image", "err", err)
+		logger.Error("image build failed", "err", err)
 		return err
 	}
 	return nil
