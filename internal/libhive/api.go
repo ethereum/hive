@@ -250,11 +250,11 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {
-		log15.Error("API: could not start client", "client", name, "container", containerID, "error", err)
+		log15.Error("API: could not start client", "client", name, "container", containerID[:8], "error", err)
 		http.Error(w, "client did not start: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", info.ID)
+	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
 	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
 }
 
