@@ -40,16 +40,6 @@ func main() {
 			"This number from 0-6 is interpreted differently depending on the client type.")
 
 		loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
-
-		// Deprecated flags:
-		_ = flag.Bool("debug", false, "A flag indicating debug mode, to allow docker containers to launch headless delve instances and so on")
-		_ = flag.String("override", "", "Comma separated regexp:files to override in client containers")
-		_ = flag.Bool("docker-noshell", false, "This flag has been deprecated and remains for script backwards compatibility. It will be removed in the future.")
-		_ = flag.String("docker-hostalias", "unix:///var/run/docker.sock", "Endpoint to the host Docket daemon from within a validator")
-		_ = flag.Bool("sim.rootcontext", false, "Indicates if the simulation should build "+
-			"the dockerfile with root (simulator) or local context. Needed for access to sibling folders like simulators/common")
-		_ = flag.Int("hivemaxtestcount", -1, "Limit the number of tests the simulator is permitted to generate in a testsuite for the Hive provider. "+
-			"Used for smoke testing consensus tests themselves.")
 	)
 
 	// Parse the flags and configure the logger.
