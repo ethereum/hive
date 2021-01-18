@@ -20,26 +20,26 @@ import (
 
 func main() {
 	var (
-		dockerEndpoint = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Endpoint to the local Docker daemon")
-		dockerNoCache  = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
-		dockerPull     = flag.Bool("docker-pull", false, "Refresh base images when building containers")
-		dockerOutput   = flag.Bool("docker-output", false, "Relay all docker output to stderr")
+		testResultsRoot = flag.String("results-root", "workspace/logs", "Target directory for results files and logs.")
+		loglevelFlag    = flag.Int("loglevel", 3, "Log level to use for displaying system events.")
+		dockerEndpoint  = flag.String("docker.endpoint", "unix:///var/run/docker.sock", "Endpoint of the local Docker daemon.")
+		dockerNoCache   = flag.String("docker.nocache", "", "Regexp selecting the docker images to forcibly rebuild.")
+		dockerPull      = flag.Bool("docker.pull", false, "Refresh base images when building containers.")
+		dockerOutput    = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
+		simPattern      = flag.String("sim", "", "Regexp selecting the simulations to run.")
+		simParallelism  = flag.Int("sim.parallelism", 1, "Max number of parallel clients/containers (interpreted by simulator).")
+		simTestLimit    = flag.Int("sim.testlimit", 0, "Max number of tests to execute per client (interpreted by simulators).")
+		simTimeLimit    = flag.Duration("sim.timelimit", 0, "Simulation timeout. Hive aborts the simulator if it exceeds this time.")
+		simLogLevel     = flag.Int("sim.loglevel", 3, "The base log level for simulator client instances. Supports values 0-5.")
 
-		testResultsRoot = flag.String("results-root", "workspace/logs", "Target folder for results output and historical results aggregation")
-
-		clientListFlag     = flag.String("client", "go-ethereum_latest", "Comma separated list of permitted clients for the test type, where client is formatted clientname_branch eg: go-ethereum_latest and the client name is a subfolder of the clients directory")
-		checkTimeLimitFlag = flag.Duration("client.checktimelimit", 3*time.Minute, "The timeout to wait for a newly "+
-			"instantiated client to open up the RPC port. If a very long chain is imported, this timeout may need to be quite large. "+
-			"A lower value means that hive won't wait as long for in case node crashes and never opens the RPC port.")
-
-		simulatorPattern     = flag.String("sim", "", "Regexp selecting the simulation tests to run")
-		simulatorParallelism = flag.Int("sim.parallelism", 1, "Max number of parallel clients/containers to run tests against")
-		simulatorTestLimit   = flag.Int("sim.testlimit", 0, "Max number of tests to execute per client (interpreted by simulators)")
-		simLimiterFlag       = flag.Int("sim.timelimit", 0, "Run all simulators with a time limit in seconds")
-		simloglevelFlag      = flag.Int("sim.loglevel", 3, "The base log level for simulator client instances. "+
-			"This number from 0-6 is interpreted differently depending on the client type.")
-
-		loglevelFlag = flag.Int("loglevel", 3, "Log level to use for displaying system events")
+		clients = flag.String("client", "go-ethereum", "Comma separated list of clients to use. Client names in the list may be given as\n"+
+			"just the client name, or a client_branch specifier. If a branch name is\n"+
+			"supplied, a client image of the branch will be built. Multiple instances of a\n"+
+			"single client type may be requested with different branches.\n"+
+			"Example: --client besu_latest,besu_20.10.2")
+		clientTimeout = flag.Duration("client.checktimelimit", 3*time.Minute, "The timeout of waiting for clients to open up the RPC port.\n"+
+			"If a very long chain is imported, this timeout may need to be quite large. A lower value means that\n"+
+			"hive won't wait as long in case the node crashes and never opens the RPC port.")
 	)
 
 	// Parse the flags and configure the logger.
@@ -52,12 +52,12 @@ func main() {
 	}
 
 	// Get the list of simulations.
-	simList, err := inv.MatchSimulators(*simulatorPattern)
+	simList, err := inv.MatchSimulators(*simPattern)
 	if err != nil {
 		fatal("bad --sim regular expression:", err)
 	}
-	if *simulatorPattern != "" && len(simList) == 0 {
-		fatal("no simulators for pattern", *simulatorPattern)
+	if *simPattern != "" && len(simList) == 0 {
+		fatal("no simulators for pattern", *simPattern)
 	}
 
 	// Create the docker backends.
@@ -97,14 +97,14 @@ func main() {
 		container: containerBackend,
 		env: libhive.SimEnv{
 			LogDir:             *testResultsRoot,
-			SimLogLevel:        *simloglevelFlag,
-			SimParallelism:     *simulatorParallelism,
-			SimTestLimit:       *simulatorTestLimit,
-			ClientStartTimeout: *checkTimeLimitFlag,
+			SimLogLevel:        *simLogLevel,
+			SimParallelism:     *simParallelism,
+			SimTestLimit:       *simTestLimit,
+			ClientStartTimeout: *clientTimeout,
 		},
-		SimDurationLimit: time.Duration(*simLimiterFlag) * time.Second,
+		SimDurationLimit: *simTimeLimit,
 	}
-	clientList := splitAndTrim(*clientListFlag, ",")
+	clientList := splitAndTrim(*clients, ",")
 	if err := runner.initClients(ctx, clientList); err != nil {
 		fatal(err)
 	}
