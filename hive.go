@@ -21,8 +21,9 @@ import (
 func main() {
 	var (
 		dockerEndpoint = flag.String("docker-endpoint", "unix:///var/run/docker.sock", "Endpoint to the local Docker daemon")
-		noCachePattern = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
-		pullEnabled    = flag.Bool("docker-pull", false, "Refresh base images when building containers")
+		dockerNoCache  = flag.String("docker-nocache", "", "Regexp selecting the docker images to forcibly rebuild")
+		dockerPull     = flag.Bool("docker-pull", false, "Refresh base images when building containers")
+		dockerOutput   = flag.Bool("docker-output", false, "Relay all docker output to stderr")
 
 		testResultsRoot = flag.String("results-root", "workspace/logs", "Target folder for results output and historical results aggregation")
 
@@ -72,16 +73,16 @@ func main() {
 	// Create the docker backends.
 	dockerConfig := &libdocker.Config{
 		Inventory:   inv,
-		PullEnabled: *pullEnabled,
+		PullEnabled: *dockerPull,
 	}
-	if *noCachePattern != "" {
-		re, err := regexp.Compile(*noCachePattern)
+	if *dockerNoCache != "" {
+		re, err := regexp.Compile(*dockerNoCache)
 		if err != nil {
 			fatal("bad --docker-nocache regular expression:", err)
 		}
 		dockerConfig.NoCachePattern = re
 	}
-	if *loglevelFlag > 3 {
+	if *dockerOutput {
 		dockerConfig.ContainerOutput = os.Stderr
 		dockerConfig.BuildOutput = os.Stderr
 	}
