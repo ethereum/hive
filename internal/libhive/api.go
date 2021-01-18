@@ -296,6 +296,9 @@ func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
 		msg := fmt.Sprintf("unable to stop client: %v", err)
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
+	if nodeInfo.wait != nil {
+		nodeInfo.wait()
+	}
 }
 
 // getEnodeURL gets the enode URL of the client.
