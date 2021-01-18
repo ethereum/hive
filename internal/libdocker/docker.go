@@ -57,7 +57,7 @@ func LookupBridgeIP(logger log15.Logger) (net.IP, error) {
 	// Find the local IPv4 address of the docker0 bridge adapter
 	interfaes, err := net.Interfaces()
 	if err != nil {
-		logger.Error("failed to list network interfaces", "error", err)
+		logger.Error("failed to list network interfaces", "err", err)
 		return nil, err
 	}
 	// Iterate over all the interfaces and find the docker0 bridge
@@ -66,14 +66,14 @@ func LookupBridgeIP(logger log15.Logger) (net.IP, error) {
 			// Retrieve all the addresses assigned to the bridge adapter
 			addrs, err := iface.Addrs()
 			if err != nil {
-				logger.Error("failed to list docker bridge addresses", "error", err)
+				logger.Error("failed to list docker bridge addresses", "err", err)
 				return nil, err
 			}
 			// Find a suitable IPv4 address and return it
 			for _, addr := range addrs {
 				ip, _, err := net.ParseCIDR(addr.String())
 				if err != nil {
-					logger.Error("failed to list parse address", "address", addr, "error", err)
+					logger.Error("failed to list parse address", "address", addr, "err", err)
 					return nil, err
 				}
 				if ipv4 := ip.To4(); ipv4 != nil {
