@@ -11,10 +11,10 @@ import (
 
 // BackendHooks can be used to override the behavior of the fake backend.
 type BackendHooks struct {
-	StartContainer func(name string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
-	WaitContainer  func(context.Context, string) (int, error)
-	StopContainer  func(string) error
-	RunEnodeSh     func(string) (string, error)
+	CreateContainer func(image string, opt libhive.ContainerOptions) (string, error)
+	StartContainer  func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
+	DeleteContainer func(containerID string) error
+	RunEnodeSh      func(containerID string) (string, error)
 
 	NetworkNameToID     func(string) (string, error)
 	CreateNetwork       func(string) (string, error)
@@ -42,18 +42,30 @@ func NewContainerBackend(hooks *BackendHooks) libhive.ContainerBackend {
 	return b
 }
 
-func (b *fakeBackend) StartContainer(ctx context.Context, imageName string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+func (b *fakeBackend) CreateContainer(ctx context.Context, image string, opt libhive.ContainerOptions) (string, error) {
+	if b.hooks.CreateContainer != nil {
+		return b.hooks.CreateContainer(image, opt)
+	}
+	b.clientCounter++
+	id := fmt.Sprintf("%0.8x", b.clientCounter)
+	return id, nil
+}
+
+func (b *fakeBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 	var info libhive.ContainerInfo
 	if b.hooks.StartContainer != nil {
-		info2, err := b.hooks.StartContainer(imageName, opt)
+		info2, err := b.hooks.StartContainer(containerID, opt)
 		if err != nil {
 			return nil, err
 		}
 		info = *info2
+		info.ID = containerID
+		if info.Wait == nil {
+			info.Wait = func() {}
+		}
 	}
 
-	b.clientCounter++
-	info.ID = fmt.Sprintf("%0.8x", b.clientCounter)
+	info.ID = containerID
 	if info.IP == "" {
 		ip := net.IP{192, 0, 2, byte(b.clientCounter)}
 		info.IP = ip.String()
@@ -61,21 +73,15 @@ func (b *fakeBackend) StartContainer(ctx context.Context, imageName string, opt 
 	if info.MAC == "" {
 		info.MAC = "00:80:41:ae:fd:7e"
 	}
+	info.Wait = func() {}
 	return &info, nil
 }
 
-func (b *fakeBackend) StopContainer(containerID string) error {
-	if b.hooks.StopContainer != nil {
-		return b.hooks.StopContainer(containerID)
+func (b *fakeBackend) DeleteContainer(containerID string) error {
+	if b.hooks.DeleteContainer != nil {
+		return b.hooks.DeleteContainer(containerID)
 	}
 	return nil
-}
-
-func (b *fakeBackend) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	if b.hooks.WaitContainer != nil {
-		return b.hooks.WaitContainer(ctx, containerID)
-	}
-	return 0, nil
 }
 
 func (b *fakeBackend) RunEnodeSh(containerID string) (string, error) {

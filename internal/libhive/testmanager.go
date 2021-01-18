@@ -417,9 +417,8 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 
 	// Stop running clients.
 	for _, v := range testCase.ClientInfo {
-		if v.WasInstantiated {
-			manager.backend.StopContainer(v.ID)
-		}
+		manager.backend.DeleteContainer(v.ID)
+		v.wait()
 	}
 
 	// Delete from running, if it's still there.

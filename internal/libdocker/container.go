@@ -2,7 +2,6 @@ package libdocker
 
 import (
 	"archive/tar"
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -13,6 +12,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/ethereum/hive/internal/libhive"
@@ -57,39 +57,77 @@ func (b *ContainerBackend) RunEnodeSh(containerID string) (string, error) {
 	return outputBuf.String(), nil
 }
 
-// StartContainer starts a docker container.
-func (b *ContainerBackend) StartContainer(ctx context.Context, imageName string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
-	container, err := b.createContainer(imageName, opt.Env, opt.Files)
-	if err != nil {
-		return nil, fmt.Errorf("can't create client container: %v", err)
+// CreateContainer creates a docker container.
+func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string, opt libhive.ContainerOptions) (string, error) {
+	vars := []string{}
+	for key, val := range opt.Env {
+		vars = append(vars, key+"="+val)
 	}
-	info := &libhive.ContainerInfo{ID: container.ID[:8]}
-	logger := b.logger.New("image", imageName, "container", info.ID)
+	c, err := b.client.CreateContainer(docker.CreateContainerOptions{
+		Context: ctx,
+		Config: &docker.Config{
+			Image: imageName,
+			Env:   vars,
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	logger := b.logger.New("image", imageName, "container", c.ID[:8])
 
-	// Get the IP of container.
+	// Now upload files.
+	if err := b.uploadFiles(ctx, c.ID, opt.Files); err != nil {
+		logger.Error("container file upload failed", "err", err)
+		if removeErr := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true}); removeErr != nil {
+			logger.Error("can't remove container", "err", removeErr)
+		}
+		return "", err
+	}
 	logger.Debug("container created")
+	return c.ID, err
+}
+
+// StartContainer starts a docker container.
+func (b *ContainerBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+	info := &libhive.ContainerInfo{ID: containerID[:8]}
+	logger := b.logger.New("container", info.ID)
 
 	// Set up log file.
 	if opt.LogDir != "" {
-		basename := opt.LogFilePrefix + container.ID + ".log"
+		basename := opt.LogFilePrefix + containerID + ".log"
 		info.LogFile = filepath.Join(opt.LogDir, basename)
 	}
 
 	// Run the container.
 	var startTime = time.Now()
-	waiter, err := b.runContainer(logger, container.ID, info.LogFile)
+	waiter, err := b.runContainer(ctx, logger, containerID, info.LogFile)
 	if err != nil {
-		waiter.Close()
 		logger.Error("container did not start", "err", err)
 		if removeErr := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: info.ID, Force: true}); removeErr != nil {
 			logger.Error("can't remove container", "err", removeErr)
 		}
-		return info, fmt.Errorf("container did not start: %v", err)
+		return nil, fmt.Errorf("container did not start: %v", err)
 	}
 
+	// This goroutine waits for the container to end and closes log
+	// files when done.
+	containerExit := make(chan struct{})
+	go func() {
+		defer close(containerExit)
+		err := waiter.Wait()
+		waiter.Close()
+		if err == nil {
+			logger.Debug("container exited cleanly")
+		} else {
+			logger.Error("container exited with error", "err", err)
+		}
+	}()
+	// Set up the wait function.
+	info.Wait = func() { <-containerExit }
+
 	// Get the IP. This can only be done after the container has started.
-	inspect := docker.InspectContainerOptions{Context: ctx, ID: info.ID}
-	container, err = b.client.InspectContainerWithOptions(inspect)
+	inspect := docker.InspectContainerOptions{Context: ctx, ID: containerID}
+	container, err := b.client.InspectContainerWithOptions(inspect)
 	if err != nil {
 		waiter.Close()
 		if removeErr := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: info.ID, Force: true}); removeErr != nil {
@@ -100,31 +138,15 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, imageName string,
 	info.IP = container.NetworkSettings.IPAddress
 	info.MAC = container.NetworkSettings.MacAddress
 
-	var containerExit = make(chan struct{}, 1)
-	go func() {
-		// Ensure the goroutine started by runContainer exits, so that its resources (e.g.
-		// the logfile it creates) can be garbage collected.
-		// TODO: This is not great. If we get an interrupt, the log file might not be flushed correctly.
-		err := waiter.Wait()
-		waiter.Close()
-		containerExit <- struct{}{}
-		if err == nil {
-			logger.Debug("container finished cleanly")
-		} else {
-			logger.Error("container finished with error", "err", err)
-		}
-	}()
-
-	var hasStarted = make(chan struct{}, 1)
+	// Set up the port check if requested.
+	hasStarted := make(chan struct{})
 	if opt.CheckLive {
-		// Port check requested.
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		addr := fmt.Sprintf("%s:%d", info.IP, 8545)
 		go checkPort(ctx, logger, addr, hasStarted)
 	} else {
-		// No port check, just assume it has started by now.
-		hasStarted <- struct{}{}
+		close(hasStarted)
 	}
 
 	// Wait for events.
@@ -135,7 +157,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, imageName string,
 	case <-containerExit:
 		checkErr = errors.New("terminated unexpectedly")
 	case <-ctx.Done():
-		checkErr = errors.New("container did not start")
+		checkErr = errors.New("timed out waiting for container startup")
 	}
 
 	if checkErr != nil {
@@ -167,21 +189,16 @@ func checkPort(ctx context.Context, logger log15.Logger, addr string, notify cha
 			var dialer net.Dialer
 			conn, err := dialer.DialContext(ctx, "tcp", addr)
 			if err == nil {
-				notify <- struct{}{}
 				conn.Close()
+				close(notify)
 				return
 			}
 		}
 	}
 }
 
-// WaitContainer waits for a container to exit.
-func (b *ContainerBackend) WaitContainer(ctx context.Context, containerID string) (int, error) {
-	return b.client.WaitContainerWithContext(containerID, ctx)
-}
-
-// StopContainer stops the given container.
-func (b *ContainerBackend) StopContainer(containerID string) error {
+// DeleteContainer removes the given container. If the container is running, it is stopped.
+func (b *ContainerBackend) DeleteContainer(containerID string) error {
 	return b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
 }
 
@@ -258,30 +275,8 @@ func (b *ContainerBackend) DisconnectContainer(containerID, networkID string) er
 	})
 }
 
-// createContainer creates a docker container from an image.
-func (b *ContainerBackend) createContainer(imageName string, env map[string]string, files map[string]*multipart.FileHeader) (*docker.Container, error) {
-	vars := []string{}
-	for key, val := range env {
-		vars = append(vars, key+"="+val)
-	}
-	// Create the container with env.
-	c, err := b.client.CreateContainer(docker.CreateContainerOptions{
-		Config: &docker.Config{
-			Image: imageName,
-			Env:   vars,
-		},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Now upload files.
-	err = b.uploadFiles(c.ID, files)
-	return c, err
-}
-
 // uploadFiles uploads the given files into a docker container.
-func (b *ContainerBackend) uploadFiles(id string, files map[string]*multipart.FileHeader) error {
+func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map[string]*multipart.FileHeader) error {
 	// Short circuit if there are no files to upload
 	if len(files) == 0 {
 		return nil
@@ -320,6 +315,7 @@ func (b *ContainerBackend) uploadFiles(id string, files map[string]*multipart.Fi
 
 	// Upload the tarball into the destination container
 	return b.client.UploadToContainer(id, docker.UploadToContainerOptions{
+		Context:     ctx,
 		InputStream: tarball,
 		Path:        "/",
 	})
@@ -328,11 +324,11 @@ func (b *ContainerBackend) uploadFiles(id string, files map[string]*multipart.Fi
 // runContainer attaches to the output streams of an existing container, then
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
-func (b *ContainerBackend) runContainer(logger log15.Logger, id, logfile string) (docker.CloseWaiter, error) {
+func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger, id, logfile string) (docker.CloseWaiter, error) {
 	var stream io.Writer
 
 	// Redirect container output to logfile.
-	var fdsToClose []io.Closer
+	closer := newFileCloser(logger)
 	if logfile != "" {
 		if err := os.MkdirAll(filepath.Dir(logfile), 0755); err != nil {
 			return nil, err
@@ -341,27 +337,14 @@ func (b *ContainerBackend) runContainer(logger log15.Logger, id, logfile string)
 		if err != nil {
 			return nil, err
 		}
+		closer.addFile(log)
 		stream = log
-		fdsToClose = append(fdsToClose, log)
 
 		// If console logging was requested, tee the output and tag it with the container id.
 		if b.config.ContainerOutput != nil {
-			// Hook into the containers output stream and tee it out.
-			hookedR, hookedW, err := os.Pipe()
-			if err != nil {
-				return nil, err
-			}
-			stream = io.MultiWriter(log, hookedW)
-			fdsToClose = append(fdsToClose, hookedW)
-			// Tag all log messages with the container ID.
-			copy := func(dst io.Writer, src io.Reader) (int64, error) {
-				scanner := bufio.NewScanner(src)
-				for scanner.Scan() {
-					dst.Write([]byte(fmt.Sprintf("[%s] %s\n", id[:8], scanner.Text())))
-				}
-				return 0, nil
-			}
-			go copy(b.config.ContainerOutput, hookedR)
+			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", id[:8]))
+			closer.addFile(prefixer)
+			stream = io.MultiWriter(log, prefixer)
 		}
 	}
 
@@ -377,37 +360,101 @@ func (b *ContainerBackend) runContainer(logger log15.Logger, id, logfile string)
 	}
 	waiter, err := b.client.AttachToContainerNonBlocking(attach)
 	if err != nil {
+		closer.closeFiles()
 		logger.Error("failed to attach to container", "err", err)
 		return nil, err
 	}
+	closer.w = waiter
 
 	logger.Debug("starting container")
-	hostConfig := &docker.HostConfig{}
-	if err := b.client.StartContainer(id, hostConfig); err != nil {
+	if err := b.client.StartContainerWithContext(id, nil, ctx); err != nil {
+		closer.Close()
 		logger.Error("failed to start container", "err", err)
 		return nil, err
 	}
-	return fdClosingWaiter{
-		CloseWaiter: waiter,
-		closers:     fdsToClose,
-		logger:      logger,
-	}, nil
+	return closer, nil
 }
 
-// fdClosingWaiter wraps a docker.CloseWaiter and closes all io.Closer
-// instances passed to it, after it is done waiting.
-type fdClosingWaiter struct {
-	docker.CloseWaiter
-	closers []io.Closer
-	logger  log15.Logger
+// fileCloser wraps a docker.CloseWaiter and closes all io.Closer instances held in it,
+// after it is done waiting.
+type fileCloser struct {
+	w         docker.CloseWaiter
+	logger    log15.Logger
+	closers   []io.Closer
+	closeOnce sync.Once
 }
 
-func (w fdClosingWaiter) Wait() error {
-	err := w.CloseWaiter.Wait()
-	for _, closer := range w.closers {
-		if err := closer.Close(); err != nil {
-			w.logger.Error("failed to close fd", "err", err)
+func newFileCloser(logger log15.Logger) *fileCloser {
+	return &fileCloser{logger: logger}
+}
+
+func (w *fileCloser) Wait() error {
+	err := w.w.Wait()
+	w.closeFiles()
+	return err
+}
+
+func (w *fileCloser) Close() error {
+	err := w.w.Close()
+	w.closeFiles()
+	return err
+}
+
+func (w *fileCloser) addFile(c io.Closer) {
+	w.closers = append(w.closers, c)
+}
+
+func (w *fileCloser) closeFiles() {
+	w.closeOnce.Do(func() {
+		for _, closer := range w.closers {
+			if err := closer.Close(); err != nil {
+				w.logger.Error("failed to close fd", "err", err)
+			}
+		}
+	})
+}
+
+// linePrefixWriter wraps a writer, prefixing written lines with a string.
+type linePrefixWriter struct {
+	w      io.Writer
+	prefix string
+	buf    []byte // holds current incomplete line
+}
+
+func newLinePrefixWriter(w io.Writer, prefix string) *linePrefixWriter {
+	return &linePrefixWriter{
+		w:      w,
+		prefix: prefix,
+		buf:    []byte(prefix),
+	}
+}
+
+func (w *linePrefixWriter) Write(bytes []byte) (int, error) {
+	var err error
+	for _, b := range bytes {
+		if b == '\n' {
+			// flush current line
+			if len(w.buf) > 0 {
+				w.buf = append(w.buf, '\n')
+				_, err = w.w.Write(w.buf)
+				w.buf = w.buf[:0]
+			}
+			// start new line in buffer
+			w.buf = append(w.buf, w.prefix...)
+		} else {
+			w.buf = append(w.buf, b)
 		}
 	}
+	return len(bytes), err
+}
+
+// Close flushes the last line.
+func (w *linePrefixWriter) Close() error {
+	var err error
+	if len(w.buf) > 0 {
+		w.buf = append(w.buf, '\n')
+		_, err = w.w.Write(w.buf)
+	}
+	w.buf = nil
 	return err
 }

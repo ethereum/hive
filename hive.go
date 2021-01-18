@@ -208,8 +208,8 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	}
 	defer shutdownServer(server)
 
-	// Start the simulator container.
-	log15.Debug("starting simulator container")
+	// Create the simulator container.
+	log15.Debug("creating simulator container")
 	opts := libhive.ContainerOptions{
 		LogDir:        r.env.LogDir,
 		LogFilePrefix: fmt.Sprintf("%d-simulator-", time.Now().Unix()),
@@ -222,29 +222,32 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	if r.env.SimTestLimit != 0 {
 		opts.Env["HIVE_SIMLIMIT"] = strconv.Itoa(r.env.SimTestLimit)
 	}
-
-	sc, err := r.container.StartContainer(ctx, r.simImages[sim], opts)
+	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
 	if err != nil {
 		return err
 	}
 
-	// TODO: There is a race here. The test manager needs to know about the
-	// simulator container ID because the docker network APIs need it, but we
-	// can't know the ID until the container is already running.
-	tm.SetSimContainerID(sc.ID)
+	// Tell the test manager about the simulator container ID. It needs to
+	// know this ID before any docker network APIs are accessed.
+	tm.SetSimContainerID(containerID)
 
+	log15.Debug("starting simulator container")
+	sc, err := r.container.StartContainer(ctx, r.simImages[sim], opts)
+	if err != nil {
+		return err
+	}
 	slogger := log15.New("id", sc.ID[:8])
 	slogger.Debug("started simulator container")
 	defer func() {
 		slogger.Debug("deleting simulator container")
-		if err := r.container.StopContainer(sc.ID); err != nil {
+		if err := r.container.DeleteContainer(sc.ID); err != nil {
 			slogger.Error("can't delete simulator container", "err", err)
 		}
 	}()
 
 	done := make(chan struct{})
 	go func() {
-		r.container.WaitContainer(ctx, sc.ID)
+		sc.Wait()
 		close(done)
 	}()
 

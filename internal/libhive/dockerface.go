@@ -10,9 +10,9 @@ import (
 // ContainerBackend captures the docker interactions of the simulation API.
 type ContainerBackend interface {
 	// These methods work with containers.
-	StartContainer(ctx context.Context, image string, opt ContainerOptions) (*ContainerInfo, error)
-	WaitContainer(ctx context.Context, containerID string) (exitCode int, err error)
-	StopContainer(containerID string) error
+	CreateContainer(ctx context.Context, image string, opt ContainerOptions) (string, error)
+	StartContainer(ctx context.Context, containerID string, opt ContainerOptions) (*ContainerInfo, error)
+	DeleteContainer(containerID string) error
 
 	// RunEnodeSh runs the /enode.sh script in the given container and returns its output.
 	RunEnodeSh(containerID string) (string, error)
@@ -31,19 +31,27 @@ var ErrNetworkNotFound = fmt.Errorf("network not found")
 
 // ContainerOptions contains the launch parameters for docker containers.
 type ContainerOptions struct {
+	// These options apply when creating the container.
+	Env   map[string]string
+	Files map[string]*multipart.FileHeader
+
+	// These options apply when starting the container.
+	CheckLive     bool   // requests check for TCP port 8545
 	LogDir        string // if set, put log file in this directory
 	LogFilePrefix string // if set, the log file name will have this prefix
-	CheckLive     bool   // if this is set, the backend waits for TCP port 8545 to open.
-	Env           map[string]string
-	Files         map[string]*multipart.FileHeader
 }
 
-// This is returned by StartContainer.
+// ContainerInfo is returned by StartContainer.
 type ContainerInfo struct {
 	ID      string // docker container ID
 	IP      string // IP address
 	MAC     string // MAC address. TODO: remove
 	LogFile string
+
+	// The wait function returns when the container is stopped.
+	// This must be called for all containers that were started
+	// to avoid resource leaks.
+	Wait func()
 }
 
 // Builder can build docker images of clients and simulators.

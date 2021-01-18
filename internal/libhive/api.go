@@ -210,40 +210,6 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start it!
-	info, err := api.startClientContainer(name, envs, files)
-	if info != nil {
-		clientInfo := &ClientInfo{
-			ID:              info.ID,
-			IP:              info.IP,
-			MAC:             info.MAC,
-			Name:            name,
-			VersionInfo:     api.env.ClientVersions[name],
-			InstantiatedAt:  time.Now(),
-			LogFile:         info.LogFile,
-			WasInstantiated: true, // ???
-		}
-		api.tm.RegisterNode(testID, info.ID, clientInfo)
-	}
-	if err != nil {
-		log15.Error("API: could not start client", "client", name, "error", err)
-		http.Error(w, "client did not start: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", info.ID)
-	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
-}
-
-func (api *simAPI) startClientContainer(name string, env map[string]string, files map[string]*multipart.FileHeader) (*ContainerInfo, error) {
-	safeName := strings.Replace(name, string(filepath.Separator), "_", -1)
-	opts := ContainerOptions{
-		LogDir:        filepath.Join(api.env.LogDir, safeName),
-		LogFilePrefix: "client-",
-		CheckLive:     true,
-		Env:           env,
-		Files:         files,
-	}
-
 	// Set up the timeout.
 	timeout := api.env.ClientStartTimeout
 	if timeout == 0 {
@@ -252,7 +218,44 @@ func (api *simAPI) startClientContainer(name string, env map[string]string, file
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return api.backend.StartContainer(ctx, api.env.Images[name], opts)
+	// Create the client container.
+	safeName := strings.Replace(name, string(filepath.Separator), "_", -1)
+	options := ContainerOptions{
+		LogDir:        filepath.Join(api.env.LogDir, safeName),
+		LogFilePrefix: "client-",
+		CheckLive:     true,
+		Env:           envs,
+		Files:         files,
+	}
+	containerID, err := api.backend.CreateContainer(ctx, api.env.Images[name], options)
+	if err != nil {
+		log15.Error("API: client container create failed", "client", name, "error", err)
+		http.Error(w, "client container create failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Start it!
+	info, err := api.backend.StartContainer(ctx, containerID, options)
+	if info != nil {
+		clientInfo := &ClientInfo{
+			ID:             info.ID,
+			IP:             info.IP,
+			MAC:            info.MAC,
+			Name:           name,
+			VersionInfo:    api.env.ClientVersions[name],
+			InstantiatedAt: time.Now(),
+			LogFile:        info.LogFile,
+			wait:           info.Wait,
+		}
+		api.tm.RegisterNode(testID, info.ID, clientInfo)
+	}
+	if err != nil {
+		log15.Error("API: could not start client", "client", name, "container", containerID, "error", err)
+		http.Error(w, "client did not start: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", info.ID)
+	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
 }
 
 func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (string, bool) {
@@ -289,7 +292,7 @@ func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Stop the container.
-	if err = api.backend.StopContainer(nodeInfo.ID); err != nil {
+	if err = api.backend.DeleteContainer(nodeInfo.ID); err != nil {
 		msg := fmt.Sprintf("unable to stop client: %v", err)
 		http.Error(w, msg, http.StatusInternalServerError)
 	}
