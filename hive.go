@@ -209,7 +209,6 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	defer shutdownServer(server)
 
 	// Create the simulator container.
-	log15.Debug("creating simulator container")
 	opts := libhive.ContainerOptions{
 		LogDir:        r.env.LogDir,
 		LogFilePrefix: fmt.Sprintf("%d-simulator-", time.Now().Unix()),
@@ -232,11 +231,11 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	tm.SetSimContainerID(containerID)
 
 	log15.Debug("starting simulator container")
-	sc, err := r.container.StartContainer(ctx, r.simImages[sim], opts)
+	sc, err := r.container.StartContainer(ctx, containerID, opts)
 	if err != nil {
 		return err
 	}
-	slogger := log15.New("id", sc.ID[:8])
+	slogger := log15.New("sim", sim, "container", sc.ID[:8])
 	slogger.Debug("started simulator container")
 	defer func() {
 		slogger.Debug("deleting simulator container")
