@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"path/filepath"
 
 	"github.com/ethereum/hive/internal/libhive"
@@ -100,12 +101,13 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag s
 		return err
 	}
 	opts := docker.BuildImageOptions{
-		Context:    ctx,
-		Name:       imageTag,
-		ContextDir: context,
-		Dockerfile: "Dockerfile",
-		NoCache:    nocache,
-		Pull:       b.config.PullEnabled,
+		Context:      ctx,
+		Name:         imageTag,
+		ContextDir:   context,
+		OutputStream: ioutil.Discard,
+		Dockerfile:   "Dockerfile",
+		NoCache:      nocache,
+		Pull:         b.config.PullEnabled,
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput
