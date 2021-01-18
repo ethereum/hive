@@ -434,12 +434,10 @@ func (w *linePrefixWriter) Write(bytes []byte) (int, error) {
 	for _, b := range bytes {
 		if b == '\n' {
 			// flush current line
-			if len(w.buf) > 0 {
-				w.buf = append(w.buf, '\n')
-				_, err = w.w.Write(w.buf)
-				w.buf = w.buf[:0]
-			}
+			w.buf = append(w.buf, '\n')
+			_, err = w.w.Write(w.buf)
 			// start new line in buffer
+			w.buf = w.buf[:0]
 			w.buf = append(w.buf, w.prefix...)
 		} else {
 			w.buf = append(w.buf, b)
@@ -451,7 +449,7 @@ func (w *linePrefixWriter) Write(bytes []byte) (int, error) {
 // Close flushes the last line.
 func (w *linePrefixWriter) Close() error {
 	var err error
-	if len(w.buf) > 0 {
+	if len(w.buf) > len(w.prefix) {
 		w.buf = append(w.buf, '\n')
 		_, err = w.w.Write(w.buf)
 	}
