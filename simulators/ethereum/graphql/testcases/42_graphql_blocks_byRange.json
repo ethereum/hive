@@ -1,7 +1,7 @@
 {
   "request": 
     
-    "{blocks (from : \"0x1e\", to: \"0x20\") { number gasUsed gasLimit hash nonce  stateRoot receiptsRoot transactionCount }} ",
+    "{blocks (from : 30, to: 32) { number gasUsed gasLimit hash nonce  stateRoot receiptsRoot transactionCount }} ",
 
 
   "responses":[{
