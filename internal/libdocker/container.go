@@ -116,11 +116,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 		defer close(containerExit)
 		err := waiter.Wait()
 		waiter.Close()
-		if err == nil {
-			logger.Debug("container exited cleanly")
-		} else {
-			logger.Error("container exited with error", "err", err)
-		}
+		logger.Debug("container exited", "err", err)
 	}()
 	// Set up the wait function.
 	info.Wait = func() { <-containerExit }
