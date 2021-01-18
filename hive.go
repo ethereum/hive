@@ -172,7 +172,7 @@ func (r *simRunner) initClients(ctx context.Context, clientList []string) error 
 func (r *simRunner) initSimulators(ctx context.Context, simList []string) error {
 	r.simImages = make(map[string]string)
 
-	log15.Info("building %d simulators...", len(simList))
+	log15.Info(fmt.Sprintf("building %d simulators...", len(simList)))
 	for _, sim := range simList {
 		image, err := r.builder.BuildSimulatorImage(ctx, sim)
 		if err != nil {
