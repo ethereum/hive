@@ -78,9 +78,7 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	// Now upload files.
 	if err := b.uploadFiles(ctx, c.ID, opt.Files); err != nil {
 		logger.Error("container file upload failed", "err", err)
-		if removeErr := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: c.ID, Force: true}); removeErr != nil {
-			logger.Error("can't remove container", "err", removeErr)
-		}
+		b.DeleteContainer(c.ID)
 		return "", err
 	}
 	logger.Debug("container created")
@@ -102,10 +100,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	var startTime = time.Now()
 	waiter, err := b.runContainer(ctx, logger, containerID, info.LogFile)
 	if err != nil {
-		logger.Error("container did not start", "err", err)
-		if removeErr := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: info.ID, Force: true}); removeErr != nil {
-			logger.Error("can't remove container", "err", removeErr)
-		}
+		b.DeleteContainer(containerID)
 		return nil, fmt.Errorf("container did not start: %v", err)
 	}
 
@@ -126,9 +121,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	container, err := b.client.InspectContainerWithOptions(inspect)
 	if err != nil {
 		waiter.Close()
-		if removeErr := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: info.ID, Force: true}); removeErr != nil {
-			logger.Error("can't remove container", "err", removeErr)
-		}
+		b.DeleteContainer(containerID)
 		return info, err
 	}
 	info.IP = container.NetworkSettings.IPAddress
@@ -157,11 +150,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	}
 
 	if checkErr != nil {
-		logger.Debug("deleting container")
-		err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: container.ID, Force: true})
-		if err != nil {
-			logger.Error("can't delete container")
-		}
+		b.DeleteContainer(containerID)
 	}
 	return info, checkErr
 }
@@ -195,7 +184,12 @@ func checkPort(ctx context.Context, logger log15.Logger, addr string, notify cha
 
 // DeleteContainer removes the given container. If the container is running, it is stopped.
 func (b *ContainerBackend) DeleteContainer(containerID string) error {
-	return b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
+	b.logger.Debug("removing container", "container", containerID[:8])
+	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
+	if err != nil {
+		b.logger.Error("can't remove container", "container", containerID[:8], "err", err)
+	}
+	return err
 }
 
 // CreateNetwork creates a docker network.
