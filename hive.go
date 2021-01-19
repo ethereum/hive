@@ -226,7 +226,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	}
 
 	// Set the log file, and notify TestManager about the container.
-	logbasename := fmt.Sprintf("%d-simulator-%s.log", time.Now().Unix(), containerID[:16])
+	logbasename := fmt.Sprintf("%d-simulator-%s.log", time.Now().Unix(), containerID)
 	opts.LogFile = filepath.Join(r.env.LogDir, logbasename)
 	tm.SetSimContainerInfo(containerID, logbasename)
 
