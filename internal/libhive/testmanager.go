@@ -56,6 +56,7 @@ type TestManager struct {
 	testLimiter int
 
 	simContainerID string
+	simLogFile     string
 
 	// all networks started by a specific test suite, where key
 	// is network name and value is network ID
@@ -83,10 +84,11 @@ func NewTestManager(config SimEnv, b ContainerBackend, testLimiter int) *TestMan
 	}
 }
 
-// SetSimContainerID sets the container ID of the simulation container. This must be called
-// after creating the simulation container.
-func (manager *TestManager) SetSimContainerID(id string) {
+// SetSimContainerInfo makes the manager aware of the simulation container.
+// This must be called after creating the simulation container, but before starting it.
+func (manager *TestManager) SetSimContainerInfo(id, logFile string) {
 	manager.simContainerID = id
+	manager.simLogFile = logFile
 }
 
 // Results returns the results for all suites that have already ended.
@@ -348,7 +350,7 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 }
 
 // StartTestSuite starts a test suite and returns the context id
-func (manager *TestManager) StartTestSuite(name string, description string, simlog string) (TestSuiteID, error) {
+func (manager *TestManager) StartTestSuite(name string, description string) (TestSuiteID, error) {
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
 
@@ -358,7 +360,7 @@ func (manager *TestManager) StartTestSuite(name string, description string, siml
 		Name:         name,
 		Description:  description,
 		TestCases:    make(map[TestID]*TestCase),
-		SimulatorLog: simlog,
+		SimulatorLog: manager.simLogFile,
 	}
 	manager.testSuiteCounter++
 	return newSuiteID, nil

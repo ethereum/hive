@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -78,8 +79,7 @@ func (api *simAPI) startSuite(w http.ResponseWriter, r *http.Request) {
 
 	name := r.Form.Get("name")
 	desc := r.Form.Get("description")
-	simlog := r.Form.Get("simlog")
-	suiteID, err := api.tm.StartTestSuite(name, desc, simlog)
+	suiteID, err := api.tm.StartTestSuite(name, desc)
 	if err != nil {
 		log15.Error("API: StartTestSuite failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -224,20 +224,19 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	// Create the client container.
-	safeName := strings.Replace(name, string(filepath.Separator), "_", -1)
-	options := ContainerOptions{
-		LogDir:        filepath.Join(api.env.LogDir, safeName),
-		LogFilePrefix: "client-",
-		CheckLive:     true,
-		Env:           env,
-		Files:         files,
-	}
+	options := ContainerOptions{Env: env, Files: files}
 	containerID, err := api.backend.CreateContainer(ctx, api.env.Images[name], options)
 	if err != nil {
 		log15.Error("API: client container create failed", "client", name, "error", err)
 		http.Error(w, "client container create failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Set the log file. We need the container ID for this,
+	// so it can only be set after creating the container.
+	logPath, logFilePath := api.clientLogFilePaths(name, containerID)
+	options.LogFile = logFilePath
+	options.CheckLive = true
 
 	// Start it!
 	info, err := api.backend.StartContainer(ctx, containerID, options)
@@ -249,7 +248,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			Name:           name,
 			VersionInfo:    api.env.ClientVersions[name],
 			InstantiatedAt: time.Now(),
-			LogFile:        info.LogFile,
+			LogFile:        logPath,
 			wait:           info.Wait,
 		}
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
@@ -261,6 +260,17 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	}
 	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
 	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
+}
+
+// clientLogFilePaths determines the log file path of a client container.
+// Note that jsonPath gets written to the result JSON and always uses '/' as the separator.
+// The filePath is passed to the docker backend and uses the platform separator.
+func (api *simAPI) clientLogFilePaths(clientName, containerID string) (jsonPath string, file string) {
+	// TODO: might be nice to put timestamp into the filename as well.
+	safeDir := strings.Replace(clientName, string(filepath.Separator), "_", -1)
+	jsonPath = path.Join(safeDir, fmt.Sprintf("client-%s.log", containerID[:16]))
+	file = filepath.Join(api.env.LogDir, filepath.FromSlash(jsonPath))
+	return jsonPath, file
 }
 
 func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (string, bool) {

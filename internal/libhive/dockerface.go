@@ -36,9 +36,8 @@ type ContainerOptions struct {
 	Files map[string]*multipart.FileHeader
 
 	// These options apply when starting the container.
-	CheckLive     bool   // requests check for TCP port 8545
-	LogDir        string // if set, put log file in this directory
-	LogFilePrefix string // if set, the log file name will have this prefix
+	CheckLive bool   // requests check for TCP port 8545
+	LogFile   string // if set, container output is written to this file
 }
 
 // ContainerInfo is returned by StartContainer.

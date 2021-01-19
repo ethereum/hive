@@ -87,14 +87,8 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 
 // StartContainer starts a docker container.
 func (b *ContainerBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
-	info := &libhive.ContainerInfo{ID: containerID[:8]}
+	info := &libhive.ContainerInfo{ID: containerID[:8], LogFile: opt.LogFile}
 	logger := b.logger.New("container", info.ID)
-
-	// Set up log file.
-	if opt.LogDir != "" {
-		basename := opt.LogFilePrefix + containerID + ".log"
-		info.LogFile = filepath.Join(opt.LogDir, basename)
-	}
 
 	// Run the container.
 	var startTime = time.Now()

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -210,8 +211,6 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 
 	// Create the simulator container.
 	opts := libhive.ContainerOptions{
-		LogDir:        r.env.LogDir,
-		LogFilePrefix: fmt.Sprintf("%d-simulator-", time.Now().Unix()),
 		Env: map[string]string{
 			"HIVE_SIMULATOR":   "http://" + addr.String(),
 			"HIVE_PARALLELISM": strconv.Itoa(r.env.SimParallelism),
@@ -226,9 +225,10 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 		return err
 	}
 
-	// Tell the test manager about the simulator container ID. It needs to
-	// know this ID before any docker network APIs are accessed.
-	tm.SetSimContainerID(containerID)
+	// Set the log file, and notify TestManager about the container.
+	logbasename := fmt.Sprintf("%d-simulator-%s.log", time.Now().Unix(), containerID[:16])
+	opts.LogFile = filepath.Join(r.env.LogDir, logbasename)
+	tm.SetSimContainerInfo(containerID, logbasename)
 
 	log15.Debug("starting simulator container")
 	sc, err := r.container.StartContainer(ctx, containerID, opts)
