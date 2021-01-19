@@ -202,7 +202,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 			log15.Error("could not terminate test manager", "error", err)
 		}
 	}()
-	addr, server, err := startTestSuiteAPI(ctx, tm)
+	addr, server, err := startTestSuiteAPI(tm)
 	if err != nil {
 		log15.Error("failed to start simulator API", "error", err)
 		return err
@@ -271,7 +271,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(ctx context.Context, tm *libhive.TestManager) (net.Addr, *http.Server, error) {
+func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
 	// Find the IP address of the host container
 	bridge, err := libdocker.LookupBridgeIP(log15.Root())
 	if err != nil {
@@ -292,7 +292,7 @@ func startTestSuiteAPI(ctx context.Context, tm *libhive.TestManager) (net.Addr, 
 	}
 	laddr := listener.Addr()
 	log15.Debug("listening for simulator commands", "addr", laddr)
-	server := &http.Server{Handler: tm.API(ctx)}
+	server := &http.Server{Handler: tm.API()}
 
 	go server.Serve(listener)
 	return laddr, server, nil
@@ -301,9 +301,7 @@ func startTestSuiteAPI(ctx context.Context, tm *libhive.TestManager) (net.Addr, 
 // shutdownServer gracefully terminates the HTTP server.
 func shutdownServer(server *http.Server) {
 	log15.Debug("terminating simulator server")
-
-	//NB! Kill this first to make sure no further testsuites are started
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := server.Shutdown(ctx); err != nil {
 		log15.Debug("simulation API server shutdown failed", "err", err)

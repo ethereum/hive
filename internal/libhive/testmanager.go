@@ -1,7 +1,6 @@
 package libhive
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -105,10 +104,8 @@ func (manager *TestManager) Results() map[TestSuiteID]*TestSuite {
 }
 
 // API returns the simulation API handler.
-// The context given here is used for canceling long-running operations
-// such as container startup.
-func (manager *TestManager) API(ctx context.Context) http.Handler {
-	return newSimulationAPI(ctx, manager.backend, manager.config, manager)
+func (manager *TestManager) API() http.Handler {
+	return newSimulationAPI(manager.backend, manager.config, manager)
 }
 
 // IsTestSuiteRunning checks if the test suite is still running and returns it if so
