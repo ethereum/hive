@@ -198,11 +198,15 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			files[key] = fheaders[0]
 		}
 	}
-	envs := make(map[string]string)
+	env := make(map[string]string)
 	for key, vals := range r.MultipartForm.Value {
 		if strings.HasPrefix(key, hiveEnvvarPrefix) {
-			envs[key] = vals[0]
+			env[key] = vals[0]
 		}
+	}
+	// Set default client loglevel to sim loglevel.
+	if env["HIVE_LOGLEVEL"] == "" {
+		env["HIVE_LOGLEVEL"] = strconv.Itoa(api.env.SimLogLevel)
 	}
 
 	// Get the client name.
@@ -225,7 +229,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		LogDir:        filepath.Join(api.env.LogDir, safeName),
 		LogFilePrefix: "client-",
 		CheckLive:     true,
-		Env:           envs,
+		Env:           env,
 		Files:         files,
 	}
 	containerID, err := api.backend.CreateContainer(ctx, api.env.Images[name], options)
