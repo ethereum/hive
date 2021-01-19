@@ -72,6 +72,10 @@ func (inv *Inventory) AddSimulator(name string) {
 
 // MatchSimulators returns matching simulator names.
 func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return nil, nil
+	}
 	re, err := regexp.Compile(expr)
 	if err != nil {
 		return nil, err
