@@ -27,8 +27,8 @@ const hiveEnvvarPrefix = "HIVE_"
 const defaultStartTimeout = time.Duration(60 * time.Second)
 
 // newSimulationAPI creates handlers for the simulation API.
-func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Handler {
-	api := &simAPI{backend: b, env: env, tm: tm}
+func newSimulationAPI(ctx context.Context, b ContainerBackend, env SimEnv, tm *TestManager) http.Handler {
+	api := &simAPI{backend: b, env: env, tm: tm, ctx: ctx}
 
 	// Collect client types.
 	for name := range env.Images {
@@ -60,6 +60,7 @@ type simAPI struct {
 	backend     ContainerBackend
 	env         SimEnv
 	tm          *TestManager
+	ctx         context.Context
 }
 
 // getClientTypes returns all known client types.
@@ -215,7 +216,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	if timeout == 0 {
 		timeout = defaultStartTimeout
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(api.ctx, timeout)
 	defer cancel()
 
 	// Create the client container.

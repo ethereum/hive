@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -193,15 +194,14 @@ func (r *simRunner) runSimulations(ctx context.Context, simList []string) error 
 func (r *simRunner) run(ctx context.Context, sim string) error {
 	log15.Info(fmt.Sprintf("running simulation: %s", sim))
 
+	// Start the simulation API.
 	tm := libhive.NewTestManager(r.env, r.container, -1)
 	defer func() {
 		if err := tm.Terminate(); err != nil {
 			log15.Error("could not terminate test manager", "error", err)
 		}
 	}()
-
-	// Start the simulation API.
-	addr, server, err := startTestSuiteAPI(tm)
+	addr, server, err := startTestSuiteAPI(ctx, tm)
 	if err != nil {
 		log15.Error("failed to start simulator API", "error", err)
 		return err
@@ -239,11 +239,10 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	slogger.Debug("started simulator container")
 	defer func() {
 		slogger.Debug("deleting simulator container")
-		if err := r.container.DeleteContainer(sc.ID); err != nil {
-			slogger.Error("can't delete simulator container", "err", err)
-		}
+		r.container.DeleteContainer(sc.ID)
 	}()
 
+	// Wait for simulator exit.
 	done := make(chan struct{})
 	go func() {
 		sc.Wait()
@@ -265,14 +264,14 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 		slogger.Info("simulation timed out")
 	case <-ctx.Done():
 		slogger.Info("interrupted, shutting down")
-		return ctx.Err()
+		return errors.New("simulation interrupted")
 	}
 	return nil
 }
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
+func startTestSuiteAPI(ctx context.Context, tm *libhive.TestManager) (net.Addr, *http.Server, error) {
 	// Find the IP address of the host container
 	bridge, err := libdocker.LookupBridgeIP(log15.Root())
 	if err != nil {
@@ -293,7 +292,7 @@ func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) 
 	}
 	laddr := listener.Addr()
 	log15.Debug("listening for simulator commands", "addr", laddr)
-	server := &http.Server{Handler: tm.API()}
+	server := &http.Server{Handler: tm.API(ctx)}
 
 	go server.Serve(listener)
 	return laddr, server, nil
