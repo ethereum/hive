@@ -15,7 +15,7 @@ type ContainerBackend interface {
 	DeleteContainer(containerID string) error
 
 	// RunEnodeSh runs the /enode.sh script in the given container and returns its output.
-	RunEnodeSh(containerID string) (string, error)
+	RunEnodeSh(ctx context.Context, containerID string) (string, error)
 
 	// These methods configure docker networks.
 	NetworkNameToID(name string) (string, error)

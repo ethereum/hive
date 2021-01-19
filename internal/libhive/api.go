@@ -330,7 +330,7 @@ func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	output, err := api.backend.RunEnodeSh(nodeInfo.ID)
+	output, err := api.backend.RunEnodeSh(r.Context(), nodeInfo.ID)
 	if err != nil {
 		log15.Error("API: error running enode.sh", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

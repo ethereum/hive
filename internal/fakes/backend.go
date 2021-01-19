@@ -84,7 +84,7 @@ func (b *fakeBackend) DeleteContainer(containerID string) error {
 	return nil
 }
 
-func (b *fakeBackend) RunEnodeSh(containerID string) (string, error) {
+func (b *fakeBackend) RunEnodeSh(ctx context.Context, containerID string) (string, error) {
 	if b.hooks.RunEnodeSh != nil {
 		return b.hooks.RunEnodeSh(containerID)
 	}
