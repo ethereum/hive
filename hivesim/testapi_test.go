@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/ethereum/hive/internal/hive"
+	"github.com/ethereum/hive/internal/libhive"
 )
 
 // This test verifies that test errors are reported correctly through the API.
@@ -42,17 +42,17 @@ func TestSuiteReporting(t *testing.T) {
 	results := tm.Results()
 	removeTimestamps(results)
 
-	wantResults := map[hive.TestSuiteID]*hive.TestSuite{
+	wantResults := map[libhive.TestSuiteID]*libhive.TestSuite{
 		0: {
 			ID:          0,
 			Name:        suite.Name,
 			Description: suite.Description,
-			TestCases: map[hive.TestID]*hive.TestCase{
+			TestCases: map[libhive.TestID]*libhive.TestCase{
 				1: {
 					ID:          1,
 					Name:        "passing test",
 					Description: "this test passes",
-					SummaryResult: hive.TestResult{
+					SummaryResult: libhive.TestResult{
 						Pass:    true,
 						Details: "message from the passing test\n",
 					},
@@ -61,7 +61,7 @@ func TestSuiteReporting(t *testing.T) {
 					ID:          2,
 					Name:        "failing test",
 					Description: "this test fails",
-					SummaryResult: hive.TestResult{
+					SummaryResult: libhive.TestResult{
 						Pass:    false,
 						Details: "message from the failing test\n",
 					},
@@ -76,7 +76,7 @@ func TestSuiteReporting(t *testing.T) {
 
 // removeTimestamps removes test timestamps in results so they can be
 // compared using reflect.DeepEqual.
-func removeTimestamps(result map[hive.TestSuiteID]*hive.TestSuite) {
+func removeTimestamps(result map[libhive.TestSuiteID]*libhive.TestSuite) {
 	for _, suite := range result {
 		for _, test := range suite.TestCases {
 			test.Start = time.Time{}

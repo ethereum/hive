@@ -1,14 +1,10 @@
 package hivesim
 
-import (
-	"github.com/ethereum/hive/internal/hive"
-)
-
 // SuiteID identifies a test suite context.
-type SuiteID = hive.TestSuiteID
+type SuiteID uint32
 
 // TestID identifies a test case context.
-type TestID = hive.TestID
+type TestID uint32
 
 // TestResult describes the outcome of a test.
 type TestResult struct {

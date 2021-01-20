@@ -49,6 +49,10 @@ set -e
 geth=/usr/local/bin/geth
 FLAGS="--nousb --pcscdpath=\"\""
 
+if [ "$HIVE_LOGLEVEL" != "" ]; then
+    FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL"
+fi
+
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 
@@ -141,6 +145,6 @@ if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
 fi
 
 # Run the go-ethereum implementation with the requested flags.
-FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL --nat=none"
+FLAGS="$FLAGS --nat=none"
 echo "Running go-ethereum with flags $FLAGS"
 $geth $FLAGS

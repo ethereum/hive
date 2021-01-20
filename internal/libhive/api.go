@@ -1,29 +1,38 @@
 package libhive
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net"
 	"net/http"
+	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/gorilla/mux"
 	"gopkg.in/inconshreveable/log15.v2"
-
-	. "github.com/ethereum/hive/internal/hive"
 )
 
+// hiveEnvvarPrefix is the prefix of the environment variables names that should
+// be moved from test images to client container to fine tune their setup.
+const hiveEnvvarPrefix = "HIVE_"
+
+// This is the default timeout for starting clients.
+const defaultStartTimeout = time.Duration(60 * time.Second)
+
 // newSimulationAPI creates handlers for the simulation API.
-func newSimulationAPI(b Backend, env SimEnv, tm *TestManager) http.Handler {
-	api := &simAPI{backend: b, tm: tm}
+func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Handler {
+	api := &simAPI{backend: b, env: env, tm: tm}
 
 	// Collect client types.
-	for name, _ := range env.Images {
+	for name := range env.Images {
 		api.clientTypes = append(api.clientTypes, name)
 	}
 	sort.Strings(api.clientTypes)
@@ -49,7 +58,8 @@ func newSimulationAPI(b Backend, env SimEnv, tm *TestManager) http.Handler {
 
 type simAPI struct {
 	clientTypes []string
-	backend     Backend
+	backend     ContainerBackend
+	env         SimEnv
 	tm          *TestManager
 }
 
@@ -68,8 +78,7 @@ func (api *simAPI) startSuite(w http.ResponseWriter, r *http.Request) {
 
 	name := r.Form.Get("name")
 	desc := r.Form.Get("description")
-	simlog := r.Form.Get("simlog")
-	suiteID, err := api.tm.StartTestSuite(name, desc, simlog)
+	suiteID, err := api.tm.StartTestSuite(name, desc)
 	if err != nil {
 		log15.Error("API: StartTestSuite failed", "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -188,34 +197,84 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			files[key] = fheaders[0]
 		}
 	}
-	envs := make(map[string]string)
+	env := make(map[string]string)
 	for key, vals := range r.MultipartForm.Value {
-		envs[key] = vals[0]
+		if strings.HasPrefix(key, hiveEnvvarPrefix) {
+			env[key] = vals[0]
+		}
+	}
+	// Set default client loglevel to sim loglevel.
+	if env["HIVE_LOGLEVEL"] == "" {
+		env["HIVE_LOGLEVEL"] = strconv.Itoa(api.env.SimLogLevel)
 	}
 
 	// Get the client name.
-	name, ok := api.checkClient(envs, w)
+	name, ok := api.checkClient(r, w)
 	if !ok {
 		return
 	}
 
+	// Set up the timeout.
+	timeout := api.env.ClientStartTimeout
+	if timeout == 0 {
+		timeout = defaultStartTimeout
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
+	defer cancel()
+
+	// Create the client container.
+	options := ContainerOptions{Env: env, Files: files}
+	containerID, err := api.backend.CreateContainer(ctx, api.env.Images[name], options)
+	if err != nil {
+		log15.Error("API: client container create failed", "client", name, "error", err)
+		http.Error(w, "client container create failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Set the log file. We need the container ID for this,
+	// so it can only be set after creating the container.
+	logPath, logFilePath := api.clientLogFilePaths(name, containerID)
+	options.LogFile = logFilePath
+	options.CheckLive = true
+
 	// Start it!
-	info, err := api.backend.StartClient(name, envs, files, true)
+	info, err := api.backend.StartContainer(ctx, containerID, options)
 	if info != nil {
-		api.tm.RegisterNode(testID, info.ID, info)
+		clientInfo := &ClientInfo{
+			ID:             info.ID,
+			IP:             info.IP,
+			MAC:            info.MAC,
+			Name:           name,
+			VersionInfo:    api.env.ClientVersions[name],
+			InstantiatedAt: time.Now(),
+			LogFile:        logPath,
+			wait:           info.Wait,
+		}
+		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {
-		log15.Error("API: could not start client", "client", name, "error", err)
+		log15.Error("API: could not start client", "client", name, "container", containerID[:8], "error", err)
 		http.Error(w, "client did not start: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", info.ID)
+	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
 	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
 }
 
-func (api *simAPI) checkClient(env map[string]string, w http.ResponseWriter) (string, bool) {
-	name, ok := env["CLIENT"]
-	if !ok {
+// clientLogFilePaths determines the log file path of a client container.
+// Note that jsonPath gets written to the result JSON and always uses '/' as the separator.
+// The filePath is passed to the docker backend and uses the platform separator.
+func (api *simAPI) clientLogFilePaths(clientName, containerID string) (jsonPath string, file string) {
+	// TODO: might be nice to put timestamp into the filename as well.
+	safeDir := strings.Replace(clientName, string(filepath.Separator), "_", -1)
+	jsonPath = path.Join(safeDir, fmt.Sprintf("client-%s.log", containerID))
+	file = filepath.Join(api.env.LogDir, filepath.FromSlash(jsonPath))
+	return jsonPath, file
+}
+
+func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (string, bool) {
+	name := r.FormValue("CLIENT")
+	if name == "" {
 		log15.Error("API: missing client name in start node request")
 		http.Error(w, "missing 'CLIENT' in request", http.StatusBadRequest)
 		return "", false
@@ -247,9 +306,12 @@ func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Stop the container.
-	if err = api.backend.StopContainer(nodeInfo.ID); err != nil {
+	if err = api.backend.DeleteContainer(nodeInfo.ID); err != nil {
 		msg := fmt.Sprintf("unable to stop client: %v", err)
 		http.Error(w, msg, http.StatusInternalServerError)
+	}
+	if nodeInfo.wait != nil {
+		nodeInfo.wait()
 	}
 }
 
@@ -268,7 +330,7 @@ func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	output, err := api.backend.RunEnodeSh(nodeInfo.ID)
+	output, err := api.backend.RunEnodeSh(r.Context(), nodeInfo.ID)
 	if err != nil {
 		log15.Error("API: error running enode.sh", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)

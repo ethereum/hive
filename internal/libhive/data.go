@@ -1,5 +1,4 @@
-// Package hive contains shared types for hive.
-package hive
+package libhive
 
 import (
 	"strconv"
@@ -50,12 +49,13 @@ type TestResult struct {
 
 // ClientInfo describes a client that participated in a test case.
 type ClientInfo struct {
-	ID              string    `json:"id"`
-	IP              string    `json:"ip"`
-	MAC             string    `json:"mac"` // TODO: remove this
-	Name            string    `json:"name"`
-	VersionInfo     string    `json:"versionInfo"` //URL to github repo + branch.
-	InstantiatedAt  time.Time `json:"instantiatedAt"`
-	LogFile         string    `json:"logFile"` //Absolute path to the logfile.
-	WasInstantiated bool
+	ID             string    `json:"id"`
+	IP             string    `json:"ip"`
+	MAC            string    `json:"mac"` // TODO: remove this
+	Name           string    `json:"name"`
+	VersionInfo    string    `json:"versionInfo"` //URL to github repo + branch.
+	InstantiatedAt time.Time `json:"instantiatedAt"`
+	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
+
+	wait func()
 }

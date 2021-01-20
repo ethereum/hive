@@ -13,8 +13,6 @@ import (
 	"time"
 
 	"gopkg.in/inconshreveable/log15.v2"
-
-	. "github.com/ethereum/hive/internal/hive"
 )
 
 var (
@@ -32,9 +30,12 @@ var (
 
 // SimEnv contains the simulation parameters.
 type SimEnv struct {
-	SimLogLevel          int
-	LogDir               string
-	PrintContainerOutput bool
+	LogDir string
+
+	// Parameters of simulation.
+	SimLogLevel    int
+	SimParallelism int
+	SimTestLimit   int
 
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
@@ -50,10 +51,11 @@ type SimEnv struct {
 // TestManager collects test results during a simulation run.
 type TestManager struct {
 	config      SimEnv
-	backend     Backend
+	backend     ContainerBackend
 	testLimiter int
 
 	simContainerID string
+	simLogFile     string
 
 	// all networks started by a specific test suite, where key
 	// is network name and value is network ID
@@ -69,7 +71,7 @@ type TestManager struct {
 	results           map[TestSuiteID]*TestSuite
 }
 
-func NewTestManager(config SimEnv, b Backend, testLimiter int) *TestManager {
+func NewTestManager(config SimEnv, b ContainerBackend, testLimiter int) *TestManager {
 	return &TestManager{
 		config:            config,
 		backend:           b,
@@ -81,10 +83,11 @@ func NewTestManager(config SimEnv, b Backend, testLimiter int) *TestManager {
 	}
 }
 
-// SetSimContainerID sets the container ID of the simulation container. This must be called
-// after creating the simulation container.
-func (manager *TestManager) SetSimContainerID(id string) {
+// SetSimContainerInfo makes the manager aware of the simulation container.
+// This must be called after creating the simulation container, but before starting it.
+func (manager *TestManager) SetSimContainerInfo(id, logFile string) {
 	manager.simContainerID = id
+	manager.simLogFile = logFile
 }
 
 // Results returns the results for all suites that have already ended.
@@ -214,7 +217,7 @@ func (manager *TestManager) RemoveNetwork(testSuite TestSuiteID, network string)
 // PruneNetworks removes all networks created by the given test suite.
 func (manager *TestManager) PruneNetworks(testSuite TestSuiteID) []error {
 	var errs []error
-	for name, _ := range manager.networks[testSuite] {
+	for name := range manager.networks[testSuite] {
 		log15.Info("removing docker network", "name", name)
 		if err := manager.RemoveNetwork(testSuite, name); err != nil {
 			errs = append(errs, err)
@@ -344,7 +347,7 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 }
 
 // StartTestSuite starts a test suite and returns the context id
-func (manager *TestManager) StartTestSuite(name string, description string, simlog string) (TestSuiteID, error) {
+func (manager *TestManager) StartTestSuite(name string, description string) (TestSuiteID, error) {
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
 
@@ -354,7 +357,7 @@ func (manager *TestManager) StartTestSuite(name string, description string, siml
 		Name:         name,
 		Description:  description,
 		TestCases:    make(map[TestID]*TestCase),
-		SimulatorLog: simlog,
+		SimulatorLog: manager.simLogFile,
 	}
 	manager.testSuiteCounter++
 	return newSuiteID, nil
@@ -416,9 +419,8 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 
 	// Stop running clients.
 	for _, v := range testCase.ClientInfo {
-		if v.WasInstantiated {
-			manager.backend.StopContainer(v.ID)
-		}
+		manager.backend.DeleteContainer(v.ID)
+		v.wait()
 	}
 
 	// Delete from running, if it's still there.

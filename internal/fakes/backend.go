@@ -1,19 +1,20 @@
 package fakes
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"mime/multipart"
 	"net"
 
-	"github.com/ethereum/hive/internal/hive"
+	"github.com/ethereum/hive/internal/libhive"
 )
 
 // BackendHooks can be used to override the behavior of the fake backend.
 type BackendHooks struct {
-	StartClient   func(name string, env map[string]string) (*hive.ClientInfo, error)
-	StopContainer func(string) error
-	RunEnodeSh    func(string) (string, error)
+	CreateContainer func(image string, opt libhive.ContainerOptions) (string, error)
+	StartContainer  func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
+	DeleteContainer func(containerID string) error
+	RunEnodeSh      func(containerID string) (string, error)
 
 	NetworkNameToID     func(string) (string, error)
 	CreateNetwork       func(string) (string, error)
@@ -23,6 +24,8 @@ type BackendHooks struct {
 	DisconnectContainer func(containerID, networkID string) error
 }
 
+var _ = libhive.ContainerBackend(&fakeBackend{})
+
 // fakeBackend implements Backend without docker.
 type fakeBackend struct {
 	hooks         BackendHooks
@@ -31,7 +34,7 @@ type fakeBackend struct {
 }
 
 // NewBackend creates a new fake container backend.
-func NewBackend(hooks *BackendHooks) hive.Backend {
+func NewContainerBackend(hooks *BackendHooks) libhive.ContainerBackend {
 	b := &fakeBackend{}
 	if hooks != nil {
 		b.hooks = *hooks
@@ -39,18 +42,30 @@ func NewBackend(hooks *BackendHooks) hive.Backend {
 	return b
 }
 
-func (b *fakeBackend) StartClient(name string, env map[string]string, files map[string]*multipart.FileHeader, checklive bool) (*hive.ClientInfo, error) {
-	var info hive.ClientInfo
-	if b.hooks.StartClient != nil {
-		info2, err := b.hooks.StartClient(name, env)
+func (b *fakeBackend) CreateContainer(ctx context.Context, image string, opt libhive.ContainerOptions) (string, error) {
+	if b.hooks.CreateContainer != nil {
+		return b.hooks.CreateContainer(image, opt)
+	}
+	b.clientCounter++
+	id := fmt.Sprintf("%0.8x", b.clientCounter)
+	return id, nil
+}
+
+func (b *fakeBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+	var info libhive.ContainerInfo
+	if b.hooks.StartContainer != nil {
+		info2, err := b.hooks.StartContainer(containerID, opt)
 		if err != nil {
 			return nil, err
 		}
 		info = *info2
+		info.ID = containerID
+		if info.Wait == nil {
+			info.Wait = func() {}
+		}
 	}
 
-	b.clientCounter++
-	info.ID = fmt.Sprintf("%0.8x", b.clientCounter)
+	info.ID = containerID
 	if info.IP == "" {
 		ip := net.IP{192, 0, 2, byte(b.clientCounter)}
 		info.IP = ip.String()
@@ -58,17 +73,18 @@ func (b *fakeBackend) StartClient(name string, env map[string]string, files map[
 	if info.MAC == "" {
 		info.MAC = "00:80:41:ae:fd:7e"
 	}
+	info.Wait = func() {}
 	return &info, nil
 }
 
-func (b *fakeBackend) StopContainer(containerID string) error {
-	if b.hooks.StopContainer != nil {
-		return b.hooks.StopContainer(containerID)
+func (b *fakeBackend) DeleteContainer(containerID string) error {
+	if b.hooks.DeleteContainer != nil {
+		return b.hooks.DeleteContainer(containerID)
 	}
 	return nil
 }
 
-func (b *fakeBackend) RunEnodeSh(containerID string) (string, error) {
+func (b *fakeBackend) RunEnodeSh(ctx context.Context, containerID string) (string, error) {
 	if b.hooks.RunEnodeSh != nil {
 		return b.hooks.RunEnodeSh(containerID)
 	}

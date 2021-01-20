@@ -111,7 +111,7 @@ func newFakeAPI(hooks *fakes.BackendHooks) (*libhive.TestManager, *httptest.Serv
 			"client-2": "client-2-image",
 		},
 	}
-	backend := fakes.NewBackend(hooks)
+	backend := fakes.NewContainerBackend(hooks)
 	tm := libhive.NewTestManager(env, backend, -1)
 	srv := httptest.NewServer(tm.API())
 	return tm, srv
