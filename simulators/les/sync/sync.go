@@ -15,16 +15,12 @@ var (
 	// the number of seconds before a sync is considered stalled or failed
 	syncTimeout = 45 * time.Second
 	params      = hivesim.Params{
-		"HIVE_NETWORK_ID":          "19763",
-		"HIVE_CHAIN_ID":            "19763",
-		"HIVE_FORK_HOMESTEAD":      "0",
-		"HIVE_FORK_TANGERINE":      "0",
-		"HIVE_FORK_SPURIOUS":       "0",
-		"HIVE_FORK_BYZANTIUM":      "0",
-		"HIVE_FORK_CONSTANTINOPLE": "0",
-		"HIVE_FORK_PETERSBURG":     "0",
-		"HIVE_FORK_ISTANBUL":       "0",
-		"HIVE_FORK_MUIRGLACIER":    "0",
+		"HIVE_NETWORK_ID":     "19763",
+		"HIVE_CHAIN_ID":       "19763",
+		"HIVE_FORK_HOMESTEAD": "0",
+		"HIVE_FORK_TANGERINE": "0",
+		"HIVE_FORK_SPURIOUS":  "0",
+		"HIVE_FORK_BYZANTIUM": "0",
 	}
 	serverFiles = map[string]string{
 		"genesis.json": "./simplechain/genesis.json",
@@ -47,6 +43,8 @@ func main() {
 	}
 	serverParams := params.Copy()
 	serverParams.Set("HIVE_NODETYPE", "full")
+	serverParams.Set("HIVE_LIGHTSERVE", "100")
+
 	suite.Add(hivesim.ClientTestSpec{
 		Name:        "CLIENT as sync source",
 		Description: "This loads the test chain into the les server and verifies whether it was imported correctly.",
