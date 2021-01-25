@@ -41,9 +41,8 @@ func main() {
 		Name:        "sync",
 		Description: `This test suite verifies that the light clients can sync from the les servers`,
 	}
-	serverParams := params.Copy()
-	serverParams.Set("HIVE_NODETYPE", "full")
-	serverParams.Set("HIVE_LIGHTSERVE", "100")
+	serverParams := params.Set("HIVE_NODETYPE", "full")
+	serverParams = serverParams.Set("HIVE_LIGHTSERVE", "100")
 
 	suite.Add(hivesim.ClientTestSpec{
 		Name:        "CLIENT as sync source",
@@ -63,13 +62,12 @@ func runServerTest(t *hivesim.T, c *hivesim.Client) {
 	}
 
 	// Configure sink to connect to the source node.
-	clientParams := params.Copy()
-	clientParams.Set("HIVE_NODETYPE", "light")
+	clientParams := params.Set("HIVE_NODETYPE", "light")
 	enode, err := source.EnodeURL()
 	if err != nil {
 		t.Fatal("can't get node peer-to-peer endpoint:", enode)
 	}
-	clientParams.Set("HIVE_BOOTNODE", enode)
+	clientParams = clientParams.Set("HIVE_BOOTNODE", enode)
 
 	// Sync all sink nodes against the source.
 	t.RunAllClients(hivesim.ClientTestSpec{
