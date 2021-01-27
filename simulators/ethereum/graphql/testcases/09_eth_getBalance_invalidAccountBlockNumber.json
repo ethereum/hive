@@ -1,5 +1,5 @@
 {
-  "request": "{account(blockNumber:\"0x19\", address: \"0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef\") { balance } }",
+  "request": "{block (number: 25) {account(address: \"0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef\") { balance } }}",
   "responses": [{
     "data": {
       "account": {
@@ -9,4 +9,3 @@
   }],
   "statusCode": 200
 }
-

@@ -10,5 +10,5 @@
       }
     ]
   }],
-  "statusCode": 400
+  "statusCodes": [400]
 }

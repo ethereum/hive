@@ -20,5 +20,5 @@
     ],
     "data": null
   }],
-  "statusCode": 400
+  "statusCodes": [400]
 }
