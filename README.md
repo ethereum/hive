@@ -64,11 +64,11 @@ The following command will run a test verifying that a blockchain can be synced 
 
 ### Iterating on bug fixes locally
 
-If you are testing locally and want to make changes to the simulation or client, run hive with the flag `--docker-nocache <simulation or client name>` so that hive rebuilds the container from scratch.
+If you are testing locally and want to make changes to the simulation or client, run hive with the flag `--docker.nocache <simulation or client name>` so that hive rebuilds the container from scratch.
 
 If you want to rebuild both, separate the names with a `,` as such: 
 ```text
---docker-nocache devp2p,go-ethereum_latest
+--docker.nocache devp2p,go-ethereum_latest
 ```
 
 # Adding a Simulation
