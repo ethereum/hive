@@ -26,7 +26,6 @@ require (
 	github.com/moby/term v0.0.0-20201101162038-25d840ce174a // indirect
 	github.com/olekukonko/tablewriter v0.0.4 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
-	github.com/shogo82148/go-tap v0.0.3 // indirect
 	github.com/sirupsen/logrus v1.7.0 // indirect
 	github.com/stretchr/testify v1.6.1 // indirect
 	golang.org/x/crypto v0.0.0-20201016220609-9e8e0b390897 // indirect
