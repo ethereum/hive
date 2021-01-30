@@ -38,20 +38,16 @@ func NewAt(url string) *Simulation {
 
 // EndTest finishes the test case, cleaning up everything, logging results, and returning
 // an error if the process could not be completed.
-func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, summaryResult TestResult, clientResults map[string]TestResult) error {
+func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, summaryResult TestResult) error {
 	// post results (which deletes the test case - because DELETE message body is not always supported)
 	summaryResultData, err := json.Marshal(summaryResult)
-	if err != nil {
-		return err
-	}
-	clientResultData, err := json.Marshal(clientResults)
 	if err != nil {
 		return err
 	}
 
 	vals := make(url.Values)
 	vals.Add("summaryresult", string(summaryResultData))
-	vals.Add("clientresults", string(clientResultData))
+
 	_, err = wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%d/test/%d", sim.url, testSuite, test), vals)
 	return err
 }

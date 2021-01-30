@@ -139,11 +139,10 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 
 	var (
 		summary         = TestResult{Pass: false}
-		clientResults   map[string]*TestResult
 		responseWritten = false // Have we already committed a response?
 	)
 	defer func() {
-		err := api.tm.EndTest(suiteID, testID, &summary, clientResults)
+		err := api.tm.EndTest(suiteID, testID, &summary)
 		if err == nil {
 			log15.Info("API: test ended", "suite", suiteID, "test", testID, "pass", summary.Pass)
 			return
@@ -168,12 +167,6 @@ func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, msg, http.StatusBadRequest)
 		responseWritten = true
 		return
-	}
-	// Client results are optional.
-	if crdata := r.Form.Get("clientresults"); crdata != "" {
-		if err := json.Unmarshal([]byte(crdata), &clientResults); err != nil {
-			log15.Error("API: invalid 'clientresults'", "test", testID, "error", err)
-		}
 	}
 }
 

@@ -432,7 +432,6 @@ function onSuiteData(data, jsonsource) {
                     "pass": true,
                     "details": " \n"
                 },
-                "clientResults": null,
                 "clientInfo": {
                     "a46beeb9": {
                         "id": "a46beeb9",
