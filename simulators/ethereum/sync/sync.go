@@ -136,7 +136,7 @@ func runLESSyncTest(t *hivesim.T, c *hivesim.Client) {
 		return
 	}
 	// todo(rjl493456442) Wait the initialization of light client
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 10)
 
 	err := c.RPC().Call(nil, "admin_addPeer", sourceURL)
 	if err != nil {
