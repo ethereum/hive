@@ -29,6 +29,7 @@ var (
 	clientFiles = map[string]string{
 		"genesis.json": "./simplechain/genesis.json",
 	}
+	sourceURL string
 )
 
 var (
@@ -67,7 +68,7 @@ func runServerTest(t *hivesim.T, c *hivesim.Client) {
 	if err != nil {
 		t.Fatal("can't get node peer-to-peer endpoint:", enode)
 	}
-	clientParams = clientParams.Set("HIVE_BOOTNODE", enode)
+	sourceURL = enode
 
 	// Sync all sink nodes against the source.
 	t.RunAllClients(hivesim.ClientTestSpec{
@@ -80,8 +81,16 @@ func runServerTest(t *hivesim.T, c *hivesim.Client) {
 }
 
 func runSyncTest(t *hivesim.T, c *hivesim.Client) {
+	// todo(rjl493456442) Wait the initialization of light client
+	time.Sleep(time.Second * 3)
+
+	err := c.RPC().Call(nil, "admin_addPeer", sourceURL)
+	if err != nil {
+		t.Fatalf("connection failed:", err)
+	}
+
 	node := &node{c}
-	err := node.checkSync(t, testchainHeadNumber, testchainHeadHash)
+	err = node.checkSync(t, testchainHeadNumber, testchainHeadHash)
 	if err != nil {
 		t.Fatal("sync failed:", err)
 	}
