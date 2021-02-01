@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -21,7 +22,6 @@ var (
 		"HIVE_FORK_TANGERINE": "0",
 		"HIVE_FORK_SPURIOUS":  "0",
 		"HIVE_FORK_BYZANTIUM": "0",
-		"HIVE_NODETYPE":       "full",
 	}
 	sourceFiles = map[string]string{
 		"genesis.json": "./simplechain/genesis.json",
@@ -30,6 +30,7 @@ var (
 	sinkFiles = map[string]string{
 		"genesis.json": "./simplechain/genesis.json",
 	}
+	sourceURL string
 )
 
 var (
@@ -43,17 +44,31 @@ func main() {
 		Description: `This suite of tests verifies that clients can sync from each other in different modes.
 For each client, we test if it can serve as a sync source for all other clients (including itself).`,
 	}
+
+	// SYNC by ETH protocol
+	ethParams := params.Set("HIVE_NODETYPE", "full")
 	suite.Add(hivesim.ClientTestSpec{
 		Name:        "CLIENT as sync source",
 		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
-		Parameters:  params,
+		Parameters:  ethParams,
 		Files:       sourceFiles,
-		Run:         runSourceTest,
+		Run:         runETHSourceTest,
+	})
+
+	// SYNC by LES protocol
+	serverParams := params.Set("HIVE_NODETYPE", "full")
+	serverParams = serverParams.Set("HIVE_LIGHTSERVE", "100")
+	suite.Add(hivesim.ClientTestSpec{
+		Name:        "CLIENT as sync source",
+		Description: "This loads the test chain into the les server and verifies whether it was imported correctly.",
+		Parameters:  serverParams,
+		Files:       sourceFiles,
+		Run:         runLESSourceTest,
 	})
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-func runSourceTest(t *hivesim.T, c *hivesim.Client) {
+func runETHSourceTest(t *hivesim.T, c *hivesim.Client) {
 	// Check whether the source has imported its chain.rlp correctly.
 	source := &node{c}
 	if err := source.checkHead(testchainHeadNumber, testchainHeadHash); err != nil {
@@ -73,13 +88,63 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client) {
 		Description: fmt.Sprintf("This test attempts to sync the chain from a %s node.", source.Type),
 		Parameters:  sinkParams,
 		Files:       sinkFiles,
-		Run:         runSyncTest,
+		Run:         runETHSyncTest,
 	})
 }
 
-func runSyncTest(t *hivesim.T, c *hivesim.Client) {
+func runETHSyncTest(t *hivesim.T, c *hivesim.Client) {
 	node := &node{c}
 	err := node.checkSync(t, testchainHeadNumber, testchainHeadHash)
+	if err != nil {
+		t.Fatal("sync failed:", err)
+	}
+}
+
+func runLESSourceTest(t *hivesim.T, c *hivesim.Client) {
+	// Short circuit if the source is not Geth client.
+	if !isGeth(c.Type) {
+		return
+	}
+
+	// Check whether the source has imported its chain.rlp correctly.
+	source := &node{c}
+	if err := source.checkHead(testchainHeadNumber, testchainHeadHash); err != nil {
+		t.Fatal(err)
+	}
+
+	// Configure sink to connect to the source node.
+	clientParams := params.Set("HIVE_NODETYPE", "light")
+	enode, err := source.EnodeURL()
+	if err != nil {
+		t.Fatal("can't get node peer-to-peer endpoint:", enode)
+	}
+	sourceURL = enode
+
+	// Sync all sink nodes against the source.
+	t.RunAllClients(hivesim.ClientTestSpec{
+		Name:        fmt.Sprintf("sync %s -> CLIENT", source.Type),
+		Description: fmt.Sprintf("This test attempts to sync the chain from a %s node.", source.Type),
+		Parameters:  clientParams,
+		Files:       sinkFiles,
+		Run:         runLESSyncTest,
+	})
+}
+
+func runLESSyncTest(t *hivesim.T, c *hivesim.Client) {
+	// Short circuit if the destination is not Geth client.
+	if !isGeth(c.Type) {
+		return
+	}
+	// todo(rjl493456442) Wait the initialization of light client
+	time.Sleep(time.Second * 3)
+
+	err := c.RPC().Call(nil, "admin_addPeer", sourceURL)
+	if err != nil {
+		t.Fatalf("connection failed:", err)
+	}
+
+	node := &node{c}
+	err = node.checkSync(t, testchainHeadNumber, testchainHeadHash)
 	if err != nil {
 		t.Fatal("sync failed:", err)
 	}
@@ -138,4 +203,9 @@ func (n *node) checkHead(num uint64, hash common.Hash) error {
 		return fmt.Errorf("wrong chain head %d (%s), want %d (%s)", head.Number, head.Hash().TerminalString(), num, hash.TerminalString())
 	}
 	return nil
+}
+
+// isGeth reports the client is Geth-based client.
+func isGeth(client string) bool {
+	return strings.HasPrefix(client, "go-ethereum")
 }
