@@ -140,7 +140,7 @@ FLAGS="$FLAGS --miner.gasprice 16000000000"
 
 # Configure any les flags
 if [ "$HIVE_LIGHTSERVE" != "" ]; then
-  FLAGS="$FLAGS --light.serve $HIVE_LIGHTSERVE"
+  FLAGS="$FLAGS --light.serve $HIVE_LIGHTSERVE --light.nosyncserve "
 fi
 
 # Configure RPC.
