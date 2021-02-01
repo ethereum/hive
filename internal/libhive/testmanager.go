@@ -353,11 +353,12 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 
 	var newSuiteID = TestSuiteID(manager.testSuiteCounter)
 	manager.runningTestSuites[newSuiteID] = &TestSuite{
-		ID:           newSuiteID,
-		Name:         name,
-		Description:  description,
-		TestCases:    make(map[TestID]*TestCase),
-		SimulatorLog: manager.simLogFile,
+		ID:             newSuiteID,
+		Name:           name,
+		Description:    description,
+		ClientVersions: make(map[string]string),
+		TestCases:      make(map[TestID]*TestCase),
+		SimulatorLog:   manager.simLogFile,
 	}
 	manager.testSuiteCounter++
 	return newSuiteID, nil

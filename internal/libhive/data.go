@@ -21,10 +21,11 @@ func (tsID TestID) String() string {
 
 // TestSuite is a single run of a simulator, a collection of testcases.
 type TestSuite struct {
-	ID          TestSuiteID          `json:"id"`
-	Name        string               `json:"name"`
-	Description string               `json:"description"`
-	TestCases   map[TestID]*TestCase `json:"testCases"`
+	ID             TestSuiteID          `json:"id"`
+	Name           string               `json:"name"`
+	Description    string               `json:"description"`
+	ClientVersions map[string]string    `json:"versionInfo"`
+	TestCases      map[TestID]*TestCase `json:"testCases"`
 	// the log-file pertaining to the simulator. (may encompass more than just one TestSuite)
 	SimulatorLog string `json:"simLog"`
 }
@@ -50,9 +51,7 @@ type TestResult struct {
 type ClientInfo struct {
 	ID             string    `json:"id"`
 	IP             string    `json:"ip"`
-	MAC            string    `json:"mac"` // TODO: remove this
 	Name           string    `json:"name"`
-	VersionInfo    string    `json:"versionInfo"` //URL to github repo + branch.
 	InstantiatedAt time.Time `json:"instantiatedAt"`
 	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
 
