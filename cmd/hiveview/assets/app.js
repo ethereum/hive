@@ -421,7 +421,7 @@ function onSuiteData(data, jsonsource) {
         "id": 0,
         "name": "Devp2p discovery v4 test suite",
         "description": "This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.",
-        "versionInfo": "",
+        "clientVersions": "",
         "testCases": {
             "1": {
                 "id": 1,

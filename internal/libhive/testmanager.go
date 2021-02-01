@@ -383,7 +383,6 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 	var newCaseID = TestID(manager.testCaseCounter)
 	// create a new test case and add it to the test suite
 	newTestCase := &TestCase{
-		ID:          newCaseID,
 		Name:        name,
 		Description: description,
 		Start:       time.Now(),
@@ -393,7 +392,7 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 	// and to the general map of id:testcases
 	manager.runningTestCases[newCaseID] = newTestCase
 
-	return newTestCase.ID, nil
+	return newCaseID, nil
 }
 
 // EndTest finishes the test case

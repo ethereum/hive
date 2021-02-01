@@ -49,7 +49,6 @@ func TestSuiteReporting(t *testing.T) {
 			Description: suite.Description,
 			TestCases: map[libhive.TestID]*libhive.TestCase{
 				1: {
-					ID:          1,
 					Name:        "passing test",
 					Description: "this test passes",
 					SummaryResult: libhive.TestResult{
@@ -58,7 +57,6 @@ func TestSuiteReporting(t *testing.T) {
 					},
 				},
 				2: {
-					ID:          2,
 					Name:        "failing test",
 					Description: "this test fails",
 					SummaryResult: libhive.TestResult{
