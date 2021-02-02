@@ -132,10 +132,11 @@ func runLESSyncTest(t *hivesim.T, sourceType string, sinkTypes []string) {
 			Name:        fmt.Sprintf("%s as LES server", name),
 			Description: "This loads the test chain into the les server and verifies whether the light client can sync correctly.",
 			Run: func(t *hivesim.T) {
+				client := t.StartClient(name, clientParams, sinkFiles)
+
 				// todo(rjl493456442) Wait the initialization of light client
 				time.Sleep(time.Second * 10)
 
-				client := t.StartClient(name, clientParams, sinkFiles)
 				err := client.RPC().Call(nil, "admin_addPeer", enode)
 				if err != nil {
 					t.Fatalf("connection failed:", err)
