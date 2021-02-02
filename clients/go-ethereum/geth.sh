@@ -130,7 +130,7 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
 fi
 
 # Configure any mining operation
-if [ "$HIVE_MINER" != "" ] && [ "$$HIVE_NODETYPE" != "light" ]; then
+if [ "$HIVE_MINER" != "" ] && [ "$HIVE_NODETYPE" != "light" ]; then
 	FLAGS="$FLAGS --mine --miner.threads 1 --miner.etherbase $HIVE_MINER"
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
