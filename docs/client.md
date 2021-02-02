@@ -57,9 +57,9 @@ The simulator may customize client start by placing these files into the client 
   container to translate the Geth genesis format into a configuration appropriate for the
   specific client implementation. This translation is usually done using a jq script. See
   the [openethereum genesis translator][oe-genesis-jq], for example.
- * `/chain.rlp` contains RLP-encoded blocks to import before startup. The client should
+- `/chain.rlp` contains RLP-encoded blocks to import before startup. The client should
    start even if the blocks are invalid.
- * `/blocks/` directory containg `.rlp` files. The client should import these blocks in
+- `/blocks/` directory containg `.rlp` files. The client should import these blocks in
    file name order after loading `/chain.rlp`.
 
 Client startup scripts need to ensure that they load the genesis state first, then import
