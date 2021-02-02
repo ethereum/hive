@@ -3,6 +3,7 @@ package hivesim
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -152,6 +153,40 @@ func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node strin
 	}
 	res := strings.TrimRight(string(body), "\r\n")
 	return res, nil
+}
+
+type execInfo struct {
+	StdOut   string `json:"out"`
+	StdErr   string `json:"err"`
+	ExitCode int    `json:"code"`
+}
+
+// ClientRunProgram runs a command in a running client.
+func (sim *Simulation) ClientRunProgram(testSuite SuiteID, test TestID,
+	nodeid string, privileged bool, user string, cmd string) (stdOut string, stdErr string, exitCode int, err error) {
+
+	params := url.Values{}
+	params.Add("privileged", strconv.FormatBool(privileged))
+	params.Add("user", user)
+	params.Add("cmd", cmd)
+	p := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec?%s", sim.url, testSuite, test, nodeid, params.Encode())
+	req, err := http.NewRequest(http.MethodPost, p, nil)
+	if err != nil {
+		return "", "", 0, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", "", 0, err
+	}
+	if resp.Body == nil {
+		return "", "", 0, errors.New("unexpected empty response body")
+	}
+	dec := json.NewDecoder(resp.Body)
+	var res execInfo
+	if err := dec.Decode(&res); err != nil {
+		return "", "", 0, err
+	}
+	return res.StdOut, res.StdErr, res.ExitCode, err
 }
 
 // CreateNetwork sends a request to the hive server to create a docker network by
