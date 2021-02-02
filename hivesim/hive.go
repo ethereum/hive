@@ -310,7 +310,9 @@ func (setup *clientSetup) postWithFiles(url string) (string, error) {
 			return "", err
 		}
 		r := src()
-		if _, err = io.Copy(fw, r); err != nil {
+		_, err = io.Copy(fw, r)
+		r.Close()
+		if err != nil {
 			return "", err
 		}
 	}
