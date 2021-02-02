@@ -3,15 +3,23 @@
 This page explains how client containers work in Hive.
 
 Clients are docker images which can be instantiated by a simulation. A client definition
-consist of a `Dockerfile` and associated resources. Client definitions live in
+consist of a Dockerfile and associated resources. Client definitions live in
 subdirectories of `clients/` in the hive repository.
 
 When hive runs a simulation, it first builds all client docker images using their
-`Dockerfile`, i.e. it basically runs `docker build .` in the client directory. Since most
+Dockerfile, i.e. it basically runs `docker build .` in the client directory. Since most
 client definitions wrap an existing Ethereum client, and building the client from source
 may take a long time, it is usually best to base the hive client on a pre-built docker
-image from Docker Hub. See the [go-ethereum](../clients/go-ethereum/Dockerfile) client
-definition for an example of a client `Dockerfile`.
+image from Docker Hub.
+
+Client Dockerfiles should support an optional argument named `branch`, which specifies the
+requested client version. This argument can be set by users by appending it to the client
+name like:
+
+    ./hive --sim my-simulation --client go-ethereum_v1.9.23,go_ethereum_v1.9.22
+
+See the [go-ethereum](../clients/go-ethereum/Dockerfile) client definition for an example
+of a client Dockerfile.
 
 ## Client Lifecycle
 
