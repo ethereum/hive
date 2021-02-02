@@ -54,8 +54,7 @@ The simulator may customize client start by placing these files into the client 
 
 - `/genesis.json` contains Ethereum genesis state in the JSON format used by Geth. This
   file is mandatory.
-- `/chain.rlp` contains RLP-encoded blocks to import before startup. The client should
-   start even if the blocks are invalid.
+- `/chain.rlp` contains RLP-encoded blocks to import before startup.
 - `/blocks/` directory containg `.rlp` files.
 
 On startup, client entry point scripts must first load the genesis block and state into
@@ -67,7 +66,9 @@ translator][oe-genesis-jq], for example.
 After the genesis state, the client should import the blocks from `/chain.rlp` if it is
 present, and finally import the individual blocks from `/blocks` in file name order. The
 reason for requiring two different block sources is that specifying a single chain is more
-optimal, but tests requiring forking chains cannot create a single chain.
+optimal, but tests requiring forking chains cannot create a single chain. The client
+should start even if the blocks are invalid, i.e. after the import, the client's 'best
+block' should be the last valid, imported block.
 
 ### Environment
 
