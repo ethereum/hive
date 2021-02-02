@@ -45,8 +45,8 @@ This section describes the requirements for Ethereum 1 client wrappers in hive. 
 entry point scripts must support this interface in order to be tested by existing Ethereum
 1.x-specific simulators.
 
-Clients must provide JSON-RPC over HTTP on TCP port `8545`. They may also support JSON-RPC
-over WebSocket on port `8546`, but this is not strictly required.
+Clients must provide JSON-RPC over HTTP on TCP port 8545. They may also support JSON-RPC
+over WebSocket on port 8546, but this is not strictly required.
 
 ### Files
 
