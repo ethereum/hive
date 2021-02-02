@@ -1,50 +1,68 @@
 ## Hive Ethereum Client Interface
 
-TODO: document client branch name
-
 This page explains how client containers work in Hive.
 
-The client definitions live in the `clients` folder, inside a folder named `<project>`
-where `<project>` is the official name of the client (lowercase, no fancy characters).
-`hive` will automatically pick up all clients from this folder.
+Clients are docker images which can be instantiated by a simulation. A client definition
+consist of a `Dockerfile` and associated resources. Client definitions live in
+subdirectories of `clients/` in the hive repository.
 
-Adding a new client implementation to `hive` entails creating a Dockerfile (and related
-resources), based on which `hive` will assemble the docker image to use as the blueprint
-for testing.
+When hive runs a simulation, it first builds all client docker images using their
+`Dockerfile`, i.e. it basically runs `docker build .` in the client directory. Since most
+client definitions wrap an existing Ethereum client, and building the client from source
+may take a long time, it is usually best to base the hive client on a pre-built docker
+image from Docker Hub. See the [go-ethereum](../clients/go-ethereum/Dockerfile) client
+definition for an example of a client `Dockerfile`.
 
-There aren't many contraints on the image itself, though a few required caveats exist:
+## Client Lifecycle
 
- * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
- * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
- * It should have a single entrypoint (or script) defined, which can initialize and run the client.
+When the simulation requests a client instance, hive creates a docker container from the
+client image. The simulator can customize the container by passing environment variables
+with prefix `HIVE_`. It may also upload files into the container before it starts. Once
+the container is created, hive simply runs the entry point defined in the `Dockerfile`.
 
-For guidance, check out the reference [go-ethereum](../clients/go-ethereum/Dockerfile) client.
+For all client containers, hive waits for TCP port 8545 to open before considering the
+client ready for use by the simulator. If the client container does not open this port
+within a certain timeout, hive assumes the client has failed to start.
 
-## Initializing the client
+Environment variables and files interpreted by thef entry point define a 'protocol'
+between the simulator and client. While hive itself does not require support for any
+specific variables or files, simulators usually expect client containers to be
+configurable in certain ways. In order to run tests against multiple Ethereum clients, for
+example, the simulator needs to be able to configure all clients for a specific blockchain
+and make it join the peer-to-peer network used for testing.
 
-hive injects all the required configurations into the Linux containers prior to launching
-the client's `entrypoint` script. It is then left to this script to interpret all the
-environmental configs and initialize the client appropriately.
+## Eth1 Client Requirements
 
-The chain configurations files:
+This section describes the requirements for Ethereum 1 client wrappers in hive. Client
+entry point scripts must support this interface in order to be tested by existing Ethereum
+1.x-specific simulators.
 
- * `/genesis.json` contains the JSON specification of the Ethereum genesis states
- * `/chain.rlp` contains a batch of RLP encoded blocks to import before startup
- * `/blocks/` folder with numbered singleton blocks to import before startup
- * `/keys/` contains account keys that should be imported before startup
+Clients must provide JSON-RPC over HTTP on TCP port `8545`. They may also support JSON-RPC
+over WebSocket on port `8546`, but this is not strictly required.
+
+### Files
+
+The simulator may customize client start by placing these files into the client container:
+
+- `/genesis.json` contains the JSON specification of the Ethereum genesis state in the
+  format used by Geth. This is mandatory, i.e. `genesis.json` will always be present. It
+  is the responsibility of the client container to translate the Geth genesis format into
+  a configuration appropriate for the specific client implementation. This translation is
+  usually done using a jq script. See the [openethereum genesis translator][oe-genesis-jq], for example.
+ * `/chain.rlp` contains RLP-encoded blocks to import before startup. The client should
+   start even if the blocks are invalid.
+ * `/blocks/` directory containg `.rlp` files. The client should import these blocks in
+   file name order after loading `/chain.rlp`.
 
 Client startup scripts need to ensure that they load the genesis state first, then import
-a possibly longer blockchain and then import possibly numerous individual blocks. The
-reason for requiring two different block sources is that specifying a single chain is more
-optimal, but tests requiring forking chains cannot create a single chain.
+blocks in `/chain.rlp` if present, and finaly import the individual blocks from `/blocks`.
+The reason for requiring two different block sources is that specifying a single chain is
+more optimal, but tests requiring forking chains cannot create a single chain.
 
-Besides the standardized chain configurations, clients can in general be modified
-behavior-wise in quite a few ways that are mostly supported by all clients, yet are
-implemented differently in each. As such, each possible behavioral change required by some
-simulator is characterized by an environment variable, which clients should interpret as
-best as they can.
+### Environment
 
-The behavioral configuration variables:
+Clients must support the following environment variables. The client's entry point script
+may map these to command line flags or use them generate a config file, for example.
 
 | Variable                   | Value                |                                                |
 |----------------------------|----------------------|------------------------------------------------|
@@ -70,31 +88,11 @@ The behavioral configuration variables:
 | `HIVE_FORK_MUIRGLACIER`    | decimal              | [Muir Glacier][EIP-2387] transition block      |
 | `HIVE_FORK_BERLIN`         | decimal              | [Berlin][EIP-2070] transition block            |
 
-The client has the responsibility of mapping the hive environment variables to its own
-command line flags. To assist in this, Hive illustrates a technique in the
-`clients/go-ethereum` folder using `mapper.jq`, which is invoked in `geth.sh` This
-technique can be replicated for other clients.
+### Enode script
 
-## Enode script
-
-For devp2p tests or other simulations that require to know the specific enode URL of the
-client instance, the client must provide an `enode.sh` that echoes the enode of the
-running instance. This is executed by the Hive host remotely in order to retrieve the
-enode URL.
-
-## Starting the client
-
-After initializing the client blockchain (genesis, chain, blocks), the last task of the
-entry script is to start up the client itself. The following defaults are required by
-`hive` to enable automatic network assembly and firewall enforcement:
-
- * Clients should open their HTTP-RPC endpoint on `0.0.0.0:8545` (mandatory)
- * Clients should open their WS-RPC endpoint on `0.0.0.0:8546` (optional)
- * Clients should open their IPC-RPC endpoints at `/rpc.ipc` (optional)
-
-There is no need to handle graceful client termination. Clients will be forcefully aborted
-upon test suite completion and all related data purged. A new instance will be started for
-every test.
+Some tests require peer-to-peer node information of the client instance. The client
+container must contain an `/enode.sh` script that echoes the enode of the running
+instance. This script is executed by Hive host in order to retrieve the enode URL.
 
 [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 [EIP-606]: https://eips.ethereum.org/EIPS/eip-606
@@ -107,3 +105,4 @@ every test.
 [EIP-1716]: https://eips.ethereum.org/EIPS/eip-1716
 [EIP-2387]: https://eips.ethereum.org/EIPS/eip-2387
 [EIP-2070]: https://eips.ethereum.org/EIPS/eip-2070
+[oe-genesis-jq]: ../clients/openethereum/mapper.jq
