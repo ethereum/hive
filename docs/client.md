@@ -53,19 +53,21 @@ over WebSocket on port 8546, but this is not strictly required.
 The simulator may customize client start by placing these files into the client container:
 
 - `/genesis.json` contains the JSON specification of the Ethereum genesis state in the
-  format used by Geth. This file is mandatory. It is the responsibility of the client
-  container to translate the Geth genesis format into a configuration appropriate for the
-  specific client implementation. This translation is usually done using a jq script. See
-  the [openethereum genesis translator][oe-genesis-jq], for example.
+  format used by Geth. This file is mandatory.
 - `/chain.rlp` contains RLP-encoded blocks to import before startup. The client should
    start even if the blocks are invalid.
 - `/blocks/` directory containg `.rlp` files.
 
-Client startup scripts need to ensure that they load the genesis state first, then import
-blocks in `/chain.rlp` if present, and finally import the individual blocks from `/blocks`
-in file name order. The reason for requiring two different block sources is that
-specifying a single chain is more optimal, but tests requiring forking chains cannot
-create a single chain.
+On startup, client entry point scripts must first load the genesis block and state into
+the client implementation from `/genesis.json`. To do this, the script needs to translate
+from Geth genesis format into a format appropriate for the specific client implementation.
+The translation is usually done using a jq script. See the [openethereum genesis
+translator][oe-genesis-jq], for example.
+
+After the genesis state, the client should import the blocks from `/chain.rlp` if it is
+present, and finally import the individual blocks from `/blocks` in file name order. The
+reason for requiring two different block sources is that specifying a single chain is more
+optimal, but tests requiring forking chains cannot create a single chain.
 
 ### Environment
 
