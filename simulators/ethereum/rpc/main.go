@@ -141,6 +141,9 @@ func runLESTests(t *hivesim.T, serverType string, clientTypes []string) {
 
 	// Configure sink to connect to the source node.
 	clientParams := clientEnv.Set("HIVE_NODETYPE", "light")
+	clientParams = clientParams.Set("HIVE_CLIQUE_PERIOD", "")
+	clientParams = clientParams.Set("HIVE_CLIQUE_PRIVATEKEY", "")
+	clientParams = clientParams.Set("HIVE_MINER", "")
 	enode, err := client.EnodeURL()
 	if err != nil {
 		t.Fatal("can't get node peer-to-peer endpoint:", enode)
