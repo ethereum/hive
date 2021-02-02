@@ -24,6 +24,13 @@ func (p Params) Set(key, value string) Params {
 	return cpy
 }
 
+// Unset returns a copy of the parameters with 'key' unset.
+func (p Params) Unset(key string) Params {
+	cpy := p.Copy()
+	delete(cpy, key)
+	return cpy
+}
+
 // Copy returns a copy of the parameters.
 func (p Params) Copy() Params {
 	cpy := make(Params, len(p))
