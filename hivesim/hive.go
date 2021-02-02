@@ -126,7 +126,7 @@ func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters ma
 	if !ok {
 		return "", nil, errors.New("missing 'CLIENT' parameter")
 	}
-	return sim.StartClientWithOptions(testSuite, test, clientType, WithFiles(parameters), WithFiles(initFiles))
+	return sim.StartClientWithOptions(testSuite, test, clientType, WithParams(parameters), WithFiles(initFiles))
 }
 
 // StartClientWithOptions starts a new node (or other container) with specified options.
