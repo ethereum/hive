@@ -18,8 +18,8 @@ name like:
 
     ./hive --sim my-simulation --client go-ethereum_v1.9.23,go_ethereum_v1.9.22
 
-See the [go-ethereum](../clients/go-ethereum/Dockerfile) client definition for an example
-of a client Dockerfile.
+See the [go-ethereum client definition][geth-docker] for an example of a client
+Dockerfile.
 
 ## Client Lifecycle
 
@@ -105,6 +105,8 @@ Some tests require peer-to-peer node information of the client instance. The cli
 container must contain an `/enode.sh` script that echoes the enode of the running
 instance. This script is executed by Hive host in order to retrieve the enode URL.
 
+[geth-docker]: ../clients/go-ethereum/Dockerfile
+[oe-genesis-jq]: ../clients/openethereum/mapper.jq
 [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 [EIP-606]: https://eips.ethereum.org/EIPS/eip-606
 [EIP-607]: https://eips.ethereum.org/EIPS/eip-607
@@ -116,4 +118,3 @@ instance. This script is executed by Hive host in order to retrieve the enode UR
 [EIP-1716]: https://eips.ethereum.org/EIPS/eip-1716
 [EIP-2387]: https://eips.ethereum.org/EIPS/eip-2387
 [EIP-2070]: https://eips.ethereum.org/EIPS/eip-2070
-[oe-genesis-jq]: ../clients/openethereum/mapper.jq
