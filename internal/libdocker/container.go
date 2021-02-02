@@ -2,6 +2,7 @@ package libdocker
 
 import (
 	"archive/tar"
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -278,21 +279,43 @@ func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map
 		}
 		defer file.Close()
 
-		data, err := ioutil.ReadAll(file)
-		if err != nil {
-			return err
-		}
-		// Insert the file into the tarball archive
-		header := &tar.Header{
-			Name: fileName, //filepath.Base(fileHeader.Filename),
-			Mode: int64(0777),
-			Size: int64(len(data)),
-		}
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-		if _, err := tw.Write(data); err != nil {
-			return err
+		fileType := fileHeader.Header.Get("X-HIVE-FILETYPE")
+		switch fileType {
+		case "TAR":
+			// We could just copy the data straight over, but we do not, to ensure the payload is valid TAR data.
+			tr := tar.NewReader(bufio.NewReader(file))
+			for {
+				h, err := tr.Next()
+				if err == io.EOF {
+					break
+				}
+				if err := tw.WriteHeader(h); err != nil {
+					return err
+				}
+				if _, err := io.Copy(tw, tr); err != nil {
+					return err
+				}
+			}
+		case "DEFAULT":
+			fallthrough
+		default:
+			// by default, it's just a file that accessible from anywhere
+			data, err := ioutil.ReadAll(file)
+			if err != nil {
+				return err
+			}
+			// Insert the file into the tarball archive
+			header := &tar.Header{
+				Name: fileName, //filepath.Base(fileHeader.Filename),
+				Mode: int64(0777),
+				Size: int64(len(data)),
+			}
+			if err := tw.WriteHeader(header); err != nil {
+				return err
+			}
+			if _, err := tw.Write(data); err != nil {
+				return err
+			}
 		}
 	}
 	if err := tw.Close(); err != nil {

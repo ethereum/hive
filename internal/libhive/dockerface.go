@@ -32,7 +32,13 @@ var ErrNetworkNotFound = fmt.Errorf("network not found")
 // ContainerOptions contains the launch parameters for docker containers.
 type ContainerOptions struct {
 	// These options apply when creating the container.
-	Env   map[string]string
+	Env map[string]string
+	// Files can be plain files (default) or TAR archives for more customization.
+	//
+	// Using the MIME header "X-HIVE-FILETYPE", customize the meaning of the data of a multi-part file upload.
+	// - "DEFAULT" (or omit) for a regular file with open to world (0777),
+	//   and placed in the root of the system, with its HTTP multi-part filename.
+	// - "TAR" for detailed customization of permissions, meta-data and easy preparation of many files.
 	Files map[string]*multipart.FileHeader
 
 	// These options apply when starting the container.

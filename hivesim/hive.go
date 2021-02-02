@@ -3,12 +3,14 @@ package hivesim
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
 	"net"
 	"net/http"
+	"net/textproto"
 	"net/url"
 	"os"
 	"strconv"
@@ -120,7 +122,25 @@ func (sim *Simulation) ClientTypes() (availableClients []string, err error) {
 // GetClientTypes. The input is used as environment variables in the new container.
 // Returns container id and ip.
 func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
-	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test), parameters, initFiles)
+	clientType, ok := parameters["CLIENT"]
+	if !ok {
+		return "", nil, errors.New("missing 'CLIENT' parameter")
+	}
+	return sim.StartClientWithOptions(testSuite, test, clientType, WithFiles(parameters), WithFiles(initFiles))
+}
+
+// StartClientWithOptions starts a new node (or other container) with specified options.
+// Returns container id and ip.
+func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error) {
+	setup := &clientSetup{
+		parameters: make(map[string]string),
+		initFiles:  make(map[string]string),
+	}
+	setup.parameters["CLIENT"] = clientType
+	for _, opt := range options {
+		opt(setup)
+	}
+	data, err := setup.postWithFiles(fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test))
 	if err != nil {
 		return "", nil, err
 	}
@@ -206,15 +226,49 @@ func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerI
 	return string(body), nil
 }
 
-func postWithFiles(url string, values map[string]string, files map[string]string) (string, error) {
+// collects client setup options
+type clientSetup struct {
+	parameters map[string]string
+	initFiles  map[string]string
+	tars       []func() io.ReadCloser
+}
+
+type StartOption func(setup *clientSetup)
+
+// WithParams adds parameters to the client setup, which are put into the docker env.
+func WithParams(params Params) StartOption {
+	return func(setup *clientSetup) {
+		for k, v := range params {
+			setup.parameters[k] = v
+		}
+	}
+}
+
+// WithFiles adds files from the local filesystem to the client.
+func WithFiles(initFiles map[string]string) StartOption {
+	return func(setup *clientSetup) {
+		for k, v := range initFiles {
+			setup.initFiles[k] = v
+		}
+	}
+}
+
+// WithTAR adds a TAR archive as source for client files.
+func WithTAR(src func() io.ReadCloser) StartOption {
+	return func(setup *clientSetup) {
+		setup.tars = append(setup.tars, src)
+	}
+}
+
+func (setup *clientSetup) postWithFiles(url string) (string, error) {
 	var err error
 
 	// make a dictionary of readers
 	formValues := make(map[string]io.Reader)
-	for key, s := range values {
+	for key, s := range setup.parameters {
 		formValues[key] = strings.NewReader(s)
 	}
-	for key, filename := range files {
+	for key, filename := range setup.initFiles {
 		filereader, err := os.Open(filename)
 		if err != nil {
 			return "", err
@@ -240,6 +294,22 @@ func postWithFiles(url string, values map[string]string, files map[string]string
 				return "", err
 			}
 		}
+		if _, err = io.Copy(fw, r); err != nil {
+			return "", err
+		}
+	}
+
+	for i, src := range setup.tars {
+		h := make(textproto.MIMEHeader)
+		filename := fmt.Sprintf("hive_tar_%d", i)
+		h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="%s"; filename="%s"`, filename, filename))
+		h.Set("Content-Type", "application/octet-stream")
+		h.Set("X-HIVE-FILETYPE", "TAR")
+		fw, err := w.CreatePart(h)
+		if err != nil {
+			return "", err
+		}
+		r := src()
 		if _, err = io.Copy(fw, r); err != nil {
 			return "", err
 		}
