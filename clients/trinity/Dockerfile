@@ -28,7 +28,7 @@ RUN \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
   | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
   | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
-  > /version.json
+  > /version.txt
 
 EXPOSE  8545 8546 30303 30303/udp
 CMD ["/trinity.sh"]

@@ -30,7 +30,7 @@ RUN apk add --update bash curl jq
 
 # TODO, make this work again
 
-RUN echo "{\"repo\":\"\", \"branch\":\"\", \"commit\":\"\"}" > /version.json
+RUN /usr/local/bin/geth version > /version.txt
 
 # Inject the startup script
 ADD geth.sh /geth.sh

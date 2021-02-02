@@ -25,7 +25,7 @@ RUN chmod +x /enode.sh
 RUN chmod 777 /enode.sh
 
 # Add dummy /version.json
-RUN echo "{\"repo\":\"\", \"branch\":\"\", \"commit\":\"\"}" > /version.json
+RUN ./openethereum --version > /version.txt
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8547 30303 30303/udp

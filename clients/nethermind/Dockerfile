@@ -16,7 +16,7 @@ RUN chmod +x /nethermind.sh
 RUN chmod +x /enode.sh
 
 # Write the version file.
-RUN echo "{\"repo\":\"https://github.com/nethermindeth/nethermind\",\"branch\":\"\",\"commit\":\"$(cat /nethermind/git-hash)\"}" > /version.json
+RUN echo "repo: https://github.com/nethermindeth/nethermind, commit: "$(cat /nethermind/git-hash)"" > /version.txt
 
 ENV NETHERMIND_HIVE_ENABLED true
 
