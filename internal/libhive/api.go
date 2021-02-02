@@ -236,13 +236,19 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		clientInfo := &ClientInfo{
 			ID:             info.ID,
 			IP:             info.IP,
-			MAC:            info.MAC,
 			Name:           name,
-			VersionInfo:    api.env.ClientVersions[name],
 			InstantiatedAt: time.Now(),
 			LogFile:        logPath,
 			wait:           info.Wait,
 		}
+		// log client version in test suite
+		suite, ok := api.tm.runningTestSuites[suiteID]
+		if !ok {
+			http.Error(w, ErrNoSuchTestSuite.Error(), http.StatusNotFound)
+			return
+		}
+		suite.ClientVersions[name] = api.env.ClientVersions[name]
+		// register the node
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {

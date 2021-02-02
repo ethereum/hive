@@ -421,6 +421,7 @@ function onSuiteData(data, jsonsource) {
         "id": 0,
         "name": "Devp2p discovery v4 test suite",
         "description": "This suite of tests checks for basic conformity to the discovery v4 protocol and for some known security weaknesses.",
+        "clientVersions": "",
         "testCases": {
             "1": {
                 "id": 1,
@@ -436,7 +437,6 @@ function onSuiteData(data, jsonsource) {
                     "a46beeb9": {
                         "id": "a46beeb9",
                         "name": "parity_latest",
-                        "versionInfo": "",
                         "instantiatedAt": "2020-04-22T17:12:14.275491827Z",
                         "logFile": "parity_latest/client-a46beeb9.log",
                         "WasInstantiated": true
