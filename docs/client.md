@@ -9,8 +9,8 @@ subdirectories of `clients/` in the hive repository.
 When hive runs a simulation, it first builds all client docker images using their
 Dockerfile, i.e. it basically runs `docker build .` in the client directory. Since most
 client definitions wrap an existing Ethereum client, and building the client from source
-may take a long time, it is usually best to base the hive client on a pre-built docker
-image from Docker Hub.
+may take a long time, it is usually best to base the hive client wrapper on a pre-built
+docker image from Docker Hub.
 
 Client Dockerfiles should support an optional argument named `branch`, which specifies the
 requested client version. This argument can be set by users by appending it to the client
