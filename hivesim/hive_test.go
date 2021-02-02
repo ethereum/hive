@@ -1,6 +1,7 @@
 package hivesim
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http/httptest"
@@ -87,6 +88,7 @@ func TestStartClientStartOptions(t *testing.T) {
 	defer srv.Close()
 	defer tm.Terminate()
 
+	// Start the client.
 	sim := NewAt(srv.URL)
 	suiteID, err := sim.StartSuite("suite", "", "")
 	if err != nil {
@@ -203,6 +205,56 @@ func TestStartClientStartOptions(t *testing.T) {
 			}
 		})
 	})
+}
+
+// This checks that the simulator can run a program
+func TestRunProgram(t *testing.T) {
+	// Set up the backend to return program execution. Simple debug program here.
+	hooks := &fakes.BackendHooks{
+		RunProgram: func(containerID string, opt libhive.ExecOptions) (*libhive.ExecInfo, error) {
+			return &libhive.ExecInfo{
+				StdOut:   fmt.Sprintf("user: %s, privileged: %v", opt.User, opt.Privileged),
+				StdErr:   "cmd: " + strings.Join(opt.Cmd, ","),
+				ExitCode: 42,
+			}, nil
+		},
+	}
+	tm, srv := newFakeAPI(hooks)
+	defer srv.Close()
+	defer tm.Terminate()
+
+	sim := NewAt(srv.URL)
+	suiteID, err := sim.StartSuite("suite", "", "")
+	if err != nil {
+		t.Fatal("can't start suite:", err)
+	}
+	testID, err := sim.StartTest(suiteID, "test", "")
+	if err != nil {
+		t.Fatal("can't start test:", err)
+	}
+
+	params := map[string]string{"CLIENT": "client-1"}
+	clientID, _, err := sim.StartClient(suiteID, testID, params, nil)
+	if err != nil {
+		t.Fatal("can't start client:", err)
+	}
+
+	// Run a program
+	stdOut, stdErr, code, err := sim.ClientRunProgram(
+		suiteID, testID, clientID, true, "ether", "echo this")
+	if err != nil {
+		t.Fatal("failed to run program:", err)
+	}
+
+	if want := "user: ether, privileged: true"; stdOut != want {
+		t.Fatalf("wrong std out %q\nwant %q", stdOut, want)
+	}
+	if want := "cmd: echo this"; stdErr != want {
+		t.Fatalf("wrong std err %q\nwant %q", stdErr, want)
+	}
+	if want := 42; code != want {
+		t.Fatalf("wrong code %q\nwant %q", code, want)
+	}
 }
 
 // This test checks for some common errors returned by StartClient.
