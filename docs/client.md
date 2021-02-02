@@ -37,7 +37,7 @@ between the simulator and client. While hive itself does not require support for
 specific variables or files, simulators usually expect client containers to be
 configurable in certain ways. In order to run tests against multiple Ethereum clients, for
 example, the simulator needs to be able to configure all clients for a specific blockchain
-and make it join the peer-to-peer network used for testing.
+and make them join the peer-to-peer network used for testing.
 
 ## Eth1 Client Requirements
 
