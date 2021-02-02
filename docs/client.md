@@ -59,13 +59,13 @@ The simulator may customize client start by placing these files into the client 
   the [openethereum genesis translator][oe-genesis-jq], for example.
 - `/chain.rlp` contains RLP-encoded blocks to import before startup. The client should
    start even if the blocks are invalid.
-- `/blocks/` directory containg `.rlp` files. The client should import these blocks in
-   file name order after loading `/chain.rlp`.
+- `/blocks/` directory containg `.rlp` files.
 
 Client startup scripts need to ensure that they load the genesis state first, then import
-blocks in `/chain.rlp` if present, and finaly import the individual blocks from `/blocks`.
-The reason for requiring two different block sources is that specifying a single chain is
-more optimal, but tests requiring forking chains cannot create a single chain.
+blocks in `/chain.rlp` if present, and finally import the individual blocks from `/blocks`
+in file name order. The reason for requiring two different block sources is that
+specifying a single chain is more optimal, but tests requiring forking chains cannot
+create a single chain.
 
 ### Environment
 
