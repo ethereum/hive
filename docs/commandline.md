@@ -90,8 +90,9 @@ To generate a chain of a desired length, run the following command:
 
     hivechain generate -genesis ./genesis.json -length 200
 
-`hivechain` generates empty blocks by default. The chain will contain non-empty blocks if
-the following accounts have balance in genesis state:
+hivechain generates empty blocks by default. The chain will contain non-empty blocks if
+the following accounts have balance in genesis state. You can find the corresponding
+private keys in the hivechain source code.
 
 - `0x71562b71999873DB5b286dF957af199Ec94617F7`
 - `0x703c4b2bD70c169f5717101CaeE543299Fc946C7`
