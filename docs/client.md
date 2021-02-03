@@ -1,4 +1,4 @@
-## Hive Ethereum Client Interface
+## Hive Clients
 
 This page explains how client containers work in Hive.
 
@@ -41,7 +41,7 @@ and make them join the peer-to-peer network used for testing.
 
 ## Eth1 Client Requirements
 
-This section describes the requirements for Ethereum 1 client wrappers in hive. Client
+This section describes the requirements for Ethereum 1.x client wrappers in hive. Client
 entry point scripts must support this interface in order to be tested by existing Ethereum
 1.x-specific simulators.
 
