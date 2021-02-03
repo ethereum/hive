@@ -226,7 +226,7 @@ based on which `hive` will assemble the docker image to use as the blueprint for
 
 The client definition(s) should reside in the `clients` folder, inside a folder named `<project>` where `<project>` is the official name of the client (lowercase, no fancy characters). `hive` will automatically pick up all clients from this folder.
 
-There aren't many contraints on the image itself, though a few required caveats exist:
+There aren't many constraints on the image itself, though a few required caveats exist:
 
  * It should be as tiny as possible (play nice with others). Preferably use `alpine` Linux.
  * It should expose the following ports: 8545 (HTTP RPC), 8546 (WS RPC), 30303 (devp2p).
@@ -254,7 +254,7 @@ The behavioral configuration variables:
   * `HIVE_BOOTNODE` enode URL of the discovery-only node to bootstrap the client
   * `HIVE_TESTNET` whether clients should run with modified starting nonces (`2^20`)
   * `HIVE_NODETYPE` specifying the sync and pruning algos that should be used
-    * If unset, then uninteresting and run in the node's default mode
+    * If unset, then runs in the (uninteresting) node's default mode
     * If `archive`, assumes that all historical state is retained after sync
     * If `full`, assumes fast sync and consecutive pruning of historical state
     * If `light`, assumes header only sync and no state maintenance at all
