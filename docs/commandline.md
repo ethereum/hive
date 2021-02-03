@@ -7,17 +7,15 @@ To run simulations, you also need a working Docker setup, and hive needs to be r
 same machine as dockerd. Using docker remotely is not supported at this time. We have also
 not tested hive extensively on any OS but Linux, so you must run Linux to use hive.
 
-To get hive, you first need to clone to the repository to any location. All commands
-should be run from within the root of the repository.
+To get hive, you first need to clone to the repository to any location, then build the hive
+executable.
 
     git clone https://github.com/ethereum/hive
     cd ./hive
-
-Now build the hive executable:
-
     go build .
 
-Then, to run a simulation, use the following command:
+All hive commands should be run from within the root of the repository. To run a
+simulation, use the following command:
 
     ./hive --sim <simulation> --client <client(s) you want to test against>
 
@@ -38,7 +36,7 @@ command-line options.
 port 8545. If a very long chain is imported, this timeout may need to be quite large. A
 lower value means that hive won't wait as long in case the node crashes and never opens
 the RPC port. Defaults to 3 minutes.
-  
+
 `--docker.pull`: Setting this option makes hive re-pull the base images of all built
 docker containers.
 
