@@ -17,7 +17,7 @@ ADD genesis.json /genesis.json
 ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
 
-RUN echo "repo: https://github.com/hyperledger/besu, branch: "${branch:-detached}", commit:"${VCS_REF:-xxxxxx}"" > /version.txt
+RUN ./bin/besu --version > /version.txt
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8546 30303 30303/udp
