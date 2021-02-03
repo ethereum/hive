@@ -13,8 +13,8 @@ dedicated sub-directory for every simulator. When hive runs a simulation, it fir
 an image using `docker build` in the simulator directory, using the Dockerfile. The image
 must contain all resources needed for testing.
 
-When hive starts the simulator container entry point, the `HIVE_SIMULATOR` environment
-variable is set to the URL of the API server.
+When the simulator container entry point runs, the `HIVE_SIMULATOR` environment variable
+is set to the URL of the API server.
 
 The simulation API assumes a certain data model, and this model dictates how the API can
 be used. In order to do anything with the API, the simulator must first request the start
@@ -36,6 +36,55 @@ results of the other tests as individual test cases.
 
 The simulator must report the results of all running test cases before ending the test
 suite.
+
+## Writing Simulators in Go
+
+While simulators may be written in any language (they're just docker containers after
+all), hive provides a Go library that wraps the simulation API in a way that resembles the
+standard library "testing" package. Be sure to check the [Go API reference] of package
+hivesim for more information about writing simulators in Go.
+
+Simulators are contained in the hive repository as independent Go modules. To create one,
+first create a new subdirectory in `./simulators` and initialize a Go module there:
+
+    mkdir ./simulators/ethereum/my-test
+    cd ./simulators/ethereum/my-test
+    go mod init github.com/ethereum/hive/simulators/ethereum/my-test
+    go get github.com/ethereum/hive/hivesim@latest
+
+Now create the simulator program:
+
+    package main
+
+    import "github.com/ethereum/hive/hivesim"
+
+    func main() {
+        suite := hivesim.Suite{
+            Name:        "my-suite",
+            Description: "This test suite performs some tests.",
+        }
+        suite.Add(hivesim.ClientTestSpec{
+            Name:        "the-test",
+            Description: "This is the example test case.",
+            Files: map[string]string{"/genesis.json": "genesis.json"},
+            Run: runMyTest,
+        })
+        hivesim.MustRunSuite(hivesim.New(), suite)
+    }
+
+Your simulator directory must also contain a Dockerfile so that hive can build it:
+
+    FROM golang:1-alpine AS builder
+    RUN apk --no-cache add gcc musl-dev linux-headers
+    ADD . /source
+    WORKDIR /source
+    RUN go build -o ./sim .
+
+    # Build the runner container.
+    FROM alpine:latest
+    ADD . /
+    COPY --from=builder /source/sim /
+    ENTRYPOINT ["./sim"]
 
 ## Simulation API Reference
 
@@ -237,6 +286,7 @@ Response:
     172.22.0.2
 
 [client interface documentation]: ./client.md
+[Go API reference]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
 [Intro]: ./intro.md
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulation.md
