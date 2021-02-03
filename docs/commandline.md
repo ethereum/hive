@@ -44,22 +44,22 @@ docker containers.
 
 `--docker.output`: This enables printing of all docker container output to stderr.
 
-`--docker.nocache expression`: Regular expression selecting docker images to forcibly
+`--docker.nocache <expression>`: Regular expression selecting docker images to forcibly
 rebuild. You can use this option during simulator development to ensure a new image is
 built even when there are no changes to the simulator code.
 
-`--sim.timelimit timeout`: Simulation timeout. Hive aborts the simulator if it exceeds
+`--sim.timelimit <timeout>`: Simulation timeout. Hive aborts the simulator if it exceeds
 this time. There is no default timeout.
 
-`--sim.loglevel level`: Selects log level of client instances. Supports values 0-5,
+`--sim.loglevel <level>`: Selects log level of client instances. Supports values 0-5,
 defaults to 3. Note that this value may be overridden by simulators for specific clients.
 This sets the default value of `HIVE_LOGLEVEL` in client containers.
 
-`--sim.parallelism number`: Sets max number of parallel clients/containers. This is
+`--sim.parallelism <number>`: Sets max number of parallel clients/containers. This is
 interpreted by simulators. It sets the `HIVE_PARALLELISM` environment variable. Defaults
 to 1.
 
-`--sim.testlimit number`: Max number of tests to execute per client. This is interpreted
+`--sim.testlimit <number>`: Max number of tests to execute per client. This is interpreted
 by simulators. It sets the `HIVE_SIMLIMIT` environment variable.
 
 ## Viewing simulation results (hiveview)
