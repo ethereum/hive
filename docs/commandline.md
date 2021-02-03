@@ -25,7 +25,7 @@ how the command would look:
     ./hive --sim devp2p/discv4 --client go-ethereum,openethereum
 
 The client list may contain any number of clients. You can select a specific client
-version by appending it to the client name with an `_`, for example:
+version by appending it to the client name with `_`, for example:
 
     ./hive --sim devp2p/discv4 --client go-ethereum_v1.9.22,go-ethereum_v1.9.23
 
