@@ -1,4 +1,4 @@
-[Intro] | [Hive Commands] | [Simulators] | [Clients]
+[Overview] | [Hive Commands] | [Simulators] | [Clients]
 
 ## Hive Simulator Programming
 
@@ -287,7 +287,7 @@ Response:
 
 [client interface documentation]: ./client.md
 [Go API reference]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
-[Intro]: ./intro.md
+[Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
-[Simulators]: ./simulation.md
-[Clients]: ./client.md
+[Simulators]: ./simulators.md
+[Clients]: ./clients.md

@@ -1,4 +1,4 @@
-[Intro] | [Hive Commands] | [Simulators] | [Clients]
+[Overview] | [Hive Commands] | [Simulators] | [Clients]
 
 ## Running Hive
 
@@ -95,7 +95,7 @@ private keys in the hivechain source code.
 - `0x703c4b2bD70c169f5717101CaeE543299Fc946C7`
 - `0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e`
 
-[Intro]: ./intro.md
+[Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
-[Simulators]: ./simulation.md
-[Clients]: ./client.md
+[Simulators]: ./simulators.md
+[Clients]: ./clients.md

@@ -1,4 +1,4 @@
-[Intro] | [Hive Commands] | [Simulators] | [Clients]
+[Overview] | [Hive Commands] | [Simulators] | [Clients]
 
 ## What is Hive?
 
@@ -98,7 +98,7 @@ simulator program. All files are written to the results directory (`./workspace/
 When the simulator program exits, the simulator container and all client containers are
 stopped and removed. The `hive` command then exits as well.
 
-[Intro]: ./intro.md
+[Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
-[Simulators]: ./simulation.md
-[Clients]: ./client.md
+[Simulators]: ./simulators.md
+[Clients]: ./clients.md
