@@ -95,15 +95,3 @@ simulator program. All files are written to the results directory (`./workspace/
 
 When the simulator program exits, the simulator container and all client containers are
 stopped and removed. The `hive` command then exits as well.
-
-## Viewing simulation results (hiveview)
-
-The output of a single simulation run is a JSON file containing test results, and several
-log files containing the output of the simulator and clients.
-
-To view the test results and logs in a web browser, use the `hiveview` tool:
-
-    ./hiveview --serve --logdir ./workspace/logs
-
-This tool runs a web interface on <http://127.0.0.1:8080>. The interface shows information
-about all simulation runs for which information was collected.
