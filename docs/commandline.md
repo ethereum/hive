@@ -1,9 +1,7 @@
 ## Running Hive
 
 The hive project is implemented in Go. You need to install Go version 1.13 or later to use
-hive.
-
-To run simulations, you also need a working Docker setup, and hive needs to be run on the
+hive. To run simulations, you also need a working Docker setup, and hive needs to be run on the
 same machine as dockerd. Using docker remotely is not supported at this time. We have also
 not tested hive extensively on any OS but Linux, so you must run Linux to use hive.
 
@@ -64,9 +62,8 @@ by simulators. It sets the `HIVE_SIMLIMIT` environment variable.
 
 The results of hive simulation runs are stored in JSON files containing test results, and
 hive also creates several log files containing the output of the simulator and clients. To
-view test results and logs in a web browser, you can use the `hiveview` tool.
-
-Build it with:
+view test results and logs in a web browser, you can use the `hiveview` tool. Build it
+with:
 
     go build ./cmd/hiveview
 
@@ -80,9 +77,7 @@ information about all simulation runs for which information was collected.
 ## Generating Ethereum 1.x test chains (hivechain)
 
 The `hivechain` tool allows you to create RLP-encoded blockchains for inclusion into
-simulations.
-
-Build it with:
+simulations. Build it with:
 
     go build ./cmd/hivechain
 
