@@ -1,3 +1,5 @@
+[Intro] | [Hive Commands] | [Simulators] | [Clients]
+
 ## Hive Simulator Programming
 
 This guide explains how to write hive simulators.
@@ -235,3 +237,7 @@ Response:
     172.22.0.2
 
 [client interface documentation]: ./client.md
+[Intro]: ./intro.md
+[Hive Commands]: ./commandline.md
+[Simulators]: ./simulation.md
+[Clients]: ./client.md

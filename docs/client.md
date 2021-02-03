@@ -1,3 +1,5 @@
+[Intro] | [Hive Commands] | [Simulators] | [Clients]
+
 ## Hive Clients
 
 This page explains how client containers work in Hive.
@@ -118,3 +120,7 @@ instance. This script is executed by Hive host in order to retrieve the enode UR
 [EIP-1716]: https://eips.ethereum.org/EIPS/eip-1716
 [EIP-2387]: https://eips.ethereum.org/EIPS/eip-2387
 [EIP-2070]: https://eips.ethereum.org/EIPS/eip-2070
+[Intro]: ./intro.md
+[Hive Commands]: ./commandline.md
+[Simulators]: ./simulation.md
+[Clients]: ./client.md
