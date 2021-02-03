@@ -63,11 +63,10 @@ by simulators. It sets the `HIVE_SIMLIMIT` environment variable.
 ## Viewing simulation results (hiveview)
 
 The results of hive simulation runs are stored in JSON files containing test results, and
-hive also creates several log files containing the output of the simulator and clients.
+hive also creates several log files containing the output of the simulator and clients. To
+view test results and logs in a web browser, you can use the `hiveview` tool.
 
-To view test results and logs in a web browser, use the `hiveview` tool.
-
-Build it with
+Build it with:
 
     go build ./cmd/hiveview
 
@@ -77,3 +76,23 @@ Run it like this to start the HTTP server:
 
 This command runs a web interface on <http://127.0.0.1:8080>. The interface shows
 information about all simulation runs for which information was collected.
+
+## Generating Ethereum 1.x test chains (hivechain)
+
+The `hivechain` tool allows you to create RLP-encoded blockchains for inclusion into
+simulations.
+
+Build it with:
+
+    go build ./cmd/hivechain
+
+To generate a chain of a desired length, run the following command:
+
+    hivechain generate -genesis ./genesis.json -length 200
+
+`hivechain` generates empty blocks by default. The chain will contain non-empty blocks if
+the following accounts have balance in genesis state:
+
+- `0x71562b71999873DB5b286dF957af199Ec94617F7`
+- `0x703c4b2bD70c169f5717101CaeE543299Fc946C7`
+- `0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e`
