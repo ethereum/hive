@@ -5,7 +5,7 @@ Hive is a system for running integration tests against Ethereum clients.
 Ethereum Foundation maintains a public Hive instance to check for consensus, p2p and
 blockchain compatibility. You can find the latest test results [here]().
 
-**To read more about hive, please check [the documentation][doc].**.
+**To read more about hive, please check [the documentation][doc].**
 
 ### Trophies
 
