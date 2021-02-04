@@ -57,7 +57,7 @@ The simulator may customize client startup by placing these files into the clien
 - `/genesis.json` contains Ethereum genesis state in the JSON format used by Geth. This
   file is mandatory.
 - `/chain.rlp` contains RLP-encoded blocks to import before startup.
-- `/blocks/` directory containg `.rlp` files.
+- `/blocks/` directory containing `.rlp` files.
 
 On startup, client entry point scripts must first load the genesis block and state into
 the client implementation from `/genesis.json`. To do this, the script needs to translate
