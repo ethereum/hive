@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="100%" height="100%" viewBox="0 0 520 170" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;">
+    <g id="Background" transform="matrix(1.00628,0,0,1.03326,-3.17749,-4.61712)">
+        <path d="M519.914,14.647C519.914,9.029 515.231,4.468 509.462,4.468L13.609,4.468C7.841,4.468 3.158,9.029 3.158,14.647L3.158,158.817C3.158,164.435 7.841,168.996 13.609,168.996L509.462,168.996C515.231,168.996 519.914,164.435 519.914,158.817L519.914,14.647Z" style="fill:white;"/>
+    </g>
     <g transform="matrix(1,0,0,1,-305,-66)">
         <g transform="matrix(0.656716,0,0,0.730769,125.925,18.3462)">
             <path d="M428,96C428,88.825 421.518,83 413.534,83L308.466,83C300.482,83 294,88.825 294,96L294,122C294,129.175 300.482,135 308.466,135L413.534,135C421.518,135 428,129.175 428,122L428,96Z" style="fill:rgb(235,185,235);"/>
