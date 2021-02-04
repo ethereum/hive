@@ -7,7 +7,7 @@ hive. To run simulations, you also need a working Docker setup, and hive needs t
 same machine as dockerd. Using docker remotely is not supported at this time. We have also
 not tested hive extensively on any OS but Linux, so you must run Linux to use hive.
 
-To get hive, you first need to clone to the repository to any location, then build the hive
+To get hive, you first need to clone the repository to any location, then build the hive
 executable.
 
     git clone https://github.com/ethereum/hive
