@@ -72,7 +72,7 @@ While the simulator build must always work without error, it's OK for some clien
 to fail as long as one of them succeeds. This is because client code pulled from the
 respective upstream repositories may occasionally fail to build.
 
-![hive simulation docker containers](./img/hive-simulation.svg)
+![hive simulation docker containers](./img/sim-overview.svg)
 
 Once all images are built, the simulator program is launched in a docker container. The
 `HIVE_SIMULATOR` environment variable contains the HTTP server URL of the hive controller.
