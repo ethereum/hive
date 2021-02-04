@@ -33,7 +33,7 @@ Simulation runs can be customized in many ways. Here's an overview of the availa
 command-line options.
 
 `--client.checktimelimit <timeout>`: The timeout of waiting for clients to open up TCP
-port 8545. If a very long chain is imported, this timeout may need to be quite large. A
+port 8545. If a very long chain is imported, this timeout may need to be quite long. A
 lower value means that hive won't wait as long in case the node crashes and never opens
 the RPC port. Defaults to 3 minutes.
 
