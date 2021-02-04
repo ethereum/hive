@@ -285,7 +285,7 @@ Response:
 
     172.22.0.2
 
-[client interface documentation]: ./client.md
+[client interface documentation]: ./clients.md
 [Go API reference]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
