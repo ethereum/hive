@@ -52,7 +52,7 @@ over WebSocket on port 8546, but this is not strictly required.
 
 ### Files
 
-The simulator may customize client start by placing these files into the client container:
+The simulator may customize client startup by placing these files into the client container:
 
 - `/genesis.json` contains Ethereum genesis state in the JSON format used by Geth. This
   file is mandatory.
