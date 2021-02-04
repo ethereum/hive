@@ -105,7 +105,7 @@ may map these to command line flags or use them generate a config file, for exam
 
 Some tests require peer-to-peer node information of the client instance. The client
 container must contain an `/enode.sh` script that echoes the enode of the running
-instance. This script is executed by Hive host in order to retrieve the enode URL.
+instance. This script is executed by the Hive host in order to retrieve the enode URL.
 
 [geth-docker]: ../clients/go-ethereum/Dockerfile
 [oe-genesis-jq]: ../clients/openethereum/mapper.jq
