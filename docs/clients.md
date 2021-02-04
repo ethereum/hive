@@ -34,7 +34,7 @@ For all client containers, hive waits for TCP port 8545 to open before consideri
 client ready for use by the simulator. If the client container does not open this port
 within a certain timeout, hive assumes the client has failed to start.
 
-Environment variables and files interpreted by thef entry point define a 'protocol'
+Environment variables and files interpreted by the entry point define a 'protocol'
 between the simulator and client. While hive itself does not require support for any
 specific variables or files, simulators usually expect client containers to be
 configurable in certain ways. In order to run tests against multiple Ethereum clients, for
