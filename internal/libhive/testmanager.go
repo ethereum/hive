@@ -446,21 +446,21 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 }
 
 // StopNode stops a client container.
-func (manager *TestManager) StopNode(suiteID SuiteID, testID TestID, nodeID string) error {
+func (manager *TestManager) StopNode(testID TestID, nodeID string) error {
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()
 
-	testCase, ok := manager.runningTestCases[test]
+	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
-		return nil, ErrNoSuchNode
+		return ErrNoSuchNode
 	}
 	nodeInfo, ok := testCase.ClientInfo[nodeID]
 	if !ok {
-		return nil, ErrNoSuchNode
+		return ErrNoSuchNode
 	}
 	// Stop the container.
 	if nodeInfo.wait != nil {
-		if err = manager.backend.DeleteContainer(nodeInfo.ID); err != nil {
+		if err := manager.backend.DeleteContainer(nodeInfo.ID); err != nil {
 			return fmt.Errorf("unable to stop client: %v", err)
 		}
 		nodeInfo.wait()

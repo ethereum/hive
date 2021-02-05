@@ -291,14 +291,14 @@ func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (string, 
 
 // stopClient terminates a client container.
 func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
-	suiteID, testID, err := api.requestSuiteAndTest(r)
+	_, testID, err := api.requestSuiteAndTest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	node := mux.Vars(r)["node"]
 
-	err := api.tm.StopNode(suiteID, testID, node)
+	err = api.tm.StopNode(testID, node)
 	if err == ErrNoSuchNode {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
