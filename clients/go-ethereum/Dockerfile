@@ -28,9 +28,11 @@ RUN apk add --update bash curl jq
 #   apk del go git make gcc musl-dev linux-headers              && \
 #   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
-# TODO, make this work again
-
-RUN /usr/local/bin/geth version > /version.txt
+RUN /usr/local/bin/geth version > /raw_version.txt
+RUN cat /raw_version.txt | grep "Geth" >> /pretty.txt
+RUN cat /raw_version.txt | grep "Version" >> /pretty.txt
+RUN cat /raw_version.txt | grep "Architecture" >> /pretty.txt
+RUN tr -d '\n' < pretty.txt > version.txt
 
 # Inject the startup script
 ADD geth.sh /geth.sh
