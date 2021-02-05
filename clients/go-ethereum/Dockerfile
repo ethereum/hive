@@ -29,10 +29,12 @@ RUN apk add --update bash curl jq
 #   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
 RUN /usr/local/bin/geth version > /raw_version.txt
-RUN cat /raw_version.txt | grep "Geth" >> /pretty.txt
-RUN cat /raw_version.txt | grep "Version" >> /pretty.txt
-RUN cat /raw_version.txt | grep "Architecture" >> /pretty.txt
-RUN tr -d '\n' < pretty.txt > version.txt
+RUN cat /raw_version.txt | grep "Geth" >> /version.txt
+RUN cat /raw_version.txt | grep "Version" >> /version.txt
+RUN cat /raw_version.txt | grep "Architecture" >> /version.txt
+RUN sed -i 's/\<Geth\>//g' version.txt && sed -i 's/^[[:space:]]*//' /version.txt
+RUN sed -i ':a;N;$!ba;s/\n/ \/\ /g' version.txt
+
 
 # Inject the startup script
 ADD geth.sh /geth.sh
