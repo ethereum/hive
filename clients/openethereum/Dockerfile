@@ -28,7 +28,7 @@ RUN chmod 777 /enode.sh
 RUN ./openethereum --version > /raw_version.txt
 RUN head -n 2 /raw_version.txt | tail -1 > /version.txt
 RUN sed -i 's/\<version\>//g' /version.txt
-RUN sed -i 's/^[[:space:]]*//' /version.txt
+RUN sed -i 's/^[[:space:]]*//' /version.txt && sed -i :a -e '/^\n*$/{$d;N;};/\n$/ba' /version.txt
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8547 30303 30303/udp

@@ -32,8 +32,9 @@ RUN /usr/local/bin/geth version > /raw_version.txt
 RUN cat /raw_version.txt | grep "Geth" >> /version.txt
 RUN cat /raw_version.txt | grep "Version" >> /version.txt
 RUN cat /raw_version.txt | grep "Architecture" >> /version.txt
-RUN sed -i 's/\<Geth\>//g' version.txt && sed -i 's/^[[:space:]]*//' /version.txt
-RUN sed -i ':a;N;$!ba;s/\n/ \/\ /g' version.txt
+RUN sed -i 's/\<Geth\>//g' /version.txt && sed -i 's/^[[:space:]]*//' /version.txt
+RUN sed -i ':a;N;$!ba;s/\n/ \/\ /g' /version.txt && sed -u :a -e '/^\n*$/{$d;N;};/\n$/ba' /version.txt
+
 
 
 # Inject the startup script
