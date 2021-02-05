@@ -298,19 +298,13 @@ func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
 	}
 	node := mux.Vars(r)["node"]
 
-	// Get the node.
-	nodeInfo, err := api.tm.GetNodeInfo(suiteID, testID, node)
-	if err != nil {
+	err := api.tm.StopNode(suiteID, testID, node)
+	if err == ErrNoSuchNode {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
-	}
-	// Stop the container.
-	if err = api.backend.DeleteContainer(nodeInfo.ID); err != nil {
-		msg := fmt.Sprintf("unable to stop client: %v", err)
-		http.Error(w, msg, http.StatusInternalServerError)
-	}
-	if nodeInfo.wait != nil {
-		nodeInfo.wait()
+	} else if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 

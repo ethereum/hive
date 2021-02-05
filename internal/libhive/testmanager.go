@@ -366,9 +366,9 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 
 //StartTest starts a new test case, returning the testcase id as a context identifier
 func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, description string) (TestID, error) {
-
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()
+
 	// check if the testsuite exists
 	testSuite, ok := manager.runningTestSuites[testSuiteID]
 	if !ok {
@@ -398,34 +398,33 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 // EndTest finishes the test case
 func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, summaryResult *TestResult) error {
 	manager.testCaseMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
 
 	// Check if the test case is running
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
-		manager.testCaseMutex.Unlock()
 		return ErrNoSuchTestCase
 	}
 	// Make sure there is at least a result summary
 	if summaryResult == nil {
-		manager.testCaseMutex.Unlock()
 		return ErrNoSummaryResult
 	}
 
 	// Add the results to the test case
 	testCase.End = time.Now()
 	testCase.SummaryResult = *summaryResult
-	manager.testCaseMutex.Unlock()
 
 	// Stop running clients.
 	for _, v := range testCase.ClientInfo {
-		manager.backend.DeleteContainer(v.ID)
-		v.wait()
+		if v.wait != nil {
+			manager.backend.DeleteContainer(v.ID)
+			v.wait()
+			v.wait = nil
+		}
 	}
 
 	// Delete from running, if it's still there.
-	manager.testCaseMutex.Lock()
 	delete(manager.runningTestCases, testID)
-	manager.testCaseMutex.Unlock()
 	return nil
 }
 
@@ -443,6 +442,30 @@ func (manager *TestManager) RegisterNode(testID TestID, nodeID string, nodeInfo 
 		testCase.ClientInfo = make(map[string]*ClientInfo)
 	}
 	testCase.ClientInfo[nodeID] = nodeInfo
+	return nil
+}
+
+// StopNode stops a client container.
+func (manager *TestManager) StopNode(suiteID SuiteID, testID TestID, nodeID string) error {
+	manager.testCaseMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
+
+	testCase, ok := manager.runningTestCases[test]
+	if !ok {
+		return nil, ErrNoSuchNode
+	}
+	nodeInfo, ok := testCase.ClientInfo[nodeID]
+	if !ok {
+		return nil, ErrNoSuchNode
+	}
+	// Stop the container.
+	if nodeInfo.wait != nil {
+		if err = manager.backend.DeleteContainer(nodeInfo.ID); err != nil {
+			return fmt.Errorf("unable to stop client: %v", err)
+		}
+		nodeInfo.wait()
+		nodeInfo.wait = nil
+	}
 	return nil
 }
 

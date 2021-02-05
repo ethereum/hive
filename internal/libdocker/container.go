@@ -118,6 +118,8 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	if err != nil {
 		waiter.Close()
 		b.DeleteContainer(containerID)
+		info.Wait()
+		info.Wait = nil
 		return info, err
 	}
 	info.IP = container.NetworkSettings.IPAddress
@@ -144,9 +146,10 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	case <-ctx.Done():
 		checkErr = errors.New("timed out waiting for container startup")
 	}
-
 	if checkErr != nil {
 		b.DeleteContainer(containerID)
+		info.Wait()
+		info.Wait = nil
 	}
 	return info, checkErr
 }
