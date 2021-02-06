@@ -1,0 +1,30 @@
+#!/bin/bash
+
+mkdir -p /data/testnet_setup
+
+echo "${DEPOSIT_CONTRACT_ADDRESS:-'0x1111111111111111111111111111111111111111'}" > /data/testnet_setup/deposit_contract.txt
+echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-'0'}" > /data/testnet_setup/deploy_block.txt
+
+/make_config.sh > /data/testnet_setup/config.yaml
+
+mkdir -p /data/vc
+
+mkdir -p /data/validators
+
+for pubkey in /hive/input/keystores/*
+do
+  mkdir "/data/validators/$pubkey"
+  cp "/hive/input/keystores/$pubkey/keystore.json" "/data/validators/$pubkey/voting_keystore.json"
+done
+
+cp -r /hive/input/secrets /data/secrets
+
+lighthouse \
+    --debug-level="${HIVE_ETH2_LOG_LEVEL:-debug}" \
+    --datadir=/data/vc \
+    --testnet-dir=/data/testnet_setup \
+    validator \
+    --validators-dir="/data/validators" \
+    --secrets-dir="/data/secrets" \
+    --init-slashing-protection \
+    --server="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT"
