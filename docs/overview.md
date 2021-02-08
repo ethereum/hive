@@ -136,6 +136,7 @@ executed by a simulator, a JSON file like the following is created:
 
 The result directory also contains log files of simulator and client output.
 
+[hive simulation API]: ./simulators.md#simulation-api-reference
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
