@@ -23,12 +23,7 @@ ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
 
 # Write the version file.
-RUN \
-  echo "{}"                                                      \
-  | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-  | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
-  | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
-  > /version.json
+RUN echo "branch: "$(git rev-parse --abbrev-ref HEAD)", commit: "$(git rev-parse HEAD)"" > /version.txt
 
 EXPOSE  8545 8546 30303 30303/udp
 CMD ["/trinity.sh"]

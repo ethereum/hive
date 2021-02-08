@@ -151,12 +151,12 @@ func (r *simRunner) initClients(ctx context.Context, clientList []string) error 
 		if err != nil {
 			return err
 		}
-		version, err := r.builder.ReadFile(image, "/version.json")
+		version, err := r.builder.ReadFile(image, "/version.txt")
 		if err != nil {
 			log15.Warn("can't read version info of "+client, "image", image, "err", err)
 		}
 		r.env.Images[client] = image
-		r.env.ClientVersions[client] = string(version)
+		r.env.ClientVersions[client] = strings.TrimSpace(string(version))
 	}
 	return nil
 }

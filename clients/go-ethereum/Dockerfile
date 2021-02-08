@@ -28,9 +28,7 @@ RUN apk add --update bash curl jq
 #   apk del go git make gcc musl-dev linux-headers              && \
 #   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
-# TODO, make this work again
-
-RUN echo "{\"repo\":\"\", \"branch\":\"\", \"commit\":\"\"}" > /version.json
+RUN /usr/local/bin/geth console --exec 'console.log(admin.nodeInfo.name)' --maxpeers=0 --nodiscover --dev 2>/dev/null | head -1 > /version.txt
 
 # Inject the startup script
 ADD geth.sh /geth.sh

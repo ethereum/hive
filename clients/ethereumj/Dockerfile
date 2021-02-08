@@ -15,7 +15,7 @@ RUN \
   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}"             \
   | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"              \
   | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"                           \
-	> /version.json)                                                                    && \
+	> /version.txt)                                                                     && \
   (cd /ethereum-harmony && ./gradlew distTar -PrpcOnly -x test)                         && \
   (cd /ethereum-harmony/build/distributions/ && tar -C / -xf harmony.ether.camp.tar)    && \
   apk del git
