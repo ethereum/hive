@@ -28,14 +28,7 @@ RUN apk add --update bash curl jq
 #   apk del go git make gcc musl-dev linux-headers              && \
 #   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
-RUN /usr/local/bin/geth version > /raw_version.txt
-RUN cat /raw_version.txt | grep "Geth" >> /version.txt
-RUN cat /raw_version.txt | grep "Version" >> /version.txt
-RUN cat /raw_version.txt | grep "Architecture" >> /version.txt
-RUN cat /raw_version.txt | grep "Git Commit:" >> /version.txt
-RUN sed -i ':a;N;$!ba;s/\n/ \/\ /g' /version.txt
-
-
+RUN /usr/local/bin/geth console --exec 'console.log(admin.nodeInfo.name)' --maxpeers=0 --nodiscover --dev 2>/dev/null | head -1 > /version.txt
 
 # Inject the startup script
 ADD geth.sh /geth.sh
