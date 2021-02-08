@@ -140,8 +140,10 @@ func (r *simRunner) initClients(ctx context.Context, clientList []string) error 
 	r.env.ClientVersions = make(map[string]string)
 
 	if len(clientList) == 0 {
-		return fmt.Errorf("client list is empty, cannot simulate")
+		return errors.New("client list is empty, cannot simulate")
 	}
+
+	var anyBuilt bool
 	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
 	for _, client := range clientList {
 		if !r.inv.HasClient(client) {
@@ -149,14 +151,18 @@ func (r *simRunner) initClients(ctx context.Context, clientList []string) error 
 		}
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
-			return err
+			continue
 		}
+		anyBuilt = true
 		version, err := r.builder.ReadFile(image, "/version.txt")
 		if err != nil {
 			log15.Warn("can't read version info of "+client, "image", image, "err", err)
 		}
 		r.env.Images[client] = image
 		r.env.ClientVersions[client] = strings.TrimSpace(string(version))
+	}
+	if !anyBuilt {
+		return errors.New("all clients failed to build")
 	}
 	return nil
 }
