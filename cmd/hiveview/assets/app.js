@@ -84,6 +84,21 @@ utils = {
         return a.outerHTML;
     },
 
+    // Takes { "a": "1", ... }
+    // Returns <dl><dt>a</dt><dd>1</dd>...
+    make_definition_list: function(data) {
+        var list = document.createElement('dl');
+        for (let key in data) {
+            let dt = document.createElement('dt');
+            dt.textContent = key;
+            list.appendChild(dt);
+            let dd = document.createElement('dd');
+            dd.textContent = data[key];
+            list.appendChild(dd);
+        }
+        return list;
+    },
+
     format_timespan: function(d1, d2) {
         var diff = d2 - d1;
         var _s = "";
@@ -117,44 +132,6 @@ utils = {
         loc = loc / 1024
         return loc.toFixed(2) + "MB";
     },
-
-    /*
-    Expects an object like
-        {
-            "repo": "https://github.com/ethereum/go-ethereum",
-            "commit": "021c3c281629baf2eae967dc2f0a7532ddfdc1fb",
-            "branch": "release/1.6"
-        }
-    Will return a link to the right place in the repo
-
-    link : https://github.com/ethereum/go-ethereum/tree/021c3c281629baf2eae967dc2f0a7532ddfdc1fb
-    text : ethereum/go-ethereum@021c3c2 [⎇ release/1.6]
-    */
-    githubRepoLink: function(data) {
-        if (data.repo == "") {
-            return "";
-        }
-        if (data.commit == "") {
-            return data.repo;
-        }
-        if (data.branch == "") {
-            return data.repo + "@" + data.commit.slice(0, 7);
-        }
-        var text = data.repo + "@" + data.commit.slice(0, 7) + " [⎇ " + data.branch + "]";
-        if (!data.repo.startsWith("https://")) {
-            return utils.html_encode(text); // not github
-        }
-
-        var a = document.createElement('a');
-        a.setAttribute("target", "_blank");
-        // Set just repo first
-        a.setAttribute("href", data.repo);
-        // Use path for text
-        a.text = a.pathname.slice(1) + "@" + data.commit.slice(0, 7) + " [\u2387 " + data.branch + "]";
-        // Set both repo and tree/commit version
-        a.setAttribute("href", data.repo + "/tree/" + data.commit);
-        return a.outerHTML;
-    }
 }
 
 // nav is a little utility to store things in the url, so that people can link into stuff.
@@ -450,6 +427,19 @@ function onSuiteData(data, jsonsource) {
     // Set title info
     $("#testsuite_name").text(data.name);
     $("#testsuite_desc").html(utils.urls_to_links(utils.html_encode(data.description)));
+    if (data.clientVersions) {
+        // Remove empty version strings.
+        for (let key in data.clientVersions) {
+            if (!data.clientVersions[key]) {
+                delete data.clientVersions[key];
+            }
+        }
+        $("#testsuite_clients").html(utils.make_definition_list(data.clientVersions));
+    } else {
+        // This is here for backward-compatibility with old suite files.
+        // Remove this after June 2021.
+        $("#testsuite_clients").html("");
+    }
 
     // Convert to list
     let cases = []
