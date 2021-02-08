@@ -17,7 +17,7 @@ ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
 
 # Copy buildinfo into version.json, and also remove the 'bool' field is_prerelease.
-RUN jq '.version' /usr/share/aleth/buildinfo.json > /version.txt
+RUN jq -r '.version' /usr/share/aleth/buildinfo.json > /version.txt
 
 # Export the usual networking ports to allow outside access to the node.
 EXPOSE 8545 8547 30303 30303/udp
