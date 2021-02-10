@@ -275,6 +275,21 @@ The client has the responsibility of mapping the hive environment variables to i
 
 For devp2p tests or other simulations that require to know the specific enode URL of the client instance, the client must provide an `enode.sh` that echoes the enode of the running instance. This is executed by the Hive host remotely in order to retrieve the enode URL. 
 
+## Client metadata
+
+Non-eth1 clients require a `hive.yaml` next to the `Dockerfile`, to specify the role of the client.
+
+The format is:
+```yaml
+role: string  # "eth1" by default.
+```
+
+E.g. `role: beacon` to run the image in Eth2 beacon-node tests,
+or `role: validator` to attach the client to a `beacon` client.
+
+More metadata fields may be added as Hive is extended to cover the various
+new types of nodes and software in the ethereum roadmap.
+
 ## Starting the client
 
 After initializing the client blockchain (genesis, chain, blocks), the last task of the entry script is to start up the client itself. The following defaults are required by `hive` to enable automatic network assembly and firewall enforcement:
