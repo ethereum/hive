@@ -155,10 +155,10 @@ func (t *T) RunClient(clientType string, spec ClientTestSpec) {
 	})
 }
 
-// RunAllClients runs the given client test against all available client types that match the given role.
+// RunAllClients runs the given client test against all available client types.
 // It waits for all subtests to complete.
-func (t *T) RunAllClients(role string, spec ClientTestSpec) {
-	spec.runTest(role, t.Sim, t.SuiteID)
+func (t *T) RunAllClients(spec ClientTestSpec) {
+	spec.runTest(t.Sim, t.SuiteID)
 }
 
 // Run runs a subtest of this test. It waits for the subtest to complete before continuing.
@@ -268,7 +268,7 @@ func runTest(host *Simulation, s SuiteID, name, desc string, runit func(t *T)) e
 	return nil
 }
 
-func (spec ClientTestSpec) runTest(role string, host *Simulation, suite SuiteID) error {
+func (spec ClientTestSpec) runTest(host *Simulation, suite SuiteID) error {
 	clients, err := host.ClientTypes()
 	if err != nil {
 		return err
@@ -276,7 +276,7 @@ func (spec ClientTestSpec) runTest(role string, host *Simulation, suite SuiteID)
 	for _, clientType := range clients {
 		// 'role' is an optional filter, so eth1 tests, beacon node tests,
 		// validator tests, etc. can all live in harmony.
-		if meta := clientType.Meta; role != "" && meta != nil && meta.Role != role {
+		if meta := clientType.Meta; spec.Role != "" && meta != nil && meta.Role != spec.Role {
 			continue
 		}
 		name := clientTestName(spec.Name, clientType.Name)

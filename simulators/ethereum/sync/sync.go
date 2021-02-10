@@ -69,7 +69,8 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client) {
 	sinkParams := params.Set("HIVE_BOOTNODE", enode)
 
 	// Sync all sink nodes against the source.
-	t.RunAllClients("eth1", hivesim.ClientTestSpec{
+	t.RunAllClients(hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        fmt.Sprintf("sync %s -> CLIENT", source.Type),
 		Description: fmt.Sprintf("This test attempts to sync the chain from a %s node.", source.Type),
 		Parameters:  sinkParams,
