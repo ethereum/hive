@@ -138,6 +138,7 @@ type simRunner struct {
 func (r *simRunner) initClients(ctx context.Context, clientList []string) error {
 	r.env.Images = make(map[string]string)
 	r.env.ClientVersions = make(map[string]string)
+	r.env.ClientMetadata = make(map[string]*libhive.ClientMetadata)
 
 	if len(clientList) == 0 {
 		return fmt.Errorf("client list is empty, cannot simulate")
@@ -147,6 +148,10 @@ func (r *simRunner) initClients(ctx context.Context, clientList []string) error 
 		if !r.inv.HasClient(client) {
 			return fmt.Errorf("unknown client %q", client)
 		}
+		meta, err := r.builder.ReadClientMetadata(client)
+		if err != nil {
+			return err
+		}
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
 			return err
@@ -155,6 +160,7 @@ func (r *simRunner) initClients(ctx context.Context, clientList []string) error 
 		if err != nil {
 			log15.Warn("can't read version info of "+client, "image", image, "err", err)
 		}
+		r.env.ClientMetadata[client] = meta
 		r.env.Images[client] = image
 		r.env.ClientVersions[client] = string(version)
 	}

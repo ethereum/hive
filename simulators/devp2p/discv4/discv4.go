@@ -17,6 +17,7 @@ func main() {
 		Description: "This runs the Discovery v4 test suite from go-ethereum.",
 	}
 	suite.Add(hivesim.ClientTestSpec{
+		Role: "eth1",
 		Run: runDiscoveryTest,
 		Parameters: hivesim.Params{
 			"HIVE_LOGLEVEL": "5",

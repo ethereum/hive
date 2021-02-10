@@ -29,7 +29,7 @@ func iptest(t *hivesim.T) {
 	if len(clients) == 0 {
 		t.Fatal("no clients available")
 	}
-	clientName := clients[0]
+	clientName := clients[0].Name
 	client := t.StartClient(clientName, nil, nil)
 
 	// This creates a network and connects both the client and the simulation container to it.

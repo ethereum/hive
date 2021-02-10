@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/ethereum/hive/internal/libhive"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
@@ -100,7 +101,7 @@ func (sim *Simulation) StartTest(testSuite SuiteID, name string, description str
 
 // ClientTypes returns all client types available to this simulator run. This depends on
 // both the available client set and the command line filters.
-func (sim *Simulation) ClientTypes() (availableClients []string, err error) {
+func (sim *Simulation) ClientTypes() (availableClients []*libhive.ClientDefinition, err error) {
 	resp, err := http.Get(fmt.Sprintf("%s/clients", sim.url))
 	if err != nil {
 		return nil, err

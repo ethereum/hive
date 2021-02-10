@@ -16,6 +16,7 @@ func main() {
 		Description: "This suite tests a client's ability to accurately respond to basic eth protocol messages.",
 	}
 	suite.Add(hivesim.ClientTestSpec{
+		Role: "eth1",
 		Name: "client launch",
 		Description: `This test launches the client and runs the test tool.
 Results from the test tool are reported as individual sub-tests.`,

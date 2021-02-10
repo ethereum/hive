@@ -26,6 +26,28 @@ func runTests(t *hivesim.T) {
 	spec := configs.Mainnet
 	valCount := uint64(4096)
 
+	clientTypes, err := t.Sim.ClientTypes()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var beaconNodes, validatorClients, eth1nodes, other []string
+	for _, client := range clientTypes {
+		switch client.Meta.Role {
+		case "beacon":
+			beaconNodes = append(beaconNodes, client.Name)
+		case "validator":
+			validatorClients = append(validatorClients, client.Name)
+		case "eth1":
+			eth1nodes = append(eth1nodes, client.Name)
+		default:
+			other = append(other, client.Name)
+		}
+	}
+
+	// TODO: build different combinations of above clients, and run tiny testnets
+
+
 	// TODO: override system time of nodes to make genesis nice and predictable, or keep it dynamic?
 	// (useful for caching docker containers too?)
 	now := time.Now()

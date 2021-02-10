@@ -99,6 +99,7 @@ several real-world scenarios such as sending value transactions, deploying a con
 interacting with one.`[1:],
 	}
 	suite.Add(&hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        "client launch",
 		Description: `This test launches the client and collects its logs.`,
 		Parameters:  clientEnv,

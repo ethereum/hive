@@ -122,7 +122,7 @@ POST /testsuite/{suite}/test/{test}
 
 ### Client endpoints
 
-**Get client types**
+**Get client types with definitions, in alphabetical order**
 
 ```
 GET /clients
@@ -130,7 +130,7 @@ GET /clients
 
 Response
 ```
-["go-ethereum_latest"]
+[{"name": "go-ethereum_latest", "version": "go-ethereum/v1.2.3/example", "meta": {"role": "eth1"}}]
 ```
 
 **Start client**

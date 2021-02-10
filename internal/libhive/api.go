@@ -33,9 +33,20 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Hand
 
 	// Collect client types.
 	for name := range env.Images {
-		api.clientTypes = append(api.clientTypes, name)
+		version, _ := env.ClientVersions[name]
+		meta, _ := env.ClientMetadata[name]
+		api.clientTypes = append(api.clientTypes, &ClientDefinition{
+			Name:    name,
+			Version: version,
+			Meta:    meta,
+		})
 	}
-	sort.Strings(api.clientTypes)
+
+	// Client data is sorted and represented in an array,
+	// to ensure test execution is consistent between runs (maps have random order)
+	sort.Slice(api.clientTypes, func(i, j int) bool {
+		return api.clientTypes[i].Name < api.clientTypes[j].Name
+	})
 
 	// API routes.
 	router := mux.NewRouter()
@@ -58,7 +69,7 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Hand
 }
 
 type simAPI struct {
-	clientTypes []string
+	clientTypes []*ClientDefinition
 	backend     ContainerBackend
 	env         SimEnv
 	tm          *TestManager
@@ -273,8 +284,8 @@ func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (string, 
 		http.Error(w, "missing 'CLIENT' in request", http.StatusBadRequest)
 		return "", false
 	}
-	for _, cn := range api.clientTypes {
-		if cn == name {
+	for _, ct := range api.clientTypes {
+		if ct.Name == name {
 			return name, true
 		}
 	}

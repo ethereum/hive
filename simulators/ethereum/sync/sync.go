@@ -44,6 +44,7 @@ func main() {
 For each client, we test if it can serve as a sync source for all other clients (including itself).`,
 	}
 	suite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        "CLIENT as sync source",
 		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
 		Parameters:  params,
@@ -68,7 +69,7 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client) {
 	sinkParams := params.Set("HIVE_BOOTNODE", enode)
 
 	// Sync all sink nodes against the source.
-	t.RunAllClients(hivesim.ClientTestSpec{
+	t.RunAllClients("eth1", hivesim.ClientTestSpec{
 		Name:        fmt.Sprintf("sync %s -> CLIENT", source.Type),
 		Description: fmt.Sprintf("This test attempts to sync the chain from a %s node.", source.Type),
 		Parameters:  sinkParams,

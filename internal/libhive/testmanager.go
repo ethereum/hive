@@ -46,6 +46,9 @@ type SimEnv struct {
 
 	// client name -> version info
 	ClientVersions map[string]string
+
+	// client name -> misc. information, e.g. role of the client.
+	ClientMetadata map[string]*ClientMetadata
 }
 
 // TestManager collects test results during a simulation run.
