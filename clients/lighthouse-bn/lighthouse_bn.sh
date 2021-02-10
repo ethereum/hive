@@ -23,12 +23,21 @@ echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-'0'}" > /data/testnet_setup/deplo
 mkdir -p /data/beacon
 mkdir -p /data/network
 
+LOG=info
+case "$HIVE_LOGLEVEL" in
+    0|1) LOG=error ;;
+    2)   LOG=warn  ;;
+    3)   LOG=info  ;;
+    4)   LOG=debug ;;
+    5)   LOG=trace ;;
+esac
+
 eth1_option=$([[ "$ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$ETH1_RPC_ADDRS")
 ip_option=$([[ "$HIVE_ETH2_P2P_IP_ADDRESS" == "" ]] && echo "" || echo "--disable-enr-auto-update=true  --enr-address='$HIVE_ETH2_P2P_IP_ADDRESS'")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port='$HIVE_ETH2_METRICS_PORT' --metrics-allow-origin='*")
 
 lighthouse \
-    --debug-level="${HIVE_ETH2_LOG_LEVEL:-debug}" \
+    --debug-level="$LOG" \
     --datadir=/data/beacon \
     --testnet-dir=/data/testnet_setup \
     bn \

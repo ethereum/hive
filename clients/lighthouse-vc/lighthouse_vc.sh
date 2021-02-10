@@ -19,8 +19,17 @@ done
 
 cp -r /hive/input/secrets /data/secrets
 
+LOG=info
+case "$HIVE_LOGLEVEL" in
+    0|1) LOG=error ;;
+    2)   LOG=warn  ;;
+    3)   LOG=info  ;;
+    4)   LOG=debug ;;
+    5)   LOG=trace ;;
+esac
+
 lighthouse \
-    --debug-level="${HIVE_ETH2_LOG_LEVEL:-debug}" \
+    --debug-level="$LOG" \
     --datadir=/data/vc \
     --testnet-dir=/data/testnet_setup \
     validator \

@@ -77,8 +77,6 @@ An Eth2 genesis state, encoded with SSZ. Not present when genesis is being teste
 The common Eth2 config vars, plus:
 
 ```yaml
-HIVE_ETH2_LOG_LEVEL: debug  # lowercase log level. trace/debug/info/warn/error
-
 HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER: 0  # decimal number
 
 HIVE_ETH2_BOOTNODE_ENRS: ""  # comma separated list of ENRs
