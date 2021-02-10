@@ -1,3 +1,6 @@
 .vscode/
 workspace
 .idea/
+
+# ignore build outpout
+hive
