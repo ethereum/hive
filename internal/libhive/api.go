@@ -392,11 +392,7 @@ func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "no program cmd specified", http.StatusBadRequest)
 		return
 	}
-	inf, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, ExecOptions{
-		Privileged: q.Get("privileged") == "true",
-		User:       q.Get("user"),
-		Cmd:        []string{cmdStr},
-	})
+	inf, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, cmdStr)
 	if err != nil {
 		log15.Error("API: error running program", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
