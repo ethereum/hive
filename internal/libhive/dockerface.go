@@ -18,7 +18,7 @@ type ContainerBackend interface {
 	RunEnodeSh(ctx context.Context, containerID string) (string, error)
 
 	// RunProgram runs a command in the given container and returns its outputs and exit code.
-	RunProgram(ctx context.Context, containerID string, opt ExecOptions) (*ExecInfo, error)
+	RunProgram(ctx context.Context, containerID string, cmd string) (*ExecInfo, error)
 
 	// These methods configure docker networks.
 	NetworkNameToID(name string) (string, error)
@@ -31,16 +31,6 @@ type ContainerBackend interface {
 
 // This error is returned by NetworkNameToID if a docker network is not present.
 var ErrNetworkNotFound = fmt.Errorf("network not found")
-
-// ExecOptions contains the command and settings for executing a command in a running container
-type ExecOptions struct {
-	// Boolean value, runs the exec process with extended privileges.
-	Privileged bool
-	// A string value specifying the user, and optionally, group to run the exec process inside the container. Format is one of: "user", "user:group", "uid", or "uid:gid".
-	User string
-	// Command to run specified as a string or an array of strings.
-	Cmd []string
-}
 
 // ExecInfo is returned by RunProgram
 type ExecInfo struct {

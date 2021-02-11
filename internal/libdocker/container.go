@@ -12,7 +12,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -60,21 +59,17 @@ func (b *ContainerBackend) RunEnodeSh(ctx context.Context, containerID string) (
 	return outputBuf.String(), nil
 }
 
-func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string,
-	opt libhive.ExecOptions) (*libhive.ExecInfo, error) {
+func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string, cmd string) (*libhive.ExecInfo, error) {
 	exec, err := b.client.CreateExec(docker.CreateExecOptions{
 		Context:      ctx,
 		AttachStdout: true,
 		AttachStderr: true,
 		Tty:          false,
-		Privileged:   opt.Privileged,
-		Cmd:          opt.Cmd,
-		User:         opt.User,
+		Cmd:          []string{cmd},
 		Container:    containerID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("can't create '%s' exec in %s: %v",
-			strings.Join(opt.Cmd, " "), containerID, err)
+		return nil, fmt.Errorf("can't create '%s' exec in %s: %v", cmd, containerID, err)
 	}
 	outputBuf := new(bytes.Buffer)
 	errBuf := new(bytes.Buffer)
@@ -85,13 +80,11 @@ func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string,
 		ErrorStream:  errBuf,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("can't run '%s' in %s: %v",
-			strings.Join(opt.Cmd, " "), containerID, err)
+		return nil, fmt.Errorf("can't run '%s' in %s: %v", cmd, containerID, err)
 	}
 	insp, err := b.client.InspectExec(exec.ID)
 	if err != nil {
-		return nil, fmt.Errorf("can't check execution result of '%s' in '%s': %v",
-			strings.Join(opt.Cmd, " "), containerID, err)
+		return nil, fmt.Errorf("can't check execution result of '%s' in '%s': %v", cmd, containerID, err)
 	}
 
 	return &libhive.ExecInfo{

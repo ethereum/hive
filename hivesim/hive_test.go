@@ -1,7 +1,6 @@
 package hivesim
 
 import (
-	"fmt"
 	"net/http/httptest"
 	"reflect"
 	"strings"
@@ -72,10 +71,10 @@ func TestEnodeReplaceIP(t *testing.T) {
 func TestRunProgram(t *testing.T) {
 	// Set up the backend to return program execution. Simple debug program here.
 	hooks := &fakes.BackendHooks{
-		RunProgram: func(containerID string, opt libhive.ExecOptions) (*libhive.ExecInfo, error) {
+		RunProgram: func(containerID string, cmd string) (*libhive.ExecInfo, error) {
 			return &libhive.ExecInfo{
-				StdOut:   fmt.Sprintf("user: %s, privileged: %v", opt.User, opt.Privileged),
-				StdErr:   "cmd: " + strings.Join(opt.Cmd, ","),
+				StdOut:   "out: " + cmd,
+				StdErr:   "err: " + cmd,
 				ExitCode: 42,
 			}, nil
 		},
@@ -101,20 +100,19 @@ func TestRunProgram(t *testing.T) {
 	}
 
 	// Run a program
-	stdOut, stdErr, code, err := sim.ClientRunProgram(
-		suiteID, testID, clientID, true, "ether", "echo this")
+	res, err := sim.ClientRunProgram(suiteID, testID, clientID,  "echo this")
 	if err != nil {
 		t.Fatal("failed to run program:", err)
 	}
 
-	if want := "user: ether, privileged: true"; stdOut != want {
-		t.Fatalf("wrong std out %q\nwant %q", stdOut, want)
+	if want := "out: echo this"; res.StdOut != want {
+		t.Fatalf("wrong std out %q\nwant %q", res.StdOut, want)
 	}
-	if want := "cmd: echo this"; stdErr != want {
-		t.Fatalf("wrong std err %q\nwant %q", stdErr, want)
+	if want := "err: echo this"; res.StdErr != want {
+		t.Fatalf("wrong std err %q\nwant %q", res.StdErr, want)
 	}
-	if want := 42; code != want {
-		t.Fatalf("wrong code %q\nwant %q", code, want)
+	if want := 42; res.ExitCode != want {
+		t.Fatalf("wrong code %q\nwant %q", res.ExitCode, want)
 	}
 }
 
