@@ -264,6 +264,15 @@ func (fn StartOptionFn) Apply(setup *clientSetup) {
 	fn(setup)
 }
 
+// Bundle combines start options, e.g. to bundle files together as option.
+func Bundle(option ...StartOption) StartOption {
+	return StartOptionFn(func(setup *clientSetup) {
+		for _, opt := range option {
+			opt.Apply(setup)
+		}
+	})
+}
+
 func fileAsSrc(path string) func() (io.ReadCloser, error) {
 	return func() (io.ReadCloser, error) {
 		return os.Open(path)

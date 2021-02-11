@@ -105,6 +105,21 @@ func TestStartClientStartOptions(t *testing.T) {
 		}
 	})
 
+	t.Run("bundle_options", func(t *testing.T) {
+		// Params with overrides
+		_, _, err = sim.StartClientWithOptions(suiteID, testID, "client-1",
+			Bundle(Params{"HIVE_FOO": "1"}, Params{"HIVE_BAR": "2"}))
+		if err != nil {
+			t.Fatalf("failed to start client: %v", err)
+		}
+		if got := lastOptions.Env["HIVE_FOO"]; got != "1" {
+			t.Fatalf("wrong HIVE_FOO, got: %s", got)
+		}
+		if got := lastOptions.Env["HIVE_BAR"]; got != "2" {
+			t.Fatalf("wrong HIVE_BAR, got: %s", got)
+		}
+	})
+
 	t.Run("params_options", func(t *testing.T) {
 		// Params with overrides
 		_, _, err = sim.StartClientWithOptions(suiteID, testID, "client-1",
