@@ -136,6 +136,14 @@ func (t *T) StartClient(clientType string, parameters Params, files map[string]s
 	return &Client{Type: clientType, Container: container, IP: ip, test: t}
 }
 
+func (t *T) StartClientWithOptions(clientType string, option ...StartOption) *Client {
+	container, ip, err := t.Sim.StartClientWithOptions(t.SuiteID, t.TestID, clientType, option...)
+	if err != nil {
+		t.Fatalf("can't launch node (type %s): %v", clientType, err)
+	}
+	return &Client{Type: clientType, Container: container, IP: ip, test: t}
+}
+
 // RunClient runs the given client test against a single client type.
 // It waits for the subtest to complete.
 func (t *T) RunClient(clientType string, spec ClientTestSpec) {

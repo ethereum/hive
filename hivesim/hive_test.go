@@ -1,7 +1,10 @@
 package hivesim
 
 import (
+	"io"
+	"io/ioutil"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"strings"
 	"testing"
@@ -65,6 +68,121 @@ func TestEnodeReplaceIP(t *testing.T) {
 	if url != want {
 		t.Fatalf("wrong enode URL %q\nwant %q", url, want)
 	}
+}
+
+// This test checks the usage of common client start options.
+func TestStartClientStartOptions(t *testing.T) {
+	var lastOptions libhive.ContainerOptions
+	tm, srv := newFakeAPI(&fakes.BackendHooks{
+		StartContainer: func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+			lastOptions = opt
+			return &libhive.ContainerInfo{}, nil
+		},
+	})
+	defer srv.Close()
+	defer tm.Terminate()
+
+	sim := NewAt(srv.URL)
+	suiteID, err := sim.StartSuite("suite", "", "")
+	if err != nil {
+		t.Fatal("can't start suite:", err)
+	}
+	testID, err := sim.StartTest(suiteID, "test", "")
+	if err != nil {
+		t.Fatal("can't start test:", err)
+	}
+
+	t.Run("empty_options", func(t *testing.T) {
+		// Empty options
+		_, _, err = sim.StartClientWithOptions(suiteID, testID, "client-2")
+		if err != nil {
+			t.Fatalf("failed to start client without any options: %v", err)
+		}
+	})
+
+	t.Run("params_options", func(t *testing.T) {
+		// Params with overrides
+		_, _, err = sim.StartClientWithOptions(suiteID, testID, "client-1",
+			Params{"HIVE_FOO": "1", "HIVE_BAR": "2"}, Params{"HIVE_FOO": "3"})
+		if err != nil {
+			t.Fatalf("failed to start client: %v", err)
+		}
+		if got := lastOptions.Env["HIVE_FOO"]; got != "3" {
+			t.Fatalf("2nd option failed to overwrite param of 1st option, got: %s", got)
+		}
+		if got := lastOptions.Env["HIVE_BAR"]; got != "2" {
+			t.Fatalf("non-overwritten option changed or went missing, got: %s", got)
+		}
+	})
+
+	t.Run("files_options", func(t *testing.T) {
+		file1, err := ioutil.TempFile("", "hivesim_test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file1.WriteString("aaa"); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(file1.Name())
+
+		file2, err := ioutil.TempFile("", "hivesim_test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file2.WriteString("bb"); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove(file2.Name())
+
+		t.Run("static", func(t *testing.T) {
+			// Static files with override of /data/foo
+			_, _, err = sim.StartClientWithOptions(suiteID, testID, "client-1",
+				WithStaticFiles(map[string]string{"/data/foo": "/tmp/bad", "foo": file1.Name()}),
+				WithStaticFiles(map[string]string{"/data/foo": file2.Name()}))
+			if err != nil {
+				t.Fatalf("failed to start client: %v", err)
+			}
+			got, ok := lastOptions.Files["/data/foo"]
+			if !ok {
+				t.Fatal("missing /data/foo")
+			}
+			if got.Size != 2 {
+				t.Fatalf("expected 2 bytes for '/data/foo', got: %d", got.Size)
+			}
+			got, ok = lastOptions.Files["foo"]
+			if !ok {
+				t.Fatal("missing foo") // same file name as /data/foo, but no path, thus different.
+			}
+			if got.Size != 3 {
+				t.Fatalf("expected 3 bytes for 'foo', got: %d", got.Size)
+			}
+		})
+
+		mockSrc := func(content string) func() (io.ReadCloser, error) {
+			return func() (io.ReadCloser, error) { return ioutil.NopCloser(strings.NewReader(content)), nil }
+		}
+
+		t.Run("dynamic", func(t *testing.T) {
+			// Dynamic files with override of /data/bar, and override static file too.
+			_, _, err = sim.StartClientWithOptions(suiteID, testID, "client-1",
+				WithDynamicFile("/data/bar", func() (io.ReadCloser, error) {
+					t.Fatal("this should have been overridden")
+					return nil, nil
+				}),
+				WithStaticFiles(map[string]string{"/data/bar": file1.Name()}),
+				WithDynamicFile("/data/bar", mockSrc("dddddd")))
+			if err != nil {
+				t.Fatalf("failed to start client: %v", err)
+			}
+			got, ok := lastOptions.Files["/data/bar"]
+			if !ok {
+				t.Fatal("missing /data/bar")
+			}
+			if got.Size != 6 {
+				t.Fatalf("expected 6 bytes for '/data/bar', got %d", got.Size)
+			}
+		})
+	})
 }
 
 // This test checks for some common errors returned by StartClient.

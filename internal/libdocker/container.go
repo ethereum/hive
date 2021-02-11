@@ -273,7 +273,7 @@ func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map
 	// Create a tarball archive with all the data files
 	tarball := new(bytes.Buffer)
 	tw := tar.NewWriter(tarball)
-	for fileName, fileHeader := range files {
+	for filePath, fileHeader := range files {
 		// Fetch the next file to inject into the container
 		file, err := fileHeader.Open()
 		if err != nil {
@@ -287,7 +287,7 @@ func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map
 		}
 		// Insert the file into the tarball archive
 		header := &tar.Header{
-			Name: fileName, //filepath.Base(fileHeader.Filename),
+			Name: filePath,
 			Mode: int64(0777),
 			Size: int64(len(data)),
 		}
