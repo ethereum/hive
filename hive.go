@@ -136,8 +136,7 @@ type simRunner struct {
 
 // initClients builds client images.
 func (r *simRunner) initClients(ctx context.Context, clientList []string) error {
-	r.env.Images = make(map[string]string)
-	r.env.ClientVersions = make(map[string]string)
+	r.env.Definitions = make(map[string]*libhive.ClientDefinition)
 
 	if len(clientList) == 0 {
 		return errors.New("client list is empty, cannot simulate")
@@ -149,6 +148,10 @@ func (r *simRunner) initClients(ctx context.Context, clientList []string) error 
 		if !r.inv.HasClient(client) {
 			return fmt.Errorf("unknown client %q", client)
 		}
+		meta, err := r.builder.ReadClientMetadata(client)
+		if err != nil {
+			return err
+		}
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
 			continue
@@ -158,8 +161,12 @@ func (r *simRunner) initClients(ctx context.Context, clientList []string) error 
 		if err != nil {
 			log15.Warn("can't read version info of "+client, "image", image, "err", err)
 		}
-		r.env.Images[client] = image
-		r.env.ClientVersions[client] = strings.TrimSpace(string(version))
+		r.env.Definitions[client] = &libhive.ClientDefinition{
+			Name:    client,
+			Version: strings.TrimSpace(string(version)),
+			Image:   image,
+			Meta:    *meta,
+		}
 	}
 	if !anyBuilt {
 		return errors.New("all clients failed to build")
