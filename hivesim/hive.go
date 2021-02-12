@@ -96,9 +96,21 @@ func (sim *Simulation) StartTest(testSuite SuiteID, name string, description str
 	return TestID(testID), nil
 }
 
+// ClientMetadata is part of the ClientDefinition and lists metadata
+type ClientMetadata struct {
+	Role string `yaml:"role" json:"role"`
+}
+
+// ClientDefinition is served by the /clients API endpoint to list the available clients
+type ClientDefinition struct {
+	Name    string         `json:"name"`
+	Version string         `json:"version"`
+	Meta    ClientMetadata `json:"meta"`
+}
+
 // ClientTypes returns all client types available to this simulator run. This depends on
 // both the available client set and the command line filters.
-func (sim *Simulation) ClientTypes() (availableClients []string, err error) {
+func (sim *Simulation) ClientTypes() (availableClients []*ClientDefinition, err error) {
 	resp, err := http.Get(fmt.Sprintf("%s/clients", sim.url))
 	if err != nil {
 		return nil, err
