@@ -23,7 +23,23 @@ func generateListing(output io.Writer, logdir string) error {
 	if err != nil {
 		return err
 	}
-	entries := convertSummaryFiles(logdir, logfiles)
+	// The files are prefixed by timestamp, so to get the latest 200 items,
+	// we just need to read the listing in reverse until we have 200
+	var entries []listingEntry
+	for i := len(logfiles) - 1; i > 0; i-- {
+		finfo := logfiles[i]
+		if !strings.HasSuffix(finfo.Name(), ".json") || skipFile(finfo.Name()) {
+			continue
+		}
+		entry, err := convertSummaryFile(logdir, finfo)
+		if err != nil {
+			continue
+		}
+		entries = append(entries, entry)
+		if len(entries) >= listLimit {
+			break
+		}
+	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].SimLog > entries[j].SimLog })
 	if len(entries) > listLimit {
 		entries = entries[:listLimit]
@@ -55,23 +71,18 @@ type listingEntry struct {
 	SimLog   string    `json:"simLog"`   // simulator log file
 }
 
-func convertSummaryFiles(logdir string, logfiles []os.FileInfo) (es []listingEntry) {
-	for _, file := range logfiles {
-		if strings.HasSuffix(file.Name(), ".json") && !skipFile(file.Name()) {
-			info := new(libhive.TestSuite)
-			err := common.LoadJSON(filepath.Join(logdir, file.Name()), info)
-			if err != nil {
-				log.Printf("Skipping invalid summary file: %v", err)
-				continue
-			}
-			if !suiteValid(info) {
-				log.Printf("Skipping invalid summary file: %s", file.Name())
-				continue
-			}
-			es = append(es, suiteToEntry(file, info))
-		}
+func convertSummaryFile(logdir string, file os.FileInfo) (listingEntry, error) {
+	info := new(libhive.TestSuite)
+	err := common.LoadJSON(filepath.Join(logdir, file.Name()), info)
+	if err != nil {
+		log.Printf("Skipping invalid summary file: %v", err)
+		return listingEntry{}, err
 	}
-	return es
+	if !suiteValid(info) {
+		log.Printf("Skipping invalid summary file: %s", file.Name())
+		return listingEntry{}, err
+	}
+	return suiteToEntry(file, info), nil
 }
 
 func suiteValid(s *libhive.TestSuite) bool {
