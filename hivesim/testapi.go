@@ -268,7 +268,7 @@ func (spec ClientTestSpec) runTest(host *Simulation, suite SuiteID) error {
 	for _, clientDef := range clients {
 		// 'role' is an optional filter, so eth1 tests, beacon node tests,
 		// validator tests, etc. can all live in harmony.
-		if meta := clientDef.Meta; spec.Role != "" && meta.Role != spec.Role {
+		if spec.Role != "" && !clientDef.HasRole(spec.Role) {
 			continue
 		}
 		name := clientTestName(spec.Name, clientDef.Name)
