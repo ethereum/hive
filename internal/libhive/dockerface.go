@@ -17,6 +17,9 @@ type ContainerBackend interface {
 	// RunEnodeSh runs the /enode.sh script in the given container and returns its output.
 	RunEnodeSh(ctx context.Context, containerID string) (string, error)
 
+	// RunProgram runs a command in the given container and returns its outputs and exit code.
+	RunProgram(ctx context.Context, containerID string, cmd string) (*ExecInfo, error)
+
 	// These methods configure docker networks.
 	NetworkNameToID(name string) (string, error)
 	CreateNetwork(name string) (string, error)
@@ -28,6 +31,16 @@ type ContainerBackend interface {
 
 // This error is returned by NetworkNameToID if a docker network is not present.
 var ErrNetworkNotFound = fmt.Errorf("network not found")
+
+// ExecInfo is returned by RunProgram
+type ExecInfo struct {
+	// The std-out output of the program execution
+	StdOut string
+	// The std-err output of the program execution
+	StdErr string
+	// The exit code of the execution
+	ExitCode int
+}
 
 // ContainerOptions contains the launch parameters for docker containers.
 type ContainerOptions struct {

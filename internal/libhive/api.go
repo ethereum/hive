@@ -33,6 +33,7 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Hand
 	// API routes.
 	router := mux.NewRouter()
 	router.HandleFunc("/clients", api.getClientTypes).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getEnodeURL).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
@@ -348,6 +349,45 @@ func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
 	// This is required because the client usually doesn't know its own IP.
 	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), tcpPort, udpPort)
 	io.WriteString(w, fixedIP.URLv4())
+}
+
+type execInfo struct {
+	StdOut   string `json:"out"`
+	StdErr   string `json:"err"`
+	ExitCode int    `json:"code"`
+}
+
+func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
+	suiteID, testID, err := api.requestSuiteAndTest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	node := mux.Vars(r)["node"]
+	nodeInfo, err := api.tm.GetNodeInfo(suiteID, testID, node)
+	if err != nil {
+		log15.Error("API: can't find node", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	q := r.URL.Query()
+	cmdStr := q.Get("cmd")
+	if cmdStr == "" {
+		log15.Error("API: no program cmd specified", "node", node, "error", err)
+		http.Error(w, "no program cmd specified", http.StatusBadRequest)
+		return
+	}
+	inf, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, cmdStr)
+	if err != nil {
+		log15.Error("API: error running program", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	out := execInfo{inf.StdOut, inf.StdErr, inf.ExitCode}
+	if err := json.NewEncoder(w).Encode(&out); err != nil {
+		log15.Error("API: failed to write output of running program", "node", node, "error", err)
+		return
+	}
 }
 
 // networkCreate creates a docker network.

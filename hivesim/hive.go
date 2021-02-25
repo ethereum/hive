@@ -195,6 +195,36 @@ func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node strin
 	return res, nil
 }
 
+type ExecInfo struct {
+	StdOut   string `json:"out"`
+	StdErr   string `json:"err"`
+	ExitCode int    `json:"code"`
+}
+
+// ClientRunProgram runs a command in a running client.
+func (sim *Simulation) ClientRunProgram(testSuite SuiteID, test TestID, nodeid string, cmd string) (*ExecInfo, error) {
+	params := url.Values{}
+	params.Add("cmd", cmd)
+	p := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec?%s", sim.url, testSuite, test, nodeid, params.Encode())
+	req, err := http.NewRequest(http.MethodPost, p, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.Body == nil {
+		return nil, errors.New("unexpected empty response body")
+	}
+	dec := json.NewDecoder(resp.Body)
+	var res ExecInfo
+	if err := dec.Decode(&res); err != nil {
+		return nil, err
+	}
+	return &res, err
+}
+
 // CreateNetwork sends a request to the hive server to create a docker network by
 // the given name.
 func (sim *Simulation) CreateNetwork(testSuite SuiteID, networkName string) error {
