@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"
-	keystorev4 "github.com/wealdtech/go-eth2-wallet-encryptor-keystorev4"
 	"strings"
 )
 
@@ -69,13 +68,14 @@ func mnemonicToSeed(mnemonic string) (seed []byte, err error) {
 	return seed, nil
 }
 
-func marshalKeystoreJSON(priv []byte, pub []byte, pass string) ([]byte, error) {
+// Same crypto, but not secure, for testing only!
+// Just generate weak keystores, so encryption and decryption doesn't take as long during testing.
+func marshalWeakKeystoreJSON(priv []byte, pub []byte, normedPass []byte) ([]byte, error) {
 	data := make(map[string]interface{})
 	// TODO: lighthouse can't handle this field, should it be here?
 	//data["name"] = ke.name
-	encryptor := keystorev4.New(keystorev4.WithCipher("pbkdf2"))
 	var err error
-	data["crypto"], err = encryptor.Encrypt(priv, pass)
+	data["crypto"], err = encrypt(priv, normedPass, "pbkdf2", 2)
 	if err != nil {
 		return nil, err
 	}
@@ -135,9 +135,9 @@ func (k *MnemonicsKeySource) Keys() ([]*KeyDetails, error) {
 		if len(pub) != 48 {
 			return nil, fmt.Errorf("expected pub key of 48 bytes, got: %x", pub) // testing, we can log privs.
 		}
-		// Convert it to human readable characters, to keep it manageable
+		// We don't have fancy password norming, just use a base64 pass instead.
 		passphrase := base64.URLEncoding.EncodeToString(passRandomness[:])
-		jsonData, err := marshalKeystoreJSON(priv, pub, passphrase)
+		jsonData, err := marshalWeakKeystoreJSON(priv, pub, []byte(passphrase))
 		k := &KeyDetails{
 			ValidatorKeystoreJSON: jsonData,
 			ValidatorKeystorePass: passphrase,
