@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -30,12 +29,6 @@ const defaultStartTimeout = time.Duration(60 * time.Second)
 // newSimulationAPI creates handlers for the simulation API.
 func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Handler {
 	api := &simAPI{backend: b, env: env, tm: tm}
-
-	// Collect client types.
-	for name := range env.Images {
-		api.clientTypes = append(api.clientTypes, name)
-	}
-	sort.Strings(api.clientTypes)
 
 	// API routes.
 	router := mux.NewRouter()
@@ -57,16 +50,19 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Hand
 }
 
 type simAPI struct {
-	clientTypes []string
-	backend     ContainerBackend
-	env         SimEnv
-	tm          *TestManager
+	backend ContainerBackend
+	env     SimEnv
+	tm      *TestManager
 }
 
 // getClientTypes returns all known client types.
 func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(api.clientTypes)
+	clients := make([]*ClientDefinition, 0, len(api.env.Definitions))
+	for _, def := range api.env.Definitions {
+		clients = append(clients, def)
+	}
+	json.NewEncoder(w).Encode(clients)
 }
 
 // startSuite starts a suite.
@@ -202,7 +198,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get the client name.
-	name, ok := api.checkClient(r, w)
+	clientDef, ok := api.checkClient(r, w)
 	if !ok {
 		return
 	}
@@ -217,16 +213,16 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 
 	// Create the client container.
 	options := ContainerOptions{Env: env, Files: files}
-	containerID, err := api.backend.CreateContainer(ctx, api.env.Images[name], options)
+	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
 	if err != nil {
-		log15.Error("API: client container create failed", "client", name, "error", err)
+		log15.Error("API: client container create failed", "client", clientDef.Name, "error", err)
 		http.Error(w, "client container create failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	// Set the log file. We need the container ID for this,
 	// so it can only be set after creating the container.
-	logPath, logFilePath := api.clientLogFilePaths(name, containerID)
+	logPath, logFilePath := api.clientLogFilePaths(clientDef.Name, containerID)
 	options.LogFile = logFilePath
 	options.CheckLive = true
 
@@ -236,7 +232,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		clientInfo := &ClientInfo{
 			ID:             info.ID,
 			IP:             info.IP,
-			Name:           name,
+			Name:           clientDef.Name,
 			InstantiatedAt: time.Now(),
 			LogFile:        logPath,
 			wait:           info.Wait,
@@ -247,16 +243,16 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, ErrNoSuchTestSuite.Error(), http.StatusNotFound)
 			return
 		}
-		suite.ClientVersions[name] = api.env.ClientVersions[name]
+		suite.ClientVersions[clientDef.Name] = clientDef.Version
 		// register the node
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {
-		log15.Error("API: could not start client", "client", name, "container", containerID[:8], "error", err)
+		log15.Error("API: could not start client", "client", clientDef.Name, "container", containerID[:8], "error", err)
 		http.Error(w, "client did not start: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	log15.Info("API: client "+name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
+	log15.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
 	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
 }
 
@@ -271,22 +267,21 @@ func (api *simAPI) clientLogFilePaths(clientName, containerID string) (jsonPath 
 	return jsonPath, file
 }
 
-func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (string, bool) {
+func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (*ClientDefinition, bool) {
 	name := r.FormValue("CLIENT")
 	if name == "" {
 		log15.Error("API: missing client name in start node request")
 		http.Error(w, "missing 'CLIENT' in request", http.StatusBadRequest)
-		return "", false
+		return nil, false
 	}
-	for _, cn := range api.clientTypes {
-		if cn == name {
-			return name, true
-		}
+	def, ok := api.env.Definitions[name]
+	if ok {
+		return def, true
 	}
 	// Client name not found.
 	log15.Error("API: unknown client name in start node request")
 	http.Error(w, "unknown 'CLIENT' type in request", http.StatusBadRequest)
-	return "", false
+	return nil, false
 }
 
 // stopClient terminates a client container.

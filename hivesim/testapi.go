@@ -76,11 +76,13 @@ type TestSpec struct {
 // ClientTestSpec is a test against a single client. You can either put this in your suite
 // directly, or launch it using RunClient or RunAllClients from another test.
 //
-// When used as a test in a suite, the test runs against all available client types.
+// When used as a test in a suite, the test runs against all available client types,
+// with the specified Role. If no Role is specified, the test runs with all available clients.
 //
 // If the Name of the test includes "CLIENT", it is replaced by the client name being tested.
 type ClientTestSpec struct {
 	Name        string
+	Role        string
 	Description string
 	Parameters  Params
 	Files       map[string]string
@@ -153,7 +155,7 @@ func (t *T) RunClient(clientType string, spec ClientTestSpec) {
 	})
 }
 
-// RunAllClients runs the given client test against all available client type.
+// RunAllClients runs the given client test against all available client types.
 // It waits for all subtests to complete.
 func (t *T) RunAllClients(spec ClientTestSpec) {
 	spec.runTest(t.Sim, t.SuiteID)
@@ -271,10 +273,15 @@ func (spec ClientTestSpec) runTest(host *Simulation, suite SuiteID) error {
 	if err != nil {
 		return err
 	}
-	for _, clientType := range clients {
-		name := clientTestName(spec.Name, clientType)
+	for _, clientDef := range clients {
+		// 'role' is an optional filter, so eth1 tests, beacon node tests,
+		// validator tests, etc. can all live in harmony.
+		if spec.Role != "" && !clientDef.HasRole(spec.Role) {
+			continue
+		}
+		name := clientTestName(spec.Name, clientDef.Name)
 		err := runTest(host, suite, name, spec.Description, func(t *T) {
-			client := t.StartClient(clientType, spec.Parameters, spec.Files)
+			client := t.StartClient(clientDef.Name, spec.Parameters, spec.Files)
 			spec.Run(t, client)
 		})
 		if err != nil {

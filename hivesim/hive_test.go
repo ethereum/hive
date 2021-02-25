@@ -24,7 +24,12 @@ func TestClientTypes(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't get client types:", err)
 	}
-	if !reflect.DeepEqual(ctypes, []string{"client-1", "client-2"}) {
+	if !reflect.DeepEqual(ctypes, []*ClientDefinition{
+		{Name: "client-1", Version: "client-1-version",
+			Meta: ClientMetadata{Roles: []string{"eth1"}}},
+		{Name: "client-2", Version: "client-2-version",
+			Meta: ClientMetadata{Roles: []string{"beacon"}}},
+	}) {
 		t.Fatal("wrong client types:", ctypes)
 	}
 }
@@ -239,9 +244,9 @@ func TestStartClientErrors(t *testing.T) {
 
 func newFakeAPI(hooks *fakes.BackendHooks) (*libhive.TestManager, *httptest.Server) {
 	env := libhive.SimEnv{
-		Images: map[string]string{
-			"client-1": "client-1-image",
-			"client-2": "client-2-image",
+		Definitions: map[string]*libhive.ClientDefinition{
+			"client-1": {Name: "client-1", Image: "/ignored/in/api", Version: "client-1-version", Meta: libhive.ClientMetadata{Roles: []string{"eth1"}}},
+			"client-2": {Name: "client-2", Image: "/not/exposed/", Version: "client-2-version", Meta: libhive.ClientMetadata{Roles: []string{"beacon"}}},
 		},
 	}
 	backend := fakes.NewContainerBackend(hooks)

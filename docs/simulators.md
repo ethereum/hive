@@ -151,14 +151,18 @@ Response:
 
     GET /clients
 
-This returns a JSON array of client names available to the simulation run.
+This returns a JSON array of client definitions available to the simulation run.
+Clients have a `name`, `version`, and `meta` for metadata as defined in the [client interface documentation].
 
 Response
 
     200 OK
     content-type: application/json
 
-    ["go-ethereum","besu"]
+    [
+     {"name":"go-ethereum", "version":"Geth/v1.10.0-unstable-8e547eec-20210224/linux-amd64/go1.16", "meta": {"roles":["eth1"]}},
+     {"name": "besu", "version": "besu/v21.1.1-dev-f1c74ed2/linux-x86_64/oracle_openjdk-java-11", "meta": {"roles": ["eth1"]}}
+    ]
 
 #### Starting a client container
 
