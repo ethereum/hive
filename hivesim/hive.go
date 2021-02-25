@@ -3,6 +3,7 @@ package hivesim
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -120,7 +122,25 @@ func (sim *Simulation) ClientTypes() (availableClients []string, err error) {
 // GetClientTypes. The input is used as environment variables in the new container.
 // Returns container id and ip.
 func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
-	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test), parameters, initFiles)
+	clientType, ok := parameters["CLIENT"]
+	if !ok {
+		return "", nil, errors.New("missing 'CLIENT' parameter")
+	}
+	return sim.StartClientWithOptions(testSuite, test, clientType, Params(parameters), WithStaticFiles(initFiles))
+}
+
+// StartClientWithOptions starts a new node (or other container) with specified options.
+// Returns container id and ip.
+func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error) {
+	setup := &clientSetup{
+		parameters: make(map[string]string),
+		files:      make(map[string]func() (io.ReadCloser, error)),
+	}
+	setup.parameters["CLIENT"] = clientType
+	for _, opt := range options {
+		opt.Apply(setup)
+	}
+	data, err := setup.postWithFiles(fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test))
 	if err != nil {
 		return "", nil, err
 	}
@@ -206,20 +226,71 @@ func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerI
 	return string(body), nil
 }
 
-func postWithFiles(url string, values map[string]string, files map[string]string) (string, error) {
+// collects client setup options
+type clientSetup struct {
+	parameters map[string]string
+	// destination path -> open data function
+	files map[string]func() (io.ReadCloser, error)
+}
+
+type StartOption interface {
+	Apply(setup *clientSetup)
+}
+
+type StartOptionFn func(setup *clientSetup)
+
+func (fn StartOptionFn) Apply(setup *clientSetup) {
+	fn(setup)
+}
+
+// Bundle combines start options, e.g. to bundle files together as option.
+func Bundle(option ...StartOption) StartOption {
+	return StartOptionFn(func(setup *clientSetup) {
+		for _, opt := range option {
+			opt.Apply(setup)
+		}
+	})
+}
+
+func fileAsSrc(path string) func() (io.ReadCloser, error) {
+	return func() (io.ReadCloser, error) {
+		return os.Open(path)
+	}
+}
+
+// WithStaticFiles adds files from the local filesystem to the client. Map: destination file path -> source file path.
+func WithStaticFiles(initFiles map[string]string) StartOption {
+	return StartOptionFn(func(setup *clientSetup) {
+		for k, v := range initFiles {
+			setup.files[k] = fileAsSrc(v)
+		}
+	})
+}
+
+// WithDynamicFile adds a file to a client, sourced dynamically from the given src function,
+// called upon usage of the returned StartOption.
+//
+// A StartOption, and thus the src function, should be reusable and safe to use in parallel.
+// Dynamic files can override static file sources (see WithStaticFiles) and vice-versa.
+func WithDynamicFile(dstPath string, src func() (io.ReadCloser, error)) StartOption {
+	return StartOptionFn(func(setup *clientSetup) {
+		setup.files[dstPath] = src
+	})
+}
+
+func (setup *clientSetup) postWithFiles(url string) (string, error) {
 	var err error
 
 	// make a dictionary of readers
 	formValues := make(map[string]io.Reader)
-	for key, s := range values {
+	for key, s := range setup.parameters {
 		formValues[key] = strings.NewReader(s)
 	}
-	for key, filename := range files {
-		filereader, err := os.Open(filename)
+	for key, src := range setup.files {
+		filereader, err := src()
 		if err != nil {
 			return "", err
 		}
-		//fi, err := filereader.Stat()
 		formValues[key] = filereader
 	}
 
@@ -231,8 +302,8 @@ func postWithFiles(url string, values map[string]string, files map[string]string
 		if x, ok := r.(io.Closer); ok {
 			defer x.Close()
 		}
-		if x, ok := r.(*os.File); ok {
-			if fw, err = w.CreateFormFile(key, x.Name()); err != nil {
+		if _, ok := setup.files[key]; ok {
+			if fw, err = w.CreateFormFile(key, filepath.Base(key)); err != nil {
 				return "", err
 			}
 		} else {
