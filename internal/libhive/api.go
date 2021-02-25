@@ -241,13 +241,16 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			LogFile:        logPath,
 			wait:           info.Wait,
 		}
+		api.tm.testSuiteMutex.Lock()
 		// log client version in test suite
-		suite, ok := api.tm.runningTestSuites[suiteID]
-		if !ok {
+		if suite, ok := api.tm.runningTestSuites[suiteID]; !ok {
 			http.Error(w, ErrNoSuchTestSuite.Error(), http.StatusNotFound)
+			api.tm.testSuiteMutex.Unlock()
 			return
+		} else {
+			suite.ClientVersions[name] = api.env.ClientVersions[name]
 		}
-		suite.ClientVersions[name] = api.env.ClientVersions[name]
+		api.tm.testSuiteMutex.Unlock()
 		// register the node
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
