@@ -38,7 +38,7 @@ func (b *Builder) ReadClientMetadata(name string) (*libhive.ClientMetadata, erro
 	if err != nil {
 		if os.IsNotExist(err) {
 			// Eth1 client by default.
-			return &libhive.ClientMetadata{Role: "eth1"}, nil
+			return &libhive.ClientMetadata{Roles: []string{"eth1"}}, nil
 		} else {
 			return nil, fmt.Errorf("failed to read hive metadata file in '%s': %v", dir, err)
 		}

@@ -55,7 +55,7 @@ type ContainerInfo struct {
 
 // ClientMetadata is metadata to describe the client in more detail, configured with a YAML file in the client dir.
 type ClientMetadata struct {
-	Role string `yaml:"role" json:"role"`
+	Roles []string `yaml:"roles" json:"roles"`
 }
 
 // Builder can build docker images of clients and simulators.
