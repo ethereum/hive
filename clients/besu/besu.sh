@@ -67,9 +67,9 @@ echo -n "Genesis: "; cat /besugenesis.json
 FLAGS="$FLAGS --genesis-file=/besugenesis.json"
 
 # Enable experimental 'berlin' hard-fork features if configured.
-if [ -n "$HIVE_FORK_BERLIN" ]; then
-    FLAGS="$FLAGS --Xberlin-enabled=true"
-fi
+#if [ -n "$HIVE_FORK_BERLIN" ]; then
+#    FLAGS="$FLAGS --Xberlin-enabled=true"
+#fi
 
 # The client should start after loading the blocks, this option configures it.
 IMPORTFLAGS="--run"
