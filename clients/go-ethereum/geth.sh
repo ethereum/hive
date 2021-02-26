@@ -133,7 +133,7 @@ if [ "$HIVE_MINER" != "" ]; then
 	FLAGS="$FLAGS --mine --miner.threads 1 --miner.etherbase $HIVE_MINER"
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
-	FLAGS="$FLAGS --extradata $HIVE_MINER_EXTRA"
+	FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
 FLAGS="$FLAGS --miner.gasprice 16000000000"
 
