@@ -118,6 +118,12 @@ def clique_engine:
     "eip2028Transition": env.HIVE_FORK_ISTANBUL|to_hex,
     "eip2200Transition": env.HIVE_FORK_ISTANBUL|to_hex,
 
+    # Berlin
+    "eip2565Transition": env.HIVE_FORK_BERLIN|to_hex,
+    "eip2718Transition": env.HIVE_FORK_BERLIN|to_hex,
+    "eip2929Transition": env.HIVE_FORK_BERLIN|to_hex,
+    "eip2930Transition": env.HIVE_FORK_BERLIN|to_hex,
+
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
