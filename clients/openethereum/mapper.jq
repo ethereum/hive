@@ -131,6 +131,10 @@ def clique_engine:
     "eip1706Transition": env.HIVE_FORK_ISTANBUL|to_hex,
     # "eip2200AdvanceTransition": env.HIVE_FORK_ISTANBUL|to_hex,
 
+    # Berlin
+    "eip2929Transition": env.HIVE_FORK_BERLIN|to_hex,
+    "eip2930Transition": env.HIVE_FORK_BERLIN|to_hex,
+
     # Other chain parameters.
     "networkID": (env.HIVE_NETWORK_ID|to_hex // "0x539"),
     "chainID": (env.HIVE_CHAIN_ID|to_hex // "0x539"),
@@ -168,8 +172,16 @@ def clique_engine:
     "0x0000000000000000000000000000000000000005": {
       "builtin": {
         "name": "modexp",
-        "activate_at": (env.HIVE_FORK_BYZANTIUM|to_hex // "0x7fffffffffffff"),
-        "pricing": {"modexp": {"divisor": 20}}
+        "pricing":{
+         (env.HIVE_FORK_BYZANTIUM|to_hex // ""): {
+            "info": "EIP-198: Big integer modular exponentiation. Byzantium hardfork",
+            "price": {"modexp": {"divisor": 20}}
+         },
+         (env.HIVE_FORK_BERLIN|to_hex // ""): {
+            "info": "EIP-2565: Big integer modular exponentiation. Berlin hardfork",
+            "price": {"modexp2565": {}}
+         }
+        }
       }
     },
     "0x0000000000000000000000000000000000000006": {
