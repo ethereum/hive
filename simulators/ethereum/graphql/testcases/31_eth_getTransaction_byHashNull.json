@@ -9,5 +9,5 @@
       "transaction" : null
     }
   }],
-  "statusCodes": [200]
+  "statusCode": 200
 }

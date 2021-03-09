@@ -23,5 +23,5 @@
       }
     }
   }],
-  "statusCodes": [200]
+  "statusCode": 200
 }

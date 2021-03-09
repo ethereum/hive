@@ -27,6 +27,6 @@
       "block": null
     }
   }],
-  "statusCodes": [400]
+  "statusCode": 400
 }
 

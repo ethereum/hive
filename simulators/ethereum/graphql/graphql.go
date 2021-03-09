@@ -118,9 +118,9 @@ type testCase struct {
 
 // graphQLTest is the JSON object structure of a test case file.
 type graphQLTest struct {
-	Request     string        `json:"request"`
-	Responses   []interface{} `json:"responses"`
-	StatusCodes []int         `json:"statusCodes"`
+	Request    string        `json:"request"`
+	Responses  []interface{} `json:"responses"`
+	StatusCode int           `json:"statusCode"`
 }
 
 type qlQuery struct {
@@ -147,8 +147,8 @@ func (tc *testCase) run(t *hivesim.T, c *hivesim.Client) {
 	}
 	resp.Body.Close()
 
-	if !tc.statusCodeMatch(resp.StatusCode) {
-		t.Errorf("HTTP response code is %d, want %v \n response body: %s", resp.StatusCode, tc.gqlTest.StatusCodes, string(respBytes))
+	if resp.StatusCode != tc.gqlTest.StatusCode {
+		t.Errorf("HTTP response code is %d, want %d \n response body: %s", resp.StatusCode, tc.gqlTest.StatusCode, string(respBytes))
 	}
 	if resp.StatusCode != 200 {
 		// Test expects HTTP error, and the client sent one, test done.
@@ -157,17 +157,6 @@ func (tc *testCase) run(t *hivesim.T, c *hivesim.Client) {
 	}
 
 	tc.responseMatch(t, resp.Status, respBytes)
-}
-
-// statusCodeMatch checks if a response status code matches against
-// one of the expected status codes.
-func (tc *testCase) statusCodeMatch(resp int) bool {
-	for _, expected := range tc.gqlTest.StatusCodes {
-		if expected == resp {
-			return true
-		}
-	}
-	return false
 }
 
 func (tc *testCase) responseMatch(t *hivesim.T, respStatus string, respBytes []byte) error {
