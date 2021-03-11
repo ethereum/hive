@@ -26,7 +26,7 @@ Results from the test tool are reported as individual sub-tests.`,
 			"HIVE_FORK_TANGERINE": "0",
 			"HIVE_FORK_SPURIOUS":  "0",
 			"HIVE_FORK_BYZANTIUM": "0",
-			"HIVE_LOGLEVEL":       "5",
+			"HIVE_LOGLEVEL":       "4",
 		},
 		Files: map[string]string{
 			"genesis.json": "./init/genesis.json",
