@@ -120,7 +120,7 @@ func (m *ClientDefinition) HasRole(role string) bool {
 // ClientTypes returns all client types available to this simulator run. This depends on
 // both the available client set and the command line filters.
 func (sim *Simulation) ClientTypes() (availableClients []*ClientDefinition, err error) {
-	resp, err := http.Get(fmt.Sprintf("%s/clients", sim.url))
+	resp, err := http.Get(fmt.Sprintf("%s/clients?metadata=1", sim.url))
 	if err != nil {
 		return nil, err
 	}

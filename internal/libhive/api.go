@@ -58,11 +58,21 @@ type simAPI struct {
 // getClientTypes returns all known client types.
 func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	clients := make([]*ClientDefinition, 0, len(api.env.Definitions))
-	for _, def := range api.env.Definitions {
-		clients = append(clients, def)
+
+	if r.URL.Query().Get("metadata") != "" {
+		// New-style response with metadata included.
+		clients := make([]*ClientDefinition, 0, len(api.env.Definitions))
+		for _, def := range api.env.Definitions {
+			clients = append(clients, def)
+		}
+		json.NewEncoder(w).Encode(clients)
+	} else {
+		clients := make([]string, 0, len(api.env.Definitions))
+		for name := range api.env.Definitions {
+			clients = append(clients, name)
+		}
+		json.NewEncoder(w).Encode(clients)
 	}
-	json.NewEncoder(w).Encode(clients)
 }
 
 // startSuite starts a suite.
