@@ -44,13 +44,15 @@ and make them join the peer-to-peer network used for testing.
 ## Client Metadata
 
 Metadata is used to express client differences. E.g. clients can have different roles
-within the Ethereum ecosystem, each of which can have different tests,
-some even capturing interactions between multiple roles.
+within the Ethereum ecosystem, each of which can have different tests, some even capturing
+interactions between multiple roles.
 
-Client metadata is defined with a `hive.yaml` file in the client directory (next to the 
-`Dockerfile`). This optional, by default each client is assumed to only have an `eth1` role.
+Client metadata is defined with a `hive.yaml` file in the client directory (next to the
+`Dockerfile`). This optional, by default each client is assumed to only have an `eth1`
+role.
 
 The YAML fields are:
+
 ```yaml
 roles: ["eth1", "example", "eth1_light_client"]  # a list of strings, applicable roles
 ```
