@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/hive/internal/fakes"
 	"github.com/ethereum/hive/internal/libhive"
 )
@@ -24,13 +25,20 @@ func TestClientTypes(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't get client types:", err)
 	}
-	if !reflect.DeepEqual(ctypes, []*ClientDefinition{
-		{Name: "client-1", Version: "client-1-version",
-			Meta: ClientMetadata{Roles: []string{"eth1"}}},
-		{Name: "client-2", Version: "client-2-version",
-			Meta: ClientMetadata{Roles: []string{"beacon"}}},
-	}) {
-		t.Fatal("wrong client types:", ctypes)
+	wantClients := []*ClientDefinition{
+		{
+			Name:    "client-1",
+			Version: "client-1-version",
+			Meta:    ClientMetadata{Roles: []string{"eth1"}},
+		},
+		{
+			Name:    "client-2",
+			Version: "client-2-version",
+			Meta:    ClientMetadata{Roles: []string{"beacon"}},
+		},
+	}
+	if !reflect.DeepEqual(ctypes, wantClients) {
+		t.Fatalf("wrong client types: %s", spew.Sdump(ctypes))
 	}
 }
 

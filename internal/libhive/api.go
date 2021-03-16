@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -66,12 +67,14 @@ func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
 		for _, def := range api.env.Definitions {
 			clients = append(clients, def)
 		}
+		sort.Slice(clients, func(i, j int) bool { return clients[i].Name < clients[j].Name })
 		json.NewEncoder(w).Encode(clients)
 	} else {
 		clients := make([]string, 0, len(api.env.Definitions))
 		for name := range api.env.Definitions {
 			clients = append(clients, name)
 		}
+		sort.Strings(clients)
 		json.NewEncoder(w).Encode(clients)
 	}
 }
