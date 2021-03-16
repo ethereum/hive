@@ -12,6 +12,13 @@ type TestResult struct {
 	Details string `json:"details"`
 }
 
+// ExecInfo is the result of running a command in a client container.
+type ExecInfo struct {
+	StdOut   string `json:"out"`
+	StdErr   string `json:"err"`
+	ExitCode int    `json:"code"`
+}
+
 // Params contains client launch parameters.
 // This exists because tests usually want to define common parameters as
 // a global variable and then customize them for specific clients.

@@ -195,12 +195,6 @@ func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node strin
 	return res, nil
 }
 
-type ExecInfo struct {
-	StdOut   string `json:"out"`
-	StdErr   string `json:"err"`
-	ExitCode int    `json:"code"`
-}
-
 // ClientExec runs a command in a running client.
 func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd string) (*ExecInfo, error) {
 	params := url.Values{}
