@@ -3,6 +3,7 @@ package hivesim
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -141,7 +143,25 @@ func (sim *Simulation) ClientTypes() (availableClients []*ClientDefinition, err 
 // GetClientTypes. The input is used as environment variables in the new container.
 // Returns container id and ip.
 func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
-	data, err := postWithFiles(fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test), parameters, initFiles)
+	clientType, ok := parameters["CLIENT"]
+	if !ok {
+		return "", nil, errors.New("missing 'CLIENT' parameter")
+	}
+	return sim.StartClientWithOptions(testSuite, test, clientType, Params(parameters), WithStaticFiles(initFiles))
+}
+
+// StartClientWithOptions starts a new node (or other container) with specified options.
+// Returns container id and ip.
+func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error) {
+	setup := &clientSetup{
+		parameters: make(map[string]string),
+		files:      make(map[string]func() (io.ReadCloser, error)),
+	}
+	setup.parameters["CLIENT"] = clientType
+	for _, opt := range options {
+		opt.Apply(setup)
+	}
+	data, err := setup.postWithFiles(fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test))
 	if err != nil {
 		return "", nil, err
 	}
@@ -227,20 +247,19 @@ func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerI
 	return string(body), nil
 }
 
-func postWithFiles(url string, values map[string]string, files map[string]string) (string, error) {
+func (setup *clientSetup) postWithFiles(url string) (string, error) {
 	var err error
 
 	// make a dictionary of readers
 	formValues := make(map[string]io.Reader)
-	for key, s := range values {
+	for key, s := range setup.parameters {
 		formValues[key] = strings.NewReader(s)
 	}
-	for key, filename := range files {
-		filereader, err := os.Open(filename)
+	for key, src := range setup.files {
+		filereader, err := src()
 		if err != nil {
 			return "", err
 		}
-		//fi, err := filereader.Stat()
 		formValues[key] = filereader
 	}
 
@@ -252,8 +271,8 @@ func postWithFiles(url string, values map[string]string, files map[string]string
 		if x, ok := r.(io.Closer); ok {
 			defer x.Close()
 		}
-		if x, ok := r.(*os.File); ok {
-			if fw, err = w.CreateFormFile(key, x.Name()); err != nil {
+		if _, ok := setup.files[key]; ok {
+			if fw, err = w.CreateFormFile(key, filepath.Base(key)); err != nil {
 				return "", err
 			}
 		} else {
