@@ -128,17 +128,8 @@ type T struct {
 	result  TestResult
 }
 
-// StartClient starts a client. If the client cannot by started, the test fails immediately.
-func (t *T) StartClient(clientType string, parameters Params, files map[string]string) *Client {
-	params := parameters.Set("CLIENT", clientType)
-	container, ip, err := t.Sim.StartClient(t.SuiteID, t.TestID, params, files)
-	if err != nil {
-		t.Fatalf("can't launch node (type %s): %v", clientType, err)
-	}
-	return &Client{Type: clientType, Container: container, IP: ip, test: t}
-}
-
-func (t *T) StartClientWithOptions(clientType string, option ...StartOption) *Client {
+// StartClient starts a client instance. If the client cannot by started, the test fails immediately.
+func (t *T) StartClient(clientType string, option ...StartOption) *Client {
 	container, ip, err := t.Sim.StartClientWithOptions(t.SuiteID, t.TestID, clientType, option...)
 	if err != nil {
 		t.Fatalf("can't launch node (type %s): %v", clientType, err)
@@ -150,7 +141,7 @@ func (t *T) StartClientWithOptions(clientType string, option ...StartOption) *Cl
 // It waits for the subtest to complete.
 func (t *T) RunClient(clientType string, spec ClientTestSpec) {
 	runTest(t.Sim, t.SuiteID, spec.Name, spec.Description, func(t *T) {
-		client := t.StartClient(clientType, spec.Parameters, spec.Files)
+		client := t.StartClient(clientType, spec.Parameters, WithStaticFiles(spec.Files))
 		spec.Run(t, client)
 	})
 }
@@ -281,7 +272,7 @@ func (spec ClientTestSpec) runTest(host *Simulation, suite SuiteID) error {
 		}
 		name := clientTestName(spec.Name, clientDef.Name)
 		err := runTest(host, suite, name, spec.Description, func(t *T) {
-			client := t.StartClient(clientDef.Name, spec.Parameters, spec.Files)
+			client := t.StartClient(clientDef.Name, spec.Parameters, WithStaticFiles(spec.Files))
 			spec.Run(t, client)
 		})
 		if err != nil {
