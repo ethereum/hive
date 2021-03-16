@@ -88,8 +88,8 @@ func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string, c
 	}
 
 	return &libhive.ExecInfo{
-		StdOut:   outputBuf.String(),
-		StdErr:   errBuf.String(),
+		Stdout:   outputBuf.String(),
+		Stderr:   errBuf.String(),
 		ExitCode: insp.ExitCode,
 	}, nil
 }
