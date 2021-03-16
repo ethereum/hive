@@ -239,7 +239,7 @@ func TestRunProgram(t *testing.T) {
 	}
 
 	// Run a program
-	res, err := sim.ClientRunProgram(suiteID, testID, clientID, "echo this")
+	res, err := sim.ClientExec(suiteID, testID, clientID, "echo this")
 	if err != nil {
 		t.Fatal("failed to run program:", err)
 	}

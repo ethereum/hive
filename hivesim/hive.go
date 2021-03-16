@@ -201,8 +201,8 @@ type ExecInfo struct {
 	ExitCode int    `json:"code"`
 }
 
-// ClientRunProgram runs a command in a running client.
-func (sim *Simulation) ClientRunProgram(testSuite SuiteID, test TestID, nodeid string, cmd string) (*ExecInfo, error) {
+// ClientExec runs a command in a running client.
+func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd string) (*ExecInfo, error) {
 	params := url.Values{}
 	params.Add("cmd", cmd)
 	p := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec?%s", sim.url, testSuite, test, nodeid, params.Encode())
