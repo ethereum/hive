@@ -5,8 +5,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/ethereum/hive/internal/libhive"
@@ -27,6 +29,26 @@ func NewBuilder(client *docker.Client, cfg *Config) *Builder {
 		b.logger = log15.Root()
 	}
 	return b
+}
+
+// ReadClientMetadata reads metadata of the given client.
+func (b *Builder) ReadClientMetadata(name string) (*libhive.ClientMetadata, error) {
+	dir := b.config.Inventory.ClientDirectory(name)
+	f, err := os.Open(filepath.Join(dir, "hive.yaml"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Eth1 client by default.
+			return &libhive.ClientMetadata{Roles: []string{"eth1"}}, nil
+		} else {
+			return nil, fmt.Errorf("failed to read hive metadata file in '%s': %v", dir, err)
+		}
+	}
+	defer f.Close()
+	var out libhive.ClientMetadata
+	if err := yaml.NewDecoder(f).Decode(&out); err != nil {
+		return nil, fmt.Errorf("failed to decode hive metadata file in '%s': %v", dir, err)
+	}
+	return &out, nil
 }
 
 // BuildClientImage builds a docker image of the given client.

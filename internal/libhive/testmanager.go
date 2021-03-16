@@ -28,6 +28,14 @@ var (
 	ErrTestSuiteLimited         = errors.New("testsuite test count is limited")
 )
 
+// ClientDefinition is served by the /clients API endpoint to list the available clients
+type ClientDefinition struct {
+	Name    string         `json:"name"`
+	Version string         `json:"version"`
+	Image   string         `json:"-"` // not exposed via API
+	Meta    ClientMetadata `json:"meta"`
+}
+
 // SimEnv contains the simulation parameters.
 type SimEnv struct {
 	LogDir string
@@ -41,11 +49,8 @@ type SimEnv struct {
 	// for the client to open port 8545 after launching the container.
 	ClientStartTimeout time.Duration
 
-	// client name -> image name
-	Images map[string]string
-
-	// client name -> version info
-	ClientVersions map[string]string
+	// client name -> client definition
+	Definitions map[string]*ClientDefinition
 }
 
 // TestManager collects test results during a simulation run.
