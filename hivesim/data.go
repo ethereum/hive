@@ -14,8 +14,8 @@ type TestResult struct {
 
 // ExecInfo is the result of running a command in a client container.
 type ExecInfo struct {
-	StdOut   string `json:"out"`
-	StdErr   string `json:"err"`
+	Stdout   string `json:"out"`
+	Stderr   string `json:"err"`
 	ExitCode int    `json:"code"`
 }
 

@@ -244,11 +244,11 @@ func TestRunProgram(t *testing.T) {
 		t.Fatal("failed to run program:", err)
 	}
 
-	if want := "out: echo this"; res.StdOut != want {
-		t.Fatalf("wrong std out %q\nwant %q", res.StdOut, want)
+	if want := "out: echo this"; res.Stdout != want {
+		t.Fatalf("wrong std out %q\nwant %q", res.Stdout, want)
 	}
-	if want := "err: echo this"; res.StdErr != want {
-		t.Fatalf("wrong std err %q\nwant %q", res.StdErr, want)
+	if want := "err: echo this"; res.Stderr != want {
+		t.Fatalf("wrong std err %q\nwant %q", res.Stderr, want)
 	}
 	if want := 42; res.ExitCode != want {
 		t.Fatalf("wrong code %q\nwant %q", res.ExitCode, want)
