@@ -19,7 +19,7 @@ type Params map[string]string
 
 var _ StartOption = (Params)(nil)
 
-// Apply adds the Params to the environment of a client start, making Params a StartOption.
+// Apply implements StartOption.
 func (p Params) Apply(setup *clientSetup) {
 	for k, v := range p {
 		setup.parameters[k] = v

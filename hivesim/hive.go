@@ -247,58 +247,6 @@ func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerI
 	return string(body), nil
 }
 
-// collects client setup options
-type clientSetup struct {
-	parameters map[string]string
-	// destination path -> open data function
-	files map[string]func() (io.ReadCloser, error)
-}
-
-type StartOption interface {
-	Apply(setup *clientSetup)
-}
-
-type StartOptionFn func(setup *clientSetup)
-
-func (fn StartOptionFn) Apply(setup *clientSetup) {
-	fn(setup)
-}
-
-// Bundle combines start options, e.g. to bundle files together as option.
-func Bundle(option ...StartOption) StartOption {
-	return StartOptionFn(func(setup *clientSetup) {
-		for _, opt := range option {
-			opt.Apply(setup)
-		}
-	})
-}
-
-func fileAsSrc(path string) func() (io.ReadCloser, error) {
-	return func() (io.ReadCloser, error) {
-		return os.Open(path)
-	}
-}
-
-// WithStaticFiles adds files from the local filesystem to the client. Map: destination file path -> source file path.
-func WithStaticFiles(initFiles map[string]string) StartOption {
-	return StartOptionFn(func(setup *clientSetup) {
-		for k, v := range initFiles {
-			setup.files[k] = fileAsSrc(v)
-		}
-	})
-}
-
-// WithDynamicFile adds a file to a client, sourced dynamically from the given src function,
-// called upon usage of the returned StartOption.
-//
-// A StartOption, and thus the src function, should be reusable and safe to use in parallel.
-// Dynamic files can override static file sources (see WithStaticFiles) and vice-versa.
-func WithDynamicFile(dstPath string, src func() (io.ReadCloser, error)) StartOption {
-	return StartOptionFn(func(setup *clientSetup) {
-		setup.files[dstPath] = src
-	})
-}
-
 func (setup *clientSetup) postWithFiles(url string) (string, error) {
 	var err error
 
