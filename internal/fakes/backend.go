@@ -96,7 +96,7 @@ func (b *fakeBackend) RunProgram(ctx context.Context, containerID string, cmd st
 	if b.hooks.RunProgram != nil {
 		return b.hooks.RunProgram(containerID, cmd)
 	}
-	return &libhive.ExecInfo{StdOut: "std output", StdErr: "std err", ExitCode: 0}, nil
+	return &libhive.ExecInfo{Stdout: "std output", Stderr: "std err", ExitCode: 0}, nil
 }
 
 func (b *fakeBackend) NetworkNameToID(name string) (string, error) {

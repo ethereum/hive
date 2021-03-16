@@ -212,8 +212,8 @@ func TestRunProgram(t *testing.T) {
 	hooks := &fakes.BackendHooks{
 		RunProgram: func(containerID string, cmd string) (*libhive.ExecInfo, error) {
 			return &libhive.ExecInfo{
-				StdOut:   "out: " + cmd,
-				StdErr:   "err: " + cmd,
+				Stdout:   "out: " + cmd,
+				Stderr:   "err: " + cmd,
 				ExitCode: 42,
 			}, nil
 		},

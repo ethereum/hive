@@ -366,12 +366,6 @@ func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
 	io.WriteString(w, fixedIP.URLv4())
 }
 
-type execInfo struct {
-	StdOut   string `json:"out"`
-	StdErr   string `json:"err"`
-	ExitCode int    `json:"code"`
-}
-
 func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 	suiteID, testID, err := api.requestSuiteAndTest(r)
 	if err != nil {
@@ -398,8 +392,7 @@ func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	out := execInfo{inf.StdOut, inf.StdErr, inf.ExitCode}
-	if err := json.NewEncoder(w).Encode(&out); err != nil {
+	if err := json.NewEncoder(w).Encode(&inf); err != nil {
 		log15.Error("API: failed to write output of running program", "node", node, "error", err)
 		return
 	}

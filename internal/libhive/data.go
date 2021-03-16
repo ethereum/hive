@@ -56,3 +56,10 @@ type ClientInfo struct {
 
 	wait func()
 }
+
+// ExecInfo is the result of running a script in a client container.
+type ExecInfo struct {
+	Stdout   string `json:"out"`
+	Stderr   string `json:"err"`
+	ExitCode int    `json:"code"`
+}
