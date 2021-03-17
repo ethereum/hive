@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/hive/internal/fakes"
 	"github.com/ethereum/hive/internal/libhive"
 )
@@ -24,13 +25,20 @@ func TestClientTypes(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't get client types:", err)
 	}
-	if !reflect.DeepEqual(ctypes, []*ClientDefinition{
-		{Name: "client-1", Version: "client-1-version",
-			Meta: ClientMetadata{Roles: []string{"eth1"}}},
-		{Name: "client-2", Version: "client-2-version",
-			Meta: ClientMetadata{Roles: []string{"beacon"}}},
-	}) {
-		t.Fatal("wrong client types:", ctypes)
+	wantClients := []*ClientDefinition{
+		{
+			Name:    "client-1",
+			Version: "client-1-version",
+			Meta:    ClientMetadata{Roles: []string{"eth1"}},
+		},
+		{
+			Name:    "client-2",
+			Version: "client-2-version",
+			Meta:    ClientMetadata{Roles: []string{"beacon"}},
+		},
+	}
+	if !reflect.DeepEqual(ctypes, wantClients) {
+		t.Fatalf("wrong client types: %s", spew.Sdump(ctypes))
 	}
 }
 
@@ -87,6 +95,7 @@ func TestStartClientStartOptions(t *testing.T) {
 	defer srv.Close()
 	defer tm.Terminate()
 
+	// Start the client.
 	sim := NewAt(srv.URL)
 	suiteID, err := sim.StartSuite("suite", "", "")
 	if err != nil {
@@ -203,6 +212,55 @@ func TestStartClientStartOptions(t *testing.T) {
 			}
 		})
 	})
+}
+
+// This checks that the simulator can run a program
+func TestRunProgram(t *testing.T) {
+	// Set up the backend to return program execution. Simple debug program here.
+	hooks := &fakes.BackendHooks{
+		RunProgram: func(containerID string, cmd []string) (*libhive.ExecInfo, error) {
+			return &libhive.ExecInfo{
+				Stdout:   "out: " + cmd[0],
+				Stderr:   "error output",
+				ExitCode: 42,
+			}, nil
+		},
+	}
+	tm, srv := newFakeAPI(hooks)
+	defer srv.Close()
+	defer tm.Terminate()
+
+	sim := NewAt(srv.URL)
+	suiteID, err := sim.StartSuite("suite", "", "")
+	if err != nil {
+		t.Fatal("can't start suite:", err)
+	}
+	testID, err := sim.StartTest(suiteID, "test", "")
+	if err != nil {
+		t.Fatal("can't start test:", err)
+	}
+
+	params := map[string]string{"CLIENT": "client-1"}
+	clientID, _, err := sim.StartClient(suiteID, testID, params, nil)
+	if err != nil {
+		t.Fatal("can't start client:", err)
+	}
+
+	// Run a program
+	res, err := sim.ClientExec(suiteID, testID, clientID, []string{"echo", "this"})
+	if err != nil {
+		t.Fatal("failed to run program:", err)
+	}
+
+	if want := "out: /hive-bin/echo"; res.Stdout != want {
+		t.Fatalf("wrong std out %q\nwant %q", res.Stdout, want)
+	}
+	if want := "error output"; res.Stderr != want {
+		t.Fatalf("wrong std err %q\nwant %q", res.Stderr, want)
+	}
+	if want := 42; res.ExitCode != want {
+		t.Fatalf("wrong code %q\nwant %q", res.ExitCode, want)
+	}
 }
 
 // This test checks for some common errors returned by StartClient.

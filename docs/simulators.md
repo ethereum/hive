@@ -198,9 +198,9 @@ Response
     content-disposition: form-data; name=file; filename="/genesis.json"
 
     {
-       "difficulty": "0x20000",
-       "gasLimit": "0xFFFFFFFF",
-       ...
+      "difficulty": "0x20000",
+      "gasLimit": "0xFFFFFFFF",
+      ...
     }
     --boundary----
 
@@ -234,6 +234,29 @@ Response:
     content-type: text/plain
 
     enode://1ba850b467b3b96eacdcb6c133d2c7907878794dbdfc114269c7f240d278594439f79975f87e43c45152072c9bd68f9311eb15fd37f1fd438812240e82de9ef9@172.17.0.3:30303
+
+#### Running client scripts
+
+    POST /testsuite/{suite}/test/{test}/node/{container}/exec
+    content-type: application/json
+
+    {
+      "command": ["my-script", "arg1"]
+    }
+
+This request invokes a script in the client container. The script must be present in the
+client container's filesystem in the `/hive-bin` directory.
+
+Response:
+
+    200 OK
+    content-type: application/json
+
+    {
+      "exitCode": 0,
+      "stdout": "output",
+      "stderr": "error output"
+    }
 
 #### Stopping a client
 

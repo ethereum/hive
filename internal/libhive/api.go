@@ -3,6 +3,7 @@ package libhive
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -33,6 +35,7 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Hand
 	// API routes.
 	router := mux.NewRouter()
 	router.HandleFunc("/clients", api.getClientTypes).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getEnodeURL).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
@@ -65,12 +68,14 @@ func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
 		for _, def := range api.env.Definitions {
 			clients = append(clients, def)
 		}
+		sort.Slice(clients, func(i, j int) bool { return clients[i].Name < clients[j].Name })
 		json.NewEncoder(w).Encode(clients)
 	} else {
 		clients := make([]string, 0, len(api.env.Definitions))
 		for name := range api.env.Definitions {
 			clients = append(clients, name)
 		}
+		sort.Strings(clients)
 		json.NewEncoder(w).Encode(clients)
 	}
 }
@@ -363,6 +368,55 @@ func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
 	// This is required because the client usually doesn't know its own IP.
 	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), tcpPort, udpPort)
 	io.WriteString(w, fixedIP.URLv4())
+}
+
+func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
+	suiteID, testID, err := api.requestSuiteAndTest(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	node := mux.Vars(r)["node"]
+	nodeInfo, err := api.tm.GetNodeInfo(suiteID, testID, node)
+	if err != nil {
+		log15.Error("API: can't find node", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+
+	// Parse and validate the exec request.
+	commandline, err := parseExecRequest(r.Body)
+	if err != nil {
+		log15.Error("API: invalid exec request", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	info, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, commandline)
+	if err != nil {
+		log15.Error("API: client script exec error", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(&info)
+}
+
+// parseExecRequest decodes and validates a client script exec request.
+func parseExecRequest(r io.Reader) ([]string, error) {
+	var request struct {
+		Command []string `json:"command"`
+	}
+	if err := json.NewDecoder(r).Decode(&request); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %v", err)
+	}
+	if len(request.Command) == 0 {
+		return nil, errors.New("empty command")
+	}
+	script := request.Command[0]
+	if strings.Contains(script, "/") {
+		return nil, errors.New("script name must not contain directory separator")
+	}
+	request.Command[0] = "/hive-bin/" + script
+	return request.Command, nil
 }
 
 // networkCreate creates a docker network.

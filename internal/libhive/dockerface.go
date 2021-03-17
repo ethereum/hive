@@ -17,6 +17,9 @@ type ContainerBackend interface {
 	// RunEnodeSh runs the /enode.sh script in the given container and returns its output.
 	RunEnodeSh(ctx context.Context, containerID string) (string, error)
 
+	// RunProgram runs a command in the given container and returns its outputs and exit code.
+	RunProgram(ctx context.Context, containerID string, cmdline []string) (*ExecInfo, error)
+
 	// These methods configure docker networks.
 	NetworkNameToID(name string) (string, error)
 	CreateNetwork(name string) (string, error)
