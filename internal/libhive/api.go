@@ -3,6 +3,7 @@ package libhive
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -382,23 +383,40 @@ func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	q := r.URL.Query()
-	cmdStr := q.Get("cmd")
-	if cmdStr == "" {
-		log15.Error("API: no program cmd specified", "node", node, "error", err)
-		http.Error(w, "no program cmd specified", http.StatusBadRequest)
+
+	// Parse and validate the exec request.
+	commandline, err := parseExecRequest(r.Body)
+	if err != nil {
+		log15.Error("API: invalid exec request", "node", node, "error", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	inf, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, cmdStr)
+	info, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, commandline)
 	if err != nil {
-		log15.Error("API: error running program", "node", node, "error", err)
+		log15.Error("API: client script exec error", "node", node, "error", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if err := json.NewEncoder(w).Encode(&inf); err != nil {
-		log15.Error("API: failed to write output of running program", "node", node, "error", err)
-		return
+	json.NewEncoder(w).Encode(&info)
+}
+
+// parseExecRequest decodes and validates a client script exec request.
+func parseExecRequest(r io.Reader) ([]string, error) {
+	var request struct {
+		Command []string `json:"command"`
 	}
+	if err := json.NewDecoder(r).Decode(&request); err != nil {
+		return nil, fmt.Errorf("invalid JSON: %v", err)
+	}
+	if len(request.Command) == 0 {
+		return nil, errors.New("empty command")
+	}
+	script := request.Command[0]
+	if strings.Contains(script, "/") {
+		return nil, errors.New("script name must not contain directory separator")
+	}
+	request.Command[0] = "/hive-bin/" + script
+	return request.Command, nil
 }
 
 // networkCreate creates a docker network.

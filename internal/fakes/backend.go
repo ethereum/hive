@@ -15,7 +15,7 @@ type BackendHooks struct {
 	StartContainer  func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
 	DeleteContainer func(containerID string) error
 	RunEnodeSh      func(containerID string) (string, error)
-	RunProgram      func(containerID string, cmd string) (*libhive.ExecInfo, error)
+	RunProgram      func(containerID string, cmd []string) (*libhive.ExecInfo, error)
 
 	NetworkNameToID     func(string) (string, error)
 	CreateNetwork       func(string) (string, error)
@@ -92,7 +92,7 @@ func (b *fakeBackend) RunEnodeSh(ctx context.Context, containerID string) (strin
 	return "enode://a61215641fb8714a373c80edbfa0ea8878243193f57c96eeb44d0bc019ef295abd4e044fd619bfc4c59731a73fb79afe84e9ab6da0c743ceb479cbb6d263fa91@192.0.2.1:30303", nil
 }
 
-func (b *fakeBackend) RunProgram(ctx context.Context, containerID string, cmd string) (*libhive.ExecInfo, error) {
+func (b *fakeBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
 	if b.hooks.RunProgram != nil {
 		return b.hooks.RunProgram(containerID, cmd)
 	}

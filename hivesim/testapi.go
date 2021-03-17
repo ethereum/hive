@@ -116,7 +116,7 @@ func (c *Client) RPC() *rpc.Client {
 }
 
 // Exec runs a script in the client container.
-func (c *Client) Exec(command string) (*ExecInfo, error) {
+func (c *Client) Exec(command ...string) (*ExecInfo, error) {
 	return c.test.Sim.ClientExec(c.test.SuiteID, c.test.TestID, c.Container, command)
 }
 

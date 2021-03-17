@@ -196,14 +196,18 @@ func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node strin
 }
 
 // ClientExec runs a command in a running client.
-func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd string) (*ExecInfo, error) {
-	params := url.Values{}
-	params.Add("cmd", cmd)
-	p := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec?%s", sim.url, testSuite, test, nodeid, params.Encode())
-	req, err := http.NewRequest(http.MethodPost, p, nil)
+func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd []string) (*ExecInfo, error) {
+	type execRequest struct {
+		Command []string `json:"command"`
+	}
+	enc, _ := json.Marshal(&execRequest{cmd})
+
+	p := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec", sim.url, testSuite, test, nodeid)
+	req, err := http.NewRequest(http.MethodPost, p, bytes.NewReader(enc))
 	if err != nil {
 		return nil, err
 	}
+	req.Header.Set("content-type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err

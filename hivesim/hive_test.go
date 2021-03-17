@@ -218,10 +218,10 @@ func TestStartClientStartOptions(t *testing.T) {
 func TestRunProgram(t *testing.T) {
 	// Set up the backend to return program execution. Simple debug program here.
 	hooks := &fakes.BackendHooks{
-		RunProgram: func(containerID string, cmd string) (*libhive.ExecInfo, error) {
+		RunProgram: func(containerID string, cmd []string) (*libhive.ExecInfo, error) {
 			return &libhive.ExecInfo{
-				Stdout:   "out: " + cmd,
-				Stderr:   "err: " + cmd,
+				Stdout:   "out: " + cmd[0],
+				Stderr:   "error output",
 				ExitCode: 42,
 			}, nil
 		},
@@ -247,15 +247,15 @@ func TestRunProgram(t *testing.T) {
 	}
 
 	// Run a program
-	res, err := sim.ClientExec(suiteID, testID, clientID, "echo this")
+	res, err := sim.ClientExec(suiteID, testID, clientID, []string{"echo", "this"})
 	if err != nil {
 		t.Fatal("failed to run program:", err)
 	}
 
-	if want := "out: echo this"; res.Stdout != want {
+	if want := "out: /hive-bin/echo"; res.Stdout != want {
 		t.Fatalf("wrong std out %q\nwant %q", res.Stdout, want)
 	}
-	if want := "err: echo this"; res.Stderr != want {
+	if want := "error output"; res.Stderr != want {
 		t.Fatalf("wrong std err %q\nwant %q", res.Stderr, want)
 	}
 	if want := 42; res.ExitCode != want {
