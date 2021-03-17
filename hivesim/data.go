@@ -14,9 +14,9 @@ type TestResult struct {
 
 // ExecInfo is the result of running a command in a client container.
 type ExecInfo struct {
-	Stdout   string `json:"out"`
-	Stderr   string `json:"err"`
-	ExitCode int    `json:"code"`
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+	ExitCode int    `json:"exitCode"`
 }
 
 // Params contains client launch parameters.
