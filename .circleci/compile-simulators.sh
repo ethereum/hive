@@ -1,8 +1,9 @@
 #!/bin/bash
 
 failed=""
-sims=$(find simulators/ -name go.mod -printf '%h\n')
+sims=$(find simulators -name go.mod)
 for d in $sims; do
+    d="$(dirname $d)"
     echo "building $d"
     ( cd $d; go build . )
     status=$?
