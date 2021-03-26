@@ -164,6 +164,8 @@ func generateCommand(args []string) {
 	flag.IntVar(&cfg.blockCount, "length", 2, "The length of the chain to generate")
 	flag.IntVar(&cfg.blockTimeSec, "blocktime", 30, "The desired block time in seconds")
 	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transaction to chain every n blocks")
+	flag.IntVar(&cfg.txCount, "tx-count", 1, "The desired number of transactions per block "+
+		"containing transactions (dependent on tx-interval). Max value = 2000")
 	flag.CommandLine.Parse(args)
 
 	if *genesis == "" {
@@ -179,6 +181,10 @@ func generateCommand(args []string) {
 		fatal(err)
 	}
 	cfg.genesis = *gspec
+	// check tx count to make sure it doesn't exceed max, set to max if exceeds
+	if cfg.txCount > 2000 {
+		cfg.txCount = 2000
+	}
 
 	if err := cfg.writeTestChain(*outdir); err != nil {
 		fatal(err)
