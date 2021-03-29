@@ -87,15 +87,21 @@ func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 	}
 
 	txType := (i / cfg.txInterval) % txTypeMax
-	i := 0
-	for i <= cfg.txCount {
+	txCount := 0
+	for txCount <= cfg.txCount {
 		for addr, key := range knownAccounts {
-			if gen.GetBalance(addr).Uint64() > uint64(1) {
+			// skip account if no allocation
+			if _, ok := cfg.genesis.Alloc[addr]; !ok {
+				continue
+			}
+			log.Printf("TX FROM ACCOUNT: %v", addr)
+			txCost := big.NewInt(1)
+			if gen.GetBalance(addr).Cmp(txCost) > 0 {
 				tx := generateTx(txType, key, &cfg.genesis, gen)
 				log.Printf("adding tx (type %d) from %s in block %d", txType, addr.String(), gen.Number())
 				log.Printf("0x%x (%d gas)", tx.Hash(), tx.Gas())
 				gen.AddTx(tx)
-				i++
+				txCount++
 			}
 		}
 	}
