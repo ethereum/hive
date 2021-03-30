@@ -94,7 +94,6 @@ func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 			if _, ok := cfg.genesis.Alloc[addr]; !ok {
 				continue
 			}
-			log.Printf("TX FROM ACCOUNT: %v", addr)
 			tx := generateTx(txType, key, &cfg.genesis, gen)
 			if gen.GetBalance(addr).Cmp(tx.Cost()) > 0 {
 				log.Printf("adding tx (type %d) from %s in block %d", txType, addr.String(), gen.Number())
