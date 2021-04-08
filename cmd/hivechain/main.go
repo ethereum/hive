@@ -163,9 +163,8 @@ func generateCommand(args []string) {
 	)
 	flag.IntVar(&cfg.blockCount, "length", 2, "The length of the chain to generate")
 	flag.IntVar(&cfg.blockTimeSec, "blocktime", 30, "The desired block time in seconds")
-	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transaction to chain every n blocks")
-	flag.IntVar(&cfg.txCount, "tx-count", 1, "The maximum desired number of txs per block "+
-		"that contains txs (dependent on tx-interval). Note, the tx count is enforced by the block gas limit")
+	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transactions to chain every n blocks")
+	flag.IntVar(&cfg.txCount, "tx-count", 1, "Maximum number of txs per block")
 	flag.CommandLine.Parse(args)
 
 	if *genesis == "" {
