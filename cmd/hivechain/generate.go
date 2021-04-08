@@ -89,31 +89,42 @@ func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 	txType := (i / cfg.txInterval) % txTypeMax
 
 	var gasLimit uint64
-	var sumGas uint64
 	if gen.Number().Uint64() > 0 {
 		gasLimit = core.CalcGasLimit(gen.PrevBlock(-1), 0, cfg.genesis.GasLimit)
 	}
 
-	txCount := 0
-	for txCount <= cfg.txCount {
-		for addr, key := range knownAccounts {
-			// skip account if no allocation
+	var (
+		txGasSum uint64
+		txCount  = 0
+		accounts = make(map[common.Address]*ecdsa.PrivateKey, len(knownAccounts))
+	)
+	for addr, key := range knownAccounts {
+		accounts[addr] = key
+	}
+	for txCount <= cfg.txCount && len(accounts) > 0 {
+		for addr, key := range accounts {
+			// Skip account if it's not allocated in genesis.
 			if _, ok := cfg.genesis.Alloc[addr]; !ok {
+				delete(accounts, addr)
 				continue
 			}
 			tx := generateTx(txType, key, &cfg.genesis, gen)
-			// check if tx gas + total gas already exceeds limit
-			if (sumGas + tx.Gas()) > gasLimit {
+
+			// Check if account has enough balance left to cover the tx.
+			if gen.GetBalance(addr).Cmp(tx.Cost()) < 0 {
+				delete(accounts, addr)
+				continue
+			}
+			// Check if block gas limit reached.
+			if (txGasSum + tx.Gas()) > gasLimit {
 				return
 			}
 
-			if gen.GetBalance(addr).Cmp(tx.Cost()) > 0 {
-				log.Printf("adding tx (type %d) from %s in block %d", txType, addr.String(), gen.Number())
-				log.Printf("0x%x (%d gas)", tx.Hash(), tx.Gas())
-				gen.AddTx(tx)
-				txCount++
-				sumGas += tx.Gas()
-			}
+			log.Printf("adding tx (type %d) from %s in block %d", txType, addr.String(), gen.Number())
+			log.Printf("%v (%d gas)", tx.Hash(), tx.Gas())
+			gen.AddTx(tx)
+			txGasSum += tx.Gas()
+			txCount++
 		}
 	}
 }
