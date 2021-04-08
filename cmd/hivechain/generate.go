@@ -96,20 +96,17 @@ func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 	var (
 		txGasSum uint64
 		txCount  = 0
-		accounts = make(map[common.Address]*ecdsa.PrivateKey, len(knownAccounts))
+		accounts = make(map[common.Address]*ecdsa.PrivateKey)
 	)
 	for addr, key := range knownAccounts {
-		accounts[addr] = key
+		if _, ok := cfg.genesis.Alloc[addr]; ok {
+			accounts[addr] = key
+		}
 	}
+
 	for txCount <= cfg.txCount && len(accounts) > 0 {
 		for addr, key := range accounts {
-			// Skip account if it's not allocated in genesis.
-			if _, ok := cfg.genesis.Alloc[addr]; !ok {
-				delete(accounts, addr)
-				continue
-			}
 			tx := generateTx(txType, key, &cfg.genesis, gen)
-
 			// Check if account has enough balance left to cover the tx.
 			if gen.GetBalance(addr).Cmp(tx.Cost()) < 0 {
 				delete(accounts, addr)
