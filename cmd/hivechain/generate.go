@@ -45,6 +45,7 @@ var (
 
 type generatorConfig struct {
 	txInterval   int // frequency of blocks containing transactions
+	txCount      int // number of txs in block
 	blockCount   int // number of generated blocks
 	blockTimeSec int // block time in seconds, influences difficulty
 	powMode      ethash.Mode
@@ -86,23 +87,41 @@ func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 	}
 
 	txType := (i / cfg.txInterval) % txTypeMax
+
+	var gasLimit uint64
+	if gen.Number().Uint64() > 0 {
+		gasLimit = core.CalcGasLimit(gen.PrevBlock(-1), 0, cfg.genesis.GasLimit)
+	}
+
+	var (
+		txGasSum uint64
+		txCount  = 0
+		accounts = make(map[common.Address]*ecdsa.PrivateKey)
+	)
 	for addr, key := range knownAccounts {
-		if a, ok := cfg.genesis.Alloc[addr]; ok {
-			// It exists, check remaining balance. Would be nice if BlockGen had a way to
-			// check balance, but it doesn't, so we need to estimate the remaining
-			// balance.
-			txCost := big.NewInt(1)
-			spent := new(big.Int).Mul(txCost, big.NewInt(int64(i*cfg.txInterval)))
-			gbal := new(big.Int).Set(a.Balance)
-			if gbal.Sub(gbal, spent).Cmp(txCost) < 0 {
-				continue // no funds left in this account
-			}
-			// Add transaction.
+		if _, ok := cfg.genesis.Alloc[addr]; ok {
+			accounts[addr] = key
+		}
+	}
+
+	for txCount <= cfg.txCount && len(accounts) > 0 {
+		for addr, key := range accounts {
 			tx := generateTx(txType, key, &cfg.genesis, gen)
+			// Check if account has enough balance left to cover the tx.
+			if gen.GetBalance(addr).Cmp(tx.Cost()) < 0 {
+				delete(accounts, addr)
+				continue
+			}
+			// Check if block gas limit reached.
+			if (txGasSum + tx.Gas()) > gasLimit {
+				return
+			}
+
 			log.Printf("adding tx (type %d) from %s in block %d", txType, addr.String(), gen.Number())
-			log.Printf("0x%x (%d gas)", tx.Hash(), tx.Gas())
+			log.Printf("%v (%d gas)", tx.Hash(), tx.Gas())
 			gen.AddTx(tx)
-			return
+			txGasSum += tx.Gas()
+			txCount++
 		}
 	}
 }
@@ -149,7 +168,7 @@ func generateTx(txType int, key *ecdsa.PrivateKey, genesis *core.Genesis, gen *c
 func createTxGasLimit(gen *core.BlockGen, genesis *core.Genesis, data []byte) uint64 {
 	isHomestead := genesis.Config.IsHomestead(gen.Number())
 	isEIP2028 := genesis.Config.IsIstanbul(gen.Number())
-	igas, err := core.IntrinsicGas(data, true, isHomestead, isEIP2028)
+	igas, err := core.IntrinsicGas(data, nil, true, isHomestead, isEIP2028)
 	if err != nil {
 		panic(err)
 	}
