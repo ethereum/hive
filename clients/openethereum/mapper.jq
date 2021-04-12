@@ -139,7 +139,7 @@ def clique_engine:
     "networkID": (env.HIVE_NETWORK_ID|to_hex // "0x539"),
     "chainID": (env.HIVE_CHAIN_ID|to_hex // "0x539"),
     "accountStartNonce": "0x0",
-    "maximumExtraDataSize": "0xffffffff",
+    "maximumExtraDataSize": "0x20",
     "minGasLimit": "0x0",
     "gasLimitBoundDivisor": "0x400",
     "registrar": "0x0000000000000000000000000000000000000000",
