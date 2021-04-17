@@ -1,37 +1,29 @@
 [Overview] | [Hive Commands] | [Simulators] | [Clients]
 
-## Installation procedure
+## Installating hive
 
-You can start from clean Debian 10 GNU/Linux distribution (we have not
-tested hive in any other OS than Linux). First add `build-essential`
-by `sudo apt install build-essential`. This allows you to install Go
-in version 1.13 or later and add the installation directory to your
-`$PATH` as described in the [Go installation documentation] (the
-correct Go installation can be checked by running `go version`).
+We have not tested hive on any OS other than Linux. It is usually best to use Ubuntu or
+Debian.
 
-[Go installation documentation]: https://golang.org/doc/install
+First add `build-essential` by `sudo apt install build-essential`. This allows you to
+install Go in version 1.13 or later and add the installation directory to your `$PATH` as
+described in the [Go installation documentation]. You can check the installed Go version
+by running `go version`.
 
-To run simulations, you also need a working Docker setup, and hive
-needs to be run on the same machine as dockerd. Using docker remotely
-is not supported at this time. So [install docker] and add your user
-to the `docker` group using:
-
-```
-sudo usermod -a -G docker <user_name>
-```
-which allows you to run docker without `sudo`. 
-
-[install docker]: https://docs.docker.com/engine/install/debian/#install-using-the-repository
-
-To get hive, you first need to clone the repository to the location of
-your preference. Then you can build the hive executable.
+To get hive, you first need to clone the repository to the location of your preference.
+Then you can build the hive executable.
 
     git clone https://github.com/ethereum/hive
     cd ./hive
     go build .
 
-## Running Hive
+To run simulutations, you need a working Docker setup. Hive needs to be run on the same
+machine as dockerd. Using docker remotely is not supported at this time. [Install docker]
+and add your user to the `docker` group to allow using docker without `sudo`.
 
+    sudo usermod -a -G docker <user_name>
+
+## Running Hive
 
 All hive commands should be run from within the root of the repository. To run a
 simulation, use the following command:
@@ -118,3 +110,5 @@ private keys in the hivechain source code.
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
 [Clients]: ./clients.md
+[Go installation documentation]: https://golang.org/doc/install
+[Install docker]: https://docs.docker.com/engine/install/debian/#install-using-the-repository
