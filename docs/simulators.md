@@ -42,7 +42,7 @@ suite.
 While simulators may be written in any language (they're just docker containers after
 all), hive provides a Go library that wraps the simulation API in a way that resembles the
 standard library "testing" package. Be sure to check the [Go API reference of package
-hivesim][hivesimref] for more information about writing simulators in Go.
+hivesim] for more information about writing simulators in Go.
 
 Simulators are contained in the hive repository as independent Go modules. To create one,
 first create a new subdirectory in `./simulators` and initialize a Go module there:
@@ -52,96 +52,76 @@ first create a new subdirectory in `./simulators` and initialize a Go module the
     go mod init github.com/ethereum/hive/simulators/ethereum/my-simulation
     go get github.com/ethereum/hive/hivesim@latest
 
-Now create the simulator program file `my-simulation.go` and place the folowing content into:
+Now create the simulator program file `my-simulation.go`.
 
-```
-package main
+    package main
 
-import "github.com/ethereum/hive/hivesim"
+    import "github.com/ethereum/hive/hivesim"
 
-func main() {
-	// initialize test
-    suite := hivesim.Suite{
-        Name:        "my-suite",
-        Description: "This test suite performs some tests.",
+    func main() {
+        suite := hivesim.Suite{
+            Name:        "my-suite",
+            Description: "This test suite performs some tests.",
+        }
+        // add a plain test (does not run a client)
+        suite.Add(hivesim.TestSpec{
+            Name:        "the-test",
+            Description: "This is an example test case.",
+            Run: runMyTest,
+        })
+        // add a client test (starts the client)
+        suite.Add(hivesim.ClientTestSpec{
+            Name:        "the-test-2",
+            Description: "This is an example test case.",
+            Files: map[string]string{"/genesis.json": "genesis.json"},
+            Run: runMyClientTest,
+        })
+
+        // Run the tests. This waits until all tests of the suite
+        // have executed.
+        hivesim.MustRunSuite(hivesim.New(), suite)
     }
-	// add a plain test (does not run a client) (comment to remove)
-	suite.Add(hivesim.TestSpec{
-		Name:        "the-test",
-		Description: "This is the example test case.",
-		Run: runMyTest,
-	})
-	// add a client test (starts the client)
-    suite.Add(hivesim.ClientTestSpec{
-        Name:        "the-test",
-        Description: "This is the example test case.",
-        Files: map[string]string{"/genesis.json": "genesis.json"},
-        Run: runMyClientTest,
-    })
-	// runs the tests (exist on failures) (RunSuit does not exit) 
-    hivesim.MustRunSuite(hivesim.New(), suite)
-}
 
 
-// template for the example test
-func runMyTest(t *hivesim.T) {
-	// write your test code here
-}
+    func runMyTest(t *hivesim.T) {
+        // write your test code here
+    }
 
-// template for the example client test
-func runMyClientTest(t *hivesim.T, c *hivesim.Client) {
-	// write your test code here
-}
-```
+    func runMyClientTest(t *hivesim.T, c *hivesim.Client) {
+        // write your test code here
+    }
 
-The templates of the funcions are to be filled with the actuall
-code. To do that you need to program the test routines using hivesim
-package. The [documentation of hivesim][hivesimref] provides a lot of
-useful information about the functions you can use.
+### Creating the Dockerfile
 
-### Setup a simulation container
+The simulator needs to have a Dockerfile in order to run.
 
-The simulation runs in a docker container. For that we need to setup a
-correct environment. As can be seen in the client test `Files:` part,
-it requires a `genesis.json` file that specifies the genesis state of
-the client. On example of `genesis.json` can be found in
-`simulators/devp2p/eth/init/genesis.json`. Copy it to your current
-`my-simulation` directory (as `cp
-../../../simulators/devp2p/eth/init/genesis.json .`.
+As can be seen in the client test `Files:` part, the simulation requires a `genesis.json`
+file that specifies the genesis state of the client. An example of `genesis.json` can be
+found in the `simulators/devp2p/eth/init/` directory. You can copy an existing genesis
+block or create your own. Make sure to add all support files to container in the
+Dockerfile. The Dockerfile might look like this:
 
-Your simulator directory must also contain a `Dockerfile` so that hive
-can build the container:
+    FROM golang:1-alpine AS builder
+    RUN apk --no-cache add gcc musl-dev linux-headers
+    ADD . /source
+    WORKDIR /source
+    RUN go build -o ./sim .
 
-```
-FROM golang:1-alpine AS builder
-RUN apk --no-cache add gcc musl-dev linux-headers
-ADD . /source
-WORKDIR /source
-RUN go build -o ./sim .
+    # Build the runner container.
+    FROM alpine:latest
+    ADD . /
+    COPY --from=builder /source/sim /
+    ENTRYPOINT ["./sim"]
 
-# Build the runner container.
-FROM alpine:latest
-ADD . /
-COPY --from=builder /source/sim /
-ENTRYPOINT ["./sim"]
-```
+You can test this build by running `docker build .` in the simulator directory.
 
 ### Running the simulation
 
-Finaly, go back to the root of the repository (`cd ../../..`) and [launch the simulation]:
+Finally, go back to the root of the repository (`cd ../../..`) and run the simulation.
 
-	./hive --sim my-simulation --client go-ethereum,openethereum
+    ./hive --sim my-simulation --client go-ethereum,openethereum
 
-[launch the simulation]: [./overview.md#running-hive]
-
-### Checking the results
-
-The test results are going to be written to the standard output and
-you can also review the results [on your server in case you run the
-`hiveview`][hiveview]. If you set everythin as described, your test
-should pass and you have your testing environment set up correctly.
-
-[hiveview]: ./commandline.md#viewing-simulation-results-hiveview
+You can check the results using [hiveview].
 
 ## Simulation API Reference
 
@@ -386,9 +366,11 @@ Response:
 
     172.22.0.2
 
-[client interface documentation]: ./clients.md
-[hivesimref]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
 [Clients]: ./clients.md
+[client interface documentation]: ./clients.md
+[Go API reference of package hivesim]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
+[launch the simulation]: ./overview.md#running-hive
+[hiveview]: ./commandline.md#viewing-simulation-results-hiveview
