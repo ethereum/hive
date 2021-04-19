@@ -106,9 +106,9 @@ private keys in the hivechain source code.
 - `0x703c4b2bD70c169f5717101CaeE543299Fc946C7`
 - `0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e`
 
+[Go installation documentation]: https://golang.org/doc/install
+[Install docker]: https://docs.docker.com/engine/install/debian/#install-using-the-repository
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
 [Clients]: ./clients.md
-[Go installation documentation]: https://golang.org/doc/install
-[Install docker]: https://docs.docker.com/engine/install/debian/#install-using-the-repository

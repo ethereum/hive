@@ -41,7 +41,7 @@ suite.
 
 While simulators may be written in any language (they're just docker containers after
 all), hive provides a Go library that wraps the simulation API in a way that resembles the
-standard library "testing" package. Be sure to check the [Go API reference of package
+standard library "testing" package. Be sure to check the Go API reference of [package
 hivesim] for more information about writing simulators in Go.
 
 Simulators are contained in the hive repository as independent Go modules. To create one,
@@ -366,11 +366,11 @@ Response:
 
     172.22.0.2
 
+[client interface documentation]: ./clients.md
+[package hivesim]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
+[launch the simulation]: ./overview.md#running-hive
+[hiveview]: ./commandline.md#viewing-simulation-results-hiveview
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
 [Clients]: ./clients.md
-[client interface documentation]: ./clients.md
-[Go API reference of package hivesim]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
-[launch the simulation]: ./overview.md#running-hive
-[hiveview]: ./commandline.md#viewing-simulation-results-hiveview
