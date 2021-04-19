@@ -1,18 +1,29 @@
 [Overview] | [Hive Commands] | [Simulators] | [Clients]
 
-## Running Hive
+## Installating hive
 
-The hive project is implemented in Go. You need to install Go version 1.13 or later to use
-hive. To run simulations, you also need a working Docker setup, and hive needs to be run on the
-same machine as dockerd. Using docker remotely is not supported at this time. We have also
-not tested hive extensively on any OS but Linux, so you must run Linux to use hive.
+We have not tested hive on any OS other than Linux. It is usually best to use Ubuntu or
+Debian.
 
-To get hive, you first need to clone the repository to any location, then build the hive
-executable.
+First add `build-essential` by `sudo apt install build-essential`. This allows you to
+install Go in version 1.13 or later and add the installation directory to your `$PATH` as
+described in the [Go installation documentation]. You can check the installed Go version
+by running `go version`.
+
+To get hive, you first need to clone the repository to the location of your preference.
+Then you can build the hive executable.
 
     git clone https://github.com/ethereum/hive
     cd ./hive
     go build .
+
+To run simulutations, you need a working Docker setup. Hive needs to be run on the same
+machine as dockerd. Using docker remotely is not supported at this time. [Install docker]
+and add your user to the `docker` group to allow using docker without `sudo`.
+
+    sudo usermod -a -G docker <user_name>
+
+## Running Hive
 
 All hive commands should be run from within the root of the repository. To run a
 simulation, use the following command:
@@ -85,7 +96,7 @@ simulations. Build it with:
 
 To generate a chain of a desired length, run the following command:
 
-    hivechain generate -genesis ./genesis.json -length 200
+    ./hivechain generate -genesis ./genesis.json -length 200
 
 hivechain generates empty blocks by default. The chain will contain non-empty blocks if
 the following accounts have balance in genesis state. You can find the corresponding
@@ -95,6 +106,8 @@ private keys in the hivechain source code.
 - `0x703c4b2bD70c169f5717101CaeE543299Fc946C7`
 - `0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e`
 
+[Go installation documentation]: https://golang.org/doc/install
+[Install docker]: https://docs.docker.com/engine/install/debian/#install-using-the-repository
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
