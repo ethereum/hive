@@ -143,6 +143,10 @@ FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
 	FLAGS="$FLAGS --graphql"
 fi
+# used for the graphql to allow submission of unprotected tx
+if [ "$HIVE_ALLOW_UNPROTECTED_TX" != "" ]; then
+ 	FLAGS="$FLAGS --rpc.allow-unprotected-txs"
+fi
 
 # Run the go-ethereum implementation with the requested flags.
 FLAGS="$FLAGS --nat=none"

@@ -32,6 +32,7 @@ the client launched by this test.`,
 			// The graphql chain comes from the Besu codebase, and is built on Frontier.
 			"HIVE_CHAIN_ID":        "1",
 			"HIVE_GRAPHQL_ENABLED": "1",
+			"HIVE_ALLOW_UNPROTECTED_TX": "1",
 		},
 		Files: map[string]string{
 			"/genesis.json": "./init/testGenesis.json",
