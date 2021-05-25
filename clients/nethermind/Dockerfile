@@ -1,4 +1,4 @@
-ARG branch=alpine
+ARG branch=latest
 FROM nethermindeth/nethermind-hive:$branch
 
 RUN apt-get update && apt-get install -y wget
