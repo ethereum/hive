@@ -26,6 +26,7 @@
 #  - HIVE_FORK_ISTANBUL block number for Istanbul
 #  - HIVE_FORK_MUIRGLACIER block number for Muir Glacier
 #  - HIVE_FORK_BERLIN block number for Berlin
+#  - HIVE_FORK_LONDON block number for London
 #
 # Other:
 #  - HIVE_MINER          address to credit with mining rewards (single thread)
