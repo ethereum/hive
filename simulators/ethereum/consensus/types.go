@@ -37,8 +37,6 @@ type btBlock struct {
 	UncleHeaders []*btHeader
 }
 
-//go:generate gencodec -type btHeader -field-override btHeaderMarshaling -out gen_btheader.go
-
 type btHeader struct {
 	Bloom            types.Bloom
 	Coinbase         common.Address
@@ -57,6 +55,7 @@ type btHeader struct {
 	GasLimit   uint64
 	GasUsed    uint64
 	Timestamp  *big.Int
+	BaseFee    *big.Int
 }
 
 func (b *btHeader) UnmarshalJSON(input []byte) error {
@@ -77,6 +76,7 @@ func (b *btHeader) UnmarshalJSON(input []byte) error {
 		GasLimit         *math.HexOrDecimal64
 		GasUsed          *math.HexOrDecimal64
 		Timestamp        *math.HexOrDecimal256
+		BaseFee          *math.HexOrDecimal256
 	}
 	var dec btHeader
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -129,6 +129,9 @@ func (b *btHeader) UnmarshalJSON(input []byte) error {
 	}
 	if dec.Timestamp != nil {
 		b.Timestamp = (*big.Int)(dec.Timestamp)
+	}
+	if dec.BaseFee != nil {
+		b.BaseFee = (*big.Int)(dec.BaseFee)
 	}
 	return nil
 }
