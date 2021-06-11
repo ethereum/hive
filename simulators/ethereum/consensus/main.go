@@ -32,6 +32,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"Homestead": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -43,6 +44,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"EIP150": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -54,6 +56,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"EIP158": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -65,6 +68,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"Byzantium": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -76,6 +80,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"Constantinople": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -87,6 +92,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"ConstantinopleFix": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -98,6 +104,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     0,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"Istanbul": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -109,6 +116,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     0,
 		"HIVE_FORK_ISTANBUL":       0,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"Berlin": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -120,6 +128,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     0,
 		"HIVE_FORK_ISTANBUL":       0,
 		"HIVE_FORK_BERLIN":         0,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"FrontierToHomesteadAt5": {
 		"HIVE_FORK_HOMESTEAD":      5,
@@ -131,6 +140,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"HomesteadToEIP150At5": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -142,6 +152,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"HomesteadToDaoAt5": {
 		"HIVE_FORK_HOMESTEAD":      0,
@@ -153,6 +164,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"EIP158ToByzantiumAt5": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -164,6 +176,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"ByzantiumToConstantinopleAt5": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -175,6 +188,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     2000,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"ByzantiumToConstantinopleFixAt5": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -186,6 +200,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     5,
 		"HIVE_FORK_ISTANBUL":       2000,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"ConstantinopleFixToIstanbulAt5": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -197,6 +212,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     0,
 		"HIVE_FORK_ISTANBUL":       5,
 		"HIVE_FORK_BERLIN":         2000,
+		"HIVE_FORK_LONDON":         2000,
 	},
 	"IstanbulToBerlinAt5": {
 		"HIVE_FORK_HOMESTEAD": 0,
@@ -208,6 +224,31 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     0,
 		"HIVE_FORK_ISTANBUL":       0,
 		"HIVE_FORK_BERLIN":         5,
+		"HIVE_FORK_LONDON":         2000,
+	},
+	"BerlinToLondonAt5": {
+		"HIVE_FORK_HOMESTEAD": 0,
+		//"HIVE_FORK_DAO_BLOCK":      2000,
+		"HIVE_FORK_TANGERINE":      0,
+		"HIVE_FORK_SPURIOUS":       0,
+		"HIVE_FORK_BYZANTIUM":      0,
+		"HIVE_FORK_CONSTANTINOPLE": 0,
+		"HIVE_FORK_PETERSBURG":     0,
+		"HIVE_FORK_ISTANBUL":       0,
+		"HIVE_FORK_BERLIN":         0,
+		"HIVE_FORK_LONDON":         5,
+	},
+	"London": {
+		"HIVE_FORK_HOMESTEAD": 0,
+		//"HIVE_FORK_DAO_BLOCK":      2000,
+		"HIVE_FORK_TANGERINE":      0,
+		"HIVE_FORK_SPURIOUS":       0,
+		"HIVE_FORK_BYZANTIUM":      0,
+		"HIVE_FORK_CONSTANTINOPLE": 0,
+		"HIVE_FORK_PETERSBURG":     0,
+		"HIVE_FORK_ISTANBUL":       0,
+		"HIVE_FORK_BERLIN":         0,
+		"HIVE_FORK_LONDON":         0,
 	},
 }
 
@@ -357,6 +398,7 @@ func (tc *testcase) validate() error {
 func (tc *testcase) run(t *hivesim.T) {
 	start := time.Now()
 	root, genesis, blocks, err := tc.artefacts()
+	t.Logf("Executing test", "name", tc.name, "root", root, "genesis", genesis)
 	if err != nil {
 		t.Fatal("can't prepare artefacts:", err)
 	}
@@ -431,6 +473,7 @@ func toGethGenesis(test *btJSON) *core.Genesis {
 		Mixhash:    test.Genesis.MixHash,
 		Coinbase:   test.Genesis.Coinbase,
 		Alloc:      test.Pre,
+		BaseFee:    test.Genesis.BaseFee,
 	}
 	return genesis
 }

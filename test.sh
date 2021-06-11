@@ -14,7 +14,7 @@ RESULTS="/tmp/TestResults"
 
 FLAGS="--loglevel 4"
 FLAGS="$FLAGS --results-root $RESULTS "
-FLAGS="$FLAGS --sim.parallelism 1 --sim.rootcontext --client.checktimelimit=20s"
+FLAGS="$FLAGS --sim.parallelism 1 --client.checktimelimit=20s"
 
 echo "Running the quick'n'dirty version of the Hive tests, for local development"
 echo "To the the hive viewer up, you can do"
@@ -35,21 +35,21 @@ function run {
 function testconsensus {
   client=$1
   echo "$(date) Starting hive consensus simulation [$client]"
-  run "hive --sim ethereum/consensus --client $client --sim.loglevel 6 --sim.testlimit 2 $FLAGS"
+  run "./hive --sim ethereum/consensus --client $client --sim.loglevel 6 --sim.testlimit 2 $FLAGS"
 }
 function testgraphql {
   echo "$(date) Starting graphql simulation [$1]"
-  run "hive --sim ethereum/graphql --client $1 $FLAGS"
+  run "./hive --sim ethereum/graphql --client $1 $FLAGS"
 }
 
 function testsync {
   echo "$(date) Starting hive sync simulation [$1]"
-  run "hive --sim ethereum/sync --client=$1 $FLAGS"
+  run "./hive --sim ethereum/sync --client=$1 $FLAGS"
 }
 
 function testdevp2p {
   echo "$(date) Starting p2p simulation [$1]"
-  run "hive --sim devp2p --client $1 $FLAGS"
+  run "./hive --sim devp2p --client $1 $FLAGS"
 }
 
 mkdir $RESULTS

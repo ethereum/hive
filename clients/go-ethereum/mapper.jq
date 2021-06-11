@@ -51,5 +51,6 @@ def to_bool:
     "berlinBlock": env.HIVE_FORK_BERLIN|to_int,
     "yolov2Block": env.HIVE_FORK_BERLIN|to_int,
     "yolov3Block": env.HIVE_FORK_BERLIN|to_int,
+    "londonBlock": env.HIVE_FORK_LONDON|to_int,
   }|remove_empty
 }

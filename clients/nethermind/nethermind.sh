@@ -27,6 +27,7 @@
 #  - HIVE_FORK_CONSTANTINOPLE  block number for Constantinople transition
 #  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/PetersBurg transition
 #  - HIVE_FORK_BERLIN          block number for Berlin transition
+#  - HIVE_FORK_LONDON          block number for London
 #
 # Clique PoA:
 #
