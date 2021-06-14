@@ -184,6 +184,8 @@ github.com/ethereum/go-ethereum v1.10.3 h1:SEYOYARvbWnoDl1hOSks3ZJQpRiiRJe8ubaQG
 github.com/ethereum/go-ethereum v1.10.3/go.mod h1:99onQmSd1GRGOziyGldI41YQb7EESX3Q4H41IfJgIQQ=
 github.com/ethereum/go-ethereum v1.10.4-0.20210608083924-248572ee5463 h1:pT6N6Wp63RyfMN8rBT/ZbWOvG7WPTrA9EcsfqD1ZLmQ=
 github.com/ethereum/go-ethereum v1.10.4-0.20210608083924-248572ee5463/go.mod h1:nEE0TP5MtxGzOMd7egIrbPJMQBnhVU3ELNxhBglIzhg=
+github.com/ethereum/go-ethereum v1.10.4-0.20210614125420-7530803065c1 h1:+iyGarENf5JSUHtd97f0QymyFbYPFpWaEjQ8B9GfS/k=
+github.com/ethereum/go-ethereum v1.10.4-0.20210614125420-7530803065c1/go.mod h1:nEE0TP5MtxGzOMd7egIrbPJMQBnhVU3ELNxhBglIzhg=
 github.com/ethereum/hive v0.0.0-20201105181315-a9685e29a08a h1:iAySPtC9HSVEyS6Psr5nXKHeJI5YN8NJ0T7dn2sbmEc=
 github.com/ethereum/hive v0.0.0-20201105181315-a9685e29a08a/go.mod h1:2oTDtJ+hKbi+YF0+PS25sIZixHB88M/yUaXi/SRzgSE=
 github.com/fatih/color v1.3.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
