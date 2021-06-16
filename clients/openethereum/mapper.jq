@@ -135,6 +135,15 @@ def clique_engine:
     "eip2929Transition": env.HIVE_FORK_BERLIN|to_hex,
     "eip2930Transition": env.HIVE_FORK_BERLIN|to_hex,
 
+    # London
+    "eip1559Transition": env.HIVE_FORK_LONDON|to_hex,
+    "eip3198Transition": env.HIVE_FORK_LONDON|to_hex,
+    "eip3541Transition": env.HIVE_FORK_LONDON|to_hex,
+    "eip3529Transition": env.HIVE_FORK_LONDON|to_hex,
+    "eip1559BaseFeeMaxChangeDenominator": "0x8",
+    "eip1559ElasticityMultiplier": "0x2",
+    "eip1559BaseFeeInitialValue": "0x3B9ACA00"
+
     # Other chain parameters.
     "networkID": (env.HIVE_NETWORK_ID|to_hex // "0x539"),
     "chainID": (env.HIVE_CHAIN_ID|to_hex // "0x539"),
