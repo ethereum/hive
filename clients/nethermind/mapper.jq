@@ -61,6 +61,7 @@ def ethash_engine:
           (env.HIVE_FORK_BYZANTIUM|to_hex//""): 3000000,
           (env.HIVE_FORK_CONSTANTINOPLE|to_hex//""): 2000000,
           (env.HIVE_FORK_MUIR_GLACIER|to_hex//""): 4000000,
+          (env.HIVE_FORK_LONDON|to_hex//""): 700000,
         }
       }
     }
