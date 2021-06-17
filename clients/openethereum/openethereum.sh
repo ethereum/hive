@@ -108,9 +108,6 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --bootnodes $HIVE_BOOTNODE"
 fi
 
-# Disable warp sync. Not sure why we do this, need to investigate.
-FLAGS="$FLAGS --no-warp"
-
 # Import clique private key.
 if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
     echo "Importing clique private key..."
