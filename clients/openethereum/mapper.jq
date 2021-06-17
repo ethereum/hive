@@ -96,6 +96,7 @@ def clique_engine:
     "parentHash": .parentHash,
     "extraData": .extraData,
     "gasLimit": .gasLimit,
+    "baseFeePerGas": .baseFeePerGas,
   },
   "params": {
     # Tangerine Whistle
