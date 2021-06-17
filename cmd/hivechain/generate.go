@@ -90,7 +90,8 @@ func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 
 	var gasLimit uint64
 	if gen.Number().Uint64() > 0 {
-		gasLimit = core.CalcGasLimit(gen.PrevBlock(-1), 0, cfg.genesis.GasLimit)
+		prev := gen.PrevBlock(-1)
+		gasLimit = core.CalcGasLimit(prev.GasUsed(), prev.GasLimit(), 0, cfg.genesis.GasLimit)
 	}
 
 	var (
@@ -205,7 +206,7 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 		return fmt.Errorf("chain validation error: %v", err)
 	}
 	headstate, _ := blockchain.State()
-	dump := headstate.Dump(false, false, false)
+	dump := headstate.Dump(&state.DumpConfig{})
 
 	// Write out the generated blockchain
 	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 1); err != nil {

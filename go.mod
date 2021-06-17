@@ -12,7 +12,7 @@ require (
 	github.com/containerd/continuity v0.0.0-20200928162600-f2cc35102c2a // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/deckarep/golang-set v1.7.1 // indirect
-	github.com/ethereum/go-ethereum v1.10.2-0.20210330180930-4a37ae510eb0
+	github.com/ethereum/go-ethereum v1.10.4
 	github.com/fsouza/go-dockerclient v1.6.6
 	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
@@ -24,9 +24,6 @@ require (
 	github.com/moby/term v0.0.0-20201101162038-25d840ce174a // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/sirupsen/logrus v1.7.0 // indirect
-	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2 // indirect
-	golang.org/x/sync v0.0.0-20201020160332-67f06af15bc9 // indirect
-	golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44 // indirect
 	google.golang.org/genproto v0.0.0-20201109203340-2640f1f9cdfb // indirect
 	google.golang.org/grpc v1.33.2 // indirect
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
