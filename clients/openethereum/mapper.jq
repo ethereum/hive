@@ -60,6 +60,7 @@ def ethash_engine:
           (env.HIVE_FORK_BYZANTIUM|to_hex//""): 3000000,
           (env.HIVE_FORK_CONSTANTINOPLE|to_hex//""): 2000000,
           (env.HIVE_FORK_MUIR_GLACIER|to_hex//""): 4000000,
+          (env.HIVE_FORK_LONDON|to_hex//""): 700000,
         }
       }
     }
@@ -142,7 +143,7 @@ def clique_engine:
     "eip3529Transition": env.HIVE_FORK_LONDON|to_hex,
     "eip1559BaseFeeMaxChangeDenominator": "0x8",
     "eip1559ElasticityMultiplier": "0x2",
-    "eip1559BaseFeeInitialValue": "0x3B9ACA00"
+    "eip1559BaseFeeInitialValue": "0x3B9ACA00",
 
     # Other chain parameters.
     "networkID": (env.HIVE_NETWORK_ID|to_hex // "0x539"),
