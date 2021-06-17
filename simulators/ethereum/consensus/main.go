@@ -422,24 +422,30 @@ func (tc *testcase) run(t *hivesim.T) {
 	client := t.StartClient(tc.clientType, env, files)
 
 	t2 := time.Now()
-	genesisHash, err := getHash(client.RPC(), "0x0")
+	genesisHash, genesisResponse, err := getBlock(client.RPC(), "0x0")
 	if err != nil {
-		t.Fatal("can't get genesis:", err)
+		t.Fatalf("can't get genesis: %v", err)
 	}
 	wantGenesis := tc.blockTest.json.Genesis.Hash
 	if !bytes.Equal(wantGenesis[:], genesisHash) {
-		t.Fatalf("genesis mismatch:\n  want 0x%x\n   got 0x%x", wantGenesis, genesisHash)
+		t.Errorf("genesis hash mismatch:\n  want 0x%x\n   got 0x%x", wantGenesis, genesisHash)
+		t.Log("client genesis response:", genesisResponse)
+		testGenesis, _ := json.MarshalIndent(tc.blockTest.json.Genesis, "", "  ")
+		t.Log("expected fields:", string(testGenesis))
+		return
 	}
 
 	// verify postconditions
 	t3 := time.Now()
-	lastHash, err := getHash(client.RPC(), "latest")
+	lastHash, lastResponse, err := getBlock(client.RPC(), "latest")
 	if err != nil {
 		t.Fatal("can't get latest block:", err)
 	}
 	wantBest := tc.blockTest.json.BestBlock
 	if !bytes.Equal(wantBest[:], lastHash) {
-		t.Fatalf("last block mismatch:\n  want 0x%x\n   got 0x%x", wantBest, lastHash)
+		t.Errorf("last block hash mismatch:\n  want 0x%x\n   got 0x%x", wantBest, lastHash)
+		t.Log("block response:", lastResponse)
+		return
 	}
 
 	t4 := time.Now()
@@ -463,6 +469,7 @@ func (tc *testcase) updateEnv(env map[string]string) {
 	}
 }
 
+// toGethGenesis creates the genesis specification from a test block.
 func toGethGenesis(test *btJSON) *core.Genesis {
 	genesis := &core.Genesis{
 		Nonce:      test.Genesis.Nonce.Uint64(),
@@ -506,22 +513,28 @@ func (tc *testcase) artefacts() (string, string, []string, error) {
 	return rootDir, genesisFile, blocks, nil
 }
 
-func getHash(rawClient *rpc.Client, arg string) ([]byte, error) {
+// getBlock fetches a block from the client under test.
+func getBlock(client *rpc.Client, arg string) (blockhash []byte, responseJSON string, err error) {
 	blockData := make(map[string]interface{})
-	if err := rawClient.Call(&blockData, "eth_getBlockByNumber", arg, false); err != nil {
+	if err := client.Call(&blockData, "eth_getBlockByNumber", arg, false); err != nil {
 		// Make one more attempt
 		fmt.Println("Client connect failed, making one more attempt...")
-		if err = rawClient.Call(&blockData, "eth_getBlockByNumber", arg, false); err != nil {
-			return nil, err
+		if err = client.Call(&blockData, "eth_getBlockByNumber", arg, false); err != nil {
+			return nil, "", err
 		}
 	}
-	if hash, exist := blockData["hash"]; !exist {
-		return nil, fmt.Errorf("no block hash found in response")
-	} else {
-		if hexHash, ok := hash.(string); !ok {
-			return nil, fmt.Errorf("error: string conversion failed for `%v`", hash)
-		} else {
-			return common.HexToHash(hexHash).Bytes(), nil
-		}
+
+	// Capture all response data.
+	resp, _ := json.MarshalIndent(blockData, "", "  ")
+	responseJSON = string(resp)
+
+	hash, ok := blockData["hash"]
+	if !ok {
+		return nil, responseJSON, fmt.Errorf("no block hash found in response")
 	}
+	hexHash, ok := hash.(string)
+	if !ok {
+		return nil, responseJSON, fmt.Errorf("block hash in response is not a string: `%v`", hash)
+	}
+	return common.HexToHash(hexHash).Bytes(), responseJSON, nil
 }
