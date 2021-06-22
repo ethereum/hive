@@ -149,6 +149,7 @@ def clique_engine:
     "parentHash": .parentHash,
     "extraData": .extraData,
     "gasLimit": .gasLimit,
+    "baseFeePerGas": .baseFeePerGas,
   },
   "accounts": ((.alloc|with_entries(.key|="0x"+.)) * {
     "0x0000000000000000000000000000000000000001": {
