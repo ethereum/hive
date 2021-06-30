@@ -6,11 +6,10 @@ We have not tested hive on any OS other than Linux. It is usually best to use Ub
 Debian.
 
 First add `build-essential` by `sudo apt install build-essential`. Also install Go
-version 1.13 or later and add the installation directory to your `$PATH` as described
-in the [Go installation documentation]. You can check the installed Go version by
-running `go version`.
+version 1.13 or later and add it to your `$PATH` as described in the [Go installation
+documentation]. You can check the installed Go version by running `go version`.
 
-To get hive, you first need to clone the repository to the location of your preference.
+To get hive, you first need to clone the repository to the location of your choice.
 Then you can build the hive executable.
 
     git clone https://github.com/ethereum/hive
