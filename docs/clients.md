@@ -118,6 +118,7 @@ may map these to command line flags or use them generate a config file, for exam
 | `HIVE_FORK_ISTANBUL`       | decimal              | [Istanbul][EIP-1679] transition block          |
 | `HIVE_FORK_MUIRGLACIER`    | decimal              | [Muir Glacier][EIP-2387] transition block      |
 | `HIVE_FORK_BERLIN`         | decimal              | [Berlin][EIP-2070] transition block            |
+| `HIVE_FORK_LONDON`         | decimal              | [London][london-spec] transition block         |
 
 ### Enode script
 
@@ -138,6 +139,7 @@ instance. This script is executed by the Hive host in order to retrieve the enod
 [EIP-1716]: https://eips.ethereum.org/EIPS/eip-1716
 [EIP-2387]: https://eips.ethereum.org/EIPS/eip-2387
 [EIP-2070]: https://eips.ethereum.org/EIPS/eip-2070
+[london-spec]: https://github.com/ethereum/eth1.0-specs/blob/master/network-upgrades/mainnet-upgrades/london.md
 [Overview]: ./overview.md
 [Hive Commands]: ./commandline.md
 [Simulators]: ./simulators.md
