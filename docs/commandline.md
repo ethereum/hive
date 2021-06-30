@@ -5,10 +5,10 @@
 We have not tested hive on any OS other than Linux. It is usually best to use Ubuntu or
 Debian.
 
-First add `build-essential` by `sudo apt install build-essential`. This allows you to
-install Go in version 1.13 or later and add the installation directory to your `$PATH` as
-described in the [Go installation documentation]. You can check the installed Go version
-by running `go version`.
+First add `build-essential` by `sudo apt install build-essential`. Also install Go
+version 1.13 or later and add the installation directory to your `$PATH` as described
+in the [Go installation documentation]. You can check the installed Go version by
+running `go version`.
 
 To get hive, you first need to clone the repository to the location of your preference.
 Then you can build the hive executable.
@@ -17,7 +17,7 @@ Then you can build the hive executable.
     cd ./hive
     go build .
 
-To run simulutations, you need a working Docker setup. Hive needs to be run on the same
+To run simulations, you need a working Docker setup. Hive needs to be run on the same
 machine as dockerd. Using docker remotely is not supported at this time. [Install docker]
 and add your user to the `docker` group to allow using docker without `sudo`.
 
