@@ -1,6 +1,6 @@
 [Overview] | [Hive Commands] | [Simulators] | [Clients]
 
-## Installating hive
+## Installing Hive
 
 We have not tested hive on any OS other than Linux. It is usually best to use Ubuntu or
 Debian.
