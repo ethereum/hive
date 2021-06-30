@@ -38,44 +38,44 @@ type btBlock struct {
 }
 
 type btHeader struct {
-	Bloom            types.Bloom
-	Coinbase         common.Address
-	MixHash          common.Hash
-	Nonce            types.BlockNonce
-	Number           *big.Int
-	Hash             common.Hash
-	ParentHash       common.Hash
-	ReceiptTrie      common.Hash
-	StateRoot        common.Hash
-	TransactionsTrie common.Hash
-	UncleHash        common.Hash
-	ExtraData        []byte
-	//	ExtraData        hexutil.Bytes
-	Difficulty *big.Int
-	GasLimit   uint64
-	GasUsed    uint64
-	Timestamp  *big.Int
-	BaseFee    *big.Int `json:"baseFeePerGas"`
+	Bloom            types.Bloom      `json:"bloom"`
+	Coinbase         common.Address   `json:"miner"`
+	MixHash          common.Hash      `json:"mixHash"`
+	Nonce            types.BlockNonce `json:"nonce"`
+	Number           *big.Int         `json:"number"`
+	Hash             common.Hash      `json:"hash"`
+	ParentHash       common.Hash      `json:"parentHash"`
+	ReceiptTrie      common.Hash      `json:"receiptsRoot"`
+	StateRoot        common.Hash      `json:"stateRoot"`
+	TransactionsTrie common.Hash      `json:"transactionsRoot"`
+	UncleHash        common.Hash      `json:"sha3Uncles"`
+	ExtraData        []byte           `json:"extraData"`
+	Difficulty       *big.Int         `json:"difficulty`
+	GasLimit         uint64           `json:"gasLimit"`
+	GasUsed          uint64           `json:"gasUsed"`
+	Timestamp        *big.Int         `json:"timestamp"`
+	BaseFee          *big.Int         `json:"baseFeePerGas"`
 }
 
 func (b *btHeader) UnmarshalJSON(input []byte) error {
 	type btHeader struct {
-		Bloom            *types.Bloom
-		Coinbase         *common.Address
-		MixHash          *common.Hash
-		Nonce            *types.BlockNonce
-		Number           *math.HexOrDecimal256
-		Hash             *common.Hash
-		ParentHash       *common.Hash
-		ReceiptTrie      *common.Hash
-		StateRoot        *common.Hash
-		TransactionsTrie *common.Hash
-		UncleHash        *common.Hash
-		ExtraData        *hexutil.Bytes
-		Difficulty       *math.HexOrDecimal256
-		GasLimit         *math.HexOrDecimal64
-		GasUsed          *math.HexOrDecimal64
-		Timestamp        *math.HexOrDecimal256
+		Bloom            *types.Bloom          `json:"bloom"`
+		Coinbase         *common.Address       `json:"miner"`
+		CoinbaseAlt      *common.Address       `json:"author"`
+		MixHash          *common.Hash          `json:"mixHash"`
+		Nonce            *types.BlockNonce     `json:"nonce"`
+		Number           *math.HexOrDecimal256 `json:"number"`
+		Hash             *common.Hash          `json:"hash"`
+		ParentHash       *common.Hash          `json:"parentHash"`
+		ReceiptTrie      *common.Hash          `json:"receiptsRoot"`
+		StateRoot        *common.Hash          `json:"stateRoot"`
+		TransactionsTrie *common.Hash          `json:"transactionsRoot"`
+		UncleHash        *common.Hash          `json:"sha3Uncles"`
+		ExtraData        *hexutil.Bytes        `json:"extraData"`
+		Difficulty       *math.HexOrDecimal256 `json:"difficulty`
+		GasLimit         *math.HexOrDecimal64  `json:"gasLimit"`
+		GasUsed          *math.HexOrDecimal64  `json:"gasUsed"`
+		Timestamp        *math.HexOrDecimal256 `json:"timestamp"`
 		BaseFee          *math.HexOrDecimal256 `json:"baseFeePerGas"`
 	}
 	var dec btHeader
@@ -87,6 +87,10 @@ func (b *btHeader) UnmarshalJSON(input []byte) error {
 	}
 	if dec.Coinbase != nil {
 		b.Coinbase = *dec.Coinbase
+	} else {
+		if dec.CoinbaseAlt != nil {
+			b.Coinbase = *dec.CoinbaseAlt
+		}
 	}
 	if dec.MixHash != nil {
 		b.MixHash = *dec.MixHash

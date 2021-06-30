@@ -428,9 +428,9 @@ func (tc *testcase) run(t *hivesim.T) {
 	wantGenesis := tc.blockTest.json.Genesis.Hash
 	if !bytes.Equal(wantGenesis[:], genesisHash) {
 		t.Errorf("genesis hash mismatch:\n  want 0x%x\n   got 0x%x", wantGenesis, genesisHash)
-		t.Log("client genesis response:", genesisResponse)
-		testGenesis, _ := json.MarshalIndent(tc.blockTest.json.Genesis, "", "  ")
-		t.Log("expected fields:", string(testGenesis))
+		if diffs, err := compareGenesis(genesisResponse, tc.blockTest.json.Genesis); err == nil {
+			t.Logf("Found differences: %v", diffs)
+		}
 		return
 	}
 
@@ -536,4 +536,37 @@ func getBlock(client *rpc.Client, arg string) (blockhash []byte, responseJSON st
 		return nil, responseJSON, fmt.Errorf("block hash in response is not a string: `%v`", hash)
 	}
 	return common.HexToHash(hexHash).Bytes(), responseJSON, nil
+}
+
+// compareGenesis is a helper utility to print out diffs in the genesis returned from the client,
+// and print out the differences found. This is to avoid gigantic outputs where 40K tests all
+// spit out all the fields.
+func compareGenesis(have string, want btHeader) (string, error) {
+	var haveGenesis btHeader
+	if err := json.Unmarshal([]byte(have), &haveGenesis); err != nil {
+		return "", err
+	}
+	output := ""
+	cmp := func(have, want interface{}, name string) {
+		if haveStr, wantStr := fmt.Sprintf("%v", have), fmt.Sprintf("%v", want); haveStr != wantStr {
+			output += fmt.Sprintf("genesis.%v - have %v, want %v \n", name, haveStr, wantStr)
+		}
+	}
+	// No need to output the hash difference -- it's already printed before entering here
+	//cmp(haveGenesis.Hash, want.Hash, "hash")
+	cmp(haveGenesis.MixHash, want.MixHash, "mixHash")
+	cmp(haveGenesis.ParentHash, want.ParentHash, "parentHash")
+	cmp(haveGenesis.ReceiptTrie, want.ReceiptTrie, "receiptsRoot")
+	cmp(haveGenesis.TransactionsTrie, want.TransactionsTrie, "transactionsRoot")
+	cmp(haveGenesis.UncleHash, want.UncleHash, "sha3Uncles")
+	cmp(haveGenesis.Bloom, want.Bloom, "bloom")
+	cmp(haveGenesis.Number, want.Number, "number")
+	cmp(haveGenesis.Coinbase, want.Coinbase, "miner")
+	cmp(haveGenesis.ExtraData, want.ExtraData, "extraData")
+	cmp(haveGenesis.Difficulty, want.Difficulty, "difficulty")
+	cmp(haveGenesis.Timestamp, want.Timestamp, "timestamp")
+	cmp(haveGenesis.BaseFee, want.BaseFee, "baseFeePerGas")
+	cmp(haveGenesis.GasLimit, want.GasLimit, "gasLimit")
+	cmp(haveGenesis.GasUsed, want.GasUsed, "gasused")
+	return output, nil
 }
