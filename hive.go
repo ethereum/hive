@@ -22,17 +22,19 @@ import (
 
 func main() {
 	var (
-		testResultsRoot = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
-		loglevelFlag    = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
-		dockerEndpoint  = flag.String("docker.endpoint", "unix:///var/run/docker.sock", "Endpoint of the local Docker daemon.")
-		dockerNoCache   = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
-		dockerPull      = flag.Bool("docker.pull", false, "Refresh base images when building images.")
-		dockerOutput    = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
-		simPattern      = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
-		simParallelism  = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
-		simTestLimit    = flag.Int("sim.testlimit", 0, "Max `number` of tests to execute per client (interpreted by simulators).")
-		simTimeLimit    = flag.Duration("sim.timelimit", 0, "Simulation `timeout`. Hive aborts the simulator if it exceeds this time.")
-		simLogLevel     = flag.Int("sim.loglevel", 3, "Selects log `level` of client instances. Supports values 0-5.")
+		testResultsRoot       = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
+		loglevelFlag          = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
+		dockerEndpoint        = flag.String("docker.endpoint", "unix:///var/run/docker.sock", "Endpoint of the local Docker daemon.")
+		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
+		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
+		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
+		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
+		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
+		simTestLimit          = flag.Int("sim.testlimit", 0, "Max `number` of tests to execute per client (interpreted by simulators).")
+		simTimeLimit          = flag.Duration("sim.timelimit", 0, "Simulation `timeout`. Hive aborts the simulator if it exceeds this time.")
+		simLogLevel           = flag.Int("sim.loglevel", 3, "Selects log `level` of client instances. Supports values 0-5.")
+		simDevMode            = flag.Bool("dev", false, "Only starts the simulator API endpoint (listening at 127.0.0.1:3000 by default) without starting any simulators.")
+		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
 
 		clients = flag.String("client", "go-ethereum", "Comma separated `list` of clients to use. Client names in the list may be given as\n"+
 			"just the client name, or a client_branch specifier. If a branch name is supplied,\n"+
@@ -111,7 +113,11 @@ func main() {
 	if err := runner.initClients(ctx, clientList); err != nil {
 		fatal(err)
 	}
-	if len(simList) > 0 {
+
+	if *simDevMode {
+		log15.Info("running in simulator development mode")
+		runner.runSimulatorAPIDevMode(ctx, *simDevModeAPIEndpoint)
+	} else if len(simList) > 0 {
 		if err := runner.initSimulators(ctx, simList); err != nil {
 			fatal(err)
 		}
@@ -200,6 +206,40 @@ func (r *simRunner) runSimulations(ctx context.Context, simList []string) error 
 		if err := r.run(ctx, sim); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (r *simRunner) runSimulatorAPIDevMode(ctx context.Context, endpoint string) error {
+	tm := libhive.NewTestManager(r.env, r.container, -1)
+	defer func() {
+		if err := tm.Terminate(); err != nil {
+			log15.Error("could not terminate test manager", "error", err)
+		}
+	}()
+
+	addr, err := net.ResolveTCPAddr("tcp4", endpoint)
+	if err != nil {
+		log15.Error(fmt.Sprintf("failed to resolve %s", endpoint), "err", err)
+		return err
+	}
+
+	listener, err := net.ListenTCP("tcp4", addr)
+	if err != nil {
+		log15.Error(fmt.Sprintf("failed to start TCP server on %s", addr), "err", err)
+		return err
+	}
+
+	log15.Info(fmt.Sprintf("simulator API listening at %s", addr))
+	server := &http.Server{Handler: tm.API()}
+	defer shutdownServer(server)
+
+	go server.Serve(listener)
+
+	// wait for interrupt
+	select {
+	case <-ctx.Done():
+		break
 	}
 	return nil
 }
