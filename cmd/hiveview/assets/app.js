@@ -218,9 +218,9 @@ function onFileListing(data, error) {
                 title: "Start time",
                 data: "start",
                 type: "date",
-                width: "10em",
+                width: "12.5em",
                 render: function(data) {
-                    return new Date(data).toLocaleString();
+                    return new Date(data).toISOString();
                 },
             },
             {
