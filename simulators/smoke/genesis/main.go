@@ -56,6 +56,25 @@ func main() {
 		},
 		Run: genesisTest{"0x5ae31c6522bd5856129f66be3d582b842e4e9faaa87f21cce547128339a9db3c"}.test,
 	})
+	suite.Add(hivesim.ClientTestSpec{
+		Name:        "precomp-storage",
+		Description: "This imports a genesis where a precompile has code/nonce/storage.",
+		Files: map[string]string{
+			"/genesis.json": "genesis-precomp-storage.json",
+		},
+		Parameters: map[string]string{
+			"HIVE_CHAIN_ID":            "10",
+			"HIVE_FORK_HOMESTEAD":      "0",
+			"HIVE_FORK_TANGERINE":      "0",
+			"HIVE_FORK_SPURIOUS":       "0",
+			"HIVE_FORK_BYZANTIUM":      "0",
+			"HIVE_FORK_CONSTANTINOPLE": "0",
+			"HIVE_FORK_PETERSBURG":     "0",
+			"HIVE_FORK_ISTANBUL":       "0",
+		},
+		Run: genesisTest{"0x1b5dc4bd86f9209e6261d43dd3085034d3a502c3823903a417a95320caccaebf"}.test,
+	})
+
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
