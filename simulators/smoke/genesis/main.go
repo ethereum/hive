@@ -35,6 +35,7 @@ func main() {
 			"HIVE_FORK_ISTANBUL":       "18",
 			"HIVE_FORK_MUIR_GLACIER":   "19",
 			"HIVE_FORK_BERLIN":         "20",
+			"HIVE_FORK_LONDON":         "21",
 		},
 		Run: genesisTest{"0x433d0b859a77a29753d2a6df477c971dcc6300af33f9d64d821a1d490b4148b1"}.test,
 	})
@@ -73,6 +74,25 @@ func main() {
 			"HIVE_FORK_ISTANBUL":       "0",
 		},
 		Run: genesisTest{"0x1b5dc4bd86f9209e6261d43dd3085034d3a502c3823903a417a95320caccaebf"}.test,
+	})
+	suite.Add(hivesim.ClientTestSpec{
+		Name:        "precomp-empty",
+		Description: "This imports a genesis where a precompile is an empty account.",
+		Files: map[string]string{
+			"/genesis.json": "genesis-precomp-empty.json",
+		},
+		Parameters: map[string]string{
+			"HIVE_CHAIN_ID":            "10",
+			"HIVE_FORK_HOMESTEAD":      "0",
+			"HIVE_FORK_TANGERINE":      "0",
+			"HIVE_FORK_SPURIOUS":       "0",
+			"HIVE_FORK_BYZANTIUM":      "0",
+			"HIVE_FORK_CONSTANTINOPLE": "0",
+			"HIVE_FORK_PETERSBURG":     "0",
+			"HIVE_FORK_ISTANBUL":       "0",
+			"HIVE_FORK_BERLIN":         "0",
+		},
+		Run: genesisTest{"0xf6df6eb772235f4f193b1a514f34bc5e4e9ce747a83732d4e8fced78ba2e939c"}.test,
 	})
 
 	hivesim.MustRunSuite(hivesim.New(), suite)

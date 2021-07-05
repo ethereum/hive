@@ -1,0 +1,20 @@
+{
+  "nonce": "0x0000000000000042",
+  "difficulty": "0x2123456",
+  "mixHash": "0x123456789abcdef123456789abcdef123456789abcdef123456789abcdef1234",
+  "coinbase": "0x0000000000000000000000000000000000000000",
+  "coinbase": "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "timestamp": "0x123456",
+  "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+  "extraData": "0xfafbfcfd",
+  "gasLimit": "0x2fefd8",
+  "alloc": {
+    "0000000000000000000000000000000000000003": {
+      "balance": "0x0",
+      "code": "0x",
+      "nonce": "0x0",
+      "storage": {
+      }
+    }
+  }
+}
