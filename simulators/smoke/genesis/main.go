@@ -94,6 +94,25 @@ func main() {
 		},
 		Run: genesisTest{"0xf6df6eb772235f4f193b1a514f34bc5e4e9ce747a83732d4e8fced78ba2e939c"}.test,
 	})
+	suite.Add(hivesim.ClientTestSpec{
+		Name:        "precomp-zero-balance",
+		Description: "This imports a genesis where a precompile has code/nonce/storage, but balance is zero.",
+		Files: map[string]string{
+			"/genesis.json": "genesis-precomp-zero-balance.json",
+		},
+		Parameters: map[string]string{
+			"HIVE_CHAIN_ID":            "10",
+			"HIVE_FORK_HOMESTEAD":      "0",
+			"HIVE_FORK_TANGERINE":      "0",
+			"HIVE_FORK_SPURIOUS":       "0",
+			"HIVE_FORK_BYZANTIUM":      "0",
+			"HIVE_FORK_CONSTANTINOPLE": "0",
+			"HIVE_FORK_PETERSBURG":     "0",
+			"HIVE_FORK_ISTANBUL":       "0",
+			"HIVE_FORK_BERLIN":         "0",
+		},
+		Run: genesisTest{"0x251e6c3c84531a8b59a62535db474d0b5967f6f4ec82e47d62e70497ccdde6a7"}.test,
+	})
 
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
