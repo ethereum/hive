@@ -55,13 +55,13 @@ func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, e
 // network adapter.
 func LookupBridgeIP(logger log15.Logger) (net.IP, error) {
 	// Find the local IPv4 address of the docker0 bridge adapter
-	interfaes, err := net.Interfaces()
+	interfaces, err := net.Interfaces()
 	if err != nil {
 		logger.Error("failed to list network interfaces", "err", err)
 		return nil, err
 	}
 	// Iterate over all the interfaces and find the docker0 bridge
-	for _, iface := range interfaes {
+	for _, iface := range interfaces {
 		if iface.Name == "docker0" || strings.Contains(iface.Name, "vEthernet") {
 			// Retrieve all the addresses assigned to the bridge adapter
 			addrs, err := iface.Addrs()
