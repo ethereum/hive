@@ -1,3 +1,5 @@
 .vscode/
 workspace
 .idea/
+# build output
+/hive
