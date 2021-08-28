@@ -118,16 +118,6 @@ func (nc *NodeChoices) preferredValidator(beacon string) (*hivesim.ClientDefinit
 	return nil, fmt.Errorf("no preferred validator for beacon %s", beacon)
 }
 
-// TODO
-//func hasBuildTarget(def *libhive.ClientDefinition, target string) bool {
-//	for _, bt := range def.Meta.BuildTargets {
-//		if bt == target {
-//			return true
-//		}
-//	}
-//	return false
-//}
-
 // PreparedTestnet has all the options for starting nodes, ready to build the network.
 type PreparedTestnet struct {
 	configName            string
