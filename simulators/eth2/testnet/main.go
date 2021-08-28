@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
+	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/configs"
 	"strings"
 	"time"
@@ -74,10 +75,7 @@ func ComposeTestnetTest(name string, description string, build ...TestnetDecorat
 }
 
 func (nc *NodeChoices) runTests(t *hivesim.T) {
-
 	for _, beaconDef := range nc.beacon {
-		// only generate data once
-		prep := prepareTestnet(t)
 
 		validatorDef, err := nc.preferredValidator(beaconDef.Name)
 		if err != nil {
@@ -87,6 +85,8 @@ func (nc *NodeChoices) runTests(t *hivesim.T) {
 			"single-client-testnet",
 			"This runs quick eth2 single-client testnets, beacon nodes matched with preferred validator type, and dummy eth1 endpoint.",
 			func(testnet *Testnet) {
+
+				prep := prepareTestnet(t)
 				for i := 0; i < len(prep.keys); i++ {
 					prep.buildBeaconNode(beaconDef, nil)(testnet)
 					prep.buildValidatorClient(validatorDef, i, i)(testnet)
@@ -120,7 +120,7 @@ func (nc *NodeChoices) preferredValidator(beacon string) (*hivesim.ClientDefinit
 
 // PreparedTestnet has all the options for starting nodes, ready to build the network.
 type PreparedTestnet struct {
-	configName            string
+	spec                  *common.Spec
 	commonValidatorParams hivesim.StartOption
 	commonBeaconParams    hivesim.StartOption
 	configOpt             hivesim.StartOption
@@ -129,16 +129,21 @@ type PreparedTestnet struct {
 }
 
 func prepareTestnet(t *hivesim.T) *PreparedTestnet {
-	// TODO: copy and modify with env vars
-	configName := "mainnet"
-	spec := configs.Mainnet // TODO: mod config
+	var spec *common.Spec
+	{
+		// TODO: specify build-target based on preset, to run clients in mainnet or minimal mode.
+		// copy the default mainnet config, and make some minimal modifications for testnet usage
+		tmp := *configs.Mainnet
+		tmp.Config.GENESIS_FORK_VERSION = common.Version{0xff, 0, 0, 0}
+		tmp.Config.ALTAIR_FORK_VERSION = common.Version{0xff, 0, 0, 1}
+		tmp.Config.ALTAIR_FORK_EPOCH = 10 // TODO: time altair fork
+		spec = &tmp
+	}
+
+	eth2Config := setup.Eth2ConfigToParams(&spec.Config)
+
 	valCount := uint64(4096)
 	keyPartitions := uint64(4)
-
-	eth2Config := hivesim.Params{
-		"HIVE_ETH2_FOOBAR": "1234",
-		// TODO: load mainnet config, but custom vars
-	}
 
 	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 	keySrc := &setup.MnemonicsKeySource{
@@ -179,7 +184,7 @@ func prepareTestnet(t *hivesim.T) *PreparedTestnet {
 	}
 
 	return &PreparedTestnet{
-		configName:            configName,
+		spec:                  spec,
 		commonBeaconParams:    beaconParams,
 		commonValidatorParams: validatorParams,
 		configOpt:             eth2Config,
@@ -212,18 +217,20 @@ func (p *PreparedTestnet) buildEth1Node(eth1Def *hivesim.ClientDefinition) func(
 func (p *PreparedTestnet) buildBeaconNode(beaconDef *hivesim.ClientDefinition, eth1Endpoints []int) TestnetDecorator {
 	return func(testnet *Testnet) {
 		opts := []hivesim.StartOption{p.configOpt, p.stateOpt, p.commonBeaconParams}
-		// Hook up validator to beacon node
-		if len(eth1Endpoints) > 0 {
-			var addrs []string
-			for _, index := range eth1Endpoints {
-				if index >= len(testnet.eth1) {
-					testnet.t.Fatalf("only have %d eth1 nodes, cannot find index %d for BN", len(testnet.eth1), index)
-				}
-				eth1Node := testnet.eth1[index]
-				addrs = append(addrs, fmt.Sprintf("http://%v:8545", eth1Node.IP))
+		// Hook up beacon node to (maybe multiple) eth1 nodes
+		for _, index := range eth1Endpoints {
+			if index < 0 || index >= len(testnet.eth1) {
+				testnet.t.Fatalf("only have %d eth1 nodes, cannot find index %d for BN", len(testnet.eth1), index)
 			}
-			opts = append(opts, hivesim.Params{"ETH1_RPC_ADDRS": strings.Join(addrs, ",")})
 		}
+
+		var addrs []string
+		for _, index := range eth1Endpoints {
+			eth1Node := testnet.eth1[index]
+			addrs = append(addrs, fmt.Sprintf("http://%v:8545", eth1Node.IP))
+		}
+		opts = append(opts, hivesim.Params{"ETH1_RPC_ADDRS": strings.Join(addrs, ",")})
+
 		// TODO
 		//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
 		//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
