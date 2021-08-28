@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
@@ -121,14 +122,24 @@ func (nc *NodeChoices) preferredValidator(beacon string) (*hivesim.ClientDefinit
 // PreparedTestnet has all the options for starting nodes, ready to build the network.
 type PreparedTestnet struct {
 	spec                  *common.Spec
+	eth1Genesis           *setup.Eth1Genesis
+	commonEth1Params      hivesim.StartOption
 	commonValidatorParams hivesim.StartOption
 	commonBeaconParams    hivesim.StartOption
-	configOpt             hivesim.StartOption
-	stateOpt              hivesim.StartOption
+	eth1ConfigOpt         hivesim.StartOption
+	eth2ConfigOpt         hivesim.StartOption
+	beaconStateOpt        hivesim.StartOption
 	keys                  []hivesim.StartOption
 }
 
 func prepareTestnet(t *hivesim.T) *PreparedTestnet {
+
+	var depositAddress common.Eth1Address
+	depositAddress.UnmarshalText([]byte("0x4242424242424242424242424242424242424242"))
+
+	eth1Genesis := setup.BuildEth1Genesis()
+	eth1Config := eth1Genesis.ToParams(depositAddress)
+
 	var spec *common.Spec
 	{
 		// TODO: specify build-target based on preset, to run clients in mainnet or minimal mode.
@@ -137,6 +148,9 @@ func prepareTestnet(t *hivesim.T) *PreparedTestnet {
 		tmp.Config.GENESIS_FORK_VERSION = common.Version{0xff, 0, 0, 0}
 		tmp.Config.ALTAIR_FORK_VERSION = common.Version{0xff, 0, 0, 1}
 		tmp.Config.ALTAIR_FORK_EPOCH = 10 // TODO: time altair fork
+		tmp.Config.DEPOSIT_CONTRACT_ADDRESS = common.Eth1Address(eth1Genesis.DepositAddress)
+		tmp.Config.DEPOSIT_CHAIN_ID = eth1Genesis.Genesis.Config.ChainID.Uint64()
+		tmp.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
 		spec = &tmp
 	}
 
@@ -165,11 +179,14 @@ func prepareTestnet(t *hivesim.T) *PreparedTestnet {
 	}
 
 	// prepare genesis beacon state, with all of the validators in it.
-	state, err := setup.BuildPhase0State(spec, keys)
+	state, err := setup.BuildBeaconState(eth1Genesis, spec, keys)
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	// Make all eth1 nodes mine blocks. Merge fork would deactivate this on the fly.
+	eth1Params := hivesim.Params{
+		"HIVE_MINER": "0x1212121212121212121212121212121212121212",
+	}
 	beaconParams := hivesim.Params{
 		"HIVE_ETH2_BN_API_PORT": "4000",
 	}
@@ -185,19 +202,37 @@ func prepareTestnet(t *hivesim.T) *PreparedTestnet {
 
 	return &PreparedTestnet{
 		spec:                  spec,
+		eth1Genesis:           eth1Genesis,
+		commonEth1Params:      eth1Params,
 		commonBeaconParams:    beaconParams,
 		commonValidatorParams: validatorParams,
-		configOpt:             eth2Config,
-		stateOpt:              stateOpt,
+		eth1ConfigOpt:         eth1Config,
+		eth2ConfigOpt:         eth2Config,
+		beaconStateOpt:        stateOpt,
 		keys:                  keyOpts,
 	}
 }
 
 type TestnetDecorator func(testnet *Testnet)
 
+type BeaconNode struct {
+	*hivesim.Client
+}
+
+func (bn *BeaconNode) ENR() (string, error) {
+	// TODO expose getter for P2P address
+	return "", nil
+}
+
+func (bn *BeaconNode) EnodeURL() (string, error) {
+	return "", errors.New("beacon node does not have an discv4 Enode URL, use ENR or multi-address instead")
+}
+
+// TODO expose beacon API endpoint
+
 type Testnet struct {
 	t          *hivesim.T
-	beacons    []*hivesim.Client
+	beacons    []*BeaconNode
 	validators []*hivesim.Client
 	eth1       []*hivesim.Client
 }
@@ -206,17 +241,30 @@ func NewTestnet(t *hivesim.T) *Testnet {
 	return &Testnet{t: t}
 }
 
-func (p *PreparedTestnet) buildEth1Node(eth1Def *hivesim.ClientDefinition) func(testnet *Testnet) {
+func (p *PreparedTestnet) buildEth1Node(eth1Def *hivesim.ClientDefinition) TestnetDecorator {
 	return func(testnet *Testnet) {
-		// TODO: eth1 node options: custom eth1 chain to back deposits for eth2 testnet...
-		n := testnet.t.StartClient(eth1Def.Name)
+		opts := []hivesim.StartOption{
+			p.eth1ConfigOpt, p.commonEth1Params,
+		}
+		if len(testnet.eth1) > 0 {
+			bootnode, err := testnet.eth1[0].EnodeURL()
+			if err != nil {
+				testnet.t.Fatalf("failed to get eth1 bootnode URL: %v", err)
+			}
+
+			// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
+			opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
+		}
+
+		n := testnet.t.StartClient(eth1Def.Name, opts...)
+
 		testnet.eth1 = append(testnet.eth1, n)
 	}
 }
 
 func (p *PreparedTestnet) buildBeaconNode(beaconDef *hivesim.ClientDefinition, eth1Endpoints []int) TestnetDecorator {
 	return func(testnet *Testnet) {
-		opts := []hivesim.StartOption{p.configOpt, p.stateOpt, p.commonBeaconParams}
+		opts := []hivesim.StartOption{p.eth2ConfigOpt, p.beaconStateOpt, p.commonBeaconParams}
 		// Hook up beacon node to (maybe multiple) eth1 nodes
 		for _, index := range eth1Endpoints {
 			if index < 0 || index >= len(testnet.eth1) {
@@ -231,11 +279,19 @@ func (p *PreparedTestnet) buildBeaconNode(beaconDef *hivesim.ClientDefinition, e
 		}
 		opts = append(opts, hivesim.Params{"ETH1_RPC_ADDRS": strings.Join(addrs, ",")})
 
+		if len(testnet.beacons) > 0 {
+			bootnodeENR, err := testnet.beacons[0].ENR()
+			if err != nil {
+				testnet.t.Fatalf("failed to get ENR as bootnode for beacon node: %v", err)
+			}
+			opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENR})
+		}
+
 		// TODO
 		//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
 		//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 		//}
-		bn := testnet.t.StartClient(beaconDef.Name, opts...)
+		bn := &BeaconNode{Client: testnet.t.StartClient(beaconDef.Name, opts...)}
 		testnet.beacons = append(testnet.beacons, bn)
 	}
 }
@@ -255,7 +311,7 @@ func (p *PreparedTestnet) buildValidatorClient(validatorDef *hivesim.ClientDefin
 		}
 		keysOpt := p.keys[keyIndex]
 		opts := []hivesim.StartOption{
-			p.configOpt, keysOpt, p.commonValidatorParams, bnAPIOpt,
+			p.eth2ConfigOpt, keysOpt, p.commonValidatorParams, bnAPIOpt,
 		}
 		// TODO
 		//if p.configName != "mainnet" && hasBuildTarget(validatorDef, p.configName) {

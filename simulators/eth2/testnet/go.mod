@@ -3,6 +3,7 @@ module github.com/ethereum/hive/simulators/eth2/testnet
 go 1.16
 
 require (
+	github.com/ethereum/go-ethereum v1.10.8
 	github.com/ethereum/hive v0.0.0-20210821090122-f34e4c76f4e4
 	github.com/google/uuid v1.3.0
 	github.com/herumi/bls-eth-go-binary v0.0.0-20210130185500-57372fb27371

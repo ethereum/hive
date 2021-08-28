@@ -49,7 +49,7 @@ type MnemonicsKeySource struct {
 	// To account range end, exclusive
 	To uint64 `yaml:"to"`
 	// Validator mnemonic
-	Validator  string `yaml:"validator"`
+	Validator string `yaml:"validator"`
 	// Withdrawal mnemonic
 	Withdrawal string `yaml:"withdrawal"`
 

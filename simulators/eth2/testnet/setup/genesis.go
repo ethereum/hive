@@ -7,7 +7,7 @@ import (
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 )
 
-func BuildPhase0State(spec *common.Spec, keys []*KeyDetails) (common.BeaconState, error) {
+func BuildBeaconState(eth1Genesis *Eth1Genesis, spec *common.Spec, keys []*KeyDetails) (common.BeaconState, error) {
 	kickstartValidators := make([]phase0.KickstartValidatorData, 0, len(keys))
 	hasher := sha256.New()
 	withdrawalCred := func(k common.BLSPubkey) (out common.Root) {
@@ -25,6 +25,9 @@ func BuildPhase0State(spec *common.Spec, keys []*KeyDetails) (common.BeaconState
 			Balance:               spec.MAX_EFFECTIVE_BALANCE,
 		})
 	}
+	// TODO: if building a Post-Merge genesis, then initialize the latest-block header
+	// in the state with the genesis block of execution layer.
+
 	// set genesis time to 0, we override it later as needed.
 	state, _, err := phase0.KickStartState(spec, common.Root{0: 0x42}, 0, kickstartValidators)
 	if err != nil {
