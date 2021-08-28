@@ -84,7 +84,6 @@ func BuildEth1Genesis() *Eth1Genesis {
 				MuirGlacierBlock:    big.NewInt(0),
 				BerlinBlock:         big.NewInt(0),
 				LondonBlock:         big.NewInt(0),
-				EWASMBlock:          nil,
 				CatalystBlock:       nil, // TODO enable merge testing
 				Ethash:              nil,
 				Clique:              nil,
