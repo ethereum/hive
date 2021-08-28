@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/ethereum/hive/hivesim"
-	"github.com/protolambda/zrnt/eth2/beacon"
+	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"
 	"io"
 	"io/ioutil"
@@ -17,12 +17,12 @@ func bytesSource(data []byte) func() (io.ReadCloser, error) {
 	}
 }
 
-func StateBundle(templ *beacon.BeaconStateView, genesisTime time.Time) (hivesim.StartOption, error) {
-	state, err := beacon.AsBeaconStateView(templ.Copy())
+func StateBundle(templ common.BeaconState, genesisTime time.Time) (hivesim.StartOption, error) {
+	state, err := templ.CopyState()
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy state: %v", err)
 	}
-	if err := state.SetGenesisTime(beacon.Timestamp(genesisTime.Unix())); err != nil {
+	if err := state.SetGenesisTime(common.Timestamp(genesisTime.Unix())); err != nil {
 		return nil, fmt.Errorf("failed to set genesis time: %v", err)
 	}
 	var stateBytes bytes.Buffer

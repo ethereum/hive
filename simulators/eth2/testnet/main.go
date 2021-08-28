@@ -214,7 +214,7 @@ func NewTestnet(t *hivesim.T) *Testnet {
 func (p *PreparedTestnet) buildEth1Node(eth1Def *hivesim.ClientDefinition) func(testnet *Testnet) {
 	return func(testnet *Testnet) {
 		// TODO: eth1 node options: custom eth1 chain to back deposits for eth2 testnet...
-		n := testnet.t.StartClientWithOptions(eth1Def.Name)
+		n := testnet.t.StartClient(eth1Def.Name)
 		testnet.eth1 = append(testnet.eth1, n)
 	}
 }
@@ -238,7 +238,7 @@ func (p *PreparedTestnet) buildBeaconNode(beaconDef *hivesim.ClientDefinition, e
 		//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
 		//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 		//}
-		bn := testnet.t.StartClientWithOptions(beaconDef.Name, opts...)
+		bn := testnet.t.StartClient(beaconDef.Name, opts...)
 		testnet.beacons = append(testnet.beacons, bn)
 	}
 }
@@ -264,7 +264,7 @@ func (p *PreparedTestnet) buildValidatorClient(validatorDef *hivesim.ClientDefin
 		//if p.configName != "mainnet" && hasBuildTarget(validatorDef, p.configName) {
 		//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 		//}
-		vc := testnet.t.StartClientWithOptions(validatorDef.Name, opts...)
+		vc := testnet.t.StartClient(validatorDef.Name, opts...)
 		testnet.validators = append(testnet.validators, vc)
 	}
 }

@@ -8,11 +8,13 @@ import (
 	"github.com/google/uuid"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
+	"github.com/protolambda/go-keystorev4"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"
 	"strings"
 )
 
+// TODO: replace wealdtech util with more minimal key derivation lib, can then also remove herumi BLS
 func init() {
 	if err := hbls.Init(hbls.BLS12_381); err != nil {
 		panic(err)
@@ -68,23 +70,41 @@ func mnemonicToSeed(mnemonic string) (seed []byte, err error) {
 	return seed, nil
 }
 
+func weakKeystore(secret []byte, pub []byte, passphrase []byte) (*keystorev4.Keystore, error) {
+	kdfParams, err := keystorev4.NewPBKDF2Params()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create PBKDF2 params: %w", err)
+	}
+	cipherParams, err := keystorev4.NewAES128CTRParams()
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AES128CTR params: %w", err)
+	}
+	crypto, err := keystorev4.Encrypt(secret, passphrase, kdfParams, keystorev4.Sha256ChecksumParams, cipherParams)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encrypt secret: %w", err)
+	}
+	id, err := uuid.NewUUID()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate UUID: %w", err)
+	}
+	return &keystorev4.Keystore{
+		Crypto:      *crypto,
+		Description: "",
+		Pubkey:      pub,
+		Path:        "",
+		UUID:        id,
+		Version:     4,
+	}, nil
+}
+
 // Same crypto, but not secure, for testing only!
 // Just generate weak keystores, so encryption and decryption doesn't take as long during testing.
 func marshalWeakKeystoreJSON(priv []byte, pub []byte, normedPass []byte) ([]byte, error) {
-	data := make(map[string]interface{})
-	// TODO: lighthouse can't handle this field, should it be here?
-	//data["name"] = ke.name
-	var err error
-	data["crypto"], err = encrypt(priv, normedPass, "pbkdf2", 2)
+	store, err := weakKeystore(priv, pub, normedPass)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to encrypt keystore: %v", err)
 	}
-	// Empty, no need to specify (it's only for the wallet user, not the consuming client)
-	data["path"] = ""
-	data["uuid"] = uuid.New()
-	data["version"] = 4
-	data["pubkey"] = fmt.Sprintf("%x", pub)
-	return json.MarshalIndent(data, "", "  ")
+	return json.MarshalIndent(store, "", "  ")
 }
 
 func (k *MnemonicsKeySource) Keys() ([]*KeyDetails, error) {
