@@ -1,4 +1,5 @@
-role: beacon
+roles:
+  - beacon
 build_targets:
   - mainnet
   - minimal

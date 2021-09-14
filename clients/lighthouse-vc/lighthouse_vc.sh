@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Immediately abort the script on any error encountered
+set -e
+
 mkdir -p /data/testnet_setup
 
 echo "${DEPOSIT_CONTRACT_ADDRESS:-'0x1111111111111111111111111111111111111111'}" > /data/testnet_setup/deposit_contract.txt

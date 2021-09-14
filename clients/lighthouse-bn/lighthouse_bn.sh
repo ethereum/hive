@@ -1,6 +1,9 @@
 #!/bin/bash
 
-if test -f "/hive/input/genesis.ssz"; then
+# Immediately abort the script on any error encountered
+set -e
+
+if [ ! -f "/hive/input/genesis.ssz" ]; then
     if [ -z "$HIVE_ETH2_ETH1_RPC_ADDRS" ]; then
       echo "genesis.ssz file is missing, and no Eth1 RPC addr was provided for building genesis from scratch."
       # TODO: alternative to start from weak-subjectivity-state
@@ -32,7 +35,7 @@ case "$HIVE_LOGLEVEL" in
     5)   LOG=trace ;;
 esac
 
-eth1_option=$([[ "$ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$ETH1_RPC_ADDRS")
+eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
 ip_option=$([[ "$HIVE_ETH2_P2P_IP_ADDRESS" == "" ]] && echo "" || echo "--disable-enr-auto-update=true  --enr-address='$HIVE_ETH2_P2P_IP_ADDRESS'")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port='$HIVE_ETH2_METRICS_PORT' --metrics-allow-origin='*")
 

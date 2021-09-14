@@ -110,7 +110,7 @@ func (conf *Eth1Genesis) ToParams(depositAddress [20]byte) hivesim.Params {
 		"HIVE_NETWORK_ID":               fmt.Sprintf("%d", conf.NetworkID),
 		"HIVE_CHAIN_ID":                 conf.Genesis.Config.ChainID.String(),
 		"HIVE_FORK_HOMESTEAD":           conf.Genesis.Config.HomesteadBlock.String(),
-		"HIVE_FORK_DAO_BLOCK":           conf.Genesis.Config.DAOForkBlock.String(),
+		//"HIVE_FORK_DAO_BLOCK":           conf.Genesis.Config.DAOForkBlock.String(),  // nil error, not used anyway
 		"HIVE_FORK_TANGERINE":           conf.Genesis.Config.EIP150Block.String(),
 		"HIVE_FORK_SPURIOUS":            conf.Genesis.Config.EIP155Block.String(), // also eip558
 		"HIVE_FORK_BYZANTIUM":           conf.Genesis.Config.ByzantiumBlock.String(),

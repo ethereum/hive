@@ -71,9 +71,15 @@ func mnemonicToSeed(mnemonic string) (seed []byte, err error) {
 }
 
 func weakKeystore(secret []byte, pub []byte, passphrase []byte) (*keystorev4.Keystore, error) {
-	kdfParams, err := keystorev4.NewPBKDF2Params()
-	if err != nil {
-		return nil, fmt.Errorf("failed to create PBKDF2 params: %w", err)
+	var salt [32]byte
+	if _, err := rand.Read(salt[:]); err != nil {
+		return nil, err
+	}
+	kdfParams := &keystorev4.PBKDF2Params{
+		Dklen: 32,
+		C:     2, // INSECURE but much faster, this is an ephemeral testnet
+		Prf:   "hmac-sha256",
+		Salt:  nil,
 	}
 	cipherParams, err := keystorev4.NewAES128CTRParams()
 	if err != nil {

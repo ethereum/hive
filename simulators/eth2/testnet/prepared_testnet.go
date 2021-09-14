@@ -59,6 +59,7 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 
 	eth2Config := setup.Eth2ConfigToParams(&spec.Config)
 
+	t.Logf("generating %d validator keys...", valCount)
 	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 	keySrc := &setup.MnemonicsKeySource{
 		From:       0,
@@ -78,6 +79,7 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 		keyOpts = append(keyOpts, setup.KeysBundle(keys[startIndex:endIndex]))
 	}
 
+	t.Log("building beacon state...")
 	// prepare genesis beacon state, with all of the validators in it.
 	state, err := setup.BuildBeaconState(eth1Genesis, spec, keys)
 	if err != nil {
@@ -105,6 +107,7 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 		t.Fatal(err)
 	}
 
+	t.Log("prepared testnet!")
 	return &PreparedTestnet{
 		spec:                  spec,
 		eth1Genesis:           eth1Genesis,
@@ -119,10 +122,11 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 	}
 }
 
-func (p *PreparedTestnet) createTestnet() *Testnet {
+func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	time, _ := p.eth2Genesis.GenesisTime()
 	valRoot, _ := p.eth2Genesis.GenesisValidatorsRoot()
 	return &Testnet{
+		t: t,
 		genesisTime:           time,
 		genesisValidatorsRoot: valRoot,
 		spec:                  p.spec,
@@ -170,7 +174,7 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 		}
 		addrs = append(addrs, userRPC)
 	}
-	opts = append(opts, hivesim.Params{"ETH1_RPC_ADDRS": strings.Join(addrs, ",")})
+	opts = append(opts, hivesim.Params{"HIVE_ETH2_ETH1_RPC_ADDRS": strings.Join(addrs, ",")})
 
 	if len(testnet.beacons) > 0 {
 		bootnodeENR, err := testnet.beacons[0].ENR()
