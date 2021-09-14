@@ -49,6 +49,8 @@ HIVE_ETH2_BN_API_PORT: "{port}"
 HIVE_ETH2_BN_VENDOR: "{vendor}"  # lowercase name of BN type. E.g. "prysm"
 
 HIVE_ETH2_GRAFFITI: ""  # graffiti to put in blocks. Disabled if empty.
+
+HIVE_ETH2_VC_API_PORT: 
 ```
 
 ### Beacon Node
