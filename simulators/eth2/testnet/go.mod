@@ -16,6 +16,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.2 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/protolambda/bls12-381-util v0.0.0-20210812140640-b03868185758 // indirect
+	github.com/protolambda/eth2api v0.0.0-20210915023423-5ced0973b68d
 	github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52
 	github.com/protolambda/zrnt v0.20.0
 	github.com/protolambda/ztyp v0.1.9

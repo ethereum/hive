@@ -72,7 +72,7 @@ func (nc *ClientDefinitionsByRole) SimpleTestnetTest() hivesim.TestSpec {
 
 			ctx := context.Background()
 			// TODO: maybe run other assertions / tests in the background?
-			testnet.ExpectFinality(ctx)
+			testnet.TrackFinality(ctx)
 		},
 	}
 }

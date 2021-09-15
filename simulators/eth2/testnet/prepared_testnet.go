@@ -190,7 +190,7 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 	//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
 	//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 	//}
-	bn := &BeaconNode{Client: testnet.t.StartClient(beaconDef.Name, opts...)}
+	bn := NewBeaconNode(testnet.t.StartClient(beaconDef.Name, opts...))
 	testnet.beacons = append(testnet.beacons, bn)
 }
 

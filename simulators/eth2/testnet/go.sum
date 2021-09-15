@@ -305,6 +305,8 @@ github.com/jstemmer/go-junit-report v0.9.1/go.mod h1:Brl9GWCQeLvo8nXZwPNNblvFj/X
 github.com/jsternberg/zap-logfmt v1.0.0/go.mod h1:uvPs/4X51zdkcm5jXl5SYoN+4RK21K8mysFmDaM/h+o=
 github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVYBRgL+9YlvaHOwJU=
 github.com/julienschmidt/httprouter v1.2.0/go.mod h1:SYymIcj16QtmaHHD7aYtjjsJG7VTCxuUUipMqKk8s4w=
+github.com/julienschmidt/httprouter v1.3.0 h1:U0609e9tgbseu3rBINet9P48AI/D3oJs4dN7jwJOQ1U=
+github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8IZAc4RVcycCCAKdM=
 github.com/jung-kurt/gofpdf v1.0.3-0.20190309125859-24315acbbda5/go.mod h1:7Id9E/uU8ce6rXgefFLlgrJj/GYY22cpxn+r32jIOes=
 github.com/jwilder/encoding v0.0.0-20170811194829-b4e1701a28ef/go.mod h1:Ct9fl0F6iIOGgxJ5npU/IUOhOhqlVrGjyIZc8/MagT0=
 github.com/karalabe/usb v0.0.0-20190919080040-51dc0efba356/go.mod h1:Od972xHfMJowv7NGVDiWVxk2zxnWgjLlJzE+F4F7AGU=
@@ -446,6 +448,10 @@ github.com/protolambda/bls12-381-util v0.0.0-20210720105258-a772f2aac13e h1:ugvw
 github.com/protolambda/bls12-381-util v0.0.0-20210720105258-a772f2aac13e/go.mod h1:MPZvj2Pr0N8/dXyTPS5REeg2sdLG7t8DRzC1rLv925w=
 github.com/protolambda/bls12-381-util v0.0.0-20210812140640-b03868185758 h1:Y+nKcW05nyE1vh/lqislMgU0ZMk7Pq/hEDk72mSybTQ=
 github.com/protolambda/bls12-381-util v0.0.0-20210812140640-b03868185758/go.mod h1:IToEjHuttnUzwZI5KBSM/LOOW3qLbbrHOEfp3SbECGY=
+github.com/protolambda/eth2api v0.0.0-20210903181825-6d2901b54651 h1:CChqUw+ufRD4iiMctT9f3w8oyzhiUv6ebYxvCoMzeZE=
+github.com/protolambda/eth2api v0.0.0-20210903181825-6d2901b54651/go.mod h1:L8zQC+5fWz75sF2y1sfeEEmPBL7Jm3JQHA9hh6f/mE8=
+github.com/protolambda/eth2api v0.0.0-20210915023423-5ced0973b68d h1:HjB40oQqNdUszn6eCzaDq750zQnL+p3R2MxO84nE/h0=
+github.com/protolambda/eth2api v0.0.0-20210915023423-5ced0973b68d/go.mod h1:L8zQC+5fWz75sF2y1sfeEEmPBL7Jm3JQHA9hh6f/mE8=
 github.com/protolambda/go-keystorev4 v0.0.0-20210718213028-59e66c3494f0 h1:0fW/tnYKPWvcLIEyBQkSIckLWJLa6at2Ji/FydCgXbU=
 github.com/protolambda/go-keystorev4 v0.0.0-20210718213028-59e66c3494f0/go.mod h1:Xda3KO8+DMyWaTr+LwUUpVRTB5SdFzoKu0ivXNI6p1s=
 github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52 h1:5znmcOBjXNx2ox6KXpBRAoIuDOCw7ZV+2Xb6yZ7M0K0=

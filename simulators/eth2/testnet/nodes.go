@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"github.com/ethereum/hive/hivesim"
-	"strings"
+	"github.com/protolambda/eth2api"
+	"github.com/protolambda/eth2api/client/nodeapi"
+	"net/http"
+	"time"
 )
 
 const (
@@ -36,21 +40,27 @@ func (en *Eth1Node) EngineRPCAddress() (string, error) {
 
 type BeaconNode struct {
 	*hivesim.Client
+	API *eth2api.Eth2HttpClient
 }
 
-func (bn *BeaconNode) BeaconAPI() (string, error) {
-	return fmt.Sprintf("http://%s:%d", bn.IP, PortBeaconAPI), nil
+func NewBeaconNode(cl *hivesim.Client) *BeaconNode {
+	return &BeaconNode{
+		Client:         cl,
+		API: &eth2api.Eth2HttpClient{
+			Addr:  fmt.Sprintf("http://%s:%d", cl.IP, PortBeaconAPI),
+			Cli:   &http.Client{},
+			Codec: eth2api.JSONCodec{},
+		},
+	}
 }
 
 func (bn *BeaconNode) ENR() (string, error) {
-	out, err := bn.Exec("enr.sh")
-	if err != nil {
-		return "", fmt.Errorf("failed exec: %v", err)
+	ctx, _ := context.WithTimeout(context.Background(), time.Second * 10)
+	var out eth2api.NetworkIdentity
+	if err := nodeapi.Identity(ctx, bn.API, &out); err != nil {
+		return "", err
 	}
-	if out.ExitCode != 0 {
-		return "", fmt.Errorf("script exit %d: %s", out.ExitCode, out.Stderr)
-	}
-	return strings.TrimSpace(out.Stdout), nil
+	return out.ENR, nil
 }
 
 func (bn *BeaconNode) EnodeURL() (string, error) {
