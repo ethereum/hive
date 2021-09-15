@@ -18,8 +18,8 @@ cp /hive/input/genesis.ssz /data/testnet_setup/genesis.ssz
 # empty bootnodes file, required for custom testnet setup, use CLI arg instead to configure it.
 echo "[]" > /data/testnet_setup/boot_enr.yaml
 
-echo "${DEPOSIT_CONTRACT_ADDRESS:-'0x1111111111111111111111111111111111111111'}" > /data/testnet_setup/deposit_contract.txt
-echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-'0'}" > /data/testnet_setup/deploy_block.txt
+echo "${DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" > /data/testnet_setup/deposit_contract.txt
+echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" > /data/testnet_setup/deploy_block.txt
 
 /make_config.sh > /data/testnet_setup/config.yaml
 
@@ -36,8 +36,8 @@ case "$HIVE_LOGLEVEL" in
 esac
 
 eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
-ip_option=$([[ "$HIVE_ETH2_P2P_IP_ADDRESS" == "" ]] && echo "" || echo "--disable-enr-auto-update=true  --enr-address='$HIVE_ETH2_P2P_IP_ADDRESS'")
-metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port='$HIVE_ETH2_METRICS_PORT' --metrics-allow-origin='*")
+ip_option=$([[ "$HIVE_ETH2_P2P_IP_ADDRESS" == "" ]] && echo "" || echo "--disable-enr-auto-update=true  --enr-address=$HIVE_ETH2_P2P_IP_ADDRESS")
+metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
 
 lighthouse \
     --debug-level="$LOG" \
