@@ -31,8 +31,9 @@ with prefix `HIVE_`. It may also upload files into the container before it start
 the container is created, hive simply runs the entry point defined in the `Dockerfile`.
 
 For all client containers, hive waits for TCP port 8545 to open before considering the
-client ready for use by the simulator. If the client container does not open this port
-within a certain timeout, hive assumes the client has failed to start.
+client ready for use by the simulator. This port is configurable as`HIVE_CHECK_LIVE_PORT`,
+and can be disabled with `0`. When enabled, if the client container does not open this
+port within a certain timeout, hive assumes the client has failed to start.
 
 Environment variables and files interpreted by the entry point define a 'protocol'
 between the simulator and client. While hive itself does not require support for any
@@ -119,11 +120,6 @@ may map these to command line flags or use them generate a config file, for exam
 | `HIVE_FORK_MUIRGLACIER`    | decimal              | [Muir Glacier][EIP-2387] transition block      |
 | `HIVE_FORK_BERLIN`         | decimal              | [Berlin][EIP-2070] transition block            |
 | `HIVE_FORK_LONDON`         | decimal              | [London][london-spec] transition block         |
-
-### Live check
-
-After starting a client, the client is checked to be live by polling a TCP port.
-This is configurable with `HIVE_CHECK_LIVE_PORT` (default `8545`, disable with `0`).
 
 ### Enode script
 
