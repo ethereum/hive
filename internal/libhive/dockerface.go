@@ -39,7 +39,7 @@ type ContainerOptions struct {
 	Files map[string]*multipart.FileHeader
 
 	// These options apply when starting the container.
-	CheckLive bool   // requests check for TCP port 8545
+	CheckLive uint16 // requests check for the given TCP port
 	LogFile   string // if set, container output is written to this file
 }
 

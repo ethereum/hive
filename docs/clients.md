@@ -120,6 +120,11 @@ may map these to command line flags or use them generate a config file, for exam
 | `HIVE_FORK_BERLIN`         | decimal              | [Berlin][EIP-2070] transition block            |
 | `HIVE_FORK_LONDON`         | decimal              | [London][london-spec] transition block         |
 
+### Live check
+
+After starting a client, the client is checked to be live by polling a TCP port.
+This is configurable with `HIVE_CHECK_LIVE_PORT` (default `8545`, disable with `0`).
+
 ### Enode script
 
 Some tests require peer-to-peer node information of the client instance. The client
