@@ -71,7 +71,7 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 	if err != nil {
 		t.Fatal(err)
 	}
-	keyOpts := make([]hivesim.StartOption, keyTranches)
+	keyOpts := make([]hivesim.StartOption, 0, keyTranches)
 	for i := uint64(0); i < keyTranches; i++ {
 		// Give each validator client an equal subset of the genesis validator keys
 		startIndex := valCount * i / keyTranches
@@ -93,12 +93,14 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 		"HIVE_ETH2_BN_API_PORT": fmt.Sprintf("%d", PortBeaconAPI),
 		"HIVE_ETH2_BN_GRPC_PORT": fmt.Sprintf("%d", PortBeaconGRPC),
 		"HIVE_ETH2_METRICS_PORT": fmt.Sprintf("%d", PortMetrics),
+		"HIVE_CHECK_LIVE_PORT": fmt.Sprintf("%d", PortBeaconAPI),
 	}
 	validatorParams := hivesim.Params{
 		"HIVE_ETH2_BN_API_PORT": fmt.Sprintf("%d", PortBeaconAPI),
 		"HIVE_ETH2_BN_GRPC_PORT": fmt.Sprintf("%d", PortBeaconGRPC),
 		"HIVE_ETH2_VC_API_PORT": fmt.Sprintf("%d", PortValidatorAPI),
 		"HIVE_ETH2_METRICS_PORT": fmt.Sprintf("%d", PortMetrics),
+		"HIVE_CHECK_LIVE_PORT": "0",  // TODO not every validator client has an API or metrics to check if it's live
 	}
 
 	// we need a new genesis time, so we take the template state and prepare a tar with updated time

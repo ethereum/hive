@@ -44,7 +44,6 @@ func (nc *ClientDefinitionsByRole) SimpleTestnetTest() hivesim.TestSpec {
 		Name:        "single-client-testnet",
 		Description: "This runs quick eth2 single-client type testnet, with 4 nodes and 2**14 (minimum) validators",
 		Run: func(t *hivesim.T) {
-			// 4096 validators, split between 4 nodes
 			prep := prepareTestnet(t, 1 << 14, 4)
 			testnet := prep.createTestnet(t)
 

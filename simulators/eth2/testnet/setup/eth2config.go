@@ -8,7 +8,7 @@ import (
 
 func Eth2ConfigToParams(config *common.Config) hivesim.Params {
 	u64 := func(v uint64) string { return fmt.Sprintf("%d", v) }
-	out := hivesim.Params{
+	tmp := map[string]string{
 		"PRESET_BASE": config.PRESET_BASE,
 
 		// Genesis.
@@ -47,9 +47,9 @@ func Eth2ConfigToParams(config *common.Config) hivesim.Params {
 		"DEPOSIT_NETWORK_ID":       u64(config.DEPOSIT_NETWORK_ID),
 		"DEPOSIT_CONTRACT_ADDRESS": config.DEPOSIT_CONTRACT_ADDRESS.String(),
 	}
+	out := make(hivesim.Params, len(tmp))
 	// prefix everything
-	for k, v := range out {
-		delete(out, k)
+	for k, v := range tmp {
 		out["HIVE_ETH2_CONFIG_"+k] = v
 	}
 	return out

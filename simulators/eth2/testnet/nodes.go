@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ethereum/hive/hivesim"
+	"strings"
 )
 
 const (
@@ -42,8 +43,14 @@ func (bn *BeaconNode) BeaconAPI() (string, error) {
 }
 
 func (bn *BeaconNode) ENR() (string, error) {
-	// TODO expose getter for P2P address
-	return "", nil
+	out, err := bn.Exec("enr.sh")
+	if err != nil {
+		return "", fmt.Errorf("failed exec: %v", err)
+	}
+	if out.ExitCode != 0 {
+		return "", fmt.Errorf("script exit %d: %s", out.ExitCode, out.Stderr)
+	}
+	return strings.TrimSpace(out.Stdout), nil
 }
 
 func (bn *BeaconNode) EnodeURL() (string, error) {
