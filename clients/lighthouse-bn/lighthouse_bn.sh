@@ -35,8 +35,12 @@ case "$HIVE_LOGLEVEL" in
     5)   LOG=trace ;;
 esac
 
+echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
+
+hostname -i
+
+CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
-ip_option=$([[ "$HIVE_ETH2_P2P_IP_ADDRESS" == "" ]] && echo "" || echo "--disable-enr-auto-update=true  --enr-address=$HIVE_ETH2_P2P_IP_ADDRESS")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
 
 lighthouse \
@@ -45,9 +49,11 @@ lighthouse \
     --testnet-dir=/data/testnet_setup \
     bn \
     --network-dir=/data/network \
-    $ip_option $metrics_option $eth1_option \
+    $metrics_option $eth1_option \
     --enr-tcp-port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --enr-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
+    --enr-address="${CONTAINER_IP}" \
+    --disable-enr-auto-update=true  \
     --port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --discovery-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}"  \
     --target-peers="${HIVE_ETH2_P2P_TARGET_PEERS:-10}" \

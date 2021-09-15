@@ -79,7 +79,7 @@ func weakKeystore(secret []byte, pub []byte, passphrase []byte) (*keystorev4.Key
 		Dklen: 32,
 		C:     2, // INSECURE but much faster, this is an ephemeral testnet
 		Prf:   "hmac-sha256",
-		Salt:  nil,
+		Salt:  salt[:],
 	}
 	cipherParams, err := keystorev4.NewAES128CTRParams()
 	if err != nil {

@@ -18,7 +18,7 @@ for keystore_path in /hive/input/keystores/*
 do
   pubkey=$(basename "$keystore_path")
   mkdir "/data/validators/$pubkey"
-  cp "/hive/input/keystores/$pubkey/keystore.json" "/data/validators/$pubkey/voting_keystore.json"
+  cp "/hive/input/keystores/$pubkey/keystore.json" "/data/validators/$pubkey/voting-keystore.json"
 done
 
 cp -r /hive/input/secrets /data/secrets
@@ -40,4 +40,4 @@ lighthouse \
     --validators-dir="/data/validators" \
     --secrets-dir="/data/secrets" \
     --init-slashing-protection \
-    --server="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT"
+    --beacon-nodes="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT"

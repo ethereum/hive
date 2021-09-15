@@ -60,6 +60,8 @@ func (bn *BeaconNode) ENR() (string, error) {
 	if err := nodeapi.Identity(ctx, bn.API, &out); err != nil {
 		return "", err
 	}
+	fmt.Printf("p2p addrs: %v\n", out.P2PAddresses)
+	fmt.Printf("peer id: %s\n", out.PeerID)
 	return out.ENR, nil
 }
 

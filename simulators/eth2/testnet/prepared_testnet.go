@@ -87,7 +87,6 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 	}
 	// Make all eth1 nodes mine blocks. Merge fork would deactivate this on the fly.
 	eth1Params := hivesim.Params{
-		"HIVE_MINER": "0x1212121212121212121212121212121212121212",
 	}
 	beaconParams := hivesim.Params{
 		"HIVE_ETH2_BN_API_PORT": fmt.Sprintf("%d", PortBeaconAPI),
@@ -150,6 +149,9 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 
 		// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
 		opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
+	} else {
+		// we only make the first eth1 node a miner
+		opts = append(opts, hivesim.Params{"HIVE_MINER": "0x1212121212121212121212121212121212121212"})
 	}
 
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}

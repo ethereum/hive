@@ -35,15 +35,19 @@ func (t *Testnet) TrackFinality(ctx context.Context) {
 
 	genesis := t.GenesisTime()
 	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
-	ticker := time.NewTicker(slotDuration)
-	// align to the start of the slot
-	ticker.Reset((slotDuration + (time.Now().Sub(genesis) % slotDuration)) % slotDuration)
+	timer := time.NewTicker(slotDuration)
 
 	for {
 		select {
 		case <- ctx.Done():
 			return
-		case <- ticker.C:
+		case tim := <- timer.C:
+			// start polling after first slot of genesis
+			if tim.Before(genesis.Add(slotDuration)) {
+				t.t.Logf("time till genesis: %s", genesis.Sub(tim))
+				continue
+			}
+
 			// new slot, log and check status of all beacon nodes
 
 			var wg sync.WaitGroup
@@ -71,10 +75,10 @@ func (t *Testnet) TrackFinality(ctx context.Context) {
 
 					slot := headInfo.Header.Message.Slot
 					t.t.Logf("beacon %d: head block root %s, slot %d, justified %s, finalized %s",
-						i, headInfo.Root, slot, out.CurrentJustified, out.Finalized)
+						i, headInfo.Root, slot, &out.CurrentJustified, &out.Finalized)
 
-					if ep := t.spec.SlotToEpoch(slot); ep + 2 > out.Finalized.Epoch {
-						t.t.Errorf("failing to finalize, head slot %d (epoch %d) is more than 2 ahead of finality checkpoint", slot, ep, out.Finalized.Epoch)
+					if ep := t.spec.SlotToEpoch(slot); ep > out.Finalized.Epoch+2 {
+						t.t.Errorf("failing to finalize, head slot %d (epoch %d) is more than 2 ahead of finality checkpoint %d", slot, ep, out.Finalized.Epoch)
 					}
 				}(ctx, i, b)
 			}

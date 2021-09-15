@@ -8,9 +8,6 @@ RUN chmod +x /make_config.sh
 ADD lighthouse_bn.sh /lighthouse_bn.sh
 RUN chmod +x /lighthouse_bn.sh
 
-ADD enr.sh /hive-bin/enr.sh
-RUN chmod +x /hive-bin/enr.sh
-
 # TODO: output accurate client version
 RUN echo "latest" > /version.txt
 
