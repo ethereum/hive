@@ -29,7 +29,7 @@ func main() {
 				t.Fatal(err)
 			}
 			t.Log("clients by role:", jsonStr(clientTypes))
-			byRole :=  ClientsByRole(clientTypes)
+			byRole := ClientsByRole(clientTypes)
 			t.Log("clients by role:", jsonStr(byRole))
 			simpleTest := byRole.SimpleTestnetTest()
 			t.Run(simpleTest)
@@ -38,13 +38,12 @@ func main() {
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-
 func (nc *ClientDefinitionsByRole) SimpleTestnetTest() hivesim.TestSpec {
 	return hivesim.TestSpec{
 		Name:        "single-client-testnet",
 		Description: "This runs quick eth2 single-client type testnet, with 4 nodes and 2**14 (minimum) validators",
 		Run: func(t *hivesim.T) {
-			prep := prepareTestnet(t, 1 << 14, 4)
+			prep := prepareTestnet(t, 1<<14, 4)
 			testnet := prep.createTestnet(t)
 
 			genesisTime := testnet.GenesisTime()

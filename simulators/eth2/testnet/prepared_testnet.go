@@ -13,11 +13,11 @@ import (
 // PreparedTestnet has all the options for starting nodes, ready to build the network.
 type PreparedTestnet struct {
 	// Consensus chain configuration
-	spec                  *common.Spec
+	spec *common.Spec
 	// Execution chain configuration and genesis info
-	eth1Genesis           *setup.Eth1Genesis
+	eth1Genesis *setup.Eth1Genesis
 	// Consensus genesis state
-	eth2Genesis           common.BeaconState
+	eth2Genesis common.BeaconState
 
 	// configuration to apply to every node of the given type
 	commonEth1Params      hivesim.StartOption
@@ -25,14 +25,14 @@ type PreparedTestnet struct {
 	commonBeaconParams    hivesim.StartOption
 
 	// embeds eth1 configuration into a node
-	eth1ConfigOpt         hivesim.StartOption
+	eth1ConfigOpt hivesim.StartOption
 	// embeds eth2 configuration into a node
-	eth2ConfigOpt         hivesim.StartOption
+	eth2ConfigOpt hivesim.StartOption
 	// embeds the genesis beacon state into a node
-	beaconStateOpt        hivesim.StartOption
+	beaconStateOpt hivesim.StartOption
 
 	// a tranche is a group of validator keys to run on 1 node
-	keyTranches           []hivesim.StartOption
+	keyTranches []hivesim.StartOption
 }
 
 func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *PreparedTestnet {
@@ -86,20 +86,19 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 		t.Fatal(err)
 	}
 	// Make all eth1 nodes mine blocks. Merge fork would deactivate this on the fly.
-	eth1Params := hivesim.Params{
-	}
+	eth1Params := hivesim.Params{}
 	beaconParams := hivesim.Params{
-		"HIVE_ETH2_BN_API_PORT": fmt.Sprintf("%d", PortBeaconAPI),
+		"HIVE_ETH2_BN_API_PORT":  fmt.Sprintf("%d", PortBeaconAPI),
 		"HIVE_ETH2_BN_GRPC_PORT": fmt.Sprintf("%d", PortBeaconGRPC),
 		"HIVE_ETH2_METRICS_PORT": fmt.Sprintf("%d", PortMetrics),
-		"HIVE_CHECK_LIVE_PORT": fmt.Sprintf("%d", PortBeaconAPI),
+		"HIVE_CHECK_LIVE_PORT":   fmt.Sprintf("%d", PortBeaconAPI),
 	}
 	validatorParams := hivesim.Params{
-		"HIVE_ETH2_BN_API_PORT": fmt.Sprintf("%d", PortBeaconAPI),
+		"HIVE_ETH2_BN_API_PORT":  fmt.Sprintf("%d", PortBeaconAPI),
 		"HIVE_ETH2_BN_GRPC_PORT": fmt.Sprintf("%d", PortBeaconGRPC),
-		"HIVE_ETH2_VC_API_PORT": fmt.Sprintf("%d", PortValidatorAPI),
+		"HIVE_ETH2_VC_API_PORT":  fmt.Sprintf("%d", PortValidatorAPI),
 		"HIVE_ETH2_METRICS_PORT": fmt.Sprintf("%d", PortMetrics),
-		"HIVE_CHECK_LIVE_PORT": "0",  // TODO not every validator client has an API or metrics to check if it's live
+		"HIVE_CHECK_LIVE_PORT":   "0", // TODO not every validator client has an API or metrics to check if it's live
 	}
 
 	// we need a new genesis time, so we take the template state and prepare a tar with updated time
@@ -127,7 +126,7 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	time, _ := p.eth2Genesis.GenesisTime()
 	valRoot, _ := p.eth2Genesis.GenesisValidatorsRoot()
 	return &Testnet{
-		t: t,
+		t:                     t,
 		genesisTime:           time,
 		genesisValidatorsRoot: valRoot,
 		spec:                  p.spec,

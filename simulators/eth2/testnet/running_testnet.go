@@ -14,13 +14,13 @@ import (
 type Testnet struct {
 	t *hivesim.T
 
-	genesisTime common.Timestamp
+	genesisTime           common.Timestamp
 	genesisValidatorsRoot common.Root
 
 	// Consensus chain configuration
-	spec                  *common.Spec
+	spec *common.Spec
 	// Execution chain configuration and genesis info
-	eth1Genesis           *setup.Eth1Genesis
+	eth1Genesis *setup.Eth1Genesis
 
 	beacons    []*BeaconNode
 	validators []*ValidatorClient
@@ -39,9 +39,9 @@ func (t *Testnet) TrackFinality(ctx context.Context) {
 
 	for {
 		select {
-		case <- ctx.Done():
+		case <-ctx.Done():
 			return
-		case tim := <- timer.C:
+		case tim := <-timer.C:
 			// start polling after first slot of genesis
 			if tim.Before(genesis.Add(slotDuration)) {
 				t.t.Logf("time till genesis: %s", genesis.Sub(tim))
@@ -55,7 +55,7 @@ func (t *Testnet) TrackFinality(ctx context.Context) {
 				wg.Add(1)
 				go func(ctx context.Context, i int, b *BeaconNode) {
 					defer wg.Done()
-					ctx, _ = context.WithTimeout(ctx, time.Second * 5)
+					ctx, _ = context.WithTimeout(ctx, time.Second*5)
 
 					var headInfo eth2api.BeaconBlockHeaderAndInfo
 					if exists, err := beaconapi.BlockHeader(ctx, b.API, eth2api.BlockHead, &headInfo); err != nil {

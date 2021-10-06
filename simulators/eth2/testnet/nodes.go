@@ -12,13 +12,13 @@ import (
 )
 
 const (
-	PortUserRPC = 8545
-	PortEngineRPC = 8600
-	PortBeaconTCP = 9000
-	PortBeaconUDP = 9000
-	PortBeaconAPI = 4000
-	PortBeaconGRPC = 4001
-	PortMetrics = 8080
+	PortUserRPC      = 8545
+	PortEngineRPC    = 8600
+	PortBeaconTCP    = 9000
+	PortBeaconUDP    = 9000
+	PortBeaconAPI    = 4000
+	PortBeaconGRPC   = 4001
+	PortMetrics      = 8080
 	PortValidatorAPI = 5000
 )
 
@@ -45,7 +45,7 @@ type BeaconNode struct {
 
 func NewBeaconNode(cl *hivesim.Client) *BeaconNode {
 	return &BeaconNode{
-		Client:         cl,
+		Client: cl,
 		API: &eth2api.Eth2HttpClient{
 			Addr:  fmt.Sprintf("http://%s:%d", cl.IP, PortBeaconAPI),
 			Cli:   &http.Client{},
@@ -55,7 +55,7 @@ func NewBeaconNode(cl *hivesim.Client) *BeaconNode {
 }
 
 func (bn *BeaconNode) ENR() (string, error) {
-	ctx, _ := context.WithTimeout(context.Background(), time.Second * 10)
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
 	var out eth2api.NetworkIdentity
 	if err := nodeapi.Identity(ctx, bn.API, &out); err != nil {
 		return "", err
@@ -72,4 +72,3 @@ func (bn *BeaconNode) EnodeURL() (string, error) {
 type ValidatorClient struct {
 	*hivesim.Client
 }
-
