@@ -37,8 +37,6 @@ esac
 
 echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
-hostname -i
-
 CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
