@@ -239,7 +239,18 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// so it can only be set after creating the container.
 	logPath, logFilePath := api.clientLogFilePaths(clientDef.Name, containerID)
 	options.LogFile = logFilePath
-	options.CheckLive = true
+
+	// by default: check the eth1 port
+	options.CheckLive = 8545
+	if portStr := env["HIVE_CHECK_LIVE_PORT"]; portStr != "" {
+		v, err := strconv.ParseUint(portStr, 10, 16)
+		if err != nil {
+			log15.Error("API: could not parse check-live port", "error", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		options.CheckLive = uint16(v)
+	}
 
 	// Start it!
 	info, err := api.backend.StartContainer(ctx, containerID, options)

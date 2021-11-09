@@ -162,10 +162,10 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 
 	// Set up the port check if requested.
 	hasStarted := make(chan struct{})
-	if opt.CheckLive {
+	if opt.CheckLive != 0 {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		addr := fmt.Sprintf("%s:%d", info.IP, 8545)
+		addr := fmt.Sprintf("%s:%d", info.IP, opt.CheckLive)
 		go checkPort(ctx, logger, addr, hasStarted)
 	} else {
 		close(hasStarted)
