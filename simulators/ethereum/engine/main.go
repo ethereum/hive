@@ -20,8 +20,10 @@ var (
 	networkID = big.NewInt(7)
 
 	// PoS related
-	terminalTotalDifficulty = big.NewInt(0)
+	terminalTotalDifficulty = big.NewInt(131072 + 25)
 	blockProductionPoS      = time.Second * 1
+	clMocker                = NewCLMocker(terminalTotalDifficulty)
+	tTDCheck                = time.Second * 1
 )
 
 var clientEnv = hivesim.Params{
@@ -77,6 +79,9 @@ var tests = []testSpec{
 	{Name: "http/ABICall", Run: callContractTest},
 	{Name: "http/ABITransact", Run: transactContractTest},
 
+	// Random opcode tests
+	{Name: "http/RandomOpcodeTx", Run: randomOpcodeTx},
+
 	/*
 		// WebSocket RPC tests.
 		{Name: "ws/BalanceAndNonceAt", Run: balanceAndNonceAtTest},
@@ -127,8 +132,8 @@ interacting with one.`[1:],
 // Most tests simply wait for tx inclusion in a block so we can run many tests concurrently.
 func runAllTests(t *hivesim.T, c *hivesim.Client) {
 	vault := newVault()
-	ec := NewCatalyst(t, c)
-	ec.enablePoSBlockProduction()
+	ec := NewCatalystClient(t, c)
+	clMocker.AddCatalystClient(ec)
 	s := newSemaphore(16)
 	for _, test := range tests {
 		test := test
@@ -141,9 +146,9 @@ func runAllTests(t *hivesim.T, c *hivesim.Client) {
 				Run: func(t *hivesim.T) {
 					switch test.Name[:strings.IndexByte(test.Name, '/')] {
 					case "http":
-						runHTTP(t, c, vault, ec, test.Run)
+						runHTTP(t, c, vault, clMocker, test.Run)
 					case "ws":
-						runWS(t, c, vault, ec, test.Run)
+						runWS(t, c, vault, clMocker, test.Run)
 					default:
 						panic("bad test prefix in name " + test.Name)
 					}

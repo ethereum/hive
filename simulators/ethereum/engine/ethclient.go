@@ -765,6 +765,86 @@ func logSubscriptionTest(t *TestEnv) {
 	validatePredeployContractLogs(t, tx, fetchedLogs, arg0, arg1)
 }
 
+// Random Opcode tests
+func randomOpcodeTx(t *TestEnv) {
+	var (
+		key                = t.Vault.createAccount(t, big.NewInt(params.Ether))
+		nonce              = uint64(0)
+		txCount            = 20
+		randomContractAddr = common.HexToAddress("0000000000000000000000000000000000000316")
+	)
+	var txs = make([]*types.Transaction, txCount)
+	for i := 0; i < txCount; i++ {
+		rawTx := types.NewTransaction(nonce, randomContractAddr, big0, 100000, gasPrice, nil)
+		nonce++
+		tx, err := t.Vault.signTransaction(key, rawTx)
+		txs[i] = tx
+		if err != nil {
+			t.Fatalf("Unable to sign deploy tx: %v", err)
+		}
+		if err = t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
+			t.Fatalf("Unable to send transaction: %v", err)
+		}
+		time.Sleep(blockProductionPoS / 2)
+	}
+	PoWBlocks := 0
+	PoSBlocks := 0
+	i := 0
+	for {
+		receipt, err := t.Eth.TransactionReceipt(t.Ctx(), txs[i].Hash())
+		if err == ethereum.NotFound {
+			time.Sleep(time.Second)
+			continue
+		}
+		if err != nil {
+			t.Errorf("Unable to fetch receipt: %v", err)
+		}
+
+		blockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), receipt.BlockNumber)
+		if err != nil {
+			t.Errorf("Unable to fetch block header: %v", err)
+		}
+
+		stor, err := t.Eth.StorageAt(t.Ctx(), randomContractAddr, common.BigToHash(receipt.BlockNumber), receipt.BlockNumber)
+		if err != nil {
+			t.Errorf("Unable to fetch storage: %v", err)
+		}
+		storHash := common.BytesToHash(stor)
+
+		if clMocker.isBlockPoS(receipt.BlockNumber) {
+			PoSBlocks++
+			if clMocker.randomHistory[receipt.BlockNumber.Uint64()] != storHash {
+				t.Fatalf("Storage does not match random: %v, %v", clMocker.randomHistory[receipt.BlockNumber.Uint64()], storHash)
+			}
+			if blockHeader.Difficulty.Cmp(big.NewInt(0)) != 0 {
+				t.Fatalf("PoS Block (%v) difficulty not set to zero: %v", receipt.BlockNumber, blockHeader.Difficulty)
+			}
+			if blockHeader.MixDigest != storHash {
+				t.Fatalf("PoS Block (%v) mix digest does not match random: %v", blockHeader.MixDigest, storHash)
+			}
+		} else {
+			PoWBlocks++
+			if blockHeader.Difficulty.Cmp(storHash.Big()) != 0 {
+				t.Fatalf("Storage does not match difficulty: %v, %v", blockHeader.Difficulty, storHash)
+			}
+			if blockHeader.Difficulty.Cmp(big.NewInt(0)) == 0 {
+				t.Fatalf("PoW Block (%v) difficulty is set to zero: %v", receipt.BlockNumber, blockHeader.Difficulty)
+			}
+		}
+
+		i++
+		if i >= txCount {
+			break
+		}
+	}
+	if PoSBlocks == 0 {
+		t.Fatalf("No Random Opcode transactions landed in PoS blocks")
+	}
+	if PoWBlocks == 0 {
+		t.Fatalf("No Random Opcode transactions landed in PoW blocks")
+	}
+}
+
 // validatePredeployContractLogs tests wether the given logs are expected when
 // the event function was called on the predeployed test contract was called
 // with the given args. The event function raises the following events:

@@ -27,7 +27,7 @@ type TestEnv struct {
 	*hivesim.T
 	RPC    *rpc.Client
 	Eth    *ethclient.Client
-	Engine *Catalyst
+	CLMock *CLMocker
 	Vault  *vault
 
 	// This holds most recent context created by the Ctx method.
@@ -38,7 +38,7 @@ type TestEnv struct {
 }
 
 // runHTTP runs the given test function using the HTTP RPC client.
-func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, cat *Catalyst, fn func(*TestEnv)) {
+func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, cl *CLMocker, fn func(*TestEnv)) {
 	// This sets up debug logging of the requests and responses.
 	client := &http.Client{
 		Transport: &loggingRoundTrip{
@@ -53,7 +53,7 @@ func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, cat *Catalyst, fn func(*
 		T:      t,
 		RPC:    rpcClient,
 		Eth:    ethclient.NewClient(rpcClient),
-		Engine: cat,
+		CLMock: cl,
 		Vault:  v,
 	}
 	fn(env)
@@ -63,7 +63,7 @@ func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, cat *Catalyst, fn func(*
 }
 
 // runWS runs the given test function using the WebSocket RPC client.
-func runWS(t *hivesim.T, c *hivesim.Client, v *vault, cat *Catalyst, fn func(*TestEnv)) {
+func runWS(t *hivesim.T, c *hivesim.Client, v *vault, cl *CLMocker, fn func(*TestEnv)) {
 	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	rpcClient, err := rpc.DialWebsocket(ctx, fmt.Sprintf("ws://%v:8546/", c.IP), "")
 	done()
@@ -76,7 +76,7 @@ func runWS(t *hivesim.T, c *hivesim.Client, v *vault, cat *Catalyst, fn func(*Te
 		T:      t,
 		RPC:    rpcClient,
 		Eth:    ethclient.NewClient(rpcClient),
-		Engine: cat,
+		CLMock: cl,
 		Vault:  v,
 	}
 	fn(env)
