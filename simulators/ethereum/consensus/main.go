@@ -349,6 +349,10 @@ func testLink(filepath string) string {
 func loadTests(t *hivesim.T, root string, limit int, fn func(testcase)) {
 	var i, j = 0, 0
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			t.Logf("unable to walk path: %s", err)
+			return nil
+		}
 		if limit >= 0 && i >= limit {
 			return filepath.SkipDir
 		}
