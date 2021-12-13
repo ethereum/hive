@@ -2,12 +2,14 @@ package main
 
 import (
 	"fmt"
+	"math/big"
+	"strings"
+	"time"
+
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/configs"
-	"strings"
-	"time"
 )
 
 // PreparedTestnet has all the options for starting nodes, ready to build the network.
@@ -35,12 +37,11 @@ type PreparedTestnet struct {
 	keyTranches []hivesim.StartOption
 }
 
-func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *PreparedTestnet {
-
+func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.Int) *PreparedTestnet {
 	var depositAddress common.Eth1Address
 	depositAddress.UnmarshalText([]byte("0x4242424242424242424242424242424242424242"))
 
-	eth1Genesis := setup.BuildEth1Genesis()
+	eth1Genesis := setup.BuildEth1Genesis(ttd)
 	eth1Config := eth1Genesis.ToParams(depositAddress)
 
 	var spec *common.Spec
@@ -50,7 +51,7 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *Prepared
 		tmp := *configs.Mainnet
 		tmp.Config.GENESIS_FORK_VERSION = common.Version{0xff, 0, 0, 0}
 		tmp.Config.ALTAIR_FORK_VERSION = common.Version{0xff, 0, 0, 1}
-		tmp.Config.ALTAIR_FORK_EPOCH = 10 // TODO: time altair fork
+		tmp.Config.ALTAIR_FORK_EPOCH = 0 // TODO: time altair fork
 		tmp.Config.DEPOSIT_CONTRACT_ADDRESS = common.Eth1Address(eth1Genesis.DepositAddress)
 		tmp.Config.DEPOSIT_CHAIN_ID = eth1Genesis.Genesis.Config.ChainID.Uint64()
 		tmp.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
@@ -134,13 +135,18 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	}
 }
 
-func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition) {
+func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, simulated bool) {
 	testnet.t.Logf("starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{
 		p.eth1ConfigOpt, p.commonEth1Params,
 	}
-	if len(testnet.eth1) > 0 {
+	if len(testnet.eth1) == 0 {
+		if !simulated {
+			// we only make the first eth1 node a miner
+			opts = append(opts, hivesim.Params{"HIVE_MINER": "0x1212121212121212121212121212121212121212"})
+		}
+	} else {
 		bootnode, err := testnet.eth1[0].EnodeURL()
 		if err != nil {
 			testnet.t.Fatalf("failed to get eth1 bootnode URL: %v", err)
@@ -148,9 +154,6 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 
 		// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
 		opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
-	} else {
-		// we only make the first eth1 node a miner
-		opts = append(opts, hivesim.Params{"HIVE_MINER": "0x1212121212121212121212121212121212121212"})
 	}
 
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}
