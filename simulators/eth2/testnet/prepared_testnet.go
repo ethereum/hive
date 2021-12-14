@@ -51,7 +51,10 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.
 		tmp := *configs.Mainnet
 		tmp.Config.GENESIS_FORK_VERSION = common.Version{0xff, 0, 0, 0}
 		tmp.Config.ALTAIR_FORK_VERSION = common.Version{0xff, 0, 0, 1}
-		tmp.Config.ALTAIR_FORK_EPOCH = 0 // TODO: time altair fork
+		tmp.Config.ALTAIR_FORK_EPOCH = 1 // TODO: time altair fork
+		if ttd != nil {
+			tmp.Config.MERGE_FORK_EPOCH = 2 // TODO: time merge fork
+		}
 		tmp.Config.DEPOSIT_CONTRACT_ADDRESS = common.Eth1Address(eth1Genesis.DepositAddress)
 		tmp.Config.DEPOSIT_CHAIN_ID = eth1Genesis.Genesis.Config.ChainID.Uint64()
 		tmp.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID

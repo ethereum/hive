@@ -10,7 +10,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/protolambda/eth2api v0.0.0-20211003135243-f12829c6e6e4
 	github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52
-	github.com/protolambda/zrnt v0.20.0
+	github.com/protolambda/zrnt v0.23.0
 	github.com/protolambda/ztyp v0.1.9
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wealdtech/go-eth2-util v1.6.5
