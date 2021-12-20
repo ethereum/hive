@@ -21,6 +21,10 @@ var (
 	terminalTotalDifficulty  = big.NewInt(131072 + 25)
 	PoSBlockProductionPeriod = time.Second * 1
 	tTDCheckPeriod           = time.Second * 1
+
+	// Confirmation blocks
+	PoWConfirmationBlocks = uint64(15)
+	PoSConfirmationBlocks = uint64(1)
 )
 
 var clMocker *CLMocker
@@ -65,6 +69,7 @@ var tests = []testSpec{
 	{Name: "Unknown HeadBlockHash", Run: unknownHeadBlockHash},
 	{Name: "Unknown SafeBlockHash", Run: unknownSafeBlockHash},
 	{Name: "Unknown FinalizedBlockHash", Run: unknownFinalizedBlockHash},
+	{Name: "Pre-TTD ForkchoiceUpdated After PoS Switch", Run: preTTDFinalizedBlockHash},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{Name: "Latest Block after ExecutePayload", Run: blockStatusExecPayload},
@@ -72,6 +77,12 @@ var tests = []testSpec{
 	{Name: "Latest Block after New SafeBlock", Run: blockStatusSafeBlock},
 	{Name: "Latest Block after New FinalizedBlock", Run: blockStatusFinalizedBlock},
 	{Name: "Latest Block after Reorg", Run: blockStatusReorg},
+
+	// Re-ExecutePayload
+	{Name: "Re-Execute Payload", Run: reExecPayloads},
+
+	// Transaction Reorg using Engine API
+	{Name: "Transaction reorg", Run: transactionReorg},
 
 	// Suggested Fee Recipient in Payload creation
 	{Name: "Suggested Fee Recipient Test", Run: suggestedFeeRecipient},

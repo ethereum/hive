@@ -14,8 +14,12 @@ import (
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
 	EngineClients           []*EngineClient
-	RandomHistory           map[uint64]common.Hash
 	BlockProductionMustStop bool
+	NextFeeRecipient        common.Address
+
+	// PoS Chain History Information
+	RandomHistory          map[uint64]common.Hash
+	ExecutedPayloadHistory map[uint64]catalyst.ExecutableDataV1
 
 	// Latest broadcasted data using the PoS Engine API
 	LatestFinalizedNumber *big.Int
@@ -27,7 +31,6 @@ type CLMocker struct {
 	FirstPoSBlockNumber         *big.Int
 	TTDReached                  bool
 	PoSBlockProductionActivated bool
-	NextFeeRecipient            common.Address
 
 	/* Set-Reset-Lock: Use LockSet() to guarantee that the test case finds the
 	environment as expected, and not as previously modified by another test.
@@ -51,6 +54,7 @@ func NewCLMocker() *CLMocker {
 	newCLMocker := &CLMocker{
 		EngineClients:               make([]*EngineClient, 0),
 		RandomHistory:               map[uint64]common.Hash{},
+		ExecutedPayloadHistory:      map[uint64]catalyst.ExecutableDataV1{},
 		LatestFinalizedHeader:       nil,
 		PoSBlockProductionActivated: false,
 		BlockProductionMustStop:     false,
@@ -261,6 +265,8 @@ func (cl *CLMocker) minePOSBlock() {
 		}
 	}
 	cl.LatestExecutedPayload = payload
+
+	cl.ExecutedPayloadHistory[payload.Number] = payload
 
 	// Trigger actions for new executePayload broadcast
 	cl.NewExecutePayloadMutex.Unlock()

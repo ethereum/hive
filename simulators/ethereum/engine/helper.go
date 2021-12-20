@@ -183,6 +183,16 @@ func waitForBlock(t *TestEnv, blockNumber *big.Int) (*types.Block, error) {
 	return nil, nil
 }
 
+func getBigIntAtStorage(t *TestEnv, account common.Address, key common.Hash, blockNumber *big.Int) (*big.Int, error) {
+	stor, err := t.Eth.StorageAt(t.Ctx(), account, key, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+	bigint := big.NewInt(0)
+	bigint.SetBytes(stor)
+	return bigint, nil
+}
+
 // From ethereum/rpc:
 
 // CallContext is a helper method that forwards a raw RPC request to

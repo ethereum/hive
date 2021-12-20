@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/params"
 )
@@ -103,7 +104,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 	t.CLMock.NewExecutePayloadMutex.LockSet()
 	defer t.CLMock.NewExecutePayloadMutex.Unlock()
 
-	// Generate a random SafeBlock hash
+	// Generate a random FinalizedBlockHash hash
 	randomFinalizedBlockHash := common.Hash{}
 	for i := 0; i < common.HashLength; i++ {
 		randomFinalizedBlockHash[i] = byte(rand.Uint32())
@@ -191,6 +192,43 @@ func unknownHeadBlockHash(t *TestEnv) {
 		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with unknown HeadBlockHash contains PayloadID: %v, %v", t.TestName, resp)
 	}
 
+}
+
+// Verify that a forkchoiceUpdated fails on hash being set to a pre-TTD block after PoS change
+func preTTDFinalizedBlockHash(t *TestEnv) {
+	// Wait until TTD is reached by this client
+	if !t.WaitForPoSSync() {
+		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
+	}
+
+	// Wait for ExecutePayload
+	t.CLMock.NewFinalizedBlockForkchoiceMutex.LockSet()
+	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+
+	// Send the Genesis block as forkchoice
+	gblock := loadGenesis()
+	forkchoiceStateGenesisHash := catalyst.ForkchoiceStateV1{
+		HeadBlockHash:      gblock.Hash(),
+		SafeBlockHash:      gblock.Hash(),
+		FinalizedBlockHash: gblock.Hash(),
+	}
+	resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateGenesisHash, nil)
+
+	/* TBD: Behavior on this edge-case is undecided, as behavior of the Execution client
+	 		if not defined on re-orgs to a point before the latest finalized block.
+
+	if err == nil {
+		t.Fatalf("FAIL (%v): No error forkchoiceUpdated with genesis: %v, %v", t.TestName, err, resp)
+	}
+	*/
+
+	resp, err = t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &t.CLMock.LatestForkchoice, nil)
+	if err != nil {
+		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
+	}
+	if resp.Status != "SUCCESS" {
+		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with genesis is not SUCCESS: %v, %v", t.TestName, resp)
+	}
 }
 
 // Test to verify Block information available at the Eth RPC after ExecutePayload
@@ -345,30 +383,155 @@ func transactionReorg(t *TestEnv) {
 		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
 	}
 
-	// Wait for the latest HeadBlock forkchoice to be broadcast
-	t.CLMock.NewHeadBlockForkchoiceMutex.LockSet()
-	// Run HeadBlock tests
-	t.CLMock.NewHeadBlockForkchoiceMutex.Unlock()
-	t.CLMock.NewSafeBlockForkchoiceMutex.LockSet()
-	// Run SafeBlock tests
-	t.CLMock.NewSafeBlockForkchoiceMutex.Unlock()
+	// Create transactions that modify the state in order to check after the reorg.
+	var (
+		key                = t.Vault.createAccount(t, big.NewInt(params.Ether))
+		nonce              = uint64(0)
+		txCount            = 5
+		sstoreContractAddr = common.HexToAddress("0000000000000000000000000000000000000317")
+	)
+	var txs = make([]*types.Transaction, txCount)
+	for i := 0; i < txCount; i++ {
+		data := make([]byte, 1)
+		data[0] = byte(i)
+		data = common.LeftPadBytes(data, 32)
+		fmt.Printf("transactionReorg, i=%v, data=%v\n", i, data)
+		rawTx := types.NewTransaction(nonce, sstoreContractAddr, big0, 100000, gasPrice, data)
+		nonce++
+		tx, err := t.Vault.signTransaction(key, rawTx)
+		txs[i] = tx
+		if err != nil {
+			t.Fatalf("FAIL (%v): Unable to sign deploy tx: %v", t.TestName, err)
+		}
+		if err = t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
+			t.Fatalf("FAIL (%v): Unable to send transaction: %v", t.TestName, err)
+		}
+		time.Sleep(PoSBlockProductionPeriod)
+	}
+	var receipts = make([]*types.Receipt, txCount)
+	for i := 0; i < txCount; i++ {
+		receipt, err := waitForTxConfirmations(t, txs[i].Hash(), PoSConfirmationBlocks)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Unable to fetch confirmed tx receipt: %v", t.TestName, err)
+		}
+		if receipt == nil {
+			t.Fatalf("FAIL (%v): Unable to confirm tx: %v", t.TestName, txs[i].Hash())
+		}
+		receipts[i] = receipt
+	}
+	// Wait for a finalized block so we can start rolling back transactions
 	t.CLMock.NewFinalizedBlockForkchoiceMutex.LockSet()
-	// Run FinalizedBlock tests
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+
+	for i := 0; i < txCount; i++ {
+
+		data := make([]byte, 1)
+		data[0] = byte(i)
+
+		data = append(common.LeftPadBytes(data, 32), common.LeftPadBytes(key.Bytes(), 32)...)
+
+		storageKey := crypto.Keccak256Hash(data)
+
+		value_after, err := getBigIntAtStorage(t, sstoreContractAddr, storageKey, nil)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
+		}
+		fmt.Printf("transactionReorg, stor[%v]: %v\n", i, value_after)
+
+		if value_after.Cmp(common.Big1) != 0 {
+			t.Fatalf("FAIL (%v): Expected storage not set after transaction: %v", t.TestName, value_after)
+		}
+
+		// Get value at a block before the tx was included
+		reorgBlock, err := t.Eth.BlockByNumber(t.Ctx(), receipts[i].BlockNumber.Sub(receipts[i].BlockNumber, common.Big1))
+		value_before, err := getBigIntAtStorage(t, sstoreContractAddr, storageKey, reorgBlock.Number())
+		if err != nil {
+			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
+		}
+		fmt.Printf("transactionReorg, stor[%v]: %v\n", i, value_before)
+
+		if value_before.Cmp(common.Big0) != 0 {
+			t.Fatalf("FAIL (%v): Expected storage not set after transaction: %v", t.TestName, value_before)
+		}
+
+		// Re-org back to a previous block where the tx is not included using forkchoiceUpdated
+		reorgForkchoice := catalyst.ForkchoiceStateV1{
+			HeadBlockHash:      reorgBlock.Hash(),
+			SafeBlockHash:      reorgBlock.Hash(),
+			FinalizedBlockHash: reorgBlock.Hash(),
+		}
+		resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &reorgForkchoice, nil)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
+		}
+		if resp.Status != "SUCCESS" {
+			t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
+		}
+
+		// Check storage again, should be unset
+		value_before, err = getBigIntAtStorage(t, sstoreContractAddr, storageKey, nil)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
+		}
+		fmt.Printf("transactionReorg, stor[%v]: %v\n", i, value_before)
+
+		if value_before.Cmp(common.Big0) != 0 {
+			t.Fatalf("FAIL (%v): Expected storage not set after transaction: %v", t.TestName, value_before)
+		}
+
+		// Re-send latest forkchoice to test next transaction
+		resp, err = t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &t.CLMock.LatestForkchoice, nil)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
+		}
+		if resp.Status != "SUCCESS" {
+			t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
+		}
+	}
+}
+
+// Re-Execute Previous Payloads
+func reExecPayloads(t *TestEnv) {
+	// Wait until this client catches up with latest PoS
+	if !t.WaitForPoSSync() {
+		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
+	}
+
+	// Wait until we have the required number of payloads executed
+	var payloadReExecCount = int64(10)
+	_, err := waitForBlock(t, big.NewInt(t.CLMock.FirstPoSBlockNumber.Int64()+payloadReExecCount))
+	if err != nil {
+		t.Fatalf("FAIL (%v): Unable to wait for %v executed payloads: %v", t.TestName, payloadReExecCount, err)
+	}
+
+	// Wait for a finalized block so we can re-executing payloads
+	t.CLMock.NewFinalizedBlockForkchoiceMutex.LockSet()
+	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+
+	lastBlock, err := t.Eth.BlockNumber(t.Ctx())
+	if err != nil {
+		t.Fatalf("FAIL (%v): Unable to get latest block number: %v", t.TestName, err)
+	}
+	for i := lastBlock - uint64(payloadReExecCount); i <= lastBlock; i++ {
+		payload := t.CLMock.ExecutedPayloadHistory[i]
+		execPayloadResp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), &payload)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Unable to re-execute valid payload: %v", err)
+		}
+		if execPayloadResp.Status != "VALID" {
+			t.Fatalf("FAIL (%v): Unexpected status after re-execute valid payload: %v", execPayloadResp)
+		}
+	}
 }
 
 // Fee Recipient Tests
 func suggestedFeeRecipient(t *TestEnv) {
-	timeout := 60
-	for i := 0; i <= timeout; i++ {
-		if t.CLMock.TTDReached {
-			break
-		}
-		if i == timeout {
-			t.Fatalf("FAIL (%v): TTD was never reached", t.TestName)
-		}
-		time.Sleep(time.Second)
+
+	// Wait until this client catches up with latest PoS
+	if !t.WaitForPoSSync() {
+		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
 	}
+
 	for i := 1; i <= 10; i++ {
 		feeRecipientAddress := common.Address{byte(i)}
 		// TODO: There is no guarantee that the client in charge of setting the fee recipient is the one we are currently testing
@@ -441,7 +604,7 @@ func randomOpcodeTx(t *TestEnv) {
 	PoSBlocks := 0
 	i := 0
 	for {
-		receipt, err := waitForTxConfirmations(t, txs[i].Hash(), 15)
+		receipt, err := waitForTxConfirmations(t, txs[i].Hash(), PoWConfirmationBlocks)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Unable to fetch confirmed tx receipt: %v", t.TestName, err)
 		}
