@@ -126,21 +126,26 @@ func runAllTests(t *hivesim.T, c *hivesim.Client) {
 	// Create an Engine API wrapper for this client
 	ec := NewEngineClient(t, c)
 	defer ec.Close()
+
 	// Add this client to CLMocker
 	clMocker.AddEngineClient(ec)
 	defer clMocker.RemoveEngineClient(ec)
-	s := newSemaphore(16)
+
+	// Setup wait lock for this client reaching PoS sync
 	var cancelFP *context.CancelFunc
 	var m sync.Mutex
 	var st bool
 	go func() {
 		WaitClientForPoSSync(t, c, &cancelFP, &m, &st)
 	}()
+
+	// Launch all tests
+	var wg sync.WaitGroup
 	for _, test := range tests {
+		wg.Add(1)
 		test := test
-		s.get()
 		go func() {
-			defer s.put()
+			defer wg.Done()
 			t.Run(hivesim.TestSpec{
 				Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
 				Description: test.About,
@@ -153,25 +158,7 @@ func runAllTests(t *hivesim.T, c *hivesim.Client) {
 	if cancelFP != nil {
 		(*cancelFP)()
 	}
-	s.drain()
-}
 
-// From ethereum/rpc
-type semaphore chan struct{}
-
-func newSemaphore(n int) semaphore {
-	s := make(semaphore, n)
-	for i := 0; i < n; i++ {
-		s <- struct{}{}
-	}
-	return s
-}
-
-func (s semaphore) get() { <-s }
-func (s semaphore) put() { s <- struct{}{} }
-
-func (s semaphore) drain() {
-	for i := 0; i < cap(s); i++ {
-		<-s
-	}
+	// Wait for all test cases to complete
+	wg.Wait()
 }
