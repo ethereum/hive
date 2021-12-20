@@ -29,8 +29,13 @@ type CLMocker struct {
 	PoSBlockProductionActivated bool
 	NextFeeRecipient            common.Address
 
-	// PoS Status Mutexes: Set-Reset lock is used to guarantee each test finds the environment as expected,
-	// and not as previously modified by another test.
+	/* Set-Reset-Lock: Use LockSet() to guarantee that the test case finds the
+	environment as expected, and not as previously modified by another test.
+
+	The test cases can request a lock to "wake up" at a specific point during
+	the PoS block production procedure and, when the CL mocker has reached it,
+	the lock is released to let only one test case do its testing.
+	*/
 	PayloadBuildMutex                SetResetLock
 	NewExecutePayloadMutex           SetResetLock
 	NewHeadBlockForkchoiceMutex      SetResetLock

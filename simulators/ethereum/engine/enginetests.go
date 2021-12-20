@@ -18,7 +18,7 @@ var (
 	big1 = big.NewInt(1)
 )
 
-// Engine API During PoW Negative tests: Client should reject Engine directives if the TTD as not been reached.
+// Engine API during PoW Negative tests: Client should reject Engine directives if the TTD has not been reached.
 func engineAPIPoWTests(t *TestEnv) {
 	// Test that the engine_ directives are correctly ignored when the chain has not yet reached TTD
 	gblock := loadGenesis()
@@ -157,11 +157,14 @@ func unknownHeadBlockHash(t *TestEnv) {
 	for i := 0; i < common.HashLength; i++ {
 		randomHeadBlockHash[i] = byte(rand.Uint32())
 	}
+
 	forkchoiceStateUnknownHeadHash := catalyst.ForkchoiceStateV1{
 		HeadBlockHash:      randomHeadBlockHash,
 		SafeBlockHash:      t.CLMock.LatestForkchoice.FinalizedBlockHash,
 		FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 	}
+
+	fmt.Printf("INFO (unknownHeadBlockHash) forkchoiceStateUnknownHeadHash: %v\n", forkchoiceStateUnknownHeadHash)
 
 	resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownHeadHash, nil)
 	if err != nil {

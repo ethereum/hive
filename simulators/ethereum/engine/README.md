@@ -43,7 +43,7 @@ tests will have the following execution flow:
         stops
      clientB':
         starts in PoW
-        syncs to clientA and transitions to PoS
+        syncs to clientB and transitions to PoS
         executes all test cases
         stops
      stops
@@ -68,4 +68,4 @@ Suggested Fee Recipient in Payload creation
 - Suggested Fee Recipient Test: Set the fee recipient to a custom address and verify that (a) balance is not increased when no fees are collected (b) balance is increased appropriately when fees are collected.
 
 Random Opcode:
-- Random Opcode Transactions: Send transactions that modify the state to the value of the 'DIFFICULTY' opcode and verify that (a) the state is equal to the difficulty on blocks before the TTD is crossed (b) the state is equal to the Random value provided using forkchoiceUpdated.
+- Random Opcode Transactions: Send transactions that modify the state to the value of the 'DIFFICULTY' opcode and verify that (a) the state is equal to the difficulty on blocks before the TTD is crossed (b) the state is equal to the Random value provided using forkchoiceUpdated after PoS transition.
