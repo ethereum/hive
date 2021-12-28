@@ -3,6 +3,7 @@ module github.com/ethereum/hive/simulators/eth2/testnet
 go 1.17
 
 require (
+	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.15
 	github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba
 	github.com/google/uuid v1.3.0
@@ -54,4 +55,11 @@ require (
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+)
+
+require (
+	github.com/edsrzf/mmap-go v1.0.0 // indirect
+	github.com/huin/goupnp v1.0.2 // indirect
+	github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 )

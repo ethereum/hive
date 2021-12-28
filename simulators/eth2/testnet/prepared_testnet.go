@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"os"
 	"strings"
 	"time"
 
@@ -33,6 +34,9 @@ type PreparedTestnet struct {
 	// embeds the genesis beacon state into a node
 	beaconStateOpt hivesim.StartOption
 
+	// writes the generated genesis file to the client
+	eth1Bundle hivesim.StartOption
+
 	// a tranche is a group of validator keys to run on 1 node
 	keyTranches []hivesim.StartOption
 }
@@ -43,6 +47,10 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.
 
 	eth1Genesis := setup.BuildEth1Genesis(ttd)
 	eth1Config := eth1Genesis.ToParams(depositAddress)
+	eth1Bundle, err := setup.Eth1Bundle(eth1Genesis.Genesis)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var spec *common.Spec
 	{
@@ -90,7 +98,10 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.
 		t.Fatal(err)
 	}
 	// Make all eth1 nodes mine blocks. Merge fork would deactivate this on the fly.
-	eth1Params := hivesim.Params{}
+	eth1Params := hivesim.Params{
+		"HIVE_LOGLEVEL": os.Getenv("HIVE_LOGLEVEL"),
+		"HIVE_NODETYPE": "full",
+	}
 	beaconParams := hivesim.Params{
 		"HIVE_ETH2_BN_API_PORT":  fmt.Sprintf("%d", PortBeaconAPI),
 		"HIVE_ETH2_BN_GRPC_PORT": fmt.Sprintf("%d", PortBeaconGRPC),
@@ -116,6 +127,7 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.
 		spec:                  spec,
 		eth1Genesis:           eth1Genesis,
 		eth2Genesis:           state,
+		eth1Bundle:            eth1Bundle,
 		commonEth1Params:      eth1Params,
 		commonBeaconParams:    beaconParams,
 		commonValidatorParams: validatorParams,
@@ -142,7 +154,7 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 	testnet.t.Logf("starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{
-		p.eth1ConfigOpt, p.commonEth1Params,
+		p.eth1ConfigOpt, p.commonEth1Params, p.eth1Bundle,
 	}
 	if len(testnet.eth1) == 0 {
 		if !simulated {

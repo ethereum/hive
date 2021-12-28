@@ -85,6 +85,7 @@ func BuildEth1Genesis(ttd *big.Int) *Eth1Genesis {
 				MuirGlacierBlock:        big.NewInt(0),
 				BerlinBlock:             big.NewInt(0),
 				LondonBlock:             big.NewInt(0),
+				ArrowGlacierBlock:       big.NewInt(0),
 				TerminalTotalDifficulty: ttd,
 				Clique:                  nil,
 			},
@@ -92,7 +93,7 @@ func BuildEth1Genesis(ttd *big.Int) *Eth1Genesis {
 			Timestamp:  uint64(time.Now().Unix()),
 			ExtraData:  nil,
 			GasLimit:   30_000_000,
-			Difficulty: nil,
+			Difficulty: big.NewInt(42),
 			Mixhash:    common.Hash{},
 			Coinbase:   common.Address{},
 			Alloc: core.GenesisAlloc{
@@ -120,6 +121,7 @@ func (conf *Eth1Genesis) ToParams(depositAddress [20]byte) hivesim.Params {
 		"HIVE_FORK_MUIRGLACIER":    conf.Genesis.Config.MuirGlacierBlock.String(),
 		"HIVE_FORK_BERLIN":         conf.Genesis.Config.BerlinBlock.String(),
 		"HIVE_FORK_LONDON":         conf.Genesis.Config.LondonBlock.String(),
+		"HIVE_FORK_ARROWGLACIER":   conf.Genesis.Config.ArrowGlacierBlock.String(),
 		"HIVE_FORK_MERGE":          conf.Genesis.Config.TerminalTotalDifficulty.String(),
 	}
 }

@@ -4,29 +4,30 @@
 # produce a very minimalistic container that can be reused many times without
 # needing to constantly rebuild.
 
-ARG branch=latest
-FROM ethereum/client-go:$branch
+# ARG branch=latest
+# FROM ethereum/client-go:$branch
 
-RUN apk add --update bash curl jq
+# RUN apk add --update bash curl jq
 
-# FROM alpine:latest
-# ARG branch=master
+FROM alpine:latest
+ARG repo=https://github.com/mariusvanderwijden/go-ethereum
+ARG branch=merge-kintsugi
 
 # Build go-ethereum on the fly and delete all build tools afterwards
-# RUN \
-#   apk add --update bash curl jq go git make gcc musl-dev              \
-#         ca-certificates linux-headers                           && \
-#   git clone --depth 1 --branch $branch  https://github.com/ethereum/go-ethereum && \
-#   (cd go-ethereum && make geth)                               && \
-#   (cd go-ethereum                                             && \
-#   echo "{}"                                                      \
-#   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-#   | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
-#   | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
-#   > /version.json)                                            && \
-#   cp go-ethereum/build/bin/geth /geth                         && \
-#   apk del go git make gcc musl-dev linux-headers              && \
-#   rm -rf /go-ethereum && rm -rf /var/cache/apk/*
+RUN \
+  apk add --update bash curl jq go git make gcc musl-dev              \
+        ca-certificates linux-headers                           && \
+  git clone --depth 1 --branch $branch $repo && \
+  (cd go-ethereum && make geth)                               && \
+  (cd go-ethereum                                             && \
+  echo "{}"                                                      \
+  | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
+  | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
+  | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
+  > /version.json)                                            && \
+  cp go-ethereum/build/bin/geth /usr/local/bin/geth                         && \
+  apk del go git make gcc musl-dev linux-headers              && \
+  rm -rf /go-ethereum && rm -rf /var/cache/apk/*
 
 RUN /usr/local/bin/geth console --exec 'console.log(admin.nodeInfo.name)' --maxpeers=0 --nodiscover --dev 2>/dev/null | head -1 > /version.txt
 

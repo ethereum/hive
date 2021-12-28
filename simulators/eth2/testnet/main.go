@@ -70,7 +70,7 @@ func (nc *ClientDefinitionsByRole) MergeTestnetTest() hivesim.TestSpec {
 		Name:        "single-client-merge-testnet",
 		Description: "This runs quick merge single-client testnet, with 4 nodes and 2**14 (minimum) validators",
 		Run: func(t *hivesim.T) {
-			nc.startTestnet(t, 1<<14, big.NewInt(1234578))
+			nc.startTestnet(t, 32, big.NewInt(1234578))
 		},
 	}
 }
@@ -94,18 +94,19 @@ func (nc *ClientDefinitionsByRole) startTestnet(t *hivesim.T, validators uint64,
 	}
 
 	// for each key partition, we start a validator client with its own beacon node and eth1 node
-	for i := 0; i < len(prep.keyTranches); i++ {
-		prep.startEth1Node(testnet, nc.Eth1[0], true)
-		prep.startBeaconNode(testnet, nc.Beacon[0], []int{i})
-		prep.startValidatorClient(testnet, nc.Validator[0], i, i)
-	}
+	// for i := 0; i < len(prep.keyTranches); i++ {
+	prep.startEth1Node(testnet, nc.Eth1[0], true)
+	// prep.startBeaconNode(testnet, nc.Beacon[0], []int{i})
+	// prep.startValidatorClient(testnet, nc.Validator[0], i, i)
+	// }
 	t.Logf("started all nodes!")
 
 	ctx := context.Background()
 
 	// TODO: maybe run other assertions / tests in the background?
-	testnet.TrackFinality(ctx)
+	go testnet.TrackFinality(ctx)
 	t.Logf("passed tracking finality")
+	testnet.MineChain(ctx)
 }
 
 /*
