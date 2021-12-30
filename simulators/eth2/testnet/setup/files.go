@@ -33,9 +33,9 @@ func StateBundle(templ common.BeaconState, genesisTime time.Time) (hivesim.Start
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy state: %v", err)
 	}
-	if err := state.SetGenesisTime(common.Timestamp(genesisTime.Unix())); err != nil {
-		return nil, fmt.Errorf("failed to set genesis time: %v", err)
-	}
+	// if err := state.SetGenesisTime(common.Timestamp(genesisTime.Unix())); err != nil {
+	//         return nil, fmt.Errorf("failed to set genesis time: %v", err)
+	// }
 	var stateBytes bytes.Buffer
 	if err := state.Serialize(codec.NewEncodingWriter(&stateBytes)); err != nil {
 		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)

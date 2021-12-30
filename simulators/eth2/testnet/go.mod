@@ -17,6 +17,8 @@ require (
 	github.com/wealdtech/go-eth2-util v1.6.5
 )
 
+replace github.com/protolambda/zrnt => /home/matt/dev/zrnt
+
 require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect

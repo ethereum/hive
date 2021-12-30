@@ -2,6 +2,7 @@ package setup
 
 import (
 	"fmt"
+
 	"github.com/ethereum/hive/hivesim"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 )
@@ -46,6 +47,9 @@ func Eth2ConfigToParams(config *common.Config) hivesim.Params {
 		"DEPOSIT_CHAIN_ID":         u64(config.DEPOSIT_CHAIN_ID),
 		"DEPOSIT_NETWORK_ID":       u64(config.DEPOSIT_NETWORK_ID),
 		"DEPOSIT_CONTRACT_ADDRESS": config.DEPOSIT_CONTRACT_ADDRESS.String(),
+
+		// Enable Merge
+		"MERGE_ENABLED": "1",
 	}
 	out := make(hivesim.Params, len(tmp))
 	// prefix everything

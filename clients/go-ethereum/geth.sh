@@ -76,6 +76,11 @@ if [ "$HIVE_TESTNET" == "1" ]; then
     FLAGS="$FLAGS --testnet"
 fi
 
+# If the client is to be run in catalyst mode, flag it as such
+if [ "$HIVE_CATALYST_ENABLED" == "1" ]; then
+        FLAGS="$FLAGS --catalyst"
+fi
+
 # Handle any client mode or operation requests
 if [ "$HIVE_NODETYPE" == "archive" ]; then
     FLAGS="$FLAGS --syncmode full --gcmode archive"
@@ -148,8 +153,12 @@ if [ "$HIVE_LES_SERVER" == "1" ]; then
 fi
 
 # Configure RPC.
-FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,personal,txpool,web3"
-FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,personal,txpool,web3"
+APIS="admin,debug,eth,miner,net,personal,txpool,web3"
+if [ "$HIVE_CATALYST_ENABLED" != "" ]; then
+        APIS="$APIS,engine"
+fi
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=$APIS"
+FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=$APIS"
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
     FLAGS="$FLAGS --graphql"
 fi

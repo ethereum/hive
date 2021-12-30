@@ -23,6 +23,10 @@ echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" > /data/testnet_setup/deploy_
 
 /make_config.sh > /data/testnet_setup/config.yaml
 
+# Dump config
+echo "Supplied config:"
+cat /data/testnet_setup/config.yaml
+
 mkdir -p /data/beacon
 mkdir -p /data/network
 
@@ -39,7 +43,9 @@ echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
 CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
+merge_option=$([[ "$HIVE_ETH2_MERGE_ENABLED" == "" ]] && echo "" || echo "--merge --execution-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
+
 
 lighthouse \
     --debug-level="$LOG" \
@@ -47,7 +53,7 @@ lighthouse \
     --testnet-dir=/data/testnet_setup \
     bn \
     --network-dir=/data/network \
-    $metrics_option $eth1_option \
+    $metrics_option $eth1_option $merge_option \
     --enr-tcp-port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --enr-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --enr-address="${CONTAINER_IP}" \
