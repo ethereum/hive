@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"time"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	"github.com/protolambda/ztyp/codec"
+	"gopkg.in/yaml.v2"
 )
 
 func bytesSource(data []byte) func() (io.ReadCloser, error) {
@@ -28,19 +27,44 @@ func Eth1Bundle(genesis *core.Genesis) (hivesim.StartOption, error) {
 	return hivesim.WithDynamicFile("genesis.json", bytesSource(out)), nil
 }
 
-func StateBundle(templ common.BeaconState, genesisTime time.Time) (hivesim.StartOption, error) {
-	state, err := templ.CopyState()
+func StateBundle(spec *common.Spec, mnemonic string, valCount uint64, tranches uint64) ([]hivesim.StartOption, error) {
+	type mnemonicInfo struct {
+		Mnemonic string
+		Count    uint64
+	}
+	m := make([]mnemonicInfo, tranches)
+	for i := range m {
+		m[i].Mnemonic = mnemonic
+		// TODO: error somewhere if this isn't divisble exactly
+		m[i].Count = valCount / tranches
+	}
+	mnemonics, err := yaml.Marshal(m)
 	if err != nil {
-		return nil, fmt.Errorf("failed to copy state: %v", err)
+		return nil, err
 	}
-	// if err := state.SetGenesisTime(common.Timestamp(genesisTime.Unix())); err != nil {
-	//         return nil, fmt.Errorf("failed to set genesis time: %v", err)
-	// }
-	var stateBytes bytes.Buffer
-	if err := state.Serialize(codec.NewEncodingWriter(&stateBytes)); err != nil {
-		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
+	config, err := yaml.Marshal(spec.Config)
+	if err != nil {
+		return nil, err
 	}
-	return hivesim.WithDynamicFile("/hive/input/genesis.ssz", bytesSource(stateBytes.Bytes())), nil
+	phase0_preset, err := yaml.Marshal(spec.Phase0Preset)
+	if err != nil {
+		return nil, err
+	}
+	altair_preset, err := yaml.Marshal(spec.AltairPreset)
+	if err != nil {
+		return nil, err
+	}
+	merge_preset, err := yaml.Marshal(spec.MergePreset)
+	if err != nil {
+		return nil, err
+	}
+	return []hivesim.StartOption{
+		hivesim.WithDynamicFile("/hive/input/mnemonics.yaml", bytesSource(mnemonics)),
+		hivesim.WithDynamicFile("/hive/input/config.yaml", bytesSource(config)),
+		hivesim.WithDynamicFile("/hive/input/preset_phase0.yaml", bytesSource(phase0_preset)),
+		hivesim.WithDynamicFile("/hive/input/preset_altair.yaml", bytesSource(altair_preset)),
+		hivesim.WithDynamicFile("/hive/input/preset_merge.yaml", bytesSource(merge_preset)),
+	}, nil
 }
 
 func KeysBundle(keys []*KeyDetails) hivesim.StartOption {

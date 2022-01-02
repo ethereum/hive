@@ -27,7 +27,7 @@ func Eth2ConfigToParams(config *common.Config) hivesim.Params {
 		"MERGE_FORK_EPOCH":   config.MERGE_FORK_EPOCH.String(),
 
 		// Merge transition
-		"MIN_ANCHOR_POW_BLOCK_DIFFICULTY": u64(config.MIN_ANCHOR_POW_BLOCK_DIFFICULTY),
+		"MIN_ANCHOR_POW_BLOCK_DIFFICULTY": u64(config.TERMINAL_TOTAL_DIFFICULTY),
 
 		// Time parameters
 		"SECONDS_PER_SLOT":                    config.SECONDS_PER_SLOT.String(),

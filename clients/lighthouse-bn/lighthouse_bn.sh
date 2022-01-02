@@ -3,17 +3,9 @@
 # Immediately abort the script on any error encountered
 set -e
 
-if [ ! -f "/hive/input/genesis.ssz" ]; then
-    if [ -z "$HIVE_ETH2_ETH1_RPC_ADDRS" ]; then
-      echo "genesis.ssz file is missing, and no Eth1 RPC addr was provided for building genesis from scratch."
-      # TODO: alternative to start from weak-subjectivity-state
-      exit 1
-    fi
-fi
-
 mkdir -p /data/testnet_setup
 
-cp /hive/input/genesis.ssz /data/testnet_setup/genesis.ssz
+cp /hive/input/config.yaml /data/testnet_setup
 
 # empty bootnodes file, required for custom testnet setup, use CLI arg instead to configure it.
 echo "[]" > /data/testnet_setup/boot_enr.yaml
@@ -21,11 +13,16 @@ echo "[]" > /data/testnet_setup/boot_enr.yaml
 echo "${DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" > /data/testnet_setup/deposit_contract.txt
 echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" > /data/testnet_setup/deploy_block.txt
 
-/make_config.sh > /data/testnet_setup/config.yaml
-
-# Dump config
-echo "Supplied config:"
-cat /data/testnet_setup/config.yaml
+eth2-testnet-genesis merge \
+        --eth1-config="" \
+        --config="/hive/input/config.yaml" \
+        --preset-phase0="/hive/input/preset_phase0.yaml" \
+        --preset-altair="/hive/input/preset_altair.yaml" \
+        --preset-merge="/hive/input/preset_merge.yaml" \
+        --eth1-block="0000000000000000000000000000000000000000000000000000000000000000" \
+        --eth1-timestamp=$HIVE_ETH2_CONFIG_MIN_GENESIS_TIME \
+        --mnemonics="/hive/input/mnemonics.yaml" \
+        --state-output="/data/testnet_setup/genesis.ssz"
 
 mkdir -p /data/beacon
 mkdir -p /data/network
@@ -46,6 +43,7 @@ eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || 
 merge_option=$([[ "$HIVE_ETH2_MERGE_ENABLED" == "" ]] && echo "" || echo "--merge --execution-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
 
+sleep 10m
 
 lighthouse \
     --debug-level="$LOG" \

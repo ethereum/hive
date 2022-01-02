@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
@@ -14,6 +13,7 @@ import (
 )
 
 var depositAddress common.Eth1Address
+var mnemonic = "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 
 func init() {
 	depositAddress.UnmarshalText([]byte("0x4242424242424242424242424242424242424242"))
@@ -26,9 +26,6 @@ type PreparedTestnet struct {
 
 	// Execution chain configuration and genesis info
 	eth1Genesis *setup.Eth1Genesis
-
-	// Consensus genesis state
-	eth2Genesis common.BeaconState
 
 	// configuration to apply to every node of the given type
 	executionOpts []hivesim.StartOption
@@ -46,14 +43,14 @@ func buildExecutionClientOpts(depositAddress common.Eth1Address, ttd *big.Int) (
 	return genesis, []hivesim.StartOption{config, bundle}, err
 }
 
-func buildBeaconSpec(depositAddress common.Eth1Address, ttd uint64, chainId uint64, networkId uint64) *common.Spec {
+func buildBeaconSpec(depositAddress common.Eth1Address, ttd uint64, chainId uint64, networkId uint64, genesisTime uint64) *common.Spec {
 	// TODO: specify build-target based on preset, to run clients in mainnet or minimal mode.
 	// copy the default mainnet config, and make some minimal modifications for testnet usage
 	spec := *configs.Mainnet
 	spec.Config.GENESIS_FORK_VERSION = common.Version{0xff, 0, 0, 0}
 	spec.Config.ALTAIR_FORK_VERSION = common.Version{0xff, 0, 0, 1}
-	spec.Config.ALTAIR_FORK_EPOCH = 1 // TODO: time altair fork
-	spec.Config.MERGE_FORK_EPOCH = 2  // TODO: time merge fork
+	spec.Config.ALTAIR_FORK_EPOCH = 0 // TODO: time altair fork
+	spec.Config.MERGE_FORK_EPOCH = 0  // TODO: time merge fork
 	spec.Config.MERGE_FORK_VERSION = common.Version{0xff, 0, 0, 2}
 	spec.Config.DEPOSIT_CONTRACT_ADDRESS = depositAddress
 	spec.Config.DEPOSIT_CHAIN_ID = chainId
@@ -61,12 +58,12 @@ func buildBeaconSpec(depositAddress common.Eth1Address, ttd uint64, chainId uint
 	spec.Config.ETH1_FOLLOW_DISTANCE = 1
 	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = 64
 	spec.Config.SECONDS_PER_SLOT = 1
-	spec.Config.MIN_ANCHOR_POW_BLOCK_DIFFICULTY = ttd
+	spec.Config.TERMINAL_TOTAL_DIFFICULTY = ttd
+	spec.Config.MIN_GENESIS_TIME = common.Timestamp(genesisTime)
 	return &spec
 }
 
-func generateValidatorKeyBundles(valCount uint64, keyTranches uint64) ([]*setup.KeyDetails, []hivesim.StartOption, error) {
-	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
+func generateValidatorKeyBundles(mnemonic string, valCount uint64, keyTranches uint64) ([]hivesim.StartOption, error) {
 	keySrc := &setup.MnemonicsKeySource{
 		From:       0,
 		To:         valCount,
@@ -75,7 +72,7 @@ func generateValidatorKeyBundles(valCount uint64, keyTranches uint64) ([]*setup.
 	}
 	keys, err := keySrc.Keys()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	keyOpts := make([]hivesim.StartOption, 0, keyTranches)
 	for i := uint64(0); i < keyTranches; i++ {
@@ -84,7 +81,7 @@ func generateValidatorKeyBundles(valCount uint64, keyTranches uint64) ([]*setup.
 		endIndex := valCount * (i + 1) / keyTranches
 		keyOpts = append(keyOpts, setup.KeysBundle(keys[startIndex:endIndex]))
 	}
-	return keys, keyOpts, nil
+	return keyOpts, nil
 }
 
 func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.Int) *PreparedTestnet {
@@ -101,21 +98,18 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.
 
 	// generate keys for validators
 	t.Logf("generating %d validator keys...", valCount)
-	keys, keyOpts, err := generateValidatorKeyBundles(valCount, keyTranches)
+	keyOpts, err := generateValidatorKeyBundles(mnemonic, valCount, keyTranches)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// prepare genesis beacon state, with all of the validators in it.
 	t.Log("building beacon state...")
-	spec := buildBeaconSpec(depositAddress, ttd.Uint64(), eth1Genesis.Genesis.Config.ChainID.Uint64(), eth1Genesis.NetworkID)
-	state, err := setup.BuildBeaconState(eth1Genesis, spec, keys)
-	if err != nil {
-		t.Fatal(err)
-	}
+	spec := buildBeaconSpec(depositAddress, ttd.Uint64(), eth1Genesis.Genesis.Config.ChainID.Uint64(), eth1Genesis.NetworkID, eth1Genesis.Genesis.Timestamp)
 
 	// create configurations for beacon and validator clients
 	eth2Config := setup.Eth2ConfigToParams(&spec.Config)
+
 	beaconOpts := []hivesim.StartOption{
 		eth2Config,
 		hivesim.Params{
@@ -137,16 +131,15 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.
 	}
 
 	// We need a new genesis time, so we take the template state and prepare a tar with updated time
-	stateBundleOpt, err := setup.StateBundle(state, time.Now().Add(1*time.Minute))
+	stateBundleOpt, err := setup.StateBundle(spec, mnemonic, valCount, keyTranches)
 	if err != nil {
 		t.Fatal(err)
 	}
-	beaconOpts = append(beaconOpts, stateBundleOpt)
+	beaconOpts = append(beaconOpts, stateBundleOpt...)
 
 	return &PreparedTestnet{
 		spec:          spec,
 		eth1Genesis:   eth1Genesis,
-		eth2Genesis:   state,
 		executionOpts: executionOpts,
 		beaconOpts:    beaconOpts,
 		validatorOpts: validatorOpts,
@@ -155,14 +148,10 @@ func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64, ttd *big.
 }
 
 func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
-	time, _ := p.eth2Genesis.GenesisTime()
-	valRoot, _ := p.eth2Genesis.GenesisValidatorsRoot()
 	return &Testnet{
-		t:                     t,
-		genesisTime:           time,
-		genesisValidatorsRoot: valRoot,
-		spec:                  p.spec,
-		eth1Genesis:           p.eth1Genesis,
+		t:           t,
+		spec:        p.spec,
+		eth1Genesis: p.eth1Genesis,
 	}
 }
 

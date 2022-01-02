@@ -12,12 +12,9 @@ require (
 	github.com/protolambda/eth2api v0.0.0-20211003135243-f12829c6e6e4
 	github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52
 	github.com/protolambda/zrnt v0.23.0
-	github.com/protolambda/ztyp v0.1.9
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wealdtech/go-eth2-util v1.6.5
 )
-
-replace github.com/protolambda/zrnt => /home/matt/dev/zrnt
 
 require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
@@ -54,8 +51,7 @@ require (
 	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e // indirect
 	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881 // indirect
 	golang.org/x/text v0.3.7 // indirect
-	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 )
 
@@ -63,5 +59,7 @@ require (
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
 	github.com/huin/goupnp v1.0.2 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458 // indirect
+	github.com/protolambda/ztyp v0.1.9 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
+	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )
