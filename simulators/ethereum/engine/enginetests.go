@@ -526,16 +526,33 @@ func reExecPayloads(t *TestEnv) {
 
 // Fee Recipient Tests
 func suggestedFeeRecipient(t *TestEnv) {
-
 	// Wait until this client catches up with latest PoS
 	if !t.WaitForPoSSync() {
 		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
 	}
 
-	for i := 1; i <= 10; i++ {
-		feeRecipientAddress := common.Address{byte(i)}
-		// TODO: There is no guarantee that the client in charge of setting the fee recipient is the one we are currently testing
-		blockNumberIncluded := t.CLMock.setNextFeeRecipient(feeRecipientAddress)
+	// We need to verify at least
+	// 	(a) one block without any fees
+	// 	(b) one block with fees
+	var noFeesBlock, feesBlock bool
+
+	// Amount of transactions to send
+	txCount := 10
+	blockNumbers := make([]*big.Int, txCount)
+	feeRecipients := make([]common.Address, txCount)
+
+	for i := 0; i < txCount; i++ {
+		// Set a random feeRecipient for `txCount` blocks.
+		randAddr := make([]byte, 20)
+		rand.Read(randAddr)
+		feeRecipients[i] = common.BytesToAddress(randAddr)
+		blockNumbers[i] = t.CLMock.setNextFeeRecipient(feeRecipients[i], t.Engine)
+	}
+
+	for i := 0; i < txCount; i++ {
+		// Check each of the blocks and verify the fees were correctly assigned.
+		feeRecipientAddress := feeRecipients[i]
+		blockNumberIncluded := blockNumbers[i]
 		if blockNumberIncluded == nil {
 			t.Fatalf("FAIL (%v): unable to get block number included", t.TestName)
 		}
@@ -546,16 +563,14 @@ func suggestedFeeRecipient(t *TestEnv) {
 		if blockIncluded.Coinbase() != feeRecipientAddress {
 			t.Fatalf("FAIL (%v): Expected feeRecipient is not header.coinbase: %v!=%v", t.TestName, blockIncluded.Coinbase, feeRecipientAddress)
 		}
+
+		// Since the recipient address is random, we can assume the previous balance was zero.
 		balanceAfter, err := t.Eth.BalanceAt(t.Ctx(), feeRecipientAddress, blockNumberIncluded)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Unable to obtain balanceAfter: %v", t.TestName, err)
 		}
-		balanceBefore, err := t.Eth.BalanceAt(t.Ctx(), feeRecipientAddress, blockNumberIncluded.Sub(blockNumberIncluded, big.NewInt(1)))
-		if err != nil {
-			t.Fatalf("FAIL (%v): Unable to obtain balanceBefore: %v", t.TestName, err)
-		}
-		balDiff := big.NewInt(0).Sub(balanceAfter, balanceBefore)
 
+		// We calculate the expected fees based on the transactions included.
 		feeRecipientFee := big.NewInt(0)
 		for _, tx := range blockIncluded.Transactions() {
 			effGasTip, err := tx.EffectiveGasTip(blockIncluded.BaseFee())
@@ -569,8 +584,21 @@ func suggestedFeeRecipient(t *TestEnv) {
 			feeRecipientFee = feeRecipientFee.Add(feeRecipientFee, effGasTip.Mul(effGasTip, big.NewInt(int64(receipt.GasUsed))))
 		}
 
-		if feeRecipientFee.Cmp(balDiff) != 0 {
-			t.Fatalf("FAIL (%v): actual fee received does not match feeRecipientFee: %v, %v", t.TestName, balDiff, feeRecipientFee)
+		if feeRecipientFee.Cmp(balanceAfter) != 0 {
+			t.Fatalf("FAIL (%v): actual fee received does not match feeRecipientFee: %v, %v", t.TestName, balanceAfter, feeRecipientFee)
+		}
+		if feeRecipientFee.Cmp(big0) == 0 {
+			noFeesBlock = true
+		} else {
+			feesBlock = true
+		}
+	}
+
+	if !(noFeesBlock && feesBlock) {
+		if !noFeesBlock {
+			t.Fatalf("FAIL (%v): Unable to test blocks without fees", t.TestName)
+		} else {
+			t.Fatalf("FAIL (%v): Unable to test blocks with fees", t.TestName)
 		}
 	}
 
