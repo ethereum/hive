@@ -43,8 +43,6 @@ eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || 
 merge_option=$([[ "$HIVE_ETH2_MERGE_ENABLED" == "" ]] && echo "" || echo "--merge --execution-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
 
-sleep 10m
-
 lighthouse \
     --debug-level="$LOG" \
     --datadir=/data/beacon \

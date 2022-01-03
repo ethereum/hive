@@ -18,6 +18,15 @@ func jsonStr(v interface{}) string {
 	return string(dat)
 }
 
+type Config struct {
+	AltairForkEpoch         uint64
+	MergeForkEpoch          uint64
+	ValidatorCount          uint64
+	KeyTranches             uint64
+	SlotTime                uint64
+	TotalTerminalDifficulty *big.Int
+}
+
 func main() {
 	var suite = hivesim.Suite{
 		Name:        "eth2-testnet",
@@ -46,14 +55,21 @@ func (nc *ClientDefinitionsByRole) MergeTestnetTest() hivesim.TestSpec {
 		Name:        "single-client-merge-testnet",
 		Description: "This runs quick merge single-client testnet, with 4 nodes and 2**14 (minimum) validators",
 		Run: func(t *hivesim.T) {
-			// nc.startTestnet(t, 1<<14, big.NewInt(8242424242))
-			nc.startTestnet(t, 64, big.NewInt(824242424))
+			config := Config{
+				AltairForkEpoch: 0,
+				MergeForkEpoch:  0,
+				// ValidatorCount:          1<<14,
+				ValidatorCount:          64,
+				SlotTime:                1,
+				TotalTerminalDifficulty: big.NewInt(824242424),
+			}
+			nc.startTestnet(t, &config)
 		},
 	}
 }
 
-func (nc *ClientDefinitionsByRole) startTestnet(t *hivesim.T, validators uint64, ttd *big.Int) {
-	prep := prepareTestnet(t, validators, 2, ttd)
+func (nc *ClientDefinitionsByRole) startTestnet(t *hivesim.T, config *Config) {
+	prep := prepareTestnet(t, config)
 	testnet := prep.createTestnet(t)
 
 	genesisTime := testnet.GenesisTime()
@@ -78,13 +94,13 @@ func (nc *ClientDefinitionsByRole) startTestnet(t *hivesim.T, validators uint64,
 	}
 	t.Logf("started all nodes!")
 
-	ctx := context.Background()
-
 	t.Logf("starting eth1 miner")
 	addr, err := testnet.eth1[0].EnodeURL()
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	ctx := context.Background()
 	go mock.MineChain(t, ctx, prep.eth1Genesis.Genesis, addr)
 
 	// TODO: maybe run other assertions / tests in the background?

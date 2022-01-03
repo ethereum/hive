@@ -26,14 +26,6 @@ require (
 	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
-	github.com/golang/snappy v0.0.4 // indirect
-	github.com/gorilla/websocket v1.4.2 // indirect
-	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
-	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.0 // indirect
-	github.com/julienschmidt/httprouter v1.3.0 // indirect
-	github.com/kilic/bls12-381 v0.1.0 // indirect
-	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.2 // indirect
@@ -41,7 +33,6 @@ require (
 	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/protolambda/bls12-381-util v0.0.0-20210812140640-b03868185758 // indirect
-	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/shirou/gopsutil v3.21.8+incompatible // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
@@ -57,9 +48,18 @@ require (
 
 require (
 	github.com/edsrzf/mmap-go v1.0.0 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
+	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
+	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
+	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/huin/goupnp v1.0.2 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458 // indirect
+	github.com/julienschmidt/httprouter v1.3.0 // indirect
+	github.com/kilic/bls12-381 v0.1.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/protolambda/ztyp v0.1.9 // indirect
+	github.com/rivo/uniseg v0.2.0 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )
