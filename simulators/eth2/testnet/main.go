@@ -18,6 +18,11 @@ func jsonStr(v interface{}) string {
 	return string(dat)
 }
 
+type NodeConfig struct {
+	ExecutionClient string
+	ConsensusClient string
+}
+
 type Config struct {
 	AltairForkEpoch         uint64
 	MergeForkEpoch          uint64
@@ -25,6 +30,26 @@ type Config struct {
 	KeyTranches             uint64
 	SlotTime                uint64
 	TotalTerminalDifficulty *big.Int
+
+	// Number of blocks the meet the TTD requirements to mine. The first
+	// block will be sent to the first node, the second block will be sent
+	// to first, and so forth until all conflicting blocks are sent - after
+	// which all remaining nodes will receive the same block.
+	TtdBlocksCount uint64
+
+	// Node configurations to launch. Each node as a proportional share of
+	// validators.
+	Nodes []NodeConfig
+}
+
+func (c *Config) activeFork() string {
+	if c.MergeForkEpoch == 0 {
+		return "merge"
+	} else if c.AltairForkEpoch == 0 {
+		return "altair"
+	} else {
+		return "phase0"
+	}
 }
 
 func main() {
@@ -40,9 +65,7 @@ func main() {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Log("clients by role:", jsonStr(clientTypes))
 			byRole := ClientsByRole(clientTypes)
-			t.Log("clients by role:", jsonStr(byRole))
 			mergeTest := byRole.MergeTestnetTest()
 			t.Run(mergeTest)
 		},
@@ -56,12 +79,23 @@ func (nc *ClientDefinitionsByRole) MergeTestnetTest() hivesim.TestSpec {
 		Description: "This runs quick merge single-client testnet, with 4 nodes and 2**14 (minimum) validators",
 		Run: func(t *hivesim.T) {
 			config := Config{
-				AltairForkEpoch: 0,
-				MergeForkEpoch:  0,
+				AltairForkEpoch: 1,
+				MergeForkEpoch:  2,
 				// ValidatorCount:          1<<14,
 				ValidatorCount:          64,
 				SlotTime:                1,
 				TotalTerminalDifficulty: big.NewInt(824242424),
+				TtdBlocksCount:          0,
+				Nodes: []NodeConfig{
+					{
+						ExecutionClient: "go-ethereum",
+						ConsensusClient: "lighthouse",
+					},
+					{
+						ExecutionClient: "go-ethereum",
+						ConsensusClient: "lighthouse",
+					},
+				},
 			}
 			nc.startTestnet(t, &config)
 		},

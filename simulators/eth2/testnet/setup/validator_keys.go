@@ -5,13 +5,14 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/google/uuid"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
 	"github.com/protolambda/go-keystorev4"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"
-	"strings"
 )
 
 // TODO: replace wealdtech util with more minimal key derivation lib, can then also remove herumi BLS
@@ -58,16 +59,11 @@ type MnemonicsKeySource struct {
 }
 
 func mnemonicToSeed(mnemonic string) (seed []byte, err error) {
-	seed, err = bip39.MnemonicToByteArray(strings.TrimSpace(mnemonic))
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode seed: %v", err)
+	mnemonic = strings.TrimSpace(mnemonic)
+	if !bip39.IsMnemonicValid(mnemonic) {
+		return nil, errors.New("mnemonic is not valid")
 	}
-	// Strip checksum; last byte.
-	seed = seed[:len(seed)-1]
-	if len(seed) != 32 {
-		return nil, fmt.Errorf("seed must have 24 words, got %d, expected %d bytes", len(seed), 32)
-	}
-	return seed, nil
+	return bip39.NewSeed(mnemonic, ""), nil
 }
 
 func weakKeystore(secret []byte, pub []byte, passphrase []byte) (*keystorev4.Keystore, error) {

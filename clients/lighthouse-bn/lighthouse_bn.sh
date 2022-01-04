@@ -10,17 +10,19 @@ cp /hive/input/config.yaml /data/testnet_setup
 # empty bootnodes file, required for custom testnet setup, use CLI arg instead to configure it.
 echo "[]" > /data/testnet_setup/boot_enr.yaml
 
-echo "${DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" > /data/testnet_setup/deposit_contract.txt
+echo "${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" > /data/testnet_setup/deposit_contract.txt
 echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" > /data/testnet_setup/deploy_block.txt
 
-eth2-testnet-genesis merge \
-        --eth1-config="" \
+eth2-testnet-genesis $HIVE_ETH2_GENESIS_FORK \
+        $([[ "$HIVE_ETH2_GENESIS_FORK" != "merge" ]] && \
+                echo "--timestamp=$HIVE_ETH2_ETH1_GENESIS_TIME" || \
+                echo "--eth1-config=\"\" --eth1-timestamp=$HIVE_ETH2_ETH1_GENESIS_TIME"
+        ) \
         --config="/hive/input/config.yaml" \
         --preset-phase0="/hive/input/preset_phase0.yaml" \
         --preset-altair="/hive/input/preset_altair.yaml" \
         --preset-merge="/hive/input/preset_merge.yaml" \
         --eth1-block="0000000000000000000000000000000000000000000000000000000000000000" \
-        --eth1-timestamp=$HIVE_ETH2_CONFIG_MIN_GENESIS_TIME \
         --mnemonics="/hive/input/mnemonics.yaml" \
         --state-output="/data/testnet_setup/genesis.ssz"
 

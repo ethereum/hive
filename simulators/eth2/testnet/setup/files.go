@@ -27,17 +27,14 @@ func Eth1Bundle(genesis *core.Genesis) (hivesim.StartOption, error) {
 	return hivesim.WithDynamicFile("genesis.json", bytesSource(out)), nil
 }
 
-func StateBundle(spec *common.Spec, mnemonic string, valCount uint64, tranches uint64) ([]hivesim.StartOption, error) {
+func StateBundle(spec *common.Spec, mnemonic string, valCount uint64) ([]hivesim.StartOption, error) {
 	type mnemonicInfo struct {
 		Mnemonic string
 		Count    uint64
 	}
-	m := make([]mnemonicInfo, tranches)
-	for i := range m {
-		m[i].Mnemonic = mnemonic
-		// TODO: error somewhere if this isn't divisble exactly
-		m[i].Count = valCount / tranches
-	}
+	m := make([]mnemonicInfo, 1)
+	m[0].Mnemonic = mnemonic
+	m[0].Count = valCount
 	mnemonics, err := yaml.Marshal(m)
 	if err != nil {
 		return nil, err
