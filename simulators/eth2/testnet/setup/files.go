@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"gopkg.in/yaml.v2"
@@ -27,7 +28,7 @@ func Eth1Bundle(genesis *core.Genesis) (hivesim.StartOption, error) {
 	return hivesim.WithDynamicFile("genesis.json", bytesSource(out)), nil
 }
 
-func StateBundle(spec *common.Spec, mnemonic string, valCount uint64) ([]hivesim.StartOption, error) {
+func StateBundle(spec *common.Spec, genesis *core.Genesis, mnemonic string, valCount uint64) ([]hivesim.StartOption, error) {
 	type mnemonicInfo struct {
 		Mnemonic string
 		Count    uint64
@@ -55,12 +56,17 @@ func StateBundle(spec *common.Spec, mnemonic string, valCount uint64) ([]hivesim
 	if err != nil {
 		return nil, err
 	}
+	db := rawdb.NewMemoryDatabase()
+	genesisHash := genesis.ToBlock(db).Hash()
 	return []hivesim.StartOption{
 		hivesim.WithDynamicFile("/hive/input/mnemonics.yaml", bytesSource(mnemonics)),
 		hivesim.WithDynamicFile("/hive/input/config.yaml", bytesSource(config)),
 		hivesim.WithDynamicFile("/hive/input/preset_phase0.yaml", bytesSource(phase0_preset)),
 		hivesim.WithDynamicFile("/hive/input/preset_altair.yaml", bytesSource(altair_preset)),
 		hivesim.WithDynamicFile("/hive/input/preset_merge.yaml", bytesSource(merge_preset)),
+		hivesim.Params{
+			"HIVE_ETH2_ETH1_GENESIS_HASH": genesisHash.String(),
+		},
 	}, nil
 }
 

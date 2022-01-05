@@ -26,7 +26,7 @@ type Testnet struct {
 }
 
 func (t *Testnet) GenesisTime() time.Time {
-	return time.Unix(int64(t.eth1Genesis.Genesis.Timestamp), 0)
+	return time.Unix(int64(t.eth1Genesis.Genesis.Timestamp)+int64(t.spec.GENESIS_DELAY), 0)
 }
 
 func (t *Testnet) TrackFinality(ctx context.Context) {

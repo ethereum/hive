@@ -16,13 +16,13 @@ echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" > /data/testnet_setup/deploy_
 eth2-testnet-genesis $HIVE_ETH2_GENESIS_FORK \
         $([[ "$HIVE_ETH2_GENESIS_FORK" != "merge" ]] && \
                 echo "--timestamp=$HIVE_ETH2_ETH1_GENESIS_TIME" || \
-                echo "--eth1-config=\"\" --eth1-timestamp=$HIVE_ETH2_ETH1_GENESIS_TIME"
+                echo "--eth1-config= --eth1-timestamp=$HIVE_ETH2_ETH1_GENESIS_TIME"
         ) \
         --config="/hive/input/config.yaml" \
         --preset-phase0="/hive/input/preset_phase0.yaml" \
         --preset-altair="/hive/input/preset_altair.yaml" \
         --preset-merge="/hive/input/preset_merge.yaml" \
-        --eth1-block="0000000000000000000000000000000000000000000000000000000000000000" \
+        --eth1-block=$HIVE_ETH2_ETH1_GENESIS_HASH \
         --mnemonics="/hive/input/mnemonics.yaml" \
         --state-output="/data/testnet_setup/genesis.ssz"
 
@@ -42,7 +42,7 @@ echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
 CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
-merge_option=$([[ "$HIVE_ETH2_MERGE_ENABLED" == "" ]] && echo "" || echo "--merge --execution-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
+merge_option=$([[ "$HIVE_ETH2_MERGE_ENABLED" == "" ]] && echo "" || echo "--merge")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
 
 lighthouse \

@@ -83,7 +83,7 @@ func (nc *ClientDefinitionsByRole) MergeTestnetTest() hivesim.TestSpec {
 				MergeForkEpoch:  2,
 				// ValidatorCount:          1<<14,
 				ValidatorCount:          64,
-				SlotTime:                1,
+				SlotTime:                2,
 				TotalTerminalDifficulty: big.NewInt(824242424),
 				TtdBlocksCount:          0,
 				Nodes: []NodeConfig{
