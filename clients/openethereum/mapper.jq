@@ -122,8 +122,8 @@ def clique_engine:
     "eip1052Transition": env.HIVE_FORK_CONSTANTINOPLE|to_hex,
 
     # Petersburg
-    "eip1283Transition": (if env.HIVE_FORK_ISTANBUL then "0x0" else env.HIVE_FORK_CONSTANTINOPLE|to_hex end),
-    "eip1283DisableTransition": (if env.HIVE_FORK_ISTANBUL then "0x0" else env.HIVE_FORK_PETERSBURG|to_hex end),
+    "eip1283Transition": (if env.HIVE_FORK_ISTANBUL|to_hex == "0x0" then "0x0" else env.HIVE_FORK_CONSTANTINOPLE|to_hex end),
+    "eip1283DisableTransition": (if env.HIVE_FORK_ISTANBUL|to_hex == "0x0" then "0x0" else env.HIVE_FORK_PETERSBURG|to_hex end),
 
     # Istanbul
     "eip1283ReenableTransition": env.HIVE_FORK_ISTANBUL|to_hex,
