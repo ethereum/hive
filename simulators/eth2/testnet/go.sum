@@ -745,8 +745,8 @@ github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52 h1:5znmc
 github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52/go.mod h1:Xda3KO8+DMyWaTr+LwUUpVRTB5SdFzoKu0ivXNI6p1s=
 github.com/protolambda/messagediff v1.4.0/go.mod h1:LboJp0EwIbJsePYpzh5Op/9G1/4mIztMRYzzwR0dR2M=
 github.com/protolambda/zrnt v0.19.0/go.mod h1:rVf0RX8t7xrbSdzbVtw9ZuRqtCoFWnACT7OCHl6DiFk=
-github.com/protolambda/zrnt v0.23.0 h1:49BveyLHZbnXK5tYVXr1nvn9TiT2oBHGHq0usak6shE=
-github.com/protolambda/zrnt v0.23.0/go.mod h1:rVf0RX8t7xrbSdzbVtw9ZuRqtCoFWnACT7OCHl6DiFk=
+github.com/protolambda/zrnt v0.23.1-0.20220106230333-0b684aed531c h1:ZMcy2mNuKrE5HRrM4L//cr76Ix+7e8niDe+jyzAvFVU=
+github.com/protolambda/zrnt v0.23.1-0.20220106230333-0b684aed531c/go.mod h1:rVf0RX8t7xrbSdzbVtw9ZuRqtCoFWnACT7OCHl6DiFk=
 github.com/protolambda/ztyp v0.1.8/go.mod h1:u9yT4ioIokwlHrOfiZ52ezHfKdza3phxhTJix01vGgU=
 github.com/protolambda/ztyp v0.1.9 h1:TEQvOTihEf89grFJMOZA1DrJ4B6M1Cg35U3WRSTdgew=
 github.com/protolambda/ztyp v0.1.9/go.mod h1:NAGmX7+zlkxxv7F5ATHrdXwZFtkQjAUinDgg7RAV29k=
