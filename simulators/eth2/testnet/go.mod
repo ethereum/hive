@@ -12,6 +12,7 @@ require (
 	github.com/protolambda/eth2api v0.0.0-20211003135243-f12829c6e6e4
 	github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52
 	github.com/protolambda/zrnt v0.23.0
+	github.com/protolambda/ztyp v0.1.9
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wealdtech/go-eth2-util v1.6.5
 )
@@ -32,7 +33,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
-	github.com/protolambda/bls12-381-util v0.0.0-20210812140640-b03868185758 // indirect
+	github.com/protolambda/bls12-381-util v0.0.0-20210812140640-b03868185758
 	github.com/shirou/gopsutil v3.21.8+incompatible // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.9 // indirect
@@ -58,7 +59,6 @@ require (
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kilic/bls12-381 v0.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
-	github.com/protolambda/ztyp v0.1.9 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect

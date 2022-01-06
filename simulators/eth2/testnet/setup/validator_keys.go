@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/hive/hivesim"
+	blsu "github.com/protolambda/bls12-381-util"
 	"strings"
 
 	"github.com/google/uuid"
@@ -173,4 +175,26 @@ func (k *MnemonicsKeySource) Keys() ([]*KeyDetails, error) {
 	}
 	k.cache = out
 	return out, nil
+}
+
+func SecretKeys(keys []*KeyDetails) ([]blsu.SecretKey, error) {
+	secrets := make([]blsu.SecretKey, len(keys))
+	for i := 0; i < len(keys); i++ {
+		if err := secrets[i].Deserialize(&keys[i].ValidatorSecretKey); err != nil {
+			return nil, fmt.Errorf("validator %d has invalid key: %v", i)
+		}
+	}
+	return secrets, nil
+}
+
+func KeyTranches(keys []*KeyDetails, keyTranches uint64) []hivesim.StartOption {
+	keyOpts := make([]hivesim.StartOption, 0, keyTranches)
+	valCount := uint64(len(keys))
+	for i := uint64(0); i < keyTranches; i++ {
+		// Give each validator client an equal subset of the genesis validator keys
+		startIndex := valCount * i / keyTranches
+		endIndex := valCount * (i + 1) / keyTranches
+		keyOpts = append(keyOpts, KeysBundle(keys[startIndex:endIndex]))
+	}
+	return keyOpts
 }

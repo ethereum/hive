@@ -15,6 +15,9 @@ import (
 type Testnet struct {
 	t *hivesim.T
 
+	genesisTime           common.Timestamp
+	genesisValidatorsRoot common.Root
+
 	// Consensus chain configuration
 	spec *common.Spec
 	// Execution chain configuration and genesis info
@@ -26,7 +29,7 @@ type Testnet struct {
 }
 
 func (t *Testnet) GenesisTime() time.Time {
-	return time.Unix(int64(t.eth1Genesis.Genesis.Timestamp)+int64(t.spec.GENESIS_DELAY), 0)
+	return time.Unix(int64(t.genesisTime), 0)
 }
 
 func (t *Testnet) TrackFinality(ctx context.Context) {

@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"io/ioutil"
-
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
+	"github.com/protolambda/ztyp/codec"
 	"gopkg.in/yaml.v2"
+	"io"
+	"io/ioutil"
 )
 
 func bytesSource(data []byte) func() (io.ReadCloser, error) {
@@ -28,42 +28,45 @@ func Eth1Bundle(genesis *core.Genesis) (hivesim.StartOption, error) {
 	return hivesim.WithDynamicFile("genesis.json", bytesSource(out)), nil
 }
 
-func StateBundle(spec *common.Spec, genesis *core.Genesis, mnemonic string, valCount uint64) ([]hivesim.StartOption, error) {
-	type mnemonicInfo struct {
-		Mnemonic string
-		Count    uint64
-	}
-	m := make([]mnemonicInfo, 1)
-	m[0].Mnemonic = mnemonic
-	m[0].Count = valCount
-	mnemonics, err := yaml.Marshal(m)
+func StateBundle(templ common.BeaconState, genesisTime common.Timestamp) (hivesim.StartOption, error) {
+	state, err := templ.CopyState()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to copy state: %v", err)
 	}
+	if err := state.SetGenesisTime(genesisTime); err != nil {
+		return nil, fmt.Errorf("failed to set genesis time: %v", err)
+	}
+	var stateBytes bytes.Buffer
+	if err := state.Serialize(codec.NewEncodingWriter(&stateBytes)); err != nil {
+		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
+	}
+	return hivesim.WithDynamicFile("/hive/input/genesis.ssz", bytesSource(stateBytes.Bytes())), nil
+}
+
+func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount uint64) ([]hivesim.StartOption, error) {
 	config, err := yaml.Marshal(spec.Config)
 	if err != nil {
 		return nil, err
 	}
-	phase0_preset, err := yaml.Marshal(spec.Phase0Preset)
+	phase0Preset, err := yaml.Marshal(spec.Phase0Preset)
 	if err != nil {
 		return nil, err
 	}
-	altair_preset, err := yaml.Marshal(spec.AltairPreset)
+	altairPreset, err := yaml.Marshal(spec.AltairPreset)
 	if err != nil {
 		return nil, err
 	}
-	merge_preset, err := yaml.Marshal(spec.MergePreset)
+	mergePreset, err := yaml.Marshal(spec.MergePreset)
 	if err != nil {
 		return nil, err
 	}
 	db := rawdb.NewMemoryDatabase()
 	genesisHash := genesis.ToBlock(db).Hash()
 	return []hivesim.StartOption{
-		hivesim.WithDynamicFile("/hive/input/mnemonics.yaml", bytesSource(mnemonics)),
 		hivesim.WithDynamicFile("/hive/input/config.yaml", bytesSource(config)),
-		hivesim.WithDynamicFile("/hive/input/preset_phase0.yaml", bytesSource(phase0_preset)),
-		hivesim.WithDynamicFile("/hive/input/preset_altair.yaml", bytesSource(altair_preset)),
-		hivesim.WithDynamicFile("/hive/input/preset_merge.yaml", bytesSource(merge_preset)),
+		hivesim.WithDynamicFile("/hive/input/preset_phase0.yaml", bytesSource(phase0Preset)),
+		hivesim.WithDynamicFile("/hive/input/preset_altair.yaml", bytesSource(altairPreset)),
+		hivesim.WithDynamicFile("/hive/input/preset_merge.yaml", bytesSource(mergePreset)),
 		hivesim.Params{
 			"HIVE_ETH2_ETH1_GENESIS_HASH": genesisHash.String(),
 		},

@@ -3,13 +3,11 @@ package setup
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
-	"time"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
+	"math/big"
 )
 
 // The runtime deposit contract code, along with the storage that would otherwise have been initialized
@@ -61,7 +59,7 @@ type Eth1Genesis struct {
 	NetworkID      uint64
 }
 
-func BuildEth1Genesis(ttd *big.Int) *Eth1Genesis {
+func BuildEth1Genesis(ttd *big.Int, genesisTime uint64) *Eth1Genesis {
 	depositContractAddr := common.HexToAddress("0x4242424242424242424242424242424242424242")
 	var depositContractAcc core.GenesisAccount
 	if err := json.Unmarshal([]byte(embeddedDepositContract), &depositContractAcc); err != nil {
@@ -90,7 +88,7 @@ func BuildEth1Genesis(ttd *big.Int) *Eth1Genesis {
 				Clique:                  nil,
 			},
 			Nonce:      0,
-			Timestamp:  uint64(time.Now().Unix()),
+			Timestamp:  genesisTime,
 			ExtraData:  nil,
 			GasLimit:   30_000_000,
 			Difficulty: big.NewInt(10000000),
