@@ -231,6 +231,25 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	}
 }
 
+func badHashOnExecPayload(t *TestEnv) {
+	// Wait until TTD is reached by this client
+	if !t.WaitForPoSSync() {
+		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
+	}
+
+	// Wait for GetPayload
+	t.CLMock.NewGetPayloadMutex.LockSet()
+	defer t.CLMock.NewGetPayloadMutex.Unlock()
+
+	// Alter hash on the payload and send it to client, should produce an error
+	alteredPayload := t.CLMock.LatestPayloadBuilt
+	alteredPayload.BlockHash[common.HashLength-1] = byte(255 - alteredPayload.BlockHash[common.HashLength-1])
+	execPayloadResp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), &alteredPayload)
+	if err == nil {
+		t.Fatalf("FAIL (%v): Incorrect block hash in execute payload was not rejected: %v", t.TestName, execPayloadResp)
+	}
+}
+
 // Test to verify Block information available at the Eth RPC after ExecutePayload
 func blockStatusExecPayload(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block

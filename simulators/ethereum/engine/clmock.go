@@ -28,6 +28,7 @@ type CLMocker struct {
 	// Latest broadcasted data using the PoS Engine API
 	LatestFinalizedNumber *big.Int
 	LatestFinalizedHeader *types.Header
+	LatestPayloadBuilt    catalyst.ExecutableDataV1
 	LatestExecutedPayload catalyst.ExecutableDataV1
 	LatestForkchoice      catalyst.ForkchoiceStateV1
 
@@ -44,6 +45,7 @@ type CLMocker struct {
 	the lock is released to let only one test case do its testing.
 	*/
 	PayloadBuildMutex                SetResetLock
+	NewGetPayloadMutex               SetResetLock
 	NewExecutePayloadMutex           SetResetLock
 	NewHeadBlockForkchoiceMutex      SetResetLock
 	NewSafeBlockForkchoiceMutex      SetResetLock
@@ -75,6 +77,7 @@ func NewCLMocker() *CLMocker {
 
 	// Lock the mutexes. To be unlocked on next PoS block production.
 	newCLMocker.PayloadBuildMutex.LockReset()
+	newCLMocker.NewGetPayloadMutex.LockReset()
 	newCLMocker.NewExecutePayloadMutex.LockReset()
 	newCLMocker.NewHeadBlockForkchoiceMutex.LockReset()
 	newCLMocker.NewSafeBlockForkchoiceMutex.LockReset()
@@ -184,6 +187,7 @@ func (cl *CLMocker) setNextFeeRecipient(feeRecipient common.Address, ec *EngineC
 // Unlock all locks in the given CLMocker instance
 func unlockAll(cl *CLMocker) {
 	cl.PayloadBuildMutex.Unlock()
+	cl.NewGetPayloadMutex.Unlock()
 	cl.NewExecutePayloadMutex.Unlock()
 	cl.NewHeadBlockForkchoiceMutex.Unlock()
 	cl.NewSafeBlockForkchoiceMutex.Unlock()
@@ -249,28 +253,31 @@ func (cl *CLMocker) minePOSBlock() {
 		fmt.Printf("forkchoiceUpdated Response: %v\n", resp)
 	}
 
-	payload, err := cl.NextBlockProducer.EngineGetPayloadV1(cl.NextBlockProducer.Ctx(), resp.PayloadID)
+	cl.LatestPayloadBuilt, err = cl.NextBlockProducer.EngineGetPayloadV1(cl.NextBlockProducer.Ctx(), resp.PayloadID)
 	if err != nil {
 		unlockAll(cl)
 		cl.NextBlockProducer.Fatalf("Could not getPayload (%v): %v", resp.PayloadID, err)
 	}
 
+	// Trigger actions for a new payload built.
+	cl.NewGetPayloadMutex.Unlock()
+	cl.NewGetPayloadMutex.LockReset()
+
 	// Broadcast the executePayload to all clients
-	for i, resp := range cl.broadcastExecutePayload(&payload) {
+	for i, resp := range cl.broadcastExecutePayload(&cl.LatestPayloadBuilt) {
 		if resp.Status != "VALID" {
 			fmt.Printf("resp (%v): %v\n", i, resp)
 		}
 	}
-	cl.LatestExecutedPayload = payload
-
-	cl.ExecutedPayloadHistory[payload.Number] = payload
+	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
+	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = cl.LatestPayloadBuilt
 
 	// Trigger actions for new executePayload broadcast
 	cl.NewExecutePayloadMutex.Unlock()
 	cl.NewExecutePayloadMutex.LockReset()
 
 	// Broadcast forkchoice updated with new HeadBlock to all clients
-	cl.LatestForkchoice.HeadBlockHash = payload.BlockHash
+	cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
 	for i, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
 		if resp.Status != "SUCCESS" {
 			fmt.Printf("resp (%v): %v\n", i, resp)
@@ -281,7 +288,7 @@ func (cl *CLMocker) minePOSBlock() {
 	cl.NewHeadBlockForkchoiceMutex.LockReset()
 
 	// Broadcast forkchoice updated with new SafeBlock to all clients
-	cl.LatestForkchoice.SafeBlockHash = payload.BlockHash
+	cl.LatestForkchoice.SafeBlockHash = cl.LatestPayloadBuilt.BlockHash
 	for i, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
 		if resp.Status != "SUCCESS" {
 			fmt.Printf("resp (%v): %v\n", i, resp)
@@ -292,7 +299,7 @@ func (cl *CLMocker) minePOSBlock() {
 	cl.NewSafeBlockForkchoiceMutex.LockReset()
 
 	// Broadcast forkchoice updated with new FinalizedBlock to all clients
-	cl.LatestForkchoice.FinalizedBlockHash = payload.BlockHash
+	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestPayloadBuilt.BlockHash
 	for i, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
 		if resp.Status != "SUCCESS" {
 			fmt.Printf("resp (%v): %v\n", i, resp)

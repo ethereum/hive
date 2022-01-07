@@ -70,6 +70,7 @@ var tests = []testSpec{
 	{Name: "Unknown SafeBlockHash", Run: unknownSafeBlockHash},
 	{Name: "Unknown FinalizedBlockHash", Run: unknownFinalizedBlockHash},
 	{Name: "Pre-TTD ForkchoiceUpdated After PoS Switch", Run: preTTDFinalizedBlockHash},
+	{Name: "Bad Hash on ExecutePayload", Run: badHashOnExecPayload},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{Name: "Latest Block after ExecutePayload", Run: blockStatusExecPayload},

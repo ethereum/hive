@@ -57,6 +57,7 @@ Engine API Negative Test Cases:
 - Unknown SafeBlockHash: Perform a forkchoiceUpdated call with an unknown (random) SafeBlockHash, the client should throw an error since the hash is not an ancestor to the HeadBlockHash.
 - Unknown FinalizedBlockHash: Perform a forkchoiceUpdated call with an unknown (random) FinalizedBlockHash, the client should initiate the syncing process.
 - Pre-TTD Block Hash: Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified)
+- Bad blockhash on ExecutePayload: Send an ExecutePayload directive to the client including an incorrect BlockHash, should result in an error.
 
 Eth RPC Status on ForkchoiceUpdated Events:
 - Latest Block after ExecutePayload: Verify the Block returned by the Eth RPC after a new payload is executed. Eth RPC should still return previous block.
