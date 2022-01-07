@@ -15,7 +15,6 @@ import (
 )
 
 var depositAddress common.Eth1Address
-var mnemonic = "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 
 func init() {
 	_ = depositAddress.UnmarshalText([]byte("0x4242424242424242424242424242424242424242"))
@@ -32,7 +31,7 @@ type PreparedTestnet struct {
 	eth2Genesis common.BeaconState
 	// Secret keys of validators, to fabricate extra signed test messages with during testnet/
 	// E.g. to test a slashable offence that would not otherwise happen.
-	keys []blsu.SecretKey
+	keys *[]blsu.SecretKey
 
 	// Configuration to apply to every node of the given type
 	executionOpts hivesim.StartOption
@@ -44,7 +43,7 @@ type PreparedTestnet struct {
 }
 
 // Build all artifacts require to start a testnet.
-func prepareTestnet(t *hivesim.T, config *Config) *PreparedTestnet {
+func prepareTestnet(t *hivesim.T, env *TestEnv, config *config) *PreparedTestnet {
 	// offset genesis by two minutes, we need some time to prepare and launch containers
 	eth1GenesisTime := common.Timestamp(time.Now().Unix()) + 2*60
 	eth2GenesisTime := eth1GenesisTime
@@ -86,24 +85,8 @@ func prepareTestnet(t *hivesim.T, config *Config) *PreparedTestnet {
 	spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime)
 	spec.Config.TERMINAL_TOTAL_DIFFICULTY = common.MustU256FromBig(config.TerminalTotalDifficulty)
 
-	// Generate keys for validators
-	t.Logf("generating %d validator keys...", config.ValidatorCount)
-	keySrc := &setup.MnemonicsKeySource{
-		From:       0,
-		To:         config.ValidatorCount,
-		Validator:  mnemonic,
-		Withdrawal: mnemonic,
-	}
-	keys, err := keySrc.Keys()
-	if err != nil {
-		t.Fatal(err)
-	}
-	secrets, err := setup.SecretKeys(keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keyOpts := setup.KeyTranches(keys, uint64(len(config.Nodes)))
+	// Generate keys opts for validators
+	keyOpts := setup.KeyTranches(env.Keys, uint64(len(config.Nodes)))
 
 	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount)
 	if err != nil {
@@ -111,7 +94,7 @@ func prepareTestnet(t *hivesim.T, config *Config) *PreparedTestnet {
 	}
 
 	// prepare genesis beacon state, with all the validators in it.
-	state, err := setup.BuildBeaconState(spec, eth1Genesis.Genesis, eth2GenesisTime, keys)
+	state, err := setup.BuildBeaconState(spec, eth1Genesis.Genesis, eth2GenesisTime, env.Keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -153,7 +136,7 @@ func prepareTestnet(t *hivesim.T, config *Config) *PreparedTestnet {
 		spec:          spec,
 		eth1Genesis:   eth1Genesis,
 		eth2Genesis:   state,
-		keys:          secrets,
+		keys:          env.Secrets,
 		executionOpts: executionOpts,
 		beaconOpts:    beaconOpts,
 		validatorOpts: validatorOpts,

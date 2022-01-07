@@ -5,9 +5,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/ethereum/hive/hivesim"
 	blsu "github.com/protolambda/bls12-381-util"
-	"strings"
 
 	"github.com/google/uuid"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
@@ -177,14 +178,14 @@ func (k *MnemonicsKeySource) Keys() ([]*KeyDetails, error) {
 	return out, nil
 }
 
-func SecretKeys(keys []*KeyDetails) ([]blsu.SecretKey, error) {
+func SecretKeys(keys []*KeyDetails) (*[]blsu.SecretKey, error) {
 	secrets := make([]blsu.SecretKey, len(keys))
 	for i := 0; i < len(keys); i++ {
 		if err := secrets[i].Deserialize(&keys[i].ValidatorSecretKey); err != nil {
-			return nil, fmt.Errorf("validator %d has invalid key: %v", i)
+			return nil, fmt.Errorf("validator %d has invalid key: %v", i, err)
 		}
 	}
-	return secrets, nil
+	return &secrets, nil
 }
 
 func KeyTranches(keys []*KeyDetails, keyTranches uint64) []hivesim.StartOption {

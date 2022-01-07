@@ -24,3 +24,24 @@ func ClientsByRole(available []*hivesim.ClientDefinition) *ClientDefinitionsByRo
 	}
 	return &out
 }
+
+func (c *ClientDefinitionsByRole) ClientByNameAndRole(name, role string) *hivesim.ClientDefinition {
+	switch role {
+	case "beacon":
+		return byName(c.Beacon, name)
+	case "validator":
+		return byName(c.Validator, name)
+	case "eth1":
+		return byName(c.Eth1, name)
+	}
+	return nil
+}
+
+func byName(clients []*hivesim.ClientDefinition, name string) *hivesim.ClientDefinition {
+	for _, client := range clients {
+		if client.Name == name {
+			return client
+		}
+	}
+	return nil
+}

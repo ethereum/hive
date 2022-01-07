@@ -3,6 +3,7 @@ package setup
 import (
 	"crypto/sha256"
 	"fmt"
+
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -199,7 +200,6 @@ func BuildBeaconState(spec *common.Spec, eth1Genesis *core.Genesis, eth2GenesisT
 	}
 
 	if st, ok := state.(*merge.BeaconStateView); ok {
-
 		// did we hit the TTD at genesis block?
 		embedExecAtGenesis := spec.TERMINAL_TOTAL_DIFFICULTY.Big().Cmp(eth1Genesis.Difficulty) < 0
 

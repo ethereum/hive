@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/mock"
+	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 )
 
 func jsonStr(v interface{}) string {
@@ -18,38 +20,14 @@ func jsonStr(v interface{}) string {
 	return string(dat)
 }
 
-type NodeConfig struct {
-	ExecutionClient string
-	ConsensusClient string
+type testSpec struct {
+	Name  string
+	About string
+	Run   func(*hivesim.T, *TestEnv)
 }
 
-type Config struct {
-	AltairForkEpoch         uint64
-	MergeForkEpoch          uint64
-	ValidatorCount          uint64
-	KeyTranches             uint64
-	SlotTime                uint64
-	TerminalTotalDifficulty *big.Int
-
-	// Number of blocks the meet the TTD requirements to mine. The first
-	// block will be sent to the first node, the second block will be sent
-	// to first, and so forth until all conflicting blocks are sent - after
-	// which all remaining nodes will receive the same block.
-	TtdBlocksCount uint64
-
-	// Node configurations to launch. Each node as a proportional share of
-	// validators.
-	Nodes []NodeConfig
-}
-
-func (c *Config) activeFork() string {
-	if c.MergeForkEpoch == 0 {
-		return "merge"
-	} else if c.AltairForkEpoch == 0 {
-		return "altair"
-	} else {
-		return "phase0"
-	}
+var tests = []testSpec{
+	{Name: "single-client-merge-testnet", Run: mergeTestnetTest},
 }
 
 func main() {
@@ -65,75 +43,97 @@ func main() {
 			if err != nil {
 				t.Fatal(err)
 			}
-			byRole := ClientsByRole(clientTypes)
-			mergeTest := byRole.MergeTestnetTest()
-			t.Run(mergeTest)
+			c := ClientsByRole(clientTypes)
+			if len(c.Eth1) != 1 {
+				t.Fatalf("choose 1 eth1 client type")
+			}
+			if len(c.Beacon) != 1 {
+				t.Fatalf("choose 1 beacon client type")
+			}
+			if len(c.Validator) != 1 {
+				t.Fatalf("choose 1 validator client type")
+			}
+			runAllTests(t, c)
 		},
 	})
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-func (nc *ClientDefinitionsByRole) MergeTestnetTest() hivesim.TestSpec {
-	return hivesim.TestSpec{
-		Name:        "single-client-merge-testnet",
-		Description: "This runs quick merge single-client testnet, with 4 nodes and 2**14 (minimum) validators",
-		Run: func(t *hivesim.T) {
-			config := Config{
-				AltairForkEpoch: 0,
-				MergeForkEpoch:  0,
-				// ValidatorCount:          1<<14,
-				ValidatorCount:          64,
-				SlotTime:                2,
-				TerminalTotalDifficulty: big.NewInt(150000000),
-				TtdBlocksCount:          0,
-				Nodes: []NodeConfig{
-					{
-						ExecutionClient: "go-ethereum",
-						ConsensusClient: "lighthouse",
-					},
-					{
-						ExecutionClient: "go-ethereum",
-						ConsensusClient: "lighthouse",
-					},
-				},
-			}
-			nc.startTestnet(t, &config)
-		},
+func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
+	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
+
+	// Generate validator keys to use for all tests.
+	keySrc := &setup.MnemonicsKeySource{
+		From:       0,
+		To:         64,
+		Validator:  mnemonic,
+		Withdrawal: mnemonic,
+	}
+	keys, err := keySrc.Keys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets, err := setup.SecretKeys(keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(hivesim.TestSpec{
+			Name:        fmt.Sprintf("%s", test.Name),
+			Description: test.About,
+			Run: func(t *hivesim.T) {
+				env := &TestEnv{c, keys, secrets}
+				test.Run(t, env)
+			},
+		})
 	}
 }
 
-func (nc *ClientDefinitionsByRole) startTestnet(t *hivesim.T, config *Config) {
-	prep := prepareTestnet(t, config)
+func mergeTestnetTest(t *hivesim.T, env *TestEnv) {
+	config := config{
+		AltairForkEpoch: 0,
+		MergeForkEpoch:  0,
+		// ValidatorCount:          1<<14,
+		ValidatorCount:          64,
+		SlotTime:                2,
+		TerminalTotalDifficulty: big.NewInt(150000000),
+		TtdBlocksCount:          0,
+		Nodes: []node{
+			{
+				ExecutionClient: "go-ethereum",
+				ConsensusClient: "lighthouse",
+			},
+			{
+				ExecutionClient: "go-ethereum",
+				ConsensusClient: "lighthouse",
+			},
+		},
+	}
+	startTestnet(t, &config, env)
+}
+
+func startTestnet(t *hivesim.T, config *config, env *TestEnv) {
+	prep := prepareTestnet(t, env, config)
 	testnet := prep.createTestnet(t)
 
 	genesisTime := testnet.GenesisTime()
 	countdown := genesisTime.Sub(time.Now())
 	t.Logf("created new testnet, genesis at %s (%s from now)", genesisTime, countdown)
 
-	if len(nc.Eth1) != 1 {
-		t.Fatalf("choose 1 eth1 client type")
-	}
-	if len(nc.Beacon) != 1 {
-		t.Fatalf("choose 1 beacon client type")
-	}
-	if len(nc.Validator) != 1 {
-		t.Fatalf("choose 1 validator client type")
-	}
-
 	// for each key partition, we start a validator client with its own beacon node and eth1 node
-	for i := 0; i < len(prep.keyTranches); i++ {
-		prep.startEth1Node(testnet, nc.Eth1[0], true)
-		prep.startBeaconNode(testnet, nc.Beacon[0], []int{i})
-		prep.startValidatorClient(testnet, nc.Validator[0], i, i)
+	for i, node := range config.Nodes {
+		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), true)
+		prep.startBeaconNode(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon"), []int{i})
+		prep.startValidatorClient(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", node.ConsensusClient), "validator"), i, i)
 	}
 	t.Logf("started all nodes!")
 
-	t.Logf("starting eth1 miner")
 	addr, err := testnet.eth1[0].EnodeURL()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	ctx := context.Background()
 	go mock.MineChain(t, ctx, prep.eth1Genesis.Genesis, addr)
 
