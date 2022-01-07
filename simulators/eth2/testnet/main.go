@@ -79,12 +79,12 @@ func (nc *ClientDefinitionsByRole) MergeTestnetTest() hivesim.TestSpec {
 		Description: "This runs quick merge single-client testnet, with 4 nodes and 2**14 (minimum) validators",
 		Run: func(t *hivesim.T) {
 			config := Config{
-				AltairForkEpoch: 1,
-				MergeForkEpoch:  2,
+				AltairForkEpoch: 0,
+				MergeForkEpoch:  0,
 				// ValidatorCount:          1<<14,
 				ValidatorCount:          64,
 				SlotTime:                2,
-				TotalTerminalDifficulty: big.NewInt(824242424),
+				TotalTerminalDifficulty: big.NewInt(150000000),
 				TtdBlocksCount:          0,
 				Nodes: []NodeConfig{
 					{

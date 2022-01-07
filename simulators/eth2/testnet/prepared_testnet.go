@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	blsu "github.com/protolambda/bls12-381-util"
 	"os"
 	"strings"
 	"time"
+
+	blsu "github.com/protolambda/bls12-381-util"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
@@ -78,7 +79,6 @@ func prepareTestnet(t *hivesim.T, config *Config) *PreparedTestnet {
 	spec.Config.MIN_GENESIS_TIME = common.Timestamp(eth1Genesis.Genesis.Timestamp)
 	spec.Config.GENESIS_DELAY = common.Timestamp(delay)
 	spec.Config.ETH1_FOLLOW_DISTANCE = 1
-	spec.AltairPreset.SYNC_COMMITTEE_SIZE = 4
 
 	spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch)
 	spec.Config.MERGE_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
