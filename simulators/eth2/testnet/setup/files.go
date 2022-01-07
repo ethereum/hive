@@ -28,14 +28,7 @@ func Eth1Bundle(genesis *core.Genesis) (hivesim.StartOption, error) {
 	return hivesim.WithDynamicFile("genesis.json", bytesSource(out)), nil
 }
 
-func StateBundle(templ common.BeaconState, genesisTime common.Timestamp) (hivesim.StartOption, error) {
-	state, err := templ.CopyState()
-	if err != nil {
-		return nil, fmt.Errorf("failed to copy state: %v", err)
-	}
-	if err := state.SetGenesisTime(genesisTime); err != nil {
-		return nil, fmt.Errorf("failed to set genesis time: %v", err)
-	}
+func StateBundle(state common.BeaconState) (hivesim.StartOption, error) {
 	var stateBytes bytes.Buffer
 	if err := state.Serialize(codec.NewEncodingWriter(&stateBytes)); err != nil {
 		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
@@ -43,7 +36,7 @@ func StateBundle(templ common.BeaconState, genesisTime common.Timestamp) (hivesi
 	return hivesim.WithDynamicFile("/hive/input/genesis.ssz", bytesSource(stateBytes.Bytes())), nil
 }
 
-func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount uint64) ([]hivesim.StartOption, error) {
+func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount uint64) (hivesim.StartOption, error) {
 	config, err := yaml.Marshal(spec.Config)
 	if err != nil {
 		return nil, err
@@ -62,7 +55,7 @@ func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount u
 	}
 	db := rawdb.NewMemoryDatabase()
 	genesisHash := genesis.ToBlock(db).Hash()
-	return []hivesim.StartOption{
+	return hivesim.Bundle(
 		hivesim.WithDynamicFile("/hive/input/config.yaml", bytesSource(config)),
 		hivesim.WithDynamicFile("/hive/input/preset_phase0.yaml", bytesSource(phase0Preset)),
 		hivesim.WithDynamicFile("/hive/input/preset_altair.yaml", bytesSource(altairPreset)),
@@ -70,7 +63,7 @@ func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount u
 		hivesim.Params{
 			"HIVE_ETH2_ETH1_GENESIS_HASH": genesisHash.String(),
 		},
-	}, nil
+	), nil
 }
 
 func KeysBundle(keys []*KeyDetails) hivesim.StartOption {
