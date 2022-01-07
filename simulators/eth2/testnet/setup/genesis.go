@@ -72,7 +72,6 @@ func createValidators(spec *common.Spec, keys []*KeyDetails) []phase0.KickstartV
 //
 // TODO: instead of providing a eth1 genesis, provide an eth1 chain, so we can simulate a merge genesis state that embeds an existing eth1 chain.
 func BuildBeaconState(spec *common.Spec, eth1Genesis *core.Genesis, eth2GenesisTime common.Timestamp, keys []*KeyDetails) (common.BeaconState, error) {
-
 	if uint64(len(keys)) < spec.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT {
 		return nil, fmt.Errorf("WARNING: not enough validator keys for genesis. Got %d, but need at least %d.\n",
 			len(keys), spec.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT)
