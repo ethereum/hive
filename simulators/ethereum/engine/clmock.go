@@ -160,13 +160,10 @@ func (cl *CLMocker) stopPoSBlockProduction() {
 
 // Check whether a block number is a PoS block
 func (cl *CLMocker) isBlockPoS(bn *big.Int) bool {
-	if cl.FirstPoSBlockNumber == nil {
+	if cl.FirstPoSBlockNumber == nil || cl.FirstPoSBlockNumber.Cmp(bn) > 0 {
 		return false
 	}
-	if cl.FirstPoSBlockNumber.Cmp(bn) <= 0 {
-		return true
-	}
-	return false
+        return true
 }
 
 // Sets the fee recipient for the next block and returns the number where it will be included.
@@ -177,7 +174,6 @@ func (cl *CLMocker) setNextFeeRecipient(feeRecipient common.Address, ec *EngineC
 			cl.NextFeeRecipient = feeRecipient
 			defer cl.PayloadBuildMutex.Unlock()
 			return big.NewInt(cl.LatestFinalizedNumber.Int64() + 1)
-
 		}
 		// Unlock and keep trying to get the requested Engine Client
 		cl.PayloadBuildMutex.Unlock()
