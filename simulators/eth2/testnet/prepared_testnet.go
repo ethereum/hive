@@ -50,7 +50,7 @@ func prepareTestnet(t *hivesim.T, config *Config) *PreparedTestnet {
 	eth2GenesisTime := eth1GenesisTime
 
 	// Generate genesis for execution clients
-	eth1Genesis := setup.BuildEth1Genesis(config.TotalTerminalDifficulty, uint64(eth1GenesisTime))
+	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime))
 	eth1ConfigOpt := eth1Genesis.ToParams(depositAddress)
 	eth1Bundle, err := setup.Eth1Bundle(eth1Genesis.Genesis)
 	if err != nil {
@@ -84,7 +84,7 @@ func prepareTestnet(t *hivesim.T, config *Config) *PreparedTestnet {
 	spec.Config.MERGE_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
 	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount
 	spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime)
-	spec.Config.TERMINAL_TOTAL_DIFFICULTY = common.MustU256FromBig(config.TotalTerminalDifficulty)
+	spec.Config.TERMINAL_TOTAL_DIFFICULTY = common.MustU256FromBig(config.TerminalTotalDifficulty)
 
 	// Generate keys for validators
 	t.Logf("generating %d validator keys...", config.ValidatorCount)

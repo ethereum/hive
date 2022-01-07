@@ -29,7 +29,7 @@ type Config struct {
 	ValidatorCount          uint64
 	KeyTranches             uint64
 	SlotTime                uint64
-	TotalTerminalDifficulty *big.Int
+	TerminalTotalDifficulty *big.Int
 
 	// Number of blocks the meet the TTD requirements to mine. The first
 	// block will be sent to the first node, the second block will be sent
@@ -84,7 +84,7 @@ func (nc *ClientDefinitionsByRole) MergeTestnetTest() hivesim.TestSpec {
 				// ValidatorCount:          1<<14,
 				ValidatorCount:          64,
 				SlotTime:                2,
-				TotalTerminalDifficulty: big.NewInt(150000000),
+				TerminalTotalDifficulty: big.NewInt(150000000),
 				TtdBlocksCount:          0,
 				Nodes: []NodeConfig{
 					{
