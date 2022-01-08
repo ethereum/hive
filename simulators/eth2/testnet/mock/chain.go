@@ -1,12 +1,12 @@
 package mock
 
 import (
-	"context"
 	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
@@ -21,7 +21,18 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
-func MineChain(t *hivesim.T, ctx context.Context, genesis *core.Genesis, addr string) {
+type MockClient struct {
+	t      *hivesim.T
+	chain  *core.BlockChain
+	db     ethdb.Database
+	engine consensus.Engine
+	gspec  *core.Genesis
+
+	peers            []*Conn
+	cancelKeepAlives []chan struct{}
+}
+
+func NewMockClient(t *hivesim.T, genesis *core.Genesis) (*MockClient, error) {
 	ethashCfg := ethash.Config{
 		PowMode:        ethash.ModeNormal,
 		DatasetDir:     "",
@@ -37,70 +48,72 @@ func MineChain(t *hivesim.T, ctx context.Context, genesis *core.Genesis, addr st
 
 	_, err := genesis.Commit(db)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	bc, err := core.NewBlockChain(db, nil, genesis.Config, engine, vm.Config{}, nil, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	// Dial the peer to feed the POW blocks to
-	n, err := enode.Parse(enode.ValidSchemes, addr)
-	if err != nil {
-		panic(fmt.Errorf("malformatted enode address (%q): %v", addr, err))
-	}
-	peer, err := Dial(n)
-	if err != nil {
-		panic(fmt.Errorf("unable to connect to client: %v", err))
-	}
-	if err := peer.Peer(bc, nil); err != nil {
-		panic(fmt.Errorf("unable to peer with client: %v", err))
-	}
-	ctx, cancelPeer := context.WithCancel(ctx)
-	defer cancelPeer()
-	t.Logf("simulator connected to eth1 client successfully")
+	return &MockClient{
+		t:      t,
+		chain:  bc,
+		db:     db,
+		engine: engine,
+		gspec:  genesis,
+	}, nil
+}
 
-	// Keep peer connection alive until after the transition
-	go peer.KeepAlive(ctx)
-
-	defer bc.Stop()
-	defer engine.Close()
-
-	// Send pre-transition blocks
+// Mines a proof-of-work chain, announcing each block to all peers. `handle` is
+// called after each block is mined to perform test-specific operations and
+// notify the miner if it should continue.
+func (m *MockClient) MineChain(handle func(*MockClient, *types.Block) (bool, error)) error {
 	for {
-		parent := bc.CurrentHeader()
-
-		t.Logf("mining new block")
-		block, err := mineBlock(db, bc, engine, parent)
+		parent := m.chain.CurrentHeader()
+		block, err := m.MineBlock(parent)
 		if block == nil {
-			t.Logf("Failed to mine block: %s", err)
+			m.t.Logf("Failed to mine block: %s", err)
 			continue
 		}
 		if err != nil {
-			panic(fmt.Errorf("failed to mine block: %v", err))
+			return fmt.Errorf("error mining block: %v", err)
 		}
-
-		// announce block
-		t.Logf("announcing mined block\thash=%s", block.Hash())
-		td := bc.GetTd(bc.CurrentHeader().ParentHash, bc.CurrentHeader().Number.Uint64())
-		newBlock := eth.NewBlockPacket{Block: block, TD: td}
-		if err := peer.Write66(&newBlock, 23); err != nil {
-			panic(fmt.Errorf("failed to msg peer: %v", err))
+		stop, err := handle(m, block)
+		if err != nil {
+			return err
 		}
-
-		// check if terminal total difficulty is reached
-		ttd := new(big.Int).SetUint64(genesis.Config.TerminalTotalDifficulty.Uint64())
-		t.Logf("Comparing TD to terminal TD\ttd: %d, ttd: %d", td, ttd)
-		if td.Cmp(ttd) >= 0 {
-			t.Logf("Terminal total difficulty reached, transitioning to POS")
-			break
-			// return bc.CurrentHeader().Number.Uint64(), nil
+		if stop {
+			return nil
 		}
 	}
 }
 
-func mineBlock(db ethdb.Database, bc *core.BlockChain, engine *ethash.Ethash, parent *types.Header) (*types.Block, error) {
+func (m *MockClient) Peer(addr string) error {
+	n, err := enode.Parse(enode.ValidSchemes, addr)
+	if err != nil {
+		return fmt.Errorf("malformatted enode address (%q): %v", addr, err)
+	}
+	peer, err := Dial(n)
+	if err != nil {
+		return fmt.Errorf("unable to connect to client: %v", err)
+	}
+	if err := peer.Peer(m.chain, nil); err != nil {
+		return fmt.Errorf("unable to peer with client: %v", err)
+	}
+	m.t.Logf("Simulator connected to eth1 client successfully")
+
+	// Keep peer connection alive until after the transition
+	cancel := make(chan struct{})
+	go peer.KeepAlive(cancel)
+
+	m.peers = append(m.peers, peer)
+	m.cancelKeepAlives = append(m.cancelKeepAlives, cancel)
+
+	return nil
+}
+
+func (m *MockClient) MineBlock(parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash(),
 		Number:     new(big.Int).Add(parent.Number, common.Big1),
@@ -108,7 +121,7 @@ func mineBlock(db ethdb.Database, bc *core.BlockChain, engine *ethash.Ethash, pa
 		Time:       uint64(time.Now().Unix()),
 	}
 
-	config := bc.Config()
+	config := m.chain.Config()
 	if config.IsLondon(header.Number) {
 		header.BaseFee = misc.CalcBaseFee(config, parent)
 		// At the transition, double the gas limit so the gas target is equal to the old gas limit.
@@ -118,23 +131,23 @@ func mineBlock(db ethdb.Database, bc *core.BlockChain, engine *ethash.Ethash, pa
 	}
 
 	// Calculate difficulty
-	if err := engine.Prepare(bc, header); err != nil {
+	if err := m.engine.Prepare(m.chain, header); err != nil {
 		return nil, fmt.Errorf("failed to prepare header for mining: %v", err)
 	}
 
 	// Finalize block
-	statedb, err := state.New(parent.Root, state.NewDatabase(db), nil)
+	statedb, err := state.New(parent.Root, state.NewDatabase(m.db), nil)
 	if err != nil {
 		panic(err)
 	}
-	block, err := engine.FinalizeAndAssemble(bc, header, statedb, nil, nil, nil)
+	block, err := m.engine.FinalizeAndAssemble(m.chain, header, statedb, nil, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to finalize and assemble block: %v", err)
 	}
 
 	// Seal block
 	results := make(chan *types.Block)
-	if err := engine.Seal(bc, block, results, nil); err != nil {
+	if err := m.engine.Seal(m.chain, block, results, nil); err != nil {
 		panic(fmt.Sprintf("failed to seal block: %v", err))
 	}
 	select {
@@ -154,10 +167,46 @@ func mineBlock(db ethdb.Database, bc *core.BlockChain, engine *ethash.Ethash, pa
 	}
 
 	// Insert block into chain
-	_, err = bc.InsertChain(types.Blocks{block})
+	_, err = m.chain.InsertChain(types.Blocks{block})
 	if err != nil {
 		return nil, err
 	}
 
 	return block, nil
+}
+
+func (m *MockClient) AnnounceBlock(block *types.Block) error {
+	m.t.Logf("Announcing block\thash=%s", block.Hash())
+	for _, peer := range m.peers {
+		newBlock := eth.NewBlockPacket{Block: block, TD: m.TotalDifficulty()}
+		if err := peer.Write66(&newBlock, 23); err != nil {
+			return fmt.Errorf("failed to msg peer: %v", err)
+		}
+	}
+	return nil
+}
+
+func (m *MockClient) TotalDifficulty() *big.Int {
+	return m.chain.GetTd(m.chain.CurrentHeader().ParentHash, m.chain.CurrentHeader().Number.Uint64())
+}
+
+func (m *MockClient) IsTerminalTotalDifficulty() bool {
+	td := m.TotalDifficulty()
+	ttd := new(big.Int).SetUint64(m.gspec.Config.TerminalTotalDifficulty.Uint64())
+	return td.Cmp(ttd) >= 0
+}
+
+func (m *MockClient) Close() error {
+	err := m.engine.Close()
+	if err != nil {
+		m.t.Fatalf("failed closing consensus engine: %s", err)
+	}
+	err = m.db.Close()
+	if err != nil {
+		m.t.Fatalf("failed closing db: %s", err)
+	}
+	for _, cancel := range m.cancelKeepAlives {
+		close(cancel)
+	}
+	return nil
 }

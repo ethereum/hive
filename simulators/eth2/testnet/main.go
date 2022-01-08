@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/mock"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
@@ -93,13 +94,11 @@ func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
 
 func mergeTestnetTest(t *hivesim.T, env *TestEnv) {
 	config := config{
-		AltairForkEpoch: 0,
-		MergeForkEpoch:  0,
-		// ValidatorCount:          1<<14,
+		AltairForkEpoch:         0,
+		MergeForkEpoch:          0,
 		ValidatorCount:          64,
 		SlotTime:                2,
-		TerminalTotalDifficulty: big.NewInt(150000000),
-		TtdBlocksCount:          0,
+		TerminalTotalDifficulty: big.NewInt(100000000),
 		Nodes: []node{
 			{
 				ExecutionClient: "go-ethereum",
@@ -111,16 +110,36 @@ func mergeTestnetTest(t *hivesim.T, env *TestEnv) {
 			},
 		},
 	}
-	startTestnet(t, &config, env)
+
+	testnet := startTestnet(t, &config, env)
+
+	m, err := mock.NewMockClient(t, testnet.eth1Genesis.Genesis)
+	if err != nil {
+		t.Fatalf("unable to initialize mock client: %s", err)
+	}
+	m.Peer(testnet.eth1[0].MustGetEnode())
+
+	handler := func(m *mock.MockClient, b *types.Block) (bool, error) {
+		t.Logf("Comparing TD to terminal TD\ttd: %d, ttd: %d", m.TotalDifficulty(), config.TerminalTotalDifficulty)
+		m.AnnounceBlock(b)
+		if m.IsTerminalTotalDifficulty() {
+			t.Logf("Terminal total difficulty reached")
+			return true, nil
+		}
+		return false, nil
+	}
+	go m.MineChain(handler)
+	testnet.VerifyFinality(context.Background(), 5)
+	m.Close()
 }
 
-func startTestnet(t *hivesim.T, config *config, env *TestEnv) {
+func startTestnet(t *hivesim.T, config *config, env *TestEnv) *Testnet {
 	prep := prepareTestnet(t, env, config)
 	testnet := prep.createTestnet(t)
 
 	genesisTime := testnet.GenesisTime()
 	countdown := genesisTime.Sub(time.Now())
-	t.Logf("created new testnet, genesis at %s (%s from now)", genesisTime, countdown)
+	t.Logf("Created new testnet, genesis at %s (%s from now)", genesisTime, countdown)
 
 	// for each key partition, we start a validator client with its own beacon node and eth1 node
 	for i, node := range config.Nodes {
@@ -128,17 +147,8 @@ func startTestnet(t *hivesim.T, config *config, env *TestEnv) {
 		prep.startBeaconNode(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon"), []int{i})
 		prep.startValidatorClient(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", node.ConsensusClient), "validator"), i, i)
 	}
-	t.Logf("started all nodes!")
 
-	addr, err := testnet.eth1[0].EnodeURL()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ctx := context.Background()
-	go mock.MineChain(t, ctx, prep.eth1Genesis.Genesis, addr)
-
-	// TODO: maybe run other assertions / tests in the background?
-	testnet.TrackFinality(ctx)
+	return testnet
 }
 
 /*

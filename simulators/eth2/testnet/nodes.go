@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/ethereum/hive/hivesim"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/eth2api/client/nodeapi"
-	"net/http"
-	"time"
 )
 
 const (
@@ -36,6 +37,14 @@ func (en *Eth1Node) UserRPCAddress() (string, error) {
 func (en *Eth1Node) EngineRPCAddress() (string, error) {
 	// TODO what will the default port be?
 	return fmt.Sprintf("http://%v:%d", en.IP, PortEngineRPC), nil
+}
+
+func (en *Eth1Node) MustGetEnode() string {
+	addr, err := en.EnodeURL()
+	if err != nil {
+		panic(err)
+	}
+	return addr
 }
 
 type BeaconNode struct {

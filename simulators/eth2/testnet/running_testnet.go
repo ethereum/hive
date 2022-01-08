@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -32,7 +33,7 @@ func (t *Testnet) GenesisTime() time.Time {
 	return time.Unix(int64(t.genesisTime), 0)
 }
 
-func (t *Testnet) TrackFinality(ctx context.Context) {
+func (t *Testnet) VerifyFinality(ctx context.Context, maxEpochs uint64) {
 	genesis := t.GenesisTime()
 	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
 	timer := time.NewTicker(slotDuration)
@@ -44,11 +45,11 @@ func (t *Testnet) TrackFinality(ctx context.Context) {
 		case tim := <-timer.C:
 			// start polling after first slot of genesis
 			if tim.Before(genesis.Add(slotDuration)) {
-				t.t.Logf("time till genesis: %s", genesis.Sub(tim))
+				t.t.Logf("Time till genesis: %s", genesis.Sub(tim))
 				continue
 			}
-			// new slot, log and check status of all beacon nodes
 
+			// new slot, log and check status of all beacon nodes
 			var wg sync.WaitGroup
 			for i, b := range t.beacons {
 				wg.Add(1)
@@ -72,16 +73,33 @@ func (t *Testnet) TrackFinality(ctx context.Context) {
 						t.t.Fatalf("[beacon %d] Expected state for head block", i)
 					}
 
-					slot := headInfo.Header.Message.Slot
-					t.t.Logf("beacon %d: head block root %s, slot %d, justified %s, finalized %s",
-						i, headInfo.Root, slot, &out.CurrentJustified, &out.Finalized)
+					if (out.Finalized != common.Checkpoint{}) {
+						return
+					}
 
-					if ep := t.spec.SlotToEpoch(slot); ep > out.Finalized.Epoch+2 {
+					slot := headInfo.Header.Message.Slot
+					head := shorten(headInfo.Root.String())
+					justified := shorten(out.CurrentJustified.String())
+					finalized := shorten(out.Finalized.String())
+					t.t.Logf("beacon %d: head block root %s, slot %d, justified %s, finalized %s", i, head, slot, justified, finalized)
+
+					ep := t.spec.SlotToEpoch(slot)
+					if ep > out.Finalized.Epoch+2 {
 						t.t.Errorf("failing to finalize, head slot %d (epoch %d) is more than 2 ahead of finality checkpoint %d", slot, ep, out.Finalized.Epoch)
+					}
+					if common.Epoch(maxEpochs) <= ep {
+						t.t.Errorf("failed to finalize in %d epochs", ep)
+						t.t.Fail()
 					}
 				}(ctx, i, b)
 			}
 			wg.Wait()
 		}
 	}
+}
+
+func shorten(s string) string {
+	start := s[0:6]
+	end := s[62:]
+	return fmt.Sprintf("%s..%s", start, end)
 }

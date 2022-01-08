@@ -17,7 +17,6 @@
 package mock
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"net"
@@ -214,18 +213,19 @@ func (c *Conn) Ping() error {
 	return err
 }
 
-func (c *Conn) KeepAlive(ctx context.Context) {
+// Clients will typically disconnect from a peer if they don't recieve any p2p
+// message for a period of time. This avoids that by pinging the peer at a
+// regular interval.
+func (c *Conn) KeepAlive(cancel chan struct{}) {
 	ticker := time.NewTicker(20 * time.Second)
 	for {
 		select {
-		case <-ctx.Done():
-			// log.Info("closing keep-alive")
+		case <-cancel:
 			return
 		case <-ticker.C:
-			// log.Trace("Pinging peer")
 			err := c.Ping()
 			if err != nil {
-				// log.WithField("err", err).Error("Unable to ping peer")
+				panic(err)
 			}
 		}
 	}

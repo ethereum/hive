@@ -44,9 +44,8 @@ type PreparedTestnet struct {
 
 // Build all artifacts require to start a testnet.
 func prepareTestnet(t *hivesim.T, env *TestEnv, config *config) *PreparedTestnet {
-	// offset genesis by two minutes, we need some time to prepare and launch containers
-	eth1GenesisTime := common.Timestamp(time.Now().Unix()) + 2*60
-	eth2GenesisTime := eth1GenesisTime
+	eth1GenesisTime := common.Timestamp(time.Now().Unix())
+	eth2GenesisTime := eth1GenesisTime + 30
 
 	// Generate genesis for execution clients
 	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime))
@@ -66,17 +65,11 @@ func prepareTestnet(t *hivesim.T, env *TestEnv, config *config) *PreparedTestnet
 	//
 	// TODO: specify build-target based on preset, to run clients in mainnet or minimal mode.
 	// copy the default mainnet config, and make some minimal modifications for testnet usage
-	delay := 30
-	if config.MergeForkEpoch != 0 {
-		delay = 60 * 2
-	}
 	specCpy := *configs.Mainnet
 	spec := &specCpy
 	spec.Config.DEPOSIT_CONTRACT_ADDRESS = depositAddress
 	spec.Config.DEPOSIT_CHAIN_ID = eth1Genesis.Genesis.Config.ChainID.Uint64()
 	spec.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
-	spec.Config.MIN_GENESIS_TIME = common.Timestamp(eth1Genesis.Genesis.Timestamp)
-	spec.Config.GENESIS_DELAY = common.Timestamp(delay)
 	spec.Config.ETH1_FOLLOW_DISTANCE = 1
 
 	spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch)
@@ -157,7 +150,7 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 }
 
 func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, simulated bool) {
-	testnet.t.Logf("starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
+	testnet.t.Logf("Starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{p.executionOpts}
 	if len(testnet.eth1) == 0 {
@@ -180,7 +173,7 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 }
 
 func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.ClientDefinition, eth1Endpoints []int) {
-	testnet.t.Logf("starting beacon node: %s (%s)", beaconDef.Name, beaconDef.Version)
+	testnet.t.Logf("Starting beacon node: %s (%s)", beaconDef.Name, beaconDef.Version)
 
 	opts := []hivesim.StartOption{p.beaconOpts}
 	// Hook up beacon node to (maybe multiple) eth1 nodes
@@ -218,7 +211,7 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 }
 
 func (p *PreparedTestnet) startValidatorClient(testnet *Testnet, validatorDef *hivesim.ClientDefinition, bnIndex int, keyIndex int) {
-	testnet.t.Logf("starting validator client: %s (%s)", validatorDef.Name, validatorDef.Version)
+	testnet.t.Logf("Starting validator client: %s (%s)", validatorDef.Name, validatorDef.Version)
 
 	if bnIndex >= len(testnet.beacons) {
 		testnet.t.Fatalf("only have %d beacon nodes, cannot find index %d for VC", len(testnet.beacons), bnIndex)
