@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
 )
@@ -109,6 +110,11 @@ func (cl *CLMocker) RemoveEngineClient(removeEngineClient *EngineClient) {
 	}
 }
 
+// Helper struct to fetch the TotalDifficulty
+type TD struct {
+	TotalDifficulty *hexutil.Big `json:"totalDifficulty"`
+}
+
 // Check whether we have reached TTD and then enable PoS block production.
 // This function must NOT be executed after we have reached TTD.
 func (cl *CLMocker) checkTTD() {
@@ -121,22 +127,17 @@ func (cl *CLMocker) checkTTD() {
 	// Pick a random client to get the total difficulty of its head
 	ec := cl.EngineClients[rand.Intn(len(cl.EngineClients))]
 
-	lastBlockNumber, err := ec.Eth.BlockNumber(ec.Ctx())
+	var td *TD
+	err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false)
 	if err != nil {
-		ec.Fatalf("Could not get block number: %v", err)
+		ec.Fatalf("Could not get latest totalDifficulty: %v", err)
 	}
-
-	currentTD := big.NewInt(0)
-	for i := 0; i <= int(lastBlockNumber); i++ {
-		cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), big.NewInt(int64(i)))
+	if td.TotalDifficulty.ToInt().Cmp(terminalTotalDifficulty) >= 0 {
+		cl.TTDReached = true
+		cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
 		if err != nil {
 			ec.Fatalf("Could not get block header: %v", err)
 		}
-		currentTD.Add(currentTD, cl.LatestFinalizedHeader.Difficulty)
-	}
-
-	if currentTD.Cmp(terminalTotalDifficulty) >= 0 {
-		cl.TTDReached = true
 		fmt.Printf("TTD has been reached at block %v\n", cl.LatestFinalizedHeader.Number)
 		// Broadcast initial ForkchoiceUpdated
 		cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
@@ -163,7 +164,7 @@ func (cl *CLMocker) isBlockPoS(bn *big.Int) bool {
 	if cl.FirstPoSBlockNumber == nil || cl.FirstPoSBlockNumber.Cmp(bn) > 0 {
 		return false
 	}
-        return true
+	return true
 }
 
 // Sets the fee recipient for the next block and returns the number where it will be included.
