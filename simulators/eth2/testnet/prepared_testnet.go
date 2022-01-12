@@ -43,7 +43,7 @@ type PreparedTestnet struct {
 }
 
 // Build all artifacts require to start a testnet.
-func prepareTestnet(t *hivesim.T, env *TestEnv, config *config) *PreparedTestnet {
+func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet {
 	eth1GenesisTime := common.Timestamp(time.Now().Unix())
 	eth2GenesisTime := eth1GenesisTime + 30
 

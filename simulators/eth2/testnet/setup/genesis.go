@@ -7,7 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/holiman/uint256"
 	"github.com/protolambda/zrnt/eth2/beacon/altair"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/merge"
@@ -26,7 +25,7 @@ func genesisPayloadHeader(eth1GenesisBlock *types.Block, spec *common.Spec) (*co
 		return nil, fmt.Errorf("expected no transactions in genesis execution payload")
 	}
 
-	baseFee, _ := uint256.FromBig(eth1GenesisBlock.BaseFee())
+	baseFee := eth1GenesisBlock.BaseFee().Uint64()
 
 	return &common.ExecutionPayloadHeader{
 		ParentHash:    common.Root(eth1GenesisBlock.ParentHash()),
@@ -40,7 +39,7 @@ func genesisPayloadHeader(eth1GenesisBlock *types.Block, spec *common.Spec) (*co
 		GasUsed:       view.Uint64View(eth1GenesisBlock.GasUsed()),
 		Timestamp:     common.Timestamp(eth1GenesisBlock.Time()),
 		ExtraData:     extra,
-		BaseFeePerGas: baseFee.Bytes32(),
+		BaseFeePerGas: view.Uint64View(baseFee),
 		BlockHash:     common.Root(eth1GenesisBlock.Hash()),
 		// empty transactions root
 		TransactionsRoot: common.PayloadTransactionsType(spec).DefaultNode().MerkleRoot(tree.GetHashFn()),

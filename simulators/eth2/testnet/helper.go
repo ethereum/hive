@@ -1,13 +1,29 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 
+	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 	blsu "github.com/protolambda/bls12-381-util"
 )
 
-type TestEnv struct {
+type testCase interface {
+	Run(t *hivesim.T, env *testEnv)
+}
+
+type testSpec struct {
+	Name  string
+	About string
+	Fn    testCase
+}
+
+func (s *testSpec) Run(t *hivesim.T, env *testEnv) {
+	s.Fn.Run(t, env)
+}
+
+type testEnv struct {
 	Clients *ClientDefinitionsByRole
 	Keys    []*setup.KeyDetails
 	Secrets *[]blsu.SecretKey
@@ -39,4 +55,10 @@ func (c *config) activeFork() string {
 	} else {
 		return "phase0"
 	}
+}
+
+func shorten(s string) string {
+	start := s[0:6]
+	end := s[62:]
+	return fmt.Sprintf("%s..%s", start, end)
 }

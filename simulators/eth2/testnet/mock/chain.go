@@ -73,7 +73,7 @@ func (m *MockClient) MineChain(handle func(*MockClient, *types.Block) (bool, err
 		parent := m.chain.CurrentHeader()
 		block, err := m.MineBlock(parent)
 		if block == nil {
-			m.t.Logf("Failed to mine block: %s", err)
+			m.t.Logf("mock: Failed to mine block: %s", err)
 			continue
 		}
 		if err != nil {
@@ -101,7 +101,7 @@ func (m *MockClient) Peer(addr string) error {
 	if err := peer.Peer(m.chain, nil); err != nil {
 		return fmt.Errorf("unable to peer with client: %v", err)
 	}
-	m.t.Logf("Simulator connected to eth1 client successfully")
+	m.t.Logf("mock: Simulator connected to eth1 client successfully")
 
 	// Keep peer connection alive until after the transition
 	cancel := make(chan struct{})
@@ -176,7 +176,6 @@ func (m *MockClient) MineBlock(parent *types.Header) (*types.Block, error) {
 }
 
 func (m *MockClient) AnnounceBlock(block *types.Block) error {
-	m.t.Logf("Announcing block\thash=%s", block.Hash())
 	for _, peer := range m.peers {
 		newBlock := eth.NewBlockPacket{Block: block, TD: m.TotalDifficulty()}
 		if err := peer.Write66(&newBlock, 23); err != nil {
