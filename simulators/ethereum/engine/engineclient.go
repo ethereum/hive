@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 
@@ -25,6 +26,7 @@ type EngineClient struct {
 	ws_c   *rpc.Client
 	c      *rpc.Client
 	Eth    *ethclient.Client
+	IP     net.IP
 
 	// This holds most recent context created by the Ctx method.
 	// Every time Ctx is called, it creates a new context with the default
@@ -51,14 +53,21 @@ func NewEngineClient(t *hivesim.T, hc *hivesim.Client) *EngineClient {
 		t.Fatal("NewEngineClient: WebSocket connection failed:", err)
 	}
 	// Prepare ETH Client (Use HTTP)
-	eth := ethclient.NewClient(rpcHttpClient)
+	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", hc.IP), client)
+	eth := ethclient.NewClient(rpcClient)
 	// By default we send requests via HTTP
-	return &EngineClient{t, rpcHttpClient, rpcWsClient, rpcHttpClient, eth, nil, nil}
+	return &EngineClient{t, rpcHttpClient, rpcWsClient, rpcHttpClient, eth, hc.IP, nil, nil}
+}
+
+// This is not necessarily true in all cases, but for this simulator it's ok.
+func (ec *EngineClient) Equals(ec2 *EngineClient) bool {
+	return ec.IP.Equal(ec2.IP)
 }
 
 func (ec *EngineClient) Close() {
 	ec.http_c.Close()
 	ec.ws_c.Close()
+	ec.Eth.Close()
 	if ec.lastCtx != nil {
 		ec.lastCancel()
 	}

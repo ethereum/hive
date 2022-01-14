@@ -12,9 +12,9 @@ Clients with support for the merge are required to run this suite and, at the mo
 
 The tests are started by running a main client, and a secondary client alongside.
 
-The secondary client runs the entire set of test cases in parallel, then it stops for the next client to start and run the entire set of test cases again, and so on until all clients have run.
+The secondary client runs a single test case, then it stops for the next client to start, sync (potentially transition to PoS), and run the next test case, and so on until all test cases are completed.
 
-Both the main and secondary client will make the transition from PoW to PoS, so that the secondary client executes test cases in both modes.
+Both the main and secondary client will make the transition from PoW to PoS, so that the secondary client might execute test cases in both modes.
 
 Given the following example,
 
@@ -23,31 +23,18 @@ Given the following example,
 tests will have the following execution flow: 
 
     clientA:
-     starts in PoW
-     clientA':
-        starts in PoW
-        executes all test cases while transitions to PoS
-        stops
-     clientB:
-        starts in PoW
-        syncs to clientA and transitions to PoS
-        executes all test cases
-        stops
+      starts in PoW
+      Loop for every test case:
+         clientA':
+            starts in PoW
+            executes a single test case while transitions to PoS
+            stops
+         clientB:
+            starts in PoW
+            syncs to clientA and transitions to PoS
+            executes a single test case
+            stops
      stops
-
-    clientB:
-     starts in PoW
-     clientA:
-        starts in PoW
-        executes all test cases while transitions to PoS
-        stops
-     clientB':
-        starts in PoW
-        syncs to clientB and transitions to PoS
-        executes all test cases
-        stops
-     stops
-
 
 ## Test Cases
 

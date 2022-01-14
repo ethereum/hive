@@ -1,10 +1,8 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/params"
@@ -110,67 +108,50 @@ have reached the Terminal Total Difficulty.`[1:],
 }
 
 // First launch a client against other clients will sync and run their respective tests.
-func runSourceTest(t *hivesim.T, c *hivesim.Client) {
+func runSourceTest(t0 *hivesim.T, c0 *hivesim.Client) {
 	clMocker = NewCLMocker()
+	defer clMocker.stopPoSBlockProduction()
+
 	vault = newVault()
 
-	ec := NewEngineClient(t, c)
+	ec := NewEngineClient(t0, c0)
 	clMocker.AddEngineClient(ec)
 
-	enode, err := c.EnodeURL()
+	enode, err := c0.EnodeURL()
 	if err != nil {
-		t.Fatal("can't get node peer-to-peer endpoint:", enode)
+		t0.Fatal("can't get node peer-to-peer endpoint:", enode)
 	}
 	newParams := clientEnv.Set("HIVE_BOOTNODE", enode)
 
-	t.RunAllClients(hivesim.ClientTestSpec{
-		Name:        fmt.Sprintf("%s", c.Type),
-		Description: "test",
-		Parameters:  newParams,
-		Files:       files,
-		Run:         runAllTests,
-	})
-	clMocker.stopPoSBlockProduction()
-}
-
-// Run all tests against a second running client which must sync at some point to the PoS chain.
-func runAllTests(t *hivesim.T, c *hivesim.Client) {
-	// Create an Engine API wrapper for this client
-	ec := NewEngineClient(t, c)
-	defer ec.Close()
-
-	// Add this client to CLMocker
-	clMocker.AddEngineClient(ec)
-	defer clMocker.RemoveEngineClient(ec)
-
-	// Setup wait lock for this client reaching PoS sync
-	var cancelFP *context.CancelFunc
-	var m sync.Mutex
-	var st bool
-	go func() {
-		WaitClientForPoSSync(t, c, &cancelFP, &m, &st)
-	}()
-
-	// Launch all tests
-	var wg sync.WaitGroup
-	for _, test := range tests {
-		wg.Add(1)
-		test := test
-		go func() {
-			defer wg.Done()
-			t.Run(hivesim.TestSpec{
-				Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
-				Description: test.About,
-				Run: func(t *hivesim.T) {
-					runTest(test.Name, t, c, ec, vault, clMocker, &m, &st, test.Run)
+	availableClients, err := t0.Sim.ClientTypes()
+	if err != nil {
+		t0.Fatal("could not get available clients:", err)
+	}
+	for _, clientType := range availableClients {
+		for _, currentTest := range tests {
+			t0.RunClient(clientType, hivesim.ClientTestSpec{
+				Name:        fmt.Sprintf("%s", c0.Type),
+				Description: "test",
+				Parameters:  newParams,
+				Files:       files,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					// Create an Engine API wrapper for this client
+					ec := NewEngineClient(t, c)
+					defer ec.Close()
+					// Add this client to CLMocker
+					clMocker.AddEngineClient(ec)
+					defer clMocker.RemoveEngineClient(ec)
+					// Run the test case
+					t.Run(hivesim.TestSpec{
+						Name:        fmt.Sprintf("%s (%s)", currentTest.Name, c.Type),
+						Description: currentTest.About,
+						Run: func(t *hivesim.T) {
+							runTest(currentTest.Name, t, c, vault, clMocker, currentTest.Run)
+						},
+					})
 				},
 			})
-		}()
-	}
-	if cancelFP != nil {
-		(*cancelFP)()
+		}
 	}
 
-	// Wait for all test cases to complete
-	wg.Wait()
 }

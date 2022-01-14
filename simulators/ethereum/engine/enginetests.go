@@ -71,7 +71,7 @@ func unknownSafeBlockHash(t *TestEnv) {
 		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
 	}
 	// Wait for ExecutePayload
-	t.CLMock.NewExecutePayloadMutex.LockSet()
+	t.CLMock.NewExecutePayloadMutex.Lock()
 	defer t.CLMock.NewExecutePayloadMutex.Unlock()
 
 	// Generate a random SafeBlock hash
@@ -101,7 +101,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 	}
 
 	// Wait for ExecutePayload
-	t.CLMock.NewExecutePayloadMutex.LockSet()
+	t.CLMock.NewExecutePayloadMutex.Lock()
 	defer t.CLMock.NewExecutePayloadMutex.Unlock()
 
 	// Generate a random FinalizedBlockHash hash
@@ -150,7 +150,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 	}
 
 	// Wait for FinalizedBlock
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.LockSet()
+	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
 	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
 
 	// Generate a random HeadBlock hash
@@ -202,7 +202,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	}
 
 	// Wait for ExecutePayload
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.LockSet()
+	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
 	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
 
 	// Send the Genesis block as forkchoice
@@ -238,7 +238,7 @@ func badHashOnExecPayload(t *TestEnv) {
 	}
 
 	// Wait for GetPayload
-	t.CLMock.NewGetPayloadMutex.LockSet()
+	t.CLMock.NewGetPayloadMutex.Lock()
 	defer t.CLMock.NewGetPayloadMutex.Unlock()
 
 	// Alter hash on the payload and send it to client, should produce an error
@@ -258,7 +258,7 @@ func blockStatusExecPayload(t *TestEnv) {
 	}
 
 	// Run executePayload tests
-	t.CLMock.NewExecutePayloadMutex.LockSet()
+	t.CLMock.NewExecutePayloadMutex.Lock()
 	defer t.CLMock.NewExecutePayloadMutex.Unlock()
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
@@ -283,7 +283,7 @@ func blockStatusHeadBlock(t *TestEnv) {
 	}
 
 	// Run HeadBlock tests
-	t.CLMock.NewHeadBlockForkchoiceMutex.LockSet()
+	t.CLMock.NewHeadBlockForkchoiceMutex.Lock()
 	defer t.CLMock.NewHeadBlockForkchoiceMutex.Unlock()
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
@@ -304,7 +304,7 @@ func blockStatusSafeBlock(t *TestEnv) {
 	}
 
 	// Run SafeBlock tests
-	t.CLMock.NewSafeBlockForkchoiceMutex.LockSet()
+	t.CLMock.NewSafeBlockForkchoiceMutex.Lock()
 	defer t.CLMock.NewSafeBlockForkchoiceMutex.Unlock()
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
@@ -325,7 +325,7 @@ func blockStatusFinalizedBlock(t *TestEnv) {
 	}
 
 	// Run FinalizedBlock tests
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.LockSet()
+	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
 	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
@@ -346,7 +346,7 @@ func blockStatusReorg(t *TestEnv) {
 	}
 
 	// Wait until we reach SafeBlock status
-	t.CLMock.NewSafeBlockForkchoiceMutex.LockSet()
+	t.CLMock.NewSafeBlockForkchoiceMutex.Lock()
 	defer t.CLMock.NewSafeBlockForkchoiceMutex.Unlock()
 
 	// Verify the client is serving the latest SafeBlock
@@ -439,7 +439,7 @@ func transactionReorg(t *TestEnv) {
 		receipts[i] = receipt
 	}
 	// Wait for a finalized block so we can start rolling back transactions
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.LockSet()
+	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
 	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
 
 	for i := 0; i < txCount; i++ {
@@ -524,7 +524,7 @@ func reExecPayloads(t *TestEnv) {
 	}
 
 	// Wait for a finalized block so we can re-executing payloads
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.LockSet()
+	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
 	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
 
 	lastBlock, err := t.Eth.BlockNumber(t.Ctx())
@@ -550,25 +550,49 @@ func suggestedFeeRecipient(t *TestEnv) {
 		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
 	}
 
-	// We need to verify at least
-	// 	(a) one block without any fees
-	// 	(b) one block with fees
-	var noFeesBlock, feesBlock bool
+	var (
+		// We need to verify at least
+		// 	(a) one block without any fees
+		// 	(b) one block with fees
+		noFeesBlock = false
+		feesBlock   = false
 
-	// Amount of transactions to send
-	txCount := 10
-	blockNumbers := make([]*big.Int, txCount)
-	feeRecipients := make([]common.Address, txCount)
+		// We need to send transaction to produce at least one block with fees
+		key                = t.Vault.createAccount(t, big.NewInt(params.Ether))
+		nonce              = uint64(0)
+		randomContractAddr = common.HexToAddress("0000000000000000000000000000000000000316")
 
-	for i := 0; i < txCount; i++ {
-		// Set a random feeRecipient for `txCount` blocks.
+		// Max amount of blocks to modify the suggestedFeeRecipient
+		maxBlockCount = 10
+		blockNumbers  = make([]*big.Int, maxBlockCount)
+		feeRecipients = make([]common.Address, maxBlockCount)
+	)
+
+	for i := 0; i < maxBlockCount; i++ {
+		// Set a random feeRecipient for `maxBlockCount` blocks.
 		randAddr := make([]byte, 20)
 		rand.Read(randAddr)
 		feeRecipients[i] = common.BytesToAddress(randAddr)
-		blockNumbers[i] = t.CLMock.setNextFeeRecipient(feeRecipients[i], t.Engine)
+
+		// Every other block send a transaction
+		var tx *types.Transaction
+		var err error
+		if (i % 2) == 0 {
+			rawTx := types.NewTransaction(nonce, randomContractAddr, big0, 100000, gasPrice, nil)
+			nonce++
+			tx, err = t.Vault.signTransaction(key, rawTx)
+			if err != nil {
+				t.Fatalf("FAIL (%v): unable to sign transaction: %v", t.TestName, err)
+			}
+		}
+		blockNumbers[i], err = t.CLMock.setNextFeeRecipient(feeRecipients[i], t.Engine, tx)
+		if err != nil {
+			t.Fatalf("FAIL (%v): unable to get block with fee recipient: %v", t.TestName, err)
+		}
+		time.Sleep(PoSBlockProductionPeriod)
 	}
 
-	for i := 0; i < txCount; i++ {
+	for i := 0; i < maxBlockCount; i++ {
 		// Check each of the blocks and verify the fees were correctly assigned.
 		feeRecipientAddress := feeRecipients[i]
 		blockNumberIncluded := blockNumbers[i]
@@ -580,7 +604,9 @@ func suggestedFeeRecipient(t *TestEnv) {
 			t.Fatalf("FAIL (%v): unable to get block with fee recipient: %v", t.TestName, err)
 		}
 		if blockIncluded.Coinbase() != feeRecipientAddress {
-			t.Fatalf("FAIL (%v): Expected feeRecipient is not header.coinbase: %v!=%v", t.TestName, blockIncluded.Coinbase, feeRecipientAddress)
+			fmt.Printf("FAIL (%v): blockNumberIncluded: %v\n", t.TestName, blockNumbers)
+			fmt.Printf("FAIL (%v): feeRecipientAddress: %v\n", t.TestName, feeRecipients)
+			t.Fatalf("FAIL (%v): Expected feeRecipient is not header.coinbase (i=%v, header.blockNumber=%v): %v!=%v", t.TestName, i, blockIncluded.Number(), blockIncluded.Coinbase, feeRecipientAddress)
 		}
 
 		// Since the recipient address is random, we can assume the previous balance was zero.

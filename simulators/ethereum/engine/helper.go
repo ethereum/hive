@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -33,10 +32,6 @@ type TestEnv struct {
 	CLMock   *CLMocker
 	Vault    *Vault
 
-	// Client's state on syncing to the latest PoS block
-	PoSSyncMutex *sync.Mutex
-	PoSSyncState *bool
-
 	// This holds most recent context created by the Ctx method.
 	// Every time Ctx is called, it creates a new context with the default
 	// timeout and cancels the previous one.
@@ -44,7 +39,7 @@ type TestEnv struct {
 	lastCancel context.CancelFunc
 }
 
-func runTest(testName string, t *hivesim.T, c *hivesim.Client, ec *EngineClient, v *Vault, cl *CLMocker, pm *sync.Mutex, ps *bool, fn func(*TestEnv)) {
+func runTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLMocker, fn func(*TestEnv)) {
 	// This sets up debug logging of the requests and responses.
 	client := &http.Client{
 		Transport: &loggingRoundTrip{
@@ -53,18 +48,19 @@ func runTest(testName string, t *hivesim.T, c *hivesim.Client, ec *EngineClient,
 		},
 	}
 
+	ec := NewEngineClient(t, c)
+	defer ec.Close()
+
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
 	defer rpcClient.Close()
 	env := &TestEnv{
-		T:            t,
-		TestName:     testName,
-		RPC:          rpcClient,
-		Eth:          ethclient.NewClient(rpcClient),
-		Engine:       ec,
-		CLMock:       cl,
-		Vault:        v,
-		PoSSyncMutex: pm,
-		PoSSyncState: ps,
+		T:        t,
+		TestName: testName,
+		RPC:      rpcClient,
+		Eth:      ethclient.NewClient(rpcClient),
+		Engine:   ec,
+		CLMock:   cl,
+		Vault:    v,
 	}
 
 	fn(env)
@@ -73,46 +69,22 @@ func runTest(testName string, t *hivesim.T, c *hivesim.Client, ec *EngineClient,
 	}
 }
 
+// Wait for a client to reach sync status past the PoS transition, with 90 second timeout
 func (t *TestEnv) WaitForPoSSync() bool {
-	t.PoSSyncMutex.Lock()
-	defer t.PoSSyncMutex.Unlock()
-	return *t.PoSSyncState
-}
-
-// Many tests need to wait for the client to sync with the latest PoS block,
-// so instead of having them all query for the latest block to match the CLMocker,
-// this function updates the value and releases a lock when the client is synced.
-func WaitClientForPoSSync(t *hivesim.T, c *hivesim.Client, cancelF **context.CancelFunc, m *sync.Mutex, s *bool) {
-	m.Lock()
-	defer m.Unlock()
-	client := &http.Client{
-		Transport: &loggingRoundTrip{
-			t:     t,
-			inner: http.DefaultTransport,
-		},
-	}
-
-	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
-	defer rpcClient.Close()
-	eth := ethclient.NewClient(rpcClient)
 
 	for i := 0; i < 90; i++ {
 		if clMocker.TTDReached {
-			ctx, thisCancelF := context.WithTimeout(context.Background(), rpcTimeout)
-			*cancelF = &thisCancelF
-			bn, err := eth.BlockNumber(ctx)
-			*cancelF = nil
+			bn, err := t.Eth.BlockNumber(t.Ctx())
 			if err != nil {
-				fmt.Printf("FAIL (WaitClientForPoSSync): error on get block number: %v\n", err)
-				break
+				t.Fatalf("FAIL (WaitClientForPoSSync): error on get block number: %v", t.TestName, err)
 			}
 			if clMocker.LatestFinalizedNumber != nil && bn >= clMocker.LatestFinalizedNumber.Uint64() {
-				*s = true
-				break
+				return true
 			}
 		}
 		time.Sleep(time.Second)
 	}
+	return false
 }
 
 // Naive generic function that works in all situations.
