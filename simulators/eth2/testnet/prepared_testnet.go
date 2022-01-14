@@ -6,7 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/holiman/uint256"
 	blsu "github.com/protolambda/bls12-381-util"
+	"github.com/protolambda/ztyp/view"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
@@ -76,7 +78,8 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	spec.Config.MERGE_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
 	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount
 	spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime)
-	spec.Config.TERMINAL_TOTAL_DIFFICULTY = common.MustU256FromBig(config.TerminalTotalDifficulty)
+	tdd, _ := uint256.FromBig(config.TerminalTotalDifficulty)
+	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)
 
 	// Generate keys opts for validators
 	keyOpts := setup.KeyTranches(env.Keys, uint64(len(config.Nodes)))

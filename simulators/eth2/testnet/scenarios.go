@@ -72,6 +72,8 @@ func (s Bscmtt) Run(t *hivesim.T, env *testEnv) {
 	}
 
 	go m.MineChain(handler)
-	testnet.VerifyFinality(context.Background())
+	ctx := context.Background()
+	testnet.VerifyFinality(ctx)
+	testnet.VerifyParticipation(ctx, 2, 95)
 	m.Close()
 }

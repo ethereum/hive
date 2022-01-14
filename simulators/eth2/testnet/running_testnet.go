@@ -10,9 +10,13 @@ import (
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/eth2api/client/beaconapi"
+	"github.com/protolambda/eth2api/client/debugapi"
+	"github.com/protolambda/zrnt/eth2/beacon/altair"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/merge"
 )
+
+var MAX_PARTICIPATION_SCORE = 7
 
 type Testnet struct {
 	t *hivesim.T
@@ -53,11 +57,11 @@ func (t *Testnet) VerifyFinality(ctx context.Context) {
 				continue
 			}
 
+			// new slot, log and check status of all beacon nodes
 			type res struct {
 				idx int
 				msg string
 			}
-			// new slot, log and check status of all beacon nodes
 			var (
 				wg sync.WaitGroup
 				ch = make(chan res, len(t.beacons))
@@ -76,42 +80,55 @@ func (t *Testnet) VerifyFinality(ctx context.Context) {
 						t.t.Fatalf("beacon %d: no head block", i)
 					}
 
-					var blockInfo eth2api.VersionedSignedBeaconBlock
-					if exists, err := beaconapi.BlockV2(ctx, b.API, eth2api.BlockIdRoot(headInfo.Root), &blockInfo); err != nil {
-						t.t.Errorf("beacon %d: failed to retrieve block: %v", i, err)
-						return
-					} else if !exists {
-						t.t.Fatalf("beacon %d: block not found", i)
-					}
-					mergeBlock := blockInfo.Data.(*merge.SignedBeaconBlock)
-
-					var out eth2api.FinalityCheckpoints
-					if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &out); err != nil {
+					var checkpoints eth2api.FinalityCheckpoints
+					if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &checkpoints); err != nil {
 						t.t.Errorf("beacon %d: failed to poll finality checkpoint: %v", i, err)
 						return
 					} else if !exists {
 						t.t.Fatalf("beacon %d: Expected state for head block", i)
 					}
 
+					var versionedBlock eth2api.VersionedSignedBeaconBlock
+					if exists, err := beaconapi.BlockV2(ctx, b.API, eth2api.BlockIdRoot(headInfo.Root), &versionedBlock); err != nil {
+						t.t.Errorf("beacon %d: failed to retrieve block: %v", i, err)
+						return
+					} else if !exists {
+						t.t.Fatalf("beacon %d: block not found", i)
+					}
+					block := versionedBlock.Data.(*merge.SignedBeaconBlock)
+
+					var stateInfo eth2api.VersionedBeaconState
+					if exists, err := debugapi.BeaconStateV2(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &stateInfo); err != nil {
+						t.t.Errorf("beacon %d: failed to retrieve state: %v", i, err)
+						return
+					} else if !exists {
+						t.t.Fatalf("beacon %d: block not found", i)
+					}
+					state := stateInfo.Data.(*merge.BeaconState)
+
 					slot := headInfo.Header.Message.Slot
 					head := shorten(headInfo.Root.String())
-					justified := shorten(out.CurrentJustified.String())
-					finalized := shorten(out.Finalized.String())
-					execution := shorten(mergeBlock.Message.Body.ExecutionPayload.BlockHash.String())
-					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, exec_payload=%s, justified=%s, finalized=%s", i, slot, head, execution, justified, finalized)}
+					justified := shorten(checkpoints.CurrentJustified.String())
+					finalized := shorten(checkpoints.Finalized.String())
+					execution := shorten(block.Message.Body.ExecutionPayload.BlockHash.String())
+					health := calcHealth(state.CurrentEpochParticipation)
+
+					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s, justified=%s, finalized=%s", i, slot, head, health, execution, justified, finalized)}
 
 					ep := t.spec.SlotToEpoch(slot)
-					if ep > 4 && ep > out.Finalized.Epoch+2 {
-						t.t.Fatalf("failed to finalize, head slot %d (epoch %d) is more than 2 ahead of finality checkpoint %d", slot, ep, out.Finalized.Epoch)
+					if ep > 4 && ep > checkpoints.Finalized.Epoch+2 {
+						t.t.Fatalf("failed to finalize, head slot %d (epoch %d) is more than 2 ahead of finality checkpoint %d", slot, ep, checkpoints.Finalized.Epoch)
 					}
 
-					if (out.Finalized != common.Checkpoint{}) {
+					if (checkpoints.Finalized != common.Checkpoint{}) {
 						done <- struct{}{}
 					}
 				}(ctx, i, b, ch)
 			}
 			wg.Wait()
 			close(ch)
+
+			// print out logs in ascending idx order
 			sorted := make([]string, len(t.beacons))
 			for out := range ch {
 				sorted[out.idx] = out.msg
@@ -121,4 +138,32 @@ func (t *Testnet) VerifyFinality(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (t *Testnet) VerifyParticipation(ctx context.Context, epoch int, expected int) {
+	slot := (epoch + 1) * int(t.spec.SLOTS_PER_EPOCH)
+	for i, b := range t.beacons {
+		var versionedState eth2api.VersionedBeaconState
+		if exists, err := debugapi.BeaconStateV2(ctx, b.API, eth2api.StateIdSlot(slot), &versionedState); err != nil {
+			t.t.Errorf("beacon %d: failed to retrieve state: %v", i, err)
+			return
+		} else if !exists {
+			t.t.Fatalf("beacon %d: block not found", i)
+		}
+		state := versionedState.Data.(*merge.BeaconState)
+		health := int(calcHealth(state.PreviousEpochParticipation) * 100)
+		if health < expected {
+			t.t.Fatalf("beacon %d: participation not healthy (got: %d, expected: %d)", i, health, expected)
+		}
+		t.t.Logf("beacon %d: epoch=%d participation=%d", i, epoch, health)
+	}
+}
+
+func calcHealth(p altair.ParticipationRegistry) float64 {
+	sum := 0
+	for _, p := range p {
+		sum += int(p)
+	}
+	avg := float64(sum) / float64(len(p))
+	return avg / float64(MAX_PARTICIPATION_SCORE)
 }

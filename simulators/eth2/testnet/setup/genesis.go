@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/holiman/uint256"
 	"github.com/protolambda/zrnt/eth2/beacon/altair"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/merge"
@@ -25,7 +26,10 @@ func genesisPayloadHeader(eth1GenesisBlock *types.Block, spec *common.Spec) (*co
 		return nil, fmt.Errorf("expected no transactions in genesis execution payload")
 	}
 
-	baseFee := eth1GenesisBlock.BaseFee().Uint64()
+	baseFee, overflow := uint256.FromBig(eth1GenesisBlock.BaseFee())
+	if overflow {
+		return nil, fmt.Errorf("basefee larger than 2^256-1")
+	}
 
 	return &common.ExecutionPayloadHeader{
 		ParentHash:    common.Root(eth1GenesisBlock.ParentHash()),
@@ -39,7 +43,7 @@ func genesisPayloadHeader(eth1GenesisBlock *types.Block, spec *common.Spec) (*co
 		GasUsed:       view.Uint64View(eth1GenesisBlock.GasUsed()),
 		Timestamp:     common.Timestamp(eth1GenesisBlock.Time()),
 		ExtraData:     extra,
-		BaseFeePerGas: view.Uint64View(baseFee),
+		BaseFeePerGas: view.Uint256View(*baseFee),
 		BlockHash:     common.Root(eth1GenesisBlock.Hash()),
 		// empty transactions root
 		TransactionsRoot: common.PayloadTransactionsType(spec).DefaultNode().MerkleRoot(tree.GetHashFn()),
@@ -200,7 +204,8 @@ func BuildBeaconState(spec *common.Spec, eth1Genesis *core.Genesis, eth2GenesisT
 
 	if st, ok := state.(*merge.BeaconStateView); ok {
 		// did we hit the TTD at genesis block?
-		embedExecAtGenesis := spec.TERMINAL_TOTAL_DIFFICULTY.Big().Cmp(eth1Genesis.Difficulty) < 0
+		tdd := uint256.Int(spec.TERMINAL_TOTAL_DIFFICULTY)
+		embedExecAtGenesis := tdd.ToBig().Cmp(eth1Genesis.Difficulty) < 0
 
 		var execPayloadHeader *common.ExecutionPayloadHeader
 		if embedExecAtGenesis {

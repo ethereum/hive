@@ -9,16 +9,13 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/herumi/bls-eth-go-binary v0.0.0-20210902234237-7763804ee078
 	github.com/pkg/errors v0.9.1
-	github.com/protolambda/eth2api v0.0.0-20211003135243-f12829c6e6e4
+	github.com/protolambda/eth2api v0.0.0-20220114125426-abe8458721c8
 	github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52
-	github.com/protolambda/zrnt v0.23.1-0.20220106230333-0b684aed531c
-	github.com/protolambda/ztyp v0.1.9
+	github.com/protolambda/zrnt v0.24.0
+	github.com/protolambda/ztyp v0.2.1
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wealdtech/go-eth2-util v1.6.5
 )
-
-replace github.com/protolambda/eth2api => /home/matt/dev/eth2api
-replace github.com/protolambda/zrnt => /home/matt/dev/zrnt
 
 require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
@@ -30,8 +27,6 @@ require (
 	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
-	github.com/google/uuid v1.3.0
-	github.com/herumi/bls-eth-go-binary v0.0.0-20210902234237-7763804ee078
 	github.com/holiman/uint256 v1.2.0
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/minio/sha256-simd v1.0.0 // indirect
@@ -59,7 +54,6 @@ require (
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
-	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/huin/goupnp v1.0.2 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
