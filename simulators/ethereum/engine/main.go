@@ -69,6 +69,13 @@ var tests = []testSpec{
 	{Name: "Unknown FinalizedBlockHash", Run: unknownFinalizedBlockHash},
 	{Name: "Pre-TTD ForkchoiceUpdated After PoS Switch", Run: preTTDFinalizedBlockHash},
 	{Name: "Bad Hash on ExecutePayload", Run: badHashOnExecPayload},
+	{Name: "Invalid ParentHash ExecutePayload", Run: invalidPayloadTestCaseGen("ParentHash")},
+	{Name: "Invalid StateRoot ExecutePayload", Run: invalidPayloadTestCaseGen("StateRoot")},
+	{Name: "Invalid ReceiptsRoot ExecutePayload", Run: invalidPayloadTestCaseGen("ReceiptsRoot")},
+	{Name: "Invalid Number ExecutePayload", Run: invalidPayloadTestCaseGen("Number")},
+	{Name: "Invalid GasLimit ExecutePayload", Run: invalidPayloadTestCaseGen("GasLimit")},
+	{Name: "Invalid GasUsed ExecutePayload", Run: invalidPayloadTestCaseGen("GasUsed")},
+	{Name: "Invalid Timestamp ExecutePayload", Run: invalidPayloadTestCaseGen("Timestamp")},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{Name: "Latest Block after ExecutePayload", Run: blockStatusExecPayload},
@@ -109,7 +116,7 @@ have reached the Terminal Total Difficulty.`[1:],
 
 // First launch a client against other clients will sync and run their respective tests.
 func runSourceTest(t0 *hivesim.T, c0 *hivesim.Client) {
-	clMocker = NewCLMocker()
+	clMocker = NewCLMocker(t0)
 	defer clMocker.stopPoSBlockProduction()
 
 	vault = newVault()

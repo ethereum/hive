@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -165,7 +164,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 		FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 	}
 
-	fmt.Printf("INFO (unknownHeadBlockHash) forkchoiceStateUnknownHeadHash: %v\n", forkchoiceStateUnknownHeadHash)
+	t.Logf("INFO (%v) forkchoiceStateUnknownHeadHash: %v\n", t.TestName, forkchoiceStateUnknownHeadHash)
 
 	resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownHeadHash, nil)
 	if err != nil {
@@ -231,6 +230,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	}
 }
 
+// Corrupt the hash of a valid payload, client should reject the payload
 func badHashOnExecPayload(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	if !t.WaitForPoSSync() {
@@ -247,6 +247,96 @@ func badHashOnExecPayload(t *TestEnv) {
 	execPayloadResp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), &alteredPayload)
 	if err == nil {
 		t.Fatalf("FAIL (%v): Incorrect block hash in execute payload was not rejected: %v", t.TestName, execPayloadResp)
+	}
+}
+
+// Generate test cases for each field of ExecutePayload, where the payload contains a single invalid field and a valid hash.
+func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
+	return func(t *TestEnv) {
+		// Wait until TTD is reached by this client
+		if !t.WaitForPoSSync() {
+			t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
+		}
+
+		// Wait for GetPayload
+		t.CLMock.NewGetPayloadMutex.Lock()
+		defer t.CLMock.NewGetPayloadMutex.Unlock()
+
+		// Alter the payload while maintaining a valid hash and send it to the client, should produce an error
+		basePayload := t.CLMock.LatestPayloadBuilt
+		customPayloadMods := make(map[string]CustomPayloadData)
+		customPayloadMods["ParentHash"] = CustomPayloadData{
+			ParentHash: func() *common.Hash {
+				modParentHash := basePayload.ParentHash
+				modParentHash[common.HashLength-1] = byte(255 - modParentHash[common.HashLength-1])
+				return &modParentHash
+			}(),
+		}
+		customPayloadMods["StateRoot"] = CustomPayloadData{
+			StateRoot: func() *common.Hash {
+				modStateRoot := basePayload.StateRoot
+				modStateRoot[common.HashLength-1] = byte(255 - modStateRoot[common.HashLength-1])
+				return &modStateRoot
+			}(),
+		}
+
+		customPayloadMods["ReceiptsRoot"] = CustomPayloadData{
+			ReceiptsRoot: func() *common.Hash {
+				modReceiptsRoot := basePayload.ReceiptsRoot
+				modReceiptsRoot[common.HashLength-1] = byte(255 - modReceiptsRoot[common.HashLength-1])
+				return &modReceiptsRoot
+			}(),
+		}
+		customPayloadMods["Number"] = CustomPayloadData{
+			Number: func() *uint64 {
+				modNumber := basePayload.Number - 1
+				return &modNumber
+			}(),
+		}
+		customPayloadMods["GasLimit"] = CustomPayloadData{
+			GasLimit: func() *uint64 {
+				modGasLimit := basePayload.GasLimit - 1
+				return &modGasLimit
+			}(),
+		}
+		customPayloadMods["GasUsed"] = CustomPayloadData{
+			GasUsed: func() *uint64 {
+				modGasUsed := basePayload.GasUsed - 1
+				return &modGasUsed
+			}(),
+		}
+		customPayloadMods["Timestamp"] = CustomPayloadData{
+			Timestamp: func() *uint64 {
+				modTimestamp := basePayload.Timestamp - 1
+				return &modTimestamp
+			}(),
+		}
+
+		customPayloadMod := customPayloadMods[payloadField]
+
+		t.Logf("INFO (%v) customizing payload using: %v\n", t.TestName, customPayloadMod)
+		alteredPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &customPayloadMod)
+		t.Logf("INFO (%v) latest real getPayload (not executed): hash=%v contents=%v\n", t.TestName, t.CLMock.LatestPayloadBuilt.BlockHash, t.CLMock.LatestPayloadBuilt)
+		t.Logf("INFO (%v) customized payload: hash=%v contents=%v\n", t.TestName, alteredPayload.BlockHash, alteredPayload)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Unable to modify payload (%v): %v", t.TestName, customPayloadMod, err)
+		}
+		execPayloadResp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), alteredPayload)
+		if payloadField == "ParentHash" {
+			// An invalid ParentHash must return SYNCING state according to the execution-apis:
+			// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+			if err != nil {
+				t.Fatalf("FAIL (%v): Incorrect %v in executePayload was rejected: %v", t.TestName, payloadField, err)
+			}
+			if execPayloadResp.Status != "SYNCING" {
+				t.Fatalf("FAIL (%v): Incorrect %v in executePayload returned incorrect status: %v", t.TestName, payloadField, execPayloadResp)
+			}
+		} else {
+			if err == nil {
+				t.Fatalf("FAIL (%v): Incorrect %v in executePayload was not rejected: %v", t.TestName, payloadField, execPayloadResp)
+			}
+		}
+		// TODO: Send each payload twice; once right after reaching TTD, and one afterwards.
 	}
 }
 
@@ -414,7 +504,7 @@ func transactionReorg(t *TestEnv) {
 		data := make([]byte, 1)
 		data[0] = byte(i)
 		data = common.LeftPadBytes(data, 32)
-		fmt.Printf("transactionReorg, i=%v, data=%v\n", i, data)
+		t.Logf("transactionReorg, i=%v, data=%v\n", i, data)
 		rawTx := types.NewTransaction(nonce, sstoreContractAddr, big0, 100000, gasPrice, data)
 		nonce++
 		tx, err := t.Vault.signTransaction(key, rawTx)
@@ -455,7 +545,7 @@ func transactionReorg(t *TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
 		}
-		fmt.Printf("transactionReorg, stor[%v]: %v\n", i, value_after)
+		t.Logf("transactionReorg, stor[%v]: %v\n", i, value_after)
 
 		if value_after.Cmp(common.Big1) != 0 {
 			t.Fatalf("FAIL (%v): Expected storage not set after transaction: %v", t.TestName, value_after)
@@ -467,7 +557,7 @@ func transactionReorg(t *TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
 		}
-		fmt.Printf("transactionReorg, stor[%v]: %v\n", i, value_before)
+		t.Logf("transactionReorg, stor[%v]: %v\n", i, value_before)
 
 		if value_before.Cmp(common.Big0) != 0 {
 			t.Fatalf("FAIL (%v): Expected storage not set after transaction: %v", t.TestName, value_before)
@@ -492,7 +582,7 @@ func transactionReorg(t *TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
 		}
-		fmt.Printf("transactionReorg, stor[%v]: %v\n", i, value_before)
+		t.Logf("transactionReorg, stor[%v]: %v\n", i, value_before)
 
 		if value_before.Cmp(common.Big0) != 0 {
 			t.Fatalf("FAIL (%v): Expected storage not set after transaction: %v", t.TestName, value_before)
@@ -604,8 +694,8 @@ func suggestedFeeRecipient(t *TestEnv) {
 			t.Fatalf("FAIL (%v): unable to get block with fee recipient: %v", t.TestName, err)
 		}
 		if blockIncluded.Coinbase() != feeRecipientAddress {
-			fmt.Printf("FAIL (%v): blockNumberIncluded: %v\n", t.TestName, blockNumbers)
-			fmt.Printf("FAIL (%v): feeRecipientAddress: %v\n", t.TestName, feeRecipients)
+			t.Logf("FAIL (%v): blockNumberIncluded: %v\n", t.TestName, blockNumbers)
+			t.Logf("FAIL (%v): feeRecipientAddress: %v\n", t.TestName, feeRecipients)
 			t.Fatalf("FAIL (%v): Expected feeRecipient is not header.coinbase (i=%v, header.blockNumber=%v): %v!=%v", t.TestName, i, blockIncluded.Number(), blockIncluded.Coinbase, feeRecipientAddress)
 		}
 
@@ -668,7 +758,7 @@ func randomOpcodeTx(t *TestEnv) {
 		}
 		if err = t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 			bal, _ := t.Eth.BalanceAt(t.Ctx(), key, nil)
-			fmt.Printf("Random: balance=%v\n", bal)
+			t.Logf("Random: balance=%v\n", bal)
 			t.Fatalf("FAIL (%v): Unable to send transaction: %v", t.TestName, err)
 		}
 		time.Sleep(PoSBlockProductionPeriod / 2)

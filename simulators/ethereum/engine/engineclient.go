@@ -40,6 +40,7 @@ func NewEngineClient(t *hivesim.T, hc *hivesim.Client) *EngineClient {
 	client := &http.Client{
 		Transport: &loggingRoundTrip{
 			t:     t,
+			hc:    hc,
 			inner: http.DefaultTransport,
 		},
 	}
@@ -53,6 +54,13 @@ func NewEngineClient(t *hivesim.T, hc *hivesim.Client) *EngineClient {
 		t.Fatal("NewEngineClient: WebSocket connection failed:", err)
 	}
 	// Prepare ETH Client (Use HTTP)
+	client = &http.Client{
+		Transport: &loggingRoundTrip{
+			t:     t,
+			hc:    hc,
+			inner: http.DefaultTransport,
+		},
+	}
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", hc.IP), client)
 	eth := ethclient.NewClient(rpcClient)
 	// By default we send requests via HTTP

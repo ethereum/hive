@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -11,10 +10,12 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth/catalyst"
+	"github.com/ethereum/hive/hivesim"
 )
 
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
+	*hivesim.T
 	// List of Engine Clients being served by the CL Mocker
 	EngineClients []*EngineClient
 	// Lock required so no client is offboarded during block production.
@@ -56,12 +57,13 @@ type CLMocker struct {
 	NewFinalizedBlockForkchoiceMutex sync.Mutex
 }
 
-func NewCLMocker() *CLMocker {
+func NewCLMocker(t *hivesim.T) *CLMocker {
 	// Init random seed for different purposes
 	rand.Seed(time.Now().Unix())
 
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
+		T:                           t,
 		EngineClients:               make([]*EngineClient, 0),
 		RandomHistory:               map[uint64]common.Hash{},
 		ExecutedPayloadHistory:      map[uint64]catalyst.ExecutableDataV1{},
@@ -137,22 +139,24 @@ func (cl *CLMocker) checkTTD() {
 	var td *TD
 	err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false)
 	if err != nil {
-		ec.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
+		cl.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
 	}
 	if td.TotalDifficulty.ToInt().Cmp(terminalTotalDifficulty) >= 0 {
 		cl.TTDReached = true
 		cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
 		if err != nil {
-			ec.Fatalf("CLMocker: Could not get block header: %v", err)
+			cl.Fatalf("CLMocker: Could not get block header: %v", err)
 		}
-		fmt.Printf("CLMocker: TTD has been reached at block %v\n", cl.LatestFinalizedHeader.Number)
+		cl.Logf("CLMocker: TTD has been reached at block %v\n", cl.LatestFinalizedHeader.Number)
 		// Broadcast initial ForkchoiceUpdated
 		cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
 		cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
 		cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
 		for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-			if resp.Status != "SUCCESS" {
-				fmt.Printf("CLMocker: forkchoiceUpdated Response: %v\n", resp)
+			if resp.Error != nil {
+				cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
+			} else if resp.ForkchoiceResponse.Status != "SUCCESS" {
+				cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
 			}
 		}
 		time.AfterFunc(PoSBlockProductionPeriod, cl.minePOSBlock)
@@ -224,13 +228,13 @@ func (cl *CLMocker) minePOSBlock() {
 		lastBlockNumber, err = cl.NextBlockProducer.Eth.BlockNumber(cl.NextBlockProducer.Ctx())
 		if err != nil {
 			unlockAll(cl)
-			cl.NextBlockProducer.Fatalf("CLMocker: Could not get block number: %v", err)
+			cl.Fatalf("CLMocker: Could not get block number: %v", err)
 		}
 
 		latestHeader, err := cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), big.NewInt(int64(lastBlockNumber)))
 		if err != nil {
 			unlockAll(cl)
-			cl.NextBlockProducer.Fatalf("CLMocker: Could not get block header: %v", err)
+			cl.Fatalf("CLMocker: Could not get block header: %v", err)
 		}
 
 		lastBlockHash := latestHeader.Hash()
@@ -261,16 +265,16 @@ func (cl *CLMocker) minePOSBlock() {
 	resp, err := cl.NextBlockProducer.EngineForkchoiceUpdatedV1(cl.NextBlockProducer.Ctx(), &cl.LatestForkchoice, &payloadAttributes)
 	if err != nil {
 		unlockAll(cl)
-		cl.NextBlockProducer.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1: %v", err)
+		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1: %v", err)
 	}
 	if resp.Status != "SUCCESS" {
-		fmt.Printf("CLMocker: forkchoiceUpdated Response: %v\n", resp)
+		cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp)
 	}
 
 	cl.LatestPayloadBuilt, err = cl.NextBlockProducer.EngineGetPayloadV1(cl.NextBlockProducer.Ctx(), resp.PayloadID)
 	if err != nil {
 		unlockAll(cl)
-		cl.NextBlockProducer.Fatalf("CLMocker: Could not getPayload (%v): %v", resp.PayloadID, err)
+		cl.Fatalf("CLMocker: Could not getPayload (%v): %v", resp.PayloadID, err)
 	}
 
 	// Trigger actions for a new payload built.
@@ -279,8 +283,11 @@ func (cl *CLMocker) minePOSBlock() {
 
 	// Broadcast the executePayload to all clients
 	for i, resp := range cl.broadcastExecutePayload(&cl.LatestPayloadBuilt) {
-		if resp.Status != "VALID" {
-			fmt.Printf("CLMocker: resp (%v): %v\n", i, resp)
+		if resp.Error != nil {
+			cl.Logf("CLMocker: broadcastExecutePayload Error (%v): %v\n", i, resp.Error)
+
+		} else if resp.ExecutePayloadResponse.Status != "VALID" {
+			cl.Logf("CLMocker: broadcastExecutePayload Response (%v): %v\n", i, resp.ExecutePayloadResponse)
 		}
 	}
 	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
@@ -293,8 +300,10 @@ func (cl *CLMocker) minePOSBlock() {
 	// Broadcast forkchoice updated with new HeadBlock to all clients
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
 	for i, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-		if resp.Status != "SUCCESS" {
-			fmt.Printf("CLMocker: resp (%v): %v\n", i, resp)
+		if resp.Error != nil {
+			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", i, resp.Error)
+		} else if resp.ForkchoiceResponse.Status != "SUCCESS" {
+			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", i, resp.ForkchoiceResponse)
 		}
 	}
 	// Trigger actions for new HeadBlock forkchoice broadcast
@@ -304,8 +313,10 @@ func (cl *CLMocker) minePOSBlock() {
 	// Broadcast forkchoice updated with new SafeBlock to all clients
 	cl.LatestForkchoice.SafeBlockHash = cl.LatestPayloadBuilt.BlockHash
 	for i, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-		if resp.Status != "SUCCESS" {
-			fmt.Printf("CLMocker: resp (%v): %v\n", i, resp)
+		if resp.Error != nil {
+			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", i, resp.Error)
+		} else if resp.ForkchoiceResponse.Status != "SUCCESS" {
+			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", i, resp.ForkchoiceResponse)
 		}
 	}
 	// Trigger actions for new SafeBlock forkchoice broadcast
@@ -315,8 +326,10 @@ func (cl *CLMocker) minePOSBlock() {
 	// Broadcast forkchoice updated with new FinalizedBlock to all clients
 	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestPayloadBuilt.BlockHash
 	for i, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-		if resp.Status != "SUCCESS" {
-			fmt.Printf("CLMocker: resp (%v): %v\n", i, resp)
+		if resp.Error != nil {
+			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", i, resp.Error)
+		} else if resp.ForkchoiceResponse.Status != "SUCCESS" {
+			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", i, resp.ForkchoiceResponse)
 		}
 	}
 
@@ -333,7 +346,7 @@ func (cl *CLMocker) minePOSBlock() {
 	cl.LatestFinalizedHeader, err = cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), cl.LatestFinalizedNumber)
 	if err != nil {
 		unlockAll(cl)
-		cl.NextBlockProducer.Fatalf("CLMocker: Could not get block header: %v", err)
+		cl.Fatalf("CLMocker: Could not get block header: %v", err)
 	}
 
 	// Switch protocol HTTP<>WS for all clients
@@ -354,26 +367,41 @@ func (cl *CLMocker) minePOSBlock() {
 	}
 }
 
-func (cl *CLMocker) broadcastExecutePayload(payload *catalyst.ExecutableDataV1) []catalyst.ExecutePayloadResponse {
-	responses := make([]catalyst.ExecutePayloadResponse, len(cl.EngineClients))
+type ExecutePayloadOutcome struct {
+	ExecutePayloadResponse *catalyst.ExecutePayloadResponse
+	Error                  error
+}
+
+func (cl *CLMocker) broadcastExecutePayload(payload *catalyst.ExecutableDataV1) []ExecutePayloadOutcome {
+	responses := make([]ExecutePayloadOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		execPayloadResp, err := ec.EngineExecutePayloadV1(ec.Ctx(), payload)
 		if err != nil {
-			ec.Fatalf("CLMocker: Could not ExecutePayloadV1: %v", err)
+			ec.Errorf("CLMocker: Could not ExecutePayloadV1: %v", err)
+			responses[i].Error = err
+		} else {
+			cl.Logf("CLMocker: Executed payload: %v", execPayloadResp)
+			responses[i].ExecutePayloadResponse = &execPayloadResp
 		}
-		responses[i] = execPayloadResp
 	}
 	return responses
 }
 
-func (cl *CLMocker) broadcastForkchoiceUpdated(fcstate *catalyst.ForkchoiceStateV1, payloadAttr *catalyst.PayloadAttributesV1) []catalyst.ForkChoiceResponse {
-	responses := make([]catalyst.ForkChoiceResponse, len(cl.EngineClients))
+type ForkChoiceOutcome struct {
+	ForkchoiceResponse *catalyst.ForkChoiceResponse
+	Error              error
+}
+
+func (cl *CLMocker) broadcastForkchoiceUpdated(fcstate *catalyst.ForkchoiceStateV1, payloadAttr *catalyst.PayloadAttributesV1) []ForkChoiceOutcome {
+	responses := make([]ForkChoiceOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		fcUpdatedResp, err := ec.EngineForkchoiceUpdatedV1(ec.Ctx(), fcstate, payloadAttr)
 		if err != nil {
-			ec.Fatalf("CLMocker: Could not ForkchoiceUpdatedV1: %v", err)
+			ec.Errorf("CLMocker: Could not ForkchoiceUpdatedV1: %v", err)
+			responses[i].Error = err
+		} else {
+			responses[i].ForkchoiceResponse = &fcUpdatedResp
 		}
-		responses[i] = fcUpdatedResp
 	}
 	return responses
 }
