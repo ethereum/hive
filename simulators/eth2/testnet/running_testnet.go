@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 	"github.com/protolambda/eth2api"
@@ -157,6 +159,29 @@ func (t *Testnet) VerifyParticipation(ctx context.Context, epoch int, expected i
 		}
 		t.t.Logf("beacon %d: epoch=%d participation=%d", i, epoch, health)
 	}
+}
+
+func (t *Testnet) VerifyExecutionPayloadIsCanonical(ctx context.Context) {
+	var versionedBlock eth2api.VersionedSignedBeaconBlock
+	if exists, err := beaconapi.BlockV2(ctx, t.beacons[0].API, eth2api.BlockFinalized, &versionedBlock); err != nil {
+		t.t.Errorf("beacon %d: failed to retrieve block: %v", 0, err)
+		return
+	} else if !exists {
+		t.t.Fatalf("beacon %d: block not found", 0)
+	}
+	payload := versionedBlock.Data.(*merge.SignedBeaconBlock).Message.Body.ExecutionPayload
+
+	for i, e := range t.eth1 {
+		client := ethclient.NewClient(e.Client.RPC())
+		block, err := client.BlockByNumber(ctx, big.NewInt(int64(payload.BlockNumber)))
+		if err != nil {
+			t.t.Fatalf("eth1 %d: %s", err)
+		}
+		if block.Hash() != [32]byte(payload.BlockHash) {
+			t.t.Fatalf("eth1 %d: blocks don't match (got=%s, expected=%s)", i, shorten(block.Hash().String()), shorten(payload.BlockHash.String()))
+		}
+	}
+
 }
 
 func calcHealth(p altair.ParticipationRegistry) float64 {
