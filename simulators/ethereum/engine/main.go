@@ -19,6 +19,7 @@ var (
 	terminalTotalDifficulty  = big.NewInt(131072 + 25)
 	PoSBlockProductionPeriod = time.Second * 1
 	tTDCheckPeriod           = time.Second * 1
+	PoSSyncTimeoutSeconds    = 20
 
 	// Confirmation blocks
 	PoWConfirmationBlocks = uint64(15)
@@ -158,6 +159,10 @@ func runSourceTest(t0 *hivesim.T, c0 *hivesim.Client) {
 					})
 				},
 			})
+			if t0.Failed() {
+				// CLMocker has failed for some reason, abort
+				break
+			}
 		}
 	}
 

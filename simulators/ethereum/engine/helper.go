@@ -72,10 +72,10 @@ func runTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 	}
 }
 
-// Wait for a client to reach sync status past the PoS transition, with 90 second timeout
+// Wait for a client to reach sync status past the PoS transition, with `PoSSyncTimeoutSeconds` seconds timeout
 func (t *TestEnv) WaitForPoSSync() bool {
 
-	for i := 0; i < 90; i++ {
+	for i := 0; i < PoSSyncTimeoutSeconds; i++ {
 		if clMocker.TTDReached {
 			bn, err := t.Eth.BlockNumber(t.Ctx())
 			if err != nil {

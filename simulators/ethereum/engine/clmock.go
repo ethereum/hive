@@ -228,18 +228,26 @@ func (cl *CLMocker) minePOSBlock() {
 		lastBlockNumber, err = cl.NextBlockProducer.Eth.BlockNumber(cl.NextBlockProducer.Ctx())
 		if err != nil {
 			unlockAll(cl)
-			cl.Fatalf("CLMocker: Could not get block number: %v", err)
+			cl.Fatalf("CLMocker: Could not get block number while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
 		}
 
-		latestHeader, err := cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), big.NewInt(int64(lastBlockNumber)))
+		lastBlockNumberBig := big.NewInt(int64(lastBlockNumber))
+
+		if cl.LatestFinalizedNumber != nil && cl.LatestFinalizedNumber.Cmp(lastBlockNumberBig) != 0 {
+			// Selected client is not synced to the last block number, try again
+			continue
+		}
+
+		latestHeader, err := cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), lastBlockNumberBig)
 		if err != nil {
 			unlockAll(cl)
-			cl.Fatalf("CLMocker: Could not get block header: %v", err)
+			cl.Fatalf("CLMocker: Could not get block header while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
 		}
 
 		lastBlockHash := latestHeader.Hash()
 
 		if cl.LatestFinalizedHeader.Hash() != lastBlockHash {
+			// Selected client latest block hash does not match canonical chain, try again
 			continue
 		} else {
 			break
@@ -265,7 +273,7 @@ func (cl *CLMocker) minePOSBlock() {
 	resp, err := cl.NextBlockProducer.EngineForkchoiceUpdatedV1(cl.NextBlockProducer.Ctx(), &cl.LatestForkchoice, &payloadAttributes)
 	if err != nil {
 		unlockAll(cl)
-		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1: %v", err)
+		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.Client.Container, err)
 	}
 	if resp.Status != "SUCCESS" {
 		cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp)
@@ -274,7 +282,7 @@ func (cl *CLMocker) minePOSBlock() {
 	cl.LatestPayloadBuilt, err = cl.NextBlockProducer.EngineGetPayloadV1(cl.NextBlockProducer.Ctx(), resp.PayloadID)
 	if err != nil {
 		unlockAll(cl)
-		cl.Fatalf("CLMocker: Could not getPayload (%v): %v", resp.PayloadID, err)
+		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.Client.Container, resp.PayloadID, err)
 	}
 
 	// Trigger actions for a new payload built.
@@ -343,10 +351,19 @@ func (cl *CLMocker) minePOSBlock() {
 
 	// Save the header of the latest block in the PoS chain
 	cl.LatestFinalizedNumber = big.NewInt(int64(lastBlockNumber + 1))
-	cl.LatestFinalizedHeader, err = cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), cl.LatestFinalizedNumber)
-	if err != nil {
+
+	// Check if any of the clients accepted the new payload
+	cl.LatestFinalizedHeader = nil
+	for _, ec := range cl.EngineClients {
+		newHeader, err := ec.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), cl.LatestFinalizedNumber)
+		if err == nil {
+			cl.LatestFinalizedHeader = newHeader
+			break
+		}
+	}
+	if cl.LatestFinalizedHeader == nil {
 		unlockAll(cl)
-		cl.Fatalf("CLMocker: Could not get block header: %v", err)
+		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
 	}
 
 	// Switch protocol HTTP<>WS for all clients

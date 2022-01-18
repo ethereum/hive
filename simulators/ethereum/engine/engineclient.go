@@ -22,6 +22,7 @@ var EnginePortWS = 8546
 // EngineClient wrapper for Ethereum Engine RPC for testing purposes.
 type EngineClient struct {
 	*hivesim.T
+	*hivesim.Client
 	http_c *rpc.Client
 	ws_c   *rpc.Client
 	c      *rpc.Client
@@ -64,7 +65,7 @@ func NewEngineClient(t *hivesim.T, hc *hivesim.Client) *EngineClient {
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", hc.IP), client)
 	eth := ethclient.NewClient(rpcClient)
 	// By default we send requests via HTTP
-	return &EngineClient{t, rpcHttpClient, rpcWsClient, rpcHttpClient, eth, hc.IP, nil, nil}
+	return &EngineClient{t, hc, rpcHttpClient, rpcWsClient, rpcHttpClient, eth, hc.IP, nil, nil}
 }
 
 // This is not necessarily true in all cases, but for this simulator it's ok.
