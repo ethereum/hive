@@ -376,11 +376,6 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
 	}
 
-	// Switch protocol HTTP<>WS for all clients
-	for _, ec := range cl.EngineClients {
-		ec.SwitchProtocol()
-	}
-
 	// Yield after block production has completed a new block
 	cl.OnFinalizedBlockForkchoiceUpdate.Yield()
 	<-cl.OnFinalizedBlockForkchoiceUpdate
