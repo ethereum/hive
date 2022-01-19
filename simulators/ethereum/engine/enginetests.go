@@ -75,9 +75,7 @@ func unknownSafeBlockHash(t *TestEnv) {
 
 	// Generate a random SafeBlock hash
 	randomSafeBlockHash := common.Hash{}
-	for i := 0; i < common.HashLength; i++ {
-		randomSafeBlockHash[i] = byte(rand.Uint32())
-	}
+	rand.Read(randomSafeBlockHash[:])
 
 	// Send forkchoiceUpdated with random SafeBlockHash
 	forkchoiceStateUnknownSafeHash := catalyst.ForkchoiceStateV1{
@@ -105,9 +103,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 
 	// Generate a random FinalizedBlockHash hash
 	randomFinalizedBlockHash := common.Hash{}
-	for i := 0; i < common.HashLength; i++ {
-		randomFinalizedBlockHash[i] = byte(rand.Uint32())
-	}
+	rand.Read(randomFinalizedBlockHash[:])
 
 	// Send forkchoiceUpdated with random FinalizedBlockHash
 	forkchoiceStateUnknownFinalizedHash := catalyst.ForkchoiceStateV1{
@@ -154,9 +150,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 
 	// Generate a random HeadBlock hash
 	randomHeadBlockHash := common.Hash{}
-	for i := 0; i < common.HashLength; i++ {
-		randomHeadBlockHash[i] = byte(rand.Uint32())
-	}
+	rand.Read(randomHeadBlockHash[:])
 
 	forkchoiceStateUnknownHeadHash := catalyst.ForkchoiceStateV1{
 		HeadBlockHash:      randomHeadBlockHash,

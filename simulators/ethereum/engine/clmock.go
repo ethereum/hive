@@ -59,7 +59,9 @@ type CLMocker struct {
 
 func NewCLMocker(t *hivesim.T) *CLMocker {
 	// Init random seed for different purposes
-	rand.Seed(time.Now().Unix())
+	seed := time.Now().Unix()
+	t.Logf("Randomness seed: %v\n", seed)
+	rand.Seed(seed)
 
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
@@ -260,9 +262,7 @@ func (cl *CLMocker) minePOSBlock() {
 
 	// Generate a random value for the Random field
 	nextRandom := common.Hash{}
-	for i := 0; i < common.HashLength; i++ {
-		nextRandom[i] = byte(rand.Uint32())
-	}
+	rand.Read(nextRandom[:])
 
 	payloadAttributes := catalyst.PayloadAttributesV1{
 		Timestamp:             cl.LatestFinalizedHeader.Time + 1,
