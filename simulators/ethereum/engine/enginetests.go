@@ -70,8 +70,10 @@ func unknownSafeBlockHash(t *TestEnv) {
 		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
 	}
 	// Wait for ExecutePayload
-	t.CLMock.NewExecutePayloadMutex.Lock()
-	defer t.CLMock.NewExecutePayloadMutex.Unlock()
+	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnExecutePayload.Yield()
 
 	// Generate a random SafeBlock hash
 	randomSafeBlockHash := common.Hash{}
@@ -98,8 +100,10 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 	}
 
 	// Wait for ExecutePayload
-	t.CLMock.NewExecutePayloadMutex.Lock()
-	defer t.CLMock.NewExecutePayloadMutex.Unlock()
+	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnExecutePayload.Yield()
 
 	// Generate a random FinalizedBlockHash hash
 	randomFinalizedBlockHash := common.Hash{}
@@ -145,8 +149,10 @@ func unknownHeadBlockHash(t *TestEnv) {
 	}
 
 	// Wait for FinalizedBlock
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
-	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 
 	// Generate a random HeadBlock hash
 	randomHeadBlockHash := common.Hash{}
@@ -195,8 +201,10 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	}
 
 	// Wait for ExecutePayload
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
-	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 
 	// Send the Genesis block as forkchoice
 	gblock := loadGenesis()
@@ -232,8 +240,10 @@ func badHashOnExecPayload(t *TestEnv) {
 	}
 
 	// Wait for GetPayload
-	t.CLMock.NewGetPayloadMutex.Lock()
-	defer t.CLMock.NewGetPayloadMutex.Unlock()
+	if closed := t.CLMock.OnGetPayload.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnGetPayload.Yield()
 
 	// Alter hash on the payload and send it to client, should produce an error
 	alteredPayload := t.CLMock.LatestPayloadBuilt
@@ -253,8 +263,10 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		}
 
 		// Wait for GetPayload
-		t.CLMock.NewGetPayloadMutex.Lock()
-		defer t.CLMock.NewGetPayloadMutex.Unlock()
+		if closed := t.CLMock.OnGetPayload.Wait(); closed {
+			t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+		}
+		defer t.CLMock.OnGetPayload.Yield()
 
 		// Alter the payload while maintaining a valid hash and send it to the client, should produce an error
 		basePayload := t.CLMock.LatestPayloadBuilt
@@ -342,11 +354,12 @@ func blockStatusExecPayload(t *TestEnv) {
 	}
 
 	// Run executePayload tests
-	t.CLMock.NewExecutePayloadMutex.Lock()
-	defer t.CLMock.NewExecutePayloadMutex.Unlock()
+	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnExecutePayload.Yield()
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
-		t.CLMock.NewHeadBlockForkchoiceMutex.Unlock()
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
 	}
 	// Latest block available via Eth RPC should not have changed at this point
@@ -367,8 +380,10 @@ func blockStatusHeadBlock(t *TestEnv) {
 	}
 
 	// Run HeadBlock tests
-	t.CLMock.NewHeadBlockForkchoiceMutex.Lock()
-	defer t.CLMock.NewHeadBlockForkchoiceMutex.Unlock()
+	if closed := t.CLMock.OnHeadBlockForkchoiceUpdate.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnHeadBlockForkchoiceUpdate.Yield()
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
@@ -388,8 +403,10 @@ func blockStatusSafeBlock(t *TestEnv) {
 	}
 
 	// Run SafeBlock tests
-	t.CLMock.NewSafeBlockForkchoiceMutex.Lock()
-	defer t.CLMock.NewSafeBlockForkchoiceMutex.Unlock()
+	if closed := t.CLMock.OnSafeBlockForkchoiceUpdate.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnSafeBlockForkchoiceUpdate.Yield()
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
@@ -409,8 +426,10 @@ func blockStatusFinalizedBlock(t *TestEnv) {
 	}
 
 	// Run FinalizedBlock tests
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
-	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
@@ -430,8 +449,10 @@ func blockStatusReorg(t *TestEnv) {
 	}
 
 	// Wait until we reach SafeBlock status
-	t.CLMock.NewSafeBlockForkchoiceMutex.Lock()
-	defer t.CLMock.NewSafeBlockForkchoiceMutex.Unlock()
+	if closed := t.CLMock.OnSafeBlockForkchoiceUpdate.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnSafeBlockForkchoiceUpdate.Yield()
 
 	// Verify the client is serving the latest SafeBlock
 	currentBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
@@ -523,8 +544,10 @@ func transactionReorg(t *TestEnv) {
 		receipts[i] = receipt
 	}
 	// Wait for a finalized block so we can start rolling back transactions
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
-	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 
 	for i := 0; i < txCount; i++ {
 
@@ -608,8 +631,10 @@ func reExecPayloads(t *TestEnv) {
 	}
 
 	// Wait for a finalized block so we can re-executing payloads
-	t.CLMock.NewFinalizedBlockForkchoiceMutex.Lock()
-	defer t.CLMock.NewFinalizedBlockForkchoiceMutex.Unlock()
+	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	}
+	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 
 	lastBlock, err := t.Eth.BlockNumber(t.Ctx())
 	if err != nil {

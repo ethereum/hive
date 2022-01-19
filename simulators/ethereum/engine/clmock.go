@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -12,6 +13,18 @@ import (
 	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/hive/hivesim"
 )
+
+// Semaphore type channel to be used as signal for current CLMocker step in block production
+type Semaphore chan bool
+
+func (m Semaphore) Wait() bool {
+	_, open := <-m
+	return !open
+}
+
+func (m Semaphore) Yield() {
+	m <- true
+}
 
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
@@ -38,23 +51,21 @@ type CLMocker struct {
 	LatestForkchoice      catalyst.ForkchoiceStateV1
 
 	// Merge related
-	FirstPoSBlockNumber         *big.Int
-	TTDReached                  bool
-	PoSBlockProductionActivated bool
+	FirstPoSBlockNumber        *big.Int
+	TTDReached                 bool
+	PoSBlockProductionFinished bool
 
-	/* Set-Reset-Lock: Use LockSet() to guarantee that the test case finds the
-	environment as expected, and not as previously modified by another test.
-
-	The test cases can request a lock to "wake up" at a specific point during
-	the PoS block production procedure and, when the CL mocker has reached it,
-	the lock is released to let only one test case do its testing.
+	/*
+		The test cases can request values from channel to "wake up" at a specific
+		point during the PoS block production procedure and, when the CL mocker has
+		reached it, the channel allows the test case to continue.
 	*/
-	PayloadBuildMutex                sync.Mutex
-	NewGetPayloadMutex               sync.Mutex
-	NewExecutePayloadMutex           sync.Mutex
-	NewHeadBlockForkchoiceMutex      sync.Mutex
-	NewSafeBlockForkchoiceMutex      sync.Mutex
-	NewFinalizedBlockForkchoiceMutex sync.Mutex
+	OnPayloadPrepare                 Semaphore
+	OnGetPayload                     Semaphore
+	OnExecutePayload                 Semaphore
+	OnHeadBlockForkchoiceUpdate      Semaphore
+	OnSafeBlockForkchoiceUpdate      Semaphore
+	OnFinalizedBlockForkchoiceUpdate Semaphore
 }
 
 func NewCLMocker(t *hivesim.T) *CLMocker {
@@ -65,31 +76,29 @@ func NewCLMocker(t *hivesim.T) *CLMocker {
 
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
-		T:                           t,
-		EngineClients:               make([]*EngineClient, 0),
-		RandomHistory:               map[uint64]common.Hash{},
-		ExecutedPayloadHistory:      map[uint64]catalyst.ExecutableDataV1{},
-		LatestFinalizedHeader:       nil,
-		PoSBlockProductionActivated: false,
-		BlockProductionMustStop:     false,
-		FirstPoSBlockNumber:         nil,
-		LatestFinalizedNumber:       nil,
-		TTDReached:                  false,
-		NextFeeRecipient:            common.Address{},
+		T:                          t,
+		EngineClients:              make([]*EngineClient, 0),
+		RandomHistory:              map[uint64]common.Hash{},
+		ExecutedPayloadHistory:     map[uint64]catalyst.ExecutableDataV1{},
+		LatestFinalizedHeader:      nil,
+		PoSBlockProductionFinished: false,
+		BlockProductionMustStop:    false,
+		FirstPoSBlockNumber:        nil,
+		LatestFinalizedNumber:      nil,
+		TTDReached:                 false,
+		NextFeeRecipient:           common.Address{},
 		LatestForkchoice: catalyst.ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
 			SafeBlockHash:      common.Hash{},
 			FinalizedBlockHash: common.Hash{},
 		},
+		OnPayloadPrepare:                 make(Semaphore, 1),
+		OnGetPayload:                     make(Semaphore, 1),
+		OnExecutePayload:                 make(Semaphore, 1),
+		OnHeadBlockForkchoiceUpdate:      make(Semaphore, 1),
+		OnSafeBlockForkchoiceUpdate:      make(Semaphore, 1),
+		OnFinalizedBlockForkchoiceUpdate: make(Semaphore, 1),
 	}
-
-	// Lock the mutexes. To be unlocked on next PoS block production.
-	newCLMocker.PayloadBuildMutex.Lock()
-	newCLMocker.NewGetPayloadMutex.Lock()
-	newCLMocker.NewExecutePayloadMutex.Lock()
-	newCLMocker.NewHeadBlockForkchoiceMutex.Lock()
-	newCLMocker.NewSafeBlockForkchoiceMutex.Lock()
-	newCLMocker.NewFinalizedBlockForkchoiceMutex.Lock()
 
 	// Start timer to check when the TTD has been reached
 	time.AfterFunc(tTDCheckPeriod, newCLMocker.checkTTD)
@@ -161,7 +170,7 @@ func (cl *CLMocker) checkTTD() {
 				cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
 			}
 		}
-		time.AfterFunc(PoSBlockProductionPeriod, cl.minePOSBlock)
+		time.AfterFunc(PoSBlockProductionPeriod, cl.producePoSBlocks)
 		return
 	}
 	time.AfterFunc(tTDCheckPeriod, cl.checkTTD)
@@ -184,9 +193,12 @@ func (cl *CLMocker) isBlockPoS(bn *big.Int) bool {
 // A transaction can be included to be sent before getPayload if necessary
 func (cl *CLMocker) setNextFeeRecipient(feeRecipient common.Address, ec *EngineClient, tx *types.Transaction) (*big.Int, error) {
 	for {
-		cl.PayloadBuildMutex.Lock()
+		closed := cl.OnPayloadPrepare.Wait()
+		if closed {
+			return nil, errors.New("CLMocker finished producing blocks")
+		}
 		if ec == nil || (cl.NextBlockProducer != nil && cl.NextBlockProducer.Equals(ec)) {
-			defer cl.PayloadBuildMutex.Unlock()
+			defer cl.OnPayloadPrepare.Yield()
 			cl.NextFeeRecipient = feeRecipient
 			if tx != nil {
 				err := ec.Eth.SendTransaction(ec.Ctx(), tx)
@@ -197,31 +209,31 @@ func (cl *CLMocker) setNextFeeRecipient(feeRecipient common.Address, ec *EngineC
 			return big.NewInt(cl.LatestFinalizedNumber.Int64() + 1), nil
 		}
 		// Unlock and keep trying to get the requested Engine Client
-		cl.PayloadBuildMutex.Unlock()
+		cl.OnPayloadPrepare.Yield()
 		time.Sleep(PoSBlockProductionPeriod)
 	}
 }
 
-// Unlock all locks in the given CLMocker instance
-func unlockAll(cl *CLMocker) {
-	cl.PayloadBuildMutex.Unlock()
-	cl.NewGetPayloadMutex.Unlock()
-	cl.NewExecutePayloadMutex.Unlock()
-	cl.NewHeadBlockForkchoiceMutex.Unlock()
-	cl.NewSafeBlockForkchoiceMutex.Unlock()
-	cl.NewFinalizedBlockForkchoiceMutex.Unlock()
+// Close all semaphores in the given CLMocker instance
+func (cl *CLMocker) closeSemaphores() {
+	close(cl.OnPayloadPrepare)
+	close(cl.OnGetPayload)
+	close(cl.OnExecutePayload)
+	close(cl.OnHeadBlockForkchoiceUpdate)
+	close(cl.OnSafeBlockForkchoiceUpdate)
+	close(cl.OnFinalizedBlockForkchoiceUpdate)
 }
 
-// Mine a PoS block by using the Engine API
-func (cl *CLMocker) minePOSBlock() {
+func (cl *CLMocker) produceSinglePoSBlock() {
+	var (
+		lastBlockNumber uint64
+		err             error
+	)
+
+	// Lock needed to ensure EngineClients is not modified mid block production
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
-	if cl.BlockProductionMustStop {
-		unlockAll(cl)
-		return
-	}
-	var lastBlockNumber uint64
-	var err error
+
 	for {
 		// Get a random client to generate the payload
 		ec_id := rand.Intn(len(cl.EngineClients))
@@ -229,7 +241,6 @@ func (cl *CLMocker) minePOSBlock() {
 
 		lastBlockNumber, err = cl.NextBlockProducer.Eth.BlockNumber(cl.NextBlockProducer.Ctx())
 		if err != nil {
-			unlockAll(cl)
 			cl.Fatalf("CLMocker: Could not get block number while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
 		}
 
@@ -242,7 +253,6 @@ func (cl *CLMocker) minePOSBlock() {
 
 		latestHeader, err := cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), lastBlockNumberBig)
 		if err != nil {
-			unlockAll(cl)
 			cl.Fatalf("CLMocker: Could not get block header while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
 		}
 
@@ -257,8 +267,9 @@ func (cl *CLMocker) minePOSBlock() {
 
 	}
 
-	cl.PayloadBuildMutex.Unlock()
-	cl.PayloadBuildMutex.Lock()
+	// Yield before preparing the next payload
+	cl.OnPayloadPrepare.Yield()
+	<-cl.OnPayloadPrepare
 
 	// Generate a random value for the Random field
 	nextRandom := common.Hash{}
@@ -272,7 +283,6 @@ func (cl *CLMocker) minePOSBlock() {
 
 	resp, err := cl.NextBlockProducer.EngineForkchoiceUpdatedV1(cl.NextBlockProducer.Ctx(), &cl.LatestForkchoice, &payloadAttributes)
 	if err != nil {
-		unlockAll(cl)
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.Client.Container, err)
 	}
 	if resp.Status != "SUCCESS" {
@@ -281,13 +291,12 @@ func (cl *CLMocker) minePOSBlock() {
 
 	cl.LatestPayloadBuilt, err = cl.NextBlockProducer.EngineGetPayloadV1(cl.NextBlockProducer.Ctx(), resp.PayloadID)
 	if err != nil {
-		unlockAll(cl)
 		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.Client.Container, resp.PayloadID, err)
 	}
 
-	// Trigger actions for a new payload built.
-	cl.NewGetPayloadMutex.Unlock()
-	cl.NewGetPayloadMutex.Lock()
+	// Yield after the new payload is built and retrieved using GetPayload
+	cl.OnGetPayload.Yield()
+	<-cl.OnGetPayload
 
 	// Broadcast the executePayload to all clients
 	for i, resp := range cl.broadcastExecutePayload(&cl.LatestPayloadBuilt) {
@@ -301,9 +310,9 @@ func (cl *CLMocker) minePOSBlock() {
 	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
 	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = cl.LatestPayloadBuilt
 
-	// Trigger actions for new executePayload broadcast
-	cl.NewExecutePayloadMutex.Unlock()
-	cl.NewExecutePayloadMutex.Lock()
+	// Yield after the new payload has been broadcasted for execution
+	cl.OnExecutePayload.Yield()
+	<-cl.OnExecutePayload
 
 	// Broadcast forkchoice updated with new HeadBlock to all clients
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
@@ -314,9 +323,10 @@ func (cl *CLMocker) minePOSBlock() {
 			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", i, resp.ForkchoiceResponse)
 		}
 	}
-	// Trigger actions for new HeadBlock forkchoice broadcast
-	cl.NewHeadBlockForkchoiceMutex.Unlock()
-	cl.NewHeadBlockForkchoiceMutex.Lock()
+
+	// Yield after fcU has been broadcasted with new payload as HeadBlock
+	cl.OnHeadBlockForkchoiceUpdate.Yield()
+	<-cl.OnHeadBlockForkchoiceUpdate
 
 	// Broadcast forkchoice updated with new SafeBlock to all clients
 	cl.LatestForkchoice.SafeBlockHash = cl.LatestPayloadBuilt.BlockHash
@@ -327,9 +337,10 @@ func (cl *CLMocker) minePOSBlock() {
 			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", i, resp.ForkchoiceResponse)
 		}
 	}
-	// Trigger actions for new SafeBlock forkchoice broadcast
-	cl.NewSafeBlockForkchoiceMutex.Unlock()
-	cl.NewSafeBlockForkchoiceMutex.Lock()
+
+	// Yield after fcU has been broadcasted with new payload as SafeBlock
+	cl.OnSafeBlockForkchoiceUpdate.Yield()
+	<-cl.OnSafeBlockForkchoiceUpdate
 
 	// Broadcast forkchoice updated with new FinalizedBlock to all clients
 	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestPayloadBuilt.BlockHash
@@ -362,7 +373,6 @@ func (cl *CLMocker) minePOSBlock() {
 		}
 	}
 	if cl.LatestFinalizedHeader == nil {
-		unlockAll(cl)
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
 	}
 
@@ -371,17 +381,25 @@ func (cl *CLMocker) minePOSBlock() {
 		ec.SwitchProtocol()
 	}
 
-	// Trigger that we have finished producing a block
-	cl.NewFinalizedBlockForkchoiceMutex.Unlock()
+	// Yield after block production has completed a new block
+	cl.OnFinalizedBlockForkchoiceUpdate.Yield()
+	<-cl.OnFinalizedBlockForkchoiceUpdate
+}
 
-	// Exit if we need to
-	if !cl.BlockProductionMustStop {
-		// Lock BlockProducedMutex until we produce a new block
-		cl.NewFinalizedBlockForkchoiceMutex.Lock()
-		time.AfterFunc(PoSBlockProductionPeriod, cl.minePOSBlock)
-	} else {
-		unlockAll(cl)
+// Loop produce PoS blocks by using the Engine API
+func (cl *CLMocker) producePoSBlocks() {
+	// Defer closing all semaphores
+	defer cl.closeSemaphores()
+
+	// Defer signaling that we are not producing more blocks
+	defer func() { cl.PoSBlockProductionFinished = true }()
+
+	// Begin PoS block production
+	for !cl.BlockProductionMustStop {
+		cl.produceSinglePoSBlock()
+		time.Sleep(PoSBlockProductionPeriod)
 	}
+
 }
 
 type ExecutePayloadOutcome struct {
