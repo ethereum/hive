@@ -379,10 +379,10 @@ func blockStatusHeadBlock(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
 	}
-	if latestBlockHeader.Hash() == t.CLMock.LatestForkchoice.HeadBlockHash ||
-		latestBlockHeader.Hash() != t.CLMock.LatestForkchoice.SafeBlockHash ||
-		latestBlockHeader.Hash() != t.CLMock.LatestForkchoice.FinalizedBlockHash {
-		t.Fatalf("FAIL (%v): latest block header doesn't match SafeBlock hash: %v, %v", t.TestName, latestBlockHeader.Hash(), t.CLMock.LatestForkchoice)
+	if latestBlockHeader.Hash() != t.CLMock.LatestForkchoice.HeadBlockHash ||
+		latestBlockHeader.Hash() == t.CLMock.LatestForkchoice.SafeBlockHash ||
+		latestBlockHeader.Hash() == t.CLMock.LatestForkchoice.FinalizedBlockHash {
+		t.Fatalf("FAIL (%v): latest block header doesn't match HeadBlock hash: %v, %v", t.TestName, latestBlockHeader.Hash(), t.CLMock.LatestForkchoice)
 	}
 }
 
