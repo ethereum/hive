@@ -40,6 +40,15 @@ func (t *Testnet) GenesisTime() time.Time {
 	return time.Unix(int64(t.genesisTime), 0)
 }
 
+func (t *Testnet) ValidatorClientIndex(pk [48]byte) (int, error) {
+	for i, v := range t.validators {
+		if v.ContainsKey(pk) {
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("key not found in any validator client")
+}
+
 func (t *Testnet) VerifyFinality(ctx context.Context) {
 	genesis := t.GenesisTime()
 	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
@@ -182,6 +191,46 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(ctx context.Context) {
 		}
 	}
 
+}
+
+func (t *Testnet) VerifyProposers(ctx context.Context) {
+	proposers := make([]bool, len(t.beacons))
+	var checkpoints eth2api.FinalityCheckpoints
+	if exists, err := beaconapi.FinalityCheckpoints(ctx, t.beacons[0].API, eth2api.StateHead, &checkpoints); err != nil {
+		t.t.Errorf("beacon %d: failed to poll finality checkpoint: %v", 0, err)
+		return
+	} else if !exists {
+		t.t.Fatalf("beacon %d: Expected state for head block")
+	}
+	finalized, _ := t.spec.EpochStartSlot(checkpoints.Finalized.Epoch)
+	for slot := 0; slot < int(finalized+t.spec.SLOTS_PER_EPOCH); slot += 1 {
+		var versionedBlock eth2api.VersionedSignedBeaconBlock
+		if exists, err := beaconapi.BlockV2(ctx, t.beacons[0].API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
+			t.t.Errorf("beacon %d: failed to retrieve block: %v", 0, err)
+			return
+		} else if !exists {
+			t.t.Fatalf("beacon %d: block not found", 0)
+		}
+		block := versionedBlock.Data.(*merge.SignedBeaconBlock)
+		proposerIndex := block.Message.ProposerIndex
+		var validator eth2api.ValidatorResponse
+		if exists, err := beaconapi.StateValidator(ctx, t.beacons[0].API, eth2api.StateIdSlot(slot), eth2api.ValidatorIdIndex(proposerIndex), &validator); err != nil {
+			t.t.Errorf("beacon %d: failed to retrieve validator: %v", 0, err)
+			return
+		} else if !exists {
+			t.t.Fatalf("beacon %d: validator not found", 0)
+		}
+		idx, err := t.ValidatorClientIndex([48]byte(validator.Validator.Pubkey))
+		if err != nil {
+			t.t.Fatalf("pub key not found on any validator client")
+		}
+		proposers[idx] = true
+	}
+	for i, proposed := range proposers {
+		if !proposed {
+			t.t.Fatalf("beacon %d: did not propose a block with a valid execution payload", i)
+		}
+	}
 }
 
 func calcHealth(p altair.ParticipationRegistry) float64 {

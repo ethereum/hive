@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/eth2api/client/nodeapi"
 )
@@ -80,4 +81,14 @@ func (bn *BeaconNode) EnodeURL() (string, error) {
 
 type ValidatorClient struct {
 	*hivesim.Client
+	keys []*setup.KeyDetails
+}
+
+func (v *ValidatorClient) ContainsKey(pk [48]byte) bool {
+	for _, k := range v.keys {
+		if k.ValidatorPubkey == pk {
+			return true
+		}
+	}
+	return false
 }

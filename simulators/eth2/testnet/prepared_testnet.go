@@ -41,7 +41,7 @@ type PreparedTestnet struct {
 	beaconOpts    hivesim.StartOption
 
 	// A tranche is a group of validator keys to run on 1 node
-	keyTranches []hivesim.StartOption
+	keyTranches [][]*setup.KeyDetails
 }
 
 // Build all artifacts require to start a testnet.
@@ -82,7 +82,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)
 
 	// Generate keys opts for validators
-	keyOpts := setup.KeyTranches(env.Keys, uint64(len(config.Nodes)))
+	keyTranches := setup.KeyTranches(env.Keys, uint64(len(config.Nodes)))
 
 	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount)
 	if err != nil {
@@ -136,7 +136,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 		executionOpts: executionOpts,
 		beaconOpts:    beaconOpts,
 		validatorOpts: validatorOpts,
-		keyTranches:   keyOpts,
+		keyTranches:   keyTranches,
 	}
 }
 
@@ -227,12 +227,12 @@ func (p *PreparedTestnet) startValidatorClient(testnet *Testnet, validatorDef *h
 	if keyIndex >= len(p.keyTranches) {
 		testnet.t.Fatalf("only have %d key tranches, cannot find index %d for VC", len(p.keyTranches), keyIndex)
 	}
-	keysOpt := p.keyTranches[keyIndex]
+	keysOpt := setup.KeysBundle(p.keyTranches[keyIndex])
 	opts := []hivesim.StartOption{p.validatorOpts, keysOpt, bnAPIOpt}
 	// TODO
 	//if p.configName != "mainnet" && hasBuildTarget(validatorDef, p.configName) {
 	//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 	//}
-	vc := &ValidatorClient{testnet.t.StartClient(validatorDef.Name, opts...)}
+	vc := &ValidatorClient{testnet.t.StartClient(validatorDef.Name, opts...), p.keyTranches[keyIndex]}
 	testnet.validators = append(testnet.validators, vc)
 }

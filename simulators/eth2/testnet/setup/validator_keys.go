@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ethereum/hive/hivesim"
 	blsu "github.com/protolambda/bls12-381-util"
 
 	"github.com/google/uuid"
@@ -188,14 +187,14 @@ func SecretKeys(keys []*KeyDetails) (*[]blsu.SecretKey, error) {
 	return &secrets, nil
 }
 
-func KeyTranches(keys []*KeyDetails, keyTranches uint64) []hivesim.StartOption {
-	keyOpts := make([]hivesim.StartOption, 0, keyTranches)
+func KeyTranches(keys []*KeyDetails, keyTranches uint64) [][]*KeyDetails {
+	tranches := make([][]*KeyDetails, 0, keyTranches)
 	valCount := uint64(len(keys))
 	for i := uint64(0); i < keyTranches; i++ {
 		// Give each validator client an equal subset of the genesis validator keys
 		startIndex := valCount * i / keyTranches
 		endIndex := valCount * (i + 1) / keyTranches
-		keyOpts = append(keyOpts, KeysBundle(keys[startIndex:endIndex]))
+		tranches = append(tranches, keys[startIndex:endIndex])
 	}
-	return keyOpts
+	return tranches
 }
