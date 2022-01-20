@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"time"
@@ -32,6 +33,7 @@ type MockClient struct {
 	cancelKeepAlives []chan struct{}
 }
 
+// NewMockClient creates a new MockClient with the provided genesis.
 func NewMockClient(t *hivesim.T, genesis *core.Genesis) (*MockClient, error) {
 	ethashCfg := ethash.Config{
 		PowMode:        ethash.ModeNormal,
@@ -65,30 +67,33 @@ func NewMockClient(t *hivesim.T, genesis *core.Genesis) (*MockClient, error) {
 	}, nil
 }
 
-// Mines a proof-of-work chain, announcing each block to all peers. `handle` is
-// called after each block is mined to perform test-specific operations and
-// notify the miner if it should continue.
-func (m *MockClient) MineChain(handle func(*MockClient, *types.Block) (bool, error)) error {
+// Mines a chain with valid PoW seals. `handle` is called after each block is
+// mined to perform test-specific operations and notify the miner if it should
+// continue.
+func (m *MockClient) MineChain(ctx context.Context, handle func(*MockClient, *types.Block) (bool, error)) error {
 	for {
-		parent := m.chain.CurrentHeader()
-		block, err := m.MineBlock(parent)
-		if block == nil {
-			m.t.Logf("mock: Failed to mine block: %s", err)
-			continue
-		}
-		if err != nil {
-			return fmt.Errorf("error mining block: %v", err)
-		}
-		stop, err := handle(m, block)
-		if err != nil {
-			return err
-		}
-		if stop {
+		select {
+		case <-ctx.Done():
 			return nil
+		default:
+			parent := m.chain.CurrentHeader()
+			block, err := m.MineBlock(parent)
+			if block == nil {
+				m.t.Logf("mock: Failed to mine block: %s", err)
+				continue
+			} else if err != nil {
+				return fmt.Errorf("error mining block: %v", err)
+			}
+			stop, err := handle(m, block)
+			if stop || err != nil {
+				return err
+			}
 		}
 	}
 }
 
+// Peer connects to a client over devep2p and starts a thread to keep the
+// connection alive.
 func (m *MockClient) Peer(addr string) error {
 	n, err := enode.Parse(enode.ValidSchemes, addr)
 	if err != nil {
@@ -113,6 +118,8 @@ func (m *MockClient) Peer(addr string) error {
 	return nil
 }
 
+// MineBlock mines a block with a valid PoW seal on the provided parent and
+// inserts it into the chain.
 func (m *MockClient) MineBlock(parent *types.Header) (*types.Block, error) {
 	header := &types.Header{
 		ParentHash: parent.Hash(),
@@ -175,6 +182,7 @@ func (m *MockClient) MineBlock(parent *types.Header) (*types.Block, error) {
 	return block, nil
 }
 
+// AnnounceBlock notifies all peers of a block.
 func (m *MockClient) AnnounceBlock(block *types.Block) error {
 	for _, peer := range m.peers {
 		newBlock := eth.NewBlockPacket{Block: block, TD: m.TotalDifficulty()}
@@ -185,16 +193,20 @@ func (m *MockClient) AnnounceBlock(block *types.Block) error {
 	return nil
 }
 
+// TotalDifficulty returns the current total difficulty of the chain.
 func (m *MockClient) TotalDifficulty() *big.Int {
 	return m.chain.GetTd(m.chain.CurrentHeader().ParentHash, m.chain.CurrentHeader().Number.Uint64())
 }
 
+// IsTerminalTotalDifficulty returns whether the terminal total difficulty has
+// been reached.
 func (m *MockClient) IsTerminalTotalDifficulty() bool {
 	td := m.TotalDifficulty()
 	ttd := new(big.Int).SetUint64(m.gspec.Config.TerminalTotalDifficulty.Uint64())
 	return td.Cmp(ttd) >= 0
 }
 
+// Close terminates any background threads maintained by the mock client.
 func (m *MockClient) Close() error {
 	err := m.engine.Close()
 	if err != nil {

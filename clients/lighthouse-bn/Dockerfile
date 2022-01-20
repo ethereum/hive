@@ -1,4 +1,4 @@
-ARG branch=latest-unstable
+ARG branch=latest
 
 FROM sigp/lighthouse:$branch
 

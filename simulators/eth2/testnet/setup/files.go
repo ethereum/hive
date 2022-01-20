@@ -4,14 +4,15 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"
 	"gopkg.in/yaml.v2"
-	"io"
-	"io/ioutil"
 )
 
 func bytesSource(data []byte) func() (io.ReadCloser, error) {
@@ -49,7 +50,7 @@ func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount u
 	if err != nil {
 		return nil, err
 	}
-	mergePreset, err := yaml.Marshal(spec.MergePreset)
+	bellatrixPreset, err := yaml.Marshal(spec.BellatrixPreset)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +60,7 @@ func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount u
 		hivesim.WithDynamicFile("/hive/input/config.yaml", bytesSource(config)),
 		hivesim.WithDynamicFile("/hive/input/preset_phase0.yaml", bytesSource(phase0Preset)),
 		hivesim.WithDynamicFile("/hive/input/preset_altair.yaml", bytesSource(altairPreset)),
-		hivesim.WithDynamicFile("/hive/input/preset_merge.yaml", bytesSource(mergePreset)),
+		hivesim.WithDynamicFile("/hive/input/preset_bellatrix.yaml", bytesSource(bellatrixPreset)),
 		hivesim.Params{
 			"HIVE_ETH2_ETH1_GENESIS_HASH": genesisHash.String(),
 		},

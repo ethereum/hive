@@ -75,7 +75,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	spec.Config.ETH1_FOLLOW_DISTANCE = 1
 
 	spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch)
-	spec.Config.MERGE_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
+	spec.Config.BELLATRIX_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
 	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount
 	spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime)
 	tdd, _ := uint256.FromBig(config.TerminalTotalDifficulty)

@@ -71,11 +71,20 @@ func (s Bscmtt) Run(t *hivesim.T, env *testEnv) {
 		return false, nil
 	}
 
-	go m.MineChain(handler)
 	ctx := context.Background()
-	testnet.VerifyFinality(ctx)
-	testnet.VerifyParticipation(ctx, 2, 95)
-	testnet.VerifyExecutionPayloadIsCanonical(ctx)
-	testnet.VerifyProposers(ctx)
+	go m.MineChain(ctx, handler)
+	finalized, err := testnet.WaitForFinality(ctx)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyParticipation(ctx, finalized, 95); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, finalized); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyProposers(ctx, finalized); err != nil {
+		t.Fatalf("%v", err)
+	}
 	m.Close()
 }

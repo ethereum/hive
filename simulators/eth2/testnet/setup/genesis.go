@@ -9,8 +9,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/holiman/uint256"
 	"github.com/protolambda/zrnt/eth2/beacon/altair"
+	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
-	"github.com/protolambda/zrnt/eth2/beacon/merge"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"github.com/protolambda/zrnt/eth2/configs"
 	"github.com/protolambda/ztyp/tree"
@@ -92,12 +92,12 @@ func BuildBeaconState(spec *common.Spec, eth1Genesis *core.Genesis, eth2GenesisT
 	var state common.BeaconState
 	var forkVersion common.Version
 	var emptyBodyRoot common.Root
-	if spec.MERGE_FORK_EPOCH == 0 {
-		state = merge.NewBeaconStateView(spec)
-		forkVersion = spec.MERGE_FORK_VERSION
-		emptyBodyRoot = merge.BeaconBlockBodyType(configs.Mainnet).New().HashTreeRoot(hFn)
+	if spec.BELLATRIX_FORK_EPOCH == 0 {
+		state = bellatrix.NewBeaconStateView(spec)
+		forkVersion = spec.BELLATRIX_FORK_VERSION
+		emptyBodyRoot = bellatrix.BeaconBlockBodyType(configs.Mainnet).New().HashTreeRoot(hFn)
 	} else if spec.ALTAIR_FORK_EPOCH == 0 {
-		state = merge.NewBeaconStateView(spec)
+		state = bellatrix.NewBeaconStateView(spec)
 		forkVersion = spec.ALTAIR_FORK_VERSION
 		emptyBodyRoot = altair.BeaconBlockBodyType(configs.Mainnet).New().HashTreeRoot(hFn)
 	} else {
@@ -202,7 +202,7 @@ func BuildBeaconState(spec *common.Spec, eth1Genesis *core.Genesis, eth2GenesisT
 		}
 	}
 
-	if st, ok := state.(*merge.BeaconStateView); ok {
+	if st, ok := state.(*bellatrix.BeaconStateView); ok {
 		// did we hit the TTD at genesis block?
 		tdd := uint256.Int(spec.TERMINAL_TOTAL_DIFFICULTY)
 		embedExecAtGenesis := tdd.ToBig().Cmp(eth1Genesis.Difficulty) < 0
