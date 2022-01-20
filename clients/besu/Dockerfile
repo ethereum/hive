@@ -16,6 +16,8 @@ ADD genesis.json /genesis.json
 # Inject the enode URL retriever script.
 ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
+RUN mkdir /hive-bin
+RUN ln -s /enode.sh /hive-bin/enode.sh
 
 RUN ./bin/besu --version > /version.txt
 

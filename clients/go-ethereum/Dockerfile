@@ -38,6 +38,8 @@ RUN chmod +x /geth.sh
 # Inject the enode id retriever script
 ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
+RUN mkdir /hive-bin
+RUN ln -s /enode.sh /hive-bin/enode.sh
 
 ADD genesis.json /genesis.json
 
