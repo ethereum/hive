@@ -15,6 +15,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/p2p/enode"
 )
 
 // Simulation wraps the simulation HTTP API provided by hive.
@@ -183,16 +185,45 @@ func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string)
 
 // ClientEnodeURL returns the enode URL of a running client.
 func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s", sim.url, testSuite, test, node))
+	return sim.ClientEnodeURLNetwork(testSuite, test, node, "bridge")
+}
+
+// ClientEnodeURLCustomNetwork returns the enode URL of a running client in a custom network.
+func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, node string, network string) (string, error) {
+	resp, err := sim.ClientExec(testSuite, test, node, []string{"enode.sh"})
 	if err != nil {
 		return "", err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	if resp.ExitCode != 0 {
+		return "", errors.New("unexpected exit code for enode.sh")
+	}
+
+	// Check that the container returned a valid enode URL.
+	output := strings.TrimSpace(resp.Stdout)
+	n, err := enode.ParseV4(output)
 	if err != nil {
 		return "", err
 	}
-	res := strings.TrimRight(string(body), "\r\n")
-	return res, nil
+
+	// Check ports returned
+	tcpPort := n.TCP()
+	if tcpPort == 0 {
+		tcpPort = 30303
+	}
+	udpPort := n.UDP()
+	if udpPort == 0 {
+		udpPort = 30303
+	}
+
+	// Get the actual IP for the container
+	ip, err := sim.ContainerNetworkIP(testSuite, network, node)
+	if err != nil {
+		return "", err
+	}
+
+	// Change IP with the real IP for the desired docker network
+	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(ip), tcpPort, udpPort)
+	return fixedIP.URLv4(), nil
 }
 
 // ClientExec runs a command in a running client.
