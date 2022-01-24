@@ -1,14 +1,13 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 )
 
 var tests = []testSpec{
 	{Name: "transition-testnet-basic-geth-lighthouse", Fn: Bscmtt{node{"go-ethereum", "lighthouse"}}},
+	{Name: "transition-testnet-basic-geth-teku", Fn: Bscmtt{node{"go-ethereum", "teku"}}},
 }
 
 func main() {
@@ -61,14 +60,18 @@ func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
 
 	for _, test := range tests {
 		test := test
-		t.Run(hivesim.TestSpec{
-			Name:        fmt.Sprintf("%s", test.Name),
-			Description: test.About,
-			Run: func(t *hivesim.T) {
-				env := &testEnv{c, keys, secrets}
-				test.Run(t, env)
-			},
-		})
+		if test.MatchClients(c) {
+			t.Run(hivesim.TestSpec{
+				Name:        test.Name,
+				Description: test.About,
+				Run: func(t *hivesim.T) {
+					env := &testEnv{c, keys, secrets}
+					test.Run(t, env)
+				},
+			})
+		} else {
+			t.Logf("Skipping test %s, missing client definitions", test.Name)
+		}
 	}
 }
 

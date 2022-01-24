@@ -40,6 +40,12 @@ type Bscmtt struct {
 	Node node
 }
 
+func (s Bscmtt) MatchClients(clients *ClientDefinitionsByRole) bool {
+	return clients.ClientByNameAndRole(s.Node.ExecutionClient, "eth1") != nil &&
+		clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", s.Node.ConsensusClient), "beacon") != nil &&
+		clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", s.Node.ConsensusClient), "validator") != nil
+}
+
 func (s Bscmtt) Run(t *hivesim.T, env *testEnv) {
 	config := config{
 		AltairForkEpoch:         0,

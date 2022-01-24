@@ -10,6 +10,9 @@ import (
 )
 
 type testCase interface {
+	// MatchClients returns if the test-case is able to run with the given client definitions
+	MatchClients(clients *ClientDefinitionsByRole) bool
+
 	Run(t *hivesim.T, env *testEnv)
 }
 
@@ -17,6 +20,10 @@ type testSpec struct {
 	Name  string
 	About string
 	Fn    testCase
+}
+
+func (s *testSpec) MatchClients(clients *ClientDefinitionsByRole) bool {
+	return s.Fn.MatchClients(clients)
 }
 
 func (s *testSpec) Run(t *hivesim.T, env *testEnv) {
