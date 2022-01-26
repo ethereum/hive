@@ -218,6 +218,13 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get the network names, if any, for the container to be connected to at start
+	networks, err := api.checkClientNetworks(r, w)
+	if err != nil {
+		// We return here so we don't even create the container in bad requests
+		return
+	}
+
 	// Set up the timeout.
 	timeout := api.env.ClientStartTimeout
 	if timeout == 0 {
@@ -239,6 +246,17 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// so it can only be set after creating the container.
 	logPath, logFilePath := api.clientLogFilePaths(clientDef.Name, containerID)
 	options.LogFile = logFilePath
+
+	// Connect to the networks if requested, so it is started already joined to each one
+	if networks != nil {
+		for _, network := range networks {
+			if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
+				log15.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
 
 	// by default: check the eth1 port
 	options.CheckLive = 8545
@@ -313,6 +331,46 @@ func (api *simAPI) checkClient(r *http.Request, w http.ResponseWriter) (*ClientD
 	log15.Error("API: unknown client name in start node request")
 	http.Error(w, "unknown 'CLIENT' type in request", http.StatusBadRequest)
 	return nil, false
+}
+
+// Parse request to start a client and be added to a specific set of networks upon startup
+func (api *simAPI) checkClientNetworks(r *http.Request, w http.ResponseWriter) ([]string, error) {
+	networksStr := r.FormValue("NETWORKS")
+	if networksStr == "" {
+		return nil, nil
+	}
+
+	var networks []string
+	err := json.Unmarshal([]byte(networksStr), &networks)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, err
+	}
+
+	if len(networks) == 0 {
+		return nil, nil
+	}
+
+	suiteID, err := api.requestSuite(r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, err
+	}
+
+	// Check that each network indeed exists
+	for _, network := range networks {
+		netExists, err := api.tm.NetworkExists(suiteID, network)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return nil, err
+		}
+		if !netExists {
+			http.Error(w, fmt.Sprintf("network '%v' not found", network), http.StatusBadRequest)
+			return nil, errors.New("Unknown network requested")
+		}
+	}
+
+	return networks, nil
 }
 
 // stopClient terminates a client container.
