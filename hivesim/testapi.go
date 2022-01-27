@@ -100,9 +100,14 @@ type Client struct {
 	test *T
 }
 
-// EnodeURL returns the peer-to-peer endpoint of the client.
+// EnodeURL returns the default peer-to-peer endpoint of the client.
 func (c *Client) EnodeURL() (string, error) {
 	return c.test.Sim.ClientEnodeURL(c.test.SuiteID, c.test.TestID, c.Container)
+}
+
+// EnodeURL returns the peer-to-peer endpoint of the client on a specific network.
+func (c *Client) EnodeURLNetwork(network string) (string, error) {
+	return c.test.Sim.ClientEnodeURLNetwork(c.test.SuiteID, c.test.TestID, c.Container, network)
 }
 
 // RPC returns an RPC client connected to the client's RPC server.

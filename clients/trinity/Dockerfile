@@ -21,6 +21,8 @@ ADD trinity.sh /trinity.sh
 RUN chmod +x /trinity.sh
 ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
+RUN mkdir /hive-bin
+RUN ln -s /enode.sh /hive-bin/enode.sh
 
 # Write the version file.
 RUN echo "branch: "$(git rev-parse --abbrev-ref HEAD)", commit: "$(git rev-parse HEAD)"" > /version.txt

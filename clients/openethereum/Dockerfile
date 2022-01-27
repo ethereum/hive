@@ -23,6 +23,8 @@ ADD mapper.jq /mapper.jq
 ADD enode.sh /enode.sh
 RUN chmod +x /enode.sh
 RUN chmod 777 /enode.sh
+RUN mkdir /hive-bin
+RUN ln -s /enode.sh /hive-bin/enode.sh
 
 # Add dummy /version.json
 RUN ./openethereum --version > /raw_version.txt

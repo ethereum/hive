@@ -3,6 +3,7 @@ package hivesim
 import (
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http/httptest"
 	"os"
 	"reflect"
@@ -51,6 +52,22 @@ func TestEnodeReplaceIP(t *testing.T) {
 		RunEnodeSh: func(string) (string, error) {
 			return urlBase + "127.0.0.1:8000", nil
 		},
+		RunProgram: func(string, []string) (*libhive.ExecInfo, error) {
+			return &libhive.ExecInfo{
+				Stdout:   urlBase + "127.0.0.1:8000",
+				Stderr:   "",
+				ExitCode: 0,
+			}, nil
+		},
+		NetworkNameToID: func(s string) (string, error) {
+			return "bridgeID", nil
+		},
+		ContainerIP: func(string, networkID string) (net.IP, error) {
+			if networkID == "bridgeID" {
+				return net.ParseIP("192.0.1.1"), nil
+			}
+			return net.ParseIP("192.0.2.1"), nil
+		},
 	}
 	tm, srv := newFakeAPI(hooks)
 	defer srv.Close()
@@ -71,13 +88,26 @@ func TestEnodeReplaceIP(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't start client:", err)
 	}
+	err = sim.CreateNetwork(suiteID, "network1")
+	if err != nil {
+		t.Fatal("can't create network:", err)
+	}
 
-	// Ask for the enode URL. The IP should be corrected to the primary container IP.
-	url, err := sim.ClientEnodeURL(suiteID, testID, clientID)
+	// Ask for the enode URL on network1. The IP should be corrected to the network1 container IP.
+	url, err := sim.ClientEnodeURLNetwork(suiteID, testID, clientID, "network1")
 	if err != nil {
 		t.Fatal("can't get enode URL:", err)
 	}
 	want := urlBase + "192.0.2.1:8000"
+	if url != want {
+		t.Fatalf("wrong enode URL %q\nwant %q", url, want)
+	}
+	// Ask for the enode URL. The IP should be corrected to the primary container IP.
+	url, err = sim.ClientEnodeURL(suiteID, testID, clientID)
+	if err != nil {
+		t.Fatal("can't get enode URL:", err)
+	}
+	want = urlBase + "192.0.1.1:8000"
 	if url != want {
 		t.Fatalf("wrong enode URL %q\nwant %q", url, want)
 	}
