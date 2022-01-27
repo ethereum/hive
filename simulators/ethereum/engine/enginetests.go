@@ -66,9 +66,7 @@ func engineAPIPoWTests(t *TestEnv) {
 // results in error
 func unknownSafeBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 	// Wait for ExecutePayload
 	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
@@ -95,9 +93,7 @@ func unknownSafeBlockHash(t *TestEnv) {
 // FinalizedBlockHash results in error
 func unknownFinalizedBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Wait for ExecutePayload
 	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
@@ -144,9 +140,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 // Verify that an unknown hash at HeadBlock in the forkchoice results in client returning "SYNCING" state
 func unknownHeadBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Wait for FinalizedBlock
 	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
@@ -196,9 +190,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 // Verify that a forkchoiceUpdated fails on hash being set to a pre-TTD block after PoS change
 func preTTDFinalizedBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Wait for ExecutePayload
 	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
@@ -235,9 +227,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 // Corrupt the hash of a valid payload, client should reject the payload
 func badHashOnExecPayload(t *TestEnv) {
 	// Wait until TTD is reached by this client
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Wait for GetPayload
 	if closed := t.CLMock.OnGetPayload.Wait(); closed {
@@ -258,9 +248,7 @@ func badHashOnExecPayload(t *TestEnv) {
 func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 	return func(t *TestEnv) {
 		// Wait until TTD is reached by this client
-		if !t.WaitForPoSSync() {
-			t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-		}
+		t.WaitForPoSSync()
 
 		// Wait for GetPayload
 		if closed := t.CLMock.OnGetPayload.Wait(); closed {
@@ -349,9 +337,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 // Test to verify Block information available at the Eth RPC after ExecutePayload
 func blockStatusExecPayload(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Run executePayload tests
 	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
@@ -375,9 +361,7 @@ func blockStatusExecPayload(t *TestEnv) {
 // Test to verify Block information available at the Eth RPC after new HeadBlock ForkchoiceUpdated
 func blockStatusHeadBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Run HeadBlock tests
 	if closed := t.CLMock.OnHeadBlockForkchoiceUpdate.Wait(); closed {
@@ -398,9 +382,7 @@ func blockStatusHeadBlock(t *TestEnv) {
 // Test to verify Block information available at the Eth RPC after new SafeBlock ForkchoiceUpdated
 func blockStatusSafeBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Run SafeBlock tests
 	if closed := t.CLMock.OnSafeBlockForkchoiceUpdate.Wait(); closed {
@@ -421,9 +403,7 @@ func blockStatusSafeBlock(t *TestEnv) {
 // Test to verify Block information available at the Eth RPC after new FinalizedBlock ForkchoiceUpdated
 func blockStatusFinalizedBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Run FinalizedBlock tests
 	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
@@ -444,9 +424,7 @@ func blockStatusFinalizedBlock(t *TestEnv) {
 // Test to verify Block information available after a reorg using forkchoiceUpdated
 func blockStatusReorg(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Wait until we reach SafeBlock status
 	if closed := t.CLMock.OnSafeBlockForkchoiceUpdate.Wait(); closed {
@@ -503,9 +481,7 @@ func blockStatusReorg(t *TestEnv) {
 // Test to re-org to a previous hash
 func transactionReorg(t *TestEnv) {
 	// Wait until this client catches up with latest PoS
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Create transactions that modify the state in order to check after the reorg.
 	var (
@@ -619,9 +595,7 @@ func transactionReorg(t *TestEnv) {
 // Re-Execute Previous Payloads
 func reExecPayloads(t *TestEnv) {
 	// Wait until this client catches up with latest PoS
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	// Wait until we have the required number of payloads executed
 	var payloadReExecCount = int64(10)
@@ -655,9 +629,7 @@ func reExecPayloads(t *TestEnv) {
 // Fee Recipient Tests
 func suggestedFeeRecipient(t *TestEnv) {
 	// Wait until this client catches up with latest PoS
-	if !t.WaitForPoSSync() {
-		t.Fatalf("FAIL (%v): Timeout on PoS sync", t.TestName)
-	}
+	t.WaitForPoSSync()
 
 	var (
 		// We need to verify at least

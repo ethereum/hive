@@ -25,12 +25,14 @@ type TestEnv struct {
 	Engine   *EngineClient
 	CLMock   *CLMocker
 	Vault    *Vault
+	PoSSync  chan interface{}
 
 	// This holds most recent context created by the Ctx method.
 	// Every time Ctx is called, it creates a new context with the default
 	// timeout and cancels the previous one.
 	lastCtx    context.Context
 	lastCancel context.CancelFunc
+	syncCancel context.CancelFunc
 }
 
 func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLMocker, fn func(*TestEnv)) {
@@ -56,33 +58,82 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 		Engine:   ec,
 		CLMock:   cl,
 		Vault:    v,
+		PoSSync:  make(chan interface{}, 1),
 	}
 
+	// Defer closing the last context
+	defer func() {
+		if env.lastCtx != nil {
+			env.lastCancel()
+		}
+	}()
+
+	// Create test end channel and defer closing it
+	testend := make(chan interface{})
+	defer func() { close(testend) }()
+
+	// Start thread to wait for client to be synced to the latest PoS block
+	defer func() {
+		if env.syncCancel != nil {
+			env.syncCancel()
+		}
+	}()
+	go func() {
+		syncRpcClient, err := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
+		if err != nil {
+			t.Logf("WARN (%v): Unable to create Eth client for PoS sync routine", env.TestName)
+			close(env.PoSSync)
+			return
+		}
+		eth := ethclient.NewClient(syncRpcClient)
+		var ctx context.Context
+		for {
+			select {
+			case <-testend:
+				close(env.PoSSync)
+				return
+			case <-time.After(time.Second):
+				if clMocker.TTDReached {
+					ctx, env.syncCancel = context.WithTimeout(context.Background(), rpcTimeout)
+					bn, err := eth.BlockNumber(ctx)
+					env.syncCancel = nil
+					if err != nil {
+						t.Logf("WARN (%v): Unable to obtain latest block", env.TestName)
+						close(env.PoSSync)
+						return
+					}
+					if clMocker.LatestFinalizedNumber != nil && bn >= clMocker.LatestFinalizedNumber.Uint64() {
+						t.Logf("INFO (%v): Client is now synced to latest PoS block", env.TestName)
+						env.PoSSync <- nil
+						return
+					}
+				}
+				if clMocker.PoSBlockProductionFinished {
+					t.Logf("WARN (%v): CLMocker finished block production while waiting for PoS sync", env.TestName)
+					close(env.PoSSync)
+					return
+				}
+			}
+		}
+
+	}()
+
+	// Run the test
 	fn(env)
-	if env.lastCtx != nil {
-		env.lastCancel()
-	}
 }
 
 // Wait for a client to reach sync status past the PoS transition, with `PoSSyncTimeoutSeconds` seconds timeout
-func (t *TestEnv) WaitForPoSSync() bool {
-	for i := 0; i < PoSSyncTimeoutSeconds; i++ {
-		if clMocker.TTDReached {
-			bn, err := t.Eth.BlockNumber(t.Ctx())
-			if err != nil {
-				t.Fatalf("FAIL (%v): error on get block number: %v", t.TestName, err)
-			}
-			if clMocker.LatestFinalizedNumber != nil && bn >= clMocker.LatestFinalizedNumber.Uint64() {
-				t.Logf("INFO (%v): Client is now synced to latest PoS block", t.TestName)
-				return true
-			}
+func (t *TestEnv) WaitForPoSSync() {
+	select {
+	case <-time.After(time.Second * time.Duration(PoSSyncTimeoutSeconds)):
+		t.Fatalf("FAIL (%v): timeout waiting for PoS sync", t.TestName)
+	case resp, open := <-t.PoSSync:
+		if !open {
+			// PoS sync routine failed or timed-out
+			t.Fatalf("FAIL (%v): Error during wait of PoS sync routine", t.TestName)
 		}
-		if t.CLMock.PoSBlockProductionFinished {
-			return false
-		}
-		time.Sleep(time.Second)
+		t.PoSSync <- resp
 	}
-	return false
 }
 
 // Naive generic function that works in all situations.
