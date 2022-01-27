@@ -45,8 +45,9 @@ type CLMocker struct {
 	LatestForkchoice      catalyst.ForkchoiceStateV1
 
 	// Merge related
-	FirstPoSBlockNumber *big.Int
-	TTDReached          bool
+	FirstPoSBlockNumber     *big.Int
+	TTDReached              bool
+	TerminalTotalDifficulty *big.Int
 
 	/*
 		The test cases can request values from channel to "wake up" at a specific
@@ -64,7 +65,7 @@ type CLMocker struct {
 	OnShutdown chan interface{}
 }
 
-func NewCLMocker(t *hivesim.T) *CLMocker {
+func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
 	// Init random seed for different purposes
 	seed := time.Now().Unix()
 	t.Logf("Randomness seed: %v\n", seed)
@@ -81,6 +82,7 @@ func NewCLMocker(t *hivesim.T) *CLMocker {
 		FirstPoSBlockNumber:     nil,
 		LatestFinalizedNumber:   nil,
 		TTDReached:              false,
+		TerminalTotalDifficulty: tTD,
 		NextFeeRecipient:        common.Address{},
 		LatestForkchoice: catalyst.ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
@@ -143,7 +145,7 @@ func (cl *CLMocker) checkTTD() {
 		close(cl.OnShutdown)
 		cl.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
 	}
-	if td.TotalDifficulty.ToInt().Cmp(terminalTotalDifficulty) < 0 {
+	if td.TotalDifficulty.ToInt().Cmp(cl.TerminalTotalDifficulty) < 0 {
 		time.AfterFunc(tTDCheckPeriod, cl.checkTTD)
 		return
 	}
@@ -154,7 +156,7 @@ func (cl *CLMocker) checkTTD() {
 		close(cl.OnShutdown)
 		cl.Fatalf("CLMocker: Could not get block header: %v", err)
 	}
-	cl.Logf("CLMocker: TTD has been reached at block %v\n", cl.LatestFinalizedHeader.Number)
+	cl.Logf("CLMocker: TTD has been reached at block %v (%v>=%v)\n", cl.LatestFinalizedHeader.Number, td.TotalDifficulty, cl.TerminalTotalDifficulty)
 	// Broadcast initial ForkchoiceUpdated
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
 	cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
@@ -179,7 +181,7 @@ func (cl *CLMocker) checkTTD() {
 }
 
 // Engine Block Production Methods
-func (cl *CLMocker) stopPoSBlockProduction() {
+func (cl *CLMocker) shutdown() {
 	cl.BlockProductionMustStop = true
 }
 

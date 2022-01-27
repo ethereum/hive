@@ -16,7 +16,7 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
-// TestClient is 00the environment of a single test.
+// TestEnv is the environment of a single test.
 type TestEnv struct {
 	*hivesim.T
 	TestName string
@@ -93,12 +93,12 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 			case <-testend:
 				close(env.PoSSync)
 				return
-			case <-clMocker.OnShutdown:
+			case <-cl.OnShutdown:
 				t.Logf("WARN (%v): CLMocker finished block production while waiting for PoS sync", env.TestName)
 				close(env.PoSSync)
 				return
 			case <-time.After(time.Second):
-				if clMocker.TTDReached {
+				if cl.TTDReached {
 					ctx, env.syncCancel = context.WithTimeout(context.Background(), rpcTimeout)
 					bn, err := eth.BlockNumber(ctx)
 					env.syncCancel = nil
@@ -107,7 +107,7 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 						close(env.PoSSync)
 						return
 					}
-					if clMocker.LatestFinalizedNumber != nil && bn >= clMocker.LatestFinalizedNumber.Uint64() {
+					if cl.LatestFinalizedNumber != nil && bn >= cl.LatestFinalizedNumber.Uint64() {
 						t.Logf("INFO (%v): Client is now synced to latest PoS block", env.TestName)
 						env.PoSSync <- nil
 						return
@@ -119,16 +119,16 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 	}()
 
 	// Setup timeout
-	env.Timeout = time.After(time.Second * time.Duration(TestCaseTimeoutSeconds))
+	env.Timeout = time.After(DefaultTestCaseTimeout)
 
 	// Run the test
 	fn(env)
 }
 
-// Wait for a client to reach sync status past the PoS transition, with `PoSSyncTimeoutSeconds` seconds timeout
+// Wait for a client to reach sync status past the PoS transition, with `DefaultPoSSyncTimeout` timeout
 func (t *TestEnv) WaitForPoSSync() {
 	select {
-	case <-time.After(time.Second * time.Duration(PoSSyncTimeoutSeconds)):
+	case <-time.After(DefaultPoSSyncTimeout):
 		t.Fatalf("FAIL (%v): timeout waiting for PoS sync", t.TestName)
 	case resp, open := <-t.PoSSync:
 		if !open {

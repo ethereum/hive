@@ -22,42 +22,40 @@ var (
 func engineAPIPoWTests(t *TestEnv) {
 	// Test that the engine_ directives are correctly ignored when the chain has not yet reached TTD
 	gblock := loadGenesis()
-	if !t.CLMock.TTDReached {
-		// We can only execute this test if we have not yet reached the TTD.
-		forkchoiceState := catalyst.ForkchoiceStateV1{
-			HeadBlockHash:      gblock.Hash(),
-			SafeBlockHash:      gblock.Hash(),
-			FinalizedBlockHash: gblock.Hash(),
-		}
-		resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceState, nil)
-		if err == nil {
-			t.Fatalf("FAIL (%v): ForkchoiceUpdated accepted under PoW rule: %v, %v", t.TestName, resp, err)
-		}
-		payloadresp, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), &hexutil.Bytes{1, 2, 3, 4, 5, 6, 7, 8})
-		if err == nil {
-			t.Fatalf("FAIL (%v): GetPayloadV1 accepted under PoW rule: %v, %v", t.TestName, payloadresp, err)
-		}
-		// Create a dummy payload to send in the ExecutePayload call
-		payload := catalyst.ExecutableDataV1{
-			ParentHash:    common.Hash{},
-			FeeRecipient:  common.Address{},
-			StateRoot:     common.Hash{},
-			ReceiptsRoot:  common.Hash{},
-			LogsBloom:     []byte{},
-			Random:        common.Hash{},
-			Number:        0,
-			GasLimit:      0,
-			GasUsed:       0,
-			Timestamp:     0,
-			ExtraData:     []byte{},
-			BaseFeePerGas: big.NewInt(0),
-			BlockHash:     common.Hash{},
-			Transactions:  [][]byte{},
-		}
-		execresp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), &payload)
-		if err == nil {
-			t.Fatalf("FAIL (%v): ExecutePayloadV1 accepted under PoW rule: %v, %v", t.TestName, execresp, err)
-		}
+
+	forkchoiceState := catalyst.ForkchoiceStateV1{
+		HeadBlockHash:      gblock.Hash(),
+		SafeBlockHash:      gblock.Hash(),
+		FinalizedBlockHash: gblock.Hash(),
+	}
+	resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceState, nil)
+	if err == nil {
+		t.Fatalf("FAIL (%v): ForkchoiceUpdated accepted under PoW rule: %v, %v", t.TestName, resp, err)
+	}
+	payloadresp, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), &hexutil.Bytes{1, 2, 3, 4, 5, 6, 7, 8})
+	if err == nil {
+		t.Fatalf("FAIL (%v): GetPayloadV1 accepted under PoW rule: %v, %v", t.TestName, payloadresp, err)
+	}
+	// Create a dummy payload to send in the ExecutePayload call
+	payload := catalyst.ExecutableDataV1{
+		ParentHash:    common.Hash{},
+		FeeRecipient:  common.Address{},
+		StateRoot:     common.Hash{},
+		ReceiptsRoot:  common.Hash{},
+		LogsBloom:     []byte{},
+		Random:        common.Hash{},
+		Number:        0,
+		GasLimit:      0,
+		GasUsed:       0,
+		Timestamp:     0,
+		ExtraData:     []byte{},
+		BaseFeePerGas: big.NewInt(0),
+		BlockHash:     common.Hash{},
+		Transactions:  [][]byte{},
+	}
+	execresp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), &payload)
+	if err == nil {
+		t.Fatalf("FAIL (%v): ExecutePayloadV1 accepted under PoW rule: %v, %v", t.TestName, execresp, err)
 	}
 
 }

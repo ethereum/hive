@@ -10,11 +10,11 @@ Clients with support for the merge are required to run this suite and, at the mo
 
 ## Architecture
 
-The tests are started by running a main client, and a secondary client alongside.
+The tests by default are started by running a single execution client, and a single instance of the CL Mocker.
 
-The secondary client runs a single test case, then it stops for the next client to start, sync (potentially transition to PoS), and run the next test case, and so on until all test cases are completed.
+Each test case has a default Terminal Total Difficulty of 0, unless specified otherwise.
 
-Both the main and secondary client will make the transition from PoW to PoS, so that the secondary client might execute test cases in both modes.
+The secondary client can be spawned and synced if the test case requires so.
 
 Given the following example,
 
@@ -22,19 +22,23 @@ Given the following example,
 
 tests will have the following execution flow: 
 
-    clientA:
-      starts in PoW
-      Loop for every test case:
-         clientA':
-            starts in PoW
-            executes a single test case while transitions to PoS
-            stops
-         clientB:
-            starts in PoW
-            syncs to clientA and transitions to PoS
-            executes a single test case
-            stops
-     stops
+for each testCase:
+   - clientA:
+      - starts (PoW or PoS, depending on TTD)
+      - CL Mocker:
+         - starts
+         - testCaseN:
+            - starts
+            - (optional) clientA/clientB:
+               - starts
+               - stops
+            - verifications complete
+            - stops
+         - stops
+      - stops
+   - clientB:
+      - (Same steps repeated)
+      - ...
 
 ## Test Cases
 
