@@ -24,7 +24,7 @@ import (
 // default timeout for RPC calls
 var rpcTimeout = 10 * time.Second
 
-// TestClient is the environment of a single test.
+// TestClient is 00the environment of a single test.
 type TestEnv struct {
 	*hivesim.T
 	TestName string

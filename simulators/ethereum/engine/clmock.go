@@ -107,26 +107,21 @@ func NewCLMocker(t *hivesim.T) *CLMocker {
 }
 
 // Add a Client to be kept in sync with the latest payloads
-func (cl *CLMocker) AddEngineClient(newEngineClient *EngineClient) {
+func (cl *CLMocker) AddEngineClient(ec *EngineClient) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
-	cl.EngineClients = append(cl.EngineClients, newEngineClient)
+	cl.EngineClients = append(cl.EngineClients, ec)
 }
 
 // Remove a Client to stop sending latest payloads
-func (cl *CLMocker) RemoveEngineClient(removeEngineClient *EngineClient) {
+func (cl *CLMocker) RemoveEngineClient(ec *EngineClient) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
-	i := -1
-	for j := 0; j < len(cl.EngineClients); j++ {
-		if cl.EngineClients[j] == removeEngineClient {
-			i = j
-			break
+
+	for i, engine := range cl.EngineClients {
+		if engine == ec {
+			cl.EngineClients = append(cl.EngineClients[:i], cl.EngineClients[i+1:]...)
 		}
-	}
-	if i >= 0 {
-		cl.EngineClients[i] = cl.EngineClients[len(cl.EngineClients)-1]
-		cl.EngineClients = cl.EngineClients[:len(cl.EngineClients)-1]
 	}
 }
 
@@ -148,32 +143,32 @@ func (cl *CLMocker) checkTTD() {
 	ec := cl.EngineClients[rand.Intn(len(cl.EngineClients))]
 
 	var td *TD
-	err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false)
-	if err != nil {
+	if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
 		cl.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
 	}
-	if td.TotalDifficulty.ToInt().Cmp(terminalTotalDifficulty) >= 0 {
-		cl.TTDReached = true
-		cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
-		if err != nil {
-			cl.Fatalf("CLMocker: Could not get block header: %v", err)
-		}
-		cl.Logf("CLMocker: TTD has been reached at block %v\n", cl.LatestFinalizedHeader.Number)
-		// Broadcast initial ForkchoiceUpdated
-		cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
-		cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
-		cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
-		for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-			if resp.Error != nil {
-				cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
-			} else if resp.ForkchoiceResponse.Status != "SUCCESS" {
-				cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
-			}
-		}
-		time.AfterFunc(PoSBlockProductionPeriod, cl.producePoSBlocks)
-		return
+	if td.TotalDifficulty.ToInt().Cmp(terminalTotalDifficulty) < 0 {
+		time.AfterFunc(tTDCheckPeriod, cl.checkTTD)
 	}
-	time.AfterFunc(tTDCheckPeriod, cl.checkTTD)
+	var err error
+	cl.TTDReached = true
+	cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
+	if err != nil {
+		cl.Fatalf("CLMocker: Could not get block header: %v", err)
+	}
+	cl.Logf("CLMocker: TTD has been reached at block %v\n", cl.LatestFinalizedHeader.Number)
+	// Broadcast initial ForkchoiceUpdated
+	cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
+	cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
+	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
+	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
+		if resp.Error != nil {
+			cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
+		} else if resp.ForkchoiceResponse.Status != "SUCCESS" {
+			cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
+		}
+	}
+	time.AfterFunc(PoSBlockProductionPeriod, cl.producePoSBlocks)
+	return
 }
 
 // Engine Block Production Methods
