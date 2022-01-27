@@ -19,6 +19,7 @@ var (
 	terminalTotalDifficulty  = big.NewInt(131072 + 25)
 	PoSBlockProductionPeriod = time.Second * 1
 	tTDCheckPeriod           = time.Second * 1
+	TestCaseTimeoutSeconds   = 60
 	PoSSyncTimeoutSeconds    = 20
 
 	// Confirmation blocks

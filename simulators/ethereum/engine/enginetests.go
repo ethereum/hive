@@ -67,25 +67,29 @@ func engineAPIPoWTests(t *TestEnv) {
 func unknownSafeBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
-	// Wait for ExecutePayload
-	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
+
+	// Wait for ExecutePayload (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnExecutePayload:
+		defer t.CLMock.OnExecutePayload.Yield()
+		// Generate a random SafeBlock hash
+		randomSafeBlockHash := common.Hash{}
+		rand.Read(randomSafeBlockHash[:])
+
+		// Send forkchoiceUpdated with random SafeBlockHash
+		forkchoiceStateUnknownSafeHash := catalyst.ForkchoiceStateV1{
+			HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
+			SafeBlockHash:      randomSafeBlockHash,
+			FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
+		}
+		resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownSafeHash, nil)
+		if err == nil {
+			t.Fatalf("FAIL (%v): No error on forkchoiceUpdated with unknown SafeBlockHash: %v, %v", t.TestName, err, resp)
+		}
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
-	}
-	defer t.CLMock.OnExecutePayload.Yield()
-
-	// Generate a random SafeBlock hash
-	randomSafeBlockHash := common.Hash{}
-	rand.Read(randomSafeBlockHash[:])
-
-	// Send forkchoiceUpdated with random SafeBlockHash
-	forkchoiceStateUnknownSafeHash := catalyst.ForkchoiceStateV1{
-		HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
-		SafeBlockHash:      randomSafeBlockHash,
-		FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-	}
-	resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownSafeHash, nil)
-	if err == nil {
-		t.Fatalf("FAIL (%v): No error on forkchoiceUpdated with unknown SafeBlockHash: %v, %v", t.TestName, err, resp)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
 }
 
@@ -95,11 +99,15 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for ExecutePayload
-	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
+	// Wait for ExecutePayload (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnExecutePayload:
+		defer t.CLMock.OnExecutePayload.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnExecutePayload.Yield()
 
 	// Generate a random FinalizedBlockHash hash
 	randomFinalizedBlockHash := common.Hash{}
@@ -142,11 +150,15 @@ func unknownHeadBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for FinalizedBlock
-	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+	// Wait for FinalizedBlock (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
+		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 
 	// Generate a random HeadBlock hash
 	randomHeadBlockHash := common.Hash{}
@@ -192,11 +204,15 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for ExecutePayload
-	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+	// Wait for ExecutePayload (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
+		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 
 	// Send the Genesis block as forkchoice
 	gblock := loadGenesis()
@@ -229,11 +245,15 @@ func badHashOnExecPayload(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for GetPayload
-	if closed := t.CLMock.OnGetPayload.Wait(); closed {
+	// Wait for GetPayload (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnGetPayload:
+		defer t.CLMock.OnGetPayload.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnGetPayload.Yield()
 
 	// Alter hash on the payload and send it to client, should produce an error
 	alteredPayload := t.CLMock.LatestPayloadBuilt
@@ -250,11 +270,15 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		// Wait until TTD is reached by this client
 		t.WaitForPoSSync()
 
-		// Wait for GetPayload
-		if closed := t.CLMock.OnGetPayload.Wait(); closed {
+		// Wait for GetPayload (or shutdown/timeout)
+		select {
+		case <-t.CLMock.OnGetPayload:
+			defer t.CLMock.OnGetPayload.Yield()
+		case <-t.CLMock.OnShutdown:
 			t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+		case <-t.Timeout:
+			t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 		}
-		defer t.CLMock.OnGetPayload.Yield()
 
 		// Alter the payload while maintaining a valid hash and send it to the client, should produce an error
 		basePayload := t.CLMock.LatestPayloadBuilt
@@ -339,11 +363,16 @@ func blockStatusExecPayload(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Run executePayload tests
-	if closed := t.CLMock.OnExecutePayload.Wait(); closed {
+	// Wait for ExecutePayload (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnExecutePayload:
+		defer t.CLMock.OnExecutePayload.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnExecutePayload.Yield()
+
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
@@ -363,11 +392,16 @@ func blockStatusHeadBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Run HeadBlock tests
-	if closed := t.CLMock.OnHeadBlockForkchoiceUpdate.Wait(); closed {
+	// Wait for HeadBlock Forkchoice Update (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnHeadBlockForkchoiceUpdate:
+		defer t.CLMock.OnHeadBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnHeadBlockForkchoiceUpdate.Yield()
+
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
@@ -384,11 +418,16 @@ func blockStatusSafeBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Run SafeBlock tests
-	if closed := t.CLMock.OnSafeBlockForkchoiceUpdate.Wait(); closed {
+	// Wait for SafeBlock Forkchoice Update (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnSafeBlockForkchoiceUpdate:
+		defer t.CLMock.OnSafeBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnSafeBlockForkchoiceUpdate.Yield()
+
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
@@ -405,11 +444,16 @@ func blockStatusFinalizedBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Run FinalizedBlock tests
-	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+	// Wait for FinalizedBlock Forkchoice Update (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
+		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
+
 	latestBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
@@ -426,11 +470,15 @@ func blockStatusReorg(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Wait until we reach SafeBlock status
-	if closed := t.CLMock.OnSafeBlockForkchoiceUpdate.Wait(); closed {
+	// Wait for SafeBlock Forkchoice Update (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnSafeBlockForkchoiceUpdate:
+		defer t.CLMock.OnSafeBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnSafeBlockForkchoiceUpdate.Yield()
 
 	// Verify the client is serving the latest SafeBlock
 	currentBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
@@ -519,11 +567,15 @@ func transactionReorg(t *TestEnv) {
 		}
 		receipts[i] = receipt
 	}
-	// Wait for a finalized block so we can start rolling back transactions
-	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+	// Wait for a finalized block so we can start rolling back transactions (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
+		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 
 	for i := 0; i < txCount; i++ {
 
@@ -604,11 +656,15 @@ func reExecPayloads(t *TestEnv) {
 		t.Fatalf("FAIL (%v): Unable to wait for %v executed payloads: %v", t.TestName, payloadReExecCount, err)
 	}
 
-	// Wait for a finalized block so we can re-executing payloads
-	if closed := t.CLMock.OnFinalizedBlockForkchoiceUpdate.Wait(); closed {
+	// Wait for a finalized block so we can re-executing payloads (or shutdown/timeout)
+	select {
+	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
+		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
-	defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
 
 	lastBlock, err := t.Eth.BlockNumber(t.Ctx())
 	if err != nil {
@@ -666,7 +722,7 @@ func suggestedFeeRecipient(t *TestEnv) {
 				t.Fatalf("FAIL (%v): unable to sign transaction: %v", t.TestName, err)
 			}
 		}
-		blockNumbers[i], err = t.CLMock.setNextFeeRecipient(feeRecipients[i], t.Engine, tx)
+		blockNumbers[i], err = t.setNextFeeRecipient(feeRecipients[i], t.Engine, tx)
 		if err != nil {
 			t.Fatalf("FAIL (%v): unable to get block with fee recipient: %v", t.TestName, err)
 		}

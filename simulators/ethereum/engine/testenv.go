@@ -25,6 +25,7 @@ type TestEnv struct {
 	Engine   *EngineClient
 	CLMock   *CLMocker
 	Vault    *Vault
+	Timeout  <-chan time.Time
 	PoSSync  chan interface{}
 
 	// This holds most recent context created by the Ctx method.
@@ -92,6 +93,10 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 			case <-testend:
 				close(env.PoSSync)
 				return
+			case <-clMocker.OnShutdown:
+				t.Logf("WARN (%v): CLMocker finished block production while waiting for PoS sync", env.TestName)
+				close(env.PoSSync)
+				return
 			case <-time.After(time.Second):
 				if clMocker.TTDReached {
 					ctx, env.syncCancel = context.WithTimeout(context.Background(), rpcTimeout)
@@ -108,15 +113,13 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 						return
 					}
 				}
-				if clMocker.PoSBlockProductionFinished {
-					t.Logf("WARN (%v): CLMocker finished block production while waiting for PoS sync", env.TestName)
-					close(env.PoSSync)
-					return
-				}
 			}
 		}
 
 	}()
+
+	// Setup timeout
+	env.Timeout = time.After(time.Second * time.Duration(TestCaseTimeoutSeconds))
 
 	// Run the test
 	fn(env)
@@ -202,6 +205,36 @@ func (t *TestEnv) WaitForBlock(blockNumber *big.Int) (*types.Block, error) {
 		time.Sleep(time.Second)
 	}
 	return nil, nil
+}
+
+// Sets the fee recipient for the next block and returns the number where it will be included.
+// A transaction can be included to be sent before getPayload if necessary
+func (t *TestEnv) setNextFeeRecipient(feeRecipient common.Address, ec *EngineClient, tx *types.Transaction) (*big.Int, error) {
+	for {
+		select {
+		case <-t.CLMock.OnPayloadPrepare:
+			// Will yield later.
+		case <-t.CLMock.OnShutdown:
+			t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+		case <-t.Timeout:
+			t.Fatalf("FAIL (%v): Test timeout", t.TestName)
+		}
+
+		if ec == nil || (t.CLMock.NextBlockProducer != nil && t.CLMock.NextBlockProducer.Equals(ec)) {
+			defer t.CLMock.OnPayloadPrepare.Yield()
+			t.CLMock.NextFeeRecipient = feeRecipient
+			if tx != nil {
+				err := ec.Eth.SendTransaction(ec.Ctx(), tx)
+				if err != nil {
+					return nil, err
+				}
+			}
+			return big.NewInt(t.CLMock.LatestFinalizedNumber.Int64() + 1), nil
+		}
+		// Unlock and keep trying to get the requested Engine Client
+		t.CLMock.OnPayloadPrepare.Yield()
+		time.Sleep(PoSBlockProductionPeriod)
+	}
 }
 
 // CallContext is a helper method that forwards a raw RPC request to

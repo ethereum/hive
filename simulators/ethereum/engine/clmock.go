@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -16,11 +15,6 @@ import (
 
 // Semaphore type channel to be used as signal for current CLMocker step in block production
 type Semaphore chan bool
-
-func (m Semaphore) Wait() bool {
-	_, open := <-m
-	return !open
-}
 
 func (m Semaphore) Yield() {
 	m <- true
@@ -51,9 +45,8 @@ type CLMocker struct {
 	LatestForkchoice      catalyst.ForkchoiceStateV1
 
 	// Merge related
-	FirstPoSBlockNumber        *big.Int
-	TTDReached                 bool
-	PoSBlockProductionFinished bool
+	FirstPoSBlockNumber *big.Int
+	TTDReached          bool
 
 	/*
 		The test cases can request values from channel to "wake up" at a specific
@@ -66,6 +59,9 @@ type CLMocker struct {
 	OnHeadBlockForkchoiceUpdate      Semaphore
 	OnSafeBlockForkchoiceUpdate      Semaphore
 	OnFinalizedBlockForkchoiceUpdate Semaphore
+
+	// CLMocker channel which will be closed on shutdown
+	OnShutdown chan interface{}
 }
 
 func NewCLMocker(t *hivesim.T) *CLMocker {
@@ -76,17 +72,16 @@ func NewCLMocker(t *hivesim.T) *CLMocker {
 
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
-		T:                          t,
-		EngineClients:              make([]*EngineClient, 0),
-		RandomHistory:              map[uint64]common.Hash{},
-		ExecutedPayloadHistory:     map[uint64]catalyst.ExecutableDataV1{},
-		LatestFinalizedHeader:      nil,
-		PoSBlockProductionFinished: false,
-		BlockProductionMustStop:    false,
-		FirstPoSBlockNumber:        nil,
-		LatestFinalizedNumber:      nil,
-		TTDReached:                 false,
-		NextFeeRecipient:           common.Address{},
+		T:                       t,
+		EngineClients:           make([]*EngineClient, 0),
+		RandomHistory:           map[uint64]common.Hash{},
+		ExecutedPayloadHistory:  map[uint64]catalyst.ExecutableDataV1{},
+		LatestFinalizedHeader:   nil,
+		BlockProductionMustStop: false,
+		FirstPoSBlockNumber:     nil,
+		LatestFinalizedNumber:   nil,
+		TTDReached:              false,
+		NextFeeRecipient:        common.Address{},
 		LatestForkchoice: catalyst.ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
 			SafeBlockHash:      common.Hash{},
@@ -98,6 +93,7 @@ func NewCLMocker(t *hivesim.T) *CLMocker {
 		OnHeadBlockForkchoiceUpdate:      make(Semaphore, 1),
 		OnSafeBlockForkchoiceUpdate:      make(Semaphore, 1),
 		OnFinalizedBlockForkchoiceUpdate: make(Semaphore, 1),
+		OnShutdown:                       make(chan interface{}),
 	}
 
 	// Start timer to check when the TTD has been reached
@@ -144,6 +140,7 @@ func (cl *CLMocker) checkTTD() {
 
 	var td *TD
 	if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
+		close(cl.OnShutdown)
 		cl.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
 	}
 	if td.TotalDifficulty.ToInt().Cmp(terminalTotalDifficulty) < 0 {
@@ -154,6 +151,7 @@ func (cl *CLMocker) checkTTD() {
 	cl.TTDReached = true
 	cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
 	if err != nil {
+		close(cl.OnShutdown)
 		cl.Fatalf("CLMocker: Could not get block header: %v", err)
 	}
 	cl.Logf("CLMocker: TTD has been reached at block %v\n", cl.LatestFinalizedHeader.Number)
@@ -161,12 +159,20 @@ func (cl *CLMocker) checkTTD() {
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
 	cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
 	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
+	anySuccess := false
 	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
-		} else if resp.ForkchoiceResponse.Status != "SUCCESS" {
-			cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
+		} else {
+			anySuccess = true
+			if resp.ForkchoiceResponse.Status != "SUCCESS" {
+				cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
+			}
 		}
+	}
+	if !anySuccess {
+		close(cl.OnShutdown)
+		cl.Fatalf("CLMocker: None of the clients accepted forkchoiceUpdated")
 	}
 	time.AfterFunc(PoSBlockProductionPeriod, cl.producePoSBlocks)
 	return
@@ -183,41 +189,6 @@ func (cl *CLMocker) isBlockPoS(bn *big.Int) bool {
 		return false
 	}
 	return true
-}
-
-// Sets the fee recipient for the next block and returns the number where it will be included.
-// A transaction can be included to be sent before getPayload if necessary
-func (cl *CLMocker) setNextFeeRecipient(feeRecipient common.Address, ec *EngineClient, tx *types.Transaction) (*big.Int, error) {
-	for {
-		closed := cl.OnPayloadPrepare.Wait()
-		if closed {
-			return nil, errors.New("CLMocker finished producing blocks")
-		}
-		if ec == nil || (cl.NextBlockProducer != nil && cl.NextBlockProducer.Equals(ec)) {
-			defer cl.OnPayloadPrepare.Yield()
-			cl.NextFeeRecipient = feeRecipient
-			if tx != nil {
-				err := ec.Eth.SendTransaction(ec.Ctx(), tx)
-				if err != nil {
-					return nil, err
-				}
-			}
-			return big.NewInt(cl.LatestFinalizedNumber.Int64() + 1), nil
-		}
-		// Unlock and keep trying to get the requested Engine Client
-		cl.OnPayloadPrepare.Yield()
-		time.Sleep(PoSBlockProductionPeriod)
-	}
-}
-
-// Close all semaphores in the given CLMocker instance
-func (cl *CLMocker) closeSemaphores() {
-	close(cl.OnPayloadPrepare)
-	close(cl.OnGetPayload)
-	close(cl.OnExecutePayload)
-	close(cl.OnHeadBlockForkchoiceUpdate)
-	close(cl.OnSafeBlockForkchoiceUpdate)
-	close(cl.OnFinalizedBlockForkchoiceUpdate)
 }
 
 func (cl *CLMocker) produceSinglePoSBlock() {
@@ -379,11 +350,8 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 
 // Loop produce PoS blocks by using the Engine API
 func (cl *CLMocker) producePoSBlocks() {
-	// Defer closing all semaphores
-	defer cl.closeSemaphores()
-
-	// Defer signaling that we are not producing more blocks
-	defer func() { cl.PoSBlockProductionFinished = true }()
+	// Defer shutdown signal
+	defer func() { close(cl.OnShutdown) }()
 
 	// Begin PoS block production
 	for !cl.BlockProductionMustStop {
