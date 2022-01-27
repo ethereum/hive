@@ -154,7 +154,7 @@ func runSourceTest(t0 *hivesim.T, c0 *hivesim.Client) {
 						Name:        fmt.Sprintf("%s (%s)", currentTest.Name, c.Type),
 						Description: currentTest.About,
 						Run: func(t *hivesim.T) {
-							runTest(currentTest.Name, t, c, vault, clMocker, currentTest.Run)
+							RunTest(currentTest.Name, t, c, vault, clMocker, currentTest.Run)
 						},
 					})
 				},

@@ -92,7 +92,7 @@ func (v *Vault) createAccount(t *TestEnv, amount *big.Int) common.Address {
 		t.Fatalf("Vault: unable to send funding transaction: %v", err)
 	}
 
-	receipt, err := waitForTxConfirmations(t, tx.Hash(), 15)
+	receipt, err := t.WaitForTxConfirmations(tx.Hash(), 15)
 
 	if err != nil {
 		t.Fatalf("Vault: Funding transaction was not mined in time")

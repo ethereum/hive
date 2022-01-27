@@ -534,7 +534,7 @@ func transactionReorg(t *TestEnv) {
 	}
 	var receipts = make([]*types.Receipt, txCount)
 	for i := 0; i < txCount; i++ {
-		receipt, err := waitForTxConfirmations(t, txs[i].Hash(), PoSConfirmationBlocks)
+		receipt, err := t.WaitForTxConfirmations(txs[i].Hash(), PoSConfirmationBlocks)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Unable to fetch confirmed tx receipt: %v", t.TestName, err)
 		}
@@ -558,7 +558,7 @@ func transactionReorg(t *TestEnv) {
 
 		storageKey := crypto.Keccak256Hash(data)
 
-		value_after, err := getBigIntAtStorage(t, sstoreContractAddr, storageKey, nil)
+		value_after, err := getBigIntAtStorage(t.Eth, t.Ctx(), sstoreContractAddr, storageKey, nil)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
 		}
@@ -570,7 +570,7 @@ func transactionReorg(t *TestEnv) {
 
 		// Get value at a block before the tx was included
 		reorgBlock, err := t.Eth.BlockByNumber(t.Ctx(), receipts[i].BlockNumber.Sub(receipts[i].BlockNumber, common.Big1))
-		value_before, err := getBigIntAtStorage(t, sstoreContractAddr, storageKey, reorgBlock.Number())
+		value_before, err := getBigIntAtStorage(t.Eth, t.Ctx(), sstoreContractAddr, storageKey, reorgBlock.Number())
 		if err != nil {
 			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
 		}
@@ -595,7 +595,7 @@ func transactionReorg(t *TestEnv) {
 		}
 
 		// Check storage again, should be unset
-		value_before, err = getBigIntAtStorage(t, sstoreContractAddr, storageKey, nil)
+		value_before, err = getBigIntAtStorage(t.Eth, t.Ctx(), sstoreContractAddr, storageKey, nil)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Could not get storage: %v", t.TestName, err)
 		}
@@ -625,7 +625,7 @@ func reExecPayloads(t *TestEnv) {
 
 	// Wait until we have the required number of payloads executed
 	var payloadReExecCount = int64(10)
-	_, err := waitForBlock(t, big.NewInt(t.CLMock.FirstPoSBlockNumber.Int64()+payloadReExecCount))
+	_, err := t.WaitForBlock(big.NewInt(t.CLMock.FirstPoSBlockNumber.Int64() + payloadReExecCount))
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to wait for %v executed payloads: %v", t.TestName, payloadReExecCount, err)
 	}
@@ -708,7 +708,7 @@ func suggestedFeeRecipient(t *TestEnv) {
 		if blockNumberIncluded == nil {
 			t.Fatalf("FAIL (%v): unable to get block number included", t.TestName)
 		}
-		blockIncluded, err := waitForBlock(t, blockNumberIncluded)
+		blockIncluded, err := t.WaitForBlock(blockNumberIncluded)
 		if err != nil {
 			t.Fatalf("FAIL (%v): unable to get block with fee recipient: %v", t.TestName, err)
 		}
@@ -786,7 +786,7 @@ func randomOpcodeTx(t *TestEnv) {
 	PoSBlocks := 0
 	i := 0
 	for {
-		receipt, err := waitForTxConfirmations(t, txs[i].Hash(), PoWConfirmationBlocks)
+		receipt, err := t.WaitForTxConfirmations(txs[i].Hash(), PoWConfirmationBlocks)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Unable to fetch confirmed tx receipt: %v", t.TestName, err)
 		}

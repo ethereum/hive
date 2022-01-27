@@ -148,6 +148,7 @@ func (cl *CLMocker) checkTTD() {
 	}
 	if td.TotalDifficulty.ToInt().Cmp(terminalTotalDifficulty) < 0 {
 		time.AfterFunc(tTDCheckPeriod, cl.checkTTD)
+		return
 	}
 	var err error
 	cl.TTDReached = true
