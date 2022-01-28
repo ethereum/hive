@@ -237,10 +237,7 @@ func (r *simRunner) runSimulatorAPIDevMode(ctx context.Context, endpoint string)
 	go server.Serve(listener)
 
 	// wait for interrupt
-	select {
-	case <-ctx.Done():
-		break
-	}
+	<-ctx.Done()
 	return nil
 }
 
