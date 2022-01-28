@@ -250,9 +250,9 @@ This request starts a client container. The request body must be encoded as mult
 The `CLIENT` form parameter is required and specifies the client type that should be
 started. It must match one of the client names returned by the `/clients` endpoint.
 
-The `NETWORKS` form parameter is optional and configures network to which the client will
+The `NETWORKS` form parameter is optional and configures networks to which the client will
 be connected before it starts to run. Network names are supplied as a comma-separated
-list, and all networks must already exist in the context of the test suite.
+list. The client container will not be created if any of the given networks doesn't exist.
 
 Other form parameters, specifically those with a prefix of `HIVE_`, are passed to the
 client entry point as environment variables. Please see the [client interface documentation]
