@@ -323,7 +323,7 @@ func loaderTest(t *hivesim.T) {
 	loadTests(t, fileRoot, testLimit, func(tc testcase) {
 		for _, client := range clientTypes {
 			tc := tc // shallow copy
-			tc.clientType = client
+			tc.clientType = client.Name
 			testCh <- &tc
 		}
 	})
@@ -407,7 +407,7 @@ func (tc *testcase) run(t *hivesim.T) {
 	}
 
 	// update the parameters with test-specific stuff
-	env := map[string]string{
+	env := hivesim.Params{
 		"HIVE_FORK_DAO_VOTE": "1",
 		"HIVE_CHAIN_ID":      "1",
 	}
@@ -422,7 +422,7 @@ func (tc *testcase) run(t *hivesim.T) {
 	}
 
 	t1 := time.Now()
-	client := t.StartClient(tc.clientType, env, files)
+	client := t.StartClient(tc.clientType, env, hivesim.WithStaticFiles(files))
 
 	t2 := time.Now()
 	genesisHash, genesisResponse, err := getBlock(client.RPC(), "0x0")
@@ -460,7 +460,7 @@ func (tc *testcase) run(t *hivesim.T) {
 }
 
 // updateEnv sets environment variables from the test
-func (tc *testcase) updateEnv(env map[string]string) {
+func (tc *testcase) updateEnv(env hivesim.Params) {
 	// Environment variables for rules.
 	rules := ruleset[tc.blockTest.json.Network]
 	for k, v := range rules {
