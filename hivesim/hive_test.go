@@ -243,16 +243,19 @@ func TestStartClientStartOptions(t *testing.T) {
 	})
 }
 
-// This checks that the simulator can run a program
+// This checks running scripts in a client container.
 func TestRunProgram(t *testing.T) {
-	// Set up the backend to return program execution. Simple debug program here.
 	hooks := &fakes.BackendHooks{
 		RunProgram: func(containerID string, cmd []string) (*libhive.ExecInfo, error) {
-			return &libhive.ExecInfo{
-				Stdout:   "out: " + cmd[0],
-				Stderr:   "error output",
-				ExitCode: 42,
-			}, nil
+			if len(cmd) > 0 && cmd[0] == "/hive-bin/echo" {
+				info := &libhive.ExecInfo{
+					Stdout:   "script: " + strings.Join(cmd, " "),
+					Stderr:   "error output",
+					ExitCode: 42,
+				}
+				return info, nil
+			}
+			return nil, errors.New("invalid script")
 		},
 	}
 	tm, srv := newFakeAPI(hooks)
@@ -275,13 +278,12 @@ func TestRunProgram(t *testing.T) {
 		t.Fatal("can't start client:", err)
 	}
 
-	// Run a program
+	// Run the echo script.
 	res, err := sim.ClientExec(suiteID, testID, clientID, []string{"echo", "this"})
 	if err != nil {
 		t.Fatal("failed to run program:", err)
 	}
-
-	if want := "out: /hive-bin/echo"; res.Stdout != want {
+	if want := "script: /hive-bin/echo this"; res.Stdout != want {
 		t.Fatalf("wrong std out %q\nwant %q", res.Stdout, want)
 	}
 	if want := "error output"; res.Stderr != want {
@@ -289,6 +291,15 @@ func TestRunProgram(t *testing.T) {
 	}
 	if want := 42; res.ExitCode != want {
 		t.Fatalf("wrong code %q\nwant %q", res.ExitCode, want)
+	}
+
+	// Run a script that doesn't exist.
+	res, err = sim.ClientExec(suiteID, testID, clientID, []string{"a-script"})
+	if err == nil {
+		t.Fatal("no error from ClientExec for non-existent script")
+	}
+	if err.Error() != "exec error (status 500): invalid script" {
+		t.Fatalf("wrong error message for non-existent script: %q", err)
 	}
 }
 

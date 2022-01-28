@@ -246,6 +246,19 @@ func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string,
 	if resp.Body == nil {
 		return nil, errors.New("unexpected empty response body")
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		var msgbuf bytes.Buffer
+		n, _ := io.Copy(&msgbuf, io.LimitReader(resp.Body, 1024)) // best effort
+		if n == 0 {
+			return nil, fmt.Errorf("exec error (status %d)", resp.StatusCode)
+		} else {
+			msg := strings.TrimSpace(msgbuf.String())
+			return nil, fmt.Errorf("exec error (status %d): %s", resp.StatusCode, msg)
+		}
+	}
+
 	dec := json.NewDecoder(resp.Body)
 	var res ExecInfo
 	if err := dec.Decode(&res); err != nil {
