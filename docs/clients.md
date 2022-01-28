@@ -23,6 +23,27 @@ name like:
 See the [go-ethereum client definition][geth-docker] for an example of a client
 Dockerfile.
 
+### version.txt
+
+Client Dockerfiles are expected to generate a `/version.txt` file during build. Hive reads
+this file after building the container and attaches version information to the output of
+all test suites in which the client is launched.
+
+### hive.yaml
+
+Hive reads additional metadata from `hive.yaml` file in the client directory (next to the
+Dockerfile). Currently, the only purpose of this file is specifying the client's role
+list:
+
+    roles:
+      - "eth1"
+      - "eth1_light_client"
+
+The role list is available to simulators and can be used to differentiate between clients
+based on features. Declaring a client role also signals that the client supports certain
+role-specific environment variables and files. If `hive.yml` is missing or doesn't declare
+roles, the `eth1` role is assumed.
+
 ## Client Lifecycle
 
 When the simulation requests a client instance, hive creates a docker container from the
@@ -43,46 +64,27 @@ certain ways. In order to run tests against multiple Ethereum clients, for examp
 simulator needs to be able to configure all clients for a specific blockchain and make
 them join the peer-to-peer network used for testing.
 
-## Client Metadata
-
-Metadata is used to express client differences. E.g. clients can have different roles
-within the Ethereum ecosystem, each of which can have different tests, some even capturing
-interactions between multiple roles.
-
-Client metadata is defined with a `hive.yaml` file in the client directory (next to the
-`Dockerfile`). This optional, by default each client is assumed to only have an `eth1`
-role.
-
-The YAML fields are:
-
-```yaml
-roles: ["eth1", "example", "eth1_light_client"]  # a list of strings, applicable roles
-```
-
-This metadata is available through the `/clients` Hive endpoint.
-
 ## Eth1 Client Requirements
 
-This section describes the requirements for Ethereum 1.x client wrappers in hive. Client
-entry point scripts must support this interface in order to be tested by existing Ethereum
-1.x-specific simulators. The simulators require the `eth1` client role.
+This section describes the requirements for the `eth1` client role.
 
-Clients must provide JSON-RPC over HTTP on TCP port 8545. They may also support JSON-RPC
-over WebSocket on port 8546, but this is not strictly required.
+Eth1 clients must provide JSON-RPC over HTTP on TCP port 8545. They may also support
+JSON-RPC over WebSocket on port 8546, but this is not strictly required.
 
 ### Files
 
-The simulator may customize client startup by placing these files into the client container:
+The simulator customizes client startup by placing these files into the eth1 client
+container:
 
 - `/genesis.json` contains Ethereum genesis state in the JSON format used by Geth. This
   file is mandatory.
 - `/chain.rlp` contains RLP-encoded blocks to import before startup.
 - `/blocks/` directory containing `.rlp` files.
 
-On startup, client entry point scripts must first load the genesis block and state into
-the client implementation from `/genesis.json`. To do this, the script needs to translate
-from Geth genesis format into a format appropriate for the specific client implementation.
-The translation is usually done using a jq script. See the [openethereum genesis
+On startup, the entry point script must first load the genesis block and state into the
+client implementation from `/genesis.json`. To do this, the script needs to translate from
+Geth genesis format into a format appropriate for the specific client implementation. The
+translation is usually done using a jq script. See the [openethereum genesis
 translator][oe-genesis-jq], for example.
 
 After the genesis state, the client should import the blocks from `/chain.rlp` if it is
