@@ -313,7 +313,7 @@ Response:
     POST /testsuite/{suite}/network/{network}
 
 This request creates a network. Unlike with other APIs, networks do not have IDs. Instead,
-the network name is assigned the API client.
+the network name is assigned by the simulator.
 
 Response:
 
@@ -323,7 +323,7 @@ Response:
 
     DELETE /testsuite/{suite}/network/{network}
 
-This request removes a network. Note: the request will fail if containers are still
+This request removes a network. Note: the request will fail if any containers are still
 connected to the network.
 
 Response:
@@ -336,7 +336,7 @@ Response:
 
 This request connects a client container to a network. You can use any client container ID
 as the `container`. You can also use `"simulation"` as the container ID, in which case the
-simulator container will be connected.
+container running the simulator will be connected.
 
 Response:
 
@@ -357,7 +357,7 @@ Response:
 
     GET /testsuite/{suite}/network/{network}/{container}
 
-This returns the IP of a client container on the given network.
+This returns the IP of a container on the given network.
 
 Response:
 
