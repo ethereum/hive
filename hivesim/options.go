@@ -3,6 +3,7 @@ package hivesim
 import (
 	"io"
 	"os"
+	"strings"
 )
 
 // clientSetup collects client options.
@@ -25,6 +26,13 @@ func fileAsSrc(path string) func() (io.ReadCloser, error) {
 	return func() (io.ReadCloser, error) {
 		return os.Open(path)
 	}
+}
+
+// WithInitialNetworks adds a list of network names as the initial networks the client must be connected before starting.
+func WithInitialNetworks(networks []string) StartOption {
+	return optionFunc(func(setup *clientSetup) {
+		setup.parameters["NETWORKS"] = strings.Join(networks, ",")
+	})
 }
 
 // WithStaticFiles adds files from the local filesystem to the client. Map: destination file path -> source file path.
