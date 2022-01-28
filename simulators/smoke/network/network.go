@@ -16,12 +16,18 @@ func main() {
 		Name: "connection on network1",
 		Description: `In this test, the client is created, then added to a new docker network.
 The test then tries to connect to the client container via TCP on the new network.`,
-		Run: iptest,
+		Run: ipTest,
 	})
+	suite.Add(hivesim.TestSpec{
+		Name:        "initial networks",
+		Description: `This test creates a network and configures a client to be connected to it before startup.`,
+		Run:         initialNetworkTest,
+	})
+
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-func iptest(t *hivesim.T) {
+func startAnyClient(t *hivesim.T, options ...hivesim.StartOption) *hivesim.Client {
 	clientDef, err := t.Sim.ClientTypes()
 	if err != nil {
 		t.Fatal(err)
@@ -29,13 +35,17 @@ func iptest(t *hivesim.T) {
 	if len(clientDef) == 0 {
 		t.Fatal("no clients available")
 	}
-	client := t.StartClient(clientDef[0].Name)
+	return t.StartClient(clientDef[0].Name, options...)
+}
+
+func ipTest(t *hivesim.T) {
+	client := startAnyClient(t)
 
 	// This creates a network and connects both the client and the simulation container to it.
 	network := "network1"
-	err = t.Sim.CreateNetwork(t.SuiteID, network)
+	err := t.Sim.CreateNetwork(t.SuiteID, network)
 	if err != nil {
-		t.Fatal("can't not create network:", err)
+		t.Fatal("can't create network:", err)
 	}
 	if err := t.Sim.ConnectContainer(t.SuiteID, network, client.Container); err != nil {
 		t.Fatal("can't connect container to network:", err)
@@ -84,4 +94,22 @@ func iptest(t *hivesim.T) {
 	if err := t.Sim.RemoveNetwork(t.SuiteID, network); err != nil {
 		t.Fatal("can't remove network:", err)
 	}
+}
+
+// This test creates a network and configures a client to be connected to it before startup.
+func initialNetworkTest(t *hivesim.T) {
+	network := "network2"
+	err := t.Sim.CreateNetwork(t.SuiteID, network)
+	if err != nil {
+		t.Fatal("can't create network:", err)
+	}
+
+	client := startAnyClient(t, hivesim.WithInitialNetworks([]string{network}))
+
+	// Now get the IP on this network.
+	clientIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, client.Container)
+	if err != nil {
+		t.Fatal("can't get IP address of container:", err)
+	}
+	t.Log("client IP", clientIP)
 }
