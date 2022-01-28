@@ -250,15 +250,15 @@ This request starts a client container. The request body must be encoded as mult
 The `CLIENT` form parameter is required and specifies the client type that should be
 started. It must match one of the client names returned by the `/clients` endpoint.
 
-The `NETWORKS` form parameter is a list of networks to which the client will be connected
-before it starts to run. The names are supplied comma-separated, and all given networks
-must already exist in the context of the test suite.
+The `NETWORKS` form parameter is optional and configures network to which the client will
+be connected before it starts to run. Network names are supplied as a comma-separated
+list, and all networks must already exist in the context of the test suite.
 
-Other form fields, specifically those with a prefix of `HIVE_`, are passed to the client
-entry point as environment variables. Please see the [client interface documentation] for
-environment variables supported by Ethereum clients.
+Other form parameters, specifically those with a prefix of `HIVE_`, are passed to the
+client entry point as environment variables. Please see the [client interface documentation]
+for environment variables supported by Ethereum clients.
 
-Form fields with a filename are copied into the client container as files.
+Parameters with a filename are copied into the client container as files.
 
 Response:
 
