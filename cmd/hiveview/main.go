@@ -3,6 +3,7 @@
 package main
 
 import (
+	"embed"
 	"flag"
 	"io/fs"
 	"log"
@@ -12,6 +13,9 @@ import (
 
 	"github.com/gorilla/mux"
 )
+
+//go:embed assets
+var embeddedAssets embed.FS
 
 func main() {
 	var (
