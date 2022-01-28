@@ -12,8 +12,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/hivesim"
@@ -103,7 +103,7 @@ func calcTxsHash(txsBytes [][]byte) (common.Hash, error) {
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
 // BlockHash is calculated automatically.
-func customizePayload(basePayload *catalyst.ExecutableDataV1, customData *CustomPayloadData) (*catalyst.ExecutableDataV1, error) {
+func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPayloadData) (*beacon.ExecutableDataV1, error) {
 	txs := basePayload.Transactions
 	if customData.Transactions != nil {
 		txs = *customData.Transactions
@@ -172,7 +172,7 @@ func customizePayload(basePayload *catalyst.ExecutableDataV1, customData *Custom
 	}
 
 	// Return the new payload
-	return &catalyst.ExecutableDataV1{
+	return &beacon.ExecutableDataV1{
 		ParentHash:    customPayloadHeader.ParentHash,
 		FeeRecipient:  customPayloadHeader.Coinbase,
 		StateRoot:     customPayloadHeader.Root,

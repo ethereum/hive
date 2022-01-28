@@ -6,10 +6,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -23,21 +22,37 @@ func engineAPIPoWTests(t *TestEnv) {
 	// Test that the engine_ directives are correctly ignored when the chain has not yet reached TTD
 	gblock := loadGenesis()
 
-	forkchoiceState := catalyst.ForkchoiceStateV1{
+	// First get latest header
+	latestH, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
+	if err != nil {
+		t.Fatalf("FAIL (%v): Unable to get latest header: %v", t.TestName, err)
+	}
+
+	forkchoiceState := beacon.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
 		SafeBlockHash:      gblock.Hash(),
 		FinalizedBlockHash: gblock.Hash(),
 	}
-	resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceState, nil)
-	if err == nil {
-		t.Fatalf("FAIL (%v): ForkchoiceUpdated accepted under PoW rule: %v, %v", t.TestName, resp, err)
+	fcResp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceState, nil)
+	if err != nil {
+		t.Fatalf("FAIL (%v): ForkchoiceUpdated under PoW rule returned error (Expected INVALID): %v, %v", t.TestName, err)
 	}
-	payloadresp, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), &hexutil.Bytes{1, 2, 3, 4, 5, 6, 7, 8})
+	if fcResp.PayloadStatus.Status != "INVALID" {
+		t.Fatalf("INFO (%v): Error in PoW response (Expected Status=INVALID): %v", t.TestName, err)
+	}
+	if fcResp.PayloadStatus.LatestValidHash != latestH.Hash() {
+		t.Fatalf("INFO (%v): Error in PoW response (Expected LatestValidHash=%v): %v != %v", t.TestName, latestH.Hash(), fcResp.PayloadStatus.LatestValidHash)
+	}
+	if fcResp.PayloadStatus.ValidationError != "Invalid terminal block" {
+		t.Fatalf("INFO (%v): Error in PoW response (Expected ValidationError=Invalid terminal block): %v", t.TestName, fcResp.PayloadStatus.ValidationError)
+	}
+
+	payloadResp, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), &beacon.PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
 	if err == nil {
-		t.Fatalf("FAIL (%v): GetPayloadV1 accepted under PoW rule: %v, %v", t.TestName, payloadresp, err)
+		t.Fatalf("FAIL (%v): GetPayloadV1 accepted under PoW rule: %v, %v", t.TestName, payloadResp, err)
 	}
 	// Create a dummy payload to send in the ExecutePayload call
-	payload := catalyst.ExecutableDataV1{
+	payload := beacon.ExecutableDataV1{
 		ParentHash:    common.Hash{},
 		FeeRecipient:  common.Address{},
 		StateRoot:     common.Hash{},
@@ -53,9 +68,18 @@ func engineAPIPoWTests(t *TestEnv) {
 		BlockHash:     common.Hash{},
 		Transactions:  [][]byte{},
 	}
-	execresp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), &payload)
-	if err == nil {
-		t.Fatalf("FAIL (%v): ExecutePayloadV1 accepted under PoW rule: %v, %v", t.TestName, execresp, err)
+	execPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &payload)
+	if err != nil {
+		t.Fatalf("FAIL (%v): EngineNewPayloadV1 under PoW rule returned error (Expected INVALID): %v, %v", t.TestName, err)
+	}
+	if execPayloadResp.Status != "INVALID" {
+		t.Fatalf("INFO (%v): Error in PoW response (Expected Status=INVALID): %v", t.TestName, err)
+	}
+	if execPayloadResp.LatestValidHash != latestH.Hash() {
+		t.Fatalf("INFO (%v): Error in PoW response (Expected LatestValidHash=%v): %v != %v", t.TestName, latestH.Hash(), execPayloadResp.LatestValidHash)
+	}
+	if execPayloadResp.ValidationError != "Invalid terminal block" {
+		t.Fatalf("INFO (%v): Error in PoW response (Expected ValidationError=Invalid terminal block): %v", t.TestName, execPayloadResp.ValidationError)
 	}
 
 }
@@ -75,7 +99,7 @@ func unknownSafeBlockHash(t *TestEnv) {
 		rand.Read(randomSafeBlockHash[:])
 
 		// Send forkchoiceUpdated with random SafeBlockHash
-		forkchoiceStateUnknownSafeHash := catalyst.ForkchoiceStateV1{
+		forkchoiceStateUnknownSafeHash := beacon.ForkchoiceStateV1{
 			HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 			SafeBlockHash:      randomSafeBlockHash,
 			FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -112,7 +136,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 	rand.Read(randomFinalizedBlockHash[:])
 
 	// Send forkchoiceUpdated with random FinalizedBlockHash
-	forkchoiceStateUnknownFinalizedHash := catalyst.ForkchoiceStateV1{
+	forkchoiceStateUnknownFinalizedHash := beacon.ForkchoiceStateV1{
 		HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 		SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 		FinalizedBlockHash: randomFinalizedBlockHash,
@@ -121,12 +145,12 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
 	}
-	if resp.Status != "SYNCING" {
+	if resp.PayloadStatus.Status != "SYNCING" {
 		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with unknown FinalizedBlockHash is not SYNCING: %v, %v", t.TestName, resp)
 	}
 
 	// Test again using PayloadAttributes, should also return SYNCING and no PayloadID
-	payloadAttr := catalyst.PayloadAttributesV1{
+	payloadAttr := beacon.PayloadAttributesV1{
 		Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
 		Random:                common.Hash{},
 		SuggestedFeeRecipient: common.Address{},
@@ -135,7 +159,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
 	}
-	if resp.Status != "SYNCING" {
+	if resp.PayloadStatus.Status != "SYNCING" {
 		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with unknown FinalizedBlockHash is not SYNCING: %v, %v", t.TestName, resp)
 	}
 	if resp.PayloadID != nil {
@@ -162,7 +186,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 	randomHeadBlockHash := common.Hash{}
 	rand.Read(randomHeadBlockHash[:])
 
-	forkchoiceStateUnknownHeadHash := catalyst.ForkchoiceStateV1{
+	forkchoiceStateUnknownHeadHash := beacon.ForkchoiceStateV1{
 		HeadBlockHash:      randomHeadBlockHash,
 		SafeBlockHash:      t.CLMock.LatestForkchoice.FinalizedBlockHash,
 		FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -174,12 +198,16 @@ func unknownHeadBlockHash(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown HeadBlockHash: %v", t.TestName, err)
 	}
-	if resp.Status != "SYNCING" {
+	// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
+	// - {payloadStatus: {status: SYNCING, latestValidHash: null, validationError: null}, payloadId: null}
+	//   if forkchoiceState.headBlockHash references an unknown payload or a payload that can't be validated
+	//   because requisite data for the validation is missing
+	if resp.PayloadStatus.Status != "SYNCING" {
 		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with unknown HeadBlockHash is not SYNCING: %v", t.TestName, resp)
 	}
 
 	// Test again using PayloadAttributes, should also return SYNCING and no PayloadID
-	payloadAttr := catalyst.PayloadAttributesV1{
+	payloadAttr := beacon.PayloadAttributesV1{
 		Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
 		Random:                common.Hash{},
 		SuggestedFeeRecipient: common.Address{},
@@ -188,7 +216,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown HeadBlockHash: %v, %v", t.TestName, err)
 	}
-	if resp.Status != "SYNCING" {
+	if resp.PayloadStatus.Status != "SYNCING" {
 		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with unknown HeadBlockHash is not SYNCING: %v, %v", t.TestName, resp)
 	}
 	if resp.PayloadID != nil {
@@ -214,7 +242,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 
 	// Send the Genesis block as forkchoice
 	gblock := loadGenesis()
-	forkchoiceStateGenesisHash := catalyst.ForkchoiceStateV1{
+	forkchoiceStateGenesisHash := beacon.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
 		SafeBlockHash:      gblock.Hash(),
 		FinalizedBlockHash: gblock.Hash(),
@@ -233,8 +261,8 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
 	}
-	if resp.Status != "SUCCESS" {
-		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with genesis is not SUCCESS: %v, %v", t.TestName, resp)
+	if resp.PayloadStatus.Status != "VALID" {
+		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with LatestForkchoice is not VALID: %v, %v", t.TestName, resp)
 	}
 }
 
@@ -256,9 +284,14 @@ func badHashOnExecPayload(t *TestEnv) {
 	// Alter hash on the payload and send it to client, should produce an error
 	alteredPayload := t.CLMock.LatestPayloadBuilt
 	alteredPayload.BlockHash[common.HashLength-1] = byte(255 - alteredPayload.BlockHash[common.HashLength-1])
-	execPayloadResp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), &alteredPayload)
-	if err == nil {
-		t.Fatalf("FAIL (%v): Incorrect block hash in execute payload was not rejected: %v", t.TestName, execPayloadResp)
+	execPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &alteredPayload)
+	// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
+	// - {status: INVALID_BLOCK_HASH, latestValidHash: null, validationError: null} if the blockHash validation has failed
+	if err != nil {
+		t.Fatalf("FAIL (%v): Incorrect block hash in execute payload resulted in error: %v", t.TestName, err)
+	}
+	if execPayloadResp.Status != "INVALID_BLOCK_HASH" {
+		t.Fatalf("FAIL (%v): Incorrect block hash in execute payload returned unexpected status (exp INVALID_BLOCK_HASH): %v", t.TestName, execPayloadResp.Status)
 	}
 }
 
@@ -337,22 +370,54 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%v): Unable to modify payload (%v): %v", t.TestName, customPayloadMod, err)
 		}
-		execPayloadResp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), alteredPayload)
-		if payloadField == "ParentHash" {
-			// An invalid ParentHash must return SYNCING state according to the execution-apis:
-			// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
-			if err != nil {
-				t.Fatalf("FAIL (%v): Incorrect %v in executePayload was rejected: %v", t.TestName, payloadField, err)
-			}
-			if execPayloadResp.Status != "SYNCING" {
-				t.Fatalf("FAIL (%v): Incorrect %v in executePayload returned incorrect status: %v", t.TestName, payloadField, execPayloadResp)
-			}
-		} else {
-			if err == nil {
-				t.Fatalf("FAIL (%v): Incorrect %v in executePayload was not rejected: %v", t.TestName, payloadField, execPayloadResp)
-			}
+		execPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), alteredPayload)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Incorrect %v in EngineNewPayload was rejected: %v", t.TestName, payloadField, err)
 		}
-		// TODO: Send each payload twice; once right after reaching TTD, and one afterwards.
+		// Depending on the field we modified, we expect a different status
+		var expectedState string
+		if payloadField == "ParentHash" {
+			// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
+			// {status: ACCEPTED, latestValidHash: null, validationError: null} if the following conditions are met:
+			//  - the blockHash of the payload is valid
+			//  - the payload doesn't extend the canonical chain
+			//  - the payload hasn't been fully validated
+			expectedState = "ACCEPTED"
+			// TODO: "latestValidHash: null" part
+		} else {
+			expectedState = "INVALID"
+		}
+
+		if execPayloadResp.Status != expectedState {
+			t.Fatalf("FAIL (%v): EngineNewPayload with reference to invalid payload returned incorrect state: %v!=%v", execPayloadResp.Status, expectedState)
+		}
+
+		// Send the forkchoiceUpdated with a reference to the invalid payload.
+		fcState := beacon.ForkchoiceStateV1{
+			HeadBlockHash:      alteredPayload.BlockHash,
+			SafeBlockHash:      alteredPayload.BlockHash,
+			FinalizedBlockHash: alteredPayload.BlockHash,
+		}
+		payloadAttrbutes := beacon.PayloadAttributesV1{
+			Timestamp:             alteredPayload.Timestamp + 1,
+			Random:                common.Hash{},
+			SuggestedFeeRecipient: common.Address{},
+		}
+		fcResp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &fcState, &payloadAttrbutes)
+		// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+		//  {payloadStatus: {status: INVALID, latestValidHash: null, validationError: errorMessage | null}, payloadId: null}
+		//  obtained from the Payload validation process if the payload is deemed INVALID
+		if err != nil {
+			t.Fatalf("FAIL (%v): ForkchoiceUpdated with reference to invalid payload resulted in error: %v", t.TestName, err)
+		}
+		if payloadField == "ParentHash" {
+			expectedState = "SYNCING"
+		} else {
+			expectedState = "INVALID"
+		}
+		if fcResp.PayloadStatus.Status != expectedState {
+			t.Fatalf("FAIL (%v): ForkchoiceUpdated with reference to invalid payload returned incorrect state: %v!=%v", t.TestName, fcResp.PayloadStatus.Status, expectedState)
+		}
 	}
 }
 
@@ -470,27 +535,27 @@ func blockStatusReorg(t *TestEnv) {
 
 	// Wait for SafeBlock Forkchoice Update (or shutdown/timeout)
 	select {
-	case <-t.CLMock.OnSafeBlockForkchoiceUpdate:
-		defer t.CLMock.OnSafeBlockForkchoiceUpdate.Yield()
+	case <-t.CLMock.OnHeadBlockForkchoiceUpdate:
+		defer t.CLMock.OnHeadBlockForkchoiceUpdate.Yield()
 	case <-t.CLMock.OnShutdown:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
 	}
 
-	// Verify the client is serving the latest SafeBlock
+	// Verify the client is serving the latest HeadBlock
 	currentBlockHeader, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to get latest block header: %v", t.TestName, err)
 	}
 	if currentBlockHeader.Hash() != t.CLMock.LatestForkchoice.HeadBlockHash ||
-		currentBlockHeader.Hash() != t.CLMock.LatestForkchoice.SafeBlockHash ||
+		currentBlockHeader.Hash() == t.CLMock.LatestForkchoice.SafeBlockHash ||
 		currentBlockHeader.Hash() == t.CLMock.LatestForkchoice.FinalizedBlockHash {
-		t.Fatalf("FAIL (%v): latest block header doesn't match SafeBlock hash: %v, %v", t.TestName, currentBlockHeader.Hash(), t.CLMock.LatestForkchoice)
+		t.Fatalf("FAIL (%v): latest block header doesn't match HeadBlock hash: %v, %v", t.TestName, currentBlockHeader.Hash(), t.CLMock.LatestForkchoice)
 	}
 
 	// Reorg back to the previous block (FinalizedBlock)
-	reorgForkchoice := catalyst.ForkchoiceStateV1{
+	reorgForkchoice := beacon.ForkchoiceStateV1{
 		HeadBlockHash:      t.CLMock.LatestForkchoice.FinalizedBlockHash,
 		SafeBlockHash:      t.CLMock.LatestForkchoice.FinalizedBlockHash,
 		FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -499,8 +564,11 @@ func blockStatusReorg(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
 	}
-	if resp.Status != "SUCCESS" {
-		t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
+	if resp.PayloadStatus.Status != "VALID" {
+		t.Fatalf("FAIL (%v): Incorrect status returned after a HeadBlockHash reorg: %v", t.TestName, resp.PayloadStatus.Status)
+	}
+	if resp.PayloadStatus.LatestValidHash != t.CLMock.LatestForkchoice.FinalizedBlockHash {
+		t.Fatalf("FAIL (%v): Incorrect latestValidHash returned after a HeadBlockHash reorg: %v!=%v", t.TestName, resp.PayloadStatus.LatestValidHash, t.CLMock.LatestForkchoice.FinalizedBlockHash)
 	}
 
 	// Check that we reorg to the previous block
@@ -513,13 +581,16 @@ func blockStatusReorg(t *TestEnv) {
 		t.Fatalf("FAIL (%v): latest block header doesn't match reorg hash: %v, %v", t.TestName, currentBlockHeader.Hash(), t.CLMock.LatestForkchoice)
 	}
 
-	// Send the SafeBlock again to leave everything back the way it was
+	// Send the HeadBlock again to leave everything back the way it was
 	resp, err = t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &t.CLMock.LatestForkchoice, nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
 	}
-	if resp.Status != "SUCCESS" {
-		t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
+	if resp.PayloadStatus.Status != "VALID" {
+		t.Fatalf("FAIL (%v): Incorrect status returned after a HeadBlockHash reorg: %v", t.TestName, resp.PayloadStatus.Status)
+	}
+	if resp.PayloadStatus.LatestValidHash != t.CLMock.LatestForkchoice.HeadBlockHash {
+		t.Fatalf("FAIL (%v): Incorrect latestValidHash returned after a HeadBlockHash reorg: %v!=%v", t.TestName, resp.PayloadStatus.LatestValidHash, t.CLMock.LatestForkchoice.FinalizedBlockHash)
 	}
 
 }
@@ -607,7 +678,7 @@ func transactionReorg(t *TestEnv) {
 		}
 
 		// Re-org back to a previous block where the tx is not included using forkchoiceUpdated
-		reorgForkchoice := catalyst.ForkchoiceStateV1{
+		reorgForkchoice := beacon.ForkchoiceStateV1{
 			HeadBlockHash:      reorgBlock.Hash(),
 			SafeBlockHash:      reorgBlock.Hash(),
 			FinalizedBlockHash: reorgBlock.Hash(),
@@ -616,7 +687,7 @@ func transactionReorg(t *TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
 		}
-		if resp.Status != "SUCCESS" {
+		if resp.PayloadStatus.Status != "VALID" {
 			t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
 		}
 
@@ -636,7 +707,7 @@ func transactionReorg(t *TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
 		}
-		if resp.Status != "SUCCESS" {
+		if resp.PayloadStatus.Status != "VALID" {
 			t.Fatalf("FAIL (%v): Could not send forkchoiceUpdatedV1: %v", t.TestName, err)
 		}
 	}
@@ -670,7 +741,7 @@ func reExecPayloads(t *TestEnv) {
 	}
 	for i := lastBlock - uint64(payloadReExecCount); i <= lastBlock; i++ {
 		payload := t.CLMock.ExecutedPayloadHistory[i]
-		execPayloadResp, err := t.Engine.EngineExecutePayloadV1(t.Engine.Ctx(), &payload)
+		execPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &payload)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Unable to re-execute valid payload: %v", err)
 		}

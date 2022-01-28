@@ -6,8 +6,7 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/eth/catalyst"
+	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
@@ -79,20 +78,20 @@ func (ec *EngineClient) Ctx() context.Context {
 }
 
 // Engine API Call Methods
-func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *catalyst.ForkchoiceStateV1, pAttributes *catalyst.PayloadAttributesV1) (catalyst.ForkChoiceResponse, error) {
-	var result catalyst.ForkChoiceResponse
+func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
+	var result beacon.ForkChoiceResponse
 	err := ec.c.CallContext(ctx, &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
 	return result, err
 }
 
-func (ec *EngineClient) EngineGetPayloadV1(ctx context.Context, payloadId *hexutil.Bytes) (catalyst.ExecutableDataV1, error) {
-	var result catalyst.ExecutableDataV1
+func (ec *EngineClient) EngineGetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableDataV1, error) {
+	var result beacon.ExecutableDataV1
 	err := ec.c.CallContext(ctx, &result, "engine_getPayloadV1", payloadId)
 	return result, err
 }
 
-func (ec *EngineClient) EngineExecutePayloadV1(ctx context.Context, payload *catalyst.ExecutableDataV1) (catalyst.ExecutePayloadResponse, error) {
-	var result catalyst.ExecutePayloadResponse
-	err := ec.c.CallContext(ctx, &result, "engine_executePayloadV1", payload)
+func (ec *EngineClient) EngineNewPayloadV1(ctx context.Context, payload *beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
+	var result beacon.PayloadStatusV1
+	err := ec.c.CallContext(ctx, &result, "engine_newPayloadV1", payload)
 	return result, err
 }
