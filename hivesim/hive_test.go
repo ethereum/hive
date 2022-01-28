@@ -294,7 +294,7 @@ func TestRunProgram(t *testing.T) {
 	}
 
 	// Run a script that doesn't exist.
-	res, err = sim.ClientExec(suiteID, testID, clientID, []string{"a-script"})
+	_, err = sim.ClientExec(suiteID, testID, clientID, []string{"a-script"})
 	if err == nil {
 		t.Fatal("no error from ClientExec for non-existent script")
 	}
