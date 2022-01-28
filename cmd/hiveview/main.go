@@ -4,16 +4,14 @@ package main
 
 import (
 	"flag"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
 
-	"github.com/ethereum/hive/cmd/hiveview/assets"
 	"github.com/gorilla/mux"
 )
-
-//go:generate go run github.com/mjibson/esc -pkg assets -o assets/assets.go -prefix assets/ assets/
 
 func main() {
 	var (
@@ -23,7 +21,7 @@ func main() {
 	)
 	flag.StringVar(&config.listenAddr, "addr", "0.0.0.0:8080", "HTTP server listen address")
 	flag.StringVar(&config.logdir, "logdir", "workspace/logs", "Path to hive simulator log directory")
-	flag.BoolVar(&config.useLocalAssets, "local-assets", false, "Serve result view app from file system")
+	flag.StringVar(&config.assetsDir, "assets", "", "Path to static files directory. Serves baked-in assets when not set.")
 	flag.Parse()
 
 	log.SetFlags(log.LstdFlags)
@@ -38,20 +36,33 @@ func main() {
 }
 
 type serverConfig struct {
-	listenAddr     string
-	logdir         string
-	useLocalAssets bool
+	listenAddr string
+	logdir     string
+	assetsDir  string
 }
 
 func runServer(config serverConfig) {
+	var assetFS fs.FS
+	if config.assetsDir != "" {
+		if stat, _ := os.Stat(config.assetsDir); stat == nil || !stat.IsDir() {
+			log.Fatalf("-assets: %q is not a directory", config.assetsDir)
+		}
+		assetFS = os.DirFS(config.assetsDir)
+	} else {
+		sub, err := fs.Sub(embeddedAssets, "assets")
+		if err != nil {
+			panic(err)
+		}
+		assetFS = sub
+	}
+
 	// Create handlers.
 	logHandler := http.FileServer(http.Dir(config.logdir))
-	assetHandler := http.FileServer(assets.Dir(config.useLocalAssets, ""))
 	listingHandler := serveListing{dir: config.logdir}
 	mux := mux.NewRouter()
 	mux.Handle("/listing.jsonl", listingHandler).Methods("GET")
 	mux.PathPrefix("/results").Handler(http.StripPrefix("/results/", logHandler))
-	mux.PathPrefix("/").Handler(assetHandler)
+	mux.PathPrefix("/").Handler(http.FileServer(http.FS(assetFS)))
 
 	// Start the server.
 	l, err := net.Listen("tcp", config.listenAddr)
