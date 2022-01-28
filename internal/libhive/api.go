@@ -251,13 +251,11 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	options.LogFile = logFilePath
 
 	// Connect to the networks if requested, so it is started already joined to each one.
-	if networks != nil {
-		for _, network := range networks {
-			if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
-				log15.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
+	for _, network := range networks {
+		if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
+			log15.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	}
 
