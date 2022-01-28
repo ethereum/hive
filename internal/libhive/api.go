@@ -351,7 +351,7 @@ func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
 	status := apiNodeInfo{ID: nodeInfo.ID, Name: nodeInfo.Name}
 	statusJSON, _ := json.Marshal(&status)
 
-	w.Header.Set("content-type", "application/json")
+	w.Header().Set("content-type", "application/json")
 	w.Write(statusJSON)
 }
 
