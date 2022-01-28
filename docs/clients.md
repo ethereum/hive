@@ -31,16 +31,17 @@ with prefix `HIVE_`. It may also upload files into the container before it start
 the container is created, hive simply runs the entry point defined in the `Dockerfile`.
 
 For all client containers, hive waits for TCP port 8545 to open before considering the
-client ready for use by the simulator. This port is configurable as`HIVE_CHECK_LIVE_PORT`,
-and can be disabled with `0`. When enabled, if the client container does not open this
-port within a certain timeout, hive assumes the client has failed to start.
+client ready for use by the simulator. This port is configurable through the
+`HIVE_CHECK_LIVE_PORT` variable, and the check can be disabled by setting it to `0`. If
+the client container does not open this port within a certain timeout, hive assumes the
+client has failed to start.
 
-Environment variables and files interpreted by the entry point define a 'protocol'
-between the simulator and client. While hive itself does not require support for any
-specific variables or files, simulators usually expect client containers to be
-configurable in certain ways. In order to run tests against multiple Ethereum clients, for
-example, the simulator needs to be able to configure all clients for a specific blockchain
-and make them join the peer-to-peer network used for testing.
+Environment variables and files interpreted by the entry point define a 'protocol' between
+the simulator and client. While hive itself does not require support for any specific
+variables or files, simulators usually expect client containers to be configurable in
+certain ways. In order to run tests against multiple Ethereum clients, for example, the
+simulator needs to be able to configure all clients for a specific blockchain and make
+them join the peer-to-peer network used for testing.
 
 ## Client Metadata
 
