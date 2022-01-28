@@ -14,9 +14,6 @@ type ContainerBackend interface {
 	StartContainer(ctx context.Context, containerID string, opt ContainerOptions) (*ContainerInfo, error)
 	DeleteContainer(containerID string) error
 
-	// RunEnodeSh runs the /enode.sh script in the given container and returns its output.
-	RunEnodeSh(ctx context.Context, containerID string) (string, error)
-
 	// RunProgram runs a command in the given container and returns its outputs and exit code.
 	RunProgram(ctx context.Context, containerID string, cmdline []string) (*ExecInfo, error)
 

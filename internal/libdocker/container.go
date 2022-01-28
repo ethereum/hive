@@ -34,31 +34,6 @@ func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
 	return b
 }
 
-// RunEnodeSh runs the enode.sh script in a container.
-func (b *ContainerBackend) RunEnodeSh(ctx context.Context, containerID string) (string, error) {
-	exec, err := b.client.CreateExec(docker.CreateExecOptions{
-		Context:      ctx,
-		AttachStdout: true,
-		AttachStderr: false,
-		Tty:          false,
-		Cmd:          []string{"/enode.sh"},
-		Container:    containerID,
-	})
-	if err != nil {
-		return "", fmt.Errorf("can't create enode.sh exec in %s: %v", containerID, err)
-	}
-	outputBuf := new(bytes.Buffer)
-	err = b.client.StartExec(exec.ID, docker.StartExecOptions{
-		Context:      ctx,
-		Detach:       false,
-		OutputStream: outputBuf,
-	})
-	if err != nil {
-		return "", fmt.Errorf("can't run enode.sh in %s: %v", containerID, err)
-	}
-	return outputBuf.String(), nil
-}
-
 func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
 	exec, err := b.client.CreateExec(docker.CreateExecOptions{
 		Context:      ctx,

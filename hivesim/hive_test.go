@@ -49,9 +49,6 @@ func TestEnodeReplaceIP(t *testing.T) {
 	// localhost IP.
 	urlBase := "enode://a61215641fb8714a373c80edbfa0ea8878243193f57c96eeb44d0bc019ef295abd4e044fd619bfc4c59731a73fb79afe84e9ab6da0c743ceb479cbb6d263fa91@"
 	hooks := &fakes.BackendHooks{
-		RunEnodeSh: func(string) (string, error) {
-			return urlBase + "127.0.0.1:8000", nil
-		},
 		RunProgram: func(string, []string) (*libhive.ExecInfo, error) {
 			return &libhive.ExecInfo{
 				Stdout:   urlBase + "127.0.0.1:8000",

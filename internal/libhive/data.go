@@ -57,6 +57,12 @@ type ClientInfo struct {
 	wait func()
 }
 
+// apiNodeInfo is the description of a running client as returned by the API.
+type apiNodeInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 // ExecInfo is the result of running a script in a client container.
 type ExecInfo struct {
 	Stdout   string `json:"stdout"`

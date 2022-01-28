@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
-	"net"
 	"net/http"
 	"path"
 	"path/filepath"
@@ -16,7 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/gorilla/mux"
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -36,7 +34,7 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Hand
 	router := mux.NewRouter()
 	router.HandleFunc("/clients", api.getClientTypes).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/exec", api.execInClient).Methods("POST")
-	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getEnodeURL).Methods("GET")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getNodeStatus).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/test", api.startTest).Methods("POST")
@@ -334,8 +332,8 @@ func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getEnodeURL gets the enode URL of the client.
-func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
+// getNodeStatus returns the status of a client container.
+func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
 	suiteID, testID, err := api.requestSuiteAndTest(r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
@@ -349,36 +347,12 @@ func (api *simAPI) getEnodeURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
-	output, err := api.backend.RunEnodeSh(r.Context(), nodeInfo.ID)
-	if err != nil {
-		log15.Error("API: error running enode.sh", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
 
-	// Check that the container returned a valid enode URL.
-	output = strings.TrimSpace(output)
-	n, err := enode.ParseV4(output)
-	if err != nil {
-		log15.Error("API: enode.sh returned bad URL", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	tcpPort := n.TCP()
-	if tcpPort == 0 {
-		log15.Warn("API: enode.sh returned TCP port zero", "node", node, "client", nodeInfo.Name)
-		tcpPort = 30303
-	}
-	udpPort := n.UDP()
-	if udpPort == 0 {
-		log15.Warn("API: enode.sh returned UDP port zero", "node", node, "client", nodeInfo.Name)
-		udpPort = 30303
-	}
+	status := apiNodeInfo{ID: nodeInfo.ID, Name: nodeInfo.Name}
+	statusJSON, _ := json.Marshal(&status)
 
-	// Switch out the IP with the container's IP on the primary network.
-	// This is required because the client usually doesn't know its own IP.
-	fixedIP := enode.NewV4(n.Pubkey(), net.ParseIP(nodeInfo.IP), tcpPort, udpPort)
-	io.WriteString(w, fixedIP.URLv4())
+	w.Header.Set("content-type", "application/json")
+	w.Write(statusJSON)
 }
 
 func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
