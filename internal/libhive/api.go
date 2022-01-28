@@ -215,14 +215,16 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// Get the client name.
 	clientDef, err := api.checkClient(r)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("could not parse node request: %s", err.Error()), http.StatusBadRequest)
+		log15.Error("API: " + err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	// Get the network names, if any, for the container to be connected to at start
-	networks, err := api.checkClientNetworks(r)
+	// Get the network names, if any, for the container to be connected to at start.
+	networks, err := api.checkClientNetworks(r, suiteID)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("could not parse node request: %s", err.Error()), http.StatusBadRequest)
+		log15.Error("API: " + err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
@@ -248,7 +250,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	logPath, logFilePath := api.clientLogFilePaths(clientDef.Name, containerID)
 	options.LogFile = logFilePath
 
-	// Connect to the networks if requested, so it is started already joined to each one
+	// Connect to the networks if requested, so it is started already joined to each one.
 	if networks != nil {
 		for _, network := range networks {
 			if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
@@ -320,49 +322,31 @@ func (api *simAPI) clientLogFilePaths(clientName, containerID string) (jsonPath 
 func (api *simAPI) checkClient(r *http.Request) (*ClientDefinition, error) {
 	name := r.FormValue("CLIENT")
 	if name == "" {
-		log15.Error("API: missing client name in start node request")
-		return nil, errors.New("missing 'CLIENT' in request")
+		return nil, errors.New("missing 'CLIENT' in client start request")
 	}
-	if def, ok := api.env.Definitions[name]; ok {
-		return def, nil
+	def, ok := api.env.Definitions[name]
+	if !ok {
+		return nil, errors.New("unknown 'CLIENT' type in client start request")
 	}
-	// Client name not found.
-	log15.Error("API: unknown client name in start node request")
-	return nil, errors.New("unknown 'CLIENT' type in request")
+	return def, nil
 }
 
 // Parse request to start a client and be added to a specific set of networks upon startup
-func (api *simAPI) checkClientNetworks(r *http.Request) ([]string, error) {
+func (api *simAPI) checkClientNetworks(r *http.Request, suiteID TestSuiteID) ([]string, error) {
 	networksStr := r.FormValue("NETWORKS")
 	if networksStr == "" {
 		return nil, nil
 	}
 
 	networks := strings.Split(networksStr, ",")
-
 	if len(networks) == 0 {
 		return nil, nil
 	}
-
-	suiteID, err := api.requestSuite(r)
-	if err != nil {
-		log15.Error("API: could not parse client networks in start node request", "error", err)
-		return nil, err
-	}
-
-	// Check that each network indeed exists
 	for _, network := range networks {
-		netExists, err := api.tm.NetworkExists(suiteID, network)
-		if err != nil {
-			log15.Error("API: could not parse client networks in start node request", "error", err)
-			return nil, err
-		}
-		if !netExists {
-			log15.Error("API: network not found in start node request", "network", network)
-			return nil, errors.New(fmt.Sprintf("network '%v' not found", network))
+		if !api.tm.NetworkExists(suiteID, network) {
+			return nil, fmt.Errorf("invalid network name '%s' in client start request", network)
 		}
 	}
-
 	return networks, nil
 }
 
