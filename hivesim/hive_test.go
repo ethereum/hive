@@ -88,27 +88,16 @@ func TestEnodeReplaceIP(t *testing.T) {
 // This test checks the usage of common client start options.
 func TestStartClientStartOptions(t *testing.T) {
 	var lastOptions libhive.ContainerOptions
-	var lastConnectedNetworks map[string]bool
 	tm, srv := newFakeAPI(&fakes.BackendHooks{
 		StartContainer: func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 			lastOptions = opt
 			return &libhive.ContainerInfo{}, nil
 		},
-		ConnectContainer: func(containerID string, networkID string) error {
-			lastConnectedNetworks[networkID] = true
-			return nil
-		},
-		ContainerIP: func(containerID string, networkID string) (net.IP, error) {
-			if _, ok := lastConnectedNetworks[networkID]; ok {
-				return net.IP{203, 0, 113, 2}, nil
-			}
-			return nil, errors.New("container not connected")
-		},
 	})
 	defer srv.Close()
 	defer tm.Terminate()
 
-	// Start the client.
+	// Start the suite and test.
 	sim := NewAt(srv.URL)
 	suiteID, err := sim.StartSuite("suite", "", "")
 	if err != nil {
@@ -154,30 +143,6 @@ func TestStartClientStartOptions(t *testing.T) {
 		}
 		if got := lastOptions.Env["HIVE_BAR"]; got != "2" {
 			t.Fatalf("non-overwritten option changed or went missing, got: %s", got)
-		}
-	})
-
-	t.Run("initial_networks_option", func(t *testing.T) {
-		sim.CreateNetwork(suiteID, "Init Network 1")
-		sim.CreateNetwork(suiteID, "Init Network 2")
-		sim.CreateNetwork(suiteID, "Init Network 3")
-		defer sim.RemoveNetwork(suiteID, "Init Network 1")
-		defer sim.RemoveNetwork(suiteID, "Init Network 2")
-		defer sim.RemoveNetwork(suiteID, "Init Network 3")
-		lastConnectedNetworks = make(map[string]bool)
-		containerID, _, err := sim.StartClientWithOptions(suiteID, testID, "client-1",
-			WithInitialNetworks([]string{"Init Network 1", "Init Network 3"}))
-		if err != nil {
-			t.Fatalf("failed to start client with initial networks: %v", err)
-		}
-		if ip, _ := sim.ContainerNetworkIP(suiteID, "Init Network 1", containerID); ip != "203.0.113.2" {
-			t.Fatalf("network was not connected at start: %v", ip)
-		}
-		if ip, _ := sim.ContainerNetworkIP(suiteID, "Init Network 2", containerID); ip == "203.0.113.2" {
-			t.Fatalf("network was incorrectly connected at start: %v", ip)
-		}
-		if ip, _ := sim.ContainerNetworkIP(suiteID, "Init Network 3", containerID); ip != "203.0.113.2" {
-			t.Fatalf("network was not connected at start: %v", ip)
 		}
 	})
 
@@ -334,6 +299,66 @@ func TestStartClientErrors(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unknown 'CLIENT'") {
 		t.Fatalf("wrong error for GetNode with unknown CLIENT parameter: %q", err.Error())
+	}
+}
+
+func TestStartClientInitialNetworks(t *testing.T) {
+	var (
+		connections = make(map[string]net.IP)
+		ipcounter   byte
+	)
+	tm, srv := newFakeAPI(&fakes.BackendHooks{
+		StartContainer: func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+			return &libhive.ContainerInfo{}, nil
+		},
+		ConnectContainer: func(containerID string, networkID string) error {
+			ipcounter++
+			connections[containerID+networkID] = net.IP{203, 0, 113, ipcounter}
+			return nil
+		},
+		ContainerIP: func(containerID string, networkID string) (net.IP, error) {
+			ip, ok := connections[containerID+networkID]
+			if !ok {
+				return nil, errors.New("container not connected")
+			}
+			return ip, nil
+		},
+	})
+	defer srv.Close()
+	defer tm.Terminate()
+
+	sim := NewAt(srv.URL)
+	suiteID, err := sim.StartSuite("suite", "", "")
+	if err != nil {
+		t.Fatal("can't start suite:", err)
+	}
+	testID, err := sim.StartTest(suiteID, "test", "")
+	if err != nil {
+		t.Fatal("can't start test:", err)
+	}
+
+	// Create networks.
+	sim.CreateNetwork(suiteID, "Init Network 1")
+	sim.CreateNetwork(suiteID, "Init Network 2")
+	sim.CreateNetwork(suiteID, "Init Network 3")
+	defer sim.RemoveNetwork(suiteID, "Init Network 1")
+	defer sim.RemoveNetwork(suiteID, "Init Network 2")
+	defer sim.RemoveNetwork(suiteID, "Init Network 3")
+
+	// Start the client.
+	opt := WithInitialNetworks([]string{"Init Network 1", "Init Network 3"})
+	containerID, _, err := sim.StartClientWithOptions(suiteID, testID, "client-1", opt)
+	if err != nil {
+		t.Fatalf("failed to start client: %v", err)
+	}
+	if ip, _ := sim.ContainerNetworkIP(suiteID, "Init Network 1", containerID); ip != "203.0.113.1" {
+		t.Fatalf("network 1 was not connected at start: %v", ip)
+	}
+	if ip, _ := sim.ContainerNetworkIP(suiteID, "Init Network 2", containerID); ip != "" {
+		t.Fatalf("network 2 was incorrectly connected at start: %v", ip)
+	}
+	if ip, _ := sim.ContainerNetworkIP(suiteID, "Init Network 3", containerID); ip != "203.0.113.2" {
+		t.Fatalf("network 3 was not connected at start: %v", ip)
 	}
 }
 
