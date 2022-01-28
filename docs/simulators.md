@@ -259,18 +259,18 @@ Response:
 
     <container ID>@<IP address>@<MAC address>
 
-#### Geting the enode URL of a running client
+#### Geting client information
 
     GET /testsuite/{suite}/test/{test}/node/{container}
 
-This request returns the enode URL of a running client.
+This request returns basic information about a running client.
 
 Response:
 
     200 OK
-    content-type: text/plain
+    content-type: application/json
 
-    enode://1ba850b467b3b96eacdcb6c133d2c7907878794dbdfc114269c7f240d278594439f79975f87e43c45152072c9bd68f9311eb15fd37f1fd438812240e82de9ef9@172.17.0.3:30303
+    {"id":"abcdef1234","name":"go-ethereum_latest"}
 
 #### Running client scripts
 
