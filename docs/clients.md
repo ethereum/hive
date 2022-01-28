@@ -91,6 +91,12 @@ optimal, but tests requiring forking chains cannot create a single chain. The cl
 should start even if the blocks are invalid, i.e. after the import, the client's 'best
 block' should be the last valid, imported block.
 
+### Scripts
+
+Some tests require peer-to-peer node information of the client instance. All eth1 client
+containers must contain a `/hive-bin/enode.sh` script. This script should output the enode
+URL of the running instance.
+
 ### Environment
 
 Clients must support the following environment variables. The client's entry point script
@@ -120,12 +126,6 @@ may map these to command line flags or use them generate a config file, for exam
 | `HIVE_FORK_MUIRGLACIER`    | decimal              | [Muir Glacier][EIP-2387] transition block      |
 | `HIVE_FORK_BERLIN`         | decimal              | [Berlin][EIP-2070] transition block            |
 | `HIVE_FORK_LONDON`         | decimal              | [London][london-spec] transition block         |
-
-### Enode script
-
-Some tests require peer-to-peer node information of the client instance. The client
-container must contain an `/enode.sh` script that echoes the enode of the running
-instance. This script is executed by the Hive host in order to retrieve the enode URL.
 
 [geth-docker]: ../clients/go-ethereum/Dockerfile
 [oe-genesis-jq]: ../clients/openethereum/mapper.jq
