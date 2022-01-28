@@ -23,16 +23,10 @@ name like:
 See the [go-ethereum client definition][geth-docker] for an example of a client
 Dockerfile.
 
-### version.txt
-
-Client Dockerfiles are expected to generate a `/version.txt` file during build. Hive reads
-this file after building the container and attaches version information to the output of
-all test suites in which the client is launched.
-
 ### hive.yaml
 
-Hive reads additional metadata from `hive.yaml` file in the client directory (next to the
-Dockerfile). Currently, the only purpose of this file is specifying the client's role
+Hive reads additional metadata from the `hive.yaml` file in the client directory (next to
+the Dockerfile). Currently, the only purpose of this file is specifying the client's role
 list:
 
     roles:
@@ -43,6 +37,17 @@ The role list is available to simulators and can be used to differentiate betwee
 based on features. Declaring a client role also signals that the client supports certain
 role-specific environment variables and files. If `hive.yml` is missing or doesn't declare
 roles, the `eth1` role is assumed.
+
+### /version.txt
+
+Client Dockerfiles are expected to generate a `/version.txt` file during build. Hive reads
+this file after building the container and attaches version information to the output of
+all test suites in which the client is launched.
+
+### /hive-bin
+
+Executables placed into the `/hive-bin` directory of the client container can be invoked
+through the simulation API.
 
 ## Client Lifecycle
 
