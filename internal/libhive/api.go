@@ -340,12 +340,7 @@ func (api *simAPI) checkClientNetworks(r *http.Request, w http.ResponseWriter) (
 		return nil, nil
 	}
 
-	var networks []string
-	err := json.Unmarshal([]byte(networksStr), &networks)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return nil, err
-	}
+	networks := strings.Split(networksStr, ",")
 
 	if len(networks) == 0 {
 		return nil, nil
