@@ -223,7 +223,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	// Get the network names, if any, for the container to be connected to at start.
 	networks, err := api.checkClientNetworks(r, suiteID)
 	if err != nil {
-		log15.Error("API: " + err.Error())
+		log15.Error("API: "+err.Error(), "client", clientDef.Name)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
