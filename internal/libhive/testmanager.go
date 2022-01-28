@@ -292,6 +292,15 @@ func (manager *TestManager) ConnectContainer(testSuite TestSuiteID, networkName,
 	return manager.backend.ConnectContainer(containerID, networkID)
 }
 
+// NetworkExists reports whether a network exists in the current test context.
+func (manager *TestManager) NetworkExists(testSuite TestSuiteID, networkName string) bool {
+	manager.networkMutex.RLock()
+	defer manager.networkMutex.RUnlock()
+
+	_, exists := manager.networks[testSuite][networkName]
+	return exists
+}
+
 // DisconnectContainer disconnects the given container from the given network.
 func (manager *TestManager) DisconnectContainer(testSuite TestSuiteID, networkName, containerID string) error {
 	manager.networkMutex.RLock()

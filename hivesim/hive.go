@@ -312,11 +312,18 @@ func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerI
 	if err != nil {
 		return "", err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
 	if err != nil {
 		return "", err
 	}
-	return string(body), nil
+	body := strings.TrimSpace(string(bodyBytes))
+
+	if resp.StatusCode >= 400 {
+		return "", errors.New(body)
+	}
+	return body, nil
 }
 
 func (setup *clientSetup) postWithFiles(url string) (string, error) {
