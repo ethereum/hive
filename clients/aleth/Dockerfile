@@ -13,10 +13,9 @@ ADD mapper.jq /mapper.jq
 ADD genesis.json /genesis.json
 
 # Add the enode URL retriever script.
-ADD enode.sh /enode.sh
-RUN chmod +x /enode.sh
 RUN mkdir /hive-bin
-RUN ln -s /enode.sh /hive-bin/enode.sh
+ADD enode.sh /hive-bin/enode.sh
+RUN chmod +x /hive-bin/enode.sh
 
 # Copy buildinfo into version.json, and also remove the 'bool' field is_prerelease.
 RUN jq -r '.version' /usr/share/aleth/buildinfo.json > /version.txt

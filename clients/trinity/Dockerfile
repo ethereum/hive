@@ -19,10 +19,11 @@ ADD genesis.json /genesis.json
 ADD mapper.jq /mapper.jq
 ADD trinity.sh /trinity.sh
 RUN chmod +x /trinity.sh
-ADD enode.sh /enode.sh
-RUN chmod +x /enode.sh
+
+# Add the enode script.
 RUN mkdir /hive-bin
-RUN ln -s /enode.sh /hive-bin/enode.sh
+ADD enode.sh /hive-bin/enode.sh
+RUN chmod +x /hive-bin/enode.sh
 
 # Write the version file.
 RUN echo "branch: "$(git rev-parse --abbrev-ref HEAD)", commit: "$(git rev-parse HEAD)"" > /version.txt

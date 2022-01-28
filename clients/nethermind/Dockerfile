@@ -13,9 +13,11 @@ ADD enode.sh /enode.sh
 ADD nethermind.sh /nethermind.sh
 
 RUN chmod +x /nethermind.sh
-RUN chmod +x /enode.sh
+
+# Add the enode script.
 RUN mkdir /hive-bin
-RUN ln -s /enode.sh /hive-bin/enode.sh
+ADD enode.sh /hive-bin/enode.sh
+RUN chmod +x /hive-bin/enode.sh
 
 # Write the version file.
 RUN dotnet /nethermind/Nethermind.Runner.dll --version > /raw_version.txt && tail -n 1 /raw_version.txt > /version.txt
