@@ -22,15 +22,14 @@ The test then tries to connect to the client container via TCP on the new networ
 }
 
 func iptest(t *hivesim.T) {
-	clients, err := t.Sim.ClientTypes()
+	clientDef, err := t.Sim.ClientTypes()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(clients) == 0 {
+	if len(clientDef) == 0 {
 		t.Fatal("no clients available")
 	}
-	clientName := clients[0]
-	client := t.StartClient(clientName, nil, nil)
+	client := t.StartClient(clientDef[0].Name)
 
 	// This creates a network and connects both the client and the simulation container to it.
 	network := "network1"
