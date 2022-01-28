@@ -28,7 +28,7 @@ func fileAsSrc(path string) func() (io.ReadCloser, error) {
 	}
 }
 
-// WithInitialNetworks adds a list of network names as the initial networks the client must be connected before starting.
+// WithInitialNetworks configures networks that the client is initially connected to.
 func WithInitialNetworks(networks []string) StartOption {
 	return optionFunc(func(setup *clientSetup) {
 		setup.parameters["NETWORKS"] = strings.Join(networks, ",")
