@@ -3,12 +3,13 @@ package setup
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"time"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
-	"math/big"
-	"time"
 )
 
 // The runtime deposit contract code, along with the storage that would otherwise have been initialized
@@ -84,7 +85,7 @@ func BuildEth1Genesis() *Eth1Genesis {
 				MuirGlacierBlock:    big.NewInt(0),
 				BerlinBlock:         big.NewInt(0),
 				LondonBlock:         big.NewInt(0),
-				CatalystBlock:       nil, // TODO enable merge testing
+				MergeForkBlock:      nil, // TODO enable merge testing
 				Ethash:              nil,
 				Clique:              nil,
 			},
