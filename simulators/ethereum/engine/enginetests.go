@@ -357,7 +357,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		}
 		customPayloadMods["GasLimit"] = CustomPayloadData{
 			GasLimit: func() *uint64 {
-				modGasLimit := basePayload.GasLimit - 1
+				modGasLimit := basePayload.GasLimit * 2
 				return &modGasLimit
 			}(),
 		}
@@ -389,6 +389,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		}
 		// Depending on the field we modified, we expect a different status
 		var expectedState string
+		var expectedLatestValidHash common.Hash
 		if payloadField == "ParentHash" {
 			// Execution specification::
 			// {status: ACCEPTED, latestValidHash: null, validationError: null} if the following conditions are met:
@@ -396,13 +397,17 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 			//  - the payload doesn't extend the canonical chain
 			//  - the payload hasn't been fully validated
 			expectedState = "ACCEPTED"
-			// TODO: "latestValidHash: null" part
 		} else {
 			expectedState = "INVALID"
+			expectedLatestValidHash = alteredPayload.ParentHash
 		}
 
+		t.Logf("INFO (%v): Invalid payload response: %v", t.TestName, newPayloadResp)
 		if newPayloadResp.Status != expectedState {
 			t.Fatalf("FAIL (%v): EngineNewPayload with reference to invalid payload returned incorrect state: %v!=%v", t.TestName, newPayloadResp.Status, expectedState)
+		}
+		if newPayloadResp.LatestValidHash != expectedLatestValidHash {
+			t.Fatalf("FAIL (%v): EngineNewPayload with reference to invalid payload returned incorrect LatestValidHash: %v!=%v", t.TestName, newPayloadResp.LatestValidHash, expectedLatestValidHash)
 		}
 
 		// Send the forkchoiceUpdated with a reference to the invalid payload.
@@ -423,6 +428,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%v): ForkchoiceUpdated with reference to invalid payload resulted in error: %v", t.TestName, err)
 		}
+		// Note: SYNCING is acceptable here as long as the block produced after this test is produced successfully
 		if fcResp.PayloadStatus.Status != "INVALID" && fcResp.PayloadStatus.Status != "SYNCING" {
 			t.Fatalf("FAIL (%v): ForkchoiceUpdated with reference to invalid payload returned incorrect state: %v!=INVALID|SYNCING", t.TestName, fcResp.PayloadStatus.Status)
 		}

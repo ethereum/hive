@@ -65,7 +65,7 @@ type CLMocker struct {
 	OnExit chan interface{}
 
 	// Internal CLMocker channel which will be closed to initiate shutdown,
-	// must be closed externally only by calling the shutdown function.
+	// must be closed externally only by calling the CLMocker.shutdown() function.
 	shutdownRequested chan interface{}
 }
 
