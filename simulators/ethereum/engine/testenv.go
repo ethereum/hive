@@ -36,7 +36,25 @@ type TestEnv struct {
 	syncCancel context.CancelFunc
 }
 
-func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLMocker, fn func(*TestEnv)) {
+func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv)) {
+	// Setup the CL Mocker for this test
+	clMocker := NewCLMocker(t, ttd)
+	defer func() {
+		clMocker.Shutdown()
+		select {
+		case <-clMocker.OnExit:
+			// Happy path
+		case <-time.After(time.Second * 10):
+			t.Fatalf("FAIL (%s): Timeout on wait for CLMocker to exit", testName)
+		}
+
+	}()
+
+	vault = newVault()
+
+	// Add main client to CLMocker
+	clMocker.AddEngineClient(t, c)
+
 	// This sets up debug logging of the requests and responses.
 	client := &http.Client{
 		Transport: &loggingRoundTrip{
@@ -46,6 +64,7 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 		},
 	}
 
+	// Create Engine client from main hivesim.Client to be used by tests
 	ec := NewEngineClient(t, c)
 	defer ec.Close()
 
@@ -57,8 +76,8 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 		RPC:      rpcClient,
 		Eth:      ethclient.NewClient(rpcClient),
 		Engine:   ec,
-		CLMock:   cl,
-		Vault:    v,
+		CLMock:   clMocker,
+		Vault:    vault,
 		PoSSync:  make(chan interface{}, 1),
 	}
 
@@ -93,12 +112,12 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 			case <-testend:
 				close(env.PoSSync)
 				return
-			case <-cl.OnShutdown:
+			case <-clMocker.OnExit:
 				t.Logf("WARN (%v): CLMocker finished block production while waiting for PoS sync", env.TestName)
 				close(env.PoSSync)
 				return
 			case <-time.After(time.Second):
-				if cl.TTDReached {
+				if clMocker.TTDReached {
 					ctx, env.syncCancel = context.WithTimeout(context.Background(), rpcTimeout)
 					bn, err := eth.BlockNumber(ctx)
 					env.syncCancel = nil
@@ -107,7 +126,7 @@ func RunTest(testName string, t *hivesim.T, c *hivesim.Client, v *Vault, cl *CLM
 						close(env.PoSSync)
 						return
 					}
-					if cl.LatestFinalizedNumber != nil && bn >= cl.LatestFinalizedNumber.Uint64() {
+					if clMocker.LatestFinalizedNumber != nil && bn >= clMocker.LatestFinalizedNumber.Uint64() {
 						t.Logf("INFO (%v): Client is now synced to latest PoS block", env.TestName)
 						env.PoSSync <- nil
 						return
@@ -214,7 +233,7 @@ func (t *TestEnv) setNextFeeRecipient(feeRecipient common.Address, ec *EngineCli
 		select {
 		case <-t.CLMock.OnPayloadPrepare:
 			// Will yield later.
-		case <-t.CLMock.OnShutdown:
+		case <-t.CLMock.OnExit:
 			t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 		case <-t.Timeout:
 			t.Fatalf("FAIL (%v): Test timeout", t.TestName)

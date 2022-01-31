@@ -12,6 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+// Execution specification reference:
+// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+
 var (
 	big0 = new(big.Int)
 	big1 = big.NewInt(1)
@@ -49,37 +52,42 @@ func engineAPIPoWTests(t *TestEnv) {
 
 	payloadResp, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), &beacon.PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
 	if err == nil {
-		t.Fatalf("FAIL (%v): GetPayloadV1 accepted under PoW rule: %v, %v", t.TestName, payloadResp, err)
+		t.Fatalf("FAIL (%v): GetPayloadV1 accepted under PoW rule: %v", t.TestName, payloadResp)
 	}
 	// Create a dummy payload to send in the ExecutePayload call
 	payload := beacon.ExecutableDataV1{
-		ParentHash:    common.Hash{},
+		ParentHash:    gblock.Hash(),
 		FeeRecipient:  common.Address{},
-		StateRoot:     common.Hash{},
-		ReceiptsRoot:  common.Hash{},
-		LogsBloom:     []byte{},
+		StateRoot:     gblock.Root(),
+		ReceiptsRoot:  types.EmptyUncleHash,
+		LogsBloom:     types.CreateBloom(types.Receipts{}).Bytes(),
 		Random:        common.Hash{},
-		Number:        0,
-		GasLimit:      0,
+		Number:        1,
+		GasLimit:      gblock.GasLimit(),
 		GasUsed:       0,
-		Timestamp:     0,
+		Timestamp:     gblock.Time() + 1,
 		ExtraData:     []byte{},
-		BaseFeePerGas: big.NewInt(0),
+		BaseFeePerGas: gblock.BaseFee(),
 		BlockHash:     common.Hash{},
 		Transactions:  [][]byte{},
 	}
-	execPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &payload)
+	hashedPayload, err := customizePayload(&payload, &CustomPayloadData{})
+	if err != nil {
+		t.Fatalf("FAIL (%v): Error while constructing PoW payload: %v", t.TestName, err)
+	}
+
+	newPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), hashedPayload)
 	if err != nil {
 		t.Fatalf("FAIL (%v): EngineNewPayloadV1 under PoW rule returned error (Expected INVALID): %v, %v", t.TestName, err)
 	}
-	if execPayloadResp.Status != "INVALID" {
+	if newPayloadResp.Status != "INVALID" {
 		t.Fatalf("INFO (%v): Error in PoW response (Expected Status=INVALID): %v", t.TestName, err)
 	}
-	if execPayloadResp.LatestValidHash != latestH.Hash() {
-		t.Fatalf("INFO (%v): Error in PoW response (Expected LatestValidHash=%v): %v != %v", t.TestName, latestH.Hash(), execPayloadResp.LatestValidHash)
+	if newPayloadResp.LatestValidHash != latestH.Hash() {
+		t.Fatalf("INFO (%v): Error in PoW response (Expected LatestValidHash=%v): %v != %v", t.TestName, latestH.Hash(), newPayloadResp.LatestValidHash)
 	}
-	if execPayloadResp.ValidationError != "Invalid terminal block" {
-		t.Fatalf("INFO (%v): Error in PoW response (Expected ValidationError=Invalid terminal block): %v", t.TestName, execPayloadResp.ValidationError)
+	if newPayloadResp.ValidationError != "Invalid terminal block" {
+		t.Fatalf("INFO (%v): Error in PoW response (Expected ValidationError=Invalid terminal block): %v", t.TestName, newPayloadResp.ValidationError)
 	}
 
 }
@@ -90,28 +98,31 @@ func unknownSafeBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for ExecutePayload (or shutdown/timeout)
+	// Wait for ExecutePayload (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnExecutePayload:
 		defer t.CLMock.OnExecutePayload.Yield()
-		// Generate a random SafeBlock hash
-		randomSafeBlockHash := common.Hash{}
-		rand.Read(randomSafeBlockHash[:])
-
-		// Send forkchoiceUpdated with random SafeBlockHash
-		forkchoiceStateUnknownSafeHash := beacon.ForkchoiceStateV1{
-			HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
-			SafeBlockHash:      randomSafeBlockHash,
-			FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-		}
-		resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownSafeHash, nil)
-		if err == nil {
-			t.Fatalf("FAIL (%v): No error on forkchoiceUpdated with unknown SafeBlockHash: %v, %v", t.TestName, err, resp)
-		}
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
+	}
+
+	// Generate a random SafeBlock hash
+	randomSafeBlockHash := common.Hash{}
+	rand.Read(randomSafeBlockHash[:])
+
+	// Send forkchoiceUpdated with random SafeBlockHash
+	forkchoiceStateUnknownSafeHash := beacon.ForkchoiceStateV1{
+		HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
+		SafeBlockHash:      randomSafeBlockHash,
+		FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
+	}
+	// Execution specification:
+	// - This value MUST be either equal to or an ancestor of headBlockHash
+	resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownSafeHash, nil)
+	if err == nil {
+		t.Fatalf("FAIL (%v): No error on forkchoiceUpdated with unknown SafeBlockHash: %v, %v", t.TestName, err, resp)
 	}
 }
 
@@ -121,11 +132,11 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for ExecutePayload (or shutdown/timeout)
+	// Wait for ExecutePayload (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnExecutePayload:
 		defer t.CLMock.OnExecutePayload.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -172,11 +183,11 @@ func unknownHeadBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for FinalizedBlock (or shutdown/timeout)
+	// Wait for FinalizedBlock (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
 		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -198,7 +209,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown HeadBlockHash: %v", t.TestName, err)
 	}
-	// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
+	// Execution specification::
 	// - {payloadStatus: {status: SYNCING, latestValidHash: null, validationError: null}, payloadId: null}
 	//   if forkchoiceState.headBlockHash references an unknown payload or a payload that can't be validated
 	//   because requisite data for the validation is missing
@@ -230,11 +241,11 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for ExecutePayload (or shutdown/timeout)
+	// Wait for ExecutePayload (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
 		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -247,6 +258,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 		SafeBlockHash:      gblock.Hash(),
 		FinalizedBlockHash: gblock.Hash(),
 	}
+	t.Logf("INFO (%v): Sending genesis block forkchoiceUpdated: %v", t.TestName, gblock.Hash())
 	resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateGenesisHash, nil)
 
 	/* TBD: Behavior on this edge-case is undecided, as behavior of the Execution client
@@ -257,6 +269,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	}
 	*/
 
+	t.Logf("INFO (%v): Sending latest forkchoice again: %v", t.TestName, t.CLMock.LatestForkchoice.FinalizedBlockHash)
 	resp, err = t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &t.CLMock.LatestForkchoice, nil)
 	if err != nil {
 		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
@@ -271,11 +284,11 @@ func badHashOnExecPayload(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.WaitForPoSSync()
 
-	// Wait for GetPayload (or shutdown/timeout)
+	// Wait for GetPayload (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnGetPayload:
 		defer t.CLMock.OnGetPayload.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -284,14 +297,14 @@ func badHashOnExecPayload(t *TestEnv) {
 	// Alter hash on the payload and send it to client, should produce an error
 	alteredPayload := t.CLMock.LatestPayloadBuilt
 	alteredPayload.BlockHash[common.HashLength-1] = byte(255 - alteredPayload.BlockHash[common.HashLength-1])
-	execPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &alteredPayload)
-	// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
+	newPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &alteredPayload)
+	// Execution specification::
 	// - {status: INVALID_BLOCK_HASH, latestValidHash: null, validationError: null} if the blockHash validation has failed
 	if err != nil {
 		t.Fatalf("FAIL (%v): Incorrect block hash in execute payload resulted in error: %v", t.TestName, err)
 	}
-	if execPayloadResp.Status != "INVALID_BLOCK_HASH" {
-		t.Fatalf("FAIL (%v): Incorrect block hash in execute payload returned unexpected status (exp INVALID_BLOCK_HASH): %v", t.TestName, execPayloadResp.Status)
+	if newPayloadResp.Status != "INVALID_BLOCK_HASH" {
+		t.Fatalf("FAIL (%v): Incorrect block hash in execute payload returned unexpected status (exp INVALID_BLOCK_HASH): %v", t.TestName, newPayloadResp.Status)
 	}
 }
 
@@ -301,11 +314,11 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		// Wait until TTD is reached by this client
 		t.WaitForPoSSync()
 
-		// Wait for GetPayload (or shutdown/timeout)
+		// Wait for GetPayload (or clmocker exit/timeout)
 		select {
 		case <-t.CLMock.OnGetPayload:
 			defer t.CLMock.OnGetPayload.Yield()
-		case <-t.CLMock.OnShutdown:
+		case <-t.CLMock.OnExit:
 			t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 		case <-t.Timeout:
 			t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -370,14 +383,14 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%v): Unable to modify payload (%v): %v", t.TestName, customPayloadMod, err)
 		}
-		execPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), alteredPayload)
+		newPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), alteredPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Incorrect %v in EngineNewPayload was rejected: %v", t.TestName, payloadField, err)
 		}
 		// Depending on the field we modified, we expect a different status
 		var expectedState string
 		if payloadField == "ParentHash" {
-			// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
+			// Execution specification::
 			// {status: ACCEPTED, latestValidHash: null, validationError: null} if the following conditions are met:
 			//  - the blockHash of the payload is valid
 			//  - the payload doesn't extend the canonical chain
@@ -388,8 +401,8 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 			expectedState = "INVALID"
 		}
 
-		if execPayloadResp.Status != expectedState {
-			t.Fatalf("FAIL (%v): EngineNewPayload with reference to invalid payload returned incorrect state: %v!=%v", execPayloadResp.Status, expectedState)
+		if newPayloadResp.Status != expectedState {
+			t.Fatalf("FAIL (%v): EngineNewPayload with reference to invalid payload returned incorrect state: %v!=%v", t.TestName, newPayloadResp.Status, expectedState)
 		}
 
 		// Send the forkchoiceUpdated with a reference to the invalid payload.
@@ -404,19 +417,14 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 			SuggestedFeeRecipient: common.Address{},
 		}
 		fcResp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &fcState, &payloadAttrbutes)
-		// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+		// Execution specification:
 		//  {payloadStatus: {status: INVALID, latestValidHash: null, validationError: errorMessage | null}, payloadId: null}
 		//  obtained from the Payload validation process if the payload is deemed INVALID
 		if err != nil {
 			t.Fatalf("FAIL (%v): ForkchoiceUpdated with reference to invalid payload resulted in error: %v", t.TestName, err)
 		}
-		if payloadField == "ParentHash" {
-			expectedState = "SYNCING"
-		} else {
-			expectedState = "INVALID"
-		}
-		if fcResp.PayloadStatus.Status != expectedState {
-			t.Fatalf("FAIL (%v): ForkchoiceUpdated with reference to invalid payload returned incorrect state: %v!=%v", t.TestName, fcResp.PayloadStatus.Status, expectedState)
+		if fcResp.PayloadStatus.Status != "INVALID" && fcResp.PayloadStatus.Status != "SYNCING" {
+			t.Fatalf("FAIL (%v): ForkchoiceUpdated with reference to invalid payload returned incorrect state: %v!=INVALID|SYNCING", t.TestName, fcResp.PayloadStatus.Status)
 		}
 	}
 }
@@ -426,11 +434,11 @@ func blockStatusExecPayload(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Wait for ExecutePayload (or shutdown/timeout)
+	// Wait for ExecutePayload (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnExecutePayload:
 		defer t.CLMock.OnExecutePayload.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -455,11 +463,11 @@ func blockStatusHeadBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Wait for HeadBlock Forkchoice Update (or shutdown/timeout)
+	// Wait for HeadBlock Forkchoice Update (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnHeadBlockForkchoiceUpdate:
 		defer t.CLMock.OnHeadBlockForkchoiceUpdate.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -481,11 +489,11 @@ func blockStatusSafeBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Wait for SafeBlock Forkchoice Update (or shutdown/timeout)
+	// Wait for SafeBlock Forkchoice Update (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnSafeBlockForkchoiceUpdate:
 		defer t.CLMock.OnSafeBlockForkchoiceUpdate.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -507,11 +515,11 @@ func blockStatusFinalizedBlock(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Wait for FinalizedBlock Forkchoice Update (or shutdown/timeout)
+	// Wait for FinalizedBlock Forkchoice Update (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
 		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -533,11 +541,11 @@ func blockStatusReorg(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
 	t.WaitForPoSSync()
 
-	// Wait for SafeBlock Forkchoice Update (or shutdown/timeout)
+	// Wait for HeadBlock Forkchoice Update (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnHeadBlockForkchoiceUpdate:
 		defer t.CLMock.OnHeadBlockForkchoiceUpdate.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -567,9 +575,11 @@ func blockStatusReorg(t *TestEnv) {
 	if resp.PayloadStatus.Status != "VALID" {
 		t.Fatalf("FAIL (%v): Incorrect status returned after a HeadBlockHash reorg: %v", t.TestName, resp.PayloadStatus.Status)
 	}
-	if resp.PayloadStatus.LatestValidHash != t.CLMock.LatestForkchoice.FinalizedBlockHash {
-		t.Fatalf("FAIL (%v): Incorrect latestValidHash returned after a HeadBlockHash reorg: %v!=%v", t.TestName, resp.PayloadStatus.LatestValidHash, t.CLMock.LatestForkchoice.FinalizedBlockHash)
-	}
+	/*
+		if resp.PayloadStatus.LatestValidHash != t.CLMock.LatestForkchoice.FinalizedBlockHash {
+			t.Fatalf("FAIL (%v): Incorrect latestValidHash returned after a HeadBlockHash reorg: %v!=%v", t.TestName, resp.PayloadStatus.LatestValidHash, t.CLMock.LatestForkchoice.FinalizedBlockHash)
+		}
+	*/
 
 	// Check that we reorg to the previous block
 	currentBlockHeader, err = t.Eth.HeaderByNumber(t.Ctx(), nil)
@@ -589,9 +599,11 @@ func blockStatusReorg(t *TestEnv) {
 	if resp.PayloadStatus.Status != "VALID" {
 		t.Fatalf("FAIL (%v): Incorrect status returned after a HeadBlockHash reorg: %v", t.TestName, resp.PayloadStatus.Status)
 	}
-	if resp.PayloadStatus.LatestValidHash != t.CLMock.LatestForkchoice.HeadBlockHash {
-		t.Fatalf("FAIL (%v): Incorrect latestValidHash returned after a HeadBlockHash reorg: %v!=%v", t.TestName, resp.PayloadStatus.LatestValidHash, t.CLMock.LatestForkchoice.FinalizedBlockHash)
-	}
+	/*
+		if resp.PayloadStatus.LatestValidHash != t.CLMock.LatestForkchoice.HeadBlockHash {
+			t.Fatalf("FAIL (%v): Incorrect latestValidHash returned after a HeadBlockHash reorg: %v!=%v", t.TestName, resp.PayloadStatus.LatestValidHash, t.CLMock.LatestForkchoice.FinalizedBlockHash)
+		}
+	*/
 
 }
 
@@ -636,11 +648,11 @@ func transactionReorg(t *TestEnv) {
 		}
 		receipts[i] = receipt
 	}
-	// Wait for a finalized block so we can start rolling back transactions (or shutdown/timeout)
+	// Wait for a finalized block so we can start rolling back transactions (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
 		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -719,17 +731,18 @@ func reExecPayloads(t *TestEnv) {
 	t.WaitForPoSSync()
 
 	// Wait until we have the required number of payloads executed
+	blockNumber, err := t.Eth.BlockNumber(t.Ctx())
 	var payloadReExecCount = int64(10)
-	_, err := t.WaitForBlock(big.NewInt(t.CLMock.FirstPoSBlockNumber.Int64() + payloadReExecCount))
+	_, err = t.WaitForBlock(big.NewInt(int64(blockNumber) + payloadReExecCount))
 	if err != nil {
 		t.Fatalf("FAIL (%v): Unable to wait for %v executed payloads: %v", t.TestName, payloadReExecCount, err)
 	}
 
-	// Wait for a finalized block so we can re-executing payloads (or shutdown/timeout)
+	// Wait for a finalized block so we can start re-executing payloads (or clmocker exit/timeout)
 	select {
 	case <-t.CLMock.OnFinalizedBlockForkchoiceUpdate:
 		defer t.CLMock.OnFinalizedBlockForkchoiceUpdate.Yield()
-	case <-t.CLMock.OnShutdown:
+	case <-t.CLMock.OnExit:
 		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
 	case <-t.Timeout:
 		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
@@ -741,14 +754,53 @@ func reExecPayloads(t *TestEnv) {
 	}
 	for i := lastBlock - uint64(payloadReExecCount); i <= lastBlock; i++ {
 		payload := t.CLMock.ExecutedPayloadHistory[i]
-		execPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &payload)
+		newPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &payload)
 		if err != nil {
 			t.Fatalf("FAIL (%v): Unable to re-execute valid payload: %v", err)
 		}
-		if execPayloadResp.Status != "VALID" {
-			t.Fatalf("FAIL (%v): Unexpected status after re-execute valid payload: %v", execPayloadResp)
+		if newPayloadResp.Status != "VALID" {
+			t.Fatalf("FAIL (%v): Unexpected status after re-execute valid payload: %v", newPayloadResp)
 		}
 	}
+}
+
+// Multiple New Payloads Extending Canonical Chain
+func multipleNewCanonicalPayloads(t *TestEnv) {
+	// Wait until this client catches up with latest PoS
+	t.WaitForPoSSync()
+
+	// Wait to get a new payload (or clmocker exit/timeout)
+	select {
+	case <-t.CLMock.OnGetPayload:
+		defer t.CLMock.OnGetPayload.Yield()
+	case <-t.CLMock.OnExit:
+		t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+	case <-t.Timeout:
+		t.Fatalf("FAIL (%v): Test timeout", t.TestName)
+	}
+
+	payloadCount := 80
+	basePayload := t.CLMock.LatestPayloadBuilt
+
+	// Fabricate and send multiple new payloads by changing the Random field
+	for i := 0; i < payloadCount; i++ {
+		newRandom := common.Hash{}
+		rand.Read(newRandom[:])
+		newPayload, err := customizePayload(&basePayload, &CustomPayloadData{
+			Random: &newRandom,
+		})
+		if err != nil {
+			t.Fatalf("FAIL (%v): Unable to customize payload %v: %v", t.TestName, i, err)
+		}
+		newPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), newPayload)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Unable to send new valid payload extending canonical chain: %v", err)
+		}
+		if newPayloadResp.Status != "VALID" {
+			t.Fatalf("FAIL (%v): Unexpected status after trying to send new valid payload extending canonical chain: %v", newPayloadResp)
+		}
+	}
+	// At the end the CLMocker continues to try to execute fcU with the original payload, which should not fail
 }
 
 // Fee Recipient Tests

@@ -29,9 +29,8 @@ type CLMocker struct {
 	EngineClientsLock sync.Mutex
 
 	// Block Production Information
-	NextBlockProducer       *EngineClient
-	BlockProductionMustStop bool
-	NextFeeRecipient        common.Address
+	NextBlockProducer *EngineClient
+	NextFeeRecipient  common.Address
 
 	// PoS Chain History Information
 	RandomHistory          map[uint64]common.Hash
@@ -61,8 +60,13 @@ type CLMocker struct {
 	OnSafeBlockForkchoiceUpdate      Semaphore
 	OnFinalizedBlockForkchoiceUpdate Semaphore
 
-	// CLMocker channel which will be closed on shutdown
-	OnShutdown chan interface{}
+	// CLMocker channel which is closed when the instance has completely finished,
+	// must be closed only by the internal CLMocker procedures.
+	OnExit chan interface{}
+
+	// Internal CLMocker channel which will be closed to initiate shutdown,
+	// must be closed externally only by calling the shutdown function.
+	shutdownRequested chan interface{}
 }
 
 func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
@@ -78,7 +82,6 @@ func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
 		RandomHistory:           map[uint64]common.Hash{},
 		ExecutedPayloadHistory:  map[uint64]beacon.ExecutableDataV1{},
 		LatestFinalizedHeader:   nil,
-		BlockProductionMustStop: false,
 		FirstPoSBlockNumber:     nil,
 		LatestFinalizedNumber:   nil,
 		TTDReached:              false,
@@ -95,32 +98,43 @@ func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
 		OnHeadBlockForkchoiceUpdate:      make(Semaphore, 1),
 		OnSafeBlockForkchoiceUpdate:      make(Semaphore, 1),
 		OnFinalizedBlockForkchoiceUpdate: make(Semaphore, 1),
-		OnShutdown:                       make(chan interface{}),
+		OnExit:                           make(chan interface{}),
+		shutdownRequested:                make(chan interface{}),
 	}
 
-	// Start timer to check when the TTD has been reached
-	time.AfterFunc(tTDCheckPeriod, newCLMocker.checkTTD)
+	// Start thread to check when the TTD has been reached
+	go newCLMocker.checkTTD()
 
 	return newCLMocker
 }
 
 // Add a Client to be kept in sync with the latest payloads
-func (cl *CLMocker) AddEngineClient(ec *EngineClient) {
+func (cl *CLMocker) AddEngineClient(t *hivesim.T, c *hivesim.Client) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
+	ec := NewEngineClient(t, c)
 	cl.EngineClients = append(cl.EngineClients, ec)
 }
 
 // Remove a Client to stop sending latest payloads
-func (cl *CLMocker) RemoveEngineClient(ec *EngineClient) {
+func (cl *CLMocker) RemoveEngineClient(c *hivesim.Client) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
 
 	for i, engine := range cl.EngineClients {
-		if engine == ec {
+		if engine.Client.Container == c.Container {
 			cl.EngineClients = append(cl.EngineClients[:i], cl.EngineClients[i+1:]...)
+			engine.Close()
 		}
 	}
+}
+
+// Exit function, called only internally to terminate the CLMocker instance
+func (cl *CLMocker) Exit() {
+	for _, engine := range cl.EngineClients {
+		engine.Close()
+	}
+	close(cl.OnExit)
 }
 
 // Helper struct to fetch the TotalDifficulty
@@ -131,59 +145,71 @@ type TD struct {
 // Check whether we have reached TTD and then enable PoS block production.
 // This function must NOT be executed after we have reached TTD.
 func (cl *CLMocker) checkTTD() {
-	if len(cl.EngineClients) == 0 {
-		// We have no clients running yet, we have not reached TTD
-		time.AfterFunc(tTDCheckPeriod, cl.checkTTD)
-		return
-	}
-
-	// Pick a random client to get the total difficulty of its head
-	ec := cl.EngineClients[rand.Intn(len(cl.EngineClients))]
-
-	var td *TD
-	if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
-		close(cl.OnShutdown)
-		cl.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
-	}
-	if td.TotalDifficulty.ToInt().Cmp(cl.TerminalTotalDifficulty) < 0 {
-		time.AfterFunc(tTDCheckPeriod, cl.checkTTD)
-		return
-	}
-	var err error
-	cl.TTDReached = true
-	cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
-	if err != nil {
-		close(cl.OnShutdown)
-		cl.Fatalf("CLMocker: Could not get block header: %v", err)
-	}
-	cl.Logf("CLMocker: TTD has been reached at block %v (%v>=%v)\n", cl.LatestFinalizedHeader.Number, td.TotalDifficulty, cl.TerminalTotalDifficulty)
-	// Broadcast initial ForkchoiceUpdated
-	cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
-	cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
-	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
-	anySuccess := false
-	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-		if resp.Error != nil {
-			cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
-		} else {
-			if resp.ForkchoiceResponse.PayloadStatus.Status == "VALID" {
-				anySuccess = true
-			} else {
-				cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
+	for {
+		select {
+		case <-time.After(tTDCheckPeriod):
+			if len(cl.EngineClients) == 0 {
+				// We have no clients running yet, we have not reached TTD
+				continue
 			}
+			// Pick a random client to get the total difficulty of its head
+			ec := cl.EngineClients[rand.Intn(len(cl.EngineClients))]
+
+			var td *TD
+			if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
+				cl.Exit()
+				cl.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
+			}
+			if td.TotalDifficulty.ToInt().Cmp(cl.TerminalTotalDifficulty) < 0 {
+				// TTD not reached yet
+				continue
+			}
+
+			var err error
+			cl.TTDReached = true
+			cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
+			if err != nil {
+				cl.Exit()
+				cl.Fatalf("CLMocker: Could not get block header: %v", err)
+			}
+
+			cl.Logf("CLMocker: TTD has been reached at block %v (%v>=%v)\n", cl.LatestFinalizedHeader.Number, td.TotalDifficulty, cl.TerminalTotalDifficulty)
+			// Broadcast initial ForkchoiceUpdated
+			cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
+			cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
+			cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
+			cl.LatestFinalizedNumber = cl.LatestFinalizedHeader.Number
+			anySuccess := false
+			for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
+				if resp.Error != nil {
+					cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
+				} else {
+					if resp.ForkchoiceResponse.PayloadStatus.Status == "VALID" {
+						anySuccess = true
+					} else {
+						cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
+					}
+				}
+			}
+			if !anySuccess {
+				cl.Exit()
+				cl.Fatalf("CLMocker: None of the clients accepted forkchoiceUpdated")
+			}
+			go cl.producePoSBlocks()
+			return
+		case <-cl.shutdownRequested:
+			cl.Exit()
+			return
+		case <-cl.OnExit:
+			// Should not happen
+			return
 		}
 	}
-	if !anySuccess {
-		close(cl.OnShutdown)
-		cl.Fatalf("CLMocker: None of the clients accepted forkchoiceUpdated")
-	}
-	time.AfterFunc(PoSBlockProductionPeriod, cl.producePoSBlocks)
-	return
 }
 
 // Engine Block Production Methods
-func (cl *CLMocker) shutdown() {
-	cl.BlockProductionMustStop = true
+func (cl *CLMocker) Shutdown() {
+	close(cl.shutdownRequested)
 }
 
 // Check whether a block number is a PoS block
@@ -204,9 +230,13 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
 
-	for {
-		// Get a random client to generate the payload
-		ec_id := rand.Intn(len(cl.EngineClients))
+	if len(cl.EngineClients) == 0 {
+		cl.Fatalf("CLMocker: No clients left for block production")
+	}
+
+	for i := 0; i < len(cl.EngineClients); i++ {
+		// Get a client to generate the payload
+		ec_id := (int(cl.LatestFinalizedNumber.Int64()) + i) % len(cl.EngineClients)
 		cl.NextBlockProducer = cl.EngineClients[ec_id]
 
 		lastBlockNumber, err = cl.NextBlockProducer.Eth.BlockNumber(cl.NextBlockProducer.Ctx())
@@ -214,14 +244,13 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 			cl.Fatalf("CLMocker: Could not get block number while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
 		}
 
-		lastBlockNumberBig := big.NewInt(int64(lastBlockNumber))
-
-		if cl.LatestFinalizedNumber != nil && cl.LatestFinalizedNumber.Cmp(lastBlockNumberBig) != 0 {
+		if cl.LatestFinalizedNumber.Int64() != int64(lastBlockNumber) {
 			// Selected client is not synced to the last block number, try again
+			cl.NextBlockProducer = nil
 			continue
 		}
 
-		latestHeader, err := cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), lastBlockNumberBig)
+		latestHeader, err := cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), big.NewInt(int64(lastBlockNumber)))
 		if err != nil {
 			cl.Fatalf("CLMocker: Could not get block header while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
 		}
@@ -230,11 +259,16 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 
 		if cl.LatestFinalizedHeader.Hash() != lastBlockHash {
 			// Selected client latest block hash does not match canonical chain, try again
+			cl.NextBlockProducer = nil
 			continue
 		} else {
 			break
 		}
 
+	}
+
+	if cl.NextBlockProducer == nil {
+		cl.Fatalf("CLMocker: Failed to obtain a client on the latest block number")
 	}
 
 	// Yield before preparing the next payload
@@ -278,7 +312,6 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 				if resp.ExecutePayloadResponse.LatestValidHash != cl.LatestPayloadBuilt.BlockHash {
 					// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
 					// - If validation succeeds, the response MUST contain {status: VALID, latestValidHash: payload.blockHash}
-					close(cl.OnShutdown)
 					cl.Fatalf("FAIL (%v): NewPayload returned ACCEPTED status with incorrect LatestValidHash, %v!=%v", resp.ExecutePayloadResponse.LatestValidHash, cl.LatestPayloadBuilt.BlockHash)
 				}
 			} else {
@@ -340,7 +373,7 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 	}
 
 	// Save the header of the latest block in the PoS chain
-	cl.LatestFinalizedNumber = big.NewInt(int64(lastBlockNumber + 1))
+	cl.LatestFinalizedNumber = cl.LatestFinalizedNumber.Add(cl.LatestFinalizedNumber, big1)
 
 	// Check if any of the clients accepted the new payload
 	cl.LatestFinalizedHeader = nil
@@ -362,15 +395,20 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 
 // Loop produce PoS blocks by using the Engine API
 func (cl *CLMocker) producePoSBlocks() {
-	// Defer shutdown signal
-	defer func() { close(cl.OnShutdown) }()
+	defer func() { cl.Exit() }()
+
+	// Defer producing one last block to ensure everything is ok after the test
+	defer cl.produceSinglePoSBlock()
 
 	// Begin PoS block production
-	for !cl.BlockProductionMustStop {
-		cl.produceSinglePoSBlock()
-		time.Sleep(PoSBlockProductionPeriod)
+	for {
+		select {
+		case <-time.After(PoSBlockProductionPeriod):
+			cl.produceSinglePoSBlock()
+		case <-cl.shutdownRequested:
+			return
+		}
 	}
-
 }
 
 type ExecutePayloadOutcome struct {

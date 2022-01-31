@@ -57,7 +57,7 @@ type TestSpec struct {
 	Name  string
 	About string
 	Run   func(*TestEnv)
-	TTD   uint64
+	TTD   int64
 }
 
 var tests = []TestSpec{
@@ -140,10 +140,14 @@ var tests = []TestSpec{
 		Run:  blockStatusReorg,
 	},
 
-	// Re-ExecutePayload
+	// Payload Tests
 	{
 		Name: "Re-Execute Payload",
 		Run:  reExecPayloads,
+	},
+	{
+		Name: "Multiple New Payloads Extending Canonical Chain",
+		Run:  multipleNewCanonicalPayloads,
 	},
 
 	// Transaction Reorg using Engine API
@@ -163,6 +167,9 @@ var tests = []TestSpec{
 		Name: "Random Opcode Transactions",
 		Run:  randomOpcodeTx,
 	},
+
+	// Multi-Client Sync tests
+	// TODO ...
 }
 
 func main() {
@@ -181,20 +188,8 @@ have reached the Terminal Total Difficulty.`[1:],
 			Parameters:  newParams,
 			Files:       files,
 			Run: func(t *hivesim.T, c *hivesim.Client) {
-				clMocker := NewCLMocker(t, big.NewInt(int64(currentTest.TTD)))
-				defer clMocker.shutdown()
-
-				vault = newVault()
-
-				// Create an Engine API wrapper for this client
-				ec := NewEngineClient(t, c)
-				defer ec.Close()
-				// Add this client to CLMocker
-				clMocker.AddEngineClient(ec)
-				defer clMocker.RemoveEngineClient(ec)
-
 				// Run the test case
-				RunTest(currentTest.Name, t, c, vault, clMocker, currentTest.Run)
+				RunTest(currentTest.Name, big.NewInt(currentTest.TTD), t, c, currentTest.Run)
 			},
 		})
 	}
