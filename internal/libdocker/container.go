@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net"
 	"os"
@@ -276,48 +275,54 @@ func (b *ContainerBackend) DisconnectContainer(containerID, networkID string) er
 
 // uploadFiles uploads the given files into a docker container.
 func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map[string]*multipart.FileHeader) error {
-	// Short circuit if there are no files to upload
 	if len(files) == 0 {
 		return nil
 	}
-	// Create a tarball archive with all the data files
-	tarball := new(bytes.Buffer)
-	tw := tar.NewWriter(tarball)
-	for filePath, fileHeader := range files {
-		// Fetch the next file to inject into the container
-		file, err := fileHeader.Open()
-		if err != nil {
-			return err
-		}
-		defer file.Close()
 
-		data, err := ioutil.ReadAll(file)
-		if err != nil {
-			return err
-		}
-		// Insert the file into the tarball archive
-		header := &tar.Header{
-			Name: filePath,
-			Mode: int64(0777),
-			Size: int64(len(data)),
-		}
-		if err := tw.WriteHeader(header); err != nil {
-			return err
-		}
-		if _, err := tw.Write(data); err != nil {
-			return err
-		}
-	}
-	if err := tw.Close(); err != nil {
-		return err
-	}
+	// Stream tar archive with all files.
+	var (
+		pipeR, pipeW = io.Pipe()
+		streamErrCh  = make(chan error, 1)
+	)
+	go func() (err error) {
+		defer func() { streamErrCh <- err }()
+		defer pipeW.Close()
 
-	// Upload the tarball into the destination container
-	return b.client.UploadToContainer(id, docker.UploadToContainerOptions{
+		tw := tar.NewWriter(pipeW)
+		for filePath, fileHeader := range files {
+			// Write file header.
+			header := &tar.Header{Name: filePath, Mode: 0777, Size: fileHeader.Size}
+			if err := tw.WriteHeader(header); err != nil {
+				return err
+			}
+			// Write the file data.
+			file, err := fileHeader.Open()
+			if err != nil {
+				return err
+			}
+			_, copyErr := io.Copy(tw, file)
+			file.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+		}
+		return tw.Close()
+	}()
+
+	// Upload the tar stream into the destination container.
+	err := b.client.UploadToContainer(id, docker.UploadToContainerOptions{
 		Context:     ctx,
-		InputStream: tarball,
+		InputStream: pipeR,
 		Path:        "/",
 	})
+
+	// Wait for the stream goroutine.
+	streamErr := <-streamErrCh
+	if err == nil && streamErr != nil {
+		return streamErr
+	}
+
+	return err
 }
 
 // runContainer attaches to the output streams of an existing container, then
