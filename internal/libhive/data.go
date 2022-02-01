@@ -65,34 +65,6 @@ type ClientDefinition struct {
 	Meta    ClientMetadata `json:"meta"`
 }
 
-type apiTestRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-// apiStartRequest contains the launch parameters for a client container.
-type apiStartRequest struct {
-	Client      string            `json:"client"`
-	Networks    []string          `json:"networks"`
-	Environment map[string]string `json:"environment"`
-}
-
-// apiNodeInfo is the description of a running client as returned by the API.
-type apiNodeInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-// apiNodeStartInfo is returned by the client startup endpoint.
-type apiNodeStartInfo struct {
-	ID string `json:"id"` // Container ID.
-	IP string `json:"ip"` // IP address in bridge network
-}
-
-type apiExecRequest struct {
-	Command []string `json:"command"`
-}
-
 // ExecInfo is the result of running a script in a client container.
 type ExecInfo struct {
 	Stdout   string `json:"stdout"`

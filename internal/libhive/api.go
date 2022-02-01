@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/hive/internal/simapi"
 	"github.com/gorilla/mux"
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -70,7 +71,7 @@ func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
 
 // startSuite starts a suite.
 func (api *simAPI) startSuite(w http.ResponseWriter, r *http.Request) {
-	var suite apiTestRequest
+	var suite simapi.TestRequest
 	if err := json.NewDecoder(r.Body).Decode(&suite); err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -112,7 +113,7 @@ func (api *simAPI) startTest(w http.ResponseWriter, r *http.Request) {
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
-	var test apiTestRequest
+	var test simapi.TestRequest
 	if err := json.NewDecoder(r.Body).Decode(&test); err != nil {
 		serveError(w, err, http.StatusBadRequest)
 		return
@@ -183,7 +184,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
-	var clientConfig apiStartRequest
+	var clientConfig simapi.NodeConfig
 	if err := json.Unmarshal([]byte(r.Form.Get("config")), &clientConfig); err != nil {
 		log15.Error("API: invalid 'config' parameter in node request", "error", err)
 		err := fmt.Errorf("invalid 'config' parameter in node request")
@@ -305,7 +306,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 
 	// It's started.
 	log15.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
-	serveJSON(w, &apiNodeStartInfo{ID: info.ID, IP: info.IP})
+	serveJSON(w, &simapi.StartNodeResponse{ID: info.ID, IP: info.IP})
 }
 
 // clientLogFilePaths determines the log file path of a client container.
@@ -319,7 +320,7 @@ func (api *simAPI) clientLogFilePaths(clientName, containerID string) (jsonPath 
 	return jsonPath, file
 }
 
-func (api *simAPI) checkClient(req *apiStartRequest) (*ClientDefinition, error) {
+func (api *simAPI) checkClient(req *simapi.NodeConfig) (*ClientDefinition, error) {
 	if req.Client == "" {
 		return nil, errors.New("missing client type in start request")
 	}
@@ -331,7 +332,7 @@ func (api *simAPI) checkClient(req *apiStartRequest) (*ClientDefinition, error) 
 }
 
 // checkClientNetworks pre-checks the existence of initial networks for a client container.
-func (api *simAPI) checkClientNetworks(req *apiStartRequest, suiteID TestSuiteID) ([]string, error) {
+func (api *simAPI) checkClientNetworks(req *simapi.NodeConfig, suiteID TestSuiteID) ([]string, error) {
 	for _, network := range req.Networks {
 		if !api.tm.NetworkExists(suiteID, network) {
 			return nil, fmt.Errorf("invalid network name '%s' in client start request", network)
@@ -376,7 +377,7 @@ func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	serveJSON(w, &apiNodeInfo{ID: nodeInfo.ID, Name: nodeInfo.Name})
+	serveJSON(w, &simapi.NodeResponse{ID: nodeInfo.ID, Name: nodeInfo.Name})
 }
 
 func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
@@ -412,7 +413,7 @@ func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 
 // parseExecRequest decodes and validates a client script exec request.
 func parseExecRequest(r io.Reader) ([]string, error) {
-	var request apiExecRequest
+	var request simapi.ExecRequest
 	if err := json.NewDecoder(r).Decode(&request); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %v", err)
 	}
@@ -584,7 +585,7 @@ func serveOK(w http.ResponseWriter) {
 }
 
 func serveError(w http.ResponseWriter, err error, status int) {
-	resp, _ := json.Marshal(map[string]string{"error": err.Error()})
+	resp, _ := json.Marshal(&simapi.Error{Error: err.Error()})
 	w.Header().Set("content-type", "application/json")
 	w.WriteHeader(status)
 	w.Write(resp)

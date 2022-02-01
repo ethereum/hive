@@ -40,27 +40,3 @@ func (m *ClientDefinition) HasRole(role string) bool {
 	}
 	return false
 }
-
-type apiTestRequest struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
-type apiStartNodeRequest struct {
-	Client      string            `json:"client"`
-	Networks    []string          `json:"networks"`
-	Environment map[string]string `json:"environment"`
-}
-
-type apiExecRequest struct {
-	Command []string `json:"command"`
-}
-
-type apiNodeStartInfo struct {
-	ID string `json:"id"` // Container ID.
-	IP string `json:"ip"` // IP address in bridge network
-}
-
-type apiError struct {
-	Error string `json:"error"`
-}

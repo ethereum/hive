@@ -3,11 +3,13 @@ package hivesim
 import (
 	"io"
 	"os"
+
+	"github.com/ethereum/hive/internal/simapi"
 )
 
 // clientSetup collects client options.
 type clientSetup struct {
-	config apiStartNodeRequest
+	config simapi.NodeConfig
 	// destination path -> open data function
 	files map[string]func() (io.ReadCloser, error)
 }

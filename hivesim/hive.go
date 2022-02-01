@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
+	"github.com/ethereum/hive/internal/simapi"
 )
 
 // Simulation wraps the simulation HTTP API provided by hive.
@@ -49,7 +50,7 @@ func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, testResult TestRe
 func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite", sim.url)
-		req  = &apiTestRequest{Name: name, Description: description}
+		req  = &simapi.TestRequest{Name: name, Description: description}
 		resp SuiteID
 	)
 	err := post(url, req, &resp)
@@ -66,7 +67,7 @@ func (sim *Simulation) EndSuite(testSuite SuiteID) error {
 func (sim *Simulation) StartTest(testSuite SuiteID, name string, description string) (TestID, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test", sim.url, testSuite)
-		req  = &apiTestRequest{Name: name, Description: description}
+		req  = &simapi.TestRequest{Name: name, Description: description}
 		resp TestID
 	)
 	err := post(url, req, &resp)
@@ -101,12 +102,12 @@ func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters ma
 func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test)
-		resp apiNodeStartInfo
+		resp simapi.StartNodeResponse
 	)
 
 	setup := &clientSetup{
 		files: make(map[string]func() (io.ReadCloser, error)),
-		config: apiStartNodeRequest{
+		config: simapi.NodeConfig{
 			Client:      clientType,
 			Environment: make(map[string]string),
 		},
@@ -183,7 +184,7 @@ func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, nod
 func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd []string) (*ExecInfo, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec", sim.url, testSuite, test, nodeid)
-		req  = &apiExecRequest{Command: cmd}
+		req  = &simapi.ExecRequest{Command: cmd}
 		resp *ExecInfo
 	)
 	err := post(url, req, &resp)
@@ -341,11 +342,11 @@ func request(httpReq *http.Request, result interface{}) error {
 		// It's an error response.
 		switch resp.Header.Get("content-type") {
 		case "application/json":
-			var errMsg apiError
-			if err := dec.Decode(&errMsg); err != nil {
+			var errobj simapi.Error
+			if err := dec.Decode(&errobj); err != nil {
 				return fmt.Errorf("request failed (status %d) and can't decode error message: %v", resp.StatusCode, err)
 			}
-			return errors.New(errMsg.Error)
+			return errors.New(errobj.Error)
 		default:
 			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
 			if len(respBody) == 0 {
