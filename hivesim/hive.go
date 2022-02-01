@@ -6,14 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -42,81 +39,48 @@ func NewAt(url string) *Simulation {
 
 // EndTest finishes the test case, cleaning up everything, logging results, and returning
 // an error if the process could not be completed.
-func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, summaryResult TestResult) error {
-	// post results (which deletes the test case - because DELETE message body is not always supported)
-	summaryResultData, err := json.Marshal(summaryResult)
-	if err != nil {
-		return err
-	}
-
-	vals := make(url.Values)
-	vals.Add("summaryresult", string(summaryResultData))
-
-	_, err = wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%d/test/%d", sim.url, testSuite, test), vals)
-	return err
+func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, testResult TestResult) error {
+	url := fmt.Sprintf("%s/testsuite/%d/test/%d", sim.url, testSuite, test)
+	return post(url, &testResult, nil)
 }
 
 // StartSuite signals the start of a test suite.
 func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, error) {
-	vals := make(url.Values)
-	vals.Add("name", name)
-	vals.Add("description", description)
-	vals.Add("simlog", simlog)
-	idstring, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite", sim.url), vals)
-	if err != nil {
-		return 0, err
-	}
-	id, err := strconv.Atoi(idstring)
-	if err != nil {
-		return 0, err
-	}
-	return SuiteID(id), nil
+	var (
+		url  = fmt.Sprintf("%s/testsuite", sim.url)
+		req  = &apiTestRequest{Name: name, Description: description}
+		resp SuiteID
+	)
+	err := post(url, req, &resp)
+	return resp, err
 }
 
 // EndSuite signals the end of a test suite.
 func (sim *Simulation) EndSuite(testSuite SuiteID) error {
-	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d", sim.url, testSuite), nil)
-	if err != nil {
-		return err
-	}
-	_, err = http.DefaultClient.Do(req)
-	return err
+	url := fmt.Sprintf("%s/testsuite/%d", sim.url, testSuite)
+	return requestDelete(url)
 }
 
 // StartTest starts a new test case, returning the testcase id as a context identifier.
 func (sim *Simulation) StartTest(testSuite SuiteID, name string, description string) (TestID, error) {
-	vals := make(url.Values)
-	vals.Add("name", name)
-	vals.Add("description", description)
-
-	idstring, err := wrapHTTPErrorsPost(fmt.Sprintf("%s/testsuite/%d/test", sim.url, testSuite), vals)
-	if err != nil {
-		return 0, err
-	}
-	testID, err := strconv.Atoi(idstring)
-	if err != nil {
-		return 0, err
-	}
-	return TestID(testID), nil
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/test", sim.url, testSuite)
+		req  = &apiTestRequest{Name: name, Description: description}
+		resp TestID
+	)
+	err := post(url, req, &resp)
+	return resp, err
 }
 
 // ClientTypes returns all client types available to this simulator run. This depends on
 // both the available client set and the command line filters.
-func (sim *Simulation) ClientTypes() (availableClients []*ClientDefinition, err error) {
-	resp, err := http.Get(fmt.Sprintf("%s/clients?metadata=1", sim.url))
-	if err != nil {
-		return nil, err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	err = json.Unmarshal(body, &availableClients)
-	if err != nil {
-		return nil, err
-	}
-	return
+func (sim *Simulation) ClientTypes() ([]*ClientDefinition, error) {
+	var (
+		url  = fmt.Sprintf("%s/clients", sim.url)
+		resp []*ClientDefinition
+	)
+	err := get(url, &resp)
+	return resp, err
 }
 
 // StartClient starts a new node (or other container) with the specified parameters. One
@@ -134,6 +98,10 @@ func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters ma
 // StartClientWithOptions starts a new node (or other container) with specified options.
 // Returns container id and ip.
 func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error) {
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test)
+		resp apiNodeStartInfo
+	)
 	setup := &clientSetup{
 		parameters: make(map[string]string),
 		files:      make(map[string]func() (io.ReadCloser, error)),
@@ -142,14 +110,15 @@ func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, cl
 	for _, opt := range options {
 		opt.Apply(setup)
 	}
-	data, err := setup.postWithFiles(fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test))
+	err := setup.postWithFiles(url, &resp)
 	if err != nil {
 		return "", nil, err
 	}
-	if idip := strings.Split(data, "@"); len(idip) >= 1 {
-		return idip[0], net.ParseIP(idip[1]), nil
+	ip := net.ParseIP(resp.IP)
+	if ip == nil {
+		return resp.ID, nil, fmt.Errorf("no IP address returned")
 	}
-	return data, net.IP{}, fmt.Errorf("no ip address returned: %v", data)
+	return resp.ID, ip, nil
 }
 
 // StopClient signals to the host that the node is no longer required.
@@ -207,105 +176,54 @@ func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, nod
 
 // ClientExec runs a command in a running client.
 func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd []string) (*ExecInfo, error) {
-	type execRequest struct {
-		Command []string `json:"command"`
-	}
-	enc, _ := json.Marshal(&execRequest{cmd})
-
-	p := fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec", sim.url, testSuite, test, nodeid)
-	req, err := http.NewRequest(http.MethodPost, p, bytes.NewReader(enc))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("content-type", "application/json")
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.Body == nil {
-		return nil, errors.New("unexpected empty response body")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		var msgbuf bytes.Buffer
-		n, _ := io.Copy(&msgbuf, io.LimitReader(resp.Body, 1024)) // best effort
-		if n == 0 {
-			return nil, fmt.Errorf("exec error (status %d)", resp.StatusCode)
-		} else {
-			msg := strings.TrimSpace(msgbuf.String())
-			return nil, fmt.Errorf("exec error (status %d): %s", resp.StatusCode, msg)
-		}
-	}
-
-	dec := json.NewDecoder(resp.Body)
-	var res ExecInfo
-	if err := dec.Decode(&res); err != nil {
-		return nil, err
-	}
-	return &res, err
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec", sim.url, testSuite, test, nodeid)
+		req  = &apiExecRequest{Command: cmd}
+		resp *ExecInfo
+	)
+	err := post(url, req, &resp)
+	return resp, err
 }
 
 // CreateNetwork sends a request to the hive server to create a docker network by
 // the given name.
 func (sim *Simulation) CreateNetwork(testSuite SuiteID, networkName string) error {
-	_, err := http.Post(fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, networkName), "application/json", nil)
-	return err
+	url := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, networkName)
+	return post(url, nil, nil)
 }
 
 // RemoveNetwork sends a request to the hive server to remove the given network.
 func (sim *Simulation) RemoveNetwork(testSuite SuiteID, network string) error {
-	endpoint := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, network)
-	req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
-	if err != nil {
-		return err
-	}
-	_, err = http.DefaultClient.Do(req)
-	return err
+	url := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, network)
+	return requestDelete(url)
 }
 
 // ConnectContainer sends a request to the hive server to connect the given
 // container to the given network.
 func (sim *Simulation) ConnectContainer(testSuite SuiteID, network, containerID string) error {
-	endpoint := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
-	_, err := http.Post(endpoint, "application/json", nil)
-	return err
+	url := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
+	return post(url, nil, nil)
 }
 
 // DisconnectContainer sends a request to the hive server to disconnect the given
 // container from the given network.
 func (sim *Simulation) DisconnectContainer(testSuite SuiteID, network, containerID string) error {
-	endpoint := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
-	req, err := http.NewRequest(http.MethodDelete, endpoint, nil)
-	if err != nil {
-		return err
-	}
-	_, err = http.DefaultClient.Do(req)
-	return err
+	url := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
+	return requestDelete(url)
 }
 
 // ContainerNetworkIP returns the IP address of a container on the given network. If the
 // container ID is "simulation", it returns the IP address of the simulator container.
 func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerID string) (string, error) {
-	resp, err := http.Get(fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID))
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
-	if err != nil {
-		return "", err
-	}
-	body := strings.TrimSpace(string(bodyBytes))
-
-	if resp.StatusCode >= 400 {
-		return "", errors.New(body)
-	}
-	return body, nil
+	var (
+		url  = fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
+		resp string
+	)
+	err := get(url, &resp)
+	return resp, err
 }
 
-func (setup *clientSetup) postWithFiles(url string) (string, error) {
+func (setup *clientSetup) postWithFiles(url string, result interface{}) error {
 	var err error
 
 	// make a dictionary of readers
@@ -316,7 +234,7 @@ func (setup *clientSetup) postWithFiles(url string) (string, error) {
 	for key, src := range setup.files {
 		filereader, err := src()
 		if err != nil {
-			return "", err
+			return err
 		}
 		formValues[key] = filereader
 	}
@@ -331,56 +249,106 @@ func (setup *clientSetup) postWithFiles(url string) (string, error) {
 		}
 		if _, ok := setup.files[key]; ok {
 			if fw, err = w.CreateFormFile(key, filepath.Base(key)); err != nil {
-				return "", err
+				return err
 			}
 		} else {
 			if fw, err = w.CreateFormField(key); err != nil {
-				return "", err
+				return err
 			}
 		}
 		if _, err = io.Copy(fw, r); err != nil {
-			return "", err
+			return err
 		}
 	}
 
-	// this must be closed or the request will be missing the terminating boundary
+	// This must be closed or the request will be missing the terminating boundary.
 	w.Close()
 
-	// Can't use http.PostForm because we need to change the content header
+	// Can't use http.PostForm because we need to change the content header.
 	req, err := http.NewRequest("POST", url, &b)
 	if err != nil {
-		return "", err
+		return err
 	}
-	// Set the content type, this will contain the boundary.
-	req.Header.Set("Content-Type", w.FormDataContentType())
+	req.Header.Set("content-type", w.FormDataContentType())
 
 	// Submit the request
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-	if resp.StatusCode >= 200 && resp.StatusCode <= 300 {
-		return string(body), nil
-	}
-	return "", fmt.Errorf("request failed (%d): %v", resp.StatusCode, string(body))
+	err = request(req, result)
+	return err
 }
 
-// wrapHttpErrorsPost wraps http.PostForm to convert responses that are not 200 OK into errors
-func wrapHTTPErrorsPost(url string, data url.Values) (string, error) {
-	resp, err := http.PostForm(url, data)
+func get(url string, result interface{}) error {
+	httpReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return "", err
+		panic(fmt.Errorf("can't create HTTP request: %v", err))
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	return request(httpReq, result)
+}
+
+func requestDelete(url string) error {
+	httpReq, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
-		return "", err
+		panic(fmt.Errorf("can't create HTTP request: %v", err))
 	}
-	if resp.StatusCode >= 200 && resp.StatusCode <= 300 {
-		return string(body), nil
+	return request(httpReq, nil)
+}
+
+func post(url string, requestObj interface{}, result interface{}) error {
+	var reqBody []byte
+	if requestObj != nil {
+		var err error
+		if reqBody, err = json.Marshal(requestObj); err != nil {
+			panic(fmt.Errorf("error encoding request body: %v", err))
+		}
 	}
-	return "", fmt.Errorf("request failed (%d): %v", resp.StatusCode, string(body))
+
+	httpReq, err := http.NewRequest("POST", url, bytes.NewReader(reqBody))
+	if err != nil {
+		panic(fmt.Errorf("can't create HTTP request: %v", err))
+	}
+	if len(reqBody) > 0 {
+		httpReq.GetBody = func() (io.ReadCloser, error) {
+			return io.NopCloser(bytes.NewReader(reqBody)), nil
+		}
+		httpReq.Header.Set("content-type", "application/json")
+	}
+	return request(httpReq, result)
+}
+
+func request(httpReq *http.Request, result interface{}) error {
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	dec := json.NewDecoder(resp.Body)
+
+	switch {
+	case resp.StatusCode >= 400:
+		// It's an error response.
+		switch resp.Header.Get("content-type") {
+		case "application/json":
+			var errMsg apiError
+			if err := dec.Decode(&errMsg); err != nil {
+				return fmt.Errorf("request failed (status %d) and can't decode error message: %v", resp.StatusCode, err)
+			}
+			return errors.New(errMsg.Error)
+		default:
+			respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+			if len(respBody) == 0 {
+				return fmt.Errorf("request failed (status %d)", resp.StatusCode)
+			}
+			return fmt.Errorf("request failed (status %d): %s", resp.StatusCode, respBody)
+		}
+	case resp.StatusCode >= 200 && resp.StatusCode < 300:
+		// Request was successful.
+		if result != nil {
+			if err := dec.Decode(result); err != nil {
+				return fmt.Errorf("invalid response (status %d): %v", resp.StatusCode, err)
+			}
+		}
+		return nil
+	default:
+		// 1xx and 3xx should never happen.
+		return fmt.Errorf("invalid response status code %d", resp.StatusCode)
+	}
 }

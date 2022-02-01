@@ -58,79 +58,78 @@ type simAPI struct {
 
 // getClientTypes returns all known client types.
 func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if r.URL.Query().Get("metadata") != "" {
-		// New-style response with metadata included.
-		clients := make([]*ClientDefinition, 0, len(api.env.Definitions))
-		for _, def := range api.env.Definitions {
-			clients = append(clients, def)
-		}
-		sort.Slice(clients, func(i, j int) bool { return clients[i].Name < clients[j].Name })
-		json.NewEncoder(w).Encode(clients)
-	} else {
-		clients := make([]string, 0, len(api.env.Definitions))
-		for name := range api.env.Definitions {
-			clients = append(clients, name)
-		}
-		sort.Strings(clients)
-		json.NewEncoder(w).Encode(clients)
+	clients := make([]*ClientDefinition, 0, len(api.env.Definitions))
+	for _, def := range api.env.Definitions {
+		clients = append(clients, def)
 	}
+	sort.Slice(clients, func(i, j int) bool {
+		return clients[i].Name < clients[j].Name
+	})
+	serveJSON(w, clients)
 }
 
 // startSuite starts a suite.
 func (api *simAPI) startSuite(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var suite apiTestRequest
+	if err := json.NewDecoder(r.Body).Decode(&suite); err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	if suite.Name == "" {
+		serveError(w, errors.New("suite name is empty"), http.StatusBadRequest)
 		return
 	}
 
-	name := r.Form.Get("name")
-	desc := r.Form.Get("description")
-	suiteID, err := api.tm.StartTestSuite(name, desc)
+	suiteID, err := api.tm.StartTestSuite(suite.Name, suite.Description)
 	if err != nil {
 		log15.Error("API: StartTestSuite failed", "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serveError(w, err, http.StatusInternalServerError)
 	}
-	log15.Info("API: suite started", "suite", suiteID, "name", name)
-	fmt.Fprintf(w, "%d", suiteID)
+	log15.Info("API: suite started", "suite", suiteID, "name", suite.Name)
+	serveJSON(w, suiteID)
 }
 
 // endSuite ends a suite.
 func (api *simAPI) endSuite(w http.ResponseWriter, r *http.Request) {
 	suiteID, err := api.requestSuite(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	if err := api.tm.EndTestSuite(suiteID); err != nil {
 		log15.Error("API: EndTestSuite failed", "suite", suiteID, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 	log15.Info("API: suite ended", "suite", suiteID)
+	serveOK(w)
 }
 
 // startTest signals the start of a test case.
 func (api *simAPI) startTest(w http.ResponseWriter, r *http.Request) {
 	suiteID, err := api.requestSuite(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	var test apiTestRequest
+	if err := json.NewDecoder(r.Body).Decode(&test); err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	if test.Name == "" {
+		serveError(w, errors.New("test name is empty"), http.StatusBadRequest)
 		return
 	}
 
-	name := r.Form.Get("name")
-	testID, err := api.tm.StartTest(suiteID, name, r.Form.Get("description"))
+	testID, err := api.tm.StartTest(suiteID, test.Name, test.Description)
 	if err != nil {
-		msg := fmt.Sprintf("can't start test case: %s", err.Error())
-		http.Error(w, msg, http.StatusInternalServerError)
+		err := fmt.Errorf("can't start test case: %s", err.Error())
+		serveError(w, err, http.StatusInternalServerError)
+		return
 	}
-	log15.Info("API: test started", "suite", suiteID, "test", testID, "name", name)
-	fmt.Fprintf(w, "%d", testID)
+	log15.Info("API: test started", "suite", suiteID, "test", testID, "name", test.Name)
+	serveJSON(w, testID)
 }
 
 // endTest signals the end of a test case. It also shuts down all clients
@@ -138,59 +137,43 @@ func (api *simAPI) startTest(w http.ResponseWriter, r *http.Request) {
 func (api *simAPI) endTest(w http.ResponseWriter, r *http.Request) {
 	suiteID, testID, err := api.requestSuiteAndTest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := r.ParseForm(); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
-	var (
-		summary         = TestResult{Pass: false}
-		responseWritten = false // Have we already committed a response?
-	)
-	defer func() {
-		err := api.tm.EndTest(suiteID, testID, &summary)
-		if err == nil {
-			log15.Info("API: test ended", "suite", suiteID, "test", testID, "pass", summary.Pass)
-			return
-		}
+	var result TestResult
+	if err := json.NewDecoder(r.Body).Decode(&result); err != nil {
+		log15.Error("API: invalid result data in endTest", "suite", suiteID, "test", testID, "error", err)
+		err := fmt.Errorf("can't unmarshal result: %v", err)
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	err = api.tm.EndTest(suiteID, testID, &result)
+	if err != nil {
 		log15.Error("API: EndTest failed", "suite", suiteID, "test", testID, "error", err)
-		if !responseWritten {
-			msg := fmt.Sprintf("can't end test case: %v", err)
-			http.Error(w, msg, http.StatusInternalServerError)
-		}
-	}()
+		err := fmt.Errorf("can't end test case: %v", err)
+		serveError(w, err, http.StatusInternalServerError)
+		return
+	}
 
-	// Summary is required.
-	summaryData := r.Form.Get("summaryresult")
-	if summaryData == "" {
-		http.Error(w, "missing 'summaryresult' in request", http.StatusBadRequest)
-		responseWritten = true
-		return
-	}
-	if err = json.Unmarshal([]byte(summaryData), &summary); err != nil {
-		log15.Error("API: invalid summary data in endTest", "test", testID, "error", err)
-		msg := fmt.Sprintf("can't unmarshal 'summaryresult': %v", err)
-		http.Error(w, msg, http.StatusBadRequest)
-		responseWritten = true
-		return
-	}
+	log15.Info("API: test ended", "suite", suiteID, "test", testID, "pass", result.Pass)
+	serveOK(w)
 }
 
 // startClient starts a client container.
 func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	suiteID, testID, err := api.requestSuiteAndTest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
 	// Client launch parameters are given as multipart/form-data.
 	if err := r.ParseMultipartForm((1 << 10) * 4); err != nil {
 		log15.Error("API: could not parse node request", "error", err)
-		http.Error(w, "could not parse node request", http.StatusBadRequest)
+		err := fmt.Errorf("could not parse node request")
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	files := make(map[string]*multipart.FileHeader)
@@ -214,7 +197,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	clientDef, err := api.checkClient(r)
 	if err != nil {
 		log15.Error("API: " + err.Error())
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -222,7 +205,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	networks, err := api.checkClientNetworks(r, suiteID)
 	if err != nil {
 		log15.Error("API: "+err.Error(), "client", clientDef.Name)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -239,7 +222,8 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
 	if err != nil {
 		log15.Error("API: client container create failed", "client", clientDef.Name, "error", err)
-		http.Error(w, "client container create failed: "+err.Error(), http.StatusInternalServerError)
+		err := fmt.Errorf("client container create failed (%v)", err)
+		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 
@@ -252,7 +236,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	for _, network := range networks {
 		if err := api.tm.ConnectContainer(suiteID, network, containerID); err != nil {
 			log15.Error("API: failed to connect container", "network", network, "container", containerID, "error", err)
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			serveError(w, err, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -263,7 +247,7 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		v, err := strconv.ParseUint(portStr, 10, 16)
 		if err != nil {
 			log15.Error("API: could not parse check-live port", "error", err)
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			serveError(w, err, http.StatusBadRequest)
 			return
 		}
 		options.CheckLive = uint16(v)
@@ -280,28 +264,28 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			LogFile:        logPath,
 			wait:           info.Wait,
 		}
-		api.tm.testSuiteMutex.Lock()
 
-		// log client version in test suite
-		if suite, ok := api.tm.runningTestSuites[suiteID]; !ok {
-			http.Error(w, ErrNoSuchTestSuite.Error(), http.StatusNotFound)
-			api.tm.testSuiteMutex.Unlock()
-			return
-		} else {
+		// Add client version to the test suite.
+		api.tm.testSuiteMutex.Lock()
+		if suite, ok := api.tm.runningTestSuites[suiteID]; ok {
 			suite.ClientVersions[clientDef.Name] = clientDef.Version
 		}
 		api.tm.testSuiteMutex.Unlock()
 
-		// register the node
+		// Register the node. This should always be done, even if starting the container
+		// failed, to ensure that the failed client log is associated with the test.
 		api.tm.RegisterNode(testID, info.ID, clientInfo)
 	}
 	if err != nil {
 		log15.Error("API: could not start client", "client", clientDef.Name, "container", containerID[:8], "error", err)
-		http.Error(w, "client did not start: "+err.Error(), http.StatusInternalServerError)
+		err := fmt.Errorf("client did not start: %v", err)
+		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
+
+	// It's started.
 	log15.Info("API: client "+clientDef.Name+" started", "suite", suiteID, "test", testID, "container", containerID[:8])
-	fmt.Fprintf(w, "%s@%s@%s", info.ID, info.IP, info.MAC)
+	serveJSON(w, &apiNodeStartInfo{ID: info.ID, IP: info.IP})
 }
 
 // clientLogFilePaths determines the log file path of a client container.
@@ -350,18 +334,19 @@ func (api *simAPI) checkClientNetworks(r *http.Request, suiteID TestSuiteID) ([]
 func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
 	_, testID, err := api.requestSuiteAndTest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	node := mux.Vars(r)["node"]
 
 	err = api.tm.StopNode(testID, node)
-	if err == ErrNoSuchNode {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	} else if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	switch {
+	case err == ErrNoSuchNode:
+		serveError(w, err, http.StatusNotFound)
+	case err != nil:
+		serveError(w, err, http.StatusInternalServerError)
+	default:
+		serveOK(w)
 	}
 }
 
@@ -369,7 +354,7 @@ func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
 func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
 	suiteID, testID, err := api.requestSuiteAndTest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -377,28 +362,25 @@ func (api *simAPI) getNodeStatus(w http.ResponseWriter, r *http.Request) {
 	nodeInfo, err := api.tm.GetNodeInfo(suiteID, testID, node)
 	if err != nil {
 		log15.Error("API: can't find node", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
+		serveError(w, err, http.StatusNotFound)
 		return
 	}
 
-	status := apiNodeInfo{ID: nodeInfo.ID, Name: nodeInfo.Name}
-	statusJSON, _ := json.Marshal(&status)
-
-	w.Header().Set("content-type", "application/json")
-	w.Write(statusJSON)
+	serveJSON(w, &apiNodeInfo{ID: nodeInfo.ID, Name: nodeInfo.Name})
 }
 
 func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 	suiteID, testID, err := api.requestSuiteAndTest(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
+
 	node := mux.Vars(r)["node"]
 	nodeInfo, err := api.tm.GetNodeInfo(suiteID, testID, node)
 	if err != nil {
 		log15.Error("API: can't find node", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
+		serveError(w, err, http.StatusNotFound)
 		return
 	}
 
@@ -406,23 +388,21 @@ func (api *simAPI) execInClient(w http.ResponseWriter, r *http.Request) {
 	commandline, err := parseExecRequest(r.Body)
 	if err != nil {
 		log15.Error("API: invalid exec request", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	info, err := api.backend.RunProgram(r.Context(), nodeInfo.ID, commandline)
 	if err != nil {
 		log15.Error("API: client script exec error", "node", node, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(&info)
+	serveJSON(w, &info)
 }
 
 // parseExecRequest decodes and validates a client script exec request.
 func parseExecRequest(r io.Reader) ([]string, error) {
-	var request struct {
-		Command []string `json:"command"`
-	}
+	var request apiExecRequest
 	if err := json.NewDecoder(r).Decode(&request); err != nil {
 		return nil, fmt.Errorf("invalid JSON: %v", err)
 	}
@@ -441,7 +421,7 @@ func parseExecRequest(r io.Reader) ([]string, error) {
 func (api *simAPI) networkCreate(w http.ResponseWriter, r *http.Request) {
 	suiteID, err := api.requestSuite(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -449,18 +429,18 @@ func (api *simAPI) networkCreate(w http.ResponseWriter, r *http.Request) {
 	err = api.tm.CreateNetwork(suiteID, networkName)
 	if err != nil {
 		log15.Error("API: failed to create network", "network", networkName, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 	log15.Info("API: network created", "name", networkName)
-	fmt.Fprint(w, "success")
+	serveOK(w)
 }
 
 // networkRemove removes a docker network.
 func (api *simAPI) networkRemove(w http.ResponseWriter, r *http.Request) {
 	suiteID, err := api.requestSuite(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -468,18 +448,18 @@ func (api *simAPI) networkRemove(w http.ResponseWriter, r *http.Request) {
 	err = api.tm.RemoveNetwork(suiteID, network)
 	if err != nil {
 		log15.Error("API: failed to remove network", "network", network, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 	log15.Info("API: docker network removed", "network", network)
-	fmt.Fprint(w, "success")
+	serveOK(w)
 }
 
 // networkIPGet gets the IP address of a container on a network.
 func (api *simAPI) networkIPGet(w http.ResponseWriter, r *http.Request) {
 	suiteID, err := api.requestSuite(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -488,18 +468,18 @@ func (api *simAPI) networkIPGet(w http.ResponseWriter, r *http.Request) {
 	ipAddr, err := api.tm.ContainerIP(suiteID, network, node)
 	if err != nil {
 		log15.Error("API: failed to get container IP", "container", node, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 	log15.Info("API: container IP requested", "network", network, "container", node, "ip", ipAddr)
-	fmt.Fprint(w, ipAddr)
+	serveJSON(w, ipAddr)
 }
 
 // networkConnect connects a container to a network.
 func (api *simAPI) networkConnect(w http.ResponseWriter, r *http.Request) {
 	suiteID, err := api.requestSuite(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -507,17 +487,18 @@ func (api *simAPI) networkConnect(w http.ResponseWriter, r *http.Request) {
 	containerID := mux.Vars(r)["node"]
 	if err := api.tm.ConnectContainer(suiteID, name, containerID); err != nil {
 		log15.Error("API: failed to connect container", "network", name, "container", containerID, "error", err)
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 	log15.Info("API: container connected to network", "network", name, "container", containerID)
+	serveOK(w)
 }
 
 // networkDisconnect disconnects a container from a network.
 func (api *simAPI) networkDisconnect(w http.ResponseWriter, r *http.Request) {
 	suiteID, err := api.requestSuite(r)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusBadRequest)
 		return
 	}
 
@@ -525,10 +506,11 @@ func (api *simAPI) networkDisconnect(w http.ResponseWriter, r *http.Request) {
 	containerID := mux.Vars(r)["node"]
 	if err := api.tm.DisconnectContainer(suiteID, network, containerID); err != nil {
 		log15.Error("API: disconnecting container failed", "network", network, "container", containerID, "error", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		serveError(w, err, http.StatusInternalServerError)
 		return
 	}
 	log15.Info("API: container disconnected", "network", network, "container", containerID)
+	serveOK(w)
 }
 
 // requestSuite returns the suite ID from the request body and checks that
@@ -571,4 +553,29 @@ func (api *simAPI) requestSuiteAndTest(r *http.Request) (TestSuiteID, TestID, er
 	}
 	testID, err := api.requestTest(r)
 	return suiteID, testID, err
+}
+
+func serveJSON(w http.ResponseWriter, value interface{}) {
+	resp, err := json.Marshal(value)
+	if err != nil {
+		log15.Error("API: internal error while encoding response", "error", err)
+		serveError(w, errors.New("internal error"), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(resp)
+}
+
+func serveOK(w http.ResponseWriter) {
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	io.WriteString(w, "null")
+}
+
+func serveError(w http.ResponseWriter, err error, status int) {
+	resp, _ := json.Marshal(map[string]string{"error": err.Error()})
+	w.Header().Set("content-type", "application/json")
+	w.WriteHeader(status)
+	w.Write(resp)
 }

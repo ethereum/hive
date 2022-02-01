@@ -298,7 +298,7 @@ func TestRunProgram(t *testing.T) {
 	if err == nil {
 		t.Fatal("no error from ClientExec for non-existent script")
 	}
-	if err.Error() != "exec error (status 500): invalid script" {
+	if err.Error() != "invalid script" {
 		t.Fatalf("wrong error message for non-existent script: %q", err)
 	}
 }
