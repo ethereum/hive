@@ -179,6 +179,10 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	files := make(map[string]*multipart.FileHeader)
 	for key, fheaders := range r.MultipartForm.File {
 		if len(fheaders) > 0 {
+			// Note: the PARAMETER NAME (not the 'filename') is used as the destination
+			// file path in the container. This is because RFC 7578 says that directory
+			// components should be ignored in the filename supplied by the form, and
+			// package multipart strips the directory info away at parse time.
 			files[key] = fheaders[0]
 		}
 	}
