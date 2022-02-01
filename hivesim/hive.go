@@ -1,6 +1,7 @@
 package hivesim
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -224,56 +225,65 @@ func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerI
 }
 
 func (setup *clientSetup) postWithFiles(url string, result interface{}) error {
-	var err error
+	var (
+		pipeR, pipeW = io.Pipe()
+		bufW         = bufio.NewWriter(pipeW)
+		pipeErrCh    = make(chan error, 1)
+		form         = multipart.NewWriter(bufW)
+	)
 
-	// make a dictionary of readers
-	formValues := make(map[string]io.Reader)
-	for key, s := range setup.parameters {
-		formValues[key] = strings.NewReader(s)
-	}
-	for key, src := range setup.files {
-		filereader, err := src()
-		if err != nil {
-			return err
-		}
-		formValues[key] = filereader
-	}
+	go func() (err error) {
+		defer func() { pipeErrCh <- err }()
+		defer pipeW.Close()
 
-	// send them
-	var b bytes.Buffer
-	w := multipart.NewWriter(&b)
-	for key, r := range formValues {
-		var fw io.Writer
-		if x, ok := r.(io.Closer); ok {
-			defer x.Close()
-		}
-		if _, ok := setup.files[key]; ok {
-			if fw, err = w.CreateFormFile(key, filepath.Base(key)); err != nil {
+		// Write regular form parameters first.
+		for key, value := range setup.parameters {
+			fw, err := form.CreateFormField(key)
+			if err != nil {
 				return err
 			}
-		} else {
-			if fw, err = w.CreateFormField(key); err != nil {
+			if _, err := io.WriteString(fw, value); err != nil {
 				return err
 			}
 		}
-		if _, err = io.Copy(fw, r); err != nil {
+		// Now upload the files.
+		for filename, open := range setup.files {
+			fw, err := form.CreateFormFile(filename, filepath.Base(filename))
+			if err != nil {
+				return err
+			}
+			fileReader, err := open()
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: upload error for %s: %v\n", filename, err)
+				return err
+			}
+			_, copyErr := io.Copy(fw, fileReader)
+			fileReader.Close()
+			if copyErr != nil {
+				return copyErr
+			}
+		}
+		// Form must be closed or the request will be missing the terminating boundary.
+		if err := form.Close(); err != nil {
 			return err
 		}
-	}
+		return bufW.Flush()
+	}()
 
-	// This must be closed or the request will be missing the terminating boundary.
-	w.Close()
-
-	// Can't use http.PostForm because we need to change the content header.
-	req, err := http.NewRequest("POST", url, &b)
+	// Send the request.
+	req, err := http.NewRequest("POST", url, pipeR)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("content-type", w.FormDataContentType())
+	req.Header.Set("content-type", form.FormDataContentType())
+	httpErr := request(req, result)
 
-	// Submit the request
-	err = request(req, result)
-	return err
+	// Wait for the uploader goroutine to finish.
+	uploadErr := <-pipeErrCh
+	if httpErr == nil && uploadErr != nil {
+		return uploadErr
+	}
+	return httpErr
 }
 
 func get(url string, result interface{}) error {
