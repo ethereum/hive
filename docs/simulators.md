@@ -236,7 +236,7 @@ Response
 
     8
     --boundary--
-    content-disposition: form-data; name=file; filename="/genesis.json"
+    content-disposition: form-data; name=/genesis.json; filename="genesis.json"
 
     {
       "difficulty": "0x20000",
@@ -255,10 +255,13 @@ be connected before it starts to run. Network names are supplied as a comma-sepa
 list. The client container will not be created if any of the given networks doesn't exist.
 
 Other form parameters, specifically those with a prefix of `HIVE_`, are passed to the
-client entry point as environment variables. Please see the [client interface documentation]
-for environment variables supported by Ethereum clients.
+client entry point as environment variables. Please see the [client interface
+documentation] for environment variables supported by Ethereum clients.
 
-Parameters with a filename are copied into the client container as files.
+Parameters with a filename are copied into the client container as files. Note: the
+**parameter name** is used as the destination file name. The 'filename' submitted in the
+form is ignored. This is because multipart/form-data does not support specifying directory
+components in 'filename'.
 
 Response:
 
