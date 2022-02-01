@@ -28,14 +28,6 @@ var (
 	ErrTestSuiteLimited         = errors.New("testsuite test count is limited")
 )
 
-// ClientDefinition is served by the /clients API endpoint to list the available clients
-type ClientDefinition struct {
-	Name    string         `json:"name"`
-	Version string         `json:"version"`
-	Image   string         `json:"-"` // not exposed via API
-	Meta    ClientMetadata `json:"meta"`
-}
-
 // SimEnv contains the simulation parameters.
 type SimEnv struct {
 	LogDir string

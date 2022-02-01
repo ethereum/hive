@@ -57,6 +57,14 @@ type ClientInfo struct {
 	wait func()
 }
 
+// ClientDefinition is served by the /clients API endpoint to list the available clients
+type ClientDefinition struct {
+	Name    string         `json:"name"`
+	Version string         `json:"version"`
+	Image   string         `json:"-"` // not exposed via API
+	Meta    ClientMetadata `json:"meta"`
+}
+
 // apiNodeInfo is the description of a running client as returned by the API.
 type apiNodeInfo struct {
 	ID   string `json:"id"`

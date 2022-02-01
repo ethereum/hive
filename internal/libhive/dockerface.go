@@ -53,11 +53,6 @@ type ContainerInfo struct {
 	Wait func()
 }
 
-// ClientMetadata is metadata to describe the client in more detail, configured with a YAML file in the client dir.
-type ClientMetadata struct {
-	Roles []string `yaml:"roles" json:"roles"`
-}
-
 // Builder can build docker images of clients and simulators.
 type Builder interface {
 	ReadClientMetadata(name string) (*ClientMetadata, error)
@@ -66,4 +61,9 @@ type Builder interface {
 
 	// ReadFile returns the content of a file in the given image.
 	ReadFile(image, path string) ([]byte, error)
+}
+
+// ClientMetadata is metadata to describe the client in more detail, configured with a YAML file in the client dir.
+type ClientMetadata struct {
+	Roles []string `yaml:"roles" json:"roles"`
 }
