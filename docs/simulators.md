@@ -125,21 +125,27 @@ You can check the results using [hiveview].
 
 ## Simulation API Reference
 
-This section lists all HTTP endpoints provided by the simulation API.
+This section lists all HTTP endpoints provided by the simulation API. Almost all API
+endpoints consume and respond with payloads of type `application/json`.
+
+When there is an error, the response will have a non 2xx status code and a response
+body containing JSON like:
+
+    {"error": "error message here"}
 
 ### Suite and Test Case Endpoints
 
 #### Creating a test suite
 
     POST /testsuite
-    content-type: application/x-www-form-urlencoded
+    content-type: application/json
 
-    name=test-suite-name&description=this%20suite%20does%20...
+    {"name": "test-suite-name", "description": "this suite does..."}
 
 This request signals the start of a test suite. The API responds with a test suite ID.
 
     200 OK
-    content-type: text/plain
+    content-type: application/json
 
     1
 
@@ -157,26 +163,26 @@ Response:
 #### Creating a test case
 
     POST /testsuite/{suite}/test
-    content-type: application/x-www-form-urlencoded
+    content-type: application/json
+
+    {"name": "test case name", "description": "..."}
 
 The API responds with a test case ID.
 
     200 OK
-    content-type: text/plain
+    content-type: application/json
 
     2
 
 #### Ending a test case
 
     POST /testsuite/{suite}/test/{test}
-    content-type: application/x-www-form-urlencoded
+    content-type: application/json
 
-    summaryresult=%7B%22pass%22%3Atrue%2C%22details%22%3A%22this%20is%20the%20test%20output%22%7D
+    {"pass": true, "details": "this is the test output"}
 
-This request reports the result of a test case. The request body is a form submission
-containing a single field `summaryresult`. The test result is a JSON object of the form:
-
-    {"pass": true/false, "details": "text..."}
+This request reports the result of a test case and ends the test case. Clients launched in
+the context of the test case are terminated by this request.
 
 Response:
 
@@ -188,9 +194,9 @@ Response:
 
     GET /clients
 
-This returns a JSON array of client definitions available to the simulation run.
-Clients have a `name`, `version`, and `meta` for metadata as defined
-in the [client interface documentation].
+This returns a JSON array of client definitions available to the simulation run. Clients
+have a `name`, `version`, and `meta` for metadata as defined in the [client interface
+documentation].
 
 Response
 
@@ -245,7 +251,8 @@ Response
     }
     --boundary----
 
-This request starts a client container. The request body must be encoded as multipart form data.
+This request starts a client container. Unlike with other requests, this request must be
+encoded as multipart/form-data.
 
 The `CLIENT` form parameter is required and specifies the client type that should be
 started. It must match one of the client names returned by the `/clients` endpoint.
@@ -266,9 +273,9 @@ components in 'filename'.
 Response:
 
     200 OK
-    content-type: text/plain
+    content-type: application/json
 
-    <container ID>@<IP address>@<MAC address>
+    {"id": "<container-id>", "ip": "172.1.2.4"}
 
 #### Geting client information
 
@@ -373,9 +380,9 @@ This returns the IP of a container on the given network.
 Response:
 
     200 OK
-    content-type: text/plain
+    content-type: application/json
 
-    172.22.0.2
+    "172.22.0.2"
 
 [client interface documentation]: ./clients.md
 [package hivesim]: https://pkg.go.dev/github.com/ethereum/hive/hivesim
