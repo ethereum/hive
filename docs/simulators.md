@@ -230,19 +230,14 @@ Response
     content-type: multipart/form-data; boundary=--boundary--
 
     --boundary--
-    content-disposition: form-data; name=CLIENT
+    content-disposition: form-data; name=config
 
-    go-ethereum
+    {
+      "client": "go-ethereum_latest",
+      "environment": {"HIVE_CHAIN_ID": "8"}
+    }
     --boundary--
-    content-disposition: form-data; name=NETWORKS
-
-    network1,network2
-    --boundary--
-    content-disposition: form-data; name=HIVE_CHAIN_ID
-
-    8
-    --boundary--
-    content-disposition: form-data; name=/genesis.json; filename="genesis.json"
+    content-disposition: form-data; name=/genesis.json; filename=genesis.json
 
     {
       "difficulty": "0x20000",
@@ -252,23 +247,34 @@ Response
     --boundary----
 
 This request starts a client container. Unlike with other requests, this request must be
-encoded as multipart/form-data.
+encoded as multipart/form-data. The `config` form parameter contains a client launch
+configuration:
 
-The `CLIENT` form parameter is required and specifies the client type that should be
-started. It must match one of the client names returned by the `/clients` endpoint.
+    {
+      "client": "<client type>",
+      "networks: ["<network>"],
+      "environment": {
+        "HIVE_xxx": "<value>",
+        "HIVE_yyy": "<value>"
+      }
+    }
 
-The `NETWORKS` form parameter is optional and configures networks to which the client will
-be connected before it starts to run. Network names are supplied as a comma-separated
-list. The client container will not be created if any of the given networks doesn't exist.
+The `"client"` field is mandatory and gives the client type to be started. It must match
+one of the names returned by the `/clients` endpoint.
 
-Other form parameters, specifically those with a prefix of `HIVE_`, are passed to the
-client entry point as environment variables. Please see the [client interface
+`"networks"` is optional and configures networks to which the client will be connected
+before it starts to run. Network names are supplied as a comma-separated list. The client
+container will not be created if any of the given networks doesn't exist.
+
+`"environment"` configures environment variables to be set in the client container. All
+variable names must start with prefix `HIVE_`. Please see the [client interface
 documentation] for environment variables supported by Ethereum clients.
 
-Parameters with a filename are copied into the client container as files. Note: the
-**parameter name** is used as the destination file name. The 'filename' submitted in the
-form is ignored. This is because multipart/form-data does not support specifying directory
-components in 'filename'.
+The submitted form data may also contain files. Any form parameters with a non-empty
+filename are copied into the client container as files. Note: the **form parameter name**
+is used as the destination file name. The 'filename' submitted in the form is ignored.
+This is because multipart/form-data does not support specifying directory components in
+'filename'.
 
 Response:
 
