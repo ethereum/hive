@@ -70,6 +70,13 @@ type apiTestRequest struct {
 	Description string `json:"description"`
 }
 
+// apiStartRequest contains the launch parameters for a client container.
+type apiStartRequest struct {
+	Client      string            `json:"client"`
+	Networks    []string          `json:"networks"`
+	Environment map[string]string `json:"environment"`
+}
+
 // apiNodeInfo is the description of a running client as returned by the API.
 type apiNodeInfo struct {
 	ID   string `json:"id"`

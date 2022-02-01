@@ -170,12 +170,42 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Client launch parameters are given as multipart/form-data.
-	if err := r.ParseMultipartForm((1 << 10) * 4); err != nil {
+	const maxMemory = 8 * 1024 * 1024
+	if err := r.ParseMultipartForm(maxMemory); err != nil {
 		log15.Error("API: could not parse node request", "error", err)
 		err := fmt.Errorf("could not parse node request")
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
+	if !r.Form.Has("config") {
+		log15.Error("API: missing 'config' parameter in node request", "error", err)
+		err := fmt.Errorf("missing 'config' parameter in node request")
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	var clientConfig apiStartRequest
+	if err := json.Unmarshal([]byte(r.Form.Get("config")), &clientConfig); err != nil {
+		log15.Error("API: invalid 'config' parameter in node request", "error", err)
+		err := fmt.Errorf("invalid 'config' parameter in node request")
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
+	// Get the client name.
+	clientDef, err := api.checkClient(&clientConfig)
+	if err != nil {
+		log15.Error("API: " + err.Error())
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	// Get the network names, if any, for the container to be connected to at start.
+	networks, err := api.checkClientNetworks(&clientConfig, suiteID)
+	if err != nil {
+		log15.Error("API: "+err.Error(), "client", clientDef.Name)
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+
 	files := make(map[string]*multipart.FileHeader)
 	for key, fheaders := range r.MultipartForm.File {
 		if len(fheaders) > 0 {
@@ -186,31 +216,17 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			files[key] = fheaders[0]
 		}
 	}
-	env := make(map[string]string)
-	for key, vals := range r.MultipartForm.Value {
-		if strings.HasPrefix(key, hiveEnvvarPrefix) {
-			env[key] = vals[0]
+
+	// Sanitize environment.
+	env := clientConfig.Environment
+	for k := range env {
+		if !strings.HasPrefix(k, hiveEnvvarPrefix) {
+			delete(env, k)
 		}
 	}
 	// Set default client loglevel to sim loglevel.
 	if env["HIVE_LOGLEVEL"] == "" {
 		env["HIVE_LOGLEVEL"] = strconv.Itoa(api.env.SimLogLevel)
-	}
-
-	// Get the client name.
-	clientDef, err := api.checkClient(r)
-	if err != nil {
-		log15.Error("API: " + err.Error())
-		serveError(w, err, http.StatusBadRequest)
-		return
-	}
-
-	// Get the network names, if any, for the container to be connected to at start.
-	networks, err := api.checkClientNetworks(r, suiteID)
-	if err != nil {
-		log15.Error("API: "+err.Error(), "client", clientDef.Name)
-		serveError(w, err, http.StatusBadRequest)
-		return
 	}
 
 	// Set up the timeout.
@@ -303,35 +319,25 @@ func (api *simAPI) clientLogFilePaths(clientName, containerID string) (jsonPath 
 	return jsonPath, file
 }
 
-func (api *simAPI) checkClient(r *http.Request) (*ClientDefinition, error) {
-	name := r.FormValue("CLIENT")
-	if name == "" {
-		return nil, errors.New("missing 'CLIENT' in client start request")
+func (api *simAPI) checkClient(req *apiStartRequest) (*ClientDefinition, error) {
+	if req.Client == "" {
+		return nil, errors.New("missing client type in start request")
 	}
-	def, ok := api.env.Definitions[name]
+	def, ok := api.env.Definitions[req.Client]
 	if !ok {
-		return nil, errors.New("unknown 'CLIENT' type in client start request")
+		return nil, errors.New("unknown client type in start request")
 	}
 	return def, nil
 }
 
-// Parse request to start a client and be added to a specific set of networks upon startup
-func (api *simAPI) checkClientNetworks(r *http.Request, suiteID TestSuiteID) ([]string, error) {
-	networksStr := r.FormValue("NETWORKS")
-	if networksStr == "" {
-		return nil, nil
-	}
-
-	networks := strings.Split(networksStr, ",")
-	if len(networks) == 0 {
-		return nil, nil
-	}
-	for _, network := range networks {
+// checkClientNetworks pre-checks the existence of initial networks for a client container.
+func (api *simAPI) checkClientNetworks(req *apiStartRequest, suiteID TestSuiteID) ([]string, error) {
+	for _, network := range req.Networks {
 		if !api.tm.NetworkExists(suiteID, network) {
 			return nil, fmt.Errorf("invalid network name '%s' in client start request", network)
 		}
 	}
-	return networks, nil
+	return req.Networks, nil
 }
 
 // stopClient terminates a client container.

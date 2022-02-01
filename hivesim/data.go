@@ -46,6 +46,12 @@ type apiTestRequest struct {
 	Description string `json:"description"`
 }
 
+type apiStartNodeRequest struct {
+	Client      string            `json:"client"`
+	Networks    []string          `json:"networks"`
+	Environment map[string]string `json:"environment"`
+}
+
 type apiExecRequest struct {
 	Command []string `json:"command"`
 }

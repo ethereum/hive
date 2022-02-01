@@ -103,14 +103,18 @@ func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, cl
 		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test)
 		resp apiNodeStartInfo
 	)
+
 	setup := &clientSetup{
-		parameters: make(map[string]string),
-		files:      make(map[string]func() (io.ReadCloser, error)),
+		files: make(map[string]func() (io.ReadCloser, error)),
+		config: apiStartNodeRequest{
+			Client:      clientType,
+			Environment: make(map[string]string),
+		},
 	}
-	setup.parameters["CLIENT"] = clientType
 	for _, opt := range options {
-		opt.Apply(setup)
+		opt.apply(setup)
 	}
+
 	err := setup.postWithFiles(url, &resp)
 	if err != nil {
 		return "", nil, err
@@ -236,16 +240,15 @@ func (setup *clientSetup) postWithFiles(url string, result interface{}) error {
 		defer func() { pipeErrCh <- err }()
 		defer pipeW.Close()
 
-		// Write regular form parameters first.
-		for key, value := range setup.parameters {
-			fw, err := form.CreateFormField(key)
-			if err != nil {
-				return err
-			}
-			if _, err := io.WriteString(fw, value); err != nil {
-				return err
-			}
+		// Write 'config' parameter first.
+		fw, err := form.CreateFormField("config")
+		if err != nil {
+			return err
 		}
+		if err := json.NewEncoder(fw).Encode(&setup.config); err != nil {
+			return err
+		}
+
 		// Now upload the files.
 		for filename, open := range setup.files {
 			fw, err := form.CreateFormFile(filename, filepath.Base(filename))
@@ -263,6 +266,7 @@ func (setup *clientSetup) postWithFiles(url string, result interface{}) error {
 				return copyErr
 			}
 		}
+
 		// Form must be closed or the request will be missing the terminating boundary.
 		if err := form.Close(); err != nil {
 			return err

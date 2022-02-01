@@ -3,24 +3,23 @@ package hivesim
 import (
 	"io"
 	"os"
-	"strings"
 )
 
 // clientSetup collects client options.
 type clientSetup struct {
-	parameters map[string]string
+	config apiStartNodeRequest
 	// destination path -> open data function
 	files map[string]func() (io.ReadCloser, error)
 }
 
 // StartOption is a parameter for starting a client.
 type StartOption interface {
-	Apply(setup *clientSetup)
+	apply(setup *clientSetup)
 }
 
 type optionFunc func(setup *clientSetup)
 
-func (fn optionFunc) Apply(setup *clientSetup) { fn(setup) }
+func (fn optionFunc) apply(setup *clientSetup) { fn(setup) }
 
 func fileAsSrc(path string) func() (io.ReadCloser, error) {
 	return func() (io.ReadCloser, error) {
@@ -31,7 +30,8 @@ func fileAsSrc(path string) func() (io.ReadCloser, error) {
 // WithInitialNetworks configures networks that the client is initially connected to.
 func WithInitialNetworks(networks []string) StartOption {
 	return optionFunc(func(setup *clientSetup) {
-		setup.parameters["NETWORKS"] = strings.Join(networks, ",")
+		setup.config.Networks = make([]string, len(networks))
+		copy(setup.config.Networks, networks)
 	})
 }
 
@@ -59,7 +59,7 @@ func WithDynamicFile(dstPath string, src func() (io.ReadCloser, error)) StartOpt
 func Bundle(option ...StartOption) StartOption {
 	return optionFunc(func(setup *clientSetup) {
 		for _, opt := range option {
-			opt.Apply(setup)
+			opt.apply(setup)
 		}
 	})
 }
@@ -71,10 +71,10 @@ type Params map[string]string
 
 var _ StartOption = (Params)(nil)
 
-// Apply implements StartOption.
-func (p Params) Apply(setup *clientSetup) {
+// apply implements StartOption.
+func (p Params) apply(setup *clientSetup) {
 	for k, v := range p {
-		setup.parameters[k] = v
+		setup.config.Environment[k] = v
 	}
 }
 

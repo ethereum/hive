@@ -333,10 +333,10 @@ func TestStartClientErrors(t *testing.T) {
 	params = map[string]string{"CLIENT": "unknown"}
 	clientID, _, err = sim.StartClient(suiteID, testID, params, nil)
 	if err == nil {
-		t.Fatalf("wanted error for unknown CLIENT parameter, got container ID %v", clientID)
+		t.Fatalf("wanted error for unknown client parameter, got container ID %v", clientID)
 	}
-	if !strings.Contains(err.Error(), "unknown 'CLIENT'") {
-		t.Fatalf("wrong error for GetNode with unknown CLIENT parameter: %q", err.Error())
+	if !strings.Contains(err.Error(), "unknown client type") {
+		t.Fatalf("wrong error for GetNode with unknown client parameter: %q", err.Error())
 	}
 }
 
