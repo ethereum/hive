@@ -20,16 +20,9 @@ var (
 	big1 = big.NewInt(1)
 )
 
-// Engine API during PoW Negative tests: Client should reject Engine directives if the TTD has not been reached.
-func engineAPIPoWTests(t *TestEnv) {
-	// Test that the engine_ directives are correctly ignored when the chain has not yet reached TTD
+// Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
+func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
 	gblock := loadGenesis()
-
-	// First get latest header
-	latestH, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
-	if err != nil {
-		t.Fatalf("FAIL (%v): Unable to get latest header: %v", t.TestName, err)
-	}
 
 	forkchoiceState := beacon.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
@@ -37,23 +30,35 @@ func engineAPIPoWTests(t *TestEnv) {
 		FinalizedBlockHash: gblock.Hash(),
 	}
 	fcResp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceState, nil)
+	// Execution specification:
+	// {payloadStatus: {status: INVALID_TERMINAL_BLOCK, latestValidHash: null, validationError: errorMessage | null}, payloadId: null}
+	// either obtained from the Payload validation process or as a result of validating a PoW block referenced by forkchoiceState.headBlockHash
 	if err != nil {
-		t.Fatalf("FAIL (%v): ForkchoiceUpdated under PoW rule returned error (Expected INVALID): %v, %v", t.TestName, err)
+		t.Fatalf("FAIL (%v): ForkchoiceUpdated under PoW rule returned error (Expected INVALID_TERMINAL_BLOCK): %v, %v", t.TestName, err)
 	}
-	if fcResp.PayloadStatus.Status != "INVALID" {
-		t.Fatalf("INFO (%v): Error in PoW response (Expected Status=INVALID): %v", t.TestName, err)
+	if fcResp.PayloadStatus.Status != "INVALID_TERMINAL_BLOCK" {
+		t.Fatalf("INFO (%v): Incorrect EngineForkchoiceUpdatedV1 response for invalid PoW parent (Expected PayloadStatus.Status=INVALID_TERMINAL_BLOCK): %v", t.TestName, fcResp.PayloadStatus.Status)
 	}
-	if fcResp.PayloadStatus.LatestValidHash != latestH.Hash() {
-		t.Fatalf("INFO (%v): Error in PoW response (Expected LatestValidHash=%v): %v != %v", t.TestName, latestH.Hash(), fcResp.PayloadStatus.LatestValidHash)
+	if fcResp.PayloadStatus.LatestValidHash != nil {
+		t.Fatalf("INFO (%v): Incorrect EngineForkchoiceUpdatedV1 response for invalid PoW parent (Expected PayloadStatus.LatestValidHash==nil): %v", t.TestName, fcResp.PayloadStatus)
 	}
-	if fcResp.PayloadStatus.ValidationError != "Invalid terminal block" {
-		t.Fatalf("INFO (%v): Error in PoW response (Expected ValidationError=Invalid terminal block): %v", t.TestName, fcResp.PayloadStatus.ValidationError)
-	}
+	// ValidationError is not validated since it can be either null or a string message
+}
 
+// Invalid GetPayload Under PoW: Client must reject GetPayload directives under PoW.
+func invalidGetPayloadUnderPoW(t *TestEnv) {
+	// We start in PoW and try to get an invalid Payload, which should produce an error but nothing should be disrupted.
 	payloadResp, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), &beacon.PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
 	if err == nil {
 		t.Fatalf("FAIL (%v): GetPayloadV1 accepted under PoW rule: %v", t.TestName, payloadResp)
 	}
+
+}
+
+// Invalid Terminal Block in NewPayload: Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
+func invalidTerminalBlockNewPayload(t *TestEnv) {
+	gblock := loadGenesis()
+
 	// Create a dummy payload to send in the ExecutePayload call
 	payload := beacon.ExecutableDataV1{
 		ParentHash:    gblock.Hash(),
@@ -77,19 +82,20 @@ func engineAPIPoWTests(t *TestEnv) {
 	}
 
 	newPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), hashedPayload)
-	if err != nil {
-		t.Fatalf("FAIL (%v): EngineNewPayloadV1 under PoW rule returned error (Expected INVALID): %v, %v", t.TestName, err)
-	}
-	if newPayloadResp.Status != "INVALID" {
-		t.Fatalf("INFO (%v): Error in PoW response (Expected Status=INVALID): %v", t.TestName, err)
-	}
-	if newPayloadResp.LatestValidHash != latestH.Hash() {
-		t.Fatalf("INFO (%v): Error in PoW response (Expected LatestValidHash=%v): %v != %v", t.TestName, latestH.Hash(), newPayloadResp.LatestValidHash)
-	}
-	if newPayloadResp.ValidationError != "Invalid terminal block" {
-		t.Fatalf("INFO (%v): Error in PoW response (Expected ValidationError=Invalid terminal block): %v", t.TestName, newPayloadResp.ValidationError)
-	}
 
+	// Execution specification:
+	// {status: INVALID_TERMINAL_BLOCK, latestValidHash: null, validationError: errorMessage | null}
+	// if terminal block conditions are not satisfied
+	if err != nil {
+		t.Fatalf("FAIL (%v): EngineNewPayloadV1 under PoW rule returned error (Expected INVALID_TERMINAL_BLOCK): %v", t.TestName, err)
+	}
+	if newPayloadResp.Status != "INVALID_TERMINAL_BLOCK" {
+		t.Fatalf("FAIL (%v): Incorrect EngineNewPayloadV1 response for invalid PoW parent (Expected Status=INVALID_TERMINAL_BLOCK): %v", t.TestName, newPayloadResp.Status)
+	}
+	if newPayloadResp.LatestValidHash != nil {
+		t.Fatalf("FAIL (%v): Incorrect EngineNewPayloadV1 response for invalid PoW parent (Expected LatestValidHash==nil): %v", t.TestName, newPayloadResp.LatestValidHash)
+	}
+	// ValidationError is not validated since it can be either null or a string message
 }
 
 // Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using ExecutePayload) and unknown SafeBlock

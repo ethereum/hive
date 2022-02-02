@@ -42,8 +42,10 @@ for each testCase:
 
 ## Test Cases
 
-Engine API Negative Test Cases:
-- Engine API Proof of Work: Make Engine API calls while the client is still in PoW mode, which should be rejected.
+### Engine API Negative Test Cases:
+- Invalid Terminal Block in ForkchoiceUpdated: Client should reject Engine directives if the referenced HeadBlockHash does not meet the TTD requirement.
+- Invalid GetPayload Under PoW: Client must reject GetPayload directives under PoW.
+- Invalid Terminal Block in NewPayload: Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
 - Unknown HeadBlockHash: Perform a forkchoiceUpdated call with an unknown (random) HeadBlockHash, the client should initiate the syncing process.
 - Unknown SafeBlockHash: Perform a forkchoiceUpdated call with an unknown (random) SafeBlockHash, the client should throw an error since the hash is not an ancestor to the HeadBlockHash.
 - Unknown FinalizedBlockHash: Perform a forkchoiceUpdated call with an unknown (random) FinalizedBlockHash, the client should initiate the syncing process.
@@ -58,21 +60,21 @@ Engine API Negative Test Cases:
    - GasUsed
    - Timestamp
 
-Eth RPC Status on ForkchoiceUpdated Events:
+### Eth RPC Status on ForkchoiceUpdated Events:
 - Latest Block after ExecutePayload: Verify the Block returned by the Eth RPC after a new payload is executed. Eth RPC should still return previous block.
 - Latest Block after New HeadBlock: Verify the Block returned by the Eth RPC after a new HeadBlockHash is set using forkchoiceUpdated. Eth RPC should still return previous block.
 - Latest Block after New SafeBlock: Verify the Block returned by the Eth RPC after a new SafeBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
 - Latest Block after New FinalizedBlock: Verify the Block returned by the Eth RPC after a new FinalizedBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
 - Latest Block after Reorg: Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to their previous value. Eth RPC should return previous block.
 
-Payload Execution
+### Payload Execution
 - Re-Execute Payload: Re-execute already executed payloads and verify that no errors occur.
 
-Transactions
+### Transactions
 - Transaction Reorg using ForkchoiceUpdated: Send transactions that modify the state tree after the PoS switch and verify that the modifications are correctly rolled back when a ForkchoiceUpdated event occurs with a block older than the block where the transaction was included.
 
-Suggested Fee Recipient in Payload creation
+### Suggested Fee Recipient in Payload creation
 - Suggested Fee Recipient Test: Set the fee recipient to a custom address and verify that (a) balance is not increased when no fees are collected (b) balance is increased appropriately when fees are collected.
 
-Random Opcode:
+### Random Opcode:
 - Random Opcode Transactions: Send transactions that modify the state to the value of the 'DIFFICULTY' opcode and verify that (a) the state is equal to the difficulty on blocks before the TTD is crossed (b) the state is equal to the Random value provided using forkchoiceUpdated after PoS transition.

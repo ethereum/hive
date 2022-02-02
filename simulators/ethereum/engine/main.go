@@ -64,8 +64,18 @@ var tests = []TestSpec{
 
 	// Engine API Negative Test Cases
 	{
-		Name: "Engine API Proof of Work",
-		Run:  engineAPIPoWTests,
+		Name: "Invalid Terminal Block in ForkchoiceUpdated",
+		Run:  invalidTerminalBlockForkchoiceUpdated,
+		TTD:  1000000,
+	},
+	{
+		Name: "Invalid GetPayload Under PoW",
+		Run:  invalidGetPayloadUnderPoW,
+		TTD:  1000000,
+	},
+	{
+		Name: "Invalid Terminal Block in NewPayload",
+		Run:  invalidTerminalBlockNewPayload,
 		TTD:  1000000,
 	},
 	{
