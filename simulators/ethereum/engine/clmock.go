@@ -308,11 +308,26 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 			cl.Logf("CLMocker: broadcastNewPayload Error (%v): %v\n", resp.Container, resp.Error)
 
 		} else {
-			if resp.ExecutePayloadResponse.Status == "ACCEPTED" {
-				if resp.ExecutePayloadResponse.LatestValidHash != cl.LatestPayloadBuilt.BlockHash {
-					// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
-					// - If validation succeeds, the response MUST contain {status: VALID, latestValidHash: payload.blockHash}
-					cl.Fatalf("FAIL (%v): NewPayload returned ACCEPTED status with incorrect LatestValidHash, %v!=%v", resp.ExecutePayloadResponse.LatestValidHash, cl.LatestPayloadBuilt.BlockHash)
+			if resp.ExecutePayloadResponse.Status == "VALID" {
+				// The client is synced and the payload was immediately validated
+				// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
+				// - If validation succeeds, the response MUST contain {status: VALID, latestValidHash: payload.blockHash}
+				if resp.ExecutePayloadResponse.LatestValidHash == nil {
+					cl.Fatalf("CLMocker: NewPayload returned VALID status with nil LatestValidHash, expected %v", cl.LatestPayloadBuilt.BlockHash)
+				}
+				if *resp.ExecutePayloadResponse.LatestValidHash != cl.LatestPayloadBuilt.BlockHash {
+					cl.Fatalf("CLMocker: NewPayload returned VALID status with incorrect LatestValidHash==%v, expected %v", resp.ExecutePayloadResponse.LatestValidHash, cl.LatestPayloadBuilt.BlockHash)
+				}
+			} else if resp.ExecutePayloadResponse.Status == "ACCEPTED" {
+				// The client is not synced but the payload was accepted
+				// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
+				// - {status: ACCEPTED, latestValidHash: null, validationError: null} if the following conditions are met:
+				// the blockHash of the payload is valid
+				// the payload doesn't extend the canonical chain
+				// the payload hasn't been fully validated.
+				nullHash := common.Hash{}
+				if resp.ExecutePayloadResponse.LatestValidHash != nil && *resp.ExecutePayloadResponse.LatestValidHash != nullHash {
+					cl.Fatalf("CLMocker: NewPayload returned ACCEPTED status with incorrect LatestValidHash==%v", resp.ExecutePayloadResponse.LatestValidHash)
 				}
 			} else {
 				cl.Logf("CLMocker: broadcastNewPayload Response (%v): %v\n", resp.Container, resp.ExecutePayloadResponse)
@@ -412,7 +427,7 @@ func (cl *CLMocker) producePoSBlocks() {
 }
 
 type ExecutePayloadOutcome struct {
-	ExecutePayloadResponse *beacon.PayloadStatusV1
+	ExecutePayloadResponse *PayloadStatusV1
 	Container              string
 	Error                  error
 }
@@ -434,7 +449,7 @@ func (cl *CLMocker) broadcastNewPayload(payload *beacon.ExecutableDataV1) []Exec
 }
 
 type ForkChoiceOutcome struct {
-	ForkchoiceResponse *beacon.ForkChoiceResponse
+	ForkchoiceResponse *ForkChoiceResponse
 	Container          string
 	Error              error
 }

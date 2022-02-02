@@ -225,7 +225,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 	}
 	resp, err = t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownHeadHash, &payloadAttr)
 	if err != nil {
-		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown HeadBlockHash: %v, %v", t.TestName, err)
+		t.Fatalf("FAIL (%v): Error on forkchoiceUpdated with unknown HeadBlockHash + PayloadAttributes: %v", t.TestName, err)
 	}
 	if resp.PayloadStatus.Status != "SYNCING" {
 		t.Fatalf("FAIL (%v): Response on forkchoiceUpdated with unknown HeadBlockHash is not SYNCING: %v, %v", t.TestName, resp)
@@ -389,7 +389,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		}
 		// Depending on the field we modified, we expect a different status
 		var expectedState string
-		var expectedLatestValidHash common.Hash
+		var expectedLatestValidHash *common.Hash = nil
 		if payloadField == "ParentHash" {
 			// Execution specification::
 			// {status: ACCEPTED, latestValidHash: null, validationError: null} if the following conditions are met:
@@ -399,15 +399,23 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 			expectedState = "ACCEPTED"
 		} else {
 			expectedState = "INVALID"
-			expectedLatestValidHash = alteredPayload.ParentHash
+			expectedLatestValidHash = &alteredPayload.ParentHash
 		}
 
 		t.Logf("INFO (%v): Invalid payload response: %v", t.TestName, newPayloadResp)
 		if newPayloadResp.Status != expectedState {
 			t.Fatalf("FAIL (%v): EngineNewPayload with reference to invalid payload returned incorrect state: %v!=%v", t.TestName, newPayloadResp.Status, expectedState)
 		}
-		if newPayloadResp.LatestValidHash != expectedLatestValidHash {
+		if newPayloadResp.LatestValidHash != nil && expectedLatestValidHash != nil {
+			// Both expected and received are different from nil, therefore their values must be equal.
+			if *newPayloadResp.LatestValidHash != *expectedLatestValidHash {
+				t.Fatalf("FAIL (%v): EngineNewPayload with reference to invalid payload returned incorrect LatestValidHash: %v!=%v", t.TestName, newPayloadResp.LatestValidHash, expectedLatestValidHash)
+			}
+		} else if newPayloadResp.LatestValidHash != expectedLatestValidHash {
+			// At least one of them is equal to nil, but they also point to different locations.
 			t.Fatalf("FAIL (%v): EngineNewPayload with reference to invalid payload returned incorrect LatestValidHash: %v!=%v", t.TestName, newPayloadResp.LatestValidHash, expectedLatestValidHash)
+		} else {
+			// The expected value and the received value both point to nil, and that's ok.
 		}
 
 		// Send the forkchoiceUpdated with a reference to the invalid payload.

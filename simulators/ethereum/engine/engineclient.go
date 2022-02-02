@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -77,9 +78,19 @@ func (ec *EngineClient) Ctx() context.Context {
 	return ec.lastCtx
 }
 
+type PayloadStatusV1 struct {
+	Status          string       `json:"status"`
+	LatestValidHash *common.Hash `json:"latestValidHash"`
+	ValidationError *string      `json:"validationError"`
+}
+type ForkChoiceResponse struct {
+	PayloadStatus PayloadStatusV1   `json:"payloadStatus"`
+	PayloadID     *beacon.PayloadID `json:"payloadId"`
+}
+
 // Engine API Call Methods
-func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
-	var result beacon.ForkChoiceResponse
+func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributesV1) (ForkChoiceResponse, error) {
+	var result ForkChoiceResponse
 	err := ec.c.CallContext(ctx, &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
 	return result, err
 }
@@ -90,8 +101,8 @@ func (ec *EngineClient) EngineGetPayloadV1(ctx context.Context, payloadId *beaco
 	return result, err
 }
 
-func (ec *EngineClient) EngineNewPayloadV1(ctx context.Context, payload *beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
-	var result beacon.PayloadStatusV1
+func (ec *EngineClient) EngineNewPayloadV1(ctx context.Context, payload *beacon.ExecutableDataV1) (PayloadStatusV1, error) {
+	var result PayloadStatusV1
 	err := ec.c.CallContext(ctx, &result, "engine_newPayloadV1", payload)
 	return result, err
 }
