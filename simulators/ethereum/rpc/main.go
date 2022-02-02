@@ -20,11 +20,13 @@ var (
 )
 
 var clientEnv = hivesim.Params{
+	"HIVE_NODETYPE":       "full",
 	"HIVE_NETWORK_ID":     networkID.String(),
 	"HIVE_CHAIN_ID":       chainID.String(),
 	"HIVE_FORK_HOMESTEAD": "0",
 	"HIVE_FORK_TANGERINE": "0",
 	"HIVE_FORK_SPURIOUS":  "0",
+
 	// All tests use clique PoA to mine new blocks.
 	"HIVE_CLIQUE_PERIOD":     "1",
 	"HIVE_CLIQUE_PRIVATEKEY": "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
@@ -98,19 +100,64 @@ The RPC test suite runs a set of RPC related tests against a running node. It te
 several real-world scenarios such as sending value transactions, deploying a contract or
 interacting with one.`[1:],
 	}
+
+	// Add tests for full nodes.
 	suite.Add(&hivesim.ClientTestSpec{
 		Name:        "client launch",
 		Description: `This test launches the client and collects its logs.`,
 		Parameters:  clientEnv,
 		Files:       files,
-		Run:         runAllTests,
+		Run:         func(t *hivesim.T, c *hivesim.Client) { runAllTests(t, c, c.Type) },
 	})
-	hivesim.MustRunSuite(hivesim.New(), suite)
+
+	// Add tests to launch LES servers.
+	serverParams := clientEnv.Set("HIVE_LES_SERVER", "1")
+	suite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1_les_server",
+		Name:        "CLIENT as LES server",
+		Description: "This test launches an LES server.",
+		Parameters:  serverParams,
+		Files:       files,
+		Run:         func(t *hivesim.T, srv *hivesim.Client) { runLESTests(t, srv) },
+	})
+
+	sim := hivesim.New()
+	hivesim.MustRunSuite(sim, suite)
+}
+
+func runLESTests(t *hivesim.T, serverNode *hivesim.Client) {
+	// Configure LES client.
+	clientParams := clientEnv.Set("HIVE_NODETYPE", "light")
+	// Disable mining.
+	clientParams = clientParams.Set("HIVE_MINER", "")
+	clientParams = clientParams.Set("HIVE_CLIQUE_PRIVATEKEY", "")
+
+	enode, err := serverNode.EnodeURL()
+	if err != nil {
+		t.Fatal("can't get node peer-to-peer endpoint:", enode)
+	}
+
+	// Sync all sink nodes against the source.
+	t.RunAllClients(hivesim.ClientTestSpec{
+		Name:        "CLIENT as LES client",
+		Description: "This runs the RPC tests against an LES client.",
+		Role:        "eth1_les_client",
+		Parameters:  clientParams,
+		Files:       files,
+		Run: func(t *hivesim.T, client *hivesim.Client) {
+			err := client.RPC().Call(nil, "admin_addPeer", enode)
+			if err != nil {
+				t.Fatalf("connection failed:", err)
+			}
+			waitSynced(client.RPC())
+			runAllTests(t, client, client.Type+" LES")
+		},
+	})
 }
 
 // runAllTests runs the tests against a client instance.
 // Most tests simply wait for tx inclusion in a block so we can run many tests concurrently.
-func runAllTests(t *hivesim.T, c *hivesim.Client) {
+func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 	vault := newVault()
 
 	s := newSemaphore(16)
@@ -120,7 +167,7 @@ func runAllTests(t *hivesim.T, c *hivesim.Client) {
 		go func() {
 			defer s.put()
 			t.Run(hivesim.TestSpec{
-				Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
+				Name:        fmt.Sprintf("%s (%s)", test.Name, clientName),
 				Description: test.About,
 				Run: func(t *hivesim.T) {
 					switch test.Name[:strings.IndexByte(test.Name, '/')] {

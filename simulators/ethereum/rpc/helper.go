@@ -99,6 +99,36 @@ func (t *TestEnv) Ctx() context.Context {
 	return t.lastCtx
 }
 
+func waitSynced(c *rpc.Client) (err error) {
+	var (
+		timeout     = 20 * time.Second
+		end         = time.Now().Add(timeout)
+		ctx, cancel = context.WithDeadline(context.Background(), end)
+	)
+	defer func() {
+		cancel()
+		if err == context.DeadlineExceeded {
+			err = fmt.Errorf("didn't sync within timeout of %v", 20*time.Second)
+		}
+	}()
+
+	ec := ethclient.NewClient(c)
+	for {
+		progress, err := ec.SyncProgress(ctx)
+		if err != nil {
+			return err
+		}
+		head, err := ec.BlockNumber(ctx)
+		if err != nil {
+			return err
+		}
+		if progress == nil && head > 0 {
+			return nil // success!
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 // Naive generic function that works in all situations.
 // A better solution is to use logs to wait for confirmations.
 func waitForTxConfirmations(t *TestEnv, txHash common.Hash, n uint64) (*types.Receipt, error) {
