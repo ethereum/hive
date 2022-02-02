@@ -2,7 +2,7 @@ module github.com/ethereum/hive/simulators/smoke/genesis
 
 go 1.17
 
-require github.com/ethereum/hive v0.0.0-20220128105037-16a0eb39b4a2
+require github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20210224194228-fe8f1750fd46 // indirect
@@ -13,6 +13,7 @@ require (
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
+	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect

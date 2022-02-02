@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/ethereum/go-ethereum v1.10.15
-	github.com/ethereum/hive v0.0.0-20220128105037-16a0eb39b4a2
+	github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba
 )
 
 require (
@@ -15,8 +15,10 @@ require (
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
+	github.com/google/uuid v1.2.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
+	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect

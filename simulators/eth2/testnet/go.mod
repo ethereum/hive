@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/ethereum/go-ethereum v1.10.15
-	github.com/ethereum/hive v0.0.0-20220128105037-16a0eb39b4a2
+	github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba
 	github.com/google/uuid v1.3.0
 	github.com/herumi/bls-eth-go-binary v0.0.0-20210902234237-7763804ee078
 	github.com/pkg/errors v0.9.1
@@ -23,6 +23,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/ferranbt/fastssz v0.0.0-20210905181407-59cf6761a7d5 // indirect
+	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
@@ -37,6 +38,7 @@ require (
 	github.com/minio/sha256-simd v1.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.4.2 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
+	github.com/onsi/gomega v1.10.3 // indirect
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/protolambda/bls12-381-util v0.0.0-20210812140640-b03868185758 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
