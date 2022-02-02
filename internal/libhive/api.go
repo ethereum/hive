@@ -178,6 +178,8 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		serveError(w, err, http.StatusBadRequest)
 		return
 	}
+	defer r.MultipartForm.RemoveAll()
+
 	if !r.Form.Has("config") {
 		log15.Error("API: missing 'config' parameter in node request", "error", err)
 		err := fmt.Errorf("missing 'config' parameter in node request")
