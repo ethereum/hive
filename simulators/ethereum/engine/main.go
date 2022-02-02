@@ -159,6 +159,10 @@ var tests = []TestSpec{
 		Name: "Multiple New Payloads Extending Canonical Chain",
 		Run:  multipleNewCanonicalPayloads,
 	},
+	{
+		Name: "Out of Order Payload Execution",
+		Run:  outOfOrderPayloads,
+	},
 
 	// Transaction Reorg using Engine API
 	{
@@ -179,7 +183,18 @@ var tests = []TestSpec{
 	},
 
 	// Multi-Client Sync tests
-	// TODO ...
+	{
+		Name: "Sync Client Post Merge",
+		Run:  postMergeSync,
+		TTD:  10,
+	},
+	/*
+		{
+			Name: "Sync Two Clients with Mismatched TTD",
+			Run:  mismatchedTTDClientSync,
+		},
+	*/
+	// TODO: Add more
 }
 
 func main() {

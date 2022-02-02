@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -823,6 +824,120 @@ func multipleNewCanonicalPayloads(t *TestEnv) {
 	// At the end the CLMocker continues to try to execute fcU with the original payload, which should not fail
 }
 
+// Out of Order Payload Execution: Secondary client should be able to set the forkchoiceUpdated to payloads received out of order
+func outOfOrderPayloads(t *TestEnv) {
+	// First prepare payloads on a first client, which will also contain multiple transactions
+
+	// We will be also verifying that the transactions are correctly interpreted in the canonical chain,
+	// prepare a random account to receive funds.
+	recipient := common.Address{}
+	rand.Read(recipient[:])
+	amountPerTx := big.NewInt(1000)
+	txPerPayload := 20
+	txsSent := int64(0)
+	payloadCount := 10
+	lastPayloadNumber := uint64(0)
+
+	for p := 0; p < payloadCount; p++ {
+		select {
+		case <-t.CLMock.OnPayloadPrepare:
+			func() {
+				defer t.CLMock.OnPayloadPrepare.Yield()
+				for i := 0; i < txPerPayload; i++ {
+					tx := t.Vault.makeFundingTx(t, recipient, amountPerTx)
+					err := t.Eth.SendTransaction(t.Ctx(), tx)
+					if err != nil {
+						t.Fatalf("FAIL (%v): Unable to send funding transaction: %v", t.TestName, err)
+					}
+					txsSent++
+				}
+				lastPayloadNumber = t.CLMock.LatestPayloadBuilt.Number + 1
+			}()
+		case <-t.CLMock.OnExit:
+			t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+		case <-t.Timeout:
+			t.Fatalf("FAIL (%v): Test timeout", t.TestName)
+		}
+
+	}
+
+	// Start a second client to send forkchoiceUpdated + newPayload out of order
+	allClients, err := t.Sim.ClientTypes()
+	if err != nil {
+		t.Fatalf("FAIL (%v): Unable to obtain all client types", t.TestName)
+	}
+	for _, client := range allClients {
+		_, ec, err := t.StartClient(client, t.ClientParams)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Unable to start client (%v): %v", t.TestName, client, err)
+		}
+		// Send the forkchoiceUpdated with the lastPayloadNumber hash
+		headPayload := t.CLMock.ExecutedPayloadHistory[lastPayloadNumber]
+		fcU := beacon.ForkchoiceStateV1{
+			HeadBlockHash:      headPayload.BlockHash,
+			SafeBlockHash:      headPayload.BlockHash,
+			FinalizedBlockHash: headPayload.BlockHash,
+		}
+		fcResp, err := ec.EngineForkchoiceUpdatedV1(ec.Ctx(), &fcU, nil)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Error while sending EngineForkchoiceUpdatedV1: %v", t.TestName, err)
+		}
+		if fcResp.PayloadStatus.Status != "SYNCING" {
+			t.Fatalf("FAIL (%v): Incorrect PayloadStatus.Status!=SYNCING: %v", t.TestName, fcResp.PayloadStatus.Status)
+		}
+		/*
+			if fcResp.PayloadStatus.LatestValidHash != nil {
+				t.Fatalf("FAIL (%v): Incorrect PayloadStatus.LatestValidHash!=null: %v", t.TestName, fcResp.PayloadStatus.LatestValidHash)
+			}
+			if fcResp.PayloadStatus.ValidationError != nil {
+				t.Fatalf("FAIL (%v): Incorrect PayloadStatus.ValidationError!=null: %v", t.TestName, fcResp.PayloadStatus.ValidationError)
+			}
+		*/
+
+		// Send all the payloads in the opposite order
+		for i := lastPayloadNumber; i > 0; i-- {
+			payload := t.CLMock.ExecutedPayloadHistory[i]
+			payloadResp, err := ec.EngineNewPayloadV1(ec.Ctx(), &payload)
+			if err != nil {
+				t.Fatalf("FAIL (%v): Error while sending EngineNewPayloadV1: %v, %v", t.TestName, err, payload)
+			}
+			if i > 1 {
+				if payloadResp.Status != "ACCEPTED" {
+					t.Fatalf("FAIL (%v): Incorrect Status!=ACCEPTED (Payload Number=%v): %v", t.TestName, i, payloadResp.Status)
+				}
+				/*
+					if payloadResp.LatestValidHash != nil {
+						t.Fatalf("FAIL (%v): Incorrect LatestValidHash!=nil: %v", t.TestName, payloadResp.LatestValidHash)
+					}
+					if payloadResp.ValidationError != nil {
+						t.Fatalf("FAIL (%v): Incorrect ValidationError!=nil: %v", t.TestName, payloadResp.ValidationError)
+					}
+				*/
+			} else {
+				// On the Payload 1, the payload is VALID since we have the complete information to validate the chain
+				if payloadResp.Status != "VALID" {
+					t.Fatalf("FAIL (%v): Incorrect Status!=ACCEPTED (Payload Number=%v): %v", t.TestName, i, payloadResp.Status)
+				}
+				if payloadResp.LatestValidHash == nil {
+					t.Fatalf("FAIL (%v): Incorrect LatestValidHash==nil (Payload Number=%v): %v", t.TestName, i, payloadResp.LatestValidHash)
+				}
+				if *payloadResp.LatestValidHash != payload.BlockHash {
+					t.Fatalf("FAIL (%v): Incorrect LatestValidHash (Payload Number=%v): %v!=%v", t.TestName, i, *payloadResp.LatestValidHash, payload.BlockHash)
+				}
+			}
+		}
+
+		// At this point we should have our funded account balance equal to the expected value.
+		bal, err := ec.Eth.BalanceAt(ec.Ctx(), recipient, nil)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Error while getting balance of funded account: %v", t.TestName, err)
+		}
+		if bal.Cmp(amountPerTx.Mul(amountPerTx, big.NewInt(txsSent))) != 0 {
+			t.Fatalf("FAIL (%v): Incorrect balance after payload execution: %v!=%v", t.TestName, bal, amountPerTx.Mul(amountPerTx, big.NewInt(txsSent)))
+		}
+	}
+}
+
 // Fee Recipient Tests
 func suggestedFeeRecipient(t *TestEnv) {
 	// Wait until this client catches up with latest PoS
@@ -1004,3 +1119,85 @@ func randomOpcodeTx(t *TestEnv) {
 		t.Fatalf("FAIL (%v): No Random Opcode transactions landed in PoS blocks", t.TestName)
 	}
 }
+
+// Client Sync tests
+func postMergeSync(t *TestEnv) {
+	// Launch another client after the PoS transition has happened in the main client.
+	// Sync should eventually happen without issues.
+	t.WaitForPoSSync()
+
+	allClients, err := t.Sim.ClientTypes()
+	if err != nil {
+		t.Fatalf("FAIL (%v): Unable to obtain all client types", t.TestName)
+	}
+	// Set the Bootnode
+	enode, err := t.Engine.EnodeURL()
+	if err != nil {
+		t.Fatalf("FAIL (%v): Unable to obtain bootnode: %v", t.TestName, err)
+	}
+	newParams := clientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", t.CLMock.TerminalTotalDifficulty.Int64()))
+	newParams = newParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
+	newParams = newParams.Set("HIVE_MINER", "")
+
+	for _, client := range allClients {
+		c, ec, err := t.StartClient(client, newParams)
+		if err != nil {
+			t.Fatalf("FAIL (%v): Unable to start client (%v): %v", t.TestName, client, err)
+		}
+		t.CLMock.AddEngineClient(t.T, c)
+	syncLoop:
+		for {
+			select {
+			case <-time.After(time.Second):
+				bn, err := ec.Eth.BlockNumber(t.Ctx())
+				if err != nil {
+					t.Fatalf("FAIL (%v): Unable to obtain latest block", t.TestName)
+				}
+				if t.CLMock.LatestFinalizedNumber != nil && bn >= t.CLMock.LatestFinalizedNumber.Uint64() {
+					t.Logf("INFO (%v): Client (%v) is now synced to latest PoS block", t.TestName, c.Container)
+					break syncLoop
+				}
+			case <-t.CLMock.OnExit:
+				t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+			case <-t.Timeout:
+				t.Fatalf("FAIL (%v): Test timeout", t.TestName)
+			}
+
+		}
+	}
+}
+
+/*
+func mismatchedTTDClientSync(t *TestEnv) {
+	// Launch another client with a higher TTD configuration,
+	// all executed payloads in the main client should be properly rejected.
+	allClients, err := t.Sim.ClientTypes()
+	if err != nil {
+		t.Fatalf("FAIL (%v): Unable to obtain all client types", t.TestName)
+	}
+	// Set the new TTD + Bootnode
+	newParams := clientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", t.CLMock.TerminalTotalDifficulty.Add(t.CLMock.TerminalTotalDifficulty, big.NewInt(2)).Uint64()))
+	enode, err := t.Engine.EnodeURL()
+	if err != nil {
+		t.Fatalf("FAIL (%v): Unable to obtain bootnode", err)
+	}
+	newParams = newParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
+
+	for _, client := range allClients {
+		c2 := t.StartClient(client, newParams, files)
+		ec := NewEngineClient(t.T, c2)
+		for i := 0; i < 10; i++ {
+			// Try running 10 payloads, all based on an chain with an apparent invalid TTD
+			select {
+			case <-t.CLMock.OnGetPayload:
+				t.CLMock.OnGetPayload.Yield()
+			case <-t.CLMock.OnExit:
+				t.Fatalf("FAIL (%v): CLMocker stopped producing blocks", t.TestName)
+			case <-t.Timeout:
+				t.Fatalf("FAIL (%v): Test timeout", t.TestName)
+			}
+		}
+
+	}
+}
+*/
