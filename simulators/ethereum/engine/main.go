@@ -199,7 +199,7 @@ have reached the Terminal Total Difficulty.`[1:],
 			Files:       files,
 			Run: func(t *hivesim.T, c *hivesim.Client) {
 				// Run the test case
-				RunTest(currentTest.Name, big.NewInt(currentTest.TTD), t, c, currentTest.Run)
+				RunTest(currentTest.Name, big.NewInt(currentTest.TTD), t, c, currentTest.Run, newParams)
 			},
 		})
 	}

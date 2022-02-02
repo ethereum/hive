@@ -19,14 +19,15 @@ import (
 // TestEnv is the environment of a single test.
 type TestEnv struct {
 	*hivesim.T
-	TestName string
-	RPC      *rpc.Client
-	Eth      *ethclient.Client
-	Engine   *EngineClient
-	CLMock   *CLMocker
-	Vault    *Vault
-	Timeout  <-chan time.Time
-	PoSSync  chan interface{}
+	TestName     string
+	RPC          *rpc.Client
+	Eth          *ethclient.Client
+	Engine       *EngineClient
+	CLMock       *CLMocker
+	Vault        *Vault
+	Timeout      <-chan time.Time
+	PoSSync      chan interface{}
+	ClientParams hivesim.Params
 
 	// This holds most recent context created by the Ctx method.
 	// Every time Ctx is called, it creates a new context with the default
@@ -36,7 +37,7 @@ type TestEnv struct {
 	syncCancel context.CancelFunc
 }
 
-func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv)) {
+func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv), cParams hivesim.Params) {
 	// Setup the CL Mocker for this test
 	clMocker := NewCLMocker(t, ttd)
 	defer func() {
@@ -71,14 +72,15 @@ func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn 
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
 	defer rpcClient.Close()
 	env := &TestEnv{
-		T:        t,
-		TestName: testName,
-		RPC:      rpcClient,
-		Eth:      ethclient.NewClient(rpcClient),
-		Engine:   ec,
-		CLMock:   clMocker,
-		Vault:    vault,
-		PoSSync:  make(chan interface{}, 1),
+		T:            t,
+		TestName:     testName,
+		RPC:          rpcClient,
+		Eth:          ethclient.NewClient(rpcClient),
+		Engine:       ec,
+		CLMock:       clMocker,
+		Vault:        vault,
+		PoSSync:      make(chan interface{}, 1),
+		ClientParams: cParams,
 	}
 
 	// Defer closing the last context
@@ -142,6 +144,12 @@ func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn 
 
 	// Run the test
 	fn(env)
+}
+
+func (t *TestEnv) StartClient(clientType string, params hivesim.Params) (*hivesim.Client, *EngineClient, error) {
+	c := t.T.StartClient(clientType, params, files)
+	ec := NewEngineClient(t.T, c)
+	return c, ec, nil
 }
 
 // Wait for a client to reach sync status past the PoS transition, with `DefaultPoSSyncTimeout` timeout
