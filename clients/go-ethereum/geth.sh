@@ -41,8 +41,9 @@
 #  - HIVE_MINER                   enable mining. value is coinbase address.
 #  - HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
 #  - HIVE_SKIP_POW                if set, skip PoW verification during block import
-#  - HIVE_LOGLEVEL		          client loglevel (0-5)
+#  - HIVE_LOGLEVEL                client loglevel (0-5)
 #  - HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
+#  - HIVE_LES_SERVER              set to '1' to enable LES server
 
 # Immediately abort the script on any error encountered
 set -e
@@ -58,12 +59,12 @@ fi
 FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 
 if [ "$HIVE_SKIP_POW" != "" ]; then
-	FLAGS="$FLAGS --fakepow"
+    FLAGS="$FLAGS --fakepow"
 fi
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
-	FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
+    FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
 else
     # Unless otherwise specified by hive, we try to avoid mainnet networkid. If geth detects mainnet network id,
     # then it tries to bump memory quite a lot
@@ -72,18 +73,18 @@ fi
 
 # If the client is to be run in testnet mode, flag it as such
 if [ "$HIVE_TESTNET" == "1" ]; then
-	FLAGS="$FLAGS --testnet"
+    FLAGS="$FLAGS --testnet"
 fi
 
 # Handle any client mode or operation requests
 if [ "$HIVE_NODETYPE" == "archive" ]; then
-	FLAGS="$FLAGS --syncmode full --gcmode archive"
+    FLAGS="$FLAGS --syncmode full --gcmode archive"
 fi
 if [ "$HIVE_NODETYPE" == "full" ]; then
-	FLAGS="$FLAGS --syncmode snap"
+    FLAGS="$FLAGS --syncmode snap"
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
-	FLAGS="$FLAGS --syncmode light"
+    FLAGS="$FLAGS --syncmode light"
 fi
 
 # Configure the chain.
@@ -104,17 +105,17 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	$geth $FLAGS --gcmode=archive import /chain.rlp
+    $geth $FLAGS --gcmode=archive import /chain.rlp
 else
-	echo "Warning: chain.rlp not found."
+    echo "Warning: chain.rlp not found."
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-	(cd /blocks && $geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL --nocompaction import `ls | sort -n`)
+    (cd /blocks && $geth $FLAGS --gcmode=archive --verbosity=$HIVE_LOGLEVEL --nocompaction import `ls | sort -n`)
 else
-	echo "Warning: blocks folder not found."
+    echo "Warning: blocks folder not found."
 fi
 
 set -e
@@ -133,23 +134,28 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
 fi
 
 # Configure any mining operation
-if [ "$HIVE_MINER" != "" ]; then
-	FLAGS="$FLAGS --mine --miner.threads 1 --miner.etherbase $HIVE_MINER"
+if [ "$HIVE_MINER" != "" ] && [ "$HIVE_NODETYPE" != "light" ]; then
+    FLAGS="$FLAGS --mine --miner.threads 1 --miner.etherbase $HIVE_MINER"
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
-	FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
+    FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
 FLAGS="$FLAGS --miner.gasprice 16000000000"
+
+# Configure LES.
+if [ "$HIVE_LES_SERVER" == "1" ]; then
+  FLAGS="$FLAGS --light.serve 50 --light.nosyncserve"
+fi
 
 # Configure RPC.
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,personal,txpool,web3"
 FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,personal,txpool,web3"
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
-	FLAGS="$FLAGS --graphql"
+    FLAGS="$FLAGS --graphql"
 fi
 # used for the graphql to allow submission of unprotected tx
 if [ "$HIVE_ALLOW_UNPROTECTED_TX" != "" ]; then
- 	FLAGS="$FLAGS --rpc.allow-unprotected-txs"
+    FLAGS="$FLAGS --rpc.allow-unprotected-txs"
 fi
 
 # Run the go-ethereum implementation with the requested flags.
