@@ -110,31 +110,50 @@ URL of the running instance.
 Clients must support the following environment variables. The client's entry point script
 may map these to command line flags or use them generate a config file, for example.
 
-| Variable                   | Value                |                                                |
-|----------------------------|----------------------|------------------------------------------------|
-| `HIVE_LOGLEVEL`            | 0 - 5                | configures log level of client                 |
-| `HIVE_NODETYPE`            | archive, full, light | sets sync algorithm                            |
-| `HIVE_BOOTNODE`            | enode URL            | makes client connect to another node           |
-| `HIVE_GRAPHQL_ENABLED`     | 0 - 1                | if set, GraphQL is enabled on port 8545        |
-| `HIVE_MINER`               | address              | if set, mining is enabled. value is coinbase   |
-| `HIVE_MINER_EXTRA`         | hex                  | extradata for mined blocks                     |
-| `HIVE_CLIQUE_PERIOD`       | decimal              | enables clique PoA. value is target block time |
-| `HIVE_CLIQUE_PRIVATEKEY`   | hex                  | private key for signing of clique blocks       |
-| `HIVE_SKIP_POW`            | 0 - 1                | disables PoW check during block import         |
-| `HIVE_NETWORK_ID`          | decimal              | p2p network ID                                 |
-| `HIVE_CHAIN_ID`            | decimal              | [EIP-155] chain ID                             |
-| `HIVE_FORK_HOMESTEAD`      | decimal              | [Homestead][EIP-606] transition block          |
-| `HIVE_FORK_DAO_BLOCK`      | decimal              | [DAO fork][EIP-779] transition block           |
-| `HIVE_FORK_TANGERINE`      | decimal              | [Tangerine Whistle][EIP-608] transition block  |
-| `HIVE_FORK_SPURIOUS`       | decimal              | [Spurious Dragon][EIP-607] transition block    |
-| `HIVE_FORK_BYZANTIUM`      | decimal              | [Byzantium][EIP-609] transition block          |
-| `HIVE_FORK_CONSTANTINOPLE` | decimal              | [Constantinople][EIP-1013] transition block    |
-| `HIVE_FORK_PETERSBURG`     | decimal              | [Petersburg][EIP-1716] transition block        |
-| `HIVE_FORK_ISTANBUL`       | decimal              | [Istanbul][EIP-1679] transition block          |
-| `HIVE_FORK_MUIRGLACIER`    | decimal              | [Muir Glacier][EIP-2387] transition block      |
-| `HIVE_FORK_BERLIN`         | decimal              | [Berlin][EIP-2070] transition block            |
-| `HIVE_FORK_LONDON`         | decimal              | [London][london-spec] transition block         |
+| Variable                   | Value         |                                                |
+|----------------------------|---------------|------------------------------------------------|
+| `HIVE_LOGLEVEL`            | 0 - 5         | configures log level of client                 |
+| `HIVE_NODETYPE`            | archive, full | sets sync algorithm                            |
+| `HIVE_BOOTNODE`            | enode URL     | makes client connect to another node           |
+| `HIVE_GRAPHQL_ENABLED`     | 0 - 1         | if set, GraphQL is enabled on port 8545        |
+| `HIVE_MINER`               | address       | if set, mining is enabled. value is coinbase   |
+| `HIVE_MINER_EXTRA`         | hex           | extradata for mined blocks                     |
+| `HIVE_CLIQUE_PERIOD`       | decimal       | enables clique PoA. value is target block time |
+| `HIVE_CLIQUE_PRIVATEKEY`   | hex           | private key for signing of clique blocks       |
+| `HIVE_SKIP_POW`            | 0 - 1         | disables PoW check during block import         |
+| `HIVE_NETWORK_ID`          | decimal       | p2p network ID                                 |
+| `HIVE_CHAIN_ID`            | decimal       | [EIP-155] chain ID                             |
+| `HIVE_FORK_HOMESTEAD`      | decimal       | [Homestead][EIP-606] transition block          |
+| `HIVE_FORK_DAO_BLOCK`      | decimal       | [DAO fork][EIP-779] transition block           |
+| `HIVE_FORK_TANGERINE`      | decimal       | [Tangerine Whistle][EIP-608] transition block  |
+| `HIVE_FORK_SPURIOUS`       | decimal       | [Spurious Dragon][EIP-607] transition block    |
+| `HIVE_FORK_BYZANTIUM`      | decimal       | [Byzantium][EIP-609] transition block          |
+| `HIVE_FORK_CONSTANTINOPLE` | decimal       | [Constantinople][EIP-1013] transition block    |
+| `HIVE_FORK_PETERSBURG`     | decimal       | [Petersburg][EIP-1716] transition block        |
+| `HIVE_FORK_ISTANBUL`       | decimal       | [Istanbul][EIP-1679] transition block          |
+| `HIVE_FORK_MUIRGLACIER`    | decimal       | [Muir Glacier][EIP-2387] transition block      |
+| `HIVE_FORK_BERLIN`         | decimal       | [Berlin][EIP-2070] transition block            |
+| `HIVE_FORK_LONDON`         | decimal       | [London][london-spec] transition block         |
 
+## LES client/server roles
+
+Eth1 clients containing an implementation of [LES] may additionally support roles
+`eth1_les_client` and `eth1_les_server`.
+
+For the client role, the following additional variables should be supported:
+
+| Variable                   | Value         |                                                |
+|----------------------------|---------------|------------------------------------------------|
+| `HIVE_NODETYPE`            | "light"       | enables LES client mode                        |
+
+For the server role, the following additional variables should be supported:
+
+| Variable                   | Value         |                                                |
+|----------------------------|---------------|------------------------------------------------|
+| `HIVE_LES_SERVER`          | 0 - 1         | if set to 1, LES server should be enabled      |
+
+
+[LES]: https://github.com/ethereum/devp2p/blob/master/caps/les.md
 [geth-docker]: ../clients/go-ethereum/Dockerfile
 [oe-genesis-jq]: ../clients/openethereum/mapper.jq
 [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
