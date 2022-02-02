@@ -139,9 +139,9 @@ func runLESTests(t *hivesim.T, serverNode *hivesim.Client) {
 
 	// Sync all sink nodes against the source.
 	t.RunAllClients(hivesim.ClientTestSpec{
+		Role:        "eth1_les_client",
 		Name:        "CLIENT as LES client",
 		Description: "This runs the RPC tests against an LES client.",
-		Role:        "eth1_les_client",
 		Parameters:  clientParams,
 		Files:       files,
 		Run: func(t *hivesim.T, client *hivesim.Client) {
