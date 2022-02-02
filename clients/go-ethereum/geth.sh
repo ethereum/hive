@@ -76,11 +76,14 @@ if [ "$HIVE_TESTNET" == "1" ]; then
 fi
 
 # Handle any client mode or operation requests
+if [ "$HIVE_NODETYPE" == "archive" ]; then
+	FLAGS="$FLAGS --syncmode full --gcmode archive"
+fi
 if [ "$HIVE_NODETYPE" == "full" ]; then
-	FLAGS="$FLAGS --syncmode fast "
+	FLAGS="$FLAGS --syncmode snap"
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
-	FLAGS="$FLAGS --syncmode light "
+	FLAGS="$FLAGS --syncmode light"
 fi
 
 # Configure the chain.
