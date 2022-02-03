@@ -149,7 +149,7 @@ fi
 
 # Configure RPC.
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
-    FLAGS="$FLAGS --catalyst --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,engine,eth,miner,net,personal,txpool,web3"
+    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,engine,eth,miner,net,personal,txpool,web3"
     FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,engine,eth,miner,net,personal,txpool,web3"
 else
     FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,personal,txpool,web3"
