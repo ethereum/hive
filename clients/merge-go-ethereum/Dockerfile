@@ -6,7 +6,7 @@
 
 FROM alpine:latest
 ARG repo=MariusVanDerWijden/go-ethereum
-ARG branch=kintsugi-v2-sync
+ARG branch=merge-kiln
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN apk add --update bash curl jq go git make gcc musl-dev          \
