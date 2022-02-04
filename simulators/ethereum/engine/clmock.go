@@ -330,6 +330,9 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 		callbacks.OnGetPayloadID()
 	}
 
+	// Give the client a delay between getting the payload ID and actually retrieving the payload
+	time.Sleep(PayloadProductionClientDelay)
+
 	cl.getNextPayload()
 
 	if callbacks.OnGetPayload != nil {

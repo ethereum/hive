@@ -15,11 +15,15 @@ var (
 	gasPrice  = big.NewInt(30 * params.GWei)
 	networkID = big.NewInt(7)
 
-	// PoS related
-	PoSBlockProductionPeriod = time.Second * 1
-	tTDCheckPeriod           = time.Second * 1
-	DefaultTestCaseTimeout   = time.Second * 60
-	DefaultPoSSyncTimeout    = time.Second * 20
+	// Time between checks of a client reaching Terminal Total Difficulty
+	tTDCheckPeriod = time.Second * 1
+
+	// Global test case timeout
+	DefaultTestCaseTimeout = time.Second * 60
+
+	// Time delay between ForkchoiceUpdated and GetPayload to allow the clients
+	// to produce a new Payload
+	PayloadProductionClientDelay = time.Second
 
 	// Confirmation blocks
 	PoWConfirmationBlocks = uint64(15)
