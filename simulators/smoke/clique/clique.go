@@ -12,6 +12,7 @@ func main() {
 		Description: "This test suite tests clique mining support.",
 	}
 	suite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        "mine one block",
 		Description: "Waits for a single block to get mined with clique.",
 		Files: map[string]string{
