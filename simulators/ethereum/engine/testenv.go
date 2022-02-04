@@ -120,8 +120,8 @@ func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn 
 	fn(env)
 }
 
-func (t *TestEnv) StartClient(clientType string, params hivesim.Params) (*hivesim.Client, *EngineClient, error) {
-	c := t.T.StartClient(clientType, params, files)
+func (t *TestEnv) StartClient(clientDef *hivesim.ClientDefinition, params hivesim.Params) (*hivesim.Client, *EngineClient, error) {
+	c := t.T.StartClient(clientDef.Name, params)
 	ec := NewEngineClient(t.T, c)
 	return c, ec, nil
 }
