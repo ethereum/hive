@@ -123,10 +123,15 @@ func unknownSafeBlockHash(t *TestEnv) {
 			// Execution specification:
 			// - This value MUST be either equal to or an ancestor of headBlockHash
 			resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownSafeHash, nil)
-			if err == nil {
-				t.Fatalf("FAIL (%s): No error on forkchoiceUpdated with unknown SafeBlockHash: %v, %v", t.TestName, err, resp)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error on forkchoiceUpdated with unknown SafeBlockHash: %v", t.TestName, err)
 			}
-
+			if resp.PayloadStatus.Status != "INVALID" {
+				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown SafeBlockHash is not INVALID: %v", t.TestName, resp)
+			}
+			if resp.PayloadID != nil {
+				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown SafeBlockHash contains PayloadID: %v, %v", t.TestName, resp)
+			}
 		},
 	})
 
@@ -159,11 +164,11 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
 			}
-			if resp.PayloadStatus.Status != "SYNCING" {
-				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown FinalizedBlockHash is not SYNCING: %v, %v", t.TestName, resp)
+			if resp.PayloadStatus.Status != "INVALID" {
+				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown FinalizedBlockHash is not INVALID: %v, %v", t.TestName, resp)
 			}
 
-			// Test again using PayloadAttributes, should also return SYNCING and no PayloadID
+			// Test again using PayloadAttributes, should also return INVALID and no PayloadID
 			payloadAttr := beacon.PayloadAttributesV1{
 				Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
 				Random:                common.Hash{},
@@ -173,8 +178,8 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
 			}
-			if resp.PayloadStatus.Status != "SYNCING" {
-				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown FinalizedBlockHash is not SYNCING: %v, %v", t.TestName, resp)
+			if resp.PayloadStatus.Status != "INVALID" {
+				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown FinalizedBlockHash is not INVALID: %v, %v", t.TestName, resp)
 			}
 			if resp.PayloadID != nil {
 				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown FinalizedBlockHash contains PayloadID: %v, %v", t.TestName, resp)
