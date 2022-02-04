@@ -10,6 +10,7 @@ func main() {
 		Description: "This test suite checks client initialization with genesis blocks.",
 	}
 	suite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        "empty genesis",
 		Description: "This imports an empty genesis block with no environment variables.",
 		Files: map[string]string{
@@ -18,6 +19,7 @@ func main() {
 		Run: genesisTest{"0x433d0b859a77a29753d2a6df477c971dcc6300af33f9d64d821a1d490b4148b1"}.test,
 	})
 	suite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        "all forks",
 		Description: "This imports an empty genesis block and sets all fork block numbers.",
 		Files: map[string]string{
@@ -40,6 +42,7 @@ func main() {
 		Run: genesisTest{"0x433d0b859a77a29753d2a6df477c971dcc6300af33f9d64d821a1d490b4148b1"}.test,
 	})
 	suite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        "non-empty",
 		Description: "This imports a non-empty genesis block.",
 		Files: map[string]string{
@@ -95,6 +98,7 @@ func main() {
 		Run: genesisTest{"0xf6df6eb772235f4f193b1a514f34bc5e4e9ce747a83732d4e8fced78ba2e939c"}.test,
 	})
 	suite.Add(hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        "precomp-zero-balance",
 		Description: "This imports a genesis where a precompile has code/nonce/storage, but balance is zero.",
 		Files: map[string]string{
