@@ -24,14 +24,15 @@ func main() {
 The GraphQL tests were initially imported from the Besu codebase.`,
 	}
 	suite.Add(hivesim.ClientTestSpec{
+		Role: "eth1",
 		Name: "client launch",
 		Description: `This is a meta-test. It launches the client with the test chain
 and reads the test case files. The individual test cases are run as sub-tests against
 the client launched by this test.`,
 		Parameters: hivesim.Params{
 			// The graphql chain comes from the Besu codebase, and is built on Frontier.
-			"HIVE_CHAIN_ID":        "1",
-			"HIVE_GRAPHQL_ENABLED": "1",
+			"HIVE_CHAIN_ID":             "1",
+			"HIVE_GRAPHQL_ENABLED":      "1",
 			"HIVE_ALLOW_UNPROTECTED_TX": "1",
 		},
 		Files: map[string]string{
