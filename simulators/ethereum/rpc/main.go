@@ -103,6 +103,7 @@ interacting with one.`[1:],
 
 	// Add tests for full nodes.
 	suite.Add(&hivesim.ClientTestSpec{
+		Role:        "eth1",
 		Name:        "client launch",
 		Description: `This test launches the client and collects its logs.`,
 		Parameters:  clientEnv,
