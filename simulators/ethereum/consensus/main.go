@@ -322,6 +322,9 @@ func loaderTest(t *hivesim.T) {
 	// Deliver test cases.
 	loadTests(t, fileRoot, testLimit, func(tc testcase) {
 		for _, client := range clientTypes {
+			if !client.HasRole("eth1") {
+				continue
+			}
 			tc := tc // shallow copy
 			tc.clientType = client.Name
 			testCh <- &tc
