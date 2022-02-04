@@ -26,8 +26,6 @@ var (
 	PoSConfirmationBlocks = uint64(1)
 )
 
-var vault *Vault
-
 var clientEnv = hivesim.Params{
 	"HIVE_NETWORK_ID":          networkID.String(),
 	"HIVE_CHAIN_ID":            chainID.String(),
@@ -180,6 +178,7 @@ var tests = []TestSpec{
 	{
 		Name: "Random Opcode Transactions",
 		Run:  randomOpcodeTx,
+		TTD:  10,
 	},
 
 	// Multi-Client Sync tests

@@ -13,13 +13,6 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
-// Semaphore type channel to be used as signal for current CLMocker step in block production
-type Semaphore chan bool
-
-func (m Semaphore) Yield() {
-	m <- true
-}
-
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
 	*hivesim.T
@@ -28,9 +21,10 @@ type CLMocker struct {
 	// Lock required so no client is offboarded during block production.
 	EngineClientsLock sync.Mutex
 
-	// Block Production Information
+	// Block Production State
 	NextBlockProducer *EngineClient
 	NextFeeRecipient  common.Address
+	NextPayloadID     *beacon.PayloadID
 
 	// PoS Chain History Information
 	RandomHistory          map[uint64]common.Hash
@@ -48,25 +42,8 @@ type CLMocker struct {
 	TTDReached              bool
 	TerminalTotalDifficulty *big.Int
 
-	/*
-		The test cases can request values from channel to "wake up" at a specific
-		point during the PoS block production procedure and, when the CL mocker has
-		reached it, the channel allows the test case to continue.
-	*/
-	OnPayloadPrepare                 Semaphore
-	OnGetPayload                     Semaphore
-	OnExecutePayload                 Semaphore
-	OnHeadBlockForkchoiceUpdate      Semaphore
-	OnSafeBlockForkchoiceUpdate      Semaphore
-	OnFinalizedBlockForkchoiceUpdate Semaphore
-
-	// CLMocker channel which is closed when the instance has completely finished,
-	// must be closed only by the internal CLMocker procedures.
-	OnExit chan interface{}
-
-	// Internal CLMocker channel which will be closed to initiate shutdown,
-	// must be closed externally only by calling the CLMocker.shutdown() function.
-	shutdownRequested chan interface{}
+	// Global timeout after which all procedures shall stop
+	Timeout <-chan time.Time
 }
 
 func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
@@ -92,18 +69,7 @@ func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
 			SafeBlockHash:      common.Hash{},
 			FinalizedBlockHash: common.Hash{},
 		},
-		OnPayloadPrepare:                 make(Semaphore, 1),
-		OnGetPayload:                     make(Semaphore, 1),
-		OnExecutePayload:                 make(Semaphore, 1),
-		OnHeadBlockForkchoiceUpdate:      make(Semaphore, 1),
-		OnSafeBlockForkchoiceUpdate:      make(Semaphore, 1),
-		OnFinalizedBlockForkchoiceUpdate: make(Semaphore, 1),
-		OnExit:                           make(chan interface{}),
-		shutdownRequested:                make(chan interface{}),
 	}
-
-	// Start thread to check when the TTD has been reached
-	go newCLMocker.checkTTD()
 
 	return newCLMocker
 }
@@ -129,12 +95,11 @@ func (cl *CLMocker) RemoveEngineClient(c *hivesim.Client) {
 	}
 }
 
-// Exit function, called only internally to terminate the CLMocker instance
-func (cl *CLMocker) Exit() {
+// Close all the engine clients
+func (cl *CLMocker) CloseClients() {
 	for _, engine := range cl.EngineClients {
 		engine.Close()
 	}
-	close(cl.OnExit)
 }
 
 // Helper struct to fetch the TotalDifficulty
@@ -142,22 +107,22 @@ type TD struct {
 	TotalDifficulty *hexutil.Big `json:"totalDifficulty"`
 }
 
-// Check whether we have reached TTD and then enable PoS block production.
-// This function must NOT be executed after we have reached TTD.
-func (cl *CLMocker) checkTTD() {
+// Wait until the TTD is reached by the client.
+func (cl *CLMocker) waitForTTD() {
+	if cl.TTDReached {
+		return
+	}
 	for {
 		select {
 		case <-time.After(tTDCheckPeriod):
 			if len(cl.EngineClients) == 0 {
-				// We have no clients running yet, we have not reached TTD
-				continue
+				cl.Fatalf("CLMocker: Waiting for TTD without clients")
 			}
 			// Pick a random client to get the total difficulty of its head
 			ec := cl.EngineClients[rand.Intn(len(cl.EngineClients))]
 
 			var td *TD
 			if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
-				cl.Exit()
 				cl.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
 			}
 			if td.TotalDifficulty.ToInt().Cmp(cl.TerminalTotalDifficulty) < 0 {
@@ -169,7 +134,6 @@ func (cl *CLMocker) checkTTD() {
 			cl.TTDReached = true
 			cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
 			if err != nil {
-				cl.Exit()
 				cl.Fatalf("CLMocker: Could not get block header: %v", err)
 			}
 
@@ -192,24 +156,14 @@ func (cl *CLMocker) checkTTD() {
 				}
 			}
 			if !anySuccess {
-				cl.Exit()
 				cl.Fatalf("CLMocker: None of the clients accepted forkchoiceUpdated")
 			}
-			go cl.producePoSBlocks()
 			return
-		case <-cl.shutdownRequested:
-			cl.Exit()
-			return
-		case <-cl.OnExit:
-			// Should not happen
+		case <-cl.Timeout:
+			cl.Fatalf("CLMocker: Timeout while waiting for TTD")
 			return
 		}
 	}
-}
-
-// Engine Block Production Methods
-func (cl *CLMocker) Shutdown() {
-	close(cl.shutdownRequested)
 }
 
 // Check whether a block number is a PoS block
@@ -220,16 +174,8 @@ func (cl *CLMocker) isBlockPoS(bn *big.Int) bool {
 	return true
 }
 
-func (cl *CLMocker) produceSinglePoSBlock() {
-	var (
-		lastBlockNumber uint64
-		err             error
-	)
-
-	// Lock needed to ensure EngineClients is not modified mid block production
-	cl.EngineClientsLock.Lock()
-	defer cl.EngineClientsLock.Unlock()
-
+// Picks the next payload producer from the set of clients registered
+func (cl *CLMocker) pickNextPayloadProducer() {
 	if len(cl.EngineClients) == 0 {
 		cl.Fatalf("CLMocker: No clients left for block production")
 	}
@@ -239,7 +185,7 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 		ec_id := (int(cl.LatestFinalizedNumber.Int64()) + i) % len(cl.EngineClients)
 		cl.NextBlockProducer = cl.EngineClients[ec_id]
 
-		lastBlockNumber, err = cl.NextBlockProducer.Eth.BlockNumber(cl.NextBlockProducer.Ctx())
+		lastBlockNumber, err := cl.NextBlockProducer.Eth.BlockNumber(cl.NextBlockProducer.Ctx())
 		if err != nil {
 			cl.Fatalf("CLMocker: Could not get block number while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
 		}
@@ -270,11 +216,9 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 	if cl.NextBlockProducer == nil {
 		cl.Fatalf("CLMocker: Failed to obtain a client on the latest block number")
 	}
+}
 
-	// Yield before preparing the next payload
-	cl.OnPayloadPrepare.Yield()
-	<-cl.OnPayloadPrepare
-
+func (cl *CLMocker) getNextPayloadID() {
 	// Generate a random value for the Random field
 	nextRandom := common.Hash{}
 	rand.Read(nextRandom[:])
@@ -285,6 +229,9 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
 	}
 
+	// Save random value
+	cl.RandomHistory[cl.LatestFinalizedHeader.Number.Uint64()+1] = nextRandom
+
 	resp, err := cl.NextBlockProducer.EngineForkchoiceUpdatedV1(cl.NextBlockProducer.Ctx(), &cl.LatestForkchoice, &payloadAttributes)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.Client.Container, err)
@@ -292,16 +239,18 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 	if resp.PayloadStatus.Status != "VALID" {
 		cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp)
 	}
+	cl.NextPayloadID = resp.PayloadID
+}
 
-	cl.LatestPayloadBuilt, err = cl.NextBlockProducer.EngineGetPayloadV1(cl.NextBlockProducer.Ctx(), resp.PayloadID)
+func (cl *CLMocker) getNextPayload() {
+	var err error
+	cl.LatestPayloadBuilt, err = cl.NextBlockProducer.EngineGetPayloadV1(cl.NextBlockProducer.Ctx(), cl.NextPayloadID)
 	if err != nil {
-		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.Client.Container, resp.PayloadID, err)
+		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.Client.Container, cl.NextPayloadID, err)
 	}
+}
 
-	// Yield after the new payload is built and retrieved using GetPayload
-	cl.OnGetPayload.Yield()
-	<-cl.OnGetPayload
-
+func (cl *CLMocker) broadcastNextNewPayload() {
 	// Broadcast the executePayload to all clients
 	for _, resp := range cl.broadcastNewPayload(&cl.LatestPayloadBuilt) {
 		if resp.Error != nil {
@@ -336,51 +285,82 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 	}
 	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
 	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = cl.LatestPayloadBuilt
+}
 
-	// Yield after the new payload has been broadcasted for execution
-	cl.OnExecutePayload.Yield()
-	<-cl.OnExecutePayload
+func (cl *CLMocker) broadcastLatestForkchoice() {
+	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
+		if resp.Error != nil {
+			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
+		} else if resp.ForkchoiceResponse.PayloadStatus.Status != "VALID" {
+			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", resp.Container, resp.ForkchoiceResponse)
+		}
+	}
+
+}
+
+type BlockProcessCallbacks struct {
+	OnPayloadProducerSelected           func()
+	OnGetPayloadID                      func()
+	OnGetPayload                        func()
+	OnNewPayloadBroadcast               func()
+	OnHeadBlockForkchoiceBroadcast      func()
+	OnSafeBlockForkchoiceBroadcast      func()
+	OnFinalizedBlockForkchoiceBroadcast func()
+}
+
+func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
+
+	if !cl.TTDReached {
+		cl.Fatalf("CLMocker: Attempted to create a block when the TTD had not yet been reached")
+	}
+
+	// Lock needed to ensure EngineClients is not modified mid block production
+	cl.EngineClientsLock.Lock()
+	defer cl.EngineClientsLock.Unlock()
+
+	cl.pickNextPayloadProducer()
+
+	if callbacks.OnPayloadProducerSelected != nil {
+		callbacks.OnPayloadProducerSelected()
+	}
+
+	cl.getNextPayloadID()
+
+	if callbacks.OnGetPayloadID != nil {
+		callbacks.OnGetPayloadID()
+	}
+
+	cl.getNextPayload()
+
+	if callbacks.OnGetPayload != nil {
+		callbacks.OnGetPayload()
+	}
+
+	cl.broadcastNextNewPayload()
+
+	if callbacks.OnNewPayloadBroadcast != nil {
+		callbacks.OnNewPayloadBroadcast()
+	}
 
 	// Broadcast forkchoice updated with new HeadBlock to all clients
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
-	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-		if resp.Error != nil {
-			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
-		} else if resp.ForkchoiceResponse.PayloadStatus.Status != "VALID" {
-			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", resp.Container, resp.ForkchoiceResponse)
-		}
-	}
+	cl.broadcastLatestForkchoice()
 
-	// Yield after fcU has been broadcasted with new payload as HeadBlock
-	cl.OnHeadBlockForkchoiceUpdate.Yield()
-	<-cl.OnHeadBlockForkchoiceUpdate
+	if callbacks.OnHeadBlockForkchoiceBroadcast != nil {
+		callbacks.OnHeadBlockForkchoiceBroadcast()
+	}
 
 	// Broadcast forkchoice updated with new SafeBlock to all clients
 	cl.LatestForkchoice.SafeBlockHash = cl.LatestPayloadBuilt.BlockHash
-	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-		if resp.Error != nil {
-			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
-		} else if resp.ForkchoiceResponse.PayloadStatus.Status != "VALID" {
-			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", resp.Container, resp.ForkchoiceResponse)
-		}
-	}
+	cl.broadcastLatestForkchoice()
 
-	// Yield after fcU has been broadcasted with new payload as SafeBlock
-	cl.OnSafeBlockForkchoiceUpdate.Yield()
-	<-cl.OnSafeBlockForkchoiceUpdate
+	if callbacks.OnSafeBlockForkchoiceBroadcast != nil {
+		callbacks.OnSafeBlockForkchoiceBroadcast()
+	}
 
 	// Broadcast forkchoice updated with new FinalizedBlock to all clients
 	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestPayloadBuilt.BlockHash
-	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-		if resp.Error != nil {
-			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
-		} else if resp.ForkchoiceResponse.PayloadStatus.Status != "VALID" {
-			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", resp.Container, resp.ForkchoiceResponse)
-		}
-	}
-
-	// Save random value
-	cl.RandomHistory[cl.LatestFinalizedHeader.Number.Uint64()+1] = nextRandom
+	cl.broadcastLatestForkchoice()
 
 	// Save the number of the first PoS block
 	if cl.FirstPoSBlockNumber == nil {
@@ -403,26 +383,17 @@ func (cl *CLMocker) produceSinglePoSBlock() {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
 	}
 
-	// Yield after block production has completed a new block
-	cl.OnFinalizedBlockForkchoiceUpdate.Yield()
-	<-cl.OnFinalizedBlockForkchoiceUpdate
+	if callbacks.OnFinalizedBlockForkchoiceBroadcast != nil {
+		callbacks.OnFinalizedBlockForkchoiceBroadcast()
+	}
+
 }
 
 // Loop produce PoS blocks by using the Engine API
-func (cl *CLMocker) producePoSBlocks() {
-	defer func() { cl.Exit() }()
-
-	// Defer producing one last block to ensure everything is ok after the test
-	defer cl.produceSinglePoSBlock()
-
-	// Begin PoS block production
-	for {
-		select {
-		case <-time.After(PoSBlockProductionPeriod):
-			cl.produceSinglePoSBlock()
-		case <-cl.shutdownRequested:
-			return
-		}
+func (cl *CLMocker) produceBlocks(blockCount int, callbacks BlockProcessCallbacks) {
+	// Produce requested amount of blocks
+	for i := 0; i < blockCount; i++ {
+		cl.produceSingleBlock(callbacks)
 	}
 }
 
