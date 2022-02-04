@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
 )
@@ -28,6 +29,9 @@ var (
 	// Confirmation blocks
 	PoWConfirmationBlocks = uint64(15)
 	PoSConfirmationBlocks = uint64(1)
+
+	// Test related
+	randomContractAddr = common.HexToAddress("0000000000000000000000000000000000000316")
 )
 
 var clientEnv = hivesim.Params{
@@ -102,6 +106,10 @@ var tests = []TestSpec{
 		Run:  badHashOnExecPayload,
 	},
 	{
+		Name: "ParentHash==BlockHash on ExecutePayload",
+		Run:  parentHashOnExecPayload,
+	},
+	{
 		Name: "Invalid ParentHash ExecutePayload",
 		Run:  invalidPayloadTestCaseGen("ParentHash"),
 	},
@@ -168,8 +176,12 @@ var tests = []TestSpec{
 
 	// Transaction Reorg using Engine API
 	{
-		Name: "Transaction reorg",
+		Name: "Transaction Reorg",
 		Run:  transactionReorg,
+	},
+	{
+		Name: "Sidechain Reorg",
+		Run:  sidechainReorg,
 	},
 
 	// Suggested Fee Recipient in Payload creation
