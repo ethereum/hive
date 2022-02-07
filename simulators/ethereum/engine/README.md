@@ -4,9 +4,10 @@ The Engine API suite runs a set of tests where the execution client is started i
 
 The PoS consensus relies on the Engine API, which receives commands from the consensus clients. This suite mimics a consensus client using a mocking tool to test specific scenarios and combinations of Engine API calls.
 
-The Consensus Layer mocker switches between HTTP and WS calls throughout the tests' runtime.
+Clients with support for the merge are required to run this suite:
+ - merge-go-ethereum
+ - merge-nethermind
 
-Clients with support for the merge are required to run this suite and, at the moment, none of the clients' versions in the docker containers support this functionality. Therefore local modifications to the clients' Dockerfile are required before running this suite to verify using a valid branch/version.
 
 ## Architecture
 
@@ -51,6 +52,7 @@ for each testCase:
 - Unknown FinalizedBlockHash: Perform a forkchoiceUpdated call with an unknown (random) FinalizedBlockHash, the client should initiate the syncing process.
 - Pre-TTD Block Hash: Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified)
 - Bad blockhash on ExecutePayload: Send an ExecutePayload directive to the client including an incorrect BlockHash, should result in an error.
+- ParentHash==BlockHash on ExecutePayload: Send an ExecutePayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
 - Invalid Field in ExecutePayload: Modify fields of the ExecutablePayload while maintaining a valid BlockHash, including:
    - ParentHash
    - StateRoot
@@ -69,12 +71,18 @@ for each testCase:
 
 ### Payload Execution
 - Re-Execute Payload: Re-execute already executed payloads and verify that no errors occur.
+- Multiple New Payloads Extending Canonical Chain: Send 80 valid NewPayload directives extending the canonical chain. Only one of the payloads is selected using ForkchoiceUpdated directive.
+- Out of Order Payload Execution: Launch a first client and produce N payloads. Launch a second client and send payloads (NewPayload) in reverse order (N, N - 1, ..., 1). The payloads should be ACCEPTED, and the last payload should be VALID (since payload 1 successfully links the chain with the Genesis).
 
-### Transactions
+### Transaction Reorg using Engine API
 - Transaction Reorg using ForkchoiceUpdated: Send transactions that modify the state tree after the PoS switch and verify that the modifications are correctly rolled back when a ForkchoiceUpdated event occurs with a block older than the block where the transaction was included.
+- Sidechain Reorg: Send a transaction that modifies the state, ForkchoiceUpdate to the payload containing this transaction. Then send an alternative payload, that produces a different state with the same transaction, and use ForkchoiceUpdated to change into this sidechain.
 
 ### Suggested Fee Recipient in Payload creation
 - Suggested Fee Recipient Test: Set the fee recipient to a custom address and verify that (a) balance is not increased when no fees are collected (b) balance is increased appropriately when fees are collected.
 
 ### Random Opcode:
 - Random Opcode Transactions: Send transactions that modify the state to the value of the 'DIFFICULTY' opcode and verify that (a) the state is equal to the difficulty on blocks before the TTD is crossed (b) the state is equal to the Random value provided using forkchoiceUpdated after PoS transition.
+
+### Sync Tests:
+- Sync Client Post Merge: Launch a first client and verify that the transition to PoS occurs. Launch a second client and verify that it successfully syncs to the first client's chain.
