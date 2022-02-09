@@ -1,4 +1,5 @@
-# This simulation runs discv4 protocol tests.
+# This simulator runs devp2p protocol tests.
+
 FROM golang:1-alpine as builder
 RUN apk add --update git gcc musl-dev linux-headers
 
@@ -10,12 +11,12 @@ RUN go build -v ./cmd/devp2p
 # Build the simulator executable.
 ADD . /source
 WORKDIR /source
-RUN go build -v
+RUN go build -v -o devp2p-simulator
 
 # Build the simulation run container.
 FROM alpine:latest
 ADD . /source
 WORKDIR /source
-COPY --from=builder /go-ethereum/devp2p ./devp2p
-COPY --from=builder /source/discv4 ./discv4
-ENTRYPOINT ["./discv4"]
+COPY --from=builder /go-ethereum/devp2p .
+COPY --from=builder /source/devp2p-simulator .
+ENTRYPOINT ["./devp2p-simulator"]

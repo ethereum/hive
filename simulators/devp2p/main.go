@@ -12,18 +12,56 @@ import (
 )
 
 func main() {
-	suite := hivesim.Suite{
+	discv4 := hivesim.Suite{
 		Name:        "discv4",
 		Description: "This runs the Discovery v4 test suite from go-ethereum.",
 	}
-	suite.Add(hivesim.ClientTestSpec{
-		Role: "eth1",
-		Run:  runDiscoveryTest,
-		Parameters: hivesim.Params{
-			"HIVE_LOGLEVEL": "5",
-		},
+	discv4.Add(hivesim.ClientTestSpec{
+		Role:       "eth1",
+		Parameters: hivesim.Params{"HIVE_LOGLEVEL": "5"},
+		AlwaysRun:  true,
+		Run:        runDiscoveryTest,
 	})
-	hivesim.MustRunSuite(hivesim.New(), suite)
+
+	eth := hivesim.Suite{
+		Name:        "eth",
+		Description: "This suite tests a client's ability to accurately respond to basic eth protocol messages.",
+	}
+	eth.Add(hivesim.ClientTestSpec{
+		Role: "eth1",
+		Name: "client launch",
+		Description: `This test launches the client and runs the test tool.
+Results from the test tool are reported as individual sub-tests.`,
+		Parameters: hivesim.Params{
+			"HIVE_NETWORK_ID":     "19763",
+			"HIVE_CHAIN_ID":       "19763",
+			"HIVE_FORK_HOMESTEAD": "0",
+			"HIVE_FORK_TANGERINE": "0",
+			"HIVE_FORK_SPURIOUS":  "0",
+			"HIVE_FORK_BYZANTIUM": "0",
+			"HIVE_LOGLEVEL":       "4",
+		},
+		Files: map[string]string{
+			"genesis.json": "./init/genesis.json",
+			"chain.rlp":    "./init/halfchain.rlp",
+		},
+		AlwaysRun: true,
+		Run:       runEthTest,
+	})
+
+	hivesim.MustRun(hivesim.New(), discv4, eth)
+}
+
+func runEthTest(t *hivesim.T, c *hivesim.Client) {
+	enode, err := c.EnodeURL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, pattern := t.Sim.TestPattern()
+	cmd := exec.Command("./devp2p", "rlpx", "eth-test", "--run", pattern, "--tap", enode, "./init/fullchain.rlp", "./init/genesis.json")
+	if err := runTAP(t, c.Type, cmd); err != nil {
+		t.Fatal(err)
+	}
 }
 
 var createNetworkOnce sync.Once
@@ -60,7 +98,8 @@ func runDiscoveryTest(t *hivesim.T, c *hivesim.Client) {
 	}
 
 	// Run the test tool.
-	cmd := exec.Command("./devp2p", "discv4", "test", "--tap", "--remote", nodeURL, "--listen1", bridgeIP, "--listen2", net1IP)
+	_, pattern := t.Sim.TestPattern()
+	cmd := exec.Command("./devp2p", "discv4", "test", "--run", pattern, "--tap", "--remote", nodeURL, "--listen1", bridgeIP, "--listen2", net1IP)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}

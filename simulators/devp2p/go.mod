@@ -1,9 +1,9 @@
-module github.com/ethereum/hive/simulators/devp2p/eth
+module github.com/ethereum/hive/simulators/devp2p
 
 go 1.17
 
 require (
-	github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba
+	github.com/ethereum/hive v0.0.0-20220209133735-23c45c59348d
 	github.com/shogo82148/go-tap v0.0.3
 )
 
