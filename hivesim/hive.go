@@ -62,6 +62,19 @@ func (sim *Simulation) SetTestPattern(p string) {
 	sim.m = m
 }
 
+// TestPattern returns the regular expressions used to enable/skip suite and test names.
+func (sim *Simulation) TestPattern() (suiteExpr string, testNameExpr string) {
+	se := ""
+	if sim.m.suite != nil {
+		se = sim.m.suite.String()
+	}
+	te := ""
+	if sim.m.test != nil {
+		te = sim.m.test.String()
+	}
+	return se, te
+}
+
 // EndTest finishes the test case, cleaning up everything, logging results, and returning
 // an error if the process could not be completed.
 func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, testResult TestResult) error {
