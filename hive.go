@@ -29,6 +29,7 @@ func main() {
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
 		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
+		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
 		simTestLimit          = flag.Int("sim.testlimit", 0, "Max `number` of tests to execute per client (interpreted by simulators).")
 		simTimeLimit          = flag.Duration("sim.timelimit", 0, "Simulation `timeout`. Hive aborts the simulator if it exceeds this time.")
@@ -103,6 +104,7 @@ func main() {
 		env: libhive.SimEnv{
 			LogDir:             *testResultsRoot,
 			SimLogLevel:        *simLogLevel,
+			SimTestPattern:     *simTestPattern,
 			SimParallelism:     *simParallelism,
 			SimTestLimit:       *simTestLimit,
 			ClientStartTimeout: *clientTimeout,
@@ -262,9 +264,10 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	// Create the simulator container.
 	opts := libhive.ContainerOptions{
 		Env: map[string]string{
-			"HIVE_SIMULATOR":   "http://" + addr.String(),
-			"HIVE_PARALLELISM": strconv.Itoa(r.env.SimParallelism),
-			"HIVE_LOGLEVEL":    strconv.Itoa(r.env.SimLogLevel),
+			"HIVE_SIMULATOR":    "http://" + addr.String(),
+			"HIVE_PARALLELISM":  strconv.Itoa(r.env.SimParallelism),
+			"HIVE_LOGLEVEL":     strconv.Itoa(r.env.SimLogLevel),
+			"HIVE_TEST_PATTERN": r.env.SimTestPattern,
 		},
 	}
 	if r.env.SimTestLimit != 0 {

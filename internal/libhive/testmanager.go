@@ -36,6 +36,7 @@ type SimEnv struct {
 	SimLogLevel    int
 	SimParallelism int
 	SimTestLimit   int
+	SimTestPattern string
 
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
