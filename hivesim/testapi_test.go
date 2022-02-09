@@ -2,6 +2,7 @@ package hivesim
 
 import (
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -80,6 +81,69 @@ func removeTimestamps(result map[libhive.TestSuiteID]*libhive.TestSuite) {
 		for _, test := range suite.TestCases {
 			test.Start = time.Time{}
 			test.End = time.Time{}
+		}
+	}
+}
+
+var testPatternTests = []struct {
+	Pattern string
+	WantRun []string
+}{
+	{
+		Pattern: "/test-b",
+		WantRun: []string{
+			"suite-a.test-b",
+			"suite-b.test-b",
+		},
+	},
+	{
+		Pattern: "suite-a",
+		WantRun: []string{
+			"suite-a.test-a",
+			"suite-a.test-b",
+		},
+	},
+}
+
+// This test verifies that suites and test cases are skipped when the test
+// pattern does not match.
+func TestSkipping(t *testing.T) {
+	suiteA := Suite{Name: "suite-a"}
+	suiteA.Add(TestSpec{Name: "test-a", Run: func(t *T) {}})
+	suiteA.Add(TestSpec{Name: "test-b", Run: func(t *T) {}})
+
+	suiteB := Suite{Name: "suite-b"}
+	suiteB.Add(TestSpec{Name: "test-a", Run: func(t *T) {}})
+	suiteB.Add(TestSpec{Name: "test-b", Run: func(t *T) {}})
+
+	for _, test := range testPatternTests {
+		tm, srv := newFakeAPI(nil)
+		defer srv.Close()
+
+		sim := NewAt(srv.URL)
+		sim.SetTestPattern(test.Pattern)
+
+		err := Run(sim, suiteA, suiteB)
+		if err != nil {
+			t.Fatal("run failed:", err)
+		}
+		srv.Close()
+
+		// Collect names of executed test cases.
+		tm.Terminate()
+		results := tm.Results()
+		removeTimestamps(results)
+		var cases []string
+		for _, suite := range results {
+			for _, testCase := range suite.TestCases {
+				name := suite.Name + "." + testCase.Name
+				cases = append(cases, name)
+			}
+		}
+		sort.Strings(cases)
+
+		if !reflect.DeepEqual(cases, test.WantRun) {
+			t.Errorf("pattern %q wrong exected test cases: %v", test.Pattern, cases)
 		}
 	}
 }

@@ -21,22 +21,45 @@ import (
 // Simulation wraps the simulation HTTP API provided by hive.
 type Simulation struct {
 	url string
+	m   testMatcher
 }
 
 // New looks up the hive host URI using the HIVE_SIMULATOR environment variable
 // and connects to it. It will panic if HIVE_SIMULATOR is not set.
 func New() *Simulation {
-	simulator, isSet := os.LookupEnv("HIVE_SIMULATOR")
+	url, isSet := os.LookupEnv("HIVE_SIMULATOR")
 	if !isSet {
 		panic("HIVE_SIMULATOR environment variable not set")
 	}
-	return &Simulation{url: simulator}
+	if url == "" {
+		panic("HIVE_SIMULATOR environment variable is empty")
+	}
+	sim := &Simulation{url: url}
+	if p := os.Getenv("HIVE_TEST_PATTERN"); p != "" {
+		m, err := parseTestPattern(p)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Warning: ignoring invalid test pattern regexp: "+err.Error())
+		}
+		sim.m = m
+	}
+	return sim
 }
 
 // NewAt creates a simulation connected to the given API endpoint. You'll will rarely need
 // to use this. In simulations launched by hive, use New() instead.
 func NewAt(url string) *Simulation {
 	return &Simulation{url: url}
+}
+
+// SetTestPattern sets the regular expression that enables/skips suites and test cases.
+// This method is provided for use in unit tests. For simulator runs launched by hive, the
+// test pattern is set automatically in New().
+func (sim *Simulation) SetTestPattern(p string) {
+	m, err := parseTestPattern(p)
+	if err != nil {
+		panic("invalid test pattern regexp: " + err.Error())
+	}
+	sim.m = m
 }
 
 // EndTest finishes the test case, cleaning up everything, logging results, and returning

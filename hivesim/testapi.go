@@ -24,22 +24,44 @@ func (s *Suite) Add(test AnyTest) *Suite {
 	return s
 }
 
-// AnyTest is either Test or SingleClientTest.
+// AnyTest is a TestSpec or ClientTestSpec.
 type AnyTest interface {
-	runTest(*Simulation, SuiteID) error
+	runTest(*Simulation, SuiteID, *Suite) error
+}
+
+// Run executes all given test suites.
+func Run(host *Simulation, suites ...Suite) error {
+	for _, s := range suites {
+		if err := RunSuite(host, s); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// MustRun executes all given test suites, exiting the process if there is a problem
+// reaching the simulation API.
+func MustRun(host *Simulation, suites ...Suite) {
+	for _, s := range suites {
+		MustRunSuite(host, s)
+	}
 }
 
 // RunSuite runs all tests in a suite.
 func RunSuite(host *Simulation, suite Suite) error {
-	logfile := os.Getenv("HIVE_SIMLOG") // TODO: remove this
-	suiteID, err := host.StartSuite(suite.Name, suite.Description, logfile)
+	if !host.m.match(suite.Name, "") {
+		fmt.Fprintf(os.Stderr, "skipping suite %q because it doesn't match test pattern %s\n", suite.Name, host.m.pattern)
+		return nil
+	}
+
+	suiteID, err := host.StartSuite(suite.Name, suite.Description, "")
 	if err != nil {
 		return err
 	}
 	defer host.EndSuite(suiteID)
 
 	for _, test := range suite.Tests {
-		if err := test.runTest(host, suiteID); err != nil {
+		if err := test.runTest(host, suiteID, &suite); err != nil {
 			return err
 		}
 	}
@@ -134,6 +156,7 @@ type T struct {
 	Sim     *Simulation
 	TestID  TestID
 	SuiteID SuiteID
+	suite   *Suite
 	mu      sync.Mutex
 	result  TestResult
 }
@@ -150,7 +173,7 @@ func (t *T) StartClient(clientType string, option ...StartOption) *Client {
 // RunClient runs the given client test against a single client type.
 // It waits for the subtest to complete.
 func (t *T) RunClient(clientType string, spec ClientTestSpec) {
-	runTest(t.Sim, t.SuiteID, spec.Name, spec.Description, func(t *T) {
+	runTest(t.Sim, t.SuiteID, t.suite, spec.Name, spec.Description, func(t *T) {
 		client := t.StartClient(clientType, spec.Parameters, WithStaticFiles(spec.Files))
 		spec.Run(t, client)
 	})
@@ -159,14 +182,14 @@ func (t *T) RunClient(clientType string, spec ClientTestSpec) {
 // RunAllClients runs the given client test against all available client types.
 // It waits for all subtests to complete.
 func (t *T) RunAllClients(spec ClientTestSpec) {
-	spec.runTest(t.Sim, t.SuiteID)
+	spec.runTest(t.Sim, t.SuiteID, t.suite)
 }
 
 // Run runs a subtest of this test. It waits for the subtest to complete before continuing.
 // It is safe to call this from multiple goroutines concurrently, just be sure to wait for
 // all your tests to finish until returning from the parent test.
 func (t *T) Run(spec TestSpec) {
-	runTest(t.Sim, t.SuiteID, spec.Name, spec.Description, spec.Run)
+	runTest(t.Sim, t.SuiteID, t.suite, spec.Name, spec.Description, spec.Run)
 }
 
 // Error is like testing.T.Error.
@@ -233,13 +256,19 @@ func (t *T) FailNow() {
 	runtime.Goexit()
 }
 
-func runTest(host *Simulation, s SuiteID, name, desc string, runit func(t *T)) error {
+func runTest(host *Simulation, suiteID SuiteID, suite *Suite, name, desc string, runit func(t *T)) error {
+	if !host.m.match(suite.Name, name) {
+		fmt.Fprintf(os.Stderr, "skipping test %q because it doesn't match test pattern %s\n", name, host.m.pattern)
+		return nil
+	}
+
 	// Register test on simulation server and initialize the T.
 	t := &T{
 		Sim:     host,
-		SuiteID: s,
+		SuiteID: suiteID,
+		suite:   suite,
 	}
-	testID, err := host.StartTest(s, name, desc)
+	testID, err := host.StartTest(suiteID, name, desc)
 	if err != nil {
 		return err
 	}
@@ -248,7 +277,7 @@ func runTest(host *Simulation, s SuiteID, name, desc string, runit func(t *T)) e
 	defer func() {
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		host.EndTest(s, testID, t.result)
+		host.EndTest(suiteID, testID, t.result)
 	}()
 
 	// Run the test function.
@@ -269,7 +298,7 @@ func runTest(host *Simulation, s SuiteID, name, desc string, runit func(t *T)) e
 	return nil
 }
 
-func (spec ClientTestSpec) runTest(host *Simulation, suite SuiteID) error {
+func (spec ClientTestSpec) runTest(host *Simulation, suiteID SuiteID, suite *Suite) error {
 	clients, err := host.ClientTypes()
 	if err != nil {
 		return err
@@ -281,7 +310,7 @@ func (spec ClientTestSpec) runTest(host *Simulation, suite SuiteID) error {
 			continue
 		}
 		name := clientTestName(spec.Name, clientDef.Name)
-		err := runTest(host, suite, name, spec.Description, func(t *T) {
+		err := runTest(host, suiteID, suite, name, spec.Description, func(t *T) {
 			client := t.StartClient(clientDef.Name, spec.Parameters, WithStaticFiles(spec.Files))
 			spec.Run(t, client)
 		})
@@ -303,6 +332,6 @@ func clientTestName(name, clientType string) string {
 	return name + " (" + clientType + ")"
 }
 
-func (spec TestSpec) runTest(host *Simulation, suite SuiteID) error {
-	return runTest(host, suite, spec.Name, spec.Description, spec.Run)
+func (spec TestSpec) runTest(host *Simulation, suiteID SuiteID, suite *Suite) error {
+	return runTest(host, suiteID, suite, spec.Name, spec.Description, spec.Run)
 }
