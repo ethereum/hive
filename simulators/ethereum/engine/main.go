@@ -88,147 +88,9 @@ type TestSpec struct {
 	ChainFile string
 }
 
-var mergetests = GenerateMergeTests()
-
-var tests = append([]TestSpec{
-
-	// Engine API Negative Test Cases
-	{
-		Name: "Invalid Terminal Block in ForkchoiceUpdated",
-		Run:  invalidTerminalBlockForkchoiceUpdated,
-		TTD:  1000000,
-	},
-	{
-		Name: "Invalid GetPayload Under PoW",
-		Run:  invalidGetPayloadUnderPoW,
-		TTD:  1000000,
-	},
-	{
-		Name: "Invalid Terminal Block in NewPayload",
-		Run:  invalidTerminalBlockNewPayload,
-		TTD:  1000000,
-	},
-	{
-		Name: "Unknown HeadBlockHash",
-		Run:  unknownHeadBlockHash,
-	},
-	{
-		Name: "Unknown SafeBlockHash",
-		Run:  unknownSafeBlockHash,
-	},
-	{
-		Name: "Unknown FinalizedBlockHash",
-		Run:  unknownFinalizedBlockHash,
-	},
-	{
-		Name: "Pre-TTD ForkchoiceUpdated After PoS Switch",
-		Run:  preTTDFinalizedBlockHash,
-		TTD:  2,
-	},
-	{
-		Name: "Bad Hash on ExecutePayload",
-		Run:  badHashOnExecPayload,
-	},
-	{
-		Name: "ParentHash==BlockHash on ExecutePayload",
-		Run:  parentHashOnExecPayload,
-	},
-	{
-		Name: "Invalid ParentHash ExecutePayload",
-		Run:  invalidPayloadTestCaseGen("ParentHash"),
-	},
-	{
-		Name: "Invalid StateRoot ExecutePayload",
-		Run:  invalidPayloadTestCaseGen("StateRoot"),
-	},
-	{
-		Name: "Invalid ReceiptsRoot ExecutePayload",
-		Run:  invalidPayloadTestCaseGen("ReceiptsRoot"),
-	},
-	{
-		Name: "Invalid Number ExecutePayload",
-		Run:  invalidPayloadTestCaseGen("Number"),
-	},
-	{
-		Name: "Invalid GasLimit ExecutePayload",
-		Run:  invalidPayloadTestCaseGen("GasLimit"),
-	},
-	{
-		Name: "Invalid GasUsed ExecutePayload",
-		Run:  invalidPayloadTestCaseGen("GasUsed"),
-	},
-	{
-		Name: "Invalid Timestamp ExecutePayload",
-		Run:  invalidPayloadTestCaseGen("Timestamp"),
-	},
-
-	// Eth RPC Status on ForkchoiceUpdated Events
-	{
-		Name: "Latest Block after ExecutePayload",
-		Run:  blockStatusExecPayload,
-	},
-	{
-		Name: "Latest Block after New HeadBlock",
-		Run:  blockStatusHeadBlock,
-	},
-	{
-		Name: "Latest Block after New SafeBlock",
-		Run:  blockStatusSafeBlock,
-	},
-	{
-		Name: "Latest Block after New FinalizedBlock",
-		Run:  blockStatusFinalizedBlock,
-	},
-	{
-		Name: "Latest Block after Reorg",
-		Run:  blockStatusReorg,
-	},
-
-	// Payload Tests
-	{
-		Name: "Re-Execute Payload",
-		Run:  reExecPayloads,
-	},
-	{
-		Name: "Multiple New Payloads Extending Canonical Chain",
-		Run:  multipleNewCanonicalPayloads,
-	},
-	{
-		Name: "Out of Order Payload Execution",
-		Run:  outOfOrderPayloads,
-	},
-
-	// Transaction Reorg using Engine API
-	{
-		Name: "Transaction Reorg",
-		Run:  transactionReorg,
-	},
-	{
-		Name: "Sidechain Reorg",
-		Run:  sidechainReorg,
-	},
-
-	// Suggested Fee Recipient in Payload creation
-	{
-		Name: "Suggested Fee Recipient Test",
-		Run:  suggestedFeeRecipient,
-	},
-
-	// Random opcode tests
-	{
-		Name: "Random Opcode Transactions",
-		Run:  randomOpcodeTx,
-		TTD:  10,
-	},
-
-	// Multi-Client Sync tests
-	{
-		Name: "Sync Client Post Merge",
-		Run:  postMergeSync,
-		TTD:  10,
-	},
-},
-	mergetests...,
+var allTests = append(
+	engineTests,
+	mergeTests...,
 )
 
 func main() {
@@ -238,7 +100,7 @@ func main() {
 Test Engine API tests using CL mocker to inject commands into clients after they 
 have reached the Terminal Total Difficulty.`[1:],
 	}
-	for _, currentTest := range tests {
+	for _, currentTest := range allTests {
 		currentTest := currentTest
 		genesisPath := "./init/genesis.json"
 		// If the TestSpec specified a custom genesis file, use that instead.
@@ -270,7 +132,7 @@ have reached the Terminal Total Difficulty.`[1:],
 					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
 				}
 				// Run the test case
-				RunTest(currentTest.Name, big.NewInt(currentTest.TTD), timeout, t, c, currentTest.Run, newParams, testFiles)
+				RunTest(currentTest.Name, big.NewInt(ttd), timeout, t, c, currentTest.Run, newParams, testFiles)
 			},
 		})
 	}

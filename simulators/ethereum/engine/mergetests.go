@@ -45,6 +45,7 @@ type MergeTestSpec struct {
 	// Chain file to initialize the main client.
 	MainChainFile string
 
+	// All secondary clients to be started during the tests with their respective chain files
 	SecondaryClients []SecondaryClient
 }
 
@@ -69,6 +70,8 @@ var mergeTestSpecs = []MergeTestSpec{
 	-
 	*/
 }
+
+var mergeTests = GenerateMergeTests()
 
 func GenerateMergeTests() []TestSpec {
 	testSpecs := make([]TestSpec, 0)

@@ -19,6 +19,145 @@ var (
 	big1 = big.NewInt(1)
 )
 
+var engineTests = []TestSpec{
+
+	// Engine API Negative Test Cases
+	{
+		Name: "Invalid Terminal Block in ForkchoiceUpdated",
+		Run:  invalidTerminalBlockForkchoiceUpdated,
+		TTD:  1000000,
+	},
+	{
+		Name: "Invalid GetPayload Under PoW",
+		Run:  invalidGetPayloadUnderPoW,
+		TTD:  1000000,
+	},
+	{
+		Name: "Invalid Terminal Block in NewPayload",
+		Run:  invalidTerminalBlockNewPayload,
+		TTD:  1000000,
+	},
+	{
+		Name: "Unknown HeadBlockHash",
+		Run:  unknownHeadBlockHash,
+	},
+	{
+		Name: "Unknown SafeBlockHash",
+		Run:  unknownSafeBlockHash,
+	},
+	{
+		Name: "Unknown FinalizedBlockHash",
+		Run:  unknownFinalizedBlockHash,
+	},
+	{
+		Name: "Pre-TTD ForkchoiceUpdated After PoS Switch",
+		Run:  preTTDFinalizedBlockHash,
+		TTD:  2,
+	},
+	{
+		Name: "Bad Hash on ExecutePayload",
+		Run:  badHashOnExecPayload,
+	},
+	{
+		Name: "ParentHash==BlockHash on ExecutePayload",
+		Run:  parentHashOnExecPayload,
+	},
+	{
+		Name: "Invalid ParentHash ExecutePayload",
+		Run:  invalidPayloadTestCaseGen("ParentHash"),
+	},
+	{
+		Name: "Invalid StateRoot ExecutePayload",
+		Run:  invalidPayloadTestCaseGen("StateRoot"),
+	},
+	{
+		Name: "Invalid ReceiptsRoot ExecutePayload",
+		Run:  invalidPayloadTestCaseGen("ReceiptsRoot"),
+	},
+	{
+		Name: "Invalid Number ExecutePayload",
+		Run:  invalidPayloadTestCaseGen("Number"),
+	},
+	{
+		Name: "Invalid GasLimit ExecutePayload",
+		Run:  invalidPayloadTestCaseGen("GasLimit"),
+	},
+	{
+		Name: "Invalid GasUsed ExecutePayload",
+		Run:  invalidPayloadTestCaseGen("GasUsed"),
+	},
+	{
+		Name: "Invalid Timestamp ExecutePayload",
+		Run:  invalidPayloadTestCaseGen("Timestamp"),
+	},
+
+	// Eth RPC Status on ForkchoiceUpdated Events
+	{
+		Name: "Latest Block after ExecutePayload",
+		Run:  blockStatusExecPayload,
+	},
+	{
+		Name: "Latest Block after New HeadBlock",
+		Run:  blockStatusHeadBlock,
+	},
+	{
+		Name: "Latest Block after New SafeBlock",
+		Run:  blockStatusSafeBlock,
+	},
+	{
+		Name: "Latest Block after New FinalizedBlock",
+		Run:  blockStatusFinalizedBlock,
+	},
+	{
+		Name: "Latest Block after Reorg",
+		Run:  blockStatusReorg,
+	},
+
+	// Payload Tests
+	{
+		Name: "Re-Execute Payload",
+		Run:  reExecPayloads,
+	},
+	{
+		Name: "Multiple New Payloads Extending Canonical Chain",
+		Run:  multipleNewCanonicalPayloads,
+	},
+	{
+		Name: "Out of Order Payload Execution",
+		Run:  outOfOrderPayloads,
+	},
+
+	// Transaction Reorg using Engine API
+	{
+		Name: "Transaction Reorg",
+		Run:  transactionReorg,
+	},
+	{
+		Name: "Sidechain Reorg",
+		Run:  sidechainReorg,
+	},
+
+	// Suggested Fee Recipient in Payload creation
+	{
+		Name: "Suggested Fee Recipient Test",
+		Run:  suggestedFeeRecipient,
+	},
+
+	// Random opcode tests
+	{
+		Name: "Random Opcode Transactions",
+		Run:  randomOpcodeTx,
+		TTD:  10,
+	},
+
+	// Multi-Client Sync tests
+	{
+		Name: "Sync Client Post Merge",
+		Run:  postMergeSync,
+		TTD:  10,
+	},
+}
+
 // Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
 func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
 	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
@@ -123,15 +262,10 @@ func unknownSafeBlockHash(t *TestEnv) {
 			// Execution specification:
 			// - This value MUST be either equal to or an ancestor of headBlockHash
 			resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownSafeHash, nil)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error on forkchoiceUpdated with unknown SafeBlockHash: %v", t.TestName, err)
+			if err == nil {
+				t.Fatalf("FAIL (%s): No error on forkchoiceUpdated with unknown SafeBlockHash: %v", t.TestName, resp)
 			}
-			if resp.PayloadStatus.Status != "INVALID" {
-				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown SafeBlockHash is not INVALID: %v", t.TestName, resp)
-			}
-			if resp.PayloadID != nil {
-				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown SafeBlockHash contains PayloadID: %v, %v", t.TestName, resp)
-			}
+
 		},
 	})
 
@@ -161,11 +295,8 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 				FinalizedBlockHash: randomFinalizedBlockHash,
 			}
 			resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownFinalizedHash, nil)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
-			}
-			if resp.PayloadStatus.Status != "INVALID" {
-				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown FinalizedBlockHash is not INVALID: %v, %v", t.TestName, resp)
+			if err == nil {
+				t.Fatalf("FAIL (%s): No error on forkchoiceUpdated with unknown FinalizedBlockHash: %v", t.TestName, resp)
 			}
 
 			// Test again using PayloadAttributes, should also return INVALID and no PayloadID
@@ -175,14 +306,8 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 				SuggestedFeeRecipient: common.Address{},
 			}
 			resp, err = t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownFinalizedHash, &payloadAttr)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
-			}
-			if resp.PayloadStatus.Status != "INVALID" {
-				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown FinalizedBlockHash is not INVALID: %v, %v", t.TestName, resp)
-			}
-			if resp.PayloadID != nil {
-				t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown FinalizedBlockHash contains PayloadID: %v, %v", t.TestName, resp)
+			if err == nil {
+				t.Fatalf("FAIL (%s): No error on forkchoiceUpdated with unknown FinalizedBlockHash: %v", t.TestName, resp)
 			}
 
 		},
@@ -636,9 +761,8 @@ func blockStatusReorg(t *TestEnv) {
 			if resp.PayloadStatus.Status != "VALID" {
 				t.Fatalf("FAIL (%s): Incorrect status returned after a HeadBlockHash reorg: %v", t.TestName, resp.PayloadStatus.Status)
 			}
-
-			if *resp.PayloadStatus.LatestValidHash != t.CLMock.LatestForkchoice.FinalizedBlockHash {
-				t.Fatalf("FAIL (%s): Incorrect latestValidHash returned after a HeadBlockHash reorg: %v!=%v", t.TestName, resp.PayloadStatus.LatestValidHash, t.CLMock.LatestForkchoice.FinalizedBlockHash)
+			if *resp.PayloadStatus.LatestValidHash != reorgForkchoice.HeadBlockHash {
+				t.Fatalf("FAIL (%s): Incorrect latestValidHash returned after a HeadBlockHash reorg: %v!=%v", t.TestName, resp.PayloadStatus.LatestValidHash, reorgForkchoice.HeadBlockHash)
 			}
 
 			// Check that we reorg to the previous block
@@ -647,8 +771,8 @@ func blockStatusReorg(t *TestEnv) {
 				t.Fatalf("FAIL (%s): Unable to get latest block header: %v", t.TestName, err)
 			}
 
-			if currentBlockHeader.Hash() != t.CLMock.LatestForkchoice.FinalizedBlockHash {
-				t.Fatalf("FAIL (%s): latest block header doesn't match reorg hash: %v, %v", t.TestName, currentBlockHeader.Hash(), t.CLMock.LatestForkchoice.FinalizedBlockHash)
+			if currentBlockHeader.Hash() != reorgForkchoice.HeadBlockHash {
+				t.Fatalf("FAIL (%s): `latest` block hash doesn't match reorg hash: %v, %v", t.TestName, currentBlockHeader.Hash(), reorgForkchoice.HeadBlockHash)
 			}
 
 			// Send the HeadBlock again to leave everything back the way it was
@@ -716,7 +840,7 @@ func transactionReorg(t *TestEnv) {
 		t.Logf("transactionReorg, stor[%v]: %v\n", i, valueWithTxApplied)
 
 		if valueWithTxApplied.Cmp(common.Big1) != 0 {
-			t.Fatalf("FAIL (%s): Expected storage not set after transaction: %v", t.TestName, valueWithTxApplied)
+			t.Fatalf("FAIL (%s): Expected storage not set after transaction (before re-org): %v", t.TestName, valueWithTxApplied)
 		}
 
 		// Get value at a block before the tx was included
@@ -728,7 +852,7 @@ func transactionReorg(t *TestEnv) {
 		t.Logf("transactionReorg, stor[%v]: %v\n", i, valueWithoutTxApplied)
 
 		if valueWithoutTxApplied.Cmp(common.Big0) != 0 {
-			t.Fatalf("FAIL (%s): Expected storage not set after transaction: %v", t.TestName, valueWithoutTxApplied)
+			t.Fatalf("FAIL (%s): Storage not unset before transaction!: %v", t.TestName, valueWithoutTxApplied)
 		}
 
 		// Re-org back to a previous block where the tx is not included using forkchoiceUpdated
@@ -746,14 +870,14 @@ func transactionReorg(t *TestEnv) {
 		}
 
 		// Check storage again using `latest`, should be unset
-		valueWithoutTxApplied, err = getBigIntAtStorage(t.Eth, t.Ctx(), sstoreContractAddr, storageKey, nil)
+		valueAfterReOrgBeforeTxApplied, err := getBigIntAtStorage(t.Eth, t.Ctx(), sstoreContractAddr, storageKey, nil)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Could not get storage: %v", t.TestName, err)
 		}
-		t.Logf("transactionReorg, stor[%v]: %v\n", i, valueWithoutTxApplied)
+		t.Logf("transactionReorg, stor[%v]: %v\n", i, valueAfterReOrgBeforeTxApplied)
 
-		if valueWithoutTxApplied.Cmp(common.Big0) != 0 {
-			t.Fatalf("FAIL (%s): Expected storage not set after transaction: %v", t.TestName, valueWithoutTxApplied)
+		if valueAfterReOrgBeforeTxApplied.Cmp(common.Big0) != 0 {
+			t.Fatalf("FAIL (%s): Storage not unset after re-org: %v", t.TestName, valueAfterReOrgBeforeTxApplied)
 		}
 
 		// Re-send latest forkchoice to test next transaction
@@ -988,8 +1112,8 @@ func outOfOrderPayloads(t *TestEnv) {
 				t.Fatalf("FAIL (%s): Error while sending EngineNewPayloadV1: %v, %v", t.TestName, err, payload)
 			}
 			if i > 1 {
-				if payloadResp.Status != "ACCEPTED" {
-					t.Fatalf("FAIL (%s): Incorrect Status!=ACCEPTED (Payload Number=%v): %v", t.TestName, i, payloadResp.Status)
+				if payloadResp.Status != "ACCEPTED" && payloadResp.Status != "SYNCING" {
+					t.Fatalf("FAIL (%s): Incorrect Status!=ACCEPTED|SYNCING (Payload Number=%v): %v", t.TestName, i, payloadResp.Status)
 				}
 				if payloadResp.LatestValidHash != nil {
 					t.Fatalf("FAIL (%s): Incorrect LatestValidHash!=nil: %v", t.TestName, payloadResp.LatestValidHash)
@@ -1132,7 +1256,7 @@ func randomOpcodeTx(t *TestEnv) {
 		t.Fatalf("FAIL (%s): Unable to get latest block number: %v", t.TestName, err)
 	}
 	// Start
-	for i := uint64(2); i <= ttdBlockNumber; i++ {
+	for i := uint64(ttdBlockNumber); i <= ttdBlockNumber; i++ {
 		// First check that the block actually contained the transaction
 		block, err := t.Eth.BlockByNumber(t.Ctx(), big.NewInt(int64(i)))
 		if err != nil {
@@ -1154,7 +1278,7 @@ func randomOpcodeTx(t *TestEnv) {
 
 	// Send transactions now past TTD, the value of the storage in these blocks must match the random value
 	t.CLMock.produceBlocks(10, BlockProcessCallbacks{
-		OnGetPayloadID: func() {
+		OnPayloadProducerSelected: func() {
 			tx := t.makeNextTransaction(randomContractAddr, big0, nil)
 			if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 				t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
