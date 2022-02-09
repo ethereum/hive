@@ -41,7 +41,9 @@ for each testCase:
       - (Same steps repeated)
       - ...
 
-## Test Cases
+## Engine API Test Cases
+
+General positive and negative test cases based on the description in https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
 
 ### Engine API Negative Test Cases:
 - Invalid Terminal Block in ForkchoiceUpdated: Client should reject Engine directives if the referenced HeadBlockHash does not meet the TTD requirement.
@@ -86,3 +88,7 @@ for each testCase:
 
 ### Sync Tests:
 - Sync Client Post Merge: Launch a first client and verify that the transition to PoS occurs. Launch a second client and verify that it successfully syncs to the first client's chain.
+
+## Engine API Merge Tests:
+
+Test cases using multiple Proof of Work chains to test the client's behavior when the Terminal Total Difficulty is reached and the Engine API takes over.

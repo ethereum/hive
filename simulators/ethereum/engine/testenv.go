@@ -31,6 +31,9 @@ type TestEnv struct {
 	Eth    *ethclient.Client
 	Engine *EngineClient
 
+	// PoW Chain TerminalTotalDifficulty
+	TTD *big.Int
+
 	// Consensus Layer Mocker Instance
 	CLMock *CLMocker
 
@@ -39,6 +42,7 @@ type TestEnv struct {
 
 	// Client parameters used to launch the default client
 	ClientParams hivesim.Params
+	ClientFiles  hivesim.Params
 
 	// This tracks the account nonce of the vault account.
 	nonce uint64
@@ -51,7 +55,7 @@ type TestEnv struct {
 	syncCancel context.CancelFunc
 }
 
-func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv), cParams hivesim.Params) {
+func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv), cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	clMocker := NewCLMocker(t, ttd)
 	// Defer closing all clients
@@ -80,11 +84,13 @@ func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn 
 	env := &TestEnv{
 		T:            t,
 		TestName:     testName,
+		TTD:          ttd,
 		RPC:          rpcClient,
 		Eth:          ethclient.NewClient(rpcClient),
 		Engine:       ec,
 		CLMock:       clMocker,
 		ClientParams: cParams,
+		ClientFiles:  cFiles,
 	}
 
 	// Defer closing the last context
@@ -106,12 +112,13 @@ func RunTest(testName string, ttd *big.Int, t *hivesim.T, c *hivesim.Client, fn 
 	}()
 
 	// Setup timeouts
-	env.Timeout = time.After(DefaultTestCaseTimeout)
-	clMocker.Timeout = time.After(DefaultTestCaseTimeout)
+	env.Timeout = time.After(timeout)
+	clMocker.Timeout = time.After(timeout)
 
 	// Defer producing one last block to verify Execution client did not break after the test
 	defer func() {
-		if clMocker.TTDReached {
+		// Only run if the TTD was reached during test, and test had not failed at this point.
+		if clMocker.TTDReached && !t.Failed() {
 			clMocker.produceSingleBlock(BlockProcessCallbacks{})
 		}
 	}()

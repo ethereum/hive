@@ -190,8 +190,8 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 	}, nil
 }
 
-func loadGenesis() *types.Block {
-	contents, err := ioutil.ReadFile("init/genesis.json")
+func loadGenesis(path string) core.Genesis {
+	contents, err := ioutil.ReadFile(path)
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}
@@ -199,5 +199,10 @@ func loadGenesis() *types.Block {
 	if err := json.Unmarshal(contents, &genesis); err != nil {
 		panic(fmt.Errorf("can't parse genesis JSON: %v", err))
 	}
+	return genesis
+}
+
+func loadGenesisBlock(path string) *types.Block {
+	genesis := loadGenesis(path)
 	return genesis.ToBlock(nil)
 }

@@ -32,6 +32,10 @@ var (
 
 	// Test related
 	randomContractAddr = common.HexToAddress("0000000000000000000000000000000000000316")
+
+	// Clique Related
+	minerPKHex   = "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
+	minerAddrHex = "658bdf435d810c91414ec09147daa6db62406379"
 )
 
 var clientEnv = hivesim.Params{
@@ -49,24 +53,44 @@ var clientEnv = hivesim.Params{
 	"HIVE_FORK_LONDON":         "0",
 	// Tests use clique PoA to mine new blocks until the TTD is reached, then PoS takes over.
 	"HIVE_CLIQUE_PERIOD":     "1",
-	"HIVE_CLIQUE_PRIVATEKEY": "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
-	"HIVE_MINER":             "658bdf435d810c91414ec09147daa6db62406379",
+	"HIVE_CLIQUE_PRIVATEKEY": minerPKHex,
+	"HIVE_MINER":             minerAddrHex,
 	// Merge related
 	"HIVE_MERGE_BLOCK_ID": "100",
 }
 
-var files = map[string]string{
-	"/genesis.json": "./init/genesis.json",
-}
-
 type TestSpec struct {
-	Name  string
+	// Name of the test
+	Name string
+
+	// Brief description of the test
 	About string
-	Run   func(*TestEnv)
-	TTD   int64
+
+	// Test procedure to execute the test
+	Run func(*TestEnv)
+
+	// TerminalTotalDifficulty delta value.
+	// Actual TTD is genesis.Difficulty + this value
+	// Default: 0
+	TTD int64
+
+	// Test maximum execution time until a timeout is raised.
+	// Default: 60 seconds
+	TimeoutSeconds int
+
+	// Genesis file to be used for all clients launched during test
+	// Default: genesis.json (init/genesis.json)
+	GenesisFile string
+
+	// Chain file to initialize the clients.
+	// When used, clique consensus mechanism is disabled.
+	// Default: None
+	ChainFile string
 }
 
-var tests = []TestSpec{
+var mergetests = GenerateMergeTests()
+
+var tests = append([]TestSpec{
 
 	// Engine API Negative Test Cases
 	{
@@ -203,14 +227,9 @@ var tests = []TestSpec{
 		Run:  postMergeSync,
 		TTD:  10,
 	},
-	/*
-		{
-			Name: "Sync Two Clients with Mismatched TTD",
-			Run:  mismatchedTTDClientSync,
-		},
-	*/
-	// TODO: Add more
-}
+},
+	mergetests...,
+)
 
 func main() {
 	suite := hivesim.Suite{
@@ -221,17 +240,45 @@ have reached the Terminal Total Difficulty.`[1:],
 	}
 	for _, currentTest := range tests {
 		currentTest := currentTest
-		newParams := clientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", currentTest.TTD))
+		genesisPath := "./init/genesis.json"
+		// If the TestSpec specified a custom genesis file, use that instead.
+		if currentTest.GenesisFile != "" {
+			genesisPath = "./init/" + currentTest.GenesisFile
+		}
+		testFiles := hivesim.Params{"/genesis.json": genesisPath}
+		// Calculate and set the TTD for this test
+		ttd := calcRealTTD(genesisPath, currentTest.TTD)
+		newParams := clientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+		if currentTest.ChainFile != "" {
+			// We are using a Proof of Work chain file, remove all clique-related settings
+			// TODO: Nethermind still requires HIVE_MINER for the Engine API
+			// delete(newParams, "HIVE_MINER")
+			delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
+			delete(newParams, "HIVE_CLIQUE_PERIOD")
+			// Add the new file to be loaded as chain.rlp
+			testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.ChainFile)
+		}
 		suite.Add(hivesim.ClientTestSpec{
 			Name:        currentTest.Name,
 			Description: currentTest.About,
 			Parameters:  newParams,
-			Files:       files,
+			Files:       testFiles,
 			Run: func(t *hivesim.T, c *hivesim.Client) {
+				timeout := DefaultTestCaseTimeout
+				// If a TestSpec specifies a timeout, use that instead
+				if currentTest.TimeoutSeconds != 0 {
+					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
+				}
 				// Run the test case
-				RunTest(currentTest.Name, big.NewInt(currentTest.TTD), t, c, currentTest.Run, newParams)
+				RunTest(currentTest.Name, big.NewInt(currentTest.TTD), timeout, t, c, currentTest.Run, newParams, testFiles)
 			},
 		})
 	}
 	hivesim.MustRunSuite(hivesim.New(), suite)
+}
+
+// TTD is the value specified in the TestSpec + Genesis.Difficulty
+func calcRealTTD(genesisPath string, ttdValue int64) int64 {
+	g := loadGenesis(genesisPath)
+	return g.Difficulty.Int64() + ttdValue
 }

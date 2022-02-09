@@ -21,7 +21,7 @@ var (
 
 // Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
 func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
-	gblock := loadGenesis()
+	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
 
 	forkchoiceState := beacon.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
@@ -56,7 +56,7 @@ func invalidGetPayloadUnderPoW(t *TestEnv) {
 
 // Invalid Terminal Block in NewPayload: Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
 func invalidTerminalBlockNewPayload(t *TestEnv) {
-	gblock := loadGenesis()
+	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
 
 	// Create a dummy payload to send in the ExecutePayload call
 	payload := beacon.ExecutableDataV1{
@@ -250,7 +250,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
 
 	// Send the Genesis block as forkchoice
-	gblock := loadGenesis()
+	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
 	forkchoiceStateGenesisHash := beacon.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
 		SafeBlockHash:      gblock.Hash(),
