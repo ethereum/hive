@@ -92,13 +92,16 @@ var testPatternTests = []struct {
 	{
 		Pattern: "/test-b",
 		WantRun: []string{
+			"suite-a.always",
 			"suite-a.test-b",
+			"suite-b.always",
 			"suite-b.test-b",
 		},
 	},
 	{
 		Pattern: "suite-a",
 		WantRun: []string{
+			"suite-a.always",
 			"suite-a.test-a",
 			"suite-a.test-b",
 		},
@@ -111,10 +114,12 @@ func TestSkipping(t *testing.T) {
 	suiteA := Suite{Name: "suite-a"}
 	suiteA.Add(TestSpec{Name: "test-a", Run: func(t *T) {}})
 	suiteA.Add(TestSpec{Name: "test-b", Run: func(t *T) {}})
+	suiteA.Add(TestSpec{Name: "always", Run: func(t *T) {}, AlwaysRun: true})
 
 	suiteB := Suite{Name: "suite-b"}
 	suiteB.Add(TestSpec{Name: "test-a", Run: func(t *T) {}})
 	suiteB.Add(TestSpec{Name: "test-b", Run: func(t *T) {}})
+	suiteB.Add(TestSpec{Name: "always", Run: func(t *T) {}, AlwaysRun: true})
 
 	for _, test := range testPatternTests {
 		tm, srv := newFakeAPI(nil)

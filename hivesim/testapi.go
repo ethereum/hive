@@ -90,9 +90,18 @@ func MustRunSuite(host *Simulation, suite Suite) {
 //    t.RunClientTest(hivesim.ClientTestSpec{...})
 //
 type TestSpec struct {
+	// These fields are displayed in the UI. Be sure to add
+	// a meaningful description here.
 	Name        string
 	Description string
-	Run         func(*T)
+
+	// If AlwaysRun is true, the test will run even if Name does not match the test
+	// pattern. This option is useful for tests that launch a client instance and
+	// then perform further tests against it.
+	AlwaysRun bool
+
+	// The Run function is invoked when the test executes.
+	Run func(*T)
 }
 
 // ClientTestSpec is a test against a single client. You can either put this in your suite
@@ -103,12 +112,26 @@ type TestSpec struct {
 //
 // If the Name of the test includes "CLIENT", it is replaced by the client name being tested.
 type ClientTestSpec struct {
+	// These fields are displayed in the UI. Be sure to add
+	// a meaningful description here.
 	Name        string
-	Role        string
 	Description string
-	Parameters  Params
-	Files       map[string]string
-	Run         func(*T, *Client)
+
+	// If AlwaysRun is true, the test will run even if Name does not match the test
+	// pattern. This option is useful for tests that launch a client instance and
+	// then perform further tests against it.
+	AlwaysRun bool
+
+	// This filters client types by role.
+	// If no role is specified, the test runs for all available client types.
+	Role string
+
+	// Parameters and Files are launch options for client instances.
+	Parameters Params
+	Files      map[string]string
+
+	// The Run function is invoked when the test executes.
+	Run func(*T, *Client)
 }
 
 // Client represents a running client.
@@ -173,7 +196,14 @@ func (t *T) StartClient(clientType string, option ...StartOption) *Client {
 // RunClient runs the given client test against a single client type.
 // It waits for the subtest to complete.
 func (t *T) RunClient(clientType string, spec ClientTestSpec) {
-	runTest(t.Sim, t.SuiteID, t.suite, spec.Name, spec.Description, func(t *T) {
+	test := testSpec{
+		suiteID:   t.SuiteID,
+		suite:     t.suite,
+		name:      clientTestName(spec.Name, clientType),
+		desc:      spec.Description,
+		alwaysRun: spec.AlwaysRun,
+	}
+	runTest(t.Sim, test, func(t *T) {
 		client := t.StartClient(clientType, spec.Parameters, WithStaticFiles(spec.Files))
 		spec.Run(t, client)
 	})
@@ -189,7 +219,7 @@ func (t *T) RunAllClients(spec ClientTestSpec) {
 // It is safe to call this from multiple goroutines concurrently, just be sure to wait for
 // all your tests to finish until returning from the parent test.
 func (t *T) Run(spec TestSpec) {
-	runTest(t.Sim, t.SuiteID, t.suite, spec.Name, spec.Description, spec.Run)
+	spec.runTest(t.Sim, t.SuiteID, t.suite)
 }
 
 // Error is like testing.T.Error.
@@ -256,19 +286,27 @@ func (t *T) FailNow() {
 	runtime.Goexit()
 }
 
-func runTest(host *Simulation, suiteID SuiteID, suite *Suite, name, desc string, runit func(t *T)) error {
-	if !host.m.match(suite.Name, name) {
-		fmt.Fprintf(os.Stderr, "skipping test %q because it doesn't match test pattern %s\n", name, host.m.pattern)
+type testSpec struct {
+	suiteID   SuiteID
+	suite     *Suite
+	name      string
+	desc      string
+	alwaysRun bool
+}
+
+func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
+	if !test.alwaysRun && !host.m.match(test.suite.Name, test.name) {
+		fmt.Fprintf(os.Stderr, "skipping test %q because it doesn't match test pattern %s\n", test.name, host.m.pattern)
 		return nil
 	}
 
 	// Register test on simulation server and initialize the T.
 	t := &T{
 		Sim:     host,
-		SuiteID: suiteID,
-		suite:   suite,
+		SuiteID: test.suiteID,
+		suite:   test.suite,
 	}
-	testID, err := host.StartTest(suiteID, name, desc)
+	testID, err := host.StartTest(test.suiteID, test.name, test.desc)
 	if err != nil {
 		return err
 	}
@@ -277,7 +315,7 @@ func runTest(host *Simulation, suiteID SuiteID, suite *Suite, name, desc string,
 	defer func() {
 		t.mu.Lock()
 		defer t.mu.Unlock()
-		host.EndTest(suiteID, testID, t.result)
+		host.EndTest(test.suiteID, testID, t.result)
 	}()
 
 	// Run the test function.
@@ -309,8 +347,14 @@ func (spec ClientTestSpec) runTest(host *Simulation, suiteID SuiteID, suite *Sui
 		if spec.Role != "" && !clientDef.HasRole(spec.Role) {
 			continue
 		}
-		name := clientTestName(spec.Name, clientDef.Name)
-		err := runTest(host, suiteID, suite, name, spec.Description, func(t *T) {
+		test := testSpec{
+			suiteID:   suiteID,
+			suite:     suite,
+			name:      clientTestName(spec.Name, clientDef.Name),
+			desc:      spec.Description,
+			alwaysRun: spec.AlwaysRun,
+		}
+		err := runTest(host, test, func(t *T) {
 			client := t.StartClient(clientDef.Name, spec.Parameters, WithStaticFiles(spec.Files))
 			spec.Run(t, client)
 		})
@@ -333,5 +377,12 @@ func clientTestName(name, clientType string) string {
 }
 
 func (spec TestSpec) runTest(host *Simulation, suiteID SuiteID, suite *Suite) error {
-	return runTest(host, suiteID, suite, spec.Name, spec.Description, spec.Run)
+	test := testSpec{
+		suiteID:   suiteID,
+		suite:     suite,
+		name:      spec.Name,
+		desc:      spec.Description,
+		alwaysRun: spec.AlwaysRun,
+	}
+	return runTest(host, test, spec.Run)
 }
