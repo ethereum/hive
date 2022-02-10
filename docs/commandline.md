@@ -32,12 +32,12 @@ simulation, use the following command:
 For example, if you want to run the `discv4` test against geth and openethereum, here is
 how the command would look:
 
-    ./hive --sim devp2p/discv4 --client go-ethereum,openethereum
+    ./hive --sim devp2p --sim.limit discv4 --client go-ethereum,openethereum
 
 The client list may contain any number of clients. You can select a specific client
 version by appending it to the client name with `_`, for example:
 
-    ./hive --sim devp2p/discv4 --client go-ethereum_v1.9.22,go-ethereum_v1.9.23
+    ./hive --sim devp2p --client go-ethereum_v1.9.22,go-ethereum_v1.9.23
 
 Simulation runs can be customized in many ways. Here's an overview of the available
 command-line options.
@@ -67,8 +67,24 @@ This sets the default value of `HIVE_LOGLEVEL` in client containers.
 interpreted by simulators. It sets the `HIVE_PARALLELISM` environment variable. Defaults
 to 1.
 
-`--sim.testlimit <number>`: Max number of tests to execute per client. This is interpreted
-by simulators. It sets the `HIVE_SIMLIMIT` environment variable.
+`--sim.limit <pattern>`: Specifies a regular expression to selectively enable suites and
+test cases. This is interpreted by simulators. It sets the `HIVE_TEST_PATTERN` environment
+variable.
+
+The test pattern expression is usually interpreted as an unanchored match, i.e. an empty
+pattern matches any suite/test name and the expression can match anywhere in name. To
+improve command-line ergonomics, the test pattern is split at the first occurrence of `/`.
+The part before `/` matches the suite name and everything after it matches test names.
+
+For example, the following command runs the `devp2p` simulator, limiting the run to the
+`eth` suite and selecting only tests containing the word `Large`.
+
+    ./hive --sim devp2p --sim.limit eth/Large
+
+This command runs the `consensus` simulator and runs only tests from the `stBugs`
+directory (note the first `/`, matching any suite name):
+
+    ./hive --sim ethereum/consensus --sim.limit /stBugs/
 
 ## Viewing simulation results (hiveview)
 
