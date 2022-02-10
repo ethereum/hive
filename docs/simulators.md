@@ -97,9 +97,9 @@ The simulator needs to have a Dockerfile in order to run.
 
 As can be seen in the client test `Files:` part, the simulation requires a `genesis.json`
 file that specifies the genesis state of the client. An example of `genesis.json` can be
-found in the `simulators/devp2p/eth/init/` directory. You can copy an existing genesis
-block or create your own. Make sure to add all support files to container in the
-Dockerfile. The Dockerfile might look like this:
+found in the `simulators/devp2p/init/` directory. You can copy an existing genesis block
+or create your own. Make sure to add all support files to container in the Dockerfile. The
+Dockerfile might look like this:
 
     FROM golang:1-alpine AS builder
     RUN apk --no-cache add gcc musl-dev linux-headers

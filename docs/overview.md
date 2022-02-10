@@ -28,12 +28,12 @@ Ethereum client implementations. You can find the latest test results at
 This is an overview of some of the simulators which are currently implemented and running
 continuously on the production hive instance:
 
-- `devp2p/eth`, `devp2p/discv4`: These simulators run the 'eth' peer-to-peer protocol
-  tests and Discovery v4 protocol tests. The test suites themselves are maintained in the
-  go-ethereum repository. In their hive adaptation, the simulator launches the client with
-  a known test chain, obtains its peer-to-peer endpoint (the `enode://` URL) and sends
-  protocol messages to it. The client's responses are analyzed by the test suite to ensure
-  that they conform to the respective protocol specification.
+- `devp2p`: This simulator runs 'eth', 'snap' and 'discv4' peer-to-peer protocol tests.
+  The test suites themselves are maintained in the go-ethereum repository. In their hive
+  adaptation, the simulator launches the client with a known test chain, obtains its
+  peer-to-peer endpoint (the `enode://` URL) and sends protocol messages to it. The
+  client's responses are analyzed by the test suite to ensure that they conform to the
+  respective protocol specification.
 
 - `ethereum/sync`: This simulator attempts to synchronize the blockchain among all
   clients. For each enabled client implementation, it creates one instance of the client
