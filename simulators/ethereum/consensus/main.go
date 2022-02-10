@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -265,7 +266,8 @@ func main() {
 		Description: "This is a meta-test. It loads the blockchain test files and " +
 			"launches the actual client tests. Any errors in test files will be reported " +
 			"through this test.",
-		Run: loaderTest,
+		Run:       loaderTest,
+		AlwaysRun: true,
 	})
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
@@ -285,15 +287,7 @@ func loaderTest(t *hivesim.T) {
 			parallelism = p
 		}
 	}
-	testLimit := -1
-	if val, ok := os.LookupEnv("HIVE_SIMLIMIT"); ok {
-		if p, err := strconv.Atoi(val); err != nil {
-			t.Logf("Warning: invalid HIVE_SIMLIMIT value %q", val)
-		} else {
-			testLimit = p
-		}
-	}
-	t.Log("parallelism:", parallelism, "testlimit:", testLimit)
+	t.Log("parallelism:", parallelism)
 
 	// Find the tests directory.
 	testPath, isset := os.LookupEnv("TESTPATH")
@@ -314,13 +308,20 @@ func loaderTest(t *hivesim.T) {
 					Name:        test.name,
 					Description: "Test source: " + testLink(test.filepath),
 					Run:         test.run,
+					// Regexp matching on Name is disabled here because it's already done
+					// in loadTests. Matching in loadTests is better because it has access
+					// to the full test file path.
+					AlwaysRun: true,
 				})
 			}
 		}()
 	}
 
+	_, testPattern := t.Sim.TestPattern()
+	re := regexp.MustCompile(testPattern)
+
 	// Deliver test cases.
-	loadTests(t, fileRoot, testLimit, func(tc testcase) {
+	loadTests(t, fileRoot, re, func(tc testcase) {
 		for _, client := range clientTypes {
 			if !client.HasRole("eth1") {
 				continue
@@ -348,16 +349,12 @@ func testLink(filepath string) string {
 	return fmt.Sprintf("https://github.com/ethereum/tests/blob/develop/%v", path)
 }
 
-// deliverTests loads the files in 'root', running the given function for each test.
-func loadTests(t *hivesim.T, root string, limit int, fn func(testcase)) {
-	var i, j = 0, 0
+// loadTests loads the files in 'root', running the given function for each test.
+func loadTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) {
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			t.Logf("unable to walk path: %s", err)
 			return err
-		}
-		if limit >= 0 && i >= limit {
-			return filepath.SkipDir
 		}
 		if info.IsDir() {
 			return nil
@@ -365,13 +362,18 @@ func loadTests(t *hivesim.T, root string, limit int, fn func(testcase)) {
 		if fname := info.Name(); !strings.HasSuffix(fname, ".json") {
 			return nil
 		}
+		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".json")
+		if !re.MatchString(pathname) {
+			fmt.Println("skip", pathname)
+			return nil // skip
+		}
+
 		var tests map[string]BlockTest
 		if err := common.LoadJSON(path, &tests); err != nil {
 			t.Logf("invalid test file: %v", err)
 			return nil
 		}
 
-		j++
 		for name, blocktest := range tests {
 			tc := testcase{blockTest: blocktest, name: name, filepath: path}
 			if err := tc.validate(); err != nil {
@@ -379,7 +381,6 @@ func loadTests(t *hivesim.T, root string, limit int, fn func(testcase)) {
 				continue
 			}
 			fn(tc)
-			i++
 		}
 		return nil
 	})

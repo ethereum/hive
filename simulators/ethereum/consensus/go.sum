@@ -321,6 +321,8 @@ github.com/ethereum/go-ethereum v1.10.15 h1:E9o0kMbD8HXhp7g6UwIwntY05WTDheCGziMh
 github.com/ethereum/go-ethereum v1.10.15/go.mod h1:W3yfrFyL9C1pHcwY5hmRHVDaorTiQxhYBkKyu5mEDHw=
 github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba h1:J/zALdNL6F+ymZqpZdrUxQ8DUVAQScscQG8lwWxXv3E=
 github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba/go.mod h1:xptEyWnRW33B208ZrXXvkDpnP/BCvsigi/vir2TxruM=
+github.com/ethereum/hive v0.0.0-20220209145247-0524a7e54b78 h1:2xECQ/84etmpcYNUtFUA3pFF1xUjt+MQamLAw5zOLtc=
+github.com/ethereum/hive v0.0.0-20220209145247-0524a7e54b78/go.mod h1:xptEyWnRW33B208ZrXXvkDpnP/BCvsigi/vir2TxruM=
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5/go.mod h1:VvhXpOYNQvB+uIk2RvXzuaQtkQJzzIx6lSBe1xv7hi0=
