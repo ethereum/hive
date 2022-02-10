@@ -4,8 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -20,6 +19,8 @@ type SecondaryClient struct {
 	// Whether to broadcast a ForkchoiceUpdated directive to all clients that
 	// points to this client's HeadBlockHash
 	ForkchoiceUpdate bool
+
+	// TODO: Expected FcU outcome, could be "SYNCING", "VALID", etc..
 }
 
 type MergeTestSpec struct {
@@ -49,9 +50,54 @@ type MergeTestSpec struct {
 	SecondaryClients []SecondaryClient
 }
 
+/*
+	Chains Included:
+		- blocks_1_td_196608.rlp
+			Block 1, ab5d6faf8d4460e2f58cff55055411bd66c2bbce7436d54bbc962576ce84605f, difficulty: 196608
+			Chain Total Difficulty 196608
+
+		- blocks_1_td_196704.rlp
+			Block 1, f37dca584c0f6abde6e9c0bb486ac42a8ac091156ab97aeb26136ee37a3aaef7, difficulty: 196704
+			Chain Total Difficulty 196704
+
+		- blocks_2_td_393120.rlp
+			Block 1, ab5d6faf8d4460e2f58cff55055411bd66c2bbce7436d54bbc962576ce84605f, difficulty: 196608
+			Block 2, 6e98e14794478cbfe8feaa24d4463b1a4e5d3743a66a49a851a3029d9ff3de60, difficulty: 196512
+			Chain Total Difficulty 393120
+
+		- blocks_2_td_393504.rlp
+			Block 1, f37dca584c0f6abde6e9c0bb486ac42a8ac091156ab97aeb26136ee37a3aaef7, difficulty: 196704
+			Block 2, ee5dbba4ccfdc75800bf98804be90d2ffe7fa9b2dce37b6fe31c891ca5fb87b8, difficulty: 196800
+			Chain Total Difficulty 393504
+
+	Chains were generated using the following command:
+		`hivechain generate -genesis ./init/genesis.json -mine -length 2|1`.
+*/
 var mergeTestSpecs = []MergeTestSpec{
 	{
-		Name:          "Re-org to Higher Total Difficulty Chain",
+		Name:          "Single Block Re-org to Higher-Total-Difficulty Chain, Equal Height",
+		TTD:           196608,
+		MainChainFile: "blocks_1_td_196608.rlp",
+		SecondaryClients: []SecondaryClient{
+			{
+				ChainFile:        "blocks_1_td_196704.rlp",
+				ForkchoiceUpdate: true,
+			},
+		},
+	},
+	{
+		Name:          "Single Block Re-org to Lower-Total-Difficulty Chain, Equal Height",
+		TTD:           196608,
+		MainChainFile: "blocks_1_td_196704.rlp",
+		SecondaryClients: []SecondaryClient{
+			{
+				ChainFile:        "blocks_1_td_196608.rlp",
+				ForkchoiceUpdate: true,
+			},
+		},
+	},
+	{
+		Name:          "Two Block Re-org to Higher-Total-Difficulty Chain, Equal Height",
 		TTD:           393120,
 		MainChainFile: "blocks_2_td_393120.rlp",
 		SecondaryClients: []SecondaryClient{
@@ -61,9 +107,41 @@ var mergeTestSpecs = []MergeTestSpec{
 			},
 		},
 	},
+	{
+		Name:          "Two Block Re-org to Lower-Total-Difficulty Chain, Equal Height",
+		TTD:           393120,
+		MainChainFile: "blocks_2_td_393504.rlp",
+		SecondaryClients: []SecondaryClient{
+			{
+				ChainFile:        "blocks_2_td_393120.rlp",
+				ForkchoiceUpdate: true,
+			},
+		},
+	},
+	{
+		Name:          "Two Block Re-org to Higher-Height Chain",
+		TTD:           196704,
+		MainChainFile: "blocks_1_td_196704.rlp",
+		SecondaryClients: []SecondaryClient{
+			{
+				ChainFile:        "blocks_2_td_393120.rlp",
+				ForkchoiceUpdate: true,
+			},
+		},
+	},
+	{
+		Name:          "Two Block Re-org to Lower-Height Chain",
+		TTD:           196704,
+		MainChainFile: "blocks_2_td_393120.rlp",
+		SecondaryClients: []SecondaryClient{
+			{
+				ChainFile:        "blocks_1_td_196704.rlp",
+				ForkchoiceUpdate: true,
+			},
+		},
+	},
+
 	/* TODOs:
-	- reorg to higher block number, still with a valid TTD
-	- reorg to lower block number, still with a valid TTD
 	- reorg to a block with uncles
 	- reorg to invalid block (bad state root or similar)
 	- reorg multiple times to multiple client chains (5+)
@@ -71,17 +149,15 @@ var mergeTestSpecs = []MergeTestSpec{
 	*/
 }
 
-var mergeTests = GenerateMergeTests()
-
-func GenerateMergeTests() []TestSpec {
+var mergeTests = func() []TestSpec {
 	testSpecs := make([]TestSpec, 0)
 	for _, mergeTest := range mergeTestSpecs {
-		testSpecs = append(testSpecs, MergeTestGenerator(mergeTest))
+		testSpecs = append(testSpecs, GenerateMergeTestSpec(mergeTest))
 	}
 	return testSpecs
-}
+}()
 
-func MergeTestGenerator(mergeTestSpec MergeTestSpec) TestSpec {
+func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 	runFunc := func(t *TestEnv) {
 		// These tests start with whichever chain was included in TestSpec.ChainFile
 
@@ -92,27 +168,30 @@ func MergeTestGenerator(mergeTestSpec MergeTestSpec) TestSpec {
 		// secondary clients
 		mustHeadHash := t.CLMock.LatestForkchoice.HeadBlockHash
 
+		enode, err := t.Engine.EnodeURL()
+		if err != nil {
+			t.Fatalf("FAIL (%s): Unable to obtain main client enode", err)
+		}
+
 		// Start a secondary clients with alternative PoW chains
 		// Exact same TotalDifficulty, different hashes, so reorg is necessary.
 		for _, secondaryClient := range mergeTestSpec.SecondaryClients {
-			altChainClient := t.StartAlternativeChainClient(secondaryClient.ChainFile)
+			// TODO: Check if the secondary has a configured TTD, use that instead.
+			altChainClient := secondaryClient.StartAlternativeChainClient(t, enode)
+			t.CLMock.AddEngineClient(t.T, altChainClient.Client)
 			if secondaryClient.ForkchoiceUpdate {
 				// Broadcast ForkchoiceUpdated to the HeadBlockHash of this client
-				altChainHeadHash := altChainClient.GetHeadBlockHash()
-				altChainFcU := beacon.ForkchoiceStateV1{
-					HeadBlockHash:      altChainHeadHash,
-					SafeBlockHash:      altChainHeadHash,
-					FinalizedBlockHash: altChainHeadHash,
-				}
+				altChainHead := altChainClient.GetHeadHeader()
 
-				// Send new ForkchoiceUpdated to the original client and wait for it to change to it
-				resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &altChainFcU, nil)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Re-org to alternative PoW chain resulted in error", t.TestName)
-				}
-				t.Logf("INFO (%s): Response from the client when attempting to reorg to alt PoW chain: %v", t.TestName, resp)
+				// Re-Org latest cl.LatestForkchoice
+				t.CLMock.LatestForkchoice.HeadBlockHash = altChainHead.Hash()
+				t.CLMock.LatestForkchoice.SafeBlockHash = altChainHead.Hash()
+				t.CLMock.LatestForkchoice.FinalizedBlockHash = altChainHead.Hash()
 
-				mustHeadHash = altChainHeadHash
+				// Send new ForkchoiceUpdated to all clients
+				t.CLMock.broadcastLatestForkchoice()
+
+				mustHeadHash = altChainHead.Hash()
 			}
 		}
 
@@ -147,10 +226,11 @@ func MergeTestGenerator(mergeTestSpec MergeTestSpec) TestSpec {
 
 type AlternativeChainClient struct {
 	*TestEnv
+	Client *hivesim.Client
 	Engine *EngineClient
 }
 
-func (t *TestEnv) StartAlternativeChainClient(chainPath string) *AlternativeChainClient {
+func (spec SecondaryClient) StartAlternativeChainClient(t *TestEnv, enode string) *AlternativeChainClient {
 	clientTypes, err := t.Sim.ClientTypes()
 	if err != nil || len(clientTypes) == 0 {
 		t.Fatalf("FAIL (%s): Unable to obtain client types: %v", t.TestName, err)
@@ -158,30 +238,32 @@ func (t *TestEnv) StartAlternativeChainClient(chainPath string) *AlternativeChai
 	// Let's use the first just for now
 	altClient := clientTypes[0]
 
-	altClientFiles := t.ClientFiles.Set("/chain.rlp", "./chains/"+chainPath)
+	altClientFiles := t.ClientFiles.Set("/chain.rlp", "./chains/"+spec.ChainFile)
 
-	enode, err := t.Engine.EnodeURL()
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to obtain bootnode", err)
+	altClientParams := t.ClientParams.Set("HIVE_BOOTNODE", enode)
+
+	if spec.TTD != 0 {
+		ttd := calcRealTTD(t.ClientFiles["/genesis.json"], spec.TTD)
+		altClientParams = altClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 	}
-	altClientParams := t.ClientParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
 
 	c := t.T.StartClient(altClient.Name, altClientParams, hivesim.WithStaticFiles(altClientFiles))
 	ec := NewEngineClient(t.T, c)
 
 	altChainClient := &AlternativeChainClient{
 		TestEnv: t,
+		Client:  c,
 		Engine:  ec,
 	}
 	return altChainClient
 }
 
-func (c *AlternativeChainClient) GetHeadBlockHash() common.Hash {
+func (c *AlternativeChainClient) GetHeadHeader() *types.Header {
 	latestHeader, err := c.Engine.Eth.HeaderByNumber(c.Engine.Ctx(), nil)
 	if err != nil {
 		c.TestEnv.Fatalf("FAIL (%s): Unable to get alternative client head block hash: %v", c.TestEnv.TestName, err)
 	}
-	return latestHeader.Hash()
+	return latestHeader
 }
 
 func (c *AlternativeChainClient) Close() {
