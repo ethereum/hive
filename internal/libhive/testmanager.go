@@ -35,7 +35,6 @@ type SimEnv struct {
 	// Parameters of simulation.
 	SimLogLevel    int
 	SimParallelism int
-	SimTestLimit   int
 	SimTestPattern string
 
 	// This configures the amount of time the simulation waits

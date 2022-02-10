@@ -31,7 +31,7 @@ func main() {
 		simPattern            = flag.String("sim", "", "Regular `expression` selecting the simulators to run.")
 		simTestPattern        = flag.String("sim.limit", "", "Regular `expression` selecting tests/suites (interpreted by simulators).")
 		simParallelism        = flag.Int("sim.parallelism", 1, "Max `number` of parallel clients/containers (interpreted by simulators).")
-		simTestLimit          = flag.Int("sim.testlimit", 0, "Max `number` of tests to execute per client (interpreted by simulators).")
+		simTestLimit          = flag.Int("sim.testlimit", 0, "[DEPRECATED] Max `number` of tests to execute per client (interpreted by simulators).")
 		simTimeLimit          = flag.Duration("sim.timelimit", 0, "Simulation `timeout`. Hive aborts the simulator if it exceeds this time.")
 		simLogLevel           = flag.Int("sim.loglevel", 3, "Selects log `level` of client instances. Supports values 0-5.")
 		simDevMode            = flag.Bool("dev", false, "Only starts the simulator API endpoint (listening at 127.0.0.1:3000 by default) without starting any simulators.")
@@ -52,12 +52,15 @@ func main() {
 	flag.Parse()
 	log15.Root().SetHandler(log15.LvlFilterHandler(log15.Lvl(*loglevelFlag), log15.StreamHandler(os.Stderr, log15.TerminalFormat())))
 
+	if *simTestLimit > 0 {
+		log15.Warn("Option --sim.testlimit is deprecated and will have no effect.")
+	}
+
+	// Get the list of simulators.
 	inv, err := libhive.LoadInventory(".")
 	if err != nil {
 		fatal(err)
 	}
-
-	// Get the list of simulations.
 	simList, err := inv.MatchSimulators(*simPattern)
 	if err != nil {
 		fatal("bad --sim regular expression:", err)
@@ -106,7 +109,6 @@ func main() {
 			SimLogLevel:        *simLogLevel,
 			SimTestPattern:     *simTestPattern,
 			SimParallelism:     *simParallelism,
-			SimTestLimit:       *simTestLimit,
 			ClientStartTimeout: *clientTimeout,
 		},
 		SimDurationLimit: *simTimeLimit,
@@ -269,9 +271,6 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 			"HIVE_LOGLEVEL":     strconv.Itoa(r.env.SimLogLevel),
 			"HIVE_TEST_PATTERN": r.env.SimTestPattern,
 		},
-	}
-	if r.env.SimTestLimit != 0 {
-		opts.Env["HIVE_SIMLIMIT"] = strconv.Itoa(r.env.SimTestLimit)
 	}
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
 	if err != nil {
