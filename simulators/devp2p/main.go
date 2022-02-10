@@ -14,42 +14,74 @@ import (
 func main() {
 	discv4 := hivesim.Suite{
 		Name:        "discv4",
-		Description: "This runs the Discovery v4 test suite from go-ethereum.",
+		Description: "This suite runs Discovery v4 protocol tests.",
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role:       "eth1",
+				Parameters: hivesim.Params{"HIVE_LOGLEVEL": "5"},
+				AlwaysRun:  true,
+				Run:        runDiscoveryTest,
+			},
+		},
 	}
-	discv4.Add(hivesim.ClientTestSpec{
-		Role:       "eth1",
-		Parameters: hivesim.Params{"HIVE_LOGLEVEL": "5"},
-		AlwaysRun:  true,
-		Run:        runDiscoveryTest,
-	})
 
 	eth := hivesim.Suite{
 		Name:        "eth",
 		Description: "This suite tests a client's ability to accurately respond to basic eth protocol messages.",
-	}
-	eth.Add(hivesim.ClientTestSpec{
-		Role: "eth1",
-		Name: "client launch",
-		Description: `This test launches the client and runs the test tool.
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Name: "client launch",
+				Description: `This test launches the client and runs the test tool.
 Results from the test tool are reported as individual sub-tests.`,
-		Parameters: hivesim.Params{
-			"HIVE_NETWORK_ID":     "19763",
-			"HIVE_CHAIN_ID":       "19763",
-			"HIVE_FORK_HOMESTEAD": "0",
-			"HIVE_FORK_TANGERINE": "0",
-			"HIVE_FORK_SPURIOUS":  "0",
-			"HIVE_FORK_BYZANTIUM": "0",
-			"HIVE_LOGLEVEL":       "4",
+				Parameters: hivesim.Params{
+					"HIVE_NETWORK_ID":     "19763",
+					"HIVE_CHAIN_ID":       "19763",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_LOGLEVEL":       "4",
+				},
+				Files: map[string]string{
+					"genesis.json": "./init/genesis.json",
+					"chain.rlp":    "./init/halfchain.rlp",
+				},
+				AlwaysRun: true,
+				Run:       runEthTest,
+			},
 		},
-		Files: map[string]string{
-			"genesis.json": "./init/genesis.json",
-			"chain.rlp":    "./init/halfchain.rlp",
-		},
-		AlwaysRun: true,
-		Run:       runEthTest,
-	})
+	}
 
-	hivesim.MustRun(hivesim.New(), discv4, eth)
+	snap := hivesim.Suite{
+		Name:        "snap",
+		Description: "This suite tests the snap protocol.",
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Name: "client launch",
+				Description: `This test launches the client and runs the test tool.
+Results from the test tool are reported as individual sub-tests.`,
+				Parameters: hivesim.Params{
+					"HIVE_NETWORK_ID":     "19763",
+					"HIVE_CHAIN_ID":       "19763",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_LOGLEVEL":       "4",
+				},
+				Files: map[string]string{
+					"genesis.json": "./init/genesis.json",
+					"chain.rlp":    "./init/halfchain.rlp",
+				},
+				AlwaysRun: true,
+				Run:       runSnapTest,
+			},
+		},
+	}
+
+	hivesim.MustRun(hivesim.New(), discv4, eth, snap)
 }
 
 func runEthTest(t *hivesim.T, c *hivesim.Client) {
@@ -59,6 +91,18 @@ func runEthTest(t *hivesim.T, c *hivesim.Client) {
 	}
 	_, pattern := t.Sim.TestPattern()
 	cmd := exec.Command("./devp2p", "rlpx", "eth-test", "--run", pattern, "--tap", enode, "./init/fullchain.rlp", "./init/genesis.json")
+	if err := runTAP(t, c.Type, cmd); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runSnapTest(t *hivesim.T, c *hivesim.Client) {
+	enode, err := c.EnodeURL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, pattern := t.Sim.TestPattern()
+	cmd := exec.Command("./devp2p", "rlpx", "snap-test", "--run", pattern, "--tap", enode, "./init/fullchain.rlp", "./init/genesis.json")
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}
