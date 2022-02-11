@@ -24,7 +24,7 @@ func main() {
 		config  serverConfig
 	)
 	flag.StringVar(&config.listenAddr, "addr", "0.0.0.0:8080", "HTTP server listen address")
-	flag.StringVar(&config.logdir, "logdir", "workspace/logs", "Path to hive simulator log directory")
+	flag.StringVar(&config.logDir, "logdir", "workspace/logs", "Path to hive simulator log directory")
 	flag.StringVar(&config.assetsDir, "assets", "", "Path to static files directory. Serves baked-in assets when not set.")
 	flag.Parse()
 
@@ -33,7 +33,8 @@ func main() {
 	case *serve:
 		runServer(config)
 	case *listing:
-		generateListing(os.Stdout, config.logdir)
+		fsys := os.DirFS(config.logDir)
+		generateListing(fsys, ".", os.Stdout)
 	default:
 		log.Fatalf("Use -serve or -listing to select mode")
 	}
@@ -41,7 +42,7 @@ func main() {
 
 type serverConfig struct {
 	listenAddr string
-	logdir     string
+	logDir     string
 	assetsDir  string
 }
 
@@ -61,8 +62,9 @@ func runServer(config serverConfig) {
 	}
 
 	// Create handlers.
-	logHandler := http.FileServer(http.Dir(config.logdir))
-	listingHandler := serveListing{dir: config.logdir}
+	logDirFS := os.DirFS(config.logDir)
+	logHandler := http.FileServer(http.FS(logDirFS))
+	listingHandler := serveListing{fsys: logDirFS}
 	mux := mux.NewRouter()
 	mux.Handle("/listing.jsonl", listingHandler).Methods("GET")
 	mux.PathPrefix("/results").Handler(http.StripPrefix("/results/", logHandler))
@@ -77,11 +79,11 @@ func runServer(config serverConfig) {
 	http.Serve(l, mux)
 }
 
-type serveListing struct{ dir string }
+type serveListing struct{ fsys fs.FS }
 
 func (h serveListing) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Generating listing...")
-	err := generateListing(w, h.dir)
+	err := generateListing(h.fsys, ".", w)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 	}

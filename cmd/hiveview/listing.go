@@ -3,35 +3,46 @@ package main
 import (
 	"encoding/json"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"log"
-	"os"
-	"path/filepath"
+	"path"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/internal/libhive"
 )
 
 const listLimit = 200 // number of runs reported
 
 // generateListing processes hive simulation output files and generates a listing file.
-func generateListing(output io.Writer, logdir string) error {
-	logfiles, err := ioutil.ReadDir(logdir)
+func generateListing(fsys fs.FS, dir string, output io.Writer) error {
+	logfiles, err := fs.ReadDir(fsys, dir)
 	if err != nil {
 		return err
 	}
-	// The files are prefixed by timestamp, so to get the latest 200 items,
-	// we just need to read the listing in reverse until we have 200
+
+	// Sort by name.
+	sort.Slice(logfiles, func(i, j int) bool {
+		return logfiles[i].Name() < logfiles[j].Name()
+	})
+
+	// The files are prefixed by timestamp, so to get the latest 200 items, we just need
+	// to read the listing in reverse until we have 200.
 	var entries []listingEntry
 	for i := len(logfiles) - 1; i > 0; i-- {
-		finfo := logfiles[i]
-		if !strings.HasSuffix(finfo.Name(), ".json") || skipFile(finfo.Name()) {
+		name := logfiles[i].Name()
+		if !strings.HasSuffix(name, ".json") || skipFile(name) {
 			continue
 		}
-		entry, err := convertSummaryFile(logdir, finfo)
+		file, err := fsys.Open(path.Join(dir, name))
+		if err != nil {
+			continue
+		}
+
+		entry, err := convertSummaryFile(file)
+		file.Close()
+
 		if err != nil {
 			continue
 		}
@@ -40,11 +51,10 @@ func generateListing(output io.Writer, logdir string) error {
 			break
 		}
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].SimLog > entries[j].SimLog })
-	if len(entries) > listLimit {
-		entries = entries[:listLimit]
-	}
 
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].SimLog > entries[j].SimLog
+	})
 	enc := json.NewEncoder(output)
 	for _, e := range entries {
 		if err := enc.Encode(e); err != nil {
@@ -71,18 +81,22 @@ type listingEntry struct {
 	SimLog   string    `json:"simLog"`   // simulator log file
 }
 
-func convertSummaryFile(logdir string, file os.FileInfo) (listingEntry, error) {
-	info := new(libhive.TestSuite)
-	err := common.LoadJSON(filepath.Join(logdir, file.Name()), info)
+func convertSummaryFile(file fs.File) (listingEntry, error) {
+	fileInfo, err := file.Stat()
 	if err != nil {
-		log.Printf("Skipping invalid summary file: %v", err)
+		log.Printf("Can't access summary file: %s", err)
+	}
+
+	var info libhive.TestSuite
+	if err := json.NewDecoder(file).Decode(&info); err != nil {
+		log.Printf("Skipping invalid summary file %s: %v", fileInfo.Name(), err)
 		return listingEntry{}, err
 	}
-	if !suiteValid(info) {
-		log.Printf("Skipping invalid summary file: %s", file.Name())
+	if !suiteValid(&info) {
+		log.Printf("Skipping invalid summary file %s", fileInfo.Name())
 		return listingEntry{}, err
 	}
-	return suiteToEntry(file, info), nil
+	return suiteToEntry(&info, fileInfo), nil
 }
 
 func suiteValid(s *libhive.TestSuite) bool {
@@ -93,7 +107,7 @@ func skipFile(f string) bool {
 	return f == "errorReport.json" || f == "containerErrorReport.json" || strings.HasPrefix(f, ".")
 }
 
-func suiteToEntry(file os.FileInfo, s *libhive.TestSuite) listingEntry {
+func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 	e := listingEntry{
 		Name:     s.Name,
 		FileName: file.Name(),
