@@ -6,8 +6,9 @@
 
 ARG branch=devel
 FROM thorax/erigon:$branch
+USER root
 
-RUN apt-get -y update && apt-get install -y bash curl jq
+RUN apk add --update bash curl jq
 
 ADD genesis.json /genesis.json
 ADD mapper.jq /mapper.jq
