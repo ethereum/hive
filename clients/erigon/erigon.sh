@@ -45,11 +45,11 @@ fi
 
 if [ "$HIVE_BOOTNODE" != "" ]; then
     # Somehow the bootnodes flag is not working for erigon, only staticpeers is working for sync tests
-	FLAGS="$FLAGS --staticpeers $HIVE_BOOTNODE --nodiscover"
+    FLAGS="$FLAGS --staticpeers $HIVE_BOOTNODE --nodiscover"
 fi
 
 if [ "$HIVE_SKIP_POW" != "" ]; then
-	FLAGS="$FLAGS --fakepow"
+    FLAGS="$FLAGS --fakepow"
 fi
 
 # Create the data directory.
@@ -58,7 +58,7 @@ FLAGS="$FLAGS --datadir /erigon-hive-datadir"
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
-	FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
+    FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
 else
     FLAGS="$FLAGS --networkid 1337"
 fi
@@ -84,22 +84,22 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-	echo "Loading initial blockchain..."
-	$erigon $FLAGS import /chain.rlp
+    echo "Loading initial blockchain..."
+    $erigon $FLAGS import /chain.rlp
 else
-	echo "Warning: chain.rlp not found."
+    echo "Warning: chain.rlp not found."
 fi
 
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-	echo "Loading remaining individual blocks..."
+    echo "Loading remaining individual blocks..."
     for file in $(ls /blocks | sort -n); do
         echo "Importing " $file
         $erigon $FLAGS import /blocks/$file
     done
 else
-	echo "Warning: blocks folder not found."
+    echo "Warning: blocks folder not found."
 fi
 
 set -e
@@ -107,10 +107,10 @@ set -e
 # Configure any mining operation
 # TODO: Erigon doesn't have inbuilt cpu miner. Need to add https://github.com/panglove/ethcpuminer/tree/master/ethash for cpu mining with erigon
 if [ "$HIVE_MINER" != "" ]; then
-	FLAGS="$FLAGS --mine --miner.etherbase $HIVE_MINER"
+    FLAGS="$FLAGS --mine --miner.etherbase $HIVE_MINER"
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
-	FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
+    FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
 
 # Launch rpcdaemon in the background
