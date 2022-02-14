@@ -21,8 +21,8 @@ RUN chmod +x /erigon.sh
 ADD enode.sh /hive-bin/enode.sh
 RUN chmod +x /hive-bin/enode.sh
 
-# Add dummy /version.txt
-RUN ./erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt
+# Create version.txt
+RUN /usr/local/bin/erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8546 30303 30303/udp
