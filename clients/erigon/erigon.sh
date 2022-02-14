@@ -113,13 +113,16 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
 
-# Launch rpcdaemon in the background
+# Launch the main client.
+FLAGS="$FLAGS --nat=none"
+echo "Running erigon with flags $FLAGS"
+$erigon $FLAGS &
+
+# Give it some time to start.
+sleep 0.3
+
+# Launch rpcdaemon.
 RPC_FLAGS="--http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,net,txpool,web3"
 RPC_FLAGS="$RPC_FLAGS --ws --datadir /erigon-hive-datadir"
 echo "Running rpcdaemon with flags $RPC_FLAGS"
-$rpcdaemon $RPC_FLAGS &
-
-# Run the client.
-FLAGS="$FLAGS --nat=none"
-echo "Running erigon with flags $FLAGS"
-$erigon $FLAGS
+$rpcdaemon $RPC_FLAGS
