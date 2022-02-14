@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/ethereum/go-ethereum v1.10.15
-	github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba
+	github.com/ethereum/hive v0.0.0-20220214133341-52d82682a461
 	github.com/kr/pretty v0.2.1
 )
 
