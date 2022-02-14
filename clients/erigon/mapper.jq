@@ -35,7 +35,7 @@ def to_bool:
     "clique": (if env.HIVE_CLIQUE_PERIOD == null then null else {
       "period": env.HIVE_CLIQUE_PERIOD|to_int,
     } end),
-    "chainId": env.HIVE_CHAIN_ID|to_int,
+    "chainId": (if env.HIVE_CHAIN_ID == null then 1 else env.HIVE_CHAIN_ID|to_int end),
     "homesteadBlock": env.HIVE_FORK_HOMESTEAD|to_int,
     "daoForkBlock": env.HIVE_FORK_DAO_BLOCK|to_int,
     "daoForkSupport": env.HIVE_FORK_DAO_VOTE|to_bool,
