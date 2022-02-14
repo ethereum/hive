@@ -18,8 +18,8 @@ ADD erigon.sh /erigon.sh
 RUN chmod +x /erigon.sh
 
 # Inject the enode id retriever script
-ADD enode.sh /enode.sh
-RUN chmod +x /enode.sh
+ADD enode.sh /hive-bin/enode.sh
+RUN chmod +x /hive-bin/enode.sh
 
 # Add dummy /version.txt
 RUN ./erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt
