@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
@@ -17,7 +16,7 @@ import (
 type CLMocker struct {
 	*hivesim.T
 	// List of Engine Clients being served by the CL Mocker
-	EngineClients []*EngineClient
+	EngineClients EngineClients
 	// Lock required so no client is offboarded during block production.
 	EngineClientsLock sync.Mutex
 
@@ -38,9 +37,8 @@ type CLMocker struct {
 	LatestForkchoice      beacon.ForkchoiceStateV1
 
 	// Merge related
-	FirstPoSBlockNumber     *big.Int
-	TTDReached              bool
-	TerminalTotalDifficulty *big.Int
+	FirstPoSBlockNumber *big.Int
+	TTDReached          bool
 
 	// Global timeout after which all procedures shall stop
 	Timeout <-chan time.Time
@@ -54,16 +52,15 @@ func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
 
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
-		T:                       t,
-		EngineClients:           make([]*EngineClient, 0),
-		RandomHistory:           map[uint64]common.Hash{},
-		ExecutedPayloadHistory:  map[uint64]beacon.ExecutableDataV1{},
-		LatestFinalizedHeader:   nil,
-		FirstPoSBlockNumber:     nil,
-		LatestFinalizedNumber:   nil,
-		TTDReached:              false,
-		TerminalTotalDifficulty: tTD,
-		NextFeeRecipient:        common.Address{},
+		T:                      t,
+		EngineClients:          make([]*EngineClient, 0),
+		RandomHistory:          map[uint64]common.Hash{},
+		ExecutedPayloadHistory: map[uint64]beacon.ExecutableDataV1{},
+		LatestFinalizedHeader:  nil,
+		FirstPoSBlockNumber:    nil,
+		LatestFinalizedNumber:  nil,
+		TTDReached:             false,
+		NextFeeRecipient:       common.Address{},
 		LatestForkchoice: beacon.ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
 			SafeBlockHash:      common.Hash{},
@@ -75,10 +72,10 @@ func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
 }
 
 // Add a Client to be kept in sync with the latest payloads
-func (cl *CLMocker) AddEngineClient(t *hivesim.T, c *hivesim.Client) {
+func (cl *CLMocker) AddEngineClient(t *hivesim.T, c *hivesim.Client, ttd *big.Int) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
-	ec := NewEngineClient(t, c)
+	ec := NewEngineClient(t, c, ttd)
 	cl.EngineClients = append(cl.EngineClients, ec)
 }
 
@@ -102,68 +99,56 @@ func (cl *CLMocker) CloseClients() {
 	}
 }
 
-// Helper struct to fetch the TotalDifficulty
-type TD struct {
-	TotalDifficulty *hexutil.Big `json:"totalDifficulty"`
-}
-
-// Wait until the TTD is reached by the client.
-func (cl *CLMocker) waitForTTD() {
-	if cl.TTDReached {
-		return
+// Sets the specified client's chain head as Terminal PoW block by sending the initial forkchoiceUpdated.
+func (cl *CLMocker) setTTDBlockClient(ec *EngineClient) {
+	var td *TotalDifficultyHeader
+	if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
+		cl.Fatalf("CLMocker: Could not get latest header: %v", err)
 	}
-	for {
-		select {
-		case <-time.After(tTDCheckPeriod):
-			if len(cl.EngineClients) == 0 {
-				cl.Fatalf("CLMocker: Waiting for TTD without clients")
-			}
-			// Pick a random client to get the total difficulty of its head
-			ec := cl.EngineClients[rand.Intn(len(cl.EngineClients))]
+	if td == nil {
+		cl.Fatalf("CLMocker: Returned TotalDifficultyHeader is invalid: %v", td)
+	}
+	cl.Logf("CLMocker: Returned TotalDifficultyHeader: %v", td)
 
-			var td *TD
-			if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
-				cl.Fatalf("CLMocker: Could not get latest totalDifficulty: %v", err)
-			}
-			if td.TotalDifficulty.ToInt().Cmp(cl.TerminalTotalDifficulty) < 0 {
-				// TTD not reached yet
-				continue
-			}
+	if td.TotalDifficulty.ToInt().Cmp(ec.TerminalTotalDifficulty) < 0 {
+		cl.Fatalf("CLMocker: Attempted to set TTD Block when TTD had not been reached: %v > %v", ec.TerminalTotalDifficulty, td.TotalDifficulty.ToInt())
+	}
 
-			var err error
-			cl.TTDReached = true
-			cl.LatestFinalizedHeader, err = ec.Eth.HeaderByNumber(ec.Ctx(), nil)
-			if err != nil {
-				cl.Fatalf("CLMocker: Could not get block header: %v", err)
-			}
+	cl.LatestFinalizedHeader = &td.Header
+	cl.TTDReached = true
+	cl.Logf("CLMocker: TTD has been reached at block %v (%v>=%v)\n", cl.LatestFinalizedHeader.Number, td.TotalDifficulty.ToInt(), ec.TerminalTotalDifficulty)
 
-			cl.Logf("CLMocker: TTD has been reached at block %v (%v>=%v)\n", cl.LatestFinalizedHeader.Number, td.TotalDifficulty, cl.TerminalTotalDifficulty)
-			// Broadcast initial ForkchoiceUpdated
-			cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
-			cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
-			cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
-			cl.LatestFinalizedNumber = cl.LatestFinalizedHeader.Number
-			anySuccess := false
-			for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-				if resp.Error != nil {
-					cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
-				} else {
-					if resp.ForkchoiceResponse.PayloadStatus.Status == "VALID" {
-						anySuccess = true
-					} else {
-						cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
-					}
-				}
+	// Broadcast initial ForkchoiceUpdated
+	cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
+	cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
+	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
+	cl.LatestFinalizedNumber = cl.LatestFinalizedHeader.Number
+	anySuccess := false
+	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
+		if resp.Error != nil {
+			cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
+		} else {
+			if resp.ForkchoiceResponse.PayloadStatus.Status == "VALID" {
+				anySuccess = true
+			} else {
+				cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
 			}
-			if !anySuccess {
-				cl.Fatalf("CLMocker: None of the clients accepted forkchoiceUpdated")
-			}
-			return
-		case <-cl.Timeout:
-			cl.Fatalf("CLMocker: Timeout while waiting for TTD")
-			return
 		}
 	}
+	if !anySuccess {
+		cl.Fatalf("CLMocker: None of the clients accepted forkchoiceUpdated")
+	}
+}
+
+// This method waits for TTD in at least one of the clients, then sends the
+// initial forkchoiceUpdated with the info obtained from the client.
+func (cl *CLMocker) waitForTTD() {
+	ec := cl.EngineClients.waitForTTD(cl.Timeout)
+	if ec == nil {
+		cl.Fatalf("CLMocker: Timeout while waiting for TTD")
+	}
+	// One of the clients has reached TTD, send the initial fcU with this client as head
+	cl.setTTDBlockClient(ec)
 }
 
 // Check whether a block number is a PoS block

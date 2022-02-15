@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/beacon"
@@ -22,9 +24,10 @@ var EnginePortWS = 8546
 type EngineClient struct {
 	*hivesim.T
 	*hivesim.Client
-	c   *rpc.Client
-	Eth *ethclient.Client
-	IP  net.IP
+	c                       *rpc.Client
+	Eth                     *ethclient.Client
+	IP                      net.IP
+	TerminalTotalDifficulty *big.Int
 
 	// This holds most recent context created by the Ctx method.
 	// Every time Ctx is called, it creates a new context with the default
@@ -33,8 +36,10 @@ type EngineClient struct {
 	lastCancel context.CancelFunc
 }
 
+type EngineClients []*EngineClient
+
 // NewClient creates a engine client that uses the given RPC client.
-func NewEngineClient(t *hivesim.T, hc *hivesim.Client) *EngineClient {
+func NewEngineClient(t *hivesim.T, hc *hivesim.Client, ttd *big.Int) *EngineClient {
 	client := &http.Client{
 		Transport: &loggingRoundTrip{
 			t:     t,
@@ -55,11 +60,79 @@ func NewEngineClient(t *hivesim.T, hc *hivesim.Client) *EngineClient {
 	}
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", hc.IP), client)
 	eth := ethclient.NewClient(rpcClient)
-	return &EngineClient{t, hc, rpcHttpClient, eth, hc.IP, nil, nil}
+	return &EngineClient{
+		T:                       t,
+		Client:                  hc,
+		c:                       rpcHttpClient,
+		Eth:                     eth,
+		IP:                      hc.IP,
+		TerminalTotalDifficulty: ttd,
+		lastCtx:                 nil,
+		lastCancel:              nil,
+	}
 }
 
 func (ec *EngineClient) Equals(ec2 *EngineClient) bool {
 	return ec.Container == ec2.Container
+}
+
+func (ec *EngineClient) checkTTD() bool {
+	var td *TotalDifficultyHeader
+	if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
+		panic(err)
+	}
+	return td.TotalDifficulty.ToInt().Cmp(ec.TerminalTotalDifficulty) >= 0
+}
+
+// Wait until the TTD is reached by a single client.
+func (ec *EngineClient) waitForTTD(done chan<- *EngineClient, cancel <-chan interface{}) {
+	for {
+		select {
+		case <-time.After(tTDCheckPeriod):
+			if ec.checkTTD() {
+				select {
+				case done <- ec:
+				case <-cancel:
+				}
+				return
+			}
+		case <-cancel:
+			return
+		}
+	}
+}
+
+// Wait until the TTD is reached by a single client with a timeout.
+// Returns true if the TTD has been reached, false when timeout occurred.
+func (ec *EngineClient) waitForTTDWithTimeout(timeout <-chan time.Time) bool {
+	for {
+		select {
+		case <-time.After(tTDCheckPeriod):
+			if ec.checkTTD() {
+				return true
+			}
+		case <-timeout:
+			return false
+		}
+	}
+}
+
+// Wait until the TTD is reached by any of the engine clients
+func (ecs EngineClients) waitForTTD(timeout <-chan time.Time) *EngineClient {
+	done := make(chan *EngineClient)
+	cancel := make(chan interface{})
+	defer func() {
+		close(cancel)
+	}()
+	for _, ec := range ecs {
+		go ec.waitForTTD(done, cancel)
+	}
+	select {
+	case ec := <-done:
+		return ec
+	case <-timeout:
+		return nil
+	}
 }
 
 func (ec *EngineClient) Close() {

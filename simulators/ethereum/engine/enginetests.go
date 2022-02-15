@@ -1080,7 +1080,7 @@ func outOfOrderPayloads(t *TestEnv) {
 		t.Fatalf("FAIL (%s): Unable to obtain all client types", t.TestName)
 	}
 	for _, client := range allClients {
-		_, ec, err := t.StartClient(client, t.ClientParams)
+		_, ec, err := t.StartClient(client, t.ClientParams, t.MainTTD())
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to start client (%v): %v", t.TestName, client, err)
 		}
@@ -1314,17 +1314,16 @@ func postMergeSync(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to obtain bootnode: %v", t.TestName, err)
 	}
-	newParams := clientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", t.CLMock.TerminalTotalDifficulty.Int64()))
-	newParams = newParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
+	newParams := t.ClientParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
 	newParams = newParams.Set("HIVE_MINER", "")
 
 	for _, client := range allClients {
-		c, ec, err := t.StartClient(client, newParams)
+		c, ec, err := t.StartClient(client, newParams, t.MainTTD())
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to start client (%v): %v", t.TestName, client, err)
 		}
 		// Add engine client and broadcast to it the latest forkchoice
-		t.CLMock.AddEngineClient(t.T, c)
+		t.CLMock.AddEngineClient(t.T, c, t.MainTTD())
 		t.CLMock.broadcastLatestForkchoice()
 	syncLoop:
 		for {
@@ -1345,38 +1344,3 @@ func postMergeSync(t *TestEnv) {
 		}
 	}
 }
-
-/*
-func mismatchedTTDClientSync(t *TestEnv) {
-	// Launch another client with a higher TTD configuration,
-	// all executed payloads in the main client should be properly rejected.
-	allClients, err := t.Sim.ClientTypes()
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to obtain all client types", t.TestName)
-	}
-	// Set the new TTD + Bootnode
-	newParams := clientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", t.CLMock.TerminalTotalDifficulty.Add(t.CLMock.TerminalTotalDifficulty, big.NewInt(2)).Uint64()))
-	enode, err := t.Engine.EnodeURL()
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to obtain bootnode", err)
-	}
-	newParams = newParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
-
-	for _, client := range allClients {
-		c2 := t.StartClient(client, newParams, files)
-		ec := NewEngineClient(t.T, c2)
-		for i := 0; i < 10; i++ {
-			// Try running 10 payloads, all based on an chain with an apparent invalid TTD
-			select {
-			case <-t.CLMock.OnGetPayload:
-				t.CLMock.OnGetPayload.Yield()
-			case <-t.CLMock.OnExit:
-				t.Fatalf("FAIL (%s): CLMocker stopped producing blocks", t.TestName)
-			case <-t.Timeout:
-				t.Fatalf("FAIL (%s): Test timeout", t.TestName)
-			}
-		}
-
-	}
-}
-*/

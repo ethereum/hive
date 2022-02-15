@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -205,4 +206,23 @@ func loadGenesis(path string) core.Genesis {
 func loadGenesisBlock(path string) *types.Block {
 	genesis := loadGenesis(path)
 	return genesis.ToBlock(nil)
+}
+
+// Helper structs to fetch the TotalDifficulty
+type TD struct {
+	TotalDifficulty *hexutil.Big `json:"totalDifficulty"`
+}
+type TotalDifficultyHeader struct {
+	types.Header
+	TD
+}
+
+func (tdh *TotalDifficultyHeader) UnmarshalJSON(data []byte) error {
+	if err := json.Unmarshal(data, &tdh.Header); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &tdh.TD); err != nil {
+		return err
+	}
+	return nil
 }

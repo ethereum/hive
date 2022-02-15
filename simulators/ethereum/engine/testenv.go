@@ -31,9 +31,6 @@ type TestEnv struct {
 	Eth    *ethclient.Client
 	Engine *EngineClient
 
-	// PoW Chain TerminalTotalDifficulty
-	TTD *big.Int
-
 	// Consensus Layer Mocker Instance
 	CLMock *CLMocker
 
@@ -64,7 +61,7 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 	}()
 
 	// Add main client to CLMocker
-	clMocker.AddEngineClient(t, c)
+	clMocker.AddEngineClient(t, c, ttd)
 
 	// This sets up debug logging of the requests and responses.
 	client := &http.Client{
@@ -76,7 +73,7 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 	}
 
 	// Create Engine client from main hivesim.Client to be used by tests
-	ec := NewEngineClient(t, c)
+	ec := NewEngineClient(t, c, ttd)
 	defer ec.Close()
 
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
@@ -84,7 +81,6 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 	env := &TestEnv{
 		T:            t,
 		TestName:     testName,
-		TTD:          ttd,
 		RPC:          rpcClient,
 		Eth:          ethclient.NewClient(rpcClient),
 		Engine:       ec,
@@ -127,9 +123,13 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 	fn(env)
 }
 
-func (t *TestEnv) StartClient(clientDef *hivesim.ClientDefinition, params hivesim.Params) (*hivesim.Client, *EngineClient, error) {
-	c := t.T.StartClient(clientDef.Name, params)
-	ec := NewEngineClient(t.T, c)
+func (t *TestEnv) MainTTD() *big.Int {
+	return t.Engine.TerminalTotalDifficulty
+}
+
+func (t *TestEnv) StartClient(clientDef *hivesim.ClientDefinition, params hivesim.Params, ttd *big.Int) (*hivesim.Client, *EngineClient, error) {
+	c := t.T.StartClient(clientDef.Name, params, hivesim.WithStaticFiles(t.ClientFiles))
+	ec := NewEngineClient(t.T, c, ttd)
 	return c, ec, nil
 }
 
