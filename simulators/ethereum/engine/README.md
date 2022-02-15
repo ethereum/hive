@@ -47,7 +47,7 @@ General positive and negative test cases based on the description in https://git
 
 ### Engine API Negative Test Cases:
 - Invalid Terminal Block in ForkchoiceUpdated:  
-Client should reject Engine directives if the referenced HeadBlockHash does not meet the TTD requirement.
+Client should reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
 
 - Invalid GetPayload Under PoW:  
 Client must reject GetPayload directives under PoW.
@@ -62,18 +62,18 @@ Perform a forkchoiceUpdated call with an unknown (random) HeadBlockHash, the cli
 Perform a forkchoiceUpdated call with an unknown (random) SafeBlockHash, the client should throw an error since the hash is not an ancestor to the HeadBlockHash.
 
 - Unknown FinalizedBlockHash:  
-Perform a forkchoiceUpdated call with an unknown (random) FinalizedBlockHash, the client should initiate the syncing process.
+Perform a forkchoiceUpdated call with an unknown (random) FinalizedBlockHash, the client should throw an error.
 
 - Pre-TTD Block Hash:  
-Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified)
+Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified, but should not produce unrecoverable error)
 
-- Bad blockhash on ExecutePayload:  
-Send an ExecutePayload directive to the client including an incorrect BlockHash, should result in an error.
+- Bad blockhash on NewPayload:  
+Send a NewPayload directive to the client including an incorrect BlockHash, should result in an error.
 
-- ParentHash==BlockHash on ExecutePayload:  
-Send an ExecutePayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
+- ParentHash==BlockHash on NewPayload:  
+Send a NewPayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
 
-- Invalid Field in ExecutePayload:  
+- Invalid Field in NewPayload:  
 Modify fields of the ExecutablePayload while maintaining a valid BlockHash, including:
    - ParentHash
    - StateRoot
@@ -84,11 +84,11 @@ Modify fields of the ExecutablePayload while maintaining a valid BlockHash, incl
    - Timestamp
 
 ### Eth RPC Status on ForkchoiceUpdated Events:
-- Latest Block after ExecutePayload:  
+- Latest Block after NewPayload:  
 Verify the Block returned by the Eth RPC after a new payload is executed. Eth RPC should still return previous block.
 
 - Latest Block after New HeadBlock:  
-Verify the Block returned by the Eth RPC after a new HeadBlockHash is set using forkchoiceUpdated. Eth RPC should still return previous block.
+Verify the Block returned by the Eth RPC after a new HeadBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
 
 - Latest Block after New SafeBlock:  
 Verify the Block returned by the Eth RPC after a new SafeBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
@@ -101,7 +101,7 @@ Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBl
 
 ### Payload Execution
 - Re-Execute Payload:  
-Re-execute already executed payloads and verify that no errors occur.
+Re-execute already executed payloads (10) and verify that no errors occur.
 
 - Multiple New Payloads Extending Canonical Chain:  
 Send 80 valid NewPayload directives extending the canonical chain. Only one of the payloads is selected using ForkchoiceUpdated directive.
@@ -135,46 +135,51 @@ Launch a second client and verify that it successfully syncs to the first client
 
 ## Engine API Merge Tests:
 
-Test cases using multiple Proof of Work chains to test the client's behavior when the Terminal Total Difficulty is reached and the Engine API takes over.
+Test cases using multiple Proof of Work chains to test the client's behavior when the Terminal Total Difficulty is reached by two different blocks simultaneously and the Engine API takes over.
 
-- Single Block Re-org to Higher-Total-Difficulty Chain, Equal Height:  
+- Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height:  
 Client 1 starts with chain G -> A, Client 2 starts with chain G -> B.  
 Blocks A and B reach TTD, but block B has higher difficulty than A.  
 ForkchoiceUpdated is sent to Client 1 with A as Head.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
-Verification is made that Client A Re-orgs to chain G -> B.  
+Verification is made that Client 1 Re-orgs to chain G -> B.  
 
-- Single Block Re-org to Lower-Total-Difficulty Chain, Equal Height:  
+- Single Block PoW Re-org to Lower-Total-Difficulty Chain, Equal Height:  
 Client 1 starts with chain G -> A, Client 2 starts with chain G -> B.  
 Blocks A and B reach TTD, but block A has higher difficulty than B.  
 ForkchoiceUpdated is sent to Client 1 with A as Head.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
-Verification is made that Client A Re-orgs to chain G -> B.  
+Verification is made that Client 1 Re-orgs to chain G -> B.  
 
-- Two Block Re-org to Higher-Total-Difficulty Chain, Equal Height:  
+- Two Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height:  
 Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C -> D.  
 Blocks B and D reach TTD, but block D has higher total difficulty than B.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
 ForkchoiceUpdated is sent to Client 1 with D as Head.  
-Verification is made that Client A Re-orgs to chain G -> C -> D.  
+Verification is made that Client 1 Re-orgs to chain G -> C -> D.  
 
-- Two Block Re-org to Lower-Total-Difficulty Chain, Equal Height:  
+- Two Block PoW Re-org to Lower-Total-Difficulty Chain, Equal Height:  
 Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C -> D.  
 Blocks B and D reach TTD, but block B has higher total difficulty than D.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
 ForkchoiceUpdated is sent to Client 1 with D as Head.  
-Verification is made that Client A Re-orgs to chain G -> C -> D.  
+Verification is made that Client 1 Re-orgs to chain G -> C -> D.  
 
-- Two Block Re-org to Higher-Height Chain:  
+- Two Block PoW Re-org to Higher-Height Chain:  
 Client 1 starts with chain G -> A, Client 2 starts with chain G -> B -> C.  
 Blocks A and C reach TTD, but block C has higher height than A.  
 ForkchoiceUpdated is sent to Client 1 with A as Head.  
 ForkchoiceUpdated is sent to Client 1 with C as Head.  
-Verification is made that Client A Re-orgs to chain G -> B -> C.  
+Verification is made that Client 1 Re-orgs to chain G -> B -> C.  
 
-- Two Block Re-org to Lower-Height Chain:  
+- Two Block PoW Re-org to Lower-Height Chain:  
  Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C.  
  Blocks B and C reach TTD, but block B has higher height than C.  
  ForkchoiceUpdated is sent to Client 1 with B as Head.  
  ForkchoiceUpdated is sent to Client 1 with C as Head.  
- Verification is made that Client A Re-orgs to chain G -> C.  
+ Verification is made that Client 1 Re-orgs to chain G -> C.  
+
+- Halt following PoW chain:  
+ Client 1 starts with chain G -> A, Client 2 starts with chain G -> A -> B.  
+ Block A reaches TTD, but Client 2 has a higher TTD and accepts block B (simulating a client not complying with the merge).  
+ Verification is made that Client 1 does not follow Client 2 chain to block B.  
