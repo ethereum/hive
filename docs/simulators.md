@@ -45,7 +45,7 @@ This is the list of all environment variables that hive sets when launching simu
 |---------------------|----------------------------------------------|---------------------|
 | `HIVE_SIMULATOR`    | URL of the API server                        |                     |
 | `HIVE_TEST_PATTERN` | Regular expression, selects suites/tests     | `--sim.limit`       |
-| `HIVE_PARALLELISM`  | Integer, sets test concurrency.              | `--sim.parallelism` |
+| `HIVE_PARALLELISM`  | Integer, sets test concurrency               | `--sim.parallelism` |
 | `HIVE_LOGLEVEL`     | Decimal 0-5, configures simulator log levels | `--sim.loglevel`    |
 
 ## Writing Simulators in Go
