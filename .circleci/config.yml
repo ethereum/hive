@@ -23,7 +23,8 @@ jobs:
   # machine instead of the container-based build environment because
   # hive needs to be able to talk to the docker containers it creates.
   smoke-tests:
-    machine: true
+    machine:
+      image: ubuntu-2004:202201-02
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
