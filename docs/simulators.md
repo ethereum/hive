@@ -37,6 +37,17 @@ results of the other tests as individual test cases.
 The simulator must report the results of all running test cases before ending the test
 suite.
 
+### Simulator Environment Variables
+
+This is the list of all environment variables that hive sets when launching simulators.
+
+| Variable            | Meaning                                      | Hive Flag           |
+|---------------------|----------------------------------------------|---------------------|
+| `HIVE_SIMULATOR`    | URL of the API server                        |                     |
+| `HIVE_TEST_PATTERN` | Regular expression, selects suites/tests     | `--sim.limit`       |
+| `HIVE_PARALLELISM`  | Integer, sets test concurrency.              | `--sim.parallelism` |
+| `HIVE_LOGLEVEL`     | Decimal 0-5, configures simulator log levels | `--sim.loglevel`    |
+
 ## Writing Simulators in Go
 
 While simulators may be written in any language (they're just docker containers after
