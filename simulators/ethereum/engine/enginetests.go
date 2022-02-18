@@ -55,45 +55,45 @@ var engineTests = []TestSpec{
 		TTD:  2,
 	},
 	{
-		Name: "Bad Hash on ExecutePayload",
+		Name: "Bad Hash on NewPayload",
 		Run:  badHashOnExecPayload,
 	},
 	{
-		Name: "ParentHash==BlockHash on ExecutePayload",
+		Name: "ParentHash==BlockHash on NewPayload",
 		Run:  parentHashOnExecPayload,
 	},
 	{
-		Name: "Invalid ParentHash ExecutePayload",
+		Name: "Invalid ParentHash NewPayload",
 		Run:  invalidPayloadTestCaseGen("ParentHash"),
 	},
 	{
-		Name: "Invalid StateRoot ExecutePayload",
+		Name: "Invalid StateRoot NewPayload",
 		Run:  invalidPayloadTestCaseGen("StateRoot"),
 	},
 	{
-		Name: "Invalid ReceiptsRoot ExecutePayload",
+		Name: "Invalid ReceiptsRoot NewPayload",
 		Run:  invalidPayloadTestCaseGen("ReceiptsRoot"),
 	},
 	{
-		Name: "Invalid Number ExecutePayload",
+		Name: "Invalid Number NewPayload",
 		Run:  invalidPayloadTestCaseGen("Number"),
 	},
 	{
-		Name: "Invalid GasLimit ExecutePayload",
+		Name: "Invalid GasLimit NewPayload",
 		Run:  invalidPayloadTestCaseGen("GasLimit"),
 	},
 	{
-		Name: "Invalid GasUsed ExecutePayload",
+		Name: "Invalid GasUsed NewPayload",
 		Run:  invalidPayloadTestCaseGen("GasUsed"),
 	},
 	{
-		Name: "Invalid Timestamp ExecutePayload",
+		Name: "Invalid Timestamp NewPayload",
 		Run:  invalidPayloadTestCaseGen("Timestamp"),
 	},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{
-		Name: "Latest Block after ExecutePayload",
+		Name: "Latest Block after NewPayload",
 		Run:  blockStatusExecPayload,
 	},
 	{
@@ -197,7 +197,7 @@ func invalidGetPayloadUnderPoW(t *TestEnv) {
 func invalidTerminalBlockNewPayload(t *TestEnv) {
 	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
 
-	// Create a dummy payload to send in the ExecutePayload call
+	// Create a dummy payload to send in the NewPayload call
 	payload := beacon.ExecutableDataV1{
 		ParentHash:    gblock.Hash(),
 		FeeRecipient:  common.Address{},
@@ -236,7 +236,7 @@ func invalidTerminalBlockNewPayload(t *TestEnv) {
 	// ValidationError is not validated since it can be either null or a string message
 }
 
-// Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using ExecutePayload) and unknown SafeBlock
+// Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using NewPayload) and unknown SafeBlock
 // results in error
 func unknownSafeBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
@@ -271,7 +271,7 @@ func unknownSafeBlockHash(t *TestEnv) {
 
 }
 
-// Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using ExecutePayload) and unknown
+// Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using NewPayload) and unknown
 // FinalizedBlockHash results in error
 func unknownFinalizedBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
@@ -459,7 +459,7 @@ func parentHashOnExecPayload(t *TestEnv) {
 
 }
 
-// Generate test cases for each field of ExecutePayload, where the payload contains a single invalid field and a valid hash.
+// Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
 func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 	return func(t *TestEnv) {
 		// Wait until TTD is reached by this client
@@ -797,6 +797,9 @@ func blockStatusReorg(t *TestEnv) {
 func transactionReorg(t *TestEnv) {
 	// Wait until this client catches up with latest PoS
 	t.CLMock.waitForTTD()
+
+	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
+	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
 
 	// Create transactions that modify the state in order to check after the reorg.
 	var (
@@ -1339,23 +1342,26 @@ func postMergeSync(t *TestEnv) {
 		}
 		// Add engine client and broadcast to it the latest forkchoice
 		t.CLMock.AddEngineClient(t.T, c, t.MainTTD())
-		t.CLMock.broadcastLatestForkchoice()
 	syncLoop:
 		for {
 			select {
-			case <-time.After(time.Second):
-				bn, err := ec.Eth.BlockNumber(t.Ctx())
-				if err != nil {
-					t.Fatalf("FAIL (%s): Unable to obtain latest block", t.TestName)
-				}
-				if t.CLMock.LatestFinalizedNumber != nil && bn >= t.CLMock.LatestFinalizedNumber.Uint64() {
-					t.Logf("INFO (%v): Client (%v) is now synced to latest PoS block", t.TestName, c.Container)
-					break syncLoop
-				}
 			case <-t.Timeout:
 				t.Fatalf("FAIL (%s): Test timeout", t.TestName)
+			default:
 			}
 
+			// CL continues building blocks on top of the PoS chain
+			t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+
+			// When the main client syncs, the test passes
+			latestHeader, err := ec.Eth.HeaderByNumber(t.Ctx(), nil)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to obtain latest header: %v", t.TestName, err)
+			}
+			if t.CLMock.LatestFinalizedHeader != nil && latestHeader.Hash() == t.CLMock.LatestFinalizedHeader.Hash() {
+				t.Logf("INFO (%v): Client (%v) is now synced to latest PoS block: %v", t.TestName, c.Container, latestHeader.Hash())
+				break syncLoop
+			}
 		}
 	}
 }
