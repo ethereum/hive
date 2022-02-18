@@ -1277,11 +1277,26 @@ func randomOpcodeTx(t *TestEnv) {
 	}
 
 	// Send transactions now past TTD, the value of the storage in these blocks must match the random value
-	t.CLMock.produceBlocks(10, BlockProcessCallbacks{
+	var (
+		txCount        = 10
+		currentTxIndex = 0
+		txs            = make([]*types.Transaction, 0)
+	)
+	t.CLMock.produceBlocks(txCount, BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			tx := t.makeNextTransaction(randomContractAddr, big0, nil)
 			if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 				t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
+			}
+			txs = append(txs, tx)
+			currentTxIndex++
+		},
+		OnHeadBlockForkchoiceBroadcast: func() {
+			// Check the transaction tracing, which is client specific
+			expectedRandom := t.CLMock.RandomHistory[t.CLMock.LatestFinalizedHeader.Number.Uint64()+1]
+			if err := debugRandomTransaction(t.Engine.Ctx(), t.RPC, t.Engine.Client.Type, txs[currentTxIndex-1],
+				&expectedRandom); err != nil {
+				t.Fatalf("FAIL (%s): Error during transaction tracing: %v", t.TestName, err)
 			}
 		},
 	})

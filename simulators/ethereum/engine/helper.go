@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -16,6 +17,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/hivesim"
 )
@@ -189,6 +191,80 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 		BlockHash:     customPayloadHeader.Hash(),
 		Transactions:  txs,
 	}, nil
+}
+
+// Use client specific rpc methods to debug a transaction that includes the RANDOM opcode
+func debugRandomTransaction(ctx context.Context, c *rpc.Client, clientType string, tx *types.Transaction, expectedRandom *common.Hash) error {
+	switch clientType {
+	case "merge-go-ethereum":
+		return gethDebugRandomTransaction(ctx, c, tx, expectedRandom)
+	case "go-ethereum":
+		return gethDebugRandomTransaction(ctx, c, tx, expectedRandom)
+	case "merge-nethermind":
+		return nethermindDebugRandomTransaction(ctx, c, tx, expectedRandom)
+	case "nethermind":
+		return nethermindDebugRandomTransaction(ctx, c, tx, expectedRandom)
+	}
+	fmt.Printf("debug_traceTransaction, no method to test client type %v", clientType)
+	return nil
+}
+
+func gethDebugRandomTransaction(ctx context.Context, c *rpc.Client, tx *types.Transaction, expectedRandom *common.Hash) error {
+	type StructLogRes struct {
+		Pc      uint64             `json:"pc"`
+		Op      string             `json:"op"`
+		Gas     uint64             `json:"gas"`
+		GasCost uint64             `json:"gasCost"`
+		Depth   int                `json:"depth"`
+		Error   string             `json:"error,omitempty"`
+		Stack   *[]string          `json:"stack,omitempty"`
+		Memory  *[]string          `json:"memory,omitempty"`
+		Storage *map[string]string `json:"storage,omitempty"`
+	}
+
+	type ExecutionResult struct {
+		Gas         uint64         `json:"gas"`
+		Failed      bool           `json:"failed"`
+		ReturnValue string         `json:"returnValue"`
+		StructLogs  []StructLogRes `json:"structLogs"`
+	}
+
+	var er *ExecutionResult
+	if err := c.CallContext(ctx, &er, "debug_traceTransaction", tx.Hash()); err != nil {
+		return err
+	}
+	if er == nil {
+		return errors.New("debug_traceTransaction returned empty result")
+	}
+	randomFound := false
+	for i, l := range er.StructLogs {
+		if l.Op == "DIFFICULTY" || l.Op == "RANDOM" {
+			if i+1 >= len(er.StructLogs) {
+				return errors.New(fmt.Sprintf("No information after RANDOM operation"))
+			}
+			randomFound = true
+			stack := *(er.StructLogs[i+1].Stack)
+			if len(stack) < 1 {
+				return errors.New(fmt.Sprintf("Invalid stack after RANDOM operation: %v", l.Stack))
+			}
+			stackHash := common.HexToHash(stack[0])
+			if stackHash != *expectedRandom {
+				return errors.New(fmt.Sprintf("Invalid stack after RANDOM operation, %v != %v", stackHash, expectedRandom))
+			}
+		}
+	}
+	if !randomFound {
+		return errors.New("RANDOM opcode not found")
+	}
+	return nil
+}
+
+func nethermindDebugRandomTransaction(ctx context.Context, c *rpc.Client, tx *types.Transaction, expectedRandom *common.Hash) error {
+	var er *interface{}
+	if err := c.CallContext(ctx, &er, "trace_transaction", tx.Hash()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func loadGenesis(path string) core.Genesis {
