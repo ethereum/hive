@@ -321,8 +321,8 @@ github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymF
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
-github.com/ethereum/hive v0.0.0-20220202182836-b91b7d136d82 h1:UAZFucT3azefKPsXZutB7fB6oZHAY5+2+I883xXPKRo=
-github.com/ethereum/hive v0.0.0-20220202182836-b91b7d136d82/go.mod h1:xptEyWnRW33B208ZrXXvkDpnP/BCvsigi/vir2TxruM=
+github.com/ethereum/hive v0.0.0-20220216101708-2784ea3e7eea h1:B41/UTJw3AV/zXFNgh2rrF+UvW2T0cZSfufgSKWk2+0=
+github.com/ethereum/hive v0.0.0-20220216101708-2784ea3e7eea/go.mod h1:xptEyWnRW33B208ZrXXvkDpnP/BCvsigi/vir2TxruM=
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5 h1:FtmdgXiUlNeRsoNMFlKLDt+S+6hbjVMEW6RGQ7aUf7c=
