@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 )
@@ -89,6 +91,26 @@ var engineTests = []TestSpec{
 	{
 		Name: "Invalid Timestamp NewPayload",
 		Run:  invalidPayloadTestCaseGen("Timestamp"),
+	},
+	{
+		Name: "Invalid Transaction Signature NewPayload",
+		Run:  invalidPayloadTestCaseGen("Transaction/Signature"),
+	},
+	{
+		Name: "Invalid Transaction Nonce NewPayload",
+		Run:  invalidPayloadTestCaseGen("Transaction/Nonce"),
+	},
+	{
+		Name: "Invalid Transaction GasPrice NewPayload",
+		Run:  invalidPayloadTestCaseGen("Transaction/GasPrice"),
+	},
+	{
+		Name: "Invalid Transaction Gas NewPayload",
+		Run:  invalidPayloadTestCaseGen("Transaction/Gas"),
+	},
+	{
+		Name: "Invalid Transaction Value NewPayload",
+		Run:  invalidPayloadTestCaseGen("Transaction/Value"),
 	},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
@@ -465,67 +487,138 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		// Wait until TTD is reached by this client
 		t.CLMock.waitForTTD()
 
+		txFunc := func() {
+			// Function to send at least one transaction each block produced
+			recipient := common.Address{}
+			rand.Read(recipient[:])
+			tx := t.makeNextTransaction(recipient, big1, nil)
+			if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
+				t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
+			}
+		}
+
 		// Produce blocks before starting the test
-		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		t.CLMock.produceBlocks(5, BlockProcessCallbacks{
+			// Make sure at least one transaction is included in each block
+			OnPayloadProducerSelected: txFunc,
+		})
 
 		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			// Make sure at least one transaction is included in the payload
+			OnPayloadProducerSelected: txFunc,
 			// Run test after the new payload has been obtained
 			OnGetPayload: func() {
 
 				// Alter the payload while maintaining a valid hash and send it to the client, should produce an error
 				basePayload := t.CLMock.LatestPayloadBuilt
-				customPayloadMods := make(map[string]CustomPayloadData)
-				customPayloadMods["ParentHash"] = CustomPayloadData{
-					ParentHash: func() *common.Hash {
-						modParentHash := basePayload.ParentHash
-						modParentHash[common.HashLength-1] = byte(255 - modParentHash[common.HashLength-1])
-						return &modParentHash
-					}(),
-				}
-				customPayloadMods["StateRoot"] = CustomPayloadData{
-					StateRoot: func() *common.Hash {
-						modStateRoot := basePayload.StateRoot
-						modStateRoot[common.HashLength-1] = byte(255 - modStateRoot[common.HashLength-1])
-						return &modStateRoot
-					}(),
+				var customPayloadMod *CustomPayloadData
+				payloadFieldSplit := strings.Split(payloadField, "/")
+				switch payloadFieldSplit[0] {
+				case "ParentHash":
+					modParentHash := basePayload.ParentHash
+					modParentHash[common.HashLength-1] = byte(255 - modParentHash[common.HashLength-1])
+					customPayloadMod = &CustomPayloadData{
+						ParentHash: &modParentHash,
+					}
+				case "StateRoot":
+					modStateRoot := basePayload.StateRoot
+					modStateRoot[common.HashLength-1] = byte(255 - modStateRoot[common.HashLength-1])
+					customPayloadMod = &CustomPayloadData{
+						StateRoot: &modStateRoot,
+					}
+				case "ReceiptsRoot":
+					modReceiptsRoot := basePayload.ReceiptsRoot
+					modReceiptsRoot[common.HashLength-1] = byte(255 - modReceiptsRoot[common.HashLength-1])
+					customPayloadMod = &CustomPayloadData{
+						ReceiptsRoot: &modReceiptsRoot,
+					}
+				case "Number":
+					modNumber := basePayload.Number - 1
+					customPayloadMod = &CustomPayloadData{
+						Number: &modNumber,
+					}
+				case "GasLimit":
+					modGasLimit := basePayload.GasLimit * 2
+					customPayloadMod = &CustomPayloadData{
+						GasLimit: &modGasLimit,
+					}
+				case "GasUsed":
+					modGasUsed := basePayload.GasUsed - 1
+					customPayloadMod = &CustomPayloadData{
+						GasUsed: &modGasUsed,
+					}
+				case "Timestamp":
+					modTimestamp := basePayload.Timestamp - 1
+					customPayloadMod = &CustomPayloadData{
+						Timestamp: &modTimestamp,
+					}
+				case "Transaction":
+					if len(payloadFieldSplit) < 2 {
+						t.Fatalf("FAIL (%s): No transaction field specified: %s", t.TestName, payloadField)
+					}
+					if len(basePayload.Transactions) == 0 {
+						t.Fatalf("FAIL (%s): No transactions available for modification", t.TestName)
+					}
+					var baseTx types.Transaction
+					if err := baseTx.UnmarshalBinary(basePayload.Transactions[0]); err != nil {
+						t.Fatalf("FAIL (%s): Unable to unmarshal binary tx: %v", t.TestName, err)
+					}
+					var customTxData CustomTransactionData
+					switch payloadFieldSplit[1] {
+					case "Signature":
+						modifiedSignature := SignatureValuesFromRaw(baseTx.RawSignatureValues())
+						modifiedSignature.R = modifiedSignature.R.Sub(modifiedSignature.R, big1)
+						customTxData = CustomTransactionData{
+							Signature: &modifiedSignature,
+						}
+					case "Nonce":
+						customNonce := baseTx.Nonce() - 1
+						customTxData = CustomTransactionData{
+							Nonce: &customNonce,
+						}
+					case "Gas":
+						customGas := uint64(0)
+						customTxData = CustomTransactionData{
+							Gas: &customGas,
+						}
+					case "GasPrice":
+						customTxData = CustomTransactionData{
+							GasPrice: big0,
+						}
+					case "Value":
+						// Vault account initially has 0x123450000000000000000, so this value should overflow
+						customValue, err := hexutil.DecodeBig("0x123450000000000000001")
+						if err != nil {
+							t.Fatalf("FAIL (%s): Unable to prepare custom tx value: %v", t.TestName, err)
+						}
+						customTxData = CustomTransactionData{
+							Value: customValue,
+						}
+					}
+
+					modifiedTx, err := customizeTransaction(&baseTx, vaultKey, &customTxData)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Unable to modify tx: %v", t.TestName, err)
+					}
+					t.Logf("INFO (%s): Modified tx %v / original tx %v", t.TestName, baseTx, modifiedTx)
+
+					modifiedTxBytes, err := modifiedTx.MarshalBinary()
+					if err != nil {
+					}
+					modifiedTransactions := [][]byte{
+						modifiedTxBytes,
+					}
+					customPayloadMod = &CustomPayloadData{
+						Transactions: &modifiedTransactions,
+					}
 				}
 
-				customPayloadMods["ReceiptsRoot"] = CustomPayloadData{
-					ReceiptsRoot: func() *common.Hash {
-						modReceiptsRoot := basePayload.ReceiptsRoot
-						modReceiptsRoot[common.HashLength-1] = byte(255 - modReceiptsRoot[common.HashLength-1])
-						return &modReceiptsRoot
-					}(),
+				if customPayloadMod == nil {
+					t.Fatalf("FAIL (%s): Invalid test case: %s", t.TestName, payloadField)
 				}
-				customPayloadMods["Number"] = CustomPayloadData{
-					Number: func() *uint64 {
-						modNumber := basePayload.Number - 1
-						return &modNumber
-					}(),
-				}
-				customPayloadMods["GasLimit"] = CustomPayloadData{
-					GasLimit: func() *uint64 {
-						modGasLimit := basePayload.GasLimit * 2
-						return &modGasLimit
-					}(),
-				}
-				customPayloadMods["GasUsed"] = CustomPayloadData{
-					GasUsed: func() *uint64 {
-						modGasUsed := basePayload.GasUsed - 1
-						return &modGasUsed
-					}(),
-				}
-				customPayloadMods["Timestamp"] = CustomPayloadData{
-					Timestamp: func() *uint64 {
-						modTimestamp := basePayload.Timestamp - 1
-						return &modTimestamp
-					}(),
-				}
-
-				customPayloadMod := customPayloadMods[payloadField]
 
 				t.Logf("INFO (%v) customizing payload using: %v\n", t.TestName, customPayloadMod)
-				alteredPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &customPayloadMod)
+				alteredPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, customPayloadMod)
 				t.Logf("INFO (%v) latest real getPayload (not executed): hash=%v contents=%v\n", t.TestName, t.CLMock.LatestPayloadBuilt.BlockHash, t.CLMock.LatestPayloadBuilt)
 				t.Logf("INFO (%v) customized payload: hash=%v contents=%v\n", t.TestName, alteredPayload.BlockHash, alteredPayload)
 				if err != nil {

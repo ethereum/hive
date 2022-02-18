@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -72,6 +73,82 @@ func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
 	rt.t.Logf("<< (%s) %s", rt.hc.Container, bytes.TrimSpace(respBytes))
 	return &respCopy, nil
+}
+
+type SignatureValues struct {
+	V *big.Int
+	R *big.Int
+	S *big.Int
+}
+
+func SignatureValuesFromRaw(v *big.Int, r *big.Int, s *big.Int) SignatureValues {
+	return SignatureValues{
+		V: v,
+		R: r,
+		S: s,
+	}
+}
+
+type CustomTransactionData struct {
+	Nonce     *uint64
+	GasPrice  *big.Int
+	Gas       *uint64
+	To        *common.Address
+	Value     *big.Int
+	Data      *[]byte
+	Signature *SignatureValues
+}
+
+func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateKey, customData *CustomTransactionData) (*types.Transaction, error) {
+	// Create a modified transaction base, from the base transaction and customData mix
+	modifiedTxBase := &types.LegacyTx{}
+
+	if customData.Nonce != nil {
+		modifiedTxBase.Nonce = *customData.Nonce
+	} else {
+		modifiedTxBase.Nonce = baseTransaction.Nonce()
+	}
+	if customData.GasPrice != nil {
+		modifiedTxBase.GasPrice = customData.GasPrice
+	} else {
+		modifiedTxBase.GasPrice = baseTransaction.GasPrice()
+	}
+	if customData.Gas != nil {
+		modifiedTxBase.Gas = *customData.Gas
+	} else {
+		modifiedTxBase.Gas = baseTransaction.Gas()
+	}
+	if customData.To != nil {
+		modifiedTxBase.To = customData.To
+	} else {
+		modifiedTxBase.To = baseTransaction.To()
+	}
+	if customData.Value != nil {
+		modifiedTxBase.Value = customData.Value
+	} else {
+		modifiedTxBase.Value = baseTransaction.Value()
+	}
+	if customData.Data != nil {
+		modifiedTxBase.Data = *customData.Data
+	} else {
+		modifiedTxBase.Data = baseTransaction.Data()
+	}
+	var modifiedTx *types.Transaction
+	if customData.Signature != nil {
+		modifiedTxBase.V = customData.Signature.V
+		modifiedTxBase.R = customData.Signature.R
+		modifiedTxBase.S = customData.Signature.S
+		modifiedTx = types.NewTx(modifiedTxBase)
+	} else {
+		// If a custom signature was not specified, simply sign the transaction again
+		signer := types.NewEIP155Signer(chainID)
+		var err error
+		modifiedTx, err = types.SignTx(types.NewTx(modifiedTxBase), signer, pk)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return modifiedTx, nil
 }
 
 type CustomPayloadData struct {
