@@ -6,8 +6,9 @@ import (
 )
 
 var tests = []testSpec{
+	// {Name: "single-client-testnet", Fn: SingleClientTestnet{}},
 	{Name: "transition-testnet-basic-geth-lighthouse", Fn: Bscmtt{node{"go-ethereum", "lighthouse"}}},
-	{Name: "transition-testnet-basic-geth-teku", Fn: Bscmtt{node{"go-ethereum", "teku"}}},
+	// {Name: "transition-testnet-basic-geth-teku", Fn: Bscmtt{node{"go-ethereum", "teku"}}},
 }
 
 func main() {

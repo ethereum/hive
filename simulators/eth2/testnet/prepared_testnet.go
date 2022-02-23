@@ -59,7 +59,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	execNodeOpts := hivesim.Params{
 		"HIVE_CATALYST_ENABLED": "1",
 		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":         "full",
+		"HIVE_NODETYPE":         "archive",
 	}
 	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts)
 
@@ -152,12 +152,12 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	}
 }
 
-func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, simulated bool) {
+func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, shouldMine bool) {
 	testnet.t.Logf("Starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{p.executionOpts}
 	if len(testnet.eth1) == 0 {
-		if !simulated {
+		if shouldMine {
 			// we only make the first eth1 node a miner
 			opts = append(opts, hivesim.Params{"HIVE_MINER": "0x1212121212121212121212121212121212121212"})
 		}

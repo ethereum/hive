@@ -51,7 +51,8 @@ type config struct {
 
 	// Node configurations to launch. Each node as a proportional share of
 	// validators.
-	Nodes []node
+	Nodes      []node
+	ShouldMine bool
 }
 
 func (c *config) activeFork() string {

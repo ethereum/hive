@@ -27,12 +27,58 @@ func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
 
 	// for each key partition, we start a validator client with its own beacon node and eth1 node
 	for i, node := range config.Nodes {
-		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), true)
+		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), config.ShouldMine)
 		prep.startBeaconNode(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon"), []int{i})
 		prep.startValidatorClient(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", node.ConsensusClient), "validator"), i, i)
 	}
 
 	return testnet
+}
+
+type SingleClientTestnet struct{}
+
+func (s SingleClientTestnet) MatchClients(clients *ClientDefinitionsByRole) bool {
+	// Run test case for all available client configurations
+	return true
+}
+
+func (s SingleClientTestnet) Run(t *hivesim.T, env *testEnv) {
+	for _, bn := range env.Clients.Beacon {
+		for _, eth1 := range env.Clients.Eth1 {
+			n := node{eth1.Name, bn.Name[:len(bn.Name)-3]}
+			config := config{
+				AltairForkEpoch:         10,
+				MergeForkEpoch:          20,
+				ValidatorCount:          VALIDATOR_COUNT,
+				SlotTime:                SLOT_TIME,
+				TerminalTotalDifficulty: TERMINCAL_TOTAL_DIFFICULTY,
+				Nodes: []node{
+					n,
+					n,
+					n,
+					n,
+				},
+				ShouldMine: true,
+			}
+
+			testnet := startTestnet(t, env, &config)
+
+			ctx := context.Background()
+			finalized, err := testnet.WaitForFinality(ctx)
+			if err != nil {
+				t.Fatalf("%v", err)
+			}
+			if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
+				t.Fatalf("%v", err)
+			}
+			if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, finalized); err != nil {
+				t.Fatalf("%v", err)
+			}
+			if err := testnet.VerifyProposers(ctx, finalized); err != nil {
+				t.Fatalf("%v", err)
+			}
+		}
+	}
 }
 
 // Basic single client merge transition testnet
@@ -57,6 +103,7 @@ func (s Bscmtt) Run(t *hivesim.T, env *testEnv) {
 			s.Node,
 			s.Node,
 		},
+		ShouldMine: false,
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -83,7 +130,7 @@ func (s Bscmtt) Run(t *hivesim.T, env *testEnv) {
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := testnet.VerifyParticipation(ctx, finalized, 95); err != nil {
+	if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
 		t.Fatalf("%v", err)
 	}
 	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, finalized); err != nil {

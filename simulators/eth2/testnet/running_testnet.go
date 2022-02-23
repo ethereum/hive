@@ -16,6 +16,8 @@ import (
 	"github.com/protolambda/zrnt/eth2/beacon/altair"
 	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
+	"github.com/protolambda/zrnt/eth2/beacon/phase0"
+	"github.com/protolambda/zrnt/eth2/util/math"
 )
 
 var MAX_PARTICIPATION_SCORE = 7
@@ -86,6 +88,15 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 					ctx, cancel := context.WithTimeout(ctx, time.Second*5)
 					defer cancel()
 
+					var (
+						slot      common.Slot
+						head      string
+						justified string
+						finalized string
+						execution string
+						health    float64
+					)
+
 					var headInfo eth2api.BeaconBlockHeaderAndInfo
 					if exists, err := beaconapi.BlockHeader(ctx, b.API, eth2api.BlockHead, &headInfo); err != nil {
 						ch <- res{err: fmt.Errorf("beacon %d: failed to poll head: %v", i, err)}
@@ -112,23 +123,24 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 						ch <- res{err: fmt.Errorf("beacon %d: block not found", i)}
 						return
 					}
-					block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
-
-					var stateInfo eth2api.VersionedBeaconState
-					if exists, err := debugapi.BeaconStateV2(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &stateInfo); err != nil {
-						ch <- res{err: fmt.Errorf("beacon %d: failed to retrieve state: %v", i, err)}
-						return
-					} else if !exists {
-						ch <- res{err: fmt.Errorf("beacon %d: block not found", i)}
+					switch versionedBlock.Version {
+					case "phase0":
+						execution = "0x0000..0000"
+					case "altair":
+						execution = "0x0000..0000"
+					case "bellatrix":
+						block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+						execution = shorten(block.Message.Body.ExecutionPayload.BlockHash.String())
 					}
-					state := stateInfo.Data.(*bellatrix.BeaconState)
 
-					slot := headInfo.Header.Message.Slot
-					head := shorten(headInfo.Root.String())
-					justified := shorten(checkpoints.CurrentJustified.String())
-					finalized := shorten(checkpoints.Finalized.String())
-					execution := shorten(block.Message.Body.ExecutionPayload.BlockHash.String())
-					health := calcHealth(state.CurrentEpochParticipation)
+					slot = headInfo.Header.Message.Slot
+					head = shorten(headInfo.Root.String())
+					justified = shorten(checkpoints.CurrentJustified.String())
+					finalized = shorten(checkpoints.Finalized.String())
+					health, err := getHealth(ctx, b.API, t.spec, slot)
+					if err != nil {
+						ch <- res{err: fmt.Errorf("beacon %d: %s", i, err)}
+					}
 
 					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s, justified=%s, finalized=%s", i, slot, head, health, execution, justified, finalized), nil}
 
@@ -162,21 +174,18 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 
 // VerifyParticipation ensures that the participation of the finialized epoch
 // of a given checkpoint is above the expected threshold.
-func (t *Testnet) VerifyParticipation(ctx context.Context, checkpoint common.Checkpoint, expected int) error {
+func (t *Testnet) VerifyParticipation(ctx context.Context, checkpoint common.Checkpoint, expected float64) error {
 	slot, _ := t.spec.EpochStartSlot(checkpoint.Epoch + 1)
 	for i, b := range t.beacons {
-		var versionedState eth2api.VersionedBeaconState
-		if exists, err := debugapi.BeaconStateV2(ctx, b.API, eth2api.StateIdSlot(slot), &versionedState); err != nil {
-			return fmt.Errorf("beacon %d: failed to retrieve state: %v", i, err)
-		} else if !exists {
-			return fmt.Errorf("beacon %d: block not found", i)
+		// slot-1 to target last slot in finalized epoch
+		health, err := getHealth(ctx, b.API, t.spec, slot-1)
+		if err != nil {
+			return err
 		}
-		state := versionedState.Data.(*bellatrix.BeaconState)
-		health := int(calcHealth(state.PreviousEpochParticipation) * 100)
 		if health < expected {
-			return fmt.Errorf("beacon %d: participation not healthy (got: %d, expected: %d)", i, health, expected)
+			return fmt.Errorf("beacon %d: participation not healthy (got: %.2f, expected: %.2f)", i, health, expected)
 		}
-		t.t.Logf("beacon %d: epoch=%d participation=%d", i, checkpoint.Epoch, health)
+		t.t.Logf("beacon %d: epoch=%d participation=%.2f", i, checkpoint.Epoch, health)
 	}
 	return nil
 }
@@ -190,6 +199,9 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(ctx context.Context, checkpo
 		return fmt.Errorf("beacon %d: failed to retrieve block: %v", 0, err)
 	} else if !exists {
 		return fmt.Errorf("beacon %d: block not found", 0)
+	}
+	if versionedBlock.Version != "bellatrix" {
+		return nil
 	}
 	payload := versionedBlock.Data.(*bellatrix.SignedBeaconBlock).Message.Body.ExecutionPayload
 
@@ -210,15 +222,26 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(ctx context.Context, checkpo
 // the finalized beacon chain that includes an execution payload.
 func (t *Testnet) VerifyProposers(ctx context.Context, checkpoint common.Checkpoint) error {
 	proposers := make([]bool, len(t.beacons))
-	for slot := 0; slot < int(checkpoint.Epoch); slot += 1 {
+	for slot := 0; slot < int(t.spec.SLOTS_PER_EPOCH)*int(checkpoint.Epoch); slot += 1 {
 		var versionedBlock eth2api.VersionedSignedBeaconBlock
 		if exists, err := beaconapi.BlockV2(ctx, t.beacons[0].API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
 			return fmt.Errorf("beacon %d: failed to retrieve block: %v", 0, err)
 		} else if !exists {
 			return fmt.Errorf("beacon %d: block not found", 0)
 		}
-		block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
-		proposerIndex := block.Message.ProposerIndex
+		var proposerIndex common.ValidatorIndex
+		switch versionedBlock.Version {
+		case "phase0":
+			block := versionedBlock.Data.(*phase0.SignedBeaconBlock)
+			proposerIndex = block.Message.ProposerIndex
+		case "altair":
+			block := versionedBlock.Data.(*altair.SignedBeaconBlock)
+			proposerIndex = block.Message.ProposerIndex
+		case "bellatrix":
+			block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+			proposerIndex = block.Message.ProposerIndex
+		}
+
 		var validator eth2api.ValidatorResponse
 		if exists, err := beaconapi.StateValidator(ctx, t.beacons[0].API, eth2api.StateIdSlot(slot), eth2api.ValidatorIdIndex(proposerIndex), &validator); err != nil {
 			return fmt.Errorf("beacon %d: failed to retrieve validator: %v", 0, err)
@@ -233,10 +256,61 @@ func (t *Testnet) VerifyProposers(ctx context.Context, checkpoint common.Checkpo
 	}
 	for i, proposed := range proposers {
 		if !proposed {
-			return fmt.Errorf("beacon %d: did not propose a block with a valid execution payload", i)
+			return fmt.Errorf("beacon %d: did not propose a block", i)
 		}
 	}
 	return nil
+}
+
+func getHealth(ctx context.Context, api *eth2api.Eth2HttpClient, spec *common.Spec, slot common.Slot) (float64, error) {
+	var (
+		health    float64
+		stateInfo eth2api.VersionedBeaconState
+	)
+	if exists, err := debugapi.BeaconStateV2(ctx, api, eth2api.StateIdSlot(slot), &stateInfo); err != nil {
+		return 0, fmt.Errorf("failed to retrieve state: %v", err)
+	} else if !exists {
+		return 0, fmt.Errorf("block not found")
+	}
+	switch stateInfo.Version {
+	case "phase0":
+		state := stateInfo.Data.(*phase0.BeaconState)
+		epoch := spec.SlotToEpoch(slot)
+		validatorIds := make([]eth2api.ValidatorId, 0, len(state.Validators))
+		for id, validator := range state.Validators {
+			if epoch >= validator.ActivationEligibilityEpoch && epoch < validator.ExitEpoch && !validator.Slashed {
+				validatorIds = append(validatorIds, eth2api.ValidatorIdIndex(id))
+			}
+		}
+		var (
+			beforeEpoch    = 0
+			afterEpoch     = spec.SlotToEpoch(slot)
+			balancesBefore []eth2api.ValidatorBalanceResponse
+			balancesAfter  []eth2api.ValidatorBalanceResponse
+		)
+		// If it's epoch, keep before also set to 0.
+		if afterEpoch != 0 {
+			beforeEpoch = int(spec.SlotToEpoch(slot)) - 1
+		}
+		if exists, err := beaconapi.StateValidatorBalances(ctx, api, eth2api.StateIdSlot(beforeEpoch*int(spec.SLOTS_PER_EPOCH)), validatorIds, &balancesBefore); err != nil {
+			return 0, fmt.Errorf("failed to retrieve validator balances: %v", err)
+		} else if !exists {
+			return 0, fmt.Errorf("validator balances not found")
+		}
+		if exists, err := beaconapi.StateValidatorBalances(ctx, api, eth2api.StateIdSlot(int(afterEpoch)*int(spec.SLOTS_PER_EPOCH)), validatorIds, &balancesAfter); err != nil {
+			return 0, fmt.Errorf("failed to retrieve validator balances: %v", err)
+		} else if !exists {
+			return 0, fmt.Errorf("validator balances not found")
+		}
+		health = legacyCalcHealth(spec, balancesBefore, balancesAfter)
+	case "altair":
+		state := stateInfo.Data.(*altair.BeaconState)
+		health = calcHealth(state.CurrentEpochParticipation)
+	case "bellatrix":
+		state := stateInfo.Data.(*bellatrix.BeaconState)
+		health = calcHealth(state.CurrentEpochParticipation)
+	}
+	return health, nil
 }
 
 func calcHealth(p altair.ParticipationRegistry) float64 {
@@ -246,4 +320,24 @@ func calcHealth(p altair.ParticipationRegistry) float64 {
 	}
 	avg := float64(sum) / float64(len(p))
 	return avg / float64(MAX_PARTICIPATION_SCORE)
+}
+
+// legacyCalcHealth calculates the health of the network based on balances at
+// the beginning of an epoch versus the balances at the end.
+//
+// NOTE: this isn't strictly the most correct way of doing things, but it is
+// quite accurate and doesn't require implementing the attestation processing
+// logic here.
+func legacyCalcHealth(spec *common.Spec, before, after []eth2api.ValidatorBalanceResponse) float64 {
+	sum_before := big.NewInt(0)
+	sum_after := big.NewInt(0)
+	for i := range before {
+		sum_before.Add(sum_before, big.NewInt(int64(before[i].Balance)))
+		sum_after.Add(sum_after, big.NewInt(int64(after[i].Balance)))
+	}
+	count := big.NewInt(int64(len(before)))
+	avg_before := big.NewInt(0).Div(sum_before, count).Uint64()
+	avg_after := sum_after.Div(sum_after, count).Uint64()
+	reward := avg_before * spec.BASE_REWARD_FACTOR / math.IntegerSquareRootPrysm(sum_before.Uint64()) / spec.HYSTERESIS_QUOTIENT
+	return float64(avg_after-avg_before) / float64(reward*common.BASE_REWARDS_PER_EPOCH)
 }
