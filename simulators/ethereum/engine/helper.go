@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -157,7 +156,7 @@ type CustomPayloadData struct {
 	StateRoot     *common.Hash
 	ReceiptsRoot  *common.Hash
 	LogsBloom     *[]byte
-	Random        *common.Hash
+	PrevRandao    *common.Hash
 	Number        *uint64
 	GasLimit      *uint64
 	GasUsed       *uint64
@@ -183,7 +182,7 @@ func calcTxsHash(txsBytes [][]byte) (common.Hash, error) {
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
 // BlockHash is calculated automatically.
-func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPayloadData) (*beacon.ExecutableDataV1, error) {
+func customizePayload(basePayload *ExecutableDataV1, customData *CustomPayloadData) (*ExecutableDataV1, error) {
 	txs := basePayload.Transactions
 	if customData.Transactions != nil {
 		txs = *customData.Transactions
@@ -208,7 +207,7 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 		GasUsed:     basePayload.GasUsed,
 		Time:        basePayload.Timestamp,
 		Extra:       basePayload.ExtraData,
-		MixDigest:   basePayload.Random,
+		MixDigest:   basePayload.PrevRandao,
 		Nonce:       types.BlockNonce{0}, // could be overwritten
 		BaseFee:     basePayload.BaseFeePerGas,
 	}
@@ -229,8 +228,8 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 	if customData.LogsBloom != nil {
 		customPayloadHeader.Bloom = types.BytesToBloom(*customData.LogsBloom)
 	}
-	if customData.Random != nil {
-		customPayloadHeader.MixDigest = *customData.Random
+	if customData.PrevRandao != nil {
+		customPayloadHeader.MixDigest = *customData.PrevRandao
 	}
 	if customData.Number != nil {
 		customPayloadHeader.Number = big.NewInt(int64(*customData.Number))
@@ -252,13 +251,13 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 	}
 
 	// Return the new payload
-	return &beacon.ExecutableDataV1{
+	return &ExecutableDataV1{
 		ParentHash:    customPayloadHeader.ParentHash,
 		FeeRecipient:  customPayloadHeader.Coinbase,
 		StateRoot:     customPayloadHeader.Root,
 		ReceiptsRoot:  customPayloadHeader.ReceiptHash,
 		LogsBloom:     customPayloadHeader.Bloom[:],
-		Random:        customPayloadHeader.MixDigest,
+		PrevRandao:    customPayloadHeader.MixDigest,
 		Number:        customPayloadHeader.Number.Uint64(),
 		GasLimit:      customPayloadHeader.GasLimit,
 		GasUsed:       customPayloadHeader.GasUsed,
@@ -270,23 +269,23 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 	}, nil
 }
 
-// Use client specific rpc methods to debug a transaction that includes the RANDOM opcode
-func debugRandomTransaction(ctx context.Context, c *rpc.Client, clientType string, tx *types.Transaction, expectedRandom *common.Hash) error {
+// Use client specific rpc methods to debug a transaction that includes the PREVRANDAO opcode
+func debugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, clientType string, tx *types.Transaction, expectedPrevRandao *common.Hash) error {
 	switch clientType {
 	case "merge-go-ethereum":
-		return gethDebugRandomTransaction(ctx, c, tx, expectedRandom)
+		return gethDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
 	case "go-ethereum":
-		return gethDebugRandomTransaction(ctx, c, tx, expectedRandom)
+		return gethDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
 	case "merge-nethermind":
-		return nethermindDebugRandomTransaction(ctx, c, tx, expectedRandom)
+		return nethermindDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
 	case "nethermind":
-		return nethermindDebugRandomTransaction(ctx, c, tx, expectedRandom)
+		return nethermindDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
 	}
 	fmt.Printf("debug_traceTransaction, no method to test client type %v", clientType)
 	return nil
 }
 
-func gethDebugRandomTransaction(ctx context.Context, c *rpc.Client, tx *types.Transaction, expectedRandom *common.Hash) error {
+func gethDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx *types.Transaction, expectedPrevRandao *common.Hash) error {
 	type StructLogRes struct {
 		Pc      uint64             `json:"pc"`
 		Op      string             `json:"op"`
@@ -313,30 +312,30 @@ func gethDebugRandomTransaction(ctx context.Context, c *rpc.Client, tx *types.Tr
 	if er == nil {
 		return errors.New("debug_traceTransaction returned empty result")
 	}
-	randomFound := false
+	prevRandaoFound := false
 	for i, l := range er.StructLogs {
-		if l.Op == "DIFFICULTY" || l.Op == "RANDOM" {
+		if l.Op == "DIFFICULTY" || l.Op == "PREVRANDAO" {
 			if i+1 >= len(er.StructLogs) {
-				return errors.New(fmt.Sprintf("No information after RANDOM operation"))
+				return errors.New(fmt.Sprintf("No information after PREVRANDAO operation"))
 			}
-			randomFound = true
+			prevRandaoFound = true
 			stack := *(er.StructLogs[i+1].Stack)
 			if len(stack) < 1 {
-				return errors.New(fmt.Sprintf("Invalid stack after RANDOM operation: %v", l.Stack))
+				return errors.New(fmt.Sprintf("Invalid stack after PREVRANDAO operation: %v", l.Stack))
 			}
 			stackHash := common.HexToHash(stack[0])
-			if stackHash != *expectedRandom {
-				return errors.New(fmt.Sprintf("Invalid stack after RANDOM operation, %v != %v", stackHash, expectedRandom))
+			if stackHash != *expectedPrevRandao {
+				return errors.New(fmt.Sprintf("Invalid stack after PREVRANDAO operation, %v != %v", stackHash, expectedPrevRandao))
 			}
 		}
 	}
-	if !randomFound {
-		return errors.New("RANDOM opcode not found")
+	if !prevRandaoFound {
+		return errors.New("PREVRANDAO opcode not found")
 	}
 	return nil
 }
 
-func nethermindDebugRandomTransaction(ctx context.Context, c *rpc.Client, tx *types.Transaction, expectedRandom *common.Hash) error {
+func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx *types.Transaction, expectedPrevRandao *common.Hash) error {
 	var er *interface{}
 	if err := c.CallContext(ctx, &er, "trace_transaction", tx.Hash()); err != nil {
 		return err

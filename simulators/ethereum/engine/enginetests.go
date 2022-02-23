@@ -9,7 +9,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -165,10 +164,10 @@ var engineTests = []TestSpec{
 		Run:  suggestedFeeRecipient,
 	},
 
-	// Random opcode tests
+	// PrevRandao opcode tests
 	{
-		Name: "Random Opcode Transactions",
-		Run:  randomOpcodeTx,
+		Name: "PrevRandao Opcode Transactions",
+		Run:  prevRandaoOpcodeTx,
 		TTD:  10,
 	},
 
@@ -184,7 +183,7 @@ var engineTests = []TestSpec{
 func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
 	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
 
-	forkchoiceState := beacon.ForkchoiceStateV1{
+	forkchoiceState := ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
 		SafeBlockHash:      gblock.Hash(),
 		FinalizedBlockHash: gblock.Hash(),
@@ -208,7 +207,7 @@ func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
 // Invalid GetPayload Under PoW: Client must reject GetPayload directives under PoW.
 func invalidGetPayloadUnderPoW(t *TestEnv) {
 	// We start in PoW and try to get an invalid Payload, which should produce an error but nothing should be disrupted.
-	payloadResp, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), &beacon.PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
+	payloadResp, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), &PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
 	if err == nil {
 		t.Fatalf("FAIL (%s): GetPayloadV1 accepted under PoW rule: %v", t.TestName, payloadResp)
 	}
@@ -220,13 +219,13 @@ func invalidTerminalBlockNewPayload(t *TestEnv) {
 	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
 
 	// Create a dummy payload to send in the NewPayload call
-	payload := beacon.ExecutableDataV1{
+	payload := ExecutableDataV1{
 		ParentHash:    gblock.Hash(),
 		FeeRecipient:  common.Address{},
 		StateRoot:     gblock.Root(),
 		ReceiptsRoot:  types.EmptyUncleHash,
 		LogsBloom:     types.CreateBloom(types.Receipts{}).Bytes(),
-		Random:        common.Hash{},
+		PrevRandao:    common.Hash{},
 		Number:        1,
 		GasLimit:      gblock.GasLimit(),
 		GasUsed:       0,
@@ -276,7 +275,7 @@ func unknownSafeBlockHash(t *TestEnv) {
 			rand.Read(randomSafeBlockHash[:])
 
 			// Send forkchoiceUpdated with random SafeBlockHash
-			forkchoiceStateUnknownSafeHash := beacon.ForkchoiceStateV1{
+			forkchoiceStateUnknownSafeHash := ForkchoiceStateV1{
 				HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 				SafeBlockHash:      randomSafeBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -311,7 +310,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 			rand.Read(randomFinalizedBlockHash[:])
 
 			// Send forkchoiceUpdated with random FinalizedBlockHash
-			forkchoiceStateUnknownFinalizedHash := beacon.ForkchoiceStateV1{
+			forkchoiceStateUnknownFinalizedHash := ForkchoiceStateV1{
 				HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: randomFinalizedBlockHash,
@@ -322,9 +321,9 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 			}
 
 			// Test again using PayloadAttributes, should also return INVALID and no PayloadID
-			payloadAttr := beacon.PayloadAttributesV1{
+			payloadAttr := PayloadAttributesV1{
 				Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
-				Random:                common.Hash{},
+				PrevRandao:            common.Hash{},
 				SuggestedFeeRecipient: common.Address{},
 			}
 			resp, err = t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownFinalizedHash, &payloadAttr)
@@ -349,7 +348,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 	randomHeadBlockHash := common.Hash{}
 	rand.Read(randomHeadBlockHash[:])
 
-	forkchoiceStateUnknownHeadHash := beacon.ForkchoiceStateV1{
+	forkchoiceStateUnknownHeadHash := ForkchoiceStateV1{
 		HeadBlockHash:      randomHeadBlockHash,
 		SafeBlockHash:      t.CLMock.LatestForkchoice.FinalizedBlockHash,
 		FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -370,9 +369,9 @@ func unknownHeadBlockHash(t *TestEnv) {
 	}
 
 	// Test again using PayloadAttributes, should also return SYNCING and no PayloadID
-	payloadAttr := beacon.PayloadAttributesV1{
+	payloadAttr := PayloadAttributesV1{
 		Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
-		Random:                common.Hash{},
+		PrevRandao:            common.Hash{},
 		SuggestedFeeRecipient: common.Address{},
 	}
 	resp, err = t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceStateUnknownHeadHash, &payloadAttr)
@@ -398,7 +397,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 
 	// Send the Genesis block as forkchoice
 	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
-	forkchoiceStateGenesisHash := beacon.ForkchoiceStateV1{
+	forkchoiceStateGenesisHash := ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
 		SafeBlockHash:      gblock.Hash(),
 		FinalizedBlockHash: gblock.Hash(),
@@ -660,14 +659,14 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 				}
 
 				// Send the forkchoiceUpdated with a reference to the invalid payload.
-				fcState := beacon.ForkchoiceStateV1{
+				fcState := ForkchoiceStateV1{
 					HeadBlockHash:      alteredPayload.BlockHash,
 					SafeBlockHash:      alteredPayload.BlockHash,
 					FinalizedBlockHash: alteredPayload.BlockHash,
 				}
-				payloadAttrbutes := beacon.PayloadAttributesV1{
+				payloadAttrbutes := PayloadAttributesV1{
 					Timestamp:             alteredPayload.Timestamp + 1,
-					Random:                common.Hash{},
+					PrevRandao:            common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
 				}
 				fcResp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &fcState, &payloadAttrbutes)
@@ -842,7 +841,7 @@ func blockStatusReorg(t *TestEnv) {
 			}
 
 			// Reorg back to the previous block (FinalizedBlock)
-			reorgForkchoice := beacon.ForkchoiceStateV1{
+			reorgForkchoice := ForkchoiceStateV1{
 				HeadBlockHash:      t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -952,7 +951,7 @@ func transactionReorg(t *TestEnv) {
 		}
 
 		// Re-org back to a previous block where the tx is not included using forkchoiceUpdated
-		reorgForkchoice := beacon.ForkchoiceStateV1{
+		reorgForkchoice := ForkchoiceStateV1{
 			HeadBlockHash:      reorgBlock.Hash(),
 			SafeBlockHash:      reorgBlock.Hash(),
 			FinalizedBlockHash: reorgBlock.Hash(),
@@ -998,7 +997,7 @@ func sidechainReorg(t *TestEnv) {
 	// Produce two payloads, send fcU with first payload, check transaction outcome, then reorg, check transaction outcome again
 
 	// This single transaction will change its outcome based on the payload
-	tx := t.makeNextTransaction(randomContractAddr, big0, nil)
+	tx := t.makeNextTransaction(prevRandaoContractAddr, big0, nil)
 	if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 		t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
 	}
@@ -1008,12 +1007,12 @@ func sidechainReorg(t *TestEnv) {
 		OnNewPayloadBroadcast: func() {
 			// At this point the CLMocker has a payload that will result in a specific outcome,
 			// we can produce an alternative payload, send it, fcU to it, and verify the changes
-			alternativeRandom := common.Hash{}
-			rand.Read(alternativeRandom[:])
+			alternativePrevRandao := common.Hash{}
+			rand.Read(alternativePrevRandao[:])
 
-			payloadAttributes := beacon.PayloadAttributesV1{
+			payloadAttributes := PayloadAttributesV1{
 				Timestamp:             t.CLMock.LatestFinalizedHeader.Time + 1,
-				Random:                alternativeRandom,
+				PrevRandao:            alternativePrevRandao,
 				SuggestedFeeRecipient: t.CLMock.NextFeeRecipient,
 			}
 
@@ -1027,7 +1026,7 @@ func sidechainReorg(t *TestEnv) {
 				t.Fatalf("FAIL (%s): Could not get alternative payload: %v", t.TestName, err)
 			}
 			if len(alternativePayload.Transactions) == 0 {
-				t.Fatalf("FAIL (%s): alternative payload does not contain the random opcode tx", t.TestName)
+				t.Fatalf("FAIL (%s): alternative payload does not contain the prevRandao opcode tx", t.TestName)
 			}
 			alternativePayloadStatus, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), &alternativePayload)
 			if err != nil {
@@ -1037,7 +1036,7 @@ func sidechainReorg(t *TestEnv) {
 				t.Fatalf("FAIL (%s): Alternative payload response returned Status!=VALID: %v", t.TestName, alternativePayloadStatus)
 			}
 			// We sent the alternative payload, fcU to it
-			alternativeFcU := beacon.ForkchoiceStateV1{
+			alternativeFcU := ForkchoiceStateV1{
 				HeadBlockHash:      alternativePayload.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -1050,14 +1049,14 @@ func sidechainReorg(t *TestEnv) {
 				t.Fatalf("FAIL (%s): Alternative fcU response returned Status!=VALID: %v", t.TestName, alternativeFcUResp)
 			}
 
-			// Random should be the alternative random we sent
-			checkRandomValue(t, alternativeRandom, alternativePayload.Number)
+			// PrevRandao should be the alternative prevRandao we sent
+			checkPrevRandaoValue(t, alternativePrevRandao, alternativePayload.Number)
 		},
 	})
 	// The reorg actually happens after the CLMocker continues,
 	// verify here that the reorg was successful
 	latestBlockNum := t.CLMock.LatestFinalizedNumber.Uint64()
-	checkRandomValue(t, t.CLMock.RandomHistory[latestBlockNum], latestBlockNum)
+	checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[latestBlockNum], latestBlockNum)
 
 }
 
@@ -1108,12 +1107,12 @@ func multipleNewCanonicalPayloads(t *TestEnv) {
 			payloadCount := 80
 			basePayload := t.CLMock.LatestPayloadBuilt
 
-			// Fabricate and send multiple new payloads by changing the Random field
+			// Fabricate and send multiple new payloads by changing the PrevRandao field
 			for i := 0; i < payloadCount; i++ {
-				newRandom := common.Hash{}
-				rand.Read(newRandom[:])
+				newPrevRandao := common.Hash{}
+				rand.Read(newPrevRandao[:])
 				newPayload, err := customizePayload(&basePayload, &CustomPayloadData{
-					Random: &newRandom,
+					PrevRandao: &newPrevRandao,
 				})
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload %v: %v", t.TestName, i, err)
@@ -1181,7 +1180,7 @@ func outOfOrderPayloads(t *TestEnv) {
 			t.Fatalf("FAIL (%s): Unable to start client (%v): %v", t.TestName, client, err)
 		}
 		// Send the forkchoiceUpdated with the LatestExecutedPayload hash, we should get SYNCING back
-		fcU := beacon.ForkchoiceStateV1{
+		fcU := ForkchoiceStateV1{
 			HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 			SafeBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 			FinalizedBlockHash: t.CLMock.LatestExecutedPayload.BlockHash,
@@ -1309,21 +1308,21 @@ func suggestedFeeRecipient(t *TestEnv) {
 
 // TODO: Do a PENDING block suggestedFeeRecipient
 
-func checkRandomValue(t *TestEnv, expectedRandom common.Hash, blockNumber uint64) {
+func checkPrevRandaoValue(t *TestEnv, expectedPrevRandao common.Hash, blockNumber uint64) {
 	storageKey := common.Hash{}
 	storageKey[31] = byte(blockNumber)
-	opcodeValueAtBlock, err := t.Eth.StorageAt(t.Ctx(), randomContractAddr, storageKey, nil)
+	opcodeValueAtBlock, err := t.Eth.StorageAt(t.Ctx(), prevRandaoContractAddr, storageKey, nil)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to get storage: %v", t.TestName, err)
 	}
-	if common.BytesToHash(opcodeValueAtBlock) != expectedRandom {
-		t.Fatalf("FAIL (%s): Storage does not match random: %v, %v", t.TestName, expectedRandom, common.BytesToHash(opcodeValueAtBlock))
+	if common.BytesToHash(opcodeValueAtBlock) != expectedPrevRandao {
+		t.Fatalf("FAIL (%s): Storage does not match prevRandao: %v, %v", t.TestName, expectedPrevRandao, common.BytesToHash(opcodeValueAtBlock))
 	}
 }
 
-// Random Opcode tests
-func randomOpcodeTx(t *TestEnv) {
-	// We need to send random opcode transactions in PoW and particularly in the block where the TTD is reached.
+// PrevRandao Opcode tests
+func prevRandaoOpcodeTx(t *TestEnv) {
+	// We need to send PREVRANDAO opcode transactions in PoW and particularly in the block where the TTD is reached.
 	ttdReached := make(chan interface{})
 
 	// Try to send many transactions before PoW transition to guarantee at least one enters in the block
@@ -1331,11 +1330,11 @@ func randomOpcodeTx(t *TestEnv) {
 		for {
 			select {
 			case <-t.Timeout:
-				t.Fatalf("FAIL (%s): Timeout while sending random opcode transactions: %v")
+				t.Fatalf("FAIL (%s): Timeout while sending PREVRANDAO opcode transactions: %v")
 			case <-ttdReached:
 				return
 			case <-time.After(time.Second / 10):
-				tx := t.makeNextTransaction(randomContractAddr, big0, nil)
+				tx := t.makeNextTransaction(prevRandaoContractAddr, big0, nil)
 				if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 					t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
 				}
@@ -1346,7 +1345,7 @@ func randomOpcodeTx(t *TestEnv) {
 	t.CLMock.waitForTTD()
 	close(ttdReached)
 
-	// Ideally all blocks up until TTD must have a random tx in it
+	// Ideally all blocks up until TTD must have a DIFFICULTY opcode tx in it
 	ttdBlockNumber, err := t.Eth.BlockNumber(t.Ctx())
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to get latest block number: %v", t.TestName, err)
@@ -1363,7 +1362,7 @@ func randomOpcodeTx(t *TestEnv) {
 		}
 		storageKey := common.Hash{}
 		storageKey[31] = byte(i)
-		opcodeValueAtBlock, err := getBigIntAtStorage(t.Eth, t.Ctx(), randomContractAddr, storageKey, nil)
+		opcodeValueAtBlock, err := getBigIntAtStorage(t.Eth, t.Ctx(), prevRandaoContractAddr, storageKey, nil)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to get storage: %v", t.TestName, err)
 		}
@@ -1372,7 +1371,7 @@ func randomOpcodeTx(t *TestEnv) {
 		}
 	}
 
-	// Send transactions now past TTD, the value of the storage in these blocks must match the random value
+	// Send transactions now past TTD, the value of the storage in these blocks must match the prevRandao value
 	var (
 		txCount        = 10
 		currentTxIndex = 0
@@ -1380,7 +1379,7 @@ func randomOpcodeTx(t *TestEnv) {
 	)
 	t.CLMock.produceBlocks(txCount, BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
-			tx := t.makeNextTransaction(randomContractAddr, big0, nil)
+			tx := t.makeNextTransaction(prevRandaoContractAddr, big0, nil)
 			if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 				t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
 			}
@@ -1389,9 +1388,9 @@ func randomOpcodeTx(t *TestEnv) {
 		},
 		OnHeadBlockForkchoiceBroadcast: func() {
 			// Check the transaction tracing, which is client specific
-			expectedRandom := t.CLMock.RandomHistory[t.CLMock.LatestFinalizedHeader.Number.Uint64()+1]
-			if err := debugRandomTransaction(t.Engine.Ctx(), t.RPC, t.Engine.Client.Type, txs[currentTxIndex-1],
-				&expectedRandom); err != nil {
+			expectedPrevRandao := t.CLMock.PrevRandaoHistory[t.CLMock.LatestFinalizedHeader.Number.Uint64()+1]
+			if err := debugPrevRandaoTransaction(t.Engine.Ctx(), t.RPC, t.Engine.Client.Type, txs[currentTxIndex-1],
+				&expectedPrevRandao); err != nil {
 				t.Fatalf("FAIL (%s): Error during transaction tracing: %v", t.TestName, err)
 			}
 		},
@@ -1402,7 +1401,7 @@ func randomOpcodeTx(t *TestEnv) {
 		t.Fatalf("FAIL (%s): Unable to get latest block number: %v", t.TestName, err)
 	}
 	for i := ttdBlockNumber + 1; i <= lastBlockNumber; i++ {
-		checkRandomValue(t, t.CLMock.RandomHistory[i], i)
+		checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[i], i)
 	}
 
 }

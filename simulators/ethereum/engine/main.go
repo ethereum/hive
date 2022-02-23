@@ -31,11 +31,14 @@ var (
 	PoSConfirmationBlocks = uint64(1)
 
 	// Test related
-	randomContractAddr = common.HexToAddress("0000000000000000000000000000000000000316")
+	prevRandaoContractAddr = common.HexToAddress("0000000000000000000000000000000000000316")
 
 	// Clique Related
 	minerPKHex   = "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 	minerAddrHex = "658bdf435d810c91414ec09147daa6db62406379"
+
+	// JWT Token Secret for authenticated Engine API calls
+	jwtTokenSecret = "0x7365637265747365637265747365637265747365637265747365637265747365" // secretsecretsecretsecretsecretse
 )
 
 var clientEnv = hivesim.Params{
@@ -57,6 +60,8 @@ var clientEnv = hivesim.Params{
 	"HIVE_MINER":             minerAddrHex,
 	// Merge related
 	"HIVE_MERGE_BLOCK_ID": "100",
+	// JWT Token
+	"HIVE_JWT_AUTH_TOKEN_SECRET": jwtTokenSecret,
 }
 
 type TestSpec struct {
