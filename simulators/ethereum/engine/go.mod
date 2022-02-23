@@ -5,7 +5,7 @@ go 1.13
 require (
 	github.com/cespare/cp v1.1.1 // indirect
 	github.com/ethereum/go-ethereum v1.10.15
-	github.com/ethereum/hive v0.0.0-20220202182836-b91b7d136d82
+	github.com/ethereum/hive v0.0.0-20220216101708-2784ea3e7eea
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect

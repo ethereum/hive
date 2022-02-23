@@ -37,7 +37,6 @@
 set -e
 
 erigon=/usr/local/bin/erigon
-rpcdaemon=/usr/local/bin/rpcdaemon
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
     FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL"
@@ -115,14 +114,12 @@ fi
 
 # Launch the main client.
 FLAGS="$FLAGS --nat=none"
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3,engine --engine.addr=0.0.0.0"
+    FLAGS="$FLAGS --ws"
+else
+    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3"
+    FLAGS="$FLAGS --ws"
+fi
 echo "Running erigon with flags $FLAGS"
-$erigon $FLAGS &
-
-# Give it some time to start.
-sleep 0.3
-
-# Launch rpcdaemon.
-RPC_FLAGS="--http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,net,txpool,web3"
-RPC_FLAGS="$RPC_FLAGS --ws --datadir /erigon-hive-datadir"
-echo "Running rpcdaemon with flags $RPC_FLAGS"
-$rpcdaemon $RPC_FLAGS
+$erigon $FLAGS
