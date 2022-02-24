@@ -243,7 +243,7 @@ type TransitionConfigurationV1Marshaling struct {
 
 // JWT Tokens
 func GetNewToken() (string, error) {
-	jwtSecretBytes := common.FromHex(jwtTokenSecret)
+	jwtSecretBytes := common.FromHex(defaultJwtTokenSecret)
 	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"iat": time.Now().Unix(),
 	})

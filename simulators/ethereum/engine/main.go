@@ -38,7 +38,7 @@ var (
 	minerAddrHex = "658bdf435d810c91414ec09147daa6db62406379"
 
 	// JWT Token Secret for authenticated Engine API calls
-	jwtTokenSecret = "0x7365637265747365637265747365637265747365637265747365637265747365" // secretsecretsecretsecretsecretse
+	defaultJwtTokenSecret = "0x7365637265747365637265747365637265747365637265747365637265747365" // secretsecretsecretsecretsecretse
 )
 
 var clientEnv = hivesim.Params{
@@ -60,8 +60,6 @@ var clientEnv = hivesim.Params{
 	"HIVE_MINER":             minerAddrHex,
 	// Merge related
 	"HIVE_MERGE_BLOCK_ID": "100",
-	// JWT Token
-	"HIVE_JWT_AUTH_TOKEN_SECRET": jwtTokenSecret,
 }
 
 type TestSpec struct {
