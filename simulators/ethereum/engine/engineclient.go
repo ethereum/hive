@@ -17,6 +17,7 @@ import (
 )
 
 // https://github.com/ethereum/execution-apis/blob/v1.0.0-alpha.7/src/engine/specification.md
+var EthPortHTTP = 8545
 var EnginePortHTTP = 8550
 var EnginePortWS = 8551
 
@@ -59,7 +60,7 @@ func NewEngineClient(t *hivesim.T, hc *hivesim.Client, ttd *big.Int) *EngineClie
 			inner: http.DefaultTransport,
 		},
 	}
-	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", hc.IP), client)
+	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:%v/", hc.IP, EthPortHTTP), client)
 	eth := ethclient.NewClient(rpcClient)
 	return &EngineClient{
 		T:                       t,

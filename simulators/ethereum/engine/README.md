@@ -82,6 +82,7 @@ Modify fields of the ExecutablePayload while maintaining a valid BlockHash, incl
    - GasLimit
    - GasUsed
    - Timestamp
+   - PrevRandao
    - Transaction with incorrect fields:
       - Signature
       - Nonce

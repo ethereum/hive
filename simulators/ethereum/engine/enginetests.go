@@ -92,6 +92,10 @@ var engineTests = []TestSpec{
 		Run:  invalidPayloadTestCaseGen("Timestamp"),
 	},
 	{
+		Name: "Invalid PrevRandao NewPayload",
+		Run:  invalidPayloadTestCaseGen("PrevRandao"),
+	},
+	{
 		Name: "Invalid Transaction Signature NewPayload",
 		Run:  invalidPayloadTestCaseGen("Transaction/Signature"),
 	},
@@ -488,9 +492,8 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 
 		txFunc := func() {
 			// Function to send at least one transaction each block produced
-			recipient := common.Address{}
-			rand.Read(recipient[:])
-			tx := t.makeNextTransaction(recipient, big1, nil)
+			// Send the transaction to the prevRandaoContractAddr
+			tx := t.makeNextTransaction(prevRandaoContractAddr, big1, nil)
 			if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
 				t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
 			}
@@ -550,6 +553,14 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 					modTimestamp := basePayload.Timestamp - 1
 					customPayloadMod = &CustomPayloadData{
 						Timestamp: &modTimestamp,
+					}
+				case "PrevRandao":
+					// This should fail since we are inserting a transaction that uses the PREVRANDAO opcode.
+					// The expected outcome will change if we modify the payload.
+					modPrevRandao := common.Hash{}
+					rand.Read(modPrevRandao[:])
+					customPayloadMod = &CustomPayloadData{
+						PrevRandao: &modPrevRandao,
 					}
 				case "Transaction":
 					if len(payloadFieldSplit) < 2 {
