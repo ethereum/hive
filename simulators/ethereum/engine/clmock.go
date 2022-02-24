@@ -28,6 +28,10 @@ type CLMocker struct {
 	PrevRandaoHistory      map[uint64]common.Hash
 	ExecutedPayloadHistory map[uint64]ExecutableDataV1
 
+	// Transition Information
+	TerminalBlockNumber *uint64
+	TerminalBlockHash   *common.Hash
+
 	// Latest broadcasted data using the PoS Engine API
 	LatestFinalizedNumber *big.Int
 	LatestFinalizedHeader *types.Header
@@ -137,6 +141,11 @@ func (cl *CLMocker) setTTDBlockClient(ec *EngineClient) {
 	if !anySuccess {
 		cl.Fatalf("CLMocker: None of the clients accepted forkchoiceUpdated")
 	}
+
+	// Save the transition information
+	transitionBlockNumber := cl.LatestFinalizedNumber.Uint64()
+	cl.TerminalBlockNumber = &transitionBlockNumber
+	cl.TerminalBlockHash = &cl.LatestForkchoice.HeadBlockHash
 }
 
 // This method waits for TTD in at least one of the clients, then sends the

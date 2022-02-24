@@ -17,7 +17,7 @@ var _ = (*TransitionConfigurationV1Marshaling)(nil)
 func (t TransitionConfigurationV1) MarshalJSON() ([]byte, error) {
 	type TransitionConfigurationV1 struct {
 		TerminalTotalDifficulty *hexutil.Big   `json:"terminalTotalDifficulty" gencodec:"required"`
-		TerminalBlockHash       *common.Hash   `json:"terminalBlockHash"       gencodec:"required"`
+		TerminalBlockHash       common.Hash    `json:"terminalBlockHash"       gencodec:"required"`
 		TerminalBlockNumber     hexutil.Uint64 `json:"terminalBlockNumber"     gencodec:"required"`
 	}
 	var enc TransitionConfigurationV1
@@ -45,7 +45,7 @@ func (t *TransitionConfigurationV1) UnmarshalJSON(input []byte) error {
 	if dec.TerminalBlockHash == nil {
 		return errors.New("missing required field 'terminalBlockHash' for TransitionConfigurationV1")
 	}
-	t.TerminalBlockHash = dec.TerminalBlockHash
+	t.TerminalBlockHash = *dec.TerminalBlockHash
 	if dec.TerminalBlockNumber == nil {
 		return errors.New("missing required field 'terminalBlockNumber' for TransitionConfigurationV1")
 	}

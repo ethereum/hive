@@ -230,9 +230,9 @@ type payloadAttributesMarshaling struct {
 
 //go:generate go run github.com/fjl/gencodec -type TransitionConfigurationV1 -field-override TransitionConfigurationV1Marshaling -out gen_transitionconf.go
 type TransitionConfigurationV1 struct {
-	TerminalTotalDifficulty *big.Int     `json:"terminalTotalDifficulty" gencodec:"required"`
-	TerminalBlockHash       *common.Hash `json:"terminalBlockHash"       gencodec:"required"`
-	TerminalBlockNumber     uint64       `json:"terminalBlockNumber"     gencodec:"required"`
+	TerminalTotalDifficulty *big.Int    `json:"terminalTotalDifficulty" gencodec:"required"`
+	TerminalBlockHash       common.Hash `json:"terminalBlockHash"       gencodec:"required"`
+	TerminalBlockNumber     uint64      `json:"terminalBlockNumber"     gencodec:"required"`
 }
 
 // JSON type overrides for TransitionConfigurationV1.

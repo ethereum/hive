@@ -185,6 +185,18 @@ var engineTests = []TestSpec{
 		Run:  postMergeSync,
 		TTD:  10,
 	},
+
+	// Exchange Transition Configuration tests
+	{
+		Name: "Exchange Transition Configuration PreMerge",
+		Run:  exTransitionConfigPreMerge,
+		TTD:  1000000,
+	},
+	{
+		Name: "Exchange Transition Configuration PostMerge",
+		Run:  exTransitionConfigPostMerge,
+		TTD:  10,
+	},
 }
 
 // Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
@@ -1530,4 +1542,16 @@ func postMergeSync(t *TestEnv) {
 			}
 		}
 	}
+}
+
+func exTransitionConfigPreMerge(t *TestEnv) {
+	// Verify transition information
+	t.VerifyTransitionInformation(t.Engine)
+}
+
+func exTransitionConfigPostMerge(t *TestEnv) {
+	// Wait for TTD to happen
+	t.CLMock.waitForTTD()
+	// Verify transition information
+	t.VerifyTransitionInformation(t.Engine)
 }
