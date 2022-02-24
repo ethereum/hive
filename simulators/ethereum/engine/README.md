@@ -82,6 +82,12 @@ Modify fields of the ExecutablePayload while maintaining a valid BlockHash, incl
    - GasLimit
    - GasUsed
    - Timestamp
+   - Transaction with incorrect fields:
+      - Signature
+      - Nonce
+      - GasPrice
+      - Gas
+      - Value
 
 ### Eth RPC Status on ForkchoiceUpdated Events:
 - Latest Block after NewPayload:  
@@ -122,11 +128,11 @@ Send a transaction that modifies the state, ForkchoiceUpdate to the payload cont
 - Suggested Fee Recipient Test:  
 Set the fee recipient to a custom address and verify that (a) balance is not increased when no fees are collected (b) balance is increased appropriately when fees are collected.
 
-### Random Opcode:
-- Random Opcode Transactions:  
+### PrevRandao Opcode:
+- PrevRandao Opcode Transactions:  
 Send transactions that modify the state to the value of the 'DIFFICULTY' opcode and verify that:  
 (a) the state is equal to the difficulty on blocks before the TTD is crossed  
-(b) the state is equal to the Random value provided using forkchoiceUpdated after PoS transition.  
+(b) the state is equal to the PrevRandao value provided using forkchoiceUpdated after PoS transition.  
 
 ### Sync Tests:
 - Sync Client Post Merge:  
