@@ -6,7 +6,7 @@
 
 FROM alpine:latest
 ARG repo=MariusVanDerWijden/go-ethereum
-ARG branch=merge-kiln
+ARG branch=merge-kiln-v2
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN apk add --update bash curl jq go git make gcc musl-dev          \
@@ -42,7 +42,7 @@ RUN chmod +x /hive-bin/enode.sh
 ADD genesis.json /genesis.json
 
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 8546 8547 30303 30303/udp
+EXPOSE 8545 8546 8550 8547 30303 30303/udp
 
 # Generate the ethash verification caches
 RUN \

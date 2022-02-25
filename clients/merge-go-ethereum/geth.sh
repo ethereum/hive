@@ -149,8 +149,10 @@ fi
 
 # Configure RPC.
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
-    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,engine,eth,miner,net,personal,txpool,web3"
+    JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
+    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.authport=8550 --http.api=admin,debug,engine,eth,miner,net,personal,txpool,web3"
     FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,engine,eth,miner,net,personal,txpool,web3"
+    FLAGS="$FLAGS --jwt-secret $JWT_SECRET"
 else
     FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,personal,txpool,web3"
     FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,personal,txpool,web3"
