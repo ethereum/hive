@@ -59,7 +59,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	execNodeOpts := hivesim.Params{
 		"HIVE_CATALYST_ENABLED": "1",
 		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":         "archive",
+		"HIVE_NODETYPE":         "full",
 	}
 	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts)
 

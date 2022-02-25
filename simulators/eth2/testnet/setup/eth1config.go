@@ -3,11 +3,12 @@ package setup
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
-	"math/big"
 )
 
 // The runtime deposit contract code, along with the storage that would otherwise have been initialized
@@ -84,6 +85,7 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64) *Eth1Genesis {
 				BerlinBlock:             big.NewInt(0),
 				LondonBlock:             big.NewInt(0),
 				ArrowGlacierBlock:       big.NewInt(0),
+				MergeForkBlock:          big.NewInt(0),
 				TerminalTotalDifficulty: ttd,
 				Clique:                  nil,
 			},
@@ -110,16 +112,17 @@ func (conf *Eth1Genesis) ToParams(depositAddress [20]byte) hivesim.Params {
 		"HIVE_CHAIN_ID":                 conf.Genesis.Config.ChainID.String(),
 		"HIVE_FORK_HOMESTEAD":           conf.Genesis.Config.HomesteadBlock.String(),
 		//"HIVE_FORK_DAO_BLOCK":           conf.Genesis.Config.DAOForkBlock.String(),  // nil error, not used anyway
-		"HIVE_FORK_TANGERINE":      conf.Genesis.Config.EIP150Block.String(),
-		"HIVE_FORK_SPURIOUS":       conf.Genesis.Config.EIP155Block.String(), // also eip558
-		"HIVE_FORK_BYZANTIUM":      conf.Genesis.Config.ByzantiumBlock.String(),
-		"HIVE_FORK_CONSTANTINOPLE": conf.Genesis.Config.ConstantinopleBlock.String(),
-		"HIVE_FORK_PETERSBURG":     conf.Genesis.Config.PetersburgBlock.String(),
-		"HIVE_FORK_ISTANBUL":       conf.Genesis.Config.IstanbulBlock.String(),
-		"HIVE_FORK_MUIRGLACIER":    conf.Genesis.Config.MuirGlacierBlock.String(),
-		"HIVE_FORK_BERLIN":         conf.Genesis.Config.BerlinBlock.String(),
-		"HIVE_FORK_LONDON":         conf.Genesis.Config.LondonBlock.String(),
-		"HIVE_FORK_ARROWGLACIER":   conf.Genesis.Config.ArrowGlacierBlock.String(),
-		"HIVE_FORK_MERGE":          conf.Genesis.Config.TerminalTotalDifficulty.String(),
+		"HIVE_FORK_TANGERINE":            conf.Genesis.Config.EIP150Block.String(),
+		"HIVE_FORK_SPURIOUS":             conf.Genesis.Config.EIP155Block.String(), // also eip558
+		"HIVE_FORK_BYZANTIUM":            conf.Genesis.Config.ByzantiumBlock.String(),
+		"HIVE_FORK_CONSTANTINOPLE":       conf.Genesis.Config.ConstantinopleBlock.String(),
+		"HIVE_FORK_PETERSBURG":           conf.Genesis.Config.PetersburgBlock.String(),
+		"HIVE_FORK_ISTANBUL":             conf.Genesis.Config.IstanbulBlock.String(),
+		"HIVE_FORK_MUIRGLACIER":          conf.Genesis.Config.MuirGlacierBlock.String(),
+		"HIVE_FORK_BERLIN":               conf.Genesis.Config.BerlinBlock.String(),
+		"HIVE_FORK_LONDON":               conf.Genesis.Config.LondonBlock.String(),
+		"HIVE_FORK_ARROWGLACIER":         conf.Genesis.Config.ArrowGlacierBlock.String(),
+		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeForkBlock.String(),
+		"HIVE_TERMINAL_TOTAL_DIFFICULTY": conf.Genesis.Config.TerminalTotalDifficulty.String(),
 	}
 }

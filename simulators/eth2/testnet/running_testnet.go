@@ -176,9 +176,12 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 // of a given checkpoint is above the expected threshold.
 func (t *Testnet) VerifyParticipation(ctx context.Context, checkpoint common.Checkpoint, expected float64) error {
 	slot, _ := t.spec.EpochStartSlot(checkpoint.Epoch + 1)
-	for i, b := range t.beacons {
+	if t.spec.BELLATRIX_FORK_EPOCH <= checkpoint.Epoch {
 		// slot-1 to target last slot in finalized epoch
-		health, err := getHealth(ctx, b.API, t.spec, slot-1)
+		slot = slot - 1
+	}
+	for i, b := range t.beacons {
+		health, err := getHealth(ctx, b.API, t.spec, slot)
 		if err != nil {
 			return err
 		}
@@ -288,7 +291,8 @@ func getHealth(ctx context.Context, api *eth2api.Eth2HttpClient, spec *common.Sp
 			balancesBefore []eth2api.ValidatorBalanceResponse
 			balancesAfter  []eth2api.ValidatorBalanceResponse
 		)
-		// If it's epoch, keep before also set to 0.
+
+		// If it's genesis, keep before also set to 0.
 		if afterEpoch != 0 {
 			beforeEpoch = int(spec.SlotToEpoch(slot)) - 1
 		}

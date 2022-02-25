@@ -9,25 +9,10 @@ import (
 	blsu "github.com/protolambda/bls12-381-util"
 )
 
-type testCase interface {
-	// MatchClients returns if the test-case is able to run with the given client definitions
-	MatchClients(clients *ClientDefinitionsByRole) bool
-
-	Run(t *hivesim.T, env *testEnv)
-}
-
 type testSpec struct {
 	Name  string
 	About string
-	Fn    testCase
-}
-
-func (s *testSpec) MatchClients(clients *ClientDefinitionsByRole) bool {
-	return s.Fn.MatchClients(clients)
-}
-
-func (s *testSpec) Run(t *hivesim.T, env *testEnv) {
-	s.Fn.Run(t, env)
+	Run   func(*hivesim.T, *testEnv, node)
 }
 
 type testEnv struct {
@@ -39,6 +24,10 @@ type testEnv struct {
 type node struct {
 	ExecutionClient string
 	ConsensusClient string
+}
+
+func (n *node) String() string {
+	return fmt.Sprintf("%s-%s", n.ConsensusClient, n.ExecutionClient)
 }
 
 type config struct {

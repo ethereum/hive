@@ -45,3 +45,13 @@ func byName(clients []*hivesim.ClientDefinition, name string) *hivesim.ClientDef
 	}
 	return nil
 }
+
+func (c *ClientDefinitionsByRole) Combinations() []node {
+	var nodes []node
+	for _, beacon := range c.Beacon {
+		for _, eth1 := range c.Eth1 {
+			nodes = append(nodes, node{eth1.Name, beacon.Name[:len(beacon.Name)-3]})
+		}
+	}
+	return nodes
+}

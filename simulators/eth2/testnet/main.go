@@ -1,14 +1,15 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 )
 
 var tests = []testSpec{
-	// {Name: "single-client-testnet", Fn: SingleClientTestnet{}},
-	{Name: "transition-testnet-basic-geth-lighthouse", Fn: Bscmtt{node{"go-ethereum", "lighthouse"}}},
-	// {Name: "transition-testnet-basic-geth-teku", Fn: Bscmtt{node{"go-ethereum", "teku"}}},
+	{Name: "single-client-testnet", Run: Phase0Testnet},
+	{Name: "transition-testnet", Run: TransitionTestnet},
 }
 
 func main() {
@@ -17,8 +18,8 @@ func main() {
 		Description: `Run different eth2 testnets.`,
 	}
 	suite.Add(hivesim.TestSpec{
-		Name:        "merge-transition-testnets",
-		Description: "Collection of different merge testnet compositions and assertions.",
+		Name:        "eth2-testnets",
+		Description: "Collection of different eth2 testnet compositions and assertions.",
 		Run: func(t *hivesim.T) {
 			clientTypes, err := t.Sim.ClientTypes()
 			if err != nil {
@@ -58,20 +59,17 @@ func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	for _, test := range tests {
-		test := test
-		if test.MatchClients(c) {
+	for _, node := range c.Combinations() {
+		for _, test := range tests {
+			test := test
 			t.Run(hivesim.TestSpec{
-				Name:        test.Name,
+				Name:        fmt.Sprintf("%s-%s", test.Name, node),
 				Description: test.About,
 				Run: func(t *hivesim.T) {
 					env := &testEnv{c, keys, secrets}
-					test.Run(t, env)
+					test.Run(t, env, node)
 				},
 			})
-		} else {
-			t.Logf("Skipping test %s, missing client definitions", test.Name)
 		}
 	}
 }

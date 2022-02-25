@@ -35,64 +35,39 @@ func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
 	return testnet
 }
 
-type SingleClientTestnet struct{}
+func Phase0Testnet(t *hivesim.T, env *testEnv, n node) {
+	config := config{
+		AltairForkEpoch:         10,
+		MergeForkEpoch:          20,
+		ValidatorCount:          VALIDATOR_COUNT,
+		SlotTime:                SLOT_TIME,
+		TerminalTotalDifficulty: TERMINCAL_TOTAL_DIFFICULTY,
+		Nodes: []node{
+			n,
+			n,
+		},
+		ShouldMine: true,
+	}
 
-func (s SingleClientTestnet) MatchClients(clients *ClientDefinitionsByRole) bool {
-	// Run test case for all available client configurations
-	return true
-}
+	testnet := startTestnet(t, env, &config)
 
-func (s SingleClientTestnet) Run(t *hivesim.T, env *testEnv) {
-	for _, bn := range env.Clients.Beacon {
-		for _, eth1 := range env.Clients.Eth1 {
-			n := node{eth1.Name, bn.Name[:len(bn.Name)-3]}
-			config := config{
-				AltairForkEpoch:         10,
-				MergeForkEpoch:          20,
-				ValidatorCount:          VALIDATOR_COUNT,
-				SlotTime:                SLOT_TIME,
-				TerminalTotalDifficulty: TERMINCAL_TOTAL_DIFFICULTY,
-				Nodes: []node{
-					n,
-					n,
-					n,
-					n,
-				},
-				ShouldMine: true,
-			}
-
-			testnet := startTestnet(t, env, &config)
-
-			ctx := context.Background()
-			finalized, err := testnet.WaitForFinality(ctx)
-			if err != nil {
-				t.Fatalf("%v", err)
-			}
-			if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
-				t.Fatalf("%v", err)
-			}
-			if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, finalized); err != nil {
-				t.Fatalf("%v", err)
-			}
-			if err := testnet.VerifyProposers(ctx, finalized); err != nil {
-				t.Fatalf("%v", err)
-			}
-		}
+	ctx := context.Background()
+	finalized, err := testnet.WaitForFinality(ctx)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, finalized); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyProposers(ctx, finalized); err != nil {
+		t.Fatalf("%v", err)
 	}
 }
 
-// Basic single client merge transition testnet
-type Bscmtt struct {
-	Node node
-}
-
-func (s Bscmtt) MatchClients(clients *ClientDefinitionsByRole) bool {
-	return clients.ClientByNameAndRole(s.Node.ExecutionClient, "eth1") != nil &&
-		clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", s.Node.ConsensusClient), "beacon") != nil &&
-		clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", s.Node.ConsensusClient), "validator") != nil
-}
-
-func (s Bscmtt) Run(t *hivesim.T, env *testEnv) {
+func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 	config := config{
 		AltairForkEpoch:         0,
 		MergeForkEpoch:          0,
@@ -100,8 +75,8 @@ func (s Bscmtt) Run(t *hivesim.T, env *testEnv) {
 		SlotTime:                SLOT_TIME,
 		TerminalTotalDifficulty: TERMINCAL_TOTAL_DIFFICULTY,
 		Nodes: []node{
-			s.Node,
-			s.Node,
+			n,
+			n,
 		},
 		ShouldMine: false,
 	}
