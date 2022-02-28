@@ -293,6 +293,9 @@ func (ec *EngineClient) EngineNewPayloadV1(ctx context.Context, payload *Executa
 
 func (ec *EngineClient) EngineExchangeTransitionConfigurationV1(ctx context.Context, t *TransitionConfigurationV1) (TransitionConfigurationV1, error) {
 	var result TransitionConfigurationV1
+	if err := ec.PrepareAuthCallToken(); err != nil {
+		return result, err
+	}
 	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", t)
 	return result, err
 }
