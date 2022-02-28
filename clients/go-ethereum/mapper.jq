@@ -52,7 +52,5 @@ def to_bool:
     "yolov2Block": env.HIVE_FORK_BERLIN|to_int,
     "yolov3Block": env.HIVE_FORK_BERLIN|to_int,
     "londonBlock": env.HIVE_FORK_LONDON|to_int,
-    "arrowGlacierBlock": env.HIVE_FORK_ARROWGLACIER|to_int,
-    "terminalTotalDifficulty": env.HIVE_FORK_MERGE|to_int,
   }|remove_empty
 }
