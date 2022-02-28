@@ -74,7 +74,9 @@ Send a NewPayload directive to the client including an incorrect BlockHash, shou
 Send a NewPayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
 
 - Invalid Field in NewPayload:  
-Modify fields of the ExecutablePayload while maintaining a valid BlockHash, including:
+Send an invalid payload in NewPayload by modifying fields of a valid ExecutablePayload while maintaining a valid BlockHash.
+After attempting to NewPayload/ForkchoiceUpdated the invalid payload, also attempt to send a valid payload that contains the previously modified invalid payload as parent (should also fail).
+Modify fields including:
    - ParentHash
    - StateRoot
    - ReceiptsRoot
@@ -83,6 +85,7 @@ Modify fields of the ExecutablePayload while maintaining a valid BlockHash, incl
    - GasUsed
    - Timestamp
    - PrevRandao
+   - Removing a Transaction
    - Transaction with incorrect fields:
       - Signature
       - Nonce
