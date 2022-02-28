@@ -361,10 +361,13 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 	cl.LatestFinalizedHeader = nil
 	for _, ec := range cl.EngineClients {
 		newHeader, err := ec.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), cl.LatestFinalizedNumber)
-		if err == nil {
-			cl.LatestFinalizedHeader = newHeader
-			break
+		if err != nil {
+			continue
 		}
+		if newHeader.Hash() != cl.LatestPayloadBuilt.BlockHash {
+			continue
+		}
+		cl.LatestFinalizedHeader = newHeader
 	}
 	if cl.LatestFinalizedHeader == nil {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
