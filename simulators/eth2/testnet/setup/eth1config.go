@@ -93,7 +93,7 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64) *Eth1Genesis {
 			Timestamp:  genesisTime,
 			ExtraData:  nil,
 			GasLimit:   30_000_000,
-			Difficulty: big.NewInt(10000000),
+			Difficulty: big.NewInt(1000000),
 			Mixhash:    common.Hash{},
 			Coinbase:   common.Address{},
 			Alloc: core.GenesisAlloc{
