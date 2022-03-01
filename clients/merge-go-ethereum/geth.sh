@@ -81,7 +81,7 @@ if [ "$HIVE_NODETYPE" == "archive" ]; then
     FLAGS="$FLAGS --syncmode full --gcmode archive"
 fi
 if [ "$HIVE_NODETYPE" == "full" ]; then
-    FLAGS="$FLAGS --syncmode full"
+    FLAGS="$FLAGS --syncmode snap"
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
     FLAGS="$FLAGS --syncmode light"

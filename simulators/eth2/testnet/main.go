@@ -8,7 +8,7 @@ import (
 )
 
 var tests = []testSpec{
-	{Name: "single-client-testnet", Run: Phase0Testnet},
+	// {Name: "single-client-testnet", Run: Phase0Testnet},
 	{Name: "transition-testnet", Run: TransitionTestnet},
 }
 

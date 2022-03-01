@@ -47,7 +47,7 @@ type PreparedTestnet struct {
 // Build all artifacts require to start a testnet.
 func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet {
 	eth1GenesisTime := common.Timestamp(time.Now().Unix())
-	eth2GenesisTime := eth1GenesisTime + 30
+	eth2GenesisTime := eth1GenesisTime + 60
 
 	// Generate genesis for execution clients
 	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime))

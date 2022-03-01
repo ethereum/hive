@@ -38,4 +38,5 @@ lighthouse \
     --validators-dir="/data/validators" \
     --secrets-dir="/data/secrets" \
     --init-slashing-protection \
-    --beacon-nodes="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT"
+    --beacon-nodes="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT" \
+    --suggested-fee-recipient="0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b"
