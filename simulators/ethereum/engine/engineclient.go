@@ -242,10 +242,9 @@ type TransitionConfigurationV1Marshaling struct {
 }
 
 // JWT Tokens
-func GetNewToken() (string, error) {
-	jwtSecretBytes := common.FromHex(defaultJwtTokenSecret)
+func GetNewToken(jwtSecretBytes []byte, iat time.Time) (string, error) {
 	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"iat": time.Now().Unix(),
+		"iat": iat.Unix(),
 	})
 	tokenString, err := newToken.SignedString(jwtSecretBytes)
 	if err != nil {
@@ -254,8 +253,8 @@ func GetNewToken() (string, error) {
 	return tokenString, nil
 }
 
-func (ec *EngineClient) PrepareAuthCallToken() error {
-	newTokenString, err := GetNewToken()
+func (ec *EngineClient) PrepareAuthCallToken(jwtSecretBytes []byte, iat time.Time) error {
+	newTokenString, err := GetNewToken(jwtSecretBytes, iat)
 	if err != nil {
 		return err
 	}
@@ -263,10 +262,15 @@ func (ec *EngineClient) PrepareAuthCallToken() error {
 	return nil
 }
 
+func (ec *EngineClient) PrepareDefaultAuthCallToken() error {
+	ec.PrepareAuthCallToken(defaultJwtTokenSecretBytes, time.Now())
+	return nil
+}
+
 // Engine API Call Methods
 func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *ForkchoiceStateV1, pAttributes *PayloadAttributesV1) (ForkChoiceResponse, error) {
 	var result ForkChoiceResponse
-	if err := ec.PrepareAuthCallToken(); err != nil {
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 	err := ec.c.CallContext(ctx, &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
@@ -275,7 +279,7 @@ func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *
 
 func (ec *EngineClient) EngineGetPayloadV1(ctx context.Context, payloadId *PayloadID) (ExecutableDataV1, error) {
 	var result ExecutableDataV1
-	if err := ec.PrepareAuthCallToken(); err != nil {
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 	err := ec.c.CallContext(ctx, &result, "engine_getPayloadV1", payloadId)
@@ -284,18 +288,18 @@ func (ec *EngineClient) EngineGetPayloadV1(ctx context.Context, payloadId *Paylo
 
 func (ec *EngineClient) EngineNewPayloadV1(ctx context.Context, payload *ExecutableDataV1) (PayloadStatusV1, error) {
 	var result PayloadStatusV1
-	if err := ec.PrepareAuthCallToken(); err != nil {
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 	err := ec.c.CallContext(ctx, &result, "engine_newPayloadV1", payload)
 	return result, err
 }
 
-func (ec *EngineClient) EngineExchangeTransitionConfigurationV1(ctx context.Context, t *TransitionConfigurationV1) (TransitionConfigurationV1, error) {
+func (ec *EngineClient) EngineExchangeTransitionConfigurationV1(ctx context.Context, tConf *TransitionConfigurationV1) (TransitionConfigurationV1, error) {
 	var result TransitionConfigurationV1
-	if err := ec.PrepareAuthCallToken(); err != nil {
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
-	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", t)
+	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", tConf)
 	return result, err
 }

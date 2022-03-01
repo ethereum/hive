@@ -37,8 +37,9 @@ var (
 	minerPKHex   = "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 	minerAddrHex = "658bdf435d810c91414ec09147daa6db62406379"
 
-	// JWT Token Secret for authenticated Engine API calls
-	defaultJwtTokenSecret = "0x7365637265747365637265747365637265747365637265747365637265747365" // secretsecretsecretsecretsecretse
+	// JWT Authentication Related
+	defaultJwtTokenSecretBytes = []byte("secretsecretsecretsecretsecretse") // secretsecretsecretsecretsecretse
+	maxTimeDriftSeconds        = int64(5)
 )
 
 var clientEnv = hivesim.Params{
@@ -93,7 +94,10 @@ type TestSpec struct {
 
 var allTests = append(
 	engineTests,
-	mergeTests...,
+	append(
+		mergeTests,
+		authTests...,
+	)...,
 )
 
 func main() {
