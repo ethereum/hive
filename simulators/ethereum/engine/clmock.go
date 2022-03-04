@@ -221,7 +221,7 @@ func (cl *CLMocker) getNextPayloadID() {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.Client.Container, err)
 	}
 	if resp.PayloadStatus.Status != "VALID" {
-		cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp)
+		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated Response from Payload builder: %v", resp)
 	}
 	cl.NextPayloadID = resp.PayloadID
 }
