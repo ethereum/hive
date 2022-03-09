@@ -148,15 +148,15 @@ if [ "$HIVE_LES_SERVER" == "1" ]; then
 fi
 
 # Configure RPC.
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,personal,txpool,web3"
+FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,personal,txpool,web3"
+
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
-    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.authport=8550 --http.api=admin,debug,engine,eth,miner,net,personal,txpool,web3"
-    FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,engine,eth,miner,net,personal,txpool,web3"
-    FLAGS="$FLAGS --jwt-secret $JWT_SECRET"
-else
-    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.port=8545 --http.api=admin,debug,eth,miner,net,personal,txpool,web3"
-    FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth,miner,net,personal,txpool,web3"
+    FLAGS="$FLAGS --authrpc.port=8550 --authrpc.jwtsecret $JWT_SECRET"
 fi
+
+# Configure GraphQL.
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
     FLAGS="$FLAGS --graphql"
 fi
