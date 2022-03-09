@@ -9,16 +9,17 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/golang-jwt/jwt/v4"
 )
 
-// Execution API v1.0.0-alpha.5 changes this to 8550
-// https://github.com/ethereum/execution-apis/releases/tag/v1.0.0-alpha.5
-var EnginePortHTTP = 8545
-var EnginePortWS = 8546
+// https://github.com/ethereum/execution-apis/blob/v1.0.0-alpha.7/src/engine/specification.md
+var EthPortHTTP = 8545
+var EnginePortHTTP = 8550
+var EnginePortWS = 8551
 
 // EngineClient wrapper for Ethereum Engine RPC for testing purposes.
 type EngineClient struct {
@@ -26,6 +27,7 @@ type EngineClient struct {
 	*hivesim.Client
 	c                       *rpc.Client
 	Eth                     *ethclient.Client
+	cEth                    *rpc.Client
 	IP                      net.IP
 	TerminalTotalDifficulty *big.Int
 
@@ -58,13 +60,14 @@ func NewEngineClient(t *hivesim.T, hc *hivesim.Client, ttd *big.Int) *EngineClie
 			inner: http.DefaultTransport,
 		},
 	}
-	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", hc.IP), client)
+	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:%v/", hc.IP, EthPortHTTP), client)
 	eth := ethclient.NewClient(rpcClient)
 	return &EngineClient{
 		T:                       t,
 		Client:                  hc,
 		c:                       rpcHttpClient,
 		Eth:                     eth,
+		cEth:                    rpcClient,
 		IP:                      hc.IP,
 		TerminalTotalDifficulty: ttd,
 		lastCtx:                 nil,
@@ -78,7 +81,7 @@ func (ec *EngineClient) Equals(ec2 *EngineClient) bool {
 
 func (ec *EngineClient) checkTTD() bool {
 	var td *TotalDifficultyHeader
-	if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
+	if err := ec.cEth.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
 		panic(err)
 	}
 	return td.TotalDifficulty.ToInt().Cmp(ec.TerminalTotalDifficulty) >= 0
@@ -151,31 +154,145 @@ func (ec *EngineClient) Ctx() context.Context {
 	return ec.lastCtx
 }
 
+// Engine API Types
 type PayloadStatusV1 struct {
 	Status          string       `json:"status"`
 	LatestValidHash *common.Hash `json:"latestValidHash"`
 	ValidationError *string      `json:"validationError"`
 }
 type ForkChoiceResponse struct {
-	PayloadStatus PayloadStatusV1   `json:"payloadStatus"`
-	PayloadID     *beacon.PayloadID `json:"payloadId"`
+	PayloadStatus PayloadStatusV1 `json:"payloadStatus"`
+	PayloadID     *PayloadID      `json:"payloadId"`
+}
+
+type PayloadID [8]byte
+
+func (b PayloadID) MarshalText() ([]byte, error) {
+	return hexutil.Bytes(b[:]).MarshalText()
+}
+func (b *PayloadID) UnmarshalText(input []byte) error {
+	err := hexutil.UnmarshalFixedText("PayloadID", input, b[:])
+	if err != nil {
+		return fmt.Errorf("invalid payload id %q: %w", input, err)
+	}
+	return nil
+}
+
+type ForkchoiceStateV1 struct {
+	HeadBlockHash      common.Hash `json:"headBlockHash"`
+	SafeBlockHash      common.Hash `json:"safeBlockHash"`
+	FinalizedBlockHash common.Hash `json:"finalizedBlockHash"`
+}
+
+//go:generate go run github.com/fjl/gencodec -type ExecutableDataV1 -field-override executableDataMarshaling -out gen_ed.go
+// ExecutableDataV1 structure described at https://github.com/ethereum/execution-apis/src/engine/specification.md
+type ExecutableDataV1 struct {
+	ParentHash    common.Hash    `json:"parentHash"    gencodec:"required"`
+	FeeRecipient  common.Address `json:"feeRecipient"  gencodec:"required"`
+	StateRoot     common.Hash    `json:"stateRoot"     gencodec:"required"`
+	ReceiptsRoot  common.Hash    `json:"receiptsRoot"  gencodec:"required"`
+	LogsBloom     []byte         `json:"logsBloom"     gencodec:"required"`
+	PrevRandao    common.Hash    `json:"prevRandao"    gencodec:"required"`
+	Number        uint64         `json:"blockNumber"   gencodec:"required"`
+	GasLimit      uint64         `json:"gasLimit"      gencodec:"required"`
+	GasUsed       uint64         `json:"gasUsed"       gencodec:"required"`
+	Timestamp     uint64         `json:"timestamp"     gencodec:"required"`
+	ExtraData     []byte         `json:"extraData"     gencodec:"required"`
+	BaseFeePerGas *big.Int       `json:"baseFeePerGas" gencodec:"required"`
+	BlockHash     common.Hash    `json:"blockHash"     gencodec:"required"`
+	Transactions  [][]byte       `json:"transactions"  gencodec:"required"`
+}
+
+// JSON type overrides for executableData.
+type executableDataMarshaling struct {
+	Number        hexutil.Uint64
+	GasLimit      hexutil.Uint64
+	GasUsed       hexutil.Uint64
+	Timestamp     hexutil.Uint64
+	BaseFeePerGas *hexutil.Big
+	ExtraData     hexutil.Bytes
+	LogsBloom     hexutil.Bytes
+	Transactions  []hexutil.Bytes
+}
+
+//go:generate go run github.com/fjl/gencodec -type PayloadAttributesV1 -field-override payloadAttributesMarshaling -out gen_blockparams.go
+// PayloadAttributesV1 structure described at https://github.com/ethereum/execution-apis/pull/74
+type PayloadAttributesV1 struct {
+	Timestamp             uint64         `json:"timestamp"              gencodec:"required"`
+	PrevRandao            common.Hash    `json:"prevRandao"             gencodec:"required"`
+	SuggestedFeeRecipient common.Address `json:"suggestedFeeRecipient"  gencodec:"required"`
+}
+
+// JSON type overrides for PayloadAttributesV1.
+type payloadAttributesMarshaling struct {
+	Timestamp hexutil.Uint64
+}
+
+//go:generate go run github.com/fjl/gencodec -type TransitionConfigurationV1 -field-override TransitionConfigurationV1Marshaling -out gen_transitionconf.go
+type TransitionConfigurationV1 struct {
+	TerminalTotalDifficulty *big.Int     `json:"terminalTotalDifficulty" gencodec:"required"`
+	TerminalBlockHash       *common.Hash `json:"terminalBlockHash"       gencodec:"required"`
+	TerminalBlockNumber     uint64       `json:"terminalBlockNumber"     gencodec:"required"`
+}
+
+// JSON type overrides for TransitionConfigurationV1.
+type TransitionConfigurationV1Marshaling struct {
+	TerminalTotalDifficulty *hexutil.Big   `json:"terminalTotalDifficulty"`
+	TerminalBlockNumber     hexutil.Uint64 `json:"terminalBlockNumber"`
+}
+
+// JWT Tokens
+func GetNewToken() (string, error) {
+	jwtSecretBytes := common.FromHex(defaultJwtTokenSecret)
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"iat": time.Now().Unix(),
+	})
+	tokenString, err := newToken.SignedString(jwtSecretBytes)
+	if err != nil {
+		return "", err
+	}
+	return tokenString, nil
+}
+
+func (ec *EngineClient) PrepareAuthCallToken() error {
+	newTokenString, err := GetNewToken()
+	if err != nil {
+		return err
+	}
+	ec.c.SetHeader("Authorization", fmt.Sprintf("Bearer %s", newTokenString))
+	return nil
 }
 
 // Engine API Call Methods
-func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributesV1) (ForkChoiceResponse, error) {
+func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *ForkchoiceStateV1, pAttributes *PayloadAttributesV1) (ForkChoiceResponse, error) {
 	var result ForkChoiceResponse
+	if err := ec.PrepareAuthCallToken(); err != nil {
+		return result, err
+	}
 	err := ec.c.CallContext(ctx, &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
 	return result, err
 }
 
-func (ec *EngineClient) EngineGetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableDataV1, error) {
-	var result beacon.ExecutableDataV1
+func (ec *EngineClient) EngineGetPayloadV1(ctx context.Context, payloadId *PayloadID) (ExecutableDataV1, error) {
+	var result ExecutableDataV1
+	if err := ec.PrepareAuthCallToken(); err != nil {
+		return result, err
+	}
 	err := ec.c.CallContext(ctx, &result, "engine_getPayloadV1", payloadId)
 	return result, err
 }
 
-func (ec *EngineClient) EngineNewPayloadV1(ctx context.Context, payload *beacon.ExecutableDataV1) (PayloadStatusV1, error) {
+func (ec *EngineClient) EngineNewPayloadV1(ctx context.Context, payload *ExecutableDataV1) (PayloadStatusV1, error) {
 	var result PayloadStatusV1
+	if err := ec.PrepareAuthCallToken(); err != nil {
+		return result, err
+	}
 	err := ec.c.CallContext(ctx, &result, "engine_newPayloadV1", payload)
+	return result, err
+}
+
+func (ec *EngineClient) EngineExchangeTransitionConfigurationV1(ctx context.Context, t *TransitionConfigurationV1) (TransitionConfigurationV1, error) {
+	var result TransitionConfigurationV1
+	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", t)
 	return result, err
 }

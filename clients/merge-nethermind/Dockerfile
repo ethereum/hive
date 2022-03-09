@@ -1,5 +1,5 @@
 ARG branch=latest
-FROM nethermindeth/nethermind:kiln_0.1
+FROM nethermindeth/nethermind:kiln_0.5
 
 RUN apt-get update && apt-get install -y wget
 RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /usr/local/bin/jq && \

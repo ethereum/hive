@@ -74,7 +74,9 @@ Send a NewPayload directive to the client including an incorrect BlockHash, shou
 Send a NewPayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
 
 - Invalid Field in NewPayload:  
-Modify fields of the ExecutablePayload while maintaining a valid BlockHash, including:
+Send an invalid payload in NewPayload by modifying fields of a valid ExecutablePayload while maintaining a valid BlockHash.
+After attempting to NewPayload/ForkchoiceUpdated the invalid payload, also attempt to send a valid payload that contains the previously modified invalid payload as parent (should also fail).
+Modify fields including:
    - ParentHash
    - StateRoot
    - ReceiptsRoot
@@ -82,6 +84,14 @@ Modify fields of the ExecutablePayload while maintaining a valid BlockHash, incl
    - GasLimit
    - GasUsed
    - Timestamp
+   - PrevRandao
+   - Removing a Transaction
+   - Transaction with incorrect fields:
+      - Signature
+      - Nonce
+      - GasPrice
+      - Gas
+      - Value
 
 ### Eth RPC Status on ForkchoiceUpdated Events:
 - Latest Block after NewPayload:  
@@ -122,11 +132,11 @@ Send a transaction that modifies the state, ForkchoiceUpdate to the payload cont
 - Suggested Fee Recipient Test:  
 Set the fee recipient to a custom address and verify that (a) balance is not increased when no fees are collected (b) balance is increased appropriately when fees are collected.
 
-### Random Opcode:
-- Random Opcode Transactions:  
+### PrevRandao Opcode:
+- PrevRandao Opcode Transactions:  
 Send transactions that modify the state to the value of the 'DIFFICULTY' opcode and verify that:  
 (a) the state is equal to the difficulty on blocks before the TTD is crossed  
-(b) the state is equal to the Random value provided using forkchoiceUpdated after PoS transition.  
+(b) the state is equal to the PrevRandao value provided using forkchoiceUpdated after PoS transition.  
 
 ### Sync Tests:
 - Sync Client Post Merge:  

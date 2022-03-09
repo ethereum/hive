@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 )
@@ -23,18 +22,18 @@ type CLMocker struct {
 	// Block Production State
 	NextBlockProducer *EngineClient
 	NextFeeRecipient  common.Address
-	NextPayloadID     *beacon.PayloadID
+	NextPayloadID     *PayloadID
 
 	// PoS Chain History Information
-	RandomHistory          map[uint64]common.Hash
-	ExecutedPayloadHistory map[uint64]beacon.ExecutableDataV1
+	PrevRandaoHistory      map[uint64]common.Hash
+	ExecutedPayloadHistory map[uint64]ExecutableDataV1
 
 	// Latest broadcasted data using the PoS Engine API
 	LatestFinalizedNumber *big.Int
 	LatestFinalizedHeader *types.Header
-	LatestPayloadBuilt    beacon.ExecutableDataV1
-	LatestExecutedPayload beacon.ExecutableDataV1
-	LatestForkchoice      beacon.ForkchoiceStateV1
+	LatestPayloadBuilt    ExecutableDataV1
+	LatestExecutedPayload ExecutableDataV1
+	LatestForkchoice      ForkchoiceStateV1
 
 	// Merge related
 	FirstPoSBlockNumber *big.Int
@@ -54,14 +53,14 @@ func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
 	newCLMocker := &CLMocker{
 		T:                      t,
 		EngineClients:          make([]*EngineClient, 0),
-		RandomHistory:          map[uint64]common.Hash{},
-		ExecutedPayloadHistory: map[uint64]beacon.ExecutableDataV1{},
+		PrevRandaoHistory:      map[uint64]common.Hash{},
+		ExecutedPayloadHistory: map[uint64]ExecutableDataV1{},
 		LatestFinalizedHeader:  nil,
 		FirstPoSBlockNumber:    nil,
 		LatestFinalizedNumber:  nil,
 		TTDReached:             false,
 		NextFeeRecipient:       common.Address{},
-		LatestForkchoice: beacon.ForkchoiceStateV1{
+		LatestForkchoice: ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
 			SafeBlockHash:      common.Hash{},
 			FinalizedBlockHash: common.Hash{},
@@ -102,7 +101,7 @@ func (cl *CLMocker) CloseClients() {
 // Sets the specified client's chain head as Terminal PoW block by sending the initial forkchoiceUpdated.
 func (cl *CLMocker) setTTDBlockClient(ec *EngineClient) {
 	var td *TotalDifficultyHeader
-	if err := ec.c.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
+	if err := ec.cEth.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
 		cl.Fatalf("CLMocker: Could not get latest header: %v", err)
 	}
 	if td == nil {
@@ -204,25 +203,25 @@ func (cl *CLMocker) pickNextPayloadProducer() {
 }
 
 func (cl *CLMocker) getNextPayloadID() {
-	// Generate a random value for the Random field
-	nextRandom := common.Hash{}
-	rand.Read(nextRandom[:])
+	// Generate a random value for the PrevRandao field
+	nextPrevRandao := common.Hash{}
+	rand.Read(nextPrevRandao[:])
 
-	payloadAttributes := beacon.PayloadAttributesV1{
+	payloadAttributes := PayloadAttributesV1{
 		Timestamp:             cl.LatestFinalizedHeader.Time + 1,
-		Random:                nextRandom,
+		PrevRandao:            nextPrevRandao,
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
 	}
 
 	// Save random value
-	cl.RandomHistory[cl.LatestFinalizedHeader.Number.Uint64()+1] = nextRandom
+	cl.PrevRandaoHistory[cl.LatestFinalizedHeader.Number.Uint64()+1] = nextPrevRandao
 
 	resp, err := cl.NextBlockProducer.EngineForkchoiceUpdatedV1(cl.NextBlockProducer.Ctx(), &cl.LatestForkchoice, &payloadAttributes)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.Client.Container, err)
 	}
 	if resp.PayloadStatus.Status != "VALID" {
-		cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp)
+		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated Response from Payload builder: %v", resp)
 	}
 	cl.NextPayloadID = resp.PayloadID
 }
@@ -362,10 +361,13 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 	cl.LatestFinalizedHeader = nil
 	for _, ec := range cl.EngineClients {
 		newHeader, err := ec.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), cl.LatestFinalizedNumber)
-		if err == nil {
-			cl.LatestFinalizedHeader = newHeader
-			break
+		if err != nil {
+			continue
 		}
+		if newHeader.Hash() != cl.LatestPayloadBuilt.BlockHash {
+			continue
+		}
+		cl.LatestFinalizedHeader = newHeader
 	}
 	if cl.LatestFinalizedHeader == nil {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
@@ -391,7 +393,7 @@ type ExecutePayloadOutcome struct {
 	Error                  error
 }
 
-func (cl *CLMocker) broadcastNewPayload(payload *beacon.ExecutableDataV1) []ExecutePayloadOutcome {
+func (cl *CLMocker) broadcastNewPayload(payload *ExecutableDataV1) []ExecutePayloadOutcome {
 	responses := make([]ExecutePayloadOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.Container
@@ -413,7 +415,7 @@ type ForkChoiceOutcome struct {
 	Error              error
 }
 
-func (cl *CLMocker) broadcastForkchoiceUpdated(fcstate *beacon.ForkchoiceStateV1, payloadAttr *beacon.PayloadAttributesV1) []ForkChoiceOutcome {
+func (cl *CLMocker) broadcastForkchoiceUpdated(fcstate *ForkchoiceStateV1, payloadAttr *PayloadAttributesV1) []ForkChoiceOutcome {
 	responses := make([]ForkChoiceOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.Container

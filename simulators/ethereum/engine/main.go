@@ -31,11 +31,14 @@ var (
 	PoSConfirmationBlocks = uint64(1)
 
 	// Test related
-	randomContractAddr = common.HexToAddress("0000000000000000000000000000000000000316")
+	prevRandaoContractAddr = common.HexToAddress("0000000000000000000000000000000000000316")
 
 	// Clique Related
 	minerPKHex   = "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
 	minerAddrHex = "658bdf435d810c91414ec09147daa6db62406379"
+
+	// JWT Token Secret for authenticated Engine API calls
+	defaultJwtTokenSecret = "0x7365637265747365637265747365637265747365637265747365637265747365" // secretsecretsecretsecretsecretse
 )
 
 var clientEnv = hivesim.Params{

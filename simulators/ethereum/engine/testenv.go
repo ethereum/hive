@@ -76,7 +76,7 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 	ec := NewEngineClient(t, c, ttd)
 	defer ec.Close()
 
-	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
+	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:%v/", c.IP, EthPortHTTP), client)
 	defer rpcClient.Close()
 	env := &TestEnv{
 		T:            t,

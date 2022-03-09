@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -13,9 +15,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/hivesim"
 )
@@ -72,13 +74,89 @@ func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	return &respCopy, nil
 }
 
+type SignatureValues struct {
+	V *big.Int
+	R *big.Int
+	S *big.Int
+}
+
+func SignatureValuesFromRaw(v *big.Int, r *big.Int, s *big.Int) SignatureValues {
+	return SignatureValues{
+		V: v,
+		R: r,
+		S: s,
+	}
+}
+
+type CustomTransactionData struct {
+	Nonce     *uint64
+	GasPrice  *big.Int
+	Gas       *uint64
+	To        *common.Address
+	Value     *big.Int
+	Data      *[]byte
+	Signature *SignatureValues
+}
+
+func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateKey, customData *CustomTransactionData) (*types.Transaction, error) {
+	// Create a modified transaction base, from the base transaction and customData mix
+	modifiedTxBase := &types.LegacyTx{}
+
+	if customData.Nonce != nil {
+		modifiedTxBase.Nonce = *customData.Nonce
+	} else {
+		modifiedTxBase.Nonce = baseTransaction.Nonce()
+	}
+	if customData.GasPrice != nil {
+		modifiedTxBase.GasPrice = customData.GasPrice
+	} else {
+		modifiedTxBase.GasPrice = baseTransaction.GasPrice()
+	}
+	if customData.Gas != nil {
+		modifiedTxBase.Gas = *customData.Gas
+	} else {
+		modifiedTxBase.Gas = baseTransaction.Gas()
+	}
+	if customData.To != nil {
+		modifiedTxBase.To = customData.To
+	} else {
+		modifiedTxBase.To = baseTransaction.To()
+	}
+	if customData.Value != nil {
+		modifiedTxBase.Value = customData.Value
+	} else {
+		modifiedTxBase.Value = baseTransaction.Value()
+	}
+	if customData.Data != nil {
+		modifiedTxBase.Data = *customData.Data
+	} else {
+		modifiedTxBase.Data = baseTransaction.Data()
+	}
+	var modifiedTx *types.Transaction
+	if customData.Signature != nil {
+		modifiedTxBase.V = customData.Signature.V
+		modifiedTxBase.R = customData.Signature.R
+		modifiedTxBase.S = customData.Signature.S
+		modifiedTx = types.NewTx(modifiedTxBase)
+	} else {
+		// If a custom signature was not specified, simply sign the transaction again
+		signer := types.NewEIP155Signer(chainID)
+		var err error
+		modifiedTx, err = types.SignTx(types.NewTx(modifiedTxBase), signer, pk)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return modifiedTx, nil
+}
+
 type CustomPayloadData struct {
 	ParentHash    *common.Hash
 	FeeRecipient  *common.Address
 	StateRoot     *common.Hash
 	ReceiptsRoot  *common.Hash
 	LogsBloom     *[]byte
-	Random        *common.Hash
+	PrevRandao    *common.Hash
 	Number        *uint64
 	GasLimit      *uint64
 	GasUsed       *uint64
@@ -104,7 +182,7 @@ func calcTxsHash(txsBytes [][]byte) (common.Hash, error) {
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
 // BlockHash is calculated automatically.
-func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPayloadData) (*beacon.ExecutableDataV1, error) {
+func customizePayload(basePayload *ExecutableDataV1, customData *CustomPayloadData) (*ExecutableDataV1, error) {
 	txs := basePayload.Transactions
 	if customData.Transactions != nil {
 		txs = *customData.Transactions
@@ -129,7 +207,7 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 		GasUsed:     basePayload.GasUsed,
 		Time:        basePayload.Timestamp,
 		Extra:       basePayload.ExtraData,
-		MixDigest:   basePayload.Random,
+		MixDigest:   basePayload.PrevRandao,
 		Nonce:       types.BlockNonce{0}, // could be overwritten
 		BaseFee:     basePayload.BaseFeePerGas,
 	}
@@ -150,8 +228,8 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 	if customData.LogsBloom != nil {
 		customPayloadHeader.Bloom = types.BytesToBloom(*customData.LogsBloom)
 	}
-	if customData.Random != nil {
-		customPayloadHeader.MixDigest = *customData.Random
+	if customData.PrevRandao != nil {
+		customPayloadHeader.MixDigest = *customData.PrevRandao
 	}
 	if customData.Number != nil {
 		customPayloadHeader.Number = big.NewInt(int64(*customData.Number))
@@ -173,13 +251,13 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 	}
 
 	// Return the new payload
-	return &beacon.ExecutableDataV1{
+	return &ExecutableDataV1{
 		ParentHash:    customPayloadHeader.ParentHash,
 		FeeRecipient:  customPayloadHeader.Coinbase,
 		StateRoot:     customPayloadHeader.Root,
 		ReceiptsRoot:  customPayloadHeader.ReceiptHash,
 		LogsBloom:     customPayloadHeader.Bloom[:],
-		Random:        customPayloadHeader.MixDigest,
+		PrevRandao:    customPayloadHeader.MixDigest,
 		Number:        customPayloadHeader.Number.Uint64(),
 		GasLimit:      customPayloadHeader.GasLimit,
 		GasUsed:       customPayloadHeader.GasUsed,
@@ -189,6 +267,80 @@ func customizePayload(basePayload *beacon.ExecutableDataV1, customData *CustomPa
 		BlockHash:     customPayloadHeader.Hash(),
 		Transactions:  txs,
 	}, nil
+}
+
+// Use client specific rpc methods to debug a transaction that includes the PREVRANDAO opcode
+func debugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, clientType string, tx *types.Transaction, expectedPrevRandao *common.Hash) error {
+	switch clientType {
+	case "merge-go-ethereum":
+		return gethDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
+	case "go-ethereum":
+		return gethDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
+	case "merge-nethermind":
+		return nethermindDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
+	case "nethermind":
+		return nethermindDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
+	}
+	fmt.Printf("debug_traceTransaction, no method to test client type %v", clientType)
+	return nil
+}
+
+func gethDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx *types.Transaction, expectedPrevRandao *common.Hash) error {
+	type StructLogRes struct {
+		Pc      uint64             `json:"pc"`
+		Op      string             `json:"op"`
+		Gas     uint64             `json:"gas"`
+		GasCost uint64             `json:"gasCost"`
+		Depth   int                `json:"depth"`
+		Error   string             `json:"error,omitempty"`
+		Stack   *[]string          `json:"stack,omitempty"`
+		Memory  *[]string          `json:"memory,omitempty"`
+		Storage *map[string]string `json:"storage,omitempty"`
+	}
+
+	type ExecutionResult struct {
+		Gas         uint64         `json:"gas"`
+		Failed      bool           `json:"failed"`
+		ReturnValue string         `json:"returnValue"`
+		StructLogs  []StructLogRes `json:"structLogs"`
+	}
+
+	var er *ExecutionResult
+	if err := c.CallContext(ctx, &er, "debug_traceTransaction", tx.Hash()); err != nil {
+		return err
+	}
+	if er == nil {
+		return errors.New("debug_traceTransaction returned empty result")
+	}
+	prevRandaoFound := false
+	for i, l := range er.StructLogs {
+		if l.Op == "DIFFICULTY" || l.Op == "PREVRANDAO" {
+			if i+1 >= len(er.StructLogs) {
+				return errors.New(fmt.Sprintf("No information after PREVRANDAO operation"))
+			}
+			prevRandaoFound = true
+			stack := *(er.StructLogs[i+1].Stack)
+			if len(stack) < 1 {
+				return errors.New(fmt.Sprintf("Invalid stack after PREVRANDAO operation: %v", l.Stack))
+			}
+			stackHash := common.HexToHash(stack[0])
+			if stackHash != *expectedPrevRandao {
+				return errors.New(fmt.Sprintf("Invalid stack after PREVRANDAO operation, %v != %v", stackHash, expectedPrevRandao))
+			}
+		}
+	}
+	if !prevRandaoFound {
+		return errors.New("PREVRANDAO opcode not found")
+	}
+	return nil
+}
+
+func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx *types.Transaction, expectedPrevRandao *common.Hash) error {
+	var er *interface{}
+	if err := c.CallContext(ctx, &er, "trace_transaction", tx.Hash()); err != nil {
+		return err
+	}
+	return nil
 }
 
 func loadGenesis(path string) core.Genesis {
