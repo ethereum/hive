@@ -153,7 +153,7 @@ FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
-    FLAGS="$FLAGS --authrpc.port=8550 --authrpc.jwtsecret $JWT_SECRET"
+    FLAGS="$FLAGS --authrpc.host=0.0.0.0 --authrpc.port=8550 --authrpc.jwtsecret $JWT_SECRET"
 fi
 
 # Configure GraphQL.
