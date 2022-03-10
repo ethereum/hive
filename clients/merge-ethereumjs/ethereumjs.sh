@@ -49,9 +49,9 @@
 set -e
 
 ethereumjs="node /ethereumjs-monorepo/packages/client/dist/bin/cli.js"
-FLAGS="--datadir ethereumjs-monorepo/packages/client/kiln/datadir --gethGenesis=./genesis.json --rpc --rpcEngine --rpcEnginePort=8545 --saveReceipts"
+FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts"
 
-FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+#FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 
 
 ## If a specific network ID is requested, use that
@@ -64,13 +64,14 @@ FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 
 
 # Configure the chain.
-mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
+#echo "Previous genesis state:"
+#cat /genesis.json
+#mv /genesis.json /genesis-input.json
+#jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis
 echo "Supplied genesis state:"
 cat /genesis.json
-
 
 echo "Running ethereumjs with flags $FLAGS"
 $ethereumjs $FLAGS

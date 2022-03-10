@@ -1,19 +1,21 @@
 FROM node:16-alpine as build
 RUN apk update && apk add --no-cache bash git jq && rm -rf /var/cache/apk/*
-RUN git clone --depth 1 https://github.com/ethereumjs/ethereumjs-monorepo.git && \
+RUN git clone --depth 1 --branch client/hive-tests https://github.com/cbrzn/ethereumjs-monorepo.git && \
     (cd ethereumjs-monorepo && npm i)
 
 ADD ethereumjs.sh /ethereumjs.sh
-ADD genesis.json /genesis.json
-ADD mapper.jq /mapper.jq
+#ADD mapper.jq /mapper.jq
 RUN chmod +x /ethereumjs.sh
 
-RUN mkdir /ethereumjs-monorepo/packages/client/kiln/datadir
+# Inject the enode id retriever script
+RUN mkdir /hive-bin
+ADD enode.sh /hive-bin/enode.sh
+RUN chmod +x /hive-bin/enode.sh
 
-EXPOSE 8545
+ADD genesis.json /genesis.json
 
-# Sanity check
-RUN node /ethereumjs-monorepo/packages/client/dist/bin/cli.js --help
+# Export the usual networking ports to allow outside access to the node
+EXPOSE 8545 8546 8550 8547 30303 30303/udp
 
 # NodeJS applications have a default memory limit of 2.5GB.
 # This limit is bit tight, it is recommended to raise the limit
