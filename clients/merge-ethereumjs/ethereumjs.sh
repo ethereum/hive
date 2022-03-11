@@ -49,29 +49,29 @@
 set -e
 
 ethereumjs="node /ethereumjs-monorepo/packages/client/dist/bin/cli.js"
-FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts"
-
-#FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
-
-
-## If a specific network ID is requested, use that
-#if [ "$HIVE_NETWORK_ID" != "" ]; then
-#    FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
-#else
-#    # Unless otherwise specified by hive, we try to avoid mainnet networkid.
-#    FLAGS="$FLAGS --networkid 1337"
-#fi
+FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcEnginePort 8550 --loglevel debug"
 
 
 # Configure the chain.
-#echo "Previous genesis state:"
-#cat /genesis.json
-#mv /genesis.json /genesis-input.json
-#jq -f /mapper.jq /genesis-input.json > /genesis.json
+mv /genesis.json /genesis-input.json
+jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis
 echo "Supplied genesis state:"
 cat /genesis.json
 
+#if [ "$HIVE_NETWORK_ID" != "" ]; then
+#    FLAGS="$FLAGS --network-id $HIVE_NETWORK_ID"
+#fi
+
+#if [ "$HIVE_MINER" != "" ]; then
+#    FLAGS="$FLAGS --mine --minerCoinbase $HIVE_MINER"
+#fi
+
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    FLAGS="$FLAGS --jwt-secret ./jwtsecret"
+fi
+
+FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 echo "Running ethereumjs with flags $FLAGS"
 $ethereumjs $FLAGS

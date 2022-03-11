@@ -34,8 +34,9 @@ def to_bool:
     "ethash": (if env.HIVE_CLIQUE_PERIOD then null else {} end),
     "clique": (if env.HIVE_CLIQUE_PERIOD == null then null else {
       "period": env.HIVE_CLIQUE_PERIOD|to_int,
+      "epoch": 30000
     } end),
-    "chainId": 1,
+    "chainId": env.HIVE_CHAIN_ID|1,
     "homesteadBlock": env.HIVE_FORK_HOMESTEAD|to_int,
     "daoForkBlock": env.HIVE_FORK_DAO_BLOCK|to_int,
     "daoForkSupport": env.HIVE_FORK_DAO_VOTE|to_bool,
@@ -52,5 +53,7 @@ def to_bool:
     "yolov2Block": env.HIVE_FORK_BERLIN|to_int,
     "yolov3Block": env.HIVE_FORK_BERLIN|to_int,
     "londonBlock": env.HIVE_FORK_LONDON|to_int,
+    "mergeForkBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
+    "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
   }|remove_empty
 }

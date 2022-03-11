@@ -1,10 +1,11 @@
 FROM node:16-alpine as build
 RUN apk update && apk add --no-cache bash git jq && rm -rf /var/cache/apk/*
-RUN git clone --depth 1 --branch client/hive-tests https://github.com/cbrzn/ethereumjs-monorepo.git && \
+RUN git clone --depth 1 https://github.com/ethereumjs/ethereumjs-monorepo.git && \
     (cd ethereumjs-monorepo && npm i)
 
 ADD ethereumjs.sh /ethereumjs.sh
-#ADD mapper.jq /mapper.jq
+ADD mapper.jq /mapper.jq
+ADD jwtsecret /jwtsecret
 RUN chmod +x /ethereumjs.sh
 
 # Inject the enode id retriever script
