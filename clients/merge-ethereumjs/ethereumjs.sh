@@ -49,7 +49,7 @@
 set -e
 
 ethereumjs="node /ethereumjs-monorepo/packages/client/dist/bin/cli.js"
-FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcEnginePort 8550 --loglevel debug"
+FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcEnginePort 8550 --ws --loglevel debug"
 
 
 # Configure the chain.
@@ -60,13 +60,16 @@ jq -f /mapper.jq /genesis-input.json > /genesis.json
 echo "Supplied genesis state:"
 cat /genesis.json
 
-#if [ "$HIVE_NETWORK_ID" != "" ]; then
-#    FLAGS="$FLAGS --network-id $HIVE_NETWORK_ID"
-#fi
-
-#if [ "$HIVE_MINER" != "" ]; then
-#    FLAGS="$FLAGS --mine --minerCoinbase $HIVE_MINER"
-#fi
+# Import clique signing key.
+if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+    # Create password file.
+    echo "Importing clique key..."
+    echo "$HIVE_CLIQUE_PRIVATEKEY" > ./private_key.txt
+    # Ensure password file is used when running ethereumjs in mining mode.
+    if [ "$HIVE_MINER" != "" ]; then
+        FLAGS="$FLAGS --mine --unlock ./private_key.txt --minerCoinbase $HIVE_MINER"
+    fi
+fi
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     FLAGS="$FLAGS --jwt-secret ./jwtsecret"

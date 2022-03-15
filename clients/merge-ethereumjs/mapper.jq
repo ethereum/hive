@@ -36,7 +36,7 @@ def to_bool:
       "period": env.HIVE_CLIQUE_PERIOD|to_int,
       "epoch": 30000
     } end),
-    "chainId": env.HIVE_CHAIN_ID|1,
+    "chainId": env.HIVE_CHAIN_ID|to_int,
     "homesteadBlock": env.HIVE_FORK_HOMESTEAD|to_int,
     "daoForkBlock": env.HIVE_FORK_DAO_BLOCK|to_int,
     "daoForkSupport": env.HIVE_FORK_DAO_VOTE|to_bool,
