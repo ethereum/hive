@@ -2,145 +2,166 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/holiman/uint256"
+	blsu "github.com/protolambda/bls12-381-util"
+	"github.com/protolambda/ztyp/view"
+
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/configs"
-	"strings"
-	"time"
 )
+
+var depositAddress common.Eth1Address
+
+func init() {
+	_ = depositAddress.UnmarshalText([]byte("0x4242424242424242424242424242424242424242"))
+}
 
 // PreparedTestnet has all the options for starting nodes, ready to build the network.
 type PreparedTestnet struct {
 	// Consensus chain configuration
 	spec *common.Spec
+
 	// Execution chain configuration and genesis info
 	eth1Genesis *setup.Eth1Genesis
 	// Consensus genesis state
 	eth2Genesis common.BeaconState
+	// Secret keys of validators, to fabricate extra signed test messages with during testnet/
+	// E.g. to test a slashable offence that would not otherwise happen.
+	keys *[]blsu.SecretKey
 
-	// configuration to apply to every node of the given type
-	commonEth1Params      hivesim.StartOption
-	commonValidatorParams hivesim.StartOption
-	commonBeaconParams    hivesim.StartOption
+	// Configuration to apply to every node of the given type
+	executionOpts hivesim.StartOption
+	validatorOpts hivesim.StartOption
+	beaconOpts    hivesim.StartOption
 
-	// embeds eth1 configuration into a node
-	eth1ConfigOpt hivesim.StartOption
-	// embeds eth2 configuration into a node
-	eth2ConfigOpt hivesim.StartOption
-	// embeds the genesis beacon state into a node
-	beaconStateOpt hivesim.StartOption
-
-	// a tranche is a group of validator keys to run on 1 node
-	keyTranches []hivesim.StartOption
+	// A tranche is a group of validator keys to run on 1 node
+	keyTranches [][]*setup.KeyDetails
 }
 
-func prepareTestnet(t *hivesim.T, valCount uint64, keyTranches uint64) *PreparedTestnet {
+// Build all artifacts require to start a testnet.
+func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet {
+	eth1GenesisTime := common.Timestamp(time.Now().Unix())
+	eth2GenesisTime := eth1GenesisTime + 60
 
-	var depositAddress common.Eth1Address
-	depositAddress.UnmarshalText([]byte("0x4242424242424242424242424242424242424242"))
-
-	eth1Genesis := setup.BuildEth1Genesis()
-	eth1Config := eth1Genesis.ToParams(depositAddress)
-
-	var spec *common.Spec
-	{
-		// TODO: specify build-target based on preset, to run clients in mainnet or minimal mode.
-		// copy the default mainnet config, and make some minimal modifications for testnet usage
-		tmp := *configs.Mainnet
-		tmp.Config.GENESIS_FORK_VERSION = common.Version{0xff, 0, 0, 0}
-		tmp.Config.ALTAIR_FORK_VERSION = common.Version{0xff, 0, 0, 1}
-		tmp.Config.ALTAIR_FORK_EPOCH = 10 // TODO: time altair fork
-		tmp.Config.DEPOSIT_CONTRACT_ADDRESS = common.Eth1Address(eth1Genesis.DepositAddress)
-		tmp.Config.DEPOSIT_CHAIN_ID = eth1Genesis.Genesis.Config.ChainID.Uint64()
-		tmp.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
-		spec = &tmp
-	}
-
-	eth2Config := setup.Eth2ConfigToParams(&spec.Config)
-
-	t.Logf("generating %d validator keys...", valCount)
-	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
-	keySrc := &setup.MnemonicsKeySource{
-		From:       0,
-		To:         valCount,
-		Validator:  mnemonic,
-		Withdrawal: mnemonic,
-	}
-	keys, err := keySrc.Keys()
+	// Generate genesis for execution clients
+	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime))
+	eth1ConfigOpt := eth1Genesis.ToParams(depositAddress)
+	eth1Bundle, err := setup.Eth1Bundle(eth1Genesis.Genesis)
 	if err != nil {
 		t.Fatal(err)
 	}
-	keyOpts := make([]hivesim.StartOption, 0, keyTranches)
-	for i := uint64(0); i < keyTranches; i++ {
-		// Give each validator client an equal subset of the genesis validator keys
-		startIndex := valCount * i / keyTranches
-		endIndex := valCount * (i + 1) / keyTranches
-		keyOpts = append(keyOpts, setup.KeysBundle(keys[startIndex:endIndex]))
+	execNodeOpts := hivesim.Params{
+		"HIVE_CATALYST_ENABLED": "1",
+		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
+		"HIVE_NODETYPE":         "full",
 	}
+	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts)
 
-	t.Log("building beacon state...")
-	// prepare genesis beacon state, with all of the validators in it.
-	state, err := setup.BuildBeaconState(eth1Genesis, spec, keys)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// Make all eth1 nodes mine blocks. Merge fork would deactivate this on the fly.
-	eth1Params := hivesim.Params{}
-	beaconParams := hivesim.Params{
-		"HIVE_ETH2_BN_API_PORT":  fmt.Sprintf("%d", PortBeaconAPI),
-		"HIVE_ETH2_BN_GRPC_PORT": fmt.Sprintf("%d", PortBeaconGRPC),
-		"HIVE_ETH2_METRICS_PORT": fmt.Sprintf("%d", PortMetrics),
-		"HIVE_CHECK_LIVE_PORT":   fmt.Sprintf("%d", PortBeaconAPI),
-	}
-	validatorParams := hivesim.Params{
-		"HIVE_ETH2_BN_API_PORT":  fmt.Sprintf("%d", PortBeaconAPI),
-		"HIVE_ETH2_BN_GRPC_PORT": fmt.Sprintf("%d", PortBeaconGRPC),
-		"HIVE_ETH2_VC_API_PORT":  fmt.Sprintf("%d", PortValidatorAPI),
-		"HIVE_ETH2_METRICS_PORT": fmt.Sprintf("%d", PortMetrics),
-		"HIVE_CHECK_LIVE_PORT":   "0", // TODO not every validator client has an API or metrics to check if it's live
-	}
+	// Generate beacon spec
+	//
+	// TODO: specify build-target based on preset, to run clients in mainnet or minimal mode.
+	// copy the default mainnet config, and make some minimal modifications for testnet usage
+	specCpy := *configs.Mainnet
+	spec := &specCpy
+	spec.Config.DEPOSIT_CONTRACT_ADDRESS = depositAddress
+	spec.Config.DEPOSIT_CHAIN_ID = eth1Genesis.Genesis.Config.ChainID.Uint64()
+	spec.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
+	spec.Config.ETH1_FOLLOW_DISTANCE = 1
 
-	// we need a new genesis time, so we take the template state and prepare a tar with updated time
-	stateOpt, err := setup.StateBundle(state, time.Now().Add(2*time.Minute))
+	spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch)
+	spec.Config.BELLATRIX_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
+	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount
+	spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime)
+	tdd, _ := uint256.FromBig(config.TerminalTotalDifficulty)
+	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)
+
+	// Generate keys opts for validators
+	keyTranches := setup.KeyTranches(env.Keys, uint64(len(config.Nodes)))
+
+	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	t.Log("prepared testnet!")
+	// prepare genesis beacon state, with all the validators in it.
+	state, err := setup.BuildBeaconState(spec, eth1Genesis.Genesis, eth2GenesisTime, env.Keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write info so that the genesis state can be generated by the client
+	stateOpt, err := setup.StateBundle(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Define additional start options for beacon chain
+	commonOpts := hivesim.Params{
+		"HIVE_ETH2_BN_API_PORT":                     fmt.Sprintf("%d", PortBeaconAPI),
+		"HIVE_ETH2_BN_GRPC_PORT":                    fmt.Sprintf("%d", PortBeaconGRPC),
+		"HIVE_ETH2_METRICS_PORT":                    fmt.Sprintf("%d", PortMetrics),
+		"HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS": depositAddress.String(),
+	}
+	beaconOpts := hivesim.Bundle(
+		commonOpts,
+		hivesim.Params{
+			"HIVE_CHECK_LIVE_PORT":        fmt.Sprintf("%d", PortBeaconAPI),
+			"HIVE_ETH2_MERGE_ENABLED":     "1",
+			"HIVE_ETH2_ETH1_GENESIS_TIME": fmt.Sprintf("%d", eth1Genesis.Genesis.Timestamp),
+			"HIVE_ETH2_GENESIS_FORK":      config.activeFork(),
+		},
+		stateOpt,
+		consensusConfigOpts,
+	)
+
+	validatorOpts := hivesim.Bundle(
+		commonOpts,
+		hivesim.Params{
+			"HIVE_CHECK_LIVE_PORT": "0",
+		},
+		consensusConfigOpts,
+	)
+
 	return &PreparedTestnet{
-		spec:                  spec,
-		eth1Genesis:           eth1Genesis,
-		eth2Genesis:           state,
-		commonEth1Params:      eth1Params,
-		commonBeaconParams:    beaconParams,
-		commonValidatorParams: validatorParams,
-		eth1ConfigOpt:         eth1Config,
-		eth2ConfigOpt:         eth2Config,
-		beaconStateOpt:        stateOpt,
-		keyTranches:           keyOpts,
+		spec:          spec,
+		eth1Genesis:   eth1Genesis,
+		eth2Genesis:   state,
+		keys:          env.Secrets,
+		executionOpts: executionOpts,
+		beaconOpts:    beaconOpts,
+		validatorOpts: validatorOpts,
+		keyTranches:   keyTranches,
 	}
 }
 
 func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
-	time, _ := p.eth2Genesis.GenesisTime()
-	valRoot, _ := p.eth2Genesis.GenesisValidatorsRoot()
+	genesisTime, _ := p.eth2Genesis.GenesisTime()
+	genesisValidatorsRoot, _ := p.eth2Genesis.GenesisValidatorsRoot()
 	return &Testnet{
 		t:                     t,
-		genesisTime:           time,
-		genesisValidatorsRoot: valRoot,
+		genesisTime:           genesisTime,
+		genesisValidatorsRoot: genesisValidatorsRoot,
 		spec:                  p.spec,
 		eth1Genesis:           p.eth1Genesis,
 	}
 }
 
-func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition) {
-	testnet.t.Logf("starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
+func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, shouldMine bool) {
+	testnet.t.Logf("Starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
-	opts := []hivesim.StartOption{
-		p.eth1ConfigOpt, p.commonEth1Params,
-	}
-	if len(testnet.eth1) > 0 {
+	opts := []hivesim.StartOption{p.executionOpts}
+	if len(testnet.eth1) == 0 {
+		if shouldMine {
+			// we only make the first eth1 node a miner
+			opts = append(opts, hivesim.Params{"HIVE_MINER": "0x1212121212121212121212121212121212121212"})
+		}
+	} else {
 		bootnode, err := testnet.eth1[0].EnodeURL()
 		if err != nil {
 			testnet.t.Fatalf("failed to get eth1 bootnode URL: %v", err)
@@ -148,9 +169,6 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 
 		// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
 		opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
-	} else {
-		// we only make the first eth1 node a miner
-		opts = append(opts, hivesim.Params{"HIVE_MINER": "0x1212121212121212121212121212121212121212"})
 	}
 
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}
@@ -158,9 +176,9 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 }
 
 func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.ClientDefinition, eth1Endpoints []int) {
-	testnet.t.Logf("starting beacon node: %s (%s)", beaconDef.Name, beaconDef.Version)
+	testnet.t.Logf("Starting beacon node: %s (%s)", beaconDef.Name, beaconDef.Version)
 
-	opts := []hivesim.StartOption{p.eth2ConfigOpt, p.beaconStateOpt, p.commonBeaconParams}
+	opts := []hivesim.StartOption{p.beaconOpts}
 	// Hook up beacon node to (maybe multiple) eth1 nodes
 	for _, index := range eth1Endpoints {
 		if index < 0 || index >= len(testnet.eth1) {
@@ -196,7 +214,7 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 }
 
 func (p *PreparedTestnet) startValidatorClient(testnet *Testnet, validatorDef *hivesim.ClientDefinition, bnIndex int, keyIndex int) {
-	testnet.t.Logf("starting validator client: %s (%s)", validatorDef.Name, validatorDef.Version)
+	testnet.t.Logf("Starting validator client: %s (%s)", validatorDef.Name, validatorDef.Version)
 
 	if bnIndex >= len(testnet.beacons) {
 		testnet.t.Fatalf("only have %d beacon nodes, cannot find index %d for VC", len(testnet.beacons), bnIndex)
@@ -209,14 +227,12 @@ func (p *PreparedTestnet) startValidatorClient(testnet *Testnet, validatorDef *h
 	if keyIndex >= len(p.keyTranches) {
 		testnet.t.Fatalf("only have %d key tranches, cannot find index %d for VC", len(p.keyTranches), keyIndex)
 	}
-	keysOpt := p.keyTranches[keyIndex]
-	opts := []hivesim.StartOption{
-		p.eth2ConfigOpt, keysOpt, p.commonValidatorParams, bnAPIOpt,
-	}
+	keysOpt := setup.KeysBundle(p.keyTranches[keyIndex])
+	opts := []hivesim.StartOption{p.validatorOpts, keysOpt, bnAPIOpt}
 	// TODO
 	//if p.configName != "mainnet" && hasBuildTarget(validatorDef, p.configName) {
 	//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 	//}
-	vc := &ValidatorClient{testnet.t.StartClient(validatorDef.Name, opts...)}
+	vc := &ValidatorClient{testnet.t.StartClient(validatorDef.Name, opts...), p.keyTranches[keyIndex]}
 	testnet.validators = append(testnet.validators, vc)
 }

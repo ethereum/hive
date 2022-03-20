@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -61,7 +60,7 @@ type Eth1Genesis struct {
 	NetworkID      uint64
 }
 
-func BuildEth1Genesis() *Eth1Genesis {
+func BuildEth1Genesis(ttd *big.Int, genesisTime uint64) *Eth1Genesis {
 	depositContractAddr := common.HexToAddress("0x4242424242424242424242424242424242424242")
 	var depositContractAcc core.GenesisAccount
 	if err := json.Unmarshal([]byte(embeddedDepositContract), &depositContractAcc); err != nil {
@@ -70,30 +69,31 @@ func BuildEth1Genesis() *Eth1Genesis {
 	return &Eth1Genesis{
 		Genesis: &core.Genesis{
 			Config: &params.ChainConfig{
-				ChainID:             big.NewInt(1),
-				HomesteadBlock:      big.NewInt(0),
-				DAOForkBlock:        nil,
-				DAOForkSupport:      false,
-				EIP150Block:         big.NewInt(0),
-				EIP150Hash:          common.Hash{},
-				EIP155Block:         big.NewInt(0),
-				EIP158Block:         big.NewInt(0),
-				ByzantiumBlock:      big.NewInt(0),
-				ConstantinopleBlock: big.NewInt(0),
-				PetersburgBlock:     big.NewInt(0),
-				IstanbulBlock:       big.NewInt(0),
-				MuirGlacierBlock:    big.NewInt(0),
-				BerlinBlock:         big.NewInt(0),
-				LondonBlock:         big.NewInt(0),
-				MergeForkBlock:      nil, // TODO enable merge testing
-				Ethash:              nil,
-				Clique:              nil,
+				ChainID:                 big.NewInt(1),
+				HomesteadBlock:          big.NewInt(0),
+				DAOForkBlock:            nil,
+				DAOForkSupport:          false,
+				EIP150Block:             big.NewInt(0),
+				EIP150Hash:              common.Hash{},
+				EIP155Block:             big.NewInt(0),
+				EIP158Block:             big.NewInt(0),
+				ByzantiumBlock:          big.NewInt(0),
+				ConstantinopleBlock:     big.NewInt(0),
+				PetersburgBlock:         big.NewInt(0),
+				IstanbulBlock:           big.NewInt(0),
+				MuirGlacierBlock:        big.NewInt(0),
+				BerlinBlock:             big.NewInt(0),
+				LondonBlock:             big.NewInt(0),
+				ArrowGlacierBlock:       big.NewInt(0),
+				MergeForkBlock:          big.NewInt(0),
+				TerminalTotalDifficulty: ttd,
+				Clique:                  nil,
 			},
 			Nonce:      0,
-			Timestamp:  uint64(time.Now().Unix()),
+			Timestamp:  genesisTime,
 			ExtraData:  nil,
 			GasLimit:   30_000_000,
-			Difficulty: nil,
+			Difficulty: big.NewInt(1000000),
 			Mixhash:    common.Hash{},
 			Coinbase:   common.Address{},
 			Alloc: core.GenesisAlloc{
@@ -112,14 +112,17 @@ func (conf *Eth1Genesis) ToParams(depositAddress [20]byte) hivesim.Params {
 		"HIVE_CHAIN_ID":                 conf.Genesis.Config.ChainID.String(),
 		"HIVE_FORK_HOMESTEAD":           conf.Genesis.Config.HomesteadBlock.String(),
 		//"HIVE_FORK_DAO_BLOCK":           conf.Genesis.Config.DAOForkBlock.String(),  // nil error, not used anyway
-		"HIVE_FORK_TANGERINE":      conf.Genesis.Config.EIP150Block.String(),
-		"HIVE_FORK_SPURIOUS":       conf.Genesis.Config.EIP155Block.String(), // also eip558
-		"HIVE_FORK_BYZANTIUM":      conf.Genesis.Config.ByzantiumBlock.String(),
-		"HIVE_FORK_CONSTANTINOPLE": conf.Genesis.Config.ConstantinopleBlock.String(),
-		"HIVE_FORK_PETERSBURG":     conf.Genesis.Config.PetersburgBlock.String(),
-		"HIVE_FORK_ISTANBUL":       conf.Genesis.Config.IstanbulBlock.String(),
-		"HIVE_FORK_MUIRGLACIER":    conf.Genesis.Config.MuirGlacierBlock.String(),
-		"HIVE_FORK_BERLIN":         conf.Genesis.Config.BerlinBlock.String(),
-		"HIVE_FORK_LONDON":         conf.Genesis.Config.LondonBlock.String(),
+		"HIVE_FORK_TANGERINE":            conf.Genesis.Config.EIP150Block.String(),
+		"HIVE_FORK_SPURIOUS":             conf.Genesis.Config.EIP155Block.String(), // also eip558
+		"HIVE_FORK_BYZANTIUM":            conf.Genesis.Config.ByzantiumBlock.String(),
+		"HIVE_FORK_CONSTANTINOPLE":       conf.Genesis.Config.ConstantinopleBlock.String(),
+		"HIVE_FORK_PETERSBURG":           conf.Genesis.Config.PetersburgBlock.String(),
+		"HIVE_FORK_ISTANBUL":             conf.Genesis.Config.IstanbulBlock.String(),
+		"HIVE_FORK_MUIRGLACIER":          conf.Genesis.Config.MuirGlacierBlock.String(),
+		"HIVE_FORK_BERLIN":               conf.Genesis.Config.BerlinBlock.String(),
+		"HIVE_FORK_LONDON":               conf.Genesis.Config.LondonBlock.String(),
+		"HIVE_FORK_ARROWGLACIER":         conf.Genesis.Config.ArrowGlacierBlock.String(),
+		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeForkBlock.String(),
+		"HIVE_TERMINAL_TOTAL_DIFFICULTY": conf.Genesis.Config.TerminalTotalDifficulty.String(),
 	}
 }

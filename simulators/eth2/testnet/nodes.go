@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum/hive/hivesim"
-	"github.com/protolambda/eth2api"
-	"github.com/protolambda/eth2api/client/nodeapi"
 	"net/http"
 	"time"
+
+	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
+	"github.com/protolambda/eth2api"
+	"github.com/protolambda/eth2api/client/nodeapi"
 )
 
 const (
@@ -36,6 +38,14 @@ func (en *Eth1Node) UserRPCAddress() (string, error) {
 func (en *Eth1Node) EngineRPCAddress() (string, error) {
 	// TODO what will the default port be?
 	return fmt.Sprintf("http://%v:%d", en.IP, PortEngineRPC), nil
+}
+
+func (en *Eth1Node) MustGetEnode() string {
+	addr, err := en.EnodeURL()
+	if err != nil {
+		panic(err)
+	}
+	return addr
 }
 
 type BeaconNode struct {
@@ -71,4 +81,14 @@ func (bn *BeaconNode) EnodeURL() (string, error) {
 
 type ValidatorClient struct {
 	*hivesim.Client
+	keys []*setup.KeyDetails
+}
+
+func (v *ValidatorClient) ContainsKey(pk [48]byte) bool {
+	for _, k := range v.keys {
+		if k.ValidatorPubkey == pk {
+			return true
+		}
+	}
+	return false
 }

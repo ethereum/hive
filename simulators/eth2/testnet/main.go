@@ -1,18 +1,15 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
+	"fmt"
+
 	"github.com/ethereum/hive/hivesim"
-	"time"
+	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 )
 
-func jsonStr(v interface{}) string {
-	dat, err := json.MarshalIndent(v, "  ", "  ")
-	if err != nil {
-		panic(err)
-	}
-	return string(dat)
+var tests = []testSpec{
+	// {Name: "single-client-testnet", Run: Phase0Testnet},
+	{Name: "transition-testnet", Run: TransitionTestnet},
 }
 
 func main() {
@@ -21,58 +18,59 @@ func main() {
 		Description: `Run different eth2 testnets.`,
 	}
 	suite.Add(hivesim.TestSpec{
-		Name:        "testnets",
-		Description: "Collection of different testnet compositions and assertions.",
+		Name:        "eth2-testnets",
+		Description: "Collection of different eth2 testnet compositions and assertions.",
 		Run: func(t *hivesim.T) {
 			clientTypes, err := t.Sim.ClientTypes()
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Log("clients by role:", jsonStr(clientTypes))
-			byRole := ClientsByRole(clientTypes)
-			t.Log("clients by role:", jsonStr(byRole))
-			simpleTest := byRole.SimpleTestnetTest()
-			t.Run(simpleTest)
+			c := ClientsByRole(clientTypes)
+			if len(c.Eth1) != 1 {
+				t.Fatalf("choose 1 eth1 client type")
+			}
+			if len(c.Beacon) != 1 {
+				t.Fatalf("choose 1 beacon client type")
+			}
+			if len(c.Validator) != 1 {
+				t.Fatalf("choose 1 validator client type")
+			}
+			runAllTests(t, c)
 		},
 	})
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-func (nc *ClientDefinitionsByRole) SimpleTestnetTest() hivesim.TestSpec {
-	return hivesim.TestSpec{
-		Name:        "single-client-testnet",
-		Description: "This runs quick eth2 single-client type testnet, with 4 nodes and 2**14 (minimum) validators",
-		Run: func(t *hivesim.T) {
-			prep := prepareTestnet(t, 1<<14, 4)
-			testnet := prep.createTestnet(t)
+func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
+	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 
-			genesisTime := testnet.GenesisTime()
-			countdown := genesisTime.Sub(time.Now())
-			t.Logf("created new testnet, genesis at %s (%s from now)", genesisTime, countdown)
-
-			// TODO: we can mix things for a multi-client testnet
-			if len(nc.Eth1) != 1 {
-				t.Fatalf("choose 1 eth1 client type")
-			}
-			if len(nc.Beacon) != 1 {
-				t.Fatalf("choose 1 beacon client type")
-			}
-			if len(nc.Validator) != 1 {
-				t.Fatalf("choose 1 validator client type")
-			}
-
-			// for each key partition, we start a validator client with its own beacon node and eth1 node
-			for i := 0; i < len(prep.keyTranches); i++ {
-				prep.startEth1Node(testnet, nc.Eth1[0])
-				prep.startBeaconNode(testnet, nc.Beacon[0], []int{i})
-				prep.startValidatorClient(testnet, nc.Validator[0], i, i)
-			}
-			t.Logf("started all nodes!")
-
-			ctx := context.Background()
-			// TODO: maybe run other assertions / tests in the background?
-			testnet.TrackFinality(ctx)
-		},
+	// Generate validator keys to use for all tests.
+	keySrc := &setup.MnemonicsKeySource{
+		From:       0,
+		To:         64,
+		Validator:  mnemonic,
+		Withdrawal: mnemonic,
+	}
+	keys, err := keySrc.Keys()
+	if err != nil {
+		t.Fatal(err)
+	}
+	secrets, err := setup.SecretKeys(keys)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, node := range c.Combinations() {
+		for _, test := range tests {
+			test := test
+			t.Run(hivesim.TestSpec{
+				Name:        fmt.Sprintf("%s-%s", test.Name, node),
+				Description: test.About,
+				Run: func(t *hivesim.T) {
+					env := &testEnv{c, keys, secrets}
+					test.Run(t, env, node)
+				},
+			})
+		}
 	}
 }
 

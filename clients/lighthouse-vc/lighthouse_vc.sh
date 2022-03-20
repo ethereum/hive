@@ -4,15 +4,13 @@
 set -e
 
 mkdir -p /data/testnet_setup
-
-echo "${DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" > /data/testnet_setup/deposit_contract.txt
-echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" > /data/testnet_setup/deploy_block.txt
-
-/make_config.sh > /data/testnet_setup/config.yaml
-
 mkdir -p /data/vc
-
 mkdir -p /data/validators
+
+cp /hive/input/config.yaml /data/testnet_setup
+
+echo "${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" > /data/testnet_setup/deposit_contract.txt
+echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" > /data/testnet_setup/deploy_block.txt
 
 for keystore_path in /hive/input/keystores/*
 do
@@ -40,4 +38,5 @@ lighthouse \
     --validators-dir="/data/validators" \
     --secrets-dir="/data/secrets" \
     --init-slashing-protection \
-    --beacon-nodes="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT"
+    --beacon-nodes="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT" \
+    --suggested-fee-recipient="0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b"
