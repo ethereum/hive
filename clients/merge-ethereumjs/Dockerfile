@@ -3,6 +3,8 @@ RUN apk update && apk add --no-cache bash git jq && rm -rf /var/cache/apk/*
 RUN git clone --depth 1 https://github.com/ethereumjs/ethereumjs-monorepo.git && \
     (cd ethereumjs-monorepo && npm i)
 
+RUN cd ethereumjs-monorepo/packages/client && npx ethereumjs --version > /version.txt
+
 ADD ethereumjs.sh /ethereumjs.sh
 ADD mapper.jq /mapper.jq
 ADD jwtsecret /jwtsecret
