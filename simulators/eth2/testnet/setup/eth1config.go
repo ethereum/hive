@@ -60,13 +60,13 @@ type Eth1Genesis struct {
 	NetworkID      uint64
 }
 
-func BuildEth1Genesis(ttd *big.Int, genesisTime uint64) *Eth1Genesis {
+func BuildEth1Genesis(ttd *big.Int, genesisTime uint64, clique bool) *Eth1Genesis {
 	depositContractAddr := common.HexToAddress("0x4242424242424242424242424242424242424242")
 	var depositContractAcc core.GenesisAccount
 	if err := json.Unmarshal([]byte(embeddedDepositContract), &depositContractAcc); err != nil {
 		panic(err)
 	}
-	return &Eth1Genesis{
+	genesis := Eth1Genesis{
 		Genesis: &core.Genesis{
 			Config: &params.ChainConfig{
 				ChainID:                 big.NewInt(1),
@@ -93,7 +93,7 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64) *Eth1Genesis {
 			Timestamp:  genesisTime,
 			ExtraData:  nil,
 			GasLimit:   30_000_000,
-			Difficulty: big.NewInt(1000000),
+			Difficulty: big.NewInt(0),
 			Mixhash:    common.Hash{},
 			Coinbase:   common.Address{},
 			Alloc: core.GenesisAlloc{
@@ -103,10 +103,15 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64) *Eth1Genesis {
 		DepositAddress: depositContractAddr,
 		NetworkID:      1,
 	}
+	if clique {
+		genesis.Genesis.Config.Clique = &params.CliqueConfig{Period: 2, Epoch: 0}
+		genesis.Genesis.ExtraData = common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000658bdf435d810c91414ec09147daa6db624063790000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+	}
+	return &genesis
 }
 
 func (conf *Eth1Genesis) ToParams(depositAddress [20]byte) hivesim.Params {
-	return hivesim.Params{
+	params := hivesim.Params{
 		"HIVE_DEPOSIT_CONTRACT_ADDRESS": common.Address(depositAddress).String(),
 		"HIVE_NETWORK_ID":               fmt.Sprintf("%d", conf.NetworkID),
 		"HIVE_CHAIN_ID":                 conf.Genesis.Config.ChainID.String(),
@@ -125,4 +130,8 @@ func (conf *Eth1Genesis) ToParams(depositAddress [20]byte) hivesim.Params {
 		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeForkBlock.String(),
 		"HIVE_TERMINAL_TOTAL_DIFFICULTY": conf.Genesis.Config.TerminalTotalDifficulty.String(),
 	}
+	if conf.Genesis.Config.Clique != nil {
+		params["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(conf.Genesis.Config.Clique.Period)
+	}
+	return params
 }

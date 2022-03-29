@@ -9,6 +9,13 @@ import (
 	blsu "github.com/protolambda/bls12-381-util"
 )
 
+type ConsensusType int
+
+const (
+	Ethash ConsensusType = iota
+	Clique
+)
+
 type testSpec struct {
 	Name  string
 	About string
@@ -40,8 +47,8 @@ type config struct {
 
 	// Node configurations to launch. Each node as a proportional share of
 	// validators.
-	Nodes      []node
-	ShouldMine bool
+	Nodes         []node
+	Eth1Consensus ConsensusType
 }
 
 func (c *config) activeFork() string {

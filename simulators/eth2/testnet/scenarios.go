@@ -11,8 +11,8 @@ import (
 
 var (
 	VALIDATOR_COUNT            uint64 = 64
-	SLOT_TIME                  uint64 = 2
-	TERMINCAL_TOTAL_DIFFICULTY        = big.NewInt(5000000)
+	SLOT_TIME                  uint64 = 3
+	TERMINRAL_TOTAL_DIFFICULTY        = big.NewInt(100)
 )
 
 func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
@@ -25,7 +25,7 @@ func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
 
 	// for each key partition, we start a validator client with its own beacon node and eth1 node
 	for i, node := range config.Nodes {
-		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), config.ShouldMine)
+		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), config.Eth1Consensus)
 		prep.startBeaconNode(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon"), []int{i})
 		prep.startValidatorClient(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", node.ConsensusClient), "validator"), i, i)
 	}
@@ -39,12 +39,12 @@ func Phase0Testnet(t *hivesim.T, env *testEnv, n node) {
 		MergeForkEpoch:          20,
 		ValidatorCount:          VALIDATOR_COUNT,
 		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINCAL_TOTAL_DIFFICULTY,
+		TerminalTotalDifficulty: TERMINRAL_TOTAL_DIFFICULTY,
 		Nodes: []node{
 			n,
 			n,
 		},
-		ShouldMine: true,
+		Eth1Consensus: Clique,
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -71,12 +71,12 @@ func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 		MergeForkEpoch:          0,
 		ValidatorCount:          VALIDATOR_COUNT,
 		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINCAL_TOTAL_DIFFICULTY,
+		TerminalTotalDifficulty: TERMINRAL_TOTAL_DIFFICULTY,
 		Nodes: []node{
 			n,
 			n,
 		},
-		ShouldMine: true,
+		Eth1Consensus: Clique,
 	}
 
 	testnet := startTestnet(t, env, &config)

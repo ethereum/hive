@@ -38,8 +38,11 @@ echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
 CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
-merge_option=$([[ "$HIVE_ETH2_MERGE_ENABLED" == "" ]] && echo "" || echo "--merge")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
+if [ "$HIVE_ETH2_MERGE_ENABLED" != "" ]; then
+    echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
+    merge_option="--merge --execution-endpoints=$HIVE_ETH2_ETH1_ENGINE_RPC_ADDRS --jwt-secrets=/jwtsecret"
+fi
 
 lighthouse \
     --debug-level="$LOG" \
