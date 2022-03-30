@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -72,6 +73,18 @@ func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
 	rt.t.Logf("<< (%s) %s", rt.hc.Container, bytes.TrimSpace(respBytes))
 	return &respCopy, nil
+}
+
+func TransactionInPayload(payload *ExecutableDataV1, tx *types.Transaction) bool {
+	for _, bytesTx := range payload.Transactions {
+		var currentTx types.Transaction
+		if err := currentTx.UnmarshalBinary(bytesTx); err == nil {
+			if currentTx.Hash() == tx.Hash() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type SignatureValues struct {
@@ -267,6 +280,50 @@ func customizePayload(basePayload *ExecutableDataV1, customData *CustomPayloadDa
 		BlockHash:     customPayloadHeader.Hash(),
 		Transactions:  txs,
 	}, nil
+}
+
+func (customData *CustomPayloadData) String() string {
+	customFieldsList := make([]string, 0)
+	if customData.ParentHash != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("ParentHash=%s", customData.ParentHash.String()))
+	}
+	if customData.FeeRecipient != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("Coinbase=%s", customData.FeeRecipient.String()))
+	}
+	if customData.StateRoot != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("StateRoot=%s", customData.StateRoot.String()))
+	}
+	if customData.ReceiptsRoot != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("ReceiptsRoot=%s", customData.ReceiptsRoot.String()))
+	}
+	if customData.LogsBloom != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("LogsBloom=%v", types.BytesToBloom(*customData.LogsBloom)))
+	}
+	if customData.PrevRandao != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("PrevRandao=%s", customData.PrevRandao.String()))
+	}
+	if customData.Number != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("Number=%d", *customData.Number))
+	}
+	if customData.GasLimit != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("GasLimit=%d", *customData.GasLimit))
+	}
+	if customData.GasUsed != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("GasUsed=%d", *customData.GasUsed))
+	}
+	if customData.Timestamp != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("Timestamp=%d", *customData.Timestamp))
+	}
+	if customData.ExtraData != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("ExtraData=%v", *customData.ExtraData))
+	}
+	if customData.BaseFeePerGas != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("BaseFeePerGas=%s", customData.BaseFeePerGas.String()))
+	}
+	if customData.Transactions != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("Transactions=%v", customData.Transactions))
+	}
+	return strings.Join(customFieldsList, ", ")
 }
 
 // Use client specific rpc methods to debug a transaction that includes the PREVRANDAO opcode

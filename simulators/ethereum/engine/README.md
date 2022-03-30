@@ -107,7 +107,7 @@ Verify the Block returned by the Eth RPC after a new SafeBlockHash is set using 
 Verify the Block returned by the Eth RPC after a new FinalizedBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
 
 - Latest Block after Reorg:  
-Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to their previous value. Eth RPC should return previous block.
+Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to a sidechain and back. Eth RPC should return the appropriate block everytime.
 
 ### Payload Execution
 - Re-Execute Payload:  
