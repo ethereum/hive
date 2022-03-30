@@ -221,7 +221,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 			// Set the head of the CLMocker to the head of the main client
 			t.CLMock.setTTDBlockClient(t.Engine)
 			// Check the transition information exchange
-			t.VerifyTransitionInformation(t.Engine)
+			// t.VerifyTransitionInformation(t.Engine)
 		}
 
 		// At this point, Head must be main client's HeadBlockHash, but this can change depending on the
@@ -295,7 +295,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 					t.Logf("INFO (%s): Main client is now synced to the expected head, %v", t.TestName, header.Hash())
 					if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() {
 						// We are synced, but also check that the transition information was updated
-						t.VerifyTransitionInformation(t.Engine)
+						// t.VerifyTransitionInformation(t.Engine)
 					}
 					break
 				}
