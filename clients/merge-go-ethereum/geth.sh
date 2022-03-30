@@ -153,7 +153,7 @@ FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.origins \"*\" --ws.api=admin,debug,eth
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
-    FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.port=8550 --authrpc.jwtsecret /jwtsecret"
+    FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.port=8551 --authrpc.jwtsecret /jwtsecret"
 fi
 
 # Configure GraphQL.
