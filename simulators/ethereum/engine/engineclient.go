@@ -18,8 +18,7 @@ import (
 
 // https://github.com/ethereum/execution-apis/blob/v1.0.0-alpha.7/src/engine/specification.md
 var EthPortHTTP = 8545
-var EnginePortHTTP = 8550
-var EnginePortWS = 8551
+var EnginePortHTTP = 8551
 
 // EngineClient wrapper for Ethereum Engine RPC for testing purposes.
 type EngineClient struct {
