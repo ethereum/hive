@@ -10,9 +10,9 @@ import (
 )
 
 var (
-	VALIDATOR_COUNT            uint64 = 64
-	SLOT_TIME                  uint64 = 3
-	TERMINRAL_TOTAL_DIFFICULTY        = big.NewInt(100)
+	VALIDATOR_COUNT           uint64 = 64
+	SLOT_TIME                 uint64 = 3
+	TERMINAL_TOTAL_DIFFICULTY        = big.NewInt(100)
 )
 
 func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
@@ -39,7 +39,7 @@ func Phase0Testnet(t *hivesim.T, env *testEnv, n node) {
 		MergeForkEpoch:          20,
 		ValidatorCount:          VALIDATOR_COUNT,
 		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINRAL_TOTAL_DIFFICULTY,
+		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
 		Nodes: []node{
 			n,
 			n,
@@ -71,7 +71,7 @@ func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 		MergeForkEpoch:          0,
 		ValidatorCount:          VALIDATOR_COUNT,
 		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINRAL_TOTAL_DIFFICULTY,
+		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
 		Nodes: []node{
 			n,
 			n,
