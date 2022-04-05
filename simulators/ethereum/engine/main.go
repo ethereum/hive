@@ -24,7 +24,7 @@ var (
 
 	// Time delay between ForkchoiceUpdated and GetPayload to allow the clients
 	// to produce a new Payload
-	PayloadProductionClientDelay = time.Second
+	PayloadProductionClientDelay = time.Second // TODO: time.Millisecond * 100
 
 	// Confirmation blocks
 	PoWConfirmationBlocks = uint64(15)
@@ -90,6 +90,24 @@ type TestSpec struct {
 	// When used, clique consensus mechanism is disabled.
 	// Default: None
 	ChainFile string
+
+	// Terminal Block Configuration
+	TerminalBlockHash   common.Hash
+	TerminalBlockNumber uint64
+}
+
+// TTD is the value specified in the TestSpec + Genesis.Difficulty
+func CalculateRealTTD(genesisPath string, ttd int64) int64 {
+	g := loadGenesis(genesisPath)
+	return g.Difficulty.Int64() + ttd
+}
+
+func (t *TestSpec) UpdateRealTTD(genesisPath string) {
+	t.TTD = CalculateRealTTD(genesisPath, t.TTD)
+}
+
+func (t *TestSpec) BigTTD() *big.Int {
+	return big.NewInt(t.TTD)
 }
 
 var allTests = append(
@@ -116,8 +134,8 @@ have reached the Terminal Total Difficulty.`[1:],
 		}
 		testFiles := hivesim.Params{"/genesis.json": genesisPath}
 		// Calculate and set the TTD for this test
-		ttd := calcRealTTD(genesisPath, currentTest.TTD)
-		newParams := clientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+		(&currentTest).UpdateRealTTD(genesisPath)
+		newParams := clientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", currentTest.TTD))
 		if currentTest.ChainFile != "" {
 			// We are using a Proof of Work chain file, remove all clique-related settings
 			// TODO: Nethermind still requires HIVE_MINER for the Engine API
@@ -126,6 +144,10 @@ have reached the Terminal Total Difficulty.`[1:],
 			delete(newParams, "HIVE_CLIQUE_PERIOD")
 			// Add the new file to be loaded as chain.rlp
 			testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.ChainFile)
+		}
+		if currentTest.TerminalBlockHash != (common.Hash{}) {
+			newParams = newParams.Set("HIVE_TERMINAL_BLOCK_HASH", currentTest.TerminalBlockHash.Hex())
+			newParams = newParams.Set("HIVE_TERMINAL_BLOCK_NUMBER", fmt.Sprintf("%d", currentTest.TerminalBlockNumber))
 		}
 		suite.Add(hivesim.ClientTestSpec{
 			Name:        currentTest.Name,
@@ -139,15 +161,9 @@ have reached the Terminal Total Difficulty.`[1:],
 					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
 				}
 				// Run the test case
-				RunTest(currentTest.Name, big.NewInt(ttd), timeout, t, c, currentTest.Run, newParams, testFiles)
+				RunTest(&currentTest, timeout, t, c, newParams, testFiles)
 			},
 		})
 	}
 	hivesim.MustRunSuite(hivesim.New(), suite)
-}
-
-// TTD is the value specified in the TestSpec + Genesis.Difficulty
-func calcRealTTD(genesisPath string, ttdValue int64) int64 {
-	g := loadGenesis(genesisPath)
-	return g.Difficulty.Int64() + ttdValue
 }

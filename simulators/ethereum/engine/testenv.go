@@ -25,6 +25,7 @@ var (
 type TestEnv struct {
 	*hivesim.T
 	TestName string
+	TestSpec *TestSpec
 
 	// RPC Clients
 	RPC    *rpc.Client
@@ -52,16 +53,16 @@ type TestEnv struct {
 	syncCancel context.CancelFunc
 }
 
-func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv), cParams hivesim.Params, cFiles hivesim.Params) {
+func RunTest(testSpec *TestSpec, timeout time.Duration, t *hivesim.T, c *hivesim.Client, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
-	clMocker := NewCLMocker(t, ttd)
+	clMocker := NewCLMocker(t, testSpec.BigTTD())
 	// Defer closing all clients
 	defer func() {
 		clMocker.CloseClients()
 	}()
 
 	// Add main client to CLMocker
-	clMocker.AddEngineClient(t, c, ttd)
+	clMocker.AddEngineClient(t, c, testSpec.BigTTD())
 
 	// This sets up debug logging of the requests and responses.
 	client := &http.Client{
@@ -73,14 +74,15 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 	}
 
 	// Create Engine client from main hivesim.Client to be used by tests
-	ec := NewEngineClient(t, c, ttd)
+	ec := NewEngineClient(t, c, testSpec.BigTTD())
 	defer ec.Close()
 
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:%v/", c.IP, EthPortHTTP), client)
 	defer rpcClient.Close()
 	env := &TestEnv{
 		T:            t,
-		TestName:     testName,
+		TestSpec:     testSpec,
+		TestName:     testSpec.Name,
 		RPC:          rpcClient,
 		Eth:          ethclient.NewClient(rpcClient),
 		Engine:       ec,
@@ -120,11 +122,11 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 	}()
 
 	// Run the test
-	fn(env)
+	testSpec.Run(env)
 }
 
 func (t *TestEnv) MainTTD() *big.Int {
-	return t.Engine.TerminalTotalDifficulty
+	return t.TestSpec.BigTTD()
 }
 
 func (t *TestEnv) StartClient(clientDef *hivesim.ClientDefinition, params hivesim.Params, ttd *big.Int) (*hivesim.Client, *EngineClient, error) {

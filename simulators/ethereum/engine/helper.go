@@ -448,35 +448,11 @@ func (t *TestEnv) VerifyTransitionInformation(ec *EngineClient) {
 		t.Fatalf("FAIL (%s): Unable to get Exchange Transition Configuration: %v", t.TestName, err)
 	}
 
-	// Returned terminal block hash must be equal to what the CLMocker observed so far
-	if t.CLMock.TerminalBlockHash == nil {
-		// We haven't gone through the transition, returned hash must be zeros
-		emptyHash := common.Hash{}
-		if trConfResp.TerminalBlockHash != emptyHash {
-			t.Fatalf("FAIL (%s): TerminalBlockHash is not empty even though we have not gone through the transition: %v", t.TestName, trConfResp.TerminalBlockHash)
-		}
-	} else {
-		// We have gone through the transition, returned hash must be equal to what the CL observed
-		if trConfResp.TerminalBlockHash != *t.CLMock.TerminalBlockHash {
-			t.Fatalf("FAIL (%s): TerminalBlockHash does not match what the CLMocker observed: %v != %v", t.TestName, trConfResp.TerminalBlockHash, t.CLMock.TerminalBlockHash)
-		}
+	if trConfResp.TerminalBlockHash != t.TestSpec.TerminalBlockHash {
+		t.Fatalf("FAIL (%s): Incorrect TerminalBlockHash %v != %v", t.TestName, trConfResp.TerminalBlockHash, t.TestSpec.TerminalBlockHash)
+	}
+	if trConfResp.TerminalBlockNumber != t.TestSpec.TerminalBlockNumber {
+		t.Fatalf("FAIL (%s): Incorrect TerminalBlockNumber: %d != %d", t.TestName, trConfResp.TerminalBlockNumber, t.TestSpec.TerminalBlockNumber)
 	}
 
-	// Returned terminal block number must be equal to what the CLMocker observed so far
-	if t.CLMock.TerminalBlockNumber == nil {
-		// We haven't gone through the transition, returned number must be zero
-		if trConfResp.TerminalBlockNumber != 0 {
-			t.Fatalf("FAIL (%s): TerminalBlockNumber is not zero even though we have not gone through the transition: %v", t.TestName, trConfResp.TerminalBlockNumber)
-		}
-	} else {
-		// We have gone through the transition, returned hash must be equal to what the CL observed
-		if trConfResp.TerminalBlockNumber != *t.CLMock.TerminalBlockNumber {
-			t.Fatalf("FAIL (%s): TerminalBlockNumber does not match what the CLMocker observed: %v != %v", t.TestName, trConfResp.TerminalBlockNumber, t.CLMock.TerminalBlockNumber)
-		}
-	}
-
-	// Returned TTD must be equal to what we have configured, regardless of whether we have transitioned or not
-	if trConfResp.TerminalTotalDifficulty.Cmp(ec.TerminalTotalDifficulty) != 0 {
-		t.Fatalf("FAIL (%s): TerminalTotalDifficulty does not match expected configuration: %v != %v", t.TestName, trConfResp.TerminalTotalDifficulty, t.MainTTD())
-	}
 }

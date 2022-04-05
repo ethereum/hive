@@ -23,6 +23,10 @@ type SecondaryClientSpec struct {
 	// Whether the main client shall sync to this secondary client or not.
 	MainClientShallSync bool
 
+	// Terminal Block Configuration
+	TerminalBlockHash   common.Hash
+	TerminalBlockNumber uint64
+
 	// TODO: Expected FcU outcome, could be "SYNCING", "VALID", etc..
 }
 
@@ -54,6 +58,10 @@ type MergeTestSpec struct {
 
 	// Chain file to initialize the main client.
 	MainChainFile string
+
+	// Terminal Block Configuration
+	TerminalBlockHash   common.Hash
+	TerminalBlockNumber uint64
 
 	// Whether or not to send a forkchoiceUpdated directive on the main client before any attempts to re-org
 	// to secondary clients happen.
@@ -343,13 +351,15 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 	}
 
 	return TestSpec{
-		Name:           mergeTestSpec.Name,
-		About:          mergeTestSpec.About,
-		Run:            runFunc,
-		TTD:            mergeTestSpec.TTD,
-		TimeoutSeconds: mergeTestSpec.TimeoutSeconds,
-		GenesisFile:    mergeTestSpec.GenesisFile,
-		ChainFile:      mergeTestSpec.MainChainFile,
+		Name:                mergeTestSpec.Name,
+		About:               mergeTestSpec.About,
+		Run:                 runFunc,
+		TTD:                 mergeTestSpec.TTD,
+		TimeoutSeconds:      mergeTestSpec.TimeoutSeconds,
+		GenesisFile:         mergeTestSpec.GenesisFile,
+		ChainFile:           mergeTestSpec.MainChainFile,
+		TerminalBlockHash:   mergeTestSpec.TerminalBlockHash,
+		TerminalBlockNumber: mergeTestSpec.TerminalBlockNumber,
 	}
 }
 
@@ -369,8 +379,13 @@ func (spec SecondaryClientSpec) StartClient(t *TestEnv, enode string) *EngineCli
 
 	secondaryClientParams := t.ClientParams.Set("HIVE_BOOTNODE", enode)
 
+	if spec.TerminalBlockHash != (common.Hash{}) {
+		secondaryClientParams = secondaryClientParams.Set("HIVE_TERMINAL_BLOCK_HASH", spec.TerminalBlockHash.Hex())
+		secondaryClientParams = secondaryClientParams.Set("HIVE_TERMINAL_BLOCK_NUMBER", fmt.Sprintf("%d", spec.TerminalBlockNumber))
+	}
+
 	if spec.TTD != 0 {
-		ttd := calcRealTTD(t.ClientFiles["/genesis.json"], spec.TTD)
+		ttd := CalculateRealTTD(t.ClientFiles["/genesis.json"], spec.TTD)
 		secondaryClientParams = secondaryClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 	}
 

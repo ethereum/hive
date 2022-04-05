@@ -188,14 +188,15 @@ var engineTests = []TestSpec{
 
 	// Exchange Transition Configuration tests
 	{
-		Name: "Exchange Transition Configuration PreMerge",
-		Run:  exTransitionConfigPreMerge,
-		TTD:  1000000,
+		Name:              "Exchange Transition Configuration Set",
+		Run:               exTransitionConfig,
+		TTD:               1000000,
+		TerminalBlockHash: common.Hash{1},
 	},
 	{
-		Name: "Exchange Transition Configuration PostMerge",
-		Run:  exTransitionConfigPostMerge,
-		TTD:  10,
+		Name: "Exchange Transition Configuration Unset",
+		Run:  exTransitionConfig,
+		TTD:  1000000,
 	},
 }
 
@@ -1200,10 +1201,10 @@ func multipleNewCanonicalPayloads(t *TestEnv) {
 				}
 				newPayloadResp, err := t.Engine.EngineNewPayloadV1(t.Engine.Ctx(), newPayload)
 				if err != nil {
-					t.Fatalf("FAIL (%s): Unable to send new valid payload extending canonical chain: %v", err)
+					t.Fatalf("FAIL (%s): Unable to send new valid payload extending canonical chain: %v", t.TestName, err)
 				}
 				if newPayloadResp.Status != "VALID" {
-					t.Fatalf("FAIL (%s): Unexpected status after trying to send new valid payload extending canonical chain: %v", newPayloadResp)
+					t.Fatalf("FAIL (%s): Unexpected status after trying to send new valid payload extending canonical chain: %v", t.TestName, newPayloadResp)
 				}
 			}
 		},
@@ -1562,14 +1563,7 @@ func postMergeSync(t *TestEnv) {
 	}
 }
 
-func exTransitionConfigPreMerge(t *TestEnv) {
-	// Verify transition information
-	t.VerifyTransitionInformation(t.Engine)
-}
-
-func exTransitionConfigPostMerge(t *TestEnv) {
-	// Wait for TTD to happen
-	t.CLMock.waitForTTD()
+func exTransitionConfig(t *TestEnv) {
 	// Verify transition information
 	t.VerifyTransitionInformation(t.Engine)
 }
