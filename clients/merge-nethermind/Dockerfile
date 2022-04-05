@@ -1,5 +1,5 @@
 # ARG branch=latest
-ARG branch=kiln_merge_sync
+ARG branch=kiln_test
 FROM nethermindeth/nethermind:$branch
 
 RUN apt-get update && apt-get install -y wget

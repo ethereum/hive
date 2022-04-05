@@ -21,6 +21,30 @@ def merge_config:
   end
 ;
 
+def merge_block_hash:
+  if env.HIVE_TERMINAL_BLOCK_HASH != null then
+    { 
+      "Merge": {
+        "TerminalBlockHash": env.HIVE_TERMINAL_BLOCK_HASH
+      }
+    }
+  else
+    {}
+  end
+;
+
+def merge_block_number:
+  if env.HIVE_TERMINAL_BLOCK_NUMBER != null then
+    { 
+      "Merge": {
+        "TerminalBlockNumber": env.HIVE_TERMINAL_BLOCK_NUMBER
+      }
+    }
+  else
+    {}
+  end
+;
+
 def json_rpc_config:
   if env.HIVE_TERMINAL_TOTAL_DIFFICULTY != null then
     {
@@ -71,4 +95,4 @@ def base_config:
 ;
 
 # This is the main expression that outputs the config.
-base_config * keystore_config * merge_config * json_rpc_config
+base_config * keystore_config * merge_config * merge_block_hash * merge_block_number * json_rpc_config
