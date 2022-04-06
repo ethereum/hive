@@ -196,3 +196,32 @@ Verification is made that Client 1 Re-orgs to chain G -> B -> C.
  Client 1 starts with chain G -> A, Client 2 starts with chain G -> A -> B.  
  Block A reaches TTD, but Client 2 has a higher TTD and accepts block B (simulating a client not complying with the merge).  
  Verification is made that Client 1 does not follow Client 2 chain to block B.  
+
+## JWT Authentication Tests:
+- No time drift, correct secret:  
+Engine API call where the `iat` claim contains no time drift, and the secret to calculate the token is correct.
+No error is expected.
+
+- No time drift, incorrect secret (shorter):  
+Engine API call where the `iat` claim contains no time drift, but the secret to calculate the token is incorrectly shorter.
+Invalid token error is expected.
+
+- No time drift, incorrect secret (longer):  
+Engine API call where the `iat` claim contains no time drift, but the secret to calculate the token is incorrectly longer.
+Invalid token error is expected.
+
+- Negative time drift, exceeding limit, correct secret:  
+Engine API call where the `iat` claim contains a negative time drift greater than the maximum threshold, but the secret to calculate the token is correct.
+Invalid token error is expected.
+
+- Negative time drift, within limit, correct secret:  
+Engine API call where the `iat` claim contains a negative time drift smaller than the maximum threshold, and the secret to calculate the token is correct.
+No error is expected.
+
+- Positive time drift, exceeding limit, correct secret:  
+Engine API call where the `iat` claim contains a positive time drift greater than the maximum threshold, but the secret to calculate the token is correct.
+Invalid token error is expected.
+
+- Positive time drift, within limit, correct secret:  
+Engine API call where the `iat` claim contains a positive time drift smaller than the maximum threshold, and the secret to calculate the token is correct.
+No error is expected.

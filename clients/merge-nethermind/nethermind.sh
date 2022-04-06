@@ -50,6 +50,12 @@
 # Immediately abort the script on any error encountered
 set -e
 
+# Generate JWT file if necessary
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
+    echo -n $JWT_SECRET > /jwt.secret
+fi
+
 # Generate the genesis and chainspec file.
 mkdir -p /chainspec
 jq -f /mapper.jq /genesis.json > /chainspec/test.json
