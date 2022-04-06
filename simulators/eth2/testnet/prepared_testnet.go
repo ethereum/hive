@@ -47,20 +47,16 @@ type PreparedTestnet struct {
 // Build all artifacts require to start a testnet.
 func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet {
 	eth1GenesisTime := common.Timestamp(time.Now().Unix())
-	eth2GenesisTime := eth1GenesisTime + 60
+	eth2GenesisTime := eth1GenesisTime + 30
 
 	// Generate genesis for execution clients
-	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime))
+	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime), config.Eth1Consensus == Clique)
 	eth1ConfigOpt := eth1Genesis.ToParams(depositAddress)
 	eth1Bundle, err := setup.Eth1Bundle(eth1Genesis.Genesis)
 	if err != nil {
 		t.Fatal(err)
 	}
-	execNodeOpts := hivesim.Params{
-		"HIVE_CATALYST_ENABLED": "1",
-		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":         "full",
-	}
+	execNodeOpts := hivesim.Params{"HIVE_LOGLEVEL": os.Getenv("HIVE_LOGLEVEL")}
 	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts)
 
 	// Generate beacon spec
@@ -152,14 +148,19 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	}
 }
 
-func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, shouldMine bool) {
+func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus ConsensusType) {
 	testnet.t.Logf("Starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{p.executionOpts}
 	if len(testnet.eth1) == 0 {
-		if shouldMine {
-			// we only make the first eth1 node a miner
-			opts = append(opts, hivesim.Params{"HIVE_MINER": "0x1212121212121212121212121212121212121212"})
+		// we only make the first eth1 node a miner
+		if consensus == Ethash {
+			opts = append(opts, hivesim.Params{"HIVE_MINER": "1212121212121212121212121212121212121212"})
+		} else if consensus == Clique {
+			opts = append(opts, hivesim.Params{
+				"HIVE_CLIQUE_PRIVATEKEY": "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
+				"HIVE_MINER":             "658bdf435d810c91414ec09147daa6db62406379",
+			})
 		}
 	} else {
 		bootnode, err := testnet.eth1[0].EnodeURL()
@@ -170,7 +171,6 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 		// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
 		opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
 	}
-
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}
 	testnet.eth1 = append(testnet.eth1, en)
 }
@@ -187,6 +187,7 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 	}
 
 	var addrs []string
+	var engineAddrs []string
 	for _, index := range eth1Endpoints {
 		eth1Node := testnet.eth1[index]
 		userRPC, err := eth1Node.UserRPCAddress()
@@ -194,8 +195,16 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 			testnet.t.Fatalf("eth1 node used for beacon without available RPC: %v", err)
 		}
 		addrs = append(addrs, userRPC)
+		engineRPC, err := eth1Node.EngineRPCAddress()
+		if err != nil {
+			testnet.t.Fatalf("eth1 node used for beacon without available RPC: %v", err)
+		}
+		engineAddrs = append(engineAddrs, engineRPC)
 	}
-	opts = append(opts, hivesim.Params{"HIVE_ETH2_ETH1_RPC_ADDRS": strings.Join(addrs, ",")})
+	opts = append(opts, hivesim.Params{
+		"HIVE_ETH2_ETH1_RPC_ADDRS":        strings.Join(addrs, ","),
+		"HIVE_ETH2_ETH1_ENGINE_RPC_ADDRS": strings.Join(engineAddrs, ","),
+	})
 
 	if len(testnet.beacons) > 0 {
 		bootnodeENR, err := testnet.beacons[0].ENR()

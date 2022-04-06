@@ -9,4 +9,3 @@ RUN chmod +x /lighthouse_bn.sh
 RUN echo "latest" > /version.txt
 
 ENTRYPOINT ["/lighthouse_bn.sh"]
-

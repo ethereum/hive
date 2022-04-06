@@ -5,8 +5,8 @@
 # needing to constantly rebuild.
 
 FROM alpine:latest
-ARG repo=MariusVanDerWijden/go-ethereum
-ARG branch=merge-kiln-v2
+ARG repo=ethereum/go-ethereum
+ARG branch=master
 
 # Build go-ethereum on the fly and delete all build tools afterwards
 RUN apk add --update bash curl jq go git make gcc musl-dev          \
