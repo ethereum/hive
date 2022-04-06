@@ -165,6 +165,10 @@ var engineTests = []TestSpec{
 		Name: "Sidechain Reorg",
 		Run:  sidechainReorg,
 	},
+	{
+		Name: "Re-Org Back into Canonical Chain",
+		Run:  reorgBack,
+	},
 
 	// Suggested Fee Recipient in Payload creation
 	{
@@ -945,6 +949,45 @@ func blockStatusReorg(t *TestEnv) {
 		},
 	})
 
+}
+
+// Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain
+// is still capable of progressing.
+func reorgBack(t *TestEnv) {
+	// Wait until this client catches up with latest PoS
+	t.CLMock.waitForTTD()
+
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+
+	// We are going to reorg back to this previous hash several times
+	previousHash := t.CLMock.LatestForkchoice.HeadBlockHash
+
+	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
+	t.CLMock.produceBlocks(5, BlockProcessCallbacks{
+		OnHeadBlockForkchoiceBroadcast: func() {
+			// Send a fcU with the HeadBlockHash pointing back to the previous block
+			forkchoiceUpdatedBack := ForkchoiceStateV1{
+				HeadBlockHash:      previousHash,
+				SafeBlockHash:      previousHash,
+				FinalizedBlockHash: previousHash,
+			}
+
+			_, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &forkchoiceUpdatedBack, nil)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error on ForkchoiceUpdated back to a previous block: %v", t.TestName, err)
+			}
+			// It is only expected that the client does not produce an error and the CL Mocker is able to progress after the re-org
+		},
+	})
+
+	// Verify that the client is pointing to the latest payload sent
+	b, err := t.Eth.BlockByNumber(t.Ctx(), nil)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Error while getting the latest block after the re-org: %v", t.TestName, err)
+	}
+	if b.Hash() != t.CLMock.LatestPayloadBuilt.BlockHash {
+		t.Fatalf("FAIL (%s): Client's latest block does not point to the latest payload built: %v != %v", t.TestName, b.Hash(), t.CLMock.LatestPayloadBuilt.BlockHash)
+	}
 }
 
 // Test transaction status after a forkchoiceUpdated re-orgs to an alternative hash where a transaction is not present

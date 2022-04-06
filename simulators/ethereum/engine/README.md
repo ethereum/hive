@@ -121,12 +121,15 @@ Launch a first client and produce N payloads.
 Launch a second client and send payloads (NewPayload) in reverse order (N, N - 1, ..., 1).  
 The payloads should be ACCEPTED/SYNCING, and the last payload should be VALID (since payload 1 successfully links the chain with the Genesis).
 
-### Transaction Reorg using Engine API
+### Re-org using Engine API
 - Transaction Reorg using ForkchoiceUpdated:  
 Send transactions that modify the state tree after the PoS switch and verify that the modifications are correctly rolled back when a ForkchoiceUpdated event occurs with a block on a different chain than the block where the transaction was included.
 
 - Sidechain Reorg:  
 Send a transaction that modifies the state, ForkchoiceUpdate to the payload containing this transaction. Then send an alternative payload, that produces a different state with the same transaction, and use ForkchoiceUpdated to change into this sidechain.
+
+- Re-Org Back into Canonical Chain:  
+Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain is still capable of progressing.
 
 ### Suggested Fee Recipient in Payload creation
 - Suggested Fee Recipient Test:  
