@@ -207,7 +207,7 @@ func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%s): ForkchoiceUpdated under PoW rule returned error (Expected INVALID_TERMINAL_BLOCK): %v, %v", t.TestName, err)
 	}
-	if fcResp.PayloadStatus.Status != "INVALID_TERMINAL_BLOCK" {
+	if fcResp.PayloadStatus.Status != InvalidTerminalBlock {
 		t.Fatalf("INFO (%v): Incorrect EngineForkchoiceUpdatedV1 response for invalid PoW parent (Expected PayloadStatus.Status=INVALID_TERMINAL_BLOCK): %v", t.TestName, fcResp.PayloadStatus.Status)
 	}
 	if fcResp.PayloadStatus.LatestValidHash != nil {
@@ -260,7 +260,7 @@ func invalidTerminalBlockNewPayload(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%s): EngineNewPayloadV1 under PoW rule returned error (Expected INVALID_TERMINAL_BLOCK): %v", t.TestName, err)
 	}
-	if newPayloadResp.Status != "INVALID_TERMINAL_BLOCK" {
+	if newPayloadResp.Status != InvalidTerminalBlock {
 		t.Fatalf("FAIL (%s): Incorrect EngineNewPayloadV1 response for invalid PoW parent (Expected Status=INVALID_TERMINAL_BLOCK): %v", t.TestName, newPayloadResp.Status)
 	}
 	if newPayloadResp.LatestValidHash != nil {
@@ -348,7 +348,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 
 }
 
-// Verify that an unknown hash at HeadBlock in the forkchoice results in client returning "SYNCING" state
+// Verify that an unknown hash at HeadBlock in the forkchoice results in client returning Syncing state
 func unknownHeadBlockHash(t *TestEnv) {
 	// Wait until TTD is reached by this client
 	t.CLMock.waitForTTD()
@@ -376,7 +376,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 	// - {payloadStatus: {status: SYNCING, latestValidHash: null, validationError: null}, payloadId: null}
 	//   if forkchoiceState.headBlockHash references an unknown payload or a payload that can't be validated
 	//   because requisite data for the validation is missing
-	if resp.PayloadStatus.Status != "SYNCING" {
+	if resp.PayloadStatus.Status != Syncing {
 		t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown HeadBlockHash is not SYNCING: %v", t.TestName, resp)
 	}
 
@@ -390,7 +390,7 @@ func unknownHeadBlockHash(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%s): Error on forkchoiceUpdated with unknown HeadBlockHash + PayloadAttributes: %v", t.TestName, err)
 	}
-	if resp.PayloadStatus.Status != "SYNCING" {
+	if resp.PayloadStatus.Status != Syncing {
 		t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with unknown HeadBlockHash is not SYNCING: %v, %v", t.TestName, resp)
 	}
 	if resp.PayloadID != nil {
@@ -430,7 +430,7 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 	if err != nil {
 		t.Fatalf("FAIL (%s): Error on forkchoiceUpdated with unknown FinalizedBlockHash: %v, %v", t.TestName, err)
 	}
-	if resp.PayloadStatus.Status != "VALID" {
+	if resp.PayloadStatus.Status != Valid {
 		t.Fatalf("FAIL (%s): Response on forkchoiceUpdated with LatestForkchoice is not VALID: %v, %v", t.TestName, resp)
 	}
 }
@@ -459,7 +459,7 @@ func badHashOnExecPayload(t *TestEnv) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Incorrect block hash in execute payload resulted in error: %v", t.TestName, err)
 			}
-			if newPayloadResp.Status != "INVALID_BLOCK_HASH" {
+			if newPayloadResp.Status != InvalidBlockHash {
 				t.Fatalf("FAIL (%s): Incorrect block hash in execute payload returned unexpected status (exp INVALID_BLOCK_HASH): %v", t.TestName, newPayloadResp.Status)
 			}
 		},
@@ -482,7 +482,7 @@ func badHashOnExecPayload(t *TestEnv) {
 			// Response status can be ACCEPTED (since parent payload could have been thrown out by the client)
 			// or INVALID (client still has the payload and can verify that this payload is incorrectly building on top of it),
 			// but a VALID response is incorrect.
-			if resp.Status == "VALID" {
+			if resp.Status == Valid {
 				t.Fatalf("FAIL (%s): Unexpected response on valid payload on top of invalid payload: %v", t.TestName, resp)
 			}
 		},
@@ -511,7 +511,7 @@ func parentHashOnExecPayload(t *TestEnv) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Incorrect block hash in execute payload resulted in error: %v", t.TestName, err)
 			}
-			if newPayloadResp.Status != "INVALID_BLOCK_HASH" {
+			if newPayloadResp.Status != InvalidBlockHash {
 				t.Fatalf("FAIL (%s): Incorrect block hash in execute payload returned unexpected status (exp INVALID_BLOCK_HASH): %v", t.TestName, newPayloadResp.Status)
 			}
 		},
@@ -682,7 +682,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 					t.Fatalf("FAIL (%s): Incorrect %v in EngineNewPayload was rejected: %v", t.TestName, payloadField, err)
 				}
 				// Depending on the field we modified, we expect a different status
-				var expectedState string
+				var expectedState PayloadStatus
 				var expectedLatestValidHash *common.Hash = nil
 				if payloadField == "ParentHash" {
 					// Execution specification::
@@ -690,9 +690,9 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 					//  - the blockHash of the payload is valid
 					//  - the payload doesn't extend the canonical chain
 					//  - the payload hasn't been fully validated
-					expectedState = "ACCEPTED"
+					expectedState = Accepted
 				} else {
-					expectedState = "INVALID"
+					expectedState = Invalid
 					expectedLatestValidHash = &alteredPayload.ParentHash
 				}
 
@@ -731,7 +731,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 					t.Fatalf("FAIL (%s): ForkchoiceUpdated with reference to invalid payload resulted in error: %v", t.TestName, err)
 				}
 				// Note: SYNCING is acceptable here as long as the block produced after this test is produced successfully
-				if fcResp.PayloadStatus.Status != "INVALID" && fcResp.PayloadStatus.Status != "SYNCING" {
+				if fcResp.PayloadStatus.Status != Invalid && fcResp.PayloadStatus.Status != Syncing {
 					t.Fatalf("FAIL (%s): ForkchoiceUpdated with reference to invalid payload returned incorrect state: %v!=INVALID|SYNCING", t.TestName, fcResp.PayloadStatus.Status)
 				}
 
@@ -757,7 +757,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 				// Response status can be ACCEPTED (since parent payload could have been thrown out by the client)
 				// or INVALID (client still has the payload and can verify that this payload is incorrectly building on top of it),
 				// but a VALID response is incorrect.
-				if resp.Status == "VALID" {
+				if resp.Status == Valid {
 					t.Fatalf("FAIL (%s): Unexpected response on valid payload on top of invalid payload: %v", t.TestName, resp)
 				}
 			},
@@ -1062,7 +1062,7 @@ func transactionReorg(t *TestEnv) {
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error sending no-txn payload: %v", t.TestName, err)
 				}
-				if status.Status != "VALID" {
+				if status.Status != Valid {
 					t.Fatalf("FAIL (%s): Invalid status on sending no-txn payload: %v", t.TestName, status.Status)
 				}
 				resp, err := t.Engine.EngineForkchoiceUpdatedV1(t.Engine.Ctx(), &ForkchoiceStateV1{
@@ -1073,7 +1073,7 @@ func transactionReorg(t *TestEnv) {
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error during forkchoiceUpdated to no-txn payload: %v", t.TestName, err)
 				}
-				if resp.PayloadStatus.Status != "VALID" {
+				if resp.PayloadStatus.Status != Valid {
 					t.Fatalf("FAIL (%s): Invalid status on forkchoiceUpdated for no-txn payload: %v", t.TestName, resp.PayloadStatus.Status)
 				}
 
@@ -1144,7 +1144,7 @@ func sidechainReorg(t *TestEnv) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Could not send alternative payload: %v", t.TestName, err)
 			}
-			if alternativePayloadStatus.Status != "VALID" {
+			if alternativePayloadStatus.Status != Valid {
 				t.Fatalf("FAIL (%s): Alternative payload response returned Status!=VALID: %v", t.TestName, alternativePayloadStatus)
 			}
 			// We sent the alternative payload, fcU to it
@@ -1157,7 +1157,7 @@ func sidechainReorg(t *TestEnv) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Could not send alternative fcU: %v", t.TestName, err)
 			}
-			if alternativeFcUResp.PayloadStatus.Status != "VALID" {
+			if alternativeFcUResp.PayloadStatus.Status != Valid {
 				t.Fatalf("FAIL (%s): Alternative fcU response returned Status!=VALID: %v", t.TestName, alternativeFcUResp)
 			}
 
@@ -1199,7 +1199,7 @@ func reExecPayloads(t *TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to re-execute valid payload: %v", err)
 		}
-		if newPayloadResp.Status != "VALID" {
+		if newPayloadResp.Status != Valid {
 			t.Fatalf("FAIL (%s): Unexpected status after re-execute valid payload: %v", newPayloadResp)
 		}
 	}
@@ -1233,7 +1233,7 @@ func multipleNewCanonicalPayloads(t *TestEnv) {
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to send new valid payload extending canonical chain: %v", t.TestName, err)
 				}
-				if newPayloadResp.Status != "VALID" {
+				if newPayloadResp.Status != Valid {
 					t.Fatalf("FAIL (%s): Unexpected status after trying to send new valid payload extending canonical chain: %v", t.TestName, newPayloadResp)
 				}
 			}
@@ -1306,7 +1306,7 @@ func outOfOrderPayloads(t *TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error while sending EngineForkchoiceUpdatedV1: %v", t.TestName, err)
 		}
-		if fcResp.PayloadStatus.Status != "SYNCING" {
+		if fcResp.PayloadStatus.Status != Syncing {
 			t.Fatalf("FAIL (%s): Incorrect PayloadStatus.Status!=SYNCING: %v", t.TestName, fcResp.PayloadStatus.Status)
 		}
 		if fcResp.PayloadStatus.LatestValidHash != nil {
@@ -1324,7 +1324,7 @@ func outOfOrderPayloads(t *TestEnv) {
 				t.Fatalf("FAIL (%s): Error while sending EngineNewPayloadV1: %v, %v", t.TestName, err, payload)
 			}
 			if i > 1 {
-				if payloadResp.Status != "ACCEPTED" && payloadResp.Status != "SYNCING" {
+				if payloadResp.Status != Accepted && payloadResp.Status != Syncing {
 					t.Fatalf("FAIL (%s): Incorrect Status!=ACCEPTED|SYNCING (Payload Number=%v): %v", t.TestName, i, payloadResp.Status)
 				}
 				if payloadResp.LatestValidHash != nil {
@@ -1336,7 +1336,7 @@ func outOfOrderPayloads(t *TestEnv) {
 
 			} else {
 				// On the Payload 1, the payload is VALID since we have the complete information to validate the chain
-				if payloadResp.Status != "VALID" {
+				if payloadResp.Status != Valid {
 					t.Fatalf("FAIL (%s): Incorrect Status!=ACCEPTED (Payload Number=%v): %v", t.TestName, i, payloadResp.Status)
 				}
 				if payloadResp.LatestValidHash == nil {
