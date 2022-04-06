@@ -107,7 +107,7 @@ Verify the Block returned by the Eth RPC after a new SafeBlockHash is set using 
 Verify the Block returned by the Eth RPC after a new FinalizedBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
 
 - Latest Block after Reorg:  
-Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to their previous value. Eth RPC should return previous block.
+Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to a sidechain and back. Eth RPC should return the appropriate block everytime.
 
 ### Payload Execution
 - Re-Execute Payload:  
@@ -123,7 +123,7 @@ The payloads should be ACCEPTED/SYNCING, and the last payload should be VALID (s
 
 ### Transaction Reorg using Engine API
 - Transaction Reorg using ForkchoiceUpdated:  
-Send transactions that modify the state tree after the PoS switch and verify that the modifications are correctly rolled back when a ForkchoiceUpdated event occurs with a block older than the block where the transaction was included.
+Send transactions that modify the state tree after the PoS switch and verify that the modifications are correctly rolled back when a ForkchoiceUpdated event occurs with a block on a different chain than the block where the transaction was included.
 
 - Sidechain Reorg:  
 Send a transaction that modifies the state, ForkchoiceUpdate to the payload containing this transaction. Then send an alternative payload, that produces a different state with the same transaction, and use ForkchoiceUpdated to change into this sidechain.
