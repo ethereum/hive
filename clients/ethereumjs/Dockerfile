@@ -1,5 +1,5 @@
 FROM node:16-alpine as build
-RUN apk update && apk add --no-cache bash git jq && rm -rf /var/cache/apk/*
+RUN apk update && apk add --no-cache bash git jq curl && rm -rf /var/cache/apk/*
 RUN git clone --depth 1 https://github.com/ethereumjs/ethereumjs-monorepo.git && \
     (cd ethereumjs-monorepo && npm i)
 
