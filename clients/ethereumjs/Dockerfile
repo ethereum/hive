@@ -18,7 +18,7 @@ RUN chmod +x /hive-bin/enode.sh
 ADD genesis.json /genesis.json
 
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 8546 8550 8547 30303 30303/udp
+EXPOSE 8545 8546 8551 8547 30303 30303/udp
 
 # NodeJS applications have a default memory limit of 2.5GB.
 # This limit is bit tight, it is recommended to raise the limit
