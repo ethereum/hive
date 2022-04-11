@@ -15,7 +15,7 @@ import (
 
 const (
 	PortUserRPC      = 8545
-	PortEngineRPC    = 8550
+	PortEngineRPC    = 8551
 	PortBeaconTCP    = 9000
 	PortBeaconUDP    = 9000
 	PortBeaconAPI    = 4000
