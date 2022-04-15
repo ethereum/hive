@@ -24,6 +24,6 @@ RUN chmod +x /hive-bin/enode.sh
 RUN /usr/local/bin/erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt
 
 # Export the usual networking ports to allow outside access to the node.
-EXPOSE 8545 8546 8550 30303 30303/udp
+EXPOSE 8545 8546 8551 30303 30303/udp
 
 ENTRYPOINT ["/erigon.sh"]

@@ -43,7 +43,7 @@ RUN chmod +x /hive-bin/enode.sh
 ADD genesis.json /genesis.json
 
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 8546 8547 8550 30303 30303/udp
+EXPOSE 8545 8546 8547 8551 30303 30303/udp
 
 # Generate the ethash verification caches
 RUN \
