@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/hivesim"
@@ -25,17 +24,6 @@ import (
 
 // default timeout for RPC calls
 var rpcTimeout = 10 * time.Second
-
-// Retrieves contract storage as BigInt
-func getBigIntAtStorage(eth *ethclient.Client, ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) (*big.Int, error) {
-	stor, err := eth.StorageAt(ctx, account, key, blockNumber)
-	if err != nil {
-		return nil, err
-	}
-	bigint := big.NewInt(0)
-	bigint.SetBytes(stor)
-	return bigint, nil
-}
 
 // From ethereum/rpc:
 

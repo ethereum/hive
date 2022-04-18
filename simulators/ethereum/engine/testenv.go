@@ -27,9 +27,11 @@ type TestEnv struct {
 	TestName string
 
 	// RPC Clients
-	RPC    *rpc.Client
-	Eth    *ethclient.Client
-	Engine *EngineClient
+	RPC        *rpc.Client
+	Eth        *ethclient.Client
+	Engine     *EngineClient
+	TestEngine *TestEngineClient
+	TestEth    *TestEthClient
 
 	// Consensus Layer Mocker Instance
 	CLMock *CLMocker
@@ -88,6 +90,8 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 		ClientParams: cParams,
 		ClientFiles:  cFiles,
 	}
+	env.TestEngine = NewTestEngineClient(env, ec)
+	env.TestEth = NewTestEthClient(env, env.Eth)
 
 	// Defer closing the last context
 	defer func() {

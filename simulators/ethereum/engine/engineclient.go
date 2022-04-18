@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -165,6 +166,7 @@ type ForkChoiceResponse struct {
 }
 
 type PayloadStatus int
+type PayloadStatusSlice []PayloadStatus
 
 const (
 	Valid PayloadStatus = iota
@@ -182,6 +184,22 @@ var PayloadStatuses = map[PayloadStatus]string{
 	Syncing:              "SYNCING",
 	InvalidTerminalBlock: "INVALID_TERMINAL_BLOCK",
 	InvalidBlockHash:     "INVALID_BLOCK_HASH",
+}
+
+func (b PayloadStatus) String() string {
+	str, ok := PayloadStatuses[b]
+	if !ok {
+		return "UNKNOWN"
+	}
+	return str
+}
+
+func (b PayloadStatusSlice) String() string {
+	names := make([]string, 0)
+	for _, status := range b {
+		names = append(names, status.String())
+	}
+	return strings.Join(names, "|")
 }
 
 func (b PayloadStatus) MarshalText() ([]byte, error) {
