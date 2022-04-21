@@ -179,6 +179,34 @@ func (exp *GetPayloadResponseExpectObject) ExpectError() {
 	}
 }
 
+func (exp *GetPayloadResponseExpectObject) ExpectPayloadParentHash(expectedParentHash common.Hash) {
+	exp.ExpectNoError()
+	if exp.Payload.ParentHash != expectedParentHash {
+		exp.Fatalf("FAIL (%s): Unexpected parent hash for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.ParentHash, expectedParentHash)
+	}
+}
+
+func (exp *GetPayloadResponseExpectObject) ExpectPayloadBlockNumber(expectedBlockNumber uint64) {
+	exp.ExpectNoError()
+	if exp.Payload.Number != expectedBlockNumber {
+		exp.Fatalf("FAIL (%s): Unexpected block number for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.Number, expectedBlockNumber)
+	}
+}
+
+func (exp *GetPayloadResponseExpectObject) ExpectPrevRandao(expectedPrevRandao common.Hash) {
+	exp.ExpectNoError()
+	if exp.Payload.PrevRandao != expectedPrevRandao {
+		exp.Fatalf("FAIL (%s): Unexpected prevRandao for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.PrevRandao, expectedPrevRandao)
+	}
+}
+
+func (exp *GetPayloadResponseExpectObject) ExpectTimestamp(expectedTimestamp uint64) {
+	exp.ExpectNoError()
+	if exp.Payload.Timestamp != expectedTimestamp {
+		exp.Fatalf("FAIL (%s): Unexpected timestamp for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.Timestamp, expectedTimestamp)
+	}
+}
+
 // Test Eth JSON-RPC Helper Structs
 type TestEthClient struct {
 	*TestEnv
