@@ -127,7 +127,7 @@ func (cl *CLMocker) setTTDBlockClient(ec *EngineClient) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
 		} else {
-			if resp.ForkchoiceResponse.PayloadStatus.Status == "VALID" {
+			if resp.ForkchoiceResponse.PayloadStatus.Status == Valid {
 				anySuccess = true
 			} else {
 				cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
@@ -220,7 +220,7 @@ func (cl *CLMocker) getNextPayloadID() {
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.Client.Container, err)
 	}
-	if resp.PayloadStatus.Status != "VALID" {
+	if resp.PayloadStatus.Status != Valid {
 		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated Response from Payload builder: %v", resp)
 	}
 	cl.NextPayloadID = resp.PayloadID
@@ -241,7 +241,7 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 			cl.Logf("CLMocker: broadcastNewPayload Error (%v): %v\n", resp.Container, resp.Error)
 
 		} else {
-			if resp.ExecutePayloadResponse.Status == "VALID" {
+			if resp.ExecutePayloadResponse.Status == Valid {
 				// The client is synced and the payload was immediately validated
 				// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
 				// - If validation succeeds, the response MUST contain {status: VALID, latestValidHash: payload.blockHash}
@@ -251,7 +251,7 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 				if *resp.ExecutePayloadResponse.LatestValidHash != cl.LatestPayloadBuilt.BlockHash {
 					cl.Fatalf("CLMocker: NewPayload returned VALID status with incorrect LatestValidHash==%v, expected %v", resp.ExecutePayloadResponse.LatestValidHash, cl.LatestPayloadBuilt.BlockHash)
 				}
-			} else if resp.ExecutePayloadResponse.Status == "ACCEPTED" {
+			} else if resp.ExecutePayloadResponse.Status == Accepted {
 				// The client is not synced but the payload was accepted
 				// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
 				// - {status: ACCEPTED, latestValidHash: null, validationError: null} if the following conditions are met:
@@ -275,7 +275,7 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
-		} else if resp.ForkchoiceResponse.PayloadStatus.Status != "VALID" {
+		} else if resp.ForkchoiceResponse.PayloadStatus.Status != Valid {
 			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", resp.Container, resp.ForkchoiceResponse)
 		}
 	}

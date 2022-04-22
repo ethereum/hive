@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -155,13 +156,69 @@ func (ec *EngineClient) Ctx() context.Context {
 
 // Engine API Types
 type PayloadStatusV1 struct {
-	Status          string       `json:"status"`
-	LatestValidHash *common.Hash `json:"latestValidHash"`
-	ValidationError *string      `json:"validationError"`
+	Status          PayloadStatus `json:"status"`
+	LatestValidHash *common.Hash  `json:"latestValidHash"`
+	ValidationError *string       `json:"validationError"`
 }
 type ForkChoiceResponse struct {
 	PayloadStatus PayloadStatusV1 `json:"payloadStatus"`
 	PayloadID     *PayloadID      `json:"payloadId"`
+}
+
+type PayloadStatus int
+type PayloadStatusSlice []PayloadStatus
+
+const (
+	Valid PayloadStatus = iota
+	Invalid
+	Accepted
+	Syncing
+	InvalidTerminalBlock
+	InvalidBlockHash
+)
+
+var PayloadStatuses = map[PayloadStatus]string{
+	Valid:                "VALID",
+	Invalid:              "INVALID",
+	Accepted:             "ACCEPTED",
+	Syncing:              "SYNCING",
+	InvalidTerminalBlock: "INVALID_TERMINAL_BLOCK",
+	InvalidBlockHash:     "INVALID_BLOCK_HASH",
+}
+
+func (b PayloadStatus) String() string {
+	str, ok := PayloadStatuses[b]
+	if !ok {
+		return "UNKNOWN"
+	}
+	return str
+}
+
+func (b PayloadStatusSlice) String() string {
+	names := make([]string, 0)
+	for _, status := range b {
+		names = append(names, status.String())
+	}
+	return strings.Join(names, "|")
+}
+
+func (b PayloadStatus) MarshalText() ([]byte, error) {
+	str, ok := PayloadStatuses[b]
+	if !ok {
+		return nil, fmt.Errorf("invalid payload status")
+	}
+	return []byte(str), nil
+}
+
+func (b *PayloadStatus) UnmarshalText(input []byte) error {
+	s := string(input)
+	for p, status := range PayloadStatuses {
+		if status == s {
+			*b = p
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid payload status: %s", s)
 }
 
 type PayloadID [8]byte
