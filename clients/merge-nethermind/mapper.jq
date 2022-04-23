@@ -95,6 +95,7 @@ def clique_engine:
     "eip155Transition": env.HIVE_FORK_SPURIOUS|to_hex,
     "maxCodeSizeTransition": env.HIVE_FORK_SPURIOUS|to_hex,
     "maxCodeSize": 24576,
+    "maximumExtraDataSize": "0x400",
 
     # Byzantium
     "eip140Transition": env.HIVE_FORK_BYZANTIUM|to_hex,
