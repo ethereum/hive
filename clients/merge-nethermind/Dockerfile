@@ -1,5 +1,5 @@
 # ARG branch=latest
-ARG branch=kiln_test
+ARG branch=kiln_shadowfork
 FROM nethermindeth/nethermind:$branch
 
 RUN apt-get update && apt-get install -y wget
