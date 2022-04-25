@@ -68,7 +68,11 @@ Perform a forkchoiceUpdated call with an unknown (random) FinalizedBlockHash, th
 Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified, but should not produce unrecoverable error)
 
 - Bad blockhash on NewPayload:  
-Send a NewPayload directive to the client including an incorrect BlockHash, should result in an error.
+Send a NewPayload directive to the client including an incorrect BlockHash, should result in an error in all the following cases:
+   - NewPayload while not syncing, on canonical chain
+   - NewPayload while not syncing, on side chain
+   - NewPayload while syncing, on canonical chain
+   - NewPayload while syncing, on side chain
 
 - ParentHash==BlockHash on NewPayload:  
 Send a NewPayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
