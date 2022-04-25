@@ -197,6 +197,16 @@ var engineTests = []TestSpec{
 		Run:  invalidPayloadTestCaseGen("Transaction/Value", true),
 	},
 
+	// Invalid Payload Re-Org Tests
+	{
+		Name: "Re-Org to Chain Missing Invalid Parent (Invalid after common ancestor)",
+		Run:  reOrgToChainMissingInvalidParentGen(1),
+	},
+	{
+		Name: "Re-Org to Chain Missing Invalid Parent (Invalid two payloads after common ancestor)",
+		Run:  reOrgToChainMissingInvalidParentGen(3),
+	},
+
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{
 		Name: "Latest Block after NewPayload",
@@ -959,6 +969,106 @@ func invalidPayloadTestCaseGen(payloadField string, syncing bool) func(*TestEnv)
 
 			},
 		})
+	}
+}
+
+// Attempt to re-org to a chain which at some point contains an unknown payload which is also invalid.
+// Then reveal the invalid payload and expect that the client rejects it and rejects forkchoice updated calls to this chain.
+// The invalid_index parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
+// with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
+func reOrgToChainMissingInvalidParentGen(invalid_index int) func(*TestEnv) {
+	return func(t *TestEnv) {
+		// Wait until TTD is reached by this client
+		t.CLMock.waitForTTD()
+
+		// Produce blocks before starting the test
+		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+		// Save the common ancestor
+		cA := t.CLMock.LatestPayloadBuilt
+
+		// Amount of blocks to deviate starting from the common ancestor
+		n := 10
+
+		// Slice to save the alternate B chain
+		altChainPayloads := make([]*ExecutableDataV1, 0)
+
+		// Append the common ancestor
+		altChainPayloads = append(altChainPayloads, &cA)
+
+		// Produce blocks but at the same time create an alternate chain which contains an invalid parent (INV_P1)
+		// CommonAncestor◄─▲── P1 ◄──── P2  ◄─ P3  ◄─ ... ◄─ Pn
+		//                 │
+		//                 └──INV_P1 ◄─ P2' ◄─ P3' ◄─ ... ◄─ Pn'
+		t.CLMock.produceBlocks(n, BlockProcessCallbacks{
+			OnGetPayload: func() {
+				var (
+					alternatePayload *ExecutableDataV1
+					err              error
+				)
+				// Create another prevRandao to ensure we deviate from the main payload
+				prevRandao := common.Hash{}
+				rand.Read(prevRandao[:])
+				if len(altChainPayloads) == invalid_index {
+					// This is the payload we are looking to invalidate, this must be invalid
+					invStateRoot := common.Hash{}
+					rand.Read(invStateRoot[:])
+					alternatePayload, err = customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+						StateRoot:  &invStateRoot,
+						ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
+						PrevRandao: &prevRandao,
+					})
+				} else {
+					// Modify the created payload only to reference the previous parent in the B chain
+					alternatePayload, err = customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+						ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
+						PrevRandao: &prevRandao,
+					})
+				}
+				if err != nil {
+					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
+				}
+				altChainPayloads = append(altChainPayloads, alternatePayload)
+			},
+		})
+
+		// Now let's send the alternate chain to the client using newPayload in reverse order
+		for i := n - 1; i >= 0; i-- {
+			// Send the payload
+			r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
+			if i == 1 {
+				if i == invalid_index {
+					// If this is the first payload after the common ancestor, and this is the payload we invalidated,
+					// then we have all the information to determine that this payload is invalid.
+					r.ExpectStatus(Invalid)
+					r.ExpectLatestValidHash(&cA.BlockHash)
+				} else {
+					// This is the first payload, but we did not invalidated the chain until after this one,
+					// therefore the expected status is valid
+					r.ExpectStatus(Valid)
+				}
+
+			} else if i > 1 {
+				r.ExpectStatus(Accepted)
+				r.ExpectLatestValidHash(nil)
+			}
+
+			if i == n-1 {
+				// Send the fcU, this is before we send all the payloads from the alternative chain.
+				// At this point is impossible to give a latestValidHash, since we don't know the required information.
+				s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+					HeadBlockHash:      altChainPayloads[i].BlockHash,
+					SafeBlockHash:      cA.BlockHash,
+					FinalizedBlockHash: cA.BlockHash,
+				}, nil)
+				s.ExpectPayloadStatus(Syncing)
+				s.ExpectLatestValidHash(nil)
+			}
+		}
+
+		// Resend the latest correct fcU
+		r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
+		r.ExpectNoError()
 	}
 }
 
