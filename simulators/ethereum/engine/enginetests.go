@@ -541,10 +541,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 		txFunc := func() {
 			// Function to send at least one transaction each block produced
 			// Send the transaction to the prevRandaoContractAddr
-			tx := t.makeNextTransaction(prevRandaoContractAddr, big1, nil)
-			if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
-				t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
-			}
+			t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
 		}
 
 		// Produce blocks before starting the test
@@ -948,12 +945,8 @@ func transactionReorg(t *TestEnv) {
 				// Data is the key where a `1` will be stored
 				data := common.LeftPadBytes([]byte{byte(i)}, 32)
 				t.Logf("transactionReorg, i=%v, data=%v\n", i, data)
-				tx = t.makeNextTransaction(sstoreContractAddr, big0, data)
+				tx = t.sendNextTransaction(t.Engine, sstoreContractAddr, big0, data)
 
-				// Send the transaction
-				if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
-					t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
-				}
 				// Get the receipt
 				receipt, _ := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
 				if receipt != nil {
@@ -1019,10 +1012,7 @@ func sidechainReorg(t *TestEnv) {
 	// Produce two payloads, send fcU with first payload, check transaction outcome, then reorg, check transaction outcome again
 
 	// This single transaction will change its outcome based on the payload
-	tx := t.makeNextTransaction(prevRandaoContractAddr, big0, nil)
-	if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
-		t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
-	}
+	tx := t.sendNextTransaction(t.Engine, prevRandaoContractAddr, big0, nil)
 	t.Logf("INFO (%s): sent tx %v", t.TestName, tx.Hash())
 
 	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
@@ -1154,11 +1144,7 @@ func outOfOrderPayloads(t *TestEnv) {
 		// We send the transactions after we got the Payload ID, before the CLMocker gets the prepared Payload
 		OnPayloadProducerSelected: func() {
 			for i := 0; i < txPerPayload; i++ {
-				tx := t.makeNextTransaction(recipient, amountPerTx, nil)
-				err := t.Eth.SendTransaction(t.Ctx(), tx)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
-				}
+				t.sendNextTransaction(t.CLMock.NextBlockProducer, recipient, amountPerTx, nil)
 			}
 		},
 	})
@@ -1244,21 +1230,7 @@ func suggestedFeeRecipient(t *TestEnv) {
 
 	// Send multiple transactions
 	for i := 0; i < txCount; i++ {
-		tx := t.makeNextTransaction(vaultAccountAddr, big0, nil)
-		// Empty self tx
-		for {
-			err := t.Eth.SendTransaction(t.Ctx(), tx)
-			if err == nil {
-				break
-			}
-			// Retry sending the same transaction after a second
-			select {
-			case <-time.After(time.Second):
-			case <-t.Timeout:
-				t.Fatalf("FAIL (%s): Timeout while waiting to send transaction: %v", t.TestName, err)
-			}
-		}
-
+		t.sendNextTransaction(t.Engine, vaultAccountAddr, big0, nil)
 	}
 	// Produce the next block with the fee recipient set
 	t.CLMock.NextFeeRecipient = feeRecipient
@@ -1313,17 +1285,14 @@ func prevRandaoOpcodeTx(t *TestEnv) {
 	// Try to send many transactions before PoW transition to guarantee at least one enters in the block
 	go func(t *TestEnv) {
 		for {
+			t.sendNextTransaction(t.Engine, prevRandaoContractAddr, big0, nil)
+
 			select {
 			case <-t.Timeout:
 				t.Fatalf("FAIL (%s): Timeout while sending PREVRANDAO opcode transactions: %v")
 			case <-ttdReached:
 				return
 			case <-time.After(time.Second / 10):
-				tx := t.makeNextTransaction(prevRandaoContractAddr, big0, nil)
-				if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
-					t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
-				}
-				t.Logf("INFO (%s): sent tx %v", t.TestName, tx.Hash())
 			}
 		}
 	}(t)
@@ -1356,10 +1325,7 @@ func prevRandaoOpcodeTx(t *TestEnv) {
 	)
 	t.CLMock.produceBlocks(txCount, BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
-			tx := t.makeNextTransaction(prevRandaoContractAddr, big0, nil)
-			if err := t.Eth.SendTransaction(t.Ctx(), tx); err != nil {
-				t.Fatalf("FAIL (%s): Unable to send transaction: %v", t.TestName, err)
-			}
+			tx := t.sendNextTransaction(t.Engine, prevRandaoContractAddr, big0, nil)
 			txs = append(txs, tx)
 			currentTxIndex++
 		},

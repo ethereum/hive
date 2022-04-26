@@ -151,6 +151,21 @@ func (t *TestEnv) makeNextTransaction(recipient common.Address, amount *big.Int,
 	return signedTx
 }
 
+func (t *TestEnv) sendNextTransaction(sender *EngineClient, recipient common.Address, amount *big.Int, payload []byte) *types.Transaction {
+	tx := t.makeNextTransaction(recipient, amount, payload)
+	for {
+		err := sender.Eth.SendTransaction(sender.Ctx(), tx)
+		if err == nil {
+			return tx
+		}
+		select {
+		case <-time.After(time.Second):
+		case <-t.Timeout:
+			t.Fatalf("FAIL (%s): Timeout while trying to send transaction: %v", t.TestName, err)
+		}
+	}
+}
+
 // CallContext is a helper method that forwards a raw RPC request to
 // the underlying RPC client. This can be used to call RPC methods
 // that are not supported by the ethclient.Client.
