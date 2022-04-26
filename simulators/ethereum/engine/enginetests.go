@@ -51,6 +51,14 @@ var engineTests = []TestSpec{
 		Run:  unknownFinalizedBlockHash,
 	},
 	{
+		Name: "ForkchoiceUpdated Invalid Payload Attributes",
+		Run:  invalidPayloadAttributesGen(false),
+	},
+	{
+		Name: "ForkchoiceUpdated Invalid Payload Attributes (Syncing)",
+		Run:  invalidPayloadAttributesGen(true),
+	},
+	{
 		Name: "Pre-TTD ForkchoiceUpdated After PoS Switch",
 		Run:  preTTDFinalizedBlockHash,
 		TTD:  2,
@@ -374,6 +382,71 @@ func unknownHeadBlockHash(t *TestEnv) {
 		})
 	r.ExpectPayloadStatus(Syncing)
 	r.ExpectPayloadID(nil)
+
+}
+
+// Verify behavior on a forkchoiceUpdated with invalid payload attributes
+func invalidPayloadAttributesGen(syncing bool) func(*TestEnv) {
+
+	return func(t *TestEnv) {
+		// Wait until TTD is reached by this client
+		t.CLMock.waitForTTD()
+
+		// Produce blocks before starting the test
+		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+		// Send a forkchoiceUpdated with invalid PayloadAttributes
+		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			OnNewPayloadBroadcast: func() {
+				// Try to apply the new payload with invalid attributes
+				var blockHash common.Hash
+				if syncing {
+					// Setting a random hash will put the client into `SYNCING`
+					rand.Read(blockHash[:])
+				} else {
+					// Set the block hash to the next payload that was broadcasted
+					blockHash = t.CLMock.LatestPayloadBuilt.BlockHash
+				}
+				t.Logf("INFO (%s): Sending EngineForkchoiceUpdatedV1 (Syncing=%s) with invalid payload attributes", t.TestName, syncing)
+				fcu := ForkchoiceStateV1{
+					HeadBlockHash:      blockHash,
+					SafeBlockHash:      blockHash,
+					FinalizedBlockHash: blockHash,
+				}
+				attr := PayloadAttributesV1{
+					Timestamp:             0,
+					PrevRandao:            common.Hash{},
+					SuggestedFeeRecipient: common.Address{},
+				}
+				// Outcome for this test is not final, at the moment these two options are being discussed:
+				// Option 1
+				// 0) Check headBlock is known and there is no missing data, if not respond with SYNCING
+				// 1) Check headBlock is VALID, if not respond with INVALID
+				// 2) Apply forkchoiceState
+				// 3) Check payloadAttributes, if invalid respond with error: code: Invalid payload attributes
+				// 4) Start payload build process and respond with VALID
+				//
+				// Option 2
+				// 0) Check headBlock is known and there is no missing data, if not respond with SYNCING
+				// 1) Check payloadAttributes (requires a lookup to database to get a timestamp of yet to be applied headBlock), if invalid respond with error: code: Invalid payload attributes
+				// 2) Check headBlock is VALID, if not respond with INVALID
+				// 3) Start payload build process and respond with VALID
+				if syncing {
+					// If we are SYNCING, the outcome should be SYNCING regardless of the validity of the payload atttributes
+					r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&fcu, &attr)
+					r.ExpectPayloadStatus(Syncing)
+					r.ExpectPayloadID(nil)
+				} else {
+					r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&fcu, &attr)
+					r.ExpectError()
+
+					// TBD: Check that the forkchoice not applied (Option 2 is implemented here)
+					s := t.TestEth.TestHeaderByNumber(nil)
+					s.ExpectHash(t.CLMock.LatestFinalizedHeader.Hash())
+				}
+			},
+		})
+	}
 
 }
 
