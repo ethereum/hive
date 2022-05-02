@@ -17,8 +17,6 @@ COPY --from=foundry /usr/local/bin/forge /usr/local/bin/forge
 # Regenerate the L1 genesis file
 RUN mkdir /hive
 ADD genesis.json /genesis.json
-RUN date +%s | xargs printf "0x%x" > /hive/genesis_timestamp
-RUN GENESIS_TIMESTAMP=$(cat /hive/genesis_timestamp); jq ". | .timestamp = \"$GENESIS_TIMESTAMP\" " < ./genesis.json > /hive/genesis-l1.json
 
 # Inject the startup script
 ADD entrypoint.sh /entrypoint.sh

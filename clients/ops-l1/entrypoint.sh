@@ -1,6 +1,10 @@
 #!/bin/sh
 set -exu
 
+# Regenerate the L1 genesis file
+date +%s | xargs printf "0x%x" > /hive/genesis_timestamp
+GENESIS_TIMESTAMP=$(cat /hive/genesis_timestamp); jq ". | .timestamp = \"$GENESIS_TIMESTAMP\" " < ./genesis.json > /hive/genesis-l1.json
+
 VERBOSITY=${GETH_VERBOSITY:-3}
 GETH_DATA_DIR=/db
 GETH_CHAINDATA_DIR="$GETH_DATA_DIR/geth/chaindata"
