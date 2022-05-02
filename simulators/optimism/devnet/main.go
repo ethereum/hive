@@ -82,10 +82,6 @@ func runAllTests(t *hivesim.T) {
 
 	c := d.l2.Client
 
-	// TODO: run integration tests
-	time.Sleep(30 * time.Second)
-	// write your test code here
-
 	vault := newVault()
 	genesis := []byte(d.l2Genesis)
 
