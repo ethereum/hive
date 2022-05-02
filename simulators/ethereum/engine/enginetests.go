@@ -1186,7 +1186,7 @@ func outOfOrderPayloads(t *TestEnv) {
 		for k := t.CLMock.LatestExecutedPayload.Number; k > 0; k-- {
 			payload := t.CLMock.ExecutedPayloadHistory[k]
 
-			if i > 1 {
+			if k > 1 {
 				r := secondaryTestEngineClients[i].TestEngineNewPayloadV1(&payload)
 				r.ExpectStatusEither(Accepted, Syncing)
 				r.ExpectLatestValidHash(nil)
