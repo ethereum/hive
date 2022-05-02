@@ -1183,8 +1183,8 @@ func outOfOrderPayloads(t *TestEnv) {
 		r.ExpectNoValidationError()
 
 		// Send all the payloads in the opposite order
-		for i := t.CLMock.LatestExecutedPayload.Number; i > 0; i-- {
-			payload := t.CLMock.ExecutedPayloadHistory[i]
+		for k := t.CLMock.LatestExecutedPayload.Number; k > 0; k-- {
+			payload := t.CLMock.ExecutedPayloadHistory[k]
 
 			if i > 1 {
 				r := secondaryTestEngineClients[i].TestEngineNewPayloadV1(&payload)
