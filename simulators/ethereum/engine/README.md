@@ -80,6 +80,8 @@ Send a NewPayload directive to the client including ParentHash that is equal to 
 - Invalid Field in NewPayload:  
 Send an invalid payload in NewPayload by modifying fields of a valid ExecutablePayload while maintaining a valid BlockHash.
 After attempting to NewPayload/ForkchoiceUpdated the invalid payload, also attempt to send a valid payload that contains the previously modified invalid payload as parent (should also fail).
+Test also has variants with a missing parent payload (client is syncing):
+I.e. Skip sending NewPayload to the client, but send the ForkchoiceUpdated to this missing payload, which will send the client to Syncing, then send the invalid payload.
 Modify fields including:
    - ParentHash
    - StateRoot
@@ -124,6 +126,9 @@ Send 80 valid NewPayload directives extending the canonical chain. Only one of t
 Launch a first client and produce N payloads.  
 Launch a second client and send payloads (NewPayload) in reverse order (N, N - 1, ..., 1).  
 The payloads should be ACCEPTED/SYNCING, and the last payload should be VALID (since payload 1 successfully links the chain with the Genesis).
+
+- Valid NewPayload->ForkchoiceUpdated on Syncing Client:
+Skip sending NewPayload to the client, but send the ForkchoiceUpdated to this missing payload, which will send the client to Syncing, then send the valid payload. Response should be either `ACCEPTED` or `SYNCING`.
 
 ### Re-org using Engine API
 - Transaction Reorg using ForkchoiceUpdated:  
