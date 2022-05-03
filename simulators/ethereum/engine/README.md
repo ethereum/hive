@@ -201,6 +201,11 @@ Verification is made that Client 1 Re-orgs to chain G -> B -> C.
  Block A reaches TTD, but Client 2 has a higher TTD and accepts block B (simulating a client not complying with the merge).  
  Verification is made that Client 1 does not follow Client 2 chain to block B.  
 
+- Long PoW Chain Sync:
+Client 1 starts with chain G -> PoW1, Client 2 starts with chain G -> PoW1 -> ... -> PoW1024.
+Block PoW1024 reaches TTD, and the CL Mock continues the PoS chain on top of this block.
+Verification is made that Client 1 syncs the remaining PoW blocks and also the PoS chain built on top of PoW1024.
+
 ## JWT Authentication Tests:
 - No time drift, correct secret:  
 Engine API call where the `iat` claim contains no time drift, and the secret to calculate the token is correct.
