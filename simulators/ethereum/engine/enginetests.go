@@ -500,7 +500,7 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*TestEnv) {
 				// or INVALID (client still has the payload and can verify that this payload is incorrectly building on top of it),
 				// but a VALID response is incorrect.
 				r := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-				r.ExpectStatusEither(Accepted, Invalid)
+				r.ExpectStatusEither(Accepted, Invalid, Syncing)
 
 			},
 		})
@@ -746,7 +746,7 @@ func invalidPayloadTestCaseGen(payloadField string) func(*TestEnv) {
 				// or INVALID (client still has the payload and can verify that this payload is incorrectly building on top of it),
 				// but a VALID response is incorrect.
 				r := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-				r.ExpectStatusEither(Accepted, Invalid)
+				r.ExpectStatusEither(Accepted, Invalid, Syncing)
 
 			},
 		})
