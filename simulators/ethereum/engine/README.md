@@ -64,6 +64,10 @@ Perform a forkchoiceUpdated call with an unknown (random) SafeBlockHash, the cli
 - Unknown FinalizedBlockHash:  
 Perform a forkchoiceUpdated call with an unknown (random) FinalizedBlockHash, the client should throw an error.
 
+- Invalid Payload Attributes:
+Perform a forkchoiceUpdated call with valid forkchoice but invalid payload attributes.
+Expected outcome is that the forkchoiceUpdate proceeds, but the call returns an error.
+
 - Pre-TTD Block Hash:  
 Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified, but should not produce unrecoverable error)
 
