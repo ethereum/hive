@@ -25,6 +25,7 @@ var (
 type TestEnv struct {
 	*hivesim.T
 	TestName string
+	Client   *hivesim.Client
 
 	// RPC Clients
 	RPC        *rpc.Client
@@ -83,6 +84,7 @@ func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T,
 	env := &TestEnv{
 		T:            t,
 		TestName:     testName,
+		Client:       c,
 		RPC:          rpcClient,
 		Eth:          ethclient.NewClient(rpcClient),
 		Engine:       ec,
@@ -131,8 +133,8 @@ func (t *TestEnv) MainTTD() *big.Int {
 	return t.Engine.TerminalTotalDifficulty
 }
 
-func (t *TestEnv) StartClient(clientDef *hivesim.ClientDefinition, params hivesim.Params, ttd *big.Int) (*hivesim.Client, *EngineClient, error) {
-	c := t.T.StartClient(clientDef.Name, params, hivesim.WithStaticFiles(t.ClientFiles))
+func (t *TestEnv) StartClient(clientType string, params hivesim.Params, ttd *big.Int) (*hivesim.Client, *EngineClient, error) {
+	c := t.T.StartClient(clientType, params, hivesim.WithStaticFiles(t.ClientFiles))
 	ec := NewEngineClient(t.T, c, ttd)
 	return c, ec, nil
 }
