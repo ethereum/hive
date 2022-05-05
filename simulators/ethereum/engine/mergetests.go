@@ -59,6 +59,9 @@ type MergeTestSpec struct {
 	// to secondary clients happen.
 	SkipMainClientFcU bool
 
+	// Whether or not to wait for TTD to be reached by the main client
+	SkipMainClientTTDWait bool
+
 	// All secondary clients to be started during the tests with their respective chain files
 	SecondaryClientSpecs SecondaryClientSpecs
 }
@@ -82,6 +85,15 @@ type MergeTestSpec struct {
 			Block 1, f37dca584c0f6abde6e9c0bb486ac42a8ac091156ab97aeb26136ee37a3aaef7, difficulty: 196704
 			Block 2, ee5dbba4ccfdc75800bf98804be90d2ffe7fa9b2dce37b6fe31c891ca5fb87b8, difficulty: 196800
 			Chain Total Difficulty 393504
+
+		- blocks_1024_td_135112316.rlp
+			Block 1, 2a9b7a5a209a58f672fa23a3ad9c831958d37dd74a960f69c0075b5c92be457e, difficulty: 196416
+			* Details of every block use `hivechain print`
+			Chain Total Difficulty 135112316
+
+		- blocks_1_td_196416.rlp
+			Block 1, 2a9b7a5a209a58f672fa23a3ad9c831958d37dd74a960f69c0075b5c92be457e, difficulty: 196416
+			Chain Total Difficulty 196416
 
 	Chains were generated using the following command:
 		`hivechain generate -genesis ./init/genesis.json -mine -length 2|1`.
@@ -175,6 +187,21 @@ var mergeTestSpecs = []MergeTestSpec{
 			},
 		},
 	},
+	{
+		Name:                  "Long PoW Chain Sync",
+		TTD:                   135112316,
+		MainChainFile:         "blocks_1_td_196416.rlp",
+		SkipMainClientFcU:     true,
+		SkipMainClientTTDWait: true,
+		TimeoutSeconds:        300,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ChainFile:           "blocks_1024_td_135112316.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
 
 	/* TODOs:
 	- reorg to a block with uncles
@@ -213,13 +240,15 @@ func (clients SecondaryClientSpecs) AnyPoSChainOnTop() bool {
 func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 	runFunc := func(t *TestEnv) {
 		// The first client waits for TTD, which ideally should be reached immediately using loaded chain
-		if !t.Engine.waitForTTDWithTimeout(t.Timeout) {
-			t.Fatalf("FAIL (%s): Timeout waiting for EngineClient (%s) to reach TTD", t.TestName, t.Engine.Container)
-		}
+		if !mergeTestSpec.SkipMainClientTTDWait {
+			if !t.Engine.waitForTTDWithTimeout(t.Timeout) {
+				t.Fatalf("FAIL (%s): Timeout waiting for EngineClient (%s) to reach TTD", t.TestName, t.Engine.Container)
+			}
 
-		if !mergeTestSpec.SkipMainClientFcU {
-			// Set the head of the CLMocker to the head of the main client
-			t.CLMock.setTTDBlockClient(t.Engine)
+			if !mergeTestSpec.SkipMainClientFcU {
+				// Set the head of the CLMocker to the head of the main client
+				t.CLMock.setTTDBlockClient(t.Engine)
+			}
 		}
 
 		// At this point, Head must be main client's HeadBlockHash, but this can change depending on the
