@@ -1005,124 +1005,131 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 				altChainPayloads = append(altChainPayloads, alternatePayload)
 			},
 		})
+		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			// Note: We perform the test in the middle of payload creation by the CL Mock, in order to be able to
+			// re-org back into this chain and use the new payload without issues.
+			OnGetPayload: func() {
 
-		// Now let's send the alternate chain to the client using newPayload/sync
-		for i := 1; i <= n; i++ {
-			// Send the payload
-			payloadValidStr := "VALID"
-			if i == invalid_index {
-				payloadValidStr = "INVALID"
-			} else if i > invalid_index {
-				payloadValidStr = "VALID with INVALID ancestor"
-			}
-			t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
-
-			if p2psync {
-				// We are syncing the main client via p2p, therefore we need to send all valid payloads to the secondary
-				// client, and since they are valid, the client will send them via p2p without problems.
-				if i < invalid_index {
-					// Payloads before the invalid payload are sent to the secondary client
-					r := secondaryEngineTest.TestEngineNewPayloadV1(altChainPayloads[i])
-					r.ExpectStatus(Valid)
-					s := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
-						HeadBlockHash:      altChainPayloads[i].BlockHash,
-						SafeBlockHash:      cA.BlockHash,
-						FinalizedBlockHash: cA.BlockHash,
-					}, nil)
-					s.ExpectPayloadStatus(Valid)
-					/*
-						p := NewTestEthClient(t, secondaryEngineTest.Engine.Eth).TestBlockByNumber(nil)
-						p.ExpectHash(altChainPayloads[invalid_index-1].BlockHash)
-					*/
-
-				} else {
-					// Payloads on and after the invalid payload are sent to the main client,
-					// which at first won't be fully verified because the client has to sync with the secondary client
-					// to obtain all the information
-					r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
-					t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
-					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
-						HeadBlockHash:      altChainPayloads[i].BlockHash,
-						SafeBlockHash:      altChainPayloads[i].BlockHash,
-						FinalizedBlockHash: altChainPayloads[i].BlockHash,
-					}, nil)
-					t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
-				}
-			} else {
-				r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
-				p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
-					HeadBlockHash:      altChainPayloads[i].BlockHash,
-					SafeBlockHash:      altChainPayloads[i].BlockHash,
-					FinalizedBlockHash: altChainPayloads[i].BlockHash,
-				}, nil)
-				if i == invalid_index {
-					// If this is the first payload after the common ancestor, and this is the payload we invalidated,
-					// then we have all the information to determine that this payload is invalid.
-					r.ExpectStatus(Invalid)
-					r.ExpectLatestValidHash(&altChainPayloads[i-1].BlockHash)
-				} else if i > invalid_index {
-					// We have already sent the invalid payload, but the client could've discarded it.
-					// In reality the CL will not get to this point because it will have already received the `INVALID`
-					// response from the previous payload.
-					r.ExpectStatusEither(Accepted, Syncing)
-					r.ExpectLatestValidHash(nil)
-				} else {
-					// This is one of the payloads before the invalid one, therefore is valid.
-					r.ExpectStatus(Valid)
-					p.ExpectPayloadStatus(Valid)
-					p.ExpectLatestValidHash(&altChainPayloads[i].BlockHash)
-				}
-
-			}
-		}
-
-		if p2psync {
-			// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
-			for {
-				r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[n])
-				t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
-				s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
-					HeadBlockHash:      altChainPayloads[n].BlockHash,
-					SafeBlockHash:      altChainPayloads[n].BlockHash,
-					FinalizedBlockHash: altChainPayloads[n].BlockHash,
-				}, nil)
-				t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
-
-				if r.Status.Status == Invalid {
-					// We also expect that the client properly returns the LatestValidHash of the block on the
-					// alternate chain that is immediately prior to the invalid payload
-					r.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
-					break
-				} else if r.Status.Status == Valid {
-					latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), nil)
-					if err != nil {
-						t.Fatalf("FAIL (%s): Unable to get latest block: %v", t.TestName, err)
+				// Now let's send the alternate chain to the client using newPayload/sync
+				for i := 1; i <= n; i++ {
+					// Send the payload
+					payloadValidStr := "VALID"
+					if i == invalid_index {
+						payloadValidStr = "INVALID"
+					} else if i > invalid_index {
+						payloadValidStr = "VALID with INVALID ancestor"
 					}
+					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 
-					// Print last 10 blocks, for debugging
-					for k := latestBlock.Number().Int64() - 10; k <= latestBlock.Number().Int64(); k++ {
-						latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), big.NewInt(k))
-						if err != nil {
-							t.Fatalf("FAIL (%s): Unable to get block %d: %v", t.TestName, k, err)
+					if p2psync {
+						// We are syncing the main client via p2p, therefore we need to send all valid payloads to the secondary
+						// client, and since they are valid, the client will send them via p2p without problems.
+						if i < invalid_index {
+							// Payloads before the invalid payload are sent to the secondary client
+							r := secondaryEngineTest.TestEngineNewPayloadV1(altChainPayloads[i])
+							r.ExpectStatus(Valid)
+							s := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+								HeadBlockHash:      altChainPayloads[i].BlockHash,
+								SafeBlockHash:      cA.BlockHash,
+								FinalizedBlockHash: cA.BlockHash,
+							}, nil)
+							s.ExpectPayloadStatus(Valid)
+							/*
+								p := NewTestEthClient(t, secondaryEngineTest.Engine.Eth).TestBlockByNumber(nil)
+								p.ExpectHash(altChainPayloads[invalid_index-1].BlockHash)
+							*/
+
+						} else {
+							// Payloads on and after the invalid payload are sent to the main client,
+							// which at first won't be fully verified because the client has to sync with the secondary client
+							// to obtain all the information
+							r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
+							t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
+							s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+								HeadBlockHash:      altChainPayloads[i].BlockHash,
+								SafeBlockHash:      altChainPayloads[i].BlockHash,
+								FinalizedBlockHash: altChainPayloads[i].BlockHash,
+							}, nil)
+							t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 						}
-						js, _ := json.MarshalIndent(latestBlock.Header(), "", "  ")
-						t.Logf("INFO (%s): Block %d: %s", t.TestName, k, js)
+					} else {
+						r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
+						p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+							HeadBlockHash:      altChainPayloads[i].BlockHash,
+							SafeBlockHash:      altChainPayloads[i].BlockHash,
+							FinalizedBlockHash: altChainPayloads[i].BlockHash,
+						}, nil)
+						if i == invalid_index {
+							// If this is the first payload after the common ancestor, and this is the payload we invalidated,
+							// then we have all the information to determine that this payload is invalid.
+							r.ExpectStatus(Invalid)
+							r.ExpectLatestValidHash(&altChainPayloads[i-1].BlockHash)
+						} else if i > invalid_index {
+							// We have already sent the invalid payload, but the client could've discarded it.
+							// In reality the CL will not get to this point because it will have already received the `INVALID`
+							// response from the previous payload.
+							r.ExpectStatusEither(Accepted, Syncing)
+							r.ExpectLatestValidHash(nil)
+						} else {
+							// This is one of the payloads before the invalid one, therefore is valid.
+							r.ExpectStatus(Valid)
+							p.ExpectPayloadStatus(Valid)
+							p.ExpectLatestValidHash(&altChainPayloads[i].BlockHash)
+						}
+
 					}
-
-					t.Fatalf("FAIL (%s): Client returned VALID on an invalid chain: %v", t.TestName, r.Status)
 				}
 
-				select {
-				case <-time.After(time.Second):
-				case <-t.Timeout:
-					t.Fatalf("FAIL (%s): Timeout waiting for main client to sync to secondary client", t.TestName)
-				}
-			}
-		}
+				if p2psync {
+					// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
+					for {
+						r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[n])
+						t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
+						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+							HeadBlockHash:      altChainPayloads[n].BlockHash,
+							SafeBlockHash:      altChainPayloads[n].BlockHash,
+							FinalizedBlockHash: altChainPayloads[n].BlockHash,
+						}, nil)
+						t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 
-		// Resend the latest correct fcU
-		r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
-		r.ExpectNoError()
+						if r.Status.Status == Invalid {
+							// We also expect that the client properly returns the LatestValidHash of the block on the
+							// alternate chain that is immediately prior to the invalid payload
+							r.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
+							break
+						} else if r.Status.Status == Valid {
+							latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), nil)
+							if err != nil {
+								t.Fatalf("FAIL (%s): Unable to get latest block: %v", t.TestName, err)
+							}
+
+							// Print last 10 blocks, for debugging
+							for k := latestBlock.Number().Int64() - 10; k <= latestBlock.Number().Int64(); k++ {
+								latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), big.NewInt(k))
+								if err != nil {
+									t.Fatalf("FAIL (%s): Unable to get block %d: %v", t.TestName, k, err)
+								}
+								js, _ := json.MarshalIndent(latestBlock.Header(), "", "  ")
+								t.Logf("INFO (%s): Block %d: %s", t.TestName, k, js)
+							}
+
+							t.Fatalf("FAIL (%s): Client returned VALID on an invalid chain: %v", t.TestName, r.Status)
+						}
+
+						select {
+						case <-time.After(time.Second):
+						case <-t.Timeout:
+							t.Fatalf("FAIL (%s): Timeout waiting for main client to sync to secondary client", t.TestName)
+						}
+					}
+				}
+
+				// Resend the latest correct fcU
+				r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
+				r.ExpectNoError()
+			},
+		})
+
 	}
 }
 
