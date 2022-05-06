@@ -275,6 +275,18 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: broadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
+		} else if resp.ForkchoiceResponse.PayloadStatus.Status == Valid {
+			// {payloadStatus: {status: VALID, latestValidHash: forkchoiceState.headBlockHash, validationError: null},
+			//  payloadId: null}
+			if *resp.ForkchoiceResponse.PayloadStatus.LatestValidHash != cl.LatestForkchoice.HeadBlockHash {
+				cl.Fatalf("CLMocker: Incorrect LatestValidHash from ForkchoiceUpdated (%v): %v != %v\n", resp.Container, resp.ForkchoiceResponse.PayloadStatus.LatestValidHash, cl.LatestForkchoice.HeadBlockHash)
+			}
+			if resp.ForkchoiceResponse.PayloadStatus.ValidationError != nil {
+				cl.Fatalf("CLMocker: Expected empty validationError: %s\n", resp.Container, *resp.ForkchoiceResponse.PayloadStatus.ValidationError)
+			}
+			if resp.ForkchoiceResponse.PayloadID != nil {
+				cl.Fatalf("CLMocker: Expected empty PayloadID: %v\n", resp.Container, resp.ForkchoiceResponse.PayloadID)
+			}
 		} else if resp.ForkchoiceResponse.PayloadStatus.Status != Valid {
 			cl.Logf("CLMocker: broadcastForkchoiceUpdated Response (%v): %v\n", resp.Container, resp.ForkchoiceResponse)
 		}
