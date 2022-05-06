@@ -71,6 +71,38 @@ Expected outcome is that the forkchoiceUpdate proceeds, but the call returns an 
 - Pre-TTD Block Hash:  
 Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified, but should not produce unrecoverable error)
 
+### Eth RPC Status on ForkchoiceUpdated Events:
+- Latest Block after NewPayload:  
+Verify the Block returned by the Eth RPC after a new payload is executed. Eth RPC should still return previous block.
+
+- Latest Block after New HeadBlock:  
+Verify the Block returned by the Eth RPC after a new HeadBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
+
+- Latest Block after New SafeBlock:  
+Verify the Block returned by the Eth RPC after a new SafeBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
+
+- Latest Block after New FinalizedBlock:  
+Verify the Block returned by the Eth RPC after a new FinalizedBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
+
+- Latest Block after Reorg:  
+Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to a sidechain and back. Eth RPC should return the appropriate block everytime.
+
+### Payload Execution
+- Re-Execute Payload:  
+Re-execute already executed payloads (10) and verify that no errors occur.
+
+- Multiple New Payloads Extending Canonical Chain:  
+Send 80 valid NewPayload directives extending the canonical chain. Only one of the payloads is selected using ForkchoiceUpdated directive.
+
+- Out of Order Payload Execution:  
+Launch a first client and produce N payloads.  
+Launch a second client and send payloads (NewPayload) in reverse order (N, N - 1, ..., 1).  
+The payloads should be ACCEPTED/SYNCING, and the last payload should be VALID (since payload 1 successfully links the chain with the Genesis).
+
+- Valid NewPayload->ForkchoiceUpdated on Syncing Client:
+Skip sending NewPayload to the client, but send the ForkchoiceUpdated to this missing payload, which will send the client to Syncing, then send the valid payload. Response should be either `ACCEPTED` or `SYNCING`.
+
+### Invalid Payload Tests
 - Bad blockhash on NewPayload:  
 Send a NewPayload directive to the client including an incorrect BlockHash, should result in an error in all the following cases:
    - NewPayload while not syncing, on canonical chain
@@ -103,36 +135,20 @@ Modify fields including:
       - Gas
       - Value
 
-### Eth RPC Status on ForkchoiceUpdated Events:
-- Latest Block after NewPayload:  
-Verify the Block returned by the Eth RPC after a new payload is executed. Eth RPC should still return previous block.
+- Invalid Ancestor Re-Org Tests
+Attempt to re-org to an unknown side chain which at some point contains an invalid payload.
+The side chain is constructed in parallel while the CL Mock builds the canonical chain, but changing the extraData to simply produce a different hash.
+At a given point, the side chain invalidates one of the payloads by modifying one of the payload fields.
+Once the side chain reaches a certain deviation height (N) from the commonAncestor, the CL switches to it by either of the following methods:
+a) `newPayload` each of the payloads in the side chain, and the invalid payload shall return `INVALID`
+b) Force the main client to partially sync the side chain by sending the initial slice of the chain (before the invalid payload) to another client, and the rest to the primary client.
+Method (b) results in the client returning `ACCEPTED` or `SYNCING` on the `newPayload(INV_P)`, but eventually the client must return `INVALID` to the head of the side chain because it was built on top of an invalid payload.
+```
+commonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
+		          │
+		          └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
+```
 
-- Latest Block after New HeadBlock:  
-Verify the Block returned by the Eth RPC after a new HeadBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
-
-- Latest Block after New SafeBlock:  
-Verify the Block returned by the Eth RPC after a new SafeBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
-
-- Latest Block after New FinalizedBlock:  
-Verify the Block returned by the Eth RPC after a new FinalizedBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
-
-- Latest Block after Reorg:  
-Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to a sidechain and back. Eth RPC should return the appropriate block everytime.
-
-### Payload Execution
-- Re-Execute Payload:  
-Re-execute already executed payloads (10) and verify that no errors occur.
-
-- Multiple New Payloads Extending Canonical Chain:  
-Send 80 valid NewPayload directives extending the canonical chain. Only one of the payloads is selected using ForkchoiceUpdated directive.
-
-- Out of Order Payload Execution:  
-Launch a first client and produce N payloads.  
-Launch a second client and send payloads (NewPayload) in reverse order (N, N - 1, ..., 1).  
-The payloads should be ACCEPTED/SYNCING, and the last payload should be VALID (since payload 1 successfully links the chain with the Genesis).
-
-- Valid NewPayload->ForkchoiceUpdated on Syncing Client:
-Skip sending NewPayload to the client, but send the ForkchoiceUpdated to this missing payload, which will send the client to Syncing, then send the valid payload. Response should be either `ACCEPTED` or `SYNCING`.
 
 ### Re-org using Engine API
 - Transaction Reorg using ForkchoiceUpdated:  
