@@ -1096,6 +1096,9 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 							// We also expect that the client properly returns the LatestValidHash of the block on the
 							// alternate chain that is immediately prior to the invalid payload
 							r.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
+							// Response on ForkchoiceUpdated should be the same
+							s.ExpectPayloadStatus(Invalid)
+							s.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
 							break
 						} else if r.Status.Status == Valid {
 							latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), nil)
@@ -1119,7 +1122,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 						select {
 						case <-time.After(time.Second):
 						case <-t.Timeout:
-							t.Fatalf("FAIL (%s): Timeout waiting for main client to sync to secondary client", t.TestName)
+							t.Fatalf("FAIL (%s): Timeout waiting for main client to detect invalid chain", t.TestName)
 						}
 					}
 				}
@@ -1127,6 +1130,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 				// Resend the latest correct fcU
 				r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
 				r.ExpectNoError()
+				// After this point, the CL Mock will send the next payload of the canonical chain
 			},
 		})
 
