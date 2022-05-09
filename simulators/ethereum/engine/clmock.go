@@ -29,11 +29,12 @@ type CLMocker struct {
 	ExecutedPayloadHistory map[uint64]ExecutableDataV1
 
 	// Latest broadcasted data using the PoS Engine API
-	LatestFinalizedNumber *big.Int
-	LatestFinalizedHeader *types.Header
-	LatestPayloadBuilt    ExecutableDataV1
-	LatestExecutedPayload ExecutableDataV1
-	LatestForkchoice      ForkchoiceStateV1
+	LatestFinalizedNumber   *big.Int
+	LatestFinalizedHeader   *types.Header
+	LatestPayloadBuilt      ExecutableDataV1
+	LatestPayloadAttributes PayloadAttributesV1
+	LatestExecutedPayload   ExecutableDataV1
+	LatestForkchoice        ForkchoiceStateV1
 
 	// Merge related
 	FirstPoSBlockNumber *big.Int
@@ -207,7 +208,7 @@ func (cl *CLMocker) getNextPayloadID() {
 	nextPrevRandao := common.Hash{}
 	rand.Read(nextPrevRandao[:])
 
-	payloadAttributes := PayloadAttributesV1{
+	cl.LatestPayloadAttributes = PayloadAttributesV1{
 		Timestamp:             cl.LatestFinalizedHeader.Time + 1,
 		PrevRandao:            nextPrevRandao,
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
@@ -216,12 +217,15 @@ func (cl *CLMocker) getNextPayloadID() {
 	// Save random value
 	cl.PrevRandaoHistory[cl.LatestFinalizedHeader.Number.Uint64()+1] = nextPrevRandao
 
-	resp, err := cl.NextBlockProducer.EngineForkchoiceUpdatedV1(cl.NextBlockProducer.Ctx(), &cl.LatestForkchoice, &payloadAttributes)
+	resp, err := cl.NextBlockProducer.EngineForkchoiceUpdatedV1(cl.NextBlockProducer.Ctx(), &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.Client.Container, err)
 	}
 	if resp.PayloadStatus.Status != Valid {
 		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated Response from Payload builder: %v", resp)
+	}
+	if resp.PayloadStatus.LatestValidHash == nil || *resp.PayloadStatus.LatestValidHash != cl.LatestForkchoice.HeadBlockHash {
+		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated LatestValidHash Response from Payload builder: %v != %v", resp.PayloadStatus.LatestValidHash, cl.LatestForkchoice.HeadBlockHash)
 	}
 	cl.NextPayloadID = resp.PayloadID
 }
@@ -231,6 +235,21 @@ func (cl *CLMocker) getNextPayload() {
 	cl.LatestPayloadBuilt, err = cl.NextBlockProducer.EngineGetPayloadV1(cl.NextBlockProducer.Ctx(), cl.NextPayloadID)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.Client.Container, cl.NextPayloadID, err)
+	}
+	if cl.LatestPayloadBuilt.Timestamp != cl.LatestPayloadAttributes.Timestamp {
+		cl.Fatalf("CLMocker: Incorrect Timestamp on payload built: %d != %d", cl.LatestPayloadBuilt.Timestamp, cl.LatestPayloadAttributes.Timestamp)
+	}
+	if cl.LatestPayloadBuilt.FeeRecipient != cl.LatestPayloadAttributes.SuggestedFeeRecipient {
+		cl.Fatalf("CLMocker: Incorrect SuggestedFeeRecipient on payload built: %v != %v", cl.LatestPayloadBuilt.FeeRecipient, cl.LatestPayloadAttributes.SuggestedFeeRecipient)
+	}
+	if cl.LatestPayloadBuilt.PrevRandao != cl.LatestPayloadAttributes.PrevRandao {
+		cl.Fatalf("CLMocker: Incorrect PrevRandao on payload built: %v != %v", cl.LatestPayloadBuilt.PrevRandao, cl.LatestPayloadAttributes.PrevRandao)
+	}
+	if cl.LatestPayloadBuilt.ParentHash != cl.LatestFinalizedHeader.Hash() {
+		cl.Fatalf("CLMocker: Incorrect ParentHash on payload built: %v != %v", cl.LatestPayloadBuilt.ParentHash, cl.LatestFinalizedHeader.Hash())
+	}
+	if cl.LatestPayloadBuilt.Number != cl.LatestFinalizedHeader.Number.Uint64()+1 {
+		cl.Fatalf("CLMocker: Incorrect Number on payload built: %v != %v", cl.LatestPayloadBuilt.Number, cl.LatestFinalizedHeader.Number.Uint64()+1)
 	}
 }
 
@@ -258,8 +277,7 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 				// the blockHash of the payload is valid
 				// the payload doesn't extend the canonical chain
 				// the payload hasn't been fully validated.
-				nullHash := common.Hash{}
-				if resp.ExecutePayloadResponse.LatestValidHash != nil && *resp.ExecutePayloadResponse.LatestValidHash != nullHash {
+				if resp.ExecutePayloadResponse.LatestValidHash != nil && *resp.ExecutePayloadResponse.LatestValidHash != (common.Hash{}) {
 					cl.Fatalf("CLMocker: NewPayload returned ACCEPTED status with incorrect LatestValidHash==%v", resp.ExecutePayloadResponse.LatestValidHash)
 				}
 			} else {
@@ -378,6 +396,26 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 		}
 		if newHeader.Hash() != cl.LatestPayloadBuilt.BlockHash {
 			continue
+		}
+		// Check that the new finalized header has the correct properties
+		// ommersHash == 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347
+		if newHeader.UncleHash != types.EmptyUncleHash {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect ommersHash: %v", ec.Container, newHeader.UncleHash)
+		}
+		// difficulty == 0
+		if newHeader.Difficulty.Cmp(big0) != 0 {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect difficulty: %v", ec.Container, newHeader.Difficulty)
+		}
+		// mixHash == prevRandao
+		if newHeader.MixDigest != cl.PrevRandaoHistory[cl.LatestFinalizedNumber.Uint64()] {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect mixHash: %v != %v", ec.Container, newHeader.MixDigest, cl.PrevRandaoHistory[cl.LatestFinalizedNumber.Uint64()])
+		}
+		// nonce == 0x0000000000000000
+		if newHeader.Nonce != (types.BlockNonce{}) {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect nonce: %v", ec.Container, newHeader.Nonce)
+		}
+		if len(newHeader.Extra) > 32 {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect extraData (len > 32): %v", ec.Container, newHeader.Extra)
 		}
 		cl.LatestFinalizedHeader = newHeader
 	}
