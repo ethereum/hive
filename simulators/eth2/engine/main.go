@@ -13,11 +13,11 @@ var tests = []testSpec{
 
 func main() {
 	var suite = hivesim.Suite{
-		Name:        "eth2-testnet",
+		Name:        "cl-test",
 		Description: `Run different eth2 testnets.`,
 	}
 	suite.Add(hivesim.TestSpec{
-		Name:        "eth2-testnets",
+		Name:        "cl-tests",
 		Description: "Collection of different eth2 testnet compositions and assertions.",
 		Run: func(t *hivesim.T) {
 			clientTypes, err := t.Sim.ClientTypes()

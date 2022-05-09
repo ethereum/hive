@@ -173,6 +173,7 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 	}
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}
 	testnet.eth1 = append(testnet.eth1, en)
+	testnet.proxies = append(testnet.proxies, NewProxy(PortEngineRPC, en.IP.String()))
 }
 
 func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.ClientDefinition, eth1Endpoints []int) {
@@ -189,7 +190,7 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 	var addrs []string
 	var engineAddrs []string
 	for _, index := range eth1Endpoints {
-		eth1Node := testnet.eth1[index]
+		eth1Node := testnet.proxies[index]
 		userRPC, err := eth1Node.UserRPCAddress()
 		if err != nil {
 			testnet.t.Fatalf("eth1 node used for beacon without available RPC: %v", err)

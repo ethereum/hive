@@ -209,8 +209,8 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(ctx context.Context, checkpo
 	}
 	payload := versionedBlock.Data.(*bellatrix.SignedBeaconBlock).Message.Body.ExecutionPayload
 
-	for i, e := range t.eth1 {
-		client := ethclient.NewClient(e.Client.RPC())
+	for i, proxy := range t.proxies {
+		client := ethclient.NewClient(proxy.RPC())
 		block, err := client.BlockByNumber(ctx, big.NewInt(int64(payload.BlockNumber)))
 		if err != nil {
 			return fmt.Errorf("eth1 %d: %s", 0, err)
