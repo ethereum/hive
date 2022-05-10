@@ -207,77 +207,77 @@ var engineTests = []TestSpec{
 
 	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, INV_P1', Reveal using newPayload",
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P1', Reveal using newPayload",
 		Run:  invalidMissingAncestorReOrgGen(1, InvalidStateRoot, false, true),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, INV_P5', Reveal using newPayload",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidStateRoot, false, true),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using newPayload",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidStateRoot, false, true),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, INV_P10', Reveal using newPayload",
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using newPayload",
 		Run:  invalidMissingAncestorReOrgGen(10, InvalidStateRoot, false, true),
 	},
 
 	// Invalid Ancestor Re-Org Tests (Reveal via sync through secondary client)
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidStateRoot, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidStateRoot, true, true),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, true),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidReceiptsRoot, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidReceiptsRoot, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid Number, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidNumber, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidNumber, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid GasLimit, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidGasLimit, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidGasLimit, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid GasUsed, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidGasUsed, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidGasUsed, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid Timestamp, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidTimestamp, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTimestamp, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidPrevRandao, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidPrevRandao, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Incomplete Transactions, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, RemoveTransaction, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, RemoveTransaction, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidTransactionSignature, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionSignature, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidTransactionNonce, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionNonce, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidTransactionGas, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionGas, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidTransactionGasPrice, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionGasPrice, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, INV_P5', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(5, InvalidTransactionValue, true, false),
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionValue, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, INV_P10', Reveal using sync",
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using sync",
 		Run:  invalidMissingAncestorReOrgGen(10, InvalidStateRoot, true, true),
 	},
 
