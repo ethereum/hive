@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -46,7 +45,7 @@ type MergeTestSpec struct {
 
 	// Amount of seconds to keep checking that the main client does not switch chains.
 	// Default: 0 seconds
-	KeepCheckingSeconds int
+	KeepCheckingUntilTimeout bool
 
 	// Genesis file to be used for all clients launched during test
 	// Default: genesis.json (init/genesis.json)
@@ -61,6 +60,11 @@ type MergeTestSpec struct {
 
 	// Whether or not to wait for TTD to be reached by the main client
 	SkipMainClientTTDWait bool
+
+	// Number of PoS blocks to build on top of the MainClient.
+	// Blocks will be built before any of the other clients is started, leading to a potential Post-PoS re-org.
+	// Requires SkipMainClientFcU==false
+	MainClientPoSBlocks int
 
 	// All secondary clients to be started during the tests with their respective chain files
 	SecondaryClientSpecs SecondaryClientSpecs
@@ -100,7 +104,7 @@ type MergeTestSpec struct {
 */
 var mergeTestSpecs = []MergeTestSpec{
 	{
-		Name:          "Single Block Re-org to Higher-Total-Difficulty Chain, Equal Height",
+		Name:          "Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height",
 		TTD:           196608,
 		MainChainFile: "blocks_1_td_196608.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
@@ -112,7 +116,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:          "Single Block Re-org to Lower-Total-Difficulty Chain, Equal Height",
+		Name:          "Single Block PoW Re-org to Lower-Total-Difficulty Chain, Equal Height",
 		TTD:           196608,
 		MainChainFile: "blocks_1_td_196704.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
@@ -124,7 +128,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:          "Two Block Re-org to Higher-Total-Difficulty Chain, Equal Height",
+		Name:          "Two Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height",
 		TTD:           393120,
 		MainChainFile: "blocks_2_td_393120.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
@@ -136,7 +140,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:          "Two Block Re-org to Lower-Total-Difficulty Chain, Equal Height",
+		Name:          "Two Block PoW Re-org to Lower-Total-Difficulty Chain, Equal Height",
 		TTD:           393120,
 		MainChainFile: "blocks_2_td_393504.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
@@ -148,7 +152,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:          "Two Block Re-org to Higher-Height Chain",
+		Name:          "Two Block PoW Re-org to Higher-Height Chain",
 		TTD:           196704,
 		MainChainFile: "blocks_1_td_196704.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
@@ -160,7 +164,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:          "Two Block Re-org to Lower-Height Chain",
+		Name:          "Two Block PoW Re-org to Lower-Height Chain",
 		TTD:           196704,
 		MainChainFile: "blocks_2_td_393120.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
@@ -172,12 +176,64 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:                "Halt following PoW chain",
+		Name:                "Two Block Post-PoS Re-org to Higher-Total-Difficulty PoW Chain",
 		TTD:                 196608,
 		MainChainFile:       "blocks_1_td_196608.rlp",
-		SkipMainClientFcU:   true,
-		TimeoutSeconds:      120,
-		KeepCheckingSeconds: 60,
+		MainClientPoSBlocks: 2,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ChainFile:           "blocks_1_td_196704.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
+	{
+		Name:                "Two Block Post-PoS Re-org to Lower-Total-Difficulty PoW Chain",
+		TTD:                 196608,
+		MainChainFile:       "blocks_1_td_196704.rlp",
+		MainClientPoSBlocks: 2,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ChainFile:           "blocks_1_td_196608.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
+	{
+		Name:                "Two Block Post-PoS Re-org to Higher-Height PoW Chain",
+		TTD:                 196704,
+		MainChainFile:       "blocks_1_td_196704.rlp",
+		MainClientPoSBlocks: 2,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ChainFile:           "blocks_2_td_393120.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
+	{
+		Name:                "Two Block Post-PoS Re-org to Lower-Height PoW Chain",
+		TTD:                 196704,
+		MainChainFile:       "blocks_2_td_393120.rlp",
+		MainClientPoSBlocks: 2,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ChainFile:           "blocks_1_td_196704.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
+	{
+		Name:                     "Halt following PoW chain",
+		TTD:                      196608,
+		MainChainFile:            "blocks_1_td_196608.rlp",
+		SkipMainClientFcU:        true,
+		TimeoutSeconds:           120,
+		KeepCheckingUntilTimeout: true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				TTD:                 393120,
@@ -199,6 +255,38 @@ var mergeTestSpecs = []MergeTestSpec{
 				ChainFile:           "blocks_1024_td_135112316.rlp",
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
+			},
+		},
+	},
+	{
+		Name:                     "Transition on an Chain with Invalid Terminal Block, Higher Configured Total Difficulty",
+		TTD:                      196608,
+		MainChainFile:            "blocks_1_td_196608.rlp",
+		MainClientPoSBlocks:      1,
+		TimeoutSeconds:           180,
+		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				TTD:                 393120,
+				ChainFile:           "blocks_2_td_393120.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                     "Transition on an Chain with Invalid Terminal Block, Lower Configured Total Difficulty",
+		TTD:                      393120,
+		MainChainFile:            "blocks_2_td_393120.rlp",
+		MainClientPoSBlocks:      1,
+		TimeoutSeconds:           180,
+		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				TTD:                 196608,
+				ChainFile:           "blocks_1_td_196608.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
 			},
 		},
 	},
@@ -248,17 +336,21 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 			if !mergeTestSpec.SkipMainClientFcU {
 				// Set the head of the CLMocker to the head of the main client
 				t.CLMock.setTTDBlockClient(t.Engine)
+				if mergeTestSpec.MainClientPoSBlocks > 0 {
+					// CL Mocker `produceBlocks` automatically checks that the PoS chain is followed by the client
+					t.CLMock.produceBlocks(mergeTestSpec.MainClientPoSBlocks, BlockProcessCallbacks{})
+				}
 			}
 		}
 
 		// At this point, Head must be main client's HeadBlockHash, but this can change depending on the
 		// secondary clients
-		var mustHeadHash common.Hash
-		if header, err := t.Eth.HeaderByNumber(t.Ctx(), nil); err == nil {
-			mustHeadHash = header.Hash()
-		} else {
+		header, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
+		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to obtain main client latest header: %v", t.TestName, err)
 		}
+		mustHeadHash := header.Hash()
+		t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 
 		// Get the main client's enode to pass it to secondary clients
 		enode, err := t.Engine.EnodeURL()
@@ -286,6 +378,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 				// The main client shall sync to this secondary client in order for the test to succeed.
 				if header, err := secondaryClient.Eth.HeaderByNumber(secondaryClient.Ctx(), nil); err == nil {
 					mustHeadHash = header.Hash()
+					t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 				} else {
 					t.Fatalf("FAIL (%s): Unable to obtain client [%s] latest header: %v", t.TestName, secondaryClient.Container, err)
 				}
@@ -300,23 +393,12 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 
 				// If the main client should follow the PoS chain, update the mustHeadHash
 				if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
+					// Keep following the chain if that is what the test expects
 					mustHeadHash = t.CLMock.LatestFinalizedHeader.Hash()
-				}
-
-				// Check for timeout
-				select {
-				case <-t.Timeout:
-					t.Fatalf("FAIL (%s): Timeout while waiting for sync on the alternative PoW chain", t.TestName)
-				default:
-				}
-			} else {
-				// The test case does not build the PoS chain, wait here before checking the head again.
-				select {
-				case <-time.After(time.Second):
-				case <-t.Timeout:
-					t.Fatalf("FAIL (%s): Timeout while waiting for sync on the alternative PoW chain", t.TestName)
+					t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 				}
 			}
+
 			if header, err := t.Eth.HeaderByNumber(t.Ctx(), nil); err == nil {
 				if header.Hash() == mustHeadHash {
 					t.Logf("INFO (%s): Main client is now synced to the expected head, %v", t.TestName, header.Hash())
@@ -326,42 +408,48 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 				t.Fatalf("FAIL (%s): Error getting latest header for main client: %v", t.TestName, err)
 			}
 
+			// Check for timeout.
+			select {
+			case <-time.After(time.Second):
+			case <-t.Timeout:
+				t.Fatalf("FAIL (%s): Timeout while waiting for sync on the alternative PoW chain", t.TestName)
+			}
 		}
 
-		// Test specified that we must keep checking the main client to stick to mustHeadHash for a certain amount of time
-		for ; mergeTestSpec.KeepCheckingSeconds > 0; mergeTestSpec.KeepCheckingSeconds -= 1 {
-			if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() {
-				// Build a block and check whether the main client switches
-				t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+		// Test specified that we must keep checking the main client to sticks to mustHeadHash until timeout
+		if mergeTestSpec.KeepCheckingUntilTimeout {
+			for {
+				if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() {
+					// Build a block and check whether the main client switches
+					t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
 
-				// If the main client should follow the PoS chain, update the mustHeadHash
-				if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
-					mustHeadHash = t.CLMock.LatestFinalizedHeader.Hash()
+					// If the main client should follow the PoS chain, update the mustHeadHash
+					if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
+						// Keep following the chain if that is what the test expects
+						mustHeadHash = t.CLMock.LatestFinalizedHeader.Hash()
+						t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
+					}
+
 				}
 
-				// Check for timeout
-				select {
-				case <-t.Timeout:
-					t.Fatalf("FAIL (%s): Timeout while waiting for sync on the alternative PoW chain", t.TestName)
-				default:
+				if header, err := t.Eth.HeaderByNumber(t.Ctx(), nil); err == nil {
+					if header.Hash() != mustHeadHash {
+						t.Fatalf("FAIL (%s): Main client synced to incorrect chain: %v", t.TestName, header.Hash())
+						break
+					}
+				} else {
+					t.Fatalf("FAIL (%s): Error getting latest header for main client: %v", t.TestName, err)
 				}
-			} else {
-				// The test case does not build the PoS chain, wait here before checking the head again.
+
+				// Wait here before checking the head again.
 				select {
 				case <-time.After(time.Second):
 				case <-t.Timeout:
-					t.Fatalf("FAIL (%s): Timeout while waiting for sync on the alternative PoW chain", t.TestName)
+					// This means the test is over but that is ok since the client did not switch to an incorrect chain.
+					return
 				}
-			}
-			if header, err := t.Eth.HeaderByNumber(t.Ctx(), nil); err == nil {
-				if header.Hash() != mustHeadHash {
-					t.Logf("FAIL (%s): Main client synced to incorrect chain: %v", t.TestName, header.Hash())
-					break
-				}
-			} else {
-				t.Fatalf("FAIL (%s): Error getting latest header for main client: %v", t.TestName, err)
-			}
 
+			}
 		}
 	}
 
