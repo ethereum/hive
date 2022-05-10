@@ -259,7 +259,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:                     "Transition on an Chain with Invalid Terminal Block, Higher Configured Total Difficulty",
+		Name:                     "Transition to a Chain with Invalid Terminal Block, Higher Configured Total Difficulty",
 		TTD:                      196608,
 		MainChainFile:            "blocks_1_td_196608.rlp",
 		MainClientPoSBlocks:      1,
@@ -275,7 +275,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:                     "Transition on an Chain with Invalid Terminal Block, Lower Configured Total Difficulty",
+		Name:                     "Transition to a Chain with Invalid Terminal Block, Lower Configured Total Difficulty",
 		TTD:                      393120,
 		MainChainFile:            "blocks_2_td_393120.rlp",
 		MainClientPoSBlocks:      1,

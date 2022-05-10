@@ -245,7 +245,7 @@ ForkchoiceUpdated is sent to Client 1 with C as Head.
 PoS Chain is continued on top of C.
 Verification is made that Client 1 Re-orgs to chain G -> C -> ...  
 
-- Transition on an Chain with Invalid Terminal Block, Incorrectly Configured Higher Total Difficulty
+- Transition to a Chain with Invalid Terminal Block, Incorrectly Configured Higher Total Difficulty
 Client 1 starts with chain G -> A, Client 2 starts with chain G -> A -> B.  
 Client 1's configured TTD is reached by A.
 Client 2's configured TTD is reached by B.
@@ -253,7 +253,7 @@ ForkchoiceUpdated is sent to both clients with B as Head.
 PoS chain is continued on top of B.
 Verification is made that Client 1 never re-orgs to chain G -> A -> B due to incorrect Terminal block.  
 
-- Transition on an Chain with Invalid Terminal Block, Incorrectly Configured Lower Total Difficulty
+- Transition to a Chain with Invalid Terminal Block, Incorrectly Configured Lower Total Difficulty
 Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> A.  
 Client 1's configured TTD is reached by B.
 Client 2's configured TTD is reached by A.
