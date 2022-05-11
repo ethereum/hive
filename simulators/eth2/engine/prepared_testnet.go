@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -57,7 +59,8 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 		t.Fatal(err)
 	}
 	execNodeOpts := hivesim.Params{"HIVE_LOGLEVEL": os.Getenv("HIVE_LOGLEVEL")}
-	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts)
+	jwtSecret := hivesim.Params{"HIVE_JWTSECRET": "true"}
+	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts, jwtSecret)
 
 	// Generate beacon spec
 	//
@@ -172,8 +175,17 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 		opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
 	}
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}
+	dest, _ := en.EngineRPCAddress()
 	testnet.eth1 = append(testnet.eth1, en)
-	testnet.proxies = append(testnet.proxies, NewProxy(PortEngineRPC, en.IP.String()))
+	simIP, err := testnet.t.Sim.ContainerNetworkIP(testnet.t.SuiteID, "bridge", "simulation")
+	if err != nil {
+		panic(err)
+	}
+	secret, err := hex.DecodeString("7365637265747365637265747365637265747365637265747365637265747365")
+	if err != nil {
+		panic(err)
+	}
+	testnet.proxies = append(testnet.proxies, NewProxy(net.ParseIP(simIP), PortEngineRPC+len(testnet.eth1), dest, secret))
 }
 
 func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.ClientDefinition, eth1Endpoints []int) {

@@ -12,7 +12,7 @@ require (
 	github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52
 	github.com/protolambda/zrnt v0.25.0
 	github.com/protolambda/ztyp v0.2.1
-	github.com/rauljordan/engine-proxy v0.0.0-20220505020248-4d72a091d291
+	github.com/rauljordan/engine-proxy v0.0.0-20220511134016-2e057ad9d277
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wealdtech/go-eth2-util v1.6.5
 )
@@ -45,7 +45,9 @@ require (
 
 require (
 	github.com/btcsuite/btcd/btcec/v2 v2.1.2 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
+	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
@@ -54,8 +56,10 @@ require (
 	github.com/kilic/bls12-381 v0.1.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
+	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
 	github.com/tklauser/numcpus v0.3.0 // indirect
+	github.com/urfave/cli/v2 v2.5.1 // indirect
 	github.com/wealdtech/go-bytesutil v1.1.1 // indirect
 	github.com/wealdtech/go-eth2-types/v2 v2.5.6 // indirect
 	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e // indirect

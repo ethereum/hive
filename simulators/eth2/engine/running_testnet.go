@@ -39,6 +39,24 @@ type Testnet struct {
 	proxies    []*Proxy
 }
 
+func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
+	prep := prepareTestnet(t, env, config)
+	testnet := prep.createTestnet(t)
+
+	genesisTime := testnet.GenesisTime()
+	countdown := genesisTime.Sub(time.Now())
+	t.Logf("Created new testnet, genesis at %s (%s from now)", genesisTime, countdown)
+
+	// for each key partition, we start a validator client with its own beacon node and eth1 node
+	for i, node := range config.Nodes {
+		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), config.Eth1Consensus)
+		prep.startBeaconNode(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon"), []int{i})
+		prep.startValidatorClient(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", node.ConsensusClient), "validator"), i, i)
+	}
+
+	return testnet
+}
+
 func (t *Testnet) GenesisTime() time.Time {
 	return time.Unix(int64(t.genesisTime), 0)
 }

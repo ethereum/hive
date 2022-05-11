@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/hive/hivesim"
+	"github.com/rauljordan/engine-proxy/proxy"
 )
 
 var (
@@ -14,24 +14,6 @@ var (
 	SLOT_TIME                 uint64 = 3
 	TERMINAL_TOTAL_DIFFICULTY        = big.NewInt(100)
 )
-
-func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
-	prep := prepareTestnet(t, env, config)
-	testnet := prep.createTestnet(t)
-
-	genesisTime := testnet.GenesisTime()
-	countdown := genesisTime.Sub(time.Now())
-	t.Logf("Created new testnet, genesis at %s (%s from now)", genesisTime, countdown)
-
-	// for each key partition, we start a validator client with its own beacon node and eth1 node
-	for i, node := range config.Nodes {
-		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), config.Eth1Consensus)
-		prep.startBeaconNode(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon"), []int{i})
-		prep.startValidatorClient(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", node.ConsensusClient), "validator"), i, i)
-	}
-
-	return testnet
-}
 
 func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 	config := config{
@@ -61,6 +43,49 @@ func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 		t.Fatalf("%v", err)
 	}
 	if err := testnet.VerifyProposers(ctx, finalized); err != nil {
+		t.Fatalf("%v", err)
+	}
+}
+
+func TestRPCError(t *hivesim.T, env *testEnv, n node) {
+	config := config{
+		AltairForkEpoch:         0,
+		MergeForkEpoch:          0,
+		ValidatorCount:          VALIDATOR_COUNT,
+		SlotTime:                SLOT_TIME,
+		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+		Nodes: []node{
+			n,
+			n,
+		},
+		Eth1Consensus: Clique,
+	}
+
+	testnet := startTestnet(t, env, &config)
+
+	ctx := context.Background()
+	finalized, err := testnet.WaitForFinality(ctx)
+	if err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, finalized); err != nil {
+		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyProposers(ctx, finalized); err != nil {
+		t.Fatalf("%v", err)
+	}
+	fields := make(map[string]interface{})
+	fields["error"] = "weird error"
+	spoof := &proxy.Spoof{
+		Method: "ForkChoiceUpdatedV1",
+		Fields: fields,
+	}
+	testnet.proxies[0].AddResponse(spoof)
+	time.Sleep(time.Minute)
+	if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
 		t.Fatalf("%v", err)
 	}
 }

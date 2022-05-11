@@ -8,7 +8,8 @@ import (
 )
 
 var tests = []testSpec{
-	{Name: "transition-testnet", Run: TransitionTestnet},
+	//{Name: "transition-testnet", Run: TransitionTestnet},
+	{Name: "test-rpc-error", Run: TestRPCError},
 }
 
 func main() {
