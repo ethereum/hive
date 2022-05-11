@@ -19,6 +19,7 @@ var (
 	vaultAccountAddr = common.HexToAddress("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
 	vaultKey, _      = crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	// Address of the vault in genesis.
+	predeployedVaultAddr = common.HexToAddress("0000000000000000000000000000000000000315")
 	// Number of blocks to wait before funding tx is considered valid.
 	vaultTxConfirmationCount = uint64(5)
 )

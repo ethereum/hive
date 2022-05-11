@@ -17,28 +17,51 @@ type testSpec struct {
 }
 
 var tests = []testSpec{
-	// HTTP RPC tests.
 	{Name: "http/BalanceAndNonceAt", Run: balanceAndNonceAtTest},
+	{Name: "http/CanonicalChain", Run: canonicalChainTest},
+	{Name: "http/CodeAt", Run: CodeAtTest},
 	{Name: "http/ContractDeployment", Run: deployContractTest},
 	{Name: "http/ContractDeploymentOutOfGas", Run: deployContractOutOfGasTest},
+	{Name: "http/EstimateGas", Run: estimateGasTest},
 	{Name: "http/GenesisBlockByHash", Run: genesisBlockByHashTest},
 	{Name: "http/GenesisBlockByNumber", Run: genesisBlockByNumberTest},
 	{Name: "http/GenesisHeaderByHash", Run: genesisHeaderByHashTest},
 	{Name: "http/GenesisHeaderByNumber", Run: genesisHeaderByNumberTest},
+	{Name: "http/Receipt", Run: receiptTest},
 	{Name: "http/SyncProgress", Run: syncProgressTest},
+	{Name: "http/TransactionCount", Run: transactionCountTest},
+	{Name: "http/TransactionInBlock", Run: transactionInBlockTest},
+	{Name: "http/TransactionReceipt", Run: TransactionReceiptTest},
+
+	// HTTP ABI tests.
+	{Name: "http/ABICall", Run: callContractTest},
+	{Name: "http/ABITransact", Run: transactContractTest},
+
+	// WebSocket ABI tests.
+	{Name: "ws/ABICall", Run: callContractTest},
+	{Name: "ws/ABITransact", Run: transactContractTest},
+
+	// WebSocket subscription tests.
+	{Name: "ws/NewHeadSubscription", Run: newHeadSubscriptionTest},
+	{Name: "ws/LogSubscription", Run: logSubscriptionTest},
+	{Name: "ws/TransactionInBlockSubscription", Run: transactionInBlockSubscriptionTest},
 
 	// WebSocket RPC tests.
 	{Name: "ws/BalanceAndNonceAt", Run: balanceAndNonceAtTest},
+	{Name: "ws/CanonicalChain", Run: canonicalChainTest},
+	{Name: "ws/CodeAt", Run: CodeAtTest},
 	{Name: "ws/ContractDeployment", Run: deployContractTest},
 	{Name: "ws/ContractDeploymentOutOfGas", Run: deployContractOutOfGasTest},
+	{Name: "ws/EstimateGas", Run: estimateGasTest},
 	{Name: "ws/GenesisBlockByHash", Run: genesisBlockByHashTest},
 	{Name: "ws/GenesisBlockByNumber", Run: genesisBlockByNumberTest},
 	{Name: "ws/GenesisHeaderByHash", Run: genesisHeaderByHashTest},
 	{Name: "ws/GenesisHeaderByNumber", Run: genesisHeaderByNumberTest},
+	{Name: "ws/Receipt", Run: receiptTest},
 	{Name: "ws/SyncProgress", Run: syncProgressTest},
-
-	// WebSocket subscription tests.
-	{Name: "ws/NewHeadSubscription", Run: newHeadSubscriptionTest},
+	{Name: "ws/TransactionCount", Run: transactionCountTest},
+	{Name: "ws/TransactionInBlock", Run: transactionInBlockTest},
+	{Name: "ws/TransactionReceipt", Run: TransactionReceiptTest},
 }
 
 func main() {
