@@ -43,5 +43,7 @@ def to_int:
     "muirGlacierBlock": env.HIVE_FORK_MUIR_GLACIER|to_int,
     "berlinBlock": env.HIVE_FORK_BERLIN|to_int,
     "londonBlock": env.HIVE_FORK_LONDON|to_int,
+    "parisBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
+    "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
   }|remove_empty
 }

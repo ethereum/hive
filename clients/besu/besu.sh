@@ -124,16 +124,17 @@ else
     FLAGS="$FLAGS --network-id=1337"
 fi
 
-# Sync mode.
-case "$HIVE_NODETYPE" in
-    "" | "full")
-        FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0" ;;
-    "light")
-        echo "Ignoring HIVE_NODETYPE == light: besu does not support light client" ;;
-esac
+# Sync mode, must only be changed for non merge related tests.
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; then
+    if [ "$HIVE_NODETYPE" == "light" ]; then
+        echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
+    else
+        FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0"
+    fi
+fi
 
 # Configure RPC.
-RPCFLAGS="--host-whitelist=*"
+RPCFLAGS="--host-allowlist=*"
 if [ "$HIVE_GRAPHQL_ENABLED" == "" ]; then
     RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
 else
@@ -142,7 +143,13 @@ else
 fi
 
 # Enable WebSocket.
-RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-host=0.0.0.0"
+#RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-host=0.0.0.0"
+
+# Enable merge support if needed
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --Xmerge-support true"
+    FLAGS="$FLAGS --sync-mode=FULL"
+fi
 
 # Start Besu.
 if [ -z "$HAS_IMPORT" ]; then
