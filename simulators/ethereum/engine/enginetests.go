@@ -237,7 +237,7 @@ var engineTests = []TestSpec{
 		Run:  validPayloadFcUSyncingClient,
 	},
 
-	// Transaction Reorg using Engine API
+	// Re-org using Engine API
 	{
 		Name: "Transaction Reorg",
 		Run:  transactionReorg,
@@ -249,6 +249,10 @@ var engineTests = []TestSpec{
 	{
 		Name: "Re-Org Back into Canonical Chain",
 		Run:  reorgBack,
+	},
+	{
+		Name: "Re-Org Back to Canonical Chain From Syncing Chain",
+		Run:  reorgBackFromSyncing,
 	},
 
 	// Suggested Fee Recipient in Payload creation
@@ -1117,6 +1121,55 @@ func reorgBack(t *TestEnv) {
 	r := t.TestEth.TestBlockByNumber(nil)
 	r.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
 
+}
+
+// Test that performs a re-org back to the canonical chain after re-org to syncing/unavailable chain.
+func reorgBackFromSyncing(t *TestEnv) {
+	// Wait until this client catches up with latest PoS
+	t.CLMock.waitForTTD()
+
+	// Produce an alternative chain
+	sidechainPayloads := make([]*ExecutableDataV1, 0)
+	t.CLMock.produceBlocks(10, BlockProcessCallbacks{
+		OnGetPayload: func() {
+			// Generate an alternative payload by simply adding extraData to the block
+			altParentHash := t.CLMock.LatestPayloadBuilt.ParentHash
+			if len(sidechainPayloads) > 0 {
+				altParentHash = sidechainPayloads[len(sidechainPayloads)-1].BlockHash
+			}
+			altPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt,
+				&CustomPayloadData{
+					ParentHash: &altParentHash,
+					ExtraData:  &([]byte{0x01}),
+				})
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
+			}
+			sidechainPayloads = append(sidechainPayloads, altPayload)
+		},
+	})
+
+	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		OnGetPayload: func() {
+			r := t.TestEngine.TestEngineNewPayloadV1(sidechainPayloads[len(sidechainPayloads)-1])
+			r.ExpectStatusEither(Syncing, Accepted)
+			// We are going to send one of the alternative payloads and fcU to it
+			forkchoiceUpdatedBack := ForkchoiceStateV1{
+				HeadBlockHash:      sidechainPayloads[len(sidechainPayloads)-1].BlockHash,
+				SafeBlockHash:      sidechainPayloads[len(sidechainPayloads)-2].BlockHash,
+				FinalizedBlockHash: sidechainPayloads[len(sidechainPayloads)-3].BlockHash,
+			}
+
+			// It is only expected that the client does not produce an error and the CL Mocker is able to progress after the re-org
+			s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceUpdatedBack, nil)
+			s.ExpectLatestValidHash(nil)
+			s.ExpectPayloadStatus(Syncing)
+
+			// After this, the CLMocker will continue and try to re-org to canonical chain once again
+			// CLMocker will fail the test if this is not possible, so nothing left to do.
+		},
+	})
 }
 
 // Test transaction status after a forkchoiceUpdated re-orgs to an alternative hash where a transaction is not present
