@@ -3,26 +3,26 @@
 Chains Included:
 
 - blocks_1_td_196608.rlp
-    Block 1, ab5d6faf8d4460e2f58cff55055411bd66c2bbce7436d54bbc962576ce84605f, difficulty: 196608, Tx: 0
+    Block 1, 548b3a20d40c9b29fe6bf89b86bc3e1d52c1fadd60d1590627f486b6cd56635c, difficulty: 196608, Tx: 1
     Chain Total Difficulty 196608
 
 - blocks_1_td_196704.rlp
-    Block 1, f37dca584c0f6abde6e9c0bb486ac42a8ac091156ab97aeb26136ee37a3aaef7, difficulty: 196704, Tx: 0
+    Block 1, 509261eb35ed0e4c07645c6f4403a347bd8245e51a1dee314e15e91fbca8c0a7, difficulty: 196704, Tx: 1
     Chain Total Difficulty 196704
 
 - blocks_2_td_393120.rlp
-    Block 1, ab5d6faf8d4460e2f58cff55055411bd66c2bbce7436d54bbc962576ce84605f, difficulty: 196608, Tx: 0
-    Block 2, 6e98e14794478cbfe8feaa24d4463b1a4e5d3743a66a49a851a3029d9ff3de60, difficulty: 196512, Tx: 0
+    Block 1, 548b3a20d40c9b29fe6bf89b86bc3e1d52c1fadd60d1590627f486b6cd56635c, difficulty: 196608, Tx: 1
+    Block 2, 2d4f65a26a8d5ca4f8000010b4741652decb89c8ccf19119b5d9f58846efbbd4, difficulty: 196512, Tx: 1
     Chain Total Difficulty 393120
 
 - blocks_2_td_393504.rlp
-    Block 1, f37dca584c0f6abde6e9c0bb486ac42a8ac091156ab97aeb26136ee37a3aaef7, difficulty: 196704, Tx: 0
-    Block 2, ee5dbba4ccfdc75800bf98804be90d2ffe7fa9b2dce37b6fe31c891ca5fb87b8, difficulty: 196800, Tx: 0
+    Block 1, 509261eb35ed0e4c07645c6f4403a347bd8245e51a1dee314e15e91fbca8c0a7, difficulty: 196704, Tx: 1
+    Block 2, b22fd8a8b1841e6b020a8626180cdb5e395c7b4eceb53a691f8c3e67557aac33, difficulty: 196800, Tx: 1
     Chain Total Difficulty 393504
 
 - blocks_1024_td_135112316.rlp
     Block 1, 2a9b7a5a209a58f672fa23a3ad9c831958d37dd74a960f69c0075b5c92be457e, difficulty: 196416, Tx: 0
-    * Details of every block use `hivechain print`
+    (Details of every block use `hivechain print`)
     Chain Total Difficulty 135112316
 
 - blocks_1_td_196416.rlp

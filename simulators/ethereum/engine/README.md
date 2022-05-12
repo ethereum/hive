@@ -205,6 +205,17 @@ ForkchoiceUpdated is sent to Client 1 with B as Head.
 ForkchoiceUpdated is sent to Client 1 with C as Head.  
 Verification is made that Client 1 Re-orgs to chain G -> C.  
 
+- Two Block PoW Re-org to Lower-Height Chain, Transaction Overwrite
+Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C. 
+Blocks B and C reach TTD, but block B has higher height than C.  
+Block A and C contain TX1, and Block B contains TX2.
+TX1 and TX2 use the DIFFICULTY/PREVRANDAO opcode into storage. 
+ForkchoiceUpdated is sent to Client 1 with B as Head.  
+ForkchoiceUpdated is sent to Client 1 with C as Head.  
+Verification is made that Client 1 Re-orgs to chain G -> C.  
+PoS chain on top of C contains TX2, which was originally part of the PoW chain.
+Verification is made that the resulting PoS storage contains PREVRANDAO instead of DIFFICULTY.
+
 - Two Block Post-PoS Re-org to Higher-Total-Difficulty PoW Chain:
 Client 1 starts with chain G -> A.
 ForkchoiceUpdated is sent to Client 1 with A as Head.
