@@ -303,6 +303,22 @@ func (teth *TestEthClient) TestBlockByNumber(number *big.Int) *BlockResponseExpe
 	}
 }
 
+func (teth *TestEthClient) TestBlockByHash(hash common.Hash) *BlockResponseExpectObject {
+	block, err := teth.BlockByHash(teth.Ctx(), hash)
+	return &BlockResponseExpectObject{
+		TestEnv: teth.TestEnv,
+		Call:    "BlockByHash",
+		Block:   block,
+		Error:   err,
+	}
+}
+
+func (exp *BlockResponseExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Block)
+	}
+}
+
 func (exp *BlockResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
 		exp.Fatalf("FAIL (%s): Unexpected error on %s: %v, expected=<None>", exp.TestName, exp.Call, exp.Error)

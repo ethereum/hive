@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -88,7 +89,8 @@ func (ec *EngineClient) checkTTD() bool {
 }
 
 // Wait until the TTD is reached by a single client.
-func (ec *EngineClient) waitForTTD(done chan<- *EngineClient, cancel <-chan interface{}) {
+func (ec *EngineClient) waitForTTD(wg *sync.WaitGroup, done chan<- *EngineClient, cancel <-chan interface{}) {
+	defer wg.Done()
 	for {
 		select {
 		case <-time.After(tTDCheckPeriod):
@@ -122,13 +124,14 @@ func (ec *EngineClient) waitForTTDWithTimeout(timeout <-chan time.Time) bool {
 
 // Wait until the TTD is reached by any of the engine clients
 func (ecs EngineClients) waitForTTD(timeout <-chan time.Time) *EngineClient {
+	var wg sync.WaitGroup
+	defer wg.Wait()
 	done := make(chan *EngineClient)
 	cancel := make(chan interface{})
-	defer func() {
-		close(cancel)
-	}()
+	defer close(cancel)
 	for _, ec := range ecs {
-		go ec.waitForTTD(done, cancel)
+		wg.Add(1)
+		go ec.waitForTTD(&wg, done, cancel)
 	}
 	select {
 	case ec := <-done:
