@@ -56,11 +56,13 @@ func (p *Proxy) EngineRPCAddress() (string, error) {
 }
 
 func (p *Proxy) AddRequest(spoof *proxy.Spoof) {
+	log.Info("Adding spoof request", "method", spoof.Method)
 	p.config.Requests = append(p.config.Requests, spoof)
 	p.proxy.UpdateSpoofingConfig(p.config)
 }
 
 func (p *Proxy) AddResponse(spoof *proxy.Spoof) {
+	log.Info("Adding spoof response", "method", spoof.Method)
 	p.config.Responses = append(p.config.Responses, spoof)
 	p.proxy.UpdateSpoofingConfig(p.config)
 }

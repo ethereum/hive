@@ -284,6 +284,27 @@ func (t *Testnet) VerifyProposers(ctx context.Context, checkpoint common.Checkpo
 	return nil
 }
 
+func (t *Testnet) VerifyELHeads(ctx context.Context) error {
+	client := ethclient.NewClient(t.eth1[0].RPC())
+	head, err := client.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	t.t.Logf("Verifying EL heads at %v", head.Hash())
+	for i, node := range t.eth1 {
+		client := ethclient.NewClient(node.RPC())
+		head2, err := client.HeaderByNumber(ctx, nil)
+		if err != nil {
+			return err
+		}
+		if head.Hash() != head2.Hash() {
+			return fmt.Errorf("different heads: %v: %v %v: %v", 0, head, i, head2)
+		}
+	}
+	return nil
+}
+
 func getHealth(ctx context.Context, api *eth2api.Eth2HttpClient, spec *common.Spec, slot common.Slot) (float64, error) {
 	var (
 		health    float64

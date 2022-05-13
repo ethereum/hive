@@ -77,15 +77,21 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	if err := testnet.VerifyProposers(ctx, finalized); err != nil {
 		t.Fatalf("%v", err)
 	}
+	if err := testnet.VerifyELHeads(ctx); err != nil {
+		t.Fatalf("%v", err)
+	}
 	fields := make(map[string]interface{})
-	fields["error"] = "weird error"
+	fields["headBlockHash"] = "weird error"
 	spoof := &proxy.Spoof{
-		Method: "ForkChoiceUpdatedV1",
+		Method: "engine_forkchoiceUpdatedV1",
 		Fields: fields,
 	}
-	testnet.proxies[0].AddResponse(spoof)
-	time.Sleep(time.Minute)
+	testnet.proxies[0].AddRequest(spoof)
+	time.Sleep(24 * time.Second)
 	if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
 		t.Fatalf("%v", err)
+	}
+	if err := testnet.VerifyELHeads(ctx); err == nil {
+		t.Fatalf("Expected different heads after spoof %v", err)
 	}
 }
