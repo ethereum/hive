@@ -99,15 +99,15 @@ if [ -d /blocks ]; then
     IMPORTFLAGS="$IMPORTFLAGS $blocks"
 fi
 
-# For clique mining, besu uses the node key as the block signing key.
-if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
-    echo "Importing clique signing key as node key..."
-    echo "$HIVE_CLIQUE_PRIVATEKEY" > /opt/besu/key
-fi
 
 # Configure mining.
 if [ "$HIVE_MINER" != "" ]; then
     FLAGS="$FLAGS --miner-enabled --miner-coinbase=$HIVE_MINER"
+    # For clique mining, besu uses the node key as the block signing key.
+    if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+        echo "Importing clique signing key as node key..."
+        echo "$HIVE_CLIQUE_PRIVATEKEY" > /opt/besu/key
+    fi
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner-extra-data=$HIVE_MINER_EXTRA"
