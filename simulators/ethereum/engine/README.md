@@ -220,11 +220,67 @@ ForkchoiceUpdated is sent to Client 1 with C as Head.
 Verification is made that Client 1 Re-orgs to chain G -> B -> C.  
 
 - Two Block PoW Re-org to Lower-Height Chain:  
- Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C.  
- Blocks B and C reach TTD, but block B has higher height than C.  
- ForkchoiceUpdated is sent to Client 1 with B as Head.  
- ForkchoiceUpdated is sent to Client 1 with C as Head.  
- Verification is made that Client 1 Re-orgs to chain G -> C.  
+Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C.  
+Blocks B and C reach TTD, but block B has higher height than C.  
+ForkchoiceUpdated is sent to Client 1 with B as Head.  
+ForkchoiceUpdated is sent to Client 1 with C as Head.  
+Verification is made that Client 1 Re-orgs to chain G -> C.  
+
+- Two Block Post-PoS Re-org to Higher-Total-Difficulty PoW Chain:
+Client 1 starts with chain G -> A.
+ForkchoiceUpdated is sent to Client 1 with A as Head.
+Two PoS blocks are produced on top of A.
+Client 2 starts with chain G -> B.  
+Blocks A and B reach TTD, but block B has higher difficulty than A.  
+ForkchoiceUpdated is sent to Client 1 with B as Head.  
+PoS Chain is continued on top of B.
+Verification is made that Client 1 Re-orgs to chain G -> B -> ... 
+
+- Two Block Post-PoS Re-org to Lower-Total-Difficulty PoW Chain:
+Client 1 starts with chain G -> A.
+ForkchoiceUpdated is sent to Client 1 with A as Head.
+Two PoS blocks are produced on top of A.
+Client 2 starts with chain G -> B.  
+Blocks A and B reach TTD, but block A has higher difficulty than B.  
+ForkchoiceUpdated is sent to Client 1 with B as Head.  
+PoS Chain is continued on top of B.
+Verification is made that Client 1 Re-orgs to chain G -> B -> ... 
+
+- Two Block Post-PoS Re-org to Higher-Height PoW Chain:
+Client 1 starts with chain G -> A.
+ForkchoiceUpdated is sent to Client 1 with A as Head.
+Two PoS blocks are produced on top of A.
+Client 2 starts with chain G -> B -> C.  
+Blocks A and C reach TTD, but have different heights.  
+ForkchoiceUpdated is sent to Client 1 with C as Head.  
+PoS Chain is continued on top of C.
+Verification is made that Client 1 Re-orgs to chain G -> B -> C -> ...  
+
+- Two Block Post-PoS Re-org to Lower-Height PoW Chain:
+Client 1 starts with chain G -> A -> B.
+ForkchoiceUpdated is sent to Client 1 with B as Head.
+Two PoS blocks are produced on top of B.
+Client 2 starts with chain G -> C.  
+Blocks B and C reach TTD, but have different heights.  
+ForkchoiceUpdated is sent to Client 1 with C as Head.  
+PoS Chain is continued on top of C.
+Verification is made that Client 1 Re-orgs to chain G -> C -> ...  
+
+- Transition to a Chain with Invalid Terminal Block, Incorrectly Configured Higher Total Difficulty
+Client 1 starts with chain G -> A, Client 2 starts with chain G -> A -> B.  
+Client 1's configured TTD is reached by A.
+Client 2's configured TTD is reached by B.
+ForkchoiceUpdated is sent to both clients with B as Head.  
+PoS chain is continued on top of B.
+Verification is made that Client 1 never re-orgs to chain G -> A -> B due to incorrect Terminal block.  
+
+- Transition to a Chain with Invalid Terminal Block, Incorrectly Configured Lower Total Difficulty
+Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> A.  
+Client 1's configured TTD is reached by B.
+Client 2's configured TTD is reached by A.
+ForkchoiceUpdated is sent to both clients with A as Head.  
+PoS chain is continued on top of A.
+Verification is made that Client 1 never re-orgs to chain G -> A -> ... due to incorrect Terminal block. 
 
 - Halt following PoW chain:  
  Client 1 starts with chain G -> A, Client 2 starts with chain G -> A -> B.  
