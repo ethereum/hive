@@ -296,19 +296,39 @@ var engineTests = []TestSpec{
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{
 		Name: "Latest Block after NewPayload",
-		Run:  blockStatusExecPayload,
+		Run:  blockStatusExecPayloadGen(false),
+	},
+	{
+		Name: "Latest Block after NewPayload (Transition Block)",
+		Run:  blockStatusExecPayloadGen(true),
+		TTD:  5,
 	},
 	{
 		Name: "Latest Block after New HeadBlock",
-		Run:  blockStatusHeadBlock,
+		Run:  blockStatusHeadBlockGen(false),
+	},
+	{
+		Name: "Latest Block after New HeadBlock (Transition Block)",
+		Run:  blockStatusHeadBlockGen(true),
+		TTD:  5,
 	},
 	{
 		Name: "Latest Block after New SafeBlock",
-		Run:  blockStatusSafeBlock,
+		Run:  blockStatusSafeBlockGen(false),
+	},
+	{
+		Name: "Latest Block after New SafeBlock (Transition Block)",
+		Run:  blockStatusSafeBlockGen(true),
+		TTD:  5,
 	},
 	{
 		Name: "Latest Block after New FinalizedBlock",
-		Run:  blockStatusFinalizedBlock,
+		Run:  blockStatusFinalizedBlockGen(false),
+	},
+	{
+		Name: "Latest Block after New FinalizedBlock (Transition Block)",
+		Run:  blockStatusFinalizedBlockGen(true),
+		TTD:  5,
 	},
 	{
 		Name: "Latest Block after Reorg",
@@ -389,14 +409,20 @@ func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
 	r.ExpectPayloadStatus(InvalidTerminalBlock)
 	r.ExpectLatestValidHash(nil)
 	// ValidationError is not validated since it can be either null or a string message
+
+	// Check that PoW chain progresses
+	t.verifyPoWProgress(gblock.Hash())
 }
 
 // Invalid GetPayload Under PoW: Client must reject GetPayload directives under PoW.
 func invalidGetPayloadUnderPoW(t *TestEnv) {
+	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
 	// We start in PoW and try to get an invalid Payload, which should produce an error but nothing should be disrupted.
 	r := t.TestEngine.TestEngineGetPayloadV1(&PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
 	r.ExpectError()
 
+	// Check that PoW chain progresses
+	t.verifyPoWProgress(gblock.Hash())
 }
 
 // Invalid Terminal Block in NewPayload: Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
@@ -432,6 +458,9 @@ func invalidTerminalBlockNewPayload(t *TestEnv) {
 	r.ExpectStatus(InvalidTerminalBlock)
 	r.ExpectLatestValidHash(nil)
 	// ValidationError is not validated since it can be either null or a string message
+
+	// Check that PoW chain progresses
+	t.verifyPoWProgress(gblock.Hash())
 }
 
 // Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using NewPayload) and unknown SafeBlock
@@ -1207,82 +1236,122 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 }
 
 // Test to verify Block information available at the Eth RPC after NewPayload
-func blockStatusExecPayload(t *TestEnv) {
-	// Wait until this client catches up with latest PoS Block
-	t.CLMock.waitForTTD()
+func blockStatusExecPayloadGen(transitionBlock bool) func(t *TestEnv) {
+	return func(t *TestEnv) {
+		// Wait until this client catches up with latest PoS Block
+		t.CLMock.waitForTTD()
 
-	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		// Produce blocks before starting the test, only if we are not testing the transition block
+		if !transitionBlock {
+			t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		}
 
-	// TODO: We can send a transaction and see if we get the transaction receipt after newPayload (we should not)
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
-		// Run test after the new payload has been broadcasted
-		OnNewPayloadBroadcast: func() {
-			r := t.TestEth.TestHeaderByNumber(nil)
-			r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+		var tx *types.Transaction
+		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			OnPayloadProducerSelected: func() {
+				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
+			},
+			// Run test after the new payload has been broadcasted
+			OnNewPayloadBroadcast: func() {
+				r := t.TestEth.TestHeaderByNumber(nil)
+				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-			s := t.TestEth.TestBlockNumber()
-			s.ExpectNumber(t.CLMock.LatestFinalizedNumber.Uint64())
+				s := t.TestEth.TestBlockNumber()
+				s.ExpectNumber(t.CLMock.LatestFinalizedNumber.Uint64())
 
-			p := t.TestEth.TestBlockByNumber(nil)
-			p.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+				p := t.TestEth.TestBlockByNumber(nil)
+				p.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-		},
-	})
-
+				// Check that the receipt for the transaction we just sent is still not available
+				q := t.TestEth.TestTransactionReceipt(tx.Hash())
+				q.ExpectError()
+			},
+		})
+	}
 }
 
 // Test to verify Block information available at the Eth RPC after new HeadBlock ForkchoiceUpdated
-func blockStatusHeadBlock(t *TestEnv) {
-	// Wait until this client catches up with latest PoS Block
-	t.CLMock.waitForTTD()
+func blockStatusHeadBlockGen(transitionBlock bool) func(t *TestEnv) {
+	return func(t *TestEnv) {
+		// Wait until this client catches up with latest PoS Block
+		t.CLMock.waitForTTD()
 
-	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		// Produce blocks before starting the test, only if we are not testing the transition block
+		if !transitionBlock {
+			t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		}
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
-		// Run test after a forkchoice with new HeadBlockHash has been broadcasted
-		OnHeadBlockForkchoiceBroadcast: func() {
-			r := t.TestEth.TestHeaderByNumber(nil)
-			r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+		var tx *types.Transaction
+		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			OnPayloadProducerSelected: func() {
+				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
+			},
+			// Run test after a forkchoice with new HeadBlockHash has been broadcasted
+			OnHeadBlockForkchoiceBroadcast: func() {
+				r := t.TestEth.TestHeaderByNumber(nil)
+				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-		},
-	})
+				s := t.TestEth.TestTransactionReceipt(tx.Hash())
+				s.ExpectTransactionHash(tx.Hash())
+			},
+		})
+	}
 }
 
 // Test to verify Block information available at the Eth RPC after new SafeBlock ForkchoiceUpdated
-func blockStatusSafeBlock(t *TestEnv) {
-	// Wait until this client catches up with latest PoS Block
-	t.CLMock.waitForTTD()
+func blockStatusSafeBlockGen(transitionBlock bool) func(t *TestEnv) {
+	return func(t *TestEnv) {
+		// Wait until this client catches up with latest PoS Block
+		t.CLMock.waitForTTD()
 
-	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		// Produce blocks before starting the test, only if we are not testing the transition block
+		if !transitionBlock {
+			t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		}
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
-		// Run test after a forkchoice with new SafeBlockHash has been broadcasted
-		OnSafeBlockForkchoiceBroadcast: func() {
-			r := t.TestEth.TestHeaderByNumber(nil)
-			r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
-		},
-	})
+		var tx *types.Transaction
+		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			OnPayloadProducerSelected: func() {
+				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
+			},
+			// Run test after a forkchoice with new SafeBlockHash has been broadcasted
+			OnSafeBlockForkchoiceBroadcast: func() {
+				r := t.TestEth.TestHeaderByNumber(nil)
+				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+
+				s := t.TestEth.TestTransactionReceipt(tx.Hash())
+				s.ExpectTransactionHash(tx.Hash())
+			},
+		})
+	}
 }
 
 // Test to verify Block information available at the Eth RPC after new FinalizedBlock ForkchoiceUpdated
-func blockStatusFinalizedBlock(t *TestEnv) {
-	// Wait until this client catches up with latest PoS Block
-	t.CLMock.waitForTTD()
+func blockStatusFinalizedBlockGen(transitionBlock bool) func(t *TestEnv) {
+	return func(t *TestEnv) {
+		// Wait until this client catches up with latest PoS Block
+		t.CLMock.waitForTTD()
 
-	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		// Produce blocks before starting the test, only if we are not testing the transition block
+		if !transitionBlock {
+			t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		}
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
-		// Run test after a forkchoice with new FinalizedBlockHash has been broadcasted
-		OnFinalizedBlockForkchoiceBroadcast: func() {
-			r := t.TestEth.TestHeaderByNumber(nil)
-			r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+		var tx *types.Transaction
+		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			OnPayloadProducerSelected: func() {
+				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
+			},
+			// Run test after a forkchoice with new FinalizedBlockHash has been broadcasted
+			OnFinalizedBlockForkchoiceBroadcast: func() {
+				r := t.TestEth.TestHeaderByNumber(nil)
+				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-		},
-	})
+				s := t.TestEth.TestTransactionReceipt(tx.Hash())
+				s.ExpectTransactionHash(tx.Hash())
+			},
+		})
+	}
 
 }
 
