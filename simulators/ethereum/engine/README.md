@@ -165,6 +165,10 @@ Send a transaction that modifies the state, ForkchoiceUpdate to the payload cont
 - Re-Org Back into Canonical Chain:  
 Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain is still capable of progressing.
 
+- Re-Org Back to Canonical Chain From Syncing Chain:
+Build an alternative chain of 10 payloads.
+Perform `newPayload(P10')` + `fcU(P10')`, which should result in client `SYNCING`. Verify that the client can re-org back to the canonical chain after sending `newPayload(P11)` + `fcU(P11)`.
+
 ### Suggested Fee Recipient in Payload creation
 - Suggested Fee Recipient Test:  
 Set the fee recipient to a custom address and verify that (a) balance is not increased when no fees are collected (b) balance is increased appropriately when fees are collected.
