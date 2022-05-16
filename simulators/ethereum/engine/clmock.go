@@ -170,25 +170,16 @@ func (cl *CLMocker) pickNextPayloadProducer() {
 		ec_id := (int(cl.LatestFinalizedNumber.Int64()) + i) % len(cl.EngineClients)
 		cl.NextBlockProducer = cl.EngineClients[ec_id]
 
-		lastBlockNumber, err := cl.NextBlockProducer.Eth.BlockNumber(cl.NextBlockProducer.Ctx())
+		// Get latest header. Number and hash must coincide with our view of the chain,
+		// and only then we can build on top of this client's chain
+		latestHeader, err := cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), nil)
 		if err != nil {
-			cl.Fatalf("CLMocker: Could not get block number while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
-		}
-
-		if cl.LatestFinalizedNumber.Int64() != int64(lastBlockNumber) {
-			// Selected client is not synced to the last block number, try again
-			cl.NextBlockProducer = nil
-			continue
-		}
-
-		latestHeader, err := cl.NextBlockProducer.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), big.NewInt(int64(lastBlockNumber)))
-		if err != nil {
-			cl.Fatalf("CLMocker: Could not get block header while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
+			cl.Fatalf("CLMocker: Could not get latest block header while selecting client for payload production (%v): %v", cl.NextBlockProducer.Client.Container, err)
 		}
 
 		lastBlockHash := latestHeader.Hash()
 
-		if cl.LatestFinalizedHeader.Hash() != lastBlockHash {
+		if cl.LatestFinalizedHeader.Hash() != lastBlockHash || cl.LatestFinalizedNumber.Cmp(latestHeader.Number) != 0 {
 			// Selected client latest block hash does not match canonical chain, try again
 			cl.NextBlockProducer = nil
 			continue

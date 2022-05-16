@@ -5,6 +5,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -54,6 +56,11 @@ type MergeTestSpec struct {
 	// Chain file to initialize the main client.
 	MainChainFile string
 
+	// Introduce PREVRANDAO transactions on the PoS blocks, including transition,
+	// which could overwrite an existing transaction in the PoW chain (if re-org
+	// occurred to a lower-height chain)
+	PrevRandaoTransactions bool
+
 	// Whether or not to send a forkchoiceUpdated directive on the main client before any attempts to re-org
 	// to secondary clients happen.
 	SkipMainClientFcU bool
@@ -70,38 +77,6 @@ type MergeTestSpec struct {
 	SecondaryClientSpecs SecondaryClientSpecs
 }
 
-/*
-	Chains Included:
-		- blocks_1_td_196608.rlp
-			Block 1, ab5d6faf8d4460e2f58cff55055411bd66c2bbce7436d54bbc962576ce84605f, difficulty: 196608
-			Chain Total Difficulty 196608
-
-		- blocks_1_td_196704.rlp
-			Block 1, f37dca584c0f6abde6e9c0bb486ac42a8ac091156ab97aeb26136ee37a3aaef7, difficulty: 196704
-			Chain Total Difficulty 196704
-
-		- blocks_2_td_393120.rlp
-			Block 1, ab5d6faf8d4460e2f58cff55055411bd66c2bbce7436d54bbc962576ce84605f, difficulty: 196608
-			Block 2, 6e98e14794478cbfe8feaa24d4463b1a4e5d3743a66a49a851a3029d9ff3de60, difficulty: 196512
-			Chain Total Difficulty 393120
-
-		- blocks_2_td_393504.rlp
-			Block 1, f37dca584c0f6abde6e9c0bb486ac42a8ac091156ab97aeb26136ee37a3aaef7, difficulty: 196704
-			Block 2, ee5dbba4ccfdc75800bf98804be90d2ffe7fa9b2dce37b6fe31c891ca5fb87b8, difficulty: 196800
-			Chain Total Difficulty 393504
-
-		- blocks_1024_td_135112316.rlp
-			Block 1, 2a9b7a5a209a58f672fa23a3ad9c831958d37dd74a960f69c0075b5c92be457e, difficulty: 196416
-			* Details of every block use `hivechain print`
-			Chain Total Difficulty 135112316
-
-		- blocks_1_td_196416.rlp
-			Block 1, 2a9b7a5a209a58f672fa23a3ad9c831958d37dd74a960f69c0075b5c92be457e, difficulty: 196416
-			Chain Total Difficulty 196416
-
-	Chains were generated using the following command:
-		`hivechain generate -genesis ./init/genesis.json -mine -length 2|1`.
-*/
 var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:          "Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height",
@@ -167,6 +142,20 @@ var mergeTestSpecs = []MergeTestSpec{
 		Name:          "Two Block PoW Re-org to Lower-Height Chain",
 		TTD:           196704,
 		MainChainFile: "blocks_2_td_393120.rlp",
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ChainFile:           "blocks_1_td_196704.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
+	{
+		Name:                     "Two Block PoW Re-org to Lower-Height Chain, Transaction Overwrite",
+		TTD:                      196704,
+		MainChainFile:            "blocks_2_td_393120.rlp",
+		KeepCheckingUntilTimeout: true,
+		PrevRandaoTransactions:   true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ChainFile:           "blocks_1_td_196704.rlp",
@@ -385,11 +374,53 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 			}
 		}
 
+		// We are going to send PREVRANDAO transactions if the test requires so.
+		// These transactions might overwrite some of the PoW chain transactions if we re-org'd into a lower height chain.
+		prevRandaoTxs := make([]*types.Transaction, 0)
+		prevRandaoFunc := func() {
+			if mergeTestSpec.PrevRandaoTransactions {
+				// Get the address nonce:
+				// This is because we could have included transactions in the PoW chain of the block
+				// producer, or re-orged.
+				nonce, err := t.CLMock.NextBlockProducer.Eth.NonceAt(t.CLMock.NextBlockProducer.Ctx(), vaultAccountAddr, nil)
+				if err != nil {
+					t.Logf("INFO (%s): Unable to obtain address [%s] latest nonce: %v", t.TestName, vaultAccountAddr, err)
+					return
+				}
+				t.nonce = nonce
+				tx := t.makeNextTransaction(prevRandaoContractAddr, big0, nil)
+				err = t.CLMock.NextBlockProducer.Eth.SendTransaction(t.CLMock.NextBlockProducer.Ctx(), tx)
+				if err != nil {
+					t.Logf("INFO (%s): Unable to send tx (address=%v): %v", t.TestName, vaultAccountAddr, err)
+				}
+				prevRandaoTxs = append(prevRandaoTxs, tx)
+			}
+		}
+		if mergeTestSpec.PrevRandaoTransactions {
+			// At the end of the test we are going to verify that these transactions did produce the post-merge expected
+			// outcome, even if they had been previously executed on the PoW chain.
+			defer func() {
+				for _, tx := range prevRandaoTxs {
+					// Get the receipt of the transaction
+					r, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+					if err != nil {
+						t.Fatalf("FAIL (%s): Unable to obtain tx [%v] receipt: %v", t.TestName, tx.Hash(), err)
+					}
+
+					blockNumberAsStorageKey := common.BytesToHash(r.BlockNumber.Bytes())
+					s := t.TestEth.TestStorageAt(prevRandaoContractAddr, blockNumberAsStorageKey, nil)
+					s.ExpectStorageEqual(t.CLMock.PrevRandaoHistory[r.BlockNumber.Uint64()])
+				}
+			}()
+		}
+
 		// Test end state of the main client
 		for {
 			if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() {
 				// Build a block and check whether the main client switches
-				t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+				t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+					OnPayloadProducerSelected: prevRandaoFunc,
+				})
 
 				// If the main client should follow the PoS chain, update the mustHeadHash
 				if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
@@ -421,7 +452,9 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 			for {
 				if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() {
 					// Build a block and check whether the main client switches
-					t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+					t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+						OnPayloadProducerSelected: prevRandaoFunc,
+					})
 
 					// If the main client should follow the PoS chain, update the mustHeadHash
 					if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
