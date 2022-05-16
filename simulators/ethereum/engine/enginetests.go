@@ -1,14 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 )
@@ -64,6 +63,7 @@ var engineTests = []TestSpec{
 		Run:  preTTDFinalizedBlockHash,
 		TTD:  2,
 	},
+	// Invalid Payload Tests
 	{
 		Name: "Bad Hash on NewPayload",
 		Run:  badHashOnNewPayloadGen(false, false),
@@ -86,115 +86,199 @@ var engineTests = []TestSpec{
 	},
 	{
 		Name: "Invalid ParentHash NewPayload",
-		Run:  invalidPayloadTestCaseGen("ParentHash", false),
+		Run:  invalidPayloadTestCaseGen(InvalidParentHash, false, false),
 	},
 	{
 		Name: "Invalid ParentHash NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("ParentHash", true),
+		Run:  invalidPayloadTestCaseGen(InvalidParentHash, true, false),
 	},
 	{
 		Name: "Invalid StateRoot NewPayload",
-		Run:  invalidPayloadTestCaseGen("StateRoot", false),
+		Run:  invalidPayloadTestCaseGen(InvalidStateRoot, false, false),
 	},
 	{
 		Name: "Invalid StateRoot NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("StateRoot", true),
+		Run:  invalidPayloadTestCaseGen(InvalidStateRoot, true, false),
+	},
+	{
+		Name: "Invalid StateRoot NewPayload, Empty Transactions",
+		Run:  invalidPayloadTestCaseGen(InvalidStateRoot, false, true),
+	},
+	{
+		Name: "Invalid StateRoot NewPayload, Empty Transactions (Syncing)",
+		Run:  invalidPayloadTestCaseGen(InvalidStateRoot, true, true),
 	},
 	{
 		Name: "Invalid ReceiptsRoot NewPayload",
-		Run:  invalidPayloadTestCaseGen("ReceiptsRoot", false),
+		Run:  invalidPayloadTestCaseGen(InvalidReceiptsRoot, false, false),
 	},
 	{
 		Name: "Invalid ReceiptsRoot NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("ReceiptsRoot", true),
+		Run:  invalidPayloadTestCaseGen(InvalidReceiptsRoot, true, false),
 	},
 	{
 		Name: "Invalid Number NewPayload",
-		Run:  invalidPayloadTestCaseGen("Number", false),
+		Run:  invalidPayloadTestCaseGen(InvalidNumber, false, false),
 	},
 	{
 		Name: "Invalid Number NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("Number", true),
+		Run:  invalidPayloadTestCaseGen(InvalidNumber, true, false),
 	},
 	{
 		Name: "Invalid GasLimit NewPayload",
-		Run:  invalidPayloadTestCaseGen("GasLimit", false),
+		Run:  invalidPayloadTestCaseGen(InvalidGasLimit, false, false),
 	},
 	{
 		Name: "Invalid GasLimit NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("GasLimit", true),
+		Run:  invalidPayloadTestCaseGen(InvalidGasLimit, true, false),
 	},
 	{
 		Name: "Invalid GasUsed NewPayload",
-		Run:  invalidPayloadTestCaseGen("GasUsed", false),
+		Run:  invalidPayloadTestCaseGen(InvalidGasUsed, false, false),
 	},
 	{
 		Name: "Invalid GasUsed NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("GasUsed", true),
+		Run:  invalidPayloadTestCaseGen(InvalidGasUsed, true, false),
 	},
 	{
 		Name: "Invalid Timestamp NewPayload",
-		Run:  invalidPayloadTestCaseGen("Timestamp", false),
+		Run:  invalidPayloadTestCaseGen(InvalidTimestamp, false, false),
 	},
 	{
 		Name: "Invalid Timestamp NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("Timestamp", true),
+		Run:  invalidPayloadTestCaseGen(InvalidTimestamp, true, false),
 	},
 	{
 		Name: "Invalid PrevRandao NewPayload",
-		Run:  invalidPayloadTestCaseGen("PrevRandao", false),
+		Run:  invalidPayloadTestCaseGen(InvalidPrevRandao, false, false),
 	},
 	{
 		Name: "Invalid PrevRandao NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("PrevRandao", true),
+		Run:  invalidPayloadTestCaseGen(InvalidPrevRandao, true, false),
 	},
 	{
 		Name: "Invalid Incomplete Transactions NewPayload",
-		Run:  invalidPayloadTestCaseGen("RemoveTransaction", false),
+		Run:  invalidPayloadTestCaseGen(RemoveTransaction, false, false),
 	},
 	{
 		Name: "Invalid Incomplete Transactions NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("RemoveTransaction", true),
+		Run:  invalidPayloadTestCaseGen(RemoveTransaction, true, false),
 	},
 	{
 		Name: "Invalid Transaction Signature NewPayload",
-		Run:  invalidPayloadTestCaseGen("Transaction/Signature", false),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
 	},
 	{
 		Name: "Invalid Transaction Signature NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("Transaction/Signature", true),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionSignature, true, false),
 	},
 	{
 		Name: "Invalid Transaction Nonce NewPayload",
-		Run:  invalidPayloadTestCaseGen("Transaction/Nonce", false),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
 	},
 	{
 		Name: "Invalid Transaction Nonce NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("Transaction/Nonce", true),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionNonce, true, false),
 	},
 	{
 		Name: "Invalid Transaction GasPrice NewPayload",
-		Run:  invalidPayloadTestCaseGen("Transaction/GasPrice", false),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
 	},
 	{
 		Name: "Invalid Transaction GasPrice NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("Transaction/GasPrice", true),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionGasPrice, true, false),
 	},
 	{
 		Name: "Invalid Transaction Gas NewPayload",
-		Run:  invalidPayloadTestCaseGen("Transaction/Gas", false),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
 	},
 	{
 		Name: "Invalid Transaction Gas NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("Transaction/Gas", true),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionGas, true, false),
 	},
 	{
 		Name: "Invalid Transaction Value NewPayload",
-		Run:  invalidPayloadTestCaseGen("Transaction/Value", false),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
 	},
 	{
 		Name: "Invalid Transaction Value NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen("Transaction/Value", true),
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionValue, true, false),
+	},
+
+	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P1', Reveal using newPayload",
+		Run:  invalidMissingAncestorReOrgGen(1, InvalidStateRoot, false, true),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using newPayload",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidStateRoot, false, true),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using newPayload",
+		Run:  invalidMissingAncestorReOrgGen(10, InvalidStateRoot, false, true),
+	},
+
+	// Invalid Ancestor Re-Org Tests (Reveal via sync through secondary client)
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, true),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidReceiptsRoot, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidNumber, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidGasLimit, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidGasUsed, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTimestamp, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidPrevRandao, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, RemoveTransaction, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionSignature, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionNonce, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionGas, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionGasPrice, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(9, InvalidTransactionValue, true, false),
+	},
+	{
+		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using sync",
+		Run:  invalidMissingAncestorReOrgGen(10, InvalidStateRoot, true, true),
 	},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
@@ -660,7 +744,7 @@ func parentHashOnExecPayload(t *TestEnv) {
 }
 
 // Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
-func invalidPayloadTestCaseGen(payloadField string, syncing bool) func(*TestEnv) {
+func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, emptyTxs bool) func(*TestEnv) {
 	return func(t *TestEnv) {
 
 		if syncing {
@@ -676,9 +760,11 @@ func invalidPayloadTestCaseGen(payloadField string, syncing bool) func(*TestEnv)
 		t.CLMock.waitForTTD()
 
 		txFunc := func() {
-			// Function to send at least one transaction each block produced
-			// Send the transaction to the prevRandaoContractAddr
-			t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+			if !emptyTxs {
+				// Function to send at least one transaction each block produced
+				// Send the transaction to the prevRandaoContractAddr
+				t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+			}
 		}
 
 		// Produce blocks before starting the test
@@ -706,144 +792,24 @@ func invalidPayloadTestCaseGen(payloadField string, syncing bool) func(*TestEnv)
 			OnPayloadProducerSelected: txFunc,
 			// Run test after the new payload has been obtained
 			OnGetPayload: func() {
-
 				// Alter the payload while maintaining a valid hash and send it to the client, should produce an error
-				basePayload := t.CLMock.LatestPayloadBuilt
-				var customPayloadMod *CustomPayloadData
-				payloadFieldSplit := strings.Split(payloadField, "/")
-				switch payloadFieldSplit[0] {
-				case "ParentHash":
-					modParentHash := basePayload.ParentHash
-					modParentHash[common.HashLength-1] = byte(255 - modParentHash[common.HashLength-1])
-					customPayloadMod = &CustomPayloadData{
-						ParentHash: &modParentHash,
-					}
-				case "StateRoot":
-					modStateRoot := basePayload.StateRoot
-					modStateRoot[common.HashLength-1] = byte(255 - modStateRoot[common.HashLength-1])
-					customPayloadMod = &CustomPayloadData{
-						StateRoot: &modStateRoot,
-					}
-				case "ReceiptsRoot":
-					modReceiptsRoot := basePayload.ReceiptsRoot
-					modReceiptsRoot[common.HashLength-1] = byte(255 - modReceiptsRoot[common.HashLength-1])
-					customPayloadMod = &CustomPayloadData{
-						ReceiptsRoot: &modReceiptsRoot,
-					}
-				case "Number":
-					modNumber := basePayload.Number - 1
-					customPayloadMod = &CustomPayloadData{
-						Number: &modNumber,
-					}
-				case "GasLimit":
-					modGasLimit := basePayload.GasLimit * 2
-					customPayloadMod = &CustomPayloadData{
-						GasLimit: &modGasLimit,
-					}
-				case "GasUsed":
-					modGasUsed := basePayload.GasUsed - 1
-					customPayloadMod = &CustomPayloadData{
-						GasUsed: &modGasUsed,
-					}
-				case "Timestamp":
-					modTimestamp := basePayload.Timestamp - 1
-					customPayloadMod = &CustomPayloadData{
-						Timestamp: &modTimestamp,
-					}
-				case "PrevRandao":
-					// This should fail since we are inserting a transaction that uses the PREVRANDAO opcode.
-					// The expected outcome will change if we modify the payload.
-					if len(basePayload.Transactions) == 0 {
-						// But if the payload has no transactions, the test is invalid
-						t.Fatalf("FAIL (%s): No transactions in the base payload", t.TestName)
-					}
-					modPrevRandao := common.Hash{}
-					rand.Read(modPrevRandao[:])
-					customPayloadMod = &CustomPayloadData{
-						PrevRandao: &modPrevRandao,
-					}
-				case "RemoveTransaction":
-					emptyTxs := make([][]byte, 0)
-					customPayloadMod = &CustomPayloadData{
-						Transactions: &emptyTxs,
-					}
-				case "Transaction":
-					if len(payloadFieldSplit) < 2 {
-						t.Fatalf("FAIL (%s): No transaction field specified: %s", t.TestName, payloadField)
-					}
-					if len(basePayload.Transactions) == 0 {
-						t.Fatalf("FAIL (%s): No transactions available for modification", t.TestName)
-					}
-					var baseTx types.Transaction
-					if err := baseTx.UnmarshalBinary(basePayload.Transactions[0]); err != nil {
-						t.Fatalf("FAIL (%s): Unable to unmarshal binary tx: %v", t.TestName, err)
-					}
-					var customTxData CustomTransactionData
-					switch payloadFieldSplit[1] {
-					case "Signature":
-						modifiedSignature := SignatureValuesFromRaw(baseTx.RawSignatureValues())
-						modifiedSignature.R = modifiedSignature.R.Sub(modifiedSignature.R, big1)
-						customTxData = CustomTransactionData{
-							Signature: &modifiedSignature,
-						}
-					case "Nonce":
-						customNonce := baseTx.Nonce() - 1
-						customTxData = CustomTransactionData{
-							Nonce: &customNonce,
-						}
-					case "Gas":
-						customGas := uint64(0)
-						customTxData = CustomTransactionData{
-							Gas: &customGas,
-						}
-					case "GasPrice":
-						customTxData = CustomTransactionData{
-							GasPrice: big0,
-						}
-					case "Value":
-						// Vault account initially has 0x123450000000000000000, so this value should overflow
-						customValue, err := hexutil.DecodeBig("0x123450000000000000001")
-						if err != nil {
-							t.Fatalf("FAIL (%s): Unable to prepare custom tx value: %v", t.TestName, err)
-						}
-						customTxData = CustomTransactionData{
-							Value: customValue,
-						}
-					}
 
-					modifiedTx, err := customizeTransaction(&baseTx, vaultKey, &customTxData)
-					if err != nil {
-						t.Fatalf("FAIL (%s): Unable to modify tx: %v", t.TestName, err)
-					}
-					t.Logf("INFO (%s): Modified tx %v / original tx %v", t.TestName, baseTx, modifiedTx)
-
-					modifiedTxBytes, err := modifiedTx.MarshalBinary()
-					if err != nil {
-					}
-					modifiedTransactions := [][]byte{
-						modifiedTxBytes,
-					}
-					customPayloadMod = &CustomPayloadData{
-						Transactions: &modifiedTransactions,
-					}
+				// We need at least one transaction for most test cases to work
+				if !emptyTxs && len(t.CLMock.LatestPayloadBuilt.Transactions) == 0 {
+					// But if the payload has no transactions, the test is invalid
+					t.Fatalf("FAIL (%s): No transactions in the base payload", t.TestName)
 				}
 
-				if customPayloadMod == nil {
-					t.Fatalf("FAIL (%s): Invalid test case: %s", t.TestName, payloadField)
-				}
-
-				t.Logf("INFO (%v) customizing payload using: %s\n", t.TestName, customPayloadMod.String())
-				alteredPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, customPayloadMod)
-				t.Logf("INFO (%v) latest real getPayload (not executed): hash=%v contents=%v\n", t.TestName, t.CLMock.LatestPayloadBuilt.BlockHash, t.CLMock.LatestPayloadBuilt)
-				t.Logf("INFO (%v) customized payload: hash=%v contents=%v\n", t.TestName, alteredPayload.BlockHash, alteredPayload)
+				alteredPayload, err := generateInvalidPayload(&t.CLMock.LatestPayloadBuilt, payloadField)
 				if err != nil {
-					t.Fatalf("FAIL (%s): Unable to modify payload (%v): %v", t.TestName, customPayloadMod, err)
+					t.Fatalf("FAIL (%s): Unable to modify payload (%v): %v", t.TestName, payloadField, err)
 				}
+
 				invalidPayloadHash = alteredPayload.BlockHash
 
 				// Depending on the field we modified, we expect a different status
 				r := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-				if syncing || payloadField == "ParentHash" {
+				if syncing || payloadField == InvalidParentHash {
 					// Execution specification::
 					// {status: ACCEPTED, latestValidHash: null, validationError: null} if the following conditions are met:
 					//  - the blockHash of the payload is valid
@@ -901,7 +867,7 @@ func invalidPayloadTestCaseGen(payloadField string, syncing bool) func(*TestEnv)
 					*/
 
 					q := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-					if payloadField == "ParentHash" {
+					if payloadField == InvalidParentHash {
 						// There is no invalid parentHash, if this value is incorrect,
 						// it is assumed that the block is missing and we need to sync.
 						// ACCEPTED also valid since the CLs normally use these interchangeably
@@ -913,7 +879,7 @@ func invalidPayloadTestCaseGen(payloadField string, syncing bool) func(*TestEnv)
 
 					// Try sending the fcU again, this time we should get the proper invalid response.
 					// At this moment the response should be INVALID
-					if payloadField != "ParentHash" {
+					if payloadField != InvalidParentHash {
 						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&fcState, nil)
 						// Note: SYNCING is acceptable here as long as the block produced after this test is produced successfully
 						s.ExpectAnyPayloadStatus(Syncing, Invalid)
@@ -959,6 +925,215 @@ func invalidPayloadTestCaseGen(payloadField string, syncing bool) func(*TestEnv)
 
 			},
 		})
+	}
+}
+
+// Attempt to re-org to a chain which at some point contains an unknown payload which is also invalid.
+// Then reveal the invalid payload and expect that the client rejects it and rejects forkchoice updated calls to this chain.
+// The invalid_index parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
+// with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
+func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPayloadField, p2psync bool, emptyTxs bool) func(*TestEnv) {
+	return func(t *TestEnv) {
+		var secondaryEngineTest *TestEngineClient
+		if p2psync {
+			// To allow having the invalid payload delivered via P2P, we need a second client to serve the payload
+			enode, err := t.Engine.EnodeURL()
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to obtain bootnode: %v", t.TestName, err)
+			}
+			newParams := t.ClientParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
+			newParams = newParams.Set("HIVE_MINER", "")
+			secondaryClient, secondaryEngine, err := t.StartClient(t.Client.Type, newParams, t.MainTTD())
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
+			}
+			t.CLMock.AddEngineClient(t.T, secondaryClient, t.MainTTD())
+			secondaryEngineTest = NewTestEngineClient(t, secondaryEngine)
+		}
+
+		// Wait until TTD is reached by this client
+		t.CLMock.waitForTTD()
+
+		// Produce blocks before starting the test
+		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+		// Save the common ancestor
+		cA := t.CLMock.LatestPayloadBuilt
+
+		// Amount of blocks to deviate starting from the common ancestor
+		n := 10
+
+		// Slice to save the alternate B chain
+		altChainPayloads := make([]*ExecutableDataV1, 0)
+
+		// Append the common ancestor
+		altChainPayloads = append(altChainPayloads, &cA)
+
+		// Produce blocks but at the same time create an alternate chain which contains an invalid payload at some point (INV_P)
+		// CommonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
+		//                 │
+		//                 └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
+		t.CLMock.produceBlocks(n, BlockProcessCallbacks{
+
+			OnPayloadProducerSelected: func() {
+				// Function to send at least one transaction each block produced.
+				// Empty Txs Payload with invalid stateRoot discovered an issue in geth sync, hence this is customizable.
+				if !emptyTxs {
+					// Send the transaction to the prevRandaoContractAddr
+					t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+				}
+			},
+			OnGetPayload: func() {
+				var (
+					alternatePayload *ExecutableDataV1
+					err              error
+				)
+				// Insert extraData to ensure we deviate from the main payload, which contains empty extradata
+				alternatePayload, err = customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+					ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
+					ExtraData:  &([]byte{0x01}),
+				})
+				if err != nil {
+					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
+				}
+				if len(altChainPayloads) == invalid_index {
+					alternatePayload, err = generateInvalidPayload(alternatePayload, payloadField)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
+					}
+				}
+				altChainPayloads = append(altChainPayloads, alternatePayload)
+			},
+		})
+		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			// Note: We perform the test in the middle of payload creation by the CL Mock, in order to be able to
+			// re-org back into this chain and use the new payload without issues.
+			OnGetPayload: func() {
+
+				// Now let's send the alternate chain to the client using newPayload/sync
+				for i := 1; i <= n; i++ {
+					// Send the payload
+					payloadValidStr := "VALID"
+					if i == invalid_index {
+						payloadValidStr = "INVALID"
+					} else if i > invalid_index {
+						payloadValidStr = "VALID with INVALID ancestor"
+					}
+					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
+
+					if p2psync {
+						// We are syncing the main client via p2p, therefore we need to send all valid payloads to the secondary
+						// client, and since they are valid, the client will send them via p2p without problems.
+						if i < invalid_index {
+							// Payloads before the invalid payload are sent to the secondary client
+							r := secondaryEngineTest.TestEngineNewPayloadV1(altChainPayloads[i])
+							r.ExpectStatus(Valid)
+							s := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+								HeadBlockHash:      altChainPayloads[i].BlockHash,
+								SafeBlockHash:      cA.BlockHash,
+								FinalizedBlockHash: cA.BlockHash,
+							}, nil)
+							s.ExpectPayloadStatus(Valid)
+							/*
+								p := NewTestEthClient(t, secondaryEngineTest.Engine.Eth).TestBlockByNumber(nil)
+								p.ExpectHash(altChainPayloads[invalid_index-1].BlockHash)
+							*/
+
+						} else {
+							// Payloads on and after the invalid payload are sent to the main client,
+							// which at first won't be fully verified because the client has to sync with the secondary client
+							// to obtain all the information
+							r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
+							t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
+							s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+								HeadBlockHash:      altChainPayloads[i].BlockHash,
+								SafeBlockHash:      altChainPayloads[i].BlockHash,
+								FinalizedBlockHash: altChainPayloads[i].BlockHash,
+							}, nil)
+							t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
+						}
+					} else {
+						r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
+						p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+							HeadBlockHash:      altChainPayloads[i].BlockHash,
+							SafeBlockHash:      altChainPayloads[i].BlockHash,
+							FinalizedBlockHash: altChainPayloads[i].BlockHash,
+						}, nil)
+						if i == invalid_index {
+							// If this is the first payload after the common ancestor, and this is the payload we invalidated,
+							// then we have all the information to determine that this payload is invalid.
+							r.ExpectStatus(Invalid)
+							r.ExpectLatestValidHash(&altChainPayloads[i-1].BlockHash)
+						} else if i > invalid_index {
+							// We have already sent the invalid payload, but the client could've discarded it.
+							// In reality the CL will not get to this point because it will have already received the `INVALID`
+							// response from the previous payload.
+							r.ExpectStatusEither(Accepted, Syncing)
+							r.ExpectLatestValidHash(nil)
+						} else {
+							// This is one of the payloads before the invalid one, therefore is valid.
+							r.ExpectStatus(Valid)
+							p.ExpectPayloadStatus(Valid)
+							p.ExpectLatestValidHash(&altChainPayloads[i].BlockHash)
+						}
+
+					}
+				}
+
+				if p2psync {
+					// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
+					for {
+						r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[n])
+						t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
+						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+							HeadBlockHash:      altChainPayloads[n].BlockHash,
+							SafeBlockHash:      altChainPayloads[n].BlockHash,
+							FinalizedBlockHash: altChainPayloads[n].BlockHash,
+						}, nil)
+						t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
+
+						if r.Status.Status == Invalid {
+							// We also expect that the client properly returns the LatestValidHash of the block on the
+							// alternate chain that is immediately prior to the invalid payload
+							r.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
+							// Response on ForkchoiceUpdated should be the same
+							s.ExpectPayloadStatus(Invalid)
+							s.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
+							break
+						} else if r.Status.Status == Valid {
+							latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), nil)
+							if err != nil {
+								t.Fatalf("FAIL (%s): Unable to get latest block: %v", t.TestName, err)
+							}
+
+							// Print last 10 blocks, for debugging
+							for k := latestBlock.Number().Int64() - 10; k <= latestBlock.Number().Int64(); k++ {
+								latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), big.NewInt(k))
+								if err != nil {
+									t.Fatalf("FAIL (%s): Unable to get block %d: %v", t.TestName, k, err)
+								}
+								js, _ := json.MarshalIndent(latestBlock.Header(), "", "  ")
+								t.Logf("INFO (%s): Block %d: %s", t.TestName, k, js)
+							}
+
+							t.Fatalf("FAIL (%s): Client returned VALID on an invalid chain: %v", t.TestName, r.Status)
+						}
+
+						select {
+						case <-time.After(time.Second):
+						case <-t.Timeout:
+							t.Fatalf("FAIL (%s): Timeout waiting for main client to detect invalid chain", t.TestName)
+						}
+					}
+				}
+
+				// Resend the latest correct fcU
+				r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
+				r.ExpectNoError()
+				// After this point, the CL Mock will send the next payload of the canonical chain
+			},
+		})
+
 	}
 }
 
