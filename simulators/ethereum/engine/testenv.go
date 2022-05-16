@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -155,6 +156,56 @@ func (t *TestEnv) makeNextTransaction(recipient common.Address, amount *big.Int,
 
 func (t *TestEnv) sendNextTransaction(sender *EngineClient, recipient common.Address, amount *big.Int, payload []byte) *types.Transaction {
 	tx := t.makeNextTransaction(recipient, amount, payload)
+	for {
+		err := sender.Eth.SendTransaction(sender.Ctx(), tx)
+		if err == nil {
+			return tx
+		}
+		select {
+		case <-time.After(time.Second):
+		case <-t.Timeout:
+			t.Fatalf("FAIL (%s): Timeout while trying to send transaction: %v", t.TestName, err)
+		}
+	}
+}
+
+// Method that attempts to create a contract filled with zeros without going over the specified gasLimit
+func (t *TestEnv) makeNextBigContractTransaction(gasLimit uint64) *types.Transaction {
+	// Total GAS: Gtransaction == 21000, Gcreate == 32000, Gcodedeposit == 200
+	contractLength := uint64(0)
+	if gasLimit > (21000 + 32000) {
+		contractLength = (gasLimit - 21000 - 32000) / 200
+		if contractLength >= 1 {
+			// Reduce by 1 to guarantee using less gas than requested
+			contractLength -= 1
+		}
+	}
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, contractLength)
+
+	initCode := []byte{
+		0x67, // PUSH8
+	}
+	initCode = append(initCode, buf...) // Size of the contract in byte length
+	initCode = append(initCode, 0x38)   // CODESIZE == 0x00
+	initCode = append(initCode, 0xF3)   // RETURN(offset, length)
+
+	txData := types.LegacyTx{
+		Nonce:    t.nonce,
+		GasPrice: gasPrice,
+		Gas:      gasLimit,
+		To:       nil,
+		Value:    big0,
+		Data:     initCode,
+	}
+	signer := types.NewEIP155Signer(chainID)
+	signedTx := types.MustSignNewTx(vaultKey, signer, &txData)
+	t.nonce++
+	return signedTx
+}
+
+func (t *TestEnv) sendNextBigContractTransaction(sender *EngineClient, gasLimit uint64) *types.Transaction {
+	tx := t.makeNextBigContractTransaction(gasLimit)
 	for {
 		err := sender.Eth.SendTransaction(sender.Ctx(), tx)
 		if err == nil {

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/big"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
@@ -312,6 +313,156 @@ func (customData *CustomPayloadData) String() string {
 		customFieldsList = append(customFieldsList, fmt.Sprintf("Transactions=%v", customData.Transactions))
 	}
 	return strings.Join(customFieldsList, ", ")
+}
+
+type InvalidPayloadField string
+
+const (
+	InvalidParentHash           InvalidPayloadField = "ParentHash"
+	InvalidStateRoot                                = "StateRoot"
+	InvalidReceiptsRoot                             = "ReceiptsRoot"
+	InvalidNumber                                   = "Number"
+	InvalidGasLimit                                 = "GasLimit"
+	InvalidGasUsed                                  = "GasUsed"
+	InvalidTimestamp                                = "Timestamp"
+	InvalidPrevRandao                               = "PrevRandao"
+	RemoveTransaction                               = "Incomplete Transactions"
+	InvalidTransactionSignature                     = "Transaction Signature"
+	InvalidTransactionNonce                         = "Transaction Nonce"
+	InvalidTransactionGas                           = "Transaction Gas"
+	InvalidTransactionGasPrice                      = "Transaction GasPrice"
+	InvalidTransactionValue                         = "Transaction Value"
+)
+
+// This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
+// One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
+func generateInvalidPayload(basePayload *ExecutableDataV1, payloadField InvalidPayloadField) (*ExecutableDataV1, error) {
+
+	var customPayloadMod *CustomPayloadData
+	switch payloadField {
+	case InvalidParentHash:
+		modParentHash := basePayload.ParentHash
+		modParentHash[common.HashLength-1] = byte(255 - modParentHash[common.HashLength-1])
+		customPayloadMod = &CustomPayloadData{
+			ParentHash: &modParentHash,
+		}
+	case InvalidStateRoot:
+		modStateRoot := basePayload.StateRoot
+		modStateRoot[common.HashLength-1] = byte(255 - modStateRoot[common.HashLength-1])
+		customPayloadMod = &CustomPayloadData{
+			StateRoot: &modStateRoot,
+		}
+	case InvalidReceiptsRoot:
+		modReceiptsRoot := basePayload.ReceiptsRoot
+		modReceiptsRoot[common.HashLength-1] = byte(255 - modReceiptsRoot[common.HashLength-1])
+		customPayloadMod = &CustomPayloadData{
+			ReceiptsRoot: &modReceiptsRoot,
+		}
+	case InvalidNumber:
+		modNumber := basePayload.Number - 1
+		customPayloadMod = &CustomPayloadData{
+			Number: &modNumber,
+		}
+	case InvalidGasLimit:
+		modGasLimit := basePayload.GasLimit * 2
+		customPayloadMod = &CustomPayloadData{
+			GasLimit: &modGasLimit,
+		}
+	case InvalidGasUsed:
+		modGasUsed := basePayload.GasUsed - 1
+		customPayloadMod = &CustomPayloadData{
+			GasUsed: &modGasUsed,
+		}
+	case InvalidTimestamp:
+		modTimestamp := basePayload.Timestamp - 1
+		customPayloadMod = &CustomPayloadData{
+			Timestamp: &modTimestamp,
+		}
+	case InvalidPrevRandao:
+		// This option potentially requires a transaction that uses the PREVRANDAO opcode.
+		// Otherwise the payload will still be valid.
+		modPrevRandao := common.Hash{}
+		rand.Read(modPrevRandao[:])
+		customPayloadMod = &CustomPayloadData{
+			PrevRandao: &modPrevRandao,
+		}
+	case RemoveTransaction:
+		emptyTxs := make([][]byte, 0)
+		customPayloadMod = &CustomPayloadData{
+			Transactions: &emptyTxs,
+		}
+	case InvalidTransactionSignature,
+		InvalidTransactionNonce,
+		InvalidTransactionGas,
+		InvalidTransactionGasPrice,
+		InvalidTransactionValue:
+
+		if len(basePayload.Transactions) == 0 {
+			return nil, fmt.Errorf("No transactions available for modification")
+		}
+		var baseTx types.Transaction
+		if err := baseTx.UnmarshalBinary(basePayload.Transactions[0]); err != nil {
+			return nil, err
+		}
+		var customTxData CustomTransactionData
+		switch payloadField {
+		case InvalidTransactionSignature:
+			modifiedSignature := SignatureValuesFromRaw(baseTx.RawSignatureValues())
+			modifiedSignature.R = modifiedSignature.R.Sub(modifiedSignature.R, big1)
+			customTxData = CustomTransactionData{
+				Signature: &modifiedSignature,
+			}
+		case InvalidTransactionNonce:
+			customNonce := baseTx.Nonce() - 1
+			customTxData = CustomTransactionData{
+				Nonce: &customNonce,
+			}
+		case InvalidTransactionGas:
+			customGas := uint64(0)
+			customTxData = CustomTransactionData{
+				Gas: &customGas,
+			}
+		case InvalidTransactionGasPrice:
+			customTxData = CustomTransactionData{
+				GasPrice: big0,
+			}
+		case InvalidTransactionValue:
+			// Vault account initially has 0x123450000000000000000, so this value should overflow
+			customValue, err := hexutil.DecodeBig("0x123450000000000000001")
+			if err != nil {
+				return nil, err
+			}
+			customTxData = CustomTransactionData{
+				Value: customValue,
+			}
+		}
+
+		modifiedTx, err := customizeTransaction(&baseTx, vaultKey, &customTxData)
+		if err != nil {
+			return nil, err
+		}
+
+		modifiedTxBytes, err := modifiedTx.MarshalBinary()
+		if err != nil {
+		}
+		modifiedTransactions := [][]byte{
+			modifiedTxBytes,
+		}
+		customPayloadMod = &CustomPayloadData{
+			Transactions: &modifiedTransactions,
+		}
+	}
+
+	if customPayloadMod == nil {
+		return nil, fmt.Errorf("Invalid payload field to corrupt: %s", payloadField)
+	}
+
+	alteredPayload, err := customizePayload(basePayload, customPayloadMod)
+	if err != nil {
+		return nil, err
+	}
+
+	return alteredPayload, nil
 }
 
 // Use client specific rpc methods to debug a transaction that includes the PREVRANDAO opcode
