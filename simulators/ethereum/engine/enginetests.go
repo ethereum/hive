@@ -39,6 +39,18 @@ var engineTests = []TestSpec{
 		TTD:  1000000,
 	},
 	{
+		Name: "Inconsistent Head in ForkchoiceState",
+		Run:  inconsistentForkchoiceStateGen("Head"),
+	},
+	{
+		Name: "Inconsistent Safe in ForkchoiceState",
+		Run:  inconsistentForkchoiceStateGen("Safe"),
+	},
+	{
+		Name: "Inconsistent Finalized in ForkchoiceState",
+		Run:  inconsistentForkchoiceStateGen("Finalized"),
+	},
+	{
 		Name: "Unknown HeadBlockHash",
 		Run:  unknownHeadBlockHash,
 	},
@@ -528,6 +540,59 @@ func unknownHeadBlockHash(t *TestEnv) {
 	r.ExpectPayloadStatus(Syncing)
 	r.ExpectPayloadID(nil)
 
+}
+
+// Send an inconsistent ForkchoiceState with a known payload that belongs to a side chain as head, safe or finalized.
+func inconsistentForkchoiceStateGen(inconsistency string) func(t *TestEnv) {
+	return func(t *TestEnv) {
+		// Wait until TTD is reached by this client
+		t.CLMock.waitForTTD()
+
+		canonicalPayloads := make([]*ExecutableDataV1, 0)
+		alternativePayloads := make([]*ExecutableDataV1, 0)
+		// Produce blocks before starting the test
+		t.CLMock.produceBlocks(3, BlockProcessCallbacks{
+			OnGetPayload: func() {
+				// Generate and send an alternative side chain
+				customData := CustomPayloadData{}
+				customData.ExtraData = &([]byte{0x01})
+				if len(alternativePayloads) > 0 {
+					customData.ParentHash = &alternativePayloads[len(alternativePayloads)-1].BlockHash
+				}
+				alternativePayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &customData)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Unable to construct alternative payload: %v", t.TestName, err)
+				}
+				alternativePayloads = append(alternativePayloads, alternativePayload)
+				latestCanonicalPayload := t.CLMock.LatestPayloadBuilt
+				canonicalPayloads = append(canonicalPayloads, &latestCanonicalPayload)
+
+				// Send the alternative payload
+				r := t.TestEngine.TestEngineNewPayloadV1(alternativePayload)
+				r.ExpectStatusEither(Valid, Accepted)
+			},
+		})
+		// Send the invalid ForkchoiceStates
+		inconsistentFcU := ForkchoiceStateV1{
+			HeadBlockHash:      canonicalPayloads[len(alternativePayloads)-1].BlockHash,
+			SafeBlockHash:      canonicalPayloads[len(alternativePayloads)-2].BlockHash,
+			FinalizedBlockHash: canonicalPayloads[len(alternativePayloads)-3].BlockHash,
+		}
+		switch inconsistency {
+		case "Head":
+			inconsistentFcU.HeadBlockHash = alternativePayloads[len(alternativePayloads)-1].BlockHash
+		case "Safe":
+			inconsistentFcU.SafeBlockHash = alternativePayloads[len(canonicalPayloads)-2].BlockHash
+		case "Finalized":
+			inconsistentFcU.FinalizedBlockHash = alternativePayloads[len(canonicalPayloads)-3].BlockHash
+		}
+		r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&inconsistentFcU, nil)
+		r.ExpectError()
+
+		// Return to the canonical chain
+		r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
+		r.ExpectPayloadStatus(Valid)
+	}
 }
 
 // Verify behavior on a forkchoiceUpdated with invalid payload attributes

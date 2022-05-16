@@ -55,6 +55,11 @@ Client must reject GetPayload directives under PoW.
 - Invalid Terminal Block in NewPayload:  
 Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
 
+- Inconsistent ForkchoiceState:
+Send an inconsistent ForkchoiceState with a known payload that belongs to a side chain as head, safe or finalized:
+Having `A: Genesis <- P1 <- P2 <- P3`, `B: Genesis <- P1' <- P2' <- P3'`, 
+send `fcU(Head: P3', Safe: P2, Finalized: P1)`, `fcU(Head: P3, Safe: P2', Finalized: P1)`, and `fcU(Head: P3, Safe: P2, Finalized: P1')`
+
 - Unknown HeadBlockHash:  
 Perform a forkchoiceUpdated call with an unknown (random) HeadBlockHash, the client should initiate the syncing process.
 
