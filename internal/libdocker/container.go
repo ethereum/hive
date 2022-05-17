@@ -33,6 +33,42 @@ func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
 	return b
 }
 
+// DefaultBridgeSubnet finds the interface base address of the default docker bridge network.
+func (b *ContainerBackend) DefaultBridgeIP() (net.IP, error) {
+	networks, err := b.client.ListNetworks()
+	if err != nil {
+		return nil, err
+	}
+	bridge := findBridge(networks)
+	if bridge == nil {
+		return nil, fmt.Errorf("network named 'bridge' not found")
+	}
+	ip := networkConfigIP(bridge)
+	if ip == nil {
+		return nil, fmt.Errorf("network named 'bridge' has no IP configuration")
+	}
+	return ip, nil
+}
+
+func findBridge(networks []docker.Network) *docker.Network {
+	for i, network := range networks {
+		if network.Name == "bridge" && network.Driver == "bridge" {
+			return &networks[i]
+		}
+	}
+	return nil
+}
+
+func networkConfigIP(network *docker.Network) net.IP {
+	for _, cfg := range network.IPAM.Config {
+		ip := net.ParseIP(cfg.Gateway)
+		if ip != nil {
+			return ip
+		}
+	}
+	return nil
+}
+
 func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
 	exec, err := b.client.CreateExec(docker.CreateExecOptions{
 		Context:      ctx,

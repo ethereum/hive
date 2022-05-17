@@ -256,7 +256,8 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 			log15.Error("could not terminate test manager", "error", err)
 		}
 	}()
-	addr, server, err := startTestSuiteAPI(tm)
+	cb := r.container.(*libdocker.ContainerBackend)
+	addr, server, err := startTestSuiteAPI(cb, tm)
 	if err != nil {
 		log15.Error("failed to start simulator API", "error", err)
 		return err
@@ -323,20 +324,20 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
+func startTestSuiteAPI(cb *libdocker.ContainerBackend, tm *libhive.TestManager) (net.Addr, *http.Server, error) {
 	// Find the IP address of the host container
-	bridge, err := libdocker.LookupBridgeIP(log15.Root())
+	bridgeIP, err := cb.DefaultBridgeIP()
 	if err != nil {
 		log15.Error("failed to lookup bridge IP", "error", err)
 		return nil, nil, err
 	}
-	log15.Debug("docker bridge IP found", "ip", bridge)
+	log15.Debug("docker bridge IP found", "ip", bridgeIP)
 
 	// Serve connections until the listener is terminated
 	log15.Debug("starting simulator API server")
 
 	// Start the API webserver for simulators to coordinate with
-	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
+	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridgeIP))
 	listener, err := net.ListenTCP("tcp4", addr)
 	if err != nil {
 		log15.Error("failed to listen on bridge adapter", "err", err)
