@@ -219,6 +219,34 @@ func (t *TestEnv) sendNextBigContractTransaction(sender *EngineClient, gasLimit 
 	}
 }
 
+// Verify that the client progresses after a certain PoW block still in PoW mode
+func (t *TestEnv) verifyPoWProgress(lastBlockHash common.Hash) {
+	// Get the block number first
+	lb, err := t.Eth.BlockByHash(t.Ctx(), lastBlockHash)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to fetch block: %v", t.TestName, err)
+	}
+	nextNum := lb.Number().Int64() + 1
+	for {
+		nh, err := t.Eth.HeaderByNumber(t.Ctx(), big.NewInt(nextNum))
+		if err == nil {
+			// Chain has progressed, check that the next block is also PoW
+			// Difficulty must NOT be zero
+			if nh.Difficulty.Cmp(big0) == 0 {
+				t.Fatalf("FAIL (%s): Expected PoW chain to progress in PoW mode, but following block difficulty==%v", t.TestName, nh.Difficulty)
+			}
+			// Chain is still PoW/Clique
+			return
+		}
+		t.Logf("INFO (%s): Error getting block, will try again: %v", t.TestName, err)
+		select {
+		case <-t.Timeout:
+			t.Fatalf("FAIL (%s): Timeout while waiting for PoW chain to progress", t.TestName)
+		case <-time.After(time.Second):
+		}
+	}
+}
+
 // CallContext is a helper method that forwards a raw RPC request to
 // the underlying RPC client. This can be used to call RPC methods
 // that are not supported by the ethclient.Client.

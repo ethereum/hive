@@ -428,6 +428,43 @@ func (exp *StorageResponseExpectObject) ExpectStorageEqual(expStorage common.Has
 	}
 }
 
+// Transaction Receipt
+type TransactionReceiptExpectObject struct {
+	*TestEnv
+	Call    string
+	Receipt *types.Receipt
+	Error   error
+}
+
+func (teth *TestEthClient) TestTransactionReceipt(txHash common.Hash) *TransactionReceiptExpectObject {
+	receipt, err := teth.TransactionReceipt(teth.Ctx(), txHash)
+	return &TransactionReceiptExpectObject{
+		TestEnv: teth.TestEnv,
+		Call:    "TransactionReceipt",
+		Receipt: receipt,
+		Error:   err,
+	}
+}
+
+func (exp *TransactionReceiptExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Receipt)
+	}
+}
+
+func (exp *TransactionReceiptExpectObject) ExpectNoError() {
+	if exp.Error != nil {
+		exp.Fatalf("FAIL (%s): Unexpected error on %s: %v, expected=<None>", exp.TestName, exp.Call, exp.Error)
+	}
+}
+
+func (exp *TransactionReceiptExpectObject) ExpectTransactionHash(expectedHash common.Hash) {
+	exp.ExpectNoError()
+	if exp.Receipt.TxHash != expectedHash {
+		exp.Fatalf("FAIL (%s): Unexpected transaction hash on %s: %v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, expectedHash)
+	}
+}
+
 // Ctx returns a context with the default timeout.
 // For subsequent calls to Ctx, it also cancels the previous context.
 func (t *TestEthClient) Ctx() context.Context {
