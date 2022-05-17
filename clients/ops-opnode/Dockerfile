@@ -5,20 +5,20 @@ RUN apk add --no-cache make gcc musl-dev linux-headers git jq bash
 RUN git clone https://github.com/ethereum-optimism/optimistic-specs /app
 
 WORKDIR /app
-RUN make opnode
+RUN make op-node
 
 FROM alpine:3.15
 
 RUN apk add jq curl
 
-COPY --from=builder /app/bin/op /usr/local/bin
+COPY --from=builder /app/op-node/bin/op-node /usr/local/bin
 COPY ./opnode-entrypoint.sh /opnode-entrypoint.sh
 COPY ./rollup.json /rollup.json
-RUN mkdir /config
-RUN mkdir /hive
-COPY ./bss-key.txt /config
+RUN mkdir /hive /config
+COPY p2p-node-key.txt /config
+COPY p2p-sequencer-key.txt /config
 
-RUN /app/bin/opnode --version 2>/dev/null | head -1 > /version.txt
+RUN op-node --version 2>/dev/null | head -1 > /version.txt
 
 EXPOSE 7545/tcp
 

@@ -17,3 +17,7 @@ type OpNode struct {
 type L2OSNode struct {
 	*hivesim.Client
 }
+
+type BSSNode struct {
+	*hivesim.Client
+}

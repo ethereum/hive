@@ -102,6 +102,7 @@ func runAllTests(t *hivesim.T) {
 	d.InitOp()
 	d.StartOp()
 	d.StartL2OS()
+	d.StartBSS()
 
 	c := d.l2.Client
 

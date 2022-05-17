@@ -37,11 +37,12 @@ type Devnet struct {
 	l2   *L2Node
 	op   *OpNode
 	l2os *L2OSNode
+	bss  *BSSNode
 
 	genesisTimestamp   string
 	withdrawerBytecode string
 	l1BlockBytecode    string
-	l2Genesis string
+	l2Genesis          string
 
 	l2OutputOracle string
 	optimismPortal string
@@ -55,7 +56,7 @@ func (d *Devnet) Start() {
 	if err != nil {
 		d.t.Fatal(err)
 	}
-	var eth1, l2, op, l2os *hivesim.ClientDefinition
+	var eth1, l2, op, l2os, bss *hivesim.ClientDefinition
 	for _, client := range clientTypes {
 		if client.HasRole("ops-l1") {
 			eth1 = client
@@ -69,10 +70,13 @@ func (d *Devnet) Start() {
 		if client.HasRole("ops-l2os") {
 			l2os = client
 		}
+		if client.HasRole("ops-bss") {
+			bss = client
+		}
 	}
 
-	if eth1 == nil || l2 == nil || op == nil || l2os == nil {
-		d.t.Fatal("ops-l1, ops-l2, ops-opnode, ops-l2os required")
+	if eth1 == nil || l2 == nil || op == nil || l2os == nil || bss == nil {
+		d.t.Fatal("ops-l1, ops-l2, ops-opnode, ops-l2os, ops-bss required")
 	}
 
 	// Generate genesis for execution clients
@@ -97,6 +101,7 @@ func (d *Devnet) Start() {
 	d.nodes["ops-l2"] = l2
 	d.nodes["ops-opnode"] = op
 	d.nodes["ops-l2os"] = l2os
+	d.nodes["ops-bss"] = bss
 }
 
 func (d *Devnet) Wait() error {
@@ -156,11 +161,11 @@ func (d *Devnet) StartL2() error {
 	l2 := d.nodes["ops-l2"]
 
 	executionOpts := hivesim.Params{
-		"HIVE_CHECK_LIVE_PORT":     "9545",
-		"HIVE_LOGLEVEL":            os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":            "full",
-		"HIVE_NETWORK_ID":          networkID.String(),
-		"HIVE_CHAIN_ID":            chainID.String(),
+		"HIVE_CHECK_LIVE_PORT": "9545",
+		"HIVE_LOGLEVEL":        os.Getenv("HIVE_LOGLEVEL"),
+		"HIVE_NODETYPE":        "full",
+		"HIVE_NETWORK_ID":      networkID.String(),
+		"HIVE_CHAIN_ID":        chainID.String(),
 	}
 
 	genesisTimestampOpt := hivesim.WithDynamicFile("/genesis_timestamp", bytesSource([]byte(d.genesisTimestamp)))
@@ -208,6 +213,22 @@ func (d *Devnet) StartL2OS() error {
 
 	l2OutputOracleOpt := hivesim.WithDynamicFile("/L2OutputOracle.json", bytesSource([]byte(d.l2OutputOracle)))
 	opts := []hivesim.StartOption{executionOpts, l2OutputOracleOpt}
+	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}
+	return nil
+}
+
+func (d *Devnet) StartBSS() error {
+	op := d.nodes["ops-bss"]
+
+	executionOpts := hivesim.Params{
+		"HIVE_CHECK_LIVE_PORT":  "0",
+		"HIVE_CATALYST_ENABLED": "1",
+		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
+		"HIVE_NODETYPE":         "full",
+	}
+
+	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortal.json", bytesSource([]byte(d.optimismPortal)))
+	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt}
 	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}
 	return nil
 }
