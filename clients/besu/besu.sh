@@ -138,7 +138,6 @@ RPCFLAGS="--host-allowlist=*"
 if [ "$HIVE_GRAPHQL_ENABLED" == "" ]; then
     RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
 else
-    RPCFLAGS="$RPCFLAGS --rpc-http-port=8550" # work around duplicate port error
     RPCFLAGS="$RPCFLAGS --graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8545"
 fi
 
@@ -147,7 +146,7 @@ fi
 
 # Enable merge support if needed
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
-    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --Xmerge-support true"
+    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --Xmerge-support true --engine-rpc-enabled"
     FLAGS="$FLAGS --sync-mode=FULL"
 fi
 
