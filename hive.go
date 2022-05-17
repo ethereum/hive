@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -122,6 +121,9 @@ func main() {
 		log15.Info("running in simulator development mode")
 		runner.runSimulatorAPIDevMode(ctx, *simDevModeAPIEndpoint)
 	} else if len(simList) > 0 {
+		if err := buildProxy(ctx, builder); err != nil {
+			fatal(err)
+		}
 		if err := runner.initSimulators(ctx, simList); err != nil {
 			fatal(err)
 		}
@@ -228,17 +230,17 @@ func (r *simRunner) runSimulatorAPIDevMode(ctx context.Context, endpoint string)
 		return err
 	}
 
-	listener, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		log15.Error(fmt.Sprintf("failed to start TCP server on %s", addr), "err", err)
-		return err
-	}
+	// listener, err := net.ListenTCP("tcp4", addr)
+	// if err != nil {
+	// 	log15.Error(fmt.Sprintf("failed to start TCP server on %s", addr), "err", err)
+	// 	return err
+	// }
 
 	log15.Info(fmt.Sprintf("simulator API listening at %s", addr))
-	server := &http.Server{Handler: tm.API()}
-	defer shutdownServer(server)
-
-	go server.Serve(listener)
+	// server := &http.Server{Handler: tm.API()}
+	// defer shutdownServer(server)
+	//
+	// go server.Serve(listener)
 
 	// wait for interrupt
 	<-ctx.Done()
@@ -323,39 +325,28 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
-	// Find the IP address of the host container
-	bridge, err := libdocker.LookupBridgeIP(log15.Root())
-	if err != nil {
-		log15.Error("failed to lookup bridge IP", "error", err)
-		return nil, nil, err
-	}
-	log15.Debug("docker bridge IP found", "ip", bridge)
-
+func startTestSuiteAPI(cb *libdocker.ContainerBackend, tm *libhive.TestManager) (net.Addr, *proxyServer, error) {
 	// Serve connections until the listener is terminated
 	log15.Debug("starting simulator API server")
 
+	ctx := context.TODO()
+	srv, err := startProxy(ctx, cb, tm.API())
+
 	// Start the API webserver for simulators to coordinate with
-	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
-	listener, err := net.ListenTCP("tcp4", addr)
 	if err != nil {
-		log15.Error("failed to listen on bridge adapter", "err", err)
+		log15.Error("can't start server", "err", err)
 		return nil, nil, err
 	}
-	laddr := listener.Addr()
-	log15.Debug("listening for simulator commands", "addr", laddr)
-	server := &http.Server{Handler: tm.API()}
 
-	go server.Serve(listener)
-	return laddr, server, nil
+	addr := srv.addr()
+	log15.Info("simulator API running", "proxy", srv.containerID[:8], "addr", addr)
+	return addr, srv, nil
 }
 
 // shutdownServer gracefully terminates the HTTP server.
-func shutdownServer(server *http.Server) {
+func shutdownServer(server *proxyServer) {
 	log15.Debug("terminating simulator server")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
+	if err := server.stop(); err != nil {
 		log15.Debug("simulation API server shutdown failed", "err", err)
 	}
 }
