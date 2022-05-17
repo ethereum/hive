@@ -56,9 +56,9 @@ type TestEnv struct {
 	syncCancel context.CancelFunc
 }
 
-func RunTest(testName string, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv), cParams hivesim.Params, cFiles hivesim.Params) {
+func RunTest(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv), cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
-	clMocker := NewCLMocker(t, ttd)
+	clMocker := NewCLMocker(t, slotsToSafe, slotsToFinalized)
 	// Defer closing all clients
 	defer func() {
 		clMocker.CloseClients()

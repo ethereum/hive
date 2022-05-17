@@ -11,6 +11,11 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
+var (
+	DefaultSlotsToSafe      = big.NewInt(1)
+	DefaultSlotsToFinalized = big.NewInt(2)
+)
+
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
 	*hivesim.T
@@ -18,6 +23,9 @@ type CLMocker struct {
 	EngineClients EngineClients
 	// Lock required so no client is offboarded during block production.
 	EngineClientsLock sync.Mutex
+	// Number of required slots before a block which was set as Head moves to `safe` and `finalized` respectively
+	SlotsToSafe      *big.Int
+	SlotsToFinalized *big.Int
 
 	// Block Production State
 	NextBlockProducer *EngineClient
@@ -27,10 +35,11 @@ type CLMocker struct {
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
 	ExecutedPayloadHistory map[uint64]ExecutableDataV1
+	HeadHashHistory        []common.Hash
 
 	// Latest broadcasted data using the PoS Engine API
-	LatestFinalizedNumber   *big.Int
-	LatestFinalizedHeader   *types.Header
+	LatestHeadNumber        *big.Int
+	LatestHeader            *types.Header
 	LatestPayloadBuilt      ExecutableDataV1
 	LatestPayloadAttributes PayloadAttributesV1
 	LatestExecutedPayload   ExecutableDataV1
@@ -44,21 +53,31 @@ type CLMocker struct {
 	Timeout <-chan time.Time
 }
 
-func NewCLMocker(t *hivesim.T, tTD *big.Int) *CLMocker {
+func NewCLMocker(t *hivesim.T, slotsToSafe *big.Int, slotsToFinalized *big.Int) *CLMocker {
 	// Init random seed for different purposes
 	seed := time.Now().Unix()
 	t.Logf("Randomness seed: %v\n", seed)
 	rand.Seed(seed)
 
+	if slotsToSafe == nil {
+		// Use default
+		slotsToSafe = DefaultSlotsToSafe
+	}
+	if slotsToFinalized == nil {
+		// Use default
+		slotsToFinalized = DefaultSlotsToFinalized
+	}
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
 		T:                      t,
 		EngineClients:          make([]*EngineClient, 0),
 		PrevRandaoHistory:      map[uint64]common.Hash{},
 		ExecutedPayloadHistory: map[uint64]ExecutableDataV1{},
-		LatestFinalizedHeader:  nil,
+		SlotsToSafe:            slotsToSafe,
+		SlotsToFinalized:       slotsToFinalized,
+		LatestHeader:           nil,
 		FirstPoSBlockNumber:    nil,
-		LatestFinalizedNumber:  nil,
+		LatestHeadNumber:       nil,
 		TTDReached:             false,
 		NextFeeRecipient:       common.Address{},
 		LatestForkchoice: ForkchoiceStateV1{
@@ -114,15 +133,26 @@ func (cl *CLMocker) setTTDBlockClient(ec *EngineClient) {
 		cl.Fatalf("CLMocker: Attempted to set TTD Block when TTD had not been reached: %v > %v", ec.TerminalTotalDifficulty, td.TotalDifficulty.ToInt())
 	}
 
-	cl.LatestFinalizedHeader = &td.Header
+	cl.LatestHeader = &td.Header
 	cl.TTDReached = true
-	cl.Logf("CLMocker: TTD has been reached at block %v (%v>=%v)\n", cl.LatestFinalizedHeader.Number, td.TotalDifficulty.ToInt(), ec.TerminalTotalDifficulty)
+	cl.Logf("CLMocker: TTD has been reached at block %v (%v>=%v)\n", cl.LatestHeader.Number, td.TotalDifficulty.ToInt(), ec.TerminalTotalDifficulty)
+
+	// Reset transition values
+	cl.LatestHeadNumber = cl.LatestHeader.Number
+	cl.HeadHashHistory = []common.Hash{cl.LatestHeader.Hash()}
+	cl.FirstPoSBlockNumber = nil
+
+	// Prepare initial forkchoice
+	cl.LatestForkchoice = ForkchoiceStateV1{}
+	cl.LatestForkchoice.HeadBlockHash = cl.LatestHeader.Hash()
+	if cl.SlotsToSafe.Cmp(big0) == 0 {
+		cl.LatestForkchoice.SafeBlockHash = cl.LatestHeader.Hash()
+	}
+	if cl.SlotsToFinalized.Cmp(big0) == 0 {
+		cl.LatestForkchoice.FinalizedBlockHash = cl.LatestHeader.Hash()
+	}
 
 	// Broadcast initial ForkchoiceUpdated
-	cl.LatestForkchoice.HeadBlockHash = cl.LatestFinalizedHeader.Hash()
-	cl.LatestForkchoice.SafeBlockHash = cl.LatestFinalizedHeader.Hash()
-	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestFinalizedHeader.Hash()
-	cl.LatestFinalizedNumber = cl.LatestFinalizedHeader.Number
 	anySuccess := false
 	for _, resp := range cl.broadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
 		if resp.Error != nil {
@@ -167,7 +197,7 @@ func (cl *CLMocker) pickNextPayloadProducer() {
 
 	for i := 0; i < len(cl.EngineClients); i++ {
 		// Get a client to generate the payload
-		ec_id := (int(cl.LatestFinalizedNumber.Int64()) + i) % len(cl.EngineClients)
+		ec_id := (int(cl.LatestHeadNumber.Int64()) + i) % len(cl.EngineClients)
 		cl.NextBlockProducer = cl.EngineClients[ec_id]
 
 		// Get latest header. Number and hash must coincide with our view of the chain,
@@ -179,7 +209,7 @@ func (cl *CLMocker) pickNextPayloadProducer() {
 
 		lastBlockHash := latestHeader.Hash()
 
-		if cl.LatestFinalizedHeader.Hash() != lastBlockHash || cl.LatestFinalizedNumber.Cmp(latestHeader.Number) != 0 {
+		if cl.LatestHeader.Hash() != lastBlockHash || cl.LatestHeadNumber.Cmp(latestHeader.Number) != 0 {
 			// Selected client latest block hash does not match canonical chain, try again
 			cl.NextBlockProducer = nil
 			continue
@@ -200,13 +230,13 @@ func (cl *CLMocker) getNextPayloadID() {
 	rand.Read(nextPrevRandao[:])
 
 	cl.LatestPayloadAttributes = PayloadAttributesV1{
-		Timestamp:             cl.LatestFinalizedHeader.Time + 1,
+		Timestamp:             cl.LatestHeader.Time + 1,
 		PrevRandao:            nextPrevRandao,
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
 	}
 
 	// Save random value
-	cl.PrevRandaoHistory[cl.LatestFinalizedHeader.Number.Uint64()+1] = nextPrevRandao
+	cl.PrevRandaoHistory[cl.LatestHeader.Number.Uint64()+1] = nextPrevRandao
 
 	resp, err := cl.NextBlockProducer.EngineForkchoiceUpdatedV1(cl.NextBlockProducer.Ctx(), &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	if err != nil {
@@ -236,11 +266,11 @@ func (cl *CLMocker) getNextPayload() {
 	if cl.LatestPayloadBuilt.PrevRandao != cl.LatestPayloadAttributes.PrevRandao {
 		cl.Fatalf("CLMocker: Incorrect PrevRandao on payload built: %v != %v", cl.LatestPayloadBuilt.PrevRandao, cl.LatestPayloadAttributes.PrevRandao)
 	}
-	if cl.LatestPayloadBuilt.ParentHash != cl.LatestFinalizedHeader.Hash() {
-		cl.Fatalf("CLMocker: Incorrect ParentHash on payload built: %v != %v", cl.LatestPayloadBuilt.ParentHash, cl.LatestFinalizedHeader.Hash())
+	if cl.LatestPayloadBuilt.ParentHash != cl.LatestHeader.Hash() {
+		cl.Fatalf("CLMocker: Incorrect ParentHash on payload built: %v != %v", cl.LatestPayloadBuilt.ParentHash, cl.LatestHeader.Hash())
 	}
-	if cl.LatestPayloadBuilt.Number != cl.LatestFinalizedHeader.Number.Uint64()+1 {
-		cl.Fatalf("CLMocker: Incorrect Number on payload built: %v != %v", cl.LatestPayloadBuilt.Number, cl.LatestFinalizedHeader.Number.Uint64()+1)
+	if cl.LatestPayloadBuilt.Number != cl.LatestHeader.Number.Uint64()+1 {
+		cl.Fatalf("CLMocker: Incorrect Number on payload built: %v != %v", cl.LatestPayloadBuilt.Number, cl.LatestHeader.Number.Uint64()+1)
 	}
 }
 
@@ -304,13 +334,13 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 }
 
 type BlockProcessCallbacks struct {
-	OnPayloadProducerSelected           func()
-	OnGetPayloadID                      func()
-	OnGetPayload                        func()
-	OnNewPayloadBroadcast               func()
-	OnHeadBlockForkchoiceBroadcast      func()
-	OnSafeBlockForkchoiceBroadcast      func()
-	OnFinalizedBlockForkchoiceBroadcast func()
+	OnPayloadProducerSelected func()
+	OnGetPayloadID            func()
+	OnGetPayload              func()
+	OnNewPayloadBroadcast     func()
+	OnForkchoiceBroadcast     func()
+	OnSafeBlockChange         func()
+	OnFinalizedBlockChange    func()
 }
 
 func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
@@ -351,37 +381,44 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 	}
 
 	// Broadcast forkchoice updated with new HeadBlock to all clients
+	previousForkchoice := cl.LatestForkchoice
+	cl.HeadHashHistory = append(cl.HeadHashHistory, cl.LatestPayloadBuilt.BlockHash)
+
+	cl.LatestForkchoice = ForkchoiceStateV1{}
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
+	if len(cl.HeadHashHistory) > int(cl.SlotsToSafe.Int64()) {
+		cl.LatestForkchoice.SafeBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToSafe.Int64())-1]
+	}
+	if len(cl.HeadHashHistory) > int(cl.SlotsToFinalized.Int64()) {
+		cl.LatestForkchoice.FinalizedBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToFinalized.Int64())-1]
+	}
 	cl.broadcastLatestForkchoice()
 
-	if callbacks.OnHeadBlockForkchoiceBroadcast != nil {
-		callbacks.OnHeadBlockForkchoiceBroadcast()
+	if callbacks.OnForkchoiceBroadcast != nil {
+		callbacks.OnForkchoiceBroadcast()
 	}
 
 	// Broadcast forkchoice updated with new SafeBlock to all clients
-	cl.LatestForkchoice.SafeBlockHash = cl.LatestPayloadBuilt.BlockHash
-	cl.broadcastLatestForkchoice()
-
-	if callbacks.OnSafeBlockForkchoiceBroadcast != nil {
-		callbacks.OnSafeBlockForkchoiceBroadcast()
+	if callbacks.OnSafeBlockChange != nil && previousForkchoice.SafeBlockHash != cl.LatestForkchoice.SafeBlockHash {
+		callbacks.OnSafeBlockChange()
 	}
-
 	// Broadcast forkchoice updated with new FinalizedBlock to all clients
-	cl.LatestForkchoice.FinalizedBlockHash = cl.LatestPayloadBuilt.BlockHash
-	cl.broadcastLatestForkchoice()
+	if callbacks.OnFinalizedBlockChange != nil && previousForkchoice.FinalizedBlockHash != cl.LatestForkchoice.FinalizedBlockHash {
+		callbacks.OnFinalizedBlockChange()
+	}
 
 	// Save the number of the first PoS block
 	if cl.FirstPoSBlockNumber == nil {
-		cl.FirstPoSBlockNumber = big.NewInt(int64(cl.LatestFinalizedHeader.Number.Uint64() + 1))
+		cl.FirstPoSBlockNumber = big.NewInt(int64(cl.LatestHeader.Number.Uint64() + 1))
 	}
 
 	// Save the header of the latest block in the PoS chain
-	cl.LatestFinalizedNumber = cl.LatestFinalizedNumber.Add(cl.LatestFinalizedNumber, big1)
+	cl.LatestHeadNumber = cl.LatestHeadNumber.Add(cl.LatestHeadNumber, big1)
 
 	// Check if any of the clients accepted the new payload
-	cl.LatestFinalizedHeader = nil
+	cl.LatestHeader = nil
 	for _, ec := range cl.EngineClients {
-		newHeader, err := ec.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), cl.LatestFinalizedNumber)
+		newHeader, err := ec.Eth.HeaderByNumber(cl.NextBlockProducer.Ctx(), cl.LatestHeadNumber)
 		if err != nil {
 			continue
 		}
@@ -398,8 +435,8 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect difficulty: %v", ec.Container, newHeader.Difficulty)
 		}
 		// mixHash == prevRandao
-		if newHeader.MixDigest != cl.PrevRandaoHistory[cl.LatestFinalizedNumber.Uint64()] {
-			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect mixHash: %v != %v", ec.Container, newHeader.MixDigest, cl.PrevRandaoHistory[cl.LatestFinalizedNumber.Uint64()])
+		if newHeader.MixDigest != cl.PrevRandaoHistory[cl.LatestHeadNumber.Uint64()] {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect mixHash: %v != %v", ec.Container, newHeader.MixDigest, cl.PrevRandaoHistory[cl.LatestHeadNumber.Uint64()])
 		}
 		// nonce == 0x0000000000000000
 		if newHeader.Nonce != (types.BlockNonce{}) {
@@ -408,14 +445,10 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 		if len(newHeader.Extra) > 32 {
 			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect extraData (len > 32): %v", ec.Container, newHeader.Extra)
 		}
-		cl.LatestFinalizedHeader = newHeader
+		cl.LatestHeader = newHeader
 	}
-	if cl.LatestFinalizedHeader == nil {
+	if cl.LatestHeader == nil {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
-	}
-
-	if callbacks.OnFinalizedBlockForkchoiceBroadcast != nil {
-		callbacks.OnFinalizedBlockForkchoiceBroadcast()
 	}
 
 }

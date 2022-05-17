@@ -423,9 +423,9 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 				})
 
 				// If the main client should follow the PoS chain, update the mustHeadHash
-				if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
+				if mustHeadHash == t.CLMock.LatestHeader.ParentHash {
 					// Keep following the chain if that is what the test expects
-					mustHeadHash = t.CLMock.LatestFinalizedHeader.Hash()
+					mustHeadHash = t.CLMock.LatestHeader.Hash()
 					t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 				}
 			}
@@ -457,9 +457,9 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 					})
 
 					// If the main client should follow the PoS chain, update the mustHeadHash
-					if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
+					if mustHeadHash == t.CLMock.LatestHeader.ParentHash {
 						// Keep following the chain if that is what the test expects
-						mustHeadHash = t.CLMock.LatestFinalizedHeader.Hash()
+						mustHeadHash = t.CLMock.LatestHeader.Hash()
 						t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 					}
 
