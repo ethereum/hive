@@ -33,21 +33,22 @@ func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
 	return b
 }
 
-// DefaultBridgeSubnet finds the interface base address of the default docker bridge network.
-func (b *ContainerBackend) DefaultBridgeIP() (net.IP, error) {
+// DefaultBridgeInfo returns information about the default docker bridge network.
+func (b *ContainerBackend) DefaultBridgeInfo() (ifname string, gateway net.IP, err error) {
 	networks, err := b.client.ListNetworks()
 	if err != nil {
-		return nil, err
+		return "", nil, err
 	}
 	bridge := findBridge(networks)
 	if bridge == nil {
-		return nil, fmt.Errorf("network named 'bridge' not found")
+		return "", nil, fmt.Errorf("network named 'bridge' not found")
 	}
-	ip := networkConfigIP(bridge)
-	if ip == nil {
-		return nil, fmt.Errorf("network named 'bridge' has no IP configuration")
+	ifname = networkBridgeInterfaceName(bridge)
+	gateway = networkGatewayIP(bridge)
+	if gateway == nil {
+		return "", nil, fmt.Errorf("network named 'bridge' has no IP configuration")
 	}
-	return ip, nil
+	return ifname, gateway, nil
 }
 
 func findBridge(networks []docker.Network) *docker.Network {
@@ -59,7 +60,7 @@ func findBridge(networks []docker.Network) *docker.Network {
 	return nil
 }
 
-func networkConfigIP(network *docker.Network) net.IP {
+func networkGatewayIP(network *docker.Network) net.IP {
 	for _, cfg := range network.IPAM.Config {
 		ip := net.ParseIP(cfg.Gateway)
 		if ip != nil {
@@ -67,6 +68,10 @@ func networkConfigIP(network *docker.Network) net.IP {
 		}
 	}
 	return nil
+}
+
+func networkBridgeInterfaceName(network *docker.Network) string {
+	return network.Options["com.docker.network.bridge.name"]
 }
 
 func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
