@@ -4,8 +4,9 @@
 package main
 
 import (
-	"errors"
 	"net"
+
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 func bindToDevice(l net.Listener, device string) error {
