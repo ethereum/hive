@@ -112,6 +112,18 @@ if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
 
+# Import clique signing key.
+if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+    # Create password file.
+    echo "Importing clique key..."
+    echo "$HIVE_CLIQUE_PRIVATEKEY" > ./private_key.txt
+
+    # Ensure password file is used when running geth in mining mode.
+    if [ "$HIVE_MINER" != "" ]; then
+        FLAGS="$FLAGS --miner.sigfile private_key.txt"
+    fi
+fi
+
 # Launch the main client.
 FLAGS="$FLAGS --nat=none"
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
