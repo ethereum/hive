@@ -36,8 +36,13 @@ func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, e
 	if logger == nil {
 		logger = log15.Root()
 	}
-
-	client, err := docker.NewClient(dockerEndpoint)
+	var client *docker.Client
+	var err error
+	if dockerEndpoint == "" {
+		client, err = docker.NewClientFromEnv()
+	} else {
+		client, err = docker.NewClient(dockerEndpoint)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't connect to docker: %v", err)
 	}
