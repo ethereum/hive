@@ -35,11 +35,11 @@ jobs:
 
   # This job also runs the smoke test simulations, but against a remote dockerd.
   smoke-tests-remote-docker:
+    docker:
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
-      - setup_remote_docker:
-          version: 20.10.14
+      - setup_remote_docker: {version: 20.10.14}
       - run:
           command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum"
       - run:
