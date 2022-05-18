@@ -23,7 +23,7 @@ func main() {
 	var (
 		testResultsRoot       = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
 		loglevelFlag          = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
-		dockerEndpoint        = flag.String("docker.endpoint", "unix:///var/run/docker.sock", "Endpoint of the local Docker daemon.")
+		dockerEndpoint        = flag.String("docker.endpoint", "", "Endpoint of the local Docker daemon.")
 		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
