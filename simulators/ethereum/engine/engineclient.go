@@ -181,12 +181,11 @@ const (
 )
 
 var PayloadStatuses = map[PayloadStatus]string{
-	Valid:                "VALID",
-	Invalid:              "INVALID",
-	Accepted:             "ACCEPTED",
-	Syncing:              "SYNCING",
-	InvalidTerminalBlock: "INVALID_TERMINAL_BLOCK",
-	InvalidBlockHash:     "INVALID_BLOCK_HASH",
+	Valid:            "VALID",
+	Invalid:          "INVALID",
+	Accepted:         "ACCEPTED",
+	Syncing:          "SYNCING",
+	InvalidBlockHash: "INVALID_BLOCK_HASH",
 }
 
 func (b PayloadStatus) String() string {

@@ -403,11 +403,11 @@ func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
 	}
 
 	// Execution specification:
-	// {payloadStatus: {status: INVALID_TERMINAL_BLOCK, latestValidHash: null, validationError: errorMessage | null}, payloadId: null}
+	// {payloadStatus: {status: INVALID, latestValidHash=0x00..00}, payloadId: null}
 	// either obtained from the Payload validation process or as a result of validating a PoW block referenced by forkchoiceState.headBlockHash
 	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceState, nil)
-	r.ExpectPayloadStatus(InvalidTerminalBlock)
-	r.ExpectLatestValidHash(nil)
+	r.ExpectPayloadStatus(Invalid)
+	r.ExpectLatestValidHash(&(common.Hash{}))
 	// ValidationError is not validated since it can be either null or a string message
 
 	// Check that PoW chain progresses
@@ -452,11 +452,11 @@ func invalidTerminalBlockNewPayload(t *TestEnv) {
 	}
 
 	// Execution specification:
-	// {status: INVALID_TERMINAL_BLOCK, latestValidHash: null, validationError: errorMessage | null}
+	// {status: INVALID, latestValidHash=0x00..00}
 	// if terminal block conditions are not satisfied
 	r := t.TestEngine.TestEngineNewPayloadV1(hashedPayload)
-	r.ExpectStatus(InvalidTerminalBlock)
-	r.ExpectLatestValidHash(nil)
+	r.ExpectStatus(Invalid)
+	r.ExpectLatestValidHash(&(common.Hash{}))
 	// ValidationError is not validated since it can be either null or a string message
 
 	// Check that PoW chain progresses
@@ -701,7 +701,8 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 		SafeBlockHash:      gblock.Hash(),
 		FinalizedBlockHash: gblock.Hash(),
 	}, nil)
-	r.ExpectPayloadStatus(InvalidTerminalBlock)
+	r.ExpectPayloadStatus(Invalid)
+	r.ExpectLatestValidHash(&(common.Hash{}))
 
 	r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
 	r.ExpectPayloadStatus(Valid)
