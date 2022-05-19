@@ -99,15 +99,15 @@ if [ -d /blocks ]; then
     IMPORTFLAGS="$IMPORTFLAGS $blocks"
 fi
 
-# For clique mining, besu uses the node key as the block signing key.
-if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
-    echo "Importing clique signing key as node key..."
-    echo "$HIVE_CLIQUE_PRIVATEKEY" > /opt/besu/key
-fi
 
 # Configure mining.
 if [ "$HIVE_MINER" != "" ]; then
     FLAGS="$FLAGS --miner-enabled --miner-coinbase=$HIVE_MINER"
+    # For clique mining, besu uses the node key as the block signing key.
+    if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+        echo "Importing clique signing key as node key..."
+        echo "$HIVE_CLIQUE_PRIVATEKEY" > /opt/besu/key
+    fi
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner-extra-data=$HIVE_MINER_EXTRA"
@@ -124,25 +124,31 @@ else
     FLAGS="$FLAGS --network-id=1337"
 fi
 
-# Sync mode.
-case "$HIVE_NODETYPE" in
-    "" | "full")
-        FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0" ;;
-    "light")
-        echo "Ignoring HIVE_NODETYPE == light: besu does not support light client" ;;
-esac
+# Sync mode, must only be changed for non merge related tests.
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; then
+    if [ "$HIVE_NODETYPE" == "light" ]; then
+        echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
+    else
+        FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0"
+    fi
+fi
 
 # Configure RPC.
-RPCFLAGS="--host-whitelist=*"
+RPCFLAGS="--host-allowlist=*"
 if [ "$HIVE_GRAPHQL_ENABLED" == "" ]; then
     RPCFLAGS="$RPCFLAGS --rpc-http-enabled --rpc-http-api=ETH,NET,WEB3,ADMIN --rpc-http-host=0.0.0.0"
 else
-    RPCFLAGS="$RPCFLAGS --rpc-http-port=8550" # work around duplicate port error
     RPCFLAGS="$RPCFLAGS --graphql-http-enabled --graphql-http-host=0.0.0.0 --graphql-http-port=8545"
 fi
 
 # Enable WebSocket.
-RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-host=0.0.0.0"
+#RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-host=0.0.0.0"
+
+# Enable merge support if needed
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --Xmerge-support true --engine-rpc-enabled"
+    FLAGS="$FLAGS --sync-mode=FULL"
+fi
 
 # Start Besu.
 if [ -z "$HAS_IMPORT" ]; then
