@@ -39,10 +39,14 @@ type Devnet struct {
 	l2os *L2OSNode
 	bss  *BSSNode
 
-	genesisTimestamp   string
-	withdrawerBytecode string
-	l1BlockBytecode    string
-	l2Genesis          string
+	genesisTimestamp string
+	l2Genesis        string
+
+	l2ToL1MessagePasserJSON          string
+	l2CrossDomainMessengerJSON       string
+	optimismMintableTokenFactoryJSON string
+	l2StandardBridgeJSON             string
+	l1BlockJSON                      string
 
 	l2OutputOracle string
 	optimismPortal string
@@ -136,23 +140,43 @@ func (d *Devnet) InitL2() error {
 	if err != nil {
 		return err
 	}
+	d.l2OutputOracle = l2OutputOracle
+
 	optimismPortal, err := d.Cat("/hive/contracts/deployments/devnetL1/OptimismPortal.json")
 	if err != nil {
 		return err
 	}
-	d.l2OutputOracle = l2OutputOracle
 	d.optimismPortal = optimismPortal
 
-	withdrawerBytecode, err := d.Cat("/hive/contracts/artifacts/contracts/L2/Withdrawer.sol/Withdrawer.json")
+	l2ToL1MessagePasserJSON, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L2ToL1MessagePasser.sol/L2ToL1MessagePasser.json")
 	if err != nil {
 		return err
 	}
-	l1BlockBytecode, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L1Block.sol/L1Block.json")
+	d.l2ToL1MessagePasserJSON = l2ToL1MessagePasserJSON
+
+	l2CrossDomainMessengerJSON, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L2CrossDomainMessenger.sol/L2CrossDomainMessenger.json")
 	if err != nil {
 		return err
 	}
-	d.withdrawerBytecode = withdrawerBytecode
-	d.l1BlockBytecode = l1BlockBytecode
+	d.l2CrossDomainMessengerJSON = l2CrossDomainMessengerJSON
+
+	optimismMintableTokenFactoryJSON, err := d.Cat("/hive/contracts/artifacts/contracts/universal/OptimismMintableTokenFactory.sol/OptimismMintableTokenFactory.json")
+	if err != nil {
+		return err
+	}
+	d.optimismMintableTokenFactoryJSON = optimismMintableTokenFactoryJSON
+
+	l2StandardBridgeJSON, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L2StandardBridge.sol/L2StandardBridge.json")
+	if err != nil {
+		return err
+	}
+	d.l2StandardBridgeJSON = l2StandardBridgeJSON
+
+	l1BlockJSON, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L1Block.sol/L1Block.json")
+	if err != nil {
+		return err
+	}
+	d.l1BlockJSON = l1BlockJSON
 
 	return nil
 }
@@ -169,9 +193,12 @@ func (d *Devnet) StartL2() error {
 	}
 
 	genesisTimestampOpt := hivesim.WithDynamicFile("/genesis_timestamp", bytesSource([]byte(d.genesisTimestamp)))
-	withdrawerBytecodeOpt := hivesim.WithDynamicFile("/Withdrawer.json", bytesSource([]byte(d.withdrawerBytecode)))
-	l1BlockBytecodeOpt := hivesim.WithDynamicFile("/L1Block.json", bytesSource([]byte(d.l1BlockBytecode)))
-	opts := []hivesim.StartOption{executionOpts, genesisTimestampOpt, withdrawerBytecodeOpt, l1BlockBytecodeOpt}
+	l2ToL1MessagePasserOpt := hivesim.WithDynamicFile("/L2ToL1MessagePasser.json", bytesSource([]byte(d.l2ToL1MessagePasserJSON)))
+	l2CrossDomainMessengerOpt := hivesim.WithDynamicFile("/L2CrossDomainMessenger.json", bytesSource([]byte(d.l2CrossDomainMessengerJSON)))
+	optimismMintableTokenFactoryOpt := hivesim.WithDynamicFile("/OptimismMintableTokenFactory.json", bytesSource([]byte(d.optimismMintableTokenFactoryJSON)))
+	l2StandardBridgeOpt := hivesim.WithDynamicFile("/L2StandardBridge.json", bytesSource([]byte(d.l2StandardBridgeJSON)))
+	l1BlockOpt := hivesim.WithDynamicFile("/L1Block.json", bytesSource([]byte(d.l1BlockJSON)))
+	opts := []hivesim.StartOption{executionOpts, genesisTimestampOpt, l2ToL1MessagePasserOpt, l2CrossDomainMessengerOpt, optimismMintableTokenFactoryOpt, l2StandardBridgeOpt, l1BlockOpt}
 	d.l2 = &L2Node{d.t.StartClient(l2.Name, opts...)}
 	return nil
 }
