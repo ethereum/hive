@@ -109,6 +109,7 @@ interacting with one.`[1:],
 		Parameters:  clientEnv,
 		Files:       files,
 		Run:         func(t *hivesim.T, c *hivesim.Client) { runAllTests(t, c, c.Type) },
+		AlwaysRun:   true,
 	})
 
 	// Add tests to launch LES servers.
@@ -120,6 +121,7 @@ interacting with one.`[1:],
 		Parameters:  serverParams,
 		Files:       files,
 		Run:         func(t *hivesim.T, srv *hivesim.Client) { runLESTests(t, srv) },
+		AlwaysRun:   true,
 	})
 
 	sim := hivesim.New()
@@ -145,6 +147,7 @@ func runLESTests(t *hivesim.T, serverNode *hivesim.Client) {
 		Description: "This runs the RPC tests against an LES client.",
 		Parameters:  clientParams,
 		Files:       files,
+		AlwaysRun:   true,
 		Run: func(t *hivesim.T, client *hivesim.Client) {
 			err := client.RPC().Call(nil, "admin_addPeer", enode)
 			if err != nil {
