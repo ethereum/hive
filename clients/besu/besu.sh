@@ -146,7 +146,8 @@ RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-ho
 
 # Enable merge support if needed
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
-    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --Xmerge-support true --engine-rpc-enabled"
+    echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
+    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --Xmerge-support true --engine-rpc-enabled --engine-jwt-enabled --engine-jwt-secret /jwtsecret"
     FLAGS="$FLAGS --sync-mode=FULL"
 fi
 
