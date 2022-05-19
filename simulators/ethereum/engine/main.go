@@ -78,6 +78,10 @@ type TestSpec struct {
 	// Default: 0
 	TTD int64
 
+	// CL Mocker configuration for slots to `safe` and `finalized` respectively
+	SlotsToSafe      *big.Int
+	SlotsToFinalized *big.Int
+
 	// Test maximum execution time until a timeout is raised.
 	// Default: 60 seconds
 	TimeoutSeconds int
@@ -139,7 +143,7 @@ have reached the Terminal Total Difficulty.`[1:],
 					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
 				}
 				// Run the test case
-				RunTest(currentTest.Name, big.NewInt(ttd), timeout, t, c, currentTest.Run, newParams, testFiles)
+				RunTest(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, newParams, testFiles)
 			},
 		})
 	}

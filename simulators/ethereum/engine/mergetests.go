@@ -73,6 +73,10 @@ type MergeTestSpec struct {
 	// Requires SkipMainClientFcU==false
 	MainClientPoSBlocks int
 
+	// Slot Safe/Finalized Delays
+	SlotsToSafe      *big.Int
+	SlotsToFinalized *big.Int
+
 	// All secondary clients to be started during the tests with their respective chain files
 	SecondaryClientSpecs SecondaryClientSpecs
 }
@@ -169,6 +173,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:                 196608,
 		MainChainFile:       "blocks_1_td_196608.rlp",
 		MainClientPoSBlocks: 2,
+		SlotsToFinalized:    big.NewInt(5),
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ChainFile:           "blocks_1_td_196704.rlp",
@@ -182,6 +187,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:                 196608,
 		MainChainFile:       "blocks_1_td_196704.rlp",
 		MainClientPoSBlocks: 2,
+		SlotsToFinalized:    big.NewInt(5),
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ChainFile:           "blocks_1_td_196608.rlp",
@@ -195,6 +201,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:                 196704,
 		MainChainFile:       "blocks_1_td_196704.rlp",
 		MainClientPoSBlocks: 2,
+		SlotsToFinalized:    big.NewInt(5),
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ChainFile:           "blocks_2_td_393120.rlp",
@@ -208,6 +215,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:                 196704,
 		MainChainFile:       "blocks_2_td_393120.rlp",
 		MainClientPoSBlocks: 2,
+		SlotsToFinalized:    big.NewInt(5),
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ChainFile:           "blocks_1_td_196704.rlp",
@@ -423,9 +431,9 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 				})
 
 				// If the main client should follow the PoS chain, update the mustHeadHash
-				if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
+				if mustHeadHash == t.CLMock.LatestHeader.ParentHash {
 					// Keep following the chain if that is what the test expects
-					mustHeadHash = t.CLMock.LatestFinalizedHeader.Hash()
+					mustHeadHash = t.CLMock.LatestHeader.Hash()
 					t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 				}
 			}
@@ -457,9 +465,9 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 					})
 
 					// If the main client should follow the PoS chain, update the mustHeadHash
-					if mustHeadHash == t.CLMock.LatestFinalizedHeader.ParentHash {
+					if mustHeadHash == t.CLMock.LatestHeader.ParentHash {
 						// Keep following the chain if that is what the test expects
-						mustHeadHash = t.CLMock.LatestFinalizedHeader.Hash()
+						mustHeadHash = t.CLMock.LatestHeader.Hash()
 						t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 					}
 
@@ -487,13 +495,15 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 	}
 
 	return TestSpec{
-		Name:           mergeTestSpec.Name,
-		About:          mergeTestSpec.About,
-		Run:            runFunc,
-		TTD:            mergeTestSpec.TTD,
-		TimeoutSeconds: mergeTestSpec.TimeoutSeconds,
-		GenesisFile:    mergeTestSpec.GenesisFile,
-		ChainFile:      mergeTestSpec.MainChainFile,
+		Name:             mergeTestSpec.Name,
+		About:            mergeTestSpec.About,
+		Run:              runFunc,
+		TTD:              mergeTestSpec.TTD,
+		TimeoutSeconds:   mergeTestSpec.TimeoutSeconds,
+		SlotsToSafe:      mergeTestSpec.SlotsToSafe,
+		SlotsToFinalized: mergeTestSpec.SlotsToFinalized,
+		GenesisFile:      mergeTestSpec.GenesisFile,
+		ChainFile:        mergeTestSpec.MainChainFile,
 	}
 }
 

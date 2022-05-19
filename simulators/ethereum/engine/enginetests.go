@@ -776,15 +776,15 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*TestEnv) {
 					// We alter the payload by setting the parent to a known past block in the
 					// canonical chain, which makes this payload a side chain payload, and also an invalid block hash
 					// (because we did not update the block hash appropriately)
-					alteredPayload.ParentHash = t.CLMock.LatestFinalizedHeader.ParentHash
+					alteredPayload.ParentHash = t.CLMock.LatestHeader.ParentHash
 				} else if syncing {
 					// We need to send an fcU to put the client in SYNCING state.
 					randomHeadBlock := common.Hash{}
 					rand.Read(randomHeadBlock[:])
 					fcU := ForkchoiceStateV1{
 						HeadBlockHash:      randomHeadBlock,
-						SafeBlockHash:      t.CLMock.LatestFinalizedHeader.Hash(),
-						FinalizedBlockHash: t.CLMock.LatestFinalizedHeader.Hash(),
+						SafeBlockHash:      t.CLMock.LatestHeader.Hash(),
+						FinalizedBlockHash: t.CLMock.LatestHeader.Hash(),
 					}
 					r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&fcU, nil)
 					r.ExpectPayloadStatus(Syncing)
@@ -793,7 +793,7 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*TestEnv) {
 						// Syncing and sidechain, the caonincal head is an unknown payload to us,
 						// but this specific bad hash payload is in theory part of a side chain.
 						// Therefore the parent we use is the head hash.
-						alteredPayload.ParentHash = t.CLMock.LatestFinalizedHeader.Hash()
+						alteredPayload.ParentHash = t.CLMock.LatestHeader.Hash()
 					} else {
 						// The invalid bad-hash payload points to the unknown head, but we know it is
 						// indeed canonical because the head was set using forkchoiceUpdated.
@@ -1272,7 +1272,7 @@ func blockStatusExecPayloadGen(transitionBlock bool) func(t *TestEnv) {
 				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
 				s := t.TestEth.TestBlockNumber()
-				s.ExpectNumber(t.CLMock.LatestFinalizedNumber.Uint64())
+				s.ExpectNumber(t.CLMock.LatestHeadNumber.Uint64())
 
 				p := t.TestEth.TestBlockByNumber(nil)
 				p.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
@@ -1302,7 +1302,7 @@ func blockStatusHeadBlockGen(transitionBlock bool) func(t *TestEnv) {
 				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
 			},
 			// Run test after a forkchoice with new HeadBlockHash has been broadcasted
-			OnHeadBlockForkchoiceBroadcast: func() {
+			OnForkchoiceBroadcast: func() {
 				r := t.TestEth.TestHeaderByNumber(nil)
 				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
@@ -1330,7 +1330,7 @@ func blockStatusSafeBlockGen(transitionBlock bool) func(t *TestEnv) {
 				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
 			},
 			// Run test after a forkchoice with new SafeBlockHash has been broadcasted
-			OnSafeBlockForkchoiceBroadcast: func() {
+			OnSafeBlockChange: func() {
 				r := t.TestEth.TestHeaderByNumber(nil)
 				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
@@ -1358,7 +1358,7 @@ func blockStatusFinalizedBlockGen(transitionBlock bool) func(t *TestEnv) {
 				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
 			},
 			// Run test after a forkchoice with new FinalizedBlockHash has been broadcasted
-			OnFinalizedBlockForkchoiceBroadcast: func() {
+			OnFinalizedBlockChange: func() {
 				r := t.TestEth.TestHeaderByNumber(nil)
 				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
@@ -1403,7 +1403,7 @@ func blockStatusReorg(t *TestEnv) {
 			r.ExpectHash(customizedPayload.BlockHash)
 
 		},
-		OnHeadBlockForkchoiceBroadcast: func() {
+		OnForkchoiceBroadcast: func() {
 			// At this point, we have re-org'd to the payload that the CLMocker was originally planning to send,
 			// verify that the client is serving the latest HeadBlock.
 			r := t.TestEth.TestHeaderByNumber(nil)
@@ -1427,7 +1427,7 @@ func reorgBack(t *TestEnv) {
 
 	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
 	t.CLMock.produceBlocks(5, BlockProcessCallbacks{
-		OnHeadBlockForkchoiceBroadcast: func() {
+		OnForkchoiceBroadcast: func() {
 			// Send a fcU with the HeadBlockHash pointing back to the previous block
 			forkchoiceUpdatedBack := ForkchoiceStateV1{
 				HeadBlockHash:      previousHash,
@@ -1545,7 +1545,7 @@ func transactionReorg(t *TestEnv) {
 					t.Fatalf("FAIL (%s): Payload built does not contain the transaction: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
 				}
 			},
-			OnHeadBlockForkchoiceBroadcast: func() {
+			OnForkchoiceBroadcast: func() {
 				// Transaction is now in the head of the canonical chain, re-org and verify it's removed
 				// Get the receipt
 				_, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
@@ -1610,7 +1610,7 @@ func sidechainReorg(t *TestEnv) {
 
 			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice,
 				&PayloadAttributesV1{
-					Timestamp:             t.CLMock.LatestFinalizedHeader.Time + 1,
+					Timestamp:             t.CLMock.LatestHeader.Time + 1,
 					PrevRandao:            alternativePrevRandao,
 					SuggestedFeeRecipient: t.CLMock.NextFeeRecipient,
 				})
@@ -1643,7 +1643,7 @@ func sidechainReorg(t *TestEnv) {
 	})
 	// The reorg actually happens after the CLMocker continues,
 	// verify here that the reorg was successful
-	latestBlockNum := t.CLMock.LatestFinalizedNumber.Uint64()
+	latestBlockNum := t.CLMock.LatestHeadNumber.Uint64()
 	checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[latestBlockNum], latestBlockNum)
 
 }
@@ -1991,9 +1991,9 @@ func prevRandaoOpcodeTx(t *TestEnv) {
 			txs = append(txs, tx)
 			currentTxIndex++
 		},
-		OnHeadBlockForkchoiceBroadcast: func() {
+		OnForkchoiceBroadcast: func() {
 			// Check the transaction tracing, which is client specific
-			expectedPrevRandao := t.CLMock.PrevRandaoHistory[t.CLMock.LatestFinalizedHeader.Number.Uint64()+1]
+			expectedPrevRandao := t.CLMock.PrevRandaoHistory[t.CLMock.LatestHeader.Number.Uint64()+1]
 			if err := debugPrevRandaoTransaction(t.Engine.Ctx(), t.RPC, t.Engine.Client.Type, txs[currentTxIndex-1],
 				&expectedPrevRandao); err != nil {
 				t.Fatalf("FAIL (%s): Error during transaction tracing: %v", t.TestName, err)
@@ -2055,7 +2055,7 @@ func postMergeSync(t *TestEnv) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to obtain latest header: %v", t.TestName, err)
 			}
-			if t.CLMock.LatestFinalizedHeader != nil && latestHeader.Hash() == t.CLMock.LatestFinalizedHeader.Hash() {
+			if t.CLMock.LatestHeader != nil && latestHeader.Hash() == t.CLMock.LatestHeader.Hash() {
 				t.Logf("INFO (%v): Client (%v) is now synced to latest PoS block: %v", t.TestName, c.Container, latestHeader.Hash())
 				break syncLoop
 			}
