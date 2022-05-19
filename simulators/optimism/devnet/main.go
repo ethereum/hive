@@ -109,7 +109,7 @@ func runAllTests(t *hivesim.T) {
 	vault := newVault()
 	genesis := []byte(d.l2Genesis)
 
-	s := newSemaphore(20)
+	s := newSemaphore(40)
 	for _, test := range tests {
 		test := test
 		s.get()
