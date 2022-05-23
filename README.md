@@ -2,8 +2,11 @@
 
 Hive is a system for running integration tests against Ethereum clients.
 
-Ethereum Foundation maintains a public Hive instance to check for consensus, p2p and
-blockchain compatibility. You can find the latest test results [here][hive-prod].
+Ethereum Foundation maintains two public Hive instances to check for consensus, p2p and
+blockchain compatibility:
+
+- eth1 consensus, rpc, p2p tests are on <https://hivetests1.ethdevops.io>.
+- 'merge' testing runs on <https://hivetests2.ethdevops.io>
 
 **To read more about hive, please check [the documentation][doc].**
 
@@ -41,7 +44,6 @@ have a negative impact – but no change must be rejected based on personal valu
 The hive project is licensed under the [GNU General Public License v3.0][gpl]. You can
 find it in the COPYING file.
 
-[hive-prod]: https://hivetests.ethdevops.io/
 [doc]: ./docs/overview.md
 [c4]: http://rfc.zeromq.org/spec:22/C4/
 [zmq-process]: https://hintjens.gitbooks.io/social-architecture/content/chapter4.html
