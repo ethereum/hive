@@ -1,9 +1,12 @@
 package libdocker
 
 import (
+	"errors"
 	"fmt"
 	"io"
+	"net"
 	"regexp"
+	"strings"
 
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
@@ -28,7 +31,6 @@ type Config struct {
 	BuildOutput     io.Writer
 }
 
-// Connect creates a docker API client.
 func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, error) {
 	logger := cfg.Logger
 	if logger == nil {
@@ -47,4 +49,39 @@ func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, e
 	builder := NewBuilder(client, cfg)
 	backend := NewContainerBackend(client, cfg)
 	return builder, backend, nil
+}
+
+// LookupBridgeIP attempts to locate the IPv4 address of the local docker0 bridge
+// network adapter.
+func LookupBridgeIP(logger log15.Logger) (net.IP, error) {
+	// Find the local IPv4 address of the docker0 bridge adapter
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		logger.Error("failed to list network interfaces", "err", err)
+		return nil, err
+	}
+	// Iterate over all the interfaces and find the docker0 bridge
+	for _, iface := range interfaces {
+		if iface.Name == "docker0" || strings.Contains(iface.Name, "vEthernet") {
+			// Retrieve all the addresses assigned to the bridge adapter
+			addrs, err := iface.Addrs()
+			if err != nil {
+				logger.Error("failed to list docker bridge addresses", "err", err)
+				return nil, err
+			}
+			// Find a suitable IPv4 address and return it
+			for _, addr := range addrs {
+				ip, _, err := net.ParseCIDR(addr.String())
+				if err != nil {
+					logger.Error("failed to list parse address", "address", addr, "err", err)
+					return nil, err
+				}
+				if ipv4 := ip.To4(); ipv4 != nil {
+					return ipv4, nil
+				}
+			}
+		}
+	}
+	// Crap, no IPv4 found, bounce
+	return nil, errors.New("not found")
 }

@@ -33,47 +33,6 @@ func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
 	return b
 }
 
-// DefaultBridgeInfo returns information about the default docker bridge network.
-func (b *ContainerBackend) DefaultBridgeInfo() (ifname string, gateway net.IP, err error) {
-	networks, err := b.client.ListNetworks()
-	if err != nil {
-		return "", nil, err
-	}
-	bridge := findBridge(networks)
-	if bridge == nil {
-		return "", nil, fmt.Errorf("network named 'bridge' not found")
-	}
-	ifname = networkBridgeInterfaceName(bridge)
-	gateway = networkGatewayIP(bridge)
-	if gateway == nil {
-		return "", nil, fmt.Errorf("network named 'bridge' has no IP configuration")
-	}
-	return ifname, gateway, nil
-}
-
-func findBridge(networks []docker.Network) *docker.Network {
-	for i, network := range networks {
-		if network.Name == "bridge" && network.Driver == "bridge" {
-			return &networks[i]
-		}
-	}
-	return nil
-}
-
-func networkGatewayIP(network *docker.Network) net.IP {
-	for _, cfg := range network.IPAM.Config {
-		ip := net.ParseIP(cfg.Gateway)
-		if ip != nil {
-			return ip
-		}
-	}
-	return nil
-}
-
-func networkBridgeInterfaceName(network *docker.Network) string {
-	return network.Options["com.docker.network.bridge.name"]
-}
-
 func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
 	exec, err := b.client.CreateExec(docker.CreateExecOptions{
 		Context:      ctx,

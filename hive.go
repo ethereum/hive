@@ -256,8 +256,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 			log15.Error("could not terminate test manager", "error", err)
 		}
 	}()
-	cb := r.container.(*libdocker.ContainerBackend)
-	addr, server, err := startTestSuiteAPI(cb, tm)
+	addr, server, err := startTestSuiteAPI(tm)
 	if err != nil {
 		log15.Error("failed to start simulator API", "error", err)
 		return err
@@ -324,37 +323,30 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(cb *libdocker.ContainerBackend, tm *libhive.TestManager) (net.Addr, *http.Server, error) {
+func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
 	// Find the IP address of the host container
-	bridgeName, bridgeGW, err := cb.DefaultBridgeInfo()
+	bridge, err := libdocker.LookupBridgeIP(log15.Root())
 	if err != nil {
 		log15.Error("failed to lookup bridge IP", "error", err)
 		return nil, nil, err
 	}
-	log15.Debug("docker bridge IP found", "name", bridgeName, "ip", bridgeGW)
+	log15.Debug("docker bridge IP found", "ip", bridge)
 
 	// Serve connections until the listener is terminated
 	log15.Debug("starting simulator API server")
 
 	// Start the API webserver for simulators to coordinate with
-	listener, err := net.Listen("tcp4", ":0")
+	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
+	listener, err := net.ListenTCP("tcp4", addr)
 	if err != nil {
-		log15.Error("can't start listener", "err", err)
+		log15.Error("failed to listen on bridge adapter", "err", err)
 		return nil, nil, err
 	}
-	// Note: this is not really secure because there is a tiny window where
-	// a connection could be created to the listener before it gets bound.
-	// This could be fixed by creating the listener via traditional socket/bind calls.
-	if err := bindToDevice(listener, bridgeName); err != nil {
-		log15.Error("failed to bind to bridge device", "device", bridgeName, "err", err)
-	}
-	lport := listener.Addr().(*net.TCPAddr).Port
-	laddr := &net.TCPAddr{IP: bridgeGW, Port: lport}
-
+	laddr := listener.Addr()
 	log15.Debug("listening for simulator commands", "addr", laddr)
 	server := &http.Server{Handler: tm.API()}
-	go server.Serve(listener)
 
+	go server.Serve(listener)
 	return laddr, server, nil
 }
 
