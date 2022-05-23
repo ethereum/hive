@@ -13,6 +13,6 @@ for d in $sims; do
         set -e
         cd $d
         go get -d "github.com/ethereum/hive@$version"
-        go mod tidy
+        go mod tidy -compat=1.17
     )
 done
