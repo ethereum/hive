@@ -107,6 +107,9 @@ The payloads should be ACCEPTED/SYNCING, and the last payload should be VALID (s
 - Valid NewPayload->ForkchoiceUpdated on Syncing Client:
 Skip sending NewPayload to the client, but send the ForkchoiceUpdated to this missing payload, which will send the client to Syncing, then send the valid payload. Response should be either `ACCEPTED` or `SYNCING`.
 
+- NewPayload with Missing ForkchoiceUpdated
+Chain `Genesis <- ... <- TB <- P1 <- P2 <- ... <- Pn`, `TB` is a valid terminal block. Secondary EL starts with `TB` as the head. `newPayload(P1)`, `newPayload(P2)`, ... `newPayload(Pn)` are sent to the secondary EL, all responses shall be `{status: VALID, latestValidHash: payload.blockHash}`. `forkchoiceUpdated(head: Pn, safe: Pn-1, finalized:Pn-2)` is sent and verified.
+
 ### Invalid Payload Tests
 - Bad blockhash on NewPayload:  
 Send a NewPayload directive to the client including an incorrect BlockHash, should result in an error in all the following cases:
