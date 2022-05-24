@@ -2,7 +2,7 @@ module github.com/ethereum-optimism/hive/simulators/optimism/devnet
 
 go 1.17
 
-replace github.com/ethereum/go-ethereum v1.10.17 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220512193241-32ef0bba48ce
+replace github.com/ethereum/go-ethereum v1.10.17 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220524005015-6e3df1ba83e6
 
 require (
 	github.com/ethereum/go-ethereum v1.10.17
