@@ -113,6 +113,8 @@ github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220411203319-ad6
 github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220411203319-ad60590374c8/go.mod h1:m2COxrfN3y8Yc0+FBC04+TVGFq9cAgxGO2QsEiiBYJM=
 github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220512193241-32ef0bba48ce h1:Wa0BVNdeyzIoJkrZtI7o2NEw8F98vVIzkPpiFACbdCA=
 github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220512193241-32ef0bba48ce/go.mod h1:zwRwhzbX7GhQgG12DdrLr9aRGGLObKwmZxYrCLICIRc=
+github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220524005015-6e3df1ba83e6 h1:zQFwssOdcN9X2Z/5k0CimI9qSHt2BsZicfcNfGDsfY0=
+github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220524005015-6e3df1ba83e6/go.mod h1:zwRwhzbX7GhQgG12DdrLr9aRGGLObKwmZxYrCLICIRc=
 github.com/ethereum/go-ethereum v1.10.17 h1:XEcumY+qSr1cZQaWsQs5Kck3FHB0V2RiMHPdTBJ+oT8=
 github.com/ethereum/go-ethereum v1.10.17/go.mod h1:Lt5WzjM07XlXc95YzrhosmR4J9Ahd6X2wyEV2SvGhk0=
 github.com/ethereum/hive v0.0.0-20220214133341-52d82682a461 h1:bQd80+sBetguVHanKkQBGkdFqqxVDq6VIxSErqkyFw0=
