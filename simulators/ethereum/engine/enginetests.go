@@ -219,92 +219,110 @@ var engineTests = []TestSpec{
 
 	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P1', Reveal using newPayload",
-		Run:  invalidMissingAncestorReOrgGen(1, InvalidStateRoot, false, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P1', Reveal using newPayload",
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(1, InvalidStateRoot, false, true),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using newPayload",
-		Run:  invalidMissingAncestorReOrgGen(9, InvalidStateRoot, false, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using newPayload",
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidStateRoot, false, true),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using newPayload",
-		Run:  invalidMissingAncestorReOrgGen(10, InvalidStateRoot, false, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using newPayload",
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(10, InvalidStateRoot, false, true),
 	},
 
 	// Invalid Ancestor Re-Org Tests (Reveal via sync through secondary client)
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, true),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidReceiptsRoot, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidReceiptsRoot, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidNumber, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidNumber, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidGasLimit, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidGasLimit, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidGasUsed, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidGasUsed, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTimestamp, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTimestamp, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidPrevRandao, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidPrevRandao, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, RemoveTransaction, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, RemoveTransaction, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionSignature, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionSignature, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionNonce, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionNonce, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionGas, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionGas, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionGasPrice, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionGasPrice, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionValue, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionValue, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(10, InvalidStateRoot, true, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using sync",
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(10, InvalidStateRoot, true, true),
 	},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
@@ -1144,7 +1162,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 							s := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 								HeadBlockHash:      altChainPayloads[i].BlockHash,
 								SafeBlockHash:      cA.BlockHash,
-								FinalizedBlockHash: cA.BlockHash,
+								FinalizedBlockHash: common.Hash{},
 							}, nil)
 							s.ExpectPayloadStatus(Valid)
 							/*
@@ -1161,7 +1179,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 							s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 								HeadBlockHash:      altChainPayloads[i].BlockHash,
 								SafeBlockHash:      altChainPayloads[i].BlockHash,
-								FinalizedBlockHash: altChainPayloads[i].BlockHash,
+								FinalizedBlockHash: common.Hash{},
 							}, nil)
 							t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 						}
@@ -1170,7 +1188,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 						p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 							HeadBlockHash:      altChainPayloads[i].BlockHash,
 							SafeBlockHash:      altChainPayloads[i].BlockHash,
-							FinalizedBlockHash: altChainPayloads[i].BlockHash,
+							FinalizedBlockHash: common.Hash{},
 						}, nil)
 						if i == invalid_index {
 							// If this is the first payload after the common ancestor, and this is the payload we invalidated,
@@ -1201,7 +1219,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 							HeadBlockHash:      altChainPayloads[n].BlockHash,
 							SafeBlockHash:      altChainPayloads[n].BlockHash,
-							FinalizedBlockHash: altChainPayloads[n].BlockHash,
+							FinalizedBlockHash: common.Hash{},
 						}, nil)
 						t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 
