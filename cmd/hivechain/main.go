@@ -177,18 +177,14 @@ func generateCommand(args []string) {
 	} else {
 		cfg.powMode = ethash.ModeFullFake
 	}
+
+	cfg.isPoS = *pos
+
 	gspec, err := loadGenesis(*genesis)
 	if err != nil {
 		fatal(err)
 	}
 	cfg.genesis = *gspec
-
-	if *pos {
-		if err := cfg.writeTestChainPoS(*outdir); err != nil {
-			fatal(err)
-		}
-		return
-	}
 
 	if err := cfg.writeTestChain(*outdir); err != nil {
 		fatal(err)
