@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -44,12 +45,13 @@ var (
 )
 
 type generatorConfig struct {
-	txInterval   int // frequency of blocks containing transactions
-	txCount      int // number of txs in block
-	blockCount   int // number of generated blocks
-	blockTimeSec int // block time in seconds, influences difficulty
-	powMode      ethash.Mode
-	genesis      core.Genesis
+	txInterval    int // frequency of blocks containing transactions
+	txCount       int // number of txs in block
+	blockCount    int // number of generated pow blocks
+	posBlockCount int // number of generated pos blocks
+	blockTimeSec  int // block time in seconds, influences difficulty
+	powMode       ethash.Mode
+	genesis       core.Genesis
 }
 
 // loadGenesis loads genesis.json.
@@ -69,6 +71,18 @@ func (cfg generatorConfig) writeTestChain(outputPath string) error {
 		cfg.addTxForKnownAccounts(i, gen)
 	}
 	return cfg.generateAndSave(outputPath, blockModifier)
+}
+
+// writeTestChain creates a test chain with no transactions or other
+// modifications based on an externally specified genesis file. The blockTimeInSeconds is
+// used to manipulate the block difficulty.
+func (cfg generatorConfig) writeTestChainPoS(outputPath string) error {
+	blockModifier := func(i int, gen *core.BlockGen) {
+		log.Println("generating block", gen.Number())
+		gen.OffsetTime(int64((i+1)*int(cfg.blockTimeSec) - 10))
+		cfg.addTxForKnownAccounts(i, gen)
+	}
+	return cfg.generateAndSavePoSChain(outputPath, blockModifier)
 }
 
 const (
@@ -203,6 +217,67 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 		return fmt.Errorf("cannot insert chain with nil chain config")
 	}
 	if _, err := blockchain.InsertChain(chain); err != nil {
+		return fmt.Errorf("chain validation error: %v", err)
+	}
+	headstate, _ := blockchain.State()
+	dump := headstate.Dump(&state.DumpConfig{})
+
+	// Write out the generated blockchain
+	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 1); err != nil {
+		return err
+	}
+	if err := writeChain(blockchain, filepath.Join(path, "chain_genesis.rlp"), 0); err != nil {
+		return err
+	}
+	if err := ioutil.WriteFile(filepath.Join(path, "chain_poststate.json"), dump, 0644); err != nil {
+		return err
+	}
+	return nil
+}
+
+// generateAndSave produces a chain based on the config.
+func (cfg generatorConfig) generateAndSavePoSChain(path string, blockModifier func(i int, gen *core.BlockGen)) error {
+	db := rawdb.NewMemoryDatabase()
+	genesis := cfg.genesis.MustCommit(db)
+	ethashConf := ethash.Config{
+		PowMode:        cfg.powMode,
+		CachesInMem:    2,
+		DatasetsOnDisk: 2,
+		DatasetDir:     ethashDir(),
+	}
+	inner := ethash.New(ethashConf, nil, false)
+
+	config := cfg.genesis.Config
+
+	// Generate a chain where each block is created, modified, and immediately sealed.
+	insta := instaSeal{inner}
+	engine := beacon.New(insta)
+	chain, _ := core.GenerateChain(cfg.genesis.Config, genesis, engine, db, cfg.blockCount, blockModifier)
+	totalDifficulty := big.NewInt(0)
+	for _, b := range chain {
+		totalDifficulty.Add(totalDifficulty, b.Difficulty())
+	}
+	config.TerminalTotalDifficulty = totalDifficulty
+
+	// Generate the PoS chain
+	posChain, _ := core.GenerateChain(config, chain[len(chain)-1], engine, db, cfg.posBlockCount, blockModifier)
+
+	// Import the chain. This runs all block validation rules.
+	blockchain, err := core.NewBlockChain(db, nil, cfg.genesis.Config, engine, vm.Config{}, nil, nil)
+	if err != nil {
+		return fmt.Errorf("can't create blockchain: %v", err)
+	}
+	defer blockchain.Stop()
+	// error out if blockchain config is nil -- avoid hanging chain generation
+	if blockchain.Config() == nil {
+		return fmt.Errorf("cannot insert chain with nil chain config")
+	}
+	// Insert PoW chain
+	if _, err := blockchain.InsertChain(chain); err != nil {
+		return fmt.Errorf("chain validation error: %v", err)
+	}
+	// Insert PoS chain
+	if _, err := blockchain.InsertChain(posChain); err != nil {
 		return fmt.Errorf("chain validation error: %v", err)
 	}
 	headstate, _ := blockchain.State()

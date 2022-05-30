@@ -160,8 +160,10 @@ func generateCommand(args []string) {
 		genesis = flag.String("genesis", "", "The path and filename to the source genesis.json")
 		outdir  = flag.String("output", ".", "Chain destination folder")
 		mine    = flag.Bool("mine", false, "Enables ethash mining")
+		pos     = flag.Bool("pos", false, "Enables PoS chain")
 	)
-	flag.IntVar(&cfg.blockCount, "length", 2, "The length of the chain to generate")
+	flag.IntVar(&cfg.blockCount, "length", 2, "The length of the pow chain to generate")
+	flag.IntVar(&cfg.posBlockCount, "poslength", 2, "The length of the pos chain to generate")
 	flag.IntVar(&cfg.blockTimeSec, "blocktime", 30, "The desired block time in seconds")
 	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transactions to chain every n blocks")
 	flag.IntVar(&cfg.txCount, "tx-count", 1, "Maximum number of txs per block")
@@ -180,6 +182,13 @@ func generateCommand(args []string) {
 		fatal(err)
 	}
 	cfg.genesis = *gspec
+
+	if *pos {
+		if err := cfg.writeTestChainPoS(*outdir); err != nil {
+			fatal(err)
+		}
+		return
+	}
 
 	if err := cfg.writeTestChain(*outdir); err != nil {
 		fatal(err)
