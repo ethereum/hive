@@ -4,11 +4,13 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -44,7 +46,7 @@ var (
 	gencode       = hexutil.MustDecode("0x630000001960010138038063000000196001016000396000f35b")
 )
 
-type generatorConfig struct {
+type GeneratorConfig struct {
 	txInterval    int // frequency of blocks containing transactions
 	txCount       int // number of txs in block
 	blockCount    int // number of generated pow blocks
@@ -52,7 +54,8 @@ type generatorConfig struct {
 	blockTimeSec  int // block time in seconds, influences difficulty
 	powMode       ethash.Mode
 	genesis       core.Genesis
-	isPoS         bool // true if the generator should create post pos blocks
+	isPoS         bool                            // true if the generator should create post pos blocks
+	modifyBlock   func(*types.Block) *types.Block // modify the block during exporting
 }
 
 // loadGenesis loads genesis.json.
@@ -65,13 +68,15 @@ func loadGenesis(file string) (*core.Genesis, error) {
 // writeTestChain creates a test chain with no transactions or other
 // modifications based on an externally specified genesis file. The blockTimeInSeconds is
 // used to manipulate the block difficulty.
-func (cfg generatorConfig) writeTestChain(outputPath string) error {
+func (cfg GeneratorConfig) writeTestChain(outputPath string) error {
 	blockModifier := func(i int, gen *core.BlockGen) {
 		log.Println("generating block", gen.Number())
 		gen.OffsetTime(int64((i+1)*int(cfg.blockTimeSec) - 10))
 		cfg.addTxForKnownAccounts(i, gen)
 	}
-	return cfg.generateAndSave(outputPath, blockModifier)
+	// Do not modify blocks
+	cfg.modifyBlock = func(b *types.Block) *types.Block { return b }
+	return cfg.GenerateAndSave(outputPath, blockModifier)
 }
 
 const (
@@ -84,7 +89,7 @@ const (
 
 // addTxForKnownAccounts adds a transaction to the generated chain if the genesis block
 // contains certain known accounts.
-func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
+func (cfg GeneratorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 	if cfg.txInterval == 0 || i%cfg.txInterval != 0 {
 		return
 	}
@@ -179,8 +184,8 @@ func createTxGasLimit(gen *core.BlockGen, genesis *core.Genesis, data []byte) ui
 	return igas
 }
 
-// generateAndSave produces a chain based on the config.
-func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int, gen *core.BlockGen)) error {
+// GenerateAndSave produces a chain based on the config.
+func (cfg GeneratorConfig) GenerateAndSave(path string, blockModifier func(i int, gen *core.BlockGen)) error {
 	db := rawdb.NewMemoryDatabase()
 	genesis := cfg.genesis.MustCommit(db)
 	config := cfg.genesis.Config
@@ -231,10 +236,10 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 	dump := headstate.Dump(&state.DumpConfig{})
 
 	// Write out the generated blockchain
-	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 1); err != nil {
+	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 1, cfg.modifyBlock); err != nil {
 		return err
 	}
-	if err := writeChain(blockchain, filepath.Join(path, "chain_genesis.rlp"), 0); err != nil {
+	if err := writeChain(blockchain, filepath.Join(path, "chain_genesis.rlp"), 0, cfg.modifyBlock); err != nil {
 		return err
 	}
 	if err := ioutil.WriteFile(filepath.Join(path, "chain_poststate.json"), dump, 0644); err != nil {
@@ -253,13 +258,13 @@ func ethashDir() string {
 }
 
 // writeChain exports the given chain to a file.
-func writeChain(chain *core.BlockChain, filename string, start uint64) error {
+func writeChain(chain *core.BlockChain, filename string, start uint64, modifyBlock func(*types.Block) *types.Block) error {
 	out, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
-	return chain.ExportN(out, start, chain.CurrentBlock().NumberU64())
+	return ExportN(chain, out, start, chain.CurrentBlock().NumberU64(), modifyBlock)
 }
 
 // instaSeal wraps a consensus engine with instant block sealing. When a block is produced
@@ -278,4 +283,25 @@ func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header
 		return nil, err
 	}
 	return <-sealedBlock, nil
+}
+
+func ExportN(bc *core.BlockChain, w io.Writer, first uint64, last uint64, modifyBlock func(*types.Block) *types.Block) error {
+	fmt.Printf("Exporting batch of blocks, count %v \n", last-first+1)
+
+	start, reported := time.Now(), time.Now()
+	for nr := first; nr <= last; nr++ {
+		block := bc.GetBlockByNumber(nr)
+		if block == nil {
+			return fmt.Errorf("export failed on #%d: not found", nr)
+		}
+		block = modifyBlock(block)
+		if err := block.EncodeRLP(w); err != nil {
+			return err
+		}
+		if time.Since(reported) >= 8*time.Second {
+			fmt.Printf("Exporting blocks, exported: %v, elapsed: %v \n", block.NumberU64()-first, common.PrettyDuration(time.Since(start)))
+			reported = time.Now()
+		}
+	}
+	return nil
 }

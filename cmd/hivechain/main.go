@@ -156,7 +156,7 @@ func trimCommand(args []string) {
 // generateCommand generates a test chain.
 func generateCommand(args []string) {
 	var (
-		cfg     generatorConfig
+		cfg     GeneratorConfig
 		genesis = flag.String("genesis", "", "The path and filename to the source genesis.json")
 		outdir  = flag.String("output", ".", "Chain destination folder")
 		mine    = flag.Bool("mine", false, "Enables ethash mining")
