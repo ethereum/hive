@@ -121,6 +121,12 @@ Send a NewPayload directive to the client including an incorrect BlockHash, shou
 - ParentHash==BlockHash on NewPayload:  
 Send a NewPayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
 
+- Invalid Transition Payload:
+Build canonical chain `A: Genesis <- ... <- TB <- P1 <- P2` where TB is a valid terminal block.
+Create an invalid transition payload `INV_P1` with parent `TB`.
+`newPayload(INV_P1)` must return `{status: INVALID/ACCEPTED, latestValidHash: 0x00..00}`.
+`forkchoiceUpdated(head: INV_P1, safe: 0x00..00, finalized: 0x00..00)` must return `{status: INVALID, latestValidHash: 0x00..00}`.
+
 - Invalid Field in NewPayload:  
 Send an invalid payload in NewPayload by modifying fields of a valid ExecutablePayload while maintaining a valid BlockHash.
 After attempting to NewPayload/ForkchoiceUpdated the invalid payload, also attempt to send a valid payload that contains the previously modified invalid payload as parent (should also fail).

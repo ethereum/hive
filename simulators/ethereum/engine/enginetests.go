@@ -96,6 +96,12 @@ var engineTests = []TestSpec{
 		Run:  parentHashOnExecPayload,
 	},
 	{
+		Name:      "Invalid Transition Payload",
+		Run:       invalidTransitionPayload,
+		TTD:       393504,
+		ChainFile: "blocks_2_td_393504.rlp",
+	},
+	{
 		Name: "Invalid ParentHash NewPayload",
 		Run:  invalidPayloadTestCaseGen(InvalidParentHash, false, false),
 	},
@@ -877,6 +883,46 @@ func parentHashOnExecPayload(t *TestEnv) {
 		},
 	})
 
+}
+
+// Attempt to re-org to a chain containing an invalid transition payload
+func invalidTransitionPayload(t *TestEnv) {
+	// Wait until TTD is reached by main client
+	t.CLMock.waitForTTD()
+
+	// Produce two blocks before trying to re-org
+	t.nonce = 2 // Initial PoW chain already contains 2 transactions
+	t.CLMock.produceBlocks(2, BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+		},
+	})
+
+	// Introduce the invalid transition payload
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		// This is being done in the middle of the block building
+		// process simply to be able to re-org back.
+		OnGetPayload: func() {
+			basePayload := t.CLMock.ExecutedPayloadHistory[t.CLMock.FirstPoSBlockNumber.Uint64()]
+			alteredPayload, err := generateInvalidPayload(&basePayload, InvalidStateRoot)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
+			}
+			p := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
+			p.ExpectStatusEither(Invalid, Accepted)
+			p.ExpectLatestValidHash(&(common.Hash{}))
+			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+				HeadBlockHash:      alteredPayload.BlockHash,
+				SafeBlockHash:      common.Hash{},
+				FinalizedBlockHash: common.Hash{},
+			}, nil)
+			r.ExpectPayloadStatus(Invalid)
+			r.ExpectLatestValidHash(&(common.Hash{}))
+
+			s := t.TestEth.TestBlockByNumber(nil)
+			s.ExpectHash(t.CLMock.LatestExecutedPayload.BlockHash)
+		},
+	})
 }
 
 // Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
