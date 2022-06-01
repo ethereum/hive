@@ -261,7 +261,7 @@ func writeChain(chain *core.BlockChain, filename string, start uint64, modifyBlo
 		return err
 	}
 	defer out.Close()
-	return ExportN(chain, out, start, chain.CurrentBlock().NumberU64(), modifyBlock)
+	return exportN(chain, out, start, chain.CurrentBlock().NumberU64(), modifyBlock)
 }
 
 // instaSeal wraps a consensus engine with instant block sealing. When a block is produced
@@ -282,7 +282,7 @@ func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header
 	return <-sealedBlock, nil
 }
 
-func ExportN(bc *core.BlockChain, w io.Writer, first uint64, last uint64, modifyBlock func(*types.Block) *types.Block) error {
+func exportN(bc *core.BlockChain, w io.Writer, first uint64, last uint64, modifyBlock func(*types.Block) *types.Block) error {
 	fmt.Printf("Exporting batch of blocks, count %v \n", last-first+1)
 
 	start, reported := time.Now(), time.Now()
