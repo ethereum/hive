@@ -2,9 +2,9 @@ FROM golang:1.18.0-alpine3.15 as builder
 
 RUN apk add --no-cache make gcc musl-dev linux-headers git jq bash
 
-RUN git clone https://github.com/ethereum-optimism/optimistic-specs /app
+RUN git clone https://github.com/ethereum-optimism/optimism /app
 
-WORKDIR /app
+WORKDIR /app/op-batcher
 RUN make op-batcher
 
 FROM alpine:3.15
