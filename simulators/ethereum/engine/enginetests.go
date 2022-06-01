@@ -366,6 +366,12 @@ var engineTests = []TestSpec{
 		Name: "Valid NewPayload->ForkchoiceUpdated on Syncing Client",
 		Run:  validPayloadFcUSyncingClient,
 	},
+	{
+		Name:      "NewPayload with Missing ForkchoiceUpdated",
+		Run:       missingFcu,
+		TTD:       393120,
+		ChainFile: "blocks_2_td_393504.rlp",
+	},
 
 	// Re-org using Engine API
 	{
@@ -1876,6 +1882,61 @@ func validPayloadFcUSyncingClient(t *TestEnv) {
 	t.CLMock.AddEngineClient(t.T, t.Client, t.MainTTD())
 
 	t.CLMock.RemoveEngineClient(secondaryClient)
+}
+
+// Send a valid `newPayload` in correct order but skip `forkchoiceUpdated` until the last payload
+func missingFcu(t *TestEnv) {
+	// Wait until TTD is reached by this client
+	t.CLMock.waitForTTD()
+
+	// Get last PoW block hash
+	lastPoWBlockHash := t.TestEth.TestBlockByNumber(nil).Block.Hash()
+
+	// Produce blocks on the main client, these payloads will be replayed on the secondary client.
+	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+	var (
+		secondaryEngineTest *TestEngineClient
+		secondaryEthTest    *TestEthClient
+	)
+
+	{
+		newParams := t.ClientParams.Copy()
+		hc, secondaryEngine, err := t.StartClient(t.Client.Type, newParams, t.MainTTD())
+		if err != nil {
+			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
+		}
+		secondaryEngineTest = NewTestEngineClient(t, secondaryEngine)
+		secondaryEthTest = NewTestEthClient(t, secondaryEngine.Eth)
+		t.CLMock.AddEngineClient(t.T, hc, t.MainTTD())
+	}
+
+	// Send each payload in the correct order but skip the ForkchoiceUpdated for each
+	for i := t.CLMock.FirstPoSBlockNumber.Uint64(); i <= t.CLMock.LatestHeadNumber.Uint64(); i++ {
+		payload := t.CLMock.ExecutedPayloadHistory[i]
+		p := secondaryEngineTest.TestEngineNewPayloadV1(&payload)
+		p.ExpectStatus(Valid)
+		p.ExpectLatestValidHash(&payload.BlockHash)
+	}
+
+	// Verify that at this point, the client's head still points to the last non-PoS block
+	r := secondaryEthTest.TestBlockByNumber(nil)
+	r.ExpectHash(lastPoWBlockHash)
+
+	// Verify that the head correctly changes after the last ForkchoiceUpdated
+	fcU := ForkchoiceStateV1{
+		HeadBlockHash:      t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()].BlockHash,
+		SafeBlockHash:      t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()-1].BlockHash,
+		FinalizedBlockHash: t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()-2].BlockHash,
+	}
+	p := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&fcU, nil)
+	p.ExpectPayloadStatus(Valid)
+	p.ExpectLatestValidHash(&fcU.HeadBlockHash)
+
+	// Now the head should've changed to the latest PoS block
+	s := secondaryEthTest.TestBlockByNumber(nil)
+	s.ExpectHash(fcU.HeadBlockHash)
+
 }
 
 // Fee Recipient Tests
