@@ -172,11 +172,11 @@ type PayloadStatus int
 type PayloadStatusSlice []PayloadStatus
 
 const (
-	Valid PayloadStatus = iota
+	Unknown PayloadStatus = iota
+	Valid
 	Invalid
 	Accepted
 	Syncing
-	InvalidTerminalBlock
 	InvalidBlockHash
 )
 

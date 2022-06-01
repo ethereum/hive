@@ -21,7 +21,6 @@ var (
 )
 
 var engineTests = []TestSpec{
-
 	// Engine API Negative Test Cases
 	{
 		Name: "Invalid Terminal Block in ForkchoiceUpdated",
@@ -95,6 +94,12 @@ var engineTests = []TestSpec{
 	{
 		Name: "ParentHash==BlockHash on NewPayload",
 		Run:  parentHashOnExecPayload,
+	},
+	{
+		Name:      "Invalid Transition Payload",
+		Run:       invalidTransitionPayload,
+		TTD:       393504,
+		ChainFile: "blocks_2_td_393504.rlp",
 	},
 	{
 		Name: "Invalid ParentHash NewPayload",
@@ -219,133 +224,143 @@ var engineTests = []TestSpec{
 
 	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P1', Reveal using newPayload",
-		Run:  invalidMissingAncestorReOrgGen(1, InvalidStateRoot, false, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P1', Reveal using newPayload",
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(1, InvalidStateRoot, false, true),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using newPayload",
-		Run:  invalidMissingAncestorReOrgGen(9, InvalidStateRoot, false, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using newPayload",
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidStateRoot, false, true),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using newPayload",
-		Run:  invalidMissingAncestorReOrgGen(10, InvalidStateRoot, false, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using newPayload",
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(10, InvalidStateRoot, false, true),
 	},
 
 	// Invalid Ancestor Re-Org Tests (Reveal via sync through secondary client)
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true, true),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidReceiptsRoot, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidReceiptsRoot, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidNumber, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidNumber, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidGasLimit, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidGasLimit, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidGasUsed, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidGasUsed, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTimestamp, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTimestamp, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidPrevRandao, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidPrevRandao, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, RemoveTransaction, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, RemoveTransaction, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionSignature, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionSignature, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionNonce, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionNonce, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionGas, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionGas, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionGasPrice, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionGasPrice, true, false),
 	},
 	{
-		Name:           "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
-		TimeoutSeconds: 15,
-		Run:            invalidMissingAncestorReOrgGen(9, InvalidTransactionValue, true, false),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   15,
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(9, InvalidTransactionValue, true, false),
 	},
 	{
-		Name: "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using sync",
-		Run:  invalidMissingAncestorReOrgGen(10, InvalidStateRoot, true, true),
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using sync",
+		SlotsToFinalized: big.NewInt(20),
+		Run:              invalidMissingAncestorReOrgGen(10, InvalidStateRoot, true, true),
 	},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{
-		Name: "Latest Block after NewPayload",
+		Name: "latest Block after NewPayload",
 		Run:  blockStatusExecPayloadGen(false),
 	},
 	{
-		Name: "Latest Block after NewPayload (Transition Block)",
+		Name: "latest Block after NewPayload (Transition Block)",
 		Run:  blockStatusExecPayloadGen(true),
 		TTD:  5,
 	},
 	{
-		Name: "Latest Block after New HeadBlock",
+		Name: "latest Block after New HeadBlock",
 		Run:  blockStatusHeadBlockGen(false),
 	},
 	{
-		Name: "Latest Block after New HeadBlock (Transition Block)",
+		Name: "latest Block after New HeadBlock (Transition Block)",
 		Run:  blockStatusHeadBlockGen(true),
 		TTD:  5,
 	},
 	{
-		Name: "Latest Block after New SafeBlock",
-		Run:  blockStatusSafeBlockGen(false),
-	},
-	{
-		Name: "Latest Block after New SafeBlock (Transition Block)",
-		Run:  blockStatusSafeBlockGen(true),
+		Name: "safe Block after New SafeBlockHash",
+		Run:  blockStatusSafeBlock,
 		TTD:  5,
 	},
 	{
-		Name: "Latest Block after New FinalizedBlock",
-		Run:  blockStatusFinalizedBlockGen(false),
-	},
-	{
-		Name: "Latest Block after New FinalizedBlock (Transition Block)",
-		Run:  blockStatusFinalizedBlockGen(true),
+		Name: "finalized Block after New FinalizedBlockHash",
+		Run:  blockStatusFinalizedBlock,
 		TTD:  5,
 	},
 	{
-		Name: "Latest Block after Reorg",
+		Name: "latest Block after Reorg",
 		Run:  blockStatusReorg,
 	},
 
@@ -365,6 +380,12 @@ var engineTests = []TestSpec{
 	{
 		Name: "Valid NewPayload->ForkchoiceUpdated on Syncing Client",
 		Run:  validPayloadFcUSyncingClient,
+	},
+	{
+		Name:      "NewPayload with Missing ForkchoiceUpdated",
+		Run:       missingFcu,
+		TTD:       393120,
+		ChainFile: "blocks_2_td_393504.rlp",
 	},
 
 	// Re-org using Engine API
@@ -926,6 +947,46 @@ func parentHashOnExecPayload(t *TestEnv) {
 
 }
 
+// Attempt to re-org to a chain containing an invalid transition payload
+func invalidTransitionPayload(t *TestEnv) {
+	// Wait until TTD is reached by main client
+	t.CLMock.waitForTTD()
+
+	// Produce two blocks before trying to re-org
+	t.nonce = 2 // Initial PoW chain already contains 2 transactions
+	t.CLMock.produceBlocks(2, BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+		},
+	})
+
+	// Introduce the invalid transition payload
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		// This is being done in the middle of the block building
+		// process simply to be able to re-org back.
+		OnGetPayload: func() {
+			basePayload := t.CLMock.ExecutedPayloadHistory[t.CLMock.FirstPoSBlockNumber.Uint64()]
+			alteredPayload, err := generateInvalidPayload(&basePayload, InvalidStateRoot)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
+			}
+			p := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
+			p.ExpectStatusEither(Invalid, Accepted)
+			p.ExpectLatestValidHash(&(common.Hash{}))
+			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+				HeadBlockHash:      alteredPayload.BlockHash,
+				SafeBlockHash:      common.Hash{},
+				FinalizedBlockHash: common.Hash{},
+			}, nil)
+			r.ExpectPayloadStatus(Invalid)
+			r.ExpectLatestValidHash(&(common.Hash{}))
+
+			s := t.TestEth.TestBlockByNumber(nil)
+			s.ExpectHash(t.CLMock.LatestExecutedPayload.BlockHash)
+		},
+	})
+}
+
 // Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
 func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, emptyTxs bool) func(*TestEnv) {
 	return func(t *TestEnv) {
@@ -1055,6 +1116,10 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 						// it is assumed that the block is missing and we need to sync.
 						// ACCEPTED also valid since the CLs normally use these interchangeably
 						q.ExpectStatusEither(Syncing, Accepted)
+					} else if payloadField == InvalidNumber {
+						// A payload with an invalid number can force us to start a sync cycle
+						// as we don't know if that block might be a valid future block.
+						q.ExpectStatusEither(Invalid, Syncing)
 					} else {
 						// Otherwise the response should be INVALID.
 						q.ExpectStatus(Invalid)
@@ -1214,7 +1279,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 							s := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 								HeadBlockHash:      altChainPayloads[i].BlockHash,
 								SafeBlockHash:      cA.BlockHash,
-								FinalizedBlockHash: cA.BlockHash,
+								FinalizedBlockHash: common.Hash{},
 							}, nil)
 							s.ExpectPayloadStatus(Valid)
 							/*
@@ -1231,7 +1296,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 							s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 								HeadBlockHash:      altChainPayloads[i].BlockHash,
 								SafeBlockHash:      altChainPayloads[i].BlockHash,
-								FinalizedBlockHash: altChainPayloads[i].BlockHash,
+								FinalizedBlockHash: common.Hash{},
 							}, nil)
 							t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 						}
@@ -1240,7 +1305,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 						p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 							HeadBlockHash:      altChainPayloads[i].BlockHash,
 							SafeBlockHash:      altChainPayloads[i].BlockHash,
-							FinalizedBlockHash: altChainPayloads[i].BlockHash,
+							FinalizedBlockHash: common.Hash{},
 						}, nil)
 						if i == invalid_index {
 							// If this is the first payload after the common ancestor, and this is the payload we invalidated,
@@ -1271,7 +1336,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 							HeadBlockHash:      altChainPayloads[n].BlockHash,
 							SafeBlockHash:      altChainPayloads[n].BlockHash,
-							FinalizedBlockHash: altChainPayloads[n].BlockHash,
+							FinalizedBlockHash: common.Hash{},
 						}, nil)
 						t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 
@@ -1384,60 +1449,47 @@ func blockStatusHeadBlockGen(transitionBlock bool) func(t *TestEnv) {
 }
 
 // Test to verify Block information available at the Eth RPC after new SafeBlock ForkchoiceUpdated
-func blockStatusSafeBlockGen(transitionBlock bool) func(t *TestEnv) {
-	return func(t *TestEnv) {
-		// Wait until this client catches up with latest PoS Block
-		t.CLMock.waitForTTD()
+func blockStatusSafeBlock(t *TestEnv) {
+	// On PoW mode, `safe` tag shall return error.
+	r := t.TestEth.TestHeaderByNumber(Safe)
+	r.ExpectErrorCode(-39001)
 
-		// Produce blocks before starting the test, only if we are not testing the transition block
-		if !transitionBlock {
-			t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
-		}
+	// Wait until this client catches up with latest PoS Block
+	t.CLMock.waitForTTD()
 
-		var tx *types.Transaction
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
-			OnPayloadProducerSelected: func() {
-				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
-			},
-			// Run test after a forkchoice with new SafeBlockHash has been broadcasted
-			OnSafeBlockChange: func() {
-				r := t.TestEth.TestHeaderByNumber(nil)
-				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+	// First ForkchoiceUpdated sent was equal to 0x00..00, `safe` should return error now
+	p := t.TestEth.TestHeaderByNumber(Safe)
+	p.ExpectErrorCode(-39001)
 
-				s := t.TestEth.TestTransactionReceipt(tx.Hash())
-				s.ExpectTransactionHash(tx.Hash())
-			},
-		})
-	}
+	t.CLMock.produceBlocks(3, BlockProcessCallbacks{
+		// Run test after a forkchoice with new SafeBlockHash has been broadcasted
+		OnSafeBlockChange: func() {
+			r := t.TestEth.TestHeaderByNumber(Safe)
+			r.ExpectHash(t.CLMock.LatestForkchoice.SafeBlockHash)
+		},
+	})
 }
 
 // Test to verify Block information available at the Eth RPC after new FinalizedBlock ForkchoiceUpdated
-func blockStatusFinalizedBlockGen(transitionBlock bool) func(t *TestEnv) {
-	return func(t *TestEnv) {
-		// Wait until this client catches up with latest PoS Block
-		t.CLMock.waitForTTD()
+func blockStatusFinalizedBlock(t *TestEnv) {
+	// On PoW mode, `finalized` tag shall return error.
+	r := t.TestEth.TestHeaderByNumber(Finalized)
+	r.ExpectErrorCode(-39001)
 
-		// Produce blocks before starting the test, only if we are not testing the transition block
-		if !transitionBlock {
-			t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
-		}
+	// Wait until this client catches up with latest PoS Block
+	t.CLMock.waitForTTD()
 
-		var tx *types.Transaction
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
-			OnPayloadProducerSelected: func() {
-				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
-			},
-			// Run test after a forkchoice with new FinalizedBlockHash has been broadcasted
-			OnFinalizedBlockChange: func() {
-				r := t.TestEth.TestHeaderByNumber(nil)
-				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+	// First ForkchoiceUpdated sent was equal to 0x00..00, `finalized` should return error now
+	p := t.TestEth.TestHeaderByNumber(Finalized)
+	p.ExpectErrorCode(-39001)
 
-				s := t.TestEth.TestTransactionReceipt(tx.Hash())
-				s.ExpectTransactionHash(tx.Hash())
-			},
-		})
-	}
-
+	t.CLMock.produceBlocks(3, BlockProcessCallbacks{
+		// Run test after a forkchoice with new FinalizedBlockHash has been broadcasted
+		OnFinalizedBlockChange: func() {
+			r := t.TestEth.TestHeaderByNumber(Finalized)
+			r.ExpectHash(t.CLMock.LatestForkchoice.FinalizedBlockHash)
+		},
+	})
 }
 
 // Test to verify Block information available after a reorg using forkchoiceUpdated
@@ -1946,6 +1998,61 @@ func validPayloadFcUSyncingClient(t *TestEnv) {
 	t.CLMock.AddEngineClient(t.T, t.Client, t.MainTTD())
 
 	t.CLMock.RemoveEngineClient(secondaryClient)
+}
+
+// Send a valid `newPayload` in correct order but skip `forkchoiceUpdated` until the last payload
+func missingFcu(t *TestEnv) {
+	// Wait until TTD is reached by this client
+	t.CLMock.waitForTTD()
+
+	// Get last PoW block hash
+	lastPoWBlockHash := t.TestEth.TestBlockByNumber(nil).Block.Hash()
+
+	// Produce blocks on the main client, these payloads will be replayed on the secondary client.
+	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+	var (
+		secondaryEngineTest *TestEngineClient
+		secondaryEthTest    *TestEthClient
+	)
+
+	{
+		newParams := t.ClientParams.Copy()
+		hc, secondaryEngine, err := t.StartClient(t.Client.Type, newParams, t.MainTTD())
+		if err != nil {
+			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
+		}
+		secondaryEngineTest = NewTestEngineClient(t, secondaryEngine)
+		secondaryEthTest = NewTestEthClient(t, secondaryEngine.Eth)
+		t.CLMock.AddEngineClient(t.T, hc, t.MainTTD())
+	}
+
+	// Send each payload in the correct order but skip the ForkchoiceUpdated for each
+	for i := t.CLMock.FirstPoSBlockNumber.Uint64(); i <= t.CLMock.LatestHeadNumber.Uint64(); i++ {
+		payload := t.CLMock.ExecutedPayloadHistory[i]
+		p := secondaryEngineTest.TestEngineNewPayloadV1(&payload)
+		p.ExpectStatus(Valid)
+		p.ExpectLatestValidHash(&payload.BlockHash)
+	}
+
+	// Verify that at this point, the client's head still points to the last non-PoS block
+	r := secondaryEthTest.TestBlockByNumber(nil)
+	r.ExpectHash(lastPoWBlockHash)
+
+	// Verify that the head correctly changes after the last ForkchoiceUpdated
+	fcU := ForkchoiceStateV1{
+		HeadBlockHash:      t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()].BlockHash,
+		SafeBlockHash:      t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()-1].BlockHash,
+		FinalizedBlockHash: t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()-2].BlockHash,
+	}
+	p := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&fcU, nil)
+	p.ExpectPayloadStatus(Valid)
+	p.ExpectLatestValidHash(&fcU.HeadBlockHash)
+
+	// Now the head should've changed to the latest PoS block
+	s := secondaryEthTest.TestBlockByNumber(nil)
+	s.ExpectHash(fcU.HeadBlockHash)
+
 }
 
 // Fee Recipient Tests
