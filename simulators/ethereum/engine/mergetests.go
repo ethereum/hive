@@ -68,6 +68,11 @@ type MergeTestSpec struct {
 	// Whether or not to wait for TTD to be reached by the main client
 	SkipMainClientTTDWait bool
 
+	// If set, the main client will be polled with `newPayload` until status!=`SYNCING` is returned.
+	// If `VALID`, `latestValidHash` is also checked to be the hash of the transition block.
+	// If `INVALID`, {status: INVALID, latestValidHash: 0x00..00, payloadId: null} is expected.
+	TransitionPayloadStatus PayloadStatus
+
 	// Number of PoS blocks to build on top of the MainClient.
 	// Blocks will be built before any of the other clients is started, leading to a potential Post-PoS re-org.
 	// Requires SkipMainClientFcU==false
@@ -86,6 +91,19 @@ var mergeTestSpecs = []MergeTestSpec{
 		Name:          "Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height",
 		TTD:           196608,
 		MainChainFile: "blocks_1_td_196608.rlp",
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ChainFile:           "blocks_1_td_196704.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
+	{
+		Name:                    "Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height (Transition Payload)",
+		TTD:                     196608,
+		MainChainFile:           "blocks_1_td_196608.rlp",
+		TransitionPayloadStatus: Valid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ChainFile:           "blocks_1_td_196704.rlp",
@@ -260,8 +278,22 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:                      196608,
 		MainChainFile:            "blocks_1_td_196608.rlp",
 		MainClientPoSBlocks:      1,
-		TimeoutSeconds:           180,
 		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				TTD:                 393120,
+				ChainFile:           "blocks_2_td_393120.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                    "Transition to a Chain with Invalid Terminal Block, Higher Configured Total Difficulty (Transition Payload)",
+		TTD:                     196608,
+		MainChainFile:           "blocks_1_td_196608.rlp",
+		MainClientPoSBlocks:     1,
+		TransitionPayloadStatus: Invalid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				TTD:                 393120,
@@ -276,8 +308,22 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:                      393120,
 		MainChainFile:            "blocks_2_td_393120.rlp",
 		MainClientPoSBlocks:      1,
-		TimeoutSeconds:           180,
 		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				TTD:                 196608,
+				ChainFile:           "blocks_1_td_196608.rlp",
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                    "Transition to a Chain with Invalid Terminal Block, Lower Configured Total Difficulty (Transition Payload)",
+		TTD:                     393120,
+		MainChainFile:           "blocks_2_td_393120.rlp",
+		MainClientPoSBlocks:     1,
+		TransitionPayloadStatus: Invalid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				TTD:                 196608,
@@ -424,7 +470,8 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 
 		// Test end state of the main client
 		for {
-			if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() {
+			if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() && (mergeTestSpec.TransitionPayloadStatus == Unknown ||
+				t.CLMock.FirstPoSBlockNumber == nil) {
 				// Build a block and check whether the main client switches
 				t.CLMock.produceSingleBlock(BlockProcessCallbacks{
 					OnPayloadProducerSelected: prevRandaoFunc,
@@ -438,7 +485,22 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 				}
 			}
 
-			if header, err := t.Eth.HeaderByNumber(t.Ctx(), nil); err == nil {
+			if mergeTestSpec.TransitionPayloadStatus != Unknown {
+				// We are specifically checking the transition payload in this test case
+				p := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestExecutedPayload)
+				p.ExpectNoError()
+				if p.Status.Status != Syncing {
+					p.ExpectStatus(mergeTestSpec.TransitionPayloadStatus)
+					if mergeTestSpec.TransitionPayloadStatus == Valid {
+						p.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
+					} else if mergeTestSpec.TransitionPayloadStatus == Invalid {
+						p.ExpectLatestValidHash(&(common.Hash{}))
+					}
+					break
+				}
+
+			} else if header, err := t.Eth.HeaderByNumber(t.Ctx(), nil); err == nil {
+				// We are not checking the transition block, we are checking that the client sticks to the correct chain.
 				if header.Hash() == mustHeadHash {
 					t.Logf("INFO (%s): Main client is now synced to the expected head, %v", t.TestName, header.Hash())
 					break
