@@ -195,26 +195,23 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 		DatasetsOnDisk: 2,
 		DatasetDir:     ethashDir(),
 	}
-	var engine consensus.Engine
 
-	// Generate a chain where each block is created, modified, and immediately sealed.
-	engine = ethash.New(ethashConf, nil, false)
-	engine = instaSeal{engine}
-	if cfg.isPoS {
-		inner := ethash.New(ethashConf, nil, false)
-		insta := instaSeal{inner}
-		engine = beacon.New(insta)
-	}
+	powEngine := ethash.New(ethashConf, nil, false)
+	posEngine := beacon.New(powEngine)
+	engine := instaSeal{posEngine}
+
+	// Create the PoW chain.
 	chain, _ := core.GenerateChain(config, genesis, engine, db, cfg.blockCount, blockModifier)
 
+	// Create the PoS chain extension.
 	if cfg.isPoS {
+		// Set TTD to the head of the PoW chain.
 		totalDifficulty := big.NewInt(0)
 		for _, b := range chain {
 			totalDifficulty.Add(totalDifficulty, b.Difficulty())
 		}
 		config.TerminalTotalDifficulty = totalDifficulty
 
-		// Generate the PoS chain
 		posChain, _ := core.GenerateChain(config, chain[len(chain)-1], engine, db, cfg.posBlockCount, blockModifier)
 		chain = append(chain, posChain...)
 	}
