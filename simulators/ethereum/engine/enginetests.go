@@ -21,7 +21,6 @@ var (
 )
 
 var engineTests = []TestSpec{
-
 	// Engine API Negative Test Cases
 	{
 		Name: "Invalid Terminal Block in ForkchoiceUpdated",
@@ -1009,6 +1008,10 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 						// it is assumed that the block is missing and we need to sync.
 						// ACCEPTED also valid since the CLs normally use these interchangeably
 						q.ExpectStatusEither(Syncing, Accepted)
+					} else if payloadField == InvalidNumber {
+						// A payload with an invalid number can force us to start a sync cycle
+						// as we don't know if that block might be a valid future block.
+						q.ExpectStatusEither(Invalid, Syncing)
 					} else {
 						// Otherwise the response should be INVALID.
 						q.ExpectStatus(Invalid)
