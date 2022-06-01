@@ -77,19 +77,19 @@ Expected outcome is that the forkchoiceUpdate proceeds, but the call returns an 
 Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified, but should not produce unrecoverable error)
 
 ### Eth RPC Status on ForkchoiceUpdated Events:
-- Latest Block after NewPayload:  
+- `latest` Block after NewPayload:  
 Verify the Block returned by the Eth RPC after a new payload is executed. Eth RPC should still return previous block.
 
-- Latest Block after New HeadBlock:  
+- `latest` Block after New HeadBlock:  
 Verify the Block returned by the Eth RPC after a new HeadBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
 
-- Latest Block after New SafeBlock:  
-Verify the Block returned by the Eth RPC after a new SafeBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
+- `safe` Block after New SafeBlockHash:  
+Verify the Block returned by the Eth RPC using the `safe` keyword after a new `SafeBlockHash` is set using `forkchoiceUpdated`. Eth RPC should return block set on the `SafeBlockHash`. When no block has been set as `SafeBlockHash` (`SafeBlockHash==0x00..00`) or PoW mode still, using `safe` shall return error.
 
-- Latest Block after New FinalizedBlock:  
-Verify the Block returned by the Eth RPC after a new FinalizedBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
+- `finalized` Block after New FinalizedBlockHash:  
+Verify the Block returned by the Eth RPC using the `finalized` keyword after a new `FinalizedBlockHash` is set using `forkchoiceUpdated`. Eth RPC should return block set on the `FinalizedBlockHash`. When no block has been set as `FinalizedBlockHash` (`FinalizedBlockHash==0x00..00`) or PoW mode still, using `finalized` shall return error.
 
-- Latest Block after Reorg:  
+- `latest` Block after Reorg:  
 Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to a sidechain and back. Eth RPC should return the appropriate block everytime.
 
 ### Payload Execution

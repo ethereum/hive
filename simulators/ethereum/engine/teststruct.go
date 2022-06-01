@@ -4,7 +4,9 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -53,6 +55,13 @@ func (exp *ForkchoiceResponseExpectObject) ExpectNoValidationError() {
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV1: response=%v", exp.TestName, exp.Response)
+	}
+}
+
+func (exp *ForkchoiceResponseExpectObject) ExpectErrorCode(code int) {
+	// TODO: Actually check error code
 	if exp.Error == nil {
 		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV1: response=%v", exp.TestName, exp.Response)
 	}
@@ -120,6 +129,13 @@ func (exp *NewPayloadResponseExpectObject) ExpectError() {
 	}
 }
 
+func (exp *NewPayloadResponseExpectObject) ExpectErrorCode(code int) {
+	// TODO: Actually check error code
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV1: status=%v", exp.TestName, exp.Status)
+	}
+}
+
 func (exp *NewPayloadResponseExpectObject) ExpectNoValidationError() {
 	if exp.Status.ValidationError != nil {
 		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineNewPayloadV1: %v, expected=<None>", exp.TestName, exp.Status.ValidationError)
@@ -174,6 +190,13 @@ func (exp *GetPayloadResponseExpectObject) ExpectNoError() {
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on EngineGetPayloadV1: payload=%v", exp.TestName, exp.Payload)
+	}
+}
+
+func (exp *GetPayloadResponseExpectObject) ExpectErrorCode(code int) {
+	// TODO: Actually check error code
 	if exp.Error == nil {
 		exp.Fatalf("FAIL (%s): Expected error on EngineGetPayloadV1: payload=%v", exp.TestName, exp.Payload)
 	}
@@ -254,6 +277,13 @@ func (exp *BlockNumberResponseExpectObject) ExpectNumber(number uint64) {
 
 // Header
 
+// Block number types - * Only supported by TestHeaderByNumber *
+var (
+	Pending   = big.NewInt(-1)
+	Finalized = big.NewInt(-2)
+	Safe      = big.NewInt(-3)
+)
+
 type HeaderResponseExpectObject struct {
 	*TestEnv
 	Call   string
@@ -261,8 +291,29 @@ type HeaderResponseExpectObject struct {
 	Error  error
 }
 
+// Custom toBlockNumArg to test `safe` and `finalized`
+func toBlockNumArg(number *big.Int) string {
+	if number == nil {
+		return "latest"
+	}
+	if number.Cmp(Pending) == 0 {
+		return "pending"
+	}
+	if number.Cmp(Finalized) == 0 {
+		return "finalized"
+	}
+	if number.Cmp(Safe) == 0 {
+		return "safe"
+	}
+	return hexutil.EncodeBig(number)
+}
+
 func (teth *TestEthClient) TestHeaderByNumber(number *big.Int) *HeaderResponseExpectObject {
-	header, err := teth.HeaderByNumber(teth.Ctx(), number)
+	var header *types.Header
+	err := teth.RPC.CallContext(teth.Ctx(), &header, "eth_getBlockByNumber", toBlockNumArg(number), false)
+	if err == nil && header == nil {
+		err = ethereum.NotFound
+	}
 	return &HeaderResponseExpectObject{
 		TestEnv: teth.TestEnv,
 		Call:    "HeaderByNumber",
@@ -274,6 +325,19 @@ func (teth *TestEthClient) TestHeaderByNumber(number *big.Int) *HeaderResponseEx
 func (exp *HeaderResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
 		exp.Fatalf("FAIL (%s): Unexpected error on %s: %v, expected=<None>", exp.TestName, exp.Call, exp.Error)
+	}
+}
+
+func (exp *HeaderResponseExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on %s: header=%v", exp.TestName, exp.Call, exp.Header)
+	}
+}
+
+func (exp *HeaderResponseExpectObject) ExpectErrorCode(code int) {
+	// TODO: Actually check error code
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on %s: header=%v", exp.TestName, exp.Call, exp.Header)
 	}
 }
 
@@ -314,6 +378,13 @@ func (teth *TestEthClient) TestBlockByHash(hash common.Hash) *BlockResponseExpec
 }
 
 func (exp *BlockResponseExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Block)
+	}
+}
+
+func (exp *BlockResponseExpectObject) ExpectErrorCode(code int) {
+	// TODO: Actually check error code
 	if exp.Error == nil {
 		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Block)
 	}
@@ -447,6 +518,13 @@ func (teth *TestEthClient) TestTransactionReceipt(txHash common.Hash) *Transacti
 }
 
 func (exp *TransactionReceiptExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Receipt)
+	}
+}
+
+func (exp *TransactionReceiptExpectObject) ExpectErrorCode(code int) {
+	// TODO: Actually check error code
 	if exp.Error == nil {
 		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Receipt)
 	}
