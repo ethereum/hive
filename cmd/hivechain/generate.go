@@ -46,7 +46,7 @@ var (
 	gencode       = hexutil.MustDecode("0x630000001960010138038063000000196001016000396000f35b")
 )
 
-type GeneratorConfig struct {
+type generatorConfig struct {
 	txInterval    int // frequency of blocks containing transactions
 	txCount       int // number of txs in block
 	blockCount    int // number of generated pow blocks
@@ -68,7 +68,7 @@ func loadGenesis(file string) (*core.Genesis, error) {
 // writeTestChain creates a test chain with no transactions or other
 // modifications based on an externally specified genesis file. The blockTimeInSeconds is
 // used to manipulate the block difficulty.
-func (cfg GeneratorConfig) writeTestChain(outputPath string) error {
+func (cfg generatorConfig) writeTestChain(outputPath string) error {
 	blockModifier := func(i int, gen *core.BlockGen) {
 		log.Println("generating block", gen.Number())
 		gen.OffsetTime(int64((i+1)*int(cfg.blockTimeSec) - 10))
@@ -76,7 +76,7 @@ func (cfg GeneratorConfig) writeTestChain(outputPath string) error {
 	}
 	// Do not modify blocks
 	cfg.modifyBlock = func(b *types.Block) *types.Block { return b }
-	return cfg.GenerateAndSave(outputPath, blockModifier)
+	return cfg.generateAndSave(outputPath, blockModifier)
 }
 
 const (
@@ -89,7 +89,7 @@ const (
 
 // addTxForKnownAccounts adds a transaction to the generated chain if the genesis block
 // contains certain known accounts.
-func (cfg GeneratorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
+func (cfg generatorConfig) addTxForKnownAccounts(i int, gen *core.BlockGen) {
 	if cfg.txInterval == 0 || i%cfg.txInterval != 0 {
 		return
 	}
@@ -184,8 +184,8 @@ func createTxGasLimit(gen *core.BlockGen, genesis *core.Genesis, data []byte) ui
 	return igas
 }
 
-// GenerateAndSave produces a chain based on the config.
-func (cfg GeneratorConfig) GenerateAndSave(path string, blockModifier func(i int, gen *core.BlockGen)) error {
+// generateAndSave produces a chain based on the config.
+func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int, gen *core.BlockGen)) error {
 	db := rawdb.NewMemoryDatabase()
 	genesis := cfg.genesis.MustCommit(db)
 	config := cfg.genesis.Config
