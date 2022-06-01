@@ -40,6 +40,15 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *ForkchoiceSt
 	}
 }
 
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedBytes(fcState *ForkchoiceStateBytes, pAttributes *PayloadAttributesBytes) *ForkchoiceResponseExpectObject {
+	resp, err := tec.EngineClient.EngineForkchoiceUpdatedBytes(tec.EngineClient.Ctx(), fcState, pAttributes)
+	return &ForkchoiceResponseExpectObject{
+		TestEnv:  tec.TestEnv,
+		Response: resp,
+		Error:    err,
+	}
+}
+
 func (exp *ForkchoiceResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
 		exp.Fatalf("FAIL (%s): Unexpected error on EngineForkchoiceUpdatedV1: %v, expected=<None>", exp.TestName, exp.Error)
@@ -101,6 +110,15 @@ type NewPayloadResponseExpectObject struct {
 
 func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *ExecutableDataV1) *NewPayloadResponseExpectObject {
 	status, err := tec.EngineClient.EngineNewPayloadV1(tec.EngineClient.Ctx(), payload)
+	return &NewPayloadResponseExpectObject{
+		TestEnv: tec.TestEnv,
+		Status:  status,
+		Error:   err,
+	}
+}
+
+func (tec *TestEngineClient) TestEngineNewPayloadByteType(payload *ExecutableDataByteType) *NewPayloadResponseExpectObject {
+	status, err := tec.EngineClient.EngineNewPayloadByteType(tec.EngineClient.Ctx(), payload)
 	return &NewPayloadResponseExpectObject{
 		TestEnv: tec.TestEnv,
 		Status:  status,
@@ -204,6 +222,61 @@ func (exp *GetPayloadResponseExpectObject) ExpectTimestamp(expectedTimestamp uin
 	exp.ExpectNoError()
 	if exp.Payload.Timestamp != expectedTimestamp {
 		exp.Fatalf("FAIL (%s): Unexpected timestamp for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.Timestamp, expectedTimestamp)
+	}
+}
+
+// TransitionConfigurationV1
+type ExchangeTransitionConfigurationResponseExpectObject struct {
+	*TestEnv
+	Response TransitionConfigurationV1
+	Error   error
+}
+
+func (tec *TestEngineClient) TestEngineExchangeTransitionConfigurationV1(payload *TransitionConfigurationV1) *ExchangeTransitionConfigurationResponseExpectObject {
+	response, err := tec.EngineClient.EngineExchangeTransitionConfigurationV1(tec.EngineClient.Ctx(), payload)
+	return &ExchangeTransitionConfigurationResponseExpectObject{
+		TestEnv: tec.TestEnv,
+		Response: response,
+		Error:   err,
+	}
+}
+
+type ExchangeTransitionConfigurationBytesResponseExpectObject struct {
+	*TestEnv
+	Response TransitionConfigurationBytes
+	Error   error
+}
+
+func (exp *ExchangeTransitionConfigurationResponseExpectObject) ExpectNoError() {
+	if exp.Error != nil {
+		exp.Fatalf("FAIL (%s): Expected no error on TransitionConfigurationV1: error=%v", exp.TestName, exp.Error)
+	}
+}
+
+func (exp *ExchangeTransitionConfigurationResponseExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on TransitionConfigurationV1: payload=%v", exp.TestName, exp.Response)
+	}
+}
+
+func (tec *TestEngineClient) TestEngineExchangeTransitionConfigurationBytes(payload *TransitionConfigurationBytes) *ExchangeTransitionConfigurationBytesResponseExpectObject {
+	response, err := tec.EngineClient.EngineExchangeTransitionConfigurationBytes(tec.EngineClient.Ctx(), payload)
+	return &ExchangeTransitionConfigurationBytesResponseExpectObject{
+		TestEnv: tec.TestEnv,
+		Response: response,
+		Error:   err,
+	}
+}
+
+func (exp *ExchangeTransitionConfigurationBytesResponseExpectObject) ExpectNoError() {
+	if exp.Error != nil {
+		exp.Fatalf("FAIL (%s): Expected no error on TransitionConfigurationV1: error=%v", exp.TestName, exp.Error)
+	}
+}
+
+func (exp *ExchangeTransitionConfigurationBytesResponseExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on TransitionConfigurationV1: payload=%v", exp.TestName, exp.Response)
 	}
 }
 

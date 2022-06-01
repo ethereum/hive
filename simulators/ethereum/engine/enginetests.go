@@ -404,6 +404,76 @@ var engineTests = []TestSpec{
 		Run:  postMergeSync,
 		TTD:  10,
 	},
+
+	//ExecutableDataV1 bytes to force invalid input tests.
+	{
+		Name: "ExecutableDataV1 ParentHash Length Errors",
+		Run:  ExecutableDataV1_ParentHashLengthErrors,
+	},
+	{
+		Name: "ExecutableDataV1 FeeRecipient Length Errors",
+		Run:  ExecutableDataV1_FeeRecipientLengthErrors,
+	},
+	{
+		Name: "ExecutableDataV1 StateRoot Length Errors",
+		Run:  ExecutableDataV1_StateRootLengthErrors,
+	},
+	{
+		Name: "ExecutableDataV1 ReceiptsRoot Length Errors",
+		Run:  ExecutableDataV1_ReceiptsRootLengthErrors,
+	},
+	{
+		Name: "ExecutableDataV1 LogsBloom Length Errors",
+		Run:  ExecutableDataV1_LogsBloomLengthErrors,
+	},
+	{
+		Name: "ExecutableDataV1 PrevRandao Length Errors",
+		Run:  ExecutableDataV1_PrevRandaoLengthErrors,
+	},
+	{
+		Name: "ExecutableDataV1 BlockHash Length Errors",
+		Run:  ExecutableDataV1_BlockHashLengthErrors,
+	},
+	//ForkchoiceStateV1 bytes to force invalid input tests.
+	{
+		Name: "ForkchoiceStateV1 HeadBlockHash Length Errors",
+		Run:  ForkchoiceStateV1_HeadBlockHashLengthErrors,
+	},
+	{
+		Name: "ForkchoiceStateV1 SafeBlockHash Length Errors",
+		Run:  ForkchoiceStateV1_SafeBlockHashLengthErrors,
+	},
+	{
+		Name: "ForkchoiceStateV1 FinalizedBlockHash Length Errors",
+		Run:  ForkchoiceStateV1_FinalizedBlockHashLengthErrors,
+	},
+	//PayloadAttributesV1 bytes input tests.
+	{
+		Name: "PayloadAttributesV1 PrevRandaoLength Errors",
+		Run:  PayloadAttributesV1_PrevRandaoLengthErrors,
+	},
+	{
+		Name: "PayloadAttributesV1 SuggestedFeeRecipient Length Errors",
+		Run:  PayloadAttributesV1_SuggestedFeeRecipientLengthErrors,
+	},
+  //TransitionConfigurationV1 TerminalTotalDifficulty correct and incorrect values.
+	{
+		Name: "TransitionConfigurationV1 CL_TTD Must Match EL_TTD",
+		Run:  TransitionConfigurationV1_CL_TTD_Must_Match_EL_TTD,
+	},
+	{
+		Name: "TransitionConfigurationV1 TerminalBlockNumber Not Zero",
+		Run:  TransitionConfigurationV1_TerminalBlockNumberNotZero,
+	},
+	{
+		Name: "TransitionConfigurationV1 TerminalBlockHash Not Zero",
+		Run:  TransitionConfigurationV1_TerminalBlockHashNotZero,
+	},
+	//TransitionConfigurationV1 bytes input tests.
+	{
+		Name: "TransitionConfigurationV1 TerminalBlockHash Length Errors",
+		Run:  TransitionConfigurationV1_TerminalBlockHashLengthErrors,
+	},
 }
 
 // Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
@@ -2061,4 +2131,247 @@ func postMergeSync(t *TestEnv) {
 			}
 		}
 	}
+}
+
+func ExecutableDataByteGenesis(t *TestEnv) *ExecutableDataByteType{
+	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
+	alteredPayload := ExecutableDataByteType{
+		ParentHash:    gblock.Hash().Bytes(),
+		FeeRecipient:  common.Address{}.Bytes(),
+		StateRoot:     gblock.Root().Bytes(),
+		ReceiptsRoot:  types.EmptyUncleHash.Bytes(),
+		LogsBloom:     types.CreateBloom(types.Receipts{}).Bytes(),
+		PrevRandao:    common.Hash{}.Bytes(),
+		Number:        1,
+		GasLimit:      gblock.GasLimit(),
+		GasUsed:       0,
+		Timestamp:     gblock.Time() + 1,
+		ExtraData:     []byte{},
+		BaseFeePerGas: gblock.BaseFee(),
+		BlockHash:     common.Hash{}.Bytes(),
+		Transactions:  [][]byte{},
+	}
+	return &alteredPayload
+}
+
+func ExecutableDataV1_ParentHashLengthErrors(t *TestEnv) {
+	alteredPayload:= ExecutableDataByteGenesis(t)
+	alteredPayload.ParentHash = common.FromHex("0x0067ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	prefix := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	prefix.ExpectError()
+	alteredPayload.ParentHash = common.FromHex("0x167ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	long := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	long.ExpectError()
+	alteredPayload.ParentHash = common.FromHex("0xead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	short := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	short.ExpectError()
+}
+
+func ExecutableDataV1_FeeRecipientLengthErrors(t *TestEnv) {
+	alteredPayload:= ExecutableDataByteGenesis(t)
+	alteredPayload.FeeRecipient = common.FromHex("0x001000000000000000000000000000000000000000")
+	prefix := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	prefix.ExpectError()
+	alteredPayload.FeeRecipient = common.FromHex("0x10000000000000000000000000000000000000000")
+	long := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	long.ExpectError()
+	alteredPayload.FeeRecipient = common.FromHex("0x00000000000000000000000000000000000000")
+	short := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	short.ExpectError()
+}
+
+func ExecutableDataV1_StateRootLengthErrors(t *TestEnv) {
+	alteredPayload:= ExecutableDataByteGenesis(t)
+	alteredPayload.StateRoot = common.FromHex("0x0084308e7d0abf860412f4a0c6fc25709a6e9eaba20a0d085a0344d271f40109ec")
+	prefix := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	prefix.ExpectError()
+	alteredPayload.StateRoot = common.FromHex("0x184308e7d0abf860412f4a0c6fc25709a6e9eaba20a0d085a0344d271f40109ec")
+	long := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	long.ExpectError()
+	alteredPayload.StateRoot = common.FromHex("0x308e7d0abf860412f4a0c6fc25709a6e9eaba20a0d085a0344d271f40109ec")
+	short := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	short.ExpectError()
+}
+
+func ExecutableDataV1_ReceiptsRootLengthErrors(t *TestEnv) {
+	alteredPayload:= ExecutableDataByteGenesis(t)
+	alteredPayload.ReceiptsRoot = common.FromHex("0x001dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
+	prefix := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	prefix.ExpectError()
+	alteredPayload.ReceiptsRoot = common.FromHex("0x11dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
+	long := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	long.ExpectError()
+	alteredPayload.ReceiptsRoot = common.FromHex("0xcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347")
+	short := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	short.ExpectError()
+}
+
+func ExecutableDataV1_LogsBloomLengthErrors(t *TestEnv) {
+	alteredPayload:= ExecutableDataByteGenesis(t)
+	alteredPayload.LogsBloom = common.FromHex("0x0010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+	prefix := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	prefix.ExpectError()
+	alteredPayload.LogsBloom = common.FromHex("0x100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+	long := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	long.ExpectError()
+	alteredPayload.LogsBloom = common.FromHex("0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+	short := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	short.ExpectError()
+}
+
+func ExecutableDataV1_PrevRandaoLengthErrors(t *TestEnv) {
+	alteredPayload:= ExecutableDataByteGenesis(t)
+	alteredPayload.PrevRandao = common.FromHex("0x001000000000000000000000000000000000000000000000000000000000000000")
+	prefix := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	prefix.ExpectError()
+	alteredPayload.PrevRandao = common.FromHex("0x10000000000000000000000000000000000000000000000000000000000000000")
+	long := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	long.ExpectError()
+	alteredPayload.PrevRandao = common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000")
+	short := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	short.ExpectError()
+}
+
+func ExecutableDataV1_BlockHashLengthErrors(t *TestEnv) {
+	alteredPayload:= ExecutableDataByteGenesis(t)
+	alteredPayload.BlockHash = common.FromHex("0x001000000000000000000000000000000000000000000000000000000000000000")
+	prefix := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	prefix.ExpectError()
+	alteredPayload.BlockHash = common.FromHex("0x10000000000000000000000000000000000000000000000000000000000000000")
+	long := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	long.ExpectError()
+	alteredPayload.BlockHash = common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000")
+	short := t.TestEngine.TestEngineNewPayloadByteType(alteredPayload)
+	short.ExpectError()
+}
+
+func ForkchoiceStateBytesGenesis(t *TestEnv) *ForkchoiceStateBytes{
+	forkchoiceState := ForkchoiceStateBytes{
+		HeadBlockHash:      common.FromHex("0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055"),
+		SafeBlockHash:      common.FromHex("0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055"),
+		FinalizedBlockHash: common.FromHex("0x67ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055"),
+	}
+	return &forkchoiceState
+}
+
+func ForkchoiceStateV1_HeadBlockHashLengthErrors(t *TestEnv) {
+	forkchoiceState := ForkchoiceStateBytesGenesis(t)
+	forkchoiceState.HeadBlockHash = common.FromHex("0x0067ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	prefix := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	prefix.ExpectError()
+	forkchoiceState.HeadBlockHash = common.FromHex("0x0167ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	long := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	long.ExpectError()
+	forkchoiceState.HeadBlockHash = common.FromHex("0xead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	short := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	short.ExpectError()
+}
+
+func ForkchoiceStateV1_SafeBlockHashLengthErrors(t *TestEnv) {
+	forkchoiceState := ForkchoiceStateBytesGenesis(t)
+	forkchoiceState.SafeBlockHash = common.FromHex("0x0067ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	prefix := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	prefix.ExpectError()
+	forkchoiceState.SafeBlockHash = common.FromHex("0x0167ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	long := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	long.ExpectError()
+	forkchoiceState.SafeBlockHash = common.FromHex("0xead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	short := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	short.ExpectError()
+}
+
+func ForkchoiceStateV1_FinalizedBlockHashLengthErrors(t *TestEnv) {
+	forkchoiceState := ForkchoiceStateBytesGenesis(t)
+	forkchoiceState.FinalizedBlockHash = common.FromHex("0x0067ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	prefix := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	prefix.ExpectError()
+	forkchoiceState.FinalizedBlockHash = common.FromHex("0x0167ead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	long := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	long.ExpectError()
+	forkchoiceState.FinalizedBlockHash = common.FromHex("0xead97eb79b47a1638659942384143f36ed44275d4182799875ab5a87324055")
+	short := t.TestEngine.TestEngineForkchoiceUpdatedBytes(forkchoiceState, nil)
+	short.ExpectError()
+}
+
+func PayloadAttributesBytesGenesis(t *TestEnv) *PayloadAttributesBytes{
+	payloadAttrbutes := PayloadAttributesBytes{
+		Timestamp:             1,
+		PrevRandao:            common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000"),
+		SuggestedFeeRecipient: common.FromHex("0x0000000000000000000000000000000000000000"),
+	}
+	return &payloadAttrbutes
+}
+
+func PayloadAttributesV1_PrevRandaoLengthErrors(t *TestEnv) {
+	payloadAttrbutes := PayloadAttributesBytesGenesis(t)
+	payloadAttrbutes.PrevRandao = common.FromHex("0x001000000000000000000000000000000000000000000000000000000000000000");
+	prefix := t.TestEngine.TestEngineForkchoiceUpdatedBytes(ForkchoiceStateBytesGenesis(t),payloadAttrbutes)
+	prefix.ExpectError()
+	payloadAttrbutes.PrevRandao = common.FromHex("0x10000000000000000000000000000000000000000000000000000000000000000");
+	long := t.TestEngine.TestEngineForkchoiceUpdatedBytes(ForkchoiceStateBytesGenesis(t),payloadAttrbutes)
+	long.ExpectError()
+	payloadAttrbutes.PrevRandao = common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000");
+	short := t.TestEngine.TestEngineForkchoiceUpdatedBytes(ForkchoiceStateBytesGenesis(t),payloadAttrbutes)
+	short.ExpectError()
+}
+
+func PayloadAttributesV1_SuggestedFeeRecipientLengthErrors(t *TestEnv) {
+	payloadAttrbutes := PayloadAttributesBytesGenesis(t)
+	payloadAttrbutes.SuggestedFeeRecipient = common.FromHex("0x001000000000000000000000000000000000000000");
+	prefix := t.TestEngine.TestEngineForkchoiceUpdatedBytes(ForkchoiceStateBytesGenesis(t),payloadAttrbutes)
+	prefix.ExpectError()
+	payloadAttrbutes.SuggestedFeeRecipient = common.FromHex("0x10000000000000000000000000000000000000000");
+	long := t.TestEngine.TestEngineForkchoiceUpdatedBytes(ForkchoiceStateBytesGenesis(t),payloadAttrbutes)
+	long.ExpectError()
+	payloadAttrbutes.SuggestedFeeRecipient = common.FromHex("0x00000000000000000000000000000000000000");
+	short := t.TestEngine.TestEngineForkchoiceUpdatedBytes(ForkchoiceStateBytesGenesis(t),payloadAttrbutes)
+	short.ExpectError()
+}
+
+func TransitionConfigurationBytesGenesis(t *TestEnv) *TransitionConfigurationBytes{
+	transitionConfiguration := TransitionConfigurationBytes{
+		TerminalTotalDifficulty: big.NewInt(196608),
+		TerminalBlockHash:       common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000"),
+		TerminalBlockNumber:     0,
+	}
+	return &transitionConfiguration
+}
+
+func TransitionConfigurationV1_CL_TTD_Must_Match_EL_TTD(t *TestEnv) {
+	transitionConfiguration := TransitionConfigurationBytesGenesis(t)
+	CLequalTTD := t.TestEngine.TestEngineExchangeTransitionConfigurationBytes(transitionConfiguration)
+	CLequalTTD.ExpectNoError()
+	transitionConfiguration.TerminalTotalDifficulty = big.NewInt(196608-1)
+	CLdecrementTTD := t.TestEngine.TestEngineExchangeTransitionConfigurationBytes(transitionConfiguration)
+	CLdecrementTTD.ExpectError()
+	transitionConfiguration.TerminalTotalDifficulty = big.NewInt(196608+1);
+	CLincrementTTD := t.TestEngine.TestEngineExchangeTransitionConfigurationBytes(transitionConfiguration)
+	CLincrementTTD.ExpectError()
+}
+
+func TransitionConfigurationV1_TerminalBlockNumberNotZero(t *TestEnv) {
+	transitionConfiguration := TransitionConfigurationBytesGenesis(t)
+	transitionConfiguration.TerminalBlockNumber = 1
+	r := t.TestEngine.TestEngineExchangeTransitionConfigurationBytes(transitionConfiguration)
+	r.ExpectError()
+}
+
+func TransitionConfigurationV1_TerminalBlockHashNotZero(t *TestEnv) {
+	transitionConfiguration := TransitionConfigurationBytesGenesis(t)
+	transitionConfiguration.TerminalBlockHash = common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000001")
+	r := t.TestEngine.TestEngineExchangeTransitionConfigurationBytes(transitionConfiguration)
+	r.ExpectError()
+}
+
+func TransitionConfigurationV1_TerminalBlockHashLengthErrors(t *TestEnv) {
+	transitionConfiguration := TransitionConfigurationBytesGenesis(t)
+	transitionConfiguration.TerminalBlockHash = common.FromHex("0x001000000000000000000000000000000000000000000000000000000000000000")
+	prefix := t.TestEngine.TestEngineExchangeTransitionConfigurationBytes(transitionConfiguration)
+	prefix.ExpectError()
+	transitionConfiguration.TerminalBlockHash = common.FromHex("0x10000000000000000000000000000000000000000000000000000000000000000")
+	long := t.TestEngine.TestEngineExchangeTransitionConfigurationBytes(transitionConfiguration)
+	long.ExpectError()
+	transitionConfiguration.TerminalBlockHash = common.FromHex("0x00000000000000000000000000000000000000000000000000000000000000")
+	short := t.TestEngine.TestEngineExchangeTransitionConfigurationBytes(transitionConfiguration)
+	short.ExpectError()
 }

@@ -242,6 +242,11 @@ type ForkchoiceStateV1 struct {
 	FinalizedBlockHash common.Hash `json:"finalizedBlockHash"`
 }
 
+type ForkchoiceStateBytes struct {
+	HeadBlockHash      hexutil.Bytes `json:"headBlockHash"`
+	SafeBlockHash      hexutil.Bytes `json:"safeBlockHash"`
+	FinalizedBlockHash hexutil.Bytes `json:"finalizedBlockHash"`
+}
 //go:generate go run github.com/fjl/gencodec -type ExecutableDataV1 -field-override executableDataMarshaling -out gen_ed.go
 // ExecutableDataV1 structure described at https://github.com/ethereum/execution-apis/src/engine/specification.md
 type ExecutableDataV1 struct {
@@ -273,6 +278,37 @@ type executableDataMarshaling struct {
 	Transactions  []hexutil.Bytes
 }
 
+
+//go:generate go run github.com/fjl/gencodec -type ExecutableDataByteType -field-override executableDataMarshalingByteType -out gen_edBytes.go
+type ExecutableDataByteType struct {
+	ParentHash    hexutil.Bytes  `json:"parentHash"    gencodec:"required"`
+	FeeRecipient  hexutil.Bytes  `json:"feeRecipient"  gencodec:"required"`
+	StateRoot     hexutil.Bytes  `json:"stateRoot"     gencodec:"required"`
+	ReceiptsRoot  hexutil.Bytes  `json:"receiptsRoot"  gencodec:"required"`
+	LogsBloom     []byte         `json:"logsBloom"     gencodec:"required"`
+	PrevRandao    hexutil.Bytes  `json:"prevRandao"    gencodec:"required"`
+	Number        uint64         `json:"blockNumber"   gencodec:"required"`
+	GasLimit      uint64         `json:"gasLimit"      gencodec:"required"`
+	GasUsed       uint64         `json:"gasUsed"       gencodec:"required"`
+	Timestamp     uint64         `json:"timestamp"     gencodec:"required"`
+	ExtraData     []byte         `json:"extraData"     gencodec:"required"`
+	BaseFeePerGas *big.Int       `json:"baseFeePerGas" gencodec:"required"`
+	BlockHash     hexutil.Bytes  `json:"blockHash"     gencodec:"required"`
+	Transactions  [][]byte       `json:"transactions"  gencodec:"required"`
+}
+
+// JSON type overrides for executableData.
+type executableDataMarshalingByteType struct {
+	Number        hexutil.Uint64
+	GasLimit      hexutil.Uint64
+	GasUsed       hexutil.Uint64
+	Timestamp     hexutil.Uint64
+	BaseFeePerGas *hexutil.Big
+	ExtraData     hexutil.Bytes
+	LogsBloom     hexutil.Bytes
+	Transactions  []hexutil.Bytes
+}
+
 //go:generate go run github.com/fjl/gencodec -type PayloadAttributesV1 -field-override payloadAttributesMarshaling -out gen_blockparams.go
 // PayloadAttributesV1 structure described at https://github.com/ethereum/execution-apis/pull/74
 type PayloadAttributesV1 struct {
@@ -283,6 +319,19 @@ type PayloadAttributesV1 struct {
 
 // JSON type overrides for PayloadAttributesV1.
 type payloadAttributesMarshaling struct {
+	Timestamp hexutil.Uint64
+}
+
+//go:generate go run github.com/fjl/gencodec -type PayloadAttributesBytes -field-override payloadAttributesMarshalingBytes -out gen_blockparamsBytes.go
+// PayloadAttributesBytes structure described at https://github.com/ethereum/execution-apis/pull/74
+type PayloadAttributesBytes struct {
+	Timestamp             uint64           `json:"timestamp"              gencodec:"required"`
+	PrevRandao            hexutil.Bytes    `json:"prevRandao"             gencodec:"required"`
+	SuggestedFeeRecipient hexutil.Bytes    `json:"suggestedFeeRecipient"  gencodec:"required"`
+}
+
+// JSON type overrides for PayloadAttributesV1.
+type payloadAttributesMarshalingBytes struct {
 	Timestamp hexutil.Uint64
 }
 
@@ -299,6 +348,18 @@ type TransitionConfigurationV1Marshaling struct {
 	TerminalBlockNumber     hexutil.Uint64 `json:"terminalBlockNumber"`
 }
 
+//go:generate go run github.com/fjl/gencodec -type TransitionConfigurationBytes -field-override TransitionConfigurationV1MarshalingBytes -out gen_transitionconfBytes.go
+type TransitionConfigurationBytes struct {
+	TerminalTotalDifficulty *big.Int      `json:"terminalTotalDifficulty" gencodec:"required"`
+	TerminalBlockHash       hexutil.Bytes `json:"terminalBlockHash"       gencodec:"required"`
+	TerminalBlockNumber     uint64        `json:"terminalBlockNumber"     gencodec:"required"`
+}
+
+// JSON type overrides for TransitionConfigurationV1.
+type TransitionConfigurationV1MarshalingBytes struct {
+	TerminalTotalDifficulty *hexutil.Big   `json:"terminalTotalDifficulty"`
+	TerminalBlockNumber     hexutil.Uint64 `json:"terminalBlockNumber"`
+}
 // JWT Tokens
 func GetNewToken(jwtSecretBytes []byte, iat time.Time) (string, error) {
 	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -335,6 +396,16 @@ func (ec *EngineClient) EngineForkchoiceUpdatedV1(ctx context.Context, fcState *
 	return result, err
 }
 
+// Engine API Call Methods
+func (ec *EngineClient) EngineForkchoiceUpdatedBytes(ctx context.Context, fcState *ForkchoiceStateBytes, pAttributes *PayloadAttributesBytes) (ForkChoiceResponse, error) {
+	var result ForkChoiceResponse
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
+		return result, err
+	}
+	err := ec.c.CallContext(ctx, &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
+	return result, err
+}
+
 func (ec *EngineClient) EngineGetPayloadV1(ctx context.Context, payloadId *PayloadID) (ExecutableDataV1, error) {
 	var result ExecutableDataV1
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
@@ -353,8 +424,26 @@ func (ec *EngineClient) EngineNewPayloadV1(ctx context.Context, payload *Executa
 	return result, err
 }
 
+func (ec *EngineClient) EngineNewPayloadByteType(ctx context.Context, payload *ExecutableDataByteType) (PayloadStatusV1, error) {
+	var result PayloadStatusV1
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
+		return result, err
+	}
+	err := ec.c.CallContext(ctx, &result, "engine_newPayloadV1", payload)
+	return result, err
+}
+
 func (ec *EngineClient) EngineExchangeTransitionConfigurationV1(ctx context.Context, tConf *TransitionConfigurationV1) (TransitionConfigurationV1, error) {
 	var result TransitionConfigurationV1
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
+		return result, err
+	}
+	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", tConf)
+	return result, err
+}
+
+func (ec *EngineClient) EngineExchangeTransitionConfigurationBytes(ctx context.Context, tConf *TransitionConfigurationBytes) (TransitionConfigurationBytes, error) {
+	var result TransitionConfigurationBytes
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
