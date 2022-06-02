@@ -225,56 +225,29 @@ func (exp *GetPayloadResponseExpectObject) ExpectTimestamp(expectedTimestamp uin
 	}
 }
 
-// TransitionConfigurationV1
-type ExchangeTransitionConfigurationResponseExpectObject struct {
-	*TestEnv
-	Response TransitionConfigurationV1
-	Error   error
-}
-
-func (tec *TestEngineClient) TestEngineExchangeTransitionConfigurationV1(payload *TransitionConfigurationV1) *ExchangeTransitionConfigurationResponseExpectObject {
-	response, err := tec.EngineClient.EngineExchangeTransitionConfigurationV1(tec.EngineClient.Ctx(), payload)
-	return &ExchangeTransitionConfigurationResponseExpectObject{
-		TestEnv: tec.TestEnv,
-		Response: response,
-		Error:   err,
-	}
-}
-
-type ExchangeTransitionConfigurationBytesResponseExpectObject struct {
+// ExchangeTransitionConfigurationV1 in bytes format.
+type ExTransConfigResponseExpectObject struct {
 	*TestEnv
 	Response TransitionConfigurationBytes
 	Error   error
 }
 
-func (exp *ExchangeTransitionConfigurationResponseExpectObject) ExpectNoError() {
-	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Expected no error on TransitionConfigurationV1: error=%v", exp.TestName, exp.Error)
-	}
-}
-
-func (exp *ExchangeTransitionConfigurationResponseExpectObject) ExpectError() {
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on TransitionConfigurationV1: payload=%v", exp.TestName, exp.Response)
-	}
-}
-
-func (tec *TestEngineClient) TestEngineExchangeTransitionConfigurationBytes(payload *TransitionConfigurationBytes) *ExchangeTransitionConfigurationBytesResponseExpectObject {
+func (tec *TestEngineClient) TestEngineExchangeTransitionConfigurationBytes(payload *TransitionConfigurationBytes) *ExTransConfigResponseExpectObject {
 	response, err := tec.EngineClient.EngineExchangeTransitionConfigurationBytes(tec.EngineClient.Ctx(), payload)
-	return &ExchangeTransitionConfigurationBytesResponseExpectObject{
+	return &ExTransConfigResponseExpectObject{
 		TestEnv: tec.TestEnv,
 		Response: response,
 		Error:   err,
 	}
 }
 
-func (exp *ExchangeTransitionConfigurationBytesResponseExpectObject) ExpectNoError() {
+func (exp *ExTransConfigResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
 		exp.Fatalf("FAIL (%s): Expected no error on TransitionConfigurationV1: error=%v", exp.TestName, exp.Error)
 	}
 }
 
-func (exp *ExchangeTransitionConfigurationBytesResponseExpectObject) ExpectError() {
+func (exp *ExTransConfigResponseExpectObject) ExpectError() {
 	if exp.Error == nil {
 		exp.Fatalf("FAIL (%s): Expected error on TransitionConfigurationV1: payload=%v", exp.TestName, exp.Response)
 	}
