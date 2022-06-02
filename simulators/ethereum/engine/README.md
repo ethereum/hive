@@ -77,19 +77,19 @@ Expected outcome is that the forkchoiceUpdate proceeds, but the call returns an 
 Perform a forkchoiceUpdated call using a block hash part of the canonical chain that precedes the block where the TTD occurred. (Behavior is undefined for this edge case and not verified, but should not produce unrecoverable error)
 
 ### Eth RPC Status on ForkchoiceUpdated Events:
-- Latest Block after NewPayload:  
+- `latest` Block after NewPayload:  
 Verify the Block returned by the Eth RPC after a new payload is executed. Eth RPC should still return previous block.
 
-- Latest Block after New HeadBlock:  
+- `latest` Block after New HeadBlock:  
 Verify the Block returned by the Eth RPC after a new HeadBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
 
-- Latest Block after New SafeBlock:  
-Verify the Block returned by the Eth RPC after a new SafeBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
+- `safe` Block after New SafeBlockHash:  
+Verify the Block returned by the Eth RPC using the `safe` keyword after a new `SafeBlockHash` is set using `forkchoiceUpdated`. Eth RPC should return block set on the `SafeBlockHash`. When no block has been set as `SafeBlockHash` (`SafeBlockHash==0x00..00`) or PoW mode still, using `safe` shall return error.
 
-- Latest Block after New FinalizedBlock:  
-Verify the Block returned by the Eth RPC after a new FinalizedBlockHash is set using forkchoiceUpdated. Eth RPC should return new block.
+- `finalized` Block after New FinalizedBlockHash:  
+Verify the Block returned by the Eth RPC using the `finalized` keyword after a new `FinalizedBlockHash` is set using `forkchoiceUpdated`. Eth RPC should return block set on the `FinalizedBlockHash`. When no block has been set as `FinalizedBlockHash` (`FinalizedBlockHash==0x00..00`) or PoW mode still, using `finalized` shall return error.
 
-- Latest Block after Reorg:  
+- `latest` Block after Reorg:  
 Verify the Block returned by the Eth RPC after a forkchoiceUpdated reorgs HeadBlockHash/SafeBlockHash to a sidechain and back. Eth RPC should return the appropriate block everytime.
 
 ### Payload Execution
@@ -107,6 +107,9 @@ The payloads should be ACCEPTED/SYNCING, and the last payload should be VALID (s
 - Valid NewPayload->ForkchoiceUpdated on Syncing Client:
 Skip sending NewPayload to the client, but send the ForkchoiceUpdated to this missing payload, which will send the client to Syncing, then send the valid payload. Response should be either `ACCEPTED` or `SYNCING`.
 
+- NewPayload with Missing ForkchoiceUpdated
+Chain `Genesis <- ... <- TB <- P1 <- P2 <- ... <- Pn`, `TB` is a valid terminal block. Secondary EL starts with `TB` as the head. `newPayload(P1)`, `newPayload(P2)`, ... `newPayload(Pn)` are sent to the secondary EL, all responses shall be `{status: VALID, latestValidHash: payload.blockHash}`. `forkchoiceUpdated(head: Pn, safe: Pn-1, finalized:Pn-2)` is sent and verified.
+
 ### Invalid Payload Tests
 - Bad blockhash on NewPayload:  
 Send a NewPayload directive to the client including an incorrect BlockHash, should result in an error in all the following cases:
@@ -117,6 +120,12 @@ Send a NewPayload directive to the client including an incorrect BlockHash, shou
 
 - ParentHash==BlockHash on NewPayload:  
 Send a NewPayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
+
+- Invalid Transition Payload:
+Build canonical chain `A: Genesis <- ... <- TB <- P1 <- P2` where TB is a valid terminal block.
+Create an invalid transition payload `INV_P1` with parent `TB`.
+`newPayload(INV_P1)` must return `{status: INVALID/ACCEPTED, latestValidHash: 0x00..00}`.
+`forkchoiceUpdated(head: INV_P1, safe: 0x00..00, finalized: 0x00..00)` must return `{status: INVALID, latestValidHash: 0x00..00}`.
 
 - Invalid Field in NewPayload:  
 Send an invalid payload in NewPayload by modifying fields of a valid ExecutablePayload while maintaining a valid BlockHash.
@@ -189,121 +198,145 @@ Launch a second client and verify that it successfully syncs to the first client
 Test cases using multiple Proof of Work chains to test the client's behavior when the Terminal Total Difficulty is reached by two different blocks simultaneously and the Engine API takes over.
 
 - Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height:  
-Client 1 starts with chain G -> A, Client 2 starts with chain G -> B.  
+Client 1 starts with chain G <- A, Client 2 starts with chain G <- B.  
 Blocks A and B reach TTD, but block B has higher difficulty than A.  
 ForkchoiceUpdated is sent to Client 1 with A as Head.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
-Verification is made that Client 1 Re-orgs to chain G -> B.  
+Verification is made that Client 1 Re-orgs to chain G <- B.  
+
+- Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height (Transition Payload):  
+Client 1 starts with chain G <- A, Client 2 starts with chain G <- B.  
+Blocks A and B reach TTD, but block B has higher difficulty than A.  
+ForkchoiceUpdated is sent to Client 1 with A as Head.  
+ForkchoiceUpdated is sent to Client 1 with B as Head.  
+P1 is produced by Client 2 on top of G <- B.
+`newPayload(P1)` is sent to Client 1 and verification is made that `{status: VALID, latestValidHash: P1.BlockHash}`.
 
 - Single Block PoW Re-org to Lower-Total-Difficulty Chain, Equal Height:  
-Client 1 starts with chain G -> A, Client 2 starts with chain G -> B.  
+Client 1 starts with chain G <- A, Client 2 starts with chain G <- B.  
 Blocks A and B reach TTD, but block A has higher difficulty than B.  
 ForkchoiceUpdated is sent to Client 1 with A as Head.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
-Verification is made that Client 1 Re-orgs to chain G -> B.  
+Verification is made that Client 1 Re-orgs to chain G <- B.  
 
 - Two Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height:  
-Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C -> D.  
+Client 1 starts with chain G <- A <- B, Client 2 starts with chain G <- C <- D.  
 Blocks B and D reach TTD, but block D has higher total difficulty than B.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
 ForkchoiceUpdated is sent to Client 1 with D as Head.  
-Verification is made that Client 1 Re-orgs to chain G -> C -> D.  
+Verification is made that Client 1 Re-orgs to chain G <- C <- D.  
 
 - Two Block PoW Re-org to Lower-Total-Difficulty Chain, Equal Height:  
-Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C -> D.  
+Client 1 starts with chain G <- A <- B, Client 2 starts with chain G <- C <- D.  
 Blocks B and D reach TTD, but block B has higher total difficulty than D.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
 ForkchoiceUpdated is sent to Client 1 with D as Head.  
-Verification is made that Client 1 Re-orgs to chain G -> C -> D.  
+Verification is made that Client 1 Re-orgs to chain G <- C <- D.  
 
 - Two Block PoW Re-org to Higher-Height Chain:  
-Client 1 starts with chain G -> A, Client 2 starts with chain G -> B -> C.  
+Client 1 starts with chain G <- A, Client 2 starts with chain G <- B <- C.  
 Blocks A and C reach TTD, but block C has higher height than A.  
 ForkchoiceUpdated is sent to Client 1 with A as Head.  
 ForkchoiceUpdated is sent to Client 1 with C as Head.  
-Verification is made that Client 1 Re-orgs to chain G -> B -> C.  
+Verification is made that Client 1 Re-orgs to chain G <- B <- C.  
 
 - Two Block PoW Re-org to Lower-Height Chain:  
-Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C.  
+Client 1 starts with chain G <- A <- B, Client 2 starts with chain G <- C.  
 Blocks B and C reach TTD, but block B has higher height than C.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
 ForkchoiceUpdated is sent to Client 1 with C as Head.  
-Verification is made that Client 1 Re-orgs to chain G -> C.  
+Verification is made that Client 1 Re-orgs to chain G <- C.  
 
 - Two Block PoW Re-org to Lower-Height Chain, Transaction Overwrite
-Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> C. 
+Client 1 starts with chain G <- A <- B, Client 2 starts with chain G <- C. 
 Blocks B and C reach TTD, but block B has higher height than C.  
 Block A and C contain TX1, and Block B contains TX2.
 TX1 and TX2 use the DIFFICULTY/PREVRANDAO opcode into storage. 
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
 ForkchoiceUpdated is sent to Client 1 with C as Head.  
-Verification is made that Client 1 Re-orgs to chain G -> C.  
+Verification is made that Client 1 Re-orgs to chain G <- C.  
 PoS chain on top of C contains TX2, which was originally part of the PoW chain.
 Verification is made that the resulting PoS storage contains PREVRANDAO instead of DIFFICULTY.
 
 - Two Block Post-PoS Re-org to Higher-Total-Difficulty PoW Chain:
-Client 1 starts with chain G -> A.
+Client 1 starts with chain G <- A.
 ForkchoiceUpdated is sent to Client 1 with A as Head.
 Two PoS blocks are produced on top of A.
-Client 2 starts with chain G -> B.  
+Client 2 starts with chain G <- B.  
 Blocks A and B reach TTD, but block B has higher difficulty than A.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
 PoS Chain is continued on top of B.
-Verification is made that Client 1 Re-orgs to chain G -> B -> ... 
+Verification is made that Client 1 Re-orgs to chain G <- B <- ... 
 
 - Two Block Post-PoS Re-org to Lower-Total-Difficulty PoW Chain:
-Client 1 starts with chain G -> A.
+Client 1 starts with chain G <- A.
 ForkchoiceUpdated is sent to Client 1 with A as Head.
 Two PoS blocks are produced on top of A.
-Client 2 starts with chain G -> B.  
+Client 2 starts with chain G <- B.  
 Blocks A and B reach TTD, but block A has higher difficulty than B.  
 ForkchoiceUpdated is sent to Client 1 with B as Head.  
 PoS Chain is continued on top of B.
-Verification is made that Client 1 Re-orgs to chain G -> B -> ... 
+Verification is made that Client 1 Re-orgs to chain G <- B <- ... 
 
 - Two Block Post-PoS Re-org to Higher-Height PoW Chain:
-Client 1 starts with chain G -> A.
+Client 1 starts with chain G <- A.
 ForkchoiceUpdated is sent to Client 1 with A as Head.
 Two PoS blocks are produced on top of A.
-Client 2 starts with chain G -> B -> C.  
+Client 2 starts with chain G <- B <- C.  
 Blocks A and C reach TTD, but have different heights.  
 ForkchoiceUpdated is sent to Client 1 with C as Head.  
 PoS Chain is continued on top of C.
-Verification is made that Client 1 Re-orgs to chain G -> B -> C -> ...  
+Verification is made that Client 1 Re-orgs to chain G <- B <- C <- ...  
 
 - Two Block Post-PoS Re-org to Lower-Height PoW Chain:
-Client 1 starts with chain G -> A -> B.
+Client 1 starts with chain G <- A <- B.
 ForkchoiceUpdated is sent to Client 1 with B as Head.
 Two PoS blocks are produced on top of B.
-Client 2 starts with chain G -> C.  
+Client 2 starts with chain G <- C.  
 Blocks B and C reach TTD, but have different heights.  
 ForkchoiceUpdated is sent to Client 1 with C as Head.  
 PoS Chain is continued on top of C.
-Verification is made that Client 1 Re-orgs to chain G -> C -> ...  
+Verification is made that Client 1 Re-orgs to chain G <- C <- ...  
 
 - Transition to a Chain with Invalid Terminal Block, Incorrectly Configured Higher Total Difficulty
-Client 1 starts with chain G -> A, Client 2 starts with chain G -> A -> B.  
+Client 1 starts with chain G <- A, Client 2 starts with chain G <- A <- B.  
 Client 1's configured TTD is reached by A.
 Client 2's configured TTD is reached by B.
 ForkchoiceUpdated is sent to both clients with B as Head.  
 PoS chain is continued on top of B.
-Verification is made that Client 1 never re-orgs to chain G -> A -> B due to incorrect Terminal block.  
+Verification is made that Client 1 never re-orgs to chain G <- A <- B due to incorrect Terminal block.
+
+- Transition to a Chain with Invalid Terminal Block, Incorrectly Configured Higher Total Difficulty (Transition Payload)
+Client 1 starts with chain G <- A, Client 2 starts with chain G <- A <- B.  
+Client 1's configured TTD is reached by A.
+Client 2's configured TTD is reached by B.
+ForkchoiceUpdated is sent to both clients with B as Head.  
+P1 is prepared by Client 2 on top of G <- A <- B.
+`newPayload(P1)` is sent to Client 1 and verification is made that `{status: INVALID, latestValidHash: 0x00..00}`
 
 - Transition to a Chain with Invalid Terminal Block, Incorrectly Configured Lower Total Difficulty
-Client 1 starts with chain G -> A -> B, Client 2 starts with chain G -> A.  
+Client 1 starts with chain G <- A <- B, Client 2 starts with chain G <- A.  
 Client 1's configured TTD is reached by B.
 Client 2's configured TTD is reached by A.
 ForkchoiceUpdated is sent to both clients with A as Head.  
 PoS chain is continued on top of A.
-Verification is made that Client 1 never re-orgs to chain G -> A -> ... due to incorrect Terminal block. 
+Verification is made that Client 1 never re-orgs to chain G <- A <- ... due to incorrect Terminal block. 
+
+- Transition to a Chain with Invalid Terminal Block, Incorrectly Configured Lower Total Difficulty (Transition Payload)
+Client 1 starts with chain G <- A <- B, Client 2 starts with chain G <- A.  
+Client 1's configured TTD is reached by B.
+Client 2's configured TTD is reached by A.
+ForkchoiceUpdated is sent to both clients with A as Head.  
+P1 is prepared by Client 2 on top of G <- A.
+`newPayload(P1)` is sent to Client 1 and verification is made that `{status: INVALID, latestValidHash: 0x00..00}`
 
 - Halt following PoW chain:  
- Client 1 starts with chain G -> A, Client 2 starts with chain G -> A -> B.  
+ Client 1 starts with chain G <- A, Client 2 starts with chain G <- A <- B.  
  Block A reaches TTD, but Client 2 has a higher TTD and accepts block B (simulating a client not complying with the merge).  
  Verification is made that Client 1 does not follow Client 2 chain to block B.  
 
 - Long PoW Chain Sync:
-Client 1 starts with chain G -> PoW1, Client 2 starts with chain G -> PoW1 -> ... -> PoW1024.
+Client 1 starts with chain G <- PoW1, Client 2 starts with chain G <- PoW1 <- ... <- PoW1024.
 Block PoW1024 reaches TTD, and the CL Mock continues the PoS chain on top of this block.
 Verification is made that Client 1 syncs the remaining PoW blocks and also the PoS chain built on top of PoW1024.
 

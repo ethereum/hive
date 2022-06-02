@@ -4,15 +4,18 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -44,12 +47,15 @@ var (
 )
 
 type generatorConfig struct {
-	txInterval   int // frequency of blocks containing transactions
-	txCount      int // number of txs in block
-	blockCount   int // number of generated blocks
-	blockTimeSec int // block time in seconds, influences difficulty
-	powMode      ethash.Mode
-	genesis      core.Genesis
+	txInterval    int // frequency of blocks containing transactions
+	txCount       int // number of txs in block
+	blockCount    int // number of generated pow blocks
+	posBlockCount int // number of generated pos blocks
+	blockTimeSec  int // block time in seconds, influences difficulty
+	powMode       ethash.Mode
+	genesis       core.Genesis
+	isPoS         bool                            // true if the generator should create post pos blocks
+	modifyBlock   func(*types.Block) *types.Block // modify the block during exporting
 }
 
 // loadGenesis loads genesis.json.
@@ -68,6 +74,8 @@ func (cfg generatorConfig) writeTestChain(outputPath string) error {
 		gen.OffsetTime(int64((i+1)*int(cfg.blockTimeSec) - 10))
 		cfg.addTxForKnownAccounts(i, gen)
 	}
+	// Do not modify blocks
+	cfg.modifyBlock = func(b *types.Block) *types.Block { return b }
 	return cfg.generateAndSave(outputPath, blockModifier)
 }
 
@@ -180,20 +188,36 @@ func createTxGasLimit(gen *core.BlockGen, genesis *core.Genesis, data []byte) ui
 func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int, gen *core.BlockGen)) error {
 	db := rawdb.NewMemoryDatabase()
 	genesis := cfg.genesis.MustCommit(db)
-	config := ethash.Config{
+	config := cfg.genesis.Config
+	ethashConf := ethash.Config{
 		PowMode:        cfg.powMode,
 		CachesInMem:    2,
 		DatasetsOnDisk: 2,
 		DatasetDir:     ethashDir(),
 	}
-	engine := ethash.New(config, nil, false)
 
-	// Generate a chain where each block is created, modified, and immediately sealed.
-	insta := instaSeal{engine}
-	chain, _ := core.GenerateChain(cfg.genesis.Config, genesis, insta, db, cfg.blockCount, blockModifier)
+	powEngine := ethash.New(ethashConf, nil, false)
+	posEngine := beacon.New(powEngine)
+	engine := instaSeal{posEngine}
+
+	// Create the PoW chain.
+	chain, _ := core.GenerateChain(config, genesis, engine, db, cfg.blockCount, blockModifier)
+
+	// Create the PoS chain extension.
+	if cfg.isPoS {
+		// Set TTD to the head of the PoW chain.
+		totalDifficulty := big.NewInt(0)
+		for _, b := range chain {
+			totalDifficulty.Add(totalDifficulty, b.Difficulty())
+		}
+		config.TerminalTotalDifficulty = totalDifficulty
+
+		posChain, _ := core.GenerateChain(config, chain[len(chain)-1], engine, db, cfg.posBlockCount, blockModifier)
+		chain = append(chain, posChain...)
+	}
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, err := core.NewBlockChain(db, nil, cfg.genesis.Config, engine, vm.Config{}, nil, nil)
+	blockchain, err := core.NewBlockChain(db, nil, config, engine, vm.Config{}, nil, nil)
 	if err != nil {
 		return fmt.Errorf("can't create blockchain: %v", err)
 	}
@@ -209,10 +233,10 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 	dump := headstate.Dump(&state.DumpConfig{})
 
 	// Write out the generated blockchain
-	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 1); err != nil {
+	if err := writeChain(blockchain, filepath.Join(path, "chain.rlp"), 1, cfg.modifyBlock); err != nil {
 		return err
 	}
-	if err := writeChain(blockchain, filepath.Join(path, "chain_genesis.rlp"), 0); err != nil {
+	if err := writeChain(blockchain, filepath.Join(path, "chain_genesis.rlp"), 0, cfg.modifyBlock); err != nil {
 		return err
 	}
 	if err := ioutil.WriteFile(filepath.Join(path, "chain_poststate.json"), dump, 0644); err != nil {
@@ -231,13 +255,13 @@ func ethashDir() string {
 }
 
 // writeChain exports the given chain to a file.
-func writeChain(chain *core.BlockChain, filename string, start uint64) error {
+func writeChain(chain *core.BlockChain, filename string, start uint64, modifyBlock func(*types.Block) *types.Block) error {
 	out, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
-	return chain.ExportN(out, start, chain.CurrentBlock().NumberU64())
+	return exportN(chain, out, start, chain.CurrentBlock().NumberU64(), modifyBlock)
 }
 
 // instaSeal wraps a consensus engine with instant block sealing. When a block is produced
@@ -256,4 +280,25 @@ func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header
 		return nil, err
 	}
 	return <-sealedBlock, nil
+}
+
+func exportN(bc *core.BlockChain, w io.Writer, first uint64, last uint64, modifyBlock func(*types.Block) *types.Block) error {
+	fmt.Printf("Exporting batch of blocks, count %v \n", last-first+1)
+
+	start, reported := time.Now(), time.Now()
+	for nr := first; nr <= last; nr++ {
+		block := bc.GetBlockByNumber(nr)
+		if block == nil {
+			return fmt.Errorf("export failed on #%d: not found", nr)
+		}
+		block = modifyBlock(block)
+		if err := block.EncodeRLP(w); err != nil {
+			return err
+		}
+		if time.Since(reported) >= 8*time.Second {
+			fmt.Printf("Exporting blocks, exported: %v, elapsed: %v \n", block.NumberU64()-first, common.PrettyDuration(time.Since(start)))
+			reported = time.Now()
+		}
+	}
+	return nil
 }
