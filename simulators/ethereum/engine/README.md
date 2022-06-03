@@ -6,7 +6,6 @@ The PoS consensus relies on the Engine API, which receives commands from the con
 
 Clients with support for the merge are required to run this suite:
  - merge-go-ethereum
- - merge-nethermind
 
 
 ## Architecture
