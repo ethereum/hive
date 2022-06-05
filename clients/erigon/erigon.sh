@@ -53,7 +53,7 @@ fi
 
 # Create the data directory.
 mkdir /erigon-hive-datadir
-FLAGS="$FLAGS --datadir /erigon-hive-datadir --syncmode=full"
+FLAGS="$FLAGS --datadir /erigon-hive-datadir"
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
