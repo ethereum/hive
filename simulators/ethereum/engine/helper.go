@@ -472,8 +472,6 @@ func debugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, clientType s
 		return gethDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
 	case "go-ethereum":
 		return gethDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
-	case "merge-nethermind":
-		return nethermindDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
 	case "nethermind":
 		return nethermindDebugPrevRandaoTransaction(ctx, c, tx, expectedPrevRandao)
 	}
