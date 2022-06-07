@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 )
@@ -1248,14 +1249,12 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to obtain bootnode: %v", t.TestName, err)
 		}
-		newParams := t.ClientParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
-		newParams = newParams.Set("HIVE_MINER", "")
-		secondaryClient, secondaryEngine, err := t.StartClient(t.Client.Type, newParams, t.MainTTD())
+
+		genesis := loadGenesis("init/genesis.json")
+		secondaryClient, err := newNode(enode, &genesis)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 		}
-		t.CLMock.AddEngineClient(t.T, secondaryClient, t.MainTTD())
-		secondaryEngineTest := NewTestEngineClient(t, secondaryEngine)
 
 		// Wait until TTD is reached by this client
 		t.CLMock.waitForTTD()
@@ -1327,37 +1326,33 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 					}
 					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 
-					// We are syncing the main client via p2p, therefore we need to send all valid payloads to the secondary
-					// client, and since they are valid, the client will send them via p2p without problems.
-					if i < invalid_index {
-						// Payloads before the invalid payload are sent to the secondary client
-						r := secondaryEngineTest.TestEngineNewPayloadV1(altChainPayloads[i])
-						r.ExpectStatus(Valid)
-						s := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
-							HeadBlockHash:      altChainPayloads[i].BlockHash,
-							SafeBlockHash:      cA.BlockHash,
-							FinalizedBlockHash: cA.BlockHash,
-						}, nil)
-						s.ExpectPayloadStatus(Valid)
-						/*
-							p := NewTestEthClient(t, secondaryEngineTest.Engine.Eth).TestBlockByNumber(nil)
-							p.ExpectHash(altChainPayloads[invalid_index-1].BlockHash)
-						*/
-
+					if i != invalid_index {
+						status, err := secondaryClient.sendNewPayload(altChainPayloads[i])
+						if err != nil {
+							t.Fatalf("FAIL (%s): Unable to send new payload: %v", t.TestName, err)
+						}
+						if status.Status != "VALID" {
+							t.Fatalf("FAIL (%s): Invalid payload status, expected VALID: %v", t.TestName, status.Status)
+						}
 					} else {
-						// Payloads on and after the invalid payload are sent to the main client,
-						// which at first won't be fully verified because the client has to sync with the secondary client
-						// to obtain all the information
-						r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
-						t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
-						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
-							HeadBlockHash:      altChainPayloads[i].BlockHash,
-							SafeBlockHash:      altChainPayloads[i].BlockHash,
-							FinalizedBlockHash: common.Hash{},
-						}, nil)
-						t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
+						invalid_block, err := beacon.ExecutableDataToBlock(execData(altChainPayloads[i]))
+						if err != nil {
+							t.Fatalf("FAIL (%s): Failed to create block from payload: %v", t.TestName, err)
+						}
+						secondaryClient.setBlock(invalid_block)
 					}
 
+					status2, err := secondaryClient.sendFCU(&ForkchoiceStateV1{
+						HeadBlockHash:      altChainPayloads[i].BlockHash,
+						SafeBlockHash:      cA.BlockHash,
+						FinalizedBlockHash: cA.BlockHash,
+					}, nil)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Unable to send new payload: %v", t.TestName, err)
+					}
+					if status2.PayloadStatus.Status != "VALID" {
+						t.Fatalf("FAIL (%s): Invalid payload status, expected VALID: %v", t.TestName, status2.PayloadStatus.Status)
+					}
 				}
 
 				// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
