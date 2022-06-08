@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"io/fs"
 	"log"
@@ -17,41 +18,25 @@ const listLimit = 200 // number of runs reported
 
 // generateListing processes hive simulation output files and generates a listing file.
 func generateListing(fsys fs.FS, dir string, output io.Writer) error {
-	logfiles, err := fs.ReadDir(fsys, dir)
-	if err != nil {
+	var (
+		stop    = errors.New("stop")
+		entries []listingEntry
+	)
+	// The files are walked in name order high->low. So to get the latest 200 items, we
+	// just need to keep going until we have 200.
+	err := walkSummaryFiles(fsys, dir, func(suite *libhive.TestSuite, fi fs.FileInfo) error {
+		entry := suiteToEntry(suite, fi)
+		entries = append(entries, entry)
+		if len(entries) >= listLimit {
+			return stop
+		}
+		return nil
+	})
+	if err != nil && err != stop {
 		return err
 	}
 
-	// Sort by name.
-	sort.Slice(logfiles, func(i, j int) bool {
-		return logfiles[i].Name() < logfiles[j].Name()
-	})
-
-	// The files are prefixed by timestamp, so to get the latest 200 items, we just need
-	// to read the listing in reverse until we have 200.
-	var entries []listingEntry
-	for i := len(logfiles) - 1; i > 0; i-- {
-		name := logfiles[i].Name()
-		if !strings.HasSuffix(name, ".json") || skipFile(name) {
-			continue
-		}
-		file, err := fsys.Open(path.Join(dir, name))
-		if err != nil {
-			continue
-		}
-
-		entry, err := convertSummaryFile(file)
-		file.Close()
-
-		if err != nil {
-			continue
-		}
-		entries = append(entries, entry)
-		if len(entries) >= listLimit {
-			break
-		}
-	}
-
+	// Write listing JSON lines to output.
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].SimLog > entries[j].SimLog
 	})
@@ -79,32 +64,6 @@ type listingEntry struct {
 	FileName string    `json:"fileName"` // hive output file
 	Size     int64     `json:"size"`     // size of hive output file
 	SimLog   string    `json:"simLog"`   // simulator log file
-}
-
-func convertSummaryFile(file fs.File) (listingEntry, error) {
-	fileInfo, err := file.Stat()
-	if err != nil {
-		log.Printf("Can't access summary file: %s", err)
-	}
-
-	var info libhive.TestSuite
-	if err := json.NewDecoder(file).Decode(&info); err != nil {
-		log.Printf("Skipping invalid summary file %s: %v", fileInfo.Name(), err)
-		return listingEntry{}, err
-	}
-	if !suiteValid(&info) {
-		log.Printf("Skipping invalid summary file %s", fileInfo.Name())
-		return listingEntry{}, err
-	}
-	return suiteToEntry(&info, fileInfo), nil
-}
-
-func suiteValid(s *libhive.TestSuite) bool {
-	return s.SimulatorLog != ""
-}
-
-func skipFile(f string) bool {
-	return f == "errorReport.json" || f == "containerErrorReport.json" || strings.HasPrefix(f, ".")
 }
 
 func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
@@ -141,4 +100,65 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
+}
+
+type suiteCB func(*libhive.TestSuite, fs.FileInfo) error
+
+func walkSummaryFiles(fsys fs.FS, dir string, proc suiteCB) error {
+	logfiles, err := fs.ReadDir(fsys, dir)
+	if err != nil {
+		return err
+	}
+	// Sort by name newest-first.
+	sort.Slice(logfiles, func(i, j int) bool {
+		return logfiles[i].Name() > logfiles[j].Name()
+	})
+
+	for _, entry := range logfiles {
+		name := entry.Name()
+		if entry.IsDir() || !strings.HasSuffix(name, ".json") || skipFile(name) {
+			continue
+		}
+		suite, fileInfo := parseSuite(fsys, path.Join(dir, name))
+		if suite != nil {
+			if err := proc(suite, fileInfo); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func parseSuite(fsys fs.FS, path string) (*libhive.TestSuite, fs.FileInfo) {
+	file, err := fsys.Open(path)
+	if err != nil {
+		log.Printf("Can't access summary file: %s", err)
+		return nil, nil
+	}
+	defer file.Close()
+
+	fileInfo, err := file.Stat()
+	if err != nil {
+		log.Printf("Can't access summary file: %s", err)
+		return nil, nil
+	}
+
+	var info libhive.TestSuite
+	if err := json.NewDecoder(file).Decode(&info); err != nil {
+		log.Printf("Skipping invalid summary file %s: %v", fileInfo.Name(), err)
+		return nil, nil
+	}
+	if !suiteValid(&info) {
+		log.Printf("Skipping invalid summary file %s", fileInfo.Name())
+		return nil, nil
+	}
+	return &info, fileInfo
+}
+
+func suiteValid(s *libhive.TestSuite) bool {
+	return s.SimulatorLog != ""
+}
+
+func skipFile(f string) bool {
+	return f == "errorReport.json" || f == "containerErrorReport.json" || strings.HasPrefix(f, ".")
 }
