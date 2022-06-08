@@ -48,9 +48,9 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 			return nil // Don't delete directories.
 		}
 		if _, used := usedFiles[path]; !used {
-			path := filepath.Join(dir, filepath.FromSlash(path))
-			fmt.Println("rm", path)
-			err := os.Remove(path)
+			file := filepath.Join(dir, filepath.FromSlash(path))
+			fmt.Println("rm", file)
+			err := os.Remove(file)
 			if err != nil {
 				fmt.Println("error:", err)
 			}
