@@ -10,21 +10,24 @@ import (
 	"github.com/ethereum/hive/internal/libhive"
 )
 
-func logdirGC(dir string, cutoff time.Time) error {
+func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 	var (
-		fsys      = os.DirFS(dir)
-		usedFiles = make(map[string]struct{})
+		fsys       = os.DirFS(dir)
+		usedFiles  = make(map[string]struct{})
+		keptSuites = 0
 	)
 
 	// Walk all suite files and pouplate the usedFiles set.
 	err := walkSummaryFiles(fsys, ".", func(suite *libhive.TestSuite, fi fs.FileInfo) error {
-		if suiteStart(suite).Before(cutoff) {
-			return nil // skip
+		// Skip when too old and when above the minimum.
+		// Note we rely on getting called in descending time order here.
+		if suiteStart(suite).Before(cutoff) && keptSuites >= keepMin {
+			return nil
 		}
-		// Add suite file itself.
+		// Add suite files and client logs.
+		keptSuites++
 		usedFiles[fi.Name()] = struct{}{}
 		usedFiles[suite.SimulatorLog] = struct{}{}
-		// Add log files.
 		for _, test := range suite.TestCases {
 			for _, client := range test.ClientInfo {
 				usedFiles[client.LogFile] = struct{}{}
