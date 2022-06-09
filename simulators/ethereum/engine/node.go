@@ -47,7 +47,7 @@ func newNode(bootnode string, genesis *core.Genesis) (*gethNode, error) {
 	econfig := &ethconfig.Config{
 		Genesis:         genesis,
 		NetworkId:       genesis.Config.ChainID.Uint64(),
-		SyncMode:        downloader.FullSync,
+		SyncMode:        downloader.SnapSync,
 		DatabaseCache:   256,
 		DatabaseHandles: 256,
 		TxPool:          core.DefaultTxPoolConfig,
@@ -76,7 +76,13 @@ func newNode(bootnode string, genesis *core.Genesis) (*gethNode, error) {
 }
 
 func (n *gethNode) setBlock(block *types.Block) {
+	parentTd := n.eth.BlockChain().GetTd(block.ParentHash(), block.NumberU64()-1)
+	rawdb.WriteTd(n.eth.ChainDb(), block.Hash(), block.NumberU64(), parentTd.Add(parentTd, block.Difficulty()))
 	rawdb.WriteBlock(n.eth.ChainDb(), block)
+	rawdb.WriteHeadBlockHash(n.eth.ChainDb(), block.Hash())
+	rawdb.WriteHeadHeaderHash(n.eth.ChainDb(), block.Hash())
+	rawdb.WriteCanonicalHash(n.eth.ChainDb(), block.Hash(), block.NumberU64())
+	rawdb.WriteHeaderNumber(n.eth.ChainDb(), block.Hash(), block.NumberU64())
 }
 
 func (n *gethNode) sendNewPayload(pl *ExecutableDataV1) (beacon.PayloadStatusV1, error) {

@@ -269,31 +269,31 @@ var engineTests = []TestSpec{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasLimit, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasLimit, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasUsed, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasUsed, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTimestamp, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTimestamp, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidPrevRandao, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidPrevRandao, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, RemoveTransaction, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, RemoveTransaction, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
@@ -1251,6 +1251,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 		}
 
 		genesis := loadGenesis("init/genesis.json")
+		genesis.Config.TerminalTotalDifficulty = t.Engine.TerminalTotalDifficulty
 		secondaryClient, err := newNode(enode, &genesis)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
@@ -1260,7 +1261,14 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 		t.CLMock.waitForTTD()
 
 		// Produce blocks before starting the test
-		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		t.CLMock.produceBlocks(5, BlockProcessCallbacks{
+			OnNewPayloadBroadcast: func() {
+				secondaryClient.sendNewPayload(&t.CLMock.LatestExecutedPayload)
+			},
+			OnForkchoiceBroadcast: func() {
+				secondaryClient.sendFCU(&t.CLMock.LatestForkchoice, &t.CLMock.LatestPayloadAttributes)
+			},
+		})
 
 		// Save the common ancestor
 		cA := t.CLMock.LatestPayloadBuilt
@@ -1331,27 +1339,29 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 						if err != nil {
 							t.Fatalf("FAIL (%s): Unable to send new payload: %v", t.TestName, err)
 						}
-						if status.Status != "VALID" {
-							t.Fatalf("FAIL (%s): Invalid payload status, expected VALID: %v", t.TestName, status.Status)
+						if status.Status != "VALID" && status.Status != "ACCEPTED" {
+							t.Fatalf("FAIL (%s): Invalid payload status, expected VALID, ACCEPTED: %v", t.TestName, status.Status)
 						}
+
+						status2, err := secondaryClient.sendFCU(&ForkchoiceStateV1{
+							HeadBlockHash:      altChainPayloads[i].BlockHash,
+							SafeBlockHash:      cA.BlockHash,
+							FinalizedBlockHash: cA.BlockHash,
+						}, nil)
+						if err != nil {
+							t.Fatalf("FAIL (%s): Unable to send new payload: %v", t.TestName, err)
+						}
+						if status2.PayloadStatus.Status != "VALID" && status2.PayloadStatus.Status != "SYNCING" {
+							t.Fatalf("FAIL (%s): Invalid payload status, expected VALID: %v", t.TestName, status2.PayloadStatus.Status)
+						}
+
 					} else {
 						invalid_block, err := beacon.ExecutableDataToBlock(execData(altChainPayloads[i]))
 						if err != nil {
 							t.Fatalf("FAIL (%s): Failed to create block from payload: %v", t.TestName, err)
 						}
 						secondaryClient.setBlock(invalid_block)
-					}
-
-					status2, err := secondaryClient.sendFCU(&ForkchoiceStateV1{
-						HeadBlockHash:      altChainPayloads[i].BlockHash,
-						SafeBlockHash:      cA.BlockHash,
-						FinalizedBlockHash: cA.BlockHash,
-					}, nil)
-					if err != nil {
-						t.Fatalf("FAIL (%s): Unable to send new payload: %v", t.TestName, err)
-					}
-					if status2.PayloadStatus.Status != "VALID" {
-						t.Fatalf("FAIL (%s): Invalid payload status, expected VALID: %v", t.TestName, status2.PayloadStatus.Status)
+						t.Logf("INFO (%s): Setting invalid block %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 					}
 				}
 
