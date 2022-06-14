@@ -387,6 +387,10 @@ var engineTests = []TestSpec{
 		TTD:       393120,
 		ChainFile: "blocks_2_td_393504.rlp",
 	},
+	{
+		Name: "Payload Build after New Invalid Payload",
+		Run:  payloadBuildAfterNewInvalidPayload,
+	},
 
 	// Re-org using Engine API
 	{
@@ -1982,6 +1986,70 @@ func missingFcu(t *TestEnv) {
 	s := secondaryEthTest.TestBlockByNumber(nil)
 	s.ExpectHash(fcU.HeadBlockHash)
 
+}
+
+// Build on top of the latest valid payload after an invalid payload has been received:
+// P <- INV_P, newPayload(INV_P), fcU(head: P, payloadAttributes: attrs) + getPayload(…)
+func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
+	// Add a second client to build the invalid payload
+	newParams := t.ClientParams.Copy()
+	hc, secondaryEngine, err := t.StartClient(t.Client.Type, newParams, t.MainTTD())
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
+	}
+	secondaryEngineTest := NewTestEngineClient(t, secondaryEngine)
+	t.CLMock.AddEngineClient(t.T, hc, t.MainTTD())
+
+	t.CLMock.AddEngineClient(t.T, hc, t.MainTTD())
+
+	// Wait until TTD is reached by this client
+	t.CLMock.waitForTTD()
+
+	// Produce blocks before starting the test
+	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+	// Produce another block, but at the same time send an invalid payload from the other client
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			// We are going to use the client that was not selected
+			// by the CLMocker to produce the invalid payload
+			invalidPayloadProducer := t.TestEngine
+			if t.CLMock.NextBlockProducer == invalidPayloadProducer.Engine {
+				invalidPayloadProducer = secondaryEngineTest
+			}
+			var inv_p *ExecutableDataV1
+
+			{
+				// Get a payload from the invalid payload producer and invalidate it
+				r := invalidPayloadProducer.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, &PayloadAttributesV1{
+					Timestamp:             t.CLMock.LatestHeader.Time + 1,
+					PrevRandao:            common.Hash{},
+					SuggestedFeeRecipient: common.Address{},
+				})
+				r.ExpectPayloadStatus(Valid)
+				// Wait for the payload to be produced by the EL
+				time.Sleep(time.Second)
+
+				s := invalidPayloadProducer.TestEngineGetPayloadV1(r.Response.PayloadID)
+				s.ExpectNoError()
+
+				inv_p, err = generateInvalidPayload(&s.Payload, InvalidStateRoot)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Unable to invalidate payload: %v", t.TestName, err)
+				}
+			}
+
+			// Broadcast the invalid payload
+			r := t.TestEngine.TestEngineNewPayloadV1(inv_p)
+			r.ExpectStatus(Invalid)
+			s := secondaryEngineTest.TestEngineNewPayloadV1(inv_p)
+			s.ExpectStatus(Invalid)
+
+			// Let the block production continue.
+			// At this point the selected payload producer will
+			// try to continue creating a valid payload.
+		},
+	})
 }
 
 // Fee Recipient Tests
