@@ -2,14 +2,27 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/engine/setup"
+)
+
+var (
+	CHAIN_ID = big.NewInt(1)
+	// This is the account that send transactions.
+	VAULT_ACCOUNT_ADDR = common.HexToAddress("0xcf49fda3be353c69b41ed96333cd24302da4556f")
+	VAULT_KEY, _       = crypto.HexToECDSA("63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376")
 )
 
 var tests = []testSpec{
 	//{Name: "transition-testnet", Run: TransitionTestnet},
 	{Name: "test-rpc-error", Run: TestRPCError},
+	{Name: "invalid-transition-payload", Run: InvalidTransitionPayload},
+	{Name: "invalid-payload-block-hash", Run: InvalidPayloadBlockHash},
+	{Name: "invalid-header-prevrandao", Run: IncorrectHeaderPrevRandaoPayload},
 }
 
 func main() {

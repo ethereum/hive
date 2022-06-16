@@ -10,9 +10,9 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/protolambda/eth2api v0.0.0-20220123235524-49a703ed9d94
 	github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52
-	github.com/protolambda/zrnt v0.25.0
-	github.com/protolambda/ztyp v0.2.1
-	github.com/rauljordan/engine-proxy v0.0.0-20220511134016-2e057ad9d277
+	github.com/protolambda/zrnt v0.26.1
+	github.com/protolambda/ztyp v0.2.2
+	github.com/rauljordan/engine-proxy v0.0.0-20220517190449-e62b2e2f6e27
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wealdtech/go-eth2-util v1.6.5
 )
@@ -47,6 +47,8 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.1.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.1 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
+	github.com/fjl/gencodec v0.0.0-20220412091415-8bb9e558978c // indirect
+	github.com/garslo/gogen v0.0.0-20170306192744-1d203ffc1f61 // indirect
 	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
@@ -63,5 +65,8 @@ require (
 	github.com/wealdtech/go-bytesutil v1.1.1 // indirect
 	github.com/wealdtech/go-eth2-types/v2 v2.5.6 // indirect
 	golang.org/x/crypto v0.0.0-20211202192323-5770296d904e // indirect
+	golang.org/x/mod v0.4.2 // indirect
+	golang.org/x/tools v0.1.0 // indirect
+	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )

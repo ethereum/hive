@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"math/big"
 	"sync"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/engine/setup"
@@ -127,6 +129,10 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 
 					var checkpoints eth2api.FinalityCheckpoints
 					if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &checkpoints); err != nil {
+						/*
+							TODO: This seems to work with other clients, but need to verify...
+							if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdSlot(headInfo.Header.Message.Slot), &checkpoints); err != nil {
+						*/
 						ch <- res{err: fmt.Errorf("beacon %d: failed to poll finality checkpoint: %v", i, err)}
 						return
 					} else if !exists {
@@ -159,6 +165,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 					health, err := getHealth(ctx, b.API, t.spec, slot)
 					if err != nil {
 						ch <- res{err: fmt.Errorf("beacon %d: %s", i, err)}
+						// UNCOMMENT: return
 					}
 
 					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s, justified=%s, finalized=%s", i, slot, head, health, execution, justified, finalized), nil}
@@ -240,15 +247,46 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(ctx context.Context, checkpo
 	return nil
 }
 
+// VerifyExecutionPayloadIsCanonical retrieves the execution payload from the
+// finalized block and verifies that is in the execution client's canonical
+// chain.
+func (t *Testnet) VerifyExecutionPayloadHashInclusion(ctx context.Context, checkpoint common.Checkpoint, hash ethcommon.Hash) *bellatrix.SignedBeaconBlock {
+	for slot := 0; slot < int(t.spec.SLOTS_PER_EPOCH)*int(checkpoint.Epoch); slot += 1 {
+		var versionedBlock eth2api.VersionedSignedBeaconBlock
+		if exists, err := beaconapi.BlockV2(ctx, t.beacons[0].API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
+			continue
+		} else if !exists {
+			continue
+		}
+		if versionedBlock.Version != "bellatrix" {
+			// Block can't contain an executable payload
+			continue
+		}
+		block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+		payload := block.Message.Body.ExecutionPayload
+		t.t.Logf("INFO: Verifying exec block found in %d: %v", block.Message.Slot, ethcommon.BytesToHash(payload.BlockHash[:]))
+		if bytes.Compare(payload.BlockHash[:], hash[:]) == 0 {
+			return block
+		}
+	}
+	return nil
+}
+
 // VerifyProposers checks that all validator clients have proposed a block on
 // the finalized beacon chain that includes an execution payload.
-func (t *Testnet) VerifyProposers(ctx context.Context, checkpoint common.Checkpoint) error {
+func (t *Testnet) VerifyProposers(ctx context.Context, checkpoint common.Checkpoint, allow_empty_blocks bool) error {
 	proposers := make([]bool, len(t.beacons))
 	for slot := 0; slot < int(t.spec.SLOTS_PER_EPOCH)*int(checkpoint.Epoch); slot += 1 {
 		var versionedBlock eth2api.VersionedSignedBeaconBlock
 		if exists, err := beaconapi.BlockV2(ctx, t.beacons[0].API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
+			if allow_empty_blocks {
+				continue
+			}
 			return fmt.Errorf("beacon %d: failed to retrieve block: %v", 0, err)
 		} else if !exists {
+			if allow_empty_blocks {
+				continue
+			}
 			return fmt.Errorf("beacon %d: block not found", 0)
 		}
 		var proposerIndex common.ValidatorIndex
