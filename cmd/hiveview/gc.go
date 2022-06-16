@@ -5,7 +5,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"sort"
 	"time"
 
 	"github.com/ethereum/hive/internal/libhive"
@@ -45,18 +44,8 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 		return err
 	}
 
-	fmt.Println("keptSuites:", keptSuites)
-	fmt.Println("oldest:", oldest)
-
-	var fileList []string
-	for f := range usedFiles {
-		fileList = append(fileList, f)
-	}
-	sort.Strings(fileList)
-	for _, f := range fileList {
-		fmt.Println(f)
-	}
-	return nil
+	fmt.Printf("keeping %d suites (%d files)\n", keptSuites, len(usedFiles))
+	fmt.Printf("oldest suite date:", oldest)
 
 	// Delete all files which aren't in usedFiles.
 	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
