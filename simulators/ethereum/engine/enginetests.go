@@ -692,8 +692,8 @@ func invalidPayloadAttributesGen(syncing bool) func(*TestEnv) {
 				t.Logf("INFO (%s): Sending EngineForkchoiceUpdatedV1 (Syncing=%s) with invalid payload attributes", t.TestName, syncing)
 				fcu := ForkchoiceStateV1{
 					HeadBlockHash:      blockHash,
-					SafeBlockHash:      blockHash,
-					FinalizedBlockHash: blockHash,
+					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
+					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				}
 				attr := PayloadAttributesV1{
 					Timestamp:             0,
