@@ -45,7 +45,7 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 	}
 
 	fmt.Printf("keeping %d suites (%d files)\n", keptSuites, len(usedFiles))
-	fmt.Printf("oldest suite date:", oldest)
+	fmt.Println("oldest suite date:", oldest)
 
 	// Delete all files which aren't in usedFiles.
 	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
