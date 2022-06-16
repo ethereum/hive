@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"github.com/ethereum/hive/internal/libhive"
@@ -15,6 +16,7 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 		fsys       = os.DirFS(dir)
 		usedFiles  = make(map[string]struct{})
 		keptSuites = 0
+		oldest     time.Time
 	)
 
 	// Walk all suite files and pouplate the usedFiles set.
@@ -24,6 +26,10 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 		if suiteStart(suite).Before(cutoff) && keptSuites >= keepMin {
 			return nil
 		}
+		if oldest.IsZero() || suiteStart(suite).Before(oldest) {
+			oldest = suiteStart(suite)
+		}
+
 		// Add suite files and client logs.
 		keptSuites++
 		usedFiles[fi.Name()] = struct{}{}
@@ -39,6 +45,19 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 		return err
 	}
 
+	fmt.Println("keptSuites:", keptSuites)
+	fmt.Println("oldest:", oldest)
+
+	var fileList []string
+	for f := range usedFiles {
+		fileList = append(fileList, f)
+	}
+	sort.Strings(fileList)
+	for _, f := range fileList {
+		fmt.Println(f)
+	}
+	return nil
+
 	// Delete all files which aren't in usedFiles.
 	return fs.WalkDir(fsys, ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -49,7 +68,7 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 		}
 		if _, used := usedFiles[path]; !used {
 			file := filepath.Join(dir, filepath.FromSlash(path))
-			fmt.Println("rm", file)
+			// fmt.Println("rm", file)
 			err := os.Remove(file)
 			if err != nil {
 				fmt.Println("error:", err)
