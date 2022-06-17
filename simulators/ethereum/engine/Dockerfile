@@ -5,7 +5,7 @@ RUN apk add --update gcc musl-dev linux-headers
 # Build the simulator executable.
 ADD . /source
 WORKDIR /source
-RUN go build -v .
+RUN go mod download github.com/ethereum/go-ethereum && go build -v .
 
 # Build the simulator run container.
 FROM alpine:latest

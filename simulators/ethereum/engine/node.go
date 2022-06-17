@@ -5,9 +5,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/eth"
 	ethcatalyst "github.com/ethereum/go-ethereum/eth/catalyst"
@@ -20,14 +22,21 @@ import (
 )
 
 type gethNode struct {
-	node *node.Node
-	eth  *eth.Ethereum
+	node     *node.Node
+	eth      *eth.Ethereum
+	datadir  string
+	bootnode string
+	genesis  *core.Genesis
 }
 
 func newNode(bootnode string, genesis *core.Genesis) (*gethNode, error) {
 	// Define the basic configurations for the Ethereum node
 	datadir, _ := os.MkdirTemp("", "")
 
+	return restart(bootnode, datadir, genesis)
+}
+
+func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error) {
 	config := &node.Config{
 		Name:    "geth",
 		Version: params.Version,
@@ -70,19 +79,64 @@ func newNode(bootnode string, genesis *core.Genesis) (*gethNode, error) {
 	err = stack.Start()
 
 	return &gethNode{
-		node: stack,
-		eth:  ethBackend,
+		node:     stack,
+		eth:      ethBackend,
+		datadir:  datadir,
+		bootnode: bootnode,
+		genesis:  genesis,
 	}, err
 }
 
-func (n *gethNode) setBlock(block *types.Block) {
+type validator struct{}
+
+func (v *validator) ValidateBody(block *types.Block) error {
+	return nil
+}
+func (v *validator) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error {
+	return nil
+}
+
+func (n *gethNode) setBlock(block *types.Block, parentRoot common.Hash) error {
 	parentTd := n.eth.BlockChain().GetTd(block.ParentHash(), block.NumberU64()-1)
 	rawdb.WriteTd(n.eth.ChainDb(), block.Hash(), block.NumberU64(), parentTd.Add(parentTd, block.Difficulty()))
 	rawdb.WriteBlock(n.eth.ChainDb(), block)
-	rawdb.WriteHeadBlockHash(n.eth.ChainDb(), block.Hash())
-	rawdb.WriteHeadHeaderHash(n.eth.ChainDb(), block.Hash())
-	rawdb.WriteCanonicalHash(n.eth.ChainDb(), block.Hash(), block.NumberU64())
+
 	rawdb.WriteHeaderNumber(n.eth.ChainDb(), block.Hash(), block.NumberU64())
+	bc := n.eth.BlockChain()
+	bc.SetValidator(new(validator))
+
+	statedb, err := state.New(parentRoot, bc.StateCache(), bc.Snapshots())
+	if err != nil {
+		return err
+	}
+	statedb.StartPrefetcher("chain")
+	receipts, _, _, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
+	if err != nil {
+		return err
+	}
+	rawdb.WriteReceipts(n.eth.ChainDb(), block.Hash(), block.NumberU64(), receipts)
+	root, err := statedb.Commit(false)
+	if err != nil {
+		return err
+	}
+	_ = root
+	triedb := bc.StateCache().TrieDB()
+	if err := triedb.Commit(block.Root(), true, nil); err != nil {
+		return err
+	}
+
+	if err := triedb.Commit(root, true, nil); err != nil {
+		return err
+	}
+	rawdb.WriteHeadHeaderHash(n.eth.ChainDb(), block.Hash())
+	rawdb.WriteHeadFastBlockHash(n.eth.ChainDb(), block.Hash())
+	rawdb.WriteCanonicalHash(n.eth.ChainDb(), block.Hash(), block.NumberU64())
+	rawdb.WriteTxLookupEntriesByBlock(n.eth.ChainDb(), block)
+	rawdb.WriteHeadBlockHash(n.eth.ChainDb(), block.Hash())
+	if _, err := bc.SetCanonical(block); err != nil {
+		panic(err)
+	}
+	return nil
 }
 
 func (n *gethNode) sendNewPayload(pl *ExecutableDataV1) (beacon.PayloadStatusV1, error) {

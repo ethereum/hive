@@ -12,3 +12,5 @@ require (
 	github.com/status-im/keycard-go v0.0.0-20190424133014-d95853db0f48 // indirect
 	github.com/tyler-smith/go-bip39 v1.0.2 // indirect
 )
+
+replace github.com/ethereum/go-ethereum => github.com/mariusvanderwijden/go-ethereum v1.8.22-0.20220617091726-f8b28218ab86

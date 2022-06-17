@@ -1334,7 +1334,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 					}
 					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 
-					if i != invalid_index {
+					if i < invalid_index {
 						status, err := secondaryClient.sendNewPayload(altChainPayloads[i])
 						if err != nil {
 							t.Fatalf("FAIL (%s): Unable to send new payload: %v", t.TestName, err)
@@ -1360,7 +1360,10 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 						if err != nil {
 							t.Fatalf("FAIL (%s): Failed to create block from payload: %v", t.TestName, err)
 						}
-						secondaryClient.setBlock(invalid_block)
+
+						if err := secondaryClient.setBlock(invalid_block, altChainPayloads[i-1].StateRoot); err != nil {
+							t.Fatalf("FAIL (%s): Failed to set invalid block: %v", t.TestName, err)
+						}
 						t.Logf("INFO (%s): Setting invalid block %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 					}
 				}
