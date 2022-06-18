@@ -29,10 +29,10 @@ simulation, use the following command:
 
     ./hive --sim <simulation> --client <client(s) you want to test against>
 
-For example, if you want to run the `discv4` test against geth and openethereum, here is
+For example, if you want to run the `discv4` test against geth and nethermind, here is
 how the command would look:
 
-    ./hive --sim devp2p --sim.limit discv4 --client go-ethereum,openethereum
+    ./hive --sim devp2p --sim.limit discv4 --client go-ethereum,nethermind
 
 The client list may contain any number of clients. You can select a specific client
 version by appending it to the client name with `_`, for example:

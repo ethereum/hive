@@ -130,7 +130,7 @@ You can test this build by running `docker build .` in the simulator directory.
 
 Finally, go back to the root of the repository (`cd ../../..`) and run the simulation.
 
-    ./hive --sim my-simulation --client go-ethereum,openethereum
+    ./hive --sim my-simulation --client go-ethereum,nethermind
 
 You can check the results using [hiveview].
 

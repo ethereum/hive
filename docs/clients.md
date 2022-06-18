@@ -89,8 +89,8 @@ container:
 On startup, the entry point script must first load the genesis block and state into the
 client implementation from `/genesis.json`. To do this, the script needs to translate from
 Geth genesis format into a format appropriate for the specific client implementation. The
-translation is usually done using a jq script. See the [openethereum genesis
-translator][oe-genesis-jq], for example.
+translation is usually done using a jq script. See the [geth genesis
+translator][geth-genesis-jq], for example.
 
 After the genesis state, the client should import the blocks from `/chain.rlp` if it is
 present, and finally import the individual blocks from `/blocks` in file name order. The
@@ -155,7 +155,7 @@ For the server role, the following additional variables should be supported:
 
 [LES]: https://github.com/ethereum/devp2p/blob/master/caps/les.md
 [geth-docker]: ../clients/go-ethereum/Dockerfile
-[oe-genesis-jq]: ../clients/openethereum/mapper.jq
+[geth-genesis-jq]: ../clients/geth/mapper.jq
 [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 [EIP-606]: https://eips.ethereum.org/EIPS/eip-606
 [EIP-607]: https://eips.ethereum.org/EIPS/eip-607
