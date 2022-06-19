@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/big"
 	"net"
 	"net/http"
 	"os"
@@ -20,30 +19,26 @@ import (
 )
 
 var (
-	chainID   = big.NewInt(1)
-	networkID = big.NewInt(1)
+	clientEnv = hivesim.Params{
+		"HIVE_NODETYPE":       "full",
+		"HIVE_NETWORK_ID":     "1",
+		"HIVE_CHAIN_ID":       "1",
+		"HIVE_FORK_HOMESTEAD": "0",
+		//"HIVE_FORK_DAO_BLOCK":      2000,
+		"HIVE_FORK_TANGERINE":      "0",
+		"HIVE_FORK_SPURIOUS":       "0",
+		"HIVE_FORK_BYZANTIUM":      "0",
+		"HIVE_FORK_CONSTANTINOPLE": "0",
+		"HIVE_FORK_PETERSBURG":     "0",
+		"HIVE_FORK_ISTANBUL":       "0",
+		"HIVE_FORK_BERLIN":         "0",
+		"HIVE_FORK_LONDON":         "0",
+	}
+	files = map[string]string{
+		"genesis.json": "./tests/genesis.json",
+		"chain.rlp":    "./tests/chain.rlp",
+	}
 )
-
-var clientEnv = hivesim.Params{
-	"HIVE_NODETYPE":       "full",
-	"HIVE_NETWORK_ID":     "1",
-	"HIVE_CHAIN_ID":       "1",
-	"HIVE_FORK_HOMESTEAD": "0",
-	//"HIVE_FORK_DAO_BLOCK":      2000,
-	"HIVE_FORK_TANGERINE":      "0",
-	"HIVE_FORK_SPURIOUS":       "0",
-	"HIVE_FORK_BYZANTIUM":      "0",
-	"HIVE_FORK_CONSTANTINOPLE": "0",
-	"HIVE_FORK_PETERSBURG":     "0",
-	"HIVE_FORK_ISTANBUL":       "0",
-	"HIVE_FORK_BERLIN":         "0",
-	"HIVE_FORK_LONDON":         "0",
-}
-
-var files = map[string]string{
-	"genesis.json": "./tests/genesis.json",
-	"chain.rlp":    "./tests/chain.rlp",
-}
 
 type test struct {
 	Name string
@@ -121,7 +116,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 			// again to remove padding differences and to print each field in the same
 			// order. This makes it easy to spot any discrepancies.
 			if resp == nil {
-				return fmt.Errorf("invalid test, response before request\n")
+				return fmt.Errorf("invalid test, response before request")
 			}
 			var want interface{}
 			if err := json.Unmarshal([]byte(strings.TrimSpace(line)[3:]), &want); err != nil {
@@ -200,7 +195,7 @@ func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 
 // loadTests walks the given directory looking for *.io files to load.
 func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
-	tests := make([]test, 0, 0)
+	tests := make([]test, 0)
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			t.Logf("unable to walk path: %s", err)
