@@ -99,8 +99,9 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 				inner: http.DefaultTransport,
 			},
 		}
-		url     = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
-		readbuf = bytes.NewBuffer(nil)
+		url  = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
+		err  error
+		resp []byte
 	)
 
 	for _, line := range strings.Split(string(data), "\n") {
@@ -110,74 +111,56 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 			// Skip comments, blank lines.
 			continue
 		case strings.HasPrefix(line, ">> "):
-			// Write to connection.
-			data := bytes.NewBuffer([]byte(line[3:]))
-			req, err := http.NewRequest("POST", url, data)
+			// Send request.
+			resp, err = postHttp(client, url, []byte(line[3:]))
 			if err != nil {
-				t.Fatalf("request error: %v", err)
+				return err
 			}
-			req.Header.Set("Content-Type", "application/json")
-			resp, err := client.Do(req)
-			if err != nil {
-				t.Fatalf("write error: %v", err)
-			}
-			readbuf.ReadFrom(resp.Body)
 		case strings.HasPrefix(line, "<< "):
-			want := line[3:]
-			// Read line from response buffer and compare.
-			got, err := readbuf.ReadString('\n')
-			if err != io.EOF && err != nil {
-				t.Fatalf("read error: %v", err)
+			// Read response. Unmarshal to interface{} to verify deep equality. Marshal
+			// again to remove padding differences and to print each field in the same
+			// order. This makes it easy to spot any discrepancies.
+			if resp == nil {
+				return fmt.Errorf("invalid test, response before request\n")
 			}
-			if eq, err := jsonEq(want, got); err != nil {
-				t.Fatalf("json decoding error: %v", err)
-			} else if !eq {
-				t.Errorf("wrong line from server\ngot:  %s\nwant: %s", got, want)
+			var want interface{}
+			if err := json.Unmarshal([]byte(strings.TrimSpace(line)[3:]), &want); err != nil {
+				return err
 			}
+			var got interface{}
+			if err := json.Unmarshal(resp, &got); err != nil {
+				return err
+			}
+			if !reflect.DeepEqual(want, got) {
+				want, _ := json.Marshal(want)
+				got, _ := json.Marshal(got)
+				return fmt.Errorf("invalid response\nwant: %s\ngot:  %s", want, got)
+			}
+			resp = nil
 		default:
 			t.Fatalf("invalid line in test script: %s", line)
 		}
 	}
+	if resp != nil {
+		t.Fatalf("unhandled response in test case")
+	}
 	return nil
 }
 
-func jsonEq(a string, b string) (bool, error) {
-	var x, y interface{}
-	if err := json.Unmarshal([]byte(a), &x); err != nil {
-		return false, err
+// sendHttp sends an HTTP POST with the provided json data and reads the
+// response into a byte slice and returns it.
+func postHttp(c *http.Client, url string, d []byte) ([]byte, error) {
+	data := bytes.NewBuffer(d)
+	req, err := http.NewRequest("POST", url, data)
+	if err != nil {
+		return nil, fmt.Errorf("error building request: %v", err)
 	}
-	if err := json.Unmarshal([]byte(b), &y); err != nil {
-		return false, err
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("write error: %v", err)
 	}
-	return reflect.DeepEqual(x, y), nil
-}
-
-func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
-	tests := make([]test, 0, 0)
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			t.Logf("unable to walk path: %s", err)
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if fname := info.Name(); !strings.HasSuffix(fname, ".io") {
-			return nil
-		}
-		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".io")
-		if !re.MatchString(pathname) {
-			fmt.Println("skip", pathname)
-			return nil // skip
-		}
-		data, err := ioutil.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		tests = append(tests, test{strings.TrimLeft(pathname, "/"), data})
-		return nil
-	})
-	return tests
+	return io.ReadAll(resp.Body)
 }
 
 // loggingRoundTrip writes requests and responses to the test log.
@@ -213,4 +196,33 @@ func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
 	rt.t.Logf("<<  %s", bytes.TrimSpace(respBytes))
 	return &respCopy, nil
+}
+
+// loadTests walks the given directory looking for *.io files to load.
+func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
+	tests := make([]test, 0, 0)
+	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			t.Logf("unable to walk path: %s", err)
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if fname := info.Name(); !strings.HasSuffix(fname, ".io") {
+			return nil
+		}
+		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".io")
+		if !re.MatchString(pathname) {
+			fmt.Println("skip", pathname)
+			return nil // skip
+		}
+		data, err := ioutil.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		tests = append(tests, test{strings.TrimLeft(pathname, "/"), data})
+		return nil
+	})
+	return tests
 }
