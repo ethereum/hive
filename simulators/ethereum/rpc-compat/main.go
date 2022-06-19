@@ -2,13 +2,16 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -124,19 +127,31 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 		case strings.HasPrefix(line, "<< "):
 			want := line[3:]
 			// Read line from response buffer and compare.
-			sent, err := readbuf.ReadString('\n')
-			if err != nil {
+			got, err := readbuf.ReadString('\n')
+			if err != io.EOF && err != nil {
 				t.Fatalf("read error: %v", err)
 			}
-			sent = strings.TrimRight(sent, "\r\n")
-			if sent != want {
-				t.Errorf("wrong line from server\ngot:  %s\nwant: %s", sent, want)
+			if eq, err := jsonEq(want, got); err != nil {
+				t.Fatalf("json decoding error: %v", err)
+			} else if !eq {
+				t.Errorf("wrong line from server\ngot:  %s\nwant: %s", got, want)
 			}
 		default:
 			t.Fatalf("invalid line in test script: %s", line)
 		}
 	}
 	return nil
+}
+
+func jsonEq(a string, b string) (bool, error) {
+	var x, y interface{}
+	if err := json.Unmarshal([]byte(a), &x); err != nil {
+		return false, err
+	}
+	if err := json.Unmarshal([]byte(b), &y); err != nil {
+		return false, err
+	}
+	return reflect.DeepEqual(x, y), nil
 }
 
 func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
