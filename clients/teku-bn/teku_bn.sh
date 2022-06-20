@@ -41,6 +41,7 @@ fi
     --data-path=/data/teku \
     --initial-state=/data/testnet_setup/genesis.ssz \
     --eth1-deposit-contract-address="${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" \
+    --log-destination console \
     --logging="$LOG" \
     $metrics_option $eth1_option $merge_option \
     --validators-proposer-default-fee-recipient="0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b" \
