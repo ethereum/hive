@@ -28,6 +28,7 @@ esac
     --network=auto \
     --beacon-node-api-endpoint="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT" \
     --data-path=/data/teku \
+    --log-destination console \
     --logging="$LOG" \
     --validator-keys=/data/validators/keys:/data/validators/passwords \
     --validators-proposer-default-fee-recipient="0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b" \
