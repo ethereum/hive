@@ -17,6 +17,7 @@ COPY ./rollup.json /rollup.json
 RUN mkdir /hive /config
 COPY p2p-node-key.txt /config
 COPY p2p-sequencer-key.txt /config
+COPY test-jwt-secret.txt /config
 
 RUN op-node --version 2>/dev/null | head -1 > /version.txt
 

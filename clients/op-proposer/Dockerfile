@@ -12,11 +12,11 @@ FROM alpine:3.15
 RUN apk add --no-cache curl jq
 
 COPY --from=builder /app/op-proposer/bin/op-proposer /usr/local/bin
-COPY l2os-entrypoint.sh /l2os-entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
 
 RUN op-proposer --version 2>/dev/null | head -1 > /version.txt
 
 # TODO
 # RUN export L2OO_ADDRESS=
 
-ENTRYPOINT ["/bin/sh", "/l2os-entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]

@@ -129,6 +129,8 @@ func runAllTests(t *hivesim.T) {
 					}
 				},
 			})
+			// TODO: debug re-org issue and remove
+			time.Sleep(5 * time.Second)
 		}()
 	}
 	s.drain()

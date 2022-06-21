@@ -62,25 +62,25 @@ func (d *Devnet) Start() {
 	}
 	var eth1, l2, op, l2os, bss *hivesim.ClientDefinition
 	for _, client := range clientTypes {
-		if client.HasRole("ops-l1") {
+		if client.HasRole("op-l1") {
 			eth1 = client
 		}
-		if client.HasRole("ops-l2") {
+		if client.HasRole("op-l2") {
 			l2 = client
 		}
-		if client.HasRole("ops-opnode") {
+		if client.HasRole("op-node") {
 			op = client
 		}
-		if client.HasRole("ops-l2os") {
+		if client.HasRole("op-proposer") {
 			l2os = client
 		}
-		if client.HasRole("ops-bss") {
+		if client.HasRole("op-batcher") {
 			bss = client
 		}
 	}
 
 	if eth1 == nil || l2 == nil || op == nil || l2os == nil || bss == nil {
-		d.t.Fatal("ops-l1, ops-l2, ops-opnode, ops-l2os, ops-bss required")
+		d.t.Fatal("op-l1, op-l2, op-node, op-proposer, op-batcher required")
 	}
 
 	// Generate genesis for execution clients
@@ -101,11 +101,11 @@ func (d *Devnet) Start() {
 	opts := []hivesim.StartOption{executionOpts}
 	d.eth1 = &Eth1Node{d.t.StartClient(eth1.Name, opts...)}
 
-	d.nodes["ops-l1"] = eth1
-	d.nodes["ops-l2"] = l2
-	d.nodes["ops-opnode"] = op
-	d.nodes["ops-l2os"] = l2os
-	d.nodes["ops-bss"] = bss
+	d.nodes["op-l1"] = eth1
+	d.nodes["op-l2"] = l2
+	d.nodes["op-node"] = op
+	d.nodes["op-proposer"] = l2os
+	d.nodes["op-batcher"] = bss
 }
 
 func (d *Devnet) Wait() error {
@@ -182,7 +182,7 @@ func (d *Devnet) InitL2() error {
 }
 
 func (d *Devnet) StartL2() error {
-	l2 := d.nodes["ops-l2"]
+	l2 := d.nodes["op-l2"]
 
 	executionOpts := hivesim.Params{
 		"HIVE_CHECK_LIVE_PORT": "9545",
@@ -213,7 +213,7 @@ func (d *Devnet) InitOp() error {
 }
 
 func (d *Devnet) StartOp() error {
-	op := d.nodes["ops-opnode"]
+	op := d.nodes["op-node"]
 
 	executionOpts := hivesim.Params{
 		"HIVE_CHECK_LIVE_PORT":  "7545",
@@ -229,7 +229,7 @@ func (d *Devnet) StartOp() error {
 }
 
 func (d *Devnet) StartL2OS() error {
-	op := d.nodes["ops-l2os"]
+	op := d.nodes["op-proposer"]
 
 	executionOpts := hivesim.Params{
 		"HIVE_CHECK_LIVE_PORT":  "0",
@@ -245,7 +245,7 @@ func (d *Devnet) StartL2OS() error {
 }
 
 func (d *Devnet) StartBSS() error {
-	op := d.nodes["ops-bss"]
+	op := d.nodes["op-batcher"]
 
 	executionOpts := hivesim.Params{
 		"HIVE_CHECK_LIVE_PORT":  "0",

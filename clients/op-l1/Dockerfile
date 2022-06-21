@@ -1,4 +1,4 @@
-FROM ethereum/client-go:v1.10.16 AS base
+FROM ethereum/client-go:release-1.10 AS base
 
 RUN apk add --no-cache jq yarn git linux-headers gcompat
 RUN /usr/local/bin/geth console --exec 'console.log(admin.nodeInfo.name)' --maxpeers=0 --nodiscover --dev 2>/dev/null | head -1 > /version.txt
@@ -25,7 +25,8 @@ RUN chmod +x /entrypoint.sh
 # Deploy contracts using Hardhat
 RUN git clone https://github.com/ethereum-optimism/optimism /opt
 RUN cd /opt && git submodule init && git submodule update
-RUN cp -r /opt/contracts-bedrock /hive/contracts
+RUN cp -r /opt/packages/contracts-bedrock /hive/contracts
+RUN cp -r /opt/tsconfig.json /
 # Defer until L1 rpc server is up; called from devnet.go
 ADD deploy.sh /hive-bin/deploy.sh
 RUN chmod +x /hive-bin/deploy.sh

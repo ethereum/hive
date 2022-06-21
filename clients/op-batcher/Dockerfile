@@ -12,9 +12,9 @@ FROM alpine:3.15
 RUN apk add jq curl
 
 COPY --from=builder /app/op-batcher/bin/op-batcher /usr/local/bin
-COPY ./bss-entrypoint.sh /bss-entrypoint.sh
+COPY ./entrypoint.sh /entrypoint.sh
 COPY ./rollup.json /rollup.json
 
 RUN op-batcher --version 2>/dev/null | head -1 > /version.txt
 
-ENTRYPOINT ["/bin/sh", "/bss-entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]

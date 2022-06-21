@@ -2,7 +2,7 @@ module github.com/ethereum-optimism/hive/simulators/optimism/devnet
 
 go 1.17
 
-replace github.com/ethereum/go-ethereum v1.10.17 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220524005015-6e3df1ba83e6
+replace github.com/ethereum/go-ethereum v1.10.17 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220616183505-9a67f31e4592
 
 require (
 	github.com/ethereum/go-ethereum v1.10.17
@@ -18,6 +18,7 @@ require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
+	github.com/ethereum-optimism/optimism/op-bindings v0.0.0-20220614233543-0d8fa52afca2 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
