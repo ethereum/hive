@@ -70,3 +70,5 @@ require (
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )
+
+replace github.com/rauljordan/engine-proxy => github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea

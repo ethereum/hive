@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"strings"
@@ -81,7 +82,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)
 
 	// Generate keys opts for validators
-	keyTranches := setup.KeyTranches(env.Keys, uint64(len(config.Nodes)))
+	keyTranches := setup.KeyTranches(env.Keys, config.Nodes.Shares())
 
 	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount)
 	if err != nil {
@@ -151,7 +152,7 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	}
 }
 
-func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus ConsensusType) {
+func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus ConsensusType, ttd *big.Int) {
 	testnet.t.Logf("Starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{p.executionOpts}
@@ -173,6 +174,9 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 
 		// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
 		opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
+	}
+	if ttd != nil {
+		opts = append(opts, hivesim.Params{"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf("%d", ttd.Int64())})
 	}
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}
 	dest, _ := en.EngineRPCAddress()
@@ -220,11 +224,11 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 	})
 
 	if len(testnet.beacons) > 0 {
-		bootnodeENR, err := testnet.beacons[0].ENR()
+		bootnodeENRs, err := testnet.beacons.ENRs()
 		if err != nil {
-			testnet.t.Fatalf("failed to get ENR as bootnode for beacon node: %v", err)
+			testnet.t.Fatalf("failed to get ENR as bootnode for every beacon node: %v", err)
 		}
-		opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENR})
+		opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENRs})
 	}
 
 	// TODO

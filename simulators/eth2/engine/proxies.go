@@ -29,7 +29,7 @@ func NewProxy(hostIP net.IP, port int, destination string, jwtSecret []byte) *Pr
 	config := proxy.SpoofingConfig{}
 	callbacks := proxy.SpoofingCallbacks{
 		RequestCallbacks:  make(map[string]func([]byte) *proxy.Spoof),
-		ResponseCallbacks: make(map[string]func([]byte) *proxy.Spoof),
+		ResponseCallbacks: make(map[string]func([]byte, []byte) *proxy.Spoof),
 	}
 	options := []proxy.Option{
 		proxy.WithHost(host),
@@ -75,7 +75,7 @@ func (p *Proxy) AddRequest(spoof *proxy.Spoof) {
 	p.proxy.UpdateSpoofingConfig(p.config)
 }
 
-func (p *Proxy) AddResponseCallback(method string, callback func([]byte) *proxy.Spoof) {
+func (p *Proxy) AddResponseCallback(method string, callback func([]byte, []byte) *proxy.Spoof) {
 	log.Info("Adding response spoof callback", "method", method)
 	responseCallbacks := p.callbacks.ResponseCallbacks
 	responseCallbacks[method] = callback

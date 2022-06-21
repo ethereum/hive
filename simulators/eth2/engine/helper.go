@@ -37,9 +37,11 @@ type testEnv struct {
 }
 
 type node struct {
-	ExecutionClient string
-	ConsensusClient string
-	ValidatorShares int
+	ExecutionClient         string
+	ConsensusClient         string
+	ValidatorShares         uint64
+	TerminalTotalDifficulty *big.Int
+	TestVerificationNode    bool
 }
 
 type Nodes []node
@@ -48,12 +50,12 @@ func (n *node) String() string {
 	return fmt.Sprintf("%s-%s", n.ConsensusClient, n.ExecutionClient)
 }
 
-func (nodes Nodes) TotalValidatorShares() int {
-	total := 0
-	for _, n := range nodes {
-		total += n.ValidatorShares
+func (nodes Nodes) Shares() []uint64 {
+	shares := make([]uint64, len(nodes))
+	for i, n := range nodes {
+		shares[i] = n.ValidatorShares
 	}
-	return total
+	return shares
 }
 
 type config struct {
@@ -479,4 +481,18 @@ func generateInvalidPayloadSpoof(method string, basePayload *ExecutableDataV1, p
 	}
 
 	return customizePayloadSpoof(method, basePayload, customPayloadMod)
+}
+
+// Generate a payload status spoof
+func payloadStatusSpoof(method string, status *PayloadStatusV1) (*proxy.Spoof, error) {
+	fields := make(map[string]interface{})
+	fields["status"] = status.Status
+	fields["latestValidHash"] = status.LatestValidHash
+	fields["validationError"] = status.ValidationError
+
+	// Return the new payload status spoof
+	return &proxy.Spoof{
+		Method: method,
+		Fields: fields,
+	}, nil
 }

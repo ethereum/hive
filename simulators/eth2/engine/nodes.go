@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/hive/hivesim"
@@ -53,6 +54,8 @@ type BeaconNode struct {
 	API *eth2api.Eth2HttpClient
 }
 
+type BeaconNodes []*BeaconNode
+
 func NewBeaconNode(cl *hivesim.Client) *BeaconNode {
 	return &BeaconNode{
 		Client: cl,
@@ -77,6 +80,22 @@ func (bn *BeaconNode) ENR() (string, error) {
 
 func (bn *BeaconNode) EnodeURL() (string, error) {
 	return "", errors.New("beacon node does not have an discv4 Enode URL, use ENR or multi-address instead")
+}
+
+// Returns comma-separated ENRs of all beacon nodes
+func (beacons BeaconNodes) ENRs() (string, error) {
+	if len(beacons) == 0 {
+		return "", nil
+	}
+	enrs := make([]string, 0)
+	for _, bn := range beacons {
+		enr, err := bn.ENR()
+		if err != nil {
+			return "", err
+		}
+		enrs = append(enrs, enr)
+	}
+	return strings.Join(enrs, ","), nil
 }
 
 type ValidatorClient struct {

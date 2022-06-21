@@ -21,8 +21,10 @@ var tests = []testSpec{
 	//{Name: "transition-testnet", Run: TransitionTestnet},
 	{Name: "test-rpc-error", Run: TestRPCError},
 	{Name: "invalid-transition-payload", Run: InvalidTransitionPayload},
-	{Name: "invalid-payload-block-hash", Run: InvalidPayloadBlockHash},
+	{Name: "invalid-payload-block-hash", Run: InvalidTransitionPayloadBlockHash},
 	{Name: "invalid-header-prevrandao", Run: IncorrectHeaderPrevRandaoPayload},
+	{Name: "invalid-terminal-block-payload-lower-ttd", Run: IncorrectTerminalBlockLowerTTD},
+	{Name: "syncing-with-invalid-chain", Run: SyncingWithInvalidChain},
 }
 
 func main() {
@@ -76,7 +78,7 @@ func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
 		for _, test := range tests {
 			test := test
 			t.Run(hivesim.TestSpec{
-				Name:        fmt.Sprintf("%s-%s", test.Name, node),
+				Name:        fmt.Sprintf("%s-%s", test.Name, node.String()),
 				Description: test.About,
 				Run: func(t *hivesim.T) {
 					env := &testEnv{c, keys, secrets}
