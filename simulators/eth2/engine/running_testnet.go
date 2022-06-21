@@ -193,16 +193,14 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 					}
 
 					var checkpoints eth2api.FinalityCheckpoints
-					if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &checkpoints); err != nil {
-						/*
-							TODO: This seems to work with other clients, but need to verify...
-							if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdSlot(headInfo.Header.Message.Slot), &checkpoints); err != nil {
-						*/
-						ch <- res{err: fmt.Errorf("beacon %d: failed to poll finality checkpoint: %v", i, err)}
-						return
-					} else if !exists {
-						ch <- res{err: fmt.Errorf("beacon %d: Expected state for head block", i)}
-						return
+					if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &checkpoints); err != nil || !exists {
+						if exists, err = beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdSlot(headInfo.Header.Message.Slot), &checkpoints); err != nil {
+							ch <- res{err: fmt.Errorf("beacon %d: failed to poll finality checkpoint: %v", i, err)}
+							return
+						} else if !exists {
+							ch <- res{err: fmt.Errorf("beacon %d: Expected state for head block", i)}
+							return
+						}
 					}
 
 					var versionedBlock eth2api.VersionedSignedBeaconBlock

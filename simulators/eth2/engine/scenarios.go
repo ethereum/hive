@@ -81,7 +81,7 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, &finalized); err != nil {
 		t.Fatalf("FAIL: Verifying execution payload is canonical: %v", err)
 	}
-	if err := testnet.VerifyProposers(ctx, &finalized, false); err != nil {
+	if err := testnet.VerifyProposers(ctx, &finalized, true); err != nil {
 		t.Fatalf("FAIL: Verifying proposers: %v", err)
 	}
 	if err := testnet.VerifyELHeads(ctx); err != nil {
