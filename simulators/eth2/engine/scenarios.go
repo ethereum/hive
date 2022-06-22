@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -90,7 +91,7 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	fields := make(map[string]interface{})
 	fields["headBlockHash"] = "weird error"
 	spoof := &proxy.Spoof{
-		Method: "engine_forkchoiceUpdatedV1",
+		Method: EngineForkchoiceUpdatedV1,
 		Fields: fields,
 	}
 	testnet.proxies[0].AddRequest(spoof)
@@ -172,7 +173,7 @@ func InvalidTransitionPayload(t *hivesim.T, env *testEnv, n node) {
 					LatestValidHash: &(common.Hash{}),
 					ValidationError: nil,
 				}
-				spoof, err = payloadStatusSpoof("engine_newPayloadV1", &status)
+				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &status)
 				if err != nil {
 					panic(err)
 				}
@@ -183,8 +184,8 @@ func InvalidTransitionPayload(t *hivesim.T, env *testEnv, n node) {
 	}
 	// We pass the id of the proxy to identify which one it is within the callback
 	for i, p := range testnet.proxies {
-		p.AddResponseCallback("engine_getPayloadV1", getPayloadCallbackGen(i))
-		p.AddResponseCallback("engine_newPayloadV1", newPayloadCallbackGen(i))
+		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
+		p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(i))
 	}
 
 	ctx := context.Background()
@@ -274,7 +275,7 @@ func InvalidTransitionPayloadBlockHash(t *hivesim.T, env *testEnv, n node) {
 					LatestValidHash: &(common.Hash{}),
 					ValidationError: nil,
 				}
-				spoof, err = payloadStatusSpoof("engine_newPayloadV1", &status)
+				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &status)
 				if err != nil {
 					panic(err)
 				}
@@ -287,8 +288,8 @@ func InvalidTransitionPayloadBlockHash(t *hivesim.T, env *testEnv, n node) {
 	t.Logf("INFO: proxies = %v", testnet.proxies)
 	for i, p := range testnet.proxies {
 		t.Logf("INFO: adding callback to proxy %d", i)
-		p.AddResponseCallback("engine_getPayloadV1", getPayloadCallbackGen(i))
-		p.AddResponseCallback("engine_newPayloadV1", newPayloadCallbackGen(i))
+		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
+		p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(i))
 	}
 
 	ctx := context.Background()
@@ -350,7 +351,7 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 				panic(err)
 			}
 			t.Logf("INFO (%v): Invalidating payload: %s", t.TestID, res)
-			invalidPayloadHash, spoof, err = generateInvalidPayloadSpoof("engine_getPayloadV1", &payload, InvalidPrevRandao)
+			invalidPayloadHash, spoof, err = generateInvalidPayloadSpoof(EngineGetPayloadV1, &payload, InvalidPrevRandao)
 			if err != nil {
 				panic(err)
 			}
@@ -360,7 +361,7 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 		return nil
 	}
 	for _, p := range testnet.proxies {
-		p.AddResponseCallback("engine_getPayloadV1", c)
+		p.AddResponseCallback(EngineGetPayloadV1, c)
 	}
 
 	ctx := context.Background()
@@ -489,7 +490,7 @@ func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
 			}
 			invalidPayload = <-invalidPayloadChan
 			t.Logf("INFO (%v): Invalidating payload: %s", t.TestID, res)
-			invalidPayloadHash, spoof, err = customizePayloadSpoof("engine_getPayloadV1", &invalidPayload, &CustomPayloadData{
+			invalidPayloadHash, spoof, err = customizePayloadSpoof(EngineGetPayloadV1, &invalidPayload, &CustomPayloadData{
 				// We need to use the timestamp/prevrandao that the CL used to request the payload, otherwise the payload will be rejected
 				// by other reasons other than the incorrect parent terminal block
 				Timestamp:  &originalPayload.Timestamp,
@@ -504,7 +505,7 @@ func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
 		return nil
 	}
 	for _, p := range testnet.proxies {
-		p.AddResponseCallback("engine_getPayloadV1", c)
+		p.AddResponseCallback(EngineGetPayloadV1, c)
 	}
 
 	ctx := context.Background()
@@ -563,11 +564,11 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 
 	testnet := startTestnet(t, env, &config)
 
-	// All proxies will use the same callback, therefore we need to use a lock and a counter
 	var (
 		transitionPayloadHeight uint64
 		lastValidHash           common.Hash
 		invalidPayloadHashes    = make([]common.Hash, 0)
+		payloadMap              = make(map[common.Hash]ExecutableDataV1)
 		done                    = make(chan interface{})
 	)
 
@@ -584,6 +585,7 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 		if err != nil {
 			panic(err)
 		}
+		payloadMap[payload.BlockHash] = payload
 		if lastValidHash == (common.Hash{}) {
 			// This is the transition payload (P1) because it's the first time this callback is called
 			transitionPayloadHeight = payload.Number
@@ -598,7 +600,7 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 					LatestValidHash: &lastValidHash,
 					ValidationError: nil,
 				}
-				spoof, err = payloadStatusSpoof("engine_newPayloadV1", &status)
+				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &status)
 				if err != nil {
 					panic(err)
 				}
@@ -615,7 +617,7 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 					LatestValidHash: nil,
 					ValidationError: nil,
 				}
-				spoof, err = payloadStatusSpoof("engine_newPayloadV1", &status)
+				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &status)
 				if err != nil {
 					panic(err)
 				}
@@ -624,8 +626,59 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 		}
 		return spoof
 	}
+
+	forkchoiceUpdatedCallback := func(res []byte, req []byte) *proxy.Spoof {
+		var (
+			fcState ForkchoiceStateV1
+			pAttr   PayloadAttributesV1
+			spoof   *proxy.Spoof
+			err     error
+		)
+		err = UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+		if err != nil {
+			panic(err)
+		}
+		if lastValidHash == (common.Hash{}) {
+			panic(fmt.Errorf("NewPayload was not called before ForkchoiceUpdated"))
+		}
+		payload, ok := payloadMap[fcState.HeadBlockHash]
+		if !ok {
+			panic(fmt.Errorf("payload not found: %v", fcState.HeadBlockHash))
+		}
+
+		if payload.Number != transitionPayloadHeight {
+			if payload.Number == transitionPayloadHeight+3 {
+				// This is P4, but we probably won't receive this since NewPayload(P4) already returned INVALID
+				status := PayloadStatusV1{
+					Status:          Invalid,
+					LatestValidHash: &lastValidHash,
+					ValidationError: nil,
+				}
+				spoof, err = forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, status, nil)
+				if err != nil {
+					panic(err)
+				}
+				t.Logf("INFO: Returning INVALID payload %d (ForkchoiceUpdated): %v", payload.Number-transitionPayloadHeight, payload.BlockHash)
+			} else {
+				// For all other payloads, including P2/P3, return SYNCING
+				status := PayloadStatusV1{
+					Status:          Syncing,
+					LatestValidHash: nil,
+					ValidationError: nil,
+				}
+				spoof, err = forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, status, nil)
+				if err != nil {
+					panic(err)
+				}
+				t.Logf("INFO: Returning SYNCING payload %d (ForkchoiceUpdated): %v", payload.Number-transitionPayloadHeight, payload.BlockHash)
+			}
+		}
+		return spoof
+	}
+
 	// Add the callback to the last proxy which will not produce blocks
-	testnet.proxies[len(testnet.proxies)-1].AddResponseCallback("engine_newPayloadV1", newPayloadCallback)
+	testnet.proxies[len(testnet.proxies)-1].AddResponseCallback(EngineNewPayloadV1, newPayloadCallback)
+	testnet.proxies[len(testnet.proxies)-1].AddResponseCallback(EngineForkchoiceUpdatedV1, forkchoiceUpdatedCallback)
 
 	<-done
 	ctx := context.Background()

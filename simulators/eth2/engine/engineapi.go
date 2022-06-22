@@ -23,6 +23,13 @@ import (
 var EthPortHTTP = 8545
 var EnginePortHTTP = 8551
 
+// API call names
+const (
+	EngineForkchoiceUpdatedV1 string = "engine_forkchoiceUpdatedV1"
+	EngineGetPayloadV1               = "engine_getPayloadV1"
+	EngineNewPayloadV1               = "engine_newPayloadV1"
+)
+
 // EngineClient wrapper for Ethereum Engine RPC for testing purposes.
 type EngineClient struct {
 	*hivesim.T
@@ -261,7 +268,7 @@ func (ec *EngineClient) EngineForkchoiceUpdatedV1(fcState *ForkchoiceStateV1, pA
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
-	err := ec.c.CallContext(ec.Ctx(), &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
+	err := ec.c.CallContext(ec.Ctx(), &result, EngineForkchoiceUpdatedV1, fcState, pAttributes)
 	return result, err
 }
 
@@ -270,7 +277,7 @@ func (ec *EngineClient) EngineGetPayloadV1(payloadId *PayloadID) (ExecutableData
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
-	err := ec.c.CallContext(ec.Ctx(), &result, "engine_getPayloadV1", payloadId)
+	err := ec.c.CallContext(ec.Ctx(), &result, EngineGetPayloadV1, payloadId)
 	return result, err
 }
 
@@ -279,7 +286,7 @@ func (ec *EngineClient) EngineNewPayloadV1(payload *ExecutableDataV1) (PayloadSt
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
-	err := ec.c.CallContext(ec.Ctx(), &result, "engine_newPayloadV1", payload)
+	err := ec.c.CallContext(ec.Ctx(), &result, EngineNewPayloadV1, payload)
 	return result, err
 }
 

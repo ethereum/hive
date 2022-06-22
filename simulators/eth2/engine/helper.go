@@ -496,3 +496,16 @@ func payloadStatusSpoof(method string, status *PayloadStatusV1) (*proxy.Spoof, e
 		Fields: fields,
 	}, nil
 }
+
+// Generate a payload status spoof
+func forkchoiceResponseSpoof(method string, status PayloadStatusV1, payloadID *PayloadID) (*proxy.Spoof, error) {
+	fields := make(map[string]interface{})
+	fields["payloadStatus"] = status
+	fields["payloadId"] = payloadID
+
+	// Return the new payload status spoof
+	return &proxy.Spoof{
+		Method: method,
+		Fields: fields,
+	}, nil
+}
