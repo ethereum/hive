@@ -19,6 +19,7 @@ type Proxy struct {
 	JWTSecret string
 	config    *proxy.SpoofingConfig
 	callbacks *proxy.SpoofingCallbacks
+	cancel    context.CancelFunc
 
 	rpc *rpc.Client
 	mu  sync.Mutex
@@ -43,14 +44,15 @@ func NewProxy(hostIP net.IP, port int, destination string, jwtSecret []byte) *Pr
 	if err != nil {
 		panic(err)
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	go func() {
-		if err := proxy.Start(context.Background()); err != nil {
+		if err := proxy.Start(ctx); err != nil && err != context.Canceled {
 			panic(err)
 		}
 	}()
 	time.Sleep(100 * time.Millisecond)
 	log.Info("Starting new proxy", "host", host, "port", port)
-	return &Proxy{IP: hostIP, port: port, proxy: proxy, config: &config, callbacks: &callbacks}
+	return &Proxy{IP: hostIP, port: port, proxy: proxy, config: &config, callbacks: &callbacks, cancel: cancel}
 }
 
 func (p *Proxy) UserRPCAddress() (string, error) {

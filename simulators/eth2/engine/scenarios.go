@@ -38,6 +38,7 @@ func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
 
 	ctx := context.Background()
 	finalized, err := testnet.WaitForFinality(ctx)
@@ -70,6 +71,7 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
 
 	ctx := context.Background()
 	finalized, err := testnet.WaitForFinality(ctx)
@@ -120,6 +122,7 @@ func InvalidTransitionPayload(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
 	var (
@@ -220,6 +223,7 @@ func InvalidTransitionPayloadBlockHash(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
 	var (
@@ -326,6 +330,7 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
 	var (
@@ -415,6 +420,7 @@ func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
 	var (
@@ -563,6 +569,7 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
 
 	var (
 		transitionPayloadHeight uint64

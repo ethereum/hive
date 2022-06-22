@@ -124,6 +124,12 @@ func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
 	return testnet
 }
 
+func (t *Testnet) stopTestnet() {
+	for _, p := range t.proxies {
+		p.cancel()
+	}
+}
+
 func (t *Testnet) GenesisTime() time.Time {
 	return time.Unix(int64(t.genesisTime), 0)
 }
