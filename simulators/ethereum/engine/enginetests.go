@@ -409,6 +409,12 @@ var engineTests = []TestSpec{
 		Name: "Re-Org Back to Canonical Chain From Syncing Chain",
 		Run:  reorgBackFromSyncing,
 	},
+	{
+		Name:             "Import and re-org to previously validated payload on a side chain",
+		SlotsToSafe:      big.NewInt(15),
+		SlotsToFinalized: big.NewInt(20),
+		Run:              reorgPrevValidatedPayloadOnSideChain,
+	},
 
 	// Suggested Fee Recipient in Payload creation
 	{
@@ -1500,6 +1506,71 @@ func reorgBack(t *TestEnv) {
 	r := t.TestEth.TestBlockByNumber(nil)
 	r.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
 
+}
+
+// Test that performs a re-org to a previously validated payload on a side chain.
+func reorgPrevValidatedPayloadOnSideChain(t *TestEnv) {
+	// Wait until this client catches up with latest PoS
+	t.CLMock.waitForTTD()
+
+	// Produce blocks before starting the test
+	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+	var (
+		sidechainPayloads     = make([]*ExecutableDataV1, 0)
+		sidechainPayloadCount = 5
+	)
+
+	// Produce a canonical chain while at the same time generate a side chain to which we will re-org.
+	t.CLMock.produceBlocks(sidechainPayloadCount, BlockProcessCallbacks{
+		OnGetPayload: func() {
+			// The side chain will consist simply of the same payloads with extra data appended
+			extraData := []byte("side")
+			customData := CustomPayloadData{
+				ExtraData: &extraData,
+			}
+			if len(sidechainPayloads) > 0 {
+				customData.ParentHash = &sidechainPayloads[len(sidechainPayloads)-1].BlockHash
+			}
+			altPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &customData)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
+			}
+			sidechainPayloads = append(sidechainPayloads, altPayload)
+
+			r := t.TestEngine.TestEngineNewPayloadV1(altPayload)
+			r.ExpectStatus(Valid)
+		},
+	})
+
+	// Attempt to re-org to one of the sidechain payloads, but not the leaf,
+	// and also build a new payload from this sidechain.
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		OnGetPayload: func() {
+			prevRandao := common.Hash{}
+			rand.Read(prevRandao[:])
+			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+				HeadBlockHash:      sidechainPayloads[len(sidechainPayloads)-2].BlockHash,
+				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
+				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
+			}, &PayloadAttributesV1{
+				Timestamp:             t.CLMock.LatestHeader.Time,
+				PrevRandao:            prevRandao,
+				SuggestedFeeRecipient: common.Address{},
+			})
+			r.ExpectPayloadStatus(Valid)
+			r.ExpectLatestValidHash(&sidechainPayloads[len(sidechainPayloads)-2].BlockHash)
+
+			p := t.TestEngine.TestEngineGetPayloadV1(r.Response.PayloadID)
+			p.ExpectPayloadParentHash(sidechainPayloads[len(sidechainPayloads)-2].BlockHash)
+
+			s := t.TestEngine.TestEngineNewPayloadV1(&p.Payload)
+			s.ExpectStatus(Valid)
+
+			// After this, the CLMocker will continue and try to re-org to canonical chain once again
+			// CLMocker will fail the test if this is not possible, so nothing left to do.
+		},
+	})
 }
 
 // Test that performs a re-org back to the canonical chain after re-org to syncing/unavailable chain.
