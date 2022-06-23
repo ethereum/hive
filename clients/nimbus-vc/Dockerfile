@@ -1,4 +1,4 @@
-# Docker container spec for building the kiln-dev branch of nimbus.
+# Docker container spec for building the unstable branch of nimbus.
 
 FROM debian:buster-slim AS build
 
@@ -9,7 +9,7 @@ RUN apt-get update \
 
 ENV NPROC=2
 
-RUN git clone --depth 1 --branch kiln-dev-auth https://github.com/status-im/nimbus-eth2.git \
+RUN git clone --depth 1 --branch unstable https://github.com/status-im/nimbus-eth2.git \
  && cd nimbus-eth2 \
  && make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC} -d:SECONDS_PER_SLOT=3" V=1 update
 
