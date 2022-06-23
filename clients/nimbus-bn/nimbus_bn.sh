@@ -24,6 +24,7 @@ sed -i 's/TERMINAL_BLOCK_HASH: "\(0x[[:xdigit:]]\+\)"/TERMINAL_BLOCK_HASH: \1/' 
 sed -i 's/GENESIS_FORK_VERSION: "\(0x[[:xdigit:]]\+\)"/GENESIS_FORK_VERSION: \1/' /data/testnet_setup/config.yaml
 sed -i 's/ALTAIR_FORK_VERSION: "\(0x[[:xdigit:]]\+\)"/ALTAIR_FORK_VERSION: \1/' /data/testnet_setup/config.yaml
 sed -i 's/BELLATRIX_FORK_VERSION: "\(0x[[:xdigit:]]\+\)"/BELLATRIX_FORK_VERSION: \1/' /data/testnet_setup/config.yaml
+sed -i 's/CAPELLA_FORK_VERSION: "\(0x[[:xdigit:]]\+\)"/CAPELLA_FORK_VERSION: \1/' /data/testnet_setup/config.yaml
 sed -i 's/SHARDING_FORK_VERSION: "\(0x[[:xdigit:]]\+\)"/SHARDING_FORK_VERSION: \1/' /data/testnet_setup/config.yaml
 echo Using config.yaml
 cat /data/testnet_setup/config.yaml
