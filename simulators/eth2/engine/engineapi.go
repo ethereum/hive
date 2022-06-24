@@ -48,7 +48,12 @@ type EngineClient struct {
 }
 
 // NewClient creates a engine client that uses the given RPC client.
-func NewEngineClient(t *hivesim.T, userRPCAddress string, engineRPCAddress string, ttd *big.Int) *EngineClient {
+func NewEngineClient(t *hivesim.T, n *Eth1Node, ttd *big.Int) *EngineClient {
+	engineRPCAddress, err := n.EngineRPCAddress()
+	if err != nil {
+		panic(err)
+	}
+
 	client := &http.Client{}
 	// Prepare HTTP Client
 	rpcHttpClient, _ := rpc.DialHTTPWithClient(engineRPCAddress, client)
@@ -56,6 +61,10 @@ func NewEngineClient(t *hivesim.T, userRPCAddress string, engineRPCAddress strin
 	// Prepare ETH Client
 	client = &http.Client{}
 
+	userRPCAddress, err := n.UserRPCAddress()
+	if err != nil {
+		panic(err)
+	}
 	rpcClient, _ := rpc.DialHTTPWithClient(userRPCAddress, client)
 	eth := ethclient.NewClient(rpcClient)
 	return &EngineClient{

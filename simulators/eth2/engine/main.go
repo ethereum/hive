@@ -25,6 +25,10 @@ var tests = []testSpec{
 	{Name: "invalid-header-prevrandao", Run: IncorrectHeaderPrevRandaoPayload},
 	{Name: "invalid-terminal-block-payload-lower-ttd", Run: IncorrectTerminalBlockLowerTTD},
 	{Name: "syncing-with-invalid-chain", Run: SyncingWithInvalidChain},
+	{Name: "basefee-encoding-check", Run: BaseFeeEncodingCheck},
+	{Name: "equal-timestamp-terminal-transition-block", Run: EqualTimestampTerminalTransitionBlock},
+	{Name: "ttd-before-bellatrix", Run: TTDBeforeBellatrix},
+	{Name: "invalid-quantity-fields", Run: InvalidQuantityPayloadFields},
 }
 
 func main() {

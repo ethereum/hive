@@ -17,13 +17,6 @@ import (
 	"github.com/rauljordan/engine-proxy/proxy"
 )
 
-type ConsensusType int
-
-const (
-	Ethash ConsensusType = iota
-	Clique
-)
-
 type testSpec struct {
 	Name  string
 	About string
@@ -69,7 +62,10 @@ type config struct {
 	// Node configurations to launch. Each node as a proportional share of
 	// validators.
 	Nodes         Nodes
-	Eth1Consensus ConsensusType
+	Eth1Consensus setup.Eth1Consensus
+
+	// Execution Layer specific config
+	InitialBaseFeePerGas *big.Int
 }
 
 func (c *config) activeFork() string {

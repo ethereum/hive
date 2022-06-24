@@ -567,6 +567,32 @@ func (t *Testnet) VerifyELHeads(ctx context.Context) error {
 	return nil
 }
 
+func (t *Testnet) GetBeaconBlockByExecutionHash(ctx context.Context, hash ethcommon.Hash) *bellatrix.SignedBeaconBlock {
+	lastSlot := t.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), t.genesisTime)
+	for slot := int(lastSlot); slot > 0; slot -= 1 {
+		for _, bn := range t.verificationBeacons() {
+			var versionedBlock eth2api.VersionedSignedBeaconBlock
+			if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
+				continue
+			} else if !exists {
+				continue
+			}
+			if versionedBlock.Version != "bellatrix" {
+				// Block can't contain an executable payload, and we are not going to find it going backwards, so return.
+				return nil
+			}
+			block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+			payload := block.Message.Body.ExecutionPayload
+			if bytes.Compare(payload.BlockHash[:], hash[:]) == 0 {
+				t.t.Logf("INFO: Execution block %v found in %d: %v", hash, block.Message.Slot, ethcommon.BytesToHash(payload.BlockHash[:]))
+				return block
+			}
+		}
+
+	}
+	return nil
+}
+
 func getHealth(ctx context.Context, api *eth2api.Eth2HttpClient, spec *common.Spec, slot common.Slot) (float64, error) {
 	var (
 		health    float64

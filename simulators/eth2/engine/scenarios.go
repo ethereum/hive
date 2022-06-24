@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/eth2api/client/beaconapi"
 	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
@@ -34,7 +36,7 @@ func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 			n,
 			n,
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -67,7 +69,7 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 			n,
 			n,
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -118,7 +120,7 @@ func InvalidTransitionPayload(t *hivesim.T, env *testEnv, n node) {
 			n,
 			n,
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -219,7 +221,7 @@ func InvalidTransitionPayloadBlockHash(t *hivesim.T, env *testEnv, n node) {
 			n,
 			n,
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -326,7 +328,7 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 			n,
 			n,
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -416,7 +418,7 @@ func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
 				TerminalTotalDifficulty: BadTTD,
 			},
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -433,15 +435,7 @@ func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
 
 	// Check on the bad TTD client when their TTD is hit and create a payload, which will be available to the first payload creator
 	go func() {
-		ethAddr, err := testnet.eth1[len(testnet.eth1)-1].UserRPCAddress()
-		if err != nil {
-			panic(err)
-		}
-		engAddr, err := testnet.eth1[len(testnet.eth1)-1].EngineRPCAddress()
-		if err != nil {
-			panic(err)
-		}
-		ec := NewEngineClient(t, ethAddr, engAddr, BadTTD)
+		ec := NewEngineClient(t, testnet.eth1[len(testnet.eth1)-1], BadTTD)
 
 		var (
 			ttdBlockHeader *types.Header
@@ -565,7 +559,7 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 				TestVerificationNode: true,
 			},
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
 	}
 
 	testnet := startTestnet(t, env, &config)
@@ -722,4 +716,268 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 		}
 	}
 
+}
+
+func BaseFeeEncodingCheck(t *hivesim.T, env *testEnv, n node) {
+	config := config{
+		AltairForkEpoch:         0,
+		MergeForkEpoch:          0,
+		ValidatorCount:          VALIDATOR_COUNT,
+		SlotTime:                SLOT_TIME,
+		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+		InitialBaseFeePerGas:    big.NewInt(9223372036854775807), // 2**63 - 1
+		Nodes: []node{
+			n,
+			n,
+		},
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
+	}
+
+	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
+
+	ctx := context.Background()
+	transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx)
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
+	}
+
+	// Check the base fee value in the transition payload.
+	// Must be at least 256 to guarantee that the endianess encoding is correct.
+	ec := NewEngineClient(t, testnet.eth1[0], config.TerminalTotalDifficulty)
+	h, err := ec.Eth.HeaderByHash(ec.Ctx(), transitionPayloadHash)
+	if err != nil {
+		t.Fatalf("FAIL: Unable to get transition payload header from execution client: %v", err)
+	}
+	if h.BaseFee.Cmp(big.NewInt(256)) < 0 {
+		t.Fatalf("FAIL: Basefee insufficient for test: %x", h.BaseFee)
+	}
+
+	t.Logf("INFO: Transition Payload created with sufficient baseFee: %x", h.BaseFee)
+}
+
+func EqualTimestampTerminalTransitionBlock(t *hivesim.T, env *testEnv, n node) {
+	config := config{
+		AltairForkEpoch: 0,
+		MergeForkEpoch:  0,
+		ValidatorCount:  VALIDATOR_COUNT,
+		SlotTime:        SLOT_TIME,
+
+		// We are increasing the clique period, therefore we can reduce the TTD
+		TerminalTotalDifficulty: big.NewInt(TERMINAL_TOTAL_DIFFICULTY.Int64() / 3),
+		Nodes: []node{
+			n,
+			n,
+		},
+
+		// The clique period needs to be equal to the slot time to try to get the CL client to attempt to produce
+		// a payload with the same timestamp as the terminal block
+		Eth1Consensus: setup.Eth1CliqueConsensus{
+			CliquePeriod: SLOT_TIME,
+		},
+	}
+
+	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
+
+	ctx := context.Background()
+	transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx)
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
+	}
+
+	beaconBlock := testnet.GetBeaconBlockByExecutionHash(ctx, transitionPayloadHash)
+	if beaconBlock == nil {
+		t.Fatalf("FAIL: Unable to get beacon block of transition payload: %v", transitionPayloadHash)
+	}
+	blockFound := false
+	for _, bn := range testnet.verificationBeacons() {
+		var versionedBlock eth2api.VersionedSignedBeaconBlock
+		if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(beaconBlock.Message.Slot-1), &versionedBlock); err != nil {
+			continue
+		} else if !exists {
+			continue
+		}
+		blockFound = true
+	}
+	if !blockFound {
+		t.Fatalf("FAIL: Block not found before transition slot (slot %d)", beaconBlock.Message.Slot-1)
+	}
+}
+
+func TTDBeforeBellatrix(t *hivesim.T, env *testEnv, n node) {
+	config := config{
+		AltairForkEpoch:         1,
+		MergeForkEpoch:          2,
+		ValidatorCount:          VALIDATOR_COUNT,
+		SlotTime:                SLOT_TIME,
+		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+		Nodes: []node{
+			n,
+			n,
+		},
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
+	}
+
+	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration((config.MergeForkEpoch+1)*config.SlotTime*32))
+	defer cancel()
+
+	_, err := testnet.WaitForExecutionPayload(ctx)
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
+	}
+	if err := testnet.VerifyELHeads(ctx); err != nil {
+		t.Fatalf("FAIL: Verifying EL Heads: %v", err)
+	}
+}
+
+func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
+	config := config{
+		AltairForkEpoch:         0,
+		MergeForkEpoch:          0,
+		ValidatorCount:          VALIDATOR_COUNT,
+		SlotTime:                SLOT_TIME,
+		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+		Nodes: Nodes{
+			n,
+			n,
+			n,
+		},
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
+	}
+
+	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
+
+	// First we are going to wait for the transition to happen
+	ctx := context.Background()
+	_, err := testnet.WaitForExecutionPayload(ctx)
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
+	}
+
+	// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+	// Values of a field of QUANTITY type MUST be encoded as a hexadecimal string with a 0x prefix
+	// and the leading 0s stripped (except for the case of encoding the value 0) matching the
+	// regular expression ^0x(?:0|(?:[a-fA-F1-9][a-fA-F0-9]*))$.
+	// Note: Byte order of encoded value having QUANTITY type is big-endian.
+	type QuantityType struct {
+		Name    string
+		BitSize uint64
+	}
+	type InvalidationType int
+	const (
+		Overflow InvalidationType = iota
+		LeadingZero
+		Empty
+		InvalidationTypeCount
+	)
+
+	invalidateQuantityType := func(method string, response []byte, q QuantityType, invType InvalidationType) *proxy.Spoof {
+		responseFields := make(map[string]string)
+		if err := UnmarshalFromJsonRPCResponse(response, &responseFields); err != nil {
+			panic(fmt.Errorf("Unable to unmarshal: %v", err))
+		}
+		fieldOriginalValue := responseFields[q.Name]
+		fields := make(map[string]interface{})
+		switch invType {
+		case Overflow:
+			overflowingStringSize := int((q.BitSize / 4) + 1)
+			fields[q.Name] = "0x" + strings.Repeat("0", overflowingStringSize-(len(fieldOriginalValue)-2)) + fieldOriginalValue[2:]
+		case LeadingZero:
+			if !strings.HasPrefix(fieldOriginalValue, "0x") {
+				panic(fmt.Errorf("Invalid original value: %v", fieldOriginalValue))
+			}
+			fields[q.Name] = "0x0" + fieldOriginalValue[2:]
+		case Empty:
+			fields[q.Name] = "0x"
+		default:
+			panic("Invalid QUANTITY invalidation type")
+		}
+
+		t.Logf("INFO: Spoofing %s, %s -> %s", q.Name, fieldOriginalValue, fields[q.Name])
+		// Return the new payload status spoof
+		return &proxy.Spoof{
+			Method: method,
+			Fields: fields,
+		}
+	}
+
+	allQuantityFields := []QuantityType{
+		{
+			Name:    "blockNumber",
+			BitSize: 64,
+		},
+		{
+			Name:    "gasLimit",
+			BitSize: 64,
+		},
+		{
+			Name:    "gasUsed",
+			BitSize: 64,
+		},
+		{
+			Name:    "timestamp",
+			BitSize: 64,
+		},
+		{
+			Name:    "baseFeePerGas",
+			BitSize: 256,
+		},
+	}
+
+	// All proxies will use the same callback, therefore we need to use a lock and a counter
+	var (
+		getPayloadLock       sync.Mutex
+		getPayloadCount      int
+		invalidPayloadHashes = make([]common.Hash, 0)
+		done                 = make(chan interface{})
+	)
+
+	// The EL mock will intercept the first engine_getPayloadV1 and corrupt the stateRoot in the response
+	getPayloadCallback := func(res []byte, req []byte) *proxy.Spoof {
+		getPayloadLock.Lock()
+		defer getPayloadLock.Unlock()
+		defer func() {
+			getPayloadCount++
+		}()
+		var (
+			payload ExecutableDataV1
+		)
+		err := UnmarshalFromJsonRPCResponse(res, &payload)
+		if err != nil {
+			panic(err)
+		}
+
+		field := getPayloadCount / int(InvalidationTypeCount)
+		invType := InvalidationType(getPayloadCount % int(InvalidationTypeCount))
+
+		if field >= len(allQuantityFields) {
+			select {
+			case done <- nil:
+			default:
+			}
+			return nil
+		}
+		invalidPayloadHashes = append(invalidPayloadHashes, payload.BlockHash)
+		return invalidateQuantityType(EngineGetPayloadV1, res, allQuantityFields[field], invType)
+	}
+
+	// We pass the id of the proxy to identify which one it is within the callback
+	for _, p := range testnet.proxies {
+		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallback)
+	}
+
+	// Wait until we are done
+	<-done
+
+	// Check that none of the invalidated payloads made it into the beacon chain
+	for i, p := range invalidPayloadHashes {
+		if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, p); b != nil {
+			t.Fatalf("FAIL: Invalid Payload (%d) %v was included in slot %d (%v)", i+1, p, b.Message.Slot, b.Message.StateRoot)
+		}
+	}
 }

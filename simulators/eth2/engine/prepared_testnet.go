@@ -53,7 +53,10 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	eth2GenesisTime := eth1GenesisTime + 30
 
 	// Generate genesis for execution clients
-	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime), config.Eth1Consensus == Clique)
+	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime), config.Eth1Consensus)
+	if config.InitialBaseFeePerGas != nil {
+		eth1Genesis.Genesis.BaseFee = config.InitialBaseFeePerGas
+	}
 	eth1ConfigOpt := eth1Genesis.ToParams(depositAddress)
 	eth1Bundle, err := setup.Eth1Bundle(eth1Genesis.Genesis)
 	if err != nil {
@@ -152,20 +155,13 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	}
 }
 
-func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus ConsensusType, ttd *big.Int) {
+func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus setup.Eth1Consensus, ttd *big.Int) {
 	testnet.t.Logf("Starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{p.executionOpts}
 	if len(testnet.eth1) == 0 {
 		// we only make the first eth1 node a miner
-		if consensus == Ethash {
-			opts = append(opts, hivesim.Params{"HIVE_MINER": "1212121212121212121212121212121212121212"})
-		} else if consensus == Clique {
-			opts = append(opts, hivesim.Params{
-				"HIVE_CLIQUE_PRIVATEKEY": "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
-				"HIVE_MINER":             "658bdf435d810c91414ec09147daa6db62406379",
-			})
-		}
+		opts = append(opts, consensus.HiveParams())
 	} else {
 		bootnode, err := testnet.eth1[0].EnodeURL()
 		if err != nil {

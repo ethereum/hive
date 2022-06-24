@@ -54,13 +54,72 @@ var embeddedDepositContract = `
 }
 `
 
+var (
+	CLIQUE_PERIOD_DEFAULT        = uint64(2)
+	DEFAULT_CLIQUE_PRIVATE_KEY   = "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
+	DEFAULT_CLIQUE_MINER_ADDRESS = "658bdf435d810c91414ec09147daa6db62406379"
+	DEFAULT_ETHASH_MINER_ADDRESS = "1212121212121212121212121212121212121212"
+)
+
+type Eth1Consensus interface {
+	Configure(*Eth1Genesis) error
+	HiveParams() hivesim.Params
+}
+
+type Eth1EthashConsensus struct {
+	MinerAddress string
+}
+
+func (c Eth1EthashConsensus) Configure(*Eth1Genesis) error {
+	// Nothing to do here...
+	return nil
+}
+
+func (c Eth1EthashConsensus) HiveParams() hivesim.Params {
+	if c.MinerAddress == "" {
+		c.MinerAddress = DEFAULT_ETHASH_MINER_ADDRESS
+	}
+	return hivesim.Params{"HIVE_MINER": c.MinerAddress}
+}
+
+type Eth1CliqueConsensus struct {
+	CliquePeriod uint64
+	PrivateKey   string
+	MinerAddress string
+}
+
+func (c Eth1CliqueConsensus) Configure(genesis *Eth1Genesis) error {
+	if c.CliquePeriod == 0 {
+		c.CliquePeriod = CLIQUE_PERIOD_DEFAULT
+	}
+	if c.MinerAddress == "" {
+		c.MinerAddress = DEFAULT_CLIQUE_MINER_ADDRESS
+	}
+	genesis.Genesis.Config.Clique = &params.CliqueConfig{Period: c.CliquePeriod, Epoch: 0}
+	genesis.Genesis.ExtraData = common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000" + c.MinerAddress + "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+	return nil
+}
+
+func (c Eth1CliqueConsensus) HiveParams() hivesim.Params {
+	if c.PrivateKey == "" {
+		c.PrivateKey = DEFAULT_CLIQUE_PRIVATE_KEY
+	}
+	if c.MinerAddress == "" {
+		c.MinerAddress = DEFAULT_CLIQUE_MINER_ADDRESS
+	}
+	return hivesim.Params{
+		"HIVE_CLIQUE_PRIVATEKEY": c.PrivateKey,
+		"HIVE_MINER":             c.MinerAddress,
+	}
+}
+
 type Eth1Genesis struct {
 	Genesis        *core.Genesis
 	DepositAddress common.Address
 	NetworkID      uint64
 }
 
-func BuildEth1Genesis(ttd *big.Int, genesisTime uint64, clique bool) *Eth1Genesis {
+func BuildEth1Genesis(ttd *big.Int, genesisTime uint64, consensus Eth1Consensus) *Eth1Genesis {
 	depositContractAddr := common.HexToAddress("0x4242424242424242424242424242424242424242")
 	var depositContractAcc core.GenesisAccount
 	if err := json.Unmarshal([]byte(embeddedDepositContract), &depositContractAcc); err != nil {
@@ -103,10 +162,12 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64, clique bool) *Eth1Genesi
 		DepositAddress: depositContractAddr,
 		NetworkID:      1,
 	}
-	if clique {
-		genesis.Genesis.Config.Clique = &params.CliqueConfig{Period: 2, Epoch: 0}
-		genesis.Genesis.ExtraData = common.FromHex("0x0000000000000000000000000000000000000000000000000000000000000000658bdf435d810c91414ec09147daa6db624063790000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+
+	// Configure consensus
+	if err := consensus.Configure(&genesis); err != nil {
+		panic(err)
 	}
+
 	return &genesis
 }
 
