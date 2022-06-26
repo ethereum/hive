@@ -1,25 +1,20 @@
-# Docker container spec defining and running a simulation to start a single
-# client node and run RPC tests against it.
-FROM python:2.7
+# This simulation runs JSON-RPC API tests.
+FROM golang:1-alpine as builder
+RUN apk add --update git ca-certificates gcc musl-dev linux-headers
 
-RUN \
-  apt-get update                                                 && \
-  apt-get install -y git ca-certificates --no-install-recommends
+# Clone the tests repo.
+RUN git clone --depth 1 https://github.com/ethereum/execution-apis.git /execution-apis
 
-COPY requirements.txt /tmp/
-RUN pip install --requirement /tmp/requirements.txt
-COPY . /tmp/
+# Build the simulator executable.
+ADD . /source
+WORKDIR /source
+RUN go build -v .
 
-# Download and install the test repository itself
-RUN \
-  git clone https://github.com/cdetrio/interfaces             && \
-  cd interfaces                                               && \
-  cp -a rpc-specs-tests/. /                                   && \
-  mv /configs/bcRPC_API_Test.json /bcRPC_API_Test.json
+# Build the simulator run container.
+FROM alpine:latest
+ADD . /source
+WORKDIR /source
+COPY --from=builder /source/rpc-compat .
+COPY --from=builder /execution-apis/tests ./tests
 
-ADD genesis.json /genesis.json
-ADD keys.tar.gz /keys
-# Add the simulation controller
-COPY *.py /
-
-ENTRYPOINT ["python","/simulator.py"]
+ENTRYPOINT ["./rpc-compat"]

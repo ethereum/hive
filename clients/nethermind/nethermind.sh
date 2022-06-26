@@ -38,7 +38,6 @@
 #
 #  - HIVE_MINER                enables mining. value is coinbase address.
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
-#  - HIVE_SKIP_POW             If set, skip PoW verification
 #  - HIVE_LOGLEVEL             Client log level
 #
 # These variables are not supported by Nethermind:
