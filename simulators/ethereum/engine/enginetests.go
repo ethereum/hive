@@ -398,6 +398,14 @@ var engineTests = []TestSpec{
 		Run:  transactionReorg,
 	},
 	{
+		Name: "Transaction Reorg - Check Blockhash",
+		Run:  transactionReorgBlockhash(false),
+	},
+	{
+		Name: "Transaction Reorg - Check Blockhash with NP on revert",
+		Run:  transactionReorgBlockhash(true),
+	},
+	{
 		Name: "Sidechain Reorg",
 		Run:  sidechainReorg,
 	},
@@ -1640,6 +1648,117 @@ func transactionReorg(t *TestEnv) {
 
 	}
 
+}
+
+// Test transaction blockhash after a forkchoiceUpdated re-orgs to an alternative block with the same transaction
+func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
+	return func(t *TestEnv) {
+		// Wait until this client catches up with latest PoS
+		t.CLMock.waitForTTD()
+
+		// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
+		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+		// Create transactions that modify the state in order to check after the reorg.
+		var (
+			txCount            = 5
+			sstoreContractAddr = common.HexToAddress("0000000000000000000000000000000000000317")
+		)
+
+		for i := 0; i < txCount; i++ {
+			var (
+				mainPayload      *ExecutableDataV1
+				alternatePayload *ExecutableDataV1
+				tx               *types.Transaction
+			)
+
+			t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+				OnPayloadProducerSelected: func() {
+					// At this point we have not broadcast the transaction,
+					// therefore any payload we get should not contain any
+					t.CLMock.getNextPayloadID()
+					t.CLMock.getNextPayload()
+
+					// Create the transaction
+					data := common.LeftPadBytes([]byte{byte(i)}, 32)
+					t.Logf("transactionReorg, i=%v, data=%v\n", i, data)
+					tx = t.sendNextTransaction(t.Engine, sstoreContractAddr, big0, data)
+
+					// Get the receipt
+					receipt, _ := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+					if receipt != nil {
+						t.Fatalf("FAIL (%s): Receipt obtained before tx included in block: %v", t.TestName, receipt)
+					}
+				},
+				OnGetPayload: func() {
+					// Check that indeed the payload contains the transaction
+					if !TransactionInPayload(&t.CLMock.LatestPayloadBuilt, tx) {
+						t.Fatalf("FAIL (%s): Payload built does not contain the transaction: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
+					}
+
+					mainPayload = &t.CLMock.LatestPayloadBuilt
+
+					// Create alternate payload with different hash
+					var err error
+					alternatePayload, err = customizePayload(mainPayload, &CustomPayloadData{
+						ExtraData: &([]byte{0x01}),
+					})
+					if err != nil {
+						t.Fatalf("Error creating reorg payload %v", err)
+					}
+
+					if alternatePayload.ParentHash != mainPayload.ParentHash {
+						t.Fatalf("FAIL (%s): Incorrect parent hash for payloads: %v != %v", t.TestName, alternatePayload.ParentHash, t.CLMock.LatestPayloadBuilt.ParentHash)
+					}
+					if alternatePayload.BlockHash == mainPayload.BlockHash {
+						t.Fatalf("FAIL (%s): Incorrect hash for payloads: %v == %v", t.TestName, alternatePayload.BlockHash, t.CLMock.LatestPayloadBuilt.BlockHash)
+					}
+
+				},
+				OnForkchoiceBroadcast: func() {
+
+					// At first, the tx will be on main payload
+					txt := t.TestEth.TestTransactionReceipt(tx.Hash())
+					txt.ExpectBlockHash(mainPayload.BlockHash)
+
+					r := t.TestEngine.TestEngineNewPayloadV1(alternatePayload)
+					r.ExpectStatus(Valid)
+
+					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+						HeadBlockHash:      alternatePayload.BlockHash,
+						SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
+						FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
+					}, nil)
+					s.ExpectPayloadStatus(Valid)
+
+					p := t.TestEth.TestBlockByNumber(nil)
+					p.ExpectHash(alternatePayload.BlockHash)
+
+					// Now it should be with alternatePayload
+					txt = t.TestEth.TestTransactionReceipt(tx.Hash())
+					txt.ExpectBlockHash(alternatePayload.BlockHash)
+
+					// Re-org back to main payload
+					if newNPOnRevert {
+						r = t.TestEngine.TestEngineNewPayloadV1(mainPayload)
+						r.ExpectStatus(Valid)
+					}
+					t.CLMock.broadcastForkchoiceUpdated(&ForkchoiceStateV1{
+						HeadBlockHash:      mainPayload.BlockHash,
+						SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
+						FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
+					}, nil)
+
+					// Not it should be back with main payload
+					txt = t.TestEth.TestTransactionReceipt(tx.Hash())
+					txt.ExpectBlockHash(mainPayload.BlockHash)
+				},
+			})
+
+		}
+
+	}
+	return nil
 }
 
 // Reorg to a Sidechain using ForkchoiceUpdated
