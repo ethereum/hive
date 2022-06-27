@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -204,7 +205,6 @@ func customizePayloadSpoof(method string, basePayload *ExecutableDataV1, customD
 	if err != nil {
 		return common.Hash{}, nil, err
 	}
-	fmt.Printf("txsHash: %v\n", txsHash)
 	// Start by filling the header with the basePayload information
 	customPayloadHeader := types.Header{
 		ParentHash:  basePayload.ParentHash,
@@ -504,4 +504,40 @@ func forkchoiceResponseSpoof(method string, status PayloadStatusV1, payloadID *P
 		Method: method,
 		Fields: fields,
 	}, nil
+}
+
+// Generates a callback that detects when a ForkchoiceUpdated with Payload Attributes fails.
+// Requires a lock in case two clients receive the fcU with payload attributes at the same time.
+// Requires chan(error) to return the final outcome of the callbacks.
+// Requires the maximum number of fcU+attr calls to check.
+func CheckErrorOnForkchoiceUpdatedPayloadAttr(fcuLock *sync.Mutex, fcUCountLimit int, fcUAttrCount *int, fcudone chan<- error) func(res []byte, req []byte) *proxy.Spoof {
+	return func(res []byte, req []byte) *proxy.Spoof {
+		var (
+			fcS ForkchoiceStateV1
+			pA  *PayloadAttributesV1
+		)
+		if err := UnmarshalFromJsonRPCRequest(req, &fcS, &pA); err != nil {
+			panic(fmt.Errorf("Unable to parse ForkchoiceUpdated request: %v", err))
+		}
+		if pA != nil {
+			fcuLock.Lock()
+			defer fcuLock.Unlock()
+			(*fcUAttrCount)++
+			// The CL requested a payload, it should have not produced an error
+			var (
+				fcResponse ForkChoiceResponse
+			)
+			err := UnmarshalFromJsonRPCResponse(res, &fcResponse)
+			if err == nil && fcResponse.PayloadID == nil {
+				err = fmt.Errorf("PayloadID null on ForkchoiceUpdated with attributes")
+			}
+			if err != nil || (*fcUAttrCount) > fcUCountLimit {
+				select {
+				case fcudone <- err:
+				default:
+				}
+			}
+		}
+		return nil
+	}
 }

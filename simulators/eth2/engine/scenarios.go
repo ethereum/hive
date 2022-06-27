@@ -386,6 +386,107 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 	}
 }
 
+// The payload produced by the execution client contains an invalid timestamp value.
+// This test covers scenario where the value of the timestamp is so high such that
+// the next validators' attempts to produce payloads could fail by invalid payload
+// attributes.
+func InvalidTimestampPayload(t *hivesim.T, env *testEnv, n node) {
+	config := config{
+		AltairForkEpoch:         0,
+		MergeForkEpoch:          0,
+		ValidatorCount:          VALIDATOR_COUNT,
+		SlotTime:                SLOT_TIME,
+		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+		Nodes: Nodes{
+			n,
+			n,
+			n,
+		},
+		Eth1Consensus: setup.Eth1CliqueConsensus{},
+	}
+
+	testnet := startTestnet(t, env, &config)
+	defer testnet.stopTestnet()
+
+	// All proxies will use the same callback, therefore we need to use a lock and a counter
+	var (
+		getPayloadLock     sync.Mutex
+		getPayloadCount    int
+		invalidPayloadHash common.Hash
+		done               = make(chan interface{})
+	)
+
+	// The EL mock will intercept an engine_getPayloadV1 call and invalidate the timestamp in the response
+	c := func(res []byte, req []byte) *proxy.Spoof {
+		getPayloadLock.Lock()
+		defer getPayloadLock.Unlock()
+		getPayloadCount++
+		var (
+			payload   ExecutableDataV1
+			payloadID PayloadID
+			spoof     *proxy.Spoof
+			err       error
+		)
+		err = UnmarshalFromJsonRPCResponse(res, &payload)
+		if err != nil {
+			panic(err)
+		}
+		err = UnmarshalFromJsonRPCRequest(req, &payloadID)
+		t.Logf("INFO: Got payload %v, parent=%v, from PayloadID=%x", payload.BlockHash, payload.ParentHash, payloadID)
+		// Invalidate a payload after the transition payload
+		if getPayloadCount == 2 {
+			t.Logf("INFO (%v): Invalidating payload: %s", t.TestID, res)
+			// We are pushing the timestamp past the slot time.
+			// The beacon chain shall identify this and reject the payload.
+			newTimestamp := payload.Timestamp + SLOT_TIME
+			// We add some extraData to guarantee we can identify the payload we altered
+			extraData := []byte("alt")
+			invalidPayloadHash, spoof, err = customizePayloadSpoof(EngineGetPayloadV1, &payload,
+				&CustomPayloadData{
+					Timestamp: &newTimestamp,
+					ExtraData: &extraData,
+				})
+			if err != nil {
+				panic(err)
+			}
+			t.Logf("INFO (%v): Invalidated payload hash: %v", t.TestID, invalidPayloadHash)
+			select {
+			case done <- nil:
+			default:
+			}
+			return spoof
+		}
+		return nil
+	}
+	// No ForkchoiceUpdated with payload attributes should fail, which could happen if the payload
+	// with invalid timestamp is accepted (next payload would fail).
+	var (
+		fcuLock       sync.Mutex
+		fcUAttrCount  int
+		fcudone       = make(chan error)
+		fcUCountLimit = 8
+	)
+
+	for _, p := range testnet.proxies {
+		p.AddResponseCallback(EngineGetPayloadV1, c)
+		p.AddResponseCallback(EngineForkchoiceUpdatedV1, CheckErrorOnForkchoiceUpdatedPayloadAttr(&fcuLock, fcUCountLimit, &fcUAttrCount, fcudone))
+	}
+
+	// Wait until the invalid payload is produced
+	<-done
+
+	// Wait until we verified all subsequent forkchoiceUpdated calls
+	if err := <-fcudone; err != nil {
+		t.Fatalf("FAIL: ForkchoiceUpdated call failed: %v", err)
+	}
+
+	// Verify beacon block with invalid payload is not accepted
+	ctx := context.Background()
+	if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, invalidPayloadHash); b != nil {
+		t.Fatalf("FAIL: Invalid Payload %v was included in slot %d (%v)", invalidPayloadHash, b.Message.Slot, b.Message.StateRoot)
+	}
+}
+
 // The produced and broadcasted transition payload has parent with an invalid total difficulty.
 func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
 	BadTTD := big.NewInt(90)
@@ -780,28 +881,22 @@ func EqualTimestampTerminalTransitionBlock(t *hivesim.T, env *testEnv, n node) {
 	testnet := startTestnet(t, env, &config)
 	defer testnet.stopTestnet()
 
-	ctx := context.Background()
-	transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx)
-	if err != nil {
-		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
+	// No ForkchoiceUpdated with payload attributes should fail, which could happen if CL tries to create
+	// the payload with `timestamp==terminalBlock.timestamp`.
+	var (
+		fcuLock       sync.Mutex
+		fcUAttrCount  int
+		fcudone       = make(chan error)
+		fcUCountLimit = 5
+	)
+
+	for _, p := range testnet.proxies {
+		p.AddResponseCallback(EngineForkchoiceUpdatedV1, CheckErrorOnForkchoiceUpdatedPayloadAttr(&fcuLock, fcUCountLimit, &fcUAttrCount, fcudone))
 	}
 
-	beaconBlock := testnet.GetBeaconBlockByExecutionHash(ctx, transitionPayloadHash)
-	if beaconBlock == nil {
-		t.Fatalf("FAIL: Unable to get beacon block of transition payload: %v", transitionPayloadHash)
-	}
-	blockFound := false
-	for _, bn := range testnet.verificationBeacons() {
-		var versionedBlock eth2api.VersionedSignedBeaconBlock
-		if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(beaconBlock.Message.Slot-1), &versionedBlock); err != nil {
-			continue
-		} else if !exists {
-			continue
-		}
-		blockFound = true
-	}
-	if !blockFound {
-		t.Fatalf("FAIL: Block not found before transition slot (slot %d)", beaconBlock.Message.Slot-1)
+	// Wait until we verified all subsequent forkchoiceUpdated calls
+	if err := <-fcudone; err != nil {
+		t.Fatalf("FAIL: ForkchoiceUpdated call failed: %v", err)
 	}
 }
 

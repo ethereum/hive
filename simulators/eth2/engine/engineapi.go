@@ -333,8 +333,7 @@ func UnmarshalFromJsonRPCResponse(b []byte, result interface{}) error {
 	if rpcMessage.Error != nil {
 		return rpcMessage.Error
 	}
-	err = json.Unmarshal(rpcMessage.Result, &result)
-	return nil
+	return json.Unmarshal(rpcMessage.Result, &result)
 }
 
 func UnmarshalFromJsonRPCRequest(b []byte, params ...interface{}) error {
@@ -346,6 +345,5 @@ func UnmarshalFromJsonRPCRequest(b []byte, params ...interface{}) error {
 	if rpcMessage.Error != nil {
 		return rpcMessage.Error
 	}
-	err = json.Unmarshal(rpcMessage.Params, &params)
-	return nil
+	return json.Unmarshal(rpcMessage.Params, &params)
 }

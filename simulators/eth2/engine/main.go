@@ -23,6 +23,7 @@ var tests = []testSpec{
 	{Name: "invalid-transition-payload", Run: InvalidTransitionPayload},
 	{Name: "invalid-payload-block-hash", Run: InvalidTransitionPayloadBlockHash},
 	{Name: "invalid-header-prevrandao", Run: IncorrectHeaderPrevRandaoPayload},
+	{Name: "invalid-timestamp", Run: InvalidTimestampPayload},
 	{Name: "invalid-terminal-block-payload-lower-ttd", Run: IncorrectTerminalBlockLowerTTD},
 	{Name: "syncing-with-invalid-chain", Run: SyncingWithInvalidChain},
 	{Name: "basefee-encoding-check", Run: BaseFeeEncodingCheck},
