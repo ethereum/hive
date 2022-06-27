@@ -543,6 +543,13 @@ func (exp *TransactionReceiptExpectObject) ExpectTransactionHash(expectedHash co
 	}
 }
 
+func (exp *TransactionReceiptExpectObject) ExpectBlockHash(expectedHash common.Hash) {
+	exp.ExpectNoError()
+	if exp.Receipt.BlockHash != expectedHash {
+		exp.Fatalf("FAIL (%s): Unexpected transaction block hash on %s: %v, blockhash=%v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, exp.Receipt.BlockHash, expectedHash)
+	}
+}
+
 // Ctx returns a context with the default timeout.
 // For subsequent calls to Ctx, it also cancels the previous context.
 func (t *TestEthClient) Ctx() context.Context {
