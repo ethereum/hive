@@ -1,9 +1,12 @@
-ARG branch=latest-alpine
-FROM gcr.io/prysmaticlabs/prysm/validator:$branch
+ARG branch=latest
+FROM gcr.io/prysmaticlabs/prysm/validator:$branch as upstream
+
+FROM debian:buster-slim
+COPY --from=upstream /app/cmd/validator/validator validator
 
 ADD prysm_vc.sh /prysm_vc.sh
 RUN chmod +x /prysm_vc.sh
 
-RUN /app/cmd/validator/validator --version > /version.txt
+RUN /validator --version > /version.txt
 
 ENTRYPOINT ["/prysm_vc.sh"]

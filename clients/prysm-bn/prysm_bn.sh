@@ -31,7 +31,7 @@ metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "--disable-monito
 echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
 
 
-/app/cmd/beacon-chain/beacon-chain \
+/beacon-chain \
     --verbosity="$LOG" \
     --accept-terms-of-use=true \
     --datadir=/data/beacon \

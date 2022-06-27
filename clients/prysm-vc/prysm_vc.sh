@@ -10,7 +10,7 @@ for keystore_path in /hive/input/keystores/*
 do
   pubkey=$(basename "$keystore_path")
 
-  /app/cmd/validator/validator accounts import \
+  /validator accounts import \
     --prater \
     --wallet-dir="/data/validators" \
     --keys-dir="/hive/input/keystores/$pubkey" \
@@ -30,7 +30,7 @@ case "$HIVE_LOGLEVEL" in
     5)   LOG=trace ;;
 esac
 
-/app/cmd/validator/validator \
+/validator \
     --verbosity="$LOG" \
     --accept-terms-of-use=true \
     --prater \
