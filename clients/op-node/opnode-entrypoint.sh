@@ -30,7 +30,7 @@ L2_GENESIS=$(curl \
     --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x0", false],"id":1}' \
     $L2_URL)
 
-DEPOSIT_CONTRACT_ADDRESS=$(jq -r .address < /OptimismPortal.json)
+DEPOSIT_CONTRACT_ADDRESS=$(jq -r .address < /OptimismPortalProxy.json)
 
 jq ". | .genesis.l1.hash = \"$(echo $L1_GENESIS | jq -r '.result.hash')\"" < /rollup.json | \
    jq ". | .genesis.l2.hash = \"$(echo $L2_GENESIS | jq -r '.result.hash')\"" | \

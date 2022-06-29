@@ -136,13 +136,13 @@ func (d *Devnet) InitL2() error {
 	}
 	d.genesisTimestamp = genesisTimestamp
 
-	l2OutputOracle, err := d.Cat("/hive/contracts/deployments/devnetL1/L2OutputOracle.json")
+	l2OutputOracle, err := d.Cat("/hive/contracts/deployments/devnetL1/L2OutputOracleProxy.json")
 	if err != nil {
 		return err
 	}
 	d.l2OutputOracle = l2OutputOracle
 
-	optimismPortal, err := d.Cat("/hive/contracts/deployments/devnetL1/OptimismPortal.json")
+	optimismPortal, err := d.Cat("/hive/contracts/deployments/devnetL1/OptimismPortalProxy.json")
 	if err != nil {
 		return err
 	}
@@ -160,7 +160,7 @@ func (d *Devnet) InitL2() error {
 	}
 	d.l2CrossDomainMessengerJSON = l2CrossDomainMessengerJSON
 
-	optimismMintableTokenFactoryJSON, err := d.Cat("/hive/contracts/artifacts/contracts/universal/OptimismMintableTokenFactory.sol/OptimismMintableTokenFactory.json")
+	optimismMintableTokenFactoryJSON, err := d.Cat("/hive/contracts/artifacts/contracts/universal/OptimismMintableTokenFactoryProxy.sol/OptimismMintableTokenFactoryProxy.json")
 	if err != nil {
 		return err
 	}
@@ -195,7 +195,7 @@ func (d *Devnet) StartL2() error {
 	genesisTimestampOpt := hivesim.WithDynamicFile("/genesis_timestamp", bytesSource([]byte(d.genesisTimestamp)))
 	l2ToL1MessagePasserOpt := hivesim.WithDynamicFile("/L2ToL1MessagePasser.json", bytesSource([]byte(d.l2ToL1MessagePasserJSON)))
 	l2CrossDomainMessengerOpt := hivesim.WithDynamicFile("/L2CrossDomainMessenger.json", bytesSource([]byte(d.l2CrossDomainMessengerJSON)))
-	optimismMintableTokenFactoryOpt := hivesim.WithDynamicFile("/OptimismMintableTokenFactory.json", bytesSource([]byte(d.optimismMintableTokenFactoryJSON)))
+	optimismMintableTokenFactoryOpt := hivesim.WithDynamicFile("/OptimismMintableTokenFactoryProxy.json", bytesSource([]byte(d.optimismMintableTokenFactoryJSON)))
 	l2StandardBridgeOpt := hivesim.WithDynamicFile("/L2StandardBridge.json", bytesSource([]byte(d.l2StandardBridgeJSON)))
 	l1BlockOpt := hivesim.WithDynamicFile("/L1Block.json", bytesSource([]byte(d.l1BlockJSON)))
 	opts := []hivesim.StartOption{executionOpts, genesisTimestampOpt, l2ToL1MessagePasserOpt, l2CrossDomainMessengerOpt, optimismMintableTokenFactoryOpt, l2StandardBridgeOpt, l1BlockOpt}
@@ -222,7 +222,7 @@ func (d *Devnet) StartOp() error {
 		"HIVE_NODETYPE":         "full",
 	}
 
-	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortal.json", bytesSource([]byte(d.optimismPortal)))
+	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortalProxy.json", bytesSource([]byte(d.optimismPortal)))
 	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt}
 	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}
 	return nil
@@ -238,7 +238,7 @@ func (d *Devnet) StartL2OS() error {
 		"HIVE_NODETYPE":         "full",
 	}
 
-	l2OutputOracleOpt := hivesim.WithDynamicFile("/L2OutputOracle.json", bytesSource([]byte(d.l2OutputOracle)))
+	l2OutputOracleOpt := hivesim.WithDynamicFile("/L2OutputOracleProxy.json", bytesSource([]byte(d.l2OutputOracle)))
 	opts := []hivesim.StartOption{executionOpts, l2OutputOracleOpt}
 	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}
 	return nil
@@ -254,7 +254,7 @@ func (d *Devnet) StartBSS() error {
 		"HIVE_NODETYPE":         "full",
 	}
 
-	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortal.json", bytesSource([]byte(d.optimismPortal)))
+	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortalProxy.json", bytesSource([]byte(d.optimismPortal)))
 	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt}
 	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}
 	return nil
