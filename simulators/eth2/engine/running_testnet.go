@@ -103,7 +103,7 @@ func (t *Testnet) removeNodeAsVerifier(id int) error {
 	return nil
 }
 
-func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
+func startTestnet(t *hivesim.T, env *testEnv, config *Config) *Testnet {
 	prep := prepareTestnet(t, env, config)
 	testnet := prep.createTestnet(t)
 
@@ -233,8 +233,9 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 					finalized = shorten(checkpoints.Finalized.String())
 					health, err := getHealth(ctx, b.API, t.spec, slot)
 					if err != nil {
-						ch <- res{err: fmt.Errorf("beacon %d: %s", i, err)}
-						return
+						// warning is printed here instead because some clients
+						// don't support the required REST endpoint.
+						fmt.Printf("WARN: beacon %d: %s\n", i, err)
 					}
 
 					ep := t.spec.SlotToEpoch(slot)
@@ -349,8 +350,9 @@ func (t *Testnet) WaitForExecutionPayload(ctx context.Context) (ethcommon.Hash, 
 					head = shorten(headInfo.Root.String())
 					health, err := getHealth(ctx, b.API, t.spec, slot)
 					if err != nil {
-						ch <- res{err: fmt.Errorf("beacon %d: %s", i, err)}
-						return
+						// warning is printed here instead because some clients
+						// don't support the required REST endpoint.
+						fmt.Printf("WARN: beacon %d: %s\n", i, err)
 					}
 
 					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s", i, slot, head, health, shorten(execution.Hex())), nil}

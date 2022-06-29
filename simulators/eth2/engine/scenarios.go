@@ -20,26 +20,50 @@ import (
 )
 
 var (
-	VALIDATOR_COUNT           uint64 = 60
-	SLOT_TIME                 uint64 = 6
-	TERMINAL_TOTAL_DIFFICULTY        = big.NewInt(100)
+	DEFAULT_VALIDATOR_COUNT           uint64 = 60
+	DEFAULT_SLOT_TIME                 uint64 = 6
+	DEFAULT_TERMINAL_TOTAL_DIFFICULTY uint64 = 100
+
+	// Default config used for all tests unless a client specific config exists
+	DEFAULT_CONFIG = &Config{
+		ValidatorCount:          big.NewInt(int64(DEFAULT_VALIDATOR_COUNT)),
+		SlotTime:                big.NewInt(int64(DEFAULT_SLOT_TIME)),
+		TerminalTotalDifficulty: big.NewInt(int64(DEFAULT_TERMINAL_TOTAL_DIFFICULTY)),
+		AltairForkEpoch:         common.Big0,
+		MergeForkEpoch:          common.Big0,
+		Eth1Consensus:           &setup.Eth1CliqueConsensus{},
+	}
+
+	// Clients that do not support starting on epoch 0 with all forks enabled.
+	// Tests take longer for these clients.
+	INCREMENTAL_FORKS_CONFIG = &Config{
+		TerminalTotalDifficulty: big.NewInt(int64(DEFAULT_TERMINAL_TOTAL_DIFFICULTY) * 3),
+		AltairForkEpoch:         common.Big1,
+		MergeForkEpoch:          common.Big2,
+	}
+	INCREMENTAL_FORKS_CLIENTS = map[string]bool{
+		"nimbus": true,
+		"prysm":  true,
+	}
 )
 
+func getClientConfig(n node) *Config {
+	config := DEFAULT_CONFIG
+	if INCREMENTAL_FORKS_CLIENTS[n.ConsensusClient] == true {
+		config = config.join(INCREMENTAL_FORKS_CONFIG)
+	}
+	return config
+}
+
 func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n).join(&Config{
 		Nodes: []node{
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	ctx := context.Background()
@@ -59,20 +83,14 @@ func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 }
 
 func TestRPCError(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n).join(&Config{
 		Nodes: []node{
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	ctx := context.Background()
@@ -109,21 +127,15 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 }
 
 func InvalidTransitionPayload(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
 			n,
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
@@ -210,21 +222,15 @@ func InvalidTransitionPayload(t *hivesim.T, env *testEnv, n node) {
 }
 
 func InvalidTransitionPayloadBlockHash(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
 			n,
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
@@ -317,21 +323,15 @@ func InvalidTransitionPayloadBlockHash(t *hivesim.T, env *testEnv, n node) {
 // The produced and broadcasted payload contains an invalid prevrandao value.
 // The PREVRANDAO opcode is not used in any transaction and therefore not introduced in the state changes.
 func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
 			n,
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
@@ -391,21 +391,15 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 // the next validators' attempts to produce payloads could fail by invalid payload
 // attributes.
 func InvalidTimestampPayload(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
 			n,
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
@@ -438,7 +432,7 @@ func InvalidTimestampPayload(t *hivesim.T, env *testEnv, n node) {
 			t.Logf("INFO (%v): Invalidating payload: %s", t.TestID, res)
 			// We are pushing the timestamp past the slot time.
 			// The beacon chain shall identify this and reject the payload.
-			newTimestamp := payload.Timestamp + SLOT_TIME
+			newTimestamp := payload.Timestamp + config.SlotTime.Uint64()
 			// We add some extraData to guarantee we can identify the payload we altered
 			extraData := []byte("alt")
 			invalidPayloadHash, spoof, err = customizePayloadSpoof(EngineGetPayloadV1, &payload,
@@ -489,13 +483,9 @@ func InvalidTimestampPayload(t *hivesim.T, env *testEnv, n node) {
 
 // The produced and broadcasted transition payload has parent with an invalid total difficulty.
 func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
-	BadTTD := big.NewInt(90)
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n)
+	BadTTD := big.NewInt(config.TerminalTotalDifficulty.Int64() - 50)
+	config = config.join(&Config{
 		Nodes: Nodes{
 			node{
 				ExecutionClient: n.ExecutionClient,
@@ -519,10 +509,9 @@ func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
 				TerminalTotalDifficulty: BadTTD,
 			},
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	// All proxies will use the same callback, therefore we need to use a lock and a counter
@@ -632,12 +621,7 @@ func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
 }
 
 func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
 			// First two nodes will do all the proposals
 			node{
@@ -660,10 +644,9 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 				TestVerificationNode: true,
 			},
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	var (
@@ -820,21 +803,15 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 }
 
 func BaseFeeEncodingCheck(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
-		InitialBaseFeePerGas:    big.NewInt(9223372036854775807), // 2**63 - 1
+	config := getClientConfig(n).join(&Config{
+		InitialBaseFeePerGas: big.NewInt(9223372036854775807), // 2**63 - 1
 		Nodes: []node{
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	ctx := context.Background()
@@ -850,7 +827,10 @@ func BaseFeeEncodingCheck(t *hivesim.T, env *testEnv, n node) {
 	if err != nil {
 		t.Fatalf("FAIL: Unable to get transition payload header from execution client: %v", err)
 	}
-	if h.BaseFee.Cmp(big.NewInt(256)) < 0 {
+	if h.Difficulty.Cmp(common.Big0) != 0 {
+		t.Fatalf("FAIL: Transition header obtained is not PoS header: difficulty=%x", h.Difficulty)
+	}
+	if h.BaseFee.Cmp(common.Big256) < 0 {
 		t.Fatalf("FAIL: Basefee insufficient for test: %x", h.BaseFee)
 	}
 
@@ -858,14 +838,10 @@ func BaseFeeEncodingCheck(t *hivesim.T, env *testEnv, n node) {
 }
 
 func EqualTimestampTerminalTransitionBlock(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch: 0,
-		MergeForkEpoch:  0,
-		ValidatorCount:  VALIDATOR_COUNT,
-		SlotTime:        SLOT_TIME,
-
+	config := getClientConfig(n)
+	config = config.join(&Config{
 		// We are increasing the clique period, therefore we can reduce the TTD
-		TerminalTotalDifficulty: big.NewInt(TERMINAL_TOTAL_DIFFICULTY.Int64() / 3),
+		TerminalTotalDifficulty: big.NewInt(config.TerminalTotalDifficulty.Int64() / 3),
 		Nodes: []node{
 			n,
 			n,
@@ -873,12 +849,12 @@ func EqualTimestampTerminalTransitionBlock(t *hivesim.T, env *testEnv, n node) {
 
 		// The clique period needs to be equal to the slot time to try to get the CL client to attempt to produce
 		// a payload with the same timestamp as the terminal block
-		Eth1Consensus: setup.Eth1CliqueConsensus{
-			CliquePeriod: SLOT_TIME,
+		Eth1Consensus: &setup.Eth1CliqueConsensus{
+			CliquePeriod: config.SlotTime.Uint64(),
 		},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	// No ForkchoiceUpdated with payload attributes should fail, which could happen if CL tries to create
@@ -901,23 +877,21 @@ func EqualTimestampTerminalTransitionBlock(t *hivesim.T, env *testEnv, n node) {
 }
 
 func TTDBeforeBellatrix(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         1,
-		MergeForkEpoch:          2,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n)
+	config = config.join(&Config{
+		AltairForkEpoch:         common.Big1,
+		MergeForkEpoch:          common.Big2,
+		TerminalTotalDifficulty: big.NewInt(50),
 		Nodes: []node{
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration((config.MergeForkEpoch+1)*config.SlotTime*32))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration((config.MergeForkEpoch.Uint64()+1)*config.SlotTime.Uint64()*32))
 	defer cancel()
 
 	_, err := testnet.WaitForExecutionPayload(ctx)
@@ -930,21 +904,15 @@ func TTDBeforeBellatrix(t *hivesim.T, env *testEnv, n node) {
 }
 
 func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
-		ValidatorCount:          VALIDATOR_COUNT,
-		SlotTime:                SLOT_TIME,
-		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
+	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
 			n,
 			n,
 			n,
 		},
-		Eth1Consensus: setup.Eth1CliqueConsensus{},
-	}
+	})
 
-	testnet := startTestnet(t, env, &config)
+	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
 	// First we are going to wait for the transition to happen

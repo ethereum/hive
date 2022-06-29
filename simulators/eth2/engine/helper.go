@@ -52,12 +52,13 @@ func (nodes Nodes) Shares() []uint64 {
 	return shares
 }
 
-type config struct {
-	AltairForkEpoch         uint64
-	MergeForkEpoch          uint64
-	ValidatorCount          uint64
-	KeyTranches             uint64
-	SlotTime                uint64
+type Config struct {
+	AltairForkEpoch         *big.Int
+	MergeForkEpoch          *big.Int
+	CapellaForkEpoch        *big.Int
+	ValidatorCount          *big.Int
+	KeyTranches             *big.Int
+	SlotTime                *big.Int
 	TerminalTotalDifficulty *big.Int
 
 	// Node configurations to launch. Each node as a proportional share of
@@ -69,10 +70,53 @@ type config struct {
 	InitialBaseFeePerGas *big.Int
 }
 
-func (c *config) activeFork() string {
-	if c.MergeForkEpoch == 0 {
+// Choose a configuration value. `b` takes precedence
+func choose(a, b *big.Int) *big.Int {
+	if b != nil {
+		return new(big.Int).Set(b)
+	}
+	if a != nil {
+		return new(big.Int).Set(a)
+	}
+	return nil
+}
+
+// Join two configurations. `b` takes precedence
+func (a *Config) join(b *Config) *Config {
+	c := Config{}
+	// Forks
+	c.AltairForkEpoch = choose(a.AltairForkEpoch, b.AltairForkEpoch)
+	c.MergeForkEpoch = choose(a.MergeForkEpoch, b.MergeForkEpoch)
+	c.CapellaForkEpoch = choose(a.CapellaForkEpoch, b.CapellaForkEpoch)
+
+	// Testnet config
+	c.ValidatorCount = choose(a.ValidatorCount, b.ValidatorCount)
+	c.KeyTranches = choose(a.KeyTranches, b.KeyTranches)
+	c.SlotTime = choose(a.SlotTime, b.SlotTime)
+	c.TerminalTotalDifficulty = choose(a.TerminalTotalDifficulty, b.TerminalTotalDifficulty)
+
+	// EL config
+	c.InitialBaseFeePerGas = choose(a.InitialBaseFeePerGas, b.InitialBaseFeePerGas)
+
+	if b.Nodes != nil {
+		c.Nodes = b.Nodes
+	} else {
+		c.Nodes = a.Nodes
+	}
+
+	if b.Eth1Consensus != nil {
+		c.Eth1Consensus = b.Eth1Consensus
+	} else {
+		c.Eth1Consensus = a.Eth1Consensus
+	}
+
+	return &c
+}
+
+func (c *Config) activeFork() string {
+	if c.MergeForkEpoch != nil && c.MergeForkEpoch.Cmp(common.Big0) == 0 {
 		return "merge"
-	} else if c.AltairForkEpoch == 0 {
+	} else if c.AltairForkEpoch != nil && c.AltairForkEpoch.Cmp(common.Big0) == 0 {
 		return "altair"
 	} else {
 		return "phase0"

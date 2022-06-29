@@ -48,7 +48,7 @@ type PreparedTestnet struct {
 }
 
 // Build all artifacts require to start a testnet.
-func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet {
+func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet {
 	eth1GenesisTime := common.Timestamp(time.Now().Unix())
 	eth2GenesisTime := eth1GenesisTime + 30
 
@@ -77,17 +77,38 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	spec.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
 	spec.Config.ETH1_FOLLOW_DISTANCE = 1
 
-	spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch)
-	spec.Config.BELLATRIX_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
-	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount
-	spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime)
+	// Alter versions to avoid conflicts with mainnet values
+	spec.Config.GENESIS_FORK_VERSION = common.Version{0x00, 0x00, 0x00, 0x0a}
+	if config.AltairForkEpoch != nil {
+		spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch.Uint64())
+	}
+	spec.Config.ALTAIR_FORK_VERSION = common.Version{0x01, 0x00, 0x00, 0x0a}
+	if config.MergeForkEpoch != nil {
+		spec.Config.BELLATRIX_FORK_EPOCH = common.Epoch(config.MergeForkEpoch.Uint64())
+	}
+	spec.Config.BELLATRIX_FORK_VERSION = common.Version{0x02, 0x00, 0x00, 0x0a}
+	// TODO: Requires https://github.com/protolambda/zrnt/pull/38
+	/*
+		if config.CapellaForkEpoch != nil {
+			spec.Config.CAPELLA_FORK_EPOCH = common.Epoch(config.CapellaForkEpoch.Uint64())
+		}
+		spec.Config.CAPELLA_FORK_VERSION = common.Version{0x03, 0x00, 0x00, 0x0a}
+	*/
+	spec.Config.SHARDING_FORK_VERSION = common.Version{0x04, 0x00, 0x00, 0x0a}
+	if config.ValidatorCount == nil {
+		t.Fatal(fmt.Errorf("ValidatorCount was not configured"))
+	}
+	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount.Uint64()
+	if config.SlotTime != nil {
+		spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime.Uint64())
+	}
 	tdd, _ := uint256.FromBig(config.TerminalTotalDifficulty)
 	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)
 
 	// Generate keys opts for validators
 	keyTranches := setup.KeyTranches(env.Keys, config.Nodes.Shares())
 
-	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount)
+	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount.Uint64())
 	if err != nil {
 		t.Fatal(err)
 	}
