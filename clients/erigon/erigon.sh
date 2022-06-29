@@ -125,7 +125,7 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
 fi
 
 # Launch the main client.
-FLAGS="$FLAGS --nat=none"
+FLAGS="$FLAGS --nat=none --experimental.overlay"
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
     echo -n $JWT_SECRET > /jwt.secret
