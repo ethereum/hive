@@ -457,6 +457,11 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(ctx context.Context, checkpo
 // finalized block and verifies that is in the execution client's canonical
 // chain.
 func (t *Testnet) VerifyExecutionPayloadHashInclusion(ctx context.Context, checkpoint *common.Checkpoint, hash ethcommon.Hash) *bellatrix.SignedBeaconBlock {
+	bn := t.verificationBeacons()[0]
+	return t.VerifyExecutionPayloadHashInclusionNode(ctx, checkpoint, bn, hash)
+}
+
+func (t *Testnet) VerifyExecutionPayloadHashInclusionNode(ctx context.Context, checkpoint *common.Checkpoint, bn *BeaconNode, hash ethcommon.Hash) *bellatrix.SignedBeaconBlock {
 	var (
 		lastSlot common.Slot
 	)
@@ -465,7 +470,6 @@ func (t *Testnet) VerifyExecutionPayloadHashInclusion(ctx context.Context, check
 	} else {
 		lastSlot = t.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), t.genesisTime)
 	}
-	bn := t.verificationBeacons()[0]
 	enr, _ := bn.ENR()
 	t.t.Logf("INFO: Looking for block %v in node %v", hash, enr)
 	for slot := int(lastSlot); slot > 0; slot -= 1 {

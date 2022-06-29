@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 	"github.com/protolambda/eth2api"
@@ -482,141 +481,72 @@ func InvalidTimestampPayload(t *hivesim.T, env *testEnv, n node) {
 }
 
 // The produced and broadcasted transition payload has parent with an invalid total difficulty.
-func IncorrectTerminalBlockLowerTTD(t *hivesim.T, env *testEnv, n node) {
-	config := getClientConfig(n)
-	BadTTD := big.NewInt(config.TerminalTotalDifficulty.Int64() - 50)
-	config = config.join(&Config{
-		Nodes: Nodes{
-			node{
-				ExecutionClient: n.ExecutionClient,
-				ConsensusClient: n.ConsensusClient,
-				ValidatorShares: 1,
+func IncorrectTerminalBlockGen(ttdDelta int64) func(t *hivesim.T, env *testEnv, n node) {
+	return func(t *hivesim.T, env *testEnv, n node) {
+		config := getClientConfig(n)
+		BadTTD := big.NewInt(config.TerminalTotalDifficulty.Int64() + ttdDelta)
+		config = config.join(&Config{
+			Nodes: Nodes{
+				node{
+					ExecutionClient:      n.ExecutionClient,
+					ConsensusClient:      n.ConsensusClient,
+					ValidatorShares:      1,
+					TestVerificationNode: true,
+				},
+				node{
+					ExecutionClient:      n.ExecutionClient,
+					ConsensusClient:      n.ConsensusClient,
+					ValidatorShares:      1,
+					TestVerificationNode: true,
+				},
+				node{
+					ExecutionClient:      n.ExecutionClient,
+					ConsensusClient:      n.ConsensusClient,
+					ValidatorShares:      1,
+					TestVerificationNode: true,
+				},
+				node{
+					// Add a node with an incorrect TTD to reject the invalid payload
+					ExecutionClient:         n.ExecutionClient,
+					ConsensusClient:         n.ConsensusClient,
+					ValidatorShares:         0,
+					TerminalTotalDifficulty: BadTTD,
+				},
 			},
-			node{
-				ExecutionClient: n.ExecutionClient,
-				ConsensusClient: n.ConsensusClient,
-				ValidatorShares: 1,
-			},
-			node{
-				ExecutionClient: n.ExecutionClient,
-				ConsensusClient: n.ConsensusClient,
-				ValidatorShares: 1,
-			},
-			node{
-				// Add a node with an incorrect TTD to produce the invalid payload
-				ExecutionClient:         n.ExecutionClient,
-				ValidatorShares:         0,
-				TerminalTotalDifficulty: BadTTD,
-			},
-		},
-	})
-
-	testnet := startTestnet(t, env, config)
-	defer testnet.stopTestnet()
-
-	// All proxies will use the same callback, therefore we need to use a lock and a counter
-	var (
-		getPayloadLock     sync.Mutex
-		getPayloadCount    int
-		invalidPayloadHash common.Hash
-		invalidPayloadChan = make(chan ExecutableDataV1)
-		finish             = make(chan interface{})
-	)
-
-	// Check on the bad TTD client when their TTD is hit and create a payload, which will be available to the first payload creator
-	go func() {
-		ec := NewEngineClient(t, testnet.eth1[len(testnet.eth1)-1], BadTTD)
-
-		var (
-			ttdBlockHeader *types.Header
-			ttdHit         bool
-		)
-		for {
-			ttdBlockHeader, ttdHit = ec.checkTTD()
-			if ttdHit {
-				break
-			}
-			select {
-			case <-time.After(time.Second):
-			case <-finish:
-				return
-			}
-		}
-		r, err := ec.EngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
-			HeadBlockHash: ttdBlockHeader.Hash(),
-		}, &PayloadAttributesV1{
-			Timestamp:             ttdBlockHeader.Time + 1,
-			PrevRandao:            common.Hash{},
-			SuggestedFeeRecipient: common.Address{},
 		})
-		if err != nil {
-			panic(err)
-		}
-		t.Logf("INFO: Forkchoice response: %v", r)
-		time.Sleep(time.Second)
-		p, err := ec.EngineGetPayloadV1(r.PayloadID)
-		if err != nil {
-			panic(err)
-		}
-		invalidPayloadChan <- p
-	}()
 
-	// The EL mock will intercept an engine_getPayloadV1 call and corrupt the prevRandao in the response
-	c := func(res []byte, req []byte) *proxy.Spoof {
-		getPayloadLock.Lock()
-		defer getPayloadLock.Unlock()
-		getPayloadCount++
-		// Invalidate a payload after the transition payload
-		if getPayloadCount == 1 {
-			var (
-				originalPayload ExecutableDataV1
-				invalidPayload  ExecutableDataV1
-				spoof           *proxy.Spoof
-				err             error
-			)
-			err = UnmarshalFromJsonRPCResponse(res, &originalPayload)
-			if err != nil {
-				panic(err)
-			}
-			invalidPayload = <-invalidPayloadChan
-			t.Logf("INFO (%v): Invalidating payload: %s", t.TestID, res)
-			invalidPayloadHash, spoof, err = customizePayloadSpoof(EngineGetPayloadV1, &invalidPayload, &CustomPayloadData{
-				// We need to use the timestamp/prevrandao that the CL used to request the payload, otherwise the payload will be rejected
-				// by other reasons other than the incorrect parent terminal block
-				Timestamp:  &originalPayload.Timestamp,
-				PrevRandao: &originalPayload.PrevRandao,
-			})
-			if err != nil {
-				panic(err)
-			}
-			t.Logf("INFO (%v): Invalidated payload hash: %v", t.TestID, invalidPayloadHash)
-			return spoof
-		}
-		return nil
-	}
-	for _, p := range testnet.proxies {
-		p.AddResponseCallback(EngineGetPayloadV1, c)
-	}
+		testnet := startTestnet(t, env, config)
+		defer testnet.stopTestnet()
 
-	ctx := context.Background()
-	finalized, err := testnet.WaitForFinality(ctx)
-	if err != nil {
-		t.Fatalf("FAIL: Waiting for finality: %v", err)
-	}
-	if err := testnet.VerifyParticipation(ctx, &finalized, 0.95); err != nil {
-		t.Fatalf("FAIL: Verifying participation: %v", err)
-	}
-	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, &finalized); err != nil {
-		t.Fatalf("FAIL: Verifying execution payload is canonical: %v", err)
-	}
-	if err := testnet.VerifyProposers(ctx, &finalized, true); err != nil {
-		t.Fatalf("FAIL: Verifying proposers: %v", err)
-	}
-	if err := testnet.VerifyELHeads(ctx); err != nil {
-		t.Fatalf("FAIL: Verifying EL Heads: %v", err)
-	}
-	if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, &finalized, invalidPayloadHash); b != nil {
-		t.Fatalf("FAIL: Invalid Payload %v was included in slot %d (%v)", invalidPayloadHash, b.Message.Slot, b.Message.StateRoot)
+		// Wait for all execution clients with the correct TTD reach the merge
+		ctx := context.Background()
+		transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx)
+		if err != nil {
+			t.Fatalf("FAIL: Waiting for execution payload: %v", err)
+		}
+		ec := NewEngineClient(t, testnet.eth1[0], config.TerminalTotalDifficulty)
+		transitionHeader, err := ec.Eth.HeaderByHash(ec.Ctx(), transitionPayloadHash)
+		if err != nil {
+			t.Fatalf("FAIL: Unable to get transition payload header from execution client: %v", err)
+		}
+		var tb, tbp *TotalDifficultyHeader
+		if err := ec.cEth.CallContext(ec.Ctx(), &tb, "eth_getBlockByHash", transitionHeader.ParentHash, false); err != nil {
+			t.Fatalf("FAIL: Unable to get terminal block header from execution client: %v", err)
+		}
+		if err := ec.cEth.CallContext(ec.Ctx(), &tbp, "eth_getBlockByHash", tb.ParentHash, false); err != nil {
+			t.Fatalf("FAIL: Unable to get terminal block header from execution client: %v", err)
+		}
+		t.Logf("INFO: CorrectTTD=%d, BadTTD=%d, TerminalBlockTotalDifficulty=%d, TerminalBlockParentTotalDifficulty=%d", config.TerminalTotalDifficulty, BadTTD, (*big.Int)(tb.TotalDifficulty), (*big.Int)(tbp.TotalDifficulty))
+
+		// Wait a couple of slots
+		time.Sleep(time.Duration(5*config.SlotTime.Uint64()) * time.Second)
+
+		// Transition payload should not be part of the beacon node with bad TTD
+		bn := testnet.beacons[len(testnet.beacons)-1]
+		b := testnet.VerifyExecutionPayloadHashInclusionNode(ctx, nil, bn, transitionPayloadHash)
+		if b != nil {
+			t.Fatalf("FAIL: Node with bad TTD included beacon block with correct TTD: %v", b)
+		}
 	}
 }
 
