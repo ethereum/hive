@@ -11,5 +11,5 @@ RUN go build -v .
 FROM alpine:latest
 ADD . /source
 WORKDIR /source
-COPY --from=builder /source/devnet .
-ENTRYPOINT ["./devnet"]
+COPY --from=builder /source/rpc .
+ENTRYPOINT ["./rpc"]
