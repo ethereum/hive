@@ -507,10 +507,11 @@ func IncorrectTerminalBlockGen(ttdDelta int64) func(t *hivesim.T, env *testEnv, 
 				},
 				node{
 					// Add a node with an incorrect TTD to reject the invalid payload
-					ExecutionClient:         n.ExecutionClient,
-					ConsensusClient:         n.ConsensusClient,
-					ValidatorShares:         0,
-					TerminalTotalDifficulty: BadTTD,
+					ExecutionClient:    n.ExecutionClient,
+					ConsensusClient:    n.ConsensusClient,
+					ValidatorShares:    0,
+					ExecutionClientTTD: BadTTD,
+					BeaconNodeTTD:      BadTTD,
 				},
 			},
 		})

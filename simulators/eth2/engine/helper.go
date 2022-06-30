@@ -31,11 +31,12 @@ type testEnv struct {
 }
 
 type node struct {
-	ExecutionClient         string
-	ConsensusClient         string
-	ValidatorShares         uint64
-	TerminalTotalDifficulty *big.Int
-	TestVerificationNode    bool
+	ExecutionClient      string
+	ConsensusClient      string
+	ValidatorShares      uint64
+	ExecutionClientTTD   *big.Int
+	BeaconNodeTTD        *big.Int
+	TestVerificationNode bool
 }
 
 type Nodes []node

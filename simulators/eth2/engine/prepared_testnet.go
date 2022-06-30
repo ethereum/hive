@@ -209,7 +209,7 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 	testnet.proxies = append(testnet.proxies, NewProxy(net.ParseIP(simIP), PortEngineRPC+len(testnet.eth1), dest, secret))
 }
 
-func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.ClientDefinition, eth1Endpoints []int) {
+func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.ClientDefinition, ttd *big.Int, eth1Endpoints []int) {
 	testnet.t.Logf("Starting beacon node: %s (%s)", beaconDef.Name, beaconDef.Version)
 
 	opts := []hivesim.StartOption{p.beaconOpts}
@@ -246,6 +246,10 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 			testnet.t.Fatalf("failed to get ENR as bootnode for every beacon node: %v", err)
 		}
 		opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENRs})
+	}
+
+	if ttd != nil {
+		opts = append(opts, hivesim.Params{"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf("%d", ttd)})
 	}
 
 	// TODO
