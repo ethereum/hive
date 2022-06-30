@@ -124,13 +124,15 @@ else
     FLAGS="$FLAGS --network-id=1337"
 fi
 
-# Sync mode, must only be changed for non merge related tests.
-if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; then
-    if [ "$HIVE_NODETYPE" == "light" ]; then
-        echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
-    else
-        FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0"
-    fi
+# Configure sync mode
+#
+# light: not supported, full sync (per default)
+# not set: fast sync
+# archive, full or merge tests: full sync (per default)
+if [ "$HIVE_NODETYPE" == "light" ]; then
+    echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
+elif [ "$HIVE_NODETYPE" == "" && "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == ""  ]; then
+    FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0"
 fi
 
 # Configure RPC.
@@ -148,7 +150,6 @@ RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=ETH,NET,WEB3,ADMIN --rpc-ws-ho
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
     RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --engine-jwt-enabled --engine-jwt-secret /jwtsecret"
-    FLAGS="$FLAGS --sync-mode=FULL"
 fi
 
 # Start Besu.
