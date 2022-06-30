@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version=latest
+version=optimism
 if [ -n "$1" ]; then
     version="$1"
 fi
@@ -12,7 +12,7 @@ for d in $sims; do
     (
         set -e
         cd $d
-        go get -d "github.com/ethereum/hive@$version"
-        go mod tidy -compat=1.17
+        go get -d "github.com/ethereum-optimism/hive@$version"
+        go mod tidy
     )
 done

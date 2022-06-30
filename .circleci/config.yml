@@ -6,7 +6,7 @@ jobs:
   # This job builds the hive executable and stores it in the workspace.
   build:
     docker:
-      - image: cimg/go:1.17
+      - image: cimg/go:1.18
     steps:
       # Build it.
       - checkout
@@ -19,19 +19,17 @@ jobs:
           root: .
           paths: ["hive"]
 
-  # This job runs the smoke test simulations. This requires a virtual
-  # machine instead of the container-based build environment because
-  # hive needs to be able to talk to the docker containers it creates.
-  smoke-tests:
+  # This job runs the optimism test simulations. This requires a virtual
+  # machine instead of the container-based build environment because hive needs
+  # to be able to talk to the docker containers it creates.
+  op-tests:
     machine:
       image: ubuntu-2004:202201-02
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
       - run:
-          command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum"
-      - run:
-          command: "/tmp/build/hive --sim=smoke/network --client=go-ethereum"
+          command: "/tmp/build/hive --sim=optimism --client=op-l1,op-l2,op-proposer,op-batcher,op-node"
 
   # This job also runs the smoke test simulations, but against a remote dockerd.
   smoke-tests-remote-docker:
@@ -49,7 +47,7 @@ jobs:
   # This job runs the go unit tests.
   go-test:
     docker:
-      - image: cimg/go:1.17
+      - image: cimg/go:1.18
     steps:
       # Get the source.
       - checkout
@@ -73,7 +71,7 @@ workflows:
     jobs:
       - go-test
       - build
-      - smoke-tests:
+      - op-tests:
           requires: ["build"]
       - smoke-tests-remote-docker:
           requires: ["build"]
