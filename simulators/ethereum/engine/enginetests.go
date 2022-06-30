@@ -1364,8 +1364,15 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 						if err := secondaryClient.setBlock(invalid_block, altChainPayloads[i-1].StateRoot); err != nil {
 							t.Fatalf("FAIL (%s): Failed to set invalid block: %v", t.TestName, err)
 						}
-						t.Logf("INFO (%s): Setting invalid block %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
+						t.Logf("INFO (%s): Invalid block successfully set %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 					}
+				}
+				// Check that the second node has the correct head
+				head := secondaryClient.eth.APIBackend.CurrentBlock()
+				if head.Hash() != altChainPayloads[n].BlockHash {
+					t.Fatalf("Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %v", head.Hash(), altChainPayloads[n].BlockHash, head.Number(), altChainPayloads[n].Number)
+				} else {
+					t.Logf("Secondary Node has correct block")
 				}
 
 				// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
@@ -1408,6 +1415,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 
 					select {
 					case <-time.After(time.Second):
+						continue
 					case <-t.Timeout:
 						t.Fatalf("FAIL (%s): Timeout waiting for main client to detect invalid chain", t.TestName)
 					}

@@ -18,6 +18,7 @@ import (
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
+	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/params"
 )
 
@@ -56,7 +57,7 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 	econfig := &ethconfig.Config{
 		Genesis:         genesis,
 		NetworkId:       genesis.Config.ChainID.Uint64(),
-		SyncMode:        downloader.SnapSync,
+		SyncMode:        downloader.FullSync,
 		DatabaseCache:   256,
 		DatabaseHandles: 256,
 		TxPool:          core.DefaultTxPoolConfig,
@@ -77,6 +78,12 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 		return nil, err
 	}
 	err = stack.Start()
+	for stack.Server().NodeInfo().Ports.Listener == 0 {
+		time.Sleep(250 * time.Millisecond)
+	}
+	// Connect the node to the bootnode
+	node := enode.MustParse(bootnode)
+	stack.Server().AddPeer(node)
 
 	return &gethNode{
 		node:     stack,
