@@ -9,7 +9,7 @@ function get_deployed_bytecode() {
 L1_BLOCK_INFO_BYTECODE=$(get_deployed_bytecode /L1Block.json)
 L2_TO_L1_MESSAGE_PASSER_BYTECODE=$(get_deployed_bytecode /L2ToL1MessagePasser.json)
 L2_CROSS_DOMAIN_MESSENGER_BYTECODE=$(get_deployed_bytecode /L2CrossDomainMessenger.json)
-OPTIMISM_MINTABLE_TOKEN_FACTORY_BYTECODE=$(get_deployed_bytecode /OptimismMintableTokenFactory.json)
+OPTIMISM_MINTABLE_TOKEN_FACTORY_BYTECODE=$(get_deployed_bytecode /OptimismMintableTokenFactoryProxy.json)
 L2_STANDARD_BRIDGE_BYTECODE=$(get_deployed_bytecode /L2StandardBridge.json)
 
 GENESIS_TIMESTAMP=$(cat /genesis_timestamp)

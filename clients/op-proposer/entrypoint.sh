@@ -11,7 +11,7 @@ curl \
     --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x0", false],"id":1}' \
     http://172.17.0.3:8545
 
-L2OO_ADDRESS=$(jq -r .address < /L2OutputOracle.json)
+L2OO_ADDRESS=$(jq -r .address < /L2OutputOracleProxy.json)
 
 exec op-proposer \
     --l1-eth-rpc http://172.17.0.3:8545 \
