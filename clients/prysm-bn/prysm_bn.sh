@@ -31,6 +31,11 @@ echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 sed -i 's/"\([[:digit:]]\+\)"/\1/' /hive/input/config.yaml
 sed -i 's/"\(0x[[:xdigit:]]\+\)"/\1/' /hive/input/config.yaml
 
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    sed -i '/TERMINAL_TOTAL_DIFFICULTY/d' /hive/input/config.yaml
+    echo "TERMINAL_TOTAL_DIFFICULTY: $HIVE_TERMINAL_TOTAL_DIFFICULTY" >> /hive/input/config.yaml
+fi
+
 echo config.yaml:
 cat /hive/input/config.yaml
 
