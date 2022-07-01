@@ -1217,8 +1217,8 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 						// We have already sent the invalid payload, but the client could've discarded it.
 						// In reality the CL will not get to this point because it will have already received the `INVALID`
 						// response from the previous payload.
-						r.ExpectStatusEither(Accepted, Syncing)
-						r.ExpectLatestValidHash(nil)
+						// The node might save the parent as invalid, thus returning INVALID
+						r.ExpectStatusEither(Accepted, Syncing, Invalid)
 					} else {
 						// This is one of the payloads before the invalid one, therefore is valid.
 						r.ExpectStatus(Valid)

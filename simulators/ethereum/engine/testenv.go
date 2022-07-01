@@ -115,7 +115,7 @@ func RunTest(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinaliz
 	}()
 
 	// Setup timeouts
-	env.Timeout = time.After(5 * timeout)
+	env.Timeout = time.After(2 * timeout)
 	clMocker.Timeout = time.After(timeout)
 
 	// Defer producing one last block to verify Execution client did not break after the test
