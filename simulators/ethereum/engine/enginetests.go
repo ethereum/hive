@@ -287,7 +287,7 @@ var engineTests = []TestSpec{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidPrevRandao, true),
+		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidPrevRandao, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
@@ -1361,7 +1361,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 							t.Fatalf("FAIL (%s): Failed to create block from payload: %v", t.TestName, err)
 						}
 
-						if err := secondaryClient.setBlock(invalid_block, altChainPayloads[i-1].StateRoot); err != nil {
+						if err := secondaryClient.setBlock(invalid_block, altChainPayloads[i-1].Number, altChainPayloads[i-1].StateRoot); err != nil {
 							t.Fatalf("FAIL (%s): Failed to set invalid block: %v", t.TestName, err)
 						}
 						t.Logf("INFO (%s): Invalid block successfully set %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
