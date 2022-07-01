@@ -468,7 +468,14 @@ func (t *Testnet) VerifyExecutionPayloadHashInclusionNode(ctx context.Context, c
 	if checkpoint != nil {
 		lastSlot = t.spec.SLOTS_PER_EPOCH * common.Slot(checkpoint.Epoch)
 	} else {
-		lastSlot = t.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), t.genesisTime)
+		var headInfo eth2api.BeaconBlockHeaderAndInfo
+		if exists, err := beaconapi.BlockHeader(ctx, t.verificationBeacons()[0].API, eth2api.BlockHead, &headInfo); err != nil {
+			panic(fmt.Errorf("failed to poll head: %v", err))
+		} else if !exists {
+			panic(fmt.Errorf("no head block"))
+		}
+		lastSlot = headInfo.Header.Message.Slot
+		fmt.Printf("INFO: Got head %d: %v\n", headInfo.Header.Message.Slot, headInfo.Root)
 	}
 	enr, _ := bn.ENR()
 	t.t.Logf("INFO: Looking for block %v in node %v", hash, enr)

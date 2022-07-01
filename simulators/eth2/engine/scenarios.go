@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
@@ -871,11 +872,14 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 	)
 
 	invalidateQuantityType := func(method string, response []byte, q QuantityType, invType InvalidationType) *proxy.Spoof {
-		responseFields := make(map[string]string)
+		responseFields := make(map[string]json.RawMessage)
 		if err := UnmarshalFromJsonRPCResponse(response, &responseFields); err != nil {
-			panic(fmt.Errorf("Unable to unmarshal: %v", err))
+			panic(fmt.Errorf("Unable to unmarshal: %v. json: %s", err, response))
 		}
-		fieldOriginalValue := responseFields[q.Name]
+		var fieldOriginalValue string
+		if err := json.Unmarshal(responseFields[q.Name], &fieldOriginalValue); err != nil {
+			panic(fmt.Errorf("Unable to unmarshal: %v. json: %s", err, responseFields[q.Name]))
+		}
 		fields := make(map[string]interface{})
 		switch invType {
 		case Overflow:
@@ -956,8 +960,13 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 			}
 			return nil
 		}
-		invalidPayloadHashes = append(invalidPayloadHashes, payload.BlockHash)
-		return invalidateQuantityType(EngineGetPayloadV1, res, allQuantityFields[field], invType)
+		// Customize to get a different hash in order to properly check that the payload is actually not included
+		customExtraData := []byte(fmt.Sprintf("invalid %s %d", allQuantityFields[field].Name, invType))
+		newHash, spoof, _ := customizePayloadSpoof(EngineGetPayloadV1, &payload, &CustomPayloadData{
+			ExtraData: &customExtraData,
+		})
+		invalidPayloadHashes = append(invalidPayloadHashes, newHash)
+		return combine(spoof, invalidateQuantityType(EngineGetPayloadV1, res, allQuantityFields[field], invType))
 	}
 
 	// We pass the id of the proxy to identify which one it is within the callback
@@ -971,7 +980,7 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 	// Check that none of the invalidated payloads made it into the beacon chain
 	for i, p := range invalidPayloadHashes {
 		if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, p); b != nil {
-			t.Fatalf("FAIL: Invalid Payload (%d) %v was included in slot %d (%v)", i+1, p, b.Message.Slot, b.Message.StateRoot)
+			t.Fatalf("FAIL: Invalid Payload #%d, %v (%s), was included in slot %d (%v)", i+1, p, ([]byte)(b.Message.Body.ExecutionPayload.ExtraData), b.Message.Slot, b.Message.StateRoot)
 		}
 	}
 }

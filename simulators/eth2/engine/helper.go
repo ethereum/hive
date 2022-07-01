@@ -586,3 +586,19 @@ func CheckErrorOnForkchoiceUpdatedPayloadAttr(fcuLock *sync.Mutex, fcUCountLimit
 		return nil
 	}
 }
+
+func combine(a, b *proxy.Spoof) *proxy.Spoof {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	if a.Method != b.Method {
+		panic(fmt.Errorf("Spoof methods don't match: %s != %s", a.Method, b.Method))
+	}
+	for k, v := range b.Fields {
+		a.Fields[k] = v
+	}
+	return a
+}
