@@ -269,19 +269,19 @@ var engineTests = []TestSpec{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasLimit, true),
+		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasLimit, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasUsed, true),
+		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasUsed, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTimestamp, true),
+		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTimestamp, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
@@ -293,7 +293,7 @@ var engineTests = []TestSpec{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, RemoveTransaction, true),
+		Run:              invalidMissingAncestorReOrgGenSync(9, RemoveTransaction, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
