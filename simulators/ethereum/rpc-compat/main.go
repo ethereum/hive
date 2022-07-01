@@ -10,12 +10,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/ethereum/hive/hivesim"
+	diff "github.com/yudai/gojsondiff"
+	"github.com/yudai/gojsondiff/formatter"
 )
 
 var (
@@ -118,18 +119,23 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 			if resp == nil {
 				return fmt.Errorf("invalid test, response before request")
 			}
-			var want interface{}
-			if err := json.Unmarshal([]byte(strings.TrimSpace(line)[3:]), &want); err != nil {
-				return err
+			want := []byte(strings.TrimSpace(line)[3:]) // trim leading "<< "
+			// Now compare.
+			d, err := diff.New().Compare(resp, want)
+			if err != nil {
+				return fmt.Errorf("failed to unmarshal value: %s\n", err)
 			}
-			var got interface{}
-			if err := json.Unmarshal(resp, &got); err != nil {
-				return err
-			}
-			if !reflect.DeepEqual(want, got) {
-				want, _ := json.Marshal(want)
-				got, _ := json.Marshal(got)
-				return fmt.Errorf("invalid response\nwant: %s\ngot:  %s", want, got)
+			// If there is a discrepancy, return error.
+			if d.Modified() {
+				var got map[string]interface{}
+				json.Unmarshal(resp, &got)
+				config := formatter.AsciiFormatterConfig{
+					ShowArrayIndex: true,
+					Coloring:       false,
+				}
+				formatter := formatter.NewAsciiFormatter(got, config)
+				diffString, _ := formatter.Format(d)
+				return fmt.Errorf("response differs from expected:\n%s", diffString)
 			}
 			resp = nil
 		default:
