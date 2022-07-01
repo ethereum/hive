@@ -136,43 +136,43 @@ func (d *Devnet) InitL2() error {
 	}
 	d.genesisTimestamp = genesisTimestamp
 
-	l2OutputOracle, err := d.Cat("/hive/contracts/deployments/devnetL1/L2OutputOracleProxy.json")
+	l2OutputOracle, err := d.Cat("/hive/optimism/packages/contracts-bedrock/deployments/devnetL1/L2OutputOracleProxy.json")
 	if err != nil {
 		return err
 	}
 	d.l2OutputOracle = l2OutputOracle
 
-	optimismPortal, err := d.Cat("/hive/contracts/deployments/devnetL1/OptimismPortalProxy.json")
+	optimismPortal, err := d.Cat("/hive/optimism/packages/contracts-bedrock/deployments/devnetL1/OptimismPortalProxy.json")
 	if err != nil {
 		return err
 	}
 	d.optimismPortal = optimismPortal
 
-	l2ToL1MessagePasserJSON, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L2ToL1MessagePasser.sol/L2ToL1MessagePasser.json")
+	l2ToL1MessagePasserJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/L2/L2ToL1MessagePasser.sol/L2ToL1MessagePasser.json")
 	if err != nil {
 		return err
 	}
 	d.l2ToL1MessagePasserJSON = l2ToL1MessagePasserJSON
 
-	l2CrossDomainMessengerJSON, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L2CrossDomainMessenger.sol/L2CrossDomainMessenger.json")
+	l2CrossDomainMessengerJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/L2/L2CrossDomainMessenger.sol/L2CrossDomainMessenger.json")
 	if err != nil {
 		return err
 	}
 	d.l2CrossDomainMessengerJSON = l2CrossDomainMessengerJSON
 
-	optimismMintableTokenFactoryJSON, err := d.Cat("/hive/contracts/artifacts/contracts/universal/OptimismMintableTokenFactoryProxy.sol/OptimismMintableTokenFactoryProxy.json")
+	optimismMintableTokenFactoryJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/universal/OptimismMintableTokenFactoryProxy.sol/OptimismMintableTokenFactoryProxy.json")
 	if err != nil {
 		return err
 	}
 	d.optimismMintableTokenFactoryJSON = optimismMintableTokenFactoryJSON
 
-	l2StandardBridgeJSON, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L2StandardBridge.sol/L2StandardBridge.json")
+	l2StandardBridgeJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/L2/L2StandardBridge.sol/L2StandardBridge.json")
 	if err != nil {
 		return err
 	}
 	d.l2StandardBridgeJSON = l2StandardBridgeJSON
 
-	l1BlockJSON, err := d.Cat("/hive/contracts/artifacts/contracts/L2/L1Block.sol/L1Block.json")
+	l1BlockJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/L2/L1Block.sol/L1Block.json")
 	if err != nil {
 		return err
 	}
