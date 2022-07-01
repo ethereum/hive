@@ -261,6 +261,11 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 }
 
 func (p *PreparedTestnet) startValidatorClient(testnet *Testnet, validatorDef *hivesim.ClientDefinition, bnIndex int, keyIndex int) {
+	if len(p.keyTranches[keyIndex]) == 0 {
+		testnet.validators = append(testnet.validators, &ValidatorClient{nil, make([]*setup.KeyDetails, 0)})
+		testnet.t.Logf("Skipping validator %d because it has 0 validator keys", keyIndex)
+		return
+	}
 	testnet.t.Logf("Starting validator client: %s (%s)", validatorDef.Name, validatorDef.Version)
 
 	if bnIndex >= len(testnet.beacons) {
