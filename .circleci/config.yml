@@ -1,6 +1,7 @@
 version: 2.1
 orbs:
   go: circleci/go@1.5.0
+  slack: circleci/slack@4.10.1
 
 jobs:
   # This job builds the hive executable and stores it in the workspace.
@@ -29,20 +30,17 @@ jobs:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
       - run:
-          command: "/tmp/build/hive --sim=optimism --client=op-l1,op-l2,op-proposer,op-batcher,op-node"
-
-  # This job also runs the smoke test simulations, but against a remote dockerd.
-  smoke-tests-remote-docker:
-    docker:
-      - image: cimg/base:2022.04
-    steps:
-      - checkout
-      - attach_workspace: {at: "/tmp/build"}
-      - setup_remote_docker: {version: 20.10.14}
+          command: "/tmp/build/hive -sim=optimism -client=op-l1,op-l2,op-proposer,op-batcher,op-node |& tee /tmp/build/hive.log"
       - run:
-          command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum --loglevel 5"
-      - run:
-          command: "/tmp/build/hive --sim=smoke/network --client=go-ethereum --loglevel 5"
+          command: "! grep 'pass.*=false' /tmp/build/hive.log"
+      - slack/notify:
+          channel: C03N11M0BBN
+          event: fail
+          template: basic_fail_1
+      - slack/notify:
+          channel: C03N11M0BBN
+          event: pass
+          template: basic_success_1
 
   # This job runs the go unit tests.
   go-test:
@@ -73,5 +71,4 @@ workflows:
       - build
       - op-tests:
           requires: ["build"]
-      - smoke-tests-remote-docker:
-          requires: ["build"]
+          context: slack
