@@ -202,6 +202,8 @@ github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d h1:dg1dEPuW
 github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d/go.mod h1:iADmTwqILo4mZ8BN3D2Q6+9jd8WM5uGBxy+E8yxSoD4=
 github.com/herumi/bls-eth-go-binary v0.0.0-20210902234237-7763804ee078 h1:7V5qCWTKJ0T/9KjYo2dBFaIDEb2dvy3onu9nqOIIFDc=
 github.com/herumi/bls-eth-go-binary v0.0.0-20210902234237-7763804ee078/go.mod h1:luAnRm3OsMQeokhGzpYmc0ZKwawY7o87PUEP11Z7r7U=
+github.com/herumi/bls-eth-go-binary v0.0.0-20220509081320-2d8ab06de53c h1:ppGSVyhAFh8VAGyDuNeLEGMYRJR5iDI92QgDNrMIqK0=
+github.com/herumi/bls-eth-go-binary v0.0.0-20220509081320-2d8ab06de53c/go.mod h1:luAnRm3OsMQeokhGzpYmc0ZKwawY7o87PUEP11Z7r7U=
 github.com/holiman/bloomfilter/v2 v2.0.3 h1:73e0e/V0tCydx14a0SCYS/EWCxgwLZ18CZcZKVu0fao=
 github.com/holiman/bloomfilter/v2 v2.0.3/go.mod h1:zpoh+gs7qcpqrHr3dB55AMiJwo0iURXE7ZOP9L9hSkA=
 github.com/holiman/uint256 v1.2.0 h1:gpSYcPLWGv4sG43I2mVLiDZCNDh/EpGjSk8tmtxitHM=

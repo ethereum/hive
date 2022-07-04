@@ -10,6 +10,7 @@ require (
 	github.com/rauljordan/engine-proxy v0.0.0-20220517190449-e62b2e2f6e27
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1
 	gopkg.in/yaml.v2 v2.4.0
+
 )
 
 require (

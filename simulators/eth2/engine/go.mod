@@ -6,7 +6,6 @@ require (
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/ethereum/hive v0.0.0-20220202142700-64e211a795ba
 	github.com/google/uuid v1.3.0
-	github.com/herumi/bls-eth-go-binary v0.0.0-20210902234237-7763804ee078
 	github.com/pkg/errors v0.9.1
 	github.com/protolambda/eth2api v0.0.0-20220123235524-49a703ed9d94
 	github.com/protolambda/go-keystorev4 v0.0.0-20210914214957-cf12d9c28a52
@@ -51,6 +50,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
+	github.com/herumi/bls-eth-go-binary v0.0.0-20220509081320-2d8ab06de53c // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kilic/bls12-381 v0.1.0 // indirect
