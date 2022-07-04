@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"math/big"
 	"os"
 	"time"
@@ -15,11 +16,13 @@ import (
 	ethcatalyst "github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 type gethNode struct {
@@ -103,10 +106,31 @@ func (v *validator) ValidateState(block *types.Block, state *state.StateDB, rece
 	return nil
 }
 
-func (n *gethNode) setBlock(block *types.Block, parentRoot common.Hash) error {
+var headerPrefix = []byte("h") // headerPrefix + num (uint64 big endian) + hash -> header
+func headerKey(number uint64, hash common.Hash) []byte {
+	return append(append(headerPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
+}
+
+func encodeBlockNumber(number uint64) []byte {
+	enc := make([]byte, 8)
+	binary.BigEndian.PutUint64(enc, number)
+	return enc
+}
+
+func (n *gethNode) setBlock(block *types.Block, parentNumber uint64, parentRoot common.Hash) error {
 	parentTd := n.eth.BlockChain().GetTd(block.ParentHash(), block.NumberU64()-1)
 	rawdb.WriteTd(n.eth.ChainDb(), block.Hash(), block.NumberU64(), parentTd.Add(parentTd, block.Difficulty()))
 	rawdb.WriteBlock(n.eth.ChainDb(), block)
+
+	// write real info (fixes fake number test)
+	data, err := rlp.EncodeToBytes(block.Header())
+	if err != nil {
+		log.Crit("Failed to RLP encode header", "err", err)
+	}
+	key := headerKey(parentNumber+1, block.Hash())
+	if err := n.eth.ChainDb().Put(key, data); err != nil {
+		log.Crit("Failed to store header", "err", err)
+	}
 
 	rawdb.WriteHeaderNumber(n.eth.ChainDb(), block.Hash(), block.NumberU64())
 	bc := n.eth.BlockChain()
@@ -135,6 +159,7 @@ func (n *gethNode) setBlock(block *types.Block, parentRoot common.Hash) error {
 	if err := triedb.Commit(root, true, nil); err != nil {
 		return err
 	}
+
 	rawdb.WriteHeadHeaderHash(n.eth.ChainDb(), block.Hash())
 	rawdb.WriteHeadFastBlockHash(n.eth.ChainDb(), block.Hash())
 	rawdb.WriteCanonicalHash(n.eth.ChainDb(), block.Hash(), block.NumberU64())
