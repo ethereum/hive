@@ -79,8 +79,8 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 
 	var hostConfig *docker.HostConfig
 
-	if strings.HasPrefix(imageName, "hive/clients") {
-		b.logger.Debug("Node client found, binding 8545 to a random host port")
+	if strings.HasPrefix(imageName, "hive/clients") && crossplatform.IsMac() {
+		b.logger.Debug("macos: client found, binding 8545 to a random host port")
 
 		portBindings := map[docker.Port][]docker.PortBinding{
 			"8545/tcp": {{HostIP: "", HostPort: "0"}},
