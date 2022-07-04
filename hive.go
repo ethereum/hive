@@ -275,7 +275,6 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 		},
 	}
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
-	fmt.Println("bboo1", containerID, err)
 	if err != nil {
 		return err
 	}
@@ -345,7 +344,6 @@ func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) 
 	// Start the API webserver for simulators to coordinate with
 	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
 	listener, err := net.ListenTCP("tcp4", addr)
-	fmt.Println("boo1", listener)
 	if err != nil {
 		log15.Error("failed to listen on bridge adapter", "err", err)
 		return nil, nil, err
