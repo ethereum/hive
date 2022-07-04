@@ -338,13 +338,12 @@ func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) 
 	if crossplatform.IsMac() {
 		bridge = "0.0.0.0" //"host.docker.internal"
 	} else {
-		var err error
-		bridge, err = libdocker.LookupBridgeIP(log15.Root())
+		bridgeAddr, err := libdocker.LookupBridgeIP(log15.Root())
 		if err != nil {
 			log15.Error("failed to lookup bridge IP", "error", err)
 			return nil, nil, err
 		}
-
+		bridge = fmt.Sprintf("%s", bridgeAddr)
 	}
 
 	log15.Debug("docker bridge IP found", "ip", bridge)
