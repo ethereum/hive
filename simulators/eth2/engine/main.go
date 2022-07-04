@@ -20,17 +20,20 @@ var (
 var tests = []testSpec{
 	//{Name: "transition-testnet", Run: TransitionTestnet},
 	{Name: "test-rpc-error", Run: TestRPCError},
-	{Name: "invalid-transition-payload", Run: InvalidTransitionPayload},
-	{Name: "invalid-payload-block-hash", Run: InvalidTransitionPayloadBlockHash},
+	{Name: "invalid-canonical-payload", Run: InvalidPayloadGen(2, Invalid)},
+	{Name: "invalid-payload-block-hash", Run: InvalidPayloadGen(2, InvalidBlockHash)},
 	{Name: "invalid-header-prevrandao", Run: IncorrectHeaderPrevRandaoPayload},
 	{Name: "invalid-timestamp", Run: InvalidTimestampPayload},
-	{Name: "invalid-terminal-block-payload-lower-ttd", Run: IncorrectTerminalBlockGen(-2)},
-	{Name: "invalid-terminal-block-payload-higher-ttd", Run: IncorrectTerminalBlockGen(1)},
 	{Name: "syncing-with-invalid-chain", Run: SyncingWithInvalidChain},
 	{Name: "basefee-encoding-check", Run: BaseFeeEncodingCheck},
-	{Name: "equal-timestamp-terminal-transition-block", Run: EqualTimestampTerminalTransitionBlock},
-	{Name: "ttd-before-bellatrix", Run: TTDBeforeBellatrix},
 	{Name: "invalid-quantity-fields", Run: InvalidQuantityPayloadFields},
+
+	// Transition (TERMINAL_TOTAL_DIFFICULTY) tests
+	{Name: "invalid-transition-payload", Run: InvalidPayloadGen(1, Invalid)},
+	{Name: "ttd-before-bellatrix", Run: TTDBeforeBellatrix},
+	{Name: "equal-timestamp-terminal-transition-block", Run: EqualTimestampTerminalTransitionBlock},
+	{Name: "invalid-terminal-block-payload-lower-ttd", Run: IncorrectTerminalBlockGen(-2)},
+	{Name: "invalid-terminal-block-payload-higher-ttd", Run: IncorrectTerminalBlockGen(1)},
 }
 
 func main() {

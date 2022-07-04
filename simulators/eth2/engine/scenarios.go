@@ -126,198 +126,113 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	}
 }
 
-func InvalidTransitionPayload(t *hivesim.T, env *testEnv, n node) {
-	config := getClientConfig(n).join(&Config{
-		Nodes: Nodes{
-			n,
-			n,
-			n,
-		},
-	})
+// Generates a testnet case where one payload is invalidated in the recipient nodes.
+// invalidPayloadNumber: The number of the payload to invalidate -- 1 is transition payload, 2+ is any canonical chain payload.
+// invalidStatusResponse: The validation error response to inject in the recipient nodes.
+func InvalidPayloadGen(invalidPayloadNumber int, invalidStatusResponse PayloadStatus) func(t *hivesim.T, env *testEnv, n node) {
+	return func(t *hivesim.T, env *testEnv, n node) {
+		config := getClientConfig(n).join(&Config{
+			Nodes: Nodes{
+				n,
+				n,
+				n,
+			},
+		})
 
-	testnet := startTestnet(t, env, config)
-	defer testnet.stopTestnet()
+		testnet := startTestnet(t, env, config)
+		defer testnet.stopTestnet()
 
-	// All proxies will use the same callback, therefore we need to use a lock and a counter
-	var (
-		getPayloadLock        sync.Mutex
-		getPayloadCount       int
-		invalidPayloadHash    common.Hash
-		invalidPayloadProxyId int
-	)
+		// All proxies will use the same callback, therefore we need to use a lock and a counter
+		var (
+			getPayloadLock        sync.Mutex
+			getPayloadCount       int
+			invalidPayloadHash    common.Hash
+			invalidPayloadProxyId int
+		)
 
-	// The EL mock will intercept the first engine_getPayloadV1 and corrupt the stateRoot in the response
-	getPayloadCallbackGen := func(id int) func(res []byte, req []byte) *proxy.Spoof {
-		return func(res []byte, req []byte) *proxy.Spoof {
-			getPayloadLock.Lock()
-			defer getPayloadLock.Unlock()
-			getPayloadCount++
-			if getPayloadCount == 1 {
-				// We are not going to spoof anything here, we just need to save the transition payload hash and the id of the validator that generated it
-				// to invalidate it in other clients.
+		// The EL mock will intercept the first engine_getPayloadV1 and corrupt the stateRoot in the response
+		getPayloadCallbackGen := func(id int) func(res []byte, req []byte) *proxy.Spoof {
+			return func(res []byte, req []byte) *proxy.Spoof {
+				getPayloadLock.Lock()
+				defer getPayloadLock.Unlock()
+				getPayloadCount++
+				if getPayloadCount == invalidPayloadNumber {
+					// We are not going to spoof anything here, we just need to save the transition payload hash and the id of the validator that generated it
+					// to invalidate it in other clients.
+					var (
+						payload ExecutableDataV1
+					)
+					err := UnmarshalFromJsonRPCResponse(res, &payload)
+					if err != nil {
+						panic(err)
+					}
+					invalidPayloadHash = payload.BlockHash
+					invalidPayloadProxyId = id
+					// Remove this validator from the verification
+					testnet.removeNodeAsVerifier(id)
+				}
+				return nil
+			}
+		}
+
+		// Here we will intercept the response from the rest of the clients that did not generate the payload to artificially invalidate them
+		newPayloadCallbackGen := func(id int) func(res []byte, req []byte) *proxy.Spoof {
+			return func(res []byte, req []byte) *proxy.Spoof {
+				t.Logf("INFO: newPayload callback node %d", id)
 				var (
 					payload ExecutableDataV1
+					spoof   *proxy.Spoof
+					err     error
 				)
-				err := UnmarshalFromJsonRPCResponse(res, &payload)
+				err = UnmarshalFromJsonRPCRequest(req, &payload)
 				if err != nil {
 					panic(err)
 				}
-				invalidPayloadHash = payload.BlockHash
-				invalidPayloadProxyId = id
-				// Remove this validator from the verification
-				testnet.removeNodeAsVerifier(id)
+				// Only invalidate if the payload hash matches the invalid payload hash and this validator is not the one that generated it
+				if invalidPayloadProxyId != id && payload.BlockHash == invalidPayloadHash {
+					var latestValidHash common.Hash
+					// Latest valid hash depends on the error we are injecting
+					if invalidPayloadNumber == 1 || invalidStatusResponse == InvalidBlockHash {
+						// The transition payload has a PoW parent, hash must be 0.
+						// If the payload has an invalid hash, we cannot link it to any other payload, hence 0.
+						latestValidHash = common.Hash{}
+					} else {
+						latestValidHash = payload.ParentHash
+					}
+					status := PayloadStatusV1{
+						Status:          invalidStatusResponse,
+						LatestValidHash: &latestValidHash,
+						ValidationError: nil,
+					}
+					spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &status)
+					if err != nil {
+						panic(err)
+					}
+					t.Logf("INFO: Invalidating payload on validator %d: %v", id, payload.BlockHash)
+				}
+				return spoof
 			}
-			return nil
+		}
+		// We pass the id of the proxy to identify which one it is within the callback
+		for i, p := range testnet.proxies {
+			p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
+			p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(i))
+		}
+
+		ctx := context.Background()
+		_, err := testnet.WaitForExecutionPayload(ctx)
+		if err != nil {
+			t.Fatalf("FAIL: Waiting for execution payload: %v", err)
+		}
+
+		// Wait 5 slots after the invalidated payload
+		time.Sleep(time.Duration(testnet.spec.SECONDS_PER_SLOT) * time.Second * time.Duration(5+invalidPayloadNumber))
+
+		// Verify beacon block with invalid payload is not accepted
+		if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, invalidPayloadHash); b != nil {
+			t.Fatalf("FAIL: Invalid Payload %v was included in slot %d (%v)", invalidPayloadHash, b.Message.Slot, b.Message.StateRoot)
 		}
 	}
-
-	// Here we will intercept the response from the rest of the clients that did not generate the payload to artificially invalidate them
-	newPayloadCallbackGen := func(id int) func(res []byte, req []byte) *proxy.Spoof {
-		return func(res []byte, req []byte) *proxy.Spoof {
-			var (
-				payload ExecutableDataV1
-				spoof   *proxy.Spoof
-				err     error
-			)
-			err = UnmarshalFromJsonRPCRequest(req, &payload)
-			if err != nil {
-				panic(err)
-			}
-			// Only invalidate if the payload hash matches the invalid payload hash and this validator is not the one that generated it
-			if invalidPayloadProxyId != id && payload.BlockHash == invalidPayloadHash {
-				status := PayloadStatusV1{
-					Status:          Invalid,
-					LatestValidHash: &(common.Hash{}),
-					ValidationError: nil,
-				}
-				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &status)
-				if err != nil {
-					panic(err)
-				}
-				t.Logf("INFO: Invalidating payload on validator %d: %v", id, payload.BlockHash)
-			}
-			return spoof
-		}
-	}
-	// We pass the id of the proxy to identify which one it is within the callback
-	for i, p := range testnet.proxies {
-		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
-		p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(i))
-	}
-
-	ctx := context.Background()
-	_, err := testnet.WaitForExecutionPayload(ctx)
-	if err != nil {
-		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
-	}
-
-	// Wait 5 slots
-	time.Sleep(time.Duration(testnet.spec.SECONDS_PER_SLOT) * time.Second * 5)
-
-	// Verify beacon block with invalid payload is not accepted
-	if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, invalidPayloadHash); b != nil {
-		t.Fatalf("FAIL: Invalid Payload %v was included in slot %d (%v)", invalidPayloadHash, b.Message.Slot, b.Message.StateRoot)
-	}
-
-}
-
-func InvalidTransitionPayloadBlockHash(t *hivesim.T, env *testEnv, n node) {
-	config := getClientConfig(n).join(&Config{
-		Nodes: Nodes{
-			n,
-			n,
-			n,
-		},
-	})
-
-	testnet := startTestnet(t, env, config)
-	defer testnet.stopTestnet()
-
-	// All proxies will use the same callback, therefore we need to use a lock and a counter
-	var (
-		getPayloadLock        sync.Mutex
-		getPayloadCount       int
-		invalidPayloadHash    common.Hash
-		invalidPayloadProxyId int
-	)
-
-	// The EL mock will intercept the first engine_getPayloadV1 and corrupt the stateRoot in the response
-	getPayloadCallbackGen := func(id int) func(res []byte, req []byte) *proxy.Spoof {
-		return func(res []byte, req []byte) *proxy.Spoof {
-			getPayloadLock.Lock()
-			defer getPayloadLock.Unlock()
-			getPayloadCount++
-			t.Logf("INFO: getPayload callback %d", getPayloadCount)
-			if getPayloadCount == 1 {
-				// We are not going to spoof anything here, we just need to save the transition payload hash and the id of the validator that generated it
-				// to invalidate it in other clients.
-				var (
-					payload ExecutableDataV1
-				)
-				err := UnmarshalFromJsonRPCResponse(res, &payload)
-				if err != nil {
-					panic(err)
-				}
-				invalidPayloadHash = payload.BlockHash
-				invalidPayloadProxyId = id
-				// Remove this validator from the verification
-				testnet.removeNodeAsVerifier(id)
-			}
-			return nil
-		}
-	}
-
-	// Here we will intercept the response from the rest of the clients that did not generate the payload to artificially invalidate them
-	newPayloadCallbackGen := func(id int) func(res []byte, req []byte) *proxy.Spoof {
-		return func(res []byte, req []byte) *proxy.Spoof {
-			t.Logf("INFO: newPayload callback node %d", id)
-			var (
-				payload ExecutableDataV1
-				spoof   *proxy.Spoof
-				err     error
-			)
-			err = UnmarshalFromJsonRPCRequest(req, &payload)
-			if err != nil {
-				panic(err)
-			}
-			// Only invalidate if the payload hash matches the invalid payload hash and this validator is not the one that generated it
-			if invalidPayloadProxyId != id && payload.BlockHash == invalidPayloadHash {
-				status := PayloadStatusV1{
-					Status:          InvalidBlockHash,
-					LatestValidHash: &(common.Hash{}),
-					ValidationError: nil,
-				}
-				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &status)
-				if err != nil {
-					panic(err)
-				}
-				t.Logf("INFO: Invalidating payload on validator %d: %v", id, payload.BlockHash)
-			}
-			return spoof
-		}
-	}
-	// We pass the id of the proxy to identify which one it is within the callback
-	t.Logf("INFO: proxies = %v", testnet.proxies)
-	for i, p := range testnet.proxies {
-		t.Logf("INFO: adding callback to proxy %d", i)
-		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
-		p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(i))
-	}
-
-	ctx := context.Background()
-	_, err := testnet.WaitForExecutionPayload(ctx)
-	if err != nil {
-		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
-	}
-
-	// Wait 5 slots
-	time.Sleep(time.Duration(testnet.spec.SECONDS_PER_SLOT) * time.Second * 5)
-
-	// Verify beacon block with invalid payload is not accepted
-	if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, invalidPayloadHash); b != nil {
-		t.Fatalf("FAIL: Invalid Payload %v was included in slot %d (%v)", invalidPayloadHash, b.Message.Slot, b.Message.StateRoot)
-	}
-
 }
 
 // The produced and broadcasted payload contains an invalid prevrandao value.
@@ -707,7 +622,7 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 	for _, bn := range testnet.verificationBeacons() {
 		var versionedBlock eth2api.VersionedSignedBeaconBlock
 		if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockHead, &versionedBlock); err != nil {
-			t.Fatalf("FAIL: Unable to poll beacon chain head")
+			t.Fatalf("FAIL: Unable to poll beacon chain head: %v", err)
 		} else if !exists {
 			t.Fatalf("FAIL: Unable to poll beacon chain head")
 		}
