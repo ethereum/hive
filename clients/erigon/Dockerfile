@@ -1,5 +1,5 @@
 ARG branch=devel
-FROM my-erigon-arm
+FROM thorax/erigon:$branch
 
 # The upstream erigon container uses a non-root user, but we need
 # to install additional commands, so switch back to root.
