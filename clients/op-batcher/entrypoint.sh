@@ -33,6 +33,5 @@ exec op-batcher \
     --mnemonic="test test test test test test test test test test test junk" \
     --sequencer-hd-path="m/44'/60'/0'/0/2" \
     --sequencer-history-db-filename="history_db.json" \
-    --sequencer-genesis-hash=$SEQUENCER_GENESIS_HASH \
     --sequencer-batch-inbox-address=$SEQUENCER_BATCH_INBOX_ADDRESS \
     --log-terminal=true
