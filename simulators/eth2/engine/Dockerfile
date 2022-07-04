@@ -4,8 +4,4 @@ ADD . /source
 WORKDIR /source
 RUN go build -o ./sim .
 
-# Build the runner container.
-FROM alpine:latest
-ADD . /
-COPY --from=builder /source/sim /
 ENTRYPOINT ["./sim"]
