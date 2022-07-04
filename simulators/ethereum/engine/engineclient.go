@@ -83,7 +83,8 @@ func (ec *EngineClient) Equals(ec2 *EngineClient) bool {
 func (ec *EngineClient) checkTTD() bool {
 	var td *TotalDifficultyHeader
 	if err := ec.cEth.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
-		panic(err)
+		fmt.Println("Error while getting TTD from RPC", "err", err)
+		return false
 	}
 	return td.TotalDifficulty.ToInt().Cmp(ec.TerminalTotalDifficulty) >= 0
 }
