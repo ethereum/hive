@@ -79,6 +79,8 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	var hostConfig *docker.HostConfig
 
 	if strings.Contains(imageName, "erigon") {
+		b.logger.Debug("Erigon found, binding 8545 to a random host port")
+
 		portBindings := map[docker.Port][]docker.PortBinding{
 			"8545/tcp": {{HostIP: "", HostPort: "0"}},
 		}
@@ -153,7 +155,11 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	for port, bindings := range container.NetworkSettings.Ports {
 		if strings.HasPrefix(string(port), portToCheck) && len(bindings) > 0 {
 			fmt.Println("bindings", bindings)
-			portToCheck = bindings[0].HostPort
+
+			newPortToCheck := bindings[0].HostPort
+			b.logger.Debug("Replacing 8545 healthcheck", "newPort", newPortToCheck)
+			portToCheck = newPortToCheck
+
 		}
 	}
 
@@ -200,7 +206,6 @@ func checkPort(ctx context.Context, logger log15.Logger, addr string, notify cha
 		case <-ticker.C:
 			if time.Since(lastMsg) >= time.Second {
 				logger.Debug("checking container online...")
-				fmt.Println("is online addr?", addr)
 				lastMsg = time.Now()
 			}
 			var dialer net.Dialer
