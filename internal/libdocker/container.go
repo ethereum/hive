@@ -154,8 +154,6 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 
 	for port, bindings := range container.NetworkSettings.Ports {
 		if strings.HasPrefix(string(port), portToCheck) && len(bindings) > 0 {
-			fmt.Println("bindings", bindings)
-
 			newPortToCheck := bindings[0].HostPort
 			b.logger.Debug("Replacing 8545 healthcheck", "newPort", newPortToCheck)
 			portToCheck = newPortToCheck
