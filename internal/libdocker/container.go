@@ -74,12 +74,22 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	for key, val := range opt.Env {
 		vars = append(vars, key+"="+val)
 	}
+
+	portBindings := map[docker.Port][]docker.PortBinding{
+		"8545/tcp": {{HostIP: "", HostPort: "8545"}},
+	}
+
+	hostConfig := docker.HostConfig{
+		PortBindings:    portBindings,
+		PublishAllPorts: true,
+	}
 	c, err := b.client.CreateContainer(docker.CreateContainerOptions{
 		Context: ctx,
 		Config: &docker.Config{
 			Image: imageName,
 			Env:   vars,
 		},
+		HostConfig: &hostConfig,
 	})
 	if err != nil {
 		return "", err
@@ -139,7 +149,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	if opt.CheckLive != 0 {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		addr := fmt.Sprintf("%s:%d", info.IP, opt.CheckLive)
+		addr := fmt.Sprintf("%s:%d", "localhost" /*info.IP*/, opt.CheckLive)
 		go checkPort(ctx, logger, addr, hasStarted)
 	} else {
 		close(hasStarted)
