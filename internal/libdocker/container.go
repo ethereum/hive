@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/hive/internal/crossplatform"
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -152,13 +153,20 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 
 	portToCheck := fmt.Sprintf("%d", opt.CheckLive)
 
-	for port, bindings := range container.NetworkSettings.Ports {
-		if strings.HasPrefix(string(port), portToCheck) && len(bindings) > 0 {
-			newPortToCheck := bindings[0].HostPort
-			b.logger.Debug("Replacing 8545 healthcheck", "newPort", newPortToCheck)
-			portToCheck = newPortToCheck
+	addr := fmt.Sprintf("%s:%s", info.IP, portToCheck)
 
+	// MacOS doesn't support bridge networking, so we instead are using host ports opened
+	// to be able to control containers
+	if crossplatform.IsMac() {
+		b.logger.Debug("MacOS detected, will have adjustments")
+		for port, bindings := range container.NetworkSettings.Ports {
+			if strings.HasPrefix(string(port), portToCheck) && len(bindings) > 0 {
+				newPortToCheck := bindings[0].HostPort
+				b.logger.Debug("Replacing 8545 healthcheck", "newPort", newPortToCheck)
+				portToCheck = newPortToCheck
+			}
 		}
+		addr = fmt.Sprintf("%s:%s", "localhost" /*info.IP*/, portToCheck)
 	}
 
 	// Set up the port check if requested.
@@ -166,7 +174,6 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	if opt.CheckLive != 0 {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		addr := fmt.Sprintf("%s:%s", "localhost" /*info.IP*/, portToCheck)
 		go checkPort(ctx, logger, addr, hasStarted)
 	} else {
 		close(hasStarted)

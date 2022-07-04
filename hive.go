@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/hive/internal/crossplatform"
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -263,12 +264,17 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	}
 	defer shutdownServer(server)
 
-	port := strings.Split(addr.String(), ":")[1]
+	simulatorAddr := "http://" + addr.String()
+
+	if crossplatform.IsMac() {
+		port := strings.Split(addr.String(), ":")[1]
+		simulatorAddr = "http://host.docker.internal:" + port
+	}
 
 	// Create the simulator container.
 	opts := libhive.ContainerOptions{
 		Env: map[string]string{
-			"HIVE_SIMULATOR":    "http://" + "host.docker.internal" + ":" + port,
+			"HIVE_SIMULATOR":    simulatorAddr,
 			"HIVE_PARALLELISM":  strconv.Itoa(r.env.SimParallelism),
 			"HIVE_LOGLEVEL":     strconv.Itoa(r.env.SimLogLevel),
 			"HIVE_TEST_PATTERN": r.env.SimTestPattern,
@@ -282,7 +288,6 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	// Set the log file, and notify TestManager about the container.
 	logbasename := fmt.Sprintf("%d-simulator-%s.log", time.Now().Unix(), containerID)
 	opts.LogFile = filepath.Join(r.env.LogDir, logbasename)
-	fmt.Println("logfile", opts.LogFile)
 	tm.SetSimContainerInfo(containerID, logbasename)
 
 	log15.Debug("starting simulator container")
@@ -328,19 +333,24 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 // on the docker bridge and executing them until it is torn down.
 func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
 	// Find the IP address of the host container
-	/*
-		bridge, err := libdocker.LookupBridgeIP(log15.Root())
+
+	var bridge string
+	if crossplatform.IsMac() {
+		bridge = "0.0.0.0" //"host.docker.internal"
+	} else {
+		var err error
+		bridge, err = libdocker.LookupBridgeIP(log15.Root())
 		if err != nil {
 			log15.Error("failed to lookup bridge IP", "error", err)
 			return nil, nil, err
 		}
-		log15.Debug("docker bridge IP found", "ip", bridge)
 
-		// Serve connections until the listener is terminated
-		log15.Debug("starting simulator API server")
+	}
 
-	*/
-	bridge := "0.0.0.0" //"host.docker.internal"
+	log15.Debug("docker bridge IP found", "ip", bridge)
+	// Serve connections until the listener is terminated
+	log15.Debug("starting simulator API server")
+
 	// Start the API webserver for simulators to coordinate with
 	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
 	listener, err := net.ListenTCP("tcp4", addr)
