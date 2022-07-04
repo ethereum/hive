@@ -524,7 +524,7 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 			lastValidHash = payload.BlockHash
 			t.Logf("INFO: Last VALID hash %d: %v", payload.Number-transitionPayloadHeight, payload.BlockHash)
 		} else {
-			if payload.Number == transitionPayloadHeight+3 {
+			if payload.Number >= transitionPayloadHeight+3 {
 				// This is P4
 				invalidPayloadHashes = append(invalidPayloadHashes, payload.BlockHash)
 				status := PayloadStatusV1{
@@ -541,7 +541,7 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 				case done <- nil:
 				default:
 				}
-			} else {
+			} else if payload.Number > transitionPayloadHeight {
 				// For all other payloads, including P2/P3, return SYNCING
 				invalidPayloadHashes = append(invalidPayloadHashes, payload.BlockHash)
 				status := PayloadStatusV1{
