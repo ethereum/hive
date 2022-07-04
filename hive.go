@@ -336,7 +336,7 @@ func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) 
 
 	var bridge string
 	if crossplatform.IsMac() {
-		bridge = "0.0.0.0" //"host.docker.internal"
+		bridge = "0.0.0.0"
 	} else {
 		bridgeAddr, err := libdocker.LookupBridgeIP(log15.Root())
 		if err != nil {
