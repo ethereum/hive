@@ -143,7 +143,7 @@ func (n *gethNode) setBlock(block *types.Block, parentNumber uint64, parentRoot 
 	statedb.StartPrefetcher("chain")
 	receipts, _, _, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
 	if err != nil {
-		return err
+		// ignore error during block processing
 	}
 	rawdb.WriteReceipts(n.eth.ChainDb(), block.Hash(), block.NumberU64(), receipts)
 	root, err := statedb.Commit(false)

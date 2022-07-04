@@ -254,10 +254,10 @@ var engineTests = []TestSpec{
 		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidStateRoot, true),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P9', Reveal using sync",
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P8', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidReceiptsRoot, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidReceiptsRoot, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
@@ -269,25 +269,25 @@ var engineTests = []TestSpec{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasLimit, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidGasLimit, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidGasUsed, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidGasUsed, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTimestamp, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidTimestamp, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidPrevRandao, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidPrevRandao, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
@@ -324,11 +324,6 @@ var engineTests = []TestSpec{
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
 		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTransactionValue, false),
-	},
-	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using sync",
-		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(10, InvalidStateRoot, true),
 	},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
@@ -1324,7 +1319,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 			OnGetPayload: func() {
 
 				// Now let's send the alternate chain to the client using newPayload/sync
-				for i := 1; i <= n; i++ {
+				for i := 1; i < n; i++ {
 					// Send the payload
 					payloadValidStr := "VALID"
 					if i == invalid_index {
@@ -1369,8 +1364,8 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 				}
 				// Check that the second node has the correct head
 				head := secondaryClient.eth.APIBackend.CurrentBlock()
-				if head.Hash() != altChainPayloads[n].BlockHash {
-					t.Fatalf("Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %v", head.Hash(), altChainPayloads[n].BlockHash, head.Number(), altChainPayloads[n].Number)
+				if head.Hash() != altChainPayloads[n-1].BlockHash {
+					t.Fatalf("Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %v", head.Hash(), altChainPayloads[n-1].BlockHash, head.Number(), altChainPayloads[n].Number)
 				} else {
 					t.Logf("Secondary Node has correct block")
 				}
