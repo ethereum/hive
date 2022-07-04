@@ -49,7 +49,15 @@ echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
 CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 echo Container IP: "${CONTAINER_IP}"
-bootnodes_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "--subscribe-all-subnets" || echo "--bootstrap-node=$HIVE_ETH2_BOOTNODE_ENRS")
+
+if [[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]]; then
+    bootnodes_option="--subscribe-all-subnets"
+else
+    bootnodes_option=""
+    for bn in ${HIVE_ETH2_BOOTNODE_ENRS//,/ }; do
+        bootnodes_option="$bootnodes_option --bootstrap-node=$bn"
+    done
+fi
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT")
 
 echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
