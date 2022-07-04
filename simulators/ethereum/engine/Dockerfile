@@ -1,6 +1,6 @@
 # This simulation runs Engine API tests.
 FROM golang:1-alpine as builder
-RUN apk add --update gcc musl-dev linux-headers git
+RUN apk add --update gcc musl-dev linux-headers
 
 # Build the simulator executable.
 ADD . /source
