@@ -134,7 +134,7 @@ func (n *gethNode) setBlock(block *types.Block, parentNumber uint64, parentRoot 
 
 	rawdb.WriteHeaderNumber(n.eth.ChainDb(), block.Hash(), block.NumberU64())
 	bc := n.eth.BlockChain()
-	bc.SetValidator(new(validator))
+	bc.SetBlockValidatorForTesting(new(validator))
 
 	statedb, err := state.New(parentRoot, bc.StateCache(), bc.Snapshots())
 	if err != nil {

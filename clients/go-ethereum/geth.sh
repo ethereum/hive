@@ -169,6 +169,6 @@ if [ "$HIVE_ALLOW_UNPROTECTED_TX" != "" ]; then
 fi
 
 # Run the go-ethereum implementation with the requested flags.
-FLAGS="$FLAGS --nat=none --vmodule=\"skeleton.go=5\""
+FLAGS="$FLAGS --nat=none"
 echo "Running go-ethereum with flags $FLAGS"
 $geth $FLAGS
