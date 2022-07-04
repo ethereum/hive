@@ -79,8 +79,8 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 
 	var hostConfig *docker.HostConfig
 
-	if strings.Contains(imageName, "erigon") {
-		b.logger.Debug("Erigon found, binding 8545 to a random host port")
+	if strings.HasPrefix(imageName, "hive/clients") {
+		b.logger.Debug("Node client found, binding 8545 to a random host port")
 
 		portBindings := map[docker.Port][]docker.PortBinding{
 			"8545/tcp": {{HostIP: "", HostPort: "0"}},
@@ -160,7 +160,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	if crossplatform.IsMac() {
 		b.logger.Debug("MacOS detected, will have adjustments")
 		for port, bindings := range container.NetworkSettings.Ports {
-			if strings.HasPrefix(string(port), portToCheck) && len(bindings) > 0 {
+			if strings.HasPrefix(string(port), fmt.Sprintf("%s/", portToCheck)) && len(bindings) > 0 {
 				newPortToCheck := bindings[0].HostPort
 				b.logger.Debug("Replacing 8545 healthcheck", "newPort", newPortToCheck)
 				portToCheck = newPortToCheck
