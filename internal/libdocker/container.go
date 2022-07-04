@@ -11,6 +11,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -75,13 +76,16 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 		vars = append(vars, key+"="+val)
 	}
 
-	portBindings := map[docker.Port][]docker.PortBinding{
-		"8545/tcp": {{HostIP: "", HostPort: "8545"}},
-	}
+	var hostConfig *docker.HostConfig
 
-	hostConfig := docker.HostConfig{
-		PortBindings:    portBindings,
-		PublishAllPorts: true,
+	if strings.Contains(imageName, "erigon") {
+		portBindings := map[docker.Port][]docker.PortBinding{
+			"8545/tcp": {{HostIP: "", HostPort: "0"}},
+		}
+
+		hostConfig = &docker.HostConfig{
+			PortBindings: portBindings,
+		}
 	}
 	c, err := b.client.CreateContainer(docker.CreateContainerOptions{
 		Context: ctx,
@@ -89,7 +93,7 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 			Image: imageName,
 			Env:   vars,
 		},
-		HostConfig: &hostConfig,
+		HostConfig: hostConfig,
 	})
 	if err != nil {
 		return "", err
@@ -144,12 +148,21 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	info.IP = container.NetworkSettings.IPAddress
 	info.MAC = container.NetworkSettings.MacAddress
 
+	portToCheck := fmt.Sprintf("%d", opt.CheckLive)
+
+	for port, bindings := range container.NetworkSettings.Ports {
+		if strings.HasPrefix(string(port), portToCheck) && len(bindings) > 0 {
+			fmt.Println("bindings", bindings)
+			portToCheck = bindings[0].HostPort
+		}
+	}
+
 	// Set up the port check if requested.
 	hasStarted := make(chan struct{})
 	if opt.CheckLive != 0 {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		addr := fmt.Sprintf("%s:%d", "localhost" /*info.IP*/, opt.CheckLive)
+		addr := fmt.Sprintf("%s:%s", "localhost" /*info.IP*/, portToCheck)
 		go checkPort(ctx, logger, addr, hasStarted)
 	} else {
 		close(hasStarted)
@@ -187,6 +200,7 @@ func checkPort(ctx context.Context, logger log15.Logger, addr string, notify cha
 		case <-ticker.C:
 			if time.Since(lastMsg) >= time.Second {
 				logger.Debug("checking container online...")
+				fmt.Println("is online addr?", addr)
 				lastMsg = time.Now()
 			}
 			var dialer net.Dialer
