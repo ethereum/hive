@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/internal/crossplatform"
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
@@ -216,8 +217,16 @@ func checkPort(ctx context.Context, logger log15.Logger, addr string, notify cha
 			var dialer net.Dialer
 			conn, err := dialer.DialContext(ctx, "tcp", addr)
 			if err == nil {
-				conn.Close()
-				close(notify)
+				defer conn.Close()
+
+				rpcClient, err2 := rpc.DialHTTP(addr)
+				if err2 == nil {
+					defer rpcClient.Close()
+					err3 := rpcClient.Call("eth_getBlockByNumber", "latest", false)
+					if err3 == nil {
+						close(notify)
+					}
+				}
 				return
 			}
 		}
