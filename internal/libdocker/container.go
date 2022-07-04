@@ -214,8 +214,9 @@ func checkPort(ctx context.Context, logger log15.Logger, addr string, notify cha
 				lastMsg = time.Now()
 			}
 			var dialer net.Dialer
-			_, err := dialer.DialContext(ctx, "tcp", addr)
+			conn, err := dialer.DialContext(ctx, "tcp", addr)
 			if err == nil {
+				conn.Close()
 				close(notify)
 				return
 			}
