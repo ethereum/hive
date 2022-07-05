@@ -1,4 +1,4 @@
-ARG branch=latest
+ARG branch=latest-debug
 FROM gcr.io/prysmaticlabs/prysm/beacon-chain:$branch as upstream
 
 FROM debian:buster-slim
