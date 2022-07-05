@@ -1496,7 +1496,7 @@ func reorgBack(t *TestEnv) {
 
 	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
 	t.CLMock.produceBlocks(5, BlockProcessCallbacks{
-		OnVerificationEnd: func() {
+		OnBlockProductionEnd: func() {
 			// Send a fcU with the HeadBlockHash pointing back to the previous block
 			forkchoiceUpdatedBack := ForkchoiceStateV1{
 				HeadBlockHash:      previousHash,
