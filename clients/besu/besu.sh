@@ -131,7 +131,7 @@ fi
 # archive, full or merge tests: full sync (per default)
 if [ "$HIVE_NODETYPE" == "light" ]; then
     echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
-elif [ "$HIVE_NODETYPE" == "" && "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == ""  ]; then
+elif [ "$HIVE_NODETYPE" == "" ] && [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; then
     FLAGS="$FLAGS --sync-mode=FAST --fast-sync-min-peers=1 --Xsynchronizer-fast-sync-pivot-distance=0"
 fi
 
