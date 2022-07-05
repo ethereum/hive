@@ -391,6 +391,8 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/ethereum/go-ethereum v1.10.17/go.mod h1:Lt5WzjM07XlXc95YzrhosmR4J9Ahd6X2wyEV2SvGhk0=
 github.com/ethereum/go-ethereum v1.10.21-0.20220704092517-5f6e870ee699 h1:WTsY8bFQD3NqOh6ZfpQG+0c9eL4rREJcaA0o0VUrsB8=
 github.com/ethereum/go-ethereum v1.10.21-0.20220704092517-5f6e870ee699/go.mod h1:LWUN82TCHGpxB3En5HVmLLzPD7YSrEUFmFfN1nKkVN0=
+github.com/ethereum/go-ethereum v1.10.21-0.20220705070249-87bb5db67505 h1:pAJB9OzOvGA+C9NIEjpT7iMMz08jR7N4/A4mfG43zD8=
+github.com/ethereum/go-ethereum v1.10.21-0.20220705070249-87bb5db67505/go.mod h1:LWUN82TCHGpxB3En5HVmLLzPD7YSrEUFmFfN1nKkVN0=
 github.com/ethereum/hive v0.0.0-20220520142542-870157aa5005 h1:8URidMKSrtmM1kvHYn5DoJmr2lVGrdoT9t68Z6bD8d4=
 github.com/ethereum/hive v0.0.0-20220520142542-870157aa5005/go.mod h1:0eDSbLDZV6756thHLMhniOEi1uY4HOqu4+s+d/z99Eg=
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=

@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
 	ethcatalyst "github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/eth/downloader"
@@ -106,6 +107,12 @@ func (v *validator) ValidateState(block *types.Block, state *state.StateDB, rece
 	return nil
 }
 
+type processor struct{}
+
+func (p *processor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
+	return types.Receipts{}, []*types.Log{}, 21000, nil
+}
+
 var headerPrefix = []byte("h") // headerPrefix + num (uint64 big endian) + hash -> header
 func headerKey(number uint64, hash common.Hash) []byte {
 	return append(append(headerPrefix, encodeBlockNumber(number)...), hash.Bytes()...)
@@ -134,16 +141,17 @@ func (n *gethNode) setBlock(block *types.Block, parentNumber uint64, parentRoot 
 
 	rawdb.WriteHeaderNumber(n.eth.ChainDb(), block.Hash(), block.NumberU64())
 	bc := n.eth.BlockChain()
-	bc.SetBlockValidatorForTesting(new(validator))
+	bc.SetBlockValidatorAndProcessorForTesting(new(validator), n.eth.BlockChain().Processor())
 
 	statedb, err := state.New(parentRoot, bc.StateCache(), bc.Snapshots())
 	if err != nil {
 		return err
 	}
 	statedb.StartPrefetcher("chain")
+	var failedProcessing bool
 	receipts, _, _, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
 	if err != nil {
-		// ignore error during block processing
+		failedProcessing = true
 	}
 	rawdb.WriteReceipts(n.eth.ChainDb(), block.Hash(), block.NumberU64(), receipts)
 	root, err := statedb.Commit(false)
@@ -165,8 +173,17 @@ func (n *gethNode) setBlock(block *types.Block, parentNumber uint64, parentRoot 
 	rawdb.WriteCanonicalHash(n.eth.ChainDb(), block.Hash(), block.NumberU64())
 	rawdb.WriteTxLookupEntriesByBlock(n.eth.ChainDb(), block)
 	rawdb.WriteHeadBlockHash(n.eth.ChainDb(), block.Hash())
+	oldProcessor := bc.Processor()
+	if failedProcessing {
+		bc.SetBlockValidatorAndProcessorForTesting(new(validator), new(processor))
+	}
+
 	if _, err := bc.SetCanonical(block); err != nil {
 		panic(err)
+	}
+	// Restore processor
+	if failedProcessing {
+		bc.SetBlockValidatorAndProcessorForTesting(new(validator), oldProcessor)
 	}
 	return nil
 }
