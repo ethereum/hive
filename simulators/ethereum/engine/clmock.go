@@ -341,6 +341,7 @@ type BlockProcessCallbacks struct {
 	OnForkchoiceBroadcast     func()
 	OnSafeBlockChange         func()
 	OnFinalizedBlockChange    func()
+	OnVerificationEnd         func()
 }
 
 func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
@@ -451,6 +452,9 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
 	}
 
+	if callbacks.OnVerificationEnd != nil {
+		callbacks.OnVerificationEnd()
+	}
 }
 
 // Loop produce PoS blocks by using the Engine API
