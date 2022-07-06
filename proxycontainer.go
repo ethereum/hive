@@ -9,8 +9,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/ethereum/hive/proxy/hiveproxy"
 	"github.com/ethereum/hive/internal/libhive"
+	"github.com/ethereum/hive/proxy/hiveproxy"
 )
 
 //go:embed proxy
@@ -49,7 +49,7 @@ func startProxy(ctx context.Context, cb libhive.ContainerBackend, h http.Handler
 		containerWait:   info.Wait,
 		containerStdin:  inR,
 		containerStdout: outW,
-		proxy *hiveproxy.Proxy
+		proxy:           proxy,
 	}
 	return srv, nil
 }
@@ -62,10 +62,10 @@ type proxyContainer struct {
 	containerStdin  *io.PipeReader
 	containerStdout *io.PipeWriter
 	containerWait   func()
-	proxy *hiveproxy.Proxy
-	
-	stopping   sync.Once
-	stopErr    error
+	proxy           *hiveproxy.Proxy
+
+	stopping sync.Once
+	stopErr  error
 }
 
 // addr returns the listening address of the proxy server.
