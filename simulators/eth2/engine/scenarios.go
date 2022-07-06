@@ -37,7 +37,7 @@ var (
 	// Clients that do not support starting on epoch 0 with all forks enabled.
 	// Tests take longer for these clients.
 	INCREMENTAL_FORKS_CONFIG = &Config{
-		TerminalTotalDifficulty: big.NewInt(int64(DEFAULT_TERMINAL_TOTAL_DIFFICULTY) * 3),
+		TerminalTotalDifficulty: big.NewInt(int64(DEFAULT_TERMINAL_TOTAL_DIFFICULTY) * 5),
 		AltairForkEpoch:         common.Big1,
 		MergeForkEpoch:          common.Big2,
 	}
@@ -745,7 +745,7 @@ func TTDBeforeBellatrix(t *hivesim.T, env *testEnv, n node) {
 	config = config.join(&Config{
 		AltairForkEpoch:         common.Big1,
 		MergeForkEpoch:          common.Big2,
-		TerminalTotalDifficulty: big.NewInt(50),
+		TerminalTotalDifficulty: big.NewInt(150),
 		Nodes: []node{
 			n,
 			n,
