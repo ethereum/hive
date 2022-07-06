@@ -32,7 +32,7 @@ func startProxy(ctx context.Context, cb libhive.ContainerBackend, h http.Handler
 		return nil, err
 	}
 
-	proxy := hiveproxy.RunServer(outR, inW, h)
+	proxy := hiveproxy.RunBackend(outR, inW, h)
 	srv := &proxyContainer{
 		cb:              cb,
 		containerID:     id,
