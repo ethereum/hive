@@ -12,9 +12,7 @@ import (
 	"github.com/hashicorp/yamux"
 )
 
-//go:embed Dockerfile
-//go:embed go.mod go.sum *.go
-//go:embed tool/*.go
+//go:embed Dockerfile go.mod go.sum *.go tool/*.go
 var Source embed.FS
 
 type Proxy struct {
