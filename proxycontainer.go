@@ -2,28 +2,19 @@ package main
 
 import (
 	"context"
-	"embed"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"sync"
 
+	"github.com/ethereum/hive/hiveproxy"
 	"github.com/ethereum/hive/internal/libhive"
-	"github.com/ethereum/hive/proxy/hiveproxy"
 )
-
-//go:embed proxy
-var hiveproxyCodeFS embed.FS
 
 const hiveproxyTag = "hive-proxy"
 
 func buildProxy(ctx context.Context, builder libhive.Builder) error {
-	root, err := fs.Sub(hiveproxyCodeFS, "proxy/hiveproxy/")
-	if err != nil {
-		return err
-	}
-	return builder.BuildImage(ctx, hiveproxyTag, root)
+	return builder.BuildImage(ctx, hiveproxyTag, hiveproxy.Source)
 }
 
 func startProxy(ctx context.Context, cb libhive.ContainerBackend, h http.Handler) (*proxyContainer, error) {
