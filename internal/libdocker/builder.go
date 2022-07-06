@@ -117,6 +117,7 @@ func (b *Builder) archiveFS(ctx context.Context, out io.WriteCloser, fsys fs.FS)
 		if err != nil {
 			return fmt.Errorf("%s: %w", path, err)
 		}
+		hdr.Name = path
 		if err := w.WriteHeader(hdr); err != nil {
 			return err
 		}
