@@ -783,10 +783,11 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 		Overflow InvalidationType = iota
 		LeadingZero
 		Empty
+		NoPrefix
 		InvalidationTypeCount
 	)
 
-	invalidateQuantityType := func(method string, response []byte, q QuantityType, invType InvalidationType) *proxy.Spoof {
+	invalidateQuantityType := func(id int, method string, response []byte, q QuantityType, invType InvalidationType) *proxy.Spoof {
 		responseFields := make(map[string]json.RawMessage)
 		if err := UnmarshalFromJsonRPCResponse(response, &responseFields); err != nil {
 			panic(fmt.Errorf("Unable to unmarshal: %v. json: %s", err, response))
@@ -807,11 +808,14 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 			fields[q.Name] = "0x0" + fieldOriginalValue[2:]
 		case Empty:
 			fields[q.Name] = "0x"
+		case NoPrefix:
+			// Remove the "0x" prefix
+			fields[q.Name] = fieldOriginalValue[2:]
 		default:
 			panic("Invalid QUANTITY invalidation type")
 		}
 
-		t.Logf("INFO: Spoofing %s, %s -> %s", q.Name, fieldOriginalValue, fields[q.Name])
+		t.Logf("INFO: Spoofing (node %d) %s, %s -> %s", id, q.Name, fieldOriginalValue, fields[q.Name])
 		// Return the new payload status spoof
 		return &proxy.Spoof{
 			Method: method,
@@ -851,42 +855,44 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 	)
 
 	// The EL mock will intercept the first engine_getPayloadV1 and corrupt the stateRoot in the response
-	getPayloadCallback := func(res []byte, req []byte) *proxy.Spoof {
-		getPayloadLock.Lock()
-		defer getPayloadLock.Unlock()
-		defer func() {
-			getPayloadCount++
-		}()
-		var (
-			payload ExecutableDataV1
-		)
-		err := UnmarshalFromJsonRPCResponse(res, &payload)
-		if err != nil {
-			panic(err)
-		}
-
-		field := getPayloadCount / int(InvalidationTypeCount)
-		invType := InvalidationType(getPayloadCount % int(InvalidationTypeCount))
-
-		if field >= len(allQuantityFields) {
-			select {
-			case done <- nil:
-			default:
+	getPayloadCallbackGen := func(id int) func([]byte, []byte) *proxy.Spoof {
+		return func(res, req []byte) *proxy.Spoof {
+			getPayloadLock.Lock()
+			defer getPayloadLock.Unlock()
+			defer func() {
+				getPayloadCount++
+			}()
+			var (
+				payload ExecutableDataV1
+			)
+			err := UnmarshalFromJsonRPCResponse(res, &payload)
+			if err != nil {
+				panic(err)
 			}
-			return nil
+
+			field := getPayloadCount / int(InvalidationTypeCount)
+			invType := InvalidationType(getPayloadCount % int(InvalidationTypeCount))
+
+			if field >= len(allQuantityFields) {
+				select {
+				case done <- nil:
+				default:
+				}
+				return nil
+			}
+			// Customize to get a different hash in order to properly check that the payload is actually not included
+			customExtraData := []byte(fmt.Sprintf("invalid %s %d", allQuantityFields[field].Name, invType))
+			newHash, spoof, _ := customizePayloadSpoof(EngineGetPayloadV1, &payload, &CustomPayloadData{
+				ExtraData: &customExtraData,
+			})
+			invalidPayloadHashes = append(invalidPayloadHashes, newHash)
+			return combine(spoof, invalidateQuantityType(id, EngineGetPayloadV1, res, allQuantityFields[field], invType))
 		}
-		// Customize to get a different hash in order to properly check that the payload is actually not included
-		customExtraData := []byte(fmt.Sprintf("invalid %s %d", allQuantityFields[field].Name, invType))
-		newHash, spoof, _ := customizePayloadSpoof(EngineGetPayloadV1, &payload, &CustomPayloadData{
-			ExtraData: &customExtraData,
-		})
-		invalidPayloadHashes = append(invalidPayloadHashes, newHash)
-		return combine(spoof, invalidateQuantityType(EngineGetPayloadV1, res, allQuantityFields[field], invType))
 	}
 
 	// We pass the id of the proxy to identify which one it is within the callback
-	for _, p := range testnet.proxies {
-		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallback)
+	for i, p := range testnet.proxies {
+		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
 	}
 
 	// Wait until we are done
@@ -895,7 +901,9 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 	// Check that none of the invalidated payloads made it into the beacon chain
 	for i, p := range invalidPayloadHashes {
 		if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, p); b != nil {
-			t.Fatalf("FAIL: Invalid Payload #%d, %v (%s), was included in slot %d (%v)", i+1, p, ([]byte)(b.Message.Body.ExecutionPayload.ExtraData), b.Message.Slot, b.Message.StateRoot)
+			t.Logf("FAIL: Invalid Payload #%d, %v (%s), was included in slot %d (%v)", i+1, p, ([]byte)(b.Message.Body.ExecutionPayload.ExtraData), b.Message.Slot, b.Message.StateRoot)
+			// Mark test as failure, but continue checking all variations
+			t.Fail()
 		}
 	}
 }
