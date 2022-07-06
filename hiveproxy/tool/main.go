@@ -4,16 +4,18 @@ import (
 	"flag"
 	"net"
 	"os"
+
+	"github.com/ethereum/hive/hiveproxy"
 )
 
 func main() {
 	addrFlag := flag.String("addr", ":8081", "listening address")
 	flag.Parse()
 
-	l, err := net.Listen("tcp", *addr)
+	l, err := net.Listen("tcp", *addrFlag)
 	if err != nil {
 		panic(err)
 	}
-	p := hiveproxy.NewClient(os.Stdin, os.Stdout, l)
+	hiveproxy.RunClient(os.Stdin, os.Stdout, l)
 	select {}
 }
