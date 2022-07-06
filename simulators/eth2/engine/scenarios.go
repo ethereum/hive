@@ -71,13 +71,13 @@ func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for finality: %v", err)
 	}
-	if err := testnet.VerifyParticipation(ctx, &finalized, 0.95); err != nil {
+	if err := VerifyParticipation(testnet, ctx, FirstSlotAfterCheckpoint{&finalized}, 0.95); err != nil {
 		t.Fatalf("FAIL: Verifying participation: %v", err)
 	}
-	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, &finalized); err != nil {
+	if err := VerifyExecutionPayloadIsCanonical(testnet, ctx, LastSlotAtCheckpoint{&finalized}); err != nil {
 		t.Fatalf("FAIL: Verifying execution payload is canonical: %v", err)
 	}
-	if err := testnet.VerifyProposers(ctx, &finalized, false); err != nil {
+	if err := VerifyProposers(testnet, ctx, LastSlotAtCheckpoint{&finalized}, false); err != nil {
 		t.Fatalf("FAIL: Verifying proposers: %v", err)
 	}
 }
@@ -98,16 +98,16 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for finality: %v", err)
 	}
-	if err := testnet.VerifyParticipation(ctx, &finalized, 0.95); err != nil {
+	if err := VerifyParticipation(testnet, ctx, FirstSlotAfterCheckpoint{&finalized}, 0.95); err != nil {
 		t.Fatalf("FAIL: Verifying participation: %v", err)
 	}
-	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, &finalized); err != nil {
+	if err := VerifyExecutionPayloadIsCanonical(testnet, ctx, LastSlotAtCheckpoint{&finalized}); err != nil {
 		t.Fatalf("FAIL: Verifying execution payload is canonical: %v", err)
 	}
-	if err := testnet.VerifyProposers(ctx, &finalized, true); err != nil {
+	if err := VerifyProposers(testnet, ctx, LastSlotAtCheckpoint{&finalized}, true); err != nil {
 		t.Fatalf("FAIL: Verifying proposers: %v", err)
 	}
-	if err := testnet.VerifyELHeads(ctx); err != nil {
+	if err := VerifyELHeads(testnet, ctx); err != nil {
 		t.Fatalf("FAIL: Verifying EL Heads: %v", err)
 	}
 	fields := make(map[string]interface{})
@@ -118,10 +118,10 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	}
 	testnet.proxies[0].AddRequest(spoof)
 	time.Sleep(24 * time.Second)
-	if err := testnet.VerifyParticipation(ctx, &finalized, 0.95); err != nil {
+	if err := VerifyParticipation(testnet, ctx, FirstSlotAfterCheckpoint{&finalized}, 0.95); err != nil {
 		t.Fatalf("FAIL: %v", err)
 	}
-	if err := testnet.VerifyELHeads(ctx); err == nil {
+	if err := VerifyELHeads(testnet, ctx); err == nil {
 		t.Fatalf("FAIL: Expected different heads after spoof %v", err)
 	}
 }
@@ -229,7 +229,10 @@ func InvalidPayloadGen(invalidPayloadNumber int, invalidStatusResponse PayloadSt
 		time.Sleep(time.Duration(testnet.spec.SECONDS_PER_SLOT) * time.Second * time.Duration(5+invalidPayloadNumber))
 
 		// Verify beacon block with invalid payload is not accepted
-		if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, invalidPayloadHash); b != nil {
+		b, err := VerifyExecutionPayloadHashInclusion(testnet, ctx, LastestSlotByHead{}, invalidPayloadHash)
+		if err != nil {
+			t.Fatalf("FAIL: Error during payload verification: %v", err)
+		} else if b != nil {
 			t.Fatalf("FAIL: Invalid Payload %v was included in slot %d (%v)", invalidPayloadHash, b.Message.Slot, b.Message.StateRoot)
 		}
 	}
@@ -296,7 +299,10 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 	time.Sleep(time.Duration(testnet.spec.SECONDS_PER_SLOT) * time.Second * 5)
 
 	// Verify beacon block with invalid payload is not accepted
-	if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, invalidPayloadHash); b != nil {
+	b, err := VerifyExecutionPayloadHashInclusion(testnet, ctx, LastestSlotByHead{}, invalidPayloadHash)
+	if err != nil {
+		t.Fatalf("FAIL: Error during payload verification: %v", err)
+	} else if b != nil {
 		t.Fatalf("FAIL: Invalid Payload %v was included in slot %d (%v)", invalidPayloadHash, b.Message.Slot, b.Message.StateRoot)
 	}
 }
@@ -391,7 +397,10 @@ func InvalidTimestampPayload(t *hivesim.T, env *testEnv, n node) {
 
 	// Verify beacon block with invalid payload is not accepted
 	ctx := context.Background()
-	if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, invalidPayloadHash); b != nil {
+	b, err := VerifyExecutionPayloadHashInclusion(testnet, ctx, LastestSlotByHead{}, invalidPayloadHash)
+	if err != nil {
+		t.Fatalf("FAIL: Error during payload verification: %v", err)
+	} else if b != nil {
 		t.Fatalf("FAIL: Invalid Payload %v was included in slot %d (%v)", invalidPayloadHash, b.Message.Slot, b.Message.StateRoot)
 	}
 }
@@ -460,8 +469,10 @@ func IncorrectTerminalBlockGen(ttdDelta int64) func(t *hivesim.T, env *testEnv, 
 
 		// Transition payload should not be part of the beacon node with bad TTD
 		bn := testnet.beacons[len(testnet.beacons)-1]
-		b := testnet.VerifyExecutionPayloadHashInclusionNode(ctx, nil, bn, transitionPayloadHash)
-		if b != nil {
+		b, err := VerifyExecutionPayloadHashInclusionNode(testnet, ctx, LastestSlotByHead{}, bn, transitionPayloadHash)
+		if err != nil {
+			t.Fatalf("FAIL: Error during payload verification: %v", err)
+		} else if b != nil {
 			t.Fatalf("FAIL: Node with bad TTD included beacon block with correct TTD: %v", b)
 		}
 	}
@@ -638,11 +649,17 @@ func SyncingWithInvalidChain(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	// Verify payloads
-	if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, lastValidHash); b == nil {
+	if b, err := VerifyExecutionPayloadHashInclusion(testnet, ctx, LastestSlotByHead{}, lastValidHash); b == nil || err != nil {
+		if err != nil {
+			t.Fatalf("FAIL: Valid Payload %v could not be found: %v", lastValidHash, err)
+		}
 		t.Fatalf("FAIL: Valid Payload %v could not be found", lastValidHash)
 	}
 	for i, p := range invalidPayloadHashes {
-		if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, p); b != nil {
+		b, err := VerifyExecutionPayloadHashInclusion(testnet, ctx, LastestSlotByHead{}, p)
+		if err != nil {
+			t.Fatalf("FAIL: Error during payload verification: %v", err)
+		} else if b != nil {
 			t.Fatalf("FAIL: Invalid Payload (%d) %v was included in slot %d (%v)", i+1, p, b.Message.Slot, b.Message.StateRoot)
 		}
 	}
@@ -745,7 +762,7 @@ func TTDBeforeBellatrix(t *hivesim.T, env *testEnv, n node) {
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
 	}
-	if err := testnet.VerifyELHeads(ctx); err != nil {
+	if err := VerifyELHeads(testnet, ctx); err != nil {
 		t.Fatalf("FAIL: Verifying EL Heads: %v", err)
 	}
 }
@@ -896,14 +913,28 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	// Wait until we are done
-	<-done
+	var testFailed bool
+	select {
+	case <-done:
+	case <-time.After(time.Second * time.Duration(int(config.SlotTime.Int64())*len(allQuantityFields)*int(InvalidationTypeCount)*2)):
+		t.Logf("FAIL: Timeout while waiting for CL requesting all payloads, test is invalid.")
+		testFailed = true
+	}
 
 	// Check that none of the invalidated payloads made it into the beacon chain
 	for i, p := range invalidPayloadHashes {
-		if b := testnet.VerifyExecutionPayloadHashInclusion(ctx, nil, p); b != nil {
+		b, err := VerifyExecutionPayloadHashInclusion(testnet, ctx, LastestSlotByTime{}, p)
+		if err != nil {
+			t.Fatalf("FAIL: Error during payload verification: %v", err)
+		} else if b != nil {
 			t.Logf("FAIL: Invalid Payload #%d, %v (%s), was included in slot %d (%v)", i+1, p, ([]byte)(b.Message.Body.ExecutionPayload.ExtraData), b.Message.Slot, b.Message.StateRoot)
 			// Mark test as failure, but continue checking all variations
-			t.Fail()
+			testFailed = true
 		}
+	}
+	if testFailed {
+		t.Fail()
+	} else {
+		t.Logf("INFO: Success, none of the hashes were included")
 	}
 }
