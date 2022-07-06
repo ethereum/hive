@@ -6,4 +6,4 @@ RUN go build -o hive-proxy ./tool
 FROM alpine:latest
 COPY --from=builder /source/hive-proxy .
 EXPOSE 8081/tcp
-ENTRYPOINT ["./hive-tool" "--addr", ":8081"]
+ENTRYPOINT ./hive-proxy --addr :8081
