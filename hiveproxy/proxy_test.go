@@ -2,6 +2,7 @@ package hiveproxy
 
 import (
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"testing"
@@ -31,4 +32,11 @@ func TestE2E(t *testing.T) {
 	if !called {
 		t.Fatal("handler not called")
 	}
+}
+
+func TestSource(t *testing.T) {
+	fs.WalkDir(Source, ".", func(path string, d fs.DirEntry, err error) error {
+		t.Log(path)
+		return err
+	})
 }
