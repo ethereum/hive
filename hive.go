@@ -326,7 +326,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(cb *libdocker.ContainerBackend, tm *libhive.TestManager) (net.Addr, *proxyServer, error) {
+func startTestSuiteAPI(cb *libdocker.ContainerBackend, tm *libhive.TestManager) (net.Addr, *proxyContainer, error) {
 	// Serve connections until the listener is terminated
 	log15.Debug("starting simulator API server")
 
@@ -345,7 +345,7 @@ func startTestSuiteAPI(cb *libdocker.ContainerBackend, tm *libhive.TestManager) 
 }
 
 // shutdownServer gracefully terminates the HTTP server.
-func shutdownServer(server *proxyServer) {
+func shutdownServer(server *proxyContainer) {
 	log15.Debug("terminating simulator server")
 	if err := server.stop(); err != nil {
 		log15.Debug("simulation API server shutdown failed", "err", err)
