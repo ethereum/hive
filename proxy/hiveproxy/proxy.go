@@ -2,6 +2,7 @@ package hiveproxy
 
 import (
 	"context"
+	"embed"
 	"io"
 	"net"
 	"net/http"
@@ -10,6 +11,9 @@ import (
 
 	"github.com/hashicorp/yamux"
 )
+
+//go:embed *.go go.mod go.sum tool
+var Source embed.FS
 
 type Proxy struct {
 	httpsrv    http.Server
