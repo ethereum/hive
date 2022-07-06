@@ -5,10 +5,12 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"net/http"
 	"sync"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 	"github.com/protolambda/eth2api"
@@ -273,6 +275,13 @@ func (t *Testnet) WaitForExecutionPayload(ctx context.Context) (ethcommon.Hash, 
 	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
 	timer := time.NewTicker(slotDuration)
 	done := make(chan ethcommon.Hash, len(t.verificationBeacons()))
+	userRPCAddress, err := t.eth1[0].UserRPCAddress()
+	if err != nil {
+		panic(err)
+	}
+	client := &http.Client{}
+	rpcClient, _ := rpc.DialHTTPWithClient(userRPCAddress, client)
+	ttdReached := false
 
 	for {
 		select {
@@ -285,6 +294,19 @@ func (t *Testnet) WaitForExecutionPayload(ctx context.Context) (ethcommon.Hash, 
 			if tim.Before(genesis.Add(slotDuration)) {
 				t.t.Logf("Time till genesis: %s", genesis.Sub(tim))
 				continue
+			}
+
+			if !ttdReached {
+				// Check if TTD has been reached
+				var td *TotalDifficultyHeader
+				if err := rpcClient.CallContext(ctx, &td, "eth_getBlockByNumber", "latest", false); err == nil {
+					if td.TotalDifficulty.ToInt().Cmp(t.eth1Genesis.Genesis.Config.TerminalTotalDifficulty) >= 0 {
+						t.t.Logf("ttd (%d) reached at execution block %d", t.eth1Genesis.Genesis.Config.TerminalTotalDifficulty, td.Number)
+						ttdReached = true
+					}
+				} else {
+					t.t.Logf("Error querying eth1 for TTD: %v", err)
+				}
 			}
 
 			// new slot, log and check status of all beacon nodes
