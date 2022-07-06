@@ -72,6 +72,11 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 // BuildImage creates a container by archiving the given file system,
 // which must contain a file called "Dockerfile".
 func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error {
+	nocache := false
+	if b.config.NoCachePattern != nil {
+		nocache = b.config.NoCachePattern.MatchString(name)
+	}
+
 	pipeR, pipeW := io.Pipe()
 	go b.archiveFS(ctx, pipeW, fsys)
 
@@ -80,12 +85,13 @@ func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error
 		Name:         name,
 		InputStream:  pipeR,
 		OutputStream: ioutil.Discard,
+		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput
 	}
-	b.logger.Info("building image...", "name", name)
+	b.logger.Info("building image...", "name", name, "nocache", nocache, "pull", b.config.PullEnabled)
 	if err := b.client.BuildImage(opts); err != nil {
 		b.logger.Error("image build failed", "name", name, "err", err)
 		return err
