@@ -1,45 +1,35 @@
 package main
 
 import (
-	"bufio"
+	"context"
 	"flag"
-	"io"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"os"
-	"sync"
+
+	"github.com/hashicorp/yamux"
 )
 
 func main() {
 	addrFlag := flag.String("addr", ":8081", "listening address")
 	flag.Parse()
-	rt := newRoundTripper(os.Stdin, os.Stdout)
+
+	mux, _ := yamux.Client(stdioRW{}, nil)
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return mux.Open()
+		},
+	}
 	proxy := httputil.ReverseProxy{
 		Director:  func(req *http.Request) {},
-		Transport: rt,
+		Transport: transport,
 	}
 	http.ListenAndServe(*addrFlag, &proxy)
 }
 
-type roundTripper struct {
-	mu  sync.Mutex
-	in  *bufio.Reader
-	out *bufio.Writer
-}
+type stdioRW struct{}
 
-func newRoundTripper(in io.Reader, out io.Writer) *roundTripper {
-	return &roundTripper{
-		in:  bufio.NewReader(in),
-		out: bufio.NewWriter(out),
-	}
-}
-
-func (rt *roundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
-	rt.mu.Lock()
-	defer rt.mu.Unlock()
-
-	req.Write(rt.out)
-	rt.out.Flush()
-
-	return http.ReadResponse(rt.in, req)
-}
+func (stdioRW) Read(b []byte) (int, error)  { return os.Stdin.Read(b) }
+func (stdioRW) Write(b []byte) (int, error) { return os.Stdout.Write(b) }
+func (stdioRW) Close() error                { return nil }

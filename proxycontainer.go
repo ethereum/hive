@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"embed"
 	"io"
@@ -10,8 +8,10 @@ import (
 	"net"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/ethereum/hive/internal/libhive"
+	"github.com/hashicorp/yamux"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -43,6 +43,13 @@ func startProxy(ctx context.Context, cb libhive.ContainerBackend, h http.Handler
 		return nil, err
 	}
 
+	mux, _ := yamux.Server(rwCombo{Reader: outR, Writer: inW}, nil)
+	httpsrv := &http.Server{
+		Handler: h,
+		ConnState: func(c net.Conn, st http.ConnState) {
+			log15.Debug("proxy conn state change", "conn", c, "state", st)
+		},
+	}
 	srv := &proxyServer{
 		cb:              cb,
 		containerID:     id,
@@ -50,12 +57,13 @@ func startProxy(ctx context.Context, cb libhive.ContainerBackend, h http.Handler
 		containerWait:   info.Wait,
 		containerStdin:  inR,
 		containerStdout: outW,
-		handler:         h,
-		localIn:         outR,
-		localOut:        inW,
+		httpsrv:         httpsrv,
+		serverDown:      make(chan error, 1),
 	}
-	srv.wg.Add(1)
-	go srv.loop()
+	go func() {
+		srv.serverDown <- httpsrv.Serve(mux)
+	}()
+
 	return srv, nil
 }
 
@@ -68,13 +76,11 @@ type proxyServer struct {
 	containerStdout *io.PipeWriter
 	containerWait   func()
 
-	handler  http.Handler
-	localIn  *io.PipeReader
-	localOut *io.PipeWriter
+	httpsrv *http.Server
 
-	wg       sync.WaitGroup
-	stopping sync.Once
-	stopErr  error
+	serverDown chan error
+	stopping   sync.Once
+	stopErr    error
 }
 
 // addr returns the listening address of the proxy server.
@@ -89,92 +95,18 @@ func (s *proxyServer) stop() error {
 		s.containerStdout.Close()
 		s.stopErr = s.cb.DeleteContainer(s.containerID)
 		s.containerWait()
-		s.localIn.Close()
-		s.localOut.Close()
-		s.wg.Wait()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		s.httpsrv.Shutdown(ctx)
+		<-s.serverDown
 	})
 	return s.stopErr
 }
 
-// loop reads requests from the proxy container and runs them.
-func (s *proxyServer) loop() {
-	defer s.wg.Done()
-
-	var (
-		in    = bufio.NewReader(s.localIn)
-		respW = new(proxyRespWriter)
-	)
-	for {
-		req, err := http.ReadRequest(in)
-		if err != nil {
-			if err != io.EOF {
-				log15.Error("read error in proxy", "err", err)
-			}
-			return
-		}
-
-		log15.Debug("serving proxy request", "method", req.Method, "url", req.URL)
-		s.handler.ServeHTTP(respW, req)
-
-		// Drain the body.
-		io.Copy(io.Discard, req.Body)
-		req.Body.Close()
-
-		// Write out the response.
-		if err := respW.writeTo(s.localOut); err != nil {
-			log15.Error("response write error in proxy", "err", err)
-			return
-		}
-		respW.reset()
-	}
+type rwCombo struct {
+	io.Reader
+	io.Writer
 }
 
-// proxyRespWriter is the http.ResponseWriter used by the proxy.
-type proxyRespWriter struct {
-	resp          http.Response
-	headerWritten bool
-	bodyBuf       bytes.Buffer
-}
-
-func (rw *proxyRespWriter) Header() http.Header {
-	if rw.resp.Header == nil {
-		rw.resp.Header = make(http.Header)
-	}
-	return rw.resp.Header
-}
-
-func (rw *proxyRespWriter) WriteHeader(status int) {
-	if !rw.headerWritten {
-		rw.resp.StatusCode = status
-		rw.resp.Status = http.StatusText(status)
-		rw.headerWritten = true
-	}
-}
-
-func (rw *proxyRespWriter) Write(b []byte) (int, error) {
-	if !rw.headerWritten {
-		rw.WriteHeader(http.StatusOK)
-	}
-	return rw.bodyBuf.Write(b)
-}
-
-func (rw *proxyRespWriter) writeTo(w io.Writer) error {
-	if !rw.headerWritten {
-		rw.WriteHeader(http.StatusOK)
-	}
-	if rw.bodyBuf.Len() > 0 {
-		rw.resp.Body = io.NopCloser(&rw.bodyBuf)
-		rw.resp.ContentLength = int64(rw.bodyBuf.Len())
-	}
-	return rw.resp.Write(w)
-}
-
-func (rw *proxyRespWriter) reset() {
-	header := rw.resp.Header
-	for k := range header {
-		delete(header, k)
-	}
-	rw.resp = http.Response{Header: header}
-	rw.headerWritten = false
-	rw.bodyBuf.Reset()
-}
+func (rwCombo) Close() error { return nil }

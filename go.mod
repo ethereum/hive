@@ -7,7 +7,7 @@ require (
 	github.com/ethereum/go-ethereum v1.10.17
 	github.com/fsouza/go-dockerclient v1.7.11
 	github.com/gorilla/mux v1.8.0
-	github.com/rauljordan/engine-proxy v0.0.0-20220517190449-e62b2e2f6e27
+	github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1
 	gopkg.in/yaml.v2 v2.4.0
 )
@@ -32,7 +32,6 @@ require (
 	github.com/go-ole/go-ole v1.2.5 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
@@ -54,6 +53,7 @@ require (
 	github.com/prometheus/tsdb v0.10.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/sirupsen/logrus v1.8.1 // indirect
+	github.com/stretchr/testify v1.7.1 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7 // indirect
 	github.com/tklauser/go-sysconf v0.3.5 // indirect
 	github.com/tklauser/numcpus v0.2.2 // indirect
