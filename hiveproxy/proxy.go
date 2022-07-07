@@ -1,13 +1,14 @@
 // Package hiveproxy implements the hive API server proxy.
 // This is for internal use by the 'hive' tool.
 //
-// The proxy is responsible for relaying HTTP requests originating in a private docker
+// hiveproxy is responsible for relaying HTTP requests originating in a private docker
 // network to the hive controller, which usually runs outside of Docker. The proxy
-// front-end accepts the requests, and relays them to the back-end over the stdio streams
-// of the proxy container.
+// frontend accepts the requests, and relays them to the backend over the stdio streams of
+// the proxy container.
 //
-// The proxy front-end also has auxiliary functions which can be triggered by the
-// back-end. Specifically, the proxy can probe TCP endpoints to check if they are alive.
+// The frontend also has auxiliary functions which can be triggered by the backend via
+// RPC. Specifically, it can run TCP endpoint probes, which are used by hive to confirm
+// that the client container has started.
 package hiveproxy
 
 import (
@@ -64,8 +65,8 @@ func (p *Proxy) Close() {
 	})
 }
 
-// CheckLive instructs the proxy front-end to probe the given network address. It returns
-// a non-nil error when a TCP connection to the address was successfully established.
+// CheckLive instructs the proxy frontend to probe the given network address. It returns a
+// non-nil error when a TCP connection to the address was successfully established.
 //
 // This can only be called on the proxy side created by RunBackend.
 func (p *Proxy) CheckLive(ctx context.Context, addr *net.TCPAddr) error {
@@ -111,11 +112,11 @@ func (p *Proxy) launchRPC(stream net.Conn) {
 	p.rpc, _ = rpc.DialIO(context.Background(), stream, stream)
 }
 
-// RunFrontent starts the proxy front-end, i.e. the server which accepts HTTP
-// connections. HTTP is served on the given listener, and all requests which arrive
-// there are forwarded to the back-end.
+// RunFrontent starts the proxy front-end, i.e. the server which accepts HTTP connections.
+// HTTP is served on the given listener, and all requests which arrive there are forwarded
+// to the backend.
 //
-// All communication with the back-end runs over the given r,w streams.
+// All communication with the backend runs over the given r,w streams.
 func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) *Proxy {
 	mux, _ := yamux.Client(rwCombo{r, w}, muxcfg)
 	p := newProxy(true)
@@ -146,10 +147,10 @@ func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) *Proxy {
 	return p
 }
 
-// RunBackend starts the proxy back-end, i.e. the side which handles HTTP requests
-// proxied by the front-end.
+// RunBackend starts the proxy backend, i.e. the side which handles HTTP requests proxied
+// by the frontend.
 //
-// All communication with the front-end runs over the given r,w streams.
+// All communication with the frontend runs over the given r,w streams.
 func RunBackend(r io.Reader, w io.WriteCloser, h http.Handler) *Proxy {
 	mux, _ := yamux.Server(rwCombo{r, w}, muxcfg)
 	p := newProxy(false)
