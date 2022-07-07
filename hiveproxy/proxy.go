@@ -74,8 +74,10 @@ func (p *Proxy) CheckLive(ctx context.Context, addr *net.TCPAddr) error {
 	}
 
 	id := atomic.AddUint64(&p.callID, 1)
+
+	// Set up cancellation relay.
 	checkDone := make(chan struct{})
-	cancelDone := p.backgroundCancelRPC(ctx, checkDone, id)
+	cancelDone := p.relayCancel(ctx, checkDone, id)
 	defer func() {
 		close(checkDone)
 		<-cancelDone
@@ -84,7 +86,8 @@ func (p *Proxy) CheckLive(ctx context.Context, addr *net.TCPAddr) error {
 	return p.rpc.CallContext(ctx, nil, "proxy_checkLive", id, addr.String())
 }
 
-func (p *Proxy) backgroundCancelRPC(ctx context.Context, done <-chan struct{}, id uint64) chan struct{} {
+// relayCancel notifies the proxy front-end when an RPC action is canceled.
+func (p *Proxy) relayCancel(ctx context.Context, done <-chan struct{}, id uint64) chan struct{} {
 	cancelDone := make(chan struct{})
 	go func() {
 		select {
