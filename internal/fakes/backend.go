@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 
 	"github.com/ethereum/hive/internal/libhive"
 )
@@ -33,6 +34,19 @@ type fakeBackend struct {
 	netCounter    uint64
 }
 
+type apiServer struct {
+	s    *http.Server
+	addr net.Addr
+}
+
+func (s apiServer) Close() error {
+	return s.s.Close()
+}
+
+func (s apiServer) Addr() net.Addr {
+	return s.addr
+}
+
 // NewBackend creates a new fake container backend.
 func NewContainerBackend(hooks *BackendHooks) libhive.ContainerBackend {
 	b := &fakeBackend{}
@@ -40,6 +54,16 @@ func NewContainerBackend(hooks *BackendHooks) libhive.ContainerBackend {
 		b.hooks = *hooks
 	}
 	return b
+}
+
+func (b *fakeBackend) ServeAPI(ctx context.Context, h http.Handler) (libhive.APIServer, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return nil, err
+	}
+	srv := &http.Server{Handler: h}
+	go srv.Serve(l)
+	return apiServer{srv, l.Addr()}, nil
 }
 
 func (b *fakeBackend) CreateContainer(ctx context.Context, image string, opt libhive.ContainerOptions) (string, error) {

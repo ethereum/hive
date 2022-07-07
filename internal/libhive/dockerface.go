@@ -7,10 +7,14 @@ import (
 	"io/fs"
 	"mime/multipart"
 	"net"
+	"net/http"
 )
 
 // ContainerBackend captures the docker interactions of the simulation API.
 type ContainerBackend interface {
+	// This is for launching the simulation API server.
+	ServeAPI(context.Context, http.Handler) (APIServer, error)
+
 	// These methods work with containers.
 	CreateContainer(ctx context.Context, image string, opt ContainerOptions) (string, error)
 	StartContainer(ctx context.Context, containerID string, opt ContainerOptions) (*ContainerInfo, error)
@@ -26,6 +30,12 @@ type ContainerBackend interface {
 	ContainerIP(containerID, networkID string) (net.IP, error)
 	ConnectContainer(containerID, networkID string) error
 	DisconnectContainer(containerID, networkID string) error
+}
+
+// APIServer is a handle for the HTTP API server.
+type APIServer interface {
+	Addr() net.Addr // returns the listening address of the HTTP server
+	Close() error   // stops the server
 }
 
 // This error is returned by NetworkNameToID if a docker network is not present.
