@@ -59,6 +59,8 @@ jobs:
       # Run the tests.
       - go/test:
           packages: "./..."
+      - go/test:
+          packages: "./hiveproxy"
       - run:
           name: "Compile Go simulators"
           command: ".circleci/compile-simulators.sh"
