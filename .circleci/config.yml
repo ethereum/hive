@@ -57,10 +57,13 @@ jobs:
       - go/mod-download
       - go/save-cache
       # Run the tests.
-      - go/test:
-          packages: "./..."
-      - go/test:
-          packages: "./hiveproxy"
+      - run:
+          name: "hive module tests"
+          command: "go test -cover ./..."
+      - run:
+          name: "hiveproxy module tests"
+          command: "go test -cover ./..."
+          working_directory: "./hiveproxy"
       - run:
           name: "Compile Go simulators"
           command: ".circleci/compile-simulators.sh"
