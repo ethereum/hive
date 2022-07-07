@@ -12,7 +12,7 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
-const hiveproxyTag = "hive-proxy"
+const hiveproxyTag = "hive/hiveproxy"
 
 // BuildProxy builds the hiveproxy image.
 func BuildProxy(ctx context.Context, builder libhive.Builder) error {
