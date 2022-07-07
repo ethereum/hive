@@ -242,9 +242,15 @@ func (r *simRunner) runSimulatorAPIDevMode(ctx context.Context, endpoint string)
 	httpsrv := &http.Server{Handler: tm.API()}
 	defer httpsrv.Close()
 	go func() { httpsrv.Serve(listener) }()
-	log15.Info(fmt.Sprintf("simulator API listening at %v", listener.Addr()))
 
-	// wait for interrupt
+	fmt.Printf(`---
+Welcome to hive --dev mode. Run with me:
+
+HIVE_SIMULATOR=http://%v
+---
+`, listener.Addr())
+
+	// Wait for interrupt.
 	<-ctx.Done()
 	return nil
 }
