@@ -24,6 +24,8 @@ case "$HIVE_LOGLEVEL" in
     5)   LOG=TRACE ;;
 esac
 
+echo Starting Teku Validator Client
+
 /opt/teku/bin/teku vc \
     --network=auto \
     --beacon-node-api-endpoint="http://$HIVE_ETH2_BN_API_IP:$HIVE_ETH2_BN_API_PORT" \

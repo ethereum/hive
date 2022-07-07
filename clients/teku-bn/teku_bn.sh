@@ -15,6 +15,11 @@ mkdir -p /data/testnet_setup
 cp /hive/input/genesis.ssz /data/testnet_setup/genesis.ssz
 cp /hive/input/config.yaml /data/testnet_setup
 
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    sed -i '/TERMINAL_TOTAL_DIFFICULTY/d' /data/testnet_setup/config.yaml
+    echo "TERMINAL_TOTAL_DIFFICULTY: $HIVE_TERMINAL_TOTAL_DIFFICULTY" >> /data/testnet_setup/config.yaml
+fi
+
 mkdir -p /data/teku
 
 LOG=INFO
@@ -38,6 +43,8 @@ if [ "$HIVE_ETH2_MERGE_ENABLED" != "" ]; then
     merge_option="--ee-endpoint=$HIVE_ETH2_ETH1_ENGINE_RPC_ADDRS --ee-jwt-secret-file=/jwtsecret"
 fi
 
+echo Starting Teku Beacon Node
+
 /opt/teku/bin/teku \
     --network=/data/testnet_setup/config.yaml \
     --data-path=/data/teku \
@@ -51,4 +58,6 @@ fi
     --p2p-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --p2p-advertised-ip="${CONTAINER_IP}" \
     --p2p-peer-lower-bound="${HIVE_ETH2_P2P_TARGET_PEERS:-10}" \
-    --rest-api-enabled=true --rest-api-interface=0.0.0.0 --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" --rest-api-host-allowlist="*"
+    --rest-api-enabled=true --rest-api-interface=0.0.0.0 --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" --rest-api-host-allowlist="*" \
+    --data-storage-mode=ARCHIVE \
+    --Xstartup-target-peer-count=0    

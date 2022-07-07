@@ -68,7 +68,7 @@ func mnemonicToSeed(mnemonic string) (seed []byte, err error) {
 	return bip39.NewSeed(mnemonic, ""), nil
 }
 
-func weakKeystore(secret []byte, pub []byte, passphrase []byte) (*keystorev4.Keystore, error) {
+func weakKeystore(secret []byte, pub []byte, passphrase []byte, path string) (*keystorev4.Keystore, error) {
 	var salt [32]byte
 	if _, err := rand.Read(salt[:]); err != nil {
 		return nil, err
@@ -95,7 +95,7 @@ func weakKeystore(secret []byte, pub []byte, passphrase []byte) (*keystorev4.Key
 		Crypto:      *crypto,
 		Description: "",
 		Pubkey:      pub,
-		Path:        "",
+		Path:        path,
 		UUID:        id,
 		Version:     4,
 	}, nil
@@ -103,8 +103,8 @@ func weakKeystore(secret []byte, pub []byte, passphrase []byte) (*keystorev4.Key
 
 // Same crypto, but not secure, for testing only!
 // Just generate weak keystores, so encryption and decryption doesn't take as long during testing.
-func marshalWeakKeystoreJSON(priv []byte, pub []byte, normedPass []byte) ([]byte, error) {
-	store, err := weakKeystore(priv, pub, normedPass)
+func marshalWeakKeystoreJSON(priv []byte, pub []byte, normedPass []byte, path string) ([]byte, error) {
+	store, err := weakKeystore(priv, pub, normedPass, path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encrypt keystore: %v", err)
 	}
@@ -128,12 +128,12 @@ func (k *MnemonicsKeySource) Keys() ([]*KeyDetails, error) {
 	}
 	out := make([]*KeyDetails, 0, k.To-k.From)
 	for i := k.From; i < k.To; i++ {
-		path := fmt.Sprintf("m/12381/3600/%d/0/0", i)
-		valPrivateKey, err := util.PrivateKeyFromSeedAndPath(valSeed, path)
+		valpath := fmt.Sprintf("m/12381/3600/%d/0/0", i)
+		valPrivateKey, err := util.PrivateKeyFromSeedAndPath(valSeed, valpath)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create validator private key for path %q", path)
+			return nil, errors.Wrapf(err, "failed to create validator private key for path %q", valpath)
 		}
-		path = fmt.Sprintf("m/12381/3600/%d/0", i)
+		path := fmt.Sprintf("m/12381/3600/%d/0", i)
 		withdrPrivateKey, err := util.PrivateKeyFromSeedAndPath(withdrSeed, path)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to create withdrawal private key for path %q", path)
@@ -161,7 +161,7 @@ func (k *MnemonicsKeySource) Keys() ([]*KeyDetails, error) {
 		}
 		// We don't have fancy password norming, just use a base64 pass instead.
 		passphrase := base64.URLEncoding.EncodeToString(passRandomness[:])
-		jsonData, err := marshalWeakKeystoreJSON(priv, pub, []byte(passphrase))
+		jsonData, err := marshalWeakKeystoreJSON(priv, pub, []byte(passphrase), valpath)
 		k := &KeyDetails{
 			ValidatorKeystoreJSON: jsonData,
 			ValidatorKeystorePass: passphrase,
@@ -187,14 +187,40 @@ func SecretKeys(keys []*KeyDetails) (*[]blsu.SecretKey, error) {
 	return &secrets, nil
 }
 
-func KeyTranches(keys []*KeyDetails, keyTranches uint64) [][]*KeyDetails {
-	tranches := make([][]*KeyDetails, 0, keyTranches)
-	valCount := uint64(len(keys))
-	for i := uint64(0); i < keyTranches; i++ {
-		// Give each validator client an equal subset of the genesis validator keys
-		startIndex := valCount * i / keyTranches
-		endIndex := valCount * (i + 1) / keyTranches
-		tranches = append(tranches, keys[startIndex:endIndex])
+type Shares []uint64
+
+func (shares Shares) TotalShares() uint64 {
+	total := uint64(0)
+	for _, s := range shares {
+		total += s
+	}
+	return total
+}
+
+func (shares Shares) ValidatorSplits(validatorTotalCount uint64) []uint64 {
+	validators := make([]uint64, len(shares))
+	totalShares := shares.TotalShares()
+	for i, s := range shares {
+		if totalShares == 0 {
+			// validators are split equally
+			validators[i] = validatorTotalCount / uint64(len(shares))
+		} else {
+			validators[i] = (validatorTotalCount * s) / totalShares
+		}
+	}
+	return validators
+}
+
+func KeyTranches(keys []*KeyDetails, shares Shares) [][]*KeyDetails {
+	tranches := make([][]*KeyDetails, 0, len(shares))
+	i := uint64(0)
+	for _, c := range shares.ValidatorSplits(uint64(len(keys))) {
+		if c > 0 {
+			tranches = append(tranches, keys[i:i+c])
+		} else {
+			tranches = append(tranches, make([]*KeyDetails, 0))
+		}
+		i += c
 	}
 	return tranches
 }
