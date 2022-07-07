@@ -1,4 +1,5 @@
 FROM golang:1-alpine as builder
+RUN apk add --update gcc musl-dev linux-headers
 ADD . /source
 WORKDIR /source
 RUN go build -o hive-proxy ./tool
