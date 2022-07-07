@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/hive/hiveproxy"
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -23,6 +24,8 @@ type ContainerBackend struct {
 	client *docker.Client
 	config *Config
 	logger log15.Logger
+
+	proxy *hiveproxy.Proxy
 }
 
 func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
@@ -33,6 +36,7 @@ func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
 	return b
 }
 
+// RunProgram runs a /hive-bin script in a container.
 func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
 	exec, err := b.client.CreateExec(docker.CreateExecOptions{
 		Context:      ctx,
@@ -108,6 +112,10 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 
 // StartContainer starts a docker container.
 func (b *ContainerBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+	if opt.CheckLive != 0 && b.proxy == nil {
+		panic("attempt to start container with CheckLive, but proxy is not running")
+	}
+
 	info := &libhive.ContainerInfo{ID: containerID[:8], LogFile: opt.LogFile}
 	logger := b.logger.New("container", info.ID)
 
@@ -150,7 +158,12 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
 		addr := fmt.Sprintf("%s:%d", info.IP, opt.CheckLive)
-		go checkPort(ctx, logger, addr, hasStarted)
+		go func() {
+			err := b.proxy.CheckLive(ctx, addr)
+			if err == nil {
+				close(hasStarted)
+			}
+		}()
 	} else {
 		close(hasStarted)
 	}
@@ -171,33 +184,6 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 		info.Wait = nil
 	}
 	return info, checkErr
-}
-
-// checkPort waits for the given TCP address to accept a connection.
-func checkPort(ctx context.Context, logger log15.Logger, addr string, notify chan<- struct{}) {
-	var (
-		lastMsg time.Time
-		ticker  = time.NewTicker(100 * time.Millisecond)
-	)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if time.Since(lastMsg) >= time.Second {
-				logger.Debug("checking container online...")
-				lastMsg = time.Now()
-			}
-			var dialer net.Dialer
-			conn, err := dialer.DialContext(ctx, "tcp", addr)
-			if err == nil {
-				conn.Close()
-				close(notify)
-				return
-			}
-		}
-	}
 }
 
 // DeleteContainer removes the given container. If the container is running, it is stopped.
