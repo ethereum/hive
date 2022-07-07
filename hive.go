@@ -24,7 +24,7 @@ func main() {
 	var (
 		testResultsRoot       = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
 		loglevelFlag          = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
-		dockerEndpoint        = flag.String("docker.endpoint", "unix:///var/run/docker.sock", "Endpoint of the local Docker daemon.")
+		dockerEndpoint        = flag.String("docker.endpoint", "", "Endpoint of the local Docker daemon.")
 		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
@@ -113,6 +113,11 @@ func main() {
 		},
 		SimDurationLimit: *simTimeLimit,
 	}
+
+	if err := libdocker.BuildProxy(ctx, builder); err != nil {
+		fatal(err)
+	}
+
 	clientList := splitAndTrim(*clients, ",")
 	if err := runner.initClients(ctx, clientList); err != nil {
 		fatal(err)
@@ -222,25 +227,32 @@ func (r *simRunner) runSimulatorAPIDevMode(ctx context.Context, endpoint string)
 		}
 	}()
 
-	addr, err := net.ResolveTCPAddr("tcp4", endpoint)
+	log15.Debug("starting simulator API proxy")
+	proxy, err := r.container.ServeAPI(ctx, tm.API())
 	if err != nil {
-		log15.Error(fmt.Sprintf("failed to resolve %s", endpoint), "err", err)
+		log15.Error("can't start proxy", "err", err)
 		return err
 	}
+	defer shutdownServer(proxy)
 
-	listener, err := net.ListenTCP("tcp4", addr)
+	log15.Debug("starting local API server")
+	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
-		log15.Error(fmt.Sprintf("failed to start TCP server on %s", addr), "err", err)
+		log15.Error("can't start TCP server", "err", err)
 		return err
 	}
+	httpsrv := &http.Server{Handler: tm.API()}
+	defer httpsrv.Close()
+	go func() { httpsrv.Serve(listener) }()
 
-	log15.Info(fmt.Sprintf("simulator API listening at %s", addr))
-	server := &http.Server{Handler: tm.API()}
-	defer shutdownServer(server)
+	fmt.Printf(`---
+Welcome to hive --dev mode. Run with me:
 
-	go server.Serve(listener)
+HIVE_SIMULATOR=http://%v
+---
+`, listener.Addr())
 
-	// wait for interrupt
+	// Wait for interrupt.
 	<-ctx.Done()
 	return nil
 }
@@ -256,9 +268,11 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 			log15.Error("could not terminate test manager", "error", err)
 		}
 	}()
-	addr, server, err := startTestSuiteAPI(tm)
+
+	log15.Debug("starting simulator API server")
+	server, err := r.container.ServeAPI(ctx, tm.API())
 	if err != nil {
-		log15.Error("failed to start simulator API", "error", err)
+		log15.Error("can't start API server", "err", err)
 		return err
 	}
 	defer shutdownServer(server)
@@ -266,7 +280,7 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	// Create the simulator container.
 	opts := libhive.ContainerOptions{
 		Env: map[string]string{
-			"HIVE_SIMULATOR":    "http://" + addr.String(),
+			"HIVE_SIMULATOR":    "http://" + server.Addr().String(),
 			"HIVE_PARALLELISM":  strconv.Itoa(r.env.SimParallelism),
 			"HIVE_LOGLEVEL":     strconv.Itoa(r.env.SimLogLevel),
 			"HIVE_TEST_PATTERN": r.env.SimTestPattern,
@@ -321,42 +335,11 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 	return nil
 }
 
-// startTestSuiteAPI starts an HTTP webserver listening for simulator commands
-// on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
-	// Find the IP address of the host container
-	bridge, err := libdocker.LookupBridgeIP(log15.Root())
-	if err != nil {
-		log15.Error("failed to lookup bridge IP", "error", err)
-		return nil, nil, err
-	}
-	log15.Debug("docker bridge IP found", "ip", bridge)
-
-	// Serve connections until the listener is terminated
-	log15.Debug("starting simulator API server")
-
-	// Start the API webserver for simulators to coordinate with
-	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
-	listener, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		log15.Error("failed to listen on bridge adapter", "err", err)
-		return nil, nil, err
-	}
-	laddr := listener.Addr()
-	log15.Debug("listening for simulator commands", "addr", laddr)
-	server := &http.Server{Handler: tm.API()}
-
-	go server.Serve(listener)
-	return laddr, server, nil
-}
-
 // shutdownServer gracefully terminates the HTTP server.
-func shutdownServer(server *http.Server) {
-	log15.Debug("terminating simulator server")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log15.Debug("simulation API server shutdown failed", "err", err)
+func shutdownServer(server libhive.APIServer) {
+	log15.Debug("terminating simulator API server")
+	if err := server.Close(); err != nil {
+		log15.Debug("API server shutdown failed", "err", err)
 	}
 }
 

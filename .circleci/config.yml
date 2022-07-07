@@ -33,6 +33,19 @@ jobs:
       - run:
           command: "/tmp/build/hive --sim=smoke/network --client=go-ethereum"
 
+  # This job also runs the smoke test simulations, but against a remote dockerd.
+  smoke-tests-remote-docker:
+    docker:
+      - image: cimg/base:2022.04
+    steps:
+      - checkout
+      - attach_workspace: {at: "/tmp/build"}
+      - setup_remote_docker: {version: 20.10.14}
+      - run:
+          command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum --loglevel 5"
+      - run:
+          command: "/tmp/build/hive --sim=smoke/network --client=go-ethereum --loglevel 5"
+
   # This job runs the go unit tests.
   go-test:
     docker:
@@ -44,8 +57,13 @@ jobs:
       - go/mod-download
       - go/save-cache
       # Run the tests.
-      - go/test:
-          packages: "./..."
+      - run:
+          name: "hive module tests"
+          command: "go test -cover ./..."
+      - run:
+          name: "hiveproxy module tests"
+          command: "go test -cover ./..."
+          working_directory: "./hiveproxy"
       - run:
           name: "Compile Go simulators"
           command: ".circleci/compile-simulators.sh"
@@ -56,4 +74,6 @@ workflows:
       - go-test
       - build
       - smoke-tests:
+          requires: ["build"]
+      - smoke-tests-remote-docker:
           requires: ["build"]
