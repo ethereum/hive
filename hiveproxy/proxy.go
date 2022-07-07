@@ -24,6 +24,7 @@ var muxcfg *yamux.Config
 func init() {
 	muxcfg = yamux.DefaultConfig()
 	muxcfg.EnableKeepAlive = false
+	muxcfg.ConnectionWriteTimeout = 30 * time.Second
 }
 
 type Proxy struct {
