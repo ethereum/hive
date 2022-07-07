@@ -157,7 +157,7 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	if opt.CheckLive != 0 {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		addr := fmt.Sprintf("%s:%d", info.IP, opt.CheckLive)
+		addr := &net.TCPAddr{IP: net.ParseIP(info.IP), Port: int(opt.CheckLive)}
 		go func() {
 			err := b.proxy.CheckLive(ctx, addr)
 			if err == nil {

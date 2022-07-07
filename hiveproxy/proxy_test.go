@@ -11,33 +11,16 @@ import (
 )
 
 func TestProxyHTTP(t *testing.T) {
-	cr, sw := io.Pipe()
-	sr, cw := io.Pipe()
-
-	done := make(chan struct{})
-	defer close(done)
-
-	// Run the frontend.
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		pc := RunFrontend(cr, cw, l)
-		<-done
-		pc.Close()
-	}()
-
-	// Run the backend.
 	var called bool
 	test := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 	})
-	ps := RunBackend(sr, sw, test)
-	defer ps.Close()
+
+	p := runProxyPair(t, test)
+	defer p.close()
 
 	// Send a HTTP request to frontend.
-	http.Get("http://" + l.Addr().String())
+	http.Get("http://" + p.lis.Addr().String())
 
 	// It should have arrived in backend.
 	if !called {
@@ -46,27 +29,8 @@ func TestProxyHTTP(t *testing.T) {
 }
 
 func TestProxyCheckLive(t *testing.T) {
-	cr, sw := io.Pipe()
-	sr, cw := io.Pipe()
-
-	done := make(chan struct{})
-	defer close(done)
-
-	// Run the frontend.
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
-	}
-	go func() {
-		pc := RunFrontend(cr, cw, l)
-		<-done
-		pc.Close()
-	}()
-
-	// Run the backend.
-	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	ps := RunBackend(sr, sw, h)
-	defer ps.Close()
+	p := runProxyPair(t, nil)
+	defer p.close()
 
 	// Create a listener that will be hit by checkLive.
 	tl, err := runTestListener("127.0.0.1:0")
@@ -76,43 +40,61 @@ func TestProxyCheckLive(t *testing.T) {
 	defer tl.Close()
 
 	// Run CheckLive on the backend side.
-	if err := ps.CheckLive(context.Background(), tl.l.Addr().String()); err != nil {
+	addr := tl.l.Addr().(*net.TCPAddr)
+	if err := p.back.CheckLive(context.Background(), addr); err != nil {
 		t.Fatal("CheckLive did not work:", err)
 	}
 }
 
 func TestProxyCheckLiveCancel(t *testing.T) {
+	p := runProxyPair(t, nil)
+	defer p.close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 400*time.Millisecond)
+	defer cancel()
+
+	// Run CheckLive on the backend side.
+	err := p.back.CheckLive(ctx, &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: 44491})
+	if err == nil {
+		t.Fatal("CheckLive did not return error")
+	}
+	t.Log(err)
+}
+
+type proxyPair struct {
+	front *Proxy
+	back  *Proxy
+	lis   net.Listener
+}
+
+func runProxyPair(t *testing.T, h http.Handler) proxyPair {
+	t.Helper()
+
+	var p proxyPair
 	cr, sw := io.Pipe()
 	sr, cw := io.Pipe()
-
-	done := make(chan struct{})
-	defer close(done)
 
 	// Run the frontend.
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
+	p.lis = l
+	frontStarted := make(chan struct{})
 	go func() {
-		pc := RunFrontend(cr, cw, l)
-		<-done
-		pc.Close()
+		p.front = RunFrontend(cr, cw, l)
+		close(frontStarted)
 	}()
 
 	// Run the backend.
-	h := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {})
-	ps := RunBackend(sr, sw, h)
-	defer ps.Close()
+	p.back = RunBackend(sr, sw, h)
+	<-frontStarted
+	return p
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 400 * time.Millisecond)
-	defer cancel()
-
-	// Run CheckLive on the backend side.
-	err = ps.CheckLive(ctx, "127.0.0.1:44491")
-	if err == nil {
-		t.Fatal("CheckLive did not return error")
-	}
-	t.Log(err)
+func (p proxyPair) close() {
+	p.back.Close()
+	p.front.Close()
 }
 
 type testListener struct {

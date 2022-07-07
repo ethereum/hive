@@ -68,7 +68,7 @@ func (p *Proxy) Close() {
 // a non-nil error when a TCP connection to the address was successfully established.
 //
 // This can only be called on the proxy side created by RunBackend.
-func (p *Proxy) CheckLive(ctx context.Context, addr string) error {
+func (p *Proxy) CheckLive(ctx context.Context, addr *net.TCPAddr) error {
 	if p.isFront {
 		return errors.New("CheckLive called on proxy frontend")
 	}
@@ -81,7 +81,7 @@ func (p *Proxy) CheckLive(ctx context.Context, addr string) error {
 		<-cancelDone
 	}()
 
-	return p.rpc.CallContext(ctx, nil, "proxy_checkLive", id, addr)
+	return p.rpc.CallContext(ctx, nil, "proxy_checkLive", id, addr.String())
 }
 
 func (p *Proxy) backgroundCancelRPC(ctx context.Context, done <-chan struct{}, id uint64) chan struct{} {
