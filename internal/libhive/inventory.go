@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// branchDelimiter is what separates the client name from the branch, eg: aleth_nightly, go-ethereum_master.
+// branchDelimiter is what separates the client name from the branch, eg: besu_nightly, go-ethereum_master.
 const branchDelimiter = "_"
 
 // SplitClientName returns the name and branch components of 'name'.
