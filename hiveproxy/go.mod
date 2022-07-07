@@ -2,12 +2,14 @@ module github.com/ethereum/hive/hiveproxy
 
 go 1.17
 
-require github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87
+require (
+	github.com/ethereum/go-ethereum v1.10.20
+	github.com/hashicorp/yamux v0.0.0-20211028200310-0bc27b27de87
+)
 
 require (
 	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
-	github.com/ethereum/go-ethereum v1.10.20 // indirect
 	github.com/go-ole/go-ole v1.2.1 // indirect
 	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
