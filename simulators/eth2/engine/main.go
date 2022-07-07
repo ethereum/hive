@@ -37,35 +37,34 @@ var tests = []testSpec{
 }
 
 func main() {
+	// Create the test suite that will include all tests
 	var suite = hivesim.Suite{
-		Name:        "cl-test",
-		Description: `Run different eth2 testnets.`,
+		Name:        "eth2-engine",
+		Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet.`,
 	}
-	suite.Add(hivesim.TestSpec{
-		Name:        "cl-tests",
-		Description: "Collection of different eth2 testnet compositions and assertions.",
-		Run: func(t *hivesim.T) {
-			clientTypes, err := t.Sim.ClientTypes()
-			if err != nil {
-				t.Fatal(err)
-			}
-			c := ClientsByRole(clientTypes)
-			if len(c.Eth1) != 1 {
-				t.Fatalf("choose 1 eth1 client type")
-			}
-			if len(c.Beacon) != 1 {
-				t.Fatalf("choose 1 beacon client type")
-			}
-			if len(c.Validator) != 1 {
-				t.Fatalf("choose 1 validator client type")
-			}
-			runAllTests(t, c)
-		},
-	})
-	hivesim.MustRunSuite(hivesim.New(), suite)
+	// Create simulator that runs all tests
+	sim := hivesim.New()
+	// From the simulator we can get all client types provided
+	clientTypes, err := sim.ClientTypes()
+	if err != nil {
+		panic(err)
+	}
+	c := ClientsByRole(clientTypes)
+	if len(c.Eth1) != 1 {
+		panic("choose 1 eth1 client type")
+	}
+	if len(c.Beacon) != 1 {
+		panic("choose 1 beacon client type")
+	}
+	if len(c.Validator) != 1 {
+		panic("choose 1 validator client type")
+	}
+	// Add all tests to the suite and then run it
+	addAllTests(&suite, c)
+	hivesim.MustRunSuite(sim, suite)
 }
 
-func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
+func addAllTests(suite *hivesim.Suite, c *ClientDefinitionsByRole) {
 	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 
 	// Generate validator keys to use for all tests.
@@ -77,23 +76,24 @@ func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
 	}
 	keys, err := keySrc.Keys()
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	secrets, err := setup.SecretKeys(keys)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	for _, node := range c.Combinations() {
 		for _, test := range tests {
 			test := test
-			t.Run(hivesim.TestSpec{
+			suite.Add(hivesim.TestSpec{
 				Name:        fmt.Sprintf("%s-%s", test.Name, node.String()),
 				Description: test.About,
 				Run: func(t *hivesim.T) {
 					env := &testEnv{c, keys, secrets}
 					test.Run(t, env, node)
 				},
-			})
+			},
+			)
 		}
 	}
 }
