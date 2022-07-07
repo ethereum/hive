@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -116,14 +117,14 @@ func main() {
 	if err := runner.initClients(ctx, clientList); err != nil {
 		fatal(err)
 	}
+	if err := libdocker.BuildProxy(ctx, builder); err != nil {
+		fatal(err)
+	}
 
 	if *simDevMode {
 		log15.Info("running in simulator development mode")
 		runner.runSimulatorAPIDevMode(ctx, *simDevModeAPIEndpoint)
 	} else if len(simList) > 0 {
-		if err := libdocker.BuildProxy(ctx, builder); err != nil {
-			fatal(err)
-		}
 		if err := runner.initSimulators(ctx, simList); err != nil {
 			fatal(err)
 		}
@@ -224,23 +225,24 @@ func (r *simRunner) runSimulatorAPIDevMode(ctx context.Context, endpoint string)
 		}
 	}()
 
-	addr, err := net.ResolveTCPAddr("tcp4", endpoint)
+	log15.Debug("starting simulator API proxy")
+	proxy, err := r.container.ServeAPI(ctx, tm.API())
 	if err != nil {
-		log15.Error(fmt.Sprintf("failed to resolve %s", endpoint), "err", err)
+		log15.Error("can't start proxy", "err", err)
 		return err
 	}
+	defer shutdownServer(proxy)
 
-	// listener, err := net.ListenTCP("tcp4", addr)
-	// if err != nil {
-	// 	log15.Error(fmt.Sprintf("failed to start TCP server on %s", addr), "err", err)
-	// 	return err
-	// }
-
-	log15.Info(fmt.Sprintf("simulator API listening at %s", addr))
-	// server := &http.Server{Handler: tm.API()}
-	// defer shutdownServer(server)
-	//
-	// go server.Serve(listenerg
+	log15.Debug("starting local API server")
+	listener, err := net.Listen("tcp", endpoint)
+	if err != nil {
+		log15.Error("can't start TCP server", "err", err)
+		return err
+	}
+	httpsrv := &http.Server{Handler: tm.API()}
+	defer httpsrv.Close()
+	go func() { httpsrv.Serve(listener) }()
+	log15.Info(fmt.Sprintf("simulator API listening at %v", listener.Addr()))
 
 	// wait for interrupt
 	<-ctx.Done()
