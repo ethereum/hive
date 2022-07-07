@@ -91,9 +91,9 @@ func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput
 	}
-	b.logger.Info("building image...", "name", name, "nocache", nocache, "pull", b.config.PullEnabled)
+	b.logger.Info("building image...", "image", name, "nocache", nocache, "pull", b.config.PullEnabled)
 	if err := b.client.BuildImage(opts); err != nil {
-		b.logger.Error("image build failed", "name", name, "err", err)
+		b.logger.Error("image build failed", "image", name, "err", err)
 		return err
 	}
 	return nil
