@@ -113,11 +113,13 @@ func main() {
 		},
 		SimDurationLimit: *simTimeLimit,
 	}
-	clientList := splitAndTrim(*clients, ",")
-	if err := runner.initClients(ctx, clientList); err != nil {
+
+	if err := libdocker.BuildProxy(ctx, builder); err != nil {
 		fatal(err)
 	}
-	if err := libdocker.BuildProxy(ctx, builder); err != nil {
+
+	clientList := splitAndTrim(*clients, ",")
+	if err := runner.initClients(ctx, clientList); err != nil {
 		fatal(err)
 	}
 
