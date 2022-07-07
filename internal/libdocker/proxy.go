@@ -48,7 +48,7 @@ func (cb *ContainerBackend) ServeAPI(ctx context.Context, h http.Handler) (libhi
 
 	// Register proxy in ContainerBackend, so it can be used for CheckLive.
 	cb.proxy = proxy
-	log15.Info("hiveproxy started", "id", id[:8], "addr", srv.Addr())
+	log15.Info("hiveproxy started", "container", id[:12], "addr", srv.Addr())
 	return srv, nil
 }
 
