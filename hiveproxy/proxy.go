@@ -19,6 +19,13 @@ import (
 //go:embed Dockerfile go.mod go.sum *.go tool/*.go
 var Source embed.FS
 
+var muxcfg *yamux.Config
+
+func init() {
+	muxcfg = yamux.DefaultConfig()
+	muxcfg.EnableKeepAlive = false
+}
+
 type Proxy struct {
 	httpsrv    http.Server
 	rpc        *rpc.Client
@@ -85,7 +92,7 @@ func (p *Proxy) launchRPC(stream net.Conn) {
 }
 
 func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) *Proxy {
-	mux, _ := yamux.Client(rwCombo{r, w}, nil)
+	mux, _ := yamux.Client(rwCombo{r, w}, muxcfg)
 	p := newProxy(true)
 
 	// Launch RPC handler.
@@ -115,7 +122,7 @@ func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) *Proxy {
 }
 
 func RunBackend(r io.Reader, w io.WriteCloser, h http.Handler) *Proxy {
-	mux, _ := yamux.Server(rwCombo{r, w}, nil)
+	mux, _ := yamux.Server(rwCombo{r, w}, muxcfg)
 	p := newProxy(false)
 
 	// Start RPC client.
