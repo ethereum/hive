@@ -38,7 +38,8 @@ func newProxy(front bool) *Proxy {
 
 func (p *Proxy) Close() {
 	p.closeOnce.Do(func() {
-		p.httpsrv.Shutdown(context.Background())
+		p.httpsrv.Close()
+		p.rpc.Close()
 		<-p.serverDown
 	})
 }
@@ -62,7 +63,6 @@ func (p *Proxy) CheckLive(ctx context.Context, addr string) error {
 func (p *Proxy) backgroundCancelRPC(ctx context.Context, done <-chan struct{}, id uint64) chan struct{} {
 	cancelDone := make(chan struct{})
 	go func() {
-		defer close(cancelDone)
 		select {
 		case <-ctx.Done():
 			bgCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -70,6 +70,7 @@ func (p *Proxy) backgroundCancelRPC(ctx context.Context, done <-chan struct{}, i
 			cancel()
 		case <-done:
 		}
+		close(cancelDone)
 	}()
 	return cancelDone
 }
