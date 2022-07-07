@@ -11,7 +11,7 @@ import (
 
 var (
 	VALIDATOR_COUNT           uint64 = 64
-	SLOT_TIME                 uint64 = 3
+	SLOT_TIME                 uint64 = 6
 	TERMINAL_TOTAL_DIFFICULTY        = big.NewInt(100)
 )
 
