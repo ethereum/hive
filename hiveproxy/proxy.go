@@ -1,3 +1,13 @@
+// Package hiveproxy implements the hive API server proxy.
+// This is for internal use by the 'hive' tool.
+//
+// The proxy is responsible for relaying HTTP requests originating in a private docker
+// network to the hive controller, which usually runs outside of Docker. The proxy
+// front-end accepts the requests, and relays them to the back-end over the stdio streams
+// of the proxy container.
+//
+// The proxy front-end also has auxiliary functions which can be triggered by the
+// back-end. Specifically, the proxy can probe TCP endpoints to check if they are alive.
 package hiveproxy
 
 import (
@@ -27,6 +37,7 @@ func init() {
 	muxcfg.ConnectionWriteTimeout = 30 * time.Second
 }
 
+// Proxy represents a running proxy server.
 type Proxy struct {
 	httpsrv    http.Server
 	rpc        *rpc.Client
@@ -44,6 +55,7 @@ func newProxy(front bool) *Proxy {
 	}
 }
 
+// Close terminates the proxy.
 func (p *Proxy) Close() {
 	p.closeOnce.Do(func() {
 		p.httpsrv.Close()
@@ -52,6 +64,10 @@ func (p *Proxy) Close() {
 	})
 }
 
+// CheckLive instructs the proxy front-end to probe the given network address. It returns
+// a non-nil error when a TCP connection to the address was successfully established.
+//
+// This can only be called on the proxy side created by RunBackend.
 func (p *Proxy) CheckLive(ctx context.Context, addr string) error {
 	if p.isFront {
 		return errors.New("CheckLive called on proxy frontend")
@@ -92,6 +108,11 @@ func (p *Proxy) launchRPC(stream net.Conn) {
 	p.rpc, _ = rpc.DialIO(context.Background(), stream, stream)
 }
 
+// RunFrontent starts the proxy front-end, i.e. the server which accepts HTTP
+// connections. HTTP is served on the given listener, and all requests which arrive
+// there are forwarded to the back-end.
+//
+// All communication with the back-end runs over the given r,w streams.
 func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) *Proxy {
 	mux, _ := yamux.Client(rwCombo{r, w}, muxcfg)
 	p := newProxy(true)
@@ -122,6 +143,10 @@ func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) *Proxy {
 	return p
 }
 
+// RunBackend starts the proxy back-end, i.e. the side which handles HTTP requests
+// proxied by the front-end.
+//
+// All communication with the front-end runs over the given r,w streams.
 func RunBackend(r io.Reader, w io.WriteCloser, h http.Handler) *Proxy {
 	mux, _ := yamux.Server(rwCombo{r, w}, muxcfg)
 	p := newProxy(false)
