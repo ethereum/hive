@@ -6,7 +6,7 @@ RUN apk add --update gcc musl-dev linux-headers
 COPY go.mod /source/
 COPY go.sum /source/
 WORKDIR /source
-RUn go mod download
+RUN go mod download
 
 # Now build the proxy executable.
 ADD . /source
