@@ -259,17 +259,17 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 		}
 	}()
 	cb := r.container.(*libdocker.ContainerBackend)
-	addr, server, err := startTestSuiteAPI(cb, tm)
+	proxy, err := startTestSuiteAPI(cb, tm)
 	if err != nil {
 		log15.Error("failed to start simulator API", "error", err)
 		return err
 	}
-	defer shutdownServer(server)
+	defer shutdownServer(proxy)
 
 	// Create the simulator container.
 	opts := libhive.ContainerOptions{
 		Env: map[string]string{
-			"HIVE_SIMULATOR":    "http://" + addr.String(),
+			"HIVE_SIMULATOR":    "http://" + proxy.addr().String(),
 			"HIVE_PARALLELISM":  strconv.Itoa(r.env.SimParallelism),
 			"HIVE_LOGLEVEL":     strconv.Itoa(r.env.SimLogLevel),
 			"HIVE_TEST_PATTERN": r.env.SimTestPattern,
@@ -326,22 +326,19 @@ func (r *simRunner) run(ctx context.Context, sim string) error {
 
 // startTestSuiteAPI starts an HTTP webserver listening for simulator commands
 // on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(cb *libdocker.ContainerBackend, tm *libhive.TestManager) (net.Addr, *proxyContainer, error) {
+func startTestSuiteAPI(cb *libdocker.ContainerBackend, tm *libhive.TestManager) (*proxyContainer, error) {
 	// Serve connections until the listener is terminated
 	log15.Debug("starting simulator API server")
 
 	ctx := context.TODO()
 	srv, err := startProxy(ctx, cb, tm.API())
-
-	// Start the API webserver for simulators to coordinate with
 	if err != nil {
-		log15.Error("can't start server", "err", err)
-		return nil, nil, err
+		log15.Error("can't start API proxy", "err", err)
+		return nil, err
 	}
 
-	addr := srv.addr()
-	log15.Info("simulator API running", "proxy", srv.containerID[:8], "addr", addr)
-	return addr, srv, nil
+	log15.Info("simulator API running", "proxy", srv.containerID[:8], "addr", srv.addr())
+	return srv, nil
 }
 
 // shutdownServer gracefully terminates the HTTP server.
