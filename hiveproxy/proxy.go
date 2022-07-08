@@ -132,7 +132,7 @@ func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) (*Proxy, 
 	p := newProxy(true, mux.CloseChan())
 
 	// Launch RPC handler.
-	rpcConn, err := mux.Open()
+	rpcConn, err := mux.Accept()
 	if err != nil {
 		mux.Close()
 		return nil, err
@@ -167,10 +167,11 @@ func RunBackend(r io.Reader, w io.WriteCloser, h http.Handler) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	p := newProxy(false, mux.CloseChan())
 
 	// Start RPC client.
-	rpcConn, err := mux.Accept()
+	rpcConn, err := mux.Open()
 	if err != nil {
 		mux.Close()
 		return nil, err
