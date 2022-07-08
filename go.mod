@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.20
-	github.com/ethereum/hive/hiveproxy v0.0.0-20220708130123-ca25cc20cc19
+	github.com/ethereum/hive/hiveproxy v0.0.0-20220708193637-ec524d7345a1
 	github.com/fsouza/go-dockerclient v1.8.1
 	github.com/gorilla/mux v1.8.0
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1
