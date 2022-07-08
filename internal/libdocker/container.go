@@ -138,8 +138,9 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	go func() {
 		defer close(containerExit)
 		err := waiter.Wait()
-		waiter.Close()
 		logger.Debug("container exited", "err", err)
+		err = waiter.Close()
+		logger.Debug("container files closed", "err", err)
 	}()
 	// Set up the wait function.
 	info.Wait = func() { <-containerExit }
