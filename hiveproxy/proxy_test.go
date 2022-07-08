@@ -61,6 +61,24 @@ func TestProxyCheckLiveCancel(t *testing.T) {
 	t.Log(err)
 }
 
+func TestProxyWait(t *testing.T) {
+	p := runProxyPair(t, nil)
+
+	unblock := make(chan struct{})
+	go func() {
+		p.front.Wait()
+		close(unblock)
+	}()
+
+	p.back.Close()
+
+	select {
+	case <-unblock:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Wait did not unblock")
+	}
+}
+
 type proxyPair struct {
 	front *Proxy
 	back  *Proxy

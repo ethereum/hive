@@ -42,6 +42,7 @@ func init() {
 type Proxy struct {
 	httpsrv    http.Server
 	rpc        *rpc.Client
+	waitCh     <-chan struct{}
 	serverDown chan struct{}
 	closeOnce  sync.Once
 
@@ -49,11 +50,17 @@ type Proxy struct {
 	callID  uint64
 }
 
-func newProxy(front bool) *Proxy {
+func newProxy(front bool, waitCh <-chan struct{}) *Proxy {
 	return &Proxy{
 		serverDown: make(chan struct{}),
+		waitCh:     waitCh,
 		isFront:    front,
 	}
+}
+
+// Wait blocks until the proxy connection is closed.
+func (p *Proxy) Wait() {
+	<-p.waitCh
 }
 
 // Close terminates the proxy.
@@ -118,14 +125,14 @@ func (p *Proxy) launchRPC(stream net.Conn) {
 //
 // All communication with the backend runs over the given r,w streams.
 func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) (*Proxy, error) {
-	p := newProxy(true)
 	mux, err := yamux.Client(rwCombo{r, w}, muxcfg)
 	if err != nil {
 		return nil, err
 	}
+	p := newProxy(true, mux.CloseChan())
 
 	// Launch RPC handler.
-	rpcConn, err := mux.Open()
+	rpcConn, err := mux.Accept()
 	if err != nil {
 		mux.Close()
 		return nil, err
@@ -156,14 +163,15 @@ func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) (*Proxy, 
 //
 // All communication with the frontend runs over the given r,w streams.
 func RunBackend(r io.Reader, w io.WriteCloser, h http.Handler) (*Proxy, error) {
-	p := newProxy(false)
 	mux, err := yamux.Server(rwCombo{r, w}, muxcfg)
 	if err != nil {
 		return nil, err
 	}
 
+	p := newProxy(false, mux.CloseChan())
+
 	// Start RPC client.
-	rpcConn, err := mux.Accept()
+	rpcConn, err := mux.Open()
 	if err != nil {
 		mux.Close()
 		return nil, err

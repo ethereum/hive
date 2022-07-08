@@ -93,6 +93,11 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 		createOpts.Config.StdinOnce = true
 		createOpts.Config.OpenStdin = true
 	}
+	if opt.Output != nil {
+		// Pre-announce that stdout will be attached. Not sure if this does anything,
+		// but it's probably best to give Docker the info as early as possible.
+		createOpts.Config.AttachStdout = true
+	}
 
 	c, err := b.client.CreateContainer(createOpts)
 	if err != nil {
@@ -133,8 +138,9 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	go func() {
 		defer close(containerExit)
 		err := waiter.Wait()
-		waiter.Close()
 		logger.Debug("container exited", "err", err)
+		err = waiter.Close()
+		logger.Debug("container files closed", "err", err)
 	}()
 	// Set up the wait function.
 	info.Wait = func() { <-containerExit }
