@@ -16,6 +16,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	hiveproxy.RunFrontend(os.Stdin, os.Stdout, l)
-	select {}
+	p, err := hiveproxy.RunFrontend(os.Stdin, os.Stdout, l)
+	if err != nil {
+		panic(err)
+	}
+	p.Wait()
 }
