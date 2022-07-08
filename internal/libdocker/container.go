@@ -93,6 +93,11 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 		createOpts.Config.StdinOnce = true
 		createOpts.Config.OpenStdin = true
 	}
+	if opt.Output != nil {
+		// Pre-announce that stdout will be attached. Not sure if this does anything,
+		// but it's probably best to give Docker the info as early as possible.
+		createOpts.Config.AttachStdout = true
+	}
 
 	c, err := b.client.CreateContainer(createOpts)
 	if err != nil {
