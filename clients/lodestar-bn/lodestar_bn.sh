@@ -36,6 +36,7 @@ CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 echo Container IP: $CONTAINER_IP
 bootnodes_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "" || echo "--network.discv5.bootEnrs ${HIVE_ETH2_BOOTNODE_ENRS//,/ }")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics.enabled --metrics.listenAddr=$CONTAINER_IP --metrics.port=$HIVE_ETH2_METRICS_PORT")
+opt_sync_option=$([[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" == "" ]] && echo "" || echo "--safe-slots-to-import-optimistically=$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY")
 
 echo "bootnodes option : ${bootnodes_option}"
 
@@ -62,6 +63,7 @@ node /usr/app/node_modules/.bin/lodestar \
     --jwt-secret=/jwtsecret \
     $metrics_option \
     $bootnodes_option \
+    $opt_sync_option \
     --enr.ip="${CONTAINER_IP}" \
     --enr.tcp="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --enr.udp="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
