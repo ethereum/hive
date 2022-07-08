@@ -35,7 +35,15 @@ func (cb *ContainerBackend) ServeAPI(ctx context.Context, h http.Handler) (libhi
 		return nil, err
 	}
 
-	proxy := hiveproxy.RunBackend(outR, inW, h)
+	proxy, err := hiveproxy.RunBackend(outR, inW, h)
+	if err != nil {
+		cb.DeleteContainer(id)
+		return nil, err
+	}
+
+	// Register proxy in ContainerBackend, so it can be used for CheckLive.
+	cb.proxy = proxy
+
 	srv := &proxyContainer{
 		cb:              cb,
 		containerID:     id,

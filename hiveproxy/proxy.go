@@ -117,14 +117,18 @@ func (p *Proxy) launchRPC(stream net.Conn) {
 // to the backend.
 //
 // All communication with the backend runs over the given r,w streams.
-func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) *Proxy {
-	mux, _ := yamux.Client(rwCombo{r, w}, muxcfg)
+func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) (*Proxy, error) {
 	p := newProxy(true)
+	mux, err := yamux.Client(rwCombo{r, w}, muxcfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Launch RPC handler.
 	rpcConn, err := mux.Open()
 	if err != nil {
-		panic(err)
+		mux.Close()
+		return nil, err
 	}
 	p.launchRPC(rpcConn)
 	p.rpc.RegisterName("proxy", new(proxyFunctions))
@@ -144,28 +148,32 @@ func RunFrontend(r io.Reader, w io.WriteCloser, listener net.Listener) *Proxy {
 		Transport: transport,
 	}
 	go p.serve(listener)
-	return p
+	return p, nil
 }
 
 // RunBackend starts the proxy backend, i.e. the side which handles HTTP requests proxied
 // by the frontend.
 //
 // All communication with the frontend runs over the given r,w streams.
-func RunBackend(r io.Reader, w io.WriteCloser, h http.Handler) *Proxy {
-	mux, _ := yamux.Server(rwCombo{r, w}, muxcfg)
+func RunBackend(r io.Reader, w io.WriteCloser, h http.Handler) (*Proxy, error) {
 	p := newProxy(false)
+	mux, err := yamux.Server(rwCombo{r, w}, muxcfg)
+	if err != nil {
+		return nil, err
+	}
 
 	// Start RPC client.
 	rpcConn, err := mux.Accept()
 	if err != nil {
-		panic(err)
+		mux.Close()
+		return nil, err
 	}
 	p.launchRPC(rpcConn)
 
 	// Start HTTP server.
 	p.httpsrv.Handler = h
 	go p.serve(mux)
-	return p
+	return p, nil
 }
 
 type rwCombo struct {

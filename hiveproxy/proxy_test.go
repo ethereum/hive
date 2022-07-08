@@ -40,7 +40,7 @@ func TestProxyCheckLive(t *testing.T) {
 	defer tl.Close()
 
 	// Run CheckLive on the backend side.
-	addr := tl.l.Addr().(*net.TCPAddr)
+	addr := tl.lis.Addr().(*net.TCPAddr)
 	if err := p.back.CheckLive(context.Background(), addr); err != nil {
 		t.Fatal("CheckLive did not work:", err)
 	}
@@ -80,15 +80,27 @@ func runProxyPair(t *testing.T, h http.Handler) proxyPair {
 		t.Fatal(err)
 	}
 	p.lis = l
-	frontStarted := make(chan struct{})
+	frontStarted := make(chan error, 1)
 	go func() {
-		p.front = RunFrontend(cr, cw, l)
-		close(frontStarted)
+		var err error
+		p.front, err = RunFrontend(cr, cw, l)
+		frontStarted <- err
 	}()
 
 	// Run the backend.
-	p.back = RunBackend(sr, sw, h)
-	<-frontStarted
+	p.back, err = RunBackend(sr, sw, h)
+	if err != nil {
+		<-frontStarted
+		if p.front != nil {
+			p.front.Close()
+		}
+		t.Fatal(err)
+	}
+
+	if err := <-frontStarted; err != nil {
+		p.back.Close()
+		t.Fatal(err)
+	}
 	return p
 }
 
@@ -98,8 +110,8 @@ func (p proxyPair) close() {
 }
 
 type testListener struct {
-	l  net.Listener
-	wg sync.WaitGroup
+	lis net.Listener
+	wg  sync.WaitGroup
 }
 
 func runTestListener(addr string) (*testListener, error) {
@@ -107,21 +119,21 @@ func runTestListener(addr string) (*testListener, error) {
 	if err != nil {
 		return nil, err
 	}
-	tl := &testListener{l: l}
+	tl := &testListener{lis: l}
 	tl.wg.Add(1)
 	go tl.acceptLoop()
 	return tl, nil
 }
 
 func (tl *testListener) Close() {
-	tl.l.Close()
+	tl.lis.Close()
 	tl.wg.Wait()
 }
 
 func (tl *testListener) acceptLoop() {
 	defer tl.wg.Done()
 	for {
-		c, err := tl.l.Accept()
+		c, err := tl.lis.Accept()
 		if err != nil {
 			return
 		}

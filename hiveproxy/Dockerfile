@@ -10,10 +10,10 @@ RUN go mod download
 
 # Now build the proxy executable.
 ADD . /source
-RUN go build -o hive-proxy ./tool
+RUN go build -o /bin/hiveproxy ./tool
 
 # Pull the executable into a fresh image.
 FROM alpine:latest
-COPY --from=builder /source/hive-proxy .
+COPY --from=builder /bin/hiveproxy .
 EXPOSE 8081/tcp
-ENTRYPOINT ./hive-proxy --addr :8081
+ENTRYPOINT ./hiveproxy --addr :8081
