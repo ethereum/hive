@@ -14,9 +14,9 @@ import (
 
 const hiveproxyTag = "hive/hiveproxy"
 
-// BuildProxy builds the hiveproxy image.
-func BuildProxy(ctx context.Context, builder libhive.Builder) error {
-	return builder.BuildImage(ctx, hiveproxyTag, hiveproxy.Source)
+// Build builds the hiveproxy image.
+func (cb *ContainerBackend) Build(ctx context.Context, b libhive.Builder) error {
+	return b.BuildImage(ctx, hiveproxyTag, hiveproxy.Source)
 }
 
 // ServeAPI starts the API server.

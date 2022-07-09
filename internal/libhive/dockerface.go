@@ -12,6 +12,10 @@ import (
 
 // ContainerBackend captures the docker interactions of the simulation API.
 type ContainerBackend interface {
+	// Build is a hook allowing ContainerBackend to build internal helper images.
+	// This is called before anything else in the simulation run.
+	Build(context.Context, Builder) error
+
 	// This is for launching the simulation API server.
 	ServeAPI(context.Context, http.Handler) (APIServer, error)
 
@@ -80,7 +84,7 @@ type Builder interface {
 	BuildImage(ctx context.Context, name string, fsys fs.FS) error
 
 	// ReadFile returns the content of a file in the given image.
-	ReadFile(image, path string) ([]byte, error)
+	ReadFile(ctx context.Context, image, path string) ([]byte, error)
 }
 
 // ClientMetadata is metadata to describe the client in more detail, configured with a YAML file in the client dir.

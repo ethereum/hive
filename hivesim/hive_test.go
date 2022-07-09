@@ -116,7 +116,7 @@ func TestEnodeReplaceIP(t *testing.T) {
 func TestStartClientStartOptions(t *testing.T) {
 	var lastOptions libhive.ContainerOptions
 	tm, srv := newFakeAPI(&fakes.BackendHooks{
-		StartContainer: func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 			lastOptions = opt
 			return &libhive.ContainerInfo{}, nil
 		},
@@ -346,7 +346,7 @@ func TestStartClientInitialNetworks(t *testing.T) {
 		ipcounter   byte
 	)
 	tm, srv := newFakeAPI(&fakes.BackendHooks{
-		StartContainer: func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 			return &libhive.ContainerInfo{}, nil
 		},
 		ConnectContainer: func(containerID string, networkID string) error {
