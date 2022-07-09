@@ -13,6 +13,11 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
+var (
+	errSimInterrupt = errors.New("simulation interrupted")
+	errSimTimeout   = errors.New("simulation timed out")
+)
+
 // Runner executes a simulation runs.
 type Runner struct {
 	inv       Inventory
@@ -98,27 +103,24 @@ func (r *Runner) buildSimulators(ctx context.Context, simList []string) error {
 	return nil
 }
 
-func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) error {
+func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) (SimResult, error) {
 	stat, err := os.Stat(env.LogDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			log15.Info("creating output directory", "folder", env.LogDir)
 			if err := os.MkdirAll(env.LogDir, 0755); err != nil {
 				log15.Crit("failed to create logs folder", "err", err)
-				return err
+				return SimResult{}, err
 			}
 		} else {
-			return err
+			return SimResult{}, err
 		}
 	}
 	if !stat.IsDir() {
-		return errors.New("log output directory is a file")
+		return SimResult{}, errors.New("log output directory is a file")
 	}
 
-	if err := r.run(ctx, sim, env); err != nil {
-		return err
-	}
-	return nil
+	return r.run(ctx, sim, env)
 }
 
 // func (r *Runner) runSimulatorAPIDevMode(ctx context.Context, endpoint string) error {
@@ -160,7 +162,7 @@ func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) error {
 // }
 
 // run runs one simulation.
-func (r *Runner) run(ctx context.Context, sim string, env SimEnv) error {
+func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, error) {
 	log15.Info(fmt.Sprintf("running simulation: %s", sim))
 
 	clientDefs := make(map[string]*ClientDefinition)
@@ -173,7 +175,7 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) error {
 		for _, name := range env.ClientList {
 			def, ok := r.defs[name]
 			if !ok {
-				return fmt.Errorf("unknown client %q in simulation client list", name)
+				return SimResult{}, fmt.Errorf("unknown client %q in simulation client list", name)
 			}
 			clientDefs[name] = def
 		}
@@ -191,7 +193,7 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) error {
 	server, err := r.container.ServeAPI(ctx, tm.API())
 	if err != nil {
 		log15.Error("can't start API server", "err", err)
-		return err
+		return SimResult{}, err
 	}
 	defer shutdownServer(server)
 
@@ -206,7 +208,7 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) error {
 	}
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
 	if err != nil {
-		return err
+		return SimResult{}, err
 	}
 
 	// Set the log file, and notify TestManager about the container.
@@ -217,7 +219,7 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) error {
 	log15.Debug("starting simulator container")
 	sc, err := r.container.StartContainer(ctx, containerID, opts)
 	if err != nil {
-		return err
+		return SimResult{}, err
 	}
 	slogger := log15.New("sim", sim, "container", sc.ID[:8])
 	slogger.Debug("started simulator container")
@@ -246,11 +248,30 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) error {
 	case <-done:
 	case <-timeout:
 		slogger.Info("simulation timed out")
+		err = errSimTimeout
 	case <-ctx.Done():
 		slogger.Info("interrupted, shutting down")
-		return errors.New("simulation interrupted")
+		err = errSimInterrupt
 	}
-	return nil
+
+	// Count the results.
+	var result SimResult
+	for _, suite := range tm.Results() {
+		var suiteFailCounted bool
+		result.Suites++
+		for _, test := range suite.TestCases {
+			result.Tests++
+			if !test.SummaryResult.Pass {
+				result.TestsFailed++
+				if !suiteFailCounted {
+					result.SuitesFailed++
+					suiteFailCounted = true
+				}
+			}
+		}
+	}
+
+	return result, err
 }
 
 // shutdownServer gracefully terminates the HTTP server.

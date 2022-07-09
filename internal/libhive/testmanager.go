@@ -50,6 +50,14 @@ type SimEnv struct {
 	ClientStartTimeout time.Duration
 }
 
+// SimResult summarizes the results of a simulation run.
+type SimResult struct {
+	Suites       int
+	SuitesFailed int
+	Tests        int
+	TestsFailed  int
+}
+
 // TestManager collects test results during a simulation run.
 type TestManager struct {
 	config     SimEnv

@@ -49,7 +49,7 @@ func TestRunner(t *testing.T) {
 	if err := runner.Build(ctx, allClients, simList); err != nil {
 		t.Fatal("Build() failed:", err)
 	}
-	if err := runner.Run(context.Background(), "sim-1", simOpt); err != nil {
+	if _, err := runner.Run(context.Background(), "sim-1", simOpt); err != nil {
 		t.Fatal("Run() failed:", err)
 	}
 }
