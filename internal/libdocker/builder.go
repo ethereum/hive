@@ -156,9 +156,13 @@ func (b *Builder) archiveFS(ctx context.Context, out io.WriteCloser, fsys fs.FS)
 
 // ReadFile returns the content of a file in the given image. To do so, it creates a
 // temporary container, downloads the file from it and destroys the container.
-func (b *Builder) ReadFile(image, path string) ([]byte, error) {
+func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, error) {
 	// Create the temporary container and ensure it's cleaned up.
-	cont, err := b.client.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: image}})
+	opt := docker.CreateContainerOptions{
+		Context: ctx,
+		Config:  &docker.Config{Image: image},
+	}
+	cont, err := b.client.CreateContainer(opt)
 	if err != nil {
 		return nil, err
 	}
@@ -170,10 +174,12 @@ func (b *Builder) ReadFile(image, path string) ([]byte, error) {
 
 	// Download a tarball of the file from the container.
 	download := new(bytes.Buffer)
-	if err := b.client.DownloadFromContainer(cont.ID, docker.DownloadFromContainerOptions{
+	dlopt := docker.DownloadFromContainerOptions{
 		Path:         path,
 		OutputStream: download,
-	}); err != nil {
+		Context:      ctx,
+	}
+	if err := b.client.DownloadFromContainer(cont.ID, dlopt); err != nil {
 		return nil, err
 	}
 	in := tar.NewReader(download)

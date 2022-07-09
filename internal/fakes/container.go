@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
+	"sync/atomic"
 
 	"github.com/ethereum/hive/internal/libhive"
 )
@@ -13,7 +15,7 @@ import (
 // BackendHooks can be used to override the behavior of the fake backend.
 type BackendHooks struct {
 	CreateContainer func(image string, opt libhive.ContainerOptions) (string, error)
-	StartContainer  func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
+	StartContainer  func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
 	DeleteContainer func(containerID string) error
 	RunProgram      func(containerID string, cmd []string) (*libhive.ExecInfo, error)
 
@@ -32,6 +34,9 @@ type fakeBackend struct {
 	hooks         BackendHooks
 	clientCounter uint64
 	netCounter    uint64
+
+	mutex sync.Mutex
+	cimg  map[string]string // tracks created containers and their image names
 }
 
 type apiServer struct {
@@ -49,11 +54,15 @@ func (s apiServer) Addr() net.Addr {
 
 // NewBackend creates a new fake container backend.
 func NewContainerBackend(hooks *BackendHooks) libhive.ContainerBackend {
-	b := &fakeBackend{}
+	b := &fakeBackend{cimg: make(map[string]string)}
 	if hooks != nil {
 		b.hooks = *hooks
 	}
 	return b
+}
+
+func (b *fakeBackend) Build(context.Context, libhive.Builder) error {
+	return nil
 }
 
 func (b *fakeBackend) ServeAPI(ctx context.Context, h http.Handler) (libhive.APIServer, error) {
@@ -67,18 +76,41 @@ func (b *fakeBackend) ServeAPI(ctx context.Context, h http.Handler) (libhive.API
 }
 
 func (b *fakeBackend) CreateContainer(ctx context.Context, image string, opt libhive.ContainerOptions) (string, error) {
+	var id string
+	var err error
 	if b.hooks.CreateContainer != nil {
-		return b.hooks.CreateContainer(image, opt)
+		id, err = b.hooks.CreateContainer(image, opt)
+		if err != nil {
+			return "", err
+		}
+	} else {
+		id = fmt.Sprintf("%0.8x", atomic.AddUint64(&b.clientCounter, 1))
 	}
-	b.clientCounter++
-	id := fmt.Sprintf("%0.8x", b.clientCounter)
+
+	b.mutex.Lock()
+	if _, ok := b.cimg[id]; ok {
+		b.mutex.Unlock()
+		return id, fmt.Errorf("duplicate container ID %q", id)
+	}
+	b.cimg[id] = image
+	b.mutex.Unlock()
 	return id, nil
 }
 
 func (b *fakeBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+	// Get image name.
+	b.mutex.Lock()
+	image, ok := b.cimg[containerID]
+	if !ok {
+		b.mutex.Unlock()
+		return nil, fmt.Errorf("container %s does not exist", containerID)
+	}
+	b.mutex.Unlock()
+
+	// Call the hook.
 	var info libhive.ContainerInfo
 	if b.hooks.StartContainer != nil {
-		info2, err := b.hooks.StartContainer(containerID, opt)
+		info2, err := b.hooks.StartContainer(image, containerID, opt)
 		if err != nil {
 			return nil, err
 		}
@@ -102,10 +134,15 @@ func (b *fakeBackend) StartContainer(ctx context.Context, containerID string, op
 }
 
 func (b *fakeBackend) DeleteContainer(containerID string) error {
+	var err error
 	if b.hooks.DeleteContainer != nil {
-		return b.hooks.DeleteContainer(containerID)
+		err = b.hooks.DeleteContainer(containerID)
 	}
-	return nil
+
+	b.mutex.Lock()
+	delete(b.cimg, containerID)
+	b.mutex.Unlock()
+	return err
 }
 
 func (b *fakeBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
@@ -126,8 +163,7 @@ func (b *fakeBackend) CreateNetwork(name string) (string, error) {
 	if b.hooks.CreateNetwork != nil {
 		return b.hooks.CreateNetwork(name)
 	}
-	b.netCounter++
-	id := fmt.Sprintf("%0.8x", b.netCounter)
+	id := fmt.Sprintf("%0.8x", atomic.AddUint64(&b.netCounter, 1))
 	return id, nil
 }
 

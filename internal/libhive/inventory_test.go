@@ -1,8 +1,10 @@
-package libhive
+package libhive_test
 
 import (
 	"path/filepath"
 	"testing"
+
+	"github.com/ethereum/hive/internal/libhive"
 )
 
 func TestSplitClientName(t *testing.T) {
@@ -15,16 +17,16 @@ func TestSplitClientName(t *testing.T) {
 		{"the_client_b", "the_client", "b"},
 	}
 	for _, test := range tests {
-		c, b := SplitClientName(test.name)
+		c, b := libhive.SplitClientName(test.name)
 		if c != test.wantClient || b != test.wantBranch {
-			t.Errorf("SplitClientName(%q) -> (%q, %q), want (%q, %q)", test.name, c, b, test.wantClient, test.wantBranch)
+			t.Errorf("SpnlitClientName(%q) -> (%q, %q), want (%q, %q)", test.name, c, b, test.wantClient, test.wantBranch)
 		}
 	}
 }
 
 func TestInventory(t *testing.T) {
 	basedir := filepath.FromSlash("../..")
-	inv, err := LoadInventory(basedir)
+	inv, err := libhive.LoadInventory(basedir)
 	if err != nil {
 		t.Fatal(err)
 	}

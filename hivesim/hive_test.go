@@ -116,7 +116,7 @@ func TestEnodeReplaceIP(t *testing.T) {
 func TestStartClientStartOptions(t *testing.T) {
 	var lastOptions libhive.ContainerOptions
 	tm, srv := newFakeAPI(&fakes.BackendHooks{
-		StartContainer: func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 			lastOptions = opt
 			return &libhive.ContainerInfo{}, nil
 		},
@@ -346,7 +346,7 @@ func TestStartClientInitialNetworks(t *testing.T) {
 		ipcounter   byte
 	)
 	tm, srv := newFakeAPI(&fakes.BackendHooks{
-		StartContainer: func(containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+		StartContainer: func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 			return &libhive.ContainerInfo{}, nil
 		},
 		ConnectContainer: func(containerID string, networkID string) error {
@@ -401,14 +401,13 @@ func TestStartClientInitialNetworks(t *testing.T) {
 }
 
 func newFakeAPI(hooks *fakes.BackendHooks) (*libhive.TestManager, *httptest.Server) {
-	env := libhive.SimEnv{
-		Definitions: map[string]*libhive.ClientDefinition{
-			"client-1": {Name: "client-1", Image: "/ignored/in/api", Version: "client-1-version", Meta: libhive.ClientMetadata{Roles: []string{"eth1"}}},
-			"client-2": {Name: "client-2", Image: "/not/exposed/", Version: "client-2-version", Meta: libhive.ClientMetadata{Roles: []string{"beacon"}}},
-		},
+	defs := map[string]*libhive.ClientDefinition{
+		"client-1": {Name: "client-1", Image: "/ignored/in/api", Version: "client-1-version", Meta: libhive.ClientMetadata{Roles: []string{"eth1"}}},
+		"client-2": {Name: "client-2", Image: "/not/exposed/", Version: "client-2-version", Meta: libhive.ClientMetadata{Roles: []string{"beacon"}}},
 	}
+	env := libhive.SimEnv{}
 	backend := fakes.NewContainerBackend(hooks)
-	tm := libhive.NewTestManager(env, backend, -1)
+	tm := libhive.NewTestManager(env, backend, defs)
 	srv := httptest.NewServer(tm.API())
 	return tm, srv
 }

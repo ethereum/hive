@@ -59,8 +59,8 @@ type simAPI struct {
 
 // getClientTypes returns all known client types.
 func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
-	clients := make([]*ClientDefinition, 0, len(api.env.Definitions))
-	for _, def := range api.env.Definitions {
+	clients := make([]*ClientDefinition, 0, len(api.tm.clientDefs))
+	for _, def := range api.tm.clientDefs {
 		clients = append(clients, def)
 	}
 	sort.Slice(clients, func(i, j int) bool {
@@ -326,7 +326,7 @@ func (api *simAPI) checkClient(req *simapi.NodeConfig) (*ClientDefinition, error
 	if req.Client == "" {
 		return nil, errors.New("missing client type in start request")
 	}
-	def, ok := api.env.Definitions[req.Client]
+	def, ok := api.tm.clientDefs[req.Client]
 	if !ok {
 		return nil, errors.New("unknown client type in start request")
 	}
