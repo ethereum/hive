@@ -118,20 +118,22 @@ func main() {
 		// runner.runSimulatorAPIDevMode(ctx, *simDevModeAPIEndpoint)
 	}
 
-	var anySuiteFailed bool
+	var failCount int
 	for _, sim := range simList {
 		result, err := runner.Run(ctx, sim, env)
 		if err != nil {
 			fatal(err)
 		}
-		if result.SuitesFailed > 0 {
-			anySuiteFailed = true
-		}
+		failCount += result.TestsFailed
 		log15.Info(fmt.Sprintf("simulation %s finished", sim), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
 	}
 
-	if anySuiteFailed {
-		fatal(errors.New("at least one test failed"))
+	switch failCount {
+	case 0:
+	case 1:
+		fatal(errors.New("1 test failed"))
+	default:
+		fatal(fmt.Errorf("%d tests failed", failCount))
 	}
 }
 
