@@ -125,7 +125,7 @@ func main() {
 			fatal(err)
 		}
 		failCount += result.TestsFailed
-		log15.Info(fmt.Sprintf("simulation %s finished", sim), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
+		log15.Info(fmt.Sprintf("simulation %s finished", sim), "nsuites", result.Suites, "ntests", result.Tests, "failed", result.TestsFailed)
 	}
 
 	switch failCount {
