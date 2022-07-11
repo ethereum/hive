@@ -106,22 +106,9 @@ func (r *Runner) buildSimulators(ctx context.Context, simList []string) error {
 }
 
 func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) (SimResult, error) {
-	stat, err := os.Stat(env.LogDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log15.Info("creating output directory", "folder", env.LogDir)
-			if err := os.MkdirAll(env.LogDir, 0755); err != nil {
-				log15.Crit("failed to create logs folder", "err", err)
-				return SimResult{}, err
-			}
-		} else {
-			return SimResult{}, err
-		}
+	if err := createWorkspace(env.LogDir); err != nil {
+		return SimResult{}, err
 	}
-	if !stat.IsDir() {
-		return SimResult{}, errors.New("log output directory is a file")
-	}
-
 	return r.run(ctx, sim, env)
 }
 
@@ -131,6 +118,10 @@ func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 //
 // Note: Sim* options in env are ignored, but Client* options and LogDir still apply.
 func (r *Runner) RunDevMode(ctx context.Context, env SimEnv, endpoint string) error {
+	if err := createWorkspace(env.LogDir); err != nil {
+		return err
+	}
+
 	tm := NewTestManager(env, r.container, r.clientDefs)
 	defer func() {
 		if err := tm.Terminate(); err != nil {
@@ -287,4 +278,23 @@ func shutdownServer(server APIServer) {
 	if err := server.Close(); err != nil {
 		log15.Debug("API server shutdown failed", "err", err)
 	}
+}
+
+// createWorkspace ensures that the hive output directory exists.
+func createWorkspace(logdir string) error {
+	stat, err := os.Stat(logdir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log15.Info("creating output directory", "folder", logdir)
+			err = os.MkdirAll(logdir, 0755)
+			if err != nil {
+				log15.Crit("failed to create output directory", "err", err)
+			}
+		}
+		return err
+	}
+	if !stat.IsDir() {
+		return errors.New("log output directory is a file")
+	}
+	return nil
 }
