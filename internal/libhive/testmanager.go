@@ -37,19 +37,32 @@ type SimEnv struct {
 	SimParallelism int
 	SimTestPattern string
 
+	// This is the time limit for the simulation run.
+	// There is no default limit.
+	SimDurationLimit time.Duration
+
+	// These are the clients which are made available to the simulator.
+	// If unset (i.e. nil), all built clients are used.
+	ClientList []string
+
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
 	ClientStartTimeout time.Duration
+}
 
-	// client name -> client definition
-	Definitions map[string]*ClientDefinition
+// SimResult summarizes the results of a simulation run.
+type SimResult struct {
+	Suites       int
+	SuitesFailed int
+	Tests        int
+	TestsFailed  int
 }
 
 // TestManager collects test results during a simulation run.
 type TestManager struct {
-	config      SimEnv
-	backend     ContainerBackend
-	testLimiter int
+	config     SimEnv
+	backend    ContainerBackend
+	clientDefs map[string]*ClientDefinition
 
 	simContainerID string
 	simLogFile     string
@@ -68,11 +81,11 @@ type TestManager struct {
 	results           map[TestSuiteID]*TestSuite
 }
 
-func NewTestManager(config SimEnv, b ContainerBackend, testLimiter int) *TestManager {
+func NewTestManager(config SimEnv, b ContainerBackend, clients map[string]*ClientDefinition) *TestManager {
 	return &TestManager{
+		clientDefs:        clients,
 		config:            config,
 		backend:           b,
-		testLimiter:       testLimiter,
 		runningTestSuites: make(map[TestSuiteID]*TestSuite),
 		runningTestCases:  make(map[TestID]*TestCase),
 		results:           make(map[TestSuiteID]*TestSuite),
@@ -379,10 +392,6 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 	testSuite, ok := manager.runningTestSuites[testSuiteID]
 	if !ok {
 		return 0, ErrNoSuchTestSuite
-	}
-	// check for a limiter
-	if manager.testLimiter >= 0 && len(testSuite.TestCases) >= manager.testLimiter {
-		return 0, ErrTestSuiteLimited
 	}
 	// increment the testcasecounter
 	manager.testCaseCounter++
