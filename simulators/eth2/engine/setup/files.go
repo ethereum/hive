@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"
@@ -65,6 +66,16 @@ func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount u
 			"HIVE_ETH2_ETH1_GENESIS_HASH": genesisHash.String(),
 		},
 	), nil
+}
+
+func ChainBundle(chain []*types.Block) (hivesim.StartOption, error) {
+	var buf bytes.Buffer
+	for _, block := range chain {
+		if err := block.EncodeRLP(&buf); err != nil {
+			return nil, err
+		}
+	}
+	return hivesim.WithDynamicFile("/chain.rlp", bytesSource(buf.Bytes())), nil
 }
 
 func KeysBundle(keys []*KeyDetails) hivesim.StartOption {

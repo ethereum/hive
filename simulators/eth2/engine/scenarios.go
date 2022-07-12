@@ -16,6 +16,7 @@ import (
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/eth2api/client/beaconapi"
 	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
+	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/rauljordan/engine-proxy/proxy"
 )
 
@@ -23,6 +24,8 @@ var (
 	DEFAULT_VALIDATOR_COUNT           uint64 = 60
 	DEFAULT_SLOT_TIME                 uint64 = 6
 	DEFAULT_TERMINAL_TOTAL_DIFFICULTY uint64 = 100
+
+	EPOCHS_TO_FINALITY uint64 = 4
 
 	// Default config used for all tests unless a client specific config exists
 	DEFAULT_CONFIG = &Config{
@@ -67,7 +70,7 @@ func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
 	defer testnet.stopTestnet()
 
 	ctx := context.Background()
-	finalized, err := testnet.WaitForFinality(ctx)
+	finalized, err := testnet.WaitForFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+1))
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for finality: %v", err)
 	}
@@ -94,7 +97,7 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	defer testnet.stopTestnet()
 
 	ctx := context.Background()
-	finalized, err := testnet.WaitForFinality(ctx)
+	finalized, err := testnet.WaitForFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+1))
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for finality: %v", err)
 	}
@@ -124,6 +127,169 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 	if err := VerifyELHeads(testnet, ctx); err == nil {
 		t.Fatalf("FAIL: Expected different heads after spoof %v", err)
 	}
+}
+
+// Test `latest`, `safe`, `finalized` block labels on the post-merge testnet.
+func BlockLatestSafeFinalized(t *hivesim.T, env *testEnv, n node) {
+	config := getClientConfig(n).join(&Config{
+		Nodes: []node{
+			n,
+			n,
+		},
+	})
+
+	testnet := startTestnet(t, env, config)
+	defer testnet.stopTestnet()
+
+	ctx := context.Background()
+	_, err := testnet.WaitForFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+1))
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for finality: %v", err)
+	}
+	if err := VerifyELBlockLabels(testnet, ctx); err != nil {
+		t.Fatalf("FAIL: Verifying EL block labels: %v", err)
+	}
+}
+
+// Generate a testnet where the transition payload contains an unknown PoW parent.
+// Verify that the testnet can finalize after this.
+func UnknownPoWParent(t *hivesim.T, env *testEnv, n node) {
+	config := getClientConfig(n).join(&Config{
+		Nodes: Nodes{
+			n,
+			n,
+			n,
+		},
+	})
+	testnet := startTestnet(t, env, config)
+	defer testnet.stopTestnet()
+
+	var (
+		getPayloadLock     sync.Mutex
+		getPayloadCount    int
+		invalidPayloadHash common.Hash
+		/*
+			invalidPayloadNewParent common.Hash
+			invalidPayloadOldParent common.Hash
+		*/
+		invalidPayloadNodeID int
+	)
+
+	// The EL mock will intercept an engine_getPayloadV1 call and set a random parent block in the response
+	getPayloadCallbackGen := func(node int) func([]byte, []byte) *proxy.Spoof {
+		return func(res []byte, req []byte) *proxy.Spoof {
+			getPayloadLock.Lock()
+			defer getPayloadLock.Unlock()
+			getPayloadCount++
+			// Invalidate the transition payload
+			if getPayloadCount == 1 {
+				var (
+					payload ExecutableDataV1
+					spoof   *proxy.Spoof
+					err     error
+				)
+				err = UnmarshalFromJsonRPCResponse(res, &payload)
+				if err != nil {
+					panic(err)
+				}
+				t.Logf("INFO (%v): Generating payload with unknown PoW parent: %s", t.TestID, res)
+				invalidPayloadHash, spoof, err = generateInvalidPayloadSpoof(EngineGetPayloadV1, &payload, InvalidParentHash)
+				if err != nil {
+					panic(err)
+				}
+				t.Logf("INFO (%v): Invalidated payload hash: %v", t.TestID, invalidPayloadHash)
+				invalidPayloadNodeID = node
+				return spoof
+			}
+			return nil
+		}
+	}
+	// The EL mock will intercept an engine_newPayloadV1 on the node that generated the invalid hash in order to validate it and broadcast it.
+	newPayloadCallbackGen := func(node int) func([]byte, []byte) *proxy.Spoof {
+		return func(res []byte, req []byte) *proxy.Spoof {
+			var (
+				payload ExecutableDataV1
+				spoof   *proxy.Spoof
+				err     error
+			)
+			err = UnmarshalFromJsonRPCRequest(req, &payload)
+			if err != nil {
+				panic(err)
+			}
+
+			// Validate the new payload in the node that produced it
+			if invalidPayloadNodeID == node && payload.BlockHash == invalidPayloadHash {
+				t.Logf("INFO (%v): Validating new payload: %s", t.TestID, payload.BlockHash)
+
+				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &PayloadStatusV1{
+					Status:          Valid,
+					LatestValidHash: &payload.BlockHash,
+					ValidationError: nil,
+				})
+				if err != nil {
+					panic(err)
+				}
+				return spoof
+			}
+			return nil
+		}
+	}
+	// The EL mock will intercept an engine_forkchoiceUpdatedV1 on the node that generated the invalid hash in order to validate it and broadcast it.
+	fcUCallbackGen := func(node int) func([]byte, []byte) *proxy.Spoof {
+		return func(res []byte, req []byte) *proxy.Spoof {
+			var (
+				fcState ForkchoiceStateV1
+				pAttr   PayloadAttributesV1
+				spoof   *proxy.Spoof
+				err     error
+			)
+			err = UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+			if err != nil {
+				panic(err)
+			}
+
+			// Validate the new payload in the node that produced it
+			if invalidPayloadNodeID == node && fcState.HeadBlockHash == invalidPayloadHash {
+				t.Logf("INFO (%v): Validating forkchoiceUpdated: %s", t.TestID, fcState.HeadBlockHash)
+
+				spoof, err = forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, PayloadStatusV1{
+					Status:          Valid,
+					LatestValidHash: &fcState.HeadBlockHash,
+					ValidationError: nil,
+				}, nil)
+				if err != nil {
+					panic(err)
+				}
+				return spoof
+			}
+			return nil
+		}
+	}
+	for n, p := range testnet.proxies {
+		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(n))
+		p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(n))
+		p.AddResponseCallback(EngineForkchoiceUpdatedV1, fcUCallbackGen(n))
+	}
+
+	// Network should recover from this
+	ctx := context.Background()
+	finalized, err := testnet.WaitForFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+1))
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for finality: %v", err)
+	}
+	if err := VerifyParticipation(testnet, ctx, FirstSlotAfterCheckpoint{&finalized}, 0.95); err != nil {
+		t.Fatalf("FAIL: Verifying participation: %v", err)
+	}
+	if err := VerifyExecutionPayloadIsCanonical(testnet, ctx, LastSlotAtCheckpoint{&finalized}); err != nil {
+		t.Fatalf("FAIL: Verifying execution payload is canonical: %v", err)
+	}
+	if err := VerifyProposers(testnet, ctx, LastSlotAtCheckpoint{&finalized}, true); err != nil {
+		t.Fatalf("FAIL: Verifying proposers: %v", err)
+	}
+	if err := VerifyELHeads(testnet, ctx); err != nil {
+		t.Fatalf("FAIL: Verifying EL Heads: %v", err)
+	}
+
 }
 
 // Generates a testnet case where one payload is invalidated in the recipient nodes.
@@ -220,7 +386,7 @@ func InvalidPayloadGen(invalidPayloadNumber int, invalidStatusResponse PayloadSt
 		}
 
 		ctx := context.Background()
-		_, err := testnet.WaitForExecutionPayload(ctx)
+		_, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
 		if err != nil {
 			t.Fatalf("FAIL: Waiting for execution payload: %v", err)
 		}
@@ -290,7 +456,7 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 	}
 
 	ctx := context.Background()
-	_, err := testnet.WaitForExecutionPayload(ctx)
+	_, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
 	}
@@ -405,6 +571,41 @@ func InvalidTimestampPayload(t *hivesim.T, env *testEnv, n node) {
 	}
 }
 
+func IncorrectTTDConfigEL(t *hivesim.T, env *testEnv, n node) {
+	config := getClientConfig(n)
+	elTTD := config.TerminalTotalDifficulty.Int64() - 2
+	config = config.join(&Config{
+		Nodes: Nodes{
+			node{
+				// Add a node with an incorrect TTD to reject the invalid payload
+				ExecutionClient:    n.ExecutionClient,
+				ConsensusClient:    n.ConsensusClient,
+				ExecutionClientTTD: big.NewInt(elTTD),
+			},
+		},
+	})
+
+	testnet := startTestnet(t, env, config)
+	defer testnet.stopTestnet()
+
+	ec := NewEngineClient(t, testnet.eth1[0], big.NewInt(elTTD))
+	if !ec.waitForTTDWithTimeout(setup.CLIQUE_PERIOD_DEFAULT, time.After(time.Duration(setup.CLIQUE_PERIOD_DEFAULT*uint64(elTTD)*2)*time.Second)) {
+		t.Fatalf("FAIL: Bad TTD was never reached by the Execution Client")
+	}
+	// Wait a couple of slots
+	time.Sleep(time.Duration(config.SlotTime.Uint64()*5) * time.Second)
+
+	// Try to get the latest execution payload, must be nil
+	ctx := context.Background()
+	b, err := testnet.GetLatestExecutionBeaconBlock(ctx)
+	if err != nil {
+		t.Fatalf("FAIL: Unable to query for the latest execution payload: %v", err)
+	}
+	if b != nil {
+		t.Fatalf("FAIL: Execution payload was included in the beacon chain with a misconfigured TTD on the EL: %v", b.Message.StateRoot)
+	}
+}
+
 // The produced and broadcasted transition payload has parent with an invalid total difficulty.
 func IncorrectTerminalBlockGen(ttdDelta int64) func(t *hivesim.T, env *testEnv, n node) {
 	return func(t *hivesim.T, env *testEnv, n node) {
@@ -446,7 +647,7 @@ func IncorrectTerminalBlockGen(ttdDelta int64) func(t *hivesim.T, env *testEnv, 
 
 		// Wait for all execution clients with the correct TTD reach the merge
 		ctx := context.Background()
-		transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx)
+		transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
 		if err != nil {
 			t.Fatalf("FAIL: Waiting for execution payload: %v", err)
 		}
@@ -679,7 +880,7 @@ func BaseFeeEncodingCheck(t *hivesim.T, env *testEnv, n node) {
 	defer testnet.stopTestnet()
 
 	ctx := context.Background()
-	transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx)
+	transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
 	}
@@ -755,11 +956,15 @@ func TTDBeforeBellatrix(t *hivesim.T, env *testEnv, n node) {
 	testnet := startTestnet(t, env, config)
 	defer testnet.stopTestnet()
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration((config.MergeForkEpoch.Uint64()+1)*config.SlotTime.Uint64()*32))
-	defer cancel()
-
-	_, err := testnet.WaitForExecutionPayload(ctx)
+	ctx := context.Background()
+	_, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
 	if err != nil {
+		for i, e := range testnet.eth1 {
+			ec := NewEngineClient(t, e, config.TerminalTotalDifficulty)
+			if b, err := ec.Eth.BlockByNumber(ec.Ctx(), nil); err == nil {
+				t.Logf("INFO: Last block on execution client %d: number=%d, hash=%s", i, b.NumberU64(), b.Hash())
+			}
+		}
 		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
 	}
 	if err := VerifyELHeads(testnet, ctx); err != nil {
@@ -781,7 +986,7 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 
 	// First we are going to wait for the transition to happen
 	ctx := context.Background()
-	_, err := testnet.WaitForExecutionPayload(ctx)
+	_, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for execution payload: %v", err)
 	}
@@ -936,5 +1141,266 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 		t.Fail()
 	} else {
 		t.Logf("INFO: Success, none of the hashes were included")
+	}
+}
+
+func OptimisticSyncingWithValidChain(t *hivesim.T, env *testEnv, n node) {
+	var (
+		SafeSlotsToImportOptimistically = 128
+	)
+	config := getClientConfig(n).join(&Config{
+		Nodes: Nodes{
+			node{
+				ExecutionClient: n.ExecutionClient,
+				ConsensusClient: n.ConsensusClient,
+				ValidatorShares: 1,
+			},
+			// Last node will receive invalidated payloads and verify
+			node{
+				ExecutionClient: n.ExecutionClient,
+				ConsensusClient: n.ConsensusClient,
+				ValidatorShares: 0,
+			},
+		},
+		SafeSlotsToImportOptimistically: big.NewInt(int64(SafeSlotsToImportOptimistically)),
+	})
+
+	testnet := startTestnet(t, env, config)
+	defer testnet.stopTestnet()
+
+	// Create two callbacks to always return `SYNCING` until stated otherwise
+	var (
+		StillSyncing = true
+	)
+	newPayloadCallback := func(res, req []byte) *proxy.Spoof {
+		if StillSyncing {
+			s, err := payloadStatusSpoof(EngineNewPayloadV1, &PayloadStatusV1{
+				Status:          Syncing,
+				LatestValidHash: nil,
+				ValidationError: nil,
+			})
+			if err != nil {
+				panic(err)
+			}
+			return s
+		}
+		return nil
+	}
+	fcUCallback := func(res, req []byte) *proxy.Spoof {
+		if StillSyncing {
+			s, err := forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, PayloadStatusV1{
+				Status:          Syncing,
+				LatestValidHash: nil,
+				ValidationError: nil,
+			}, nil)
+			if err != nil {
+				panic(err)
+			}
+			return s
+		}
+		return nil
+	}
+
+	testnet.proxies[len(testnet.proxies)-1].AddResponseCallback(EngineNewPayloadV1, newPayloadCallback)
+	testnet.proxies[len(testnet.proxies)-1].AddResponseCallback(EngineForkchoiceUpdatedV1, fcUCallback)
+
+	ctx := context.Background()
+	transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
+	if err != nil {
+		t.Fatalf("FAIL: Error getting transition payload: %v", err)
+	}
+
+	// Get the beacon block where the transition payload was included
+	b, err := VerifyExecutionPayloadHashInclusionNode(testnet, ctx, LastestSlotByHead{}, testnet.beacons[0], transitionPayloadHash)
+	transitionSlot := b.Message.Slot
+
+	// Compare heads of both nodes until the difference is equal to SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY
+	slotsToVerify := SafeSlotsToImportOptimistically * 2
+	for {
+		select {
+		case <-time.After(time.Duration(config.SlotTime.Uint64()) * time.Second):
+		}
+		var (
+			beaconBuilder    = testnet.beacons[0]
+			beaconImporter   = testnet.beacons[1]
+			builderHeadInfo  eth2api.BeaconBlockHeaderAndInfo
+			importerHeadInfo eth2api.BeaconBlockHeaderAndInfo
+		)
+		if exists, err := beaconapi.BlockHeader(ctx, beaconBuilder.API, eth2api.BlockHead, &builderHeadInfo); err != nil {
+			t.Fatalf("failed to poll head: %v", err)
+		} else if !exists {
+			t.Fatalf("no head block")
+		}
+		if exists, err := beaconapi.BlockHeader(ctx, beaconImporter.API, eth2api.BlockHead, &importerHeadInfo); err != nil {
+			t.Fatalf("failed to poll head: %v", err)
+		} else if !exists {
+			t.Fatalf("no head block")
+		}
+
+		slotDiff := builderHeadInfo.Header.Message.Slot - importerHeadInfo.Header.Message.Slot
+		t.Logf("INFO: Builder head %d/%s, Importer head %d/%s", builderHeadInfo.Header.Message.Slot, shorten(builderHeadInfo.Root.String()), importerHeadInfo.Header.Message.Slot, shorten(importerHeadInfo.Root.String()))
+		if slotDiff == 0 {
+			t.Fatalf("FAIL: Syncing importer node is following head when execution client is syncing")
+		} else if slotDiff < beacon.Slot(SafeSlotsToImportOptimistically) {
+			if importerHeadInfo.Header.Message.Slot > transitionSlot {
+				t.Fatalf("FAIL: Syncing importer node is following builder head when execution client is syncing and below the SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY threshold")
+			}
+		} else if slotDiff > beacon.Slot(SafeSlotsToImportOptimistically) {
+			//t.Fatalf("FAIL: Syncing importer node fell behind the SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY threshold (builder=%d, importer=%d", builderHeadInfo.Header.Message.Slot, importerHeadInfo.Header.Message.Slot)
+		}
+
+		slotsToVerify--
+		if slotsToVerify == 0 {
+			break
+		}
+	}
+	StillSyncing = false
+}
+
+func SyncingWithChainHavingValidTransitionBlock(t *hivesim.T, env *testEnv, n node) {
+	var (
+		safeSlotsToImportOptimistically = big.NewInt(16)
+		safeSlotsImportThreshold        = uint64(4)
+	)
+
+	config := getClientConfig(n).join(&Config{
+		Nodes: Nodes{
+			node{
+				ExecutionClient: n.ExecutionClient,
+				ConsensusClient: n.ConsensusClient,
+				ValidatorShares: 1,
+				ChainGenerator: PoWChainGenerator{
+					BlockCount: 1,
+					Config:     PoWChainGeneratorDefaults,
+				},
+			},
+			// Last node will receive invalidated payloads and verify
+			node{
+				ExecutionClient: n.ExecutionClient,
+				ConsensusClient: n.ConsensusClient,
+				ValidatorShares: 0,
+				ChainGenerator: PoWChainGenerator{
+					BlockCount: 1,
+					Config:     PoWChainGeneratorDefaults,
+				},
+			},
+		},
+		Eth1Consensus: setup.Eth1EthashConsensus{
+			MiningNodes: 2,
+		},
+		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
+	})
+
+	testnet := startTestnet(t, env, config)
+	defer testnet.stopTestnet()
+
+	ctx := context.Background()
+	// Wait until the builder creates the first block with an execution payload
+	_, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for execution payload on builder: %v", err)
+	}
+	builderExecutionBlock, err := testnet.GetFirstExecutionBeaconBlock(ctx)
+	if err != nil || builderExecutionBlock == nil {
+		t.Fatalf("FAIL: Could not find first execution block")
+	}
+	t.Logf("Builder Execution block found on slot %d", builderExecutionBlock.Message.Slot)
+
+	// Wait for the importer to get an execution payload
+	testnet.removeNodeAsVerifier(0)
+	_, err = testnet.WaitForExecutionPayload(ctx, beacon.Slot(safeSlotsToImportOptimistically.Uint64()+safeSlotsImportThreshold))
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for execution payload on importer: %v", err)
+	}
+
+	// Check the time at which the importer finally imported the block
+	importerSlot := testnet.spec.TimeToSlot(beacon.Timestamp(time.Now().Unix()), testnet.genesisTime)
+
+	// Delta bewteen the first built execution block and the time when the importer
+	// finally imports the block must be at least SafeSlotsToImportOptimistically
+	diff := importerSlot - builderExecutionBlock.Message.Slot
+	if diff < beacon.Slot(safeSlotsToImportOptimistically.Uint64()) || diff > beacon.Slot(safeSlotsToImportOptimistically.Uint64()+safeSlotsImportThreshold) {
+		t.Fatalf("FAIL: Execution block imported outside of slot range: SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY=%d, ImporterSlot=%d, BuilderSlot=%d, Diff=%d", safeSlotsToImportOptimistically.Uint64(), importerSlot, builderExecutionBlock.Message.Slot, diff)
+	}
+
+	// Wait for the importer to fully sync and then verify heads
+	time.Sleep(time.Duration(config.SlotTime.Uint64()) * time.Second)
+	if err := VerifyELHeads(testnet, ctx); err != nil {
+		t.Fatalf("FAIL: Verifying EL Heads: %v", err)
+	}
+}
+
+func SyncingWithChainHavingInvalidTransitionBlock(t *hivesim.T, env *testEnv, n node) {
+	var (
+		safeSlotsToImportOptimistically = big.NewInt(16)
+		safeSlotsImportThreshold        = uint64(4)
+	)
+
+	config := getClientConfig(n).join(&Config{
+		Nodes: Nodes{
+			node{
+				ExecutionClient: n.ExecutionClient,
+				ConsensusClient: n.ConsensusClient,
+				ValidatorShares: 1,
+				ChainGenerator: PoWChainGenerator{
+					BlockCount: 1,
+					Config:     PoWChainGeneratorDefaults,
+				},
+			},
+			// Last node will receive invalidated payloads and verify
+			node{
+				ExecutionClient: n.ExecutionClient,
+				ConsensusClient: n.ConsensusClient,
+				ValidatorShares: 0,
+				ChainGenerator: PoWChainGenerator{
+					BlockCount: 1,
+					Config:     PoWChainGeneratorDefaults,
+				},
+			},
+		},
+		Eth1Consensus: setup.Eth1EthashConsensus{
+			MiningNodes: 2,
+		},
+		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
+	})
+
+	testnet := startTestnet(t, env, config)
+	defer testnet.stopTestnet()
+
+	ctx := context.Background()
+	// Wait until the builder creates the first block with an execution payload
+	_, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for execution payload on builder: %v", err)
+	}
+	builderExecutionBlock, err := testnet.GetFirstExecutionBeaconBlock(ctx)
+	if err != nil || builderExecutionBlock == nil {
+		t.Fatalf("FAIL: Could not find first execution block")
+	}
+	transitionPayloadHash := common.BytesToHash(builderExecutionBlock.Message.Body.ExecutionPayload.BlockHash[:])
+	t.Logf("Builder Execution block found on slot %d, hash=%s", builderExecutionBlock.Message.Slot, transitionPayloadHash)
+
+	// The importer's execution client will invalidate the payload
+	callbackCalled := make(chan interface{})
+	testnet.proxies[len(testnet.proxies)-1].AddResponseCallback(EngineForkchoiceUpdatedV1, InvalidateExecutionPayloadByHash(EngineForkchoiceUpdatedV1, transitionPayloadHash, callbackCalled))
+
+	// Wait here until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` slots have passed
+	select {
+	case <-callbackCalled:
+	case <-time.After(time.Duration((safeSlotsToImportOptimistically.Uint64()+safeSlotsImportThreshold)*uint64(testnet.spec.SECONDS_PER_SLOT)) * time.Second):
+		t.Fatalf("FAIL: Test timeout waiting for importer to optimistically sync the invalid payload")
+	}
+
+	// Query the beacon chain head of the importer node, it should still
+	// point to a pre-merge block.
+	var headInfo eth2api.BeaconBlockHeaderAndInfo
+	if exists, err := beaconapi.BlockHeader(ctx, testnet.beacons[len(testnet.beacons)-1].API, eth2api.BlockHead, &headInfo); err != nil {
+		t.Fatalf("FAIL: Failed to poll head importer head: %v", err)
+	} else if !exists {
+		t.Fatalf("FAIL: Failed to poll head importer head: !exists")
+	}
+
+	if headInfo.Header.Message.Slot != (builderExecutionBlock.Message.Slot - 1) {
+		t.Fatalf("FAIL: Importer head is beyond the invalid execution payload block: importer=%v:%d, builder=%v:%d", headInfo.Root, headInfo.Header.Message.Slot, builderExecutionBlock.Message.StateRoot, builderExecutionBlock.Message.Slot)
 	}
 }
