@@ -684,7 +684,6 @@ func combine(a, b *proxy.Spoof) *proxy.Spoof {
 // This function is used to calculate timeouts, so it will always return a pessimistic value.
 func SlotsUntilMerge(t *Testnet, c *Config) beacon.Slot {
 	l := make([]beacon.Slot, 0)
-	// TODO: Simply return zero to allow unlimited time
 	l = append(l, SlotsUntilBellatrix(t.genesisTime, t.spec))
 
 	for i, e := range t.eth1 {
@@ -714,6 +713,7 @@ func SlotsUntilBellatrix(genesisTime beacon.Timestamp, spec *beacon.Spec) beacon
 	if currentTimestamp >= bellatrixTime {
 		return beacon.Slot(0)
 	}
+	fmt.Printf("INFO: bellatrixTime:%d, currentTimestamp:%d\n", bellatrixTime, currentTimestamp)
 	return beacon.Slot((bellatrixTime-currentTimestamp)/spec.SECONDS_PER_SLOT) + 1
 }
 
@@ -738,6 +738,7 @@ func TimeUntilTerminalBlock(e *Eth1Node, c setup.Eth1Consensus, defaultTTD *big.
 		// TTD already reached
 		return 0
 	}
+	fmt.Printf("INFO: ttd:%d, td:%d, diffPerBlock:%d, secondsPerBlock:%d\n", ttd, td, c.DifficultyPerBlock(), c.SecondsPerBlock())
 	td.Sub(ttd, td).Div(td, c.DifficultyPerBlock()).Mul(td, big.NewInt(int64(c.SecondsPerBlock())))
 	return td.Uint64()
 }

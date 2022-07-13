@@ -141,6 +141,9 @@ func (c Eth1CliqueConsensus) DifficultyPerBlock() *big.Int {
 }
 
 func (c Eth1CliqueConsensus) SecondsPerBlock() uint64 {
+	if c.CliquePeriod == 0 {
+		return CLIQUE_PERIOD_DEFAULT
+	}
 	return c.CliquePeriod
 }
 
