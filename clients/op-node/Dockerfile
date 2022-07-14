@@ -1,8 +1,10 @@
+ARG branch=develop
+
 FROM golang:1.18.0-alpine3.15 as builder
 
 RUN apk add --no-cache make gcc musl-dev linux-headers git jq bash
 
-RUN git clone https://github.com/ethereum-optimism/optimism /app
+RUN git clone -b $branch https://github.com/ethereum-optimism/optimism /app
 
 WORKDIR /app/op-node
 RUN make op-node

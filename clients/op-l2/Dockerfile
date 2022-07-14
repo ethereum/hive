@@ -1,9 +1,11 @@
+ARG branch=optimism-prototype
+
 # Build Geth in a stock Go builder container
 FROM golang:1.18-alpine as builder
 
 RUN apk add --no-cache gcc musl-dev linux-headers git
 
-RUN git clone https://github.com/ethereum-optimism/reference-optimistic-geth /go-ethereum
+RUN git clone -b $branch https://github.com/ethereum-optimism/reference-optimistic-geth /go-ethereum
 
 RUN cd /go-ethereum && go run build/ci.go install ./cmd/geth
 
