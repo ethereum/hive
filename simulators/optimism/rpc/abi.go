@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum-optimism/hive/simulators/optimism/devnet/testcontract"
+	"github.com/ethereum-optimism/hive/simulators/optimism/rpc/testcontract"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
