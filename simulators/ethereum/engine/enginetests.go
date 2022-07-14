@@ -1201,7 +1201,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 					p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 						HeadBlockHash:      altChainPayloads[i].BlockHash,
 						SafeBlockHash:      altChainPayloads[i].BlockHash,
-						FinalizedBlockHash: altChainPayloads[i].BlockHash,
+						FinalizedBlockHash: common.Hash{},
 					}, nil)
 					if i == invalid_index {
 						// If this is the first payload after the common ancestor, and this is the payload we invalidated,
