@@ -16,6 +16,11 @@ mkdir -p /data/testnet_setup
 cp /hive/input/genesis.ssz /data/testnet_setup/genesis.ssz
 cp /hive/input/config.yaml /data/testnet_setup
 
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    sed -i '/TERMINAL_TOTAL_DIFFICULTY/d' /data/testnet_setup/config.yaml
+    echo "TERMINAL_TOTAL_DIFFICULTY: $HIVE_TERMINAL_TOTAL_DIFFICULTY" >> /data/testnet_setup/config.yaml
+fi
+
 # empty bootnodes file, required for custom testnet setup, use CLI arg instead to configure it.
 echo "[]" > /data/testnet_setup/boot_enr.yaml
 

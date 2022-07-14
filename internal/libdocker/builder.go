@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Builder takes care of building docker images.
@@ -68,11 +69,100 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 	return tag, err
 }
 
+// BuildImage creates a container by archiving the given file system,
+// which must contain a file called "Dockerfile".
+func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error {
+	nocache := false
+	if b.config.NoCachePattern != nil {
+		nocache = b.config.NoCachePattern.MatchString(name)
+	}
+
+	pipeR, pipeW := io.Pipe()
+	go b.archiveFS(ctx, pipeW, fsys)
+
+	opts := docker.BuildImageOptions{
+		Context:      ctx,
+		Name:         name,
+		InputStream:  pipeR,
+		OutputStream: ioutil.Discard,
+		NoCache:      nocache,
+		Pull:         b.config.PullEnabled,
+	}
+	if b.config.BuildOutput != nil {
+		opts.OutputStream = b.config.BuildOutput
+	}
+	b.logger.Info("building image", "image", name, "nocache", nocache, "pull", b.config.PullEnabled)
+	if err := b.client.BuildImage(opts); err != nil {
+		b.logger.Error("image build failed", "image", name, "err", err)
+		return err
+	}
+	return nil
+}
+
+func (b *Builder) archiveFS(ctx context.Context, out io.WriteCloser, fsys fs.FS) error {
+	defer out.Close()
+
+	w := tar.NewWriter(out)
+	err := fs.WalkDir(fsys, ".", func(path string, e fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if ctx.Err() != nil {
+			return err
+		}
+
+		// Write header.
+		if e.Type()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("%s: symlinks are not supported in BuildImage", path)
+		}
+		info, err := e.Info()
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		hdr, err := tar.FileInfoHeader(info, "")
+		if err != nil {
+			return fmt.Errorf("%s: %w", path, err)
+		}
+		hdr.Name = path
+		if err := w.WriteHeader(hdr); err != nil {
+			return err
+		}
+
+		// Write file content.
+		if e.Type().IsRegular() {
+			file, err := fsys.Open(path)
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(w, file); err != nil {
+				file.Close()
+				return err
+			}
+			file.Close()
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	// TODO: errors
+	w.Flush()
+	w.Close()
+	return nil
+}
+
 // ReadFile returns the content of a file in the given image. To do so, it creates a
 // temporary container, downloads the file from it and destroys the container.
-func (b *Builder) ReadFile(image, path string) ([]byte, error) {
+func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, error) {
 	// Create the temporary container and ensure it's cleaned up.
-	cont, err := b.client.CreateContainer(docker.CreateContainerOptions{Config: &docker.Config{Image: image}})
+	opt := docker.CreateContainerOptions{
+		Context: ctx,
+		Config:  &docker.Config{Image: image},
+	}
+	cont, err := b.client.CreateContainer(opt)
 	if err != nil {
 		return nil, err
 	}
@@ -84,10 +174,12 @@ func (b *Builder) ReadFile(image, path string) ([]byte, error) {
 
 	// Download a tarball of the file from the container.
 	download := new(bytes.Buffer)
-	if err := b.client.DownloadFromContainer(cont.ID, docker.DownloadFromContainerOptions{
+	dlopt := docker.DownloadFromContainerOptions{
 		Path:         path,
 		OutputStream: download,
-	}); err != nil {
+		Context:      ctx,
+	}
+	if err := b.client.DownloadFromContainer(cont.ID, dlopt); err != nil {
 		return nil, err
 	}
 	in := tar.NewReader(download)

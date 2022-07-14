@@ -81,10 +81,13 @@ if [ "$HIVE_NODETYPE" == "archive" ]; then
     FLAGS="$FLAGS --syncmode full --gcmode archive"
 fi
 if [ "$HIVE_NODETYPE" == "full" ]; then
-    FLAGS="$FLAGS --syncmode snap"
+    FLAGS="$FLAGS --syncmode full"
 fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
     FLAGS="$FLAGS --syncmode light"
+fi
+if [ "$HIVE_NODETYPE" == "" ]; then
+    FLAGS="$FLAGS --syncmode full"
 fi
 
 # Configure the chain.

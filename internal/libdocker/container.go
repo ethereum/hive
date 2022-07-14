@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/hive/hiveproxy"
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
@@ -23,6 +24,8 @@ type ContainerBackend struct {
 	client *docker.Client
 	config *Config
 	logger log15.Logger
+
+	proxy *hiveproxy.Proxy
 }
 
 func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
@@ -33,6 +36,7 @@ func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
 	return b
 }
 
+// RunProgram runs a /hive-bin script in a container.
 func (b *ContainerBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
 	exec, err := b.client.CreateExec(docker.CreateExecOptions{
 		Context:      ctx,
@@ -74,13 +78,28 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	for key, val := range opt.Env {
 		vars = append(vars, key+"="+val)
 	}
-	c, err := b.client.CreateContainer(docker.CreateContainerOptions{
+	createOpts := docker.CreateContainerOptions{
 		Context: ctx,
 		Config: &docker.Config{
 			Image: imageName,
 			Env:   vars,
 		},
-	})
+	}
+
+	if opt.Input != nil {
+		// Pre-announce that stdin will be attached. The stdin attachment
+		// will fail silently if this is not set.
+		createOpts.Config.AttachStdin = true
+		createOpts.Config.StdinOnce = true
+		createOpts.Config.OpenStdin = true
+	}
+	if opt.Output != nil {
+		// Pre-announce that stdout will be attached. Not sure if this does anything,
+		// but it's probably best to give Docker the info as early as possible.
+		createOpts.Config.AttachStdout = true
+	}
+
+	c, err := b.client.CreateContainer(createOpts)
 	if err != nil {
 		return "", err
 	}
@@ -98,12 +117,16 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 
 // StartContainer starts a docker container.
 func (b *ContainerBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+	if opt.CheckLive != 0 && b.proxy == nil {
+		panic("attempt to start container with CheckLive, but proxy is not running")
+	}
+
 	info := &libhive.ContainerInfo{ID: containerID[:8], LogFile: opt.LogFile}
 	logger := b.logger.New("container", info.ID)
 
 	// Run the container.
 	var startTime = time.Now()
-	waiter, err := b.runContainer(ctx, logger, containerID, info.LogFile)
+	waiter, err := b.runContainer(ctx, logger, containerID, opt)
 	if err != nil {
 		b.DeleteContainer(containerID)
 		return nil, fmt.Errorf("container did not start: %v", err)
@@ -115,8 +138,9 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	go func() {
 		defer close(containerExit)
 		err := waiter.Wait()
-		waiter.Close()
 		logger.Debug("container exited", "err", err)
+		err = waiter.Close()
+		logger.Debug("container files closed", "err", err)
 	}()
 	// Set up the wait function.
 	info.Wait = func() { <-containerExit }
@@ -139,8 +163,13 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	if opt.CheckLive != 0 {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		addr := fmt.Sprintf("%s:%d", info.IP, opt.CheckLive)
-		go checkPort(ctx, logger, addr, hasStarted)
+		addr := &net.TCPAddr{IP: net.ParseIP(info.IP), Port: int(opt.CheckLive)}
+		go func() {
+			err := b.proxy.CheckLive(ctx, addr)
+			if err == nil {
+				close(hasStarted)
+			}
+		}()
 	} else {
 		close(hasStarted)
 	}
@@ -161,33 +190,6 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 		info.Wait = nil
 	}
 	return info, checkErr
-}
-
-// checkPort waits for the given TCP address to accept a connection.
-func checkPort(ctx context.Context, logger log15.Logger, addr string, notify chan<- struct{}) {
-	var (
-		lastMsg time.Time
-		ticker  = time.NewTicker(100 * time.Millisecond)
-	)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if time.Since(lastMsg) >= time.Second {
-				logger.Debug("checking container online...")
-				lastMsg = time.Now()
-			}
-			var dialer net.Dialer
-			conn, err := dialer.DialContext(ctx, "tcp", addr)
-			if err == nil {
-				conn.Close()
-				close(notify)
-				return
-			}
-		}
-	}
 }
 
 // DeleteContainer removes the given container. If the container is running, it is stopped.
@@ -328,40 +330,70 @@ func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map
 // runContainer attaches to the output streams of an existing container, then
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
-func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger, id, logfile string) (docker.CloseWaiter, error) {
-	var stream io.Writer
+func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger, id string, opts libhive.ContainerOptions) (docker.CloseWaiter, error) {
+	var (
+		outStream io.Writer
+		errStream io.Writer
+		closer    = newFileCloser(logger)
+	)
 
-	// Redirect container output to logfile.
-	closer := newFileCloser(logger)
-	if logfile != "" {
-		if err := os.MkdirAll(filepath.Dir(logfile), 0755); err != nil {
+	switch {
+	case opts.Output != nil && opts.LogFile != "":
+		return nil, fmt.Errorf("can't use LogFile and Output options at the same time")
+
+	case opts.Output != nil:
+		outStream = opts.Output
+		closer.addFile(opts.Output)
+
+		// If console logging is requested, dump stderr there.
+		if b.config.ContainerOutput != nil {
+			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", id[:8]))
+			closer.addFile(prefixer)
+			errStream = prefixer
+
+			// outStream = io.MultiWriter(outStream, prefixer)
+		}
+
+	case opts.LogFile != "":
+		// Redirect container output to logfile.
+		if err := os.MkdirAll(filepath.Dir(opts.LogFile), 0755); err != nil {
 			return nil, err
 		}
-		log, err := os.OpenFile(logfile, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0644)
+		log, err := os.OpenFile(opts.LogFile, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0644)
 		if err != nil {
 			return nil, err
 		}
 		closer.addFile(log)
-		stream = log
+		outStream = log
 
 		// If console logging was requested, tee the output and tag it with the container id.
 		if b.config.ContainerOutput != nil {
 			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", id[:8]))
 			closer.addFile(prefixer)
-			stream = io.MultiWriter(log, prefixer)
+			outStream = io.MultiWriter(log, prefixer)
 		}
+		// In LogFile mode, stderr is redirected to stdout.
+		errStream = outStream
 	}
 
-	// Attach the output stream.
-	logger.Debug("attaching to container")
+	// Configure the streams and attach.
 	attach := docker.AttachToContainerOptions{Container: id}
-	if stream != nil {
-		attach.OutputStream = stream
-		attach.ErrorStream = stream
+	if outStream != nil {
 		attach.Stream = true
 		attach.Stdout = true
+		attach.OutputStream = outStream
+	}
+	if errStream != nil {
+		attach.ErrorStream = errStream
 		attach.Stderr = true
 	}
+	if opts.Input != nil {
+		attach.InputStream = opts.Input
+		attach.Stdin = true
+		closer.addFile(opts.Input)
+	}
+
+	logger.Debug("attaching to container", "stdin", attach.Stdin, "stdout", attach.Stdout, "stderr", attach.Stderr)
 	waiter, err := b.client.AttachToContainerNonBlocking(attach)
 	if err != nil {
 		closer.closeFiles()

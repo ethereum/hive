@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"net"
 	"os"
 	"strings"
@@ -47,12 +48,15 @@ type PreparedTestnet struct {
 }
 
 // Build all artifacts require to start a testnet.
-func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet {
+func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet {
 	eth1GenesisTime := common.Timestamp(time.Now().Unix())
 	eth2GenesisTime := eth1GenesisTime + 30
 
 	// Generate genesis for execution clients
-	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime), config.Eth1Consensus == Clique)
+	eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime), config.Eth1Consensus)
+	if config.InitialBaseFeePerGas != nil {
+		eth1Genesis.Genesis.BaseFee = config.InitialBaseFeePerGas
+	}
 	eth1ConfigOpt := eth1Genesis.ToParams(depositAddress)
 	eth1Bundle, err := setup.Eth1Bundle(eth1Genesis.Genesis)
 	if err != nil {
@@ -73,17 +77,38 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	spec.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
 	spec.Config.ETH1_FOLLOW_DISTANCE = 1
 
-	spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch)
-	spec.Config.BELLATRIX_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
-	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount
-	spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime)
+	// Alter versions to avoid conflicts with mainnet values
+	spec.Config.GENESIS_FORK_VERSION = common.Version{0x00, 0x00, 0x00, 0x0a}
+	if config.AltairForkEpoch != nil {
+		spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch.Uint64())
+	}
+	spec.Config.ALTAIR_FORK_VERSION = common.Version{0x01, 0x00, 0x00, 0x0a}
+	if config.MergeForkEpoch != nil {
+		spec.Config.BELLATRIX_FORK_EPOCH = common.Epoch(config.MergeForkEpoch.Uint64())
+	}
+	spec.Config.BELLATRIX_FORK_VERSION = common.Version{0x02, 0x00, 0x00, 0x0a}
+	// TODO: Requires https://github.com/protolambda/zrnt/pull/38
+	/*
+		if config.CapellaForkEpoch != nil {
+			spec.Config.CAPELLA_FORK_EPOCH = common.Epoch(config.CapellaForkEpoch.Uint64())
+		}
+		spec.Config.CAPELLA_FORK_VERSION = common.Version{0x03, 0x00, 0x00, 0x0a}
+	*/
+	spec.Config.SHARDING_FORK_VERSION = common.Version{0x04, 0x00, 0x00, 0x0a}
+	if config.ValidatorCount == nil {
+		t.Fatal(fmt.Errorf("ValidatorCount was not configured"))
+	}
+	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount.Uint64()
+	if config.SlotTime != nil {
+		spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime.Uint64())
+	}
 	tdd, _ := uint256.FromBig(config.TerminalTotalDifficulty)
 	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)
 
 	// Generate keys opts for validators
-	keyTranches := setup.KeyTranches(env.Keys, uint64(len(config.Nodes)))
+	keyTranches := setup.KeyTranches(env.Keys, config.Nodes.Shares())
 
-	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount)
+	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount.Uint64())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,20 +176,13 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	}
 }
 
-func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus ConsensusType) {
+func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus setup.Eth1Consensus, ttd *big.Int) {
 	testnet.t.Logf("Starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{p.executionOpts}
 	if len(testnet.eth1) == 0 {
 		// we only make the first eth1 node a miner
-		if consensus == Ethash {
-			opts = append(opts, hivesim.Params{"HIVE_MINER": "1212121212121212121212121212121212121212"})
-		} else if consensus == Clique {
-			opts = append(opts, hivesim.Params{
-				"HIVE_CLIQUE_PRIVATEKEY": "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
-				"HIVE_MINER":             "658bdf435d810c91414ec09147daa6db62406379",
-			})
-		}
+		opts = append(opts, consensus.HiveParams())
 	} else {
 		bootnode, err := testnet.eth1[0].EnodeURL()
 		if err != nil {
@@ -173,6 +191,9 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 
 		// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
 		opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
+	}
+	if ttd != nil {
+		opts = append(opts, hivesim.Params{"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf("%d", ttd.Int64())})
 	}
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}
 	dest, _ := en.EngineRPCAddress()
@@ -188,7 +209,7 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 	testnet.proxies = append(testnet.proxies, NewProxy(net.ParseIP(simIP), PortEngineRPC+len(testnet.eth1), dest, secret))
 }
 
-func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.ClientDefinition, eth1Endpoints []int) {
+func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.ClientDefinition, ttd *big.Int, eth1Endpoints []int) {
 	testnet.t.Logf("Starting beacon node: %s (%s)", beaconDef.Name, beaconDef.Version)
 
 	opts := []hivesim.StartOption{p.beaconOpts}
@@ -220,11 +241,15 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 	})
 
 	if len(testnet.beacons) > 0 {
-		bootnodeENR, err := testnet.beacons[0].ENR()
+		bootnodeENRs, err := testnet.beacons.ENRs()
 		if err != nil {
-			testnet.t.Fatalf("failed to get ENR as bootnode for beacon node: %v", err)
+			testnet.t.Fatalf("failed to get ENR as bootnode for every beacon node: %v", err)
 		}
-		opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENR})
+		opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENRs})
+	}
+
+	if ttd != nil {
+		opts = append(opts, hivesim.Params{"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf("%d", ttd)})
 	}
 
 	// TODO
@@ -236,6 +261,11 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 }
 
 func (p *PreparedTestnet) startValidatorClient(testnet *Testnet, validatorDef *hivesim.ClientDefinition, bnIndex int, keyIndex int) {
+	if len(p.keyTranches[keyIndex]) == 0 {
+		testnet.validators = append(testnet.validators, &ValidatorClient{nil, make([]*setup.KeyDetails, 0)})
+		testnet.t.Logf("Skipping validator %d because it has 0 validator keys", keyIndex)
+		return
+	}
 	testnet.t.Logf("Starting validator client: %s (%s)", validatorDef.Name, validatorDef.Version)
 
 	if bnIndex >= len(testnet.beacons) {

@@ -5,13 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -24,7 +20,7 @@ func main() {
 	var (
 		testResultsRoot       = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
 		loglevelFlag          = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
-		dockerEndpoint        = flag.String("docker.endpoint", "unix:///var/run/docker.sock", "Endpoint of the local Docker daemon.")
+		dockerEndpoint        = flag.String("docker.endpoint", "", "Endpoint of the local Docker daemon.")
 		dockerNoCache         = flag.String("docker.nocache", "", "Regular `expression` selecting the docker images to forcibly rebuild.")
 		dockerPull            = flag.Bool("docker.pull", false, "Refresh base images when building images.")
 		dockerOutput          = flag.Bool("docker.output", false, "Relay all docker output to stderr.")
@@ -68,6 +64,10 @@ func main() {
 	if *simPattern != "" && len(simList) == 0 {
 		fatal("no simulators for pattern", *simPattern)
 	}
+	if *simPattern != "" && *simDevMode {
+		log15.Warn("--sim is ignored when using --dev mode")
+		simList = nil
+	}
 
 	// Create the docker backends.
 	dockerConfig := &libdocker.Config{
@@ -85,7 +85,7 @@ func main() {
 		dockerConfig.ContainerOutput = os.Stderr
 		dockerConfig.BuildOutput = os.Stderr
 	}
-	builder, containerBackend, err := libdocker.Connect(*dockerEndpoint, dockerConfig)
+	builder, cb, err := libdocker.Connect(*dockerEndpoint, dockerConfig)
 	if err != nil {
 		fatal(err)
 	}
@@ -100,263 +100,42 @@ func main() {
 	}()
 
 	// Run.
-	runner := simRunner{
-		inv:       inv,
-		builder:   builder,
-		container: containerBackend,
-		env: libhive.SimEnv{
-			LogDir:             *testResultsRoot,
-			SimLogLevel:        *simLogLevel,
-			SimTestPattern:     *simTestPattern,
-			SimParallelism:     *simParallelism,
-			ClientStartTimeout: *clientTimeout,
-		},
-		SimDurationLimit: *simTimeLimit,
+	env := libhive.SimEnv{
+		LogDir:             *testResultsRoot,
+		SimLogLevel:        *simLogLevel,
+		SimTestPattern:     *simTestPattern,
+		SimParallelism:     *simParallelism,
+		SimDurationLimit:   *simTimeLimit,
+		ClientStartTimeout: *clientTimeout,
 	}
+	runner := libhive.NewRunner(inv, builder, cb)
 	clientList := splitAndTrim(*clients, ",")
-	if err := runner.initClients(ctx, clientList); err != nil {
+
+	if err := runner.Build(ctx, clientList, simList); err != nil {
 		fatal(err)
 	}
 
 	if *simDevMode {
-		log15.Info("running in simulator development mode")
-		runner.runSimulatorAPIDevMode(ctx, *simDevModeAPIEndpoint)
-	} else if len(simList) > 0 {
-		if err := runner.initSimulators(ctx, simList); err != nil {
+		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint)
+		return
+	}
+
+	var failCount int
+	for _, sim := range simList {
+		result, err := runner.Run(ctx, sim, env)
+		if err != nil {
 			fatal(err)
 		}
-		if err := runner.runSimulations(ctx, simList); err != nil {
-			fatal(err)
-		}
-	}
-}
-
-type simRunner struct {
-	inv       libhive.Inventory
-	container libhive.ContainerBackend
-	builder   libhive.Builder
-	env       libhive.SimEnv
-
-	// This holds the image names of all built simulators.
-	simImages map[string]string
-
-	// This is the time limit for a single simulation run.
-	SimDurationLimit time.Duration
-}
-
-// initClients builds client images.
-func (r *simRunner) initClients(ctx context.Context, clientList []string) error {
-	r.env.Definitions = make(map[string]*libhive.ClientDefinition)
-
-	if len(clientList) == 0 {
-		return errors.New("client list is empty, cannot simulate")
+		failCount += result.TestsFailed
+		log15.Info(fmt.Sprintf("simulation %s finished", sim), "suites", result.Suites, "tests", result.Tests, "failed", result.TestsFailed)
 	}
 
-	var anyBuilt bool
-	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
-	for _, client := range clientList {
-		if !r.inv.HasClient(client) {
-			return fmt.Errorf("unknown client %q", client)
-		}
-		meta, err := r.builder.ReadClientMetadata(client)
-		if err != nil {
-			return err
-		}
-		image, err := r.builder.BuildClientImage(ctx, client)
-		if err != nil {
-			continue
-		}
-		anyBuilt = true
-		version, err := r.builder.ReadFile(image, "/version.txt")
-		if err != nil {
-			log15.Warn("can't read version info of "+client, "image", image, "err", err)
-		}
-		r.env.Definitions[client] = &libhive.ClientDefinition{
-			Name:    client,
-			Version: strings.TrimSpace(string(version)),
-			Image:   image,
-			Meta:    *meta,
-		}
-	}
-	if !anyBuilt {
-		return errors.New("all clients failed to build")
-	}
-	return nil
-}
-
-// initSimulators builds simulator images.
-func (r *simRunner) initSimulators(ctx context.Context, simList []string) error {
-	r.simImages = make(map[string]string)
-
-	log15.Info(fmt.Sprintf("building %d simulators...", len(simList)))
-	for _, sim := range simList {
-		image, err := r.builder.BuildSimulatorImage(ctx, sim)
-		if err != nil {
-			return err
-		}
-		r.simImages[sim] = image
-	}
-	return nil
-}
-
-func (r *simRunner) runSimulations(ctx context.Context, simList []string) error {
-	log15.Info("creating output directory", "folder", r.env.LogDir)
-	if err := os.MkdirAll(r.env.LogDir, 0755); err != nil {
-		log15.Crit("failed to create logs folder", "err", err)
-		return err
-	}
-
-	for _, sim := range simList {
-		if err := r.run(ctx, sim); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (r *simRunner) runSimulatorAPIDevMode(ctx context.Context, endpoint string) error {
-	tm := libhive.NewTestManager(r.env, r.container, -1)
-	defer func() {
-		if err := tm.Terminate(); err != nil {
-			log15.Error("could not terminate test manager", "error", err)
-		}
-	}()
-
-	addr, err := net.ResolveTCPAddr("tcp4", endpoint)
-	if err != nil {
-		log15.Error(fmt.Sprintf("failed to resolve %s", endpoint), "err", err)
-		return err
-	}
-
-	listener, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		log15.Error(fmt.Sprintf("failed to start TCP server on %s", addr), "err", err)
-		return err
-	}
-
-	log15.Info(fmt.Sprintf("simulator API listening at %s", addr))
-	server := &http.Server{Handler: tm.API()}
-	defer shutdownServer(server)
-
-	go server.Serve(listener)
-
-	// wait for interrupt
-	<-ctx.Done()
-	return nil
-}
-
-// run runs one simulation.
-func (r *simRunner) run(ctx context.Context, sim string) error {
-	log15.Info(fmt.Sprintf("running simulation: %s", sim))
-
-	// Start the simulation API.
-	tm := libhive.NewTestManager(r.env, r.container, -1)
-	defer func() {
-		if err := tm.Terminate(); err != nil {
-			log15.Error("could not terminate test manager", "error", err)
-		}
-	}()
-	addr, server, err := startTestSuiteAPI(tm)
-	if err != nil {
-		log15.Error("failed to start simulator API", "error", err)
-		return err
-	}
-	defer shutdownServer(server)
-
-	// Create the simulator container.
-	opts := libhive.ContainerOptions{
-		Env: map[string]string{
-			"HIVE_SIMULATOR":    "http://" + addr.String(),
-			"HIVE_PARALLELISM":  strconv.Itoa(r.env.SimParallelism),
-			"HIVE_LOGLEVEL":     strconv.Itoa(r.env.SimLogLevel),
-			"HIVE_TEST_PATTERN": r.env.SimTestPattern,
-		},
-	}
-	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
-	if err != nil {
-		return err
-	}
-
-	// Set the log file, and notify TestManager about the container.
-	logbasename := fmt.Sprintf("%d-simulator-%s.log", time.Now().Unix(), containerID)
-	opts.LogFile = filepath.Join(r.env.LogDir, logbasename)
-	tm.SetSimContainerInfo(containerID, logbasename)
-
-	log15.Debug("starting simulator container")
-	sc, err := r.container.StartContainer(ctx, containerID, opts)
-	if err != nil {
-		return err
-	}
-	slogger := log15.New("sim", sim, "container", sc.ID[:8])
-	slogger.Debug("started simulator container")
-	defer func() {
-		slogger.Debug("deleting simulator container")
-		r.container.DeleteContainer(sc.ID)
-	}()
-
-	// Wait for simulator exit.
-	done := make(chan struct{})
-	go func() {
-		sc.Wait()
-		close(done)
-	}()
-
-	// if we have a simulation time limit, apply it.
-	var timeout <-chan time.Time
-	if r.SimDurationLimit != 0 {
-		tt := time.NewTimer(r.SimDurationLimit)
-		defer tt.Stop()
-		timeout = tt.C
-	}
-
-	// Wait for simulation to end.
-	select {
-	case <-done:
-	case <-timeout:
-		slogger.Info("simulation timed out")
-	case <-ctx.Done():
-		slogger.Info("interrupted, shutting down")
-		return errors.New("simulation interrupted")
-	}
-	return nil
-}
-
-// startTestSuiteAPI starts an HTTP webserver listening for simulator commands
-// on the docker bridge and executing them until it is torn down.
-func startTestSuiteAPI(tm *libhive.TestManager) (net.Addr, *http.Server, error) {
-	// Find the IP address of the host container
-	bridge, err := libdocker.LookupBridgeIP(log15.Root())
-	if err != nil {
-		log15.Error("failed to lookup bridge IP", "error", err)
-		return nil, nil, err
-	}
-	log15.Debug("docker bridge IP found", "ip", bridge)
-
-	// Serve connections until the listener is terminated
-	log15.Debug("starting simulator API server")
-
-	// Start the API webserver for simulators to coordinate with
-	addr, _ := net.ResolveTCPAddr("tcp4", fmt.Sprintf("%s:0", bridge))
-	listener, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		log15.Error("failed to listen on bridge adapter", "err", err)
-		return nil, nil, err
-	}
-	laddr := listener.Addr()
-	log15.Debug("listening for simulator commands", "addr", laddr)
-	server := &http.Server{Handler: tm.API()}
-
-	go server.Serve(listener)
-	return laddr, server, nil
-}
-
-// shutdownServer gracefully terminates the HTTP server.
-func shutdownServer(server *http.Server) {
-	log15.Debug("terminating simulator server")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	if err := server.Shutdown(ctx); err != nil {
-		log15.Debug("simulation API server shutdown failed", "err", err)
+	switch failCount {
+	case 0:
+	case 1:
+		fatal(errors.New("1 test failed"))
+	default:
+		fatal(fmt.Errorf("%d tests failed", failCount))
 	}
 }
 
