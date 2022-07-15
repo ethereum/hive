@@ -372,8 +372,8 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 	runFunc := func(t *TestEnv) {
 		// The first client waits for TTD, which ideally should be reached immediately using loaded chain
 		if !mergeTestSpec.SkipMainClientTTDWait {
-			if !t.Engine.waitForTTDWithTimeout(t.Timeout) {
-				t.Fatalf("FAIL (%s): Timeout waiting for EngineClient (%s) to reach TTD", t.TestName, t.Engine.Container)
+			if err := t.Engine.waitForTTDWithTimeout(t.Timeout); err != nil {
+				t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, t.Engine.Container, err)
 			}
 
 			if !mergeTestSpec.SkipMainClientFcU {
@@ -411,8 +411,8 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 			t.CLMock.AddEngineClient(t.T, secondaryClient.Client, big.NewInt(secondaryClientSpec.TTD))
 
 			if secondaryClientSpec.BuildPoSChainOnTop {
-				if !secondaryClient.waitForTTDWithTimeout(t.Timeout) {
-					t.Fatalf("FAIL (%s): Timeout waiting for EngineClient (%s) to reach TTD", t.TestName, secondaryClient.Client.Container)
+				if err := secondaryClient.waitForTTDWithTimeout(t.Timeout); err != nil {
+					t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, secondaryClient.Client.Container, err)
 				}
 				t.CLMock.setTTDBlockClient(secondaryClient)
 			}

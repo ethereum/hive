@@ -137,6 +137,10 @@ have reached the Terminal Total Difficulty.`[1:],
 			Parameters:  newParams,
 			Files:       testFiles,
 			Run: func(t *hivesim.T, c *hivesim.Client) {
+				t.Logf("Start test: %s", currentTest.Name)
+				defer func() {
+					t.Logf("End test: %s", currentTest.Name)
+				}()
 				timeout := DefaultTestCaseTimeout
 				// If a TestSpec specifies a timeout, use that instead
 				if currentTest.TimeoutSeconds != 0 {

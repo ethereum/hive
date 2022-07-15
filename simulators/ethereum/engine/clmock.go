@@ -127,7 +127,6 @@ func (cl *CLMocker) setTTDBlockClient(ec *EngineClient) {
 	if td == nil {
 		cl.Fatalf("CLMocker: Returned TotalDifficultyHeader is invalid: %v", td)
 	}
-	cl.Logf("CLMocker: Returned TotalDifficultyHeader: %v", td)
 
 	if td.TotalDifficulty.ToInt().Cmp(ec.TerminalTotalDifficulty) < 0 {
 		cl.Fatalf("CLMocker: Attempted to set TTD Block when TTD had not been reached: %v > %v", ec.TerminalTotalDifficulty, td.TotalDifficulty.ToInt())
@@ -173,9 +172,9 @@ func (cl *CLMocker) setTTDBlockClient(ec *EngineClient) {
 // This method waits for TTD in at least one of the clients, then sends the
 // initial forkchoiceUpdated with the info obtained from the client.
 func (cl *CLMocker) waitForTTD() {
-	ec := cl.EngineClients.waitForTTD(cl.Timeout)
-	if ec == nil {
-		cl.Fatalf("CLMocker: Timeout while waiting for TTD")
+	ec, err := cl.EngineClients.waitForTTD(cl.Timeout)
+	if ec == nil || err != nil {
+		cl.Fatalf("CLMocker: Error while waiting for TTD: %v", err)
 	}
 	// One of the clients has reached TTD, send the initial fcU with this client as head
 	cl.setTTDBlockClient(ec)

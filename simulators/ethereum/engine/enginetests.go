@@ -259,12 +259,15 @@ var engineTests = []TestSpec{
 		SlotsToFinalized: big.NewInt(20),
 		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidReceiptsRoot, false),
 	},
-	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
-		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidNumber, false),
-	},
+	/*
+		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
+		{
+			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
+			TimeoutSeconds:   30,
+			SlotsToFinalized: big.NewInt(20),
+			Run:              invalidMissingAncestorReOrgGenSync(9, InvalidNumber, false),
+		},
+	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
@@ -283,12 +286,15 @@ var engineTests = []TestSpec{
 		SlotsToFinalized: big.NewInt(20),
 		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidTimestamp, false),
 	},
-	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
-		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidPrevRandao, false),
-	},
+	/*
+		TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
+		{
+			Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
+			TimeoutSeconds:   30,
+			SlotsToFinalized: big.NewInt(20),
+			Run:              invalidMissingAncestorReOrgGenSync(8, InvalidPrevRandao, false),
+		},
+	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
@@ -1248,6 +1254,13 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 		genesis := loadGenesis("init/genesis.json")
 		genesis.Config.TerminalTotalDifficulty = t.Engine.TerminalTotalDifficulty
 		secondaryClient, err := newNode(enode, &genesis)
+		defer func() {
+			if err := secondaryClient.Stop(); err != nil {
+				t.Logf("WARN (%s): Unable to stop secondary node: %v", t.TestName, err)
+			} else {
+				t.Logf("INFO (%s): Successfully stopped secondary node", t.TestName)
+			}
+		}()
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 		}
@@ -1332,10 +1345,10 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 					if i < invalid_index {
 						status, err := secondaryClient.sendNewPayload(altChainPayloads[i])
 						if err != nil {
-							t.Fatalf("FAIL (%s): Unable to send new payload: %v", t.TestName, err)
+							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
 						}
 						if status.Status != "VALID" && status.Status != "ACCEPTED" {
-							t.Fatalf("FAIL (%s): Invalid payload status, expected VALID, ACCEPTED: %v", t.TestName, status.Status)
+							t.Fatalf("FAIL (%s): TEST ISSUE - Invalid payload status, expected VALID, ACCEPTED: %v", t.TestName, status.Status)
 						}
 
 						status2, err := secondaryClient.sendFCU(&ForkchoiceStateV1{
@@ -1344,20 +1357,20 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 							FinalizedBlockHash: cA.BlockHash,
 						}, nil)
 						if err != nil {
-							t.Fatalf("FAIL (%s): Unable to send new payload: %v", t.TestName, err)
+							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
 						}
 						if status2.PayloadStatus.Status != "VALID" && status2.PayloadStatus.Status != "SYNCING" {
-							t.Fatalf("FAIL (%s): Invalid payload status, expected VALID: %v", t.TestName, status2.PayloadStatus.Status)
+							t.Fatalf("FAIL (%s): TEST ISSUE - Invalid payload status, expected VALID: %v", t.TestName, status2.PayloadStatus.Status)
 						}
 
 					} else {
 						invalid_block, err := beacon.ExecutableDataToBlock(execData(altChainPayloads[i]))
 						if err != nil {
-							t.Fatalf("FAIL (%s): Failed to create block from payload: %v", t.TestName, err)
+							t.Fatalf("FAIL (%s): TEST ISSUE - Failed to create block from payload: %v", t.TestName, err)
 						}
 
 						if err := secondaryClient.setBlock(invalid_block, altChainPayloads[i-1].Number, altChainPayloads[i-1].StateRoot); err != nil {
-							t.Fatalf("FAIL (%s): Failed to set invalid block: %v", t.TestName, err)
+							t.Fatalf("FAIL (%s): TEST ISSUE - Failed to set invalid block: %v", t.TestName, err)
 						}
 						t.Logf("INFO (%s): Invalid block successfully set %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 					}
@@ -1365,9 +1378,9 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 				// Check that the second node has the correct head
 				head := secondaryClient.eth.APIBackend.CurrentBlock()
 				if head.Hash() != altChainPayloads[n-1].BlockHash {
-					t.Fatalf("Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %v", head.Hash(), altChainPayloads[n-1].BlockHash, head.Number(), altChainPayloads[n].Number)
+					t.Fatalf("FAIL (%s): TEST ISSUE - Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %v", t.TestName, head.Hash(), altChainPayloads[n-1].BlockHash, head.Number(), altChainPayloads[n].Number)
 				} else {
-					t.Logf("Secondary Node has correct block")
+					t.Logf("INFO (%s): Secondary Node has correct block", t.TestName)
 				}
 
 				// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
