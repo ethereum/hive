@@ -51,7 +51,7 @@ type ContainerOptions struct {
 	Files map[string]*multipart.FileHeader
 
 	// This requests checking for the given TCP port to be opened by the container.
-	CheckLive uint16
+	CheckLive []uint16
 
 	// Output: if LogFile is set, container stdin and stderr is redirected to the
 	// given log file. If Output is set, stdout is redirected to the writer. These

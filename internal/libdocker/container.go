@@ -117,7 +117,7 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 
 // StartContainer starts a docker container.
 func (b *ContainerBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
-	if opt.CheckLive != 0 && b.proxy == nil {
+	if opt.CheckLive != nil && b.proxy == nil {
 		panic("attempt to start container with CheckLive, but proxy is not running")
 	}
 
@@ -158,18 +158,34 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 	info.IP = container.NetworkSettings.IPAddress
 	info.MAC = container.NetworkSettings.MacAddress
 
-	// Set up the port check if requested.
+	// Set up ports check if requested.
 	hasStarted := make(chan struct{})
-	if opt.CheckLive != 0 {
+	if opt.CheckLive != nil && len(opt.CheckLive) > 0 && opt.CheckLive[0] != 0 {
+		var (
+			wg     sync.WaitGroup
+			errors = make(chan error, len(opt.CheckLive))
+		)
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()
-		addr := &net.TCPAddr{IP: net.ParseIP(info.IP), Port: int(opt.CheckLive)}
-		go func() {
-			err := b.proxy.CheckLive(ctx, addr)
-			if err == nil {
+		for _, port := range opt.CheckLive {
+			wg.Add(1)
+			addr := &net.TCPAddr{IP: net.ParseIP(info.IP), Port: int(port)}
+			go func(wg *sync.WaitGroup) {
+				defer wg.Done()
+				if err := b.proxy.CheckLive(ctx, addr); err != nil {
+					errors <- err
+				}
+			}(&wg)
+		}
+		go func(wg *sync.WaitGroup) {
+			wg.Wait()
+			select {
+			case err := <-errors:
+				logger.Error("error checking live ports", err)
+			default:
 				close(hasStarted)
 			}
-		}()
+		}(&wg)
 	} else {
 		close(hasStarted)
 	}

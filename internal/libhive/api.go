@@ -265,15 +265,20 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// by default: check the eth1 port
-	options.CheckLive = 8545
+	options.CheckLive = []uint16{
+		8545,
+	}
 	if portStr := env["HIVE_CHECK_LIVE_PORT"]; portStr != "" {
-		v, err := strconv.ParseUint(portStr, 10, 16)
-		if err != nil {
-			log15.Error("API: could not parse check-live port", "error", err)
-			serveError(w, err, http.StatusBadRequest)
-			return
+		options.CheckLive = make([]uint16, 0)
+		for _, pStr := range strings.Split(portStr, ",") {
+			v, err := strconv.ParseUint(pStr, 10, 16)
+			if err != nil {
+				log15.Error("API: could not parse check-live port", "error", err)
+				serveError(w, err, http.StatusBadRequest)
+				return
+			}
+			options.CheckLive = append(options.CheckLive, uint16(v))
 		}
-		options.CheckLive = uint16(v)
 	}
 
 	// Start it!
