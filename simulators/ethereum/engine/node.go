@@ -98,6 +98,10 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 	}, err
 }
 
+func (n *gethNode) Stop() error {
+	return n.eth.Stop()
+}
+
 type validator struct{}
 
 func (v *validator) ValidateBody(block *types.Block) error {

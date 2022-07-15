@@ -143,21 +143,21 @@ func (t *TestEnv) StartClient(clientType string, params hivesim.Params, ttd *big
 func (t *TestEnv) makeNextTransaction(recipient common.Address, amount *big.Int, payload []byte) *types.Transaction {
 
 	gasLimit := uint64(75000)
-
 	tx := types.NewTransaction(t.nonce, recipient, amount, gasLimit, gasPrice, payload)
 	signer := types.NewEIP155Signer(chainID)
 	signedTx, err := types.SignTx(tx, signer, vaultKey)
 	if err != nil {
 		t.Fatal("FAIL (%s): could not sign new tx: %v", t.TestName, err)
 	}
+	t.Logf("INFO (%s): Built next transaction: hash=%s, nonce=%d, recipient=%s", t.TestName, signedTx.Hash(), t.nonce, recipient)
 	t.nonce++
 	return signedTx
 }
 
-func (t *TestEnv) sendNextTransaction(sender *EngineClient, recipient common.Address, amount *big.Int, payload []byte) *types.Transaction {
+func (t *TestEnv) sendNextTransaction(node *EngineClient, recipient common.Address, amount *big.Int, payload []byte) *types.Transaction {
 	tx := t.makeNextTransaction(recipient, amount, payload)
 	for {
-		err := sender.Eth.SendTransaction(sender.Ctx(), tx)
+		err := node.Eth.SendTransaction(node.Ctx(), tx)
 		if err == nil {
 			return tx
 		}
