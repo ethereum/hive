@@ -80,23 +80,35 @@ func (ec *EngineClient) Equals(ec2 *EngineClient) bool {
 	return ec.Container == ec2.Container
 }
 
-func (ec *EngineClient) checkTTD() bool {
+func (ec *EngineClient) checkTTD() (bool, error) {
 	var td *TotalDifficultyHeader
 	if err := ec.cEth.CallContext(ec.Ctx(), &td, "eth_getBlockByNumber", "latest", false); err != nil {
-		panic(err)
+		return false, err
 	}
-	return td.TotalDifficulty.ToInt().Cmp(ec.TerminalTotalDifficulty) >= 0
+	return td.TotalDifficulty.ToInt().Cmp(ec.TerminalTotalDifficulty) >= 0, nil
+}
+
+type WaitTTDResponse struct {
+	ec  *EngineClient
+	err error
 }
 
 // Wait until the TTD is reached by a single client.
-func (ec *EngineClient) waitForTTD(wg *sync.WaitGroup, done chan<- *EngineClient, cancel <-chan interface{}) {
+func (ec *EngineClient) waitForTTD(wg *sync.WaitGroup, done chan<- WaitTTDResponse, cancel <-chan interface{}) {
 	defer wg.Done()
 	for {
 		select {
 		case <-time.After(tTDCheckPeriod):
-			if ec.checkTTD() {
+			ttdReached, err := ec.checkTTD()
+			if err != nil {
+
+			}
+			if err != nil || ttdReached {
 				select {
-				case done <- ec:
+				case done <- WaitTTDResponse{
+					ec:  ec,
+					err: err,
+				}:
 				case <-cancel:
 				}
 				return
@@ -109,24 +121,28 @@ func (ec *EngineClient) waitForTTD(wg *sync.WaitGroup, done chan<- *EngineClient
 
 // Wait until the TTD is reached by a single client with a timeout.
 // Returns true if the TTD has been reached, false when timeout occurred.
-func (ec *EngineClient) waitForTTDWithTimeout(timeout <-chan time.Time) bool {
+func (ec *EngineClient) waitForTTDWithTimeout(timeout <-chan time.Time) error {
 	for {
 		select {
 		case <-time.After(tTDCheckPeriod):
-			if ec.checkTTD() {
-				return true
+			ttdReached, err := ec.checkTTD()
+			if err != nil {
+				return err
+			}
+			if ttdReached {
+				return nil
 			}
 		case <-timeout:
-			return false
+			return fmt.Errorf("Timeout")
 		}
 	}
 }
 
 // Wait until the TTD is reached by any of the engine clients
-func (ecs EngineClients) waitForTTD(timeout <-chan time.Time) *EngineClient {
+func (ecs EngineClients) waitForTTD(timeout <-chan time.Time) (*EngineClient, error) {
 	var wg sync.WaitGroup
 	defer wg.Wait()
-	done := make(chan *EngineClient)
+	done := make(chan WaitTTDResponse)
 	cancel := make(chan interface{})
 	defer close(cancel)
 	for _, ec := range ecs {
@@ -134,10 +150,10 @@ func (ecs EngineClients) waitForTTD(timeout <-chan time.Time) *EngineClient {
 		go ec.waitForTTD(&wg, done, cancel)
 	}
 	select {
-	case ec := <-done:
-		return ec
+	case r := <-done:
+		return r.ec, r.err
 	case <-timeout:
-		return nil
+		return nil, fmt.Errorf("Timeout")
 	}
 }
 
