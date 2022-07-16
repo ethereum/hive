@@ -1,8 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
-
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
@@ -26,6 +24,8 @@ var PoWChainGeneratorDefaults = ethash.Config{
 type PoWChainGenerator struct {
 	BlockCount int
 	ethash.Config
+	GenFunction func(int, *core.BlockGen)
+	blocks      []*types.Block
 }
 
 // instaSeal wraps a consensus engine with instant block sealing. When a block is produced
@@ -46,16 +46,17 @@ func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header
 	return <-sealedBlock, nil
 }
 
-func (p PoWChainGenerator) Generate(genesis *setup.Eth1Genesis) ([]*types.Block, error) {
+func (p *PoWChainGenerator) Generate(genesis *setup.Eth1Genesis) ([]*types.Block, error) {
+	// We generate a new chain only if the generator had not generated one already.
+	// This is done because the chain generators can be reused on different clients to ensure
+	// they start with the same chain.
+	if p.blocks != nil {
+		return p.blocks, nil
+	}
 	db := rawdb.NewMemoryDatabase()
 	engine := ethash.New(p.Config, nil, false)
 	insta := instaSeal{engine}
 	genesisBlock := genesis.Genesis.ToBlock(db)
-	gen := func(i int, blockGen *core.BlockGen) {
-		data := make([]byte, 16)
-		rand.Read(data)
-		blockGen.SetExtra(data)
-	}
-	blocks, _ := core.GenerateChain(genesis.Genesis.Config, genesisBlock, insta, db, p.BlockCount, gen)
-	return blocks, nil
+	p.blocks, _ = core.GenerateChain(genesis.Genesis.Config, genesisBlock, insta, db, p.BlockCount, p.GenFunction)
+	return p.blocks, nil
 }

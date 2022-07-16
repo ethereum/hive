@@ -78,7 +78,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet
 			if err != nil {
 				t.Fatal(err)
 			}
-			fmt.Printf("Generated chain for node %d:\n", i)
+			fmt.Printf("Generated chain for node %d:\n", i+1)
 			for j, b := range config.Nodes[i].Chain {
 				js, _ := json.MarshalIndent(b.Header(), "", "  ")
 				fmt.Printf("Block %d: %s\n", j, js)
@@ -126,7 +126,13 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet
 	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)
 
 	// Generate keys opts for validators
-	keyTranches := setup.KeyTranches(env.Keys, config.Nodes.Shares())
+	shares := config.Nodes.Shares()
+	// ExtraShares defines an extra set of keys that none of the nodes will have.
+	// E.g. to produce an environment where none of the nodes has 50%+ of the keys.
+	if config.ExtraShares != nil {
+		shares = append(shares, config.ExtraShares.Uint64())
+	}
+	keyTranches := setup.KeyTranches(env.Keys, shares)
 
 	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount.Uint64())
 	if err != nil {
@@ -289,7 +295,7 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 	//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
 	//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 	//}
-	bn := NewBeaconNode(testnet.t.StartClient(beaconDef.Name, opts...))
+	bn := NewBeaconNode(testnet.t.StartClient(beaconDef.Name, opts...), testnet.genesisTime, testnet.spec, len(testnet.beacons))
 	testnet.beacons = append(testnet.beacons, bn)
 }
 

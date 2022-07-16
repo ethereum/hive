@@ -135,6 +135,10 @@ func (t *Testnet) GenesisTime() time.Time {
 	return time.Unix(int64(t.genesisTime), 0)
 }
 
+func (t *Testnet) SlotsTimeout(slots common.Slot) <-chan time.Time {
+	return time.After(time.Duration(uint64(slots)*uint64(t.spec.SECONDS_PER_SLOT)) * time.Second)
+}
+
 func (t *Testnet) ValidatorClientIndex(pk [48]byte) (int, error) {
 	for i, v := range t.validators {
 		if v.ContainsKey(pk) {
@@ -153,7 +157,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context, timeoutSlots common.Slot)
 	done := make(chan common.Checkpoint, len(t.verificationBeacons()))
 	var timeout <-chan time.Time
 	if timeoutSlots > 0 {
-		timeout = time.After(time.Second * time.Duration(uint64(timeoutSlots)*uint64(t.spec.SECONDS_PER_SLOT)))
+		timeout = t.SlotsTimeout(timeoutSlots)
 	} else {
 		timeout = make(<-chan time.Time)
 	}
@@ -293,7 +297,7 @@ func (t *Testnet) WaitForExecutionPayload(ctx context.Context, timeoutSlots comm
 	ttdReached := false
 	var timeout <-chan time.Time
 	if timeoutSlots > 0 {
-		timeout = time.After(time.Second * time.Duration(uint64(timeoutSlots)*uint64(t.spec.SECONDS_PER_SLOT)))
+		timeout = t.SlotsTimeout(timeoutSlots)
 	} else {
 		timeout = make(<-chan time.Time)
 	}
@@ -413,82 +417,6 @@ func (t *Testnet) WaitForExecutionPayload(ctx context.Context, timeoutSlots comm
 
 		}
 	}
-}
-
-func (t *Testnet) GetBeaconBlockByExecutionHash(ctx context.Context, hash ethcommon.Hash) *bellatrix.SignedBeaconBlock {
-	lastSlot := t.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), t.genesisTime)
-	for slot := int(lastSlot); slot > 0; slot -= 1 {
-		for _, bn := range t.verificationBeacons() {
-			var versionedBlock eth2api.VersionedSignedBeaconBlock
-			if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
-				continue
-			} else if !exists {
-				continue
-			}
-			if versionedBlock.Version != "bellatrix" {
-				// Block can't contain an executable payload, and we are not going to find it going backwards, so return.
-				return nil
-			}
-			block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
-			payload := block.Message.Body.ExecutionPayload
-			if bytes.Compare(payload.BlockHash[:], hash[:]) == 0 {
-				t.t.Logf("INFO: Execution block %v found in %d: %v", hash, block.Message.Slot, ethcommon.BytesToHash(payload.BlockHash[:]))
-				return block
-			}
-		}
-
-	}
-	return nil
-}
-
-//
-func (t *Testnet) GetLatestExecutionBeaconBlock(ctx context.Context) (*bellatrix.SignedBeaconBlock, error) {
-	bn := t.verificationBeacons()[0]
-	var headInfo eth2api.BeaconBlockHeaderAndInfo
-	if exists, err := beaconapi.BlockHeader(ctx, bn.API, eth2api.BlockHead, &headInfo); err != nil {
-		return nil, fmt.Errorf("failed to poll head: %v", err)
-	} else if !exists {
-		return nil, fmt.Errorf("no head block")
-	}
-	for slot := headInfo.Header.Message.Slot; slot > 0; slot-- {
-		var versionedBlock eth2api.VersionedSignedBeaconBlock
-		if exists, err := beaconapi.BlockV2(ctx, t.verificationBeacons()[0].API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
-			return nil, fmt.Errorf("failed to retrieve block: %v", err)
-		} else if !exists {
-			return nil, fmt.Errorf("block not found")
-		}
-		if versionedBlock.Version != "bellatrix" {
-			return nil, nil
-		}
-		block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
-		payload := block.Message.Body.ExecutionPayload
-		if ethcommon.BytesToHash(payload.BlockHash[:]) != (ethcommon.Hash{}) {
-			return block, nil
-		}
-	}
-	return nil, nil
-}
-
-func (t *Testnet) GetFirstExecutionBeaconBlock(ctx context.Context) (*bellatrix.SignedBeaconBlock, error) {
-	bn := t.verificationBeacons()[0]
-	lastSlot := t.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), t.genesisTime)
-	for slot := common.Slot(0); slot <= lastSlot; slot++ {
-		var versionedBlock eth2api.VersionedSignedBeaconBlock
-		if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
-			continue
-		} else if !exists {
-			continue
-		}
-		if versionedBlock.Version != "bellatrix" {
-			continue
-		}
-		block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
-		payload := block.Message.Body.ExecutionPayload
-		if ethcommon.BytesToHash(payload.BlockHash[:]) != (ethcommon.Hash{}) {
-			return block, nil
-		}
-	}
-	return nil, nil
 }
 
 func getHealth(ctx context.Context, api *eth2api.Eth2HttpClient, spec *common.Spec, slot common.Slot) (float64, error) {

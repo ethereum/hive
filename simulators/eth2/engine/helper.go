@@ -69,6 +69,7 @@ type Config struct {
 	SlotTime                        *big.Int
 	TerminalTotalDifficulty         *big.Int
 	SafeSlotsToImportOptimistically *big.Int
+	ExtraShares                     *big.Int
 
 	// Node configurations to launch. Each node as a proportional share of
 	// validators.
@@ -104,6 +105,7 @@ func (a *Config) join(b *Config) *Config {
 	c.SlotTime = choose(a.SlotTime, b.SlotTime)
 	c.TerminalTotalDifficulty = choose(a.TerminalTotalDifficulty, b.TerminalTotalDifficulty)
 	c.SafeSlotsToImportOptimistically = choose(a.SafeSlotsToImportOptimistically, b.SafeSlotsToImportOptimistically)
+	c.ExtraShares = choose(a.ExtraShares, b.ExtraShares)
 
 	// EL config
 	c.InitialBaseFeePerGas = choose(a.InitialBaseFeePerGas, b.InitialBaseFeePerGas)
@@ -560,9 +562,46 @@ func forkchoiceResponseSpoof(method string, status PayloadStatusV1, payloadID *P
 	}, nil
 }
 
+// List of Hashes that can be accessed concurrently
+type SyncHashes struct {
+	Hashes []common.Hash
+	Lock   *sync.Mutex
+}
+
+func NewSyncHashes(hashes ...common.Hash) *SyncHashes {
+	newSyncHashes := &SyncHashes{
+		Hashes: make([]common.Hash, 0),
+		Lock:   &sync.Mutex{},
+	}
+	for _, h := range hashes {
+		newSyncHashes.Hashes = append(newSyncHashes.Hashes, h)
+	}
+	return newSyncHashes
+}
+
+func (syncHashes *SyncHashes) Contains(hash common.Hash) bool {
+	syncHashes.Lock.Lock()
+	defer syncHashes.Lock.Unlock()
+	if syncHashes.Hashes == nil {
+		return false
+	}
+	for _, h := range syncHashes.Hashes {
+		if h == hash {
+			return true
+		}
+	}
+	return false
+}
+
+func (syncHashes *SyncHashes) Add(hash common.Hash) {
+	syncHashes.Lock.Lock()
+	defer syncHashes.Lock.Unlock()
+	syncHashes.Hashes = append(syncHashes.Hashes, hash)
+}
+
 // Generate a callback that invalidates either a call to `engine_forkchoiceUpdatedV1` or `engine_newPayloadV1`
-// if the hash of the payload matches the specified hash.
-func InvalidateExecutionPayloadByHash(method string, payloadHash common.Hash, called chan<- interface{}) func([]byte, []byte) *proxy.Spoof {
+// for all hashes with given exceptions, and a given LatestValidHash.
+func InvalidateExecutionPayloads(method string, exceptions *SyncHashes, latestValidHash *common.Hash, invalidated chan<- common.Hash) func([]byte, []byte) *proxy.Spoof {
 	if method == EngineForkchoiceUpdatedV1 {
 		return func(res []byte, req []byte) *proxy.Spoof {
 			var (
@@ -575,18 +614,17 @@ func InvalidateExecutionPayloadByHash(method string, payloadHash common.Hash, ca
 			if err != nil {
 				panic(err)
 			}
-			if fcState.HeadBlockHash == payloadHash {
-				zeroHash := common.Hash{}
+			if !exceptions.Contains(fcState.HeadBlockHash) {
 				spoof, err = forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, PayloadStatusV1{
 					Status:          Invalid,
-					LatestValidHash: &zeroHash,
+					LatestValidHash: latestValidHash,
 					ValidationError: nil,
 				}, nil)
 				if err != nil {
 					panic(err)
 				}
 				select {
-				case called <- fcState:
+				case invalidated <- fcState.HeadBlockHash:
 				default:
 				}
 				return spoof
@@ -605,18 +643,17 @@ func InvalidateExecutionPayloadByHash(method string, payloadHash common.Hash, ca
 			if err != nil {
 				panic(err)
 			}
-			if payload.BlockHash == payloadHash {
-				zeroHash := common.Hash{}
+			if !exceptions.Contains(payload.BlockHash) {
 				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &PayloadStatusV1{
 					Status:          Invalid,
-					LatestValidHash: &zeroHash,
+					LatestValidHash: latestValidHash,
 					ValidationError: nil,
 				})
 				if err != nil {
 					panic(err)
 				}
 				select {
-				case called <- payload:
+				case invalidated <- payload.BlockHash:
 				default:
 				}
 				return spoof
@@ -713,8 +750,9 @@ func SlotsUntilBellatrix(genesisTime beacon.Timestamp, spec *beacon.Spec) beacon
 	if currentTimestamp >= bellatrixTime {
 		return beacon.Slot(0)
 	}
-	fmt.Printf("INFO: bellatrixTime:%d, currentTimestamp:%d\n", bellatrixTime, currentTimestamp)
-	return beacon.Slot((bellatrixTime-currentTimestamp)/spec.SECONDS_PER_SLOT) + 1
+	s := beacon.Slot((bellatrixTime-currentTimestamp)/spec.SECONDS_PER_SLOT) + 1
+	fmt.Printf("INFO: bellatrixTime:%d, currentTimestamp:%d, slots=%d\n", bellatrixTime, currentTimestamp, s)
+	return s
 }
 
 func TimeUntilTerminalBlock(e *Eth1Node, c setup.Eth1Consensus, defaultTTD *big.Int, n node) uint64 {
