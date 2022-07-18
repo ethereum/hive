@@ -19,6 +19,12 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     sed -i '/TERMINAL_TOTAL_DIFFICULTY/d' /data/testnet_setup/config.yaml
     echo "TERMINAL_TOTAL_DIFFICULTY: $HIVE_TERMINAL_TOTAL_DIFFICULTY" >> /data/testnet_setup/config.yaml
 fi
+if [[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" != "" ]]; then
+    echo "SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY: $HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" >> /data/testnet_setup/config.yaml
+fi
+
+echo config.yaml:
+cat /data/testnet_setup/config.yaml
 
 mkdir -p /data/teku
 
@@ -37,6 +43,7 @@ CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics-enabled=true --metrics-interface=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-host-allowlist=*")
 enr_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "" || echo --p2p-discovery-bootnodes="$HIVE_ETH2_BOOTNODE_ENRS")
+opt_sync_option=$([[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" == "" ]] && echo "" || echo "--Xnetwork-safe-slots-to-import-optimistically=$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY")
 
 if [ "$HIVE_ETH2_MERGE_ENABLED" != "" ]; then
     echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
@@ -52,7 +59,7 @@ echo Starting Teku Beacon Node
     --eth1-deposit-contract-address="${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" \
     --log-destination console \
     --logging="$LOG" \
-    $metrics_option $eth1_option $merge_option $enr_option \
+    $metrics_option $eth1_option $merge_option $enr_option $opt_sync_option \
     --validators-proposer-default-fee-recipient="0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b" \
     --p2p-port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --p2p-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
