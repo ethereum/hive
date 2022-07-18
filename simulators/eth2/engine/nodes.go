@@ -127,7 +127,7 @@ func (b *BeaconNode) WaitForExecutionPayload(ctx context.Context, timeoutSlots c
 		case <-timeout:
 			return ethcommon.Hash{}, fmt.Errorf("Timeout")
 		case <-timer.C:
-
+			realTimeSlot := b.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), b.genesisTime)
 			var headInfo eth2api.BeaconBlockHeaderAndInfo
 			if exists, err := beaconapi.BlockHeader(ctx, b.API, eth2api.BlockHead, &headInfo); err != nil {
 				return ethcommon.Hash{}, fmt.Errorf("WaitForExecutionPayload: failed to poll head: %v", err)
@@ -147,7 +147,7 @@ func (b *BeaconNode) WaitForExecutionPayload(ctx context.Context, timeoutSlots c
 				copy(execution[:], block.Message.Body.ExecutionPayload.BlockHash[:])
 			}
 			zero := ethcommon.Hash{}
-			fmt.Printf("beacon %d: slot=%d, head=%s, exec=%s\n", b.index, headInfo.Header.Message.Slot, shorten(headInfo.Root.String()), shorten(execution.Hex()))
+			fmt.Printf("beacon %d: slot=%d, realTimeSlot=%d, head=%s, exec=%s\n", b.index, headInfo.Header.Message.Slot, realTimeSlot, shorten(headInfo.Root.String()), shorten(execution.Hex()))
 			if bytes.Compare(execution[:], zero[:]) != 0 {
 				return execution, nil
 			}

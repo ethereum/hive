@@ -38,7 +38,6 @@ var transitionTests = []testSpec{
 	{Name: "invalid-terminal-block-payload-lower-ttd", Run: IncorrectTerminalBlockGen(-2)},
 	{Name: "invalid-terminal-block-payload-higher-ttd", Run: IncorrectTerminalBlockGen(1)},
 	{Name: "build-atop-invalid-terminal-block", Run: IncorrectTTDConfigEL},
-	{Name: "optimistic-syncing-with-valid-chain", Run: OptimisticSyncingWithValidChain},
 	{Name: "syncing-with-chain-having-valid-transition-block", Run: SyncingWithChainHavingValidTransitionBlock},
 	{Name: "syncing-with-chain-having-invalid-transition-block", Run: SyncingWithChainHavingInvalidTransitionBlock},
 	{Name: "syncing-with-chain-having-invalid-post-transition-block", Run: SyncingWithChainHavingInvalidPostTransitionBlock},

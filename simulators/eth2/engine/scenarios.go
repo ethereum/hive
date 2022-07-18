@@ -49,6 +49,11 @@ var (
 		"nimbus": true,
 		"prysm":  true,
 	}
+
+	SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE = map[string]*big.Int{
+		"teku":       big.NewInt(128),
+		"lighthouse": big.NewInt(128),
+	}
 )
 
 func getClientConfig(n node) *Config {
@@ -1171,130 +1176,14 @@ func InvalidQuantityPayloadFields(t *hivesim.T, env *testEnv, n node) {
 	}
 }
 
-func OptimisticSyncingWithValidChain(t *hivesim.T, env *testEnv, n node) {
-	var (
-		SafeSlotsToImportOptimistically = 128
-	)
-	config := getClientConfig(n).join(&Config{
-		Nodes: Nodes{
-			// Builder
-			node{
-				ExecutionClient: n.ExecutionClient,
-				ConsensusClient: n.ConsensusClient,
-				ValidatorShares: 1,
-			},
-			// Importer
-			node{
-				ExecutionClient: n.ExecutionClient,
-				ConsensusClient: n.ConsensusClient,
-				ValidatorShares: 0,
-			},
-		},
-		SafeSlotsToImportOptimistically: big.NewInt(int64(SafeSlotsToImportOptimistically)),
-	})
-
-	testnet := startTestnet(t, env, config)
-	defer testnet.stopTestnet()
-
-	// Create two callbacks to always return `SYNCING` until stated otherwise
-	var (
-		StillSyncing = true
-	)
-	newPayloadCallback := func(res, req []byte) *proxy.Spoof {
-		if StillSyncing {
-			s, err := payloadStatusSpoof(EngineNewPayloadV1, &PayloadStatusV1{
-				Status:          Syncing,
-				LatestValidHash: nil,
-				ValidationError: nil,
-			})
-			if err != nil {
-				panic(err)
-			}
-			return s
-		}
-		return nil
-	}
-	fcUCallback := func(res, req []byte) *proxy.Spoof {
-		if StillSyncing {
-			s, err := forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, PayloadStatusV1{
-				Status:          Syncing,
-				LatestValidHash: nil,
-				ValidationError: nil,
-			}, nil)
-			if err != nil {
-				panic(err)
-			}
-			return s
-		}
-		return nil
-	}
-
-	var (
-		builder       = testnet.beacons[0]
-		importer      = testnet.beacons[1]
-		importerProxy = testnet.proxies[1]
-	)
-
-	importerProxy.AddResponseCallback(EngineNewPayloadV1, newPayloadCallback)
-	importerProxy.AddResponseCallback(EngineForkchoiceUpdatedV1, fcUCallback)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	transitionPayloadHash, err := testnet.WaitForExecutionPayload(ctx, SlotsUntilMerge(testnet, config))
-	if err != nil {
-		t.Fatalf("FAIL: Error getting transition payload: %v", err)
-	}
-
-	// Get the beacon block where the transition payload was included
-	b, err := VerifyExecutionPayloadHashInclusionNode(testnet, ctx, LastestSlotByHead{}, builder, transitionPayloadHash)
-	transitionSlot := b.Message.Slot
-
-	// Compare heads of both nodes until the difference is equal to SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY
-	slotsToVerify := SafeSlotsToImportOptimistically * 2
-	for {
-		select {
-		case <-testnet.SlotsTimeout(beacon.Slot(1)):
-		}
-		var (
-			builderHeadInfo  eth2api.BeaconBlockHeaderAndInfo
-			importerHeadInfo eth2api.BeaconBlockHeaderAndInfo
-		)
-		if exists, err := beaconapi.BlockHeader(ctx, builder.API, eth2api.BlockHead, &builderHeadInfo); err != nil {
-			t.Fatalf("failed to poll head: %v", err)
-		} else if !exists {
-			t.Fatalf("no head block")
-		}
-		if exists, err := beaconapi.BlockHeader(ctx, importer.API, eth2api.BlockHead, &importerHeadInfo); err != nil {
-			t.Fatalf("failed to poll head: %v", err)
-		} else if !exists {
-			t.Fatalf("no head block")
-		}
-
-		slotDiff := builderHeadInfo.Header.Message.Slot - importerHeadInfo.Header.Message.Slot
-		t.Logf("INFO: Builder head %d/%s, Importer head %d/%s", builderHeadInfo.Header.Message.Slot, shorten(builderHeadInfo.Root.String()), importerHeadInfo.Header.Message.Slot, shorten(importerHeadInfo.Root.String()))
-		if slotDiff == 0 {
-			t.Fatalf("FAIL: Syncing importer node is following head when execution client is syncing")
-		} else if slotDiff < beacon.Slot(SafeSlotsToImportOptimistically) {
-			if importerHeadInfo.Header.Message.Slot > transitionSlot {
-				t.Fatalf("FAIL: Syncing importer node is following builder head when execution client is syncing and below the SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY threshold")
-			}
-		} else if slotDiff > beacon.Slot(SafeSlotsToImportOptimistically) {
-			//t.Fatalf("FAIL: Syncing importer node fell behind the SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY threshold (builder=%d, importer=%d", builderHeadInfo.Header.Message.Slot, importerHeadInfo.Header.Message.Slot)
-		}
-
-		slotsToVerify--
-		if slotsToVerify == 0 {
-			break
-		}
-	}
-	StillSyncing = false
-}
-
 func SyncingWithChainHavingValidTransitionBlock(t *hivesim.T, env *testEnv, n node) {
 	var (
 		safeSlotsToImportOptimistically = big.NewInt(16)
 		safeSlotsImportThreshold        = uint64(4)
 	)
+	if clientSafeSlots, ok := SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE[n.ConsensusClient]; ok {
+		safeSlotsToImportOptimistically = clientSafeSlots
+	}
 
 	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
@@ -1374,6 +1263,9 @@ func SyncingWithChainHavingInvalidTransitionBlock(t *hivesim.T, env *testEnv, n 
 		safeSlotsToImportOptimistically = big.NewInt(16)
 		safeSlotsImportThreshold        = uint64(4)
 	)
+	if clientSafeSlots, ok := SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE[n.ConsensusClient]; ok {
+		safeSlotsToImportOptimistically = clientSafeSlots
+	}
 
 	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
@@ -1433,11 +1325,19 @@ func SyncingWithChainHavingInvalidTransitionBlock(t *hivesim.T, env *testEnv, n 
 	importerProxy.AddResponseCallback(EngineForkchoiceUpdatedV1, InvalidateExecutionPayloads(EngineForkchoiceUpdatedV1, NewSyncHashes(), &zeroHash, callbackCalled))
 
 	// Wait here until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` slots have passed
-	select {
-	case invalidatedHash := <-callbackCalled:
-		t.Logf("INFO: Callback invalidated payload %v", invalidatedHash)
-	case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold)):
-		t.Fatalf("FAIL: Test timeout waiting for importer to optimistically sync the invalid payload")
+forloop:
+	for {
+		select {
+		case invalidatedHash := <-callbackCalled:
+			t.Logf("INFO: Callback invalidated payload %v", invalidatedHash)
+			break forloop
+		case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold)):
+			t.Fatalf("FAIL: Test timeout waiting for importer to optimistically sync the invalid payload")
+		case <-testnet.SlotsTimeout(1):
+			t.Logf("INFO: Waiting for importer to try to optimistically sync the invalid payload, realTimeSlot=%d", importer.spec.TimeToSlot(beacon.Timestamp(time.Now().Unix()), importer.genesisTime))
+		case <-ctx.Done():
+			t.Fatalf("FAIL: Context done while waiting for importer")
+		}
 	}
 
 	// Wait a couple of slots here to make sure syncing does not produce a false positive
@@ -1462,6 +1362,9 @@ func SyncingWithChainHavingInvalidPostTransitionBlock(t *hivesim.T, env *testEnv
 		safeSlotsToImportOptimistically = big.NewInt(16)
 		safeSlotsImportThreshold        = uint64(4)
 	)
+	if clientSafeSlots, ok := SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE[n.ConsensusClient]; ok {
+		safeSlotsToImportOptimistically = clientSafeSlots
+	}
 
 	config := getClientConfig(n).join(&Config{
 		Nodes: Nodes{
@@ -1521,11 +1424,19 @@ func SyncingWithChainHavingInvalidPostTransitionBlock(t *hivesim.T, env *testEnv
 	importerProxy.AddResponseCallback(EngineForkchoiceUpdatedV1, InvalidateExecutionPayloads(EngineForkchoiceUpdatedV1, exceptions, &transitionPayloadHash, callbackCalled))
 
 	// Wait here until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` slots have passed
-	select {
-	case invalidatedHash := <-callbackCalled:
-		t.Logf("INFO: Callback invalidated payload %v", invalidatedHash)
-	case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold)):
-		t.Fatalf("FAIL: Test timeout waiting for importer to optimistically sync the invalid payload")
+forloop:
+	for {
+		select {
+		case invalidatedHash := <-callbackCalled:
+			t.Logf("INFO: Callback invalidated payload %v", invalidatedHash)
+			break forloop
+		case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold)):
+			t.Fatalf("FAIL: Test timeout waiting for importer to optimistically sync the invalid payload")
+		case <-testnet.SlotsTimeout(1):
+			t.Logf("INFO: Waiting for importer to try to optimistically sync the invalid payload, realTimeSlot=%d", importer.spec.TimeToSlot(beacon.Timestamp(time.Now().Unix()), importer.genesisTime))
+		case <-ctx.Done():
+			t.Fatalf("FAIL: Context done while waiting for importer")
+		}
 	}
 
 	// Wait a couple of slots here to make sure syncing does not produce a false positive
@@ -1533,7 +1444,7 @@ func SyncingWithChainHavingInvalidPostTransitionBlock(t *hivesim.T, env *testEnv
 
 	// Query the beacon chain head of the importer node, it should point to transition payload block.
 	block, err := importer.GetFirstExecutionBeaconBlock(ctx)
-	if err != nil {
+	if err != nil || block == nil {
 		t.Fatalf("FAIL: Block not found: %v", err)
 	}
 	payload := block.Message.Body.ExecutionPayload
@@ -1547,6 +1458,9 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(t *hivesim.T, env *testEnv, n 
 		safeSlotsToImportOptimistically = big.NewInt(16)
 		safeSlotsImportThreshold        = uint64(2)
 	)
+	if clientSafeSlots, ok := SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE[n.ConsensusClient]; ok {
+		safeSlotsToImportOptimistically = clientSafeSlots
+	}
 
 	// We are going to produce two PoW chains for three different clients
 	// EL_A:
@@ -1613,7 +1527,10 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(t *hivesim.T, env *testEnv, n 
 	}
 	b, err := invalidBuilder.GetFirstExecutionBeaconBlock(ctx)
 	if err != nil {
-		t.Fatalf("FAIL: Getting the first execution block on the invalid builder: %v", err)
+		t.Fatalf("FAIL: Getting the first execution block invalid builder: %v", err)
+	}
+	if b == nil {
+		t.Fatalf("FAIL: Getting the first execution block invalid builder: %v", b)
 	}
 	invalidBuilderPayloadHash := ethcommon.BytesToHash(b.Message.Body.ExecutionPayload.BlockHash[:])
 	fmt.Printf("INFO: First execution block on invalid builder: slot=%d, head=%s, exec=%s\n", b.Message.Slot, shorten(b.Message.StateRoot.String()), shorten(invalidBuilderPayloadHash.Hex()))
@@ -1624,7 +1541,10 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(t *hivesim.T, env *testEnv, n 
 	}
 	b, err = validBuilder.GetFirstExecutionBeaconBlock(ctx)
 	if err != nil {
-		t.Fatalf("FAIL: Getting the first execution block on the valid builder: %v", err)
+		t.Fatalf("FAIL: Getting the first execution block on valid builder: %v", err)
+	}
+	if b == nil {
+		t.Fatalf("FAIL: Getting the first execution block on valid builder: %v", b)
 	}
 	validBuilderPayloadHash := ethcommon.BytesToHash(b.Message.Body.ExecutionPayload.BlockHash[:])
 	fmt.Printf("INFO: First execution block on valid builder: slot=%d, head=%s, exec=%s\n", b.Message.Slot, shorten(b.Message.StateRoot.String()), shorten(invalidBuilderPayloadHash.Hex()))
@@ -1633,9 +1553,16 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(t *hivesim.T, env *testEnv, n 
 		t.Fatalf("FAIL: Valid builder and invalid builder execution blocks are equal: %v == %v", validBuilderPayloadHash, invalidBuilderPayloadHash)
 	}
 
+	_, err = importer.WaitForExecutionPayload(ctx, 10)
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for execution payload on importer: %v", err)
+	}
 	b, err = importer.GetFirstExecutionBeaconBlock(ctx)
 	if err != nil {
-		t.Fatalf("FAIL: Getting the first execution block on the importer: %v", err)
+		t.Fatalf("FAIL: Getting the first execution block on importer: %v", err)
+	}
+	if b == nil {
+		t.Fatalf("FAIL: Getting the first execution block on importer: %v", b)
 	}
 	importerPayloadHash := ethcommon.BytesToHash(b.Message.Body.ExecutionPayload.BlockHash[:])
 	if importerPayloadHash != validBuilderPayloadHash {
@@ -1689,11 +1616,10 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(t *hivesim.T, env *testEnv, n 
 	}(ctx, callbackCalled)
 
 	// We need to wait until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` pass, plus a couple more slots
-	safeSlotsTimeout := testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() - safeSlotsImportThreshold))
 forloop:
 	for {
 		select {
-		case <-safeSlotsTimeout:
+		case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() - safeSlotsImportThreshold)):
 			break forloop
 		case <-testnet.SlotsTimeout(1):
 			// Keep checking that the valid builder does not re-org before time
@@ -1704,6 +1630,8 @@ forloop:
 			if b != nil {
 				t.Fatalf("FAIL: Client re-org'd before `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY`", err)
 			}
+		case <-ctx.Done():
+			t.Fatalf("FAIL: Context done while waiting for importer")
 		}
 	}
 
