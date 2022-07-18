@@ -26,12 +26,12 @@ exec op-batcher \
     --rollup-rpc=http://172.17.0.5:7545 \
     --min-l1-tx-size-bytes=1 \
     --max-l1-tx-size-bytes=120000 \
+    --channel-timeout=40 \
     --poll-interval=1s \
     --num-confirmations=1 \
     --safe-abort-nonce-too-low-count=3 \
     --resubmission-timeout=30s \
     --mnemonic="test test test test test test test test test test test junk" \
     --sequencer-hd-path="m/44'/60'/0'/0/2" \
-    --sequencer-history-db-filename="history_db.json" \
     --sequencer-batch-inbox-address=$SEQUENCER_BATCH_INBOX_ADDRESS \
     --log-terminal=true
