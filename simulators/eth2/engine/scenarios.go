@@ -1252,10 +1252,22 @@ func SyncingWithChainHavingValidTransitionBlock(t *hivesim.T, env *testEnv, n no
 	}
 
 	// Wait for the importer to fully sync and then verify heads
-	<-testnet.SlotsTimeout(1)
-	if err := VerifyELHeads(testnet, ctx); err != nil {
-		t.Fatalf("FAIL: Verifying EL Heads: %v", err)
+	maxTimeout := testnet.SlotsTimeout(5)
+forloop:
+	for {
+		select {
+		case <-testnet.SlotsTimeout(1):
+			if err := VerifyELHeads(testnet, ctx); err == nil {
+				t.Logf("INFO: EL heads are in sync")
+				break forloop
+			}
+		case <-maxTimeout:
+			t.Fatalf("FAIL: Timeout waiting for EL Heads to sync up")
+		case <-ctx.Done():
+			t.Fatalf("FAIL: Context done waiting for EL Heads to sync up")
+		}
 	}
+
 }
 
 func SyncingWithChainHavingInvalidTransitionBlock(t *hivesim.T, env *testEnv, n node) {
