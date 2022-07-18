@@ -1252,7 +1252,7 @@ func SyncingWithChainHavingValidTransitionBlock(t *hivesim.T, env *testEnv, n no
 	}
 
 	// Wait for the importer to fully sync and then verify heads
-	time.Sleep(time.Duration(config.SlotTime.Uint64()) * time.Second)
+	<-testnet.SlotsTimeout(1)
 	if err := VerifyELHeads(testnet, ctx); err != nil {
 		t.Fatalf("FAIL: Verifying EL Heads: %v", err)
 	}
@@ -1325,13 +1325,14 @@ func SyncingWithChainHavingInvalidTransitionBlock(t *hivesim.T, env *testEnv, n 
 	importerProxy.AddResponseCallback(EngineForkchoiceUpdatedV1, InvalidateExecutionPayloads(EngineForkchoiceUpdatedV1, NewSyncHashes(), &zeroHash, callbackCalled))
 
 	// Wait here until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` slots have passed
+	safeSlotsTimeout := testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold))
 forloop:
 	for {
 		select {
 		case invalidatedHash := <-callbackCalled:
 			t.Logf("INFO: Callback invalidated payload %v", invalidatedHash)
 			break forloop
-		case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold)):
+		case <-safeSlotsTimeout:
 			t.Fatalf("FAIL: Test timeout waiting for importer to optimistically sync the invalid payload")
 		case <-testnet.SlotsTimeout(1):
 			t.Logf("INFO: Waiting for importer to try to optimistically sync the invalid payload, realTimeSlot=%d", importer.spec.TimeToSlot(beacon.Timestamp(time.Now().Unix()), importer.genesisTime))
@@ -1424,13 +1425,14 @@ func SyncingWithChainHavingInvalidPostTransitionBlock(t *hivesim.T, env *testEnv
 	importerProxy.AddResponseCallback(EngineForkchoiceUpdatedV1, InvalidateExecutionPayloads(EngineForkchoiceUpdatedV1, exceptions, &transitionPayloadHash, callbackCalled))
 
 	// Wait here until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` slots have passed
+	safeSlotsTimeout := testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold))
 forloop:
 	for {
 		select {
 		case invalidatedHash := <-callbackCalled:
 			t.Logf("INFO: Callback invalidated payload %v", invalidatedHash)
 			break forloop
-		case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold)):
+		case <-safeSlotsTimeout:
 			t.Fatalf("FAIL: Test timeout waiting for importer to optimistically sync the invalid payload")
 		case <-testnet.SlotsTimeout(1):
 			t.Logf("INFO: Waiting for importer to try to optimistically sync the invalid payload, realTimeSlot=%d", importer.spec.TimeToSlot(beacon.Timestamp(time.Now().Unix()), importer.genesisTime))
@@ -1616,10 +1618,11 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(t *hivesim.T, env *testEnv, n 
 	}(ctx, callbackCalled)
 
 	// We need to wait until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` pass, plus a couple more slots
+	safeSlotsTimeout := testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold))
 forloop:
 	for {
 		select {
-		case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() - safeSlotsImportThreshold)):
+		case <-safeSlotsTimeout:
 			break forloop
 		case <-testnet.SlotsTimeout(1):
 			// Keep checking that the valid builder does not re-org before time
@@ -1636,10 +1639,6 @@ forloop:
 	}
 
 	// Check that the invalid payload hash was not incorporated into the valid builder or the importer.
-	select {
-	case <-testnet.SlotsTimeout(beacon.Slot(safeSlotsImportThreshold)):
-	}
-
 	b, err = BeaconNodes{
 		importer,
 		validBuilder,
