@@ -305,6 +305,7 @@ func (exp *BlockNumberResponseExpectObject) ExpectNumber(number uint64) {
 
 // Block number types - * Only supported by TestHeaderByNumber *
 var (
+	Head      *big.Int // Nil
 	Pending   = big.NewInt(-1)
 	Finalized = big.NewInt(-2)
 	Safe      = big.NewInt(-3)

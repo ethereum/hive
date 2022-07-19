@@ -143,18 +143,12 @@ func (cl *CLMocker) setTTDBlockClient(ec *EngineClient) {
 
 	// Reset transition values
 	cl.LatestHeadNumber = cl.LatestHeader.Number
-	cl.HeadHashHistory = []common.Hash{cl.LatestHeader.Hash()}
+	cl.HeadHashHistory = []common.Hash{}
 	cl.FirstPoSBlockNumber = nil
 
 	// Prepare initial forkchoice
 	cl.LatestForkchoice = ForkchoiceStateV1{}
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestHeader.Hash()
-	if cl.SlotsToSafe.Cmp(big0) == 0 {
-		cl.LatestForkchoice.SafeBlockHash = cl.LatestHeader.Hash()
-	}
-	if cl.SlotsToFinalized.Cmp(big0) == 0 {
-		cl.LatestForkchoice.FinalizedBlockHash = cl.LatestHeader.Hash()
-	}
 
 	// Broadcast initial ForkchoiceUpdated
 	anySuccess := false

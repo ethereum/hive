@@ -416,6 +416,12 @@ var engineTests = []TestSpec{
 		TTD:  5,
 	},
 	{
+		Name:             "safe, finalized on canonical chain",
+		Run:              safeFinalizedCanonicalChain,
+		SlotsToSafe:      big.NewInt(1),
+		SlotsToFinalized: big.NewInt(2),
+	},
+	{
 		Name: "finalized Block after New FinalizedBlockHash",
 		Run:  blockStatusFinalizedBlock,
 		TTD:  5,
@@ -493,6 +499,12 @@ var engineTests = []TestSpec{
 		SlotsToSafe:      big.NewInt(15),
 		SlotsToFinalized: big.NewInt(20),
 		Run:              reorgPrevValidatedPayloadOnSideChain,
+	},
+	{
+		Name:             "Safe Re-Org to Side Chain",
+		Run:              safeReorgToSideChain,
+		SlotsToSafe:      big.NewInt(1),
+		SlotsToFinalized: big.NewInt(2),
 	},
 
 	// Suggested Fee Recipient in Payload creation
@@ -806,7 +818,7 @@ func invalidPayloadAttributesGen(syncing bool) func(*TestEnv) {
 					r.ExpectError()
 
 					// Check that the forkchoice was applied, regardless of the error
-					s := t.TestEth.TestHeaderByNumber(nil)
+					s := t.TestEth.TestHeaderByNumber(Head)
 					s.ExpectHash(blockHash)
 				}
 			},
@@ -1011,7 +1023,7 @@ func invalidTransitionPayload(t *TestEnv) {
 			r.ExpectPayloadStatus(Invalid)
 			r.ExpectLatestValidHash(&(common.Hash{}))
 
-			s := t.TestEth.TestBlockByNumber(nil)
+			s := t.TestEth.TestBlockByNumber(Head)
 			s.ExpectHash(t.CLMock.LatestExecutedPayload.BlockHash)
 		},
 	})
@@ -1557,13 +1569,13 @@ func blockStatusExecPayloadGen(transitionBlock bool) func(t *TestEnv) {
 			},
 			// Run test after the new payload has been broadcasted
 			OnNewPayloadBroadcast: func() {
-				r := t.TestEth.TestHeaderByNumber(nil)
+				r := t.TestEth.TestHeaderByNumber(Head)
 				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
 				s := t.TestEth.TestBlockNumber()
 				s.ExpectNumber(t.CLMock.LatestHeadNumber.Uint64())
 
-				p := t.TestEth.TestBlockByNumber(nil)
+				p := t.TestEth.TestBlockByNumber(Head)
 				p.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
 				// Check that the receipt for the transaction we just sent is still not available
@@ -1592,7 +1604,7 @@ func blockStatusHeadBlockGen(transitionBlock bool) func(t *TestEnv) {
 			},
 			// Run test after a forkchoice with new HeadBlockHash has been broadcasted
 			OnForkchoiceBroadcast: func() {
-				r := t.TestEth.TestHeaderByNumber(nil)
+				r := t.TestEth.TestHeaderByNumber(Head)
 				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
 				s := t.TestEth.TestTransactionReceipt(tx.Hash())
@@ -1646,6 +1658,48 @@ func blockStatusFinalizedBlock(t *TestEnv) {
 	})
 }
 
+func safeFinalizedCanonicalChain(t *TestEnv) {
+	// Wait until this client catches up with latest PoS Block
+	t.CLMock.waitForTTD()
+	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
+
+	// At the merge we need to have head equal to the last PoW block, and safe/finalized must return error
+	h := t.TestEth.TestHeaderByNumber(Head)
+	h.ExpectHash(gblock.Hash())
+	h = t.TestEth.TestHeaderByNumber(Safe)
+	h.ExpectErrorCode(-39001)
+	h = t.TestEth.TestHeaderByNumber(Finalized)
+	h.ExpectErrorCode(-39001)
+
+	// Producing one PoS payload should change only the head (latest)
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	h = t.TestEth.TestHeaderByNumber(Head)
+	h.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
+	h = t.TestEth.TestHeaderByNumber(Safe)
+	h.ExpectErrorCode(-39001)
+	h = t.TestEth.TestHeaderByNumber(Finalized)
+	h.ExpectErrorCode(-39001)
+
+	// Producing a second PoS payload should change safe
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	h = t.TestEth.TestHeaderByNumber(Head)
+	h.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
+	h = t.TestEth.TestHeaderByNumber(Safe)
+	h.ExpectHash(t.CLMock.ExecutedPayloadHistory[1].BlockHash)
+	h = t.TestEth.TestHeaderByNumber(Finalized)
+	h.ExpectErrorCode(-39001)
+
+	// Producing a third PoS payload should change finalized
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	h = t.TestEth.TestHeaderByNumber(Head)
+	h.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
+	h = t.TestEth.TestHeaderByNumber(Safe)
+	h.ExpectHash(t.CLMock.ExecutedPayloadHistory[2].BlockHash)
+	h = t.TestEth.TestHeaderByNumber(Finalized)
+	h.ExpectHash(t.CLMock.ExecutedPayloadHistory[1].BlockHash)
+
+}
+
 // Test to verify Block information available after a reorg using forkchoiceUpdated
 func blockStatusReorg(t *TestEnv) {
 	// Wait until this client catches up with latest PoS Block
@@ -1675,14 +1729,14 @@ func blockStatusReorg(t *TestEnv) {
 			}, nil)
 
 			// Verify the client is serving the latest HeadBlock
-			r := t.TestEth.TestHeaderByNumber(nil)
+			r := t.TestEth.TestHeaderByNumber(Head)
 			r.ExpectHash(customizedPayload.BlockHash)
 
 		},
 		OnForkchoiceBroadcast: func() {
 			// At this point, we have re-org'd to the payload that the CLMocker was originally planning to send,
 			// verify that the client is serving the latest HeadBlock.
-			r := t.TestEth.TestHeaderByNumber(nil)
+			r := t.TestEth.TestHeaderByNumber(Head)
 			r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
 		},
@@ -1718,7 +1772,7 @@ func reorgBack(t *TestEnv) {
 	})
 
 	// Verify that the client is pointing to the latest payload sent
-	r := t.TestEth.TestBlockByNumber(nil)
+	r := t.TestEth.TestBlockByNumber(Head)
 	r.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
 
 }
@@ -1786,6 +1840,73 @@ func reorgPrevValidatedPayloadOnSideChain(t *TestEnv) {
 
 			// After this, the CLMocker will continue and try to re-org to canonical chain once again
 			// CLMocker will fail the test if this is not possible, so nothing left to do.
+		},
+	})
+}
+
+// Test that performs a re-org of the safe block to a side chain.
+func safeReorgToSideChain(t *TestEnv) {
+	// Wait until this client catches up with latest PoS
+	t.CLMock.waitForTTD()
+
+	// Produce an alternative chain
+	sidechainPayloads := make([]*ExecutableDataV1, 0)
+
+	// Produce three payloads `P1`, `P2`, `P3`, along with the side chain payloads `P2'`, `P3'`
+	// First payload is finalized so no alternative payload
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	t.CLMock.produceBlocks(2, BlockProcessCallbacks{
+		OnGetPayload: func() {
+			// Generate an alternative payload by simply adding extraData to the block
+			altParentHash := t.CLMock.LatestPayloadBuilt.ParentHash
+			if len(sidechainPayloads) > 0 {
+				altParentHash = sidechainPayloads[len(sidechainPayloads)-1].BlockHash
+			}
+			altPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt,
+				&CustomPayloadData{
+					ParentHash: &altParentHash,
+					ExtraData:  &([]byte{0x01}),
+				})
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
+			}
+			sidechainPayloads = append(sidechainPayloads, altPayload)
+		},
+	})
+
+	// Verify current state of labels
+	head := t.TestEth.TestHeaderByNumber(Head)
+	head.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
+
+	safe := t.TestEth.TestHeaderByNumber(Safe)
+	safe.ExpectHash(t.CLMock.ExecutedPayloadHistory[2].BlockHash)
+
+	finalized := t.TestEth.TestHeaderByNumber(Finalized)
+	finalized.ExpectHash(t.CLMock.ExecutedPayloadHistory[1].BlockHash)
+
+	// Re-org the safe/head blocks to point to the alternative side chain
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		OnGetPayload: func() {
+			for _, p := range sidechainPayloads {
+				r := t.TestEngine.TestEngineNewPayloadV1(p)
+				r.ExpectStatusEither(Valid, Accepted)
+			}
+			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+				HeadBlockHash:      sidechainPayloads[1].BlockHash,
+				SafeBlockHash:      sidechainPayloads[0].BlockHash,
+				FinalizedBlockHash: t.CLMock.ExecutedPayloadHistory[1].BlockHash,
+			}, nil)
+			r.ExpectPayloadStatus(Valid)
+
+			head := t.TestEth.TestHeaderByNumber(Head)
+			head.ExpectHash(sidechainPayloads[1].BlockHash)
+
+			safe := t.TestEth.TestHeaderByNumber(Safe)
+			safe.ExpectHash(sidechainPayloads[0].BlockHash)
+
+			finalized := t.TestEth.TestHeaderByNumber(Finalized)
+			finalized.ExpectHash(t.CLMock.ExecutedPayloadHistory[1].BlockHash)
+
 		},
 	})
 }
@@ -1915,7 +2036,7 @@ func transactionReorg(t *TestEnv) {
 				}, nil)
 				s.ExpectPayloadStatus(Valid)
 
-				p := t.TestEth.TestBlockByNumber(nil)
+				p := t.TestEth.TestBlockByNumber(Head)
 				p.ExpectHash(noTxnPayload.BlockHash)
 
 				reorgReceipt, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
@@ -2014,7 +2135,7 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
 					}, nil)
 					s.ExpectPayloadStatus(Valid)
 
-					p := t.TestEth.TestBlockByNumber(nil)
+					p := t.TestEth.TestBlockByNumber(Head)
 					p.ExpectHash(alternatePayload.BlockHash)
 
 					// Now it should be with alternatePayload
@@ -2346,7 +2467,7 @@ func missingFcu(t *TestEnv) {
 	t.CLMock.waitForTTD()
 
 	// Get last PoW block hash
-	lastPoWBlockHash := t.TestEth.TestBlockByNumber(nil).Block.Hash()
+	lastPoWBlockHash := t.TestEth.TestBlockByNumber(Head).Block.Hash()
 
 	// Produce blocks on the main client, these payloads will be replayed on the secondary client.
 	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
@@ -2376,7 +2497,7 @@ func missingFcu(t *TestEnv) {
 	}
 
 	// Verify that at this point, the client's head still points to the last non-PoS block
-	r := secondaryEthTest.TestBlockByNumber(nil)
+	r := secondaryEthTest.TestBlockByNumber(Head)
 	r.ExpectHash(lastPoWBlockHash)
 
 	// Verify that the head correctly changes after the last ForkchoiceUpdated
@@ -2390,7 +2511,7 @@ func missingFcu(t *TestEnv) {
 	p.ExpectLatestValidHash(&fcU.HeadBlockHash)
 
 	// Now the head should've changed to the latest PoS block
-	s := secondaryEthTest.TestBlockByNumber(nil)
+	s := secondaryEthTest.TestBlockByNumber(Head)
 	s.ExpectHash(fcU.HeadBlockHash)
 
 }
@@ -2523,7 +2644,7 @@ func suggestedFeeRecipient(t *TestEnv) {
 	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
 
 	// Calculate the fees and check that they match the balance of the fee recipient
-	r := t.TestEth.TestBlockByNumber(nil)
+	r := t.TestEth.TestBlockByNumber(Head)
 	r.ExpectTransactionCountEqual(txCount)
 	r.ExpectCoinbase(feeRecipient)
 	blockIncluded := r.Block
