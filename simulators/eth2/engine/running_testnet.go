@@ -114,7 +114,7 @@ func startTestnet(t *hivesim.T, env *testEnv, config *Config) *Testnet {
 
 	// for each key partition, we start a validator client with its own beacon node and eth1 node
 	for i, node := range config.Nodes {
-		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), config.Eth1Consensus, node.ExecutionClientTTD)
+		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), config.Eth1Consensus, node.ExecutionClientTTD, node.Chain)
 		if node.ConsensusClient != "" {
 			prep.startBeaconNode(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon"), node.BeaconNodeTTD, []int{i})
 			prep.startValidatorClient(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", node.ConsensusClient), "validator"), i, i)
@@ -135,6 +135,10 @@ func (t *Testnet) GenesisTime() time.Time {
 	return time.Unix(int64(t.genesisTime), 0)
 }
 
+func (t *Testnet) SlotsTimeout(slots common.Slot) <-chan time.Time {
+	return time.After(time.Duration(uint64(slots)*uint64(t.spec.SECONDS_PER_SLOT)) * time.Second)
+}
+
 func (t *Testnet) ValidatorClientIndex(pk [48]byte) (int, error) {
 	for i, v := range t.validators {
 		if v.ContainsKey(pk) {
@@ -144,17 +148,25 @@ func (t *Testnet) ValidatorClientIndex(pk [48]byte) (int, error) {
 	return 0, fmt.Errorf("key not found in any validator client")
 }
 
-// WaitForFinality blocks until a beacon client reaches finality.
-func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error) {
+// WaitForFinality blocks until a beacon client reaches finality,
+// or timeoutSlots have passed, whichever happens first.
+func (t *Testnet) WaitForFinality(ctx context.Context, timeoutSlots common.Slot) (common.Checkpoint, error) {
 	genesis := t.GenesisTime()
 	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
 	timer := time.NewTicker(slotDuration)
 	done := make(chan common.Checkpoint, len(t.verificationBeacons()))
-
+	var timeout <-chan time.Time
+	if timeoutSlots > 0 {
+		timeout = t.SlotsTimeout(timeoutSlots)
+	} else {
+		timeout = make(<-chan time.Time)
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return common.Checkpoint{}, fmt.Errorf("context called")
+		case <-timeout:
+			return common.Checkpoint{}, fmt.Errorf("Timeout")
 		case finalized := <-done:
 			return finalized, nil
 		case tim := <-timer.C:
@@ -269,8 +281,9 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 	}
 }
 
-// Waits for any execution payload to be available included in a beacon block (merge)
-func (t *Testnet) WaitForExecutionPayload(ctx context.Context) (ethcommon.Hash, error) {
+// Waits for any execution payload to be available included in a beacon block (merge),
+// or timeoutSlots have passed, whichever happens first.
+func (t *Testnet) WaitForExecutionPayload(ctx context.Context, timeoutSlots common.Slot) (ethcommon.Hash, error) {
 	genesis := t.GenesisTime()
 	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
 	timer := time.NewTicker(slotDuration)
@@ -282,13 +295,20 @@ func (t *Testnet) WaitForExecutionPayload(ctx context.Context) (ethcommon.Hash, 
 	client := &http.Client{}
 	rpcClient, _ := rpc.DialHTTPWithClient(userRPCAddress, client)
 	ttdReached := false
-
+	var timeout <-chan time.Time
+	if timeoutSlots > 0 {
+		timeout = t.SlotsTimeout(timeoutSlots)
+	} else {
+		timeout = make(<-chan time.Time)
+	}
 	for {
 		select {
 		case <-ctx.Done():
 			return ethcommon.Hash{}, fmt.Errorf("context called")
-		case execHash := <-done:
-			return execHash, nil
+		case result := <-done:
+			return result, nil
+		case <-timeout:
+			return ethcommon.Hash{}, fmt.Errorf("Timeout")
 		case tim := <-timer.C:
 			// start polling after first slot of genesis
 			if tim.Before(genesis.Add(slotDuration)) {
@@ -397,32 +417,6 @@ func (t *Testnet) WaitForExecutionPayload(ctx context.Context) (ethcommon.Hash, 
 
 		}
 	}
-}
-
-func (t *Testnet) GetBeaconBlockByExecutionHash(ctx context.Context, hash ethcommon.Hash) *bellatrix.SignedBeaconBlock {
-	lastSlot := t.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), t.genesisTime)
-	for slot := int(lastSlot); slot > 0; slot -= 1 {
-		for _, bn := range t.verificationBeacons() {
-			var versionedBlock eth2api.VersionedSignedBeaconBlock
-			if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
-				continue
-			} else if !exists {
-				continue
-			}
-			if versionedBlock.Version != "bellatrix" {
-				// Block can't contain an executable payload, and we are not going to find it going backwards, so return.
-				return nil
-			}
-			block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
-			payload := block.Message.Body.ExecutionPayload
-			if bytes.Compare(payload.BlockHash[:], hash[:]) == 0 {
-				t.t.Logf("INFO: Execution block %v found in %d: %v", hash, block.Message.Slot, ethcommon.BytesToHash(payload.BlockHash[:]))
-				return block
-			}
-		}
-
-	}
-	return nil
 }
 
 func getHealth(ctx context.Context, api *eth2api.Eth2HttpClient, spec *common.Spec, slot common.Slot) (float64, error) {

@@ -28,6 +28,8 @@ const (
 	EngineForkchoiceUpdatedV1 string = "engine_forkchoiceUpdatedV1"
 	EngineGetPayloadV1               = "engine_getPayloadV1"
 	EngineNewPayloadV1               = "engine_newPayloadV1"
+	EthGetBlockByHash                = "eth_getBlockByHash"
+	EthGetBlockByNumber              = "eth_getBlockByNumber"
 )
 
 // EngineClient wrapper for Ethereum Engine RPC for testing purposes.
@@ -122,6 +124,20 @@ func (ec *EngineClient) checkTTD() (*types.Header, bool) {
 		return &td.Header, true
 	}
 	return nil, false
+}
+
+func (ec *EngineClient) waitForTTDWithTimeout(cliqueSeconds uint64, timeout <-chan time.Time) bool {
+	for {
+		select {
+		case <-time.After(time.Duration(cliqueSeconds) * time.Second):
+			_, ok := ec.checkTTD()
+			if ok {
+				return true
+			}
+		case <-timeout:
+			return false
+		}
+	}
 }
 
 // Engine API Types

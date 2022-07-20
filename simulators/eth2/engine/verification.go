@@ -5,16 +5,20 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"net/http"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/eth2api/client/beaconapi"
 	"github.com/protolambda/zrnt/eth2/beacon/altair"
 	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
+	"github.com/protolambda/ztyp/tree"
 )
 
 // Interface to specify on which slot the verification will be performed
@@ -217,6 +221,75 @@ func VerifyProposers(t *Testnet, ctx context.Context, vs VerificationSlot, allow
 	for i, proposed := range proposers {
 		if !proposed {
 			return fmt.Errorf("beacon %d: did not propose a block", i)
+		}
+	}
+	return nil
+}
+
+func VerifyELBlockLabels(t *Testnet, ctx context.Context) error {
+	for i := 0; i < len(t.verificationExecution()); i++ {
+		el := t.verificationExecution()[i]
+		bn := t.verificationBeacons()[i]
+		// Get the head
+		var headInfo eth2api.BeaconBlockHeaderAndInfo
+		if exists, err := beaconapi.BlockHeader(ctx, bn.API, eth2api.BlockHead, &headInfo); err != nil {
+			return err
+		} else if !exists {
+			return fmt.Errorf("beacon %d: head info not found", i)
+		}
+
+		// Get the checkpoints
+		var checkpoints eth2api.FinalityCheckpoints
+		if exists, err := beaconapi.FinalityCheckpoints(ctx, bn.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &checkpoints); err != nil || !exists {
+			if exists, err = beaconapi.FinalityCheckpoints(ctx, bn.API, eth2api.StateIdSlot(headInfo.Header.Message.Slot), &checkpoints); err != nil {
+				return err
+			} else if !exists {
+				return fmt.Errorf("beacon %d: finality checkpoints not found", i)
+			}
+		}
+		blockLabels := map[string]tree.Root{
+			"latest":    headInfo.Root,
+			"finalized": checkpoints.Finalized.Root,
+			"safe":      checkpoints.CurrentJustified.Root,
+		}
+
+		for label, root := range blockLabels {
+			// Get the beacon block
+			var (
+				versionedBlock eth2api.VersionedSignedBeaconBlock
+				expectedExec   ethcommon.Hash
+			)
+			if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdRoot(root), &versionedBlock); err != nil {
+				return err
+			} else if !exists {
+				return fmt.Errorf("beacon %d: beacon block to query %s not found", i, label)
+			}
+			switch versionedBlock.Version {
+			case "phase0":
+				expectedExec = ethcommon.Hash{}
+			case "altair":
+				expectedExec = ethcommon.Hash{}
+			case "bellatrix":
+				block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+				expectedExec = ethcommon.BytesToHash(block.Message.Body.ExecutionPayload.BlockHash[:])
+			}
+
+			// Get the el block and compare
+			rpcAddr, _ := el.UserRPCAddress()
+			rpcClient, _ := rpc.DialHTTPWithClient(rpcAddr, &http.Client{})
+			var h types.Header
+
+			if err := rpcClient.CallContext(ctx, &h, "eth_getBlockByNumber", label, false); err != nil {
+				if expectedExec != (ethcommon.Hash{}) {
+					return err
+				}
+			} else {
+				if h.Hash() != expectedExec {
+					return fmt.Errorf("beacon %d: Execution hash found in checkpoint block (%s) does not match what the el returns: %v != %v", i, label, expectedExec, h.Hash())
+				}
+				fmt.Printf("beacon %d: Execution hash matches beacon checkpoint block (%s) information: %v\n", i, label, h.Hash())
+			}
+
 		}
 	}
 	return nil

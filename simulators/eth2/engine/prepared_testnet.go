@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net"
@@ -13,13 +14,17 @@ import (
 	blsu "github.com/protolambda/bls12-381-util"
 	"github.com/protolambda/ztyp/view"
 
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/configs"
 )
 
-var depositAddress common.Eth1Address
+var (
+	depositAddress                              common.Eth1Address
+	DEFAULT_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY = big.NewInt(128)
+)
 
 func init() {
 	_ = depositAddress.UnmarshalText([]byte("0x4242424242424242424242424242424242424242"))
@@ -66,6 +71,21 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet
 	jwtSecret := hivesim.Params{"HIVE_JWTSECRET": "true"}
 	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts, jwtSecret)
 
+	// Pre-generate PoW chains for clients that require it
+	for i := 0; i < len(config.Nodes); i++ {
+		if config.Nodes[i].ChainGenerator != nil {
+			config.Nodes[i].Chain, err = config.Nodes[i].ChainGenerator.Generate(eth1Genesis)
+			if err != nil {
+				t.Fatal(err)
+			}
+			fmt.Printf("Generated chain for node %d:\n", i+1)
+			for j, b := range config.Nodes[i].Chain {
+				js, _ := json.MarshalIndent(b.Header(), "", "  ")
+				fmt.Printf("Block %d: %s\n", j, js)
+			}
+		}
+	}
+
 	// Generate beacon spec
 	//
 	// TODO: specify build-target based on preset, to run clients in mainnet or minimal mode.
@@ -106,12 +126,24 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet
 	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)
 
 	// Generate keys opts for validators
-	keyTranches := setup.KeyTranches(env.Keys, config.Nodes.Shares())
+	shares := config.Nodes.Shares()
+	// ExtraShares defines an extra set of keys that none of the nodes will have.
+	// E.g. to produce an environment where none of the nodes has 50%+ of the keys.
+	if config.ExtraShares != nil {
+		shares = append(shares, config.ExtraShares.Uint64())
+	}
+	keyTranches := setup.KeyTranches(env.Keys, shares)
 
 	consensusConfigOpts, err := setup.ConsensusConfigsBundle(spec, eth1Genesis.Genesis, config.ValidatorCount.Uint64())
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	var optimisticSync hivesim.Params
+	if config.SafeSlotsToImportOptimistically == nil {
+		config.SafeSlotsToImportOptimistically = DEFAULT_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY
+	}
+	optimisticSync = optimisticSync.Set("HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY", fmt.Sprintf("%d", config.SafeSlotsToImportOptimistically))
 
 	// prepare genesis beacon state, with all the validators in it.
 	state, err := setup.BuildBeaconState(spec, eth1Genesis.Genesis, eth2GenesisTime, env.Keys)
@@ -142,6 +174,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet
 		},
 		stateOpt,
 		consensusConfigOpts,
+		optimisticSync,
 	)
 
 	validatorOpts := hivesim.Bundle(
@@ -176,14 +209,12 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 	}
 }
 
-func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus setup.Eth1Consensus, ttd *big.Int) {
+func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus setup.Eth1Consensus, ttd *big.Int, chain []*types.Block) {
 	testnet.t.Logf("Starting eth1 node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	opts := []hivesim.StartOption{p.executionOpts}
-	if len(testnet.eth1) == 0 {
-		// we only make the first eth1 node a miner
-		opts = append(opts, consensus.HiveParams())
-	} else {
+	opts = append(opts, consensus.HiveParams(len(testnet.eth1)))
+	if len(testnet.eth1) > 0 {
 		bootnode, err := testnet.eth1[0].EnodeURL()
 		if err != nil {
 			testnet.t.Fatalf("failed to get eth1 bootnode URL: %v", err)
@@ -194,6 +225,14 @@ func (p *PreparedTestnet) startEth1Node(testnet *Testnet, eth1Def *hivesim.Clien
 	}
 	if ttd != nil {
 		opts = append(opts, hivesim.Params{"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf("%d", ttd.Int64())})
+	}
+	if chain != nil && len(chain) > 0 {
+		// Bundle the chain into the container
+		chainParam, err := setup.ChainBundle(chain)
+		if err != nil {
+			panic(err)
+		}
+		opts = append(opts, chainParam)
 	}
 	en := &Eth1Node{testnet.t.StartClient(eth1Def.Name, opts...)}
 	dest, _ := en.EngineRPCAddress()
@@ -256,7 +295,7 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 	//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
 	//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 	//}
-	bn := NewBeaconNode(testnet.t.StartClient(beaconDef.Name, opts...))
+	bn := NewBeaconNode(testnet.t.StartClient(beaconDef.Name, opts...), testnet.genesisTime, testnet.spec, len(testnet.beacons))
 	testnet.beacons = append(testnet.beacons, bn)
 }
 

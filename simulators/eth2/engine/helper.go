@@ -1,20 +1,25 @@
 package main
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 	blsu "github.com/protolambda/bls12-381-util"
+	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/rauljordan/engine-proxy/proxy"
 )
 
@@ -37,6 +42,8 @@ type node struct {
 	ExecutionClientTTD   *big.Int
 	BeaconNodeTTD        *big.Int
 	TestVerificationNode bool
+	ChainGenerator       ChainGenerator
+	Chain                []*types.Block
 }
 
 type Nodes []node
@@ -54,13 +61,15 @@ func (nodes Nodes) Shares() []uint64 {
 }
 
 type Config struct {
-	AltairForkEpoch         *big.Int
-	MergeForkEpoch          *big.Int
-	CapellaForkEpoch        *big.Int
-	ValidatorCount          *big.Int
-	KeyTranches             *big.Int
-	SlotTime                *big.Int
-	TerminalTotalDifficulty *big.Int
+	AltairForkEpoch                 *big.Int
+	MergeForkEpoch                  *big.Int
+	CapellaForkEpoch                *big.Int
+	ValidatorCount                  *big.Int
+	KeyTranches                     *big.Int
+	SlotTime                        *big.Int
+	TerminalTotalDifficulty         *big.Int
+	SafeSlotsToImportOptimistically *big.Int
+	ExtraShares                     *big.Int
 
 	// Node configurations to launch. Each node as a proportional share of
 	// validators.
@@ -95,6 +104,8 @@ func (a *Config) join(b *Config) *Config {
 	c.KeyTranches = choose(a.KeyTranches, b.KeyTranches)
 	c.SlotTime = choose(a.SlotTime, b.SlotTime)
 	c.TerminalTotalDifficulty = choose(a.TerminalTotalDifficulty, b.TerminalTotalDifficulty)
+	c.SafeSlotsToImportOptimistically = choose(a.SafeSlotsToImportOptimistically, b.SafeSlotsToImportOptimistically)
+	c.ExtraShares = choose(a.ExtraShares, b.ExtraShares)
 
 	// EL config
 	c.InitialBaseFeePerGas = choose(a.InitialBaseFeePerGas, b.InitialBaseFeePerGas)
@@ -405,10 +416,10 @@ func generateInvalidPayloadSpoof(method string, basePayload *ExecutableDataV1, p
 	var customPayloadMod *CustomPayloadData
 	switch payloadField {
 	case InvalidParentHash:
-		modParentHash := basePayload.ParentHash
-		modParentHash[common.HashLength-1] = byte(255 - modParentHash[common.HashLength-1])
+		var randomParentHash common.Hash
+		rand.Read(randomParentHash[:])
 		customPayloadMod = &CustomPayloadData{
-			ParentHash: &modParentHash,
+			ParentHash: &randomParentHash,
 		}
 	case InvalidStateRoot:
 		modStateRoot := basePayload.StateRoot
@@ -551,6 +562,108 @@ func forkchoiceResponseSpoof(method string, status PayloadStatusV1, payloadID *P
 	}, nil
 }
 
+// List of Hashes that can be accessed concurrently
+type SyncHashes struct {
+	Hashes []common.Hash
+	Lock   *sync.Mutex
+}
+
+func NewSyncHashes(hashes ...common.Hash) *SyncHashes {
+	newSyncHashes := &SyncHashes{
+		Hashes: make([]common.Hash, 0),
+		Lock:   &sync.Mutex{},
+	}
+	for _, h := range hashes {
+		newSyncHashes.Hashes = append(newSyncHashes.Hashes, h)
+	}
+	return newSyncHashes
+}
+
+func (syncHashes *SyncHashes) Contains(hash common.Hash) bool {
+	syncHashes.Lock.Lock()
+	defer syncHashes.Lock.Unlock()
+	if syncHashes.Hashes == nil {
+		return false
+	}
+	for _, h := range syncHashes.Hashes {
+		if h == hash {
+			return true
+		}
+	}
+	return false
+}
+
+func (syncHashes *SyncHashes) Add(hash common.Hash) {
+	syncHashes.Lock.Lock()
+	defer syncHashes.Lock.Unlock()
+	syncHashes.Hashes = append(syncHashes.Hashes, hash)
+}
+
+// Generate a callback that invalidates either a call to `engine_forkchoiceUpdatedV1` or `engine_newPayloadV1`
+// for all hashes with given exceptions, and a given LatestValidHash.
+func InvalidateExecutionPayloads(method string, exceptions *SyncHashes, latestValidHash *common.Hash, invalidated chan<- common.Hash) func([]byte, []byte) *proxy.Spoof {
+	if method == EngineForkchoiceUpdatedV1 {
+		return func(res []byte, req []byte) *proxy.Spoof {
+			var (
+				fcState ForkchoiceStateV1
+				pAttr   PayloadAttributesV1
+				spoof   *proxy.Spoof
+				err     error
+			)
+			err = UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+			if err != nil {
+				panic(err)
+			}
+			if !exceptions.Contains(fcState.HeadBlockHash) {
+				spoof, err = forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, PayloadStatusV1{
+					Status:          Invalid,
+					LatestValidHash: latestValidHash,
+					ValidationError: nil,
+				}, nil)
+				if err != nil {
+					panic(err)
+				}
+				select {
+				case invalidated <- fcState.HeadBlockHash:
+				default:
+				}
+				return spoof
+			}
+			return nil
+		}
+	}
+	if method == EngineNewPayloadV1 {
+		return func(res []byte, req []byte) *proxy.Spoof {
+			var (
+				payload ExecutableDataV1
+				spoof   *proxy.Spoof
+				err     error
+			)
+			err = UnmarshalFromJsonRPCRequest(req, &payload)
+			if err != nil {
+				panic(err)
+			}
+			if !exceptions.Contains(payload.BlockHash) {
+				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &PayloadStatusV1{
+					Status:          Invalid,
+					LatestValidHash: latestValidHash,
+					ValidationError: nil,
+				})
+				if err != nil {
+					panic(err)
+				}
+				select {
+				case invalidated <- payload.BlockHash:
+				default:
+				}
+				return spoof
+			}
+			return nil
+		}
+	}
+	panic(fmt.Errorf("ERROR: Invalid method to generate callback: %s", method))
+}
+
 // Generates a callback that detects when a ForkchoiceUpdated with Payload Attributes fails.
 // Requires a lock in case two clients receive the fcU with payload attributes at the same time.
 // Requires chan(error) to return the final outcome of the callbacks.
@@ -601,4 +714,69 @@ func combine(a, b *proxy.Spoof) *proxy.Spoof {
 		a.Fields[k] = v
 	}
 	return a
+}
+
+// Try to approximate how much time until the merge based on current time, bellatrix fork epoch,
+// TTD, execution clients' consensus mechanism, current total difficulty.
+// This function is used to calculate timeouts, so it will always return a pessimistic value.
+func SlotsUntilMerge(t *Testnet, c *Config) beacon.Slot {
+	l := make([]beacon.Slot, 0)
+	l = append(l, SlotsUntilBellatrix(t.genesisTime, t.spec))
+
+	for i, e := range t.eth1 {
+		l = append(l, beacon.Slot(TimeUntilTerminalBlock(e, c.Eth1Consensus, c.TerminalTotalDifficulty, c.Nodes[i])/uint64(t.spec.SECONDS_PER_SLOT)))
+	}
+
+	// Return the worst case
+	var max = beacon.Slot(0)
+	for _, s := range l {
+		if s > max {
+			max = s
+		}
+	}
+
+	fmt.Printf("INFO: Estimated slots until merge %d\n", max)
+
+	// Add more slots give it some wiggle room
+	return max + 5
+}
+
+func SlotsUntilBellatrix(genesisTime beacon.Timestamp, spec *beacon.Spec) beacon.Slot {
+	currentTimestamp := beacon.Timestamp(time.Now().Unix())
+	bellatrixTime, err := spec.TimeAtSlot(beacon.Slot(spec.BELLATRIX_FORK_EPOCH*beacon.Epoch(spec.SLOTS_PER_EPOCH)), genesisTime)
+	if err != nil {
+		panic(err)
+	}
+	if currentTimestamp >= bellatrixTime {
+		return beacon.Slot(0)
+	}
+	s := beacon.Slot((bellatrixTime-currentTimestamp)/spec.SECONDS_PER_SLOT) + 1
+	fmt.Printf("INFO: bellatrixTime:%d, currentTimestamp:%d, slots=%d\n", bellatrixTime, currentTimestamp, s)
+	return s
+}
+
+func TimeUntilTerminalBlock(e *Eth1Node, c setup.Eth1Consensus, defaultTTD *big.Int, n node) uint64 {
+	var ttd = defaultTTD
+	if n.ExecutionClientTTD != nil {
+		ttd = n.ExecutionClientTTD
+	}
+	// Get the current total difficulty for node
+	userRPCAddress, err := e.UserRPCAddress()
+	if err != nil {
+		panic(err)
+	}
+	client := &http.Client{}
+	rpcClient, _ := rpc.DialHTTPWithClient(userRPCAddress, client)
+	var tdh *TotalDifficultyHeader
+	if err := rpcClient.CallContext(context.Background(), &tdh, "eth_getBlockByNumber", "latest", false); err != nil {
+		panic(err)
+	}
+	td := tdh.TotalDifficulty.ToInt()
+	if td.Cmp(ttd) >= 0 {
+		// TTD already reached
+		return 0
+	}
+	fmt.Printf("INFO: ttd:%d, td:%d, diffPerBlock:%d, secondsPerBlock:%d\n", ttd, td, c.DifficultyPerBlock(), c.SecondsPerBlock())
+	td.Sub(ttd, td).Div(td, c.DifficultyPerBlock()).Mul(td, big.NewInt(int64(c.SecondsPerBlock())))
+	return td.Uint64()
 }

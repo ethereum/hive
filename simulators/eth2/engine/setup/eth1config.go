@@ -63,11 +63,14 @@ var (
 
 type Eth1Consensus interface {
 	Configure(*Eth1Genesis) error
-	HiveParams() hivesim.Params
+	HiveParams(int) hivesim.Params
+	DifficultyPerBlock() *big.Int
+	SecondsPerBlock() uint64
 }
 
 type Eth1EthashConsensus struct {
 	MinerAddress string
+	MiningNodes  int
 }
 
 func (c Eth1EthashConsensus) Configure(*Eth1Genesis) error {
@@ -75,11 +78,28 @@ func (c Eth1EthashConsensus) Configure(*Eth1Genesis) error {
 	return nil
 }
 
-func (c Eth1EthashConsensus) HiveParams() hivesim.Params {
+func (c Eth1EthashConsensus) HiveParams(node int) hivesim.Params {
 	if c.MinerAddress == "" {
 		c.MinerAddress = DEFAULT_ETHASH_MINER_ADDRESS
 	}
-	return hivesim.Params{"HIVE_MINER": c.MinerAddress}
+	if c.MiningNodes == 0 {
+		// Default is that only one node is a miner
+		c.MiningNodes = 1
+	}
+	if node < c.MiningNodes {
+		return hivesim.Params{"HIVE_MINER": c.MinerAddress}
+	}
+	return hivesim.Params{}
+}
+
+func (c Eth1EthashConsensus) DifficultyPerBlock() *big.Int {
+	// Approximately 0x20000
+	return big.NewInt(131072)
+}
+
+func (c Eth1EthashConsensus) SecondsPerBlock() uint64 {
+	// It is really hard to approxmate this value
+	return 10
 }
 
 type Eth1CliqueConsensus struct {
@@ -100,7 +120,10 @@ func (c Eth1CliqueConsensus) Configure(genesis *Eth1Genesis) error {
 	return nil
 }
 
-func (c Eth1CliqueConsensus) HiveParams() hivesim.Params {
+func (c Eth1CliqueConsensus) HiveParams(node int) hivesim.Params {
+	if node > 0 {
+		return hivesim.Params{}
+	}
 	if c.PrivateKey == "" {
 		c.PrivateKey = DEFAULT_CLIQUE_PRIVATE_KEY
 	}
@@ -111,6 +134,17 @@ func (c Eth1CliqueConsensus) HiveParams() hivesim.Params {
 		"HIVE_CLIQUE_PRIVATEKEY": c.PrivateKey,
 		"HIVE_MINER":             c.MinerAddress,
 	}
+}
+
+func (c Eth1CliqueConsensus) DifficultyPerBlock() *big.Int {
+	return big.NewInt(2)
+}
+
+func (c Eth1CliqueConsensus) SecondsPerBlock() uint64 {
+	if c.CliquePeriod == 0 {
+		return CLIQUE_PERIOD_DEFAULT
+	}
+	return c.CliquePeriod
 }
 
 type Eth1Genesis struct {
@@ -144,7 +178,7 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64, consensus Eth1Consensus)
 				BerlinBlock:             big.NewInt(0),
 				LondonBlock:             big.NewInt(0),
 				ArrowGlacierBlock:       big.NewInt(0),
-				MergeForkBlock:          big.NewInt(0),
+				MergeNetsplitBlock:      big.NewInt(0),
 				TerminalTotalDifficulty: ttd,
 				Clique:                  nil,
 			},
@@ -188,7 +222,7 @@ func (conf *Eth1Genesis) ToParams(depositAddress [20]byte) hivesim.Params {
 		"HIVE_FORK_BERLIN":               conf.Genesis.Config.BerlinBlock.String(),
 		"HIVE_FORK_LONDON":               conf.Genesis.Config.LondonBlock.String(),
 		"HIVE_FORK_ARROWGLACIER":         conf.Genesis.Config.ArrowGlacierBlock.String(),
-		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeForkBlock.String(),
+		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeNetsplitBlock.String(),
 		"HIVE_TERMINAL_TOTAL_DIFFICULTY": conf.Genesis.Config.TerminalTotalDifficulty.String(),
 	}
 	if conf.Genesis.Config.Clique != nil {

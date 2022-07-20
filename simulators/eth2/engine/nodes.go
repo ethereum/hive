@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,10 +9,14 @@ import (
 	"strings"
 	"time"
 
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 	"github.com/protolambda/eth2api"
+	"github.com/protolambda/eth2api/client/beaconapi"
 	"github.com/protolambda/eth2api/client/nodeapi"
+	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
+	"github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
 const (
@@ -51,12 +56,15 @@ func (en *Eth1Node) MustGetEnode() string {
 
 type BeaconNode struct {
 	*hivesim.Client
-	API *eth2api.Eth2HttpClient
+	API         *eth2api.Eth2HttpClient
+	genesisTime common.Timestamp
+	spec        *common.Spec
+	index       int
 }
 
 type BeaconNodes []*BeaconNode
 
-func NewBeaconNode(cl *hivesim.Client) *BeaconNode {
+func NewBeaconNode(cl *hivesim.Client, genesisTime common.Timestamp, spec *common.Spec, index int) *BeaconNode {
 	return &BeaconNode{
 		Client: cl,
 		API: &eth2api.Eth2HttpClient{
@@ -64,6 +72,9 @@ func NewBeaconNode(cl *hivesim.Client) *BeaconNode {
 			Cli:   &http.Client{},
 			Codec: eth2api.JSONCodec{},
 		},
+		genesisTime: genesisTime,
+		spec:        spec,
+		index:       index,
 	}
 }
 
@@ -96,6 +107,138 @@ func (beacons BeaconNodes) ENRs() (string, error) {
 		enrs = append(enrs, enr)
 	}
 	return strings.Join(enrs, ","), nil
+}
+
+func (b *BeaconNode) WaitForExecutionPayload(ctx context.Context, timeoutSlots common.Slot) (ethcommon.Hash, error) {
+	fmt.Printf("Waiting for execution payload on beacon %d\n", b.index)
+	slotDuration := time.Duration(b.spec.SECONDS_PER_SLOT) * time.Second
+	timer := time.NewTicker(slotDuration)
+	var timeout <-chan time.Time
+	if timeoutSlots > 0 {
+		timeout = time.After(time.Second * time.Duration(uint64(timeoutSlots)*uint64(b.spec.SECONDS_PER_SLOT)))
+	} else {
+		timeout = make(<-chan time.Time)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ethcommon.Hash{}, fmt.Errorf("context called")
+		case <-timeout:
+			return ethcommon.Hash{}, fmt.Errorf("Timeout")
+		case <-timer.C:
+			realTimeSlot := b.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), b.genesisTime)
+			var headInfo eth2api.BeaconBlockHeaderAndInfo
+			if exists, err := beaconapi.BlockHeader(ctx, b.API, eth2api.BlockHead, &headInfo); err != nil {
+				return ethcommon.Hash{}, fmt.Errorf("WaitForExecutionPayload: failed to poll head: %v", err)
+			} else if !exists {
+				return ethcommon.Hash{}, fmt.Errorf("WaitForExecutionPayload: failed to poll head: !exists")
+			}
+
+			var versionedBlock eth2api.VersionedSignedBeaconBlock
+			if exists, err := beaconapi.BlockV2(ctx, b.API, eth2api.BlockIdRoot(headInfo.Root), &versionedBlock); err != nil {
+				return ethcommon.Hash{}, fmt.Errorf("WaitForExecutionPayload: failed to retrieve block: %v", err)
+			} else if !exists {
+				return ethcommon.Hash{}, fmt.Errorf("WaitForExecutionPayload: block not found")
+			}
+			var execution ethcommon.Hash
+			if versionedBlock.Version == "bellatrix" {
+				block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+				copy(execution[:], block.Message.Body.ExecutionPayload.BlockHash[:])
+			}
+			zero := ethcommon.Hash{}
+			fmt.Printf("beacon %d: slot=%d, realTimeSlot=%d, head=%s, exec=%s\n", b.index, headInfo.Header.Message.Slot, realTimeSlot, shorten(headInfo.Root.String()), shorten(execution.Hex()))
+			if bytes.Compare(execution[:], zero[:]) != 0 {
+				return execution, nil
+			}
+		}
+	}
+}
+
+//
+func (bn *BeaconNode) GetLatestExecutionBeaconBlock(ctx context.Context) (*bellatrix.SignedBeaconBlock, error) {
+	var headInfo eth2api.BeaconBlockHeaderAndInfo
+	if exists, err := beaconapi.BlockHeader(ctx, bn.API, eth2api.BlockHead, &headInfo); err != nil {
+		return nil, fmt.Errorf("failed to poll head: %v", err)
+	} else if !exists {
+		return nil, fmt.Errorf("no head block")
+	}
+	for slot := headInfo.Header.Message.Slot; slot > 0; slot-- {
+		var versionedBlock eth2api.VersionedSignedBeaconBlock
+		if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
+			return nil, fmt.Errorf("failed to retrieve block: %v", err)
+		} else if !exists {
+			return nil, fmt.Errorf("block not found")
+		}
+		if versionedBlock.Version != "bellatrix" {
+			return nil, nil
+		}
+		block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+		payload := block.Message.Body.ExecutionPayload
+		if ethcommon.BytesToHash(payload.BlockHash[:]) != (ethcommon.Hash{}) {
+			return block, nil
+		}
+	}
+	return nil, nil
+}
+
+func (bn *BeaconNode) GetFirstExecutionBeaconBlock(ctx context.Context) (*bellatrix.SignedBeaconBlock, error) {
+	lastSlot := bn.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), bn.genesisTime)
+	for slot := common.Slot(0); slot <= lastSlot; slot++ {
+		var versionedBlock eth2api.VersionedSignedBeaconBlock
+		if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
+			continue
+		} else if !exists {
+			continue
+		}
+		if versionedBlock.Version != "bellatrix" {
+			continue
+		}
+		block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+		payload := block.Message.Body.ExecutionPayload
+		if ethcommon.BytesToHash(payload.BlockHash[:]) != (ethcommon.Hash{}) {
+			return block, nil
+		}
+	}
+	return nil, nil
+}
+
+func (bn *BeaconNode) GetBeaconBlockByExecutionHash(ctx context.Context, hash ethcommon.Hash) (*bellatrix.SignedBeaconBlock, error) {
+	var headInfo eth2api.BeaconBlockHeaderAndInfo
+	if exists, err := beaconapi.BlockHeader(ctx, bn.API, eth2api.BlockHead, &headInfo); err != nil {
+		return nil, fmt.Errorf("failed to poll head: %v", err)
+	} else if !exists {
+		return nil, fmt.Errorf("no head block")
+	}
+
+	for slot := int(headInfo.Header.Message.Slot); slot > 0; slot -= 1 {
+		var versionedBlock eth2api.VersionedSignedBeaconBlock
+		if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
+			continue
+		} else if !exists {
+			continue
+		}
+		if versionedBlock.Version != "bellatrix" {
+			// Block can't contain an executable payload, and we are not going to find it going backwards, so return.
+			return nil, nil
+		}
+		block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+		payload := block.Message.Body.ExecutionPayload
+		if bytes.Compare(payload.BlockHash[:], hash[:]) == 0 {
+			return block, nil
+		}
+	}
+	return nil, nil
+}
+
+func (b BeaconNodes) GetBeaconBlockByExecutionHash(ctx context.Context, hash ethcommon.Hash) (*bellatrix.SignedBeaconBlock, error) {
+	for _, bn := range b {
+		block, err := bn.GetBeaconBlockByExecutionHash(ctx, hash)
+		if err != nil || block != nil {
+			return block, err
+		}
+	}
+	return nil, nil
 }
 
 type ValidatorClient struct {
