@@ -222,6 +222,11 @@ func (d *Devnet) StartOp() error {
 		"HIVE_NODETYPE":         "full",
 	}
 
+	if op.HasRole("op-sequencer") {
+		executionOpts = executionOpts.Set("HIVE_SEQUENCER_ENABLED_FLAG", "--sequencer.enabled")
+		executionOpts = executionOpts.Set("HIVE_SEQUENCER_KEY_FLAG", "--p2p.sequencer.key=/config/p2p-sequencer-key.txt")
+	}
+
 	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortalProxy.json", bytesSource([]byte(d.optimismPortal)))
 	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt}
 	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}

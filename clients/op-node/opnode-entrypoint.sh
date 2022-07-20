@@ -41,10 +41,10 @@ exec op-node \
     --l1=ws://172.17.0.3:8546 \
     --l2=ws://172.17.0.4:9546 \
     --l2.jwt-secret=/config/test-jwt-secret.txt \
-    --sequencer.enabled \
+    $HIVE_SEQUENCER_ENABLED_FLAG \
     --sequencer.l1-confs=0 \
     --verifier.l1-confs=0 \
-    --p2p.sequencer.key=/config/p2p-sequencer-key.txt \
+    $HIVE_SEQUENCER_KEY_FLAG \
     --rollup.config=/hive/rollup.json \
     --rpc.addr=0.0.0.0 \
     --rpc.port=7545 \
