@@ -64,6 +64,9 @@ jq . /chainspec/test.json
 mkdir /configs
 jq -n -f /mkconfig.jq > /configs/test.cfg
 
+echo "test.cfg"
+cat /configs/test.cfg
+
 # Set bootnode.
 if [ -n "$HIVE_BOOTNODE" ]; then
     mkdir -p /nethermind/Data
