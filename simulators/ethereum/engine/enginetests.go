@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -436,13 +435,6 @@ var engineTests = []TestSpec{
 	{
 		Name: "PrevRandao Opcode Transactions",
 		Run:  prevRandaoOpcodeTx,
-		TTD:  10,
-	},
-
-	// Multi-Client Sync tests
-	{
-		Name: "Sync Client Post Merge",
-		Run:  postMergeSync,
 		TTD:  10,
 	},
 }
@@ -2297,8 +2289,6 @@ func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
 	secondaryEngineTest := NewTestEngineClient(t, secondaryEngine)
 	t.CLMock.AddEngineClient(t.T, hc, t.MainTTD())
 
-	t.CLMock.AddEngineClient(t.T, hc, t.MainTTD())
-
 	// Wait until TTD is reached by this client
 	t.CLMock.waitForTTD()
 
@@ -2480,56 +2470,4 @@ func prevRandaoOpcodeTx(t *TestEnv) {
 		checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[i], i)
 	}
 
-}
-
-// Client Sync tests
-func postMergeSync(t *TestEnv) {
-	// Launch another client after the PoS transition has happened in the main client.
-	// Sync should eventually happen without issues.
-	t.CLMock.waitForTTD()
-
-	// Produce some blocks
-	t.CLMock.produceBlocks(10, BlockProcessCallbacks{})
-
-	allClients, err := t.Sim.ClientTypes()
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to obtain all client types", t.TestName)
-	}
-	// Set the Bootnode
-	enode, err := t.Engine.EnodeURL()
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to obtain bootnode: %v", t.TestName, err)
-	}
-	newParams := t.ClientParams.Set("HIVE_BOOTNODE", fmt.Sprintf("%s", enode))
-	newParams = newParams.Set("HIVE_MINER", "")
-
-	for _, client := range allClients {
-		c, ec, err := t.StartClient(client.Name, newParams, t.MainTTD())
-		if err != nil {
-			t.Fatalf("FAIL (%s): Unable to start client (%v): %v", t.TestName, client, err)
-		}
-		// Add engine client and broadcast to it the latest forkchoice
-		t.CLMock.AddEngineClient(t.T, c, t.MainTTD())
-	syncLoop:
-		for {
-			select {
-			case <-t.Timeout:
-				t.Fatalf("FAIL (%s): Test timeout", t.TestName)
-			default:
-			}
-
-			// CL continues building blocks on top of the PoS chain
-			t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
-
-			// When the main client syncs, the test passes
-			latestHeader, err := ec.Eth.HeaderByNumber(t.Ctx(), nil)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Unable to obtain latest header: %v", t.TestName, err)
-			}
-			if t.CLMock.LatestHeader != nil && latestHeader.Hash() == t.CLMock.LatestHeader.Hash() {
-				t.Logf("INFO (%v): Client (%v) is now synced to latest PoS block: %v", t.TestName, c.Container, latestHeader.Hash())
-				break syncLoop
-			}
-		}
-	}
 }

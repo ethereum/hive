@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math/big"
 	"math/rand"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -18,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/hivesim"
@@ -537,6 +540,28 @@ func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx
 	return nil
 }
 
+func loadChain(path string) types.Blocks {
+	fh, err := os.Open(path)
+	if err != nil {
+		panic(err)
+	}
+	defer fh.Close()
+	var reader io.Reader = fh
+	stream := rlp.NewStream(reader, 0)
+
+	blocks := make(types.Blocks, 0)
+	for {
+		var b types.Block
+		if err := stream.Decode(&b); err == io.EOF {
+			break
+		} else if err != nil {
+			panic(err)
+		}
+		blocks = append(blocks, &b)
+	}
+	return blocks
+}
+
 func loadGenesis(path string) core.Genesis {
 	contents, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -552,6 +577,17 @@ func loadGenesis(path string) core.Genesis {
 func loadGenesisBlock(path string) *types.Block {
 	genesis := loadGenesis(path)
 	return genesis.ToBlock(nil)
+}
+
+func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
+	result := new(big.Int).Set(genesis.Difficulty)
+	for _, b := range chain {
+		if lastBlock != 0 && lastBlock == b.NumberU64() {
+			break
+		}
+		result.Add(result, b.Difficulty())
+	}
+	return result
 }
 
 // Helper structs to fetch the TotalDifficulty
