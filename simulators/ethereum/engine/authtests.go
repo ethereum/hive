@@ -12,6 +12,7 @@ type AuthTestSpec struct {
 	TimeDriftSeconds      int64
 	CustomAuthSecretBytes []byte
 	AuthOk                bool
+	RetryAttempts         int64
 }
 
 var authTestSpecs = []AuthTestSpec{
@@ -38,24 +39,28 @@ var authTestSpecs = []AuthTestSpec{
 		TimeDriftSeconds:      -1 - maxTimeDriftSeconds,
 		CustomAuthSecretBytes: nil,
 		AuthOk:                false,
+		RetryAttempts:         5,
 	},
 	{
 		Name:                  "JWT Authentication: Negative time drift, within limit, correct secret",
 		TimeDriftSeconds:      1 - maxTimeDriftSeconds,
 		CustomAuthSecretBytes: nil,
 		AuthOk:                true,
+		RetryAttempts:         5,
 	},
 	{
 		Name:                  "JWT Authentication: Positive time drift, exceeding limit, correct secret",
 		TimeDriftSeconds:      maxTimeDriftSeconds + 1,
 		CustomAuthSecretBytes: nil,
 		AuthOk:                false,
+		RetryAttempts:         5,
 	},
 	{
 		Name:                  "JWT Authentication: Positive time drift, within limit, correct secret",
 		TimeDriftSeconds:      maxTimeDriftSeconds - 1,
 		CustomAuthSecretBytes: nil,
 		AuthOk:                true,
+		RetryAttempts:         5,
 	},
 }
 
@@ -78,26 +83,38 @@ func GenerateAuthTestSpec(authTestSpec AuthTestSpec) TestSpec {
 				TerminalBlockNumber:     0,
 			}
 			testSecret = authTestSpec.CustomAuthSecretBytes
-			testTime   = time.Now()
+			// Time drift test cases are reattempted in order to mitigate false negatives
+			retryAttemptsLeft = authTestSpec.RetryAttempts
 		)
-		if testSecret == nil {
-			testSecret = defaultJwtTokenSecretBytes
-		}
-		if authTestSpec.TimeDriftSeconds != 0 {
-			testTime = testTime.Add(time.Second * time.Duration(authTestSpec.TimeDriftSeconds))
-		}
-		if err := t.Engine.PrepareAuthCallToken(testSecret, testTime); err != nil {
-			t.Fatalf("FAIL (%s): Unable to prepare the auth token: %v", t.TestName, err)
-		}
-		err := t.Engine.c.CallContext(t.Engine.Ctx(), &tConf, "engine_exchangeTransitionConfigurationV1", tConf)
-		if authTestSpec.AuthOk {
-			if err != nil {
-				t.Fatalf("FAIL (%s): Authentication was supposed to pass authentication but failed: %v", t.TestName, err)
+
+		for {
+			var testTime = time.Now()
+			if testSecret == nil {
+				testSecret = defaultJwtTokenSecretBytes
 			}
-		} else {
-			if err == nil {
-				t.Fatalf("FAIL (%s): Authentication was supposed to fail authentication but passed", t.TestName)
+			if authTestSpec.TimeDriftSeconds != 0 {
+				testTime = testTime.Add(time.Second * time.Duration(authTestSpec.TimeDriftSeconds))
 			}
+			if err := t.Engine.PrepareAuthCallToken(testSecret, testTime); err != nil {
+				t.Fatalf("FAIL (%s): Unable to prepare the auth token: %v", t.TestName, err)
+			}
+			err := t.Engine.c.CallContext(t.Engine.Ctx(), &tConf, "engine_exchangeTransitionConfigurationV1", tConf)
+			if (authTestSpec.AuthOk && err == nil) || (!authTestSpec.AuthOk && err != nil) {
+				// Test passed
+				return
+			}
+			if retryAttemptsLeft == 0 {
+				if err != nil {
+					// Test failed because unexpected error
+					t.Fatalf("FAIL (%s): Authentication was supposed to pass authentication but failed: %v", t.TestName, err)
+				} else {
+					// Test failed because unexpected success
+					t.Fatalf("FAIL (%s): Authentication was supposed to fail authentication but passed", t.TestName)
+				}
+			}
+			retryAttemptsLeft--
+			// Wait at least a second before trying again
+			time.Sleep(time.Second)
 		}
 	}
 	return TestSpec{

@@ -96,22 +96,40 @@ type TestSpec struct {
 	ChainFile string
 }
 
-var allTests = append(
-	engineTests,
-	append(
-		mergeTests,
-		authTests...,
-	)...,
-)
-
 func main() {
-	suite := hivesim.Suite{
+	engine := hivesim.Suite{
 		Name: "engine",
 		Description: `
 Test Engine API tests using CL mocker to inject commands into clients after they 
 have reached the Terminal Total Difficulty.`[1:],
 	}
-	for _, currentTest := range allTests {
+	addTestsToSuite(&engine, engineTests)
+
+	transition := hivesim.Suite{
+		Name: "transition",
+		Description: `
+Test Engine API tests using CL mocker to inject commands into clients and drive 
+them through the merge.`[1:],
+	}
+	addTestsToSuite(&transition, mergeTests)
+
+	auth := hivesim.Suite{
+		Name: "auth",
+		Description: `
+Test Engine API authentication features.`[1:],
+	}
+	addTestsToSuite(&auth, authTests)
+
+	// Mark suites for execution
+	simulator := hivesim.New()
+	hivesim.MustRunSuite(simulator, engine)
+	hivesim.MustRunSuite(simulator, transition)
+	hivesim.MustRunSuite(simulator, auth)
+}
+
+// Add test cases to a given test suite
+func addTestsToSuite(suite *hivesim.Suite, tests []TestSpec) {
+	for _, currentTest := range tests {
 		currentTest := currentTest
 		genesisPath := "./init/genesis.json"
 		// If the TestSpec specified a custom genesis file, use that instead.
@@ -137,9 +155,9 @@ have reached the Terminal Total Difficulty.`[1:],
 			Parameters:  newParams,
 			Files:       testFiles,
 			Run: func(t *hivesim.T, c *hivesim.Client) {
-				t.Logf("Start test: %s", currentTest.Name)
+				t.Logf("Start test (%s): %s", c.Type, currentTest.Name)
 				defer func() {
-					t.Logf("End test: %s", currentTest.Name)
+					t.Logf("End test (%s): %s", c.Type, currentTest.Name)
 				}()
 				timeout := DefaultTestCaseTimeout
 				// If a TestSpec specifies a timeout, use that instead
@@ -151,7 +169,6 @@ have reached the Terminal Total Difficulty.`[1:],
 			},
 		})
 	}
-	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
 // TTD is the value specified in the TestSpec + Genesis.Difficulty
