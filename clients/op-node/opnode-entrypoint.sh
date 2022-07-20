@@ -3,9 +3,6 @@ set -exu
 
 # Generate the rollup config.
 
-L1_URL="http://172.17.0.3:8545"
-L2_URL="http://172.17.0.4:9545"
-
 # Grab the L1 genesis. We can use cURL here to retry.
 L1_GENESIS=$(curl \
     --silent \
@@ -16,7 +13,7 @@ L1_GENESIS=$(curl \
     -X POST \
     -H "Content-Type: application/json" \
     --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x0", false],"id":1}' \
-    $L1_URL)
+    $HIVE_L1_URL)
 
 # Grab the L2 genesis. We can use cURL here to retry.
 L2_GENESIS=$(curl \
@@ -28,7 +25,7 @@ L2_GENESIS=$(curl \
     -X POST \
     -H "Content-Type: application/json" \
     --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x0", false],"id":1}' \
-    $L2_URL)
+    $HIVE_L2_URL)
 
 DEPOSIT_CONTRACT_ADDRESS=$(jq -r .address < /OptimismPortalProxy.json)
 
@@ -38,13 +35,13 @@ jq ". | .genesis.l1.hash = \"$(echo $L1_GENESIS | jq -r '.result.hash')\"" < /ro
    jq ". | .deposit_contract_address = \"$DEPOSIT_CONTRACT_ADDRESS\"" > /hive/rollup.json
 
 exec op-node \
-    --l1=ws://172.17.0.3:8546 \
-    --l2=ws://172.17.0.4:9546 \
+    $HIVE_L1_ETH_RPC_FLAG \
+    $HIVE_L2_ENGINE_RPC_FLAG \
     --l2.jwt-secret=/config/test-jwt-secret.txt \
     $HIVE_SEQUENCER_ENABLED_FLAG \
+    $HIVE_SEQUENCER_KEY_FLAG \
     --sequencer.l1-confs=0 \
     --verifier.l1-confs=0 \
-    $HIVE_SEQUENCER_KEY_FLAG \
     --rollup.config=/hive/rollup.json \
     --rpc.addr=0.0.0.0 \
     --rpc.port=7545 \

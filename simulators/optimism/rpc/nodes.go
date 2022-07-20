@@ -4,10 +4,14 @@ import "github.com/ethereum/hive/hivesim"
 
 type Eth1Node struct {
 	*hivesim.Client
+	HTTPPort uint16
+	WSPort   uint16
 }
 
 type L2Node struct {
 	*hivesim.Client
+	HTTPPort uint16
+	WSPort   uint16
 }
 
 type OpNode struct {

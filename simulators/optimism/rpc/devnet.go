@@ -99,7 +99,7 @@ func (d *Devnet) Start() {
 	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts)
 
 	opts := []hivesim.StartOption{executionOpts}
-	d.eth1 = &Eth1Node{d.t.StartClient(eth1.Name, opts...)}
+	d.eth1 = &Eth1Node{d.t.StartClient(eth1.Name, opts...), 8545, 8546}
 
 	d.nodes["op-l1"] = eth1
 	d.nodes["op-l2"] = l2
@@ -199,7 +199,7 @@ func (d *Devnet) StartL2() error {
 	l2StandardBridgeOpt := hivesim.WithDynamicFile("/L2StandardBridge.json", bytesSource([]byte(d.l2StandardBridgeJSON)))
 	l1BlockOpt := hivesim.WithDynamicFile("/L1Block.json", bytesSource([]byte(d.l1BlockJSON)))
 	opts := []hivesim.StartOption{executionOpts, genesisTimestampOpt, l2ToL1MessagePasserOpt, l2CrossDomainMessengerOpt, optimismMintableTokenFactoryOpt, l2StandardBridgeOpt, l1BlockOpt}
-	d.l2 = &L2Node{d.t.StartClient(l2.Name, opts...)}
+	d.l2 = &L2Node{d.t.StartClient(l2.Name, opts...), 9545, 9546}
 	return nil
 }
 
@@ -220,6 +220,11 @@ func (d *Devnet) StartOp() error {
 		"HIVE_CATALYST_ENABLED": "1",
 		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
 		"HIVE_NODETYPE":         "full",
+
+		"HIVE_L1_URL":             fmt.Sprintf("http://%s:%d", d.eth1.IP, d.eth1.HTTPPort),
+		"HIVE_L2_URL":             fmt.Sprintf("http://%s:%d", d.l2.IP, d.l2.HTTPPort),
+		"HIVE_L1_ETH_RPC_FLAG":    fmt.Sprintf("--l1=ws://%s:%d", d.eth1.IP, d.eth1.WSPort),
+		"HIVE_L2_ENGINE_RPC_FLAG": fmt.Sprintf("--l2=ws://%s:%d", d.l2.IP, d.l2.WSPort),
 	}
 
 	if op.HasRole("op-sequencer") {
