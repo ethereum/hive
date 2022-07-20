@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/big"
+	"net"
 	"net/http"
 	"time"
 
@@ -114,6 +115,11 @@ func RunTest(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinaliz
 		}
 	}()
 
+	// Before running the test, make sure Eth and Engine ports are open for the client
+	if err := CheckEthEngineLive(c); err != nil {
+		t.Fatalf("FAIL (%s): Ports were never open for client: %v", env.TestName, err)
+	}
+
 	// Setup timeouts
 	env.Timeout = time.After(timeout)
 	clMocker.Timeout = time.After(timeout)
@@ -136,8 +142,38 @@ func (t *TestEnv) MainTTD() *big.Int {
 
 func (t *TestEnv) StartClient(clientType string, params hivesim.Params, ttd *big.Int) (*hivesim.Client, *EngineClient, error) {
 	c := t.T.StartClient(clientType, params, hivesim.WithStaticFiles(t.ClientFiles))
+	if err := CheckEthEngineLive(c); err != nil {
+		return nil, nil, fmt.Errorf("Engine/Eth ports were never open for client: %v", err)
+	}
 	ec := NewEngineClient(t.T, c, ttd)
 	return c, ec, nil
+}
+
+func CheckEthEngineLive(c *hivesim.Client) error {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	var (
+		ticker = time.NewTicker(100 * time.Millisecond)
+		dialer net.Dialer
+	)
+	defer ticker.Stop()
+	for _, checkport := range []int{EthPortHTTP, EnginePortHTTP} {
+		addr := fmt.Sprintf("%s:%d", c.IP, checkport)
+	portcheckloop:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-ticker.C:
+				conn, err := dialer.DialContext(ctx, "tcp", addr)
+				if err == nil {
+					conn.Close()
+					break portcheckloop
+				}
+			}
+		}
+	}
+	return nil
 }
 
 func (t *TestEnv) makeNextTransaction(recipient common.Address, amount *big.Int, payload []byte) *types.Transaction {
