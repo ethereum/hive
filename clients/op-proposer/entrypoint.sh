@@ -1,22 +1,12 @@
 #!/bin/sh
 set -exu
 
-curl \
-    --fail \
-    --retry 10 \
-    --retry-delay 2 \
-    --retry-connrefused \
-    -X POST \
-    -H "Content-Type: application/json" \
-    --data '{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["0x0", false],"id":1}' \
-    http://172.17.0.3:8545
-
 L2OO_ADDRESS=$(jq -r .address < /L2OutputOracleProxy.json)
 
 exec op-proposer \
-    --l1-eth-rpc http://172.17.0.3:8545 \
-    --l2-eth-rpc http://172.17.0.4:9545 \
-    --rollup-rpc http://172.17.0.5:7545 \
+    $HIVE_L1_ETH_RPC_FLAG \
+    $HIVE_L2_ETH_RPC_FLAG \
+    $HIVE_ROLLUP_RPC_FLAG \
     --poll-interval 10s \
     --num-confirmations 1 \
     --safe-abort-nonce-too-low-count 3 \

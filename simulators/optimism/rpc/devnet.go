@@ -234,38 +234,46 @@ func (d *Devnet) StartOp() error {
 
 	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortalProxy.json", bytesSource([]byte(d.optimismPortal)))
 	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt}
-	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}
+	d.op = &OpNode{d.t.StartClient(op.Name, opts...), 7545}
 	return nil
 }
 
 func (d *Devnet) StartL2OS() error {
-	op := d.nodes["op-proposer"]
+	l2os := d.nodes["op-proposer"]
 
 	executionOpts := hivesim.Params{
 		"HIVE_CHECK_LIVE_PORT":  "0",
 		"HIVE_CATALYST_ENABLED": "1",
 		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
 		"HIVE_NODETYPE":         "full",
+
+		"HIVE_L1_ETH_RPC_FLAG": fmt.Sprintf("--l1-eth-rpc=http://%s:%d", d.eth1.IP, d.eth1.HTTPPort),
+		"HIVE_L2_ETH_RPC_FLAG": fmt.Sprintf("--l2-eth-rpc=http://%s:%d", d.l2.IP, d.l2.HTTPPort),
+		"HIVE_ROLLUP_RPC_FLAG": fmt.Sprintf("--rollup-rpc=http://%s:%d", d.op.IP, d.op.HTTPPort),
 	}
 
 	l2OutputOracleOpt := hivesim.WithDynamicFile("/L2OutputOracleProxy.json", bytesSource([]byte(d.l2OutputOracle)))
 	opts := []hivesim.StartOption{executionOpts, l2OutputOracleOpt}
-	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}
+	d.l2os = &L2OSNode{d.t.StartClient(l2os.Name, opts...)}
 	return nil
 }
 
 func (d *Devnet) StartBSS() error {
-	op := d.nodes["op-batcher"]
+	bss := d.nodes["op-batcher"]
 
 	executionOpts := hivesim.Params{
 		"HIVE_CHECK_LIVE_PORT":  "0",
 		"HIVE_CATALYST_ENABLED": "1",
 		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
 		"HIVE_NODETYPE":         "full",
+
+		"HIVE_L1_ETH_RPC_FLAG": fmt.Sprintf("--l1-eth-rpc=http://%s:%d", d.eth1.IP, d.eth1.HTTPPort),
+		"HIVE_L2_ETH_RPC_FLAG": fmt.Sprintf("--l2-eth-rpc=http://%s:%d", d.l2.IP, d.l2.HTTPPort),
+		"HIVE_ROLLUP_RPC_FLAG": fmt.Sprintf("--rollup-rpc=http://%s:%d", d.op.IP, d.op.HTTPPort),
 	}
 
 	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortalProxy.json", bytesSource([]byte(d.optimismPortal)))
 	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt}
-	d.op = &OpNode{d.t.StartClient(op.Name, opts...)}
+	d.bss = &BSSNode{d.t.StartClient(bss.Name, opts...)}
 	return nil
 }

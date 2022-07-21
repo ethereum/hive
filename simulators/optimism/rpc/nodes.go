@@ -16,6 +16,7 @@ type L2Node struct {
 
 type OpNode struct {
 	*hivesim.Client
+	HTTPPort uint16
 }
 
 type L2OSNode struct {
