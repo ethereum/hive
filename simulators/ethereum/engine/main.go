@@ -39,7 +39,7 @@ var (
 
 	// JWT Authentication Related
 	defaultJwtTokenSecretBytes = []byte("secretsecretsecretsecretsecretse") // secretsecretsecretsecretsecretse
-	maxTimeDriftSeconds        = int64(5)
+	maxTimeDriftSeconds        = int64(60)
 )
 
 var clientEnv = hivesim.Params{
