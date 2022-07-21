@@ -176,22 +176,49 @@ func CheckEthEngineLive(c *hivesim.Client) error {
 	return nil
 }
 
-func (t *TestEnv) makeNextTransaction(recipient common.Address, amount *big.Int, payload []byte) *types.Transaction {
-
-	gasLimit := uint64(75000)
-	tx := types.NewTransaction(t.nonce, recipient, amount, gasLimit, gasPrice, payload)
-	signer := types.NewEIP155Signer(chainID)
-	signedTx, err := types.SignTx(tx, signer, vaultKey)
-	if err != nil {
-		t.Fatal("FAIL (%s): could not sign new tx: %v", t.TestName, err)
+func (t *TestEnv) makeNextTransaction(recipient *common.Address, gasLimit uint64, amount *big.Int, payload []byte) *types.Transaction {
+	var (
+		newTxData types.TxData
+		txType    string
+	)
+	// Depending on the nonce, send a legacy/eip-1559 tx
+	switch t.nonce % 2 {
+	case 0:
+		newTxData = &types.LegacyTx{
+			Nonce:    t.nonce,
+			To:       recipient,
+			Value:    amount,
+			Gas:      gasLimit,
+			GasPrice: gasPrice,
+			Data:     payload,
+		}
+		txType = "Legacy"
+	case 1:
+		gasFeeCap := new(big.Int).Set(gasPrice)
+		gasTipCap := new(big.Int).Set(big1)
+		newTxData = &types.DynamicFeeTx{
+			Nonce:     t.nonce,
+			Gas:       gasLimit,
+			GasTipCap: gasTipCap,
+			GasFeeCap: gasFeeCap,
+			To:        recipient,
+			Value:     amount,
+			Data:      payload,
+		}
+		txType = "DynamicFeeTx"
 	}
-	t.Logf("INFO (%s): Built next transaction: hash=%s, nonce=%d, recipient=%s", t.TestName, signedTx.Hash(), t.nonce, recipient)
+	tx := types.NewTx(newTxData)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainID), vaultKey)
+	if err != nil {
+		t.Fatalf("FAIL (%s): could not sign new tx: %v", t.TestName, err)
+	}
+	t.Logf("INFO (%s): Built next transaction: hash=%s, nonce=%d, recipient=%s, type=%s", t.TestName, signedTx.Hash(), t.nonce, recipient, txType)
 	t.nonce++
 	return signedTx
 }
 
 func (t *TestEnv) sendNextTransaction(node *EngineClient, recipient common.Address, amount *big.Int, payload []byte) *types.Transaction {
-	tx := t.makeNextTransaction(recipient, amount, payload)
+	tx := t.makeNextTransaction(&recipient, 75000, amount, payload)
 	for {
 		err := node.Eth.SendTransaction(node.Ctx(), tx)
 		if err == nil {
@@ -226,18 +253,7 @@ func (t *TestEnv) makeNextBigContractTransaction(gasLimit uint64) *types.Transac
 	initCode = append(initCode, 0x38)   // CODESIZE == 0x00
 	initCode = append(initCode, 0xF3)   // RETURN(offset, length)
 
-	txData := types.LegacyTx{
-		Nonce:    t.nonce,
-		GasPrice: gasPrice,
-		Gas:      gasLimit,
-		To:       nil,
-		Value:    big0,
-		Data:     initCode,
-	}
-	signer := types.NewEIP155Signer(chainID)
-	signedTx := types.MustSignNewTx(vaultKey, signer, &txData)
-	t.nonce++
-	return signedTx
+	return t.makeNextTransaction(nil, gasLimit, big0, initCode)
 }
 
 func (t *TestEnv) sendNextBigContractTransaction(sender *EngineClient, gasLimit uint64) *types.Transaction {
