@@ -118,7 +118,7 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 		chain = loadChain("./chains/" + ChainFile)
 	}
 
-	// FastSync
+	// ArchiveSync
 	archiveSyncConfig := NethermindSyncConfig{
 		FastSync:   false,
 		SnapSync:   false,
@@ -134,57 +134,57 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 			},
 		})
 
-	// SnapSync, pivot == TTD
+	// FastSync, pivot == TTD
 	pivot := chain[len(chain)-1]
 	pivotHash := pivot.Hash()
-	snapSyncConfigPivotOnTTD := NethermindSyncConfig{
+	fastSyncConfigPivotOnTTD := NethermindSyncConfig{
 		FastSync:             true,
-		SnapSync:             true,
+		SnapSync:             false,
 		FastBlocks:           true,
 		PivotNumber:          pivot.Number(),
 		PivotHash:            &pivotHash,
 		PivotTotalDifficulty: CalculateTotalDifficulty(genesis, chain, pivot.NumberU64()).String(),
 	}
-	fmt.Printf("DEBUG: snapSyncConfigPivotOnTTD: %s\n", snapSyncConfigPivotOnTTD.String())
+	fmt.Printf("DEBUG: fastSyncConfigPivotOnTTD: %s\n", fastSyncConfigPivotOnTTD.String())
 	result = append(result,
 		SyncTestVariant{
-			Name: "snap sync/pivot.Difficulty>=TTD",
+			Name: "fast sync/pivot.Difficulty>=TTD",
 			MainClientConfig: hivesim.Params{
 				"HIVE_SYNC_CONFIG": NethermindSyncConfig{
 					FastSync:   true,
-					SnapSync:   true,
+					SnapSync:   false,
 					FastBlocks: true,
 				}.String(),
 			},
 			SyncClientConfig: hivesim.Params{
-				"HIVE_SYNC_CONFIG": snapSyncConfigPivotOnTTD.String(),
+				"HIVE_SYNC_CONFIG": fastSyncConfigPivotOnTTD.String(),
 			},
 		})
 
-	// SnapSync, pivot < TTD
+	// FastSync, pivot < TTD
 	pivot = chain[len(chain)-2]
 	pivotHash = pivot.Hash()
-	snapSyncConfigPivotLessThanTTD := NethermindSyncConfig{
+	fastSyncConfigPivotLessThanTTD := NethermindSyncConfig{
 		FastSync:             true,
-		SnapSync:             true,
+		SnapSync:             false,
 		FastBlocks:           true,
 		PivotNumber:          pivot.Number(),
 		PivotHash:            &pivotHash,
 		PivotTotalDifficulty: CalculateTotalDifficulty(genesis, chain, pivot.NumberU64()).String(),
 	}
-	fmt.Printf("DEBUG: snapSyncConfigPivotLessThanTTD: %s\n", snapSyncConfigPivotLessThanTTD.String())
+	fmt.Printf("DEBUG: fastSyncConfigPivotLessThanTTD: %s\n", fastSyncConfigPivotLessThanTTD.String())
 	result = append(result,
 		SyncTestVariant{
-			Name: "snap sync/pivot.Difficulty<TTD",
+			Name: "fast sync/pivot.Difficulty<TTD",
 			MainClientConfig: hivesim.Params{
 				"HIVE_SYNC_CONFIG": NethermindSyncConfig{
 					FastSync:   true,
-					SnapSync:   true,
+					SnapSync:   false,
 					FastBlocks: true,
 				}.String(),
 			},
 			SyncClientConfig: hivesim.Params{
-				"HIVE_SYNC_CONFIG": snapSyncConfigPivotLessThanTTD.String(),
+				"HIVE_SYNC_CONFIG": fastSyncConfigPivotLessThanTTD.String(),
 			},
 		})
 	return result
@@ -194,8 +194,4 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 var ClientToSyncVariantGenerator = map[string]SyncVariantGenerator{
 	"go-ethereum": GethSyncVariantGenerator{},
 	"nethermind":  NethermindSyncVariantGenerator{},
-	"erigon":      DefaultSyncVariantGenerator{},
-	"besu":        DefaultSyncVariantGenerator{},
-	"ethereumjs":  DefaultSyncVariantGenerator{},
-	"nimbus-el":   DefaultSyncVariantGenerator{},
 }
