@@ -105,7 +105,7 @@ func postMergeSync(t *TestEnv) {
 	t.CLMock.waitForTTD()
 
 	// Speed up block production
-	t.CLMock.PayloadProductionClientDelay = time.Millisecond * 100
+	t.CLMock.PayloadProductionClientDelay = 0
 
 	// Also set the transition payload timestamp to 500 seconds before now
 	// This is done in order to try to not create payloads too old, nor into the future.
@@ -113,6 +113,9 @@ func postMergeSync(t *TestEnv) {
 
 	// Produce some blocks
 	t.CLMock.produceBlocks(500, BlockProcessCallbacks{})
+
+	// Reset block production delay
+	t.CLMock.PayloadProductionClientDelay = time.Second
 
 	// Set the Bootnode
 	enode, err := t.Engine.EnodeURL()
@@ -164,7 +167,7 @@ func incrementalPostMergeSync(t *TestEnv) {
 	)
 
 	// Speed up block production
-	t.CLMock.PayloadProductionClientDelay = time.Millisecond * 100
+	t.CLMock.PayloadProductionClientDelay = 0
 
 	// Also set the transition payload timestamp to 500 seconds before now.
 	// This is done in order to try to not create payloads too old, nor into the future.
@@ -172,6 +175,9 @@ func incrementalPostMergeSync(t *TestEnv) {
 
 	// Produce some blocks
 	t.CLMock.produceBlocks(int(N), BlockProcessCallbacks{})
+
+	// Reset block production delay
+	t.CLMock.PayloadProductionClientDelay = time.Second
 
 	// Set the Bootnode
 	enode, err := t.Engine.EnodeURL()
