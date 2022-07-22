@@ -222,6 +222,14 @@ var engineTests = []TestSpec{
 		Name: "Invalid Transaction Value NewPayload (Syncing)",
 		Run:  invalidPayloadTestCaseGen(InvalidTransactionValue, true, false),
 	},
+	{
+		Name: "Invalid Transaction ChainID NewPayload",
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionChainID, false, false),
+	},
+	{
+		Name: "Invalid Transaction ChainID NewPayload (Syncing)",
+		Run:  invalidPayloadTestCaseGen(InvalidTransactionChainID, true, false),
+	},
 
 	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
 	{
@@ -392,6 +400,10 @@ var engineTests = []TestSpec{
 	{
 		Name: "Payload Build after New Invalid Payload",
 		Run:  payloadBuildAfterNewInvalidPayload,
+	},
+	{
+		Name: "Build Payload with Invalid ChainID Transaction",
+		Run:  buildPayloadWithInvalidChainIDTx,
 	},
 
 	// Re-org using Engine API
@@ -2347,6 +2359,49 @@ func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
 			// try to continue creating a valid payload.
 		},
 	})
+}
+
+// Send a valid `newPayload` in correct order but skip `forkchoiceUpdated` until the last payload
+func buildPayloadWithInvalidChainIDTx(t *TestEnv) {
+	// Wait until TTD is reached by this client
+	t.CLMock.waitForTTD()
+
+	// Produce blocks before starting the test
+	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+	// Send a transaction with an incorrect ChainID.
+	// Transaction must be not be included in payload creation.
+	var invalidChainIDTx *types.Transaction
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		// Run test after a new payload has been broadcast
+		OnPayloadProducerSelected: func() {
+			txData := &types.LegacyTx{
+				Nonce:    t.nonce,
+				To:       &prevRandaoContractAddr,
+				Value:    big0,
+				Gas:      75000,
+				GasPrice: gasPrice,
+				Data:     nil,
+			}
+			invalidChainID := new(big.Int).Set(chainID)
+			invalidChainID.Add(invalidChainID, big1)
+			invalidChainIDTx, err := types.SignTx(types.NewTx(txData), types.NewLondonSigner(invalidChainID), vaultKey)
+			if err != nil {
+				t.Fatalf("FAIL(%s): Unable to sign tx with invalid chain ID: %v", t.TestName, err)
+			}
+			err = t.Engine.Eth.SendTransaction(t.Engine.Ctx(), invalidChainIDTx)
+			if err != nil {
+				t.Logf("INFO (%s): Error on sending transaction with incorrect chain ID (Expected): %v", t.TestName, err)
+			}
+		},
+	})
+
+	// Verify that the latest payload built does NOT contain the invalid chain Tx
+	if TransactionInPayload(&t.CLMock.LatestPayloadBuilt, invalidChainIDTx) {
+		p, _ := json.MarshalIndent(t.CLMock.LatestPayloadBuilt, "", " ")
+		t.Fatalf("FAIL (%s): Invalid chain ID tx was included in payload: %s", t.TestName, p)
+	}
+
 }
 
 // Fee Recipient Tests

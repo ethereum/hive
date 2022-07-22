@@ -97,6 +97,7 @@ type CustomTransactionData struct {
 	To        *common.Address
 	Value     *big.Int
 	Data      *[]byte
+	ChainID   *big.Int
 	Signature *SignatureValues
 }
 
@@ -134,6 +135,9 @@ func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateK
 	} else {
 		modifiedTxBase.Data = baseTransaction.Data()
 	}
+	if customData.ChainID == nil {
+		customData.ChainID = chainID
+	}
 	var modifiedTx *types.Transaction
 	if customData.Signature != nil {
 		modifiedTxBase.V = customData.Signature.V
@@ -142,7 +146,7 @@ func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateK
 		modifiedTx = types.NewTx(modifiedTxBase)
 	} else {
 		// If a custom signature was not specified, simply sign the transaction again
-		signer := types.NewEIP155Signer(chainID)
+		signer := types.NewEIP155Signer(customData.ChainID)
 		var err error
 		modifiedTx, err = types.SignTx(types.NewTx(modifiedTxBase), signer, pk)
 		if err != nil {
@@ -332,6 +336,7 @@ const (
 	InvalidTransactionGas                           = "Transaction Gas"
 	InvalidTransactionGasPrice                      = "Transaction GasPrice"
 	InvalidTransactionValue                         = "Transaction Value"
+	InvalidTransactionChainID                       = "Transaction ChainID"
 )
 
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
@@ -395,7 +400,8 @@ func generateInvalidPayload(basePayload *ExecutableDataV1, payloadField InvalidP
 		InvalidTransactionNonce,
 		InvalidTransactionGas,
 		InvalidTransactionGasPrice,
-		InvalidTransactionValue:
+		InvalidTransactionValue,
+		InvalidTransactionChainID:
 
 		if len(basePayload.Transactions) == 0 {
 			return nil, fmt.Errorf("No transactions available for modification")
@@ -435,6 +441,12 @@ func generateInvalidPayload(basePayload *ExecutableDataV1, payloadField InvalidP
 			customTxData = CustomTransactionData{
 				Value: customValue,
 			}
+		case InvalidTransactionChainID:
+			customChainID := new(big.Int).Set(chainID)
+			customChainID.Add(customChainID, big1)
+			customTxData = CustomTransactionData{
+				ChainID: customChainID,
+			}
 		}
 
 		modifiedTx, err := customizeTransaction(&baseTx, vaultKey, &customTxData)
@@ -444,6 +456,7 @@ func generateInvalidPayload(basePayload *ExecutableDataV1, payloadField InvalidP
 
 		modifiedTxBytes, err := modifiedTx.MarshalBinary()
 		if err != nil {
+			return nil, err
 		}
 		modifiedTransactions := [][]byte{
 			modifiedTxBytes,
