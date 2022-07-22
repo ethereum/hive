@@ -24,7 +24,7 @@ var (
 
 	// Time delay between ForkchoiceUpdated and GetPayload to allow the clients
 	// to produce a new Payload
-	PayloadProductionClientDelay = time.Second
+	DefaultPayloadProductionClientDelay = time.Second
 
 	// Confirmation blocks
 	PoWConfirmationBlocks = uint64(15)

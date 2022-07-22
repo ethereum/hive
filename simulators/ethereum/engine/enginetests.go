@@ -1960,7 +1960,7 @@ func sidechainReorg(t *TestEnv) {
 				})
 			r.ExpectNoError()
 
-			time.Sleep(PayloadProductionClientDelay)
+			time.Sleep(t.CLMock.PayloadProductionClientDelay)
 
 			alternativePayload, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), r.Response.PayloadID)
 			if err != nil {

@@ -44,11 +44,6 @@ type GethSyncVariantGenerator struct{}
 func (GethSyncVariantGenerator) Configure(*big.Int, string, string) []SyncTestVariant {
 	return []SyncTestVariant{
 		{
-			Name:             "default",
-			MainClientConfig: hivesim.Params{},
-			SyncClientConfig: hivesim.Params{},
-		},
-		{
 			Name: "Full",
 			MainClientConfig: hivesim.Params{
 				"HIVE_NODETYPE": "full",
@@ -101,13 +96,7 @@ func (c NethermindSyncConfig) String() string {
 }
 
 func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string, ChainFile string) []SyncTestVariant {
-	result := []SyncTestVariant{
-		{
-			Name:             "default",
-			MainClientConfig: hivesim.Params{},
-			SyncClientConfig: hivesim.Params{},
-		},
-	}
+	result := make([]SyncTestVariant, 0)
 
 	var (
 		genesis = loadGenesis(GenesisFile)
@@ -124,7 +113,6 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 		SnapSync:   false,
 		FastBlocks: false,
 	}
-	fmt.Printf("DEBUG: archiveSyncConfig: %s\n", archiveSyncConfig.String())
 	result = append(result,
 		SyncTestVariant{
 			Name:             "archive sync",
@@ -145,7 +133,6 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 		PivotHash:            &pivotHash,
 		PivotTotalDifficulty: CalculateTotalDifficulty(genesis, chain, pivot.NumberU64()).String(),
 	}
-	fmt.Printf("DEBUG: fastSyncConfigPivotOnTTD: %s\n", fastSyncConfigPivotOnTTD.String())
 	result = append(result,
 		SyncTestVariant{
 			Name: "fast sync/pivot.Difficulty>=TTD",
@@ -172,7 +159,6 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 		PivotHash:            &pivotHash,
 		PivotTotalDifficulty: CalculateTotalDifficulty(genesis, chain, pivot.NumberU64()).String(),
 	}
-	fmt.Printf("DEBUG: fastSyncConfigPivotLessThanTTD: %s\n", fastSyncConfigPivotLessThanTTD.String())
 	result = append(result,
 		SyncTestVariant{
 			Name: "fast sync/pivot.Difficulty<TTD",

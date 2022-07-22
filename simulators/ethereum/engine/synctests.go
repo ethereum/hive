@@ -54,7 +54,6 @@ func addSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 				delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
 				delete(newParams, "HIVE_CLIQUE_PERIOD")
 				// Add the new file to be loaded as chain.rlp
-				testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.ChainFile)
 			}
 			for _, variant := range clientSyncVariantGenerator.Configure(big.NewInt(ttd), genesisPath, currentTest.ChainFile) {
 				suite.Add(hivesim.TestSpec{
@@ -66,12 +65,17 @@ func addSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 						for k, v := range variant.MainClientConfig {
 							mainClientParams = mainClientParams.Set(k, v)
 						}
-						c := t.StartClient(clientDef.Name, mainClientParams, hivesim.WithStaticFiles(testFiles))
+						mainClientFiles := testFiles.Copy()
+						if currentTest.ChainFile != "" {
+							mainClientFiles = mainClientFiles.Set("/chain.rlp", "./chains/"+currentTest.ChainFile)
+						}
+						c := t.StartClient(clientDef.Name, mainClientParams, hivesim.WithStaticFiles(mainClientFiles))
 
 						t.Logf("Start test (%s, %s, sync/%s)", c.Type, currentTest.Name, variant.Name)
 						defer func() {
 							t.Logf("End test (%s, %s, sync/%s)", c.Type, currentTest.Name, variant.Name)
 						}()
+
 						timeout := DefaultTestCaseTimeout
 						// If a TestSpec specifies a timeout, use that instead
 						if currentTest.TimeoutSeconds != 0 {
@@ -85,7 +89,7 @@ func addSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 						}
 
 						// Run the test case
-						RunTest(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, syncClientParams, testFiles)
+						RunTest(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, syncClientParams, testFiles.Copy())
 					},
 				})
 			}
@@ -101,18 +105,14 @@ func postMergeSync(t *TestEnv) {
 	t.CLMock.waitForTTD()
 
 	// Speed up block production
-	OriginalPayloadProductionClientDelay := PayloadProductionClientDelay
-	defer func() {
-		// In case test fails, revert block production speed
-		PayloadProductionClientDelay = OriginalPayloadProductionClientDelay
-	}()
-	PayloadProductionClientDelay = time.Millisecond * 100
+	t.CLMock.PayloadProductionClientDelay = time.Millisecond * 100
+
+	// Also set the transition payload timestamp to 500 seconds before now
+	// This is done in order to try to not create payloads too old, nor into the future.
+	t.CLMock.TransitionPayloadTimestamp = big.NewInt(time.Now().Unix() - 500)
 
 	// Produce some blocks
 	t.CLMock.produceBlocks(500, BlockProcessCallbacks{})
-
-	// Revert block production speed
-	PayloadProductionClientDelay = OriginalPayloadProductionClientDelay
 
 	// Set the Bootnode
 	enode, err := t.Engine.EnodeURL()
@@ -164,18 +164,14 @@ func incrementalPostMergeSync(t *TestEnv) {
 	)
 
 	// Speed up block production
-	OriginalPayloadProductionClientDelay := PayloadProductionClientDelay
-	defer func() {
-		// In case test fails, revert block production speed
-		PayloadProductionClientDelay = OriginalPayloadProductionClientDelay
-	}()
-	PayloadProductionClientDelay = time.Millisecond * 100
+	t.CLMock.PayloadProductionClientDelay = time.Millisecond * 100
+
+	// Also set the transition payload timestamp to 500 seconds before now.
+	// This is done in order to try to not create payloads too old, nor into the future.
+	t.CLMock.TransitionPayloadTimestamp = big.NewInt(time.Now().Unix() - int64(N))
 
 	// Produce some blocks
 	t.CLMock.produceBlocks(int(N), BlockProcessCallbacks{})
-
-	// Revert block production speed
-	PayloadProductionClientDelay = OriginalPayloadProductionClientDelay
 
 	// Set the Bootnode
 	enode, err := t.Engine.EnodeURL()
