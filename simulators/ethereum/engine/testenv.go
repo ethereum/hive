@@ -23,6 +23,14 @@ var (
 	vaultKey, _      = crypto.HexToECDSA("63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376")
 )
 
+type TestTransactionType int
+
+const (
+	UnspecifiedTransactionType TestTransactionType = iota
+	LegacyTxOnly
+	DynamicFeeTxOnly
+)
+
 // TestEnv is the environment of a single test.
 type TestEnv struct {
 	*hivesim.T
@@ -49,6 +57,9 @@ type TestEnv struct {
 	// This tracks the account nonce of the vault account.
 	nonce uint64
 
+	// Sets the type of transactions to use during the test
+	TestTransactionType TestTransactionType
+
 	// This holds most recent context created by the Ctx method.
 	// Every time Ctx is called, it creates a new context with the default
 	// timeout and cancels the previous one.
@@ -57,7 +68,7 @@ type TestEnv struct {
 	syncCancel context.CancelFunc
 }
 
-func RunTest(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv), cParams hivesim.Params, cFiles hivesim.Params) {
+func RunTest(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*TestEnv), cParams hivesim.Params, cFiles hivesim.Params, testTransactionType TestTransactionType) {
 	// Setup the CL Mocker for this test
 	clMocker := NewCLMocker(t, slotsToSafe, slotsToFinalized)
 	// Defer closing all clients
@@ -84,15 +95,16 @@ func RunTest(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinaliz
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:%v/", c.IP, EthPortHTTP), client)
 	defer rpcClient.Close()
 	env := &TestEnv{
-		T:            t,
-		TestName:     testName,
-		Client:       c,
-		RPC:          rpcClient,
-		Eth:          ethclient.NewClient(rpcClient),
-		Engine:       ec,
-		CLMock:       clMocker,
-		ClientParams: cParams,
-		ClientFiles:  cFiles,
+		T:                   t,
+		TestName:            testName,
+		Client:              c,
+		RPC:                 rpcClient,
+		Eth:                 ethclient.NewClient(rpcClient),
+		Engine:              ec,
+		CLMock:              clMocker,
+		ClientParams:        cParams,
+		ClientFiles:         cFiles,
+		TestTransactionType: testTransactionType,
 	}
 	env.TestEngine = NewTestEngineClient(env, ec)
 	env.TestEth = NewTestEthClient(env, env.Eth)
@@ -181,9 +193,26 @@ func (t *TestEnv) makeNextTransaction(recipient *common.Address, gasLimit uint64
 		newTxData types.TxData
 		txType    string
 	)
-	// Depending on the nonce, send a legacy/eip-1559 tx
-	switch t.nonce % 2 {
-	case 0:
+	var txTypeToUse int
+	switch t.TestTransactionType {
+	case UnspecifiedTransactionType:
+		// Test case has no specific type of transaction to use.
+		// Select the type of tx based on the nonce.
+		switch t.nonce % 2 {
+		case 0:
+			txTypeToUse = types.LegacyTxType
+		case 1:
+			txTypeToUse = types.DynamicFeeTxType
+		}
+	case LegacyTxOnly:
+		txTypeToUse = types.LegacyTxType
+	case DynamicFeeTxOnly:
+		txTypeToUse = types.DynamicFeeTxType
+	}
+
+	// Build the transaction depending on the specified type
+	switch txTypeToUse {
+	case types.LegacyTxType:
 		newTxData = &types.LegacyTx{
 			Nonce:    t.nonce,
 			To:       recipient,
@@ -193,9 +222,9 @@ func (t *TestEnv) makeNextTransaction(recipient *common.Address, gasLimit uint64
 			Data:     payload,
 		}
 		txType = "Legacy"
-	case 1:
+	case types.DynamicFeeTxType:
 		gasFeeCap := new(big.Int).Set(gasPrice)
-		gasTipCap := new(big.Int).Set(big1)
+		gasTipCap := new(big.Int).Set(gasTipPrice)
 		newTxData = &types.DynamicFeeTx{
 			Nonce:     t.nonce,
 			Gas:       gasLimit,
@@ -207,6 +236,7 @@ func (t *TestEnv) makeNextTransaction(recipient *common.Address, gasLimit uint64
 		}
 		txType = "DynamicFeeTx"
 	}
+
 	tx := types.NewTx(newTxData)
 	signedTx, err := types.SignTx(tx, types.NewLondonSigner(chainID), vaultKey)
 	if err != nil {

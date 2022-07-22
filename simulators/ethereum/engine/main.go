@@ -12,9 +12,10 @@ import (
 
 var (
 	// Test chain parameters
-	chainID   = big.NewInt(7)
-	gasPrice  = big.NewInt(30 * params.GWei)
-	networkID = big.NewInt(7)
+	chainID     = big.NewInt(7)
+	gasPrice    = big.NewInt(30 * params.GWei)
+	gasTipPrice = big.NewInt(1 * params.GWei)
+	networkID   = big.NewInt(7)
 
 	// Time between checks of a client reaching Terminal Total Difficulty
 	tTDCheckPeriod = time.Second * 1
@@ -94,6 +95,9 @@ type TestSpec struct {
 	// When used, clique consensus mechanism is disabled.
 	// Default: None
 	ChainFile string
+
+	// Transaction type to use throughout the test
+	TestTransactionType TestTransactionType
 }
 
 func main() {
@@ -165,7 +169,7 @@ func addTestsToSuite(suite *hivesim.Suite, tests []TestSpec) {
 					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
 				}
 				// Run the test case
-				RunTest(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, newParams, testFiles)
+				RunTest(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, newParams, testFiles, currentTest.TestTransactionType)
 			},
 		})
 	}

@@ -183,52 +183,104 @@ var engineTests = []TestSpec{
 		Run:  invalidPayloadTestCaseGen(RemoveTransaction, true, false),
 	},
 	{
-		Name: "Invalid Transaction Signature NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
+		Name:                "Invalid Transaction Signature NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Signature NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionSignature, true, false),
+		Name:                "Invalid Transaction Signature NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Nonce NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
+		Name:                "Invalid Transaction Signature NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, true, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Nonce NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionNonce, true, false),
+		Name:                "Invalid Transaction Nonce NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction GasPrice NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
+		Name:                "Invalid Transaction Nonce NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 	{
-		Name: "Invalid Transaction GasPrice NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionGasPrice, true, false),
+		Name:                "Invalid Transaction Nonce NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, true, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Gas NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
+		Name:                "Invalid Transaction GasPrice NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Gas NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionGas, true, false),
+		Name:                "Invalid Transaction GasPrice NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Value NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
+		Name:                "Invalid Transaction GasPrice NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, true, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Value NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionValue, true, false),
+		Name:                "Invalid Transaction Gas Tip NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasTipPrice, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 	{
-		Name: "Invalid Transaction ChainID NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionChainID, false, false),
+		Name:                "Invalid Transaction Gas Tip NewPayload (EIP-1559, Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasTipPrice, true, false),
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 	{
-		Name: "Invalid Transaction ChainID NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionChainID, true, false),
+		Name:                "Invalid Transaction Gas NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Gas NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Gas NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, true, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Value NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Value NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Value NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, true, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction ChainID NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, false, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction ChainID NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction ChainID NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, true, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 
 	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
@@ -440,8 +492,14 @@ var engineTests = []TestSpec{
 
 	// Suggested Fee Recipient in Payload creation
 	{
-		Name: "Suggested Fee Recipient Test",
-		Run:  suggestedFeeRecipient,
+		Name:                "Suggested Fee Recipient Test",
+		Run:                 suggestedFeeRecipient,
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Suggested Fee Recipient Test (EIP-1559 Transactions)",
+		Run:                 suggestedFeeRecipient,
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 
 	// PrevRandao opcode tests
@@ -449,6 +507,12 @@ var engineTests = []TestSpec{
 		Name: "PrevRandao Opcode Transactions",
 		Run:  prevRandaoOpcodeTx,
 		TTD:  10,
+	},
+	{
+		Name:                "PrevRandao Opcode Transactions (EIP-1559 Transactions)",
+		Run:                 prevRandaoOpcodeTx,
+		TTD:                 10,
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 
 	// Multi-Client Sync tests
