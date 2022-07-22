@@ -454,8 +454,14 @@ var engineTests = []TestSpec{
 		Run:  payloadBuildAfterNewInvalidPayload,
 	},
 	{
-		Name: "Build Payload with Invalid ChainID Transaction",
-		Run:  buildPayloadWithInvalidChainIDTx,
+		Name:                "Build Payload with Invalid ChainID Transaction (Legacy Tx)",
+		Run:                 buildPayloadWithInvalidChainIDTx,
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Build Payload with Invalid ChainID Transaction (EIP-1559)",
+		Run:                 buildPayloadWithInvalidChainIDTx,
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 
 	// Re-org using Engine API
@@ -504,9 +510,10 @@ var engineTests = []TestSpec{
 
 	// PrevRandao opcode tests
 	{
-		Name: "PrevRandao Opcode Transactions",
-		Run:  prevRandaoOpcodeTx,
-		TTD:  10,
+		Name:                "PrevRandao Opcode Transactions",
+		Run:                 prevRandaoOpcodeTx,
+		TTD:                 10,
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
 		Name:                "PrevRandao Opcode Transactions (EIP-1559 Transactions)",
