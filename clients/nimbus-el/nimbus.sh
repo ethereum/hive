@@ -108,7 +108,11 @@ if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
 else
   FLAGS="$FLAGS --rpc --rpc-api:eth,debug --rpc-address:0.0.0.0 --rpc-port:8545"
   FLAGS="$FLAGS --ws --ws-api:eth,debug --ws-address:0.0.0.0 --ws-port:8546"
-  FLAGS="$FLAGS --engine-api:true --engine-api-address:0.0.0.0 --engine-api-port:8551"
+fi
+
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+  echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
+  FLAGS="$FLAGS --engine-api:true --engine-api-address:0.0.0.0 --engine-api-port:8551 --jwt-secret:/jwtsecret"
 fi
 
 echo "Running nimbus with flags $FLAGS"
