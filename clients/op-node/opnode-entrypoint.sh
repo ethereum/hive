@@ -48,5 +48,6 @@ exec op-node \
     --p2p.listen.ip=0.0.0.0 \
     --p2p.listen.tcp=9003 \
     --p2p.listen.udp=9003 \
+    $HIVE_P2P_STATIC_FLAG \
     --snapshotlog.file=/snapshot.log \
     --p2p.priv.path=/config/p2p-node-key.txt

@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum-optimism/hive/simulators/optimism/rpc/testcontract"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -15,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/hive/simulators/optimism/rpc/testcontract"
 )
 
 //go:generate abigen -abi ./contractABI.json -pkg testcontract -type Contract -out ./testcontract/contract.go

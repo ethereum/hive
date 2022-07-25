@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/optimism"
 )
 
 type testSpec struct {
@@ -89,10 +90,10 @@ interacting with one.`[1:],
 func runAllTests(t *hivesim.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	d := Devnet{
-		t:     t,
-		nodes: make(map[string]*hivesim.ClientDefinition),
-		ctx:   ctx,
+	d := optimism.Devnet{
+		T:     t,
+		Nodes: make(map[string]*hivesim.ClientDefinition),
+		Ctx:   ctx,
 	}
 	d.Start()
 	d.Wait()
@@ -104,10 +105,10 @@ func runAllTests(t *hivesim.T) {
 	d.StartL2OS()
 	d.StartBSS()
 
-	c := d.l2.Client
+	c := d.L2.Client
 
 	vault := newVault()
-	genesis := []byte(d.l2Genesis)
+	genesis := []byte(d.L2Genesis)
 
 	s := newSemaphore(40)
 	for _, test := range tests {
