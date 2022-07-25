@@ -884,6 +884,7 @@ func parentHashOnExecPayload(t *TestEnv) {
 			// - {status: INVALID_BLOCK_HASH, latestValidHash: null, validationError: null} if the blockHash validation has failed
 			r := t.TestEngine.TestEngineNewPayloadV1(&alteredPayload)
 			r.ExpectStatus(InvalidBlockHash)
+			r.ExpectLatestValidHash(nil)
 		},
 	})
 
@@ -914,7 +915,11 @@ func invalidTransitionPayload(t *TestEnv) {
 			}
 			p := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
 			p.ExpectStatusEither(Invalid, Accepted)
-			p.ExpectLatestValidHash(&(common.Hash{}))
+			if p.Status.Status == Invalid {
+				p.ExpectLatestValidHash(&(common.Hash{}))
+			} else if p.Status.Status == Accepted {
+				p.ExpectLatestValidHash(nil)
+			}
 			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 				HeadBlockHash:      alteredPayload.BlockHash,
 				SafeBlockHash:      common.Hash{},
@@ -971,7 +976,10 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 			r.ExpectPayloadStatus(Syncing)
 		}
 
-		var invalidPayloadHash common.Hash
+		var (
+			alteredPayload *ExecutableDataV1
+			err            error
+		)
 
 		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
 			// Make sure at least one transaction is included in the payload
@@ -986,12 +994,10 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 					t.Fatalf("FAIL (%s): No transactions in the base payload", t.TestName)
 				}
 
-				alteredPayload, err := generateInvalidPayload(&t.CLMock.LatestPayloadBuilt, payloadField)
+				alteredPayload, err = generateInvalidPayload(&t.CLMock.LatestPayloadBuilt, payloadField)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to modify payload (%v): %v", t.TestName, payloadField, err)
 				}
-
-				invalidPayloadHash = alteredPayload.BlockHash
 
 				// Depending on the field we modified, we expect a different status
 				r := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
@@ -1040,6 +1046,7 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 					// When we send the previous payload, the client must now be capable of determining that the invalid payload is actually invalid
 					p := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestExecutedPayload)
 					p.ExpectStatus(Valid)
+					p.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 
 					/*
 						// Another option here could be to send an fcU to the previous payload,
@@ -1058,13 +1065,20 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 						// it is assumed that the block is missing and we need to sync.
 						// ACCEPTED also valid since the CLs normally use these interchangeably
 						q.ExpectStatusEither(Syncing, Accepted)
+						q.ExpectLatestValidHash(nil)
 					} else if payloadField == InvalidNumber {
 						// A payload with an invalid number can force us to start a sync cycle
 						// as we don't know if that block might be a valid future block.
 						q.ExpectStatusEither(Invalid, Syncing)
+						if q.Status.Status == Invalid {
+							q.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
+						} else {
+							q.ExpectLatestValidHash(nil)
+						}
 					} else {
 						// Otherwise the response should be INVALID.
 						q.ExpectStatus(Invalid)
+						q.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 					}
 
 					// Try sending the fcU again, this time we should get the proper invalid response.
@@ -1086,9 +1100,11 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 			// Send the valid payload and its corresponding forkchoiceUpdated
 			r := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestExecutedPayload)
 			r.ExpectStatus(Valid)
+			r.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 
 			s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
 			s.ExpectPayloadStatus(Valid)
+			s.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 
 			// Add main client again to the CL Mocker
 			t.CLMock.AddEngineClient(t.T, t.Client, t.MainTTD())
@@ -1098,21 +1114,25 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
 			// Run test after the new payload has been obtained
 			OnGetPayload: func() {
-				alteredPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
-					ParentHash: &invalidPayloadHash,
+				followUpAlteredPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+					ParentHash: &alteredPayload.BlockHash,
 				})
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
 				}
 
-				t.Logf("INFO (%s): Sending customized NewPayload: ParentHash %v -> %v", t.TestName, t.CLMock.LatestPayloadBuilt.ParentHash, invalidPayloadHash)
+				t.Logf("INFO (%s): Sending customized NewPayload: ParentHash %v -> %v", t.TestName, t.CLMock.LatestPayloadBuilt.ParentHash, alteredPayload.BlockHash)
 				// Response status can be ACCEPTED (since parent payload could have been thrown out by the client)
 				// or SYNCING (parent payload is thrown out and also client assumes that the parent is part of canonical chain)
 				// or INVALID (client still has the payload and can verify that this payload is incorrectly building on top of it),
 				// but a VALID response is incorrect.
-				r := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
+				r := t.TestEngine.TestEngineNewPayloadV1(followUpAlteredPayload)
 				r.ExpectStatusEither(Accepted, Invalid, Syncing)
-
+				if r.Status.Status == Accepted || r.Status.Status == Syncing {
+					r.ExpectLatestValidHash(nil)
+				} else if r.Status.Status == Invalid {
+					r.ExpectLatestValidHash(&alteredPayload.ParentHash)
+				}
 			},
 		})
 	}
@@ -1212,6 +1232,11 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 						// response from the previous payload.
 						// The node might save the parent as invalid, thus returning INVALID
 						r.ExpectStatusEither(Accepted, Syncing, Invalid)
+						if r.Status.Status == Accepted || r.Status.Status == Syncing {
+							r.ExpectLatestValidHash(nil)
+						} else if r.Status.Status == Invalid {
+							r.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
+						}
 					} else {
 						// This is one of the payloads before the invalid one, therefore is valid.
 						r.ExpectStatus(Valid)
@@ -1647,6 +1672,7 @@ func reorgPrevValidatedPayloadOnSideChain(t *TestEnv) {
 
 			r := t.TestEngine.TestEngineNewPayloadV1(altPayload)
 			r.ExpectStatus(Valid)
+			r.ExpectLatestValidHash(&altPayload.BlockHash)
 		},
 	})
 
@@ -1673,6 +1699,7 @@ func reorgPrevValidatedPayloadOnSideChain(t *TestEnv) {
 
 			s := t.TestEngine.TestEngineNewPayloadV1(&p.Payload)
 			s.ExpectStatus(Valid)
+			s.ExpectLatestValidHash(&p.Payload.BlockHash)
 
 			// After this, the CLMocker will continue and try to re-org to canonical chain once again
 			// CLMocker will fail the test if this is not possible, so nothing left to do.
@@ -1711,6 +1738,7 @@ func reorgBackFromSyncing(t *TestEnv) {
 		OnGetPayload: func() {
 			r := t.TestEngine.TestEngineNewPayloadV1(sidechainPayloads[len(sidechainPayloads)-1])
 			r.ExpectStatusEither(Syncing, Accepted)
+			r.ExpectLatestValidHash(nil)
 			// We are going to send one of the alternative payloads and fcU to it
 			forkchoiceUpdatedBack := ForkchoiceStateV1{
 				HeadBlockHash:      sidechainPayloads[len(sidechainPayloads)-1].BlockHash,
@@ -1795,6 +1823,7 @@ func transactionReorg(t *TestEnv) {
 
 				r := t.TestEngine.TestEngineNewPayloadV1(&noTxnPayload)
 				r.ExpectStatus(Valid)
+				r.ExpectLatestValidHash(&noTxnPayload.BlockHash)
 
 				s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 					HeadBlockHash:      noTxnPayload.BlockHash,
@@ -1893,6 +1922,7 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
 
 					r := t.TestEngine.TestEngineNewPayloadV1(alternatePayload)
 					r.ExpectStatus(Valid)
+					r.ExpectLatestValidHash(&alternatePayload.BlockHash)
 
 					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 						HeadBlockHash:      alternatePayload.BlockHash,
@@ -1912,6 +1942,7 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
 					if newNPOnRevert {
 						r = t.TestEngine.TestEngineNewPayloadV1(mainPayload)
 						r.ExpectStatus(Valid)
+						r.ExpectLatestValidHash(&mainPayload.BlockHash)
 					}
 					t.CLMock.broadcastForkchoiceUpdated(&ForkchoiceStateV1{
 						HeadBlockHash:      mainPayload.BlockHash,
@@ -1972,6 +2003,7 @@ func sidechainReorg(t *TestEnv) {
 
 			s := t.TestEngine.TestEngineNewPayloadV1(&alternativePayload)
 			s.ExpectStatus(Valid)
+			s.ExpectLatestValidHash(&alternativePayload.BlockHash)
 
 			// We sent the alternative payload, fcU to it
 			p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
@@ -2017,7 +2049,7 @@ func reExecPayloads(t *TestEnv) {
 
 		r := t.TestEngine.TestEngineNewPayloadV1(&payload)
 		r.ExpectStatus(Valid)
-
+		r.ExpectLatestValidHash(&payload.BlockHash)
 	}
 }
 
@@ -2048,7 +2080,7 @@ func multipleNewCanonicalPayloads(t *TestEnv) {
 
 				r := t.TestEngine.TestEngineNewPayloadV1(newPayload)
 				r.ExpectStatus(Valid)
-
+				r.ExpectLatestValidHash(&newPayload.BlockHash)
 			}
 		},
 	})
@@ -2184,6 +2216,7 @@ func validPayloadFcUSyncingClient(t *TestEnv) {
 			// Send the new payload from the second client to the first, it won't be able to validate it
 			r := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestPayloadBuilt)
 			r.ExpectStatusEither(Accepted, Syncing)
+			r.ExpectLatestValidHash(nil)
 
 			// Send the forkchoiceUpdated with a reference to the valid payload on the SYNCING client.
 			s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
@@ -2200,11 +2233,13 @@ func validPayloadFcUSyncingClient(t *TestEnv) {
 			// Send the previous payload to be able to continue
 			p := t.TestEngine.TestEngineNewPayloadV1(&previousPayload)
 			p.ExpectStatus(Valid)
+			p.ExpectLatestValidHash(&previousPayload.BlockHash)
 
 			// Send the new payload again
 
 			p = t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestPayloadBuilt)
 			p.ExpectStatus(Valid)
+			p.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.BlockHash)
 
 			s = t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
 				HeadBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
@@ -2329,8 +2364,10 @@ func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
 			// Broadcast the invalid payload
 			r := t.TestEngine.TestEngineNewPayloadV1(inv_p)
 			r.ExpectStatus(Invalid)
+			r.ExpectLatestValidHash(&t.CLMock.LatestForkchoice.HeadBlockHash)
 			s := secondaryEngineTest.TestEngineNewPayloadV1(inv_p)
 			s.ExpectStatus(Invalid)
+			s.ExpectLatestValidHash(&t.CLMock.LatestForkchoice.HeadBlockHash)
 
 			// Let the block production continue.
 			// At this point the selected payload producer will

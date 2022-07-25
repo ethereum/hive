@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math/big"
+	"runtime"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
@@ -11,24 +13,48 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
+// Print the caller to this file
+func PrintExpectStack(t *TestEnv) {
+	_, currentFile, _, _ := runtime.Caller(0)
+	for i := 1; ; i++ {
+		_, file, line, ok := runtime.Caller(i)
+		if !ok {
+			return
+		}
+		if file == currentFile {
+			continue
+		}
+		fmt.Printf("INFO (%s): Failed `Expect*` routine called from: file=%s, line=%d\n", t.TestName, file, line)
+		return
+	}
+}
+
 // Test Engine API Helper Structs
+type ExpectTestEnv struct {
+	*TestEnv
+}
+
+func (e ExpectTestEnv) Fatalf(format string, values ...interface{}) {
+	PrintExpectStack(e.TestEnv)
+	e.TestEnv.Fatalf(format, values...)
+}
 
 type TestEngineClient struct {
-	*TestEnv
+	*ExpectTestEnv
 	*EngineClient
 }
 
 func NewTestEngineClient(t *TestEnv, ec *EngineClient) *TestEngineClient {
 	return &TestEngineClient{
-		TestEnv:      t,
-		EngineClient: ec,
+		ExpectTestEnv: &ExpectTestEnv{t},
+		EngineClient:  ec,
 	}
 }
 
 // ForkchoiceUpdatedV1
 
 type ForkchoiceResponseExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Response ForkChoiceResponse
 	Error    error
 }
@@ -36,9 +62,9 @@ type ForkchoiceResponseExpectObject struct {
 func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *ForkchoiceStateV1, pAttributes *PayloadAttributesV1) *ForkchoiceResponseExpectObject {
 	resp, err := tec.EngineClient.EngineForkchoiceUpdatedV1(tec.EngineClient.Ctx(), fcState, pAttributes)
 	return &ForkchoiceResponseExpectObject{
-		TestEnv:  tec.TestEnv,
-		Response: resp,
-		Error:    err,
+		ExpectTestEnv: &ExpectTestEnv{tec.TestEnv},
+		Response:      resp,
+		Error:         err,
 	}
 }
 
@@ -103,7 +129,7 @@ func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *PayloadID) {
 // NewPayloadV1
 
 type NewPayloadResponseExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Status PayloadStatusV1
 	Error  error
 }
@@ -111,9 +137,9 @@ type NewPayloadResponseExpectObject struct {
 func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *ExecutableDataV1) *NewPayloadResponseExpectObject {
 	status, err := tec.EngineClient.EngineNewPayloadV1(tec.EngineClient.Ctx(), payload)
 	return &NewPayloadResponseExpectObject{
-		TestEnv: tec.TestEnv,
-		Status:  status,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{tec.TestEnv},
+		Status:        status,
+		Error:         err,
 	}
 }
 
@@ -169,7 +195,7 @@ func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Has
 
 // GetPayloadV1
 type GetPayloadResponseExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Payload ExecutableDataV1
 	Error   error
 }
@@ -177,9 +203,9 @@ type GetPayloadResponseExpectObject struct {
 func (tec *TestEngineClient) TestEngineGetPayloadV1(payloadID *PayloadID) *GetPayloadResponseExpectObject {
 	payload, err := tec.EngineClient.EngineGetPayloadV1(tec.EngineClient.Ctx(), payloadID)
 	return &GetPayloadResponseExpectObject{
-		TestEnv: tec.TestEnv,
-		Payload: payload,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{tec.TestEnv},
+		Payload:       payload,
+		Error:         err,
 	}
 }
 
@@ -232,21 +258,21 @@ func (exp *GetPayloadResponseExpectObject) ExpectTimestamp(expectedTimestamp uin
 
 // Test Eth JSON-RPC Helper Structs
 type TestEthClient struct {
-	*TestEnv
+	*ExpectTestEnv
 	*ethclient.Client
 	lastCtx context.Context
 }
 
 func NewTestEthClient(t *TestEnv, eth *ethclient.Client) *TestEthClient {
 	return &TestEthClient{
-		TestEnv: t,
-		Client:  eth,
+		ExpectTestEnv: &ExpectTestEnv{t},
+		Client:        eth,
 	}
 }
 
 // BlockNumber
 type BlockNumberResponseExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Call   string
 	Number uint64
 	Error  error
@@ -255,10 +281,10 @@ type BlockNumberResponseExpectObject struct {
 func (teth *TestEthClient) TestBlockNumber() *BlockNumberResponseExpectObject {
 	number, err := teth.BlockNumber(teth.Ctx())
 	return &BlockNumberResponseExpectObject{
-		TestEnv: teth.TestEnv,
-		Call:    "BlockNumber",
-		Number:  number,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
+		Call:          "BlockNumber",
+		Number:        number,
+		Error:         err,
 	}
 }
 
@@ -285,7 +311,7 @@ var (
 )
 
 type HeaderResponseExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Call   string
 	Header *types.Header
 	Error  error
@@ -315,10 +341,10 @@ func (teth *TestEthClient) TestHeaderByNumber(number *big.Int) *HeaderResponseEx
 		err = ethereum.NotFound
 	}
 	return &HeaderResponseExpectObject{
-		TestEnv: teth.TestEnv,
-		Call:    "HeaderByNumber",
-		Header:  header,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
+		Call:          "HeaderByNumber",
+		Header:        header,
+		Error:         err,
 	}
 }
 
@@ -351,7 +377,7 @@ func (exp *HeaderResponseExpectObject) ExpectHash(expHash common.Hash) {
 // Block
 
 type BlockResponseExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Call  string
 	Block *types.Block
 	Error error
@@ -360,20 +386,20 @@ type BlockResponseExpectObject struct {
 func (teth *TestEthClient) TestBlockByNumber(number *big.Int) *BlockResponseExpectObject {
 	block, err := teth.BlockByNumber(teth.Ctx(), number)
 	return &BlockResponseExpectObject{
-		TestEnv: teth.TestEnv,
-		Call:    "BlockByNumber",
-		Block:   block,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
+		Call:          "BlockByNumber",
+		Block:         block,
+		Error:         err,
 	}
 }
 
 func (teth *TestEthClient) TestBlockByHash(hash common.Hash) *BlockResponseExpectObject {
 	block, err := teth.BlockByHash(teth.Ctx(), hash)
 	return &BlockResponseExpectObject{
-		TestEnv: teth.TestEnv,
-		Call:    "BlockByHash",
-		Block:   block,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
+		Call:          "BlockByHash",
+		Block:         block,
+		Error:         err,
 	}
 }
 
@@ -427,7 +453,7 @@ func (exp *BlockResponseExpectObject) ExpectCoinbase(expCoinbase common.Address)
 // Balance
 
 type BalanceResponseExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Call    string
 	Balance *big.Int
 	Error   error
@@ -436,10 +462,10 @@ type BalanceResponseExpectObject struct {
 func (teth *TestEthClient) TestBalanceAt(account common.Address, number *big.Int) *BalanceResponseExpectObject {
 	balance, err := teth.BalanceAt(teth.Ctx(), account, number)
 	return &BalanceResponseExpectObject{
-		TestEnv: teth.TestEnv,
-		Call:    "BalanceAt",
-		Balance: balance,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
+		Call:          "BalanceAt",
+		Balance:       balance,
+		Error:         err,
 	}
 }
 
@@ -460,7 +486,7 @@ func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) 
 // Storage
 
 type StorageResponseExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Call    string
 	Storage []byte
 	Error   error
@@ -469,10 +495,10 @@ type StorageResponseExpectObject struct {
 func (teth *TestEthClient) TestStorageAt(account common.Address, key common.Hash, number *big.Int) *StorageResponseExpectObject {
 	storage, err := teth.StorageAt(teth.Ctx(), account, key, number)
 	return &StorageResponseExpectObject{
-		TestEnv: teth.TestEnv,
-		Call:    "StorageAt",
-		Storage: storage,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
+		Call:          "StorageAt",
+		Storage:       storage,
+		Error:         err,
 	}
 }
 
@@ -501,7 +527,7 @@ func (exp *StorageResponseExpectObject) ExpectStorageEqual(expStorage common.Has
 
 // Transaction Receipt
 type TransactionReceiptExpectObject struct {
-	*TestEnv
+	*ExpectTestEnv
 	Call    string
 	Receipt *types.Receipt
 	Error   error
@@ -510,10 +536,10 @@ type TransactionReceiptExpectObject struct {
 func (teth *TestEthClient) TestTransactionReceipt(txHash common.Hash) *TransactionReceiptExpectObject {
 	receipt, err := teth.TransactionReceipt(teth.Ctx(), txHash)
 	return &TransactionReceiptExpectObject{
-		TestEnv: teth.TestEnv,
-		Call:    "TransactionReceipt",
-		Receipt: receipt,
-		Error:   err,
+		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
+		Call:          "TransactionReceipt",
+		Receipt:       receipt,
+		Error:         err,
 	}
 }
 
