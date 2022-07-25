@@ -70,6 +70,19 @@ if [ -n "$HIVE_BOOTNODE" ]; then
     echo "[\"$HIVE_BOOTNODE\"]" > /nethermind/Data/static-nodes.json
 fi
 
+# Configure logging.
+LOG_FLAG=""
+if [ "$HIVE_LOGLEVEL" != "" ]; then
+    case "$HIVE_LOGLEVEL" in
+        0)   LOG=OFF ;;
+        1)   LOG=ERROR ;;
+        2)   LOG=WARN  ;;
+        3)   LOG=INFO  ;;
+        4)   LOG=DEBUG ;;
+        5)   LOG=TRACE ;;
+    esac
+    LOG_FLAG="--log $LOG"
+fi
 echo "Running Nethermind..."
 # The output is tee:d, via /log.txt, because the enode script uses that logfile to parse out the enode id
-dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg 2>&1 | tee /log.txt
+dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg $LOG_FLAG 2>&1 | tee /log.txt
