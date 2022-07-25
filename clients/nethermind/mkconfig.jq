@@ -1,5 +1,23 @@
 # This JQ script generates the Nethermind config file.
 
+# Removes all empty keys and values in input.
+def remove_empty:
+  . | walk(
+    if type == "object" then
+      with_entries(
+        select(
+          .value != null and
+          .value != "" and
+          .value != [] and
+          .key != null and
+          .key != ""
+        )
+      )
+    else .
+    end
+  )
+;
+
 def keystore_config:
   if env.HIVE_CLIQUE_PRIVATEKEY == null then
     {}
@@ -39,6 +57,16 @@ def json_rpc_config:
   end
 ;
 
+def sync_config:
+  if env.HIVE_SYNC_CONFIG != null then
+    {
+      "Sync": ( env.HIVE_SYNC_CONFIG | fromjson | remove_empty )
+    }
+  else
+    {}
+  end
+;
+
 def base_config:
   {
     "Init": {
@@ -71,4 +99,4 @@ def base_config:
 ;
 
 # This is the main expression that outputs the config.
-base_config * keystore_config * merge_config * json_rpc_config
+base_config * keystore_config * merge_config * json_rpc_config * sync_config

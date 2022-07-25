@@ -86,6 +86,9 @@ fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
     FLAGS="$FLAGS --syncmode light"
 fi
+if [ "$HIVE_NODETYPE" == "snap" ]; then
+    FLAGS="$FLAGS --syncmode snap"
+fi
 if [ "$HIVE_NODETYPE" == "" ]; then
     FLAGS="$FLAGS --syncmode full"
 fi

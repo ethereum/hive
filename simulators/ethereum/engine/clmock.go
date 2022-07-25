@@ -27,6 +27,9 @@ type CLMocker struct {
 	SlotsToSafe      *big.Int
 	SlotsToFinalized *big.Int
 
+	// Wait time before attempting to get the payload
+	PayloadProductionClientDelay time.Duration
+
 	// Block Production State
 	NextBlockProducer *EngineClient
 	NextFeeRecipient  common.Address
@@ -46,8 +49,9 @@ type CLMocker struct {
 	LatestForkchoice        ForkchoiceStateV1
 
 	// Merge related
-	FirstPoSBlockNumber *big.Int
-	TTDReached          bool
+	FirstPoSBlockNumber        *big.Int
+	TTDReached                 bool
+	TransitionPayloadTimestamp *big.Int
 
 	// Global timeout after which all procedures shall stop
 	Timeout <-chan time.Time
@@ -69,17 +73,18 @@ func NewCLMocker(t *hivesim.T, slotsToSafe *big.Int, slotsToFinalized *big.Int) 
 	}
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
-		T:                      t,
-		EngineClients:          make([]*EngineClient, 0),
-		PrevRandaoHistory:      map[uint64]common.Hash{},
-		ExecutedPayloadHistory: map[uint64]ExecutableDataV1{},
-		SlotsToSafe:            slotsToSafe,
-		SlotsToFinalized:       slotsToFinalized,
-		LatestHeader:           nil,
-		FirstPoSBlockNumber:    nil,
-		LatestHeadNumber:       nil,
-		TTDReached:             false,
-		NextFeeRecipient:       common.Address{},
+		T:                            t,
+		EngineClients:                make([]*EngineClient, 0),
+		PrevRandaoHistory:            map[uint64]common.Hash{},
+		ExecutedPayloadHistory:       map[uint64]ExecutableDataV1{},
+		SlotsToSafe:                  slotsToSafe,
+		SlotsToFinalized:             slotsToFinalized,
+		PayloadProductionClientDelay: DefaultPayloadProductionClientDelay,
+		LatestHeader:                 nil,
+		FirstPoSBlockNumber:          nil,
+		LatestHeadNumber:             nil,
+		TTDReached:                   false,
+		NextFeeRecipient:             common.Address{},
 		LatestForkchoice: ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
 			SafeBlockHash:      common.Hash{},
@@ -229,9 +234,15 @@ func (cl *CLMocker) getNextPayloadID() {
 	rand.Read(nextPrevRandao[:])
 
 	cl.LatestPayloadAttributes = PayloadAttributesV1{
-		Timestamp:             cl.LatestHeader.Time + 1,
 		PrevRandao:            nextPrevRandao,
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
+	}
+
+	if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
+		// We are producing the transition payload
+		cl.LatestPayloadAttributes.Timestamp = cl.TransitionPayloadTimestamp.Uint64()
+	} else {
+		cl.LatestPayloadAttributes.Timestamp = cl.LatestHeader.Time + 1
 	}
 
 	// Save random value
@@ -365,7 +376,7 @@ func (cl *CLMocker) produceSingleBlock(callbacks BlockProcessCallbacks) {
 	}
 
 	// Give the client a delay between getting the payload ID and actually retrieving the payload
-	time.Sleep(PayloadProductionClientDelay)
+	time.Sleep(cl.PayloadProductionClientDelay)
 
 	cl.getNextPayload()
 

@@ -24,7 +24,7 @@ var (
 
 	// Time delay between ForkchoiceUpdated and GetPayload to allow the clients
 	// to produce a new Payload
-	PayloadProductionClientDelay = time.Second
+	DefaultPayloadProductionClientDelay = time.Second
 
 	// Confirmation blocks
 	PoWConfirmationBlocks = uint64(15)
@@ -97,34 +97,43 @@ type TestSpec struct {
 }
 
 func main() {
-	engine := hivesim.Suite{
-		Name: "engine",
-		Description: `
-Test Engine API tests using CL mocker to inject commands into clients after they 
-have reached the Terminal Total Difficulty.`[1:],
-	}
+	var (
+		engine = hivesim.Suite{
+			Name: "engine",
+			Description: `
+	Test Engine API tests using CL mocker to inject commands into clients after they 
+	have reached the Terminal Total Difficulty.`[1:],
+		}
+		transition = hivesim.Suite{
+			Name: "transition",
+			Description: `
+	Test Engine API tests using CL mocker to inject commands into clients and drive 
+	them through the merge.`[1:],
+		}
+		auth = hivesim.Suite{
+			Name: "auth",
+			Description: `
+	Test Engine API authentication features.`[1:],
+		}
+		sync = hivesim.Suite{
+			Name: "sync",
+			Description: `
+	Test Engine API sync, pre/post merge.`[1:],
+		}
+	)
+
+	simulator := hivesim.New()
+
 	addTestsToSuite(&engine, engineTests)
-
-	transition := hivesim.Suite{
-		Name: "transition",
-		Description: `
-Test Engine API tests using CL mocker to inject commands into clients and drive 
-them through the merge.`[1:],
-	}
 	addTestsToSuite(&transition, mergeTests)
-
-	auth := hivesim.Suite{
-		Name: "auth",
-		Description: `
-Test Engine API authentication features.`[1:],
-	}
 	addTestsToSuite(&auth, authTests)
+	addSyncTestsToSuite(simulator, &sync, syncTests)
 
 	// Mark suites for execution
-	simulator := hivesim.New()
 	hivesim.MustRunSuite(simulator, engine)
 	hivesim.MustRunSuite(simulator, transition)
 	hivesim.MustRunSuite(simulator, auth)
+	hivesim.MustRunSuite(simulator, sync)
 }
 
 // Add test cases to a given test suite
