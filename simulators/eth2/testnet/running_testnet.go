@@ -107,12 +107,14 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 					}
 
 					var checkpoints eth2api.FinalityCheckpoints
-					if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &checkpoints); err != nil {
-						ch <- res{err: fmt.Errorf("beacon %d: failed to poll finality checkpoint: %v", i, err)}
-						return
-					} else if !exists {
-						ch <- res{err: fmt.Errorf("beacon %d: Expected state for head block", i)}
-						return
+					if exists, err := beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdRoot(headInfo.Header.Message.StateRoot), &checkpoints); err != nil || !exists {
+						if exists, err = beaconapi.FinalityCheckpoints(ctx, b.API, eth2api.StateIdSlot(headInfo.Header.Message.Slot), &checkpoints); err != nil {
+							ch <- res{err: fmt.Errorf("beacon %d: failed to poll finality checkpoint: %v", i, err)}
+							return
+						} else if !exists {
+							ch <- res{err: fmt.Errorf("beacon %d: Expected state for head block", i)}
+							return
+						}
 					}
 
 					var versionedBlock eth2api.VersionedSignedBeaconBlock
@@ -139,14 +141,16 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (common.Checkpoint, error
 					finalized = shorten(checkpoints.Finalized.String())
 					health, err := getHealth(ctx, b.API, t.spec, slot)
 					if err != nil {
-						ch <- res{err: fmt.Errorf("beacon %d: %s", i, err)}
+						// warning is printed here instead because some clients
+						// don't support the required REST endpoint.
+						fmt.Printf("WARN: beacon %d: %s\n", i, err)
 					}
-
-					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s, justified=%s, finalized=%s", i, slot, head, health, execution, justified, finalized), nil}
 
 					ep := t.spec.SlotToEpoch(slot)
 					if ep > 4 && ep > checkpoints.Finalized.Epoch+2 {
 						ch <- res{err: fmt.Errorf("failed to finalize, head slot %d (epoch %d) is more than 2 ahead of finality checkpoint %d", slot, ep, checkpoints.Finalized.Epoch)}
+					} else {
+						ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s, justified=%s, finalized=%s", i, slot, head, health, execution, justified, finalized), nil}
 					}
 
 					if (checkpoints.Finalized != common.Checkpoint{}) {
