@@ -94,61 +94,127 @@ func SignatureValuesFromRaw(v *big.Int, r *big.Int, s *big.Int) SignatureValues 
 }
 
 type CustomTransactionData struct {
-	Nonce     *uint64
-	GasPrice  *big.Int
-	Gas       *uint64
-	To        *common.Address
-	Value     *big.Int
-	Data      *[]byte
-	Signature *SignatureValues
+	Nonce               *uint64
+	GasPriceOrGasFeeCap *big.Int
+	GasTipCap           *big.Int
+	Gas                 *uint64
+	To                  *common.Address
+	Value               *big.Int
+	Data                *[]byte
+	ChainID             *big.Int
+	Signature           *SignatureValues
 }
 
 func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateKey, customData *CustomTransactionData) (*types.Transaction, error) {
 	// Create a modified transaction base, from the base transaction and customData mix
-	modifiedTxBase := &types.LegacyTx{}
+	var (
+		modifiedTxData types.TxData
+	)
 
-	if customData.Nonce != nil {
-		modifiedTxBase.Nonce = *customData.Nonce
-	} else {
-		modifiedTxBase.Nonce = baseTransaction.Nonce()
+	switch baseTransaction.Type() {
+	case types.LegacyTxType:
+		modifiedLegacyTxBase := &types.LegacyTx{}
+
+		if customData.Nonce != nil {
+			modifiedLegacyTxBase.Nonce = *customData.Nonce
+		} else {
+			modifiedLegacyTxBase.Nonce = baseTransaction.Nonce()
+		}
+		if customData.GasPriceOrGasFeeCap != nil {
+			modifiedLegacyTxBase.GasPrice = customData.GasPriceOrGasFeeCap
+		} else {
+			modifiedLegacyTxBase.GasPrice = baseTransaction.GasPrice()
+		}
+		if customData.GasTipCap != nil {
+			return nil, fmt.Errorf("GasTipCap is not supported for LegacyTx type")
+		}
+		if customData.Gas != nil {
+			modifiedLegacyTxBase.Gas = *customData.Gas
+		} else {
+			modifiedLegacyTxBase.Gas = baseTransaction.Gas()
+		}
+		if customData.To != nil {
+			modifiedLegacyTxBase.To = customData.To
+		} else {
+			modifiedLegacyTxBase.To = baseTransaction.To()
+		}
+		if customData.Value != nil {
+			modifiedLegacyTxBase.Value = customData.Value
+		} else {
+			modifiedLegacyTxBase.Value = baseTransaction.Value()
+		}
+		if customData.Data != nil {
+			modifiedLegacyTxBase.Data = *customData.Data
+		} else {
+			modifiedLegacyTxBase.Data = baseTransaction.Data()
+		}
+
+		if customData.Signature != nil {
+			modifiedLegacyTxBase.V = customData.Signature.V
+			modifiedLegacyTxBase.R = customData.Signature.R
+			modifiedLegacyTxBase.S = customData.Signature.S
+		}
+
+		modifiedTxData = modifiedLegacyTxBase
+
+	case types.DynamicFeeTxType:
+		modifiedDynamicFeeTxBase := &types.DynamicFeeTx{}
+
+		if customData.Nonce != nil {
+			modifiedDynamicFeeTxBase.Nonce = *customData.Nonce
+		} else {
+			modifiedDynamicFeeTxBase.Nonce = baseTransaction.Nonce()
+		}
+		if customData.GasPriceOrGasFeeCap != nil {
+			modifiedDynamicFeeTxBase.GasFeeCap = customData.GasPriceOrGasFeeCap
+		} else {
+			modifiedDynamicFeeTxBase.GasFeeCap = baseTransaction.GasFeeCap()
+		}
+		if customData.GasTipCap != nil {
+			modifiedDynamicFeeTxBase.GasTipCap = customData.GasTipCap
+		} else {
+			modifiedDynamicFeeTxBase.GasTipCap = baseTransaction.GasTipCap()
+		}
+		if customData.Gas != nil {
+			modifiedDynamicFeeTxBase.Gas = *customData.Gas
+		} else {
+			modifiedDynamicFeeTxBase.Gas = baseTransaction.Gas()
+		}
+		if customData.To != nil {
+			modifiedDynamicFeeTxBase.To = customData.To
+		} else {
+			modifiedDynamicFeeTxBase.To = baseTransaction.To()
+		}
+		if customData.Value != nil {
+			modifiedDynamicFeeTxBase.Value = customData.Value
+		} else {
+			modifiedDynamicFeeTxBase.Value = baseTransaction.Value()
+		}
+		if customData.Data != nil {
+			modifiedDynamicFeeTxBase.Data = *customData.Data
+		} else {
+			modifiedDynamicFeeTxBase.Data = baseTransaction.Data()
+		}
+		if customData.Signature != nil {
+			modifiedDynamicFeeTxBase.V = customData.Signature.V
+			modifiedDynamicFeeTxBase.R = customData.Signature.R
+			modifiedDynamicFeeTxBase.S = customData.Signature.S
+		}
+
+		modifiedTxData = modifiedDynamicFeeTxBase
+
 	}
-	if customData.GasPrice != nil {
-		modifiedTxBase.GasPrice = customData.GasPrice
-	} else {
-		modifiedTxBase.GasPrice = baseTransaction.GasPrice()
-	}
-	if customData.Gas != nil {
-		modifiedTxBase.Gas = *customData.Gas
-	} else {
-		modifiedTxBase.Gas = baseTransaction.Gas()
-	}
-	if customData.To != nil {
-		modifiedTxBase.To = customData.To
-	} else {
-		modifiedTxBase.To = baseTransaction.To()
-	}
-	if customData.Value != nil {
-		modifiedTxBase.Value = customData.Value
-	} else {
-		modifiedTxBase.Value = baseTransaction.Value()
-	}
-	if customData.Data != nil {
-		modifiedTxBase.Data = *customData.Data
-	} else {
-		modifiedTxBase.Data = baseTransaction.Data()
-	}
-	var modifiedTx *types.Transaction
-	if customData.Signature != nil {
-		modifiedTxBase.V = customData.Signature.V
-		modifiedTxBase.R = customData.Signature.R
-		modifiedTxBase.S = customData.Signature.S
-		modifiedTx = types.NewTx(modifiedTxBase)
-	} else {
-		// If a custom signature was not specified, simply sign the transaction again
-		signer := types.NewEIP155Signer(chainID)
+
+	modifiedTx := types.NewTx(modifiedTxData)
+	if customData.Signature == nil {
+		// If a custom invalid signature was not specified, simply sign the transaction again
+		if customData.ChainID == nil {
+			// Use the default value if an invaild chain ID was not specified
+			customData.ChainID = chainID
+		}
+		signer := types.NewLondonSigner(customData.ChainID)
 		var err error
-		modifiedTx, err = types.SignTx(types.NewTx(modifiedTxBase), signer, pk)
-		if err != nil {
+		if modifiedTx, err = types.SignTx(modifiedTx, signer, pk); err != nil {
 			return nil, err
 		}
 	}
@@ -321,20 +387,22 @@ func (customData *CustomPayloadData) String() string {
 type InvalidPayloadField string
 
 const (
-	InvalidParentHash           InvalidPayloadField = "ParentHash"
-	InvalidStateRoot                                = "StateRoot"
-	InvalidReceiptsRoot                             = "ReceiptsRoot"
-	InvalidNumber                                   = "Number"
-	InvalidGasLimit                                 = "GasLimit"
-	InvalidGasUsed                                  = "GasUsed"
-	InvalidTimestamp                                = "Timestamp"
-	InvalidPrevRandao                               = "PrevRandao"
-	RemoveTransaction                               = "Incomplete Transactions"
-	InvalidTransactionSignature                     = "Transaction Signature"
-	InvalidTransactionNonce                         = "Transaction Nonce"
-	InvalidTransactionGas                           = "Transaction Gas"
-	InvalidTransactionGasPrice                      = "Transaction GasPrice"
-	InvalidTransactionValue                         = "Transaction Value"
+	InvalidParentHash             InvalidPayloadField = "ParentHash"
+	InvalidStateRoot                                  = "StateRoot"
+	InvalidReceiptsRoot                               = "ReceiptsRoot"
+	InvalidNumber                                     = "Number"
+	InvalidGasLimit                                   = "GasLimit"
+	InvalidGasUsed                                    = "GasUsed"
+	InvalidTimestamp                                  = "Timestamp"
+	InvalidPrevRandao                                 = "PrevRandao"
+	RemoveTransaction                                 = "Incomplete Transactions"
+	InvalidTransactionSignature                       = "Transaction Signature"
+	InvalidTransactionNonce                           = "Transaction Nonce"
+	InvalidTransactionGas                             = "Transaction Gas"
+	InvalidTransactionGasPrice                        = "Transaction GasPrice"
+	InvalidTransactionGasTipPrice                     = "Transaction GasTipCapPrice"
+	InvalidTransactionValue                           = "Transaction Value"
+	InvalidTransactionChainID                         = "Transaction ChainID"
 )
 
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
@@ -398,7 +466,9 @@ func generateInvalidPayload(basePayload *ExecutableDataV1, payloadField InvalidP
 		InvalidTransactionNonce,
 		InvalidTransactionGas,
 		InvalidTransactionGasPrice,
-		InvalidTransactionValue:
+		InvalidTransactionGasTipPrice,
+		InvalidTransactionValue,
+		InvalidTransactionChainID:
 
 		if len(basePayload.Transactions) == 0 {
 			return nil, fmt.Errorf("No transactions available for modification")
@@ -412,32 +482,26 @@ func generateInvalidPayload(basePayload *ExecutableDataV1, payloadField InvalidP
 		case InvalidTransactionSignature:
 			modifiedSignature := SignatureValuesFromRaw(baseTx.RawSignatureValues())
 			modifiedSignature.R = modifiedSignature.R.Sub(modifiedSignature.R, big1)
-			customTxData = CustomTransactionData{
-				Signature: &modifiedSignature,
-			}
+			customTxData.Signature = &modifiedSignature
 		case InvalidTransactionNonce:
 			customNonce := baseTx.Nonce() - 1
-			customTxData = CustomTransactionData{
-				Nonce: &customNonce,
-			}
+			customTxData.Nonce = &customNonce
 		case InvalidTransactionGas:
 			customGas := uint64(0)
-			customTxData = CustomTransactionData{
-				Gas: &customGas,
-			}
+			customTxData.Gas = &customGas
 		case InvalidTransactionGasPrice:
-			customTxData = CustomTransactionData{
-				GasPrice: big0,
-			}
+			customTxData.GasPriceOrGasFeeCap = big0
+		case InvalidTransactionGasTipPrice:
+			invalidGasTip := new(big.Int).Set(gasTipPrice)
+			invalidGasTip.Mul(invalidGasTip, big.NewInt(2))
+			customTxData.GasTipCap = invalidGasTip
 		case InvalidTransactionValue:
 			// Vault account initially has 0x123450000000000000000, so this value should overflow
-			customValue, err := hexutil.DecodeBig("0x123450000000000000001")
-			if err != nil {
-				return nil, err
-			}
-			customTxData = CustomTransactionData{
-				Value: customValue,
-			}
+			customTxData.Value, _ = hexutil.DecodeBig("0x123450000000000000001")
+		case InvalidTransactionChainID:
+			customChainID := new(big.Int).Set(chainID)
+			customChainID.Add(customChainID, big1)
+			customTxData.ChainID = customChainID
 		}
 
 		modifiedTx, err := customizeTransaction(&baseTx, vaultKey, &customTxData)
@@ -447,6 +511,7 @@ func generateInvalidPayload(basePayload *ExecutableDataV1, payloadField InvalidP
 
 		modifiedTxBytes, err := modifiedTx.MarshalBinary()
 		if err != nil {
+			return nil, err
 		}
 		modifiedTransactions := [][]byte{
 			modifiedTxBytes,

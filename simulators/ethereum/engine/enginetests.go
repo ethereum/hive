@@ -182,44 +182,104 @@ var engineTests = []TestSpec{
 		Run:  invalidPayloadTestCaseGen(RemoveTransaction, true, false),
 	},
 	{
-		Name: "Invalid Transaction Signature NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
+		Name:                "Invalid Transaction Signature NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Signature NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionSignature, true, false),
+		Name:                "Invalid Transaction Signature NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Nonce NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
+		Name:                "Invalid Transaction Signature NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, true, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Nonce NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionNonce, true, false),
+		Name:                "Invalid Transaction Nonce NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction GasPrice NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
+		Name:                "Invalid Transaction Nonce NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 	{
-		Name: "Invalid Transaction GasPrice NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionGasPrice, true, false),
+		Name:                "Invalid Transaction Nonce NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, true, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Gas NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
+		Name:                "Invalid Transaction GasPrice NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Gas NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionGas, true, false),
+		Name:                "Invalid Transaction GasPrice NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Value NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
+		Name:                "Invalid Transaction GasPrice NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, true, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 	{
-		Name: "Invalid Transaction Value NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTransactionValue, true, false),
+		Name:                "Invalid Transaction Gas Tip NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasTipPrice, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Gas Tip NewPayload (EIP-1559, Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasTipPrice, true, false),
+		TestTransactionType: DynamicFeeTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Gas NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Gas NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Gas NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, true, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Value NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Value NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction Value NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, true, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction ChainID NewPayload",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, false, false),
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction ChainID NewPayload (EIP-1559)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, false, false),
+		TestTransactionType: DynamicFeeTxOnly,
+	},
+	{
+		Name:                "Invalid Transaction ChainID NewPayload (Syncing)",
+		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, true, false),
+		TestTransactionType: LegacyTxOnly,
 	},
 
 	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
@@ -392,6 +452,16 @@ var engineTests = []TestSpec{
 		Name: "Payload Build after New Invalid Payload",
 		Run:  payloadBuildAfterNewInvalidPayload,
 	},
+	{
+		Name:                "Build Payload with Invalid ChainID Transaction (Legacy Tx)",
+		Run:                 buildPayloadWithInvalidChainIDTx,
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Build Payload with Invalid ChainID Transaction (EIP-1559)",
+		Run:                 buildPayloadWithInvalidChainIDTx,
+		TestTransactionType: DynamicFeeTxOnly,
+	},
 
 	// Re-org using Engine API
 	{
@@ -427,15 +497,28 @@ var engineTests = []TestSpec{
 
 	// Suggested Fee Recipient in Payload creation
 	{
-		Name: "Suggested Fee Recipient Test",
-		Run:  suggestedFeeRecipient,
+		Name:                "Suggested Fee Recipient Test",
+		Run:                 suggestedFeeRecipient,
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "Suggested Fee Recipient Test (EIP-1559 Transactions)",
+		Run:                 suggestedFeeRecipient,
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 
 	// PrevRandao opcode tests
 	{
-		Name: "PrevRandao Opcode Transactions",
-		Run:  prevRandaoOpcodeTx,
-		TTD:  10,
+		Name:                "PrevRandao Opcode Transactions",
+		Run:                 prevRandaoOpcodeTx,
+		TTD:                 10,
+		TestTransactionType: LegacyTxOnly,
+	},
+	{
+		Name:                "PrevRandao Opcode Transactions (EIP-1559 Transactions)",
+		Run:                 prevRandaoOpcodeTx,
+		TTD:                 10,
+		TestTransactionType: DynamicFeeTxOnly,
 	},
 }
 
@@ -2374,6 +2457,49 @@ func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
 			// try to continue creating a valid payload.
 		},
 	})
+}
+
+// Send a valid `newPayload` in correct order but skip `forkchoiceUpdated` until the last payload
+func buildPayloadWithInvalidChainIDTx(t *TestEnv) {
+	// Wait until TTD is reached by this client
+	t.CLMock.waitForTTD()
+
+	// Produce blocks before starting the test
+	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+
+	// Send a transaction with an incorrect ChainID.
+	// Transaction must be not be included in payload creation.
+	var invalidChainIDTx *types.Transaction
+	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		// Run test after a new payload has been broadcast
+		OnPayloadProducerSelected: func() {
+			txData := &types.LegacyTx{
+				Nonce:    t.nonce,
+				To:       &prevRandaoContractAddr,
+				Value:    big0,
+				Gas:      75000,
+				GasPrice: gasPrice,
+				Data:     nil,
+			}
+			invalidChainID := new(big.Int).Set(chainID)
+			invalidChainID.Add(invalidChainID, big1)
+			invalidChainIDTx, err := types.SignTx(types.NewTx(txData), types.NewLondonSigner(invalidChainID), vaultKey)
+			if err != nil {
+				t.Fatalf("FAIL(%s): Unable to sign tx with invalid chain ID: %v", t.TestName, err)
+			}
+			err = t.Engine.Eth.SendTransaction(t.Engine.Ctx(), invalidChainIDTx)
+			if err != nil {
+				t.Logf("INFO (%s): Error on sending transaction with incorrect chain ID (Expected): %v", t.TestName, err)
+			}
+		},
+	})
+
+	// Verify that the latest payload built does NOT contain the invalid chain Tx
+	if TransactionInPayload(&t.CLMock.LatestPayloadBuilt, invalidChainIDTx) {
+		p, _ := json.MarshalIndent(t.CLMock.LatestPayloadBuilt, "", " ")
+		t.Fatalf("FAIL (%s): Invalid chain ID tx was included in payload: %s", t.TestName, p)
+	}
+
 }
 
 // Fee Recipient Tests

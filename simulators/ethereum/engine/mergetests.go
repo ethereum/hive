@@ -442,7 +442,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 					return
 				}
 				t.nonce = nonce
-				tx := t.makeNextTransaction(prevRandaoContractAddr, big0, nil)
+				tx := t.makeNextTransaction(&prevRandaoContractAddr, 75000, big0, nil)
 				err = t.CLMock.NextBlockProducer.Eth.SendTransaction(t.CLMock.NextBlockProducer.Ctx(), tx)
 				if err != nil {
 					t.Logf("INFO (%s): Unable to send tx (address=%v): %v", t.TestName, vaultAccountAddr, err)
