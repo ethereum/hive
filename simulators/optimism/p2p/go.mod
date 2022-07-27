@@ -4,11 +4,11 @@ go 1.18
 
 replace github.com/ethereum/go-ethereum v1.10.20 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220715235548-70b02481016d
 
-replace github.com/ethereum/hive v0.0.0-20220630112103-4b22dc796d94 => github.com/ethereum-optimism/hive v0.0.0-20220725184331-e0ca18567bc8
+replace github.com/ethereum/hive v0.0.0-20220726101544-19cb1f8cc162 => github.com/ethereum-optimism/hive v0.0.0-20220727114344-022fad9696a4
 
 require (
 	github.com/ethereum/go-ethereum v1.10.20
-	github.com/ethereum/hive v0.0.0-20220630112103-4b22dc796d94
+	github.com/ethereum/hive v0.0.0-20220726101544-19cb1f8cc162
 )
 
 require (
@@ -17,7 +17,7 @@ require (
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/go-ole/go-ole v1.2.5 // indirect
-	github.com/go-stack/stack v1.8.0 // indirect
+	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/golang-jwt/jwt/v4 v4.3.0 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.4.2 // indirect
