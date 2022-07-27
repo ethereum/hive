@@ -1,9 +1,14 @@
-package main
+package suite_auth
 
 import (
+	"context"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	api "github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
 
 // JWT Authentication Tests
@@ -36,50 +41,50 @@ var authTestSpecs = []AuthTestSpec{
 	},
 	{
 		Name:                  "JWT Authentication: Negative time drift, exceeding limit, correct secret",
-		TimeDriftSeconds:      -1 - maxTimeDriftSeconds,
+		TimeDriftSeconds:      -1 - globals.MaxTimeDriftSeconds,
 		CustomAuthSecretBytes: nil,
 		AuthOk:                false,
 		RetryAttempts:         5,
 	},
 	{
 		Name:                  "JWT Authentication: Negative time drift, within limit, correct secret",
-		TimeDriftSeconds:      1 - maxTimeDriftSeconds,
+		TimeDriftSeconds:      1 - globals.MaxTimeDriftSeconds,
 		CustomAuthSecretBytes: nil,
 		AuthOk:                true,
 		RetryAttempts:         5,
 	},
 	{
 		Name:                  "JWT Authentication: Positive time drift, exceeding limit, correct secret",
-		TimeDriftSeconds:      maxTimeDriftSeconds + 1,
+		TimeDriftSeconds:      globals.MaxTimeDriftSeconds + 1,
 		CustomAuthSecretBytes: nil,
 		AuthOk:                false,
 		RetryAttempts:         5,
 	},
 	{
 		Name:                  "JWT Authentication: Positive time drift, within limit, correct secret",
-		TimeDriftSeconds:      maxTimeDriftSeconds - 1,
+		TimeDriftSeconds:      globals.MaxTimeDriftSeconds - 1,
 		CustomAuthSecretBytes: nil,
 		AuthOk:                true,
 		RetryAttempts:         5,
 	},
 }
 
-var authTests = func() []TestSpec {
-	testSpecs := make([]TestSpec, 0)
+var Tests = func() []test.Spec {
+	testSpecs := make([]test.Spec, 0)
 	for _, authTest := range authTestSpecs {
 		testSpecs = append(testSpecs, GenerateAuthTestSpec(authTest))
 	}
 	return testSpecs
 }()
 
-func GenerateAuthTestSpec(authTestSpec AuthTestSpec) TestSpec {
-	runFunc := func(t *TestEnv) {
+func GenerateAuthTestSpec(authTestSpec AuthTestSpec) test.Spec {
+	runFunc := func(t *test.Env) {
 		// Default values
 		var (
 			// All test cases send a simple TransitionConfigurationV1 to check the Authentication mechanism (JWT)
-			tConf = TransitionConfigurationV1{
-				TerminalTotalDifficulty: t.MainTTD(),
-				TerminalBlockHash:       &(common.Hash{}),
+			tConf = api.TransitionConfigurationV1{
+				TerminalTotalDifficulty: (*hexutil.Big)(t.MainTTD()),
+				TerminalBlockHash:       common.Hash{},
 				TerminalBlockNumber:     0,
 			}
 			testSecret = authTestSpec.CustomAuthSecretBytes
@@ -90,15 +95,17 @@ func GenerateAuthTestSpec(authTestSpec AuthTestSpec) TestSpec {
 		for {
 			var testTime = time.Now()
 			if testSecret == nil {
-				testSecret = defaultJwtTokenSecretBytes
+				testSecret = globals.DefaultJwtTokenSecretBytes
 			}
 			if authTestSpec.TimeDriftSeconds != 0 {
 				testTime = testTime.Add(time.Second * time.Duration(authTestSpec.TimeDriftSeconds))
 			}
-			if err := t.Engine.PrepareAuthCallToken(testSecret, testTime); err != nil {
+			if err := t.HiveEngine.PrepareAuthCallToken(testSecret, testTime); err != nil {
 				t.Fatalf("FAIL (%s): Unable to prepare the auth token: %v", t.TestName, err)
 			}
-			err := t.Engine.c.CallContext(t.Engine.Ctx(), &tConf, "engine_exchangeTransitionConfigurationV1", tConf)
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			_, err := t.HiveEngine.ExchangeTransitionConfigurationV1(ctx, &tConf)
 			if (authTestSpec.AuthOk && err == nil) || (!authTestSpec.AuthOk && err != nil) {
 				// Test passed
 				return
@@ -117,7 +124,7 @@ func GenerateAuthTestSpec(authTestSpec AuthTestSpec) TestSpec {
 			time.Sleep(time.Second)
 		}
 	}
-	return TestSpec{
+	return test.Spec{
 		Name: authTestSpec.Name,
 		Run:  runFunc,
 	}

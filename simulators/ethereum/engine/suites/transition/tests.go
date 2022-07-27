@@ -1,22 +1,24 @@
-package main
+package suite_transition
 
 import (
-	"fmt"
+	"context"
 	"math/big"
 	"time"
 
+	api "github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
+	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
+	"github.com/ethereum/hive/simulators/ethereum/engine/test"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/hive/hivesim"
 )
 
 type SecondaryClientSpec struct {
-	// Chain file to initialize the secondary client
-	ChainFile string
-
-	// Terminal Total Difficulty of this client.
-	// Default: Main Client's TTD
-	TTD int64
+	ClientStarter client.EngineStarter
 
 	// Whether the PoS chain should be built on top of this secondary client
 	BuildPoSChainOnTop bool
@@ -71,7 +73,7 @@ type MergeTestSpec struct {
 	// If set, the main client will be polled with `newPayload` until status!=`SYNCING` is returned.
 	// If `VALID`, `latestValidHash` is also checked to be the hash of the transition block.
 	// If `INVALID`, {status: INVALID, latestValidHash: 0x00..00, payloadId: null} is expected.
-	TransitionPayloadStatus PayloadStatus
+	TransitionPayloadStatus test.PayloadStatus
 
 	// Number of PoS blocks to build on top of the MainClient.
 	// Blocks will be built before any of the other clients is started, leading to a potential Post-PoS re-org.
@@ -93,7 +95,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile: "blocks_1_td_196608.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1_td_196704.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1_td_196704.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -103,10 +107,12 @@ var mergeTestSpecs = []MergeTestSpec{
 		Name:                    "Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height (Transition Payload)",
 		TTD:                     196608,
 		MainChainFile:           "blocks_1_td_196608.rlp",
-		TransitionPayloadStatus: Valid,
+		TransitionPayloadStatus: test.Valid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1_td_196704.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1_td_196704.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -118,7 +124,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile: "blocks_1_td_196704.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1_td_196608.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1_td_196608.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -130,7 +138,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile: "blocks_2_td_393120.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_2_td_393504.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_2_td_393504.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -142,7 +152,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile: "blocks_2_td_393504.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_2_td_393120.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_2_td_393120.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -154,7 +166,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile: "blocks_1_td_196704.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_2_td_393120.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_2_td_393120.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -166,7 +180,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile: "blocks_2_td_393120.rlp",
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1_td_196704.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1_td_196704.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -180,7 +196,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		PrevRandaoTransactions:   true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1_td_196704.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1_td_196704.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -194,7 +212,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		SlotsToFinalized:    big.NewInt(5),
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1_td_196704.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1_td_196704.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -208,7 +228,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		SlotsToFinalized:    big.NewInt(5),
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1_td_196608.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1_td_196608.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -222,7 +244,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		SlotsToFinalized:    big.NewInt(5),
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_2_td_393120.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_2_td_393120.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -236,7 +260,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		SlotsToFinalized:    big.NewInt(5),
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1_td_196704.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1_td_196704.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -251,8 +277,10 @@ var mergeTestSpecs = []MergeTestSpec{
 		KeepCheckingUntilTimeout: true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				TTD:                 393120,
-				ChainFile:           "blocks_2_td_393120.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					TerminalTotalDifficulty: big.NewInt(393120),
+					ChainFile:               "blocks_2_td_393120.rlp",
+				},
 				BuildPoSChainOnTop:  false,
 				MainClientShallSync: false,
 			},
@@ -267,7 +295,9 @@ var mergeTestSpecs = []MergeTestSpec{
 		TimeoutSeconds:        300,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ChainFile:           "blocks_1024_td_135112316.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					ChainFile: "blocks_1024_td_135112316.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: true,
 			},
@@ -281,8 +311,10 @@ var mergeTestSpecs = []MergeTestSpec{
 		KeepCheckingUntilTimeout: true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				TTD:                 393120,
-				ChainFile:           "blocks_2_td_393120.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					TerminalTotalDifficulty: big.NewInt(393120),
+					ChainFile:               "blocks_2_td_393120.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: false,
 			},
@@ -293,11 +325,13 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:                     196608,
 		MainChainFile:           "blocks_1_td_196608.rlp",
 		MainClientPoSBlocks:     1,
-		TransitionPayloadStatus: Invalid,
+		TransitionPayloadStatus: test.Invalid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				TTD:                 393120,
-				ChainFile:           "blocks_2_td_393120.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					TerminalTotalDifficulty: big.NewInt(393120),
+					ChainFile:               "blocks_2_td_393120.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: false,
 			},
@@ -311,8 +345,10 @@ var mergeTestSpecs = []MergeTestSpec{
 		KeepCheckingUntilTimeout: true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				TTD:                 196608,
-				ChainFile:           "blocks_1_td_196608.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					TerminalTotalDifficulty: big.NewInt(196608),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: false,
 			},
@@ -323,11 +359,30 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:                     393120,
 		MainChainFile:           "blocks_2_td_393120.rlp",
 		MainClientPoSBlocks:     1,
-		TransitionPayloadStatus: Invalid,
+		TransitionPayloadStatus: test.Invalid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				TTD:                 196608,
-				ChainFile:           "blocks_1_td_196608.rlp",
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					TerminalTotalDifficulty: big.NewInt(196608),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                    "Stop processing gossiped PoW blocks",
+		TTD:                     393120,
+		MainChainFile:           "blocks_2_td_393120.rlp",
+		MainClientPoSBlocks:     1,
+		TransitionPayloadStatus: test.Invalid,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: hive_rpc.HiveRPCEngineStarter{
+					TerminalTotalDifficulty: big.NewInt(196608),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: false,
 			},
@@ -342,8 +397,8 @@ var mergeTestSpecs = []MergeTestSpec{
 	*/
 }
 
-var mergeTests = func() []TestSpec {
-	testSpecs := make([]TestSpec, 0)
+var Tests = func() []test.Spec {
+	testSpecs := make([]test.Spec, 0)
 	for _, mergeTest := range mergeTestSpecs {
 		testSpecs = append(testSpecs, GenerateMergeTestSpec(mergeTest))
 	}
@@ -368,62 +423,63 @@ func (clients SecondaryClientSpecs) AnyPoSChainOnTop() bool {
 	return false
 }
 
-func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
-	runFunc := func(t *TestEnv) {
+func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
+	runFunc := func(t *test.Env) {
 		// The first client waits for TTD, which ideally should be reached immediately using loaded chain
 		if !mergeTestSpec.SkipMainClientTTDWait {
-			if err := t.Engine.waitForTTDWithTimeout(t.Timeout); err != nil {
-				t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, t.Engine.Container, err)
+			if err := helper.WaitForTTDWithTimeout(t.Engine, t.TestContext); err != nil {
+				t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, t.Engine.ID(), err)
 			}
 
 			if !mergeTestSpec.SkipMainClientFcU {
 				// Set the head of the CLMocker to the head of the main client
-				t.CLMock.setTTDBlockClient(t.Engine)
+				t.CLMock.SetTTDBlockClient(t.Engine)
 				if mergeTestSpec.MainClientPoSBlocks > 0 {
-					// CL Mocker `produceBlocks` automatically checks that the PoS chain is followed by the client
-					t.CLMock.produceBlocks(mergeTestSpec.MainClientPoSBlocks, BlockProcessCallbacks{})
+					// CL Mocker `ProduceBlocks` automatically checks that the PoS chain is followed by the client
+					t.CLMock.ProduceBlocks(mergeTestSpec.MainClientPoSBlocks, clmock.BlockProcessCallbacks{})
 				}
 			}
 		}
 
 		// At this point, Head must be main client's HeadBlockHash, but this can change depending on the
 		// secondary clients
-		header, err := t.Eth.HeaderByNumber(t.Ctx(), nil)
+		ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+		defer cancel()
+		header, err := t.Eth.HeaderByNumber(ctx, nil)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to obtain main client latest header: %v", t.TestName, err)
 		}
 		mustHeadHash := header.Hash()
 		t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 
-		// Get the main client's enode to pass it to secondary clients
-		enode, err := t.Engine.EnodeURL()
-		if err != nil {
-			t.Fatalf("FAIL (%s): Unable to obtain main client enode: %v", t.TestName, err)
-		}
-
 		// Start a secondary clients with alternative PoW chains
 		for _, secondaryClientSpec := range mergeTestSpec.SecondaryClientSpecs {
 			// Start the secondary client with the alternative PoW chain
 			t.Logf("INFO (%s): Running secondary client: %v", t.TestName, secondaryClientSpec)
-			secondaryClient := secondaryClientSpec.StartClient(t, enode)
+			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.ClientParams, t.ClientFiles, t.Engine)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
+			}
 
 			// Add this client to the CLMocker list of Engine clients
-			t.CLMock.AddEngineClient(t.T, secondaryClient.Client, big.NewInt(secondaryClientSpec.TTD))
+			t.CLMock.AddEngineClient(secondaryClient)
 
 			if secondaryClientSpec.BuildPoSChainOnTop {
-				if err := secondaryClient.waitForTTDWithTimeout(t.Timeout); err != nil {
-					t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, secondaryClient.Client.Container, err)
+				if err := helper.WaitForTTDWithTimeout(secondaryClient, t.TestContext); err != nil {
+					t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, secondaryClient.ID(), err)
 				}
-				t.CLMock.setTTDBlockClient(secondaryClient)
+				t.CLMock.SetTTDBlockClient(secondaryClient)
 			}
 
 			if secondaryClientSpec.MainClientShallSync {
 				// The main client shall sync to this secondary client in order for the test to succeed.
-				if header, err := secondaryClient.Eth.HeaderByNumber(secondaryClient.Ctx(), nil); err == nil {
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				if header, err := secondaryClient.HeaderByNumber(ctx, nil); err == nil {
 					mustHeadHash = header.Hash()
 					t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 				} else {
-					t.Fatalf("FAIL (%s): Unable to obtain client [%s] latest header: %v", t.TestName, secondaryClient.Container, err)
+					t.Fatalf("FAIL (%s): Unable to obtain client [%s] latest header: %v", t.TestName, secondaryClient.ID, err)
 				}
 			}
 		}
@@ -436,16 +492,23 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 				// Get the address nonce:
 				// This is because we could have included transactions in the PoW chain of the block
 				// producer, or re-orged.
-				nonce, err := t.CLMock.NextBlockProducer.Eth.NonceAt(t.CLMock.NextBlockProducer.Ctx(), vaultAccountAddr, nil)
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				nonce, err := t.CLMock.NextBlockProducer.NonceAt(ctx, globals.VaultAccountAddress, nil)
 				if err != nil {
-					t.Logf("INFO (%s): Unable to obtain address [%s] latest nonce: %v", t.TestName, vaultAccountAddr, err)
+					t.Logf("INFO (%s): Unable to obtain address [%s] latest nonce: %v", t.TestName, globals.VaultAccountAddress, err)
 					return
 				}
-				t.nonce = nonce
-				tx := t.makeNextTransaction(&prevRandaoContractAddr, 75000, big0, nil)
-				err = t.CLMock.NextBlockProducer.Eth.SendTransaction(t.CLMock.NextBlockProducer.Ctx(), tx)
+				tx, err := helper.MakeNextTransaction(nonce, &globals.PrevRandaoContractAddr, 75000, common.Big0, nil, t.TestTransactionType)
 				if err != nil {
-					t.Logf("INFO (%s): Unable to send tx (address=%v): %v", t.TestName, vaultAccountAddr, err)
+					t.Fatalf("FAIL (%s): Unable create next transaction: %v", t.TestName, err)
+
+				}
+				ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				err = t.CLMock.NextBlockProducer.SendTransaction(ctx, tx)
+				if err != nil {
+					t.Logf("INFO (%s): Unable to send tx (address=%v): %v", t.TestName, globals.VaultAccountAddress, err)
 				}
 				prevRandaoTxs = append(prevRandaoTxs, tx)
 			}
@@ -456,13 +519,15 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 			defer func() {
 				for _, tx := range prevRandaoTxs {
 					// Get the receipt of the transaction
-					r, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+					ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+					defer cancel()
+					r, err := t.Eth.TransactionReceipt(ctx, tx.Hash())
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to obtain tx [%v] receipt: %v", t.TestName, tx.Hash(), err)
 					}
 
 					blockNumberAsStorageKey := common.BytesToHash(r.BlockNumber.Bytes())
-					s := t.TestEth.TestStorageAt(prevRandaoContractAddr, blockNumberAsStorageKey, nil)
+					s := t.TestEngine.TestStorageAt(globals.PrevRandaoContractAddr, blockNumberAsStorageKey, nil)
 					s.ExpectStorageEqual(t.CLMock.PrevRandaoHistory[r.BlockNumber.Uint64()])
 				}
 			}()
@@ -470,10 +535,10 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 
 		// Test end state of the main client
 		for {
-			if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() && (mergeTestSpec.TransitionPayloadStatus == Unknown ||
+			if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() && (mergeTestSpec.TransitionPayloadStatus == test.Unknown ||
 				t.CLMock.FirstPoSBlockNumber == nil) {
 				// Build a block and check whether the main client switches
-				t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+				t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 					OnPayloadProducerSelected: prevRandaoFunc,
 				})
 
@@ -484,22 +549,23 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 					t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 				}
 			}
-
-			if mergeTestSpec.TransitionPayloadStatus != Unknown {
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			if mergeTestSpec.TransitionPayloadStatus != test.Unknown {
 				// We are specifically checking the transition payload in this test case
 				p := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestExecutedPayload)
 				p.ExpectNoError()
-				if p.Status.Status != Syncing {
+				if p.Status.Status != api.SYNCING {
 					p.ExpectStatus(mergeTestSpec.TransitionPayloadStatus)
-					if mergeTestSpec.TransitionPayloadStatus == Valid {
+					if mergeTestSpec.TransitionPayloadStatus == test.Valid {
 						p.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
-					} else if mergeTestSpec.TransitionPayloadStatus == Invalid {
+					} else if mergeTestSpec.TransitionPayloadStatus == test.Invalid {
 						p.ExpectLatestValidHash(&(common.Hash{}))
 					}
 					break
 				}
 
-			} else if header, err := t.Eth.HeaderByNumber(t.Ctx(), nil); err == nil {
+			} else if header, err := t.Eth.HeaderByNumber(ctx, nil); err == nil {
 				// We are not checking the transition block, we are checking that the client sticks to the correct chain.
 				if header.Hash() == mustHeadHash {
 					t.Logf("INFO (%s): Main client is now synced to the expected head, %v", t.TestName, header.Hash())
@@ -512,7 +578,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 			// Check for timeout.
 			select {
 			case <-time.After(time.Second):
-			case <-t.Timeout:
+			case <-t.TestContext.Done():
 				t.Fatalf("FAIL (%s): Timeout while waiting for sync on the alternative PoW chain", t.TestName)
 			}
 		}
@@ -522,7 +588,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 			for {
 				if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() {
 					// Build a block and check whether the main client switches
-					t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+					t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 						OnPayloadProducerSelected: prevRandaoFunc,
 					})
 
@@ -534,8 +600,9 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 					}
 
 				}
-
-				if header, err := t.Eth.HeaderByNumber(t.Ctx(), nil); err == nil {
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				if header, err := t.Eth.HeaderByNumber(ctx, nil); err == nil {
 					if header.Hash() != mustHeadHash {
 						t.Fatalf("FAIL (%s): Main client synced to incorrect chain: %v", t.TestName, header.Hash())
 						break
@@ -547,7 +614,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 				// Wait here before checking the head again.
 				select {
 				case <-time.After(time.Second):
-				case <-t.Timeout:
+				case <-t.TestContext.Done():
 					// This means the test is over but that is ok since the client did not switch to an incorrect chain.
 					return
 				}
@@ -556,7 +623,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 		}
 	}
 
-	return TestSpec{
+	return test.Spec{
 		Name:             mergeTestSpec.Name,
 		About:            mergeTestSpec.About,
 		Run:              runFunc,
@@ -567,29 +634,4 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) TestSpec {
 		GenesisFile:      mergeTestSpec.GenesisFile,
 		ChainFile:        mergeTestSpec.MainChainFile,
 	}
-}
-
-func (spec SecondaryClientSpec) ChainPath() string {
-	return "./chains/" + spec.ChainFile
-}
-
-func (spec SecondaryClientSpec) StartClient(t *TestEnv, enode string) *EngineClient {
-	clientTypes, err := t.Sim.ClientTypes()
-	if err != nil || len(clientTypes) == 0 {
-		t.Fatalf("FAIL (%s): Unable to obtain client types: %v", t.TestName, err)
-	}
-	// Let's use the first just for now
-	secondaryClientType := clientTypes[0]
-
-	secondaryClientFiles := t.ClientFiles.Set("/chain.rlp", spec.ChainPath())
-
-	secondaryClientParams := t.ClientParams.Set("HIVE_BOOTNODE", enode)
-
-	if spec.TTD != 0 {
-		ttd := calcRealTTD(t.ClientFiles["/genesis.json"], spec.TTD)
-		secondaryClientParams = secondaryClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
-	}
-
-	c := t.T.StartClient(secondaryClientType.Name, secondaryClientParams, hivesim.WithStaticFiles(secondaryClientFiles))
-	return NewEngineClient(t.T, c, big.NewInt(spec.TTD))
 }

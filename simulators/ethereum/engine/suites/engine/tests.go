@@ -1,26 +1,39 @@
-package main
+package suite_engine
 
 import (
+	"context"
 	"encoding/json"
 	"math/big"
 	"math/rand"
 	"time"
 
+	api "github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client/node"
+	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
+	"github.com/ethereum/hive/simulators/ethereum/engine/test"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/hive/hivesim"
 )
 
 // Execution specification reference:
 // https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
 
 var (
-	big0 = new(big.Int)
-	big1 = big.NewInt(1)
+	big0      = new(big.Int)
+	big1      = big.NewInt(1)
+	Head      *big.Int // Nil
+	Pending   = big.NewInt(-2)
+	Finalized = big.NewInt(-3)
+	Safe      = big.NewInt(-4)
 )
 
-var engineTests = []TestSpec{
+var Tests = []test.Spec{
 	// Engine API Negative Test Cases
 	{
 		Name: "Invalid Terminal Block in ForkchoiceUpdated",
@@ -103,200 +116,200 @@ var engineTests = []TestSpec{
 	},
 	{
 		Name: "Invalid ParentHash NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidParentHash, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidParentHash, false, false),
 	},
 	{
 		Name: "Invalid ParentHash NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidParentHash, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidParentHash, true, false),
 	},
 	{
 		Name: "Invalid StateRoot NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidStateRoot, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidStateRoot, false, false),
 	},
 	{
 		Name: "Invalid StateRoot NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidStateRoot, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidStateRoot, true, false),
 	},
 	{
 		Name: "Invalid StateRoot NewPayload, Empty Transactions",
-		Run:  invalidPayloadTestCaseGen(InvalidStateRoot, false, true),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidStateRoot, false, true),
 	},
 	{
 		Name: "Invalid StateRoot NewPayload, Empty Transactions (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidStateRoot, true, true),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidStateRoot, true, true),
 	},
 	{
 		Name: "Invalid ReceiptsRoot NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidReceiptsRoot, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidReceiptsRoot, false, false),
 	},
 	{
 		Name: "Invalid ReceiptsRoot NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidReceiptsRoot, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidReceiptsRoot, true, false),
 	},
 	{
 		Name: "Invalid Number NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidNumber, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidNumber, false, false),
 	},
 	{
 		Name: "Invalid Number NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidNumber, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidNumber, true, false),
 	},
 	{
 		Name: "Invalid GasLimit NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidGasLimit, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidGasLimit, false, false),
 	},
 	{
 		Name: "Invalid GasLimit NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidGasLimit, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidGasLimit, true, false),
 	},
 	{
 		Name: "Invalid GasUsed NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidGasUsed, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidGasUsed, false, false),
 	},
 	{
 		Name: "Invalid GasUsed NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidGasUsed, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidGasUsed, true, false),
 	},
 	{
 		Name: "Invalid Timestamp NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidTimestamp, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidTimestamp, false, false),
 	},
 	{
 		Name: "Invalid Timestamp NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidTimestamp, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidTimestamp, true, false),
 	},
 	{
 		Name: "Invalid PrevRandao NewPayload",
-		Run:  invalidPayloadTestCaseGen(InvalidPrevRandao, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidPrevRandao, false, false),
 	},
 	{
 		Name: "Invalid PrevRandao NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(InvalidPrevRandao, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.InvalidPrevRandao, true, false),
 	},
 	{
 		Name: "Invalid Incomplete Transactions NewPayload",
-		Run:  invalidPayloadTestCaseGen(RemoveTransaction, false, false),
+		Run:  invalidPayloadTestCaseGen(helper.RemoveTransaction, false, false),
 	},
 	{
 		Name: "Invalid Incomplete Transactions NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(RemoveTransaction, true, false),
+		Run:  invalidPayloadTestCaseGen(helper.RemoveTransaction, true, false),
 	},
 	{
 		Name:                "Invalid Transaction Signature NewPayload",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionSignature, false, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Signature NewPayload (EIP-1559)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, false, false),
-		TestTransactionType: DynamicFeeTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionSignature, false, false),
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Signature NewPayload (Syncing)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionSignature, true, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionSignature, true, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Nonce NewPayload",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionNonce, false, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Nonce NewPayload (EIP-1559)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, false, false),
-		TestTransactionType: DynamicFeeTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionNonce, false, false),
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Nonce NewPayload (Syncing)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionNonce, true, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionNonce, true, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction GasPrice NewPayload",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasPrice, false, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction GasPrice NewPayload (EIP-1559)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, false, false),
-		TestTransactionType: DynamicFeeTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasPrice, false, false),
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction GasPrice NewPayload (Syncing)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasPrice, true, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasPrice, true, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas Tip NewPayload (EIP-1559)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasTipPrice, false, false),
-		TestTransactionType: DynamicFeeTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasTipPrice, false, false),
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas Tip NewPayload (EIP-1559, Syncing)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGasTipPrice, true, false),
-		TestTransactionType: DynamicFeeTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasTipPrice, true, false),
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas NewPayload",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGas, false, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas NewPayload (EIP-1559)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, false, false),
-		TestTransactionType: DynamicFeeTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGas, false, false),
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas NewPayload (Syncing)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionGas, true, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGas, true, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Value NewPayload",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionValue, false, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Value NewPayload (EIP-1559)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, false, false),
-		TestTransactionType: DynamicFeeTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionValue, false, false),
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Value NewPayload (Syncing)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionValue, true, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionValue, true, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction ChainID NewPayload",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, false, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionChainID, false, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction ChainID NewPayload (EIP-1559)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, false, false),
-		TestTransactionType: DynamicFeeTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionChainID, false, false),
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction ChainID NewPayload (Syncing)",
-		Run:                 invalidPayloadTestCaseGen(InvalidTransactionChainID, true, false),
-		TestTransactionType: LegacyTxOnly,
+		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionChainID, true, false),
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 
 	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P1', Reveal using newPayload",
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGen(1, InvalidStateRoot, true),
+		Run:              invalidMissingAncestorReOrgGen(1, helper.InvalidStateRoot, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using newPayload",
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGen(9, InvalidStateRoot, true),
+		Run:              invalidMissingAncestorReOrgGen(9, helper.InvalidStateRoot, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using newPayload",
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGen(10, InvalidStateRoot, true),
+		Run:              invalidMissingAncestorReOrgGen(10, helper.InvalidStateRoot, true),
 	},
 
 	// Invalid Ancestor Re-Org Tests (Reveal via sync through secondary client)
@@ -304,19 +317,19 @@ var engineTests = []TestSpec{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidStateRoot, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidStateRoot, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidStateRoot, true),
+		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidStateRoot, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P8', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidReceiptsRoot, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, helper.InvalidReceiptsRoot, false),
 	},
 	/*
 		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
@@ -324,26 +337,26 @@ var engineTests = []TestSpec{
 			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
 			TimeoutSeconds:   30,
 			SlotsToFinalized: big.NewInt(20),
-			Run:              invalidMissingAncestorReOrgGenSync(9, InvalidNumber, false),
+			Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidNumber, false),
 		},
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidGasLimit, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, helper.InvalidGasLimit, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidGasUsed, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, helper.InvalidGasUsed, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, InvalidTimestamp, false),
+		Run:              invalidMissingAncestorReOrgGenSync(8, helper.InvalidTimestamp, false),
 	},
 	/*
 		TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
@@ -358,37 +371,37 @@ var engineTests = []TestSpec{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, RemoveTransaction, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, helper.RemoveTransaction, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTransactionSignature, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionSignature, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTransactionNonce, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionNonce, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTransactionGas, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionGas, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTransactionGasPrice, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionGasPrice, false),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, InvalidTransactionValue, false),
+		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionValue, false),
 	},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
@@ -461,12 +474,12 @@ var engineTests = []TestSpec{
 	{
 		Name:                "Build Payload with Invalid ChainID Transaction (Legacy Tx)",
 		Run:                 buildPayloadWithInvalidChainIDTx,
-		TestTransactionType: LegacyTxOnly,
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Build Payload with Invalid ChainID Transaction (EIP-1559)",
 		Run:                 buildPayloadWithInvalidChainIDTx,
-		TestTransactionType: DynamicFeeTxOnly,
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 
 	// Re-org using Engine API
@@ -511,12 +524,12 @@ var engineTests = []TestSpec{
 	{
 		Name:                "Suggested Fee Recipient Test",
 		Run:                 suggestedFeeRecipient,
-		TestTransactionType: LegacyTxOnly,
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Suggested Fee Recipient Test (EIP-1559 Transactions)",
 		Run:                 suggestedFeeRecipient,
-		TestTransactionType: DynamicFeeTxOnly,
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 
 	// PrevRandao opcode tests
@@ -524,21 +537,21 @@ var engineTests = []TestSpec{
 		Name:                "PrevRandao Opcode Transactions",
 		Run:                 prevRandaoOpcodeTx,
 		TTD:                 10,
-		TestTransactionType: LegacyTxOnly,
+		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "PrevRandao Opcode Transactions (EIP-1559 Transactions)",
 		Run:                 prevRandaoOpcodeTx,
 		TTD:                 10,
-		TestTransactionType: DynamicFeeTxOnly,
+		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 }
 
 // Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
-func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
-	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
+func invalidTerminalBlockForkchoiceUpdated(t *test.Env) {
+	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
 
-	forkchoiceState := ForkchoiceStateV1{
+	forkchoiceState := api.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
 		SafeBlockHash:      gblock.Hash(),
 		FinalizedBlockHash: gblock.Hash(),
@@ -548,37 +561,37 @@ func invalidTerminalBlockForkchoiceUpdated(t *TestEnv) {
 	// {payloadStatus: {status: INVALID, latestValidHash=0x00..00}, payloadId: null}
 	// either obtained from the Payload validation process or as a result of validating a PoW block referenced by forkchoiceState.headBlockHash
 	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceState, nil)
-	r.ExpectPayloadStatus(Invalid)
+	r.ExpectPayloadStatus(test.Invalid)
 	r.ExpectLatestValidHash(&(common.Hash{}))
 	// ValidationError is not validated since it can be either null or a string message
 
 	// Check that PoW chain progresses
-	t.verifyPoWProgress(gblock.Hash())
+	t.VerifyPoWProgress(gblock.Hash())
 }
 
 // Invalid GetPayload Under PoW: Client must reject GetPayload directives under PoW.
-func invalidGetPayloadUnderPoW(t *TestEnv) {
-	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
+func invalidGetPayloadUnderPoW(t *test.Env) {
+	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
 	// We start in PoW and try to get an invalid Payload, which should produce an error but nothing should be disrupted.
-	r := t.TestEngine.TestEngineGetPayloadV1(&PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
+	r := t.TestEngine.TestEngineGetPayloadV1(&api.PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
 	r.ExpectError()
 
 	// Check that PoW chain progresses
-	t.verifyPoWProgress(gblock.Hash())
+	t.VerifyPoWProgress(gblock.Hash())
 }
 
 // Invalid Terminal Block in NewPayload: Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
-func invalidTerminalBlockNewPayload(t *TestEnv) {
-	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
+func invalidTerminalBlockNewPayload(t *test.Env) {
+	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
 
 	// Create a dummy payload to send in the NewPayload call
-	payload := ExecutableDataV1{
+	payload := api.ExecutableDataV1{
 		ParentHash:    gblock.Hash(),
 		FeeRecipient:  common.Address{},
 		StateRoot:     gblock.Root(),
 		ReceiptsRoot:  types.EmptyUncleHash,
 		LogsBloom:     types.CreateBloom(types.Receipts{}).Bytes(),
-		PrevRandao:    common.Hash{},
+		Random:        common.Hash{},
 		Number:        1,
 		GasLimit:      gblock.GasLimit(),
 		GasUsed:       0,
@@ -588,7 +601,7 @@ func invalidTerminalBlockNewPayload(t *TestEnv) {
 		BlockHash:     common.Hash{},
 		Transactions:  [][]byte{},
 	}
-	hashedPayload, err := customizePayload(&payload, &CustomPayloadData{})
+	hashedPayload, err := helper.CustomizePayload(&payload, &helper.CustomPayloadData{})
 	if err != nil {
 		t.Fatalf("FAIL (%s): Error while constructing PoW payload: %v", t.TestName, err)
 	}
@@ -597,24 +610,24 @@ func invalidTerminalBlockNewPayload(t *TestEnv) {
 	// {status: INVALID, latestValidHash=0x00..00}
 	// if terminal block conditions are not satisfied
 	r := t.TestEngine.TestEngineNewPayloadV1(hashedPayload)
-	r.ExpectStatus(Invalid)
+	r.ExpectStatus(test.Invalid)
 	r.ExpectLatestValidHash(&(common.Hash{}))
 	// ValidationError is not validated since it can be either null or a string message
 
 	// Check that PoW chain progresses
-	t.verifyPoWProgress(gblock.Hash())
+	t.VerifyPoWProgress(gblock.Hash())
 }
 
 // Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using NewPayload) and unknown SafeBlock
 // results in error
-func unknownSafeBlockHash(t *TestEnv) {
+func unknownSafeBlockHash(t *test.Env) {
 	// Wait until TTD is reached by this client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Run test after a new payload has been broadcast
 		OnNewPayloadBroadcast: func() {
 
@@ -626,7 +639,7 @@ func unknownSafeBlockHash(t *TestEnv) {
 			// Execution specification:
 			// - This value MUST be either equal to or an ancestor of headBlockHash
 			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(
-				&ForkchoiceStateV1{
+				&api.ForkchoiceStateV1{
 					HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 					SafeBlockHash:      randomSafeBlockHash,
 					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -640,14 +653,14 @@ func unknownSafeBlockHash(t *TestEnv) {
 
 // Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using NewPayload) and unknown
 // FinalizedBlockHash results in error
-func unknownFinalizedBlockHash(t *TestEnv) {
+func unknownFinalizedBlockHash(t *test.Env) {
 	// Wait until TTD is reached by this client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Run test after a new payload has been broadcast
 		OnNewPayloadBroadcast: func() {
 
@@ -656,7 +669,7 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 			rand.Read(randomFinalizedBlockHash[:])
 
 			// Send forkchoiceUpdated with random FinalizedBlockHash
-			forkchoiceStateUnknownFinalizedHash := ForkchoiceStateV1{
+			forkchoiceStateUnknownFinalizedHash := api.ForkchoiceStateV1{
 				HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: randomFinalizedBlockHash,
@@ -666,9 +679,9 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 
 			// Test again using PayloadAttributes, should also return INVALID and no PayloadID
 			r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceStateUnknownFinalizedHash,
-				&PayloadAttributesV1{
+				&api.PayloadAttributesV1{
 					Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
-					PrevRandao:            common.Hash{},
+					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
 				})
 			r.ExpectError()
@@ -679,18 +692,18 @@ func unknownFinalizedBlockHash(t *TestEnv) {
 }
 
 // Verify that an unknown hash at HeadBlock in the forkchoice results in client returning Syncing state
-func unknownHeadBlockHash(t *TestEnv) {
+func unknownHeadBlockHash(t *test.Env) {
 	// Wait until TTD is reached by this client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	// Generate a random HeadBlock hash
 	randomHeadBlockHash := common.Hash{}
 	rand.Read(randomHeadBlockHash[:])
 
-	forkchoiceStateUnknownHeadHash := ForkchoiceStateV1{
+	forkchoiceStateUnknownHeadHash := api.ForkchoiceStateV1{
 		HeadBlockHash:      randomHeadBlockHash,
 		SafeBlockHash:      t.CLMock.LatestForkchoice.FinalizedBlockHash,
 		FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
@@ -703,38 +716,38 @@ func unknownHeadBlockHash(t *TestEnv) {
 	//   if forkchoiceState.headBlockHash references an unknown payload or a payload that can't be validated
 	//   because requisite data for the validation is missing
 	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceStateUnknownHeadHash, nil)
-	r.ExpectPayloadStatus(Syncing)
+	r.ExpectPayloadStatus(test.Syncing)
 
 	// Test again using PayloadAttributes, should also return SYNCING and no PayloadID
 	r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceStateUnknownHeadHash,
-		&PayloadAttributesV1{
+		&api.PayloadAttributesV1{
 			Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
-			PrevRandao:            common.Hash{},
+			Random:                common.Hash{},
 			SuggestedFeeRecipient: common.Address{},
 		})
-	r.ExpectPayloadStatus(Syncing)
+	r.ExpectPayloadStatus(test.Syncing)
 	r.ExpectPayloadID(nil)
 
 }
 
 // Send an inconsistent ForkchoiceState with a known payload that belongs to a side chain as head, safe or finalized.
-func inconsistentForkchoiceStateGen(inconsistency string) func(t *TestEnv) {
-	return func(t *TestEnv) {
+func inconsistentForkchoiceStateGen(inconsistency string) func(t *test.Env) {
+	return func(t *test.Env) {
 		// Wait until TTD is reached by this client
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
-		canonicalPayloads := make([]*ExecutableDataV1, 0)
-		alternativePayloads := make([]*ExecutableDataV1, 0)
+		canonicalPayloads := make([]*api.ExecutableDataV1, 0)
+		alternativePayloads := make([]*api.ExecutableDataV1, 0)
 		// Produce blocks before starting the test
-		t.CLMock.produceBlocks(3, BlockProcessCallbacks{
+		t.CLMock.ProduceBlocks(3, clmock.BlockProcessCallbacks{
 			OnGetPayload: func() {
 				// Generate and send an alternative side chain
-				customData := CustomPayloadData{}
+				customData := helper.CustomPayloadData{}
 				customData.ExtraData = &([]byte{0x01})
 				if len(alternativePayloads) > 0 {
 					customData.ParentHash = &alternativePayloads[len(alternativePayloads)-1].BlockHash
 				}
-				alternativePayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &customData)
+				alternativePayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &customData)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to construct alternative payload: %v", t.TestName, err)
 				}
@@ -744,11 +757,11 @@ func inconsistentForkchoiceStateGen(inconsistency string) func(t *TestEnv) {
 
 				// Send the alternative payload
 				r := t.TestEngine.TestEngineNewPayloadV1(alternativePayload)
-				r.ExpectStatusEither(Valid, Accepted)
+				r.ExpectStatusEither(test.Valid, test.Accepted)
 			},
 		})
 		// Send the invalid ForkchoiceStates
-		inconsistentFcU := ForkchoiceStateV1{
+		inconsistentFcU := api.ForkchoiceStateV1{
 			HeadBlockHash:      canonicalPayloads[len(alternativePayloads)-1].BlockHash,
 			SafeBlockHash:      canonicalPayloads[len(alternativePayloads)-2].BlockHash,
 			FinalizedBlockHash: canonicalPayloads[len(alternativePayloads)-3].BlockHash,
@@ -766,22 +779,22 @@ func inconsistentForkchoiceStateGen(inconsistency string) func(t *TestEnv) {
 
 		// Return to the canonical chain
 		r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
-		r.ExpectPayloadStatus(Valid)
+		r.ExpectPayloadStatus(test.Valid)
 	}
 }
 
 // Verify behavior on a forkchoiceUpdated with invalid payload attributes
-func invalidPayloadAttributesGen(syncing bool) func(*TestEnv) {
+func invalidPayloadAttributesGen(syncing bool) func(*test.Env) {
 
-	return func(t *TestEnv) {
+	return func(t *test.Env) {
 		// Wait until TTD is reached by this client
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test
-		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 		// Send a forkchoiceUpdated with invalid PayloadAttributes
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnNewPayloadBroadcast: func() {
 				// Try to apply the new payload with invalid attributes
 				var blockHash common.Hash
@@ -793,14 +806,14 @@ func invalidPayloadAttributesGen(syncing bool) func(*TestEnv) {
 					blockHash = t.CLMock.LatestPayloadBuilt.BlockHash
 				}
 				t.Logf("INFO (%s): Sending EngineForkchoiceUpdatedV1 (Syncing=%s) with invalid payload attributes", t.TestName, syncing)
-				fcu := ForkchoiceStateV1{
+				fcu := api.ForkchoiceStateV1{
 					HeadBlockHash:      blockHash,
 					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				}
-				attr := PayloadAttributesV1{
+				attr := api.PayloadAttributesV1{
 					Timestamp:             0,
-					PrevRandao:            common.Hash{},
+					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
 				}
 				// 0) Check headBlock is known and there is no missing data, if not respond with SYNCING
@@ -811,14 +824,14 @@ func invalidPayloadAttributesGen(syncing bool) func(*TestEnv) {
 				if syncing {
 					// If we are SYNCING, the outcome should be SYNCING regardless of the validity of the payload atttributes
 					r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&fcu, &attr)
-					r.ExpectPayloadStatus(Syncing)
+					r.ExpectPayloadStatus(test.Syncing)
 					r.ExpectPayloadID(nil)
 				} else {
 					r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&fcu, &attr)
 					r.ExpectError()
 
 					// Check that the forkchoice was applied, regardless of the error
-					s := t.TestEth.TestHeaderByNumber(Head)
+					s := t.TestEngine.TestHeaderByNumber(Head)
 					s.ExpectHash(blockHash)
 				}
 			},
@@ -828,26 +841,26 @@ func invalidPayloadAttributesGen(syncing bool) func(*TestEnv) {
 }
 
 // Verify that a forkchoiceUpdated fails on hash being set to a pre-TTD block after PoS change
-func preTTDFinalizedBlockHash(t *TestEnv) {
+func preTTDFinalizedBlockHash(t *test.Env) {
 	// Wait until TTD is reached by this client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	// Send the Genesis block as forkchoice
-	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
+	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
 
-	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
 		SafeBlockHash:      gblock.Hash(),
 		FinalizedBlockHash: gblock.Hash(),
 	}, nil)
-	r.ExpectPayloadStatus(Invalid)
+	r.ExpectPayloadStatus(test.Invalid)
 	r.ExpectLatestValidHash(&(common.Hash{}))
 
 	r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
-	r.ExpectPayloadStatus(Valid)
+	r.ExpectPayloadStatus(test.Valid)
 
 }
 
@@ -877,21 +890,21 @@ func preTTDFinalizedBlockHash(t *TestEnv) {
 //		 │
 //
 
-func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*TestEnv) {
+func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*test.Env) {
 
-	return func(t *TestEnv) {
+	return func(t *test.Env) {
 		// Wait until TTD is reached by this client
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test
-		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 		var (
-			alteredPayload     ExecutableDataV1
+			alteredPayload     api.ExecutableDataV1
 			invalidPayloadHash common.Hash
 		)
 
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			// Run test after the new payload has been obtained
 			OnGetPayload: func() {
 				// Alter hash on the payload and send it to client, should produce an error
@@ -909,13 +922,13 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*TestEnv) {
 					// We need to send an fcU to put the client in SYNCING state.
 					randomHeadBlock := common.Hash{}
 					rand.Read(randomHeadBlock[:])
-					fcU := ForkchoiceStateV1{
+					fcU := api.ForkchoiceStateV1{
 						HeadBlockHash:      randomHeadBlock,
 						SafeBlockHash:      t.CLMock.LatestHeader.Hash(),
 						FinalizedBlockHash: t.CLMock.LatestHeader.Hash(),
 					}
 					r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&fcU, nil)
-					r.ExpectPayloadStatus(Syncing)
+					r.ExpectPayloadStatus(test.Syncing)
 
 					if sidechain {
 						// Syncing and sidechain, the caonincal head is an unknown payload to us,
@@ -932,16 +945,16 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*TestEnv) {
 				// Execution specification::
 				// - {status: INVALID_BLOCK_HASH, latestValidHash: null, validationError: null} if the blockHash validation has failed
 				r := t.TestEngine.TestEngineNewPayloadV1(&alteredPayload)
-				r.ExpectStatus(InvalidBlockHash)
+				r.ExpectStatus(test.InvalidBlockHash)
 				r.ExpectLatestValidHash(nil)
 			},
 		})
 
 		// Lastly, attempt to build on top of the invalid payload
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			// Run test after the new payload has been obtained
 			OnGetPayload: func() {
-				alteredPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+				alteredPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
 					ParentHash: &invalidPayloadHash,
 				})
 				if err != nil {
@@ -952,7 +965,7 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*TestEnv) {
 				// or INVALID (client still has the payload and can verify that this payload is incorrectly building on top of it),
 				// but a VALID response is incorrect.
 				r := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-				r.ExpectStatusEither(Accepted, Invalid, Syncing)
+				r.ExpectStatusEither(test.Accepted, test.Invalid, test.Syncing)
 
 			},
 		})
@@ -962,14 +975,14 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*TestEnv) {
 
 // Copy the parentHash into the blockHash, client should reject the payload
 // (from Kintsugi Incident Report: https://notes.ethereum.org/@ExXcnR0-SJGthjz1dwkA1A/BkkdHWXTY)
-func parentHashOnExecPayload(t *TestEnv) {
+func parentHashOnExecPayload(t *test.Env) {
 	// Wait until TTD is reached by this client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Run test after the new payload has been obtained
 		OnGetPayload: func() {
 			// Alter hash on the payload and send it to client, should produce an error
@@ -978,7 +991,7 @@ func parentHashOnExecPayload(t *TestEnv) {
 			// Execution specification::
 			// - {status: INVALID_BLOCK_HASH, latestValidHash: null, validationError: null} if the blockHash validation has failed
 			r := t.TestEngine.TestEngineNewPayloadV1(&alteredPayload)
-			r.ExpectStatus(InvalidBlockHash)
+			r.ExpectStatus(test.InvalidBlockHash)
 			r.ExpectLatestValidHash(nil)
 		},
 	})
@@ -986,97 +999,102 @@ func parentHashOnExecPayload(t *TestEnv) {
 }
 
 // Attempt to re-org to a chain containing an invalid transition payload
-func invalidTransitionPayload(t *TestEnv) {
+func invalidTransitionPayload(t *test.Env) {
 	// Wait until TTD is reached by main client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce two blocks before trying to re-org
-	t.nonce = 2 // Initial PoW chain already contains 2 transactions
-	t.CLMock.produceBlocks(2, BlockProcessCallbacks{
+	t.CLMock.ProduceBlocks(2, clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
-			t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+			_, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, big1, nil, t.TestTransactionType)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+			}
 		},
 	})
 
 	// Introduce the invalid transition payload
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// This is being done in the middle of the block building
 		// process simply to be able to re-org back.
 		OnGetPayload: func() {
 			basePayload := t.CLMock.ExecutedPayloadHistory[t.CLMock.FirstPoSBlockNumber.Uint64()]
-			alteredPayload, err := generateInvalidPayload(&basePayload, InvalidStateRoot)
+			alteredPayload, err := helper.GenerateInvalidPayload(&basePayload, helper.InvalidStateRoot)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
 			}
 			p := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-			p.ExpectStatusEither(Invalid, Accepted)
-			if p.Status.Status == Invalid {
+			p.ExpectStatusEither(test.Invalid, test.Accepted)
+			if p.Status.Status == test.Invalid {
 				p.ExpectLatestValidHash(&(common.Hash{}))
-			} else if p.Status.Status == Accepted {
+			} else if p.Status.Status == test.Accepted {
 				p.ExpectLatestValidHash(nil)
 			}
-			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 				HeadBlockHash:      alteredPayload.BlockHash,
 				SafeBlockHash:      common.Hash{},
 				FinalizedBlockHash: common.Hash{},
 			}, nil)
-			r.ExpectPayloadStatus(Invalid)
+			r.ExpectPayloadStatus(test.Invalid)
 			r.ExpectLatestValidHash(&(common.Hash{}))
 
-			s := t.TestEth.TestBlockByNumber(Head)
+			s := t.TestEngine.TestBlockByNumber(Head)
 			s.ExpectHash(t.CLMock.LatestExecutedPayload.BlockHash)
 		},
 	})
 }
 
 // Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
-func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, emptyTxs bool) func(*TestEnv) {
-	return func(t *TestEnv) {
+func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadField, syncing bool, emptyTxs bool) func(*test.Env) {
+	return func(t *test.Env) {
 
 		if syncing {
 			// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
-			secondaryClient, _, err := t.StartClient(t.Client.Type, t.ClientParams, t.MainTTD())
+			secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 			}
-			t.CLMock.AddEngineClient(t.T, secondaryClient, t.MainTTD())
+			t.CLMock.AddEngineClient(secondaryClient)
 		}
 
 		// Wait until TTD is reached by all clients
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
 		txFunc := func() {
 			if !emptyTxs {
 				// Function to send at least one transaction each block produced
-				// Send the transaction to the prevRandaoContractAddr
-				t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+				// Send the transaction to the globals.PrevRandaoContractAddr
+				_, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, big1, nil, t.TestTransactionType)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
 			}
 		}
 
 		// Produce blocks before starting the test
-		t.CLMock.produceBlocks(5, BlockProcessCallbacks{
+		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{
 			// Make sure at least one transaction is included in each block
 			OnPayloadProducerSelected: txFunc,
 		})
 
 		if syncing {
 			// Disconnect the main engine client from the CL Mocker and produce a block
-			t.CLMock.RemoveEngineClient(t.Client)
-			t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			t.CLMock.RemoveEngineClient(t.Engine)
+			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 				OnPayloadProducerSelected: txFunc,
 			})
 
 			// This block is now unknown to the main client, sending an fcU will set it to syncing mode
 			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
-			r.ExpectPayloadStatus(Syncing)
+			r.ExpectPayloadStatus(test.Syncing)
 		}
 
 		var (
-			alteredPayload *ExecutableDataV1
+			alteredPayload *api.ExecutableDataV1
 			err            error
 		)
 
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			// Make sure at least one transaction is included in the payload
 			OnPayloadProducerSelected: txFunc,
 			// Run test after the new payload has been obtained
@@ -1089,14 +1107,14 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 					t.Fatalf("FAIL (%s): No transactions in the base payload", t.TestName)
 				}
 
-				alteredPayload, err = generateInvalidPayload(&t.CLMock.LatestPayloadBuilt, payloadField)
+				alteredPayload, err = helper.GenerateInvalidPayload(&t.CLMock.LatestPayloadBuilt, payloadField)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to modify payload (%v): %v", t.TestName, payloadField, err)
 				}
 
 				// Depending on the field we modified, we expect a different status
 				r := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-				if syncing || payloadField == InvalidParentHash {
+				if syncing || payloadField == helper.InvalidParentHash {
 					// Execution specification::
 					// {status: ACCEPTED, latestValidHash: null, validationError: null} if the following conditions are met:
 					//  - the blockHash of the payload is valid
@@ -1105,22 +1123,22 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 					// {status: SYNCING, latestValidHash: null, validationError: null}
 					// if the payload extends the canonical chain and requisite data for its validation is missing
 					// (the client can assume the payload extends the canonical because the linking payload could be missing)
-					r.ExpectStatusEither(Accepted, Syncing)
+					r.ExpectStatusEither(test.Accepted, test.Syncing)
 					r.ExpectLatestValidHash(nil)
 				} else {
-					r.ExpectStatus(Invalid)
+					r.ExpectStatus(test.Invalid)
 					r.ExpectLatestValidHash(&alteredPayload.ParentHash)
 				}
 
 				// Send the forkchoiceUpdated with a reference to the invalid payload.
-				fcState := ForkchoiceStateV1{
+				fcState := api.ForkchoiceStateV1{
 					HeadBlockHash:      alteredPayload.BlockHash,
 					SafeBlockHash:      alteredPayload.BlockHash,
 					FinalizedBlockHash: alteredPayload.BlockHash,
 				}
-				payloadAttrbutes := PayloadAttributesV1{
+				payloadAttrbutes := api.PayloadAttributesV1{
 					Timestamp:             alteredPayload.Timestamp + 1,
-					PrevRandao:            common.Hash{},
+					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
 				}
 
@@ -1133,20 +1151,20 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 					//  {payloadStatus: {status: INVALID, latestValidHash: null, validationError: errorMessage | null}, payloadId: null}
 					//  obtained from the Payload validation process if the payload is deemed INVALID
 					// Note: SYNCING/ACCEPTED is acceptable here as long as the block produced after this test is produced successfully
-					s.ExpectAnyPayloadStatus(Syncing, Accepted, Invalid)
+					s.ExpectAnyPayloadStatus(test.Syncing, test.Accepted, test.Invalid)
 				} else {
 					// At this moment the response should be SYNCING
-					s.ExpectPayloadStatus(Syncing)
+					s.ExpectPayloadStatus(test.Syncing)
 
 					// When we send the previous payload, the client must now be capable of determining that the invalid payload is actually invalid
 					p := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestExecutedPayload)
-					p.ExpectStatus(Valid)
+					p.ExpectStatus(test.Valid)
 					p.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 
 					/*
 						// Another option here could be to send an fcU to the previous payload,
 						// but this does not seem like something the CL would do.
-						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 							HeadBlockHash:      previousPayload.BlockHash,
 							SafeBlockHash:      previousPayload.BlockHash,
 							FinalizedBlockHash: previousPayload.BlockHash,
@@ -1155,38 +1173,38 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 					*/
 
 					q := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-					if payloadField == InvalidParentHash {
+					if payloadField == helper.InvalidParentHash {
 						// There is no invalid parentHash, if this value is incorrect,
 						// it is assumed that the block is missing and we need to sync.
 						// ACCEPTED also valid since the CLs normally use these interchangeably
-						q.ExpectStatusEither(Syncing, Accepted)
+						q.ExpectStatusEither(test.Syncing, test.Accepted)
 						q.ExpectLatestValidHash(nil)
-					} else if payloadField == InvalidNumber {
+					} else if payloadField == helper.InvalidNumber {
 						// A payload with an invalid number can force us to start a sync cycle
 						// as we don't know if that block might be a valid future block.
-						q.ExpectStatusEither(Invalid, Syncing)
-						if q.Status.Status == Invalid {
+						q.ExpectStatusEither(test.Invalid, test.Syncing)
+						if q.Status.Status == test.Invalid {
 							q.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 						} else {
 							q.ExpectLatestValidHash(nil)
 						}
 					} else {
 						// Otherwise the response should be INVALID.
-						q.ExpectStatus(Invalid)
+						q.ExpectStatus(test.Invalid)
 						q.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 					}
 
 					// Try sending the fcU again, this time we should get the proper invalid response.
 					// At this moment the response should be INVALID
-					if payloadField != InvalidParentHash {
+					if payloadField != helper.InvalidParentHash {
 						s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&fcState, nil)
 						// Note: SYNCING is acceptable here as long as the block produced after this test is produced successfully
-						s.ExpectAnyPayloadStatus(Syncing, Invalid)
+						s.ExpectAnyPayloadStatus(test.Syncing, test.Invalid)
 					}
 				}
 
 				// Finally, attempt to fetch the invalid payload using the JSON-RPC endpoint
-				p := t.TestEth.TestBlockByHash(alteredPayload.BlockHash)
+				p := t.TestEngine.TestBlockByHash(alteredPayload.BlockHash)
 				p.ExpectError()
 			},
 		})
@@ -1194,22 +1212,22 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 		if syncing {
 			// Send the valid payload and its corresponding forkchoiceUpdated
 			r := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestExecutedPayload)
-			r.ExpectStatus(Valid)
+			r.ExpectStatus(test.Valid)
 			r.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 
 			s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
-			s.ExpectPayloadStatus(Valid)
+			s.ExpectPayloadStatus(test.Valid)
 			s.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
 
 			// Add main client again to the CL Mocker
-			t.CLMock.AddEngineClient(t.T, t.Client, t.MainTTD())
+			t.CLMock.AddEngineClient(t.Engine)
 		}
 
 		// Lastly, attempt to build on top of the invalid payload
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			// Run test after the new payload has been obtained
 			OnGetPayload: func() {
-				followUpAlteredPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+				followUpAlteredPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
 					ParentHash: &alteredPayload.BlockHash,
 				})
 				if err != nil {
@@ -1222,10 +1240,10 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 				// or INVALID (client still has the payload and can verify that this payload is incorrectly building on top of it),
 				// but a VALID response is incorrect.
 				r := t.TestEngine.TestEngineNewPayloadV1(followUpAlteredPayload)
-				r.ExpectStatusEither(Accepted, Invalid, Syncing)
-				if r.Status.Status == Accepted || r.Status.Status == Syncing {
+				r.ExpectStatusEither(test.Accepted, test.Invalid, test.Syncing)
+				if r.Status.Status == test.Accepted || r.Status.Status == test.Syncing {
 					r.ExpectLatestValidHash(nil)
-				} else if r.Status.Status == Invalid {
+				} else if r.Status.Status == test.Invalid {
 					r.ExpectLatestValidHash(&alteredPayload.ParentHash)
 				}
 			},
@@ -1237,14 +1255,14 @@ func invalidPayloadTestCaseGen(payloadField InvalidPayloadField, syncing bool, e
 // Then reveal the invalid payload and expect that the client rejects it and rejects forkchoice updated calls to this chain.
 // The invalid_index parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
 // with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
-func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPayloadField, emptyTxs bool) func(*TestEnv) {
-	return func(t *TestEnv) {
+func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.InvalidPayloadField, emptyTxs bool) func(*test.Env) {
+	return func(t *test.Env) {
 
 		// Wait until TTD is reached by this client
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test
-		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 		// Save the common ancestor
 		cA := t.CLMock.LatestPayloadBuilt
@@ -1253,7 +1271,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 		n := 10
 
 		// Slice to save the alternate B chain
-		altChainPayloads := make([]*ExecutableDataV1, 0)
+		altChainPayloads := make([]*api.ExecutableDataV1, 0)
 
 		// Append the common ancestor
 		altChainPayloads = append(altChainPayloads, &cA)
@@ -1262,23 +1280,26 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 		// CommonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
 		//                 │
 		//                 └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
-		t.CLMock.produceBlocks(n, BlockProcessCallbacks{
+		t.CLMock.ProduceBlocks(n, clmock.BlockProcessCallbacks{
 
 			OnPayloadProducerSelected: func() {
 				// Function to send at least one transaction each block produced.
 				// Empty Txs Payload with invalid stateRoot discovered an issue in geth sync, hence this is customizable.
 				if !emptyTxs {
-					// Send the transaction to the prevRandaoContractAddr
-					t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+					// Send the transaction to the globals.PrevRandaoContractAddr
+					_, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, big1, nil, t.TestTransactionType)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+					}
 				}
 			},
 			OnGetPayload: func() {
 				var (
-					alternatePayload *ExecutableDataV1
+					alternatePayload *api.ExecutableDataV1
 					err              error
 				)
 				// Insert extraData to ensure we deviate from the main payload, which contains empty extradata
-				alternatePayload, err = customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+				alternatePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
 					ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
 					ExtraData:  &([]byte{0x01}),
 				})
@@ -1286,7 +1307,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
 				if len(altChainPayloads) == invalid_index {
-					alternatePayload, err = generateInvalidPayload(alternatePayload, payloadField)
+					alternatePayload, err = helper.GenerateInvalidPayload(alternatePayload, payloadField)
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 					}
@@ -1294,7 +1315,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 				altChainPayloads = append(altChainPayloads, alternatePayload)
 			},
 		})
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			// Note: We perform the test in the middle of payload creation by the CL Mock, in order to be able to
 			// re-org back into this chain and use the new payload without issues.
 			OnGetPayload: func() {
@@ -1311,7 +1332,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 
 					r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[i])
-					p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+					p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 						HeadBlockHash:      altChainPayloads[i].BlockHash,
 						SafeBlockHash:      altChainPayloads[i].BlockHash,
 						FinalizedBlockHash: common.Hash{},
@@ -1319,23 +1340,23 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 					if i == invalid_index {
 						// If this is the first payload after the common ancestor, and this is the payload we invalidated,
 						// then we have all the information to determine that this payload is invalid.
-						r.ExpectStatus(Invalid)
+						r.ExpectStatus(test.Invalid)
 						r.ExpectLatestValidHash(&altChainPayloads[i-1].BlockHash)
 					} else if i > invalid_index {
 						// We have already sent the invalid payload, but the client could've discarded it.
 						// In reality the CL will not get to this point because it will have already received the `INVALID`
 						// response from the previous payload.
 						// The node might save the parent as invalid, thus returning INVALID
-						r.ExpectStatusEither(Accepted, Syncing, Invalid)
-						if r.Status.Status == Accepted || r.Status.Status == Syncing {
+						r.ExpectStatusEither(test.Accepted, test.Syncing, test.Invalid)
+						if r.Status.Status == test.Accepted || r.Status.Status == test.Syncing {
 							r.ExpectLatestValidHash(nil)
-						} else if r.Status.Status == Invalid {
+						} else if r.Status.Status == test.Invalid {
 							r.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
 						}
 					} else {
 						// This is one of the payloads before the invalid one, therefore is valid.
-						r.ExpectStatus(Valid)
-						p.ExpectPayloadStatus(Valid)
+						r.ExpectStatus(test.Valid)
+						p.ExpectPayloadStatus(test.Valid)
 						p.ExpectLatestValidHash(&altChainPayloads[i].BlockHash)
 					}
 
@@ -1355,19 +1376,24 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField InvalidPaylo
 // Then reveal the invalid payload and expect that the client rejects it and rejects forkchoice updated calls to this chain.
 // The invalid_index parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
 // with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
-func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidPayloadField, emptyTxs bool) func(*TestEnv) {
-	return func(t *TestEnv) {
+func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.InvalidPayloadField, emptyTxs bool) func(*test.Env) {
+	return func(t *test.Env) {
+		var (
+			enode string
+			err   error
+		)
 		// To allow having the invalid payload delivered via P2P, we need a second client to serve the payload
-		enode, err := t.Engine.EnodeURL()
+		enode, err = t.Engine.EnodeURL()
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to obtain bootnode: %v", t.TestName, err)
 		}
 
-		genesis := loadGenesis("init/genesis.json")
-		genesis.Config.TerminalTotalDifficulty = t.Engine.TerminalTotalDifficulty
-		secondaryClient, err := newNode(enode, &genesis)
+		genesis := helper.LoadGenesis("init/genesis.json")
+		genesis.Config.TerminalTotalDifficulty = t.Engine.TerminalTotalDifficulty()
+
+		secondaryClient, err := node.NewNode(enode, &genesis)
 		defer func() {
-			if err := secondaryClient.Stop(); err != nil {
+			if err := secondaryClient.Close(); err != nil {
 				t.Logf("WARN (%s): Unable to stop secondary node: %v", t.TestName, err)
 			} else {
 				t.Logf("INFO (%s): Successfully stopped secondary node", t.TestName)
@@ -1376,18 +1402,25 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 		}
+		t.CLMock.AddEngineClient(secondaryClient)
 
 		// Wait until TTD is reached by this client
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test
-		t.CLMock.produceBlocks(5, BlockProcessCallbacks{
-			OnNewPayloadBroadcast: func() {
-				secondaryClient.sendNewPayload(&t.CLMock.LatestExecutedPayload)
-			},
-			OnForkchoiceBroadcast: func() {
-				secondaryClient.sendFCU(&t.CLMock.LatestForkchoice, &t.CLMock.LatestPayloadAttributes)
-			},
+		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{
+			/*
+				OnNewPayloadBroadcast: func() {
+					ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+					defer cancel()
+					secondaryClient.NewPayloadV1(ctx, &t.CLMock.LatestExecutedPayload)
+				},
+				OnForkchoiceBroadcast: func() {
+					ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+					defer cancel()
+					secondaryClient.ForkchoiceUpdatedV1(ctx, &t.CLMock.LatestForkchoice, &t.CLMock.LatestPayloadAttributes)
+				},
+			*/
 		})
 
 		// Save the common ancestor
@@ -1397,7 +1430,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 		n := 10
 
 		// Slice to save the alternate B chain
-		altChainPayloads := make([]*ExecutableDataV1, 0)
+		altChainPayloads := make([]*api.ExecutableDataV1, 0)
 
 		// Append the common ancestor
 		altChainPayloads = append(altChainPayloads, &cA)
@@ -1406,23 +1439,26 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 		// CommonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
 		//                 │
 		//                 └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
-		t.CLMock.produceBlocks(n, BlockProcessCallbacks{
+		t.CLMock.ProduceBlocks(n, clmock.BlockProcessCallbacks{
 
 			OnPayloadProducerSelected: func() {
 				// Function to send at least one transaction each block produced.
 				// Empty Txs Payload with invalid stateRoot discovered an issue in geth sync, hence this is customizable.
 				if !emptyTxs {
-					// Send the transaction to the prevRandaoContractAddr
-					t.sendNextTransaction(t.CLMock.NextBlockProducer, prevRandaoContractAddr, big1, nil)
+					// Send the transaction to the globals.PrevRandaoContractAddr
+					_, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, big1, nil, t.TestTransactionType)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+					}
 				}
 			},
 			OnGetPayload: func() {
 				var (
-					alternatePayload *ExecutableDataV1
+					alternatePayload *api.ExecutableDataV1
 					err              error
 				)
 				// Insert extraData to ensure we deviate from the main payload, which contains empty extradata
-				alternatePayload, err = customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+				alternatePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
 					ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
 					ExtraData:  &([]byte{0x01}),
 				})
@@ -1430,7 +1466,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
 				if len(altChainPayloads) == invalid_index {
-					alternatePayload, err = generateInvalidPayload(alternatePayload, payloadField)
+					alternatePayload, err = helper.GenerateInvalidPayload(alternatePayload, payloadField)
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 					}
@@ -1438,7 +1474,8 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 				altChainPayloads = append(altChainPayloads, alternatePayload)
 			},
 		})
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.RemoveEngineClient(secondaryClient)
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			// Note: We perform the test in the middle of payload creation by the CL Mock, in order to be able to
 			// re-org back into this chain and use the new payload without issues.
 			OnGetPayload: func() {
@@ -1455,7 +1492,9 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 
 					if i < invalid_index {
-						status, err := secondaryClient.sendNewPayload(altChainPayloads[i])
+						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+						defer cancel()
+						status, err := secondaryClient.NewPayloadV1(ctx, altChainPayloads[i])
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
 						}
@@ -1463,7 +1502,9 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 							t.Fatalf("FAIL (%s): TEST ISSUE - Invalid payload status, expected VALID, ACCEPTED: %v", t.TestName, status.Status)
 						}
 
-						status2, err := secondaryClient.sendFCU(&ForkchoiceStateV1{
+						ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
+						defer cancel()
+						status2, err := secondaryClient.ForkchoiceUpdatedV1(ctx, &api.ForkchoiceStateV1{
 							HeadBlockHash:      altChainPayloads[i].BlockHash,
 							SafeBlockHash:      cA.BlockHash,
 							FinalizedBlockHash: cA.BlockHash,
@@ -1476,21 +1517,27 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 						}
 
 					} else {
-						invalid_block, err := beacon.ExecutableDataToBlock(execData(altChainPayloads[i]))
+						invalid_block, err := beacon.ExecutableDataToBlock(*altChainPayloads[i])
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Failed to create block from payload: %v", t.TestName, err)
 						}
 
-						if err := secondaryClient.setBlock(invalid_block, altChainPayloads[i-1].Number, altChainPayloads[i-1].StateRoot); err != nil {
+						if err := secondaryClient.SetBlock(invalid_block, altChainPayloads[i-1].Number, altChainPayloads[i-1].StateRoot); err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Failed to set invalid block: %v", t.TestName, err)
 						}
 						t.Logf("INFO (%s): Invalid block successfully set %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
 					}
 				}
 				// Check that the second node has the correct head
-				head := secondaryClient.eth.APIBackend.CurrentBlock()
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				head, err := secondaryClient.HeaderByNumber(ctx, nil)
+				if err != nil {
+					t.Fatalf("FAIL (%s): TEST ISSUE - Secondary Node unable to reatrieve latest header: %v", t.TestName, err)
+
+				}
 				if head.Hash() != altChainPayloads[n-1].BlockHash {
-					t.Fatalf("FAIL (%s): TEST ISSUE - Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %v", t.TestName, head.Hash(), altChainPayloads[n-1].BlockHash, head.Number(), altChainPayloads[n].Number)
+					t.Fatalf("FAIL (%s): TEST ISSUE - Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %v", t.TestName, head.Hash(), altChainPayloads[n-1].BlockHash, head.Number, altChainPayloads[n].Number)
 				} else {
 					t.Logf("INFO (%s): Secondary Node has correct block", t.TestName)
 				}
@@ -1499,30 +1546,34 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 				for {
 					r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[n])
 					t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
-					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 						HeadBlockHash:      altChainPayloads[n].BlockHash,
 						SafeBlockHash:      altChainPayloads[n].BlockHash,
 						FinalizedBlockHash: altChainPayloads[n].BlockHash,
 					}, nil)
 					t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 
-					if r.Status.Status == Invalid {
+					if r.Status.Status == test.Invalid {
 						// We also expect that the client properly returns the LatestValidHash of the block on the
 						// alternate chain that is immediately prior to the invalid payload
 						r.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
 						// Response on ForkchoiceUpdated should be the same
-						s.ExpectPayloadStatus(Invalid)
+						s.ExpectPayloadStatus(test.Invalid)
 						s.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
 						break
-					} else if r.Status.Status == Valid {
-						latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), nil)
+					} else if test.PayloadStatus(r.Status.Status) == test.Valid {
+						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+						defer cancel()
+						latestBlock, err := t.Eth.BlockByNumber(ctx, nil)
 						if err != nil {
 							t.Fatalf("FAIL (%s): Unable to get latest block: %v", t.TestName, err)
 						}
 
 						// Print last 10 blocks, for debugging
 						for k := latestBlock.Number().Int64() - 10; k <= latestBlock.Number().Int64(); k++ {
-							latestBlock, err := t.Eth.BlockByNumber(t.Ctx(), big.NewInt(k))
+							ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
+							defer cancel()
+							latestBlock, err := t.Eth.BlockByNumber(ctx, big.NewInt(k))
 							if err != nil {
 								t.Fatalf("FAIL (%s): Unable to get block %d: %v", t.TestName, k, err)
 							}
@@ -1536,7 +1587,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 					select {
 					case <-time.After(time.Second):
 						continue
-					case <-t.Timeout:
+					case <-t.TestContext.Done():
 						t.Fatalf("FAIL (%s): Timeout waiting for main client to detect invalid chain", t.TestName)
 					}
 				}
@@ -1552,34 +1603,38 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField InvalidP
 }
 
 // Test to verify Block information available at the Eth RPC after NewPayload
-func blockStatusExecPayloadGen(transitionBlock bool) func(t *TestEnv) {
-	return func(t *TestEnv) {
+func blockStatusExecPayloadGen(transitionBlock bool) func(t *test.Env) {
+	return func(t *test.Env) {
 		// Wait until this client catches up with latest PoS Block
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test, only if we are not testing the transition block
 		if !transitionBlock {
-			t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+			t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 		}
 
 		var tx *types.Transaction
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnPayloadProducerSelected: func() {
-				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
+				var err error
+				tx, err = helper.SendNextTransaction(t.TestContext, t.Engine, (common.Address{}), big1, nil, t.TestTransactionType)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", err)
+				}
 			},
 			// Run test after the new payload has been broadcasted
 			OnNewPayloadBroadcast: func() {
-				r := t.TestEth.TestHeaderByNumber(Head)
+				r := t.TestEngine.TestHeaderByNumber(Head)
 				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-				s := t.TestEth.TestBlockNumber()
+				s := t.TestEngine.TestBlockNumber()
 				s.ExpectNumber(t.CLMock.LatestHeadNumber.Uint64())
 
-				p := t.TestEth.TestBlockByNumber(Head)
+				p := t.TestEngine.TestBlockByNumber(Head)
 				p.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
 				// Check that the receipt for the transaction we just sent is still not available
-				q := t.TestEth.TestTransactionReceipt(tx.Hash())
+				q := t.TestEngine.TestTransactionReceipt(tx.Hash())
 				q.ExpectError()
 			},
 		})
@@ -1587,27 +1642,31 @@ func blockStatusExecPayloadGen(transitionBlock bool) func(t *TestEnv) {
 }
 
 // Test to verify Block information available at the Eth RPC after new HeadBlock ForkchoiceUpdated
-func blockStatusHeadBlockGen(transitionBlock bool) func(t *TestEnv) {
-	return func(t *TestEnv) {
+func blockStatusHeadBlockGen(transitionBlock bool) func(t *test.Env) {
+	return func(t *test.Env) {
 		// Wait until this client catches up with latest PoS Block
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test, only if we are not testing the transition block
 		if !transitionBlock {
-			t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+			t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 		}
 
 		var tx *types.Transaction
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnPayloadProducerSelected: func() {
-				tx = t.sendNextTransaction(t.TestEngine.Engine, (common.Address{}), big1, nil)
+				var err error
+				tx, err = helper.SendNextTransaction(t.TestContext, t.Engine, (common.Address{}), big1, nil, t.TestTransactionType)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
 			},
 			// Run test after a forkchoice with new HeadBlockHash has been broadcasted
 			OnForkchoiceBroadcast: func() {
-				r := t.TestEth.TestHeaderByNumber(Head)
+				r := t.TestEngine.TestHeaderByNumber(Head)
 				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-				s := t.TestEth.TestTransactionReceipt(tx.Hash())
+				s := t.TestEngine.TestTransactionReceipt(tx.Hash())
 				s.ExpectTransactionHash(tx.Hash())
 			},
 		})
@@ -1615,105 +1674,105 @@ func blockStatusHeadBlockGen(transitionBlock bool) func(t *TestEnv) {
 }
 
 // Test to verify Block information available at the Eth RPC after new SafeBlock ForkchoiceUpdated
-func blockStatusSafeBlock(t *TestEnv) {
+func blockStatusSafeBlock(t *test.Env) {
 	// On PoW mode, `safe` tag shall return error.
-	r := t.TestEth.TestHeaderByNumber(Safe)
+	r := t.TestEngine.TestHeaderByNumber(Safe)
 	r.ExpectErrorCode(-39001)
 
 	// Wait until this client catches up with latest PoS Block
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// First ForkchoiceUpdated sent was equal to 0x00..00, `safe` should return error now
-	p := t.TestEth.TestHeaderByNumber(Safe)
+	p := t.TestEngine.TestHeaderByNumber(Safe)
 	p.ExpectErrorCode(-39001)
 
-	t.CLMock.produceBlocks(3, BlockProcessCallbacks{
+	t.CLMock.ProduceBlocks(3, clmock.BlockProcessCallbacks{
 		// Run test after a forkchoice with new SafeBlockHash has been broadcasted
 		OnSafeBlockChange: func() {
-			r := t.TestEth.TestHeaderByNumber(Safe)
+			r := t.TestEngine.TestHeaderByNumber(Safe)
 			r.ExpectHash(t.CLMock.LatestForkchoice.SafeBlockHash)
 		},
 	})
 }
 
 // Test to verify Block information available at the Eth RPC after new FinalizedBlock ForkchoiceUpdated
-func blockStatusFinalizedBlock(t *TestEnv) {
+func blockStatusFinalizedBlock(t *test.Env) {
 	// On PoW mode, `finalized` tag shall return error.
-	r := t.TestEth.TestHeaderByNumber(Finalized)
+	r := t.TestEngine.TestHeaderByNumber(Finalized)
 	r.ExpectErrorCode(-39001)
 
 	// Wait until this client catches up with latest PoS Block
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// First ForkchoiceUpdated sent was equal to 0x00..00, `finalized` should return error now
-	p := t.TestEth.TestHeaderByNumber(Finalized)
+	p := t.TestEngine.TestHeaderByNumber(Finalized)
 	p.ExpectErrorCode(-39001)
 
-	t.CLMock.produceBlocks(3, BlockProcessCallbacks{
+	t.CLMock.ProduceBlocks(3, clmock.BlockProcessCallbacks{
 		// Run test after a forkchoice with new FinalizedBlockHash has been broadcasted
 		OnFinalizedBlockChange: func() {
-			r := t.TestEth.TestHeaderByNumber(Finalized)
+			r := t.TestEngine.TestHeaderByNumber(Finalized)
 			r.ExpectHash(t.CLMock.LatestForkchoice.FinalizedBlockHash)
 		},
 	})
 }
 
-func safeFinalizedCanonicalChain(t *TestEnv) {
+func safeFinalizedCanonicalChain(t *test.Env) {
 	// Wait until this client catches up with latest PoS Block
-	t.CLMock.waitForTTD()
-	gblock := loadGenesisBlock(t.ClientFiles["/genesis.json"])
+	t.CLMock.WaitForTTD()
+	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
 
 	// At the merge we need to have head equal to the last PoW block, and safe/finalized must return error
-	h := t.TestEth.TestHeaderByNumber(Head)
+	h := t.TestEngine.TestHeaderByNumber(Head)
 	h.ExpectHash(gblock.Hash())
-	h = t.TestEth.TestHeaderByNumber(Safe)
+	h = t.TestEngine.TestHeaderByNumber(Safe)
 	h.ExpectErrorCode(-39001)
-	h = t.TestEth.TestHeaderByNumber(Finalized)
+	h = t.TestEngine.TestHeaderByNumber(Finalized)
 	h.ExpectErrorCode(-39001)
 
 	// Producing one PoS payload should change only the head (latest)
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
-	h = t.TestEth.TestHeaderByNumber(Head)
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
+	h = t.TestEngine.TestHeaderByNumber(Head)
 	h.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
-	h = t.TestEth.TestHeaderByNumber(Safe)
+	h = t.TestEngine.TestHeaderByNumber(Safe)
 	h.ExpectErrorCode(-39001)
-	h = t.TestEth.TestHeaderByNumber(Finalized)
+	h = t.TestEngine.TestHeaderByNumber(Finalized)
 	h.ExpectErrorCode(-39001)
 
 	// Producing a second PoS payload should change safe
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
-	h = t.TestEth.TestHeaderByNumber(Head)
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
+	h = t.TestEngine.TestHeaderByNumber(Head)
 	h.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
-	h = t.TestEth.TestHeaderByNumber(Safe)
+	h = t.TestEngine.TestHeaderByNumber(Safe)
 	h.ExpectHash(t.CLMock.ExecutedPayloadHistory[1].BlockHash)
-	h = t.TestEth.TestHeaderByNumber(Finalized)
+	h = t.TestEngine.TestHeaderByNumber(Finalized)
 	h.ExpectErrorCode(-39001)
 
 	// Producing a third PoS payload should change finalized
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
-	h = t.TestEth.TestHeaderByNumber(Head)
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
+	h = t.TestEngine.TestHeaderByNumber(Head)
 	h.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
-	h = t.TestEth.TestHeaderByNumber(Safe)
+	h = t.TestEngine.TestHeaderByNumber(Safe)
 	h.ExpectHash(t.CLMock.ExecutedPayloadHistory[2].BlockHash)
-	h = t.TestEth.TestHeaderByNumber(Finalized)
+	h = t.TestEngine.TestHeaderByNumber(Finalized)
 	h.ExpectHash(t.CLMock.ExecutedPayloadHistory[1].BlockHash)
 
 }
 
 // Test to verify Block information available after a reorg using forkchoiceUpdated
-func blockStatusReorg(t *TestEnv) {
+func blockStatusReorg(t *test.Env) {
 	// Wait until this client catches up with latest PoS Block
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnGetPayload: func() {
 			// Run using an alternative Payload, verify that the latest info is updated after re-org
 			customRandom := common.Hash{}
 			rand.Read(customRandom[:])
-			customizedPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &CustomPayloadData{
+			customizedPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
 				PrevRandao: &customRandom,
 			})
 			if err != nil {
@@ -1721,22 +1780,22 @@ func blockStatusReorg(t *TestEnv) {
 			}
 
 			// Send custom payload and fcU to it
-			t.CLMock.broadcastNewPayload(customizedPayload)
-			t.CLMock.broadcastForkchoiceUpdated(&ForkchoiceStateV1{
+			t.CLMock.BroadcastNewPayload(customizedPayload)
+			t.CLMock.BroadcastForkchoiceUpdated(&api.ForkchoiceStateV1{
 				HeadBlockHash:      customizedPayload.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 			}, nil)
 
 			// Verify the client is serving the latest HeadBlock
-			r := t.TestEth.TestHeaderByNumber(Head)
+			r := t.TestEngine.TestHeaderByNumber(Head)
 			r.ExpectHash(customizedPayload.BlockHash)
 
 		},
 		OnForkchoiceBroadcast: func() {
 			// At this point, we have re-org'd to the payload that the CLMocker was originally planning to send,
 			// verify that the client is serving the latest HeadBlock.
-			r := t.TestEth.TestHeaderByNumber(Head)
+			r := t.TestEngine.TestHeaderByNumber(Head)
 			r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
 		},
@@ -1746,20 +1805,20 @@ func blockStatusReorg(t *TestEnv) {
 
 // Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain
 // is still capable of progressing.
-func reorgBack(t *TestEnv) {
+func reorgBack(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 
 	// We are going to reorg back to this previous hash several times
 	previousHash := t.CLMock.LatestForkchoice.HeadBlockHash
 
 	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{
 		OnForkchoiceBroadcast: func() {
 			// Send a fcU with the HeadBlockHash pointing back to the previous block
-			forkchoiceUpdatedBack := ForkchoiceStateV1{
+			forkchoiceUpdatedBack := api.ForkchoiceStateV1{
 				HeadBlockHash:      previousHash,
 				SafeBlockHash:      previousHash,
 				FinalizedBlockHash: previousHash,
@@ -1772,70 +1831,70 @@ func reorgBack(t *TestEnv) {
 	})
 
 	// Verify that the client is pointing to the latest payload sent
-	r := t.TestEth.TestBlockByNumber(Head)
+	r := t.TestEngine.TestBlockByNumber(Head)
 	r.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
 
 }
 
 // Test that performs a re-org to a previously validated payload on a side chain.
-func reorgPrevValidatedPayloadOnSideChain(t *TestEnv) {
+func reorgPrevValidatedPayloadOnSideChain(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	var (
-		sidechainPayloads     = make([]*ExecutableDataV1, 0)
+		sidechainPayloads     = make([]*api.ExecutableDataV1, 0)
 		sidechainPayloadCount = 5
 	)
 
 	// Produce a canonical chain while at the same time generate a side chain to which we will re-org.
-	t.CLMock.produceBlocks(sidechainPayloadCount, BlockProcessCallbacks{
+	t.CLMock.ProduceBlocks(sidechainPayloadCount, clmock.BlockProcessCallbacks{
 		OnGetPayload: func() {
 			// The side chain will consist simply of the same payloads with extra data appended
 			extraData := []byte("side")
-			customData := CustomPayloadData{
+			customData := helper.CustomPayloadData{
 				ExtraData: &extraData,
 			}
 			if len(sidechainPayloads) > 0 {
 				customData.ParentHash = &sidechainPayloads[len(sidechainPayloads)-1].BlockHash
 			}
-			altPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt, &customData)
+			altPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &customData)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
 			sidechainPayloads = append(sidechainPayloads, altPayload)
 
 			r := t.TestEngine.TestEngineNewPayloadV1(altPayload)
-			r.ExpectStatus(Valid)
+			r.ExpectStatus(test.Valid)
 			r.ExpectLatestValidHash(&altPayload.BlockHash)
 		},
 	})
 
 	// Attempt to re-org to one of the sidechain payloads, but not the leaf,
 	// and also build a new payload from this sidechain.
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnGetPayload: func() {
 			prevRandao := common.Hash{}
 			rand.Read(prevRandao[:])
-			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 				HeadBlockHash:      sidechainPayloads[len(sidechainPayloads)-2].BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-			}, &PayloadAttributesV1{
+			}, &api.PayloadAttributesV1{
 				Timestamp:             t.CLMock.LatestHeader.Time,
-				PrevRandao:            prevRandao,
+				Random:                prevRandao,
 				SuggestedFeeRecipient: common.Address{},
 			})
-			r.ExpectPayloadStatus(Valid)
+			r.ExpectPayloadStatus(test.Valid)
 			r.ExpectLatestValidHash(&sidechainPayloads[len(sidechainPayloads)-2].BlockHash)
 
 			p := t.TestEngine.TestEngineGetPayloadV1(r.Response.PayloadID)
 			p.ExpectPayloadParentHash(sidechainPayloads[len(sidechainPayloads)-2].BlockHash)
 
 			s := t.TestEngine.TestEngineNewPayloadV1(&p.Payload)
-			s.ExpectStatus(Valid)
+			s.ExpectStatus(test.Valid)
 			s.ExpectLatestValidHash(&p.Payload.BlockHash)
 
 			// After this, the CLMocker will continue and try to re-org to canonical chain once again
@@ -1845,25 +1904,25 @@ func reorgPrevValidatedPayloadOnSideChain(t *TestEnv) {
 }
 
 // Test that performs a re-org of the safe block to a side chain.
-func safeReorgToSideChain(t *TestEnv) {
+func safeReorgToSideChain(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce an alternative chain
-	sidechainPayloads := make([]*ExecutableDataV1, 0)
+	sidechainPayloads := make([]*api.ExecutableDataV1, 0)
 
 	// Produce three payloads `P1`, `P2`, `P3`, along with the side chain payloads `P2'`, `P3'`
 	// First payload is finalized so no alternative payload
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
-	t.CLMock.produceBlocks(2, BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(2, clmock.BlockProcessCallbacks{
 		OnGetPayload: func() {
 			// Generate an alternative payload by simply adding extraData to the block
 			altParentHash := t.CLMock.LatestPayloadBuilt.ParentHash
 			if len(sidechainPayloads) > 0 {
 				altParentHash = sidechainPayloads[len(sidechainPayloads)-1].BlockHash
 			}
-			altPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt,
-				&CustomPayloadData{
+			altPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt,
+				&helper.CustomPayloadData{
 					ParentHash: &altParentHash,
 					ExtraData:  &([]byte{0x01}),
 				})
@@ -1875,36 +1934,36 @@ func safeReorgToSideChain(t *TestEnv) {
 	})
 
 	// Verify current state of labels
-	head := t.TestEth.TestHeaderByNumber(Head)
+	head := t.TestEngine.TestHeaderByNumber(Head)
 	head.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
 
-	safe := t.TestEth.TestHeaderByNumber(Safe)
+	safe := t.TestEngine.TestHeaderByNumber(Safe)
 	safe.ExpectHash(t.CLMock.ExecutedPayloadHistory[2].BlockHash)
 
-	finalized := t.TestEth.TestHeaderByNumber(Finalized)
+	finalized := t.TestEngine.TestHeaderByNumber(Finalized)
 	finalized.ExpectHash(t.CLMock.ExecutedPayloadHistory[1].BlockHash)
 
 	// Re-org the safe/head blocks to point to the alternative side chain
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnGetPayload: func() {
 			for _, p := range sidechainPayloads {
 				r := t.TestEngine.TestEngineNewPayloadV1(p)
-				r.ExpectStatusEither(Valid, Accepted)
+				r.ExpectStatusEither(test.Valid, test.Accepted)
 			}
-			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 				HeadBlockHash:      sidechainPayloads[1].BlockHash,
 				SafeBlockHash:      sidechainPayloads[0].BlockHash,
 				FinalizedBlockHash: t.CLMock.ExecutedPayloadHistory[1].BlockHash,
 			}, nil)
-			r.ExpectPayloadStatus(Valid)
+			r.ExpectPayloadStatus(test.Valid)
 
-			head := t.TestEth.TestHeaderByNumber(Head)
+			head := t.TestEngine.TestHeaderByNumber(Head)
 			head.ExpectHash(sidechainPayloads[1].BlockHash)
 
-			safe := t.TestEth.TestHeaderByNumber(Safe)
+			safe := t.TestEngine.TestHeaderByNumber(Safe)
 			safe.ExpectHash(sidechainPayloads[0].BlockHash)
 
-			finalized := t.TestEth.TestHeaderByNumber(Finalized)
+			finalized := t.TestEngine.TestHeaderByNumber(Finalized)
 			finalized.ExpectHash(t.CLMock.ExecutedPayloadHistory[1].BlockHash)
 
 		},
@@ -1912,21 +1971,21 @@ func safeReorgToSideChain(t *TestEnv) {
 }
 
 // Test that performs a re-org back to the canonical chain after re-org to syncing/unavailable chain.
-func reorgBackFromSyncing(t *TestEnv) {
+func reorgBackFromSyncing(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce an alternative chain
-	sidechainPayloads := make([]*ExecutableDataV1, 0)
-	t.CLMock.produceBlocks(10, BlockProcessCallbacks{
+	sidechainPayloads := make([]*api.ExecutableDataV1, 0)
+	t.CLMock.ProduceBlocks(10, clmock.BlockProcessCallbacks{
 		OnGetPayload: func() {
 			// Generate an alternative payload by simply adding extraData to the block
 			altParentHash := t.CLMock.LatestPayloadBuilt.ParentHash
 			if len(sidechainPayloads) > 0 {
 				altParentHash = sidechainPayloads[len(sidechainPayloads)-1].BlockHash
 			}
-			altPayload, err := customizePayload(&t.CLMock.LatestPayloadBuilt,
-				&CustomPayloadData{
+			altPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt,
+				&helper.CustomPayloadData{
 					ParentHash: &altParentHash,
 					ExtraData:  &([]byte{0x01}),
 				})
@@ -1938,13 +1997,13 @@ func reorgBackFromSyncing(t *TestEnv) {
 	})
 
 	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnGetPayload: func() {
 			r := t.TestEngine.TestEngineNewPayloadV1(sidechainPayloads[len(sidechainPayloads)-1])
-			r.ExpectStatusEither(Syncing, Accepted)
+			r.ExpectStatusEither(test.Syncing, test.Accepted)
 			r.ExpectLatestValidHash(nil)
 			// We are going to send one of the alternative payloads and fcU to it
-			forkchoiceUpdatedBack := ForkchoiceStateV1{
+			forkchoiceUpdatedBack := api.ForkchoiceStateV1{
 				HeadBlockHash:      sidechainPayloads[len(sidechainPayloads)-1].BlockHash,
 				SafeBlockHash:      sidechainPayloads[len(sidechainPayloads)-2].BlockHash,
 				FinalizedBlockHash: sidechainPayloads[len(sidechainPayloads)-3].BlockHash,
@@ -1953,7 +2012,7 @@ func reorgBackFromSyncing(t *TestEnv) {
 			// It is only expected that the client does not produce an error and the CL Mocker is able to progress after the re-org
 			s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceUpdatedBack, nil)
 			s.ExpectLatestValidHash(nil)
-			s.ExpectPayloadStatus(Syncing)
+			s.ExpectPayloadStatus(test.Syncing)
 
 			// After this, the CLMocker will continue and try to re-org to canonical chain once again
 			// CLMocker will fail the test if this is not possible, so nothing left to do.
@@ -1962,12 +2021,12 @@ func reorgBackFromSyncing(t *TestEnv) {
 }
 
 // Test transaction status after a forkchoiceUpdated re-orgs to an alternative hash where a transaction is not present
-func transactionReorg(t *TestEnv) {
+func transactionReorg(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	// Create transactions that modify the state in order to check after the reorg.
 	var (
@@ -1977,16 +2036,16 @@ func transactionReorg(t *TestEnv) {
 
 	for i := 0; i < txCount; i++ {
 		var (
-			noTxnPayload ExecutableDataV1
+			noTxnPayload api.ExecutableDataV1
 			tx           *types.Transaction
 		)
 		// Generate two payloads, one with the transaction and the other one without it
-		t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnPayloadProducerSelected: func() {
 				// At this point we have not broadcast the transaction,
 				// therefore any payload we get should not contain any
-				t.CLMock.getNextPayloadID()
-				t.CLMock.getNextPayload()
+				t.CLMock.GetNextPayloadID()
+				t.CLMock.GetNextPayload()
 				noTxnPayload = t.CLMock.LatestPayloadBuilt
 				if len(noTxnPayload.Transactions) != 0 {
 					t.Fatalf("FAIL (%s): Empty payload contains transactions: %v", t.TestName, noTxnPayload)
@@ -1996,24 +2055,32 @@ func transactionReorg(t *TestEnv) {
 				// Data is the key where a `1` will be stored
 				data := common.LeftPadBytes([]byte{byte(i)}, 32)
 				t.Logf("transactionReorg, i=%v, data=%v\n", i, data)
-				tx = t.sendNextTransaction(t.Engine, sstoreContractAddr, big0, data)
+				var err error
+				tx, err = helper.SendNextTransaction(t.TestContext, t.Engine, sstoreContractAddr, big0, data, t.TestTransactionType)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
 
 				// Get the receipt
-				receipt, _ := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				receipt, _ := t.Eth.TransactionReceipt(ctx, tx.Hash())
 				if receipt != nil {
 					t.Fatalf("FAIL (%s): Receipt obtained before tx included in block: %v", t.TestName, receipt)
 				}
 			},
 			OnGetPayload: func() {
 				// Check that indeed the payload contains the transaction
-				if !TransactionInPayload(&t.CLMock.LatestPayloadBuilt, tx) {
+				if !helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, tx) {
 					t.Fatalf("FAIL (%s): Payload built does not contain the transaction: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
 				}
 			},
 			OnForkchoiceBroadcast: func() {
 				// Transaction is now in the head of the canonical chain, re-org and verify it's removed
 				// Get the receipt
-				_, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				_, err := t.Eth.TransactionReceipt(ctx, tx.Hash())
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to obtain transaction receipt: %v", t.TestName, err)
 				}
@@ -2026,26 +2093,28 @@ func transactionReorg(t *TestEnv) {
 				}
 
 				r := t.TestEngine.TestEngineNewPayloadV1(&noTxnPayload)
-				r.ExpectStatus(Valid)
+				r.ExpectStatus(test.Valid)
 				r.ExpectLatestValidHash(&noTxnPayload.BlockHash)
 
-				s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+				s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 					HeadBlockHash:      noTxnPayload.BlockHash,
 					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				}, nil)
-				s.ExpectPayloadStatus(Valid)
+				s.ExpectPayloadStatus(test.Valid)
 
-				p := t.TestEth.TestBlockByNumber(Head)
+				p := t.TestEngine.TestBlockByNumber(Head)
 				p.ExpectHash(noTxnPayload.BlockHash)
 
-				reorgReceipt, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+				ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				reorgReceipt, err := t.Eth.TransactionReceipt(ctx, tx.Hash())
 				if reorgReceipt != nil {
 					t.Fatalf("FAIL (%s): Receipt was obtained when the tx had been re-org'd out: %v", t.TestName, reorgReceipt)
 				}
 
 				// Re-org back
-				t.CLMock.broadcastForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil)
+				t.CLMock.BroadcastForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil)
 			},
 		})
 
@@ -2054,13 +2123,13 @@ func transactionReorg(t *TestEnv) {
 }
 
 // Test transaction blockhash after a forkchoiceUpdated re-orgs to an alternative block with the same transaction
-func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
-	return func(t *TestEnv) {
+func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
+	return func(t *test.Env) {
 		// Wait until this client catches up with latest PoS
-		t.CLMock.waitForTTD()
+		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
-		t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 		// Create transactions that modify the state in order to check after the reorg.
 		var (
@@ -2070,32 +2139,38 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
 
 		for i := 0; i < txCount; i++ {
 			var (
-				mainPayload      *ExecutableDataV1
-				alternatePayload *ExecutableDataV1
+				mainPayload      *api.ExecutableDataV1
+				alternatePayload *api.ExecutableDataV1
 				tx               *types.Transaction
 			)
 
-			t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 				OnPayloadProducerSelected: func() {
 					// At this point we have not broadcast the transaction,
 					// therefore any payload we get should not contain any
-					t.CLMock.getNextPayloadID()
-					t.CLMock.getNextPayload()
+					t.CLMock.GetNextPayloadID()
+					t.CLMock.GetNextPayload()
 
 					// Create the transaction
 					data := common.LeftPadBytes([]byte{byte(i)}, 32)
 					t.Logf("transactionReorg, i=%v, data=%v\n", i, data)
-					tx = t.sendNextTransaction(t.Engine, sstoreContractAddr, big0, data)
+					var err error
+					tx, err = helper.SendNextTransaction(t.TestContext, t.Engine, sstoreContractAddr, big0, data, t.TestTransactionType)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+					}
 
 					// Get the receipt
-					receipt, _ := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+					ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+					defer cancel()
+					receipt, _ := t.Eth.TransactionReceipt(ctx, tx.Hash())
 					if receipt != nil {
 						t.Fatalf("FAIL (%s): Receipt obtained before tx included in block: %v", t.TestName, receipt)
 					}
 				},
 				OnGetPayload: func() {
 					// Check that indeed the payload contains the transaction
-					if !TransactionInPayload(&t.CLMock.LatestPayloadBuilt, tx) {
+					if !helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, tx) {
 						t.Fatalf("FAIL (%s): Payload built does not contain the transaction: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
 					}
 
@@ -2103,7 +2178,7 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
 
 					// Create alternate payload with different hash
 					var err error
-					alternatePayload, err = customizePayload(mainPayload, &CustomPayloadData{
+					alternatePayload, err = helper.CustomizePayload(mainPayload, &helper.CustomPayloadData{
 						ExtraData: &([]byte{0x01}),
 					})
 					if err != nil {
@@ -2121,41 +2196,41 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
 				OnForkchoiceBroadcast: func() {
 
 					// At first, the tx will be on main payload
-					txt := t.TestEth.TestTransactionReceipt(tx.Hash())
+					txt := t.TestEngine.TestTransactionReceipt(tx.Hash())
 					txt.ExpectBlockHash(mainPayload.BlockHash)
 
 					r := t.TestEngine.TestEngineNewPayloadV1(alternatePayload)
-					r.ExpectStatus(Valid)
+					r.ExpectStatus(test.Valid)
 					r.ExpectLatestValidHash(&alternatePayload.BlockHash)
 
-					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 						HeadBlockHash:      alternatePayload.BlockHash,
 						SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 						FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 					}, nil)
-					s.ExpectPayloadStatus(Valid)
+					s.ExpectPayloadStatus(test.Valid)
 
-					p := t.TestEth.TestBlockByNumber(Head)
+					p := t.TestEngine.TestBlockByNumber(Head)
 					p.ExpectHash(alternatePayload.BlockHash)
 
 					// Now it should be with alternatePayload
-					txt = t.TestEth.TestTransactionReceipt(tx.Hash())
+					txt = t.TestEngine.TestTransactionReceipt(tx.Hash())
 					txt.ExpectBlockHash(alternatePayload.BlockHash)
 
 					// Re-org back to main payload
 					if newNPOnRevert {
 						r = t.TestEngine.TestEngineNewPayloadV1(mainPayload)
-						r.ExpectStatus(Valid)
+						r.ExpectStatus(test.Valid)
 						r.ExpectLatestValidHash(&mainPayload.BlockHash)
 					}
-					t.CLMock.broadcastForkchoiceUpdated(&ForkchoiceStateV1{
+					t.CLMock.BroadcastForkchoiceUpdated(&api.ForkchoiceStateV1{
 						HeadBlockHash:      mainPayload.BlockHash,
 						SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 						FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 					}, nil)
 
 					// Not it should be back with main payload
-					txt = t.TestEth.TestTransactionReceipt(tx.Hash())
+					txt = t.TestEngine.TestTransactionReceipt(tx.Hash())
 					txt.ExpectBlockHash(mainPayload.BlockHash)
 				},
 			})
@@ -2163,24 +2238,26 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *TestEnv) {
 		}
 
 	}
-	return nil
 }
 
 // Reorg to a Sidechain using ForkchoiceUpdated
-func sidechainReorg(t *TestEnv) {
+func sidechainReorg(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	// Produce two payloads, send fcU with first payload, check transaction outcome, then reorg, check transaction outcome again
 
 	// This single transaction will change its outcome based on the payload
-	tx := t.sendNextTransaction(t.Engine, prevRandaoContractAddr, big0, nil)
+	tx, err := helper.SendNextTransaction(t.TestContext, t.Engine, globals.PrevRandaoContractAddr, big0, nil, t.TestTransactionType)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+	}
 	t.Logf("INFO (%s): sent tx %v", t.TestName, tx.Hash())
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnNewPayloadBroadcast: func() {
 			// At this point the CLMocker has a payload that will result in a specific outcome,
 			// we can produce an alternative payload, send it, fcU to it, and verify the changes
@@ -2188,16 +2265,18 @@ func sidechainReorg(t *TestEnv) {
 			rand.Read(alternativePrevRandao[:])
 
 			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice,
-				&PayloadAttributesV1{
+				&api.PayloadAttributesV1{
 					Timestamp:             t.CLMock.LatestHeader.Time + 1,
-					PrevRandao:            alternativePrevRandao,
+					Random:                alternativePrevRandao,
 					SuggestedFeeRecipient: t.CLMock.NextFeeRecipient,
 				})
 			r.ExpectNoError()
 
 			time.Sleep(t.CLMock.PayloadProductionClientDelay)
 
-			alternativePayload, err := t.Engine.EngineGetPayloadV1(t.Engine.Ctx(), r.Response.PayloadID)
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			alternativePayload, err := t.Engine.GetPayloadV1(ctx, r.Response.PayloadID)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Could not get alternative payload: %v", t.TestName, err)
 			}
@@ -2206,16 +2285,16 @@ func sidechainReorg(t *TestEnv) {
 			}
 
 			s := t.TestEngine.TestEngineNewPayloadV1(&alternativePayload)
-			s.ExpectStatus(Valid)
+			s.ExpectStatus(test.Valid)
 			s.ExpectLatestValidHash(&alternativePayload.BlockHash)
 
 			// We sent the alternative payload, fcU to it
-			p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+			p := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 				HeadBlockHash:      alternativePayload.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 			}, nil)
-			p.ExpectPayloadStatus(Valid)
+			p.ExpectPayloadStatus(test.Valid)
 
 			// PrevRandao should be the alternative prevRandao we sent
 			checkPrevRandaoValue(t, alternativePrevRandao, alternativePayload.Number)
@@ -2229,18 +2308,18 @@ func sidechainReorg(t *TestEnv) {
 }
 
 // Re-Execute Previous Payloads
-func reExecPayloads(t *TestEnv) {
+func reExecPayloads(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// How many Payloads we are going to re-execute
 	var payloadReExecCount = 10
 
 	// Create those blocks
-	t.CLMock.produceBlocks(payloadReExecCount, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(payloadReExecCount, clmock.BlockProcessCallbacks{})
 
 	// Re-execute the payloads
-	r := t.TestEth.TestBlockNumber()
+	r := t.TestEngine.TestBlockNumber()
 	r.ExpectNoError()
 	lastBlock := r.Number
 	t.Logf("INFO (%s): Started re-executing payloads at block: %v", t.TestName, lastBlock)
@@ -2252,20 +2331,20 @@ func reExecPayloads(t *TestEnv) {
 		}
 
 		r := t.TestEngine.TestEngineNewPayloadV1(&payload)
-		r.ExpectStatus(Valid)
+		r.ExpectStatus(test.Valid)
 		r.ExpectLatestValidHash(&payload.BlockHash)
 	}
 }
 
 // Multiple New Payloads Extending Canonical Chain
-func multipleNewCanonicalPayloads(t *TestEnv) {
+func multipleNewCanonicalPayloads(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Run test after a new payload has been obtained
 		OnGetPayload: func() {
 			payloadCount := 80
@@ -2275,7 +2354,7 @@ func multipleNewCanonicalPayloads(t *TestEnv) {
 			for i := 0; i < payloadCount; i++ {
 				newPrevRandao := common.Hash{}
 				rand.Read(newPrevRandao[:])
-				newPayload, err := customizePayload(&basePayload, &CustomPayloadData{
+				newPayload, err := helper.CustomizePayload(&basePayload, &helper.CustomPayloadData{
 					PrevRandao: &newPrevRandao,
 				})
 				if err != nil {
@@ -2283,7 +2362,7 @@ func multipleNewCanonicalPayloads(t *TestEnv) {
 				}
 
 				r := t.TestEngine.TestEngineNewPayloadV1(newPayload)
-				r.ExpectStatus(Valid)
+				r.ExpectStatus(test.Valid)
 				r.ExpectLatestValidHash(&newPayload.BlockHash)
 			}
 		},
@@ -2292,9 +2371,9 @@ func multipleNewCanonicalPayloads(t *TestEnv) {
 }
 
 // Out of Order Payload Execution: Secondary client should be able to set the forkchoiceUpdated to payloads received out of order
-func outOfOrderPayloads(t *TestEnv) {
+func outOfOrderPayloads(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// First prepare payloads on a first client, which will also contain multiple transactions
 
@@ -2306,11 +2385,14 @@ func outOfOrderPayloads(t *TestEnv) {
 	txPerPayload := 20
 	payloadCount := 10
 
-	t.CLMock.produceBlocks(payloadCount, BlockProcessCallbacks{
+	t.CLMock.ProduceBlocks(payloadCount, clmock.BlockProcessCallbacks{
 		// We send the transactions after we got the Payload ID, before the CLMocker gets the prepared Payload
 		OnPayloadProducerSelected: func() {
 			for i := 0; i < txPerPayload; i++ {
-				t.sendNextTransaction(t.CLMock.NextBlockProducer, recipient, amountPerTx, nil)
+				_, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, recipient, amountPerTx, nil, t.TestTransactionType)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
 			}
 		},
 	})
@@ -2318,7 +2400,7 @@ func outOfOrderPayloads(t *TestEnv) {
 	expectedBalance := amountPerTx.Mul(amountPerTx, big.NewInt(int64(payloadCount*txPerPayload)))
 
 	// Check balance on this first client
-	r := t.TestEth.TestBalanceAt(recipient, nil)
+	r := t.TestEngine.TestBalanceAt(recipient, nil)
 	r.ExpectBalanceEqual(expectedBalance)
 
 	// Start a second client to send forkchoiceUpdated + newPayload out of order
@@ -2327,24 +2409,27 @@ func outOfOrderPayloads(t *TestEnv) {
 		t.Fatalf("FAIL (%s): Unable to obtain all client types", t.TestName)
 	}
 
-	secondaryTestEngineClients := make([]*TestEngineClient, len(allClients))
+	secondaryTestEngineClients := make([]*test.TestEngineClient, len(allClients))
 
 	for i, client := range allClients {
-		_, c, err := t.StartClient(client.Name, t.ClientParams, t.MainTTD())
-		secondaryTestEngineClients[i] = NewTestEngineClient(t, c)
+		c, err := hive_rpc.HiveRPCEngineStarter{
+			ClientType: client.Name,
+		}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+
+		secondaryTestEngineClients[i] = test.NewTestEngineClient(t, c)
 
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to start client (%v): %v", t.TestName, client, err)
 		}
 		// Send the forkchoiceUpdated with the LatestExecutedPayload hash, we should get SYNCING back
-		fcU := ForkchoiceStateV1{
+		fcU := api.ForkchoiceStateV1{
 			HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 			SafeBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
 			FinalizedBlockHash: t.CLMock.LatestExecutedPayload.BlockHash,
 		}
 
 		r := secondaryTestEngineClients[i].TestEngineForkchoiceUpdatedV1(&fcU, nil)
-		r.ExpectPayloadStatus(Syncing)
+		r.ExpectPayloadStatus(test.Syncing)
 		r.ExpectLatestValidHash(nil)
 		r.ExpectNoValidationError()
 
@@ -2354,12 +2439,12 @@ func outOfOrderPayloads(t *TestEnv) {
 
 			if k > 1 {
 				r := secondaryTestEngineClients[i].TestEngineNewPayloadV1(&payload)
-				r.ExpectStatusEither(Accepted, Syncing)
+				r.ExpectStatusEither(test.Accepted, test.Syncing)
 				r.ExpectLatestValidHash(nil)
 				r.ExpectNoValidationError()
 			} else {
 				r := secondaryTestEngineClients[i].TestEngineNewPayloadV1(&payload)
-				r.ExpectStatus(Valid)
+				r.ExpectStatus(test.Valid)
 				r.ExpectLatestValidHash(&payload.BlockHash)
 
 			}
@@ -2367,175 +2452,171 @@ func outOfOrderPayloads(t *TestEnv) {
 	}
 	// Add the clients to the CLMocker
 	for _, tec := range secondaryTestEngineClients {
-		t.CLMock.AddEngineClient(t.T, tec.Engine.Client, t.MainTTD())
+		t.CLMock.AddEngineClient(tec)
 	}
 
 	// Produce a single block on top of the canonical chain, all clients must accept this
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 
 	for _, ec := range secondaryTestEngineClients {
 		// At this point we should have our funded account balance equal to the expected value.
-		r := NewTestEthClient(t, ec.Engine.Eth).TestBalanceAt(recipient, nil)
+		r := ec.TestBalanceAt(recipient, nil)
 		r.ExpectBalanceEqual(expectedBalance)
 
-		ec.Close()
+		ec.Engine.Close()
 	}
 }
 
 // Send a valid payload on a client that is currently SYNCING
-func validPayloadFcUSyncingClient(t *TestEnv) {
+func validPayloadFcUSyncingClient(t *test.Env) {
 	var (
-		secondaryClient *hivesim.Client
-		previousPayload ExecutableDataV1
+		secondaryClient client.EngineClient
+		previousPayload api.ExecutableDataV1
 	)
 	{
 		// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
 		var err error
-		secondaryClient, _, err = t.StartClient(t.Client.Type, t.ClientParams, t.MainTTD())
+		secondaryClient, err = hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 		}
-		t.CLMock.AddEngineClient(t.T, secondaryClient, t.MainTTD())
+		t.CLMock.AddEngineClient(secondaryClient)
 	}
 
 	// Wait until TTD is reached by all clients
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	// Disconnect the first engine client from the CL Mocker and produce a block
-	t.CLMock.RemoveEngineClient(t.Client)
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	t.CLMock.RemoveEngineClient(t.Engine)
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 
 	previousPayload = t.CLMock.LatestPayloadBuilt
 
 	// Send the fcU to set it to syncing mode
 	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
-	r.ExpectPayloadStatus(Syncing)
+	r.ExpectPayloadStatus(test.Syncing)
 
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Run test after the new payload has been obtained
 		OnGetPayload: func() {
 			// Send the new payload from the second client to the first, it won't be able to validate it
 			r := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestPayloadBuilt)
-			r.ExpectStatusEither(Accepted, Syncing)
+			r.ExpectStatusEither(test.Accepted, test.Syncing)
 			r.ExpectLatestValidHash(nil)
 
 			// Send the forkchoiceUpdated with a reference to the valid payload on the SYNCING client.
-			s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+			s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 				HeadBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
 				FinalizedBlockHash: t.CLMock.LatestPayloadBuilt.BlockHash,
-			}, &PayloadAttributesV1{
+			}, &api.PayloadAttributesV1{
 				Timestamp:             t.CLMock.LatestPayloadBuilt.Timestamp + 1,
-				PrevRandao:            common.Hash{},
+				Random:                common.Hash{},
 				SuggestedFeeRecipient: common.Address{},
 			})
-			s.ExpectPayloadStatus(Syncing)
+			s.ExpectPayloadStatus(test.Syncing)
 
 			// Send the previous payload to be able to continue
 			p := t.TestEngine.TestEngineNewPayloadV1(&previousPayload)
-			p.ExpectStatus(Valid)
+			p.ExpectStatus(test.Valid)
 			p.ExpectLatestValidHash(&previousPayload.BlockHash)
 
 			// Send the new payload again
 
 			p = t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestPayloadBuilt)
-			p.ExpectStatus(Valid)
+			p.ExpectStatus(test.Valid)
 			p.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.BlockHash)
 
-			s = t.TestEngine.TestEngineForkchoiceUpdatedV1(&ForkchoiceStateV1{
+			s = t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 				HeadBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
 				FinalizedBlockHash: t.CLMock.LatestPayloadBuilt.BlockHash,
 			}, nil)
-			s.ExpectPayloadStatus(Valid)
+			s.ExpectPayloadStatus(test.Valid)
 
 		},
 	})
 
 	// Add the secondary client again to the CL Mocker
-	t.CLMock.AddEngineClient(t.T, t.Client, t.MainTTD())
+	t.CLMock.AddEngineClient(t.Engine)
 
 	t.CLMock.RemoveEngineClient(secondaryClient)
 }
 
 // Send a valid `newPayload` in correct order but skip `forkchoiceUpdated` until the last payload
-func missingFcu(t *TestEnv) {
+func missingFcu(t *test.Env) {
 	// Wait until TTD is reached by this client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Get last PoW block hash
-	lastPoWBlockHash := t.TestEth.TestBlockByNumber(Head).Block.Hash()
+	lastPoWBlockHash := t.TestEngine.TestBlockByNumber(Head).Block.Hash()
 
 	// Produce blocks on the main client, these payloads will be replayed on the secondary client.
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-	var (
-		secondaryEngineTest *TestEngineClient
-		secondaryEthTest    *TestEthClient
-	)
-
+	var secondaryEngineTest *test.TestEngineClient
 	{
-		newParams := t.ClientParams.Copy()
-		hc, secondaryEngine, err := t.StartClient(t.Client.Type, newParams, t.MainTTD())
+		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 		}
-		secondaryEngineTest = NewTestEngineClient(t, secondaryEngine)
-		secondaryEthTest = NewTestEthClient(t, secondaryEngine.Eth)
-		t.CLMock.AddEngineClient(t.T, hc, t.MainTTD())
+		secondaryEngineTest = test.NewTestEngineClient(t, secondaryEngine)
+		t.CLMock.AddEngineClient(secondaryEngine)
 	}
 
 	// Send each payload in the correct order but skip the ForkchoiceUpdated for each
 	for i := t.CLMock.FirstPoSBlockNumber.Uint64(); i <= t.CLMock.LatestHeadNumber.Uint64(); i++ {
 		payload := t.CLMock.ExecutedPayloadHistory[i]
 		p := secondaryEngineTest.TestEngineNewPayloadV1(&payload)
-		p.ExpectStatus(Valid)
+		p.ExpectStatus(test.Valid)
 		p.ExpectLatestValidHash(&payload.BlockHash)
 	}
 
 	// Verify that at this point, the client's head still points to the last non-PoS block
-	r := secondaryEthTest.TestBlockByNumber(Head)
+	r := secondaryEngineTest.TestBlockByNumber(Head)
 	r.ExpectHash(lastPoWBlockHash)
 
 	// Verify that the head correctly changes after the last ForkchoiceUpdated
-	fcU := ForkchoiceStateV1{
+	fcU := api.ForkchoiceStateV1{
 		HeadBlockHash:      t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()].BlockHash,
 		SafeBlockHash:      t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()-1].BlockHash,
 		FinalizedBlockHash: t.CLMock.ExecutedPayloadHistory[t.CLMock.LatestHeadNumber.Uint64()-2].BlockHash,
 	}
 	p := secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&fcU, nil)
-	p.ExpectPayloadStatus(Valid)
+	p.ExpectPayloadStatus(test.Valid)
 	p.ExpectLatestValidHash(&fcU.HeadBlockHash)
 
 	// Now the head should've changed to the latest PoS block
-	s := secondaryEthTest.TestBlockByNumber(Head)
+	s := secondaryEngineTest.TestBlockByNumber(Head)
 	s.ExpectHash(fcU.HeadBlockHash)
 
 }
 
 // Build on top of the latest valid payload after an invalid payload has been received:
 // P <- INV_P, newPayload(INV_P), fcU(head: P, payloadAttributes: attrs) + getPayload(…)
-func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
+func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 	// Add a second client to build the invalid payload
-	newParams := t.ClientParams.Copy()
-	hc, secondaryEngine, err := t.StartClient(t.Client.Type, newParams, t.MainTTD())
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 	}
-	secondaryEngineTest := NewTestEngineClient(t, secondaryEngine)
-	t.CLMock.AddEngineClient(t.T, hc, t.MainTTD())
+	secondaryEngineTest := test.NewTestEngineClient(t, secondaryEngine)
+	t.CLMock.AddEngineClient(secondaryEngine)
 
 	// Wait until TTD is reached by this client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	// Produce another block, but at the same time send an invalid payload from the other client
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			// We are going to use the client that was not selected
 			// by the CLMocker to produce the invalid payload
@@ -2543,23 +2624,23 @@ func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
 			if t.CLMock.NextBlockProducer == invalidPayloadProducer.Engine {
 				invalidPayloadProducer = secondaryEngineTest
 			}
-			var inv_p *ExecutableDataV1
+			var inv_p *api.ExecutableDataV1
 
 			{
 				// Get a payload from the invalid payload producer and invalidate it
-				r := invalidPayloadProducer.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, &PayloadAttributesV1{
+				r := invalidPayloadProducer.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, &api.PayloadAttributesV1{
 					Timestamp:             t.CLMock.LatestHeader.Time + 1,
-					PrevRandao:            common.Hash{},
+					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
 				})
-				r.ExpectPayloadStatus(Valid)
+				r.ExpectPayloadStatus(test.Valid)
 				// Wait for the payload to be produced by the EL
 				time.Sleep(time.Second)
 
 				s := invalidPayloadProducer.TestEngineGetPayloadV1(r.Response.PayloadID)
 				s.ExpectNoError()
 
-				inv_p, err = generateInvalidPayload(&s.Payload, InvalidStateRoot)
+				inv_p, err = helper.GenerateInvalidPayload(&s.Payload, helper.InvalidStateRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to invalidate payload: %v", t.TestName, err)
 				}
@@ -2567,10 +2648,10 @@ func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
 
 			// Broadcast the invalid payload
 			r := t.TestEngine.TestEngineNewPayloadV1(inv_p)
-			r.ExpectStatus(Invalid)
+			r.ExpectStatus(test.Invalid)
 			r.ExpectLatestValidHash(&t.CLMock.LatestForkchoice.HeadBlockHash)
 			s := secondaryEngineTest.TestEngineNewPayloadV1(inv_p)
-			s.ExpectStatus(Invalid)
+			s.ExpectStatus(test.Invalid)
 			s.ExpectLatestValidHash(&t.CLMock.LatestForkchoice.HeadBlockHash)
 
 			// Let the block production continue.
@@ -2581,34 +2662,42 @@ func payloadBuildAfterNewInvalidPayload(t *TestEnv) {
 }
 
 // Send a valid `newPayload` in correct order but skip `forkchoiceUpdated` until the last payload
-func buildPayloadWithInvalidChainIDTx(t *TestEnv) {
+func buildPayloadWithInvalidChainIDTx(t *test.Env) {
 	// Wait until TTD is reached by this client
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Produce blocks before starting the test
-	t.CLMock.produceBlocks(5, BlockProcessCallbacks{})
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	// Send a transaction with an incorrect ChainID.
 	// Transaction must be not be included in payload creation.
 	var invalidChainIDTx *types.Transaction
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Run test after a new payload has been broadcast
 		OnPayloadProducerSelected: func() {
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			nonce, err := t.CLMock.NextBlockProducer.NonceAt(ctx, globals.VaultAccountAddress, nil)
+			if err != nil {
+				t.Fatalf("FAIL(%s): Unable to get address nonce: %v", t.TestName, err)
+			}
 			txData := &types.LegacyTx{
-				Nonce:    t.nonce,
-				To:       &prevRandaoContractAddr,
+				Nonce:    nonce,
+				To:       &globals.PrevRandaoContractAddr,
 				Value:    big0,
 				Gas:      75000,
-				GasPrice: gasPrice,
+				GasPrice: globals.GasPrice,
 				Data:     nil,
 			}
-			invalidChainID := new(big.Int).Set(chainID)
+			invalidChainID := new(big.Int).Set(globals.ChainID)
 			invalidChainID.Add(invalidChainID, big1)
-			invalidChainIDTx, err := types.SignTx(types.NewTx(txData), types.NewLondonSigner(invalidChainID), vaultKey)
+			invalidChainIDTx, err := types.SignTx(types.NewTx(txData), types.NewLondonSigner(invalidChainID), globals.VaultKey)
 			if err != nil {
 				t.Fatalf("FAIL(%s): Unable to sign tx with invalid chain ID: %v", t.TestName, err)
 			}
-			err = t.Engine.Eth.SendTransaction(t.Engine.Ctx(), invalidChainIDTx)
+			ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			err = t.Engine.SendTransaction(ctx, invalidChainIDTx)
 			if err != nil {
 				t.Logf("INFO (%s): Error on sending transaction with incorrect chain ID (Expected): %v", t.TestName, err)
 			}
@@ -2616,7 +2705,7 @@ func buildPayloadWithInvalidChainIDTx(t *TestEnv) {
 	})
 
 	// Verify that the latest payload built does NOT contain the invalid chain Tx
-	if TransactionInPayload(&t.CLMock.LatestPayloadBuilt, invalidChainIDTx) {
+	if helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, invalidChainIDTx) {
 		p, _ := json.MarshalIndent(t.CLMock.LatestPayloadBuilt, "", " ")
 		t.Fatalf("FAIL (%s): Invalid chain ID tx was included in payload: %s", t.TestName, p)
 	}
@@ -2624,9 +2713,9 @@ func buildPayloadWithInvalidChainIDTx(t *TestEnv) {
 }
 
 // Fee Recipient Tests
-func suggestedFeeRecipient(t *TestEnv) {
+func suggestedFeeRecipient(t *test.Env) {
 	// Wait until this client catches up with latest PoS
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 
 	// Amount of transactions to send
 	txCount := 20
@@ -2637,14 +2726,17 @@ func suggestedFeeRecipient(t *TestEnv) {
 
 	// Send multiple transactions
 	for i := 0; i < txCount; i++ {
-		t.sendNextTransaction(t.Engine, vaultAccountAddr, big0, nil)
+		_, err := helper.SendNextTransaction(t.TestContext, t.Engine, globals.VaultAccountAddress, big0, nil, t.TestTransactionType)
+		if err != nil {
+			t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+		}
 	}
 	// Produce the next block with the fee recipient set
 	t.CLMock.NextFeeRecipient = feeRecipient
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 
 	// Calculate the fees and check that they match the balance of the fee recipient
-	r := t.TestEth.TestBlockByNumber(Head)
+	r := t.TestEngine.TestBlockByNumber(Head)
 	r.ExpectTransactionCountEqual(txCount)
 	r.ExpectCoinbase(feeRecipient)
 	blockIncluded := r.Block
@@ -2655,47 +2747,52 @@ func suggestedFeeRecipient(t *TestEnv) {
 		if err != nil {
 			t.Fatalf("FAIL (%s): unable to obtain EffectiveGasTip: %v", t.TestName, err)
 		}
-		receipt, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+		ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+		defer cancel()
+		receipt, err := t.Eth.TransactionReceipt(ctx, tx.Hash())
 		if err != nil {
 			t.Fatalf("FAIL (%s): unable to obtain receipt: %v", t.TestName, err)
 		}
 		feeRecipientFees = feeRecipientFees.Add(feeRecipientFees, effGasTip.Mul(effGasTip, big.NewInt(int64(receipt.GasUsed))))
 	}
 
-	s := t.TestEth.TestBalanceAt(feeRecipient, nil)
+	s := t.TestEngine.TestBalanceAt(feeRecipient, nil)
 	s.ExpectBalanceEqual(feeRecipientFees)
 
 	// Produce another block without txns and get the balance again
 	t.CLMock.NextFeeRecipient = feeRecipient
-	t.CLMock.produceSingleBlock(BlockProcessCallbacks{})
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 
-	s = t.TestEth.TestBalanceAt(feeRecipient, nil)
+	s = t.TestEngine.TestBalanceAt(feeRecipient, nil)
 	s.ExpectBalanceEqual(feeRecipientFees)
 
 }
 
 // TODO: Do a PENDING block suggestedFeeRecipient
 
-func checkPrevRandaoValue(t *TestEnv, expectedPrevRandao common.Hash, blockNumber uint64) {
+func checkPrevRandaoValue(t *test.Env, expectedPrevRandao common.Hash, blockNumber uint64) {
 	storageKey := common.Hash{}
 	storageKey[31] = byte(blockNumber)
-	r := t.TestEth.TestStorageAt(prevRandaoContractAddr, storageKey, nil)
+	r := t.TestEngine.TestStorageAt(globals.PrevRandaoContractAddr, storageKey, nil)
 	r.ExpectStorageEqual(expectedPrevRandao)
 
 }
 
 // PrevRandao Opcode tests
-func prevRandaoOpcodeTx(t *TestEnv) {
+func prevRandaoOpcodeTx(t *test.Env) {
 	// We need to send PREVRANDAO opcode transactions in PoW and particularly in the block where the TTD is reached.
 	ttdReached := make(chan interface{})
 
 	// Try to send many transactions before PoW transition to guarantee at least one enters in the block
-	go func(t *TestEnv) {
+	go func(t *test.Env) {
 		for {
-			t.sendNextTransaction(t.Engine, prevRandaoContractAddr, big0, nil)
+			_, err := helper.SendNextTransaction(t.TestContext, t.Engine, globals.PrevRandaoContractAddr, big0, nil, t.TestTransactionType)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+			}
 
 			select {
-			case <-t.Timeout:
+			case <-t.TestContext.Done():
 				t.Fatalf("FAIL (%s): Timeout while sending PREVRANDAO opcode transactions: %v")
 			case <-ttdReached:
 				return
@@ -2703,23 +2800,23 @@ func prevRandaoOpcodeTx(t *TestEnv) {
 			}
 		}
 	}(t)
-	t.CLMock.waitForTTD()
+	t.CLMock.WaitForTTD()
 	close(ttdReached)
 
 	// Ideally all blocks up until TTD must have a DIFFICULTY opcode tx in it
-	r := t.TestEth.TestBlockNumber()
+	r := t.TestEngine.TestBlockNumber()
 	r.ExpectNoError()
 	ttdBlockNumber := r.Number
 
 	// Start
 	for i := uint64(ttdBlockNumber); i <= ttdBlockNumber; i++ {
 		// First check that the block actually contained the transaction
-		r := t.TestEth.TestBlockByNumber(big.NewInt(int64(i)))
+		r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(i)))
 		r.ExpectTransactionCountGreaterThan(0)
 
 		storageKey := common.Hash{}
 		storageKey[31] = byte(i)
-		s := t.TestEth.TestStorageAt(prevRandaoContractAddr, storageKey, nil)
+		s := t.TestEngine.TestStorageAt(globals.PrevRandaoContractAddr, storageKey, nil)
 		s.ExpectBigIntStorageEqual(big.NewInt(2))
 
 	}
@@ -2730,23 +2827,30 @@ func prevRandaoOpcodeTx(t *TestEnv) {
 		currentTxIndex = 0
 		txs            = make([]*types.Transaction, 0)
 	)
-	t.CLMock.produceBlocks(txCount, BlockProcessCallbacks{
+	t.CLMock.ProduceBlocks(txCount, clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
-			tx := t.sendNextTransaction(t.Engine, prevRandaoContractAddr, big0, nil)
+			tx, err := helper.SendNextTransaction(t.TestContext, t.Engine, globals.PrevRandaoContractAddr, big0, nil, t.TestTransactionType)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+			}
 			txs = append(txs, tx)
 			currentTxIndex++
 		},
 		OnForkchoiceBroadcast: func() {
 			// Check the transaction tracing, which is client specific
 			expectedPrevRandao := t.CLMock.PrevRandaoHistory[t.CLMock.LatestHeader.Number.Uint64()+1]
-			if err := debugPrevRandaoTransaction(t.Engine.Ctx(), t.RPC, t.Engine.Client.Type, txs[currentTxIndex-1],
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			if err := helper.DebugPrevRandaoTransaction(ctx, t.Client.RPC(), t.Client.Type, txs[currentTxIndex-1],
 				&expectedPrevRandao); err != nil {
 				t.Fatalf("FAIL (%s): Error during transaction tracing: %v", t.TestName, err)
 			}
 		},
 	})
 
-	lastBlockNumber, err := t.Eth.BlockNumber(t.Ctx())
+	ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+	defer cancel()
+	lastBlockNumber, err := t.Eth.BlockNumber(ctx)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to get latest block number: %v", t.TestName, err)
 	}

@@ -1,4 +1,4 @@
-package main
+package suite_sync
 
 import (
 	"encoding/json"
@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
 
 // Specifies a single test variant for the given client:
@@ -99,12 +100,12 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 	result := make([]SyncTestVariant, 0)
 
 	var (
-		genesis = loadGenesis(GenesisFile)
+		genesis = helper.LoadGenesis(GenesisFile)
 		chain   types.Blocks
 	)
 
 	if ChainFile != "" {
-		chain = loadChain("./chains/" + ChainFile)
+		chain = helper.LoadChain("./chains/" + ChainFile)
 	}
 
 	// ArchiveSync
@@ -131,7 +132,7 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 		FastBlocks:           true,
 		PivotNumber:          pivot.Number(),
 		PivotHash:            &pivotHash,
-		PivotTotalDifficulty: CalculateTotalDifficulty(genesis, chain, pivot.NumberU64()).String(),
+		PivotTotalDifficulty: helper.CalculateTotalDifficulty(genesis, chain, pivot.NumberU64()).String(),
 	}
 	result = append(result,
 		SyncTestVariant{
@@ -157,7 +158,7 @@ func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string
 		FastBlocks:           true,
 		PivotNumber:          pivot.Number(),
 		PivotHash:            &pivotHash,
-		PivotTotalDifficulty: CalculateTotalDifficulty(genesis, chain, pivot.NumberU64()).String(),
+		PivotTotalDifficulty: helper.CalculateTotalDifficulty(genesis, chain, pivot.NumberU64()).String(),
 	}
 	result = append(result,
 		SyncTestVariant{

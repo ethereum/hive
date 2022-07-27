@@ -1,7 +1,9 @@
-package main
+package node
 
 import (
+	"context"
 	"encoding/binary"
+	"fmt"
 	"math/big"
 	"os"
 	"time"
@@ -24,7 +26,24 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/enode"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/rpc"
 )
+
+type GethNodeEngineStarter struct {
+	// Client parameters used to launch the default client
+	ClientType              string
+	ChainFile               string
+	TerminalTotalDifficulty *big.Int
+	EnginePort              int
+	EthPort                 int
+	JWTSecret               []byte
+
+	// Test specific configuration (TBD)
+	AmountOfTerminalBlocksToProduce int
+	NthTerminalBlockToReturnAsHead  int
+	KeepProducingPoWBlocks          bool
+	MaxPeers                        int // To allow testing terminal block gossiping on the other clients
+}
 
 type gethNode struct {
 	node     *node.Node
@@ -32,9 +51,11 @@ type gethNode struct {
 	datadir  string
 	bootnode string
 	genesis  *core.Genesis
+	ttd      *big.Int
+	api      *ethcatalyst.ConsensusAPI
 }
 
-func newNode(bootnode string, genesis *core.Genesis) (*gethNode, error) {
+func NewNode(bootnode string, genesis *core.Genesis) (*gethNode, error) {
 	// Define the basic configurations for the Ethereum node
 	datadir, _ := os.MkdirTemp("", "")
 
@@ -95,10 +116,11 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 		datadir:  datadir,
 		bootnode: bootnode,
 		genesis:  genesis,
+		api:      ethcatalyst.NewConsensusAPI(ethBackend),
 	}, err
 }
 
-func (n *gethNode) Stop() error {
+func (n *gethNode) Close() error {
 	return n.eth.Stop()
 }
 
@@ -128,7 +150,7 @@ func encodeBlockNumber(number uint64) []byte {
 	return enc
 }
 
-func (n *gethNode) setBlock(block *types.Block, parentNumber uint64, parentRoot common.Hash) error {
+func (n *gethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot common.Hash) error {
 	parentTd := n.eth.BlockChain().GetTd(block.ParentHash(), block.NumberU64()-1)
 	rawdb.WriteTd(n.eth.ChainDb(), block.Hash(), block.NumberU64(), parentTd.Add(parentTd, block.Difficulty()))
 	rawdb.WriteBlock(n.eth.ChainDb(), block)
@@ -192,50 +214,130 @@ func (n *gethNode) setBlock(block *types.Block, parentNumber uint64, parentRoot 
 	return nil
 }
 
-func (n *gethNode) sendNewPayload(pl *ExecutableDataV1) (beacon.PayloadStatusV1, error) {
-	api := ethcatalyst.NewConsensusAPI(n.eth)
-	return api.NewPayloadV1(beacon.ExecutableDataV1(execData(pl)))
+// Engine API
+func (n *gethNode) NewPayloadV1(ctx context.Context, pl *beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
+	return n.api.NewPayloadV1(*pl)
 }
 
-func (n *gethNode) sendFCU(fcs *ForkchoiceStateV1, payload *PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
-	api := ethcatalyst.NewConsensusAPI(n.eth)
-	return api.ForkchoiceUpdatedV1(forkchoiceState(fcs), payloadAttributes(payload))
+func (n *gethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
+	return n.api.ForkchoiceUpdatedV1(*fcs, payload)
 }
 
-func execData(data *ExecutableDataV1) beacon.ExecutableDataV1 {
-	return beacon.ExecutableDataV1{
-		ParentHash:    data.ParentHash,
-		FeeRecipient:  data.FeeRecipient,
-		StateRoot:     data.StateRoot,
-		ReceiptsRoot:  data.ReceiptsRoot,
-		LogsBloom:     data.LogsBloom,
-		Random:        data.PrevRandao,
-		Number:        data.Number,
-		GasLimit:      data.GasLimit,
-		GasUsed:       data.GasUsed,
-		Timestamp:     data.Timestamp,
-		ExtraData:     data.ExtraData,
-		BaseFeePerGas: data.BaseFeePerGas,
-		BlockHash:     data.BlockHash,
-		Transactions:  data.Transactions,
+func (n *gethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableDataV1, error) {
+	p, err := n.api.GetPayloadV1(*payloadId)
+	if p == nil || err != nil {
+		return beacon.ExecutableDataV1{}, err
 	}
+	return *p, err
 }
 
-func forkchoiceState(data *ForkchoiceStateV1) beacon.ForkchoiceStateV1 {
-	return beacon.ForkchoiceStateV1{
-		HeadBlockHash:      data.HeadBlockHash,
-		SafeBlockHash:      data.SafeBlockHash,
-		FinalizedBlockHash: data.FinalizedBlockHash,
+// Eth JSON RPC
+const (
+	SafeBlockNumber      = rpc.BlockNumber(-4) // This is not yet true
+	FinalizedBlockNumber = rpc.BlockNumber(-3)
+	PendingBlockNumber   = rpc.BlockNumber(-2)
+	LatestBlockNumber    = rpc.BlockNumber(-1)
+	EarliestBlockNumber  = rpc.BlockNumber(0)
+)
+
+var (
+	Head      *big.Int // Nil
+	Pending   = big.NewInt(-2)
+	Finalized = big.NewInt(-3)
+	Safe      = big.NewInt(-4)
+)
+
+func parseBlockNumber(number *big.Int) rpc.BlockNumber {
+	if number == nil {
+		return LatestBlockNumber
 	}
+	return rpc.BlockNumber(number.Int64())
 }
 
-func payloadAttributes(data *PayloadAttributesV1) *beacon.PayloadAttributesV1 {
-	if data == nil {
-		return nil
+func (n *gethNode) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+	return n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
+}
+
+func (n *gethNode) BlockNumber(ctx context.Context) (uint64, error) {
+	return n.eth.APIBackend.CurrentBlock().NumberU64(), nil
+}
+
+func (n *gethNode) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+	return n.eth.APIBackend.BlockByHash(ctx, hash)
+}
+
+func (n *gethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	b, err := n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
+	if err != nil {
+		return nil, err
 	}
-	return &beacon.PayloadAttributesV1{
-		Timestamp:             data.Timestamp,
-		Random:                data.PrevRandao,
-		SuggestedFeeRecipient: data.SuggestedFeeRecipient,
+	return b.Header(), err
+}
+
+func (n *gethNode) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+	return n.eth.APIBackend.SendTx(ctx, tx)
+}
+
+func (n *gethNode) currentStateDB() (*state.StateDB, error) {
+	return state.New(n.eth.APIBackend.CurrentBlock().Root(), n.eth.BlockChain().StateCache(), n.eth.BlockChain().Snapshots())
+}
+
+func (n *gethNode) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+	stateDB, err := n.currentStateDB()
+	if err != nil {
+		return nil, err
 	}
+	return stateDB.GetBalance(account), nil
+}
+
+func (n *gethNode) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
+	stateDB, err := n.currentStateDB()
+	if err != nil {
+		return nil, err
+	}
+	return stateDB.GetState(account, key).Bytes(), nil
+}
+
+func (n *gethNode) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+	return nil, fmt.Errorf("TransactionReceipt not implemented")
+}
+
+func (n *gethNode) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
+	stateDB, err := n.currentStateDB()
+	if err != nil {
+		return 0, err
+	}
+	return stateDB.GetNonce(account), nil
+}
+
+func (n *gethNode) GetTotalDifficulty(ctx context.Context) (*big.Int, error) {
+	td := new(big.Int).Set(n.genesis.Difficulty)
+	for i := int64(1); i <= n.eth.BlockChain().CurrentHeader().Number.Int64(); i++ {
+		b, err := n.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(i))
+		if err != nil {
+			return nil, err
+		}
+		td.Add(td, b.Difficulty())
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+	}
+	return td, nil
+}
+
+func (n *gethNode) TerminalTotalDifficulty() *big.Int {
+	if n.ttd != nil {
+		return n.ttd
+	}
+	return n.genesis.Config.TerminalTotalDifficulty
+}
+
+func (n *gethNode) EnodeURL() (string, error) {
+	return n.node.Server().NodeInfo().Enode, nil
+}
+
+func (n *gethNode) ID() string {
+	return "Geth NODE"
 }
