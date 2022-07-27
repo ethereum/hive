@@ -103,24 +103,24 @@ type TestSpec struct {
 func main() {
 	var (
 		engine = hivesim.Suite{
-			Name: "engine",
+			Name: "engine-api",
 			Description: `
 	Test Engine API tests using CL mocker to inject commands into clients after they 
 	have reached the Terminal Total Difficulty.`[1:],
 		}
 		transition = hivesim.Suite{
-			Name: "transition",
+			Name: "engine-transition",
 			Description: `
 	Test Engine API tests using CL mocker to inject commands into clients and drive 
 	them through the merge.`[1:],
 		}
 		auth = hivesim.Suite{
-			Name: "auth",
+			Name: "engine-auth",
 			Description: `
 	Test Engine API authentication features.`[1:],
 		}
 		sync = hivesim.Suite{
-			Name: "sync",
+			Name: "engine-sync",
 			Description: `
 	Test Engine API sync, pre/post merge.`[1:],
 		}
