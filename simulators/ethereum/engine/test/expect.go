@@ -61,13 +61,13 @@ func (e ExpectEnv) Fatalf(format string, values ...interface{}) {
 
 type TestEngineClient struct {
 	*ExpectEnv
-	client.EngineClient
+	Engine client.EngineClient
 }
 
 func NewTestEngineClient(t *Env, ec client.EngineClient) *TestEngineClient {
 	return &TestEngineClient{
-		ExpectEnv:    &ExpectEnv{t},
-		EngineClient: ec,
+		ExpectEnv: &ExpectEnv{t},
+		Engine:    ec,
 	}
 }
 
@@ -294,7 +294,7 @@ type BlockNumberResponseExpectObject struct {
 func (tec *TestEngineClient) TestBlockNumber() *BlockNumberResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	number, err := tec.Eth.BlockNumber(ctx)
+	number, err := tec.Engine.BlockNumber(ctx)
 	return &BlockNumberResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Call:      "BlockNumber",
@@ -375,7 +375,7 @@ type BlockResponseExpectObject struct {
 func (tec *TestEngineClient) TestBlockByNumber(number *big.Int) *BlockResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	block, err := tec.Eth.BlockByNumber(ctx, number)
+	block, err := tec.Engine.BlockByNumber(ctx, number)
 	return &BlockResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Call:      "BlockByNumber",
@@ -387,7 +387,7 @@ func (tec *TestEngineClient) TestBlockByNumber(number *big.Int) *BlockResponseEx
 func (tec *TestEngineClient) TestBlockByHash(hash common.Hash) *BlockResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	block, err := tec.Eth.BlockByHash(ctx, hash)
+	block, err := tec.Engine.BlockByHash(ctx, hash)
 	return &BlockResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Call:      "BlockByHash",
@@ -455,7 +455,7 @@ type BalanceResponseExpectObject struct {
 func (tec *TestEngineClient) TestBalanceAt(account common.Address, number *big.Int) *BalanceResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	balance, err := tec.Eth.BalanceAt(ctx, account, number)
+	balance, err := tec.Engine.BalanceAt(ctx, account, number)
 	return &BalanceResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Call:      "BalanceAt",
@@ -490,7 +490,7 @@ type StorageResponseExpectObject struct {
 func (tec *TestEngineClient) TestStorageAt(account common.Address, key common.Hash, number *big.Int) *StorageResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	storage, err := tec.Eth.StorageAt(ctx, account, key, number)
+	storage, err := tec.Engine.StorageAt(ctx, account, key, number)
 	return &StorageResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Call:      "StorageAt",
@@ -533,7 +533,7 @@ type TransactionReceiptExpectObject struct {
 func (tec *TestEngineClient) TestTransactionReceipt(txHash common.Hash) *TransactionReceiptExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	receipt, err := tec.Eth.TransactionReceipt(ctx, txHash)
+	receipt, err := tec.Engine.TransactionReceipt(ctx, txHash)
 	return &TransactionReceiptExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Call:      "TransactionReceipt",

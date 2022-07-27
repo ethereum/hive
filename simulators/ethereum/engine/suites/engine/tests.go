@@ -2415,12 +2415,11 @@ func outOfOrderPayloads(t *test.Env) {
 		c, err := hive_rpc.HiveRPCEngineStarter{
 			ClientType: client.Name,
 		}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
-
-		secondaryTestEngineClients[i] = test.NewTestEngineClient(t, c)
-
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to start client (%v): %v", t.TestName, client, err)
 		}
+		secondaryTestEngineClients[i] = test.NewTestEngineClient(t, c)
+
 		// Send the forkchoiceUpdated with the LatestExecutedPayload hash, we should get SYNCING back
 		fcU := api.ForkchoiceStateV1{
 			HeadBlockHash:      t.CLMock.LatestExecutedPayload.BlockHash,
@@ -2452,13 +2451,16 @@ func outOfOrderPayloads(t *test.Env) {
 	}
 	// Add the clients to the CLMocker
 	for _, tec := range secondaryTestEngineClients {
-		t.CLMock.AddEngineClient(tec)
+		t.CLMock.AddEngineClient(tec.Engine)
 	}
 
 	// Produce a single block on top of the canonical chain, all clients must accept this
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 
 	for _, ec := range secondaryTestEngineClients {
+		// Head must point to the latest produced payload
+		p := ec.TestBlockByNumber(nil)
+		p.ExpectHash(t.CLMock.LatestExecutedPayload.BlockHash)
 		// At this point we should have our funded account balance equal to the expected value.
 		r := ec.TestBalanceAt(recipient, nil)
 		r.ExpectBalanceEqual(expectedBalance)
