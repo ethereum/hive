@@ -755,7 +755,7 @@ const (
 	DynamicFeeTxOnly
 )
 
-func MakeNextTransaction(nonce uint64, recipient *common.Address, gasLimit uint64, amount *big.Int, payload []byte, txType TestTransactionType) (*types.Transaction, error) {
+func MakeTransaction(nonce uint64, recipient *common.Address, gasLimit uint64, amount *big.Int, payload []byte, txType TestTransactionType) (*types.Transaction, error) {
 	var newTxData types.TxData
 
 	var txTypeToUse int
@@ -808,16 +808,14 @@ func MakeNextTransaction(nonce uint64, recipient *common.Address, gasLimit uint6
 	return signedTx, nil
 }
 
-func SendNextTransaction(parentCtx context.Context, node client.Eth, recipient common.Address, amount *big.Int, payload []byte, txType TestTransactionType) (*types.Transaction, error) {
-	ctx, cancel := context.WithTimeout(parentCtx, globals.RPCTimeout)
-	defer cancel()
-	nonce, err := node.NonceAt(ctx, globals.VaultAccountAddress, nil)
+func SendNextTransaction(testCtx context.Context, node client.EngineClient, recipient common.Address, amount *big.Int, payload []byte, txType TestTransactionType) (*types.Transaction, error) {
+	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
 	if err != nil {
 		return nil, err
 	}
-	tx, err := MakeNextTransaction(nonce, &recipient, 75000, amount, payload, txType)
+	tx, err := MakeTransaction(nonce, &recipient, 75000, amount, payload, txType)
 	for {
-		ctx, cancel := context.WithTimeout(parentCtx, globals.RPCTimeout)
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
 		defer cancel()
 		err := node.SendTransaction(ctx, tx)
 		if err == nil {
@@ -825,14 +823,14 @@ func SendNextTransaction(parentCtx context.Context, node client.Eth, recipient c
 		}
 		select {
 		case <-time.After(time.Second):
-		case <-parentCtx.Done():
-			return nil, parentCtx.Err()
+		case <-testCtx.Done():
+			return nil, testCtx.Err()
 		}
 	}
 }
 
 // Method that attempts to create a contract filled with zeros without going over the specified gasLimit
-func MakeNextBigContractTransaction(nonce uint64, gasLimit uint64, txType TestTransactionType) (*types.Transaction, error) {
+func MakeBigContractTransaction(nonce uint64, gasLimit uint64, txType TestTransactionType) (*types.Transaction, error) {
 	// Total GAS: Gtransaction == 21000, Gcreate == 32000, Gcodedeposit == 200
 	contractLength := uint64(0)
 	if gasLimit > (21000 + 32000) {
@@ -852,32 +850,29 @@ func MakeNextBigContractTransaction(nonce uint64, gasLimit uint64, txType TestTr
 	initCode = append(initCode, 0x38)   // CODESIZE == 0x00
 	initCode = append(initCode, 0xF3)   // RETURN(offset, length)
 
-	return MakeNextTransaction(nonce, nil, gasLimit, common.Big0, initCode, txType)
+	return MakeTransaction(nonce, nil, gasLimit, common.Big0, initCode, txType)
 }
 
-func SendNextBigContractTransaction(parentCtx context.Context, sender client.Eth, gasLimit uint64, txType TestTransactionType) (*types.Transaction, error) {
-	ctx, cancel := context.WithTimeout(parentCtx, globals.RPCTimeout)
-	defer cancel()
-	nonce, err := sender.NonceAt(ctx, globals.VaultAccountAddress, nil)
+func SendNextBigContractTransaction(testCtx context.Context, node client.EngineClient, gasLimit uint64, txType TestTransactionType) (*types.Transaction, error) {
+	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
 	if err != nil {
 		return nil, err
 	}
-
-	tx, err := MakeNextBigContractTransaction(nonce, gasLimit, txType)
+	tx, err := MakeBigContractTransaction(nonce, gasLimit, txType)
 	if err != nil {
 		return nil, err
 	}
 	for {
-		ctx, cancel := context.WithTimeout(parentCtx, globals.RPCTimeout)
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
 		defer cancel()
-		err := sender.SendTransaction(ctx, tx)
+		err := node.SendTransaction(ctx, tx)
 		if err == nil {
 			return tx, nil
 		}
 		select {
 		case <-time.After(time.Second):
-		case <-parentCtx.Done():
-			return nil, parentCtx.Err()
+		case <-testCtx.Done():
+			return nil, testCtx.Err()
 		}
 	}
 }

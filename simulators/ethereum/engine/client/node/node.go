@@ -45,6 +45,11 @@ type GethNodeEngineStarter struct {
 	MaxPeers                        int // To allow testing terminal block gossiping on the other clients
 }
 
+type AccountTransactionInfo struct {
+	PreviousBlock common.Hash
+	PreviousNonce uint64
+}
+
 type gethNode struct {
 	node     *node.Node
 	eth      *eth.Ethereum
@@ -53,6 +58,9 @@ type gethNode struct {
 	genesis  *core.Genesis
 	ttd      *big.Int
 	api      *ethcatalyst.ConsensusAPI
+
+	// Test account nonces
+	accTxInfoMap map[common.Address]*AccountTransactionInfo
 }
 
 func NewNode(bootnode string, genesis *core.Genesis) (*gethNode, error) {
@@ -111,12 +119,13 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 	stack.Server().AddPeer(node)
 
 	return &gethNode{
-		node:     stack,
-		eth:      ethBackend,
-		datadir:  datadir,
-		bootnode: bootnode,
-		genesis:  genesis,
-		api:      ethcatalyst.NewConsensusAPI(ethBackend),
+		node:         stack,
+		eth:          ethBackend,
+		datadir:      datadir,
+		bootnode:     bootnode,
+		genesis:      genesis,
+		api:          ethcatalyst.NewConsensusAPI(ethBackend),
+		accTxInfoMap: make(map[common.Address]*AccountTransactionInfo),
 	}, err
 }
 
@@ -340,4 +349,29 @@ func (n *gethNode) EnodeURL() (string, error) {
 
 func (n *gethNode) ID() string {
 	return "Geth NODE"
+}
+
+func (n *gethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+	// First get the current head of the client where we will send the tx
+	head, err := n.eth.APIBackend.BlockByNumber(testCtx, LatestBlockNumber)
+	if err != nil {
+		return 0, err
+	}
+	// Then check if we have any info about this account, and when it was last updated
+	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && accTxInfo.PreviousBlock == head.Hash() {
+		// We have info about this account and is up to date.
+		// Increase the nonce and return it
+		accTxInfo.PreviousNonce++
+		return accTxInfo.PreviousNonce, nil
+	}
+	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
+	nonce, err := n.NonceAt(testCtx, account, nil)
+	if err != nil {
+		return 0, err
+	}
+	n.accTxInfoMap[account] = &AccountTransactionInfo{
+		PreviousBlock: head.Hash(),
+		PreviousNonce: nonce,
+	}
+	return nonce, nil
 }

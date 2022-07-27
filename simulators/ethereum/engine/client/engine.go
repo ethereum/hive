@@ -35,6 +35,9 @@ type EngineClient interface {
 	Close() error
 	EnodeURL() (string, error)
 
+	// Local Test Account Management
+	GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error)
+
 	// TTD Methods
 	TerminalTotalDifficulty() *big.Int
 	GetTotalDifficulty(context.Context) (*big.Int, error)

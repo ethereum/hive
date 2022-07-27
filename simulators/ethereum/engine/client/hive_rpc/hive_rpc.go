@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -125,6 +126,11 @@ func CheckEthEngineLive(c *hivesim.Client) error {
 	return nil
 }
 
+type AccountTransactionInfo struct {
+	PreviousBlock common.Hash
+	PreviousNonce uint64
+}
+
 // Implements the EngineClient interface for a normal RPC client.
 type HiveRPCEngineClient struct {
 	*ethclient.Client
@@ -133,6 +139,9 @@ type HiveRPCEngineClient struct {
 	cEth           *rpc.Client
 	ttd            *big.Int
 	JWTSecretBytes []byte
+
+	// Test account nonces
+	accTxInfoMap map[common.Address]*AccountTransactionInfo
 }
 
 // NewClient creates a engine client that uses the given RPC client.
@@ -156,6 +165,7 @@ func NewHiveRPCEngineClient(h *hivesim.Client, enginePort int, ethPort int, jwtS
 		cEth:           rpcClient,
 		ttd:            ttd,
 		JWTSecretBytes: jwtSecretBytes,
+		accTxInfoMap:   make(map[common.Address]*AccountTransactionInfo),
 	}
 }
 
@@ -201,7 +211,7 @@ func (ec *HiveRPCEngineClient) HeaderByNumber(ctx context.Context, number *big.I
 	if err == nil && header == nil {
 		err = ethereum.NotFound
 	}
-	return header, nil
+	return header, err
 }
 
 // Helper structs to fetch the TotalDifficulty
@@ -296,4 +306,33 @@ func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Con
 	var result api.TransitionConfigurationV1
 	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", tConf)
 	return result, err
+}
+
+func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+	// First get the current head of the client where we will send the tx
+	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+	defer cancel()
+	head, err := ec.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	// Then check if we have any info about this account, and when it was last updated
+	if accTxInfo, ok := ec.accTxInfoMap[account]; ok && accTxInfo != nil && accTxInfo.PreviousBlock == head.Hash() {
+		// We have info about this account and is up to date.
+		// Increase the nonce and return it
+		accTxInfo.PreviousNonce++
+		return accTxInfo.PreviousNonce, nil
+	}
+	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
+	ctx, cancel = context.WithTimeout(testCtx, globals.RPCTimeout)
+	defer cancel()
+	nonce, err := ec.NonceAt(ctx, account, nil)
+	if err != nil {
+		return 0, err
+	}
+	ec.accTxInfoMap[account] = &AccountTransactionInfo{
+		PreviousBlock: head.Hash(),
+		PreviousNonce: nonce,
+	}
+	return nonce, nil
 }

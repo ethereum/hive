@@ -492,23 +492,9 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 				// Get the address nonce:
 				// This is because we could have included transactions in the PoW chain of the block
 				// producer, or re-orged.
-				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-				defer cancel()
-				nonce, err := t.CLMock.NextBlockProducer.NonceAt(ctx, globals.VaultAccountAddress, nil)
-				if err != nil {
-					t.Logf("INFO (%s): Unable to obtain address [%s] latest nonce: %v", t.TestName, globals.VaultAccountAddress, err)
-					return
-				}
-				tx, err := helper.MakeNextTransaction(nonce, &globals.PrevRandaoContractAddr, 75000, common.Big0, nil, t.TestTransactionType)
+				tx, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, common.Big0, nil, t.TestTransactionType)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable create next transaction: %v", t.TestName, err)
-
-				}
-				ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
-				defer cancel()
-				err = t.CLMock.NextBlockProducer.SendTransaction(ctx, tx)
-				if err != nil {
-					t.Logf("INFO (%s): Unable to send tx (address=%v): %v", t.TestName, globals.VaultAccountAddress, err)
 				}
 				prevRandaoTxs = append(prevRandaoTxs, tx)
 			}
