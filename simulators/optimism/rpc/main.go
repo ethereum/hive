@@ -96,14 +96,19 @@ func runAllTests(t *hivesim.T) {
 		Ctx:   ctx,
 	}
 	d.Start()
-	d.Wait()
-	d.DeployL1()
-	d.InitL2()
-	d.StartL2()
-	d.InitOp()
-	d.StartOp()
-	d.StartL2OS()
-	d.StartBSS()
+	handleErr := func(err error) {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	handleErr(d.Wait())
+	handleErr(d.DeployL1())
+	handleErr(d.InitL2())
+	handleErr(d.StartL2())
+	handleErr(d.InitOp())
+	handleErr(d.StartOp())
+	handleErr(d.StartL2OS())
+	handleErr(d.StartBSS())
 
 	c := d.L2.Client
 

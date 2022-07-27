@@ -10,7 +10,7 @@ RUN wget -q -O ${GLIBC_KEY_FILE} ${GLIBC_KEY} \
     && apk add glibc.apk --force
 
 # copy forge
-FROM ghcr.io/foundry-rs/foundry:nightly as foundry
+FROM ghcr.io/foundry-rs/foundry:nightly-64fe4acc97e6d76551cea7598c201f05ecd65639 as foundry
 FROM base
 COPY --from=foundry /usr/local/bin/forge /usr/local/bin/forge
 
