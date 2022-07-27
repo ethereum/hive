@@ -2,12 +2,12 @@ module github.com/ethereum/hive/simulators/optimism/rpc
 
 go 1.18
 
-replace github.com/ethereum/go-ethereum v1.10.17 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220715235548-70b02481016d
+replace github.com/ethereum/go-ethereum v1.10.20 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220715235548-70b02481016d
 
 replace github.com/ethereum/hive v0.0.0-20220630112103-4b22dc796d94 => github.com/ethereum-optimism/hive v0.0.0-20220722220036-baac6288f68d
 
 require (
-	github.com/ethereum/go-ethereum v1.10.17
+	github.com/ethereum/go-ethereum v1.10.20
 	github.com/ethereum/hive v0.0.0-20220630112103-4b22dc796d94
 	github.com/kr/pretty v0.3.0
 )
