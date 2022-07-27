@@ -317,16 +317,17 @@ func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, acco
 		return 0, err
 	}
 	// Then check if we have any info about this account, and when it was last updated
-	if accTxInfo, ok := ec.accTxInfoMap[account]; ok && accTxInfo != nil && accTxInfo.PreviousBlock == head.Hash() {
-		// We have info about this account and is up to date.
+	if accTxInfo, ok := ec.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
+		// We have info about this account and is up to date (or up to date until the very last block).
 		// Increase the nonce and return it
+		accTxInfo.PreviousBlock = head.Hash()
 		accTxInfo.PreviousNonce++
 		return accTxInfo.PreviousNonce, nil
 	}
 	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
 	ctx, cancel = context.WithTimeout(testCtx, globals.RPCTimeout)
 	defer cancel()
-	nonce, err := ec.NonceAt(ctx, account, nil)
+	nonce, err := ec.NonceAt(ctx, account, head.Number)
 	if err != nil {
 		return 0, err
 	}

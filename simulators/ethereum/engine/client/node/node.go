@@ -59,7 +59,7 @@ type gethNode struct {
 	ttd      *big.Int
 	api      *ethcatalyst.ConsensusAPI
 
-	// Test account nonces
+	// Test specific configuration
 	accTxInfoMap map[common.Address]*AccountTransactionInfo
 }
 
@@ -287,12 +287,16 @@ func (n *gethNode) SendTransaction(ctx context.Context, tx *types.Transaction) e
 	return n.eth.APIBackend.SendTx(ctx, tx)
 }
 
-func (n *gethNode) currentStateDB() (*state.StateDB, error) {
-	return state.New(n.eth.APIBackend.CurrentBlock().Root(), n.eth.BlockChain().StateCache(), n.eth.BlockChain().Snapshots())
+func (n *gethNode) getStateDB(ctx context.Context, blockNumber *big.Int) (*state.StateDB, error) {
+	b, err := n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(blockNumber))
+	if err != nil {
+		return nil, err
+	}
+	return state.New(b.Root(), n.eth.BlockChain().StateCache(), n.eth.BlockChain().Snapshots())
 }
 
 func (n *gethNode) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
-	stateDB, err := n.currentStateDB()
+	stateDB, err := n.getStateDB(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -300,7 +304,7 @@ func (n *gethNode) BalanceAt(ctx context.Context, account common.Address, blockN
 }
 
 func (n *gethNode) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
-	stateDB, err := n.currentStateDB()
+	stateDB, err := n.getStateDB(ctx, blockNumber)
 	if err != nil {
 		return nil, err
 	}
@@ -312,7 +316,7 @@ func (n *gethNode) TransactionReceipt(ctx context.Context, txHash common.Hash) (
 }
 
 func (n *gethNode) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
-	stateDB, err := n.currentStateDB()
+	stateDB, err := n.getStateDB(ctx, blockNumber)
 	if err != nil {
 		return 0, err
 	}
@@ -357,15 +361,16 @@ func (n *gethNode) GetNextAccountNonce(testCtx context.Context, account common.A
 	if err != nil {
 		return 0, err
 	}
-	// Then check if we have any info about this account, and when it was last updated
-	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && accTxInfo.PreviousBlock == head.Hash() {
-		// We have info about this account and is up to date.
+	// Check if we have any info about this account, and when it was last updated
+	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash()) {
+		// We have info about this account and is up to date (or up to date until the very last block).
 		// Increase the nonce and return it
+		accTxInfo.PreviousBlock = head.Hash()
 		accTxInfo.PreviousNonce++
 		return accTxInfo.PreviousNonce, nil
 	}
 	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
-	nonce, err := n.NonceAt(testCtx, account, nil)
+	nonce, err := n.NonceAt(testCtx, account, head.Number())
 	if err != nil {
 		return 0, err
 	}

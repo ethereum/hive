@@ -25,7 +25,7 @@ func PrintExpectStack(t *Env) {
 		if file == currentFile {
 			continue
 		}
-		fmt.Printf("INFO (%s): Failed `Expect*` routine called from: file=%s, line=%d\n", t.TestName, file, line)
+		fmt.Printf("DEBUG (%s): Failed `Expect*` routine called from: file=%s, line=%d\n", t.TestName, file, line)
 		return
 	}
 }
