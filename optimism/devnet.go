@@ -1,290 +1,265 @@
 package optimism
 
 import (
-	"context"
+	"encoding/json"
 	"fmt"
-	"os"
+	"github.com/ethereum-optimism/optimism/op-node/rollup"
+	"github.com/ethereum/go-ethereum/params"
+	"sync"
 
-	"github.com/ethereum/go-ethereum/ethclient"
+	opbf "github.com/ethereum-optimism/optimism/op-batcher/flags"
+	opnf "github.com/ethereum-optimism/optimism/op-node/flags"
+	oppf "github.com/ethereum-optimism/optimism/op-proposer/flags"
 	"github.com/ethereum/hive/hivesim"
 )
 
 type Devnet struct {
-	T *hivesim.T
+	mu sync.Mutex
 
-	L1       *Eth1Node
-	L2       *L2Node
-	Rollup   *OpNode
-	Verifier *OpNode
-	Proposer *L2OSNode
-	Batcher  *BSSNode
+	T       *hivesim.T
+	Clients *ClientsByRole
 
-	GenesisTimestamp string
-	L2Genesis        string
+	Contracts   *OpContracts
+	Eth1s       []*Eth1Node
+	OpL2Engines []*OpL2Engine
+	OpNodes     []*OpNode
 
-	L2ToL1MessagePasserJSON          string
-	L2CrossDomainMessengerJSON       string
-	OptimismMintableTokenFactoryJSON string
-	L2StandardBridgeJSON             string
-	L1BlockJSON                      string
+	Proposer *ProposerNode
+	Batcher  *BatcherNode
 
-	L2OutputOracle string
-	OptimismPortal string
+	L1Cfg     *params.ChainConfig
+	L2Cfg     *params.ChainConfig
+	RollupCfg *rollup.Config
 
-	Nodes map[string]*hivesim.ClientDefinition
-	Ctx   context.Context
+	MnemonicCfg MnemonicConfig
+	Secrets     *Secrets
+	Addresses   *Addresses
+
+	Deployments Deployments
+	Bindings    Bindings
 }
 
-func (d *Devnet) Start() {
-	clientTypes, err := d.T.Sim.ClientTypes()
+func NewDevnet(t *hivesim.T) *Devnet {
+	clientTypes, err := t.Sim.ClientTypes()
 	if err != nil {
-		d.T.Fatal(err)
+		t.Fatalf("failed to retrieve list of client types: %v", err)
 	}
-	var eth1, l2, op, l2os, bss *hivesim.ClientDefinition
-	for _, client := range clientTypes {
-		if client.HasRole("op-l1") {
-			eth1 = client
-		}
-		if client.HasRole("op-l2") {
-			l2 = client
-		}
-		if client.HasRole("op-node") {
-			op = client
-		}
-		if client.HasRole("op-proposer") {
-			l2os = client
-		}
-		if client.HasRole("op-batcher") {
-			bss = client
-		}
+	// we may want to make this configurable, but let's default to the same keys for every hive net
+	secrets, err := DefaultMnemonicConfig.Secrets()
+	if err != nil {
+		t.Fatalf("failed to parse testnet secrets: %v", err)
 	}
 
-	if eth1 == nil || l2 == nil || op == nil || l2os == nil || bss == nil {
-		d.T.Fatal("op-l1, op-l2, op-node, op-proposer, op-batcher required")
+	return &Devnet{
+		T:           t,
+		Clients:     Roles(clientTypes),
+		MnemonicCfg: DefaultMnemonicConfig,
+		Secrets:     secrets,
+		Addresses:   secrets.Addresses(),
 	}
-
-	// Generate genesis for execution clients
-	//    eth1Genesis := setup.BuildEth1Genesis(config.TerminalTotalDifficulty, uint64(eth1GenesisTime))
-	//    eth1ConfigOpt := eth1Genesis.ToParams(depositAddress)
-	//    eth1Bundle, err := setup.Eth1Bundle(eth1Genesis.Genesis)
-	//    if err != nil {
-	//            t.Fatal(err)
-	//    }
-	var eth1ConfigOpt, eth1Bundle hivesim.Params
-	execNodeOpts := hivesim.Params{
-		"HIVE_CATALYST_ENABLED": "1",
-		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":         "full",
-	}
-	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts)
-
-	opts := []hivesim.StartOption{executionOpts}
-	d.L1 = &Eth1Node{d.T.StartClient(eth1.Name, opts...), 8545, 8546}
-
-	d.Nodes["op-l1"] = eth1
-	d.Nodes["op-l2"] = l2
-	d.Nodes["op-node"] = op
-	d.Nodes["op-proposer"] = l2os
-	d.Nodes["op-batcher"] = bss
 }
 
-func (d *Devnet) Wait() error {
-	// TODO: wait until rpc connects
-	client := ethclient.NewClient(d.L1.Client.RPC())
-	_, err := client.ChainID(d.Ctx)
-	return err
+func (d *Devnet) InitContracts(opts ...hivesim.StartOption) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if len(d.Clients.OpContracts) == 0 {
+		d.T.Fatal("no op-contracts client types found")
+		return
+	}
+	if d.Contracts != nil {
+		d.T.Fatalf("already initialized op contracts client: %v", d.Contracts)
+		return
+	}
+	clDef := d.Clients.OpContracts[0]
+	cl := d.T.StartClient(clDef.Name, opts...)
+	d.Contracts = &OpContracts{cl}
+	return
 }
 
-func (d *Devnet) DeployL1() error {
-	execInfo, err := d.L1.Client.Exec("deploy.sh")
-	fmt.Println(execInfo.Stdout)
-	return err
+// AddEth1 creates a new L1 eth1 client. This requires a L1 chain config to be created previously.
+func (d *Devnet) AddEth1(opts ...hivesim.StartOption) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if len(d.Clients.Eth1) == 0 {
+		d.T.Fatal("no eth1 client types found")
+		return
+	}
+	if d.L1Cfg == nil {
+		d.T.Fatal("no eth1 L1 chain configuration found")
+		return
+	}
+	// TODO
+
+	// TODO: bundle options for new client
+	// TODO: start new eth1 client
 }
 
-func (d *Devnet) Cat(path string) (string, error) {
-	execInfo, err := d.L1.Client.Exec("cat.sh", path)
-	if err != nil {
-		return "", err
+// AddOpL2 creates a new Optimism L2 execution engine. This requires a L2 chain config to be created previously.
+func (d *Devnet) AddOpL2(opts ...hivesim.StartOption) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if len(d.Clients.OpL2) == 0 {
+		d.T.Fatal("no op-l2 engine client types found")
+		return
 	}
-	return execInfo.Stdout, nil
+	if d.L2Cfg == nil {
+		d.T.Fatal("no op-l2 chain configuration found")
+		return
+	}
+	defaultSettings := hivesim.Params{
+		"HIVE_ETH1_LOGLEVEL": "3",
+	}
+	input := []hivesim.StartOption{defaultSettings}
+
+	l2GenesisCfg, err := json.Marshal(&d.L2Cfg)
+	if err != nil {
+		d.T.Fatalf("failed to encode l2 genesis: %v", err)
+		return
+	}
+	input = append(input, bytesFile("genesis.json", l2GenesisCfg))
+	input = append(input, opts...)
+
+	c := &OpL2Engine{ELNode{d.T.StartClient(d.Clients.OpL2[0].Name, opts...)}}
+	d.T.Logf("added op-l2 %d: %s", len(d.OpL2Engines), c.IP)
+	d.OpL2Engines = append(d.OpL2Engines, c)
 }
 
-func (d *Devnet) InitL2() error {
-	genesisTimestamp, err := d.Cat("/hive/genesis_timestamp")
-	if err != nil {
-		return err
-	}
-	d.GenesisTimestamp = genesisTimestamp
+// AddOpNode creates a new Optimism rollup node. This requires a rollup config to be created previously.
+func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, opts ...hivesim.StartOption) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
-	l2OutputOracle, err := d.Cat("/hive/optimism/packages/contracts-bedrock/deployments/devnetL1/L2OutputOracleProxy.json")
-	if err != nil {
-		return err
+	if len(d.Clients.OpNode) == 0 {
+		d.T.Fatal("no op-node client types found")
+		return
 	}
-	d.L2OutputOracle = l2OutputOracle
-
-	optimismPortal, err := d.Cat("/hive/optimism/packages/contracts-bedrock/deployments/devnetL1/OptimismPortalProxy.json")
-	if err != nil {
-		return err
+	if d.RollupCfg == nil {
+		d.T.Fatal("no rollup configuration found")
+		return
 	}
-	d.OptimismPortal = optimismPortal
+	eth1Node := d.GetEth1(eth1Index)
+	l2Engine := d.GetOpL2Engine(l2EngIndex)
 
-	l2ToL1MessagePasserJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/L2/L2ToL1MessagePasser.sol/L2ToL1MessagePasser.json")
-	if err != nil {
-		return err
+	defaultSettings := UnprefixedParams{
+		opnf.L1NodeAddr.EnvVar:        eth1Node.WsRpcEndpoint(),
+		opnf.L2EngineAddr.EnvVar:      l2Engine.WsRpcEndpoint(),
+		opnf.RPCListenAddr.EnvVar:     "127.0.0.1",
+		opnf.RPCListenPort.EnvVar:     fmt.Sprintf("%d", RollupRPCPort),
+		opnf.L1TrustRPC.EnvVar:        "false",
+		opnf.L2EngineJWTSecret.EnvVar: defaultJWTPath,
+		opnf.LogLevelFlag.EnvVar:      "debug",
 	}
-	d.L2ToL1MessagePasserJSON = l2ToL1MessagePasserJSON
+	input := []hivesim.StartOption{defaultSettings.Params()}
+	input = append(input, defaultJWTFile)
+	input = append(input, opts...)
 
-	l2CrossDomainMessengerJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/L2/L2CrossDomainMessenger.sol/L2CrossDomainMessenger.json")
-	if err != nil {
-		return err
-	}
-	d.L2CrossDomainMessengerJSON = l2CrossDomainMessengerJSON
-
-	optimismMintableTokenFactoryJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/universal/OptimismMintableTokenFactoryProxy.sol/OptimismMintableTokenFactoryProxy.json")
-	if err != nil {
-		return err
-	}
-	d.OptimismMintableTokenFactoryJSON = optimismMintableTokenFactoryJSON
-
-	l2StandardBridgeJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/L2/L2StandardBridge.sol/L2StandardBridge.json")
-	if err != nil {
-		return err
-	}
-	d.L2StandardBridgeJSON = l2StandardBridgeJSON
-
-	l1BlockJSON, err := d.Cat("/hive/optimism/packages/contracts-bedrock/artifacts/contracts/L2/L1Block.sol/L1Block.json")
-	if err != nil {
-		return err
-	}
-	d.L1BlockJSON = l1BlockJSON
-
-	return nil
+	c := &OpNode{d.T.StartClient(d.Clients.OpNode[0].Name, opts...)}
+	d.T.Logf("added op-node %d: %s", len(d.OpNodes), c.IP)
+	d.OpNodes = append(d.OpNodes, c)
 }
 
-func (d *Devnet) StartL2() error {
-	l2 := d.Nodes["op-l2"]
+func (d *Devnet) AddOpProposer(eth1Index int, l2EngIndex int, opNodeIndex int, opts ...hivesim.StartOption) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
 
-	executionOpts := hivesim.Params{
-		"HIVE_CHECK_LIVE_PORT": "9545",
-		"HIVE_LOGLEVEL":        os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":        "full",
-		"HIVE_NETWORK_ID":      networkID.String(),
-		"HIVE_CHAIN_ID":        chainID.String(),
+	if len(d.Clients.OpProposer) == 0 {
+		d.T.Fatal("no op-proposer client types found")
+		return
+	}
+	if d.Proposer != nil {
+		d.T.Fatal("already initialized op proposer")
+		return
 	}
 
-	genesisTimestampOpt := hivesim.WithDynamicFile("/genesis_timestamp", bytesSource([]byte(d.GenesisTimestamp)))
-	l2ToL1MessagePasserOpt := hivesim.WithDynamicFile("/L2ToL1MessagePasser.json", bytesSource([]byte(d.L2ToL1MessagePasserJSON)))
-	l2CrossDomainMessengerOpt := hivesim.WithDynamicFile("/L2CrossDomainMessenger.json", bytesSource([]byte(d.L2CrossDomainMessengerJSON)))
-	optimismMintableTokenFactoryOpt := hivesim.WithDynamicFile("/OptimismMintableTokenFactoryProxy.json", bytesSource([]byte(d.OptimismMintableTokenFactoryJSON)))
-	l2StandardBridgeOpt := hivesim.WithDynamicFile("/L2StandardBridge.json", bytesSource([]byte(d.L2StandardBridgeJSON)))
-	l1BlockOpt := hivesim.WithDynamicFile("/L1Block.json", bytesSource([]byte(d.L1BlockJSON)))
-	opts := []hivesim.StartOption{executionOpts, genesisTimestampOpt, l2ToL1MessagePasserOpt, l2CrossDomainMessengerOpt, optimismMintableTokenFactoryOpt, l2StandardBridgeOpt, l1BlockOpt}
-	d.L2 = &L2Node{d.T.StartClient(l2.Name, opts...), 9545, 9546}
-	return nil
+	eth1Node := d.GetEth1(eth1Index)
+	opNode := d.GetOpNode(opNodeIndex)
+	l2Engine := d.GetOpL2Engine(l2EngIndex)
+
+	defaultSettings := UnprefixedParams{
+		oppf.L1EthRpcFlag.EnvVar:                  eth1Node.WsRpcEndpoint(),
+		oppf.L2EthRpcFlag.EnvVar:                  l2Engine.WsRpcEndpoint(),
+		oppf.RollupRpcFlag.EnvVar:                 opNode.HttpRpcEndpoint(),
+		oppf.L2OOAddressFlag.EnvVar:               d.Deployments.L2OutputOracleProxy.String(),
+		oppf.PollIntervalFlag.EnvVar:              "10s",
+		oppf.NumConfirmationsFlag.EnvVar:          "1",
+		oppf.SafeAbortNonceTooLowCountFlag.EnvVar: "3",
+		oppf.ResubmissionTimeoutFlag.EnvVar:       "30s",
+		oppf.MnemonicFlag.EnvVar:                  d.MnemonicCfg.Mnemonic,
+		oppf.L2OutputHDPathFlag.EnvVar:            d.MnemonicCfg.Proposer,
+		oppf.LogLevelFlag.EnvVar:                  "debug",
+	}
+	input := []hivesim.StartOption{defaultSettings.Params()}
+	input = append(input, opts...)
+
+	c := &ProposerNode{d.T.StartClient(d.Clients.OpProposer[0].Name, opts...)}
+	d.T.Logf("added op-proposer: %s", c.IP)
+	d.Proposer = c
 }
 
-func (d *Devnet) InitOp() error {
-	execInfo, err := d.L2.Client.Exec("cat.sh", "/hive/genesis-l2.json")
-	if err != nil {
-		return err
+func (d *Devnet) AddOpBatcher(eth1Index int, l2EngIndex int, opNodeIndex int, opts ...hivesim.StartOption) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	if len(d.Clients.OpBatcher) == 0 {
+		d.T.Fatal("no op-batcher client types found")
+		return
 	}
-	d.L2Genesis = execInfo.Stdout
-	return nil
+	if d.Batcher != nil {
+		d.T.Fatal("already initialized op batcher")
+		return
+	}
+
+	eth1Node := d.GetEth1(eth1Index)
+	opNode := d.GetOpNode(opNodeIndex)
+	l2Engine := d.GetOpL2Engine(l2EngIndex)
+
+	defaultSettings := UnprefixedParams{
+		opbf.L1EthRpcFlag.EnvVar:                   eth1Node.WsRpcEndpoint(),
+		opbf.L2EthRpcFlag.EnvVar:                   l2Engine.WsRpcEndpoint(),
+		opbf.RollupRpcFlag.EnvVar:                  opNode.HttpRpcEndpoint(),
+		opbf.MinL1TxSizeBytesFlag.EnvVar:           "1",
+		opbf.MaxL1TxSizeBytesFlag.EnvVar:           "120000",
+		opbf.ChannelTimeoutFlag.EnvVar:             "40",
+		opbf.PollIntervalFlag.EnvVar:               "1s",
+		opbf.NumConfirmationsFlag.EnvVar:           "1",
+		opbf.SafeAbortNonceTooLowCountFlag.EnvVar:  "3",
+		opbf.ResubmissionTimeoutFlag.EnvVar:        "30s",
+		opbf.MnemonicFlag.EnvVar:                   d.MnemonicCfg.Mnemonic,
+		opbf.SequencerHDPathFlag.EnvVar:            d.MnemonicCfg.Batcher,
+		opbf.SequencerBatchInboxAddressFlag.EnvVar: d.RollupCfg.BatchInboxAddress.String(),
+		opbf.LogLevelFlag.EnvVar:                   "debug",
+	}
+	input := []hivesim.StartOption{defaultSettings.Params()}
+	input = append(input, opts...)
+
+	c := &BatcherNode{d.T.StartClient(d.Clients.OpBatcher[0].Name, opts...)}
+	d.T.Logf("added op-batcher: %s", c.IP)
+	d.Batcher = c
 }
 
-func (d *Devnet) StartOp() error {
-	op := d.Nodes["op-node"]
-
-	executionOpts := hivesim.Params{
-		"HIVE_CHECK_LIVE_PORT":  "7545",
-		"HIVE_CATALYST_ENABLED": "1",
-		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":         "full",
-
-		"HIVE_L1_URL":             fmt.Sprintf("http://%s:%d", d.L1.IP, d.L1.HTTPPort),
-		"HIVE_L2_URL":             fmt.Sprintf("http://%s:%d", d.L2.IP, d.L2.HTTPPort),
-		"HIVE_L1_ETH_RPC_FLAG":    fmt.Sprintf("--l1=ws://%s:%d", d.L1.IP, d.L1.WSPort),
-		"HIVE_L2_ENGINE_RPC_FLAG": fmt.Sprintf("--l2=ws://%s:%d", d.L2.IP, d.L2.WSPort),
-
-		"HIVE_P2P_STATIC_FLAG": "",
+func (d *Devnet) GetEth1(i int) *Eth1Node {
+	if i < 0 || i >= len(d.Eth1s) {
+		d.T.Fatalf("only have %d eth1 nodes, cannot find %d", len(d.Eth1s), i)
+		return nil
 	}
-
-	if op.HasRole("op-sequencer") {
-		executionOpts = executionOpts.Set("HIVE_SEQUENCER_ENABLED_FLAG", "--sequencer.enabled")
-		executionOpts = executionOpts.Set("HIVE_SEQUENCER_KEY_FLAG", "--p2p.sequencer.key=/config/p2p-sequencer-key.txt")
-	}
-
-	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortalProxy.json", bytesSource([]byte(d.OptimismPortal)))
-	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt}
-	d.Rollup = &OpNode{d.T.StartClient(op.Name, opts...), 7545}
-	return nil
+	return d.Eth1s[i]
 }
 
-func (d *Devnet) StartVerifier() error {
-	op := d.Nodes["op-node"]
-
-	executionOpts := hivesim.Params{
-		"HIVE_CHECK_LIVE_PORT":  "7545",
-		"HIVE_CATALYST_ENABLED": "1",
-		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":         "full",
-
-		"HIVE_L1_URL":             fmt.Sprintf("http://%s:%d", d.L1.IP, d.L1.HTTPPort),
-		"HIVE_L2_URL":             fmt.Sprintf("http://%s:%d", d.L2.IP, d.L2.HTTPPort),
-		"HIVE_L1_ETH_RPC_FLAG":    fmt.Sprintf("--l1=ws://%s:%d", d.L1.IP, d.L1.WSPort),
-		"HIVE_L2_ENGINE_RPC_FLAG": fmt.Sprintf("--l2=ws://%s:%d", d.L2.IP, d.L2.WSPort),
-
-		"HIVE_SEQUENCER_ENABLED_FLAG": "",
-		"HIVE_SEQUENCER_KEY_FLAG":     "",
-		// TODO: avoid hardcoding p2p key
-		"HIVE_P2P_STATIC_FLAG": fmt.Sprintf("--p2p.static=/ip4/%s/tcp/9003/p2p/16Uiu2HAmHqrXGts25TtKMBRHtvhWZLNypsobKoggpZye1XQtJpbZ", d.Rollup.IP),
+func (d *Devnet) GetOpNode(i int) *OpNode {
+	if i < 0 || i >= len(d.OpNodes) {
+		d.T.Fatalf("only have %d op rollup nodes, cannot find %d", len(d.OpNodes), i)
+		return nil
 	}
-
-	p2pNodeKey := "d30e180aa6c25bac3ba2f0965af5da1934dbabe4505c92ddd1459e5cec27a882"
-
-	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortalProxy.json", bytesSource([]byte(d.OptimismPortal)))
-	p2pNodeKeyOpt := hivesim.WithDynamicFile("/config/p2p-node-key.txt", bytesSource([]byte(p2pNodeKey)))
-	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt, p2pNodeKeyOpt}
-	d.Verifier = &OpNode{d.T.StartClient(op.Name, opts...), 7545}
-	return nil
+	return d.OpNodes[i]
 }
 
-func (d *Devnet) StartL2OS() error {
-	l2os := d.Nodes["op-proposer"]
-
-	executionOpts := hivesim.Params{
-		"HIVE_CHECK_LIVE_PORT":  "0",
-		"HIVE_CATALYST_ENABLED": "1",
-		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":         "full",
-
-		"HIVE_L1_ETH_RPC_FLAG": fmt.Sprintf("--l1-eth-rpc=http://%s:%d", d.L1.IP, d.L1.HTTPPort),
-		"HIVE_L2_ETH_RPC_FLAG": fmt.Sprintf("--l2-eth-rpc=http://%s:%d", d.L2.IP, d.L2.HTTPPort),
-		"HIVE_ROLLUP_RPC_FLAG": fmt.Sprintf("--rollup-rpc=http://%s:%d", d.Rollup.IP, d.Rollup.HTTPPort),
+func (d *Devnet) GetOpL2Engine(i int) *OpL2Engine {
+	if i < 0 || i >= len(d.OpL2Engines) {
+		d.T.Fatalf("only have %d op-l2 nodes, cannot find %d", len(d.OpL2Engines), i)
+		return nil
 	}
-
-	l2OutputOracleOpt := hivesim.WithDynamicFile("/L2OutputOracleProxy.json", bytesSource([]byte(d.L2OutputOracle)))
-	opts := []hivesim.StartOption{executionOpts, l2OutputOracleOpt}
-	d.Proposer = &L2OSNode{d.T.StartClient(l2os.Name, opts...)}
-	return nil
-}
-
-func (d *Devnet) StartBSS() error {
-	bss := d.Nodes["op-batcher"]
-
-	executionOpts := hivesim.Params{
-		"HIVE_CHECK_LIVE_PORT":  "0",
-		"HIVE_CATALYST_ENABLED": "1",
-		"HIVE_LOGLEVEL":         os.Getenv("HIVE_LOGLEVEL"),
-		"HIVE_NODETYPE":         "full",
-
-		"HIVE_L1_ETH_RPC_FLAG": fmt.Sprintf("--l1-eth-rpc=http://%s:%d", d.L1.IP, d.L1.HTTPPort),
-		"HIVE_L2_ETH_RPC_FLAG": fmt.Sprintf("--l2-eth-rpc=http://%s:%d", d.L2.IP, d.L2.HTTPPort),
-		"HIVE_ROLLUP_RPC_FLAG": fmt.Sprintf("--rollup-rpc=http://%s:%d", d.Rollup.IP, d.Rollup.HTTPPort),
-	}
-
-	optimismPortalOpt := hivesim.WithDynamicFile("/OptimismPortalProxy.json", bytesSource([]byte(d.OptimismPortal)))
-	opts := []hivesim.StartOption{executionOpts, optimismPortalOpt}
-	d.Batcher = &BSSNode{d.T.StartClient(bss.Name, opts...)}
-	return nil
+	return d.OpL2Engines[i]
 }

@@ -11,14 +11,14 @@ RUN make
 
 FROM alpine:3.15
 
-RUN apk add --no-cache curl jq
+RUN apk add curl jq bash
+RUN apk add --no-cache ca-certificates
+
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 COPY --from=builder /app/op-proposer/bin/op-proposer /usr/local/bin
-COPY entrypoint.sh /entrypoint.sh
 
 RUN op-proposer --version 2>/dev/null | head -1 > /version.txt
 
-# TODO
-# RUN export L2OO_ADDRESS=
-
-ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]

@@ -1,17 +1,14 @@
-#!/bin/sh
-set -exu
+#!/bin/bash
 
-L2OO_ADDRESS=$(jq -r .address < /L2OutputOracleProxy.json)
+# Hive requires us to prefix env vars with "HIVE_"
+# Iterate the env, find all HIVE_PROPOSER_ vars, and remove the HIVE_ prefix.
+env -0 | while IFS='=' read -r -d '' n v; do
+    if [[ "$n" == HIVE_PROPOSER_* ]]; then
+        name=${n#"HIVE_"}  # remove the HIVE_ prefix
+        printf "'%s'='%s'\n" "$name" "$v"
+        echo "$name=$v"
+        export "$name=$v"
+    fi
+done
 
-exec op-proposer \
-    $HIVE_L1_ETH_RPC_FLAG \
-    $HIVE_L2_ETH_RPC_FLAG \
-    $HIVE_ROLLUP_RPC_FLAG \
-    --poll-interval 10s \
-    --num-confirmations 1 \
-    --safe-abort-nonce-too-low-count 3 \
-    --resubmission-timeout 30s \
-    --mnemonic "test test test test test test test test test test test junk" \
-    --l2-output-hd-path "m/44'/60'/0'/0/1" \
-    --l2oo-address $L2OO_ADDRESS \
-    --log-terminal=true
+exec op-proposer

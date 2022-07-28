@@ -11,12 +11,14 @@ RUN make op-batcher
 
 FROM alpine:3.15
 
-RUN apk add jq curl
+RUN apk add curl jq bash
+RUN apk add --no-cache ca-certificates
+
+COPY ./entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 COPY --from=builder /app/op-batcher/bin/op-batcher /usr/local/bin
-COPY ./entrypoint.sh /entrypoint.sh
-COPY ./rollup.json /rollup.json
 
 RUN op-batcher --version 2>/dev/null | head -1 > /version.txt
 
-ENTRYPOINT ["/bin/sh", "/entrypoint.sh"]
+ENTRYPOINT ["/bin/bash", "/entrypoint.sh"]

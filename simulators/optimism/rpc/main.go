@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"fmt"
@@ -90,30 +91,39 @@ interacting with one.`[1:],
 func runAllTests(t *hivesim.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-	d := optimism.Devnet{
-		T:     t,
-		Nodes: make(map[string]*hivesim.ClientDefinition),
-		Ctx:   ctx,
-	}
-	d.Start()
+
 	handleErr := func(err error) {
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	handleErr(d.Wait())
-	handleErr(d.DeployL1())
-	handleErr(d.InitL2())
-	handleErr(d.StartL2())
-	handleErr(d.InitOp())
-	handleErr(d.StartOp())
-	handleErr(d.StartL2OS())
-	handleErr(d.StartBSS())
 
-	c := d.L2.Client
+	d := optimism.NewDevnet(t)
+
+	d.InitContracts()
+	d.InitRollupHardhat()
+	d.AddEth1()
+	// wait for L1 to come online before deploying
+	_, err := d.GetEth1(0).EthClient().ChainID(ctx)
+	handleErr(err)
+	d.DeployL1Hardhat()
+
+	// sequencer stack, on top of first eth1 node
+	d.AddOpL2()
+	d.AddOpNode(0, 0)
+	d.AddOpBatcher(0, 0, 0)
+	// proposer does not need to run for L2 to be stable
+	//d.AddOpProposer(0, 0, 0)
+
+	// verifier stack (optional)
+	//d.AddOpL2()
+	//d.AddOpNode(0, 1)  // can use the same eth1 node
+
+	c := d.GetOpL2Engine(0).Client
 
 	vault := newVault()
-	genesis := []byte(d.L2Genesis)
+	genesis, err := json.Marshal(d.L1Cfg)
+	handleErr(err)
 
 	s := newSemaphore(40)
 	for _, test := range tests {
