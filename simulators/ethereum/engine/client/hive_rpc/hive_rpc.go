@@ -33,7 +33,7 @@ type HiveRPCEngineStarter struct {
 	JWTSecret               []byte
 }
 
-func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (client.EngineClient, error) {
+func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (client.EngineClient, error) {
 	var (
 		clientType = s.ClientType
 		enginePort = s.EnginePort

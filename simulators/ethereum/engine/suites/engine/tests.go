@@ -1050,7 +1050,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadField, syncing 
 
 		if syncing {
 			// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
-			secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+			secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, nil)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 			}
@@ -1379,49 +1379,21 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.InvalidPayloadField, emptyTxs bool) func(*test.Env) {
 	return func(t *test.Env) {
 		var (
-			enode string
-			err   error
+			err error
 		)
 		// To allow having the invalid payload delivered via P2P, we need a second client to serve the payload
-		enode, err = t.Engine.EnodeURL()
-		if err != nil {
-			t.Fatalf("FAIL (%s): Unable to obtain bootnode: %v", t.TestName, err)
-		}
-
-		genesis := helper.LoadGenesis("init/genesis.json")
-		genesis.Config.TerminalTotalDifficulty = t.Engine.TerminalTotalDifficulty()
-
-		secondaryClient, err := node.NewNode(enode, &genesis)
-		defer func() {
-			if err := secondaryClient.Close(); err != nil {
-				t.Logf("WARN (%s): Unable to stop secondary node: %v", t.TestName, err)
-			} else {
-				t.Logf("INFO (%s): Successfully stopped secondary node", t.TestName)
-			}
-		}()
+		secondaryClient, err := node.GethNodeEngineStarter{}.StartGethNode(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 		}
+
 		t.CLMock.AddEngineClient(secondaryClient)
 
 		// Wait until TTD is reached by this client
 		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test
-		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{
-			/*
-				OnNewPayloadBroadcast: func() {
-					ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-					defer cancel()
-					secondaryClient.NewPayloadV1(ctx, &t.CLMock.LatestExecutedPayload)
-				},
-				OnForkchoiceBroadcast: func() {
-					ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-					defer cancel()
-					secondaryClient.ForkchoiceUpdatedV1(ctx, &t.CLMock.LatestForkchoice, &t.CLMock.LatestPayloadAttributes)
-				},
-			*/
-		})
+		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 		// Save the common ancestor
 		cA := t.CLMock.LatestPayloadBuilt
@@ -2414,7 +2386,7 @@ func outOfOrderPayloads(t *test.Env) {
 	for i, client := range allClients {
 		c, err := hive_rpc.HiveRPCEngineStarter{
 			ClientType: client.Name,
-		}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+		}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, nil)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to start client (%v): %v", t.TestName, client, err)
 		}
@@ -2478,7 +2450,7 @@ func validPayloadFcUSyncingClient(t *test.Env) {
 	{
 		// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
 		var err error
-		secondaryClient, err = hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+		secondaryClient, err = hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, nil)
 
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
@@ -2562,7 +2534,7 @@ func missingFcu(t *test.Env) {
 
 	var secondaryEngineTest *test.TestEngineClient
 	{
-		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, nil)
 
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
@@ -2603,7 +2575,7 @@ func missingFcu(t *test.Env) {
 // P <- INV_P, newPayload(INV_P), fcU(head: P, payloadAttributes: attrs) + getPayload(…)
 func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 	// Add a second client to build the invalid payload
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.ClientParams, t.ClientFiles, nil)
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, nil)
 
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)

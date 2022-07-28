@@ -78,6 +78,9 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec) {
 			// Add the new file to be loaded as chain.rlp
 			testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.ChainFile)
 		}
+		if currentTest.DisableMining {
+			delete(newParams, "HIVE_MINER")
+		}
 		suite.Add(hivesim.ClientTestSpec{
 			Name:        currentTest.Name,
 			Description: currentTest.About,

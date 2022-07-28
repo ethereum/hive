@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/beacon"
@@ -27,30 +28,114 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
 
+type GethNodeTestConfiguration struct {
+	// Node name
+	Name string
+
+	// The node mines proof of work blocks
+	PoWMiner          bool
+	PoWMinerEtherBase common.Address
+
+	// In PoW production mode, produce many terminal blocks which shall be gossiped
+	AmountOfTerminalBlocksToProduce int
+
+	// Of all terminal blocks produced, the index of the one to send as terminal block when queried
+	NthTerminalBlockToReturnAsHead int
+
+	// To allow testing terminal block gossiping on the other clients, restrict this client
+	// to only connect to the boot node
+	MaxPeers *big.Int
+
+	// Chain to import
+	ChainFile string
+}
 type GethNodeEngineStarter struct {
 	// Client parameters used to launch the default client
-	ClientType              string
 	ChainFile               string
 	TerminalTotalDifficulty *big.Int
-	EnginePort              int
-	EthPort                 int
-	JWTSecret               []byte
 
-	// Test specific configuration (TBD)
-	AmountOfTerminalBlocksToProduce int
-	NthTerminalBlockToReturnAsHead  int
-	KeepProducingPoWBlocks          bool
-	MaxPeers                        int // To allow testing terminal block gossiping on the other clients
+	// Test specific configuration
+	Config GethNodeTestConfiguration
+}
+
+var (
+	DefaultMaxPeers = big.NewInt(25)
+)
+
+func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (client.EngineClient, error) {
+	return s.StartGethNode(T, testContext, ClientParams, ClientFiles, bootClient)
+}
+
+func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (*GethNode, error) {
+	var (
+		ttd      = s.TerminalTotalDifficulty
+		bootnode string
+		err      error
+	)
+	genesisPath, ok := ClientFiles["/genesis.json"]
+	if !ok {
+		return nil, fmt.Errorf("Cannot start without genesis file")
+	}
+	genesis := helper.LoadGenesis(genesisPath)
+
+	if ttd == nil {
+		if ttdStr, ok := ClientParams["HIVE_TERMINAL_TOTAL_DIFFICULTY"]; ok {
+			// Retrieve TTD from parameters
+			ttd, ok = new(big.Int).SetString(ttdStr, 10)
+			if !ok {
+				return nil, fmt.Errorf("Unable to parse TTD from parameters")
+			}
+		}
+	} else {
+		ttd = big.NewInt(helper.CalculateRealTTD(genesisPath, ttd.Int64()))
+		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+	}
+	genesis.Config.TerminalTotalDifficulty = ttd
+
+	if bootClient != nil {
+		bootnode, err = bootClient.EnodeURL()
+		if err != nil {
+			return nil, fmt.Errorf("Unable to obtain bootnode: %v", err)
+		}
+	}
+
+	if s.Config.MaxPeers == nil {
+		s.Config.MaxPeers = DefaultMaxPeers
+	}
+
+	if s.ChainFile != "" {
+		s.Config.ChainFile = "./chains/" + s.ChainFile
+	}
+
+	if s.Config.PoWMiner && s.Config.PoWMinerEtherBase == (common.Address{}) {
+		s.Config.PoWMinerEtherBase = common.HexToAddress("0x" + globals.MinerAddrHex)
+	}
+
+	g, err := newNode(s.Config, bootnode, &genesis)
+	if err != nil {
+		return nil, err
+	}
+	go func(ctx context.Context) {
+		select {
+		case <-ctx.Done():
+			// Close the node when the context is done
+			g.Close()
+		}
+	}(testContext)
+	return g, nil
 }
 
 type AccountTransactionInfo struct {
 	PreviousBlock common.Hash
 	PreviousNonce uint64
 }
-
-type gethNode struct {
+type GethNode struct {
 	node     *node.Node
 	eth      *eth.Ethereum
 	datadir  string
@@ -58,27 +143,31 @@ type gethNode struct {
 	genesis  *core.Genesis
 	ttd      *big.Int
 	api      *ethcatalyst.ConsensusAPI
+	running  context.Context
+	closing  context.CancelFunc
 
 	// Test specific configuration
 	accTxInfoMap map[common.Address]*AccountTransactionInfo
+
+	config GethNodeTestConfiguration
 }
 
-func NewNode(bootnode string, genesis *core.Genesis) (*gethNode, error) {
+func newNode(config GethNodeTestConfiguration, bootnode string, genesis *core.Genesis) (*GethNode, error) {
 	// Define the basic configurations for the Ethereum node
 	datadir, _ := os.MkdirTemp("", "")
 
-	return restart(bootnode, datadir, genesis)
+	return restart(config, bootnode, datadir, genesis)
 }
 
-func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error) {
+func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, genesis *core.Genesis) (*GethNode, error) {
 	config := &node.Config{
-		Name:    "geth",
+		Name:    startConfig.Name,
 		Version: params.Version,
 		DataDir: datadir,
 		P2P: p2p.Config{
 			ListenAddr:  "0.0.0.0:0",
 			NoDiscovery: true,
-			MaxPeers:    25,
+			MaxPeers:    int(startConfig.MaxPeers.Int64()),
 		},
 		UseLightweightKDF: true,
 	}
@@ -87,6 +176,9 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 	if err != nil {
 		return nil, err
 	}
+	ethHashConfig := ethconfig.Defaults.Ethash
+	ethHashConfig.CacheDir = "/ethash"
+	ethHashConfig.DatasetDir = ethHashConfig.CacheDir
 	econfig := &ethconfig.Config{
 		Genesis:         genesis,
 		NetworkId:       genesis.Config.ChainID.Uint64(),
@@ -95,12 +187,13 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 		DatabaseHandles: 256,
 		TxPool:          core.DefaultTxPoolConfig,
 		GPO:             ethconfig.Defaults.GPO,
-		Ethash:          ethconfig.Defaults.Ethash,
+		Ethash:          ethHashConfig,
 		Miner: miner.Config{
-			GasFloor: genesis.GasLimit * 9 / 10,
-			GasCeil:  genesis.GasLimit * 11 / 10,
-			GasPrice: big.NewInt(1),
-			Recommit: 10 * time.Second, // Disable the recommit
+			GasFloor:  genesis.GasLimit * 9 / 10,
+			GasCeil:   genesis.GasLimit * 11 / 10,
+			GasPrice:  big.NewInt(1),
+			Recommit:  10 * time.Second, // Disable the recommit
+			Etherbase: startConfig.PoWMinerEtherBase,
 		},
 		LightServ:        100,
 		LightPeers:       10,
@@ -110,6 +203,13 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 	if err != nil {
 		return nil, err
 	}
+	if startConfig.ChainFile != "" {
+		err = utils.ImportChain(ethBackend.BlockChain(), startConfig.ChainFile)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	err = stack.Start()
 	for stack.Server().NodeInfo().Ports.Listener == 0 {
 		time.Sleep(250 * time.Millisecond)
@@ -118,7 +218,20 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 	node := enode.MustParse(bootnode)
 	stack.Server().AddPeer(node)
 
-	return &gethNode{
+	eventChan := make(chan *p2p.PeerEvent)
+	stack.Server().SubscribeEvents(eventChan)
+
+	// Enable mining
+	if startConfig.PoWMiner {
+		ethBackend.Miner().SetEtherbase(startConfig.PoWMinerEtherBase)
+		err = ethBackend.StartMining(1)
+		if err != nil {
+			stack.Close()
+			return nil, err
+		}
+	}
+
+	g := &GethNode{
 		node:         stack,
 		eth:          ethBackend,
 		datadir:      datadir,
@@ -126,11 +239,49 @@ func restart(bootnode, datadir string, genesis *core.Genesis) (*gethNode, error)
 		genesis:      genesis,
 		api:          ethcatalyst.NewConsensusAPI(ethBackend),
 		accTxInfoMap: make(map[common.Address]*AccountTransactionInfo),
-	}, err
+	}
+	g.running, g.closing = context.WithCancel(context.Background())
+	if startConfig.PoWMiner {
+		// Launch check on miner to print status
+		go func(eth *eth.Ethereum, ctx context.Context) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(time.Second * 5):
+					fmt.Printf("DEBUG: isMining=%t, pendingBlockNumber=%d\n", eth.Miner().Mining(), eth.Miner().PendingBlock().Number())
+				}
+			}
+		}(ethBackend, g.running)
+	}
+	go func(eventChan chan *p2p.PeerEvent, running context.Context) {
+		for {
+			select {
+			case event := <-eventChan:
+				fmt.Printf("DEBUG: P2P event: %v\n", event)
+			case <-running.Done():
+				return
+			}
+		}
+	}(eventChan, g.running)
+
+	return g, err
 }
 
-func (n *gethNode) Close() error {
-	return n.eth.Stop()
+func (n *GethNode) Close() error {
+	select {
+	case <-n.running.Done():
+		// Node already closed
+		return nil
+	default:
+	}
+	defer n.closing()
+	err := n.node.Close()
+	if err != nil {
+		return err
+	}
+	os.RemoveAll(n.datadir)
+	return nil
 }
 
 type validator struct{}
@@ -159,7 +310,7 @@ func encodeBlockNumber(number uint64) []byte {
 	return enc
 }
 
-func (n *gethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot common.Hash) error {
+func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot common.Hash) error {
 	parentTd := n.eth.BlockChain().GetTd(block.ParentHash(), block.NumberU64()-1)
 	rawdb.WriteTd(n.eth.ChainDb(), block.Hash(), block.NumberU64(), parentTd.Add(parentTd, block.Difficulty()))
 	rawdb.WriteBlock(n.eth.ChainDb(), block)
@@ -224,15 +375,15 @@ func (n *gethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 }
 
 // Engine API
-func (n *gethNode) NewPayloadV1(ctx context.Context, pl *beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
+func (n *GethNode) NewPayloadV1(ctx context.Context, pl *beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
 	return n.api.NewPayloadV1(*pl)
 }
 
-func (n *gethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
 	return n.api.ForkchoiceUpdatedV1(*fcs, payload)
 }
 
-func (n *gethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableDataV1, error) {
+func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableDataV1, error) {
 	p, err := n.api.GetPayloadV1(*payloadId)
 	if p == nil || err != nil {
 		return beacon.ExecutableDataV1{}, err
@@ -263,19 +414,19 @@ func parseBlockNumber(number *big.Int) rpc.BlockNumber {
 	return rpc.BlockNumber(number.Int64())
 }
 
-func (n *gethNode) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+func (n *GethNode) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	return n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 }
 
-func (n *gethNode) BlockNumber(ctx context.Context) (uint64, error) {
+func (n *GethNode) BlockNumber(ctx context.Context) (uint64, error) {
 	return n.eth.APIBackend.CurrentBlock().NumberU64(), nil
 }
 
-func (n *gethNode) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
+func (n *GethNode) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
 	return n.eth.APIBackend.BlockByHash(ctx, hash)
 }
 
-func (n *gethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	b, err := n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 	if err != nil {
 		return nil, err
@@ -283,11 +434,11 @@ func (n *gethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.
 	return b.Header(), err
 }
 
-func (n *gethNode) SendTransaction(ctx context.Context, tx *types.Transaction) error {
+func (n *GethNode) SendTransaction(ctx context.Context, tx *types.Transaction) error {
 	return n.eth.APIBackend.SendTx(ctx, tx)
 }
 
-func (n *gethNode) getStateDB(ctx context.Context, blockNumber *big.Int) (*state.StateDB, error) {
+func (n *GethNode) getStateDB(ctx context.Context, blockNumber *big.Int) (*state.StateDB, error) {
 	b, err := n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(blockNumber))
 	if err != nil {
 		return nil, err
@@ -295,7 +446,7 @@ func (n *gethNode) getStateDB(ctx context.Context, blockNumber *big.Int) (*state
 	return state.New(b.Root(), n.eth.BlockChain().StateCache(), n.eth.BlockChain().Snapshots())
 }
 
-func (n *gethNode) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
+func (n *GethNode) BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error) {
 	stateDB, err := n.getStateDB(ctx, blockNumber)
 	if err != nil {
 		return nil, err
@@ -303,7 +454,7 @@ func (n *gethNode) BalanceAt(ctx context.Context, account common.Address, blockN
 	return stateDB.GetBalance(account), nil
 }
 
-func (n *gethNode) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
+func (n *GethNode) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
 	stateDB, err := n.getStateDB(ctx, blockNumber)
 	if err != nil {
 		return nil, err
@@ -311,11 +462,11 @@ func (n *gethNode) StorageAt(ctx context.Context, account common.Address, key co
 	return stateDB.GetState(account, key).Bytes(), nil
 }
 
-func (n *gethNode) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+func (n *GethNode) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	return nil, fmt.Errorf("TransactionReceipt not implemented")
 }
 
-func (n *gethNode) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
+func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error) {
 	stateDB, err := n.getStateDB(ctx, blockNumber)
 	if err != nil {
 		return 0, err
@@ -323,7 +474,7 @@ func (n *gethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 	return stateDB.GetNonce(account), nil
 }
 
-func (n *gethNode) GetTotalDifficulty(ctx context.Context) (*big.Int, error) {
+func (n *GethNode) GetTotalDifficulty(ctx context.Context) (*big.Int, error) {
 	td := new(big.Int).Set(n.genesis.Difficulty)
 	for i := int64(1); i <= n.eth.BlockChain().CurrentHeader().Number.Int64(); i++ {
 		b, err := n.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(i))
@@ -340,22 +491,22 @@ func (n *gethNode) GetTotalDifficulty(ctx context.Context) (*big.Int, error) {
 	return td, nil
 }
 
-func (n *gethNode) TerminalTotalDifficulty() *big.Int {
+func (n *GethNode) TerminalTotalDifficulty() *big.Int {
 	if n.ttd != nil {
 		return n.ttd
 	}
 	return n.genesis.Config.TerminalTotalDifficulty
 }
 
-func (n *gethNode) EnodeURL() (string, error) {
+func (n *GethNode) EnodeURL() (string, error) {
 	return n.node.Server().NodeInfo().Enode, nil
 }
 
-func (n *gethNode) ID() string {
-	return "Geth NODE"
+func (n *GethNode) ID() string {
+	return n.node.Config().Name
 }
 
-func (n *gethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
 	// First get the current head of the client where we will send the tx
 	head, err := n.eth.APIBackend.BlockByNumber(testCtx, LatestBlockNumber)
 	if err != nil {

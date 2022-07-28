@@ -81,7 +81,12 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	env.TestContext = ctx
+	// CL Mocker has some extra time to be able to produce the last block after the test has finished
+	ctx, cancel = context.WithTimeout(context.Background(), timeout+(time.Second*10))
+	defer cancel()
 	clMocker.TestContext = ctx
+
+	// Create the test-expect object
 	env.TestEngine = NewTestEngineClient(env, ec)
 
 	// Defer producing one last block to verify Execution client did not break after the test

@@ -38,6 +38,9 @@ type Spec struct {
 	// Default: None
 	ChainFile string
 
+	// Disables clique and PoW mining
+	DisableMining bool
+
 	// Transaction type to use throughout the test
 	TestTransactionType helper.TestTransactionType
 }

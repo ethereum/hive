@@ -8,6 +8,7 @@ import (
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client/node"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -83,6 +84,9 @@ type MergeTestSpec struct {
 	// Slot Safe/Finalized Delays
 	SlotsToSafe      *big.Int
 	SlotsToFinalized *big.Int
+
+	// Disable Mining
+	DisableMining bool
 
 	// All secondary clients to be started during the tests with their respective chain files
 	SecondaryClientSpecs SecondaryClientSpecs
@@ -371,20 +375,25 @@ var mergeTestSpecs = []MergeTestSpec{
 			},
 		},
 	},
+
 	{
-		Name:                    "Stop processing gossiped PoW blocks",
-		TTD:                     393120,
-		MainChainFile:           "blocks_2_td_393120.rlp",
-		MainClientPoSBlocks:     1,
-		TransitionPayloadStatus: test.Invalid,
+		Name:                  "Stop processing gossiped PoW blocks",
+		TTD:                   200000,
+		TimeoutSeconds:        600,
+		MainChainFile:         "blocks_1_td_196608.rlp",
+		DisableMining:         true,
+		SkipMainClientTTDWait: true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
-				ClientStarter: hive_rpc.HiveRPCEngineStarter{
-					TerminalTotalDifficulty: big.NewInt(196608),
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						PoWMiner: true,
+					},
+					TerminalTotalDifficulty: big.NewInt(200000),
 					ChainFile:               "blocks_1_td_196608.rlp",
 				},
 				BuildPoSChainOnTop:  true,
-				MainClientShallSync: false,
+				MainClientShallSync: true,
 			},
 		},
 	},
@@ -456,7 +465,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 		for _, secondaryClientSpec := range mergeTestSpec.SecondaryClientSpecs {
 			// Start the secondary client with the alternative PoW chain
 			t.Logf("INFO (%s): Running secondary client: %v", t.TestName, secondaryClientSpec)
-			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.ClientParams, t.ClientFiles, t.Engine)
+			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
 			}
@@ -586,7 +595,9 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 					}
 
 				}
-				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+
+				// Use the CL Mocker context since that has extra time
+				ctx, cancel := context.WithTimeout(t.CLMock.TestContext, globals.RPCTimeout)
 				defer cancel()
 				if header, err := t.Eth.HeaderByNumber(ctx, nil); err == nil {
 					if header.Hash() != mustHeadHash {
@@ -618,6 +629,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 		SlotsToSafe:      mergeTestSpec.SlotsToSafe,
 		SlotsToFinalized: mergeTestSpec.SlotsToFinalized,
 		GenesisFile:      mergeTestSpec.GenesisFile,
+		DisableMining:    mergeTestSpec.DisableMining,
 		ChainFile:        mergeTestSpec.MainChainFile,
 	}
 }
