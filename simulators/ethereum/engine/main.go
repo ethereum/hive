@@ -97,7 +97,7 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec) {
 					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
 				}
 				// Run the test case
-				test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, newParams, testFiles, currentTest.TestTransactionType)
+				test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, newParams, testFiles, currentTest.TestTransactionType, currentTest.SafeSlotsToImportOptimistically)
 			},
 		})
 	}

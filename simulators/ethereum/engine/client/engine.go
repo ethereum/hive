@@ -42,6 +42,9 @@ type EngineClient interface {
 	TerminalTotalDifficulty() *big.Int
 	GetTotalDifficulty(context.Context) (*big.Int, error)
 
+	// Test Methods
+	PostRunVerifications() error
+
 	// Engine, Eth Interfaces
 	Engine
 	Eth

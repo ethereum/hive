@@ -25,6 +25,9 @@ type Spec struct {
 	SlotsToSafe      *big.Int
 	SlotsToFinalized *big.Int
 
+	// CL Mocker configuration for SafeSlotsToImportOptimistically
+	SafeSlotsToImportOptimistically int64
+
 	// Test maximum execution time until a timeout is raised.
 	// Default: 60 seconds
 	TimeoutSeconds int

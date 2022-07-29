@@ -96,7 +96,7 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 						}
 
 						// Run the test case
-						test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, syncClientParams, testFiles.Copy(), currentTest.TestTransactionType)
+						test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, syncClientParams, testFiles.Copy(), currentTest.TestTransactionType, currentTest.SafeSlotsToImportOptimistically)
 					},
 				})
 			}

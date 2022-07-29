@@ -37,6 +37,8 @@ type CLMocker struct {
 	SlotsToSafe      *big.Int
 	SlotsToFinalized *big.Int
 
+	SafeSlotsToImportOptimistically *big.Int
+
 	// Wait time before attempting to get the payload
 	PayloadProductionClientDelay time.Duration
 
@@ -67,7 +69,7 @@ type CLMocker struct {
 	TestContext context.Context
 }
 
-func NewCLMocker(t *hivesim.T, slotsToSafe *big.Int, slotsToFinalized *big.Int) *CLMocker {
+func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int) *CLMocker {
 	// Init random seed for different purposes
 	seed := time.Now().Unix()
 	t.Logf("Randomness seed: %v\n", seed)
@@ -83,18 +85,19 @@ func NewCLMocker(t *hivesim.T, slotsToSafe *big.Int, slotsToFinalized *big.Int) 
 	}
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
-		T:                            t,
-		EngineClients:                make([]client.EngineClient, 0),
-		PrevRandaoHistory:            map[uint64]common.Hash{},
-		ExecutedPayloadHistory:       map[uint64]api.ExecutableDataV1{},
-		SlotsToSafe:                  slotsToSafe,
-		SlotsToFinalized:             slotsToFinalized,
-		PayloadProductionClientDelay: DefaultPayloadProductionClientDelay,
-		LatestHeader:                 nil,
-		FirstPoSBlockNumber:          nil,
-		LatestHeadNumber:             nil,
-		TTDReached:                   false,
-		NextFeeRecipient:             common.Address{},
+		T:                               t,
+		EngineClients:                   make([]client.EngineClient, 0),
+		PrevRandaoHistory:               map[uint64]common.Hash{},
+		ExecutedPayloadHistory:          map[uint64]api.ExecutableDataV1{},
+		SlotsToSafe:                     slotsToSafe,
+		SlotsToFinalized:                slotsToFinalized,
+		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
+		PayloadProductionClientDelay:    DefaultPayloadProductionClientDelay,
+		LatestHeader:                    nil,
+		FirstPoSBlockNumber:             nil,
+		LatestHeadNumber:                nil,
+		TTDReached:                      false,
+		NextFeeRecipient:                common.Address{},
 		LatestForkchoice: api.ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
 			SafeBlockHash:      common.Hash{},

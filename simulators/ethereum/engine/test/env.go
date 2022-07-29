@@ -40,9 +40,9 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*Env), cParams hivesim.Params, cFiles hivesim.Params, testTransactionType helper.TestTransactionType) {
+func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*Env), cParams hivesim.Params, cFiles hivesim.Params, testTransactionType helper.TestTransactionType, safeSlotsToImportOptimistically int64) {
 	// Setup the CL Mocker for this test
-	clMocker := clmock.NewCLMocker(t, slotsToSafe, slotsToFinalized)
+	clMocker := clmock.NewCLMocker(t, slotsToSafe, slotsToFinalized, big.NewInt(safeSlotsToImportOptimistically))
 	// Defer closing all clients
 	defer func() {
 		clMocker.CloseClients()

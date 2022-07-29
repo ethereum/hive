@@ -20,6 +20,7 @@ import (
 	ethcatalyst "github.com/ethereum/go-ethereum/eth/catalyst"
 	"github.com/ethereum/go-ethereum/eth/downloader"
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
+	ethprotocol "github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
@@ -43,17 +44,23 @@ type GethNodeTestConfiguration struct {
 	PoWMinerEtherBase common.Address
 
 	// In PoW production mode, produce many terminal blocks which shall be gossiped
-	AmountOfTerminalBlocksToProduce int
+	AmountOfTerminalBlocksToProduce *big.Int
 
 	// Of all terminal blocks produced, the index of the one to send as terminal block when queried
-	NthTerminalBlockToReturnAsHead int
+	NthTerminalBlockToReturnAsHead *big.Int
 
 	// To allow testing terminal block gossiping on the other clients, restrict this client
 	// to only connect to the boot node
 	MaxPeers *big.Int
 
+	// Max number of gossiped blocks to receive
+	ExpectedGossipNewBlocksCount *big.Int
+
 	// Chain to import
 	ChainFile string
+
+	// How many seconds to delay PoW mining start
+	MiningStartDelaySeconds *big.Int
 }
 type GethNodeEngineStarter struct {
 	// Client parameters used to launch the default client
@@ -65,7 +72,8 @@ type GethNodeEngineStarter struct {
 }
 
 var (
-	DefaultMaxPeers = big.NewInt(25)
+	DefaultMaxPeers                = big.NewInt(25)
+	DefaultMiningStartDelaySeconds = big.NewInt(10)
 )
 
 func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (client.EngineClient, error) {
@@ -117,10 +125,15 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		s.Config.PoWMinerEtherBase = common.HexToAddress("0x" + globals.MinerAddrHex)
 	}
 
+	if s.Config.MiningStartDelaySeconds == nil {
+		s.Config.MiningStartDelaySeconds = DefaultMiningStartDelaySeconds
+	}
+
 	g, err := newNode(s.Config, bootnode, &genesis)
 	if err != nil {
 		return nil, err
 	}
+
 	go func(ctx context.Context) {
 		select {
 		case <-ctx.Done():
@@ -128,6 +141,7 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 			g.Close()
 		}
 	}(testContext)
+
 	return g, nil
 }
 
@@ -147,7 +161,9 @@ type GethNode struct {
 	closing  context.CancelFunc
 
 	// Test specific configuration
-	accTxInfoMap map[common.Address]*AccountTransactionInfo
+	accTxInfoMap           map[common.Address]*AccountTransactionInfo
+	totalReceivedNewBlocks *big.Int
+	terminalBlocksMined    *big.Int
 
 	config GethNodeTestConfiguration
 }
@@ -160,6 +176,9 @@ func newNode(config GethNodeTestConfiguration, bootnode string, genesis *core.Ge
 }
 
 func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, genesis *core.Genesis) (*GethNode, error) {
+	if startConfig.Name == "" {
+		startConfig.Name = "Geth Node"
+	}
 	config := &node.Config{
 		Name:    startConfig.Name,
 		Version: params.Version,
@@ -196,7 +215,7 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 			Etherbase: startConfig.PoWMinerEtherBase,
 		},
 		LightServ:        100,
-		LightPeers:       10,
+		LightPeers:       int(startConfig.MaxPeers.Int64()) - 1,
 		LightNoSyncServe: true,
 	}
 	ethBackend, err := eth.New(stack, econfig)
@@ -218,18 +237,7 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 	node := enode.MustParse(bootnode)
 	stack.Server().AddPeer(node)
 
-	eventChan := make(chan *p2p.PeerEvent)
-	stack.Server().SubscribeEvents(eventChan)
-
-	// Enable mining
-	if startConfig.PoWMiner {
-		ethBackend.Miner().SetEtherbase(startConfig.PoWMinerEtherBase)
-		err = ethBackend.StartMining(1)
-		if err != nil {
-			stack.Close()
-			return nil, err
-		}
-	}
+	stack.Server().EnableMsgEvents = true
 
 	g := &GethNode{
 		node:         stack,
@@ -237,35 +245,99 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 		datadir:      datadir,
 		bootnode:     bootnode,
 		genesis:      genesis,
+		ttd:          genesis.Config.TerminalTotalDifficulty,
 		api:          ethcatalyst.NewConsensusAPI(ethBackend),
 		accTxInfoMap: make(map[common.Address]*AccountTransactionInfo),
+		// Test related configuration
+		totalReceivedNewBlocks: big.NewInt(0),
+		terminalBlocksMined:    big.NewInt(0),
+		config:                 startConfig,
 	}
+
 	g.running, g.closing = context.WithCancel(context.Background())
 	if startConfig.PoWMiner {
-		// Launch check on miner to print status
-		go func(eth *eth.Ethereum, ctx context.Context) {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-time.After(time.Second * 5):
-					fmt.Printf("DEBUG: isMining=%t, pendingBlockNumber=%d\n", eth.Miner().Mining(), eth.Miner().PendingBlock().Number())
-				}
-			}
-		}(ethBackend, g.running)
+		// Enable mining
+		go g.EnablePoWMining()
 	}
-	go func(eventChan chan *p2p.PeerEvent, running context.Context) {
-		for {
-			select {
-			case event := <-eventChan:
-				fmt.Printf("DEBUG: P2P event: %v\n", event)
-			case <-running.Done():
-				return
-			}
-		}
-	}(eventChan, g.running)
+
+	// Start thread to monitor the amount of gossiped blocks this node receives
+	go g.SubscribeP2PEvents()
 
 	return g, err
+}
+
+func (n *GethNode) isBlockTerminal(b *types.Block) (bool, *big.Int, error) {
+	ctx, cancel := context.WithTimeout(n.running, globals.RPCTimeout)
+	defer cancel()
+	parentTD, err := n.GetBlockTotalDifficulty(ctx, b.ParentHash())
+	if err != nil {
+		return false, nil, err
+	}
+	blockTD := new(big.Int).Add(parentTD, b.Difficulty())
+	return blockTD.Cmp(n.ttd) >= 0 && parentTD.Cmp(n.ttd) < 0, blockTD, nil
+}
+
+func (n *GethNode) EnablePoWMining() {
+	// Delay mining start
+	select {
+	case <-time.After(time.Second * time.Duration(n.config.MiningStartDelaySeconds.Int64())):
+		n.eth.Miner().SetEtherbase(n.config.PoWMinerEtherBase)
+		err := n.eth.StartMining(1)
+		if err != nil {
+			n.Close()
+			return
+		}
+	case <-n.running.Done():
+		return
+	}
+
+	// Subscribe and process all mined blocks
+	minedBlockSub := n.node.EventMux().Subscribe(core.NewMinedBlockEvent{}).Chan()
+	for {
+		select {
+		case obj := <-minedBlockSub:
+			if obj != nil {
+				if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
+					b := ev.Block
+					if t, td, err := n.isBlockTerminal(b); t {
+						fmt.Printf("DEBUG (%s): Mined a New Terminal Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
+						n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
+						if n.config.AmountOfTerminalBlocksToProduce != nil && n.config.AmountOfTerminalBlocksToProduce.Cmp(n.terminalBlocksMined) > 0 {
+							// Reset the canonical chain to the parent of the terminal block to keep the miner mining.
+							p := n.eth.BlockChain().GetBlockByHash(b.ParentHash())
+							n.eth.BlockChain().SetCanonical(p)
+						}
+					} else if err == nil {
+						fmt.Printf("DEBUG (%s): Mined a New Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
+					} else if err != nil {
+						fmt.Printf("DEBUG (%s): ERROR during terminal block calc=%v\n", n.config.Name, err)
+					}
+				}
+			}
+		case <-n.running.Done():
+			return
+		}
+	}
+}
+
+func (n *GethNode) SubscribeP2PEvents() {
+	eventChan := make(chan *p2p.PeerEvent)
+	n.node.Server().SubscribeEvents(eventChan)
+	for {
+		select {
+		case event := <-eventChan:
+			var msgCode uint64
+			if event.MsgCode != nil {
+				msgCode = *event.MsgCode
+			}
+			if event.Type == p2p.PeerEventTypeMsgRecv && msgCode == ethprotocol.NewBlockMsg {
+				n.totalReceivedNewBlocks.Add(n.totalReceivedNewBlocks, common.Big1)
+				fmt.Printf("DEBUG (%s): Received new block: Peer=%s, MsgCode=%d, Type=%s, Protocol=%s, RemoteAddress=%s\n", n.config.Name, event.Peer.String(), msgCode, event.Type, event.Protocol, event.RemoteAddress)
+			}
+		case <-n.running.Done():
+			return
+		}
+	}
 }
 
 func (n *GethNode) Close() error {
@@ -431,6 +503,9 @@ func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.
 	if err != nil {
 		return nil, err
 	}
+	if b == nil {
+		return nil, fmt.Errorf("Block not found (%v)", number)
+	}
 	return b.Header(), err
 }
 
@@ -474,21 +549,13 @@ func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 	return stateDB.GetNonce(account), nil
 }
 
+func (n *GethNode) GetBlockTotalDifficulty(ctx context.Context, hash common.Hash) (*big.Int, error) {
+	currentBlock := n.eth.BlockChain().GetBlockByHash(hash)
+	return n.eth.BlockChain().GetTd(hash, currentBlock.NumberU64()), nil
+}
+
 func (n *GethNode) GetTotalDifficulty(ctx context.Context) (*big.Int, error) {
-	td := new(big.Int).Set(n.genesis.Difficulty)
-	for i := int64(1); i <= n.eth.BlockChain().CurrentHeader().Number.Int64(); i++ {
-		b, err := n.eth.APIBackend.BlockByNumber(ctx, rpc.BlockNumber(i))
-		if err != nil {
-			return nil, err
-		}
-		td.Add(td, b.Difficulty())
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-	}
-	return td, nil
+	return n.GetBlockTotalDifficulty(ctx, n.eth.BlockChain().CurrentHeader().Hash())
 }
 
 func (n *GethNode) TerminalTotalDifficulty() *big.Int {
@@ -530,4 +597,14 @@ func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.A
 		PreviousNonce: nonce,
 	}
 	return nonce, nil
+}
+
+func (n *GethNode) PostRunVerifications() error {
+	// Check that the node did not receive more gossiped blocks than expected
+	if n.config.ExpectedGossipNewBlocksCount != nil {
+		if n.config.ExpectedGossipNewBlocksCount.Cmp(n.totalReceivedNewBlocks) != 0 {
+			return fmt.Errorf("Node received gossiped blocks count different than expected: %d != %d", n.totalReceivedNewBlocks, n.config.ExpectedGossipNewBlocksCount)
+		}
+	}
+	return nil
 }

@@ -337,3 +337,8 @@ func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, acco
 	}
 	return nonce, nil
 }
+
+func (ec *HiveRPCEngineClient) PostRunVerifications() error {
+	// There are no post run verifications for RPC clients yet
+	return nil
+}

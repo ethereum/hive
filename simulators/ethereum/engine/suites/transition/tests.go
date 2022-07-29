@@ -85,6 +85,9 @@ type MergeTestSpec struct {
 	SlotsToSafe      *big.Int
 	SlotsToFinalized *big.Int
 
+	// CL Mocker configuration for SafeSlotsToImportOptimistically
+	SafeSlotsToImportOptimistically int64
+
 	// Disable Mining
 	DisableMining bool
 
@@ -377,19 +380,41 @@ var mergeTestSpecs = []MergeTestSpec{
 	},
 
 	{
-		Name:                  "Stop processing gossiped PoW blocks",
-		TTD:                   200000,
-		TimeoutSeconds:        600,
-		MainChainFile:         "blocks_1_td_196608.rlp",
-		DisableMining:         true,
-		SkipMainClientTTDWait: true,
+		Name:           "Stop processing gossiped Post-TTD PoW blocks",
+		TTD:            600000,
+		TimeoutSeconds: 60,
+		MainChainFile:  "blocks_1_td_196608.rlp",
+		// Keep checking to make sure that the blocks past PoS are not forwarded
+		KeepCheckingUntilTimeout: true,
+		DisableMining:            true,
+		SkipMainClientTTDWait:    true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
+			// This node will keep producing PoW blocks that, for the other clients' perspective,
+			// are  past the configured TTD.
 			{
 				ClientStarter: node.GethNodeEngineStarter{
 					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
 						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
 					},
-					TerminalTotalDifficulty: big.NewInt(200000),
+					TerminalTotalDifficulty: big.NewInt(1000000000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  false,
+				MainClientShallSync: false,
+			},
+			// This node should receive and count all gossiped blocks, and should receieve
+			// at most 2 gossiped PoW blocks, which are the two blocks required to reach TTD.
+			// If more than two blocks are received by this client, test fails.
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:                         "PoW Receiver",
+						MaxPeers:                     big.NewInt(1),
+						ExpectedGossipNewBlocksCount: big.NewInt(2),
+					},
+					TerminalTotalDifficulty: big.NewInt(600000),
 					ChainFile:               "blocks_1_td_196608.rlp",
 				},
 				BuildPoSChainOnTop:  true,
@@ -398,12 +423,47 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 
-	/* TODOs:
-	- reorg to a block with uncles
-	- reorg to invalid block (bad state root or similar)
-	- reorg multiple times to multiple client chains (5+)
-	-
-	*/
+	{
+		Name:                  "Terminal blocks are gossiped",
+		TTD:                   600000,
+		TimeoutSeconds:        120,
+		MainChainFile:         "blocks_1_td_196608.rlp",
+		DisableMining:         true,
+		SkipMainClientTTDWait: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			// This node will keep producing PoW blocks + 5 different terminal blocks.
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:                            "PoW Producer",
+						PoWMiner:                        true,
+						MaxPeers:                        big.NewInt(1),
+						AmountOfTerminalBlocksToProduce: big.NewInt(5),
+					},
+					TerminalTotalDifficulty: big.NewInt(600000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+			// This node should receive and count all gossiped blocks, which includes
+			// the two blocks before reaching TTD, and 5 terminal blocks produced by
+			// the PoW Producer.
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:                         "PoW Receiver",
+						MaxPeers:                     big.NewInt(1),
+						ExpectedGossipNewBlocksCount: big.NewInt(7),
+					},
+					TerminalTotalDifficulty: big.NewInt(600000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  false,
+				MainClientShallSync: false,
+			},
+		},
+	},
 }
 
 var Tests = func() []test.Spec {
@@ -461,34 +521,47 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 		mustHeadHash := header.Hash()
 		t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 
-		// Start a secondary clients with alternative PoW chains
-		for _, secondaryClientSpec := range mergeTestSpec.SecondaryClientSpecs {
-			// Start the secondary client with the alternative PoW chain
+		type ClientSpec struct {
+			Client client.EngineClient
+			Spec   SecondaryClientSpec
+		}
+		secondaryClients := make([]ClientSpec, len(mergeTestSpec.SecondaryClientSpecs))
+
+		for i, secondaryClientSpec := range mergeTestSpec.SecondaryClientSpecs {
+			// Start the secondary client with the alternative chain
 			t.Logf("INFO (%s): Running secondary client: %v", t.TestName, secondaryClientSpec)
-			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.CLMock.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+			defer secondaryClient.PostRunVerifications()
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
 			}
+			secondaryClients[i] = ClientSpec{
+				Client: secondaryClient,
+				Spec:   secondaryClientSpec,
+			}
+		}
 
+		// Start a secondary clients with alternative PoW chains
+		for _, cs := range secondaryClients {
 			// Add this client to the CLMocker list of Engine clients
-			t.CLMock.AddEngineClient(secondaryClient)
+			t.CLMock.AddEngineClient(cs.Client)
 
-			if secondaryClientSpec.BuildPoSChainOnTop {
-				if err := helper.WaitForTTDWithTimeout(secondaryClient, t.TestContext); err != nil {
-					t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, secondaryClient.ID(), err)
+			if cs.Spec.BuildPoSChainOnTop {
+				if err := helper.WaitForTTDWithTimeout(cs.Client, t.TestContext); err != nil {
+					t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, cs.Client.ID(), err)
 				}
-				t.CLMock.SetTTDBlockClient(secondaryClient)
+				t.CLMock.SetTTDBlockClient(cs.Client)
 			}
 
-			if secondaryClientSpec.MainClientShallSync {
+			if cs.Spec.MainClientShallSync {
 				// The main client shall sync to this secondary client in order for the test to succeed.
 				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 				defer cancel()
-				if header, err := secondaryClient.HeaderByNumber(ctx, nil); err == nil {
+				if header, err := cs.Client.HeaderByNumber(ctx, nil); err == nil {
 					mustHeadHash = header.Hash()
 					t.Logf("INFO (%s): Must head hash updated: %v", t.TestName, mustHeadHash)
 				} else {
-					t.Fatalf("FAIL (%s): Unable to obtain client [%s] latest header: %v", t.TestName, secondaryClient.ID, err)
+					t.Fatalf("FAIL (%s): Unable to obtain client [%s] latest header: %v", t.TestName, cs.Client.ID, err)
 				}
 			}
 		}
@@ -621,15 +694,16 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 	}
 
 	return test.Spec{
-		Name:             mergeTestSpec.Name,
-		About:            mergeTestSpec.About,
-		Run:              runFunc,
-		TTD:              mergeTestSpec.TTD,
-		TimeoutSeconds:   mergeTestSpec.TimeoutSeconds,
-		SlotsToSafe:      mergeTestSpec.SlotsToSafe,
-		SlotsToFinalized: mergeTestSpec.SlotsToFinalized,
-		GenesisFile:      mergeTestSpec.GenesisFile,
-		DisableMining:    mergeTestSpec.DisableMining,
-		ChainFile:        mergeTestSpec.MainChainFile,
+		Name:                            mergeTestSpec.Name,
+		About:                           mergeTestSpec.About,
+		Run:                             runFunc,
+		TTD:                             mergeTestSpec.TTD,
+		TimeoutSeconds:                  mergeTestSpec.TimeoutSeconds,
+		SlotsToSafe:                     mergeTestSpec.SlotsToSafe,
+		SlotsToFinalized:                mergeTestSpec.SlotsToFinalized,
+		GenesisFile:                     mergeTestSpec.GenesisFile,
+		DisableMining:                   mergeTestSpec.DisableMining,
+		ChainFile:                       mergeTestSpec.MainChainFile,
+		SafeSlotsToImportOptimistically: mergeTestSpec.SafeSlotsToImportOptimistically,
 	}
 }
