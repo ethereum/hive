@@ -19,8 +19,13 @@ import (
 // Env is the environment of a single test.
 type Env struct {
 	*hivesim.T
-	TestName    string
-	Client      *hivesim.Client
+	TestName string
+	Client   *hivesim.Client
+
+	// Timeout context signals that the test must wrap up its execution
+	TimeoutContext context.Context
+
+	// Test context will be done after timeout to allow test to gracefully finish
 	TestContext context.Context
 
 	// RPC Clients
@@ -77,14 +82,17 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 		t.Fatalf("FAIL (%s): Ports were never open for client: %v", env.TestName, err)
 	}
 
-	// Setup context timeout
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	// Full test context has a few more seconds to finish up after timeout happens
+	ctx, cancel := context.WithTimeout(context.Background(), timeout+(time.Second*10))
 	defer cancel()
 	env.TestContext = ctx
-	// CL Mocker has some extra time to be able to produce the last block after the test has finished
-	ctx, cancel = context.WithTimeout(context.Background(), timeout+(time.Second*10))
-	defer cancel()
 	clMocker.TestContext = ctx
+
+	// Setup context timeout
+	ctx, cancel = context.WithTimeout(ctx, timeout)
+	defer cancel()
+	env.TimeoutContext = ctx
+	clMocker.TimeoutContext = ctx
 
 	// Create the test-expect object
 	env.TestEngine = NewTestEngineClient(env, ec)
@@ -130,7 +138,7 @@ func (t *Env) VerifyPoWProgress(lastBlockHash common.Hash) {
 		}
 		t.Logf("INFO (%s): Error getting block, will try again: %v", t.TestName, err)
 		select {
-		case <-t.TestContext.Done():
+		case <-t.TimeoutContext.Done():
 			t.Fatalf("FAIL (%s): Timeout while waiting for PoW chain to progress", t.TestName)
 		case <-time.After(time.Second):
 		}

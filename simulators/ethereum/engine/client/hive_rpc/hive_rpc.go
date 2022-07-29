@@ -140,6 +140,14 @@ type HiveRPCEngineClient struct {
 	ttd            *big.Int
 	JWTSecretBytes []byte
 
+	// Engine updates info
+	latestFcUStateSent *api.ForkchoiceStateV1
+	latestPAttrSent    *api.PayloadAttributesV1
+	latestFcUResponse  *api.ForkChoiceResponse
+
+	latestPayloadSent          *api.ExecutableDataV1
+	latestPayloadStatusReponse *api.PayloadStatusV1
+
 	// Test account nonces
 	accTxInfoMap map[common.Address]*AccountTransactionInfo
 }
@@ -280,7 +288,10 @@ func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV1(ctx context.Context, fcState 
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
+	ec.latestFcUStateSent = fcState
+	ec.latestPAttrSent = pAttributes
 	err := ec.c.CallContext(ctx, &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
+	ec.latestFcUResponse = &result
 	return result, err
 }
 
@@ -298,7 +309,9 @@ func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *api.Ex
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
+	ec.latestPayloadSent = payload
 	err := ec.c.CallContext(ctx, &result, "engine_newPayloadV1", payload)
+	ec.latestPayloadStatusReponse = &result
 	return result, err
 }
 
@@ -341,4 +354,19 @@ func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, acco
 func (ec *HiveRPCEngineClient) PostRunVerifications() error {
 	// There are no post run verifications for RPC clients yet
 	return nil
+}
+
+func (ec *HiveRPCEngineClient) LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) {
+	return ec.latestFcUStateSent, ec.latestPAttrSent
+}
+
+func (ec *HiveRPCEngineClient) LatestNewPayloadSent() *api.ExecutableDataV1 {
+	return ec.latestPayloadSent
+}
+
+func (ec *HiveRPCEngineClient) LatestForkchoiceResponse() *api.ForkChoiceResponse {
+	return ec.latestFcUResponse
+}
+func (ec *HiveRPCEngineClient) LatestNewPayloadResponse() *api.PayloadStatusV1 {
+	return ec.latestPayloadStatusReponse
 }

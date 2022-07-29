@@ -27,7 +27,8 @@ type SecondaryClientSpec struct {
 	// Whether the main client shall sync to this secondary client or not.
 	MainClientShallSync bool
 
-	// TODO: Expected FcU outcome, could be "SYNCING", "VALID", etc..
+	// Skip adding to CL Mocker list of payload producers
+	SkipAddingToCLMocker bool
 }
 
 type SecondaryClientSpecs []SecondaryClientSpec
@@ -74,6 +75,12 @@ type MergeTestSpec struct {
 	// If set, the main client will be polled with `newPayload` until status!=`SYNCING` is returned.
 	// If `VALID`, `latestValidHash` is also checked to be the hash of the transition block.
 	// If `INVALID`, {status: INVALID, latestValidHash: 0x00..00, payloadId: null} is expected.
+	TransitionPayloadStatusSync test.PayloadStatus
+
+	// If set, the main client's response to the first `newPayload` sent (transition payload) will be
+	// compared against this value, and if not immediately equal, the test fails.
+	// Difference between this parameter and the *Sync version is that the other parameter gives the
+	// client time to sync.
 	TransitionPayloadStatus test.PayloadStatus
 
 	// Number of PoS blocks to build on top of the MainClient.
@@ -111,10 +118,10 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:                    "Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height (Transition Payload)",
-		TTD:                     196608,
-		MainChainFile:           "blocks_1_td_196608.rlp",
-		TransitionPayloadStatus: test.Valid,
+		Name:                        "Single Block PoW Re-org to Higher-Total-Difficulty Chain, Equal Height (Transition Payload Sync)",
+		TTD:                         196608,
+		MainChainFile:               "blocks_1_td_196608.rlp",
+		TransitionPayloadStatusSync: test.Valid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ClientStarter: hive_rpc.HiveRPCEngineStarter{
@@ -328,11 +335,11 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:                    "Transition to a Chain with Invalid Terminal Block, Higher Configured Total Difficulty (Transition Payload)",
-		TTD:                     196608,
-		MainChainFile:           "blocks_1_td_196608.rlp",
-		MainClientPoSBlocks:     1,
-		TransitionPayloadStatus: test.Invalid,
+		Name:                        "Transition to a Chain with Invalid Terminal Block, Higher Configured Total Difficulty (Transition Payload Sync)",
+		TTD:                         196608,
+		MainChainFile:               "blocks_1_td_196608.rlp",
+		MainClientPoSBlocks:         1,
+		TransitionPayloadStatusSync: test.Invalid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ClientStarter: hive_rpc.HiveRPCEngineStarter{
@@ -362,11 +369,11 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:                    "Transition to a Chain with Invalid Terminal Block, Lower Configured Total Difficulty (Transition Payload)",
-		TTD:                     393120,
-		MainChainFile:           "blocks_2_td_393120.rlp",
-		MainClientPoSBlocks:     1,
-		TransitionPayloadStatus: test.Invalid,
+		Name:                        "Transition to a Chain with Invalid Terminal Block, Lower Configured Total Difficulty (Transition Payload Sync)",
+		TTD:                         393120,
+		MainChainFile:               "blocks_2_td_393120.rlp",
+		MainClientPoSBlocks:         1,
+		TransitionPayloadStatusSync: test.Invalid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ClientStarter: hive_rpc.HiveRPCEngineStarter{
@@ -401,8 +408,9 @@ var mergeTestSpecs = []MergeTestSpec{
 					TerminalTotalDifficulty: big.NewInt(1000000000),
 					ChainFile:               "blocks_1_td_196608.rlp",
 				},
-				BuildPoSChainOnTop:  false,
-				MainClientShallSync: false,
+				BuildPoSChainOnTop:   false,
+				MainClientShallSync:  false,
+				SkipAddingToCLMocker: true,
 			},
 			// This node should receive and count all gossiped blocks, and should receieve
 			// at most 2 gossiped PoW blocks, which are the two blocks required to reach TTD.
@@ -435,10 +443,10 @@ var mergeTestSpecs = []MergeTestSpec{
 			{
 				ClientStarter: node.GethNodeEngineStarter{
 					Config: node.GethNodeTestConfiguration{
-						Name:                            "PoW Producer",
-						PoWMiner:                        true,
-						MaxPeers:                        big.NewInt(1),
-						AmountOfTerminalBlocksToProduce: big.NewInt(5),
+						Name:                      "PoW Producer",
+						PoWMiner:                  true,
+						MaxPeers:                  big.NewInt(1),
+						TerminalBlockSiblingCount: big.NewInt(5),
 					},
 					TerminalTotalDifficulty: big.NewInt(600000),
 					ChainFile:               "blocks_1_td_196608.rlp",
@@ -474,15 +482,16 @@ var mergeTestSpecs = []MergeTestSpec{
 		DisableMining:                   true,
 		SkipMainClientTTDWait:           true,
 		SafeSlotsToImportOptimistically: 1000,
+		TransitionPayloadStatus:         test.Valid,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			// This node will keep producing PoW blocks + 5 different terminal blocks.
 			{
 				ClientStarter: node.GethNodeEngineStarter{
 					Config: node.GethNodeTestConfiguration{
-						Name:                            "PoW Producer",
-						PoWMiner:                        true,
-						MaxPeers:                        big.NewInt(1),
-						AmountOfTerminalBlocksToProduce: big.NewInt(5),
+						Name:                      "PoW Producer",
+						PoWMiner:                  true,
+						MaxPeers:                  big.NewInt(1),
+						TerminalBlockSiblingCount: big.NewInt(5),
 					},
 					TerminalTotalDifficulty: big.NewInt(500000),
 					ChainFile:               "blocks_1_td_196608.rlp",
@@ -524,7 +533,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 	runFunc := func(t *test.Env) {
 		// The first client waits for TTD, which ideally should be reached immediately using loaded chain
 		if !mergeTestSpec.SkipMainClientTTDWait {
-			if err := helper.WaitForTTDWithTimeout(t.Engine, t.TestContext); err != nil {
+			if err := helper.WaitForTTDWithTimeout(t.Engine, t.TimeoutContext); err != nil {
 				t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, t.Engine.ID(), err)
 			}
 
@@ -557,8 +566,8 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 
 		for i, secondaryClientSpec := range mergeTestSpec.SecondaryClientSpecs {
 			// Start the secondary client with the alternative chain
-			t.Logf("INFO (%s): Running secondary client: %v", t.TestName, secondaryClientSpec)
 			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.CLMock.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+			t.Logf("INFO (%s): Started secondary client: %v", t.TestName, secondaryClient.ID())
 			defer secondaryClient.PostRunVerifications()
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
@@ -571,14 +580,22 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 
 		// Start a secondary clients with alternative PoW chains
 		for _, cs := range secondaryClients {
+			if cs.Spec.SkipAddingToCLMocker {
+				continue
+			}
+
 			// Add this client to the CLMocker list of Engine clients
 			t.CLMock.AddEngineClient(cs.Client)
 
 			if cs.Spec.BuildPoSChainOnTop {
-				if err := helper.WaitForTTDWithTimeout(cs.Client, t.TestContext); err != nil {
+				if err := helper.WaitForTTDWithTimeout(cs.Client, t.TimeoutContext); err != nil {
 					t.Fatalf("FAIL (%s): Error while waiting for EngineClient (%s) to reach TTD: %v", t.TestName, cs.Client.ID(), err)
 				}
 				t.CLMock.SetTTDBlockClient(cs.Client)
+				if mergeTestSpec.TransitionPayloadStatus != "Unknown" {
+					// Build the transition payload to later check the client's result
+					t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
+				}
 			}
 
 			if cs.Spec.MainClientShallSync {
@@ -592,6 +609,16 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 					t.Fatalf("FAIL (%s): Unable to obtain client [%s] latest header: %v", t.TestName, cs.Client.ID, err)
 				}
 			}
+		}
+
+		if mergeTestSpec.TransitionPayloadStatus != test.Unknown {
+			// We are only testing the transition payload
+			if resp := t.Engine.LatestNewPayloadResponse(); resp == nil {
+				t.Fatalf("FAIL (%s): Test expected a %s response on the newPayload(Transition Payload), but there was no response", t.TestName, mergeTestSpec.TransitionPayloadStatus)
+			} else if resp.Status != string(mergeTestSpec.TransitionPayloadStatus) {
+				t.Fatalf("FAIL (%s): Test expected a %s response on the newPayload(Transition Payload), but response was %s", t.TestName, mergeTestSpec.TransitionPayloadStatus, resp.Status)
+			}
+			return
 		}
 
 		// We are going to send PREVRANDAO transactions if the test requires so.
@@ -631,7 +658,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 
 		// Test end state of the main client
 		for {
-			if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() && (mergeTestSpec.TransitionPayloadStatus == test.Unknown ||
+			if mergeTestSpec.SecondaryClientSpecs.AnyPoSChainOnTop() && (mergeTestSpec.TransitionPayloadStatusSync == test.Unknown ||
 				t.CLMock.FirstPoSBlockNumber == nil) {
 				// Build a block and check whether the main client switches
 				t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
@@ -647,15 +674,15 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 			}
 			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 			defer cancel()
-			if mergeTestSpec.TransitionPayloadStatus != test.Unknown {
+			if mergeTestSpec.TransitionPayloadStatusSync != test.Unknown {
 				// We are specifically checking the transition payload in this test case
 				p := t.TestEngine.TestEngineNewPayloadV1(&t.CLMock.LatestExecutedPayload)
 				p.ExpectNoError()
 				if p.Status.Status != api.SYNCING {
-					p.ExpectStatus(mergeTestSpec.TransitionPayloadStatus)
-					if mergeTestSpec.TransitionPayloadStatus == test.Valid {
+					p.ExpectStatus(mergeTestSpec.TransitionPayloadStatusSync)
+					if mergeTestSpec.TransitionPayloadStatusSync == test.Valid {
 						p.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
-					} else if mergeTestSpec.TransitionPayloadStatus == test.Invalid {
+					} else if mergeTestSpec.TransitionPayloadStatusSync == test.Invalid {
 						p.ExpectLatestValidHash(&(common.Hash{}))
 					}
 					break
@@ -674,7 +701,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 			// Check for timeout.
 			select {
 			case <-time.After(time.Second):
-			case <-t.TestContext.Done():
+			case <-t.TimeoutContext.Done():
 				t.Fatalf("FAIL (%s): Timeout while waiting for sync on the alternative PoW chain", t.TestName)
 			}
 		}
@@ -698,7 +725,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 				}
 
 				// Use the CL Mocker context since that has extra time
-				ctx, cancel := context.WithTimeout(t.CLMock.TestContext, globals.RPCTimeout)
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 				defer cancel()
 				if header, err := t.Eth.HeaderByNumber(ctx, nil); err == nil {
 					if header.Hash() != mustHeadHash {
@@ -712,7 +739,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 				// Wait here before checking the head again.
 				select {
 				case <-time.After(time.Second):
-				case <-t.TestContext.Done():
+				case <-t.TimeoutContext.Done():
 					// This means the test is over but that is ok since the client did not switch to an incorrect chain.
 					return
 				}

@@ -66,7 +66,8 @@ type CLMocker struct {
 	SafeSlotsToImportOptimistically *big.Int
 
 	// Global context which all procedures shall stop
-	TestContext context.Context
+	TestContext    context.Context
+	TimeoutContext context.Context
 }
 
 func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int) *CLMocker {
@@ -301,13 +302,12 @@ func (cl *CLMocker) GetNextPayload() {
 	}
 }
 
-func (cl *CLMocker) broadcastNextNewPayload() []ExecutePayloadOutcome {
+func (cl *CLMocker) broadcastNextNewPayload() {
 	// Broadcast the executePayload to all clients
 	responses := cl.BroadcastNewPayload(&cl.LatestPayloadBuilt)
 	for _, resp := range responses {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastNewPayload Error (%v): %v\n", resp.Container, resp.Error)
-
 		} else {
 			if resp.ExecutePayloadResponse.Status == api.VALID {
 				// The client is synced and the payload was immediately validated
@@ -336,11 +336,10 @@ func (cl *CLMocker) broadcastNextNewPayload() []ExecutePayloadOutcome {
 	}
 	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
 	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = cl.LatestPayloadBuilt
-	return responses
 }
 
-func (cl *CLMocker) broadcastLatestForkchoice(newPayloadOutcomes ExecutePayloadOutcomes) {
-	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, newPayloadOutcomes) {
+func (cl *CLMocker) broadcastLatestForkchoice() {
+	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
 		} else if resp.ForkchoiceResponse.PayloadStatus.Status == api.VALID {
@@ -403,7 +402,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 		callbacks.OnGetPayload()
 	}
 
-	newPayloadResponses := cl.broadcastNextNewPayload()
+	cl.broadcastNextNewPayload()
 
 	if callbacks.OnNewPayloadBroadcast != nil {
 		callbacks.OnNewPayloadBroadcast()
@@ -421,7 +420,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 	if len(cl.HeadHashHistory) > int(cl.SlotsToFinalized.Int64()) {
 		cl.LatestForkchoice.FinalizedBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToFinalized.Int64())-1]
 	}
-	cl.broadcastLatestForkchoice(newPayloadResponses)
+	cl.broadcastLatestForkchoice()
 
 	if callbacks.OnForkchoiceBroadcast != nil {
 		callbacks.OnForkchoiceBroadcast()
@@ -498,8 +497,6 @@ type ExecutePayloadOutcome struct {
 	Error                  error
 }
 
-type ExecutePayloadOutcomes []ExecutePayloadOutcome
-
 func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableDataV1) []ExecutePayloadOutcome {
 	responses := make([]ExecutePayloadOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
@@ -518,27 +515,18 @@ func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableDataV1) []Execute
 	return responses
 }
 
-func (all ExecutePayloadOutcomes) ContainerStatus(container string) string {
-	for _, outcome := range all {
-		if outcome.Container == container {
-			return outcome.ExecutePayloadResponse.Status
-		}
-	}
-	return ""
-}
-
 type ForkChoiceOutcome struct {
 	ForkchoiceResponse *api.ForkChoiceResponse
 	Container          string
 	Error              error
 }
 
-func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, payloadAttr *api.PayloadAttributesV1, newPayloadOutcomes ExecutePayloadOutcomes) []ForkChoiceOutcome {
+func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, payloadAttr *api.PayloadAttributesV1) []ForkChoiceOutcome {
 	responses := make([]ForkChoiceOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.ID()
-		newPayloadStatus := newPayloadOutcomes.ContainerStatus(responses[i].Container)
-		if cl.IsOptimisticallySyncing() || newPayloadStatus == "VALID" {
+		newPayloadStatus := ec.LatestNewPayloadResponse()
+		if cl.IsOptimisticallySyncing() || newPayloadStatus.Status == "VALID" {
 			ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 			defer cancel()
 			fcUpdatedResp, err := ec.ForkchoiceUpdatedV1(ctx, fcstate, payloadAttr)

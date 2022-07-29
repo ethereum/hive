@@ -721,7 +721,7 @@ func WaitForTTDWithTimeout(ec client.EngineClient, ctx context.Context) error {
 				return nil
 			}
 		case <-ctx.Done():
-			return ctx.Err()
+			return fmt.Errorf("Timeout reached")
 		}
 	}
 }

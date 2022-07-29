@@ -133,7 +133,7 @@ func postMergeSync(t *test.Env) {
 
 	for {
 		select {
-		case <-t.TestContext.Done():
+		case <-t.TimeoutContext.Done():
 			t.Fatalf("FAIL (%s): Test timeout", t.TestName)
 		default:
 		}
@@ -213,7 +213,7 @@ func incrementalPostMergeSync(t *test.Env) {
 			}
 			select {
 			case <-time.After(time.Second):
-			case <-t.TestContext.Done():
+			case <-t.TimeoutContext.Done():
 				t.Fatalf("FAIL (%s): Timeout waiting for client to sync", t.TestName)
 			}
 		}

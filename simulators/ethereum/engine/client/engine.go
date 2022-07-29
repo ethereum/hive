@@ -27,6 +27,12 @@ type Engine interface {
 	ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) (api.ForkChoiceResponse, error)
 	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableDataV1, error)
 	NewPayloadV1(ctx context.Context, payload *api.ExecutableDataV1) (api.PayloadStatusV1, error)
+
+	LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1)
+	LatestNewPayloadSent() (payload *api.ExecutableDataV1)
+
+	LatestForkchoiceResponse() (fcuResponse *api.ForkChoiceResponse)
+	LatestNewPayloadResponse() (payloadResponse *api.PayloadStatusV1)
 }
 
 type EngineClient interface {

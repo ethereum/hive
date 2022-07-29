@@ -98,10 +98,10 @@ Re-execute already executed payloads (10) and verify that no errors occur.
 - Multiple New Payloads Extending Canonical Chain:  
 Send 80 valid NewPayload directives extending the canonical chain. Only one of the payloads is selected using ForkchoiceUpdated directive.
 
-- Out of Order Payload Execution:  
+- Consecutive Payload Execution:  
 Launch a first client and produce N payloads.  
-Launch a second client and send payloads (NewPayload) in reverse order (N, N - 1, ..., 1).  
-The payloads should be ACCEPTED/SYNCING, and the last payload should be VALID (since payload 1 successfully links the chain with the Genesis).
+Launch a second client and send payloads (NewPayload) consecutive order skipping ForkchoiceUpdated calls.  
+The payloads should be validated correctly.
 
 - Valid NewPayload->ForkchoiceUpdated on Syncing Client:
 Skip sending NewPayload to the client, but send the ForkchoiceUpdated to this missing payload, which will send the client to Syncing, then send the valid payload. Response should be either `ACCEPTED` or `SYNCING`.

@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/binary"
 	"fmt"
 	"math/big"
@@ -44,7 +45,8 @@ type GethNodeTestConfiguration struct {
 	PoWMinerEtherBase common.Address
 
 	// In PoW production mode, produce many terminal blocks which shall be gossiped
-	AmountOfTerminalBlocksToProduce *big.Int
+	TerminalBlockSiblingCount *big.Int
+	TerminalBlockSiblingDepth *big.Int
 
 	// Of all terminal blocks produced, the index of the one to send as terminal block when queried
 	NthTerminalBlockToReturnAsHead *big.Int
@@ -72,8 +74,10 @@ type GethNodeEngineStarter struct {
 }
 
 var (
-	DefaultMaxPeers                = big.NewInt(25)
-	DefaultMiningStartDelaySeconds = big.NewInt(10)
+	DefaultMaxPeers                  = big.NewInt(25)
+	DefaultMiningStartDelaySeconds   = big.NewInt(10)
+	DefaultTerminalBlockSiblingCount = big.NewInt(1)
+	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
 )
 
 func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (client.EngineClient, error) {
@@ -129,6 +133,14 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		s.Config.MiningStartDelaySeconds = DefaultMiningStartDelaySeconds
 	}
 
+	if s.Config.TerminalBlockSiblingCount == nil {
+		s.Config.TerminalBlockSiblingCount = DefaultTerminalBlockSiblingCount
+	}
+
+	if s.Config.TerminalBlockSiblingDepth == nil {
+		s.Config.TerminalBlockSiblingDepth = DefaultTerminalBlockSiblingDepth
+	}
+
 	g, err := newNode(s.Config, bootnode, &genesis)
 	if err != nil {
 		return nil, err
@@ -160,6 +172,14 @@ type GethNode struct {
 	running  context.Context
 	closing  context.CancelFunc
 
+	// Engine updates info
+	latestFcUStateSent *beacon.ForkchoiceStateV1
+	latestPAttrSent    *beacon.PayloadAttributesV1
+	latestFcUResponse  *beacon.ForkChoiceResponse
+
+	latestPayloadSent          *beacon.ExecutableDataV1
+	latestPayloadStatusReponse *beacon.PayloadStatusV1
+
 	// Test specific configuration
 	accTxInfoMap           map[common.Address]*AccountTransactionInfo
 	totalReceivedNewBlocks *big.Int
@@ -177,7 +197,7 @@ func newNode(config GethNodeTestConfiguration, bootnode string, genesis *core.Ge
 
 func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, genesis *core.Genesis) (*GethNode, error) {
 	if startConfig.Name == "" {
-		startConfig.Name = "Geth Node"
+		startConfig.Name = "Modified Geth Module"
 	}
 	config := &node.Config{
 		Name:    startConfig.Name,
@@ -196,24 +216,28 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 		return nil, err
 	}
 	ethHashConfig := ethconfig.Defaults.Ethash
-	ethHashConfig.CacheDir = "/ethash"
-	ethHashConfig.DatasetDir = ethHashConfig.CacheDir
-	econfig := &ethconfig.Config{
-		Genesis:         genesis,
-		NetworkId:       genesis.Config.ChainID.Uint64(),
-		SyncMode:        downloader.FullSync,
-		DatabaseCache:   256,
-		DatabaseHandles: 256,
-		TxPool:          core.DefaultTxPoolConfig,
-		GPO:             ethconfig.Defaults.GPO,
-		Ethash:          ethHashConfig,
-		Miner: miner.Config{
+	minerConfig := ethconfig.Defaults.Miner
+	if startConfig.PoWMiner {
+		ethHashConfig.CacheDir = "/ethash"
+		ethHashConfig.DatasetDir = ethHashConfig.CacheDir
+		minerConfig = miner.Config{
 			GasFloor:  genesis.GasLimit * 9 / 10,
 			GasCeil:   genesis.GasLimit * 11 / 10,
 			GasPrice:  big.NewInt(1),
-			Recommit:  10 * time.Second, // Disable the recommit
+			Recommit:  1 * time.Second, // Disable the recommit
 			Etherbase: startConfig.PoWMinerEtherBase,
-		},
+		}
+	}
+	econfig := &ethconfig.Config{
+		Genesis:          genesis,
+		NetworkId:        genesis.Config.ChainID.Uint64(),
+		SyncMode:         downloader.FullSync,
+		DatabaseCache:    256,
+		DatabaseHandles:  256,
+		TxPool:           core.DefaultTxPoolConfig,
+		GPO:              ethconfig.Defaults.GPO,
+		Ethash:           ethHashConfig,
+		Miner:            minerConfig,
 		LightServ:        100,
 		LightPeers:       int(startConfig.MaxPeers.Int64()) - 1,
 		LightNoSyncServe: true,
@@ -291,6 +315,12 @@ func (n *GethNode) EnablePoWMining() {
 		return
 	}
 
+	// Start PoW Processing
+	go n.StartPoWMiningProcessing()
+
+}
+
+func (n *GethNode) StartPoWMiningProcessing() {
 	// Subscribe and process all mined blocks
 	minedBlockSub := n.node.EventMux().Subscribe(core.NewMinedBlockEvent{}).Chan()
 	for {
@@ -298,26 +328,49 @@ func (n *GethNode) EnablePoWMining() {
 		case obj := <-minedBlockSub:
 			if obj != nil {
 				if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
-					b := ev.Block
-					if t, td, err := n.isBlockTerminal(b); t {
-						fmt.Printf("DEBUG (%s): Mined a New Terminal Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
-						n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
-						if n.config.AmountOfTerminalBlocksToProduce != nil && n.config.AmountOfTerminalBlocksToProduce.Cmp(n.terminalBlocksMined) > 0 {
-							// Reset the canonical chain to the parent of the terminal block to keep the miner mining.
-							p := n.eth.BlockChain().GetBlockByHash(b.ParentHash())
-							n.eth.BlockChain().SetCanonical(p)
-						}
-					} else if err == nil {
-						fmt.Printf("DEBUG (%s): Mined a New Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
-					} else if err != nil {
-						fmt.Printf("DEBUG (%s): ERROR during terminal block calc=%v\n", n.config.Name, err)
-					}
+					n.ProcessNewMinedPoWBlock(ev.Block)
 				}
 			}
 		case <-n.running.Done():
 			return
 		}
 	}
+}
+
+func (n *GethNode) ProcessNewMinedPoWBlock(b *types.Block) {
+	if t, td, err := n.isBlockTerminal(b); t {
+		fmt.Printf("DEBUG (%s): Mined a New Terminal Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
+		n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
+		if n.config.TerminalBlockSiblingCount.Cmp(n.terminalBlocksMined) > 0 {
+			// Shuffle the extra bytes of the miner before re-org to force having a different sealhash
+			newExtra := make([]byte, 8)
+			rand.Read(newExtra)
+			n.eth.Miner().SetExtra(newExtra)
+			// Reset the canonical chain to the parent of the terminal block to keep the miner mining.
+			if _, err := n.ReOrgBackBlockChain(n.config.TerminalBlockSiblingDepth.Uint64(), b); err != nil {
+				panic(err)
+			}
+		}
+	} else if err == nil {
+		fmt.Printf("DEBUG (%s): Mined a New Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
+	} else if err != nil {
+		fmt.Printf("DEBUG (%s): ERROR during terminal block calc=%v\n", n.config.Name, err)
+	}
+}
+
+// Sets the canonical block to an ancestor of the provided block.
+// `N==1` means to re-org to the parent of the provided block.
+func (n *GethNode) ReOrgBackBlockChain(N uint64, currentBlock *types.Block) (common.Hash, error) {
+	if N == 0 {
+		return currentBlock.Hash(), nil
+	}
+	for ; N > 0; N-- {
+		currentBlock = n.eth.BlockChain().GetBlockByHash(currentBlock.ParentHash())
+		if currentBlock == nil {
+			return common.Hash{}, fmt.Errorf("Unable to re-org back")
+		}
+	}
+	return n.eth.BlockChain().SetCanonical(currentBlock)
 }
 
 func (n *GethNode) SubscribeP2PEvents() {
@@ -448,11 +501,18 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 
 // Engine API
 func (n *GethNode) NewPayloadV1(ctx context.Context, pl *beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
-	return n.api.NewPayloadV1(*pl)
+	n.latestPayloadSent = pl
+	resp, err := n.api.NewPayloadV1(*pl)
+	n.latestPayloadStatusReponse = &resp
+	return resp, err
 }
 
 func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
-	return n.api.ForkchoiceUpdatedV1(*fcs, payload)
+	n.latestFcUStateSent = fcs
+	n.latestPAttrSent = payload
+	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, payload)
+	n.latestFcUResponse = &fcr
+	return fcr, err
 }
 
 func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableDataV1, error) {
@@ -607,4 +667,20 @@ func (n *GethNode) PostRunVerifications() error {
 		}
 	}
 	return nil
+}
+
+func (n *GethNode) LatestForkchoiceSent() (fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributesV1) {
+	return n.latestFcUStateSent, n.latestPAttrSent
+}
+
+func (n *GethNode) LatestNewPayloadSent() (payload *beacon.ExecutableDataV1) {
+	return n.latestPayloadSent
+}
+
+func (n *GethNode) LatestForkchoiceResponse() (fcuResponse *beacon.ForkChoiceResponse) {
+	return n.latestFcUResponse
+}
+
+func (n *GethNode) LatestNewPayloadResponse() (payloadResponse *beacon.PayloadStatusV1) {
+	return n.latestPayloadStatusReponse
 }
