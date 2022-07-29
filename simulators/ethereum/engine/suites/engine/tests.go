@@ -1757,7 +1757,7 @@ func blockStatusReorg(t *test.Env) {
 				HeadBlockHash:      customizedPayload.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-			}, nil)
+			}, nil, nil)
 
 			// Verify the client is serving the latest HeadBlock
 			r := t.TestEngine.TestHeaderByNumber(Head)
@@ -2086,7 +2086,7 @@ func transactionReorg(t *test.Env) {
 				}
 
 				// Re-org back
-				t.CLMock.BroadcastForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil)
+				t.CLMock.BroadcastForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil, nil)
 			},
 		})
 
@@ -2199,7 +2199,7 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
 						HeadBlockHash:      mainPayload.BlockHash,
 						SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 						FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-					}, nil)
+					}, nil, nil)
 
 					// Not it should be back with main payload
 					txt = t.TestEngine.TestTransactionReceipt(tx.Hash())

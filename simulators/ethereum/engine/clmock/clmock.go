@@ -2,6 +2,7 @@ package clmock
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"sync"
@@ -37,8 +38,6 @@ type CLMocker struct {
 	SlotsToSafe      *big.Int
 	SlotsToFinalized *big.Int
 
-	SafeSlotsToImportOptimistically *big.Int
-
 	// Wait time before attempting to get the payload
 	PayloadProductionClientDelay time.Duration
 
@@ -61,9 +60,10 @@ type CLMocker struct {
 	LatestForkchoice        api.ForkchoiceStateV1
 
 	// Merge related
-	FirstPoSBlockNumber        *big.Int
-	TTDReached                 bool
-	TransitionPayloadTimestamp *big.Int
+	FirstPoSBlockNumber             *big.Int
+	TTDReached                      bool
+	TransitionPayloadTimestamp      *big.Int
+	SafeSlotsToImportOptimistically *big.Int
 
 	// Global context which all procedures shall stop
 	TestContext context.Context
@@ -137,6 +137,17 @@ func (cl *CLMocker) CloseClients() {
 	}
 }
 
+func (cl *CLMocker) IsOptimisticallySyncing() bool {
+	if cl.SafeSlotsToImportOptimistically.Cmp(common.Big0) == 0 {
+		return true
+	}
+	if cl.FirstPoSBlockNumber == nil {
+		return false
+	}
+	diff := big.NewInt(int64(cl.LatestExecutedPayload.Number) - cl.FirstPoSBlockNumber.Int64())
+	return diff.Cmp(cl.SafeSlotsToImportOptimistically) >= 0
+}
+
 // Sets the specified client's chain head as Terminal PoW block by sending the initial forkchoiceUpdated.
 func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 	var err error
@@ -166,26 +177,10 @@ func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 	cl.HeadHashHistory = []common.Hash{}
 	cl.FirstPoSBlockNumber = nil
 
-	// Prepare initial forkchoice
+	// Prepare initial forkchoice, to be sent to the transition payload producer
 	cl.LatestForkchoice = api.ForkchoiceStateV1{}
 	cl.LatestForkchoice.HeadBlockHash = cl.LatestHeader.Hash()
 
-	// Broadcast initial ForkchoiceUpdated
-	anySuccess := false
-	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
-		if resp.Error != nil {
-			cl.Logf("CLMocker: forkchoiceUpdated Error: %v\n", resp.Error)
-		} else {
-			if resp.ForkchoiceResponse.PayloadStatus.Status == api.VALID {
-				anySuccess = true
-			} else {
-				cl.Logf("CLMocker: forkchoiceUpdated Response: %v\n", resp.ForkchoiceResponse)
-			}
-		}
-	}
-	if !anySuccess {
-		cl.Fatalf("CLMocker: None of the clients accepted forkchoiceUpdated")
-	}
 }
 
 // This method waits for TTD in at least one of the clients, then sends the
@@ -217,6 +212,8 @@ func (cl *CLMocker) pickNextPayloadProducer() {
 		// Get a client to generate the payload
 		ec_id := (int(cl.LatestHeadNumber.Int64()) + i) % len(cl.EngineClients)
 		cl.NextBlockProducer = cl.EngineClients[ec_id]
+
+		cl.Logf("CLMocker: Selected payload producer: %s", cl.NextBlockProducer.ID())
 
 		// Get latest header. Number and hash must coincide with our view of the chain,
 		// and only then we can build on top of this client's chain
@@ -304,9 +301,10 @@ func (cl *CLMocker) GetNextPayload() {
 	}
 }
 
-func (cl *CLMocker) broadcastNextNewPayload() {
+func (cl *CLMocker) broadcastNextNewPayload() []ExecutePayloadOutcome {
 	// Broadcast the executePayload to all clients
-	for _, resp := range cl.BroadcastNewPayload(&cl.LatestPayloadBuilt) {
+	responses := cl.BroadcastNewPayload(&cl.LatestPayloadBuilt)
+	for _, resp := range responses {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastNewPayload Error (%v): %v\n", resp.Container, resp.Error)
 
@@ -338,10 +336,11 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 	}
 	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
 	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = cl.LatestPayloadBuilt
+	return responses
 }
 
-func (cl *CLMocker) broadcastLatestForkchoice() {
-	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
+func (cl *CLMocker) broadcastLatestForkchoice(newPayloadOutcomes ExecutePayloadOutcomes) {
+	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, newPayloadOutcomes) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
 		} else if resp.ForkchoiceResponse.PayloadStatus.Status == api.VALID {
@@ -404,7 +403,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 		callbacks.OnGetPayload()
 	}
 
-	cl.broadcastNextNewPayload()
+	newPayloadResponses := cl.broadcastNextNewPayload()
 
 	if callbacks.OnNewPayloadBroadcast != nil {
 		callbacks.OnNewPayloadBroadcast()
@@ -422,7 +421,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 	if len(cl.HeadHashHistory) > int(cl.SlotsToFinalized.Int64()) {
 		cl.LatestForkchoice.FinalizedBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToFinalized.Int64())-1]
 	}
-	cl.broadcastLatestForkchoice()
+	cl.broadcastLatestForkchoice(newPayloadResponses)
 
 	if callbacks.OnForkchoiceBroadcast != nil {
 		callbacks.OnForkchoiceBroadcast()
@@ -499,6 +498,8 @@ type ExecutePayloadOutcome struct {
 	Error                  error
 }
 
+type ExecutePayloadOutcomes []ExecutePayloadOutcome
+
 func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableDataV1) []ExecutePayloadOutcome {
 	responses := make([]ExecutePayloadOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
@@ -517,24 +518,38 @@ func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableDataV1) []Execute
 	return responses
 }
 
+func (all ExecutePayloadOutcomes) ContainerStatus(container string) string {
+	for _, outcome := range all {
+		if outcome.Container == container {
+			return outcome.ExecutePayloadResponse.Status
+		}
+	}
+	return ""
+}
+
 type ForkChoiceOutcome struct {
 	ForkchoiceResponse *api.ForkChoiceResponse
 	Container          string
 	Error              error
 }
 
-func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, payloadAttr *api.PayloadAttributesV1) []ForkChoiceOutcome {
+func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, payloadAttr *api.PayloadAttributesV1, newPayloadOutcomes ExecutePayloadOutcomes) []ForkChoiceOutcome {
 	responses := make([]ForkChoiceOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.ID()
-		ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
-		defer cancel()
-		fcUpdatedResp, err := ec.ForkchoiceUpdatedV1(ctx, fcstate, payloadAttr)
-		if err != nil {
-			cl.Errorf("CLMocker: Could not ForkchoiceUpdatedV1: %v", err)
-			responses[i].Error = err
+		newPayloadStatus := newPayloadOutcomes.ContainerStatus(responses[i].Container)
+		if cl.IsOptimisticallySyncing() || newPayloadStatus == "VALID" {
+			ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
+			defer cancel()
+			fcUpdatedResp, err := ec.ForkchoiceUpdatedV1(ctx, fcstate, payloadAttr)
+			if err != nil {
+				cl.Errorf("CLMocker: Could not ForkchoiceUpdatedV1: %v", err)
+				responses[i].Error = err
+			} else {
+				responses[i].ForkchoiceResponse = &fcUpdatedResp
+			}
 		} else {
-			responses[i].ForkchoiceResponse = &fcUpdatedResp
+			responses[i].Error = fmt.Errorf("Cannot optimistically import block")
 		}
 	}
 	return responses

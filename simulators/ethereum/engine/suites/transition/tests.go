@@ -464,6 +464,34 @@ var mergeTestSpecs = []MergeTestSpec{
 			},
 		},
 	},
+	{
+		Name: "Multiple Terminal blocks via gossip",
+		// TTD is important in this test case, it guarantees that the CLMocker
+		// selects the PoW Producer as transition payload creator.
+		TTD:                             500000,
+		TimeoutSeconds:                  120,
+		MainChainFile:                   "blocks_1_td_196608.rlp",
+		DisableMining:                   true,
+		SkipMainClientTTDWait:           true,
+		SafeSlotsToImportOptimistically: 1000,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			// This node will keep producing PoW blocks + 5 different terminal blocks.
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:                            "PoW Producer",
+						PoWMiner:                        true,
+						MaxPeers:                        big.NewInt(1),
+						AmountOfTerminalBlocksToProduce: big.NewInt(5),
+					},
+					TerminalTotalDifficulty: big.NewInt(500000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
 }
 
 var Tests = func() []test.Spec {
