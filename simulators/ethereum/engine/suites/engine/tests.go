@@ -415,11 +415,11 @@ var Tests = []test.Spec{
 		TTD:  5,
 	},
 	{
-		Name: "latest Block after New HeadBlock",
+		Name: "latest Block after New HeadBlockHash",
 		Run:  blockStatusHeadBlockGen(false),
 	},
 	{
-		Name: "latest Block after New HeadBlock (Transition Block)",
+		Name: "latest Block after New HeadBlockHash (Transition Block)",
 		Run:  blockStatusHeadBlockGen(true),
 		TTD:  5,
 	},
@@ -429,15 +429,15 @@ var Tests = []test.Spec{
 		TTD:  5,
 	},
 	{
-		Name:             "safe, finalized on canonical chain",
-		Run:              safeFinalizedCanonicalChain,
-		SlotsToSafe:      big.NewInt(1),
-		SlotsToFinalized: big.NewInt(2),
-	},
-	{
 		Name: "finalized Block after New FinalizedBlockHash",
 		Run:  blockStatusFinalizedBlock,
 		TTD:  5,
+	},
+	{
+		Name:             "safe, finalized on Canonical Chain",
+		Run:              safeFinalizedCanonicalChain,
+		SlotsToSafe:      big.NewInt(1),
+		SlotsToFinalized: big.NewInt(2),
 	},
 	{
 		Name: "latest Block after Reorg",
@@ -2618,7 +2618,8 @@ func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 	})
 }
 
-// Send a valid `newPayload` in correct order but skip `forkchoiceUpdated` until the last payload
+// Attempt to produce a payload after a transaction with an invalid Chain ID was sent to the client
+// using `eth_sendRawTransaction`.
 func buildPayloadWithInvalidChainIDTx(t *test.Env) {
 	// Wait until TTD is reached by this client
 	t.CLMock.WaitForTTD()

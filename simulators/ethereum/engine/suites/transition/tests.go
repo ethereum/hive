@@ -283,7 +283,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name:                     "Halt following PoW chain",
+		Name:                     "Halt syncing to PoW chain",
 		TTD:                      196608,
 		MainChainFile:            "blocks_1_td_196608.rlp",
 		SkipMainClientFcU:        true,
@@ -391,13 +391,13 @@ var mergeTestSpecs = []MergeTestSpec{
 		TTD:            600000,
 		TimeoutSeconds: 60,
 		MainChainFile:  "blocks_1_td_196608.rlp",
-		// Keep checking to make sure that the blocks past PoS are not forwarded
+		// Keep checking to make sure that the blocks post-TTD are not forwarded
 		KeepCheckingUntilTimeout: true,
 		DisableMining:            true,
 		SkipMainClientTTDWait:    true,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			// This node will keep producing PoW blocks that, for the other clients' perspective,
-			// are  past the configured TTD.
+			// are past the configured TTD.
 			{
 				ClientStarter: node.GethNodeEngineStarter{
 					Config: node.GethNodeTestConfiguration{
@@ -473,7 +473,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
-		Name: "Multiple Terminal blocks via gossip",
+		Name: "Build Payload After Multiple Terminal blocks via gossip",
 		// TTD is important in this test case, it guarantees that the CLMocker
 		// selects the PoW Producer as transition payload creator.
 		TTD:                             500000,
