@@ -76,7 +76,6 @@ type GethNodeEngineStarter struct {
 var (
 	DefaultMaxPeers                  = big.NewInt(25)
 	DefaultMiningStartDelaySeconds   = big.NewInt(10)
-	DefaultTerminalBlockSiblingCount = big.NewInt(1)
 	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
 )
 
@@ -131,10 +130,6 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 
 	if s.Config.MiningStartDelaySeconds == nil {
 		s.Config.MiningStartDelaySeconds = DefaultMiningStartDelaySeconds
-	}
-
-	if s.Config.TerminalBlockSiblingCount == nil {
-		s.Config.TerminalBlockSiblingCount = DefaultTerminalBlockSiblingCount
 	}
 
 	if s.Config.TerminalBlockSiblingDepth == nil {
@@ -341,7 +336,7 @@ func (n *GethNode) ProcessNewMinedPoWBlock(b *types.Block) {
 	if t, td, err := n.isBlockTerminal(b); t {
 		fmt.Printf("DEBUG (%s): Mined a New Terminal Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
 		n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
-		if n.config.TerminalBlockSiblingCount.Cmp(n.terminalBlocksMined) > 0 {
+		if n.config.TerminalBlockSiblingCount != nil && n.config.TerminalBlockSiblingCount.Cmp(n.terminalBlocksMined) > 0 {
 			// Shuffle the extra bytes of the miner before re-org to force having a different sealhash
 			newExtra := make([]byte, 8)
 			rand.Read(newExtra)
@@ -666,7 +661,7 @@ func (n *GethNode) PostRunVerifications() error {
 			return fmt.Errorf("Node received gossiped blocks count different than expected: %d != %d", n.totalReceivedNewBlocks, n.config.ExpectedGossipNewBlocksCount)
 		}
 	}
-	if n.config.PoWMiner {
+	if n.config.PoWMiner && n.config.TerminalBlockSiblingCount != nil {
 		if n.terminalBlocksMined.Cmp(n.config.TerminalBlockSiblingCount) != 0 {
 			return fmt.Errorf("PoW Miner node could not mine expected amount of terminal blocks: %d != %d", n.terminalBlocksMined, n.config.TerminalBlockSiblingCount)
 
