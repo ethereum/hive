@@ -1,20 +1,21 @@
-package main
+package test
 
 import (
 	"context"
 	"fmt"
 	"math/big"
 	"runtime"
+	"strings"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 )
 
 // Print the caller to this file
-func PrintExpectStack(t *TestEnv) {
+func PrintExpectStack(t *Env) {
 	_, currentFile, _, _ := runtime.Caller(0)
 	for i := 1; ; i++ {
 		_, file, line, ok := runtime.Caller(i)
@@ -24,47 +25,68 @@ func PrintExpectStack(t *TestEnv) {
 		if file == currentFile {
 			continue
 		}
-		fmt.Printf("INFO (%s): Failed `Expect*` routine called from: file=%s, line=%d\n", t.TestName, file, line)
+		fmt.Printf("DEBUG (%s): Failed `Expect*` routine called from: file=%s, line=%d\n", t.TestName, file, line)
 		return
 	}
 }
 
-// Test Engine API Helper Structs
-type ExpectTestEnv struct {
-	*TestEnv
+type PayloadStatus string
+
+const (
+	Unknown          PayloadStatus = ""
+	Valid                          = "VALID"
+	Invalid                        = "INVALID"
+	Syncing                        = "SYNCING"
+	Accepted                       = "ACCEPTED"
+	InvalidBlockHash               = "INVALID_BLOCK_HASH"
+)
+
+func StatusesToString(statuses []PayloadStatus) []string {
+	result := make([]string, len(statuses))
+	for i, s := range statuses {
+		result[i] = string(s)
+	}
+	return result
 }
 
-func (e ExpectTestEnv) Fatalf(format string, values ...interface{}) {
-	PrintExpectStack(e.TestEnv)
-	e.TestEnv.Fatalf(format, values...)
+// Test Engine API Helper Structs
+type ExpectEnv struct {
+	*Env
+}
+
+func (e ExpectEnv) Fatalf(format string, values ...interface{}) {
+	PrintExpectStack(e.Env)
+	e.Env.Fatalf(format, values...)
 }
 
 type TestEngineClient struct {
-	*ExpectTestEnv
-	*EngineClient
+	*ExpectEnv
+	Engine client.EngineClient
 }
 
-func NewTestEngineClient(t *TestEnv, ec *EngineClient) *TestEngineClient {
+func NewTestEngineClient(t *Env, ec client.EngineClient) *TestEngineClient {
 	return &TestEngineClient{
-		ExpectTestEnv: &ExpectTestEnv{t},
-		EngineClient:  ec,
+		ExpectEnv: &ExpectEnv{t},
+		Engine:    ec,
 	}
 }
 
 // ForkchoiceUpdatedV1
 
 type ForkchoiceResponseExpectObject struct {
-	*ExpectTestEnv
-	Response ForkChoiceResponse
+	*ExpectEnv
+	Response api.ForkChoiceResponse
 	Error    error
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *ForkchoiceStateV1, pAttributes *PayloadAttributesV1) *ForkchoiceResponseExpectObject {
-	resp, err := tec.EngineClient.EngineForkchoiceUpdatedV1(tec.EngineClient.Ctx(), fcState, pAttributes)
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) *ForkchoiceResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	resp, err := tec.Engine.ForkchoiceUpdatedV1(ctx, fcState, pAttributes)
 	return &ForkchoiceResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{tec.TestEnv},
-		Response:      resp,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Response:  resp,
+		Error:     err,
 	}
 }
 
@@ -95,7 +117,7 @@ func (exp *ForkchoiceResponseExpectObject) ExpectErrorCode(code int) {
 
 func (exp *ForkchoiceResponseExpectObject) ExpectPayloadStatus(ps PayloadStatus) {
 	exp.ExpectNoError()
-	if exp.Response.PayloadStatus.Status != ps {
+	if PayloadStatus(exp.Response.PayloadStatus.Status) != ps {
 		exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.Status, ps)
 	}
 }
@@ -103,11 +125,11 @@ func (exp *ForkchoiceResponseExpectObject) ExpectPayloadStatus(ps PayloadStatus)
 func (exp *ForkchoiceResponseExpectObject) ExpectAnyPayloadStatus(statuses ...PayloadStatus) {
 	exp.ExpectNoError()
 	for _, status := range statuses {
-		if exp.Response.PayloadStatus.Status == status {
+		if PayloadStatus(exp.Response.PayloadStatus.Status) == status {
 			return
 		}
 	}
-	exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.Status, PayloadStatusSlice(statuses).String())
+	exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.Status, StatusesToString(statuses))
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectLatestValidHash(lvh *common.Hash) {
@@ -118,7 +140,7 @@ func (exp *ForkchoiceResponseExpectObject) ExpectLatestValidHash(lvh *common.Has
 	}
 }
 
-func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *PayloadID) {
+func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *api.PayloadID) {
 	exp.ExpectNoError()
 	if ((exp.Response.PayloadID == nil || pid == nil) && exp.Response.PayloadID != pid) ||
 		(exp.Response.PayloadID != nil && pid != nil && *exp.Response.PayloadID != *pid) {
@@ -129,17 +151,19 @@ func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *PayloadID) {
 // NewPayloadV1
 
 type NewPayloadResponseExpectObject struct {
-	*ExpectTestEnv
-	Status PayloadStatusV1
+	*ExpectEnv
+	Status api.PayloadStatusV1
 	Error  error
 }
 
-func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *ExecutableDataV1) *NewPayloadResponseExpectObject {
-	status, err := tec.EngineClient.EngineNewPayloadV1(tec.EngineClient.Ctx(), payload)
+func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableDataV1) *NewPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	status, err := tec.Engine.NewPayloadV1(ctx, payload)
 	return &NewPayloadResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{tec.TestEnv},
-		Status:        status,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Status:    status,
+		Error:     err,
 	}
 }
 
@@ -170,7 +194,7 @@ func (exp *NewPayloadResponseExpectObject) ExpectNoValidationError() {
 
 func (exp *NewPayloadResponseExpectObject) ExpectStatus(ps PayloadStatus) {
 	exp.ExpectNoError()
-	if exp.Status.Status != ps {
+	if PayloadStatus(exp.Status.Status) != ps {
 		exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.Status, ps)
 	}
 }
@@ -178,11 +202,12 @@ func (exp *NewPayloadResponseExpectObject) ExpectStatus(ps PayloadStatus) {
 func (exp *NewPayloadResponseExpectObject) ExpectStatusEither(statuses ...PayloadStatus) {
 	exp.ExpectNoError()
 	for _, status := range statuses {
-		if exp.Status.Status == status {
+		if PayloadStatus(exp.Status.Status) == status {
 			return
 		}
 	}
-	exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.Status, PayloadStatusSlice(statuses).String())
+
+	exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.Status, strings.Join(StatusesToString(statuses), ","))
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Hash) {
@@ -195,17 +220,19 @@ func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Has
 
 // GetPayloadV1
 type GetPayloadResponseExpectObject struct {
-	*ExpectTestEnv
-	Payload ExecutableDataV1
+	*ExpectEnv
+	Payload api.ExecutableDataV1
 	Error   error
 }
 
-func (tec *TestEngineClient) TestEngineGetPayloadV1(payloadID *PayloadID) *GetPayloadResponseExpectObject {
-	payload, err := tec.EngineClient.EngineGetPayloadV1(tec.EngineClient.Ctx(), payloadID)
+func (tec *TestEngineClient) TestEngineGetPayloadV1(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	payload, err := tec.Engine.GetPayloadV1(ctx, payloadID)
 	return &GetPayloadResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{tec.TestEnv},
-		Payload:       payload,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Payload:   payload,
+		Error:     err,
 	}
 }
 
@@ -244,8 +271,8 @@ func (exp *GetPayloadResponseExpectObject) ExpectPayloadBlockNumber(expectedBloc
 
 func (exp *GetPayloadResponseExpectObject) ExpectPrevRandao(expectedPrevRandao common.Hash) {
 	exp.ExpectNoError()
-	if exp.Payload.PrevRandao != expectedPrevRandao {
-		exp.Fatalf("FAIL (%s): Unexpected prevRandao for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.PrevRandao, expectedPrevRandao)
+	if exp.Payload.Random != expectedPrevRandao {
+		exp.Fatalf("FAIL (%s): Unexpected prevRandao for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.Random, expectedPrevRandao)
 	}
 }
 
@@ -256,35 +283,23 @@ func (exp *GetPayloadResponseExpectObject) ExpectTimestamp(expectedTimestamp uin
 	}
 }
 
-// Test Eth JSON-RPC Helper Structs
-type TestEthClient struct {
-	*ExpectTestEnv
-	*ethclient.Client
-	lastCtx context.Context
-}
-
-func NewTestEthClient(t *TestEnv, eth *ethclient.Client) *TestEthClient {
-	return &TestEthClient{
-		ExpectTestEnv: &ExpectTestEnv{t},
-		Client:        eth,
-	}
-}
-
 // BlockNumber
 type BlockNumberResponseExpectObject struct {
-	*ExpectTestEnv
+	*ExpectEnv
 	Call   string
 	Number uint64
 	Error  error
 }
 
-func (teth *TestEthClient) TestBlockNumber() *BlockNumberResponseExpectObject {
-	number, err := teth.BlockNumber(teth.Ctx())
+func (tec *TestEngineClient) TestBlockNumber() *BlockNumberResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	number, err := tec.Engine.BlockNumber(ctx)
 	return &BlockNumberResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
-		Call:          "BlockNumber",
-		Number:        number,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Call:      "BlockNumber",
+		Number:    number,
+		Error:     err,
 	}
 }
 
@@ -303,48 +318,22 @@ func (exp *BlockNumberResponseExpectObject) ExpectNumber(number uint64) {
 
 // Header
 
-// Block number types - * Only supported by TestHeaderByNumber *
-var (
-	Pending   = big.NewInt(-1)
-	Finalized = big.NewInt(-2)
-	Safe      = big.NewInt(-3)
-)
-
 type HeaderResponseExpectObject struct {
-	*ExpectTestEnv
+	*ExpectEnv
 	Call   string
 	Header *types.Header
 	Error  error
 }
 
-// Custom toBlockNumArg to test `safe` and `finalized`
-func toBlockNumArg(number *big.Int) string {
-	if number == nil {
-		return "latest"
-	}
-	if number.Cmp(Pending) == 0 {
-		return "pending"
-	}
-	if number.Cmp(Finalized) == 0 {
-		return "finalized"
-	}
-	if number.Cmp(Safe) == 0 {
-		return "safe"
-	}
-	return hexutil.EncodeBig(number)
-}
-
-func (teth *TestEthClient) TestHeaderByNumber(number *big.Int) *HeaderResponseExpectObject {
-	var header *types.Header
-	err := teth.RPC.CallContext(teth.Ctx(), &header, "eth_getBlockByNumber", toBlockNumArg(number), false)
-	if err == nil && header == nil {
-		err = ethereum.NotFound
-	}
+func (tec *TestEngineClient) TestHeaderByNumber(number *big.Int) *HeaderResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	header, err := tec.Engine.HeaderByNumber(ctx, number)
 	return &HeaderResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
-		Call:          "HeaderByNumber",
-		Header:        header,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Call:      "HeaderByNumber",
+		Header:    header,
+		Error:     err,
 	}
 }
 
@@ -377,29 +366,33 @@ func (exp *HeaderResponseExpectObject) ExpectHash(expHash common.Hash) {
 // Block
 
 type BlockResponseExpectObject struct {
-	*ExpectTestEnv
+	*ExpectEnv
 	Call  string
 	Block *types.Block
 	Error error
 }
 
-func (teth *TestEthClient) TestBlockByNumber(number *big.Int) *BlockResponseExpectObject {
-	block, err := teth.BlockByNumber(teth.Ctx(), number)
+func (tec *TestEngineClient) TestBlockByNumber(number *big.Int) *BlockResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	block, err := tec.Engine.BlockByNumber(ctx, number)
 	return &BlockResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
-		Call:          "BlockByNumber",
-		Block:         block,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Call:      "BlockByNumber",
+		Block:     block,
+		Error:     err,
 	}
 }
 
-func (teth *TestEthClient) TestBlockByHash(hash common.Hash) *BlockResponseExpectObject {
-	block, err := teth.BlockByHash(teth.Ctx(), hash)
+func (tec *TestEngineClient) TestBlockByHash(hash common.Hash) *BlockResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	block, err := tec.Engine.BlockByHash(ctx, hash)
 	return &BlockResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
-		Call:          "BlockByHash",
-		Block:         block,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Call:      "BlockByHash",
+		Block:     block,
+		Error:     err,
 	}
 }
 
@@ -453,19 +446,21 @@ func (exp *BlockResponseExpectObject) ExpectCoinbase(expCoinbase common.Address)
 // Balance
 
 type BalanceResponseExpectObject struct {
-	*ExpectTestEnv
+	*ExpectEnv
 	Call    string
 	Balance *big.Int
 	Error   error
 }
 
-func (teth *TestEthClient) TestBalanceAt(account common.Address, number *big.Int) *BalanceResponseExpectObject {
-	balance, err := teth.BalanceAt(teth.Ctx(), account, number)
+func (tec *TestEngineClient) TestBalanceAt(account common.Address, number *big.Int) *BalanceResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	balance, err := tec.Engine.BalanceAt(ctx, account, number)
 	return &BalanceResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
-		Call:          "BalanceAt",
-		Balance:       balance,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Call:      "BalanceAt",
+		Balance:   balance,
+		Error:     err,
 	}
 }
 
@@ -486,19 +481,21 @@ func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) 
 // Storage
 
 type StorageResponseExpectObject struct {
-	*ExpectTestEnv
+	*ExpectEnv
 	Call    string
 	Storage []byte
 	Error   error
 }
 
-func (teth *TestEthClient) TestStorageAt(account common.Address, key common.Hash, number *big.Int) *StorageResponseExpectObject {
-	storage, err := teth.StorageAt(teth.Ctx(), account, key, number)
+func (tec *TestEngineClient) TestStorageAt(account common.Address, key common.Hash, number *big.Int) *StorageResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	storage, err := tec.Engine.StorageAt(ctx, account, key, number)
 	return &StorageResponseExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
-		Call:          "StorageAt",
-		Storage:       storage,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Call:      "StorageAt",
+		Storage:   storage,
+		Error:     err,
 	}
 }
 
@@ -527,19 +524,21 @@ func (exp *StorageResponseExpectObject) ExpectStorageEqual(expStorage common.Has
 
 // Transaction Receipt
 type TransactionReceiptExpectObject struct {
-	*ExpectTestEnv
+	*ExpectEnv
 	Call    string
 	Receipt *types.Receipt
 	Error   error
 }
 
-func (teth *TestEthClient) TestTransactionReceipt(txHash common.Hash) *TransactionReceiptExpectObject {
-	receipt, err := teth.TransactionReceipt(teth.Ctx(), txHash)
+func (tec *TestEngineClient) TestTransactionReceipt(txHash common.Hash) *TransactionReceiptExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	receipt, err := tec.Engine.TransactionReceipt(ctx, txHash)
 	return &TransactionReceiptExpectObject{
-		ExpectTestEnv: &ExpectTestEnv{teth.TestEnv},
-		Call:          "TransactionReceipt",
-		Receipt:       receipt,
-		Error:         err,
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Call:      "TransactionReceipt",
+		Receipt:   receipt,
+		Error:     err,
 	}
 }
 
@@ -574,14 +573,4 @@ func (exp *TransactionReceiptExpectObject) ExpectBlockHash(expectedHash common.H
 	if exp.Receipt.BlockHash != expectedHash {
 		exp.Fatalf("FAIL (%s): Unexpected transaction block hash on %s: %v, blockhash=%v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, exp.Receipt.BlockHash, expectedHash)
 	}
-}
-
-// Ctx returns a context with the default timeout.
-// For subsequent calls to Ctx, it also cancels the previous context.
-func (t *TestEthClient) Ctx() context.Context {
-	if t.lastCtx != nil {
-		t.lastCancel()
-	}
-	t.lastCtx, t.lastCancel = context.WithTimeout(context.Background(), rpcTimeout)
-	return t.lastCtx
 }
