@@ -1479,7 +1479,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 						status2, err := secondaryClient.ForkchoiceUpdatedV1(ctx, &api.ForkchoiceStateV1{
 							HeadBlockHash:      altChainPayloads[i].BlockHash,
 							SafeBlockHash:      cA.BlockHash,
-							FinalizedBlockHash: cA.BlockHash,
+							FinalizedBlockHash: common.Hash{},
 						}, nil)
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
@@ -1521,7 +1521,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 						HeadBlockHash:      altChainPayloads[n].BlockHash,
 						SafeBlockHash:      altChainPayloads[n].BlockHash,
-						FinalizedBlockHash: altChainPayloads[n].BlockHash,
+						FinalizedBlockHash: common.Hash{},
 					}, nil)
 					t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 
