@@ -113,6 +113,12 @@ func (t *Env) MainTTD() *big.Int {
 	return t.Engine.TerminalTotalDifficulty()
 }
 
+func (t *Env) HandleClientPostRunVerification(ec client.EngineClient) {
+	if err := ec.PostRunVerifications(); err != nil {
+		t.Fatalf("FAIL (%s): Client failed post-run verification: %v", t.TestName, err)
+	}
+}
+
 // Verify that the client progresses after a certain PoW block still in PoW mode
 func (t *Env) VerifyPoWProgress(lastBlockHash common.Hash) {
 	// Get the block number first
