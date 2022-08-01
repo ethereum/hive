@@ -90,10 +90,37 @@ func (d *Devnet) AddEth1(opts ...hivesim.StartOption) {
 		d.T.Fatal("no eth1 L1 chain configuration found")
 		return
 	}
-	// TODO
 
-	// TODO: bundle options for new client
-	// TODO: start new eth1 client
+	// Even though the exact configuration is provided already,
+	// hive allows overrides of individual config vars by env params.
+	// If any eth1 client uses these params, let's just make sure they are there.
+	eth1Params := Eth1GenesisToParams(d.L1Cfg)
+
+	eth1Cfg, err := json.Marshal(d.L1Cfg)
+	if err != nil {
+		d.T.Fatalf("failed to serialize genesis state: %v", err)
+	}
+	eth1CfgOpt := bytesFile("genesis.json", eth1Cfg)
+
+	input := []hivesim.StartOption{eth1CfgOpt, eth1Params}
+	if len(d.Eth1s) == 0 {
+		// we only make the first eth1 node a miner
+		input = append(input, hivesim.Params{
+			"HIVE_CLIQUE_PRIVATEKEY": EncodePrivKey(d.Secrets.CliqueSigner).String(),
+			"HIVE_MINER":             d.Addresses.CliqueSigner.String(),
+		})
+	} else {
+		bootnode, err := d.Eth1s[0].EnodeURL()
+		if err != nil {
+			d.T.Fatalf("failed to get eth1 bootnode URL: %v", err)
+		}
+		// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
+		input = append(input, hivesim.Params{"HIVE_BOOTNODE": bootnode})
+	}
+
+	c := &Eth1Node{ELNode{d.T.StartClient(d.Clients.Eth1[0].Name, input...)}}
+	d.T.Logf("added eth1 node %d of type %s: %s", len(d.OpL2Engines), d.Clients.Eth1[0].Name, c.IP)
+	d.Eth1s = append(d.Eth1s, c)
 }
 
 // AddOpL2 creates a new Optimism L2 execution engine. This requires a L2 chain config to be created previously.

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/crypto"
 	hdwallet "github.com/miguelmota/go-ethereum-hdwallet"
 )
@@ -107,6 +108,13 @@ type Secrets struct {
 	Alice   *ecdsa.PrivateKey
 	Bob     *ecdsa.PrivateKey
 	Mallory *ecdsa.PrivateKey
+}
+
+func EncodePrivKey(priv *ecdsa.PrivateKey) hexutil.Bytes {
+	privkey := make([]byte, 32)
+	blob := priv.D.Bytes()
+	copy(privkey[32-len(blob):], blob)
+	return privkey
 }
 
 func (s *Secrets) Addresses() *Addresses {
