@@ -3,10 +3,10 @@ module github.com/ethereum/hive/optimism
 go 1.18
 
 require (
-	github.com/ethereum-optimism/optimism/op-batcher v0.3.1-0.20220728232301-d1702add5058
-	github.com/ethereum-optimism/optimism/op-bindings v0.3.1-0.20220728232301-d1702add5058
-	github.com/ethereum-optimism/optimism/op-node v0.3.1-0.20220728232301-d1702add5058
-	github.com/ethereum-optimism/optimism/op-proposer v0.3.1-0.20220728232301-d1702add5058
+	github.com/ethereum-optimism/optimism/op-batcher v0.3.1-0.20220801052740-6d9011ec4242
+	github.com/ethereum-optimism/optimism/op-bindings v0.3.1-0.20220801052740-6d9011ec4242
+	github.com/ethereum-optimism/optimism/op-node v0.3.1-0.20220801052740-6d9011ec4242
+	github.com/ethereum-optimism/optimism/op-proposer v0.3.1-0.20220801052740-6d9011ec4242
 	github.com/ethereum/go-ethereum v1.10.20
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/miguelmota/go-ethereum-hdwallet v0.1.1
