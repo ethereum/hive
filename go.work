@@ -5,4 +5,5 @@ use (
 	./optimism
 	./simulators/optimism/p2p
 	./simulators/optimism/rpc
+	./simulators/optimism/testnet
 )

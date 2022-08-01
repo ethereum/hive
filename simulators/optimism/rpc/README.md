@@ -1,4 +1,4 @@
-# Optimism RPC test suite
+# Hive Optimism RPC test suite
 
 This test suite is a copy of the ETH L1 RPC test suite adapted for Optimism L2.
 It tests several real-world scenarios such as sending value transactions,

@@ -1,6 +1,5 @@
-# Optimism P2P test suite
+# Hive Optimism P2P test suite
 
-This test suite tests the P2P protocol between the sequencer and verifier on
-the optimism network.
+This test suite tests the P2P functionality in an Optimism Bedrock testnet.
 
-    hive --sim optimism/p2p --client=op-l1,op-l2,op-proposer,op-batcher,op-sequencer,op-verifier --docker.output
+    hive --sim optimism/p2p --client=op-l1,op-geth,op-proposer,op-batcher,op-node,op-contracts --docker.output
