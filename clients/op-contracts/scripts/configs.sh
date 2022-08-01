@@ -1,13 +1,19 @@
 #!/bin/bash
 
-set -e
+set -eu
 
-# first and only argument is the timestamp
-export L2OO_STARTING_BLOCK_TIMESTAMP=$1
+cd /hive/optimism/packages/contracts-bedrock
 
-# TODO: create custom hivenet hardhat deployment instead of using the devnet network.
+# Deploy config is provided as first script argument
+echo "$1" >> deploy-config/hivenet_data.json
+
+# Our hardhat system wants a typescript deploy config, not json. Just wrap the json.
 cat > deploy-config/hivenet.ts << EOF
-config stuff here
+import hivenetData from "hivenet_data.json"
+
+const config = hivenetData;
+
+export default config
 EOF
 
 # generate configs, redirect standard output to stderr, we output the results as a merged json to stdout later

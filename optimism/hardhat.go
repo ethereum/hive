@@ -2,11 +2,46 @@ package optimism
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/params"
-	"time"
 )
+
+type HardhatDeployConfig struct {
+	SubmissionInterval           uint64         `json:"submissionInterval"`
+	GenesisOutput                common.Hash    `json:"genesisOutput"`
+	HistoricalBlocks             uint64         `json:"historicalBlocks"`
+	StartingBlockNumber          uint64         `json:"startingBlockNumber"`
+	L2BlockTime                  uint64         `json:"l2BlockTime"`
+	L1StartingBlockTag           string         `json:"l1StartingBlockTag"`
+	SequencerAddress             common.Address `json:"sequencerAddress"`
+	L2CrossDomainMessengerOwner  common.Address `json:"l2CrossDomainMessengerOwner"`
+	GasPriceOracleOwner          common.Address `json:"gasPriceOracleOwner"`
+	GasPriceOracleOverhead       uint64         `json:"gasPriceOracleOverhead"`
+	GasPriceOracleScalar         uint64         `json:"gasPriceOracleScalar"`
+	GasPriceOracleDecimals       uint64         `json:"gasPriceOracleDecimals"`
+	L1BlockInitialNumber         uint64         `json:"l1BlockInitialNumber"`
+	L1BlockInitialTimestamp      uint64         `json:"l1BlockInitialTimestamp"`
+	L1BlockInitialBasefee        uint64         `json:"l1BlockInitialBasefee"`
+	L1BlockInitialHash           common.Hash    `json:"l1BlockInitialHash"`
+	L1BlockInitialSequenceNumber uint64         `json:"l1BlockInitialSequenceNumber"`
+	GenesisBlockExtradata        hexutil.Bytes  `json:"genesisBlockExtradata"`
+	GenesisBlockGasLimit         hexutil.Uint64 `json:"genesisBlockGasLimit"`
+	GenesisBlockChainid          uint64         `json:"genesisBlockChainid"`
+	FundDevAccounts              bool           `json:"fundDevAccounts"`
+	P2pSequencerAddress          common.Address `json:"p2pSequencerAddress"`
+	DeploymentWaitConfirmations  uint64         `json:"deploymentWaitConfirmations"`
+	MaxSequencerDrift            uint64         `json:"maxSequencerDrift"`
+	SequencerWindowSize          uint64         `json:"sequencerWindowSize"`
+	ChannelTimeout               uint64         `json:"channelTimeout"`
+	ProxyAdmin                   common.Address `json:"proxyAdmin"`
+	OptimismBaseFeeRecipient     common.Address `json:"optimismBaseFeeRecipient"`
+	OptimismL1FeeRecipient       common.Address `json:"optimismL1FeeRecipient"`
+	OptimismL2FeeRecipient       common.Address `json:"optimismL2FeeRecipient"`
+	OutputOracleOwner            common.Address `json:"outputOracleOwner"`
+	BatchSenderAddress           common.Address `json:"batchSenderAddress"`
+}
 
 type HardhatGeneratedConfigs struct {
 	L1     *params.ChainConfig `json:"l1"`
@@ -25,9 +60,56 @@ func (d *Devnet) InitRollupHardhat() {
 		d.T.Fatalf("already initialized L1 chain config: %v", d.L1Cfg)
 		return
 	}
+	var extraDataL1 hexutil.Bytes
+	extraDataL1 = append(extraDataL1, make([]byte, 32)...)
+	extraDataL1 = append(extraDataL1, d.Addresses.CliqueSigner[:]...)
+	extraDataL1 = append(extraDataL1, make([]byte, 65)...)
 
-	// TODO: better way to configure testnet timestamp
-	execInfo, err := d.Contracts.Client.Exec("configs.sh", fmt.Sprintf("%d", time.Now().Unix()+30))
+	deployConf := HardhatDeployConfig{
+		SubmissionInterval:          6,
+		GenesisOutput:               common.Hash{},
+		HistoricalBlocks:            0,
+		StartingBlockNumber:         0,
+		L2BlockTime:                 2,
+		L1StartingBlockTag:          "earliest",
+		SequencerAddress:            d.Addresses.CliqueSigner,
+		L2CrossDomainMessengerOwner: common.Address{},
+		GasPriceOracleOwner:         common.Address{},
+		GasPriceOracleOverhead:      2100,
+		GasPriceOracleScalar:        1000000,
+		GasPriceOracleDecimals:      6,
+
+		L1BlockInitialNumber:         0,
+		L1BlockInitialTimestamp:      0,
+		L1BlockInitialBasefee:        10,
+		L1BlockInitialHash:           common.Hash{},
+		L1BlockInitialSequenceNumber: 0,
+
+		GenesisBlockExtradata: extraDataL1,
+
+		GenesisBlockGasLimit:        15000000,
+		GenesisBlockChainid:         111,
+		FundDevAccounts:             true,
+		P2pSequencerAddress:         d.Addresses.SequencerP2P,
+		DeploymentWaitConfirmations: 1,
+		MaxSequencerDrift:           100,
+		SequencerWindowSize:         4,
+		ChannelTimeout:              40,
+		ProxyAdmin:                  d.Addresses.Deployer,
+		OptimismBaseFeeRecipient:    common.Address{0: 0x42, 19: 0xf1}, // tbd
+		OptimismL1FeeRecipient:      d.Addresses.Batcher,
+		OptimismL2FeeRecipient:      common.Address{0: 0x42, 19: 0xf0}, // tbd
+		OutputOracleOwner:           common.Address{},                  // tbd
+		BatchSenderAddress:          d.Addresses.Batcher,
+	}
+
+	deployConfBytes, err := json.Marshal(&deployConf)
+	if err != nil {
+		d.T.Fatalf("failed to marshal hardhat deploy config: %v", err)
+		return
+	}
+
+	execInfo, err := d.Contracts.Client.Exec("configs.sh", string(deployConfBytes))
 	if err != nil {
 		if execInfo != nil {
 			d.T.Log(execInfo.Stdout)
