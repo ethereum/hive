@@ -666,6 +666,12 @@ func (n *GethNode) PostRunVerifications() error {
 			return fmt.Errorf("Node received gossiped blocks count different than expected: %d != %d", n.totalReceivedNewBlocks, n.config.ExpectedGossipNewBlocksCount)
 		}
 	}
+	if n.config.PoWMiner {
+		if n.terminalBlocksMined.Cmp(n.config.TerminalBlockSiblingCount) != 0 {
+			return fmt.Errorf("PoW Miner node could not mine expected amount of terminal blocks: %d != %d", n.terminalBlocksMined, n.config.TerminalBlockSiblingCount)
+
+		}
+	}
 	return nil
 }
 
