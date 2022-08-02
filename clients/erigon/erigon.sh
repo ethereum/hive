@@ -124,17 +124,17 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
     fi
 fi
 
-# Launch the main client.
-FLAGS="$FLAGS --nat=none --experimental.overlay"
+# Configure RPC.
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3"
+FLAGS="$FLAGS --ws"
+
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
     echo -n $JWT_SECRET > /jwt.secret
-    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3,engine --engine.addr=0.0.0.0"
-    FLAGS="$FLAGS --ws"
-    FLAGS="$FLAGS --authrpc.jwtsecret=/jwt.secret"
-else
-    FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3"
-    FLAGS="$FLAGS --ws"
+    FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt.secret"
 fi
+
+# Launch the main client.
+FLAGS="$FLAGS --nat=none"
 echo "Running erigon with flags $FLAGS"
 $erigon $FLAGS
