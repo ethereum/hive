@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
@@ -164,13 +165,14 @@ type GethNode struct {
 
 	mustHeadBlock *types.Block
 
-	datadir  string
-	bootnode string
-	genesis  *core.Genesis
-	ttd      *big.Int
-	api      *ethcatalyst.ConsensusAPI
-	running  context.Context
-	closing  context.CancelFunc
+	datadir    string
+	bootnode   string
+	genesis    *core.Genesis
+	ttd        *big.Int
+	api        *ethcatalyst.ConsensusAPI
+	running    context.Context
+	closing    context.CancelFunc
+	closeMutex sync.Mutex
 
 	// Engine updates info
 	latestFcUStateSent *beacon.ForkchoiceStateV1
@@ -373,6 +375,11 @@ func (n *GethNode) PoWMiningLoop() {
 	}()
 
 	for {
+		select {
+		case <-n.running.Done():
+			return
+		default:
+		}
 		s, b, err := n.PrepareNextBlock(currentBlock)
 		if err != nil {
 			panic(err)
@@ -472,6 +479,8 @@ func (n *GethNode) SubscribeP2PEvents() {
 }
 
 func (n *GethNode) Close() error {
+	n.closeMutex.Lock()
+	defer n.closeMutex.Unlock()
 	select {
 	case <-n.running.Done():
 		// Node already closed
