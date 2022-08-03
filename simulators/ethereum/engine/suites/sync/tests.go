@@ -197,11 +197,11 @@ func incrementalPostMergeSync(t *test.Env) {
 		if !ok {
 			t.Fatalf("FAIL (%s): TEST ISSUE - Payload not found: %d", t.TestName, i)
 		}
-		secondaryEngineTest.TestEngineNewPayloadV1(&payload)
-		secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
-			HeadBlockHash: payload.BlockHash,
-		}, nil)
 		for {
+			secondaryEngineTest.TestEngineNewPayloadV1(&payload)
+			secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
+				HeadBlockHash: payload.BlockHash,
+			}, nil)
 			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 			defer cancel()
 			b, err := secondaryEngine.BlockByNumber(ctx, nil)
