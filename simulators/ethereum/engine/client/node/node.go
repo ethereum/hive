@@ -46,6 +46,9 @@ type GethNodeTestConfiguration struct {
 	PoWMiner          bool
 	PoWMinerEtherBase common.Address
 
+	// Block Modifier
+	BlockModifier helper.BlockModifier
+
 	// In PoW production mode, produce many terminal blocks which shall be gossiped
 	TerminalBlockSiblingCount *big.Int
 	TerminalBlockSiblingDepth *big.Int
@@ -398,6 +401,14 @@ func (n *GethNode) PoWMiningLoop() {
 		// Wait until the previous block is succesfully propagated
 		<-time.After(time.Millisecond * 200)
 
+		// Modify the block before sealing
+		if n.config.BlockModifier != nil {
+			b, err = n.config.BlockModifier.ModifyUnsealedBlock(b)
+			if err != nil {
+				panic(err)
+			}
+		}
+
 		// Seal the next block to broadcast
 		rChan := make(chan *types.Block, 0)
 		stopChan := make(chan struct{})
@@ -407,6 +418,17 @@ func (n *GethNode) PoWMiningLoop() {
 			if b == nil {
 				panic(fmt.Errorf("no block got sealed"))
 			}
+			// Modify the sealed block if necessary
+			if n.config.BlockModifier != nil {
+				sealVerifier := func(h *types.Header) bool {
+					return n.powEngine.VerifyHeader(n.eth.BlockChain(), h, true) == nil
+				}
+				b, err = n.config.BlockModifier.ModifySealedBlock(sealVerifier, b)
+				if err != nil {
+					panic(err)
+				}
+			}
+
 			// Broadcast
 			n.eth.EventMux().Post(core.NewMinedBlockEvent{Block: b})
 
