@@ -386,9 +386,13 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 
+	// TTD of tests that produce PoW blocks during runtime is calculated on the following basis:
+	// - The average difficulty of the PoW blocks produced during test runs is ~187257
+	// - The TTD must be set so that it is close to half of this value
+	// Reasoning is that this guarantees that the TTD is hit by a given block height with high certainty.
 	{
 		Name:           "Stop processing gossiped Post-TTD PoW blocks",
-		TTD:            600000,
+		TTD:            665000,
 		TimeoutSeconds: 60,
 		MainChainFile:  "blocks_1_td_196608.rlp",
 		// Keep checking to make sure that the blocks post-TTD are not forwarded
@@ -413,16 +417,16 @@ var mergeTestSpecs = []MergeTestSpec{
 				SkipAddingToCLMocker: true,
 			},
 			// This node should receive and count all gossiped blocks, and should receieve
-			// at most 2 gossiped PoW blocks, which are the two blocks required to reach TTD.
+			// at most 3 gossiped PoW blocks, which are the three blocks required to reach TTD.
 			// If more than two blocks are received by this client, test fails.
 			{
 				ClientStarter: node.GethNodeEngineStarter{
 					Config: node.GethNodeTestConfiguration{
 						Name:                         "PoW Receiver",
 						MaxPeers:                     big.NewInt(1),
-						ExpectedGossipNewBlocksCount: big.NewInt(2),
+						ExpectedGossipNewBlocksCount: big.NewInt(3),
 					},
-					TerminalTotalDifficulty: big.NewInt(600000),
+					TerminalTotalDifficulty: big.NewInt(665000),
 					ChainFile:               "blocks_1_td_196608.rlp",
 				},
 				BuildPoSChainOnTop:  true,
@@ -430,10 +434,9 @@ var mergeTestSpecs = []MergeTestSpec{
 			},
 		},
 	},
-
 	{
 		Name:                  "Terminal blocks are gossiped",
-		TTD:                   600000,
+		TTD:                   665000,
 		TimeoutSeconds:        120,
 		MainChainFile:         "blocks_1_td_196608.rlp",
 		DisableMining:         true,
@@ -448,7 +451,7 @@ var mergeTestSpecs = []MergeTestSpec{
 						MaxPeers:                  big.NewInt(1),
 						TerminalBlockSiblingCount: big.NewInt(5),
 					},
-					TerminalTotalDifficulty: big.NewInt(600000),
+					TerminalTotalDifficulty: big.NewInt(665000),
 					ChainFile:               "blocks_1_td_196608.rlp",
 				},
 				BuildPoSChainOnTop:  true,
@@ -464,7 +467,49 @@ var mergeTestSpecs = []MergeTestSpec{
 						MaxPeers:                     big.NewInt(1),
 						ExpectedGossipNewBlocksCount: big.NewInt(7),
 					},
-					TerminalTotalDifficulty: big.NewInt(600000),
+					TerminalTotalDifficulty: big.NewInt(665000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  false,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                  "Terminal blocks are gossiped (Common Ancestor Depth 5)",
+		TTD:                   1040000,
+		TimeoutSeconds:        180,
+		MainChainFile:         "blocks_1_td_196608.rlp",
+		DisableMining:         true,
+		SkipMainClientTTDWait: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			// This node will keep producing PoW blocks + 5 different terminal blocks.
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:                      "PoW Producer",
+						PoWMiner:                  true,
+						MaxPeers:                  big.NewInt(1),
+						TerminalBlockSiblingCount: big.NewInt(2),
+						TerminalBlockSiblingDepth: big.NewInt(5),
+					},
+					TerminalTotalDifficulty: big.NewInt(1040000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+			// This node should receive and count all gossiped blocks, which includes
+			// the two blocks before reaching TTD, and 5 terminal blocks produced by
+			// the PoW Producer.
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:                         "PoW Receiver",
+						MaxPeers:                     big.NewInt(1),
+						ExpectedGossipNewBlocksCount: big.NewInt(10),
+					},
+					TerminalTotalDifficulty: big.NewInt(1040000),
 					ChainFile:               "blocks_1_td_196608.rlp",
 				},
 				BuildPoSChainOnTop:  false,
@@ -476,7 +521,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		Name: "Build Payload After Multiple Terminal blocks via gossip",
 		// TTD is important in this test case, it guarantees that the CLMocker
 		// selects the PoW Producer as transition payload creator.
-		TTD:                             500000,
+		TTD:                             480000,
 		TimeoutSeconds:                  120,
 		MainChainFile:                   "blocks_1_td_196608.rlp",
 		DisableMining:                   true,
@@ -493,7 +538,37 @@ var mergeTestSpecs = []MergeTestSpec{
 						MaxPeers:                  big.NewInt(1),
 						TerminalBlockSiblingCount: big.NewInt(5),
 					},
-					TerminalTotalDifficulty: big.NewInt(500000),
+					TerminalTotalDifficulty: big.NewInt(480000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: true,
+			},
+		},
+	},
+	{
+		Name: "Build Payload After Multiple Terminal blocks via gossip (Common Ancestor Depth 5)",
+		// TTD is important in this test case, it guarantees that the CLMocker
+		// selects the PoW Producer as transition payload creator.
+		TTD:                             1230000,
+		TimeoutSeconds:                  180,
+		MainChainFile:                   "blocks_1_td_196608.rlp",
+		DisableMining:                   true,
+		SkipMainClientTTDWait:           true,
+		SafeSlotsToImportOptimistically: 1000,
+		TransitionPayloadStatus:         test.Valid,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			// This node will keep producing PoW blocks + 2 different terminal blocks with a common ancestor N-5 in height.
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:                      "PoW Producer",
+						PoWMiner:                  true,
+						MaxPeers:                  big.NewInt(1),
+						TerminalBlockSiblingCount: big.NewInt(2),
+						TerminalBlockSiblingDepth: big.NewInt(5),
+					},
+					TerminalTotalDifficulty: big.NewInt(1230000),
 					ChainFile:               "blocks_1_td_196608.rlp",
 				},
 				BuildPoSChainOnTop:  true,
@@ -568,10 +643,10 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 			// Start the secondary client with the alternative chain
 			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.CLMock.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
 			t.Logf("INFO (%s): Started secondary client: %v", t.TestName, secondaryClient.ID())
-			defer secondaryClient.PostRunVerifications()
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
 			}
+			defer t.HandleClientPostRunVerification(secondaryClient)
 			secondaryClients[i] = ClientSpec{
 				Client: secondaryClient,
 				Spec:   secondaryClientSpec,

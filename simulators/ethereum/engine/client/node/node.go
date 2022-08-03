@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus/ethash"
+	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/rawdb"
@@ -23,7 +26,6 @@ import (
 	"github.com/ethereum/go-ethereum/eth/ethconfig"
 	ethprotocol "github.com/ethereum/go-ethereum/eth/protocols/eth"
 	"github.com/ethereum/go-ethereum/log"
-	"github.com/ethereum/go-ethereum/miner"
 	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -76,7 +78,6 @@ type GethNodeEngineStarter struct {
 var (
 	DefaultMaxPeers                  = big.NewInt(25)
 	DefaultMiningStartDelaySeconds   = big.NewInt(10)
-	DefaultTerminalBlockSiblingCount = big.NewInt(1)
 	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
 )
 
@@ -133,10 +134,6 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		s.Config.MiningStartDelaySeconds = DefaultMiningStartDelaySeconds
 	}
 
-	if s.Config.TerminalBlockSiblingCount == nil {
-		s.Config.TerminalBlockSiblingCount = DefaultTerminalBlockSiblingCount
-	}
-
 	if s.Config.TerminalBlockSiblingDepth == nil {
 		s.Config.TerminalBlockSiblingDepth = DefaultTerminalBlockSiblingDepth
 	}
@@ -162,15 +159,20 @@ type AccountTransactionInfo struct {
 	PreviousNonce uint64
 }
 type GethNode struct {
-	node     *node.Node
-	eth      *eth.Ethereum
-	datadir  string
-	bootnode string
-	genesis  *core.Genesis
-	ttd      *big.Int
-	api      *ethcatalyst.ConsensusAPI
-	running  context.Context
-	closing  context.CancelFunc
+	node      *node.Node
+	eth       *eth.Ethereum
+	powEngine *ethash.Ethash
+
+	mustHeadBlock *types.Block
+
+	datadir    string
+	bootnode   string
+	genesis    *core.Genesis
+	ttd        *big.Int
+	api        *ethcatalyst.ConsensusAPI
+	running    context.Context
+	closing    context.CancelFunc
+	closeMutex sync.Mutex
 
 	// Engine updates info
 	latestFcUStateSent *beacon.ForkchoiceStateV1
@@ -181,9 +183,9 @@ type GethNode struct {
 	latestPayloadStatusReponse *beacon.PayloadStatusV1
 
 	// Test specific configuration
-	accTxInfoMap           map[common.Address]*AccountTransactionInfo
-	totalReceivedNewBlocks *big.Int
-	terminalBlocksMined    *big.Int
+	accTxInfoMap                      map[common.Address]*AccountTransactionInfo
+	totalReceivedOrAnnouncedNewBlocks *big.Int
+	terminalBlocksMined               *big.Int
 
 	config GethNodeTestConfiguration
 }
@@ -215,19 +217,6 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 	if err != nil {
 		return nil, err
 	}
-	ethHashConfig := ethconfig.Defaults.Ethash
-	minerConfig := ethconfig.Defaults.Miner
-	if startConfig.PoWMiner {
-		ethHashConfig.CacheDir = "/ethash"
-		ethHashConfig.DatasetDir = ethHashConfig.CacheDir
-		minerConfig = miner.Config{
-			GasFloor:  genesis.GasLimit * 9 / 10,
-			GasCeil:   genesis.GasLimit * 11 / 10,
-			GasPrice:  big.NewInt(1),
-			Recommit:  1 * time.Second, // Disable the recommit
-			Etherbase: startConfig.PoWMinerEtherBase,
-		}
-	}
 	econfig := &ethconfig.Config{
 		Genesis:          genesis,
 		NetworkId:        genesis.Config.ChainID.Uint64(),
@@ -236,8 +225,8 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 		DatabaseHandles:  256,
 		TxPool:           core.DefaultTxPoolConfig,
 		GPO:              ethconfig.Defaults.GPO,
-		Ethash:           ethHashConfig,
-		Miner:            minerConfig,
+		Ethash:           ethconfig.Defaults.Ethash,
+		Miner:            ethconfig.Defaults.Miner,
 		LightServ:        100,
 		LightPeers:       int(startConfig.MaxPeers.Int64()) - 1,
 		LightNoSyncServe: true,
@@ -273,9 +262,9 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 		api:          ethcatalyst.NewConsensusAPI(ethBackend),
 		accTxInfoMap: make(map[common.Address]*AccountTransactionInfo),
 		// Test related configuration
-		totalReceivedNewBlocks: big.NewInt(0),
-		terminalBlocksMined:    big.NewInt(0),
-		config:                 startConfig,
+		totalReceivedOrAnnouncedNewBlocks: big.NewInt(0),
+		terminalBlocksMined:               big.NewInt(0),
+		config:                            startConfig,
 	}
 
 	g.running, g.closing = context.WithCancel(context.Background())
@@ -305,72 +294,162 @@ func (n *GethNode) EnablePoWMining() {
 	// Delay mining start
 	select {
 	case <-time.After(time.Second * time.Duration(n.config.MiningStartDelaySeconds.Int64())):
-		n.eth.Miner().SetEtherbase(n.config.PoWMinerEtherBase)
-		err := n.eth.StartMining(1)
-		if err != nil {
-			n.Close()
-			return
-		}
 	case <-n.running.Done():
 		return
 	}
 
-	// Start PoW Processing
-	go n.StartPoWMiningProcessing()
+	// Start PoW Mining Loop
+	go n.PoWMiningLoop()
 
 }
 
-func (n *GethNode) StartPoWMiningProcessing() {
-	// Subscribe and process all mined blocks
-	minedBlockSub := n.node.EventMux().Subscribe(core.NewMinedBlockEvent{}).Chan()
-	for {
-		select {
-		case obj := <-minedBlockSub:
-			if obj != nil {
-				if ev, ok := obj.Data.(core.NewMinedBlockEvent); ok {
-					n.ProcessNewMinedPoWBlock(ev.Block)
+func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, *types.Block, error) {
+	if t, _, err := n.isBlockTerminal(currentBlock); err == nil {
+		if t {
+			if n.config.TerminalBlockSiblingCount != nil && n.config.TerminalBlockSiblingCount.Cmp(n.terminalBlocksMined) > 0 {
+				// Reset the canonical chain to the parent of the terminal block to keep the miner mining.
+				if currentBlock, err = n.ReOrgBackBlockChain(n.config.TerminalBlockSiblingDepth.Uint64(), currentBlock); err != nil {
+					panic(err)
 				}
+			} else {
+				// PoW has finished
+				return nil, nil, nil
 			}
-		case <-n.running.Done():
-			return
 		}
 	}
+
+	timestamp := uint64(time.Now().Unix())
+	if currentBlock.Time() >= timestamp {
+		timestamp = currentBlock.Time() + 1
+	}
+	num := currentBlock.Number()
+	nextHeader := &types.Header{
+		ParentHash: currentBlock.Hash(),
+		Number:     num.Add(num, common.Big1),
+		GasLimit:   currentBlock.GasLimit(),
+		Time:       timestamp,
+		Coinbase:   n.config.PoWMinerEtherBase,
+	}
+
+	// Always randomize extra to try to generate different seal hash
+	rand.Read(nextHeader.Extra)
+
+	// Set baseFee and GasLimit if we are on an EIP-1559 chain
+	if n.eth.BlockChain().Config().IsLondon(nextHeader.Number) {
+		nextHeader.BaseFee = misc.CalcBaseFee(n.eth.BlockChain().Config(), currentBlock.Header())
+		if !n.eth.BlockChain().Config().IsLondon(currentBlock.Number()) {
+			parentGasLimit := currentBlock.GasLimit() * params.ElasticityMultiplier
+			nextHeader.GasLimit = parentGasLimit
+		}
+	}
+
+	if err := n.powEngine.Prepare(n.eth.BlockChain(), nextHeader); err != nil {
+		log.Error("Failed to prepare header for sealing", "err", err)
+		return nil, nil, err
+	}
+
+	state, err := n.eth.BlockChain().StateAt(currentBlock.Root())
+	if err != nil {
+		panic(err)
+	}
+	b, err := n.powEngine.FinalizeAndAssemble(n.eth.BlockChain(), nextHeader, state, nil, nil, nil)
+	return state, b, err
 }
 
-func (n *GethNode) ProcessNewMinedPoWBlock(b *types.Block) {
-	if t, td, err := n.isBlockTerminal(b); t {
-		fmt.Printf("DEBUG (%s): Mined a New Terminal Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
-		n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
-		if n.config.TerminalBlockSiblingCount.Cmp(n.terminalBlocksMined) > 0 {
-			// Shuffle the extra bytes of the miner before re-org to force having a different sealhash
-			newExtra := make([]byte, 8)
-			rand.Read(newExtra)
-			n.eth.Miner().SetExtra(newExtra)
-			// Reset the canonical chain to the parent of the terminal block to keep the miner mining.
-			if _, err := n.ReOrgBackBlockChain(n.config.TerminalBlockSiblingDepth.Uint64(), b); err != nil {
+func (n *GethNode) PoWMiningLoop() {
+	// Start a ethash instance to seal blocks
+	ethashConfig := ethconfig.Defaults.Ethash
+	ethashConfig.PowMode = ethash.ModeNormal
+	ethashConfig.CacheDir = "/ethash"
+	ethashConfig.DatasetDir = ethashConfig.CacheDir
+	n.powEngine = ethash.New(ethashConfig, nil, false)
+	defer n.powEngine.Close()
+
+	currentBlock := n.eth.BlockChain().CurrentBlock()
+	// During the Pow mining, the node must respond with the latest mined block, not what the blockchain actually states
+	n.mustHeadBlock = currentBlock
+
+	// When the node stops mining, the head must now point to the actual head
+	defer func() {
+		n.mustHeadBlock = nil
+	}()
+
+	for {
+		select {
+		case <-n.running.Done():
+			return
+		default:
+		}
+		s, b, err := n.PrepareNextBlock(currentBlock)
+		if err != nil {
+			panic(err)
+		}
+		if b == nil {
+			// Nothing left to mine
+			return
+		}
+
+		// Wait until the previous block is succesfully propagated
+		<-time.After(time.Millisecond * 200)
+
+		// Seal the next block to broadcast
+		rChan := make(chan *types.Block, 0)
+		stopChan := make(chan struct{})
+		n.powEngine.Seal(n.eth.BlockChain(), b, rChan, stopChan)
+		select {
+		case b := <-rChan:
+			if b == nil {
+				panic(fmt.Errorf("no block got sealed"))
+			}
+			// Broadcast
+			n.eth.EventMux().Post(core.NewMinedBlockEvent{Block: b})
+
+			// Check whether the block was a terminal block
+			if t, td, err := n.isBlockTerminal(b); err == nil {
+				if t {
+					n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
+					fmt.Printf("DEBUG (%s) [%v]: Mined a New Terminal Block: hash=%v, parent=%v, number=%d, td=%d, ttd=%d\n", n.config.Name, time.Now(), b.Hash(), b.ParentHash(), b.Number(), td, n.ttd)
+				} else {
+					fmt.Printf("DEBUG (%s) [%v]: Mined a New Block: hash=%v, parent=%v, number=%d, td=%d, ttd=%d\n", n.config.Name, time.Now(), b.Hash(), b.ParentHash(), b.Number(), td, n.ttd)
+				}
+			} else {
 				panic(err)
 			}
+
+			// Write to the chain
+			_, err = n.eth.BlockChain().WriteBlockAndSetHead(b, nil, nil, s, false)
+			if err != nil {
+				panic(err)
+			}
+
+			// Update the block on top of which to proceed with mining
+			currentBlock = b
+			n.mustHeadBlock = b
+		case <-n.running.Done():
+			close(stopChan)
+			return
 		}
-	} else if err == nil {
-		fmt.Printf("DEBUG (%s): Mined a New Block: hash=%v, td=%d, ttd=%d\n", n.config.Name, b.Hash(), td, n.ttd)
-	} else if err != nil {
-		fmt.Printf("DEBUG (%s): ERROR during terminal block calc=%v\n", n.config.Name, err)
 	}
 }
 
 // Sets the canonical block to an ancestor of the provided block.
 // `N==1` means to re-org to the parent of the provided block.
-func (n *GethNode) ReOrgBackBlockChain(N uint64, currentBlock *types.Block) (common.Hash, error) {
+func (n *GethNode) ReOrgBackBlockChain(N uint64, currentBlock *types.Block) (*types.Block, error) {
 	if N == 0 {
-		return currentBlock.Hash(), nil
+		return currentBlock, nil
 	}
 	for ; N > 0; N-- {
 		currentBlock = n.eth.BlockChain().GetBlockByHash(currentBlock.ParentHash())
 		if currentBlock == nil {
-			return common.Hash{}, fmt.Errorf("Unable to re-org back")
+			return nil, fmt.Errorf("Unable to re-org back")
 		}
 	}
-	return n.eth.BlockChain().SetCanonical(currentBlock)
+	_, err := n.eth.BlockChain().SetCanonical(currentBlock)
+	n.mustHeadBlock = currentBlock
+	if err != nil {
+		return nil, err
+	}
+	return currentBlock, nil
 }
 
 func (n *GethNode) SubscribeP2PEvents() {
@@ -383,10 +462,16 @@ func (n *GethNode) SubscribeP2PEvents() {
 			if event.MsgCode != nil {
 				msgCode = *event.MsgCode
 			}
-			if event.Type == p2p.PeerEventTypeMsgRecv && msgCode == ethprotocol.NewBlockMsg {
-				n.totalReceivedNewBlocks.Add(n.totalReceivedNewBlocks, common.Big1)
-				fmt.Printf("DEBUG (%s): Received new block: Peer=%s, MsgCode=%d, Type=%s, Protocol=%s, RemoteAddress=%s\n", n.config.Name, event.Peer.String(), msgCode, event.Type, event.Protocol, event.RemoteAddress)
+			if event.Type == p2p.PeerEventTypeMsgRecv {
+				if msgCode == ethprotocol.NewBlockMsg {
+					n.totalReceivedOrAnnouncedNewBlocks.Add(n.totalReceivedOrAnnouncedNewBlocks, common.Big1)
+					fmt.Printf("DEBUG (%s) [%v]: Received new block: Peer=%s, MsgCode=%d, Type=%s, Protocol=%s, RemoteAddress=%s\n", n.config.Name, time.Now(), event.Peer.String(), msgCode, event.Type, event.Protocol, event.RemoteAddress)
+				} else if msgCode == ethprotocol.NewBlockHashesMsg {
+					n.totalReceivedOrAnnouncedNewBlocks.Add(n.totalReceivedOrAnnouncedNewBlocks, common.Big1)
+					fmt.Printf("DEBUG (%s) [%v]: Received new block announcement: Peer=%s, MsgCode=%d, Type=%s, Protocol=%s, RemoteAddress=%s\n", n.config.Name, time.Now(), event.Peer.String(), msgCode, event.Type, event.Protocol, event.RemoteAddress)
+				}
 			}
+
 		case <-n.running.Done():
 			return
 		}
@@ -394,6 +479,8 @@ func (n *GethNode) SubscribeP2PEvents() {
 }
 
 func (n *GethNode) Close() error {
+	n.closeMutex.Lock()
+	defer n.closeMutex.Unlock()
 	select {
 	case <-n.running.Done():
 		// Node already closed
@@ -547,10 +634,16 @@ func parseBlockNumber(number *big.Int) rpc.BlockNumber {
 }
 
 func (n *GethNode) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+	if number == nil && n.mustHeadBlock != nil {
+		return n.mustHeadBlock, nil
+	}
 	return n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 }
 
 func (n *GethNode) BlockNumber(ctx context.Context) (uint64, error) {
+	if n.mustHeadBlock != nil {
+		return n.mustHeadBlock.NumberU64(), nil
+	}
 	return n.eth.APIBackend.CurrentBlock().NumberU64(), nil
 }
 
@@ -559,6 +652,9 @@ func (n *GethNode) BlockByHash(ctx context.Context, hash common.Hash) (*types.Bl
 }
 
 func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+	if number == nil && n.mustHeadBlock != nil {
+		return n.mustHeadBlock.Header(), nil
+	}
 	b, err := n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 	if err != nil {
 		return nil, err
@@ -610,11 +706,14 @@ func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 }
 
 func (n *GethNode) GetBlockTotalDifficulty(ctx context.Context, hash common.Hash) (*big.Int, error) {
-	currentBlock := n.eth.BlockChain().GetBlockByHash(hash)
-	return n.eth.BlockChain().GetTd(hash, currentBlock.NumberU64()), nil
+	block := n.eth.BlockChain().GetBlockByHash(hash)
+	return n.eth.BlockChain().GetTd(hash, block.NumberU64()), nil
 }
 
 func (n *GethNode) GetTotalDifficulty(ctx context.Context) (*big.Int, error) {
+	if n.mustHeadBlock != nil {
+		return n.GetBlockTotalDifficulty(ctx, n.mustHeadBlock.Hash())
+	}
 	return n.GetBlockTotalDifficulty(ctx, n.eth.BlockChain().CurrentHeader().Hash())
 }
 
@@ -662,8 +761,14 @@ func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.A
 func (n *GethNode) PostRunVerifications() error {
 	// Check that the node did not receive more gossiped blocks than expected
 	if n.config.ExpectedGossipNewBlocksCount != nil {
-		if n.config.ExpectedGossipNewBlocksCount.Cmp(n.totalReceivedNewBlocks) != 0 {
-			return fmt.Errorf("Node received gossiped blocks count different than expected: %d != %d", n.totalReceivedNewBlocks, n.config.ExpectedGossipNewBlocksCount)
+		if n.config.ExpectedGossipNewBlocksCount.Cmp(n.totalReceivedOrAnnouncedNewBlocks) != 0 {
+			return fmt.Errorf("Node received gossiped blocks count different than expected: %d != %d", n.totalReceivedOrAnnouncedNewBlocks, n.config.ExpectedGossipNewBlocksCount)
+		}
+	}
+	if n.config.PoWMiner && n.config.TerminalBlockSiblingCount != nil {
+		if n.terminalBlocksMined.Cmp(n.config.TerminalBlockSiblingCount) != 0 {
+			return fmt.Errorf("PoW Miner node could not mine expected amount of terminal blocks: %d != %d", n.terminalBlocksMined, n.config.TerminalBlockSiblingCount)
+
 		}
 	}
 	return nil
