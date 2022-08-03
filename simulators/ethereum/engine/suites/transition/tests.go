@@ -606,6 +606,33 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
+		Name:                     "Transition on an Invalid Terminal Execution - Distant Future",
+		TTD:                      290000,
+		TimeoutSeconds:           30,
+		MainChainFile:            "blocks_1_td_196608.rlp",
+		DisableMining:            true,
+		SkipMainClientTTDWait:    true,
+		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							TimeSecondsInFuture: 60,
+						},
+					},
+					TerminalTotalDifficulty: big.NewInt(290000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
 		Name:                     "Transition on an Invalid Terminal Execution - Sealed MixHash",
 		TTD:                      290000,
 		TimeoutSeconds:           30,

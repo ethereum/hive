@@ -45,6 +45,7 @@ type GethNodeTestConfiguration struct {
 	// The node mines proof of work blocks
 	PoWMiner          bool
 	PoWMinerEtherBase common.Address
+	DisableGossiping  bool
 
 	// Block Modifier
 	BlockModifier helper.BlockModifier
@@ -430,7 +431,9 @@ func (n *GethNode) PoWMiningLoop() {
 			}
 
 			// Broadcast
-			n.eth.EventMux().Post(core.NewMinedBlockEvent{Block: b})
+			if !n.config.DisableGossiping {
+				n.eth.EventMux().Post(core.NewMinedBlockEvent{Block: b})
+			}
 
 			// Check whether the block was a terminal block
 			if t, td, err := n.isBlockTerminal(b); err == nil {

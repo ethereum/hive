@@ -1,6 +1,7 @@
 package helper
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -19,6 +20,7 @@ type PoWBlockModifier struct {
 	RandomStateRoot      bool
 	InvalidSealedMixHash bool
 	InvalidSealedNonce   bool
+	TimeSecondsInFuture  uint64
 }
 
 func (m PoWBlockModifier) ModifyUnsealedBlock(baseBlock *types.Block) (*types.Block, error) {
@@ -30,18 +32,21 @@ func (m PoWBlockModifier) ModifyUnsealedBlock(baseBlock *types.Block) (*types.Bl
 	if m.RandomStateRoot {
 		rand.Read(modifiedHeader.Root[:])
 	}
+	if m.TimeSecondsInFuture > 0 {
+		modifiedHeader.Time += m.TimeSecondsInFuture
+	}
 
 	modifiedBlock := types.NewBlockWithHeader(modifiedHeader)
 	modifiedBlock = modifiedBlock.WithBody(baseBlock.Transactions(), baseBlock.Uncles())
+
+	js, _ := json.MarshalIndent(modifiedBlock.Header(), "", "  ")
+	fmt.Printf("DEBUG: Modified unsealed block with hash %v:\n%s\n", modifiedBlock.Hash(), js)
 
 	return modifiedBlock, nil
 }
 
 func (m PoWBlockModifier) ModifySealedBlock(f func(*types.Header) bool, baseBlock *types.Block) (*types.Block, error) {
 	modifiedHeader := types.CopyHeader(baseBlock.Header())
-
-	// Set the extra to be able to identify this block
-	modifiedHeader.Extra = []byte("modified block")
 
 	if m.InvalidSealedMixHash {
 		modifiedHeader.MixDigest = common.Hash{}
@@ -61,6 +66,7 @@ func (m PoWBlockModifier) ModifySealedBlock(f func(*types.Header) bool, baseBloc
 	modifiedBlock := types.NewBlockWithHeader(modifiedHeader)
 	modifiedBlock = modifiedBlock.WithBody(baseBlock.Transactions(), baseBlock.Uncles())
 
-	fmt.Printf("DEBUG: Modified block with hash %v\n", modifiedBlock.Hash())
+	js, _ := json.MarshalIndent(modifiedBlock.Header(), "", "  ")
+	fmt.Printf("DEBUG: Modified sealed block with hash %v:\n%s\n", modifiedBlock.Hash(), js)
 	return modifiedBlock, nil
 }
