@@ -174,6 +174,7 @@ const (
 	InvalidGasUsed                                    = "GasUsed"
 	InvalidTimestamp                                  = "Timestamp"
 	InvalidPrevRandao                                 = "PrevRandao"
+	InvalidOmmers                                     = "Ommers"
 	RemoveTransaction                                 = "Incomplete Transactions"
 	InvalidTransactionSignature                       = "Transaction Signature"
 	InvalidTransactionNonce                           = "Transaction Nonce"

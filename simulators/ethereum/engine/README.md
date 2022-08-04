@@ -321,15 +321,15 @@ Test cases using multiple Proof of Work chains to test the client's behavior whe
    - `C1`'s configured `TTD` is reached by `A`
    - `C2`'s configured `TTD` is reached by `B`
    - `forkchoiceUpdated` is sent to both clients with `B` as Head  
-   - PoS chain is continued on top of `B`
-   - Verify that `C1` never re-orgs to chain `G <- A <- B` due to incorrect Terminal block
+   - PoS chain with transition payload `P1` is continued on top of `B`
+   - Verify that `C1` never re-orgs to chain `G <- A <- B <- P1 <- ...` due to incorrect Terminal block
 
 - Transition to a Chain with Invalid Terminal Block, Higher Configured Total Difficulty (Transition Payload Sync)
    - Client `C1` starts with chain `G <- A`, Client `C2` starts with chain `G <- A <- B`  
    - `C1`'s configured `TTD` is reached by `A`
    - `C2`'s configured `TTD` is reached by `B`
    - `forkchoiceUpdated` is sent to both clients with `B` as Head  
-   - P1 is prepared by `C2` on top of `G <- A <- B`
+   - `P1` is prepared by `C2` on top of `G <- A <- B`
    - `newPayload(P1)` is sent to `C1` and verification is made that, after syncing, `{status: INVALID, latestValidHash: 0x00..00}` is returned
 
 - Transition to a Chain with Invalid Terminal Block, Lower Configured Total Difficulty
@@ -337,15 +337,15 @@ Test cases using multiple Proof of Work chains to test the client's behavior whe
    - `C1`'s configured `TTD` is reached by `B`
    - `C2`'s configured `TTD` is reached by `A`
    - `forkchoiceUpdated` is sent to both clients with `A` as Head  
-   - PoS chain is continued on top of `A`
-   - Verify that `C1` never re-orgs to chain `G <- A <- ...` due to incorrect Terminal block 
+   - PoS chain with transition payload `P1` is continued on top of `A`
+   - Verify that `C1` never re-orgs to chain `G <- A <- P1 <- ...` due to incorrect Terminal block 
 
 - Transition to a Chain with Invalid Terminal Block, Lower Configured Total Difficulty (Transition Payload Sync)
    - Client `C1` starts with chain `G <- A <- B`, Client `C2` starts with chain `G <- A`  
    - `C1`'s configured `TTD` is reached by `B`
    - `C2`'s configured `TTD` is reached by `A`
    - `forkchoiceUpdated` is sent to both clients with `A` as Head  
-   - P1 is prepared by `C2` on top of `G <- A`
+   - `P1` is prepared by `C2` on top of `G <- A`
    - `newPayload(P1)` is sent to `C1` and verification is made that, after syncing, `{status: INVALID, latestValidHash: 0x00..00}` is returned
 
 - Halt syncing to PoW chain:  

@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -317,91 +316,148 @@ var Tests = []test.Spec{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidStateRoot, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.InvalidStateRoot,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidStateRoot, true),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.InvalidStateRoot,
+			EmptyTransactions:   true,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P8', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, helper.InvalidReceiptsRoot, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 8,
+			PayloadField:        helper.InvalidReceiptsRoot,
+		}.GenerateSync(),
 	},
 	/*
-		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
-		{
-			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
-			TimeoutSeconds:   30,
-			SlotsToFinalized: big.NewInt(20),
-			Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidNumber, false),
-		},
+				TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
+				{
+					Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
+					TimeoutSeconds:   30,
+					SlotsToFinalized: big.NewInt(20),
+					Run:              InvalidMissingAncestorReOrgSpec{
+					PayloadInvalidIndex: 9,
+					PayloadField: helper.InvalidNumber,
+		}.GenerateSync(),
+				},
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, helper.InvalidGasLimit, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 8,
+			PayloadField:        helper.InvalidGasLimit,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, helper.InvalidGasUsed, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 8,
+			PayloadField:        helper.InvalidGasUsed,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(8, helper.InvalidTimestamp, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 8,
+			PayloadField:        helper.InvalidTimestamp,
+		}.GenerateSync(),
 	},
 	/*
-		TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
-		{
-			Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
-			TimeoutSeconds:   30,
-			SlotsToFinalized: big.NewInt(20),
-			Run:              invalidMissingAncestorReOrgGenSync(8, InvalidPrevRandao, false),
-		},
+				TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
+				{
+					Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
+					TimeoutSeconds:   30,
+					SlotsToFinalized: big.NewInt(20),
+					Run:              InvalidMissingAncestorReOrgSpec{
+					PayloadInvalidIndex: 8,
+					PayloadField: InvalidPrevRandao,
+		}.GenerateSync(),
+				},
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, helper.RemoveTransaction, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.RemoveTransaction,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionSignature, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.InvalidTransactionSignature,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionNonce, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.InvalidTransactionNonce,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionGas, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.InvalidTransactionGas,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionGasPrice, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.InvalidTransactionGasPrice,
+		}.GenerateSync(),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
-		Run:              invalidMissingAncestorReOrgGenSync(9, helper.InvalidTransactionValue, false),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.InvalidTransactionValue,
+		}.GenerateSync(),
+	},
+	// TODO: Add an `Invalid Ancestor Chain Re-Org, Invalid Uncles, Invalid P9`
+
+	// Invalid Transition Re-Org Tests (Reveal via sync through secondary client)
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidStateRoot,
+		}.GenerateSync(),
 	},
 
 	// Eth RPC Status on ForkchoiceUpdated Events
@@ -1374,9 +1430,21 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 
 // Attempt to re-org to a chain which at some point contains an unknown payload which is also invalid.
 // Then reveal the invalid payload and expect that the client rejects it and rejects forkchoice updated calls to this chain.
-// The invalid_index parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
+// The PayloadInvalidIndex parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
 // with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
-func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.InvalidPayloadField, emptyTxs bool) func(*test.Env) {
+type InvalidMissingAncestorReOrgSpec struct {
+	PayloadInvalidIndex     int
+	PayloadField            helper.InvalidPayloadField
+	EmptyTransactions       bool
+	CommonAncestorPoSHeight *big.Int
+	DeviatingPayloadCount   *big.Int
+}
+
+func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
+	var (
+		invalidIndex = spec.PayloadInvalidIndex
+	)
+
 	return func(t *test.Env) {
 		var (
 			err error
@@ -1393,19 +1461,45 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 		t.CLMock.WaitForTTD()
 
 		// Produce blocks before starting the test
-		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
+		var cA *types.Block
+
+		cAHeight := spec.CommonAncestorPoSHeight
+		if cAHeight == nil {
+			// Default is to produce 5 PoS blocks before the common ancestor
+			cAHeight = big.NewInt(5)
+			t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
+		}
 
 		// Save the common ancestor
-		cA := t.CLMock.LatestPayloadBuilt
+		if cAHeight.Cmp(big0) == 0 {
+			// Common ancestor is pre-merge
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			b, err := t.Engine.BlockByNumber(ctx, nil)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error while getting latest block: %v", t.TestName, err)
+			}
+			cA = b
+		} else {
+			t.CLMock.ProduceBlocks(int(cAHeight.Int64()), clmock.BlockProcessCallbacks{})
+			cA, err = api.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
+			}
+		}
 
 		// Amount of blocks to deviate starting from the common ancestor
+		// Default is to deviate 10 payloads from the common ancestor
 		n := 10
+		if spec.DeviatingPayloadCount != nil {
+			n = int(spec.DeviatingPayloadCount.Int64())
+		}
 
 		// Slice to save the alternate B chain
-		altChainPayloads := make([]*api.ExecutableDataV1, 0)
+		altChainPayloads := make([]*types.Block, 0)
 
 		// Append the common ancestor
-		altChainPayloads = append(altChainPayloads, &cA)
+		altChainPayloads = append(altChainPayloads, cA)
 
 		// Produce blocks but at the same time create an alternate chain which contains an invalid payload at some point (INV_P)
 		// CommonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
@@ -1416,7 +1510,7 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 			OnPayloadProducerSelected: func() {
 				// Function to send at least one transaction each block produced.
 				// Empty Txs Payload with invalid stateRoot discovered an issue in geth sync, hence this is customizable.
-				if !emptyTxs {
+				if !spec.EmptyTransactions {
 					// Send the transaction to the globals.PrevRandaoContractAddr
 					_, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, big1, nil, t.TestTransactionType)
 					if err != nil {
@@ -1430,20 +1524,26 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 					err              error
 				)
 				// Insert extraData to ensure we deviate from the main payload, which contains empty extradata
+				pHash := altChainPayloads[len(altChainPayloads)-1].Hash()
 				alternatePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
-					ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
+					ParentHash: &pHash,
 					ExtraData:  &([]byte{0x01}),
 				})
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
-				if len(altChainPayloads) == invalid_index {
-					alternatePayload, err = helper.GenerateInvalidPayload(alternatePayload, payloadField)
+				if len(altChainPayloads) == invalidIndex {
+					alternatePayload, err = helper.GenerateInvalidPayload(alternatePayload, spec.PayloadField)
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 					}
 				}
-				altChainPayloads = append(altChainPayloads, alternatePayload)
+
+				b, err := api.ExecutableDataToBlock(*alternatePayload)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
+				}
+				altChainPayloads = append(altChainPayloads, b)
 			},
 		})
 		t.CLMock.RemoveEngineClient(secondaryClient)
@@ -1456,17 +1556,19 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 				for i := 1; i < n; i++ {
 					// Send the payload
 					payloadValidStr := "VALID"
-					if i == invalid_index {
+					if i == invalidIndex {
 						payloadValidStr = "INVALID"
-					} else if i > invalid_index {
+					} else if i > invalidIndex {
 						payloadValidStr = "VALID with INVALID ancestor"
 					}
-					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
+					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].Hash())
 
-					if i < invalid_index {
+					if i < invalidIndex {
 						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 						defer cancel()
-						status, err := secondaryClient.NewPayloadV1(ctx, altChainPayloads[i])
+
+						p := api.BlockToExecutableData(altChainPayloads[i])
+						status, err := secondaryClient.NewPayloadV1(ctx, p)
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
 						}
@@ -1477,8 +1579,8 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 						ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
 						defer cancel()
 						status2, err := secondaryClient.ForkchoiceUpdatedV1(ctx, &api.ForkchoiceStateV1{
-							HeadBlockHash:      altChainPayloads[i].BlockHash,
-							SafeBlockHash:      cA.BlockHash,
+							HeadBlockHash:      p.BlockHash,
+							SafeBlockHash:      cA.Hash(),
 							FinalizedBlockHash: common.Hash{},
 						}, nil)
 						if err != nil {
@@ -1489,15 +1591,15 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 						}
 
 					} else {
-						invalid_block, err := beacon.ExecutableDataToBlock(*altChainPayloads[i])
+						invalidBlock := altChainPayloads[i]
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Failed to create block from payload: %v", t.TestName, err)
 						}
 
-						if err := secondaryClient.SetBlock(invalid_block, altChainPayloads[i-1].Number, altChainPayloads[i-1].StateRoot); err != nil {
+						if err := secondaryClient.SetBlock(invalidBlock, altChainPayloads[i-1].NumberU64(), altChainPayloads[i-1].Root()); err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Failed to set invalid block: %v", t.TestName, err)
 						}
-						t.Logf("INFO (%s): Invalid block successfully set %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].BlockHash)
+						t.Logf("INFO (%s): Invalid block successfully set %d (%s): %v", t.TestName, i, payloadValidStr, invalidBlock.Hash())
 					}
 				}
 				// Check that the second node has the correct head
@@ -1508,30 +1610,35 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 					t.Fatalf("FAIL (%s): TEST ISSUE - Secondary Node unable to reatrieve latest header: %v", t.TestName, err)
 
 				}
-				if head.Hash() != altChainPayloads[n-1].BlockHash {
-					t.Fatalf("FAIL (%s): TEST ISSUE - Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %v", t.TestName, head.Hash(), altChainPayloads[n-1].BlockHash, head.Number, altChainPayloads[n].Number)
+				if head.Hash() != altChainPayloads[n-1].Hash() {
+					t.Fatalf("FAIL (%s): TEST ISSUE - Secondary Node has invalid blockhash got %v want %v gotNum %v wantNum %d", t.TestName, head.Hash(), altChainPayloads[n-1].Hash(), head.Number, altChainPayloads[n].NumberU64())
 				} else {
 					t.Logf("INFO (%s): Secondary Node has correct block", t.TestName)
 				}
 
 				// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
 				for {
-					r := t.TestEngine.TestEngineNewPayloadV1(altChainPayloads[n])
+					r := t.TestEngine.TestEngineNewPayloadV1(api.BlockToExecutableData(altChainPayloads[n]))
 					t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
 					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
-						HeadBlockHash:      altChainPayloads[n].BlockHash,
-						SafeBlockHash:      altChainPayloads[n].BlockHash,
+						HeadBlockHash:      altChainPayloads[n].Hash(),
+						SafeBlockHash:      altChainPayloads[n].Hash(),
 						FinalizedBlockHash: common.Hash{},
 					}, nil)
 					t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 
 					if r.Status.Status == test.Invalid {
 						// We also expect that the client properly returns the LatestValidHash of the block on the
-						// alternate chain that is immediately prior to the invalid payload
-						r.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
+						// alternate chain that is immediately prior to the invalid payload (or zero if parent is PoW)
+						var lvh common.Hash
+						if cAHeight.Cmp(big0) != 0 || invalidIndex != 1 {
+							// Parent is NOT Proof of Work
+							lvh = altChainPayloads[invalidIndex-1].Hash()
+						}
+						r.ExpectLatestValidHash(&lvh)
 						// Response on ForkchoiceUpdated should be the same
 						s.ExpectPayloadStatus(test.Invalid)
-						s.ExpectLatestValidHash(&altChainPayloads[invalid_index-1].BlockHash)
+						s.ExpectLatestValidHash(&lvh)
 						break
 					} else if test.PayloadStatus(r.Status.Status) == test.Valid {
 						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
@@ -1541,8 +1648,12 @@ func invalidMissingAncestorReOrgGenSync(invalid_index int, payloadField helper.I
 							t.Fatalf("FAIL (%s): Unable to get latest block: %v", t.TestName, err)
 						}
 
-						// Print last 10 blocks, for debugging
-						for k := latestBlock.Number().Int64() - 10; k <= latestBlock.Number().Int64(); k++ {
+						// Print last n blocks, for debugging
+						k := latestBlock.Number().Int64() - int64(n)
+						if k < 0 {
+							k = 0
+						}
+						for ; k <= latestBlock.Number().Int64(); k++ {
 							ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
 							defer cancel()
 							latestBlock, err := t.Eth.BlockByNumber(ctx, big.NewInt(k))
