@@ -372,12 +372,49 @@ Test cases using multiple Proof of Work chains to test the client's behavior whe
    - Blocks `PoW4` through `PoW8` are all siblings and all reach TTD
    - Verify that `PoW Receiver` receives exactly 7 gossiped new blocks (`PoW2` through `PoW8`)
 
+- Terminal blocks are gossiped (Common Ancestor Depth 5)
+   - Clients `C1`, `PoW Producer` and `PoW Receiver` start with `G <- PoW1`
+   - `PoW Producer` and `PoW Receiver` are connected only to `C1`, not between each other
+   - `PoW Producer` continues mining chains `PoW1 <- PoW2 <- PoW3 <- PoW4 <- PoW5 <- PoW6` and `PoW1 <- PoW2' <- PoW3' <- PoW4' <- PoW5' <- PoW6'`
+   - Blocks `PoW2` and `PoW2'` have same parent `PoW1`, but have different hashes (e.g. different `ethash` seal)
+   - Blocks `PoW6` and `PoW6'` reach TTD
+   - Verify that `PoW Receiver` receives exactly 10 gossiped new blocks (`PoW2` through `PoW6` and `PoW2'` through `PoW6'`)
+
 - Build Payload After Multiple Terminal blocks via gossip
    - Clients `C1` and `PoW Producer` start with `G <- PoW1`
    - `PoW Producer` continues mining chains `PoW1 <- PoW2 <- PoW3`, `PoW1 <- PoW2 <- PoW4`, ..., `PoW1 <- PoW2 <- PoW7`
    - Blocks `PoW3` through `PoW7` are all siblings and all reach TTD
    - Send `newPayload(P1)` where `P1.parentHash == PoW7` to `C1`
    - Verify that `C1` immediately validates `P1` and returns `VALID`
+
+- Build Payload After Multiple Terminal blocks via gossip (Common Ancestor Depth 5)
+   - Clients `C1` and `PoW Producer` start with `G <- PoW1`
+   - `PoW Producer` continues mining chains `PoW1 <- PoW2 <- PoW3 <- PoW4 <- PoW5 <- PoW6` and `PoW1 <- PoW2' <- PoW3' <- PoW4' <- PoW5' <- PoW6'`
+   - Blocks `PoW2` and `PoW2'` have same parent `PoW1`, but have different hashes (e.g. different `ethash` seal)
+   - Blocks `PoW6` and `PoW6'` reach TTD
+   - Send `newPayload(P1)` where `P1.parentHash == PoW6'` to `C1`
+   - Verify that `C1` immediately validates `P1` and returns `VALID`
+
+- Transition on an Invalid Terminal Execution - Difficulty
+   - Clients `C1` and `PoW Producer` start with `G <- PoW1`
+   - `PoW Producer` mines and gossips `PoW2`
+   - `PoW2` has a `difficulty` value which reaches `TTD`, but it's not the correct expected value for `PoW2` according to `ethash` consensus rules
+   - Send `newPayload(P1)` where `P1.parentHash == PoW2` to `C1`
+   - Verify that `C1` does not follow `PoS` chain built on top of `P1` and its head still points to `PoW1`
+
+- Transition on an Invalid Terminal Execution - Distant Future
+   - Clients `C1` and `PoW Producer` start with `G <- PoW1`
+   - `PoW Producer` mines and gossips `PoW2`
+   - `PoW2` has a correct `difficulty` value and reaches `TTD`, but its `timestamp` value is 60 seconds into the future
+   - Send `newPayload(P1)` where `P1.parentHash == PoW2` to `C1`
+   - Verify that `C1` does not follow `PoS` chain built on top of `P1` and its head still points to `PoW1`
+
+- Transition on an Invalid Terminal Execution - Sealed MixHash/Nonce
+   - Clients `C1` and `PoW Producer` start with `G <- PoW1`
+   - `PoW Producer` mines and gossips `PoW2`
+   - `PoW2` has a correct `difficulty` value and reaches `TTD`, but its `mixHash`/`nonce` values are incorrect according to `ethash` consensus rules
+   - Send `newPayload(P1)` where `P1.parentHash == PoW2` to `C1`
+   - Verify that `C1` does not follow `PoS` chain built on top of `P1` and its head still points to `PoW1`
 
 
 ## Engine API Authentication (JWT) Tests:
