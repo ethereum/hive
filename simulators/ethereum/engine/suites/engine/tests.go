@@ -341,16 +341,16 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	/*
-				TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
-				{
-					Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
-					TimeoutSeconds:   30,
-					SlotsToFinalized: big.NewInt(20),
-					Run:              InvalidMissingAncestorReOrgSpec{
-					PayloadInvalidIndex: 9,
-					PayloadField: helper.InvalidNumber,
-		}.GenerateSync(),
-				},
+		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
+		{
+			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
+			TimeoutSeconds:   30,
+			SlotsToFinalized: big.NewInt(20),
+			Run: InvalidMissingAncestorReOrgSpec{
+				PayloadInvalidIndex: 9,
+				PayloadField:        helper.InvalidNumber,
+			}.GenerateSync(),
+		},
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
@@ -380,16 +380,16 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	/*
-				TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
-				{
-					Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
-					TimeoutSeconds:   30,
-					SlotsToFinalized: big.NewInt(20),
-					Run:              InvalidMissingAncestorReOrgSpec{
-					PayloadInvalidIndex: 8,
-					PayloadField: InvalidPrevRandao,
-		}.GenerateSync(),
-				},
+			TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
+		{
+			Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
+			TimeoutSeconds:   30,
+			SlotsToFinalized: big.NewInt(20),
+			Run: InvalidMissingAncestorReOrgSpec{
+				PayloadInvalidIndex: 8,
+				PayloadField:        InvalidPrevRandao,
+			}.GenerateSync(),
+		},
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
@@ -455,7 +455,66 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 
-	// Invalid Transition Re-Org Tests (Reveal via sync through secondary client)
+	// Invalid Transition Payload Re-Org Tests (Reveal via sync through secondary client)
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidStateRoot,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidStateRoot,
+			EmptyTransactions:       true,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(3),
+			PayloadField:            helper.InvalidReceiptsRoot,
+		}.GenerateSync(),
+	},
+	/*
+		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
+		{
+			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid Transition Payload, Reveal using sync",
+			TimeoutSeconds:   30,
+			SlotsToFinalized: big.NewInt(20),
+			Run: InvalidMissingAncestorReOrgSpec{
+				PayloadInvalidIndex:     1, // Transition payload
+				CommonAncestorPoSHeight: big.NewInt(0),
+				DeviatingPayloadCount:   big.NewInt(2),
+				PayloadField:            helper.InvalidNumber,
+			}.GenerateSync(),
+		},
+	*/
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(3),
+			PayloadField:            helper.InvalidGasLimit,
+		}.GenerateSync(),
+	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
@@ -463,8 +522,99 @@ var Tests = []test.Spec{
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
 			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
+			DeviatingPayloadCount:   big.NewInt(3),
 			PayloadField:            helper.InvalidGasUsed,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(3),
+			PayloadField:            helper.InvalidTimestamp,
+		}.GenerateSync(),
+	},
+	/*
+		TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
+		{
+			Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid Transition Payload, Reveal using sync",
+			TimeoutSeconds:   30,
+			SlotsToFinalized: big.NewInt(20),
+			Run: InvalidMissingAncestorReOrgSpec{
+				PayloadInvalidIndex:     1, // Transition payload
+				CommonAncestorPoSHeight: big.NewInt(0),
+				DeviatingPayloadCount:   big.NewInt(3),
+				PayloadField:            helper.InvalidPrevRandao,
+			}.GenerateSync(),
+		},
+	*/
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.RemoveTransaction,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidTransactionSignature,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidTransactionNonce,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidTransactionGas,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidTransactionGasPrice,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidTransactionValue,
 		}.GenerateSync(),
 	},
 	{
