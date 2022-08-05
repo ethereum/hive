@@ -1335,13 +1335,13 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 		// Amount of blocks to deviate starting from the common ancestor
 		n := 10
 
-		// Slice to save the alternate B chain
+		// Slice to save the side B chain
 		altChainPayloads := make([]*api.ExecutableDataV1, 0)
 
 		// Append the common ancestor
 		altChainPayloads = append(altChainPayloads, &cA)
 
-		// Produce blocks but at the same time create an alternate chain which contains an invalid payload at some point (INV_P)
+		// Produce blocks but at the same time create an side chain which contains an invalid payload at some point (INV_P)
 		// CommonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
 		//                 │
 		//                 └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
@@ -1360,11 +1360,11 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 			},
 			OnGetPayload: func() {
 				var (
-					alternatePayload *api.ExecutableDataV1
-					err              error
+					sidePayload *api.ExecutableDataV1
+					err         error
 				)
 				// Insert extraData to ensure we deviate from the main payload, which contains empty extradata
-				alternatePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				sidePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
 					ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
 					ExtraData:  &([]byte{0x01}),
 				})
@@ -1372,12 +1372,12 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
 				if len(altChainPayloads) == invalid_index {
-					alternatePayload, err = helper.GenerateInvalidPayload(alternatePayload, payloadField)
+					sidePayload, err = helper.GenerateInvalidPayload(sidePayload, payloadField)
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 					}
 				}
-				altChainPayloads = append(altChainPayloads, alternatePayload)
+				altChainPayloads = append(altChainPayloads, sidePayload)
 			},
 		})
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
@@ -1385,7 +1385,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 			// re-org back into this chain and use the new payload without issues.
 			OnGetPayload: func() {
 
-				// Now let's send the alternate chain to the client using newPayload/sync
+				// Now let's send the side chain to the client using newPayload/sync
 				for i := 1; i <= n; i++ {
 					// Send the payload
 					payloadValidStr := "VALID"
@@ -1504,13 +1504,13 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			n = int(spec.DeviatingPayloadCount.Int64())
 		}
 
-		// Slice to save the alternate B chain
+		// Slice to save the side B chain
 		altChainPayloads := make([]*types.Block, 0)
 
 		// Append the common ancestor
 		altChainPayloads = append(altChainPayloads, cA)
 
-		// Produce blocks but at the same time create an alternate chain which contains an invalid payload at some point (INV_P)
+		// Produce blocks but at the same time create an side chain which contains an invalid payload at some point (INV_P)
 		// CommonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
 		//                 │
 		//                 └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
@@ -1529,12 +1529,12 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			},
 			OnGetPayload: func() {
 				var (
-					alternatePayload *api.ExecutableDataV1
-					err              error
+					sidePayload *api.ExecutableDataV1
+					err         error
 				)
 				// Insert extraData to ensure we deviate from the main payload, which contains empty extradata
 				pHash := altChainPayloads[len(altChainPayloads)-1].Hash()
-				alternatePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				sidePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
 					ParentHash: &pHash,
 					ExtraData:  &([]byte{0x01}),
 				})
@@ -1542,20 +1542,20 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
 				if len(altChainPayloads) == invalidIndex {
-					alternatePayload, err = helper.GenerateInvalidPayload(alternatePayload, spec.PayloadField)
+					sidePayload, err = helper.GenerateInvalidPayload(sidePayload, spec.PayloadField)
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 					}
 				}
 
-				b, err := api.ExecutableDataToBlock(*alternatePayload)
+				sideBlock, err := api.ExecutableDataToBlock(*sidePayload)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
 				}
 				if len(altChainPayloads) == invalidIndex {
 					var uncle *types.Block
 					if spec.PayloadField == helper.InvalidOmmers {
-						if unclePayload, ok := t.CLMock.ExecutedPayloadHistory[b.NumberU64()-1]; ok {
+						if unclePayload, ok := t.CLMock.ExecutedPayloadHistory[sideBlock.NumberU64()-1]; ok {
 							// Uncle is a PoS payload
 							uncle, err = api.ExecutableDataToBlock(unclePayload)
 							if err != nil {
@@ -1567,13 +1567,13 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 						}
 					}
 					// Invalidate fields not available in the ExecutableDataV1
-					b, err = helper.GenerateInvalidPayloadBlock(b, uncle, spec.PayloadField)
+					sideBlock, err = helper.GenerateInvalidPayloadBlock(sideBlock, uncle, spec.PayloadField)
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to customize payload block: %v", t.TestName, err)
 					}
 				}
 
-				altChainPayloads = append(altChainPayloads, b)
+				altChainPayloads = append(altChainPayloads, sideBlock)
 			},
 		})
 		t.CLMock.RemoveEngineClient(secondaryClient)
@@ -1582,7 +1582,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			// re-org back into this chain and use the new payload without issues.
 			OnGetPayload: func() {
 
-				// Now let's send the alternate chain to the client using newPayload/sync
+				// Now let's send the side chain to the client using newPayload/sync
 				for i := 1; i < n; i++ {
 					// Send the payload
 					payloadValidStr := "VALID"
@@ -1659,7 +1659,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 
 					if r.Status.Status == test.Invalid {
 						// We also expect that the client properly returns the LatestValidHash of the block on the
-						// alternate chain that is immediately prior to the invalid payload (or zero if parent is PoW)
+						// side chain that is immediately prior to the invalid payload (or zero if parent is PoW)
 						var lvh common.Hash
 						if cAHeight.Cmp(big0) != 0 || invalidIndex != 1 {
 							// Parent is NOT Proof of Work
@@ -2252,9 +2252,9 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
 
 		for i := 0; i < txCount; i++ {
 			var (
-				mainPayload      *api.ExecutableDataV1
-				alternatePayload *api.ExecutableDataV1
-				tx               *types.Transaction
+				mainPayload *api.ExecutableDataV1
+				sidePayload *api.ExecutableDataV1
+				tx          *types.Transaction
 			)
 
 			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
@@ -2289,20 +2289,20 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
 
 					mainPayload = &t.CLMock.LatestPayloadBuilt
 
-					// Create alternate payload with different hash
+					// Create side payload with different hash
 					var err error
-					alternatePayload, err = helper.CustomizePayload(mainPayload, &helper.CustomPayloadData{
+					sidePayload, err = helper.CustomizePayload(mainPayload, &helper.CustomPayloadData{
 						ExtraData: &([]byte{0x01}),
 					})
 					if err != nil {
 						t.Fatalf("Error creating reorg payload %v", err)
 					}
 
-					if alternatePayload.ParentHash != mainPayload.ParentHash {
-						t.Fatalf("FAIL (%s): Incorrect parent hash for payloads: %v != %v", t.TestName, alternatePayload.ParentHash, t.CLMock.LatestPayloadBuilt.ParentHash)
+					if sidePayload.ParentHash != mainPayload.ParentHash {
+						t.Fatalf("FAIL (%s): Incorrect parent hash for payloads: %v != %v", t.TestName, sidePayload.ParentHash, t.CLMock.LatestPayloadBuilt.ParentHash)
 					}
-					if alternatePayload.BlockHash == mainPayload.BlockHash {
-						t.Fatalf("FAIL (%s): Incorrect hash for payloads: %v == %v", t.TestName, alternatePayload.BlockHash, t.CLMock.LatestPayloadBuilt.BlockHash)
+					if sidePayload.BlockHash == mainPayload.BlockHash {
+						t.Fatalf("FAIL (%s): Incorrect hash for payloads: %v == %v", t.TestName, sidePayload.BlockHash, t.CLMock.LatestPayloadBuilt.BlockHash)
 					}
 
 				},
@@ -2312,23 +2312,23 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
 					txt := t.TestEngine.TestTransactionReceipt(tx.Hash())
 					txt.ExpectBlockHash(mainPayload.BlockHash)
 
-					r := t.TestEngine.TestEngineNewPayloadV1(alternatePayload)
+					r := t.TestEngine.TestEngineNewPayloadV1(sidePayload)
 					r.ExpectStatus(test.Valid)
-					r.ExpectLatestValidHash(&alternatePayload.BlockHash)
+					r.ExpectLatestValidHash(&sidePayload.BlockHash)
 
 					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
-						HeadBlockHash:      alternatePayload.BlockHash,
+						HeadBlockHash:      sidePayload.BlockHash,
 						SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 						FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 					}, nil)
 					s.ExpectPayloadStatus(test.Valid)
 
 					p := t.TestEngine.TestBlockByNumber(Head)
-					p.ExpectHash(alternatePayload.BlockHash)
+					p.ExpectHash(sidePayload.BlockHash)
 
-					// Now it should be with alternatePayload
+					// Now it should be with sidePayload
 					txt = t.TestEngine.TestTransactionReceipt(tx.Hash())
-					txt.ExpectBlockHash(alternatePayload.BlockHash)
+					txt.ExpectBlockHash(sidePayload.BlockHash)
 
 					// Re-org back to main payload
 					if newNPOnRevert {
