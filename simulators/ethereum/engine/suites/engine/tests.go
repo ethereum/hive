@@ -3,7 +3,6 @@ package suite_engine
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -466,6 +465,19 @@ var Tests = []test.Spec{
 			CommonAncestorPoSHeight: big.NewInt(0),
 			DeviatingPayloadCount:   big.NewInt(2),
 			PayloadField:            helper.InvalidGasUsed,
+		}.GenerateSync(),
+	},
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Ommers, Invalid Transition Payload, Reveal using sync",
+		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex:     1, // Transition payload
+			CommonAncestorPoSHeight: big.NewInt(0),
+			DeviatingPayloadCount:   big.NewInt(2),
+			PayloadField:            helper.InvalidOmmers,
 		}.GenerateSync(),
 	},
 
@@ -1459,7 +1471,15 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			err error
 		)
 		// To allow having the invalid payload delivered via P2P, we need a second client to serve the payload
-		secondaryClient, err := node.GethNodeEngineStarter{}.StartGethNode(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+		secondaryClient, err := node.GethNodeEngineStarter{
+			Config: node.GethNodeTestConfiguration{
+				// Ethash engine is only needed in a single test case
+				Ethash: spec.PayloadField == helper.InvalidOmmers &&
+					spec.CommonAncestorPoSHeight != nil &&
+					spec.CommonAncestorPoSHeight.Cmp(big0) == 0 &&
+					spec.PayloadInvalidIndex == 1,
+			},
+		}.StartGethNode(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 		}
@@ -1563,7 +1583,16 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 							}
 						} else {
 							// Uncle is a PoW block, we need to mine an alternative PoW block
-							panic(fmt.Errorf("not implemented"))
+							ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+							defer cancel()
+							parentPoW, err := t.Engine.BlockByNumber(ctx, new(big.Int).Sub(sideBlock.Number(), big1))
+							if err != nil || parentPoW == nil {
+								t.Fatalf("FAIL (%s): Unable to get parent base block to generate uncle: %v", t.TestName, err)
+							}
+							uncle, err = secondaryClient.SealBlock(t.TimeoutContext, parentPoW)
+							if err != nil {
+								t.Fatalf("FAIL (%s): Unable generate uncle: %v", t.TestName, err)
+							}
 						}
 					}
 					// Invalidate fields not available in the ExecutableDataV1
