@@ -57,7 +57,7 @@ type EngineClient interface {
 }
 
 type EngineStarter interface {
-	StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient EngineClient) (EngineClient, error)
+	StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...EngineClient) (EngineClient, error)
 }
 
 var (

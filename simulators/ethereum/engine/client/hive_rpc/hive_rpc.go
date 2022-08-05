@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -33,7 +34,7 @@ type HiveRPCEngineStarter struct {
 	JWTSecret               []byte
 }
 
-func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (client.EngineClient, error) {
+func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
 	var (
 		clientType = s.ClientType
 		enginePort = s.EnginePort
@@ -78,12 +79,19 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		ttdInt := helper.CalculateRealTTD(ClientFiles["/genesis.json"], ttd.Int64())
 		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttdInt))
 	}
-	if bootClient != nil {
-		enode, err := bootClient.EnodeURL()
-		if err != nil {
-			return nil, fmt.Errorf("Unable to obtain bootnode: %v", err)
+	if bootClients != nil && len(bootClients) > 0 {
+		var (
+			enodes = make([]string, len(bootClients))
+			err    error
+		)
+		for i, bootClient := range bootClients {
+			enodes[i], err = bootClient.EnodeURL()
+			if err != nil {
+				return nil, fmt.Errorf("Unable to obtain bootnode: %v", err)
+			}
 		}
-		ClientParams = ClientParams.Set("HIVE_BOOTNODE", enode)
+		enodeString := strings.Join(enodes, ",")
+		ClientParams = ClientParams.Set("HIVE_BOOTNODE", enodeString)
 	}
 
 	// Start the client and create the engine client object

@@ -576,6 +576,116 @@ var mergeTestSpecs = []MergeTestSpec{
 			},
 		},
 	},
+
+	// Invalid execution on terminal block cases
+	{
+		Name:                     "Transition on an Invalid Terminal Execution - Difficulty",
+		TTD:                      696608,
+		TimeoutSeconds:           30,
+		MainChainFile:            "blocks_1_td_196608.rlp",
+		DisableMining:            true,
+		SkipMainClientTTDWait:    true,
+		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							Difficulty: big.NewInt(500000),
+						},
+					},
+					TerminalTotalDifficulty: big.NewInt(696608),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                     "Transition on an Invalid Terminal Execution - Distant Future",
+		TTD:                      290000,
+		TimeoutSeconds:           30,
+		MainChainFile:            "blocks_1_td_196608.rlp",
+		DisableMining:            true,
+		SkipMainClientTTDWait:    true,
+		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							TimeSecondsInFuture: 60,
+						},
+					},
+					TerminalTotalDifficulty: big.NewInt(290000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                     "Transition on an Invalid Terminal Execution - Sealed MixHash",
+		TTD:                      290000,
+		TimeoutSeconds:           30,
+		MainChainFile:            "blocks_1_td_196608.rlp",
+		DisableMining:            true,
+		SkipMainClientTTDWait:    true,
+		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							InvalidSealedMixHash: true,
+						},
+					},
+					TerminalTotalDifficulty: big.NewInt(290000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                     "Transition on an Invalid Terminal Execution - Sealed Nonce",
+		TTD:                      290000,
+		TimeoutSeconds:           30,
+		MainChainFile:            "blocks_1_td_196608.rlp",
+		DisableMining:            true,
+		SkipMainClientTTDWait:    true,
+		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							InvalidSealedNonce: true,
+						},
+					},
+					TerminalTotalDifficulty: big.NewInt(290000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
 }
 
 var Tests = func() []test.Spec {
@@ -777,7 +887,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 			select {
 			case <-time.After(time.Second):
 			case <-t.TimeoutContext.Done():
-				t.Fatalf("FAIL (%s): Timeout while waiting for sync on the alternative PoW chain", t.TestName)
+				t.Fatalf("FAIL (%s): Timeout waiting for the main client to sync, or the client synced to an invalid chain", t.TestName)
 			}
 		}
 

@@ -45,6 +45,10 @@ type GethNodeTestConfiguration struct {
 	// The node mines proof of work blocks
 	PoWMiner          bool
 	PoWMinerEtherBase common.Address
+	DisableGossiping  bool
+
+	// Block Modifier
+	BlockModifier helper.BlockModifier
 
 	// In PoW production mode, produce many terminal blocks which shall be gossiped
 	TerminalBlockSiblingCount *big.Int
@@ -81,15 +85,14 @@ var (
 	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
 )
 
-func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (client.EngineClient, error) {
-	return s.StartGethNode(T, testContext, ClientParams, ClientFiles, bootClient)
+func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+	return s.StartGethNode(T, testContext, ClientParams, ClientFiles, bootClients...)
 }
 
-func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClient client.EngineClient) (*GethNode, error) {
+func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
 	var (
-		ttd      = s.TerminalTotalDifficulty
-		bootnode string
-		err      error
+		ttd = s.TerminalTotalDifficulty
+		err error
 	)
 	genesisPath, ok := ClientFiles["/genesis.json"]
 	if !ok {
@@ -111,10 +114,14 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 	}
 	genesis.Config.TerminalTotalDifficulty = ttd
 
-	if bootClient != nil {
-		bootnode, err = bootClient.EnodeURL()
-		if err != nil {
-			return nil, fmt.Errorf("Unable to obtain bootnode: %v", err)
+	var enodes []string
+	if bootClients != nil && len(bootClients) > 0 {
+		enodes = make([]string, len(bootClients))
+		for i, bootClient := range bootClients {
+			enodes[i], err = bootClient.EnodeURL()
+			if err != nil {
+				return nil, fmt.Errorf("Unable to obtain bootnode: %v", err)
+			}
 		}
 	}
 
@@ -138,7 +145,7 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		s.Config.TerminalBlockSiblingDepth = DefaultTerminalBlockSiblingDepth
 	}
 
-	g, err := newNode(s.Config, bootnode, &genesis)
+	g, err := newNode(s.Config, enodes, &genesis)
 	if err != nil {
 		return nil, err
 	}
@@ -166,7 +173,6 @@ type GethNode struct {
 	mustHeadBlock *types.Block
 
 	datadir    string
-	bootnode   string
 	genesis    *core.Genesis
 	ttd        *big.Int
 	api        *ethcatalyst.ConsensusAPI
@@ -190,14 +196,14 @@ type GethNode struct {
 	config GethNodeTestConfiguration
 }
 
-func newNode(config GethNodeTestConfiguration, bootnode string, genesis *core.Genesis) (*GethNode, error) {
+func newNode(config GethNodeTestConfiguration, bootnodes []string, genesis *core.Genesis) (*GethNode, error) {
 	// Define the basic configurations for the Ethereum node
 	datadir, _ := os.MkdirTemp("", "")
 
-	return restart(config, bootnode, datadir, genesis)
+	return restart(config, bootnodes, datadir, genesis)
 }
 
-func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, genesis *core.Genesis) (*GethNode, error) {
+func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir string, genesis *core.Genesis) (*GethNode, error) {
 	if startConfig.Name == "" {
 		startConfig.Name = "Modified Geth Module"
 	}
@@ -247,8 +253,13 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 		time.Sleep(250 * time.Millisecond)
 	}
 	// Connect the node to the bootnode
-	node := enode.MustParse(bootnode)
-	stack.Server().AddPeer(node)
+	if bootnodes != nil && len(bootnodes) > 0 {
+		for _, bootnode := range bootnodes {
+			node := enode.MustParse(bootnode)
+			stack.Server().AddTrustedPeer(node)
+			stack.Server().AddPeer(node)
+		}
+	}
 
 	stack.Server().EnableMsgEvents = true
 
@@ -256,7 +267,6 @@ func restart(startConfig GethNodeTestConfiguration, bootnode, datadir string, ge
 		node:         stack,
 		eth:          ethBackend,
 		datadir:      datadir,
-		bootnode:     bootnode,
 		genesis:      genesis,
 		ttd:          genesis.Config.TerminalTotalDifficulty,
 		api:          ethcatalyst.NewConsensusAPI(ethBackend),
@@ -392,6 +402,14 @@ func (n *GethNode) PoWMiningLoop() {
 		// Wait until the previous block is succesfully propagated
 		<-time.After(time.Millisecond * 200)
 
+		// Modify the block before sealing
+		if n.config.BlockModifier != nil {
+			b, err = n.config.BlockModifier.ModifyUnsealedBlock(b)
+			if err != nil {
+				panic(err)
+			}
+		}
+
 		// Seal the next block to broadcast
 		rChan := make(chan *types.Block, 0)
 		stopChan := make(chan struct{})
@@ -401,8 +419,21 @@ func (n *GethNode) PoWMiningLoop() {
 			if b == nil {
 				panic(fmt.Errorf("no block got sealed"))
 			}
+			// Modify the sealed block if necessary
+			if n.config.BlockModifier != nil {
+				sealVerifier := func(h *types.Header) bool {
+					return n.powEngine.VerifyHeader(n.eth.BlockChain(), h, true) == nil
+				}
+				b, err = n.config.BlockModifier.ModifySealedBlock(sealVerifier, b)
+				if err != nil {
+					panic(err)
+				}
+			}
+
 			// Broadcast
-			n.eth.EventMux().Post(core.NewMinedBlockEvent{Block: b})
+			if !n.config.DisableGossiping {
+				n.eth.EventMux().Post(core.NewMinedBlockEvent{Block: b})
+			}
 
 			// Check whether the block was a terminal block
 			if t, td, err := n.isBlockTerminal(b); err == nil {
