@@ -3,6 +3,7 @@ package suite_engine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"math/rand"
 	"time"
@@ -445,18 +446,26 @@ var Tests = []test.Spec{
 			PayloadField:        helper.InvalidTransactionValue,
 		}.GenerateSync(),
 	},
-	// TODO: Add an `Invalid Ancestor Chain Re-Org, Invalid Uncles, Invalid P9`
+	{
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid Ommers, Invalid P9', Reveal using sync",
+		TimeoutSeconds:   30,
+		SlotsToFinalized: big.NewInt(20),
+		Run: InvalidMissingAncestorReOrgSpec{
+			PayloadInvalidIndex: 9,
+			PayloadField:        helper.InvalidOmmers,
+		}.GenerateSync(),
+	},
 
 	// Invalid Transition Re-Org Tests (Reveal via sync through secondary client)
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
 			CommonAncestorPoSHeight: big.NewInt(0),
 			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidStateRoot,
+			PayloadField:            helper.InvalidGasUsed,
 		}.GenerateSync(),
 	},
 
@@ -1101,7 +1110,7 @@ func invalidTransitionPayload(t *test.Env) {
 }
 
 // Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
-func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadField, syncing bool, emptyTxs bool) func(*test.Env) {
+func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syncing bool, emptyTxs bool) func(*test.Env) {
 	return func(t *test.Env) {
 
 		if syncing {
@@ -1311,7 +1320,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadField, syncing 
 // Then reveal the invalid payload and expect that the client rejects it and rejects forkchoice updated calls to this chain.
 // The invalid_index parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
 // with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
-func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.InvalidPayloadField, emptyTxs bool) func(*test.Env) {
+func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.InvalidPayloadBlockField, emptyTxs bool) func(*test.Env) {
 	return func(t *test.Env) {
 
 		// Wait until TTD is reached by this client
@@ -1434,7 +1443,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 // with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
 type InvalidMissingAncestorReOrgSpec struct {
 	PayloadInvalidIndex     int
-	PayloadField            helper.InvalidPayloadField
+	PayloadField            helper.InvalidPayloadBlockField
 	EmptyTransactions       bool
 	CommonAncestorPoSHeight *big.Int
 	DeviatingPayloadCount   *big.Int
@@ -1543,6 +1552,27 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
 				}
+				if len(altChainPayloads) == invalidIndex {
+					var uncle *types.Block
+					if spec.PayloadField == helper.InvalidOmmers {
+						if unclePayload, ok := t.CLMock.ExecutedPayloadHistory[b.NumberU64()-1]; ok {
+							// Uncle is a PoS payload
+							uncle, err = api.ExecutableDataToBlock(unclePayload)
+							if err != nil {
+								t.Fatalf("FAIL (%s): Unable to get uncle block: %v", t.TestName, err)
+							}
+						} else {
+							// Uncle is a PoW block, we need to mine an alternative PoW block
+							panic(fmt.Errorf("not implemented"))
+						}
+					}
+					// Invalidate fields not available in the ExecutableDataV1
+					b, err = helper.GenerateInvalidPayloadBlock(b, uncle, spec.PayloadField)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Unable to customize payload block: %v", t.TestName, err)
+					}
+				}
+
 				altChainPayloads = append(altChainPayloads, b)
 			},
 		})

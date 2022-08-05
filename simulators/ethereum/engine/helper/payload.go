@@ -163,31 +163,9 @@ func (customData *CustomPayloadData) String() string {
 	return strings.Join(customFieldsList, ", ")
 }
 
-type InvalidPayloadField string
-
-const (
-	InvalidParentHash             InvalidPayloadField = "ParentHash"
-	InvalidStateRoot                                  = "StateRoot"
-	InvalidReceiptsRoot                               = "ReceiptsRoot"
-	InvalidNumber                                     = "Number"
-	InvalidGasLimit                                   = "GasLimit"
-	InvalidGasUsed                                    = "GasUsed"
-	InvalidTimestamp                                  = "Timestamp"
-	InvalidPrevRandao                                 = "PrevRandao"
-	InvalidOmmers                                     = "Ommers"
-	RemoveTransaction                                 = "Incomplete Transactions"
-	InvalidTransactionSignature                       = "Transaction Signature"
-	InvalidTransactionNonce                           = "Transaction Nonce"
-	InvalidTransactionGas                             = "Transaction Gas"
-	InvalidTransactionGasPrice                        = "Transaction GasPrice"
-	InvalidTransactionGasTipPrice                     = "Transaction GasTipCapPrice"
-	InvalidTransactionValue                           = "Transaction Value"
-	InvalidTransactionChainID                         = "Transaction ChainID"
-)
-
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
 // One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
-func GenerateInvalidPayload(basePayload *api.ExecutableDataV1, payloadField InvalidPayloadField) (*api.ExecutableDataV1, error) {
+func GenerateInvalidPayload(basePayload *api.ExecutableDataV1, payloadField InvalidPayloadBlockField) (*api.ExecutableDataV1, error) {
 
 	var customPayloadMod *CustomPayloadData
 	switch payloadField {
@@ -302,7 +280,7 @@ func GenerateInvalidPayload(basePayload *api.ExecutableDataV1, payloadField Inva
 	}
 
 	if customPayloadMod == nil {
-		return nil, fmt.Errorf("Invalid payload field to corrupt: %s", payloadField)
+		return basePayload, nil
 	}
 
 	alteredPayload, err := CustomizePayload(basePayload, customPayloadMod)
