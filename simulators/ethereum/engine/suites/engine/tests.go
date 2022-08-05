@@ -459,6 +459,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -470,6 +472,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -482,6 +486,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -495,6 +501,8 @@ var Tests = []test.Spec{
 		{
 			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid Transition Payload, Reveal using sync",
 			TimeoutSeconds:   30,
+			TTD:              393504,
+			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex:     1, // Transition payload
@@ -507,6 +515,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -518,6 +528,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -529,6 +541,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -542,6 +556,8 @@ var Tests = []test.Spec{
 		{
 			Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid Transition Payload, Reveal using sync",
 			TimeoutSeconds:   30,
+			TTD:              393504,
+			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex:     1, // Transition payload
@@ -554,6 +570,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -565,6 +583,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -576,6 +596,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -587,6 +609,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -598,6 +622,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -609,6 +635,8 @@ var Tests = []test.Spec{
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid Transition Payload, Reveal using sync",
 		TimeoutSeconds:   30,
+		TTD:              393504,
+		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex:     1, // Transition payload
@@ -1770,7 +1798,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					} else if i > invalidIndex {
 						payloadValidStr = "VALID with INVALID ancestor"
 					}
-					t.Logf("INFO (%s): Invalid chain payload %d (%s): %v", t.TestName, i, payloadValidStr, altChainPayloads[i].Hash())
+					t.Logf("INFO (%s): Invalid chain payload %d (%s): hash=%v, number=%d, parent=%v", t.TestName, i, payloadValidStr, altChainPayloads[i].Hash(), altChainPayloads[i].Number(), altChainPayloads[i].ParentHash())
 
 					if i < invalidIndex {
 						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
