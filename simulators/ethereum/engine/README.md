@@ -152,6 +152,7 @@ Modify fields including:
    - Timestamp
    - PrevRandao
    - Removing a Transaction
+   - Non-Empty Uncles
    - Transaction with incorrect fields:
       - Signature
       - Nonce
@@ -175,6 +176,16 @@ commonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
 		          └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
 ```
 
+- Invalid Transition Payload Re-Org Tests
+Attempt to re-org to an unknown side chain which contains an invalid transition payload.
+The side chain is constructed in parallel while the CL Mock builds the canonical chain, but changing the extraData to simply produce a different hash.
+The transition payload is invalidated by modifying one of the payload fields (See "Invalid Field NewPayload").
+Once the side chain reaches a certain deviation height (N) from the terminal block, the CL forces a sync of the main client by sending a `newPayload` with the head of the side (invalid) chain.
+```
+terminalBlock ◄─▲── TP ◄─ P2 ◄─ ...
+		          │
+		          └── INV_TP ◄─ P2' ◄─ ...
+```
 
 ### Re-org using Engine API
 - Transaction Reorg:  

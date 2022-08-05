@@ -457,7 +457,7 @@ var Tests = []test.Spec{
 
 	// Invalid Transition Payload Re-Org Tests (Reveal via sync through secondary client)
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid StateRoot, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -470,7 +470,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid StateRoot, Empty Txs, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -484,7 +484,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid ReceiptsRoot, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -499,7 +499,7 @@ var Tests = []test.Spec{
 	/*
 		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
 		{
-			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid Transition Payload, Reveal using sync",
+			Name:             "Invalid Transition Payload, Invalid Number, Reveal using sync",
 			TimeoutSeconds:   30,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
@@ -513,7 +513,7 @@ var Tests = []test.Spec{
 		},
 	*/
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid GasLimit, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -526,7 +526,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid GasUsed, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -539,7 +539,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid Timestamp, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -554,7 +554,7 @@ var Tests = []test.Spec{
 	/*
 		TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
 		{
-			Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid Transition Payload, Reveal using sync",
+			Name:             "Invalid Transition Payload, Invalid PrevRandao, Reveal using sync",
 			TimeoutSeconds:   30,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
@@ -568,7 +568,7 @@ var Tests = []test.Spec{
 		},
 	*/
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Incomplete Transactions, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -581,7 +581,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid Transaction Signature, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -594,7 +594,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid Transaction Nonce, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -607,7 +607,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid Transaction Gas, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -620,7 +620,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid Transaction GasPrice, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -633,7 +633,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid Transaction Value, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
@@ -646,7 +646,7 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 	{
-		Name:             "Invalid Ancestor Chain Re-Org, Invalid Ommers, Invalid Transition Payload, Reveal using sync",
+		Name:             "Invalid Transition Payload, Invalid Ommers, Reveal using sync",
 		TimeoutSeconds:   30,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
