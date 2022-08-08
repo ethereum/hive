@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"time"
 
@@ -89,9 +88,6 @@ interacting with one.`[1:],
 // runAllTests runs the tests against a client instance.
 // Most tests simply wait for tx inclusion in a block so we can run many tests concurrently.
 func runAllTests(t *hivesim.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-
 	handleErr := func(err error) {
 		if err != nil {
 			t.Fatal(err)
@@ -101,15 +97,18 @@ func runAllTests(t *hivesim.T) {
 	d := optimism.NewDevnet(t)
 
 	d.InitContracts()
+	d.InitHardhatDeployConfig()
+	d.InitL1Hardhat()
+	d.AddEth1() // l1 eth1 node is required for l2 config init
+	d.WaitUpEth1(0, time.Second*10)
+	d.InitL2Hardhat()
+	d.AddOpL2() // l2 engine is required for rollup config init
+	d.WaitUpOpL2Engine(0, time.Second*10)
 	d.InitRollupHardhat()
-	d.AddEth1()
-	// wait for L1 to come online before deploying
-	_, err := d.GetEth1(0).EthClient().ChainID(ctx)
-	handleErr(err)
+	// deploy contracts
 	d.DeployL1Hardhat()
 
 	// sequencer stack, on top of first eth1 node
-	d.AddOpL2()
 	d.AddOpNode(0, 0)
 	d.AddOpBatcher(0, 0, 0)
 	// proposer does not need to run for L2 to be stable

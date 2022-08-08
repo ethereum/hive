@@ -30,28 +30,21 @@ func main() {
 
 // runP2PTests runs the P2P tests between the sequencer and verifier.
 func runP2PTests(t *hivesim.T) {
-	handleErr := func(err error) {
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
 	d := optimism.NewDevnet(t)
 
 	d.InitContracts()
+	d.InitHardhatDeployConfig()
+	d.InitL1Hardhat()
+	d.AddEth1() // l1 eth1 node is required for l2 config init
+	d.WaitUpEth1(0, time.Second*10)
+	d.InitL2Hardhat()
+	d.AddOpL2() // l2 engine is required for rollup config init
+	d.WaitUpOpL2Engine(0, time.Second*10)
 	d.InitRollupHardhat()
-	d.AddEth1()
-	// wait for L1 to come online before deploying
-	{
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		_, err := d.GetEth1(0).EthClient().ChainID(ctx)
-		handleErr(err)
-	}
+	// deploy contracts
 	d.DeployL1Hardhat()
 
 	// sequencer stack, on top of first eth1 node
-	d.AddOpL2()
 	d.AddOpNode(0, 0)
 	d.AddOpBatcher(0, 0, 0)
 	d.AddOpProposer(0, 0, 0)
@@ -110,7 +103,7 @@ func runP2PTests(t *hivesim.T) {
 	}()
 
 	// Run testnet for duration of 3 sequence windows
-	time.Sleep(time.Second * time.Duration(d.L1Cfg.Clique.Period*d.RollupCfg.SeqWindowSize*3))
+	time.Sleep(time.Second * time.Duration(d.L1Cfg.Config.Clique.Period*d.RollupCfg.SeqWindowSize*3))
 	cancel()
 
 	// TODO: Add P2P tests

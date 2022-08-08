@@ -70,7 +70,7 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 	// build context dir of simulator can be overridden with "context.txt" file containing the desired build path
 	if contextPathBytes, err := ioutil.ReadFile(filepath.Join(filepath.FromSlash(dir), "context.txt")); err == nil {
 		buildContextPath = filepath.Join(dir, strings.TrimSpace(string(contextPathBytes)))
-		if p, err := filepath.Rel(dir, filepath.Join(buildContextPath, "Dockerfile")); err != nil {
+		if p, err := filepath.Rel(buildContextPath, filepath.Join(filepath.FromSlash(dir), "Dockerfile")); err != nil {
 			return "", fmt.Errorf("failed to derive relative simulator Dockerfile path: %v", err)
 		} else {
 			buildDockerfile = p
@@ -231,7 +231,7 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, branch
 		Name:         imageTag,
 		ContextDir:   context,
 		OutputStream: ioutil.Discard,
-		Dockerfile:   "Dockerfile",
+		Dockerfile:   dockerFile,
 		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
 	}

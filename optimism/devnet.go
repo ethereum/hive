@@ -1,11 +1,14 @@
 package optimism
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
-	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/stretchr/testify/require"
 	"sync"
+	"time"
 
 	opbf "github.com/ethereum-optimism/optimism/op-batcher/flags"
 	opnf "github.com/ethereum-optimism/optimism/op-node/flags"
@@ -27,8 +30,8 @@ type Devnet struct {
 	Proposer *ProposerNode
 	Batcher  *BatcherNode
 
-	L1Cfg     *params.ChainConfig
-	L2Cfg     *params.ChainConfig
+	L1Cfg     *core.Genesis
+	L2Cfg     *core.Genesis
 	RollupCfg *rollup.Config
 
 	MnemonicCfg MnemonicConfig
@@ -49,10 +52,11 @@ func NewDevnet(t *hivesim.T) *Devnet {
 	if err != nil {
 		t.Fatalf("failed to parse testnet secrets: %v", err)
 	}
-
+	roles := Roles(clientTypes)
+	t.Logf("creating devnet with client roles: %s", roles)
 	return &Devnet{
 		T:           t,
-		Clients:     Roles(clientTypes),
+		Clients:     roles,
 		MnemonicCfg: DefaultMnemonicConfig,
 		Secrets:     secrets,
 		Addresses:   secrets.Addresses(),
@@ -91,10 +95,10 @@ func (d *Devnet) AddEth1(opts ...hivesim.StartOption) {
 		return
 	}
 
-	// Even though the exact configuration is provided already,
-	// hive allows overrides of individual config vars by env params.
-	// If any eth1 client uses these params, let's just make sure they are there.
-	eth1Params := Eth1GenesisToParams(d.L1Cfg)
+	// Even though these exact params are already specified,
+	// the mapper thing in go-ethereum removes the fields in favor of the Env var fields.
+	// So we preserve them by doing this hack.
+	eth1Params := Eth1GenesisToParams(d.L1Cfg.Config)
 
 	eth1Cfg, err := json.Marshal(d.L1Cfg)
 	if err != nil {
@@ -106,7 +110,7 @@ func (d *Devnet) AddEth1(opts ...hivesim.StartOption) {
 	if len(d.Eth1s) == 0 {
 		// we only make the first eth1 node a miner
 		input = append(input, hivesim.Params{
-			"HIVE_CLIQUE_PRIVATEKEY": EncodePrivKey(d.Secrets.CliqueSigner).String(),
+			"HIVE_CLIQUE_PRIVATEKEY": EncodePrivKey(d.Secrets.CliqueSigner).String()[2:], // no 0x prefix here
 			"HIVE_MINER":             d.Addresses.CliqueSigner.String(),
 		})
 	} else {
@@ -275,6 +279,13 @@ func (d *Devnet) GetEth1(i int) *Eth1Node {
 	return d.Eth1s[i]
 }
 
+func (d *Devnet) WaitUpEth1(i int, wait time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	_, err := d.GetEth1(i).EthClient().ChainID(ctx)
+	require.NoError(d.T, err, "eth1 node should be up within %s", wait)
+}
+
 func (d *Devnet) GetOpNode(i int) *OpNode {
 	if i < 0 || i >= len(d.OpNodes) {
 		d.T.Fatalf("only have %d op rollup nodes, cannot find %d", len(d.OpNodes), i)
@@ -289,4 +300,11 @@ func (d *Devnet) GetOpL2Engine(i int) *OpL2Engine {
 		return nil
 	}
 	return d.OpL2Engines[i]
+}
+
+func (d *Devnet) WaitUpOpL2Engine(i int, wait time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), wait)
+	defer cancel()
+	_, err := d.GetOpL2Engine(i).EthClient().ChainID(ctx)
+	require.NoError(d.T, err, "op l2 engine node should be up within %s", wait)
 }

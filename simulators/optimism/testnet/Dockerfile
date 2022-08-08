@@ -9,7 +9,7 @@ ADD ./simulators/optimism/testnet/hive.go.work /source/go.work
 ADD ./optimism /source/optimism
 ADD ./simulators/optimism/testnet /source/testnet
 
-WORKDIR /source/p2p
+WORKDIR /source/testnet
 RUN go build -v .
 
 
