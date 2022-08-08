@@ -463,10 +463,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidStateRoot,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.InvalidStateRoot,
 		}.GenerateSync(),
 	},
 	{
@@ -476,11 +476,11 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidStateRoot,
-			EmptyTransactions:       true,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.InvalidStateRoot,
+			EmptyTransactions:     true,
 		}.GenerateSync(),
 	},
 	{
@@ -490,10 +490,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(3),
-			PayloadField:            helper.InvalidReceiptsRoot,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(3),
+			PayloadField:          helper.InvalidReceiptsRoot,
 		}.GenerateSync(),
 	},
 	/*
@@ -506,9 +506,9 @@ var Tests = []test.Spec{
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex:     1, // Transition payload
-				CommonAncestorPoSHeight: big.NewInt(0),
-				DeviatingPayloadCount:   big.NewInt(2),
-				PayloadField:            helper.InvalidNumber,
+				CommonAncestorHeight:  big.NewInt(0),
+				DeviatingPayloadCount: big.NewInt(2),
+				PayloadField:          helper.InvalidNumber,
 			}.GenerateSync(),
 		},
 	*/
@@ -519,10 +519,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(3),
-			PayloadField:            helper.InvalidGasLimit,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(3),
+			PayloadField:          helper.InvalidGasLimit,
 		}.GenerateSync(),
 	},
 	{
@@ -532,10 +532,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(3),
-			PayloadField:            helper.InvalidGasUsed,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(3),
+			PayloadField:          helper.InvalidGasUsed,
 		}.GenerateSync(),
 	},
 	{
@@ -545,10 +545,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(3),
-			PayloadField:            helper.InvalidTimestamp,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(3),
+			PayloadField:          helper.InvalidTimestamp,
 		}.GenerateSync(),
 	},
 	/*
@@ -561,9 +561,9 @@ var Tests = []test.Spec{
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex:     1, // Transition payload
-				CommonAncestorPoSHeight: big.NewInt(0),
-				DeviatingPayloadCount:   big.NewInt(3),
-				PayloadField:            helper.InvalidPrevRandao,
+				CommonAncestorHeight:  big.NewInt(0),
+				DeviatingPayloadCount: big.NewInt(3),
+				PayloadField:          helper.InvalidPrevRandao,
 			}.GenerateSync(),
 		},
 	*/
@@ -574,10 +574,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.RemoveTransaction,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.RemoveTransaction,
 		}.GenerateSync(),
 	},
 	{
@@ -587,10 +587,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidTransactionSignature,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.InvalidTransactionSignature,
 		}.GenerateSync(),
 	},
 	{
@@ -600,10 +600,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidTransactionNonce,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.InvalidTransactionNonce,
 		}.GenerateSync(),
 	},
 	{
@@ -613,10 +613,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidTransactionGas,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.InvalidTransactionGas,
 		}.GenerateSync(),
 	},
 	{
@@ -626,10 +626,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidTransactionGasPrice,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.InvalidTransactionGasPrice,
 		}.GenerateSync(),
 	},
 	{
@@ -639,10 +639,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidTransactionValue,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.InvalidTransactionValue,
 		}.GenerateSync(),
 	},
 	{
@@ -652,10 +652,10 @@ var Tests = []test.Spec{
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:     1, // Transition payload
-			CommonAncestorPoSHeight: big.NewInt(0),
-			DeviatingPayloadCount:   big.NewInt(2),
-			PayloadField:            helper.InvalidOmmers,
+			PayloadInvalidIndex:   1, // Transition payload
+			CommonAncestorHeight:  big.NewInt(0),
+			DeviatingPayloadCount: big.NewInt(2),
+			PayloadField:          helper.InvalidOmmers,
 		}.GenerateSync(),
 	},
 
@@ -1629,14 +1629,22 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 
 // Attempt to re-org to a chain which at some point contains an unknown payload which is also invalid.
 // Then reveal the invalid payload and expect that the client rejects it and rejects forkchoice updated calls to this chain.
-// The PayloadInvalidIndex parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
-// with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
 type InvalidMissingAncestorReOrgSpec struct {
-	PayloadInvalidIndex     int
-	PayloadField            helper.InvalidPayloadBlockField
-	EmptyTransactions       bool
-	CommonAncestorPoSHeight *big.Int
-	DeviatingPayloadCount   *big.Int
+	// Index of the payload to invalidate, starting with 0 being the common ancestor.
+	// Value must be greater than 0.
+	PayloadInvalidIndex int
+	// Field of the payload to invalidate (see helper module)
+	PayloadField helper.InvalidPayloadBlockField
+	// Whether to create payloads with empty transactions or not:
+	// Used to test scenarios where the stateRoot is invalidated but its invalidation
+	// goes unnoticed by the client because of the lack of transactions.
+	EmptyTransactions bool
+	// Height of the common ancestor in the proof-of-stake chain.
+	// Value of 0 means the common ancestor is the terminal proof-of-work block.
+	CommonAncestorHeight *big.Int
+	// Amount of payloads to produce between the common ancestor and the head of the
+	// proof-of-stake chain.
+	DeviatingPayloadCount *big.Int
 }
 
 func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
@@ -1653,8 +1661,8 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			Config: node.GethNodeTestConfiguration{
 				// Ethash engine is only needed in a single test case
 				Ethash: spec.PayloadField == helper.InvalidOmmers &&
-					spec.CommonAncestorPoSHeight != nil &&
-					spec.CommonAncestorPoSHeight.Cmp(big0) == 0 &&
+					spec.CommonAncestorHeight != nil &&
+					spec.CommonAncestorHeight.Cmp(big0) == 0 &&
 					spec.PayloadInvalidIndex == 1,
 			},
 		}.StartGethNode(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
@@ -1670,7 +1678,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 		// Produce blocks before starting the test
 		var cA *types.Block
 
-		cAHeight := spec.CommonAncestorPoSHeight
+		cAHeight := spec.CommonAncestorHeight
 		if cAHeight == nil {
 			// Default is to produce 5 PoS blocks before the common ancestor
 			cAHeight = big.NewInt(5)
@@ -1679,7 +1687,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 
 		// Save the common ancestor
 		if cAHeight.Cmp(big0) == 0 {
-			// Common ancestor is pre-merge
+			// Common ancestor is the proof-of-work terminal block
 			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 			defer cancel()
 			b, err := t.Engine.BlockByNumber(ctx, nil)
@@ -1798,7 +1806,8 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					} else if i > invalidIndex {
 						payloadValidStr = "VALID with INVALID ancestor"
 					}
-					t.Logf("INFO (%s): Invalid chain payload %d (%s): hash=%v, number=%d, parent=%v", t.TestName, i, payloadValidStr, altChainPayloads[i].Hash(), altChainPayloads[i].Number(), altChainPayloads[i].ParentHash())
+					payloadJs, _ := json.MarshalIndent(altChainPayloads[i], "", " ")
+					t.Logf("INFO (%s): Invalid chain payload %d (%s):\n%s", t.TestName, i, payloadValidStr, payloadJs)
 
 					if i < invalidIndex {
 						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
