@@ -162,8 +162,8 @@ Modify fields including:
       - Value
       - ChainID
 
-- Invalid Ancestor Re-Org Tests
-Attempt to re-org to an unknown side chain which at some point contains an invalid payload.
+- Invalid Ancestor Re-Org/Sync Tests
+Attempt to re-org to an unknown side chain, or sync to an unknown canonical chain, which at some point contains an invalid payload.
 The side chain is constructed in parallel while the CL Mock builds the canonical chain, but changing the extraData to simply produce a different hash.
 At a given point, the side chain invalidates one of the payloads by modifying one of the payload fields (See "Invalid Field NewPayload").
 Once the side chain reaches a certain deviation height (N) from the commonAncestor, the CL switches to it by either of the following methods:
@@ -176,8 +176,8 @@ commonAncestor◄─▲── P1 ◄─ P2 ◄─ P3 ◄─ ... ◄─ Pn
 		          └── P1' ◄─ P2' ◄─ ... ◄─ INV_P ◄─ ... ◄─ Pn'
 ```
 
-- Invalid Transition Payload Re-Org Tests
-Attempt to re-org to an unknown side chain which contains an invalid transition payload.
+- Invalid Transition Payload Re-Org/Sync Tests
+Attempt to re-org to an unknown side chain, or sync to an unknown canonical chain, which contains an invalid transition payload.
 The side chain is constructed in parallel while the CL Mock builds the canonical chain, but changing the extraData to simply produce a different hash.
 The transition payload is invalidated by modifying one of the payload fields (See "Invalid Field NewPayload").
 Once the side chain reaches a certain deviation height (N) from the terminal block, the CL forces a sync of the main client by sending a `newPayload` with the head of the side (invalid) chain.
