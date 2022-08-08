@@ -104,7 +104,7 @@ func (d *Devnet) AddEth1(opts ...hivesim.StartOption) {
 	if err != nil {
 		d.T.Fatalf("failed to serialize genesis state: %v", err)
 	}
-	eth1CfgOpt := bytesFile("genesis.json", eth1Cfg)
+	eth1CfgOpt := bytesFile("/genesis.json", eth1Cfg)
 
 	input := []hivesim.StartOption{eth1CfgOpt, eth1Params}
 	if len(d.Eth1s) == 0 {
@@ -150,10 +150,11 @@ func (d *Devnet) AddOpL2(opts ...hivesim.StartOption) {
 		d.T.Fatalf("failed to encode l2 genesis: %v", err)
 		return
 	}
-	input = append(input, bytesFile("genesis.json", l2GenesisCfg))
+	input = append(input, bytesFile("/genesis.json", l2GenesisCfg))
+	input = append(input, defaultJWTFile)
 	input = append(input, opts...)
 
-	c := &OpL2Engine{ELNode{d.T.StartClient(d.Clients.OpL2[0].Name, opts...)}}
+	c := &OpL2Engine{ELNode{d.T.StartClient(d.Clients.OpL2[0].Name, input...)}}
 	d.T.Logf("added op-l2 %d: %s", len(d.OpL2Engines), c.IP)
 	d.OpL2Engines = append(d.OpL2Engines, c)
 }

@@ -7,14 +7,14 @@ VERBOSITY=${HIVE_ETH1_LOGLEVEL:-3}
 GETH_DATA_DIR=/db
 GETH_CHAINDATA_DIR="$GETH_DATA_DIR/geth/chaindata"
 
-CHAIN_ID=$(cat /hive/input/genesis.json | jq -r .config.chainId)
+CHAIN_ID=$(cat /genesis.json | jq -r .config.chainId)
 
 if [ ! -d "$GETH_CHAINDATA_DIR" ]; then
 	echo "$GETH_CHAINDATA_DIR missing, running init"
 	echo "Initializing genesis."
 	geth --verbosity="$VERBOSITY" init \
 		--datadir="$GETH_DATA_DIR" \
-		"/hive/input/genesis-l2.json"
+		"/genesis.json"
 else
 	echo "$GETH_CHAINDATA_DIR exists."
 fi

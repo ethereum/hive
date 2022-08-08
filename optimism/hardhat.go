@@ -253,38 +253,11 @@ func (d *Devnet) DeployL1Hardhat() {
 		d.T.Fatal("no L1 eth1 node to deploy contracts to")
 	}
 
-	execInfo, err := d.Contracts.Client.Exec("deploy_l1.sh",
+	execInfo := d.RunScript("deploy to L1", "deploy_l1.sh",
 		d.Eth1s[0].HttpRpcEndpoint(), EncodePrivKey(d.Secrets.Deployer).String()[2:], d.L1Cfg.Config.ChainID.String())
+	d.T.Log("deployed contracts", execInfo.Stdout, execInfo.Stderr)
 
-	if err != nil {
-		if execInfo != nil {
-			d.T.Log(execInfo.Stdout)
-			d.T.Error(execInfo.Stderr)
-		}
-		d.T.Fatalf("failed to deploy L1 contracts: %v", err)
-		return
-	}
-	d.T.Log(execInfo.Stdout)
-	if execInfo.ExitCode != 0 {
-		d.T.Error(execInfo.Stderr)
-		d.T.Fatalf("contract deployment exit code non-zero: %d", execInfo.ExitCode)
-		return
-	}
-
-	execInfo, err = d.Contracts.Client.Exec("deployments.sh")
-	if err != nil {
-		if execInfo != nil {
-			d.T.Log(execInfo.Stdout)
-			d.T.Error(execInfo.Stderr)
-		}
-		d.T.Fatalf("failed to get deployments data: %v", err)
-		return
-	}
-	if execInfo.ExitCode != 0 {
-		d.T.Error(execInfo.Stderr)
-		d.T.Fatalf("deployments data exit code non-zero: %d", execInfo.ExitCode)
-		return
-	}
+	execInfo = d.RunScript("deployments", "deployments.sh")
 	var hhDeployments HardhatDeploymentsL1
 	if err := json.Unmarshal([]byte(execInfo.Stdout), &hhDeployments); err != nil {
 		d.T.Fatalf("failed to decode hardhat deployments")
