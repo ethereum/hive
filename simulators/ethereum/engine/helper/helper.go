@@ -191,6 +191,7 @@ func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBloc
 	result := new(big.Int).Set(genesis.Difficulty)
 	for _, b := range chain {
 		if lastBlock != 0 && lastBlock == b.NumberU64() {
+			result.Add(result, b.Difficulty())
 			break
 		}
 		result.Add(result, b.Difficulty())
