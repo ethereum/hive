@@ -190,11 +190,10 @@ func LoadGenesisBlock(path string) *types.Block {
 func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
 	result := new(big.Int).Set(genesis.Difficulty)
 	for _, b := range chain {
+		result.Add(result, b.Difficulty())
 		if lastBlock != 0 && lastBlock == b.NumberU64() {
-			result.Add(result, b.Difficulty())
 			break
 		}
-		result.Add(result, b.Difficulty())
 	}
 	return result
 }
