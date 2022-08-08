@@ -63,6 +63,8 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 				// Add the new file to be loaded as chain.rlp
 			}
 			for _, variant := range clientSyncVariantGenerator.Configure(big.NewInt(ttd), genesisPath, currentTest.ChainFile) {
+				variant := variant
+				clientDef := clientDef
 				suite.Add(hivesim.TestSpec{
 					Name:        fmt.Sprintf("%s (%s, sync/%s)", currentTest.Name, clientDef.Name, variant.Name),
 					Description: currentTest.About,
