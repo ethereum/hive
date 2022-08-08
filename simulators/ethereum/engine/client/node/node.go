@@ -133,6 +133,10 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 
 	if s.ChainFile != "" {
 		s.Config.ChainFile = "./chains/" + s.ChainFile
+	} else {
+		if chainFilePath, ok := ClientFiles["/chain.rlp"]; ok {
+			s.Config.ChainFile = chainFilePath
+		}
 	}
 
 	if s.Config.PoWMiner && s.Config.PoWMinerEtherBase == (common.Address{}) {
@@ -298,6 +302,17 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 	go g.SubscribeP2PEvents()
 
 	return g, err
+}
+
+func (n *GethNode) AddPeer(ec client.EngineClient) error {
+	bootnode, err := ec.EnodeURL()
+	if err != nil {
+		return err
+	}
+	node := enode.MustParse(bootnode)
+	n.node.Server().AddTrustedPeer(node)
+	n.node.Server().AddPeer(node)
+	return nil
 }
 
 func (n *GethNode) isBlockTerminal(b *types.Block) (bool, *big.Int, error) {
