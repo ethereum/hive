@@ -142,10 +142,12 @@ func (d *Devnet) AddOpL2(opts ...hivesim.StartOption) {
 	}
 	defaultSettings := hivesim.Params{
 		"HIVE_ETH1_LOGLEVEL": "3",
+		// just repeat that of the genesis block (rollup cfg is not initialized yet)
+		"HIVE_ETHERBASE": d.L2Cfg.Coinbase.String(),
 	}
 	input := []hivesim.StartOption{defaultSettings}
 
-	l2GenesisCfg, err := json.Marshal(&d.L2Cfg)
+	l2GenesisCfg, err := json.Marshal(d.L2Cfg)
 	if err != nil {
 		d.T.Fatalf("failed to encode l2 genesis: %v", err)
 		return
@@ -175,20 +177,28 @@ func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, opts ...hivesim.StartO
 	eth1Node := d.GetEth1(eth1Index)
 	l2Engine := d.GetOpL2Engine(l2EngIndex)
 
-	defaultSettings := UnprefixedParams{
+	defaultSettings := HiveUnpackParams{
 		opnf.L1NodeAddr.EnvVar:        eth1Node.WsRpcEndpoint(),
 		opnf.L2EngineAddr.EnvVar:      l2Engine.WsRpcEndpoint(),
-		opnf.RPCListenAddr.EnvVar:     "127.0.0.1",
+		opnf.RollupConfig.EnvVar:      "/rollup_config.json",
+		opnf.RPCListenAddr.EnvVar:     "0.0.0.0",
 		opnf.RPCListenPort.EnvVar:     fmt.Sprintf("%d", RollupRPCPort),
 		opnf.L1TrustRPC.EnvVar:        "false",
 		opnf.L2EngineJWTSecret.EnvVar: defaultJWTPath,
 		opnf.LogLevelFlag.EnvVar:      "debug",
 	}
 	input := []hivesim.StartOption{defaultSettings.Params()}
+
+	rollupCfg, err := json.Marshal(d.RollupCfg)
+	if err != nil {
+		d.T.Fatalf("failed to encode l2 genesis: %v", err)
+		return
+	}
+	input = append(input, bytesFile("/rollup_config.json", rollupCfg))
 	input = append(input, defaultJWTFile)
 	input = append(input, opts...)
 
-	c := &OpNode{d.T.StartClient(d.Clients.OpNode[0].Name, opts...)}
+	c := &OpNode{d.T.StartClient(d.Clients.OpNode[0].Name, input...)}
 	d.T.Logf("added op-node %d: %s", len(d.OpNodes), c.IP)
 	d.OpNodes = append(d.OpNodes, c)
 }
@@ -210,7 +220,7 @@ func (d *Devnet) AddOpProposer(eth1Index int, l2EngIndex int, opNodeIndex int, o
 	opNode := d.GetOpNode(opNodeIndex)
 	l2Engine := d.GetOpL2Engine(l2EngIndex)
 
-	defaultSettings := UnprefixedParams{
+	defaultSettings := HiveUnpackParams{
 		oppf.L1EthRpcFlag.EnvVar:                  eth1Node.WsRpcEndpoint(),
 		oppf.L2EthRpcFlag.EnvVar:                  l2Engine.WsRpcEndpoint(),
 		oppf.RollupRpcFlag.EnvVar:                 opNode.HttpRpcEndpoint(),
@@ -226,7 +236,7 @@ func (d *Devnet) AddOpProposer(eth1Index int, l2EngIndex int, opNodeIndex int, o
 	input := []hivesim.StartOption{defaultSettings.Params()}
 	input = append(input, opts...)
 
-	c := &ProposerNode{d.T.StartClient(d.Clients.OpProposer[0].Name, opts...)}
+	c := &ProposerNode{d.T.StartClient(d.Clients.OpProposer[0].Name, input...)}
 	d.T.Logf("added op-proposer: %s", c.IP)
 	d.Proposer = c
 }
@@ -248,7 +258,7 @@ func (d *Devnet) AddOpBatcher(eth1Index int, l2EngIndex int, opNodeIndex int, op
 	opNode := d.GetOpNode(opNodeIndex)
 	l2Engine := d.GetOpL2Engine(l2EngIndex)
 
-	defaultSettings := UnprefixedParams{
+	defaultSettings := HiveUnpackParams{
 		opbf.L1EthRpcFlag.EnvVar:                   eth1Node.WsRpcEndpoint(),
 		opbf.L2EthRpcFlag.EnvVar:                   l2Engine.WsRpcEndpoint(),
 		opbf.RollupRpcFlag.EnvVar:                  opNode.HttpRpcEndpoint(),
@@ -267,7 +277,7 @@ func (d *Devnet) AddOpBatcher(eth1Index int, l2EngIndex int, opNodeIndex int, op
 	input := []hivesim.StartOption{defaultSettings.Params()}
 	input = append(input, opts...)
 
-	c := &BatcherNode{d.T.StartClient(d.Clients.OpBatcher[0].Name, opts...)}
+	c := &BatcherNode{d.T.StartClient(d.Clients.OpBatcher[0].Name, input...)}
 	d.T.Logf("added op-batcher: %s", c.IP)
 	d.Batcher = c
 }

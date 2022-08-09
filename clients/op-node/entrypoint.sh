@@ -1,16 +1,15 @@
 #!/bin/bash
 
 # Hive requires us to prefix env vars with "HIVE_"
-# Iterate the env, find all HIVE_ROLLUP_NODE_ vars, and remove the HIVE_ prefix.
-env -0 | while IFS='=' read -r -d '' n v; do
-    if [[ "$n" == HIVE_ROLLUP_NODE_* ]]; then
-        name=${n#"HIVE_"}  # remove the HIVE_ prefix
-        printf "'%s'='%s'\n" "$name" "$v"
+# Iterate the env, find all HIVE_UNPACK_ vars, and remove the HIVE_UNPACK_ prefix.
+while IFS='=' read -r -d '' n v; do
+    if [[ "$n" == HIVE_UNPACK_* ]]; then
+        name=${n#"HIVE_UNPACK_"}  # remove the HIVE_UNPACK_ prefix
         echo "$name=$v"
-        export "$name=$v"
+        declare -gx "$name=$v"
     fi
-done
+done < <(env -0)
 
-exec op-node
+op-node
 
 

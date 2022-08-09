@@ -103,7 +103,7 @@ func (d *Devnet) InitHardhatDeployConfig() {
 		ChannelTimeout:         40,
 		P2pSequencerAddress:    d.Addresses.SequencerP2P,
 		OptimismL2FeeRecipient: common.Address{0: 0x42, 19: 0xf0}, // tbd
-		BatchInboxAddress:      common.Address{},
+		BatchInboxAddress:      common.Address{0: 0x42, 19: 0xff}, // tbd
 		BatchSenderAddress:     d.Addresses.Batcher,
 
 		L2OutputOracleSubmissionInterval:    6,
@@ -132,7 +132,7 @@ func (d *Devnet) InitHardhatDeployConfig() {
 		L2GenesisBlockGasLimit:      15_000_000,
 		L2GenesisBlockDifficulty:    1,
 		L2GenesisBlockMixHash:       common.Hash{},
-		L2GenesisBlockCoinbase:      common.Address{0: 0x42, 19: 0xf0},
+		L2GenesisBlockCoinbase:      common.Address{0: 0x42, 19: 0xf0}, // matching OptimismL2FeeRecipient
 		L2GenesisBlockNumber:        0,
 		L2GenesisBlockGasUsed:       0,
 		L2GenesisBlockParentHash:    common.Hash{},

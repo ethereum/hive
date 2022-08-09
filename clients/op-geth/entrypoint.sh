@@ -24,7 +24,7 @@ fi
 
 # TODO: increase max peers, enable p2p, once we get to snap sync testing in Hive.
 
-exec geth \
+geth \
 	--datadir="$GETH_DATA_DIR" \
 	--verbosity="$VERBOSITY" \
 	--http \
@@ -46,6 +46,7 @@ exec geth \
 	--maxpeers=0 \
 	--networkid="$CHAIN_ID" \
 	--mine \
+	--miner.etherbase="$HIVE_ETHERBASE" \
 	--password="$GETH_DATA_DIR"/password \
 	--allow-insecure-unlock \
 	--gcmode=archive \

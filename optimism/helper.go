@@ -22,24 +22,24 @@ var defaultJWTPath = "/hive/input/jwt-secret.txt"
 var defaultJWTSecret = common.Hash{42}
 var defaultJWTFile = stringFile(defaultJWTPath, defaultJWTSecret.String())
 
-// UnprefixedParams are hivesim.Params that have yet to be prefixed with "HIVE_".
+// HiveUnpackParams are hivesim.Params that have yet to be prefixed with "HIVE_UNPACK_".
 //
-// In optimism monorepo we have many flags packages that define flags with namespaced env vars.
+// In the optimism monorepo we have many flags packages that define flags with namespaced env vars.
 // We use these same env vars to configure the hive clients.
 // But we need to add "HIVE_" to them, and then unpack them again in the hive client entrypoint, to use them.
 //
-// Within the client only params starting with "HIVE_<namespace>_" will be unpacked.
-// E.g. "HIVE_ROLLUP_NODE_HELLO_WORLD" will become "ROLLUP_NODE_HELLO_WORLD"
-type UnprefixedParams hivesim.Params
+// Within the client only params starting with "HIVE_UNPACK_" will be unpacked.
+// E.g. "HIVE_UNPACK_OP_NODE_HELLO_WORLD" will become "OP_NODE_HELLO_WORLD"
+type HiveUnpackParams hivesim.Params
 
-func (u UnprefixedParams) Params() hivesim.Params {
+func (u HiveUnpackParams) Params() hivesim.Params {
 	out := make(hivesim.Params)
 	for k, v := range u {
-		out["HIVE_"+k] = v
+		out["HIVE_UNPACK_"+k] = v
 	}
 	return out
 }
-func (u UnprefixedParams) Merge(other UnprefixedParams) {
+func (u HiveUnpackParams) Merge(other HiveUnpackParams) {
 	for k, v := range other {
 		u[k] = v
 	}

@@ -52,7 +52,7 @@ func runTestnet(t *hivesim.T) {
 	d.AddOpBatcher(0, 0, 0)
 	d.AddOpProposer(0, 0, 0)
 
-	// TODO: pass optimism.UnprefixedParams{flag env vars here}.Params()
+	// TODO: pass optimism.HiveUnpackParams{flag env vars here}.Params()
 	//  hivesim start option to the op nodes to configure p2p networking
 
 	// verifier A

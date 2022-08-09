@@ -3,13 +3,14 @@ module github.com/ethereum/hive/optimism
 go 1.18
 
 require (
-	github.com/ethereum-optimism/optimism/op-batcher v0.3.1-0.20220801052740-6d9011ec4242
-	github.com/ethereum-optimism/optimism/op-bindings v0.3.1-0.20220801052740-6d9011ec4242
-	github.com/ethereum-optimism/optimism/op-node v0.3.1-0.20220801052740-6d9011ec4242
-	github.com/ethereum-optimism/optimism/op-proposer v0.3.1-0.20220801052740-6d9011ec4242
-	github.com/ethereum/go-ethereum v1.10.20
+	github.com/ethereum-optimism/optimism/op-batcher v0.3.1-0.20220809151300-646c8d7f45e4
+	github.com/ethereum-optimism/optimism/op-bindings v0.3.1-0.20220809151300-646c8d7f45e4
+	github.com/ethereum-optimism/optimism/op-node v0.3.1-0.20220809151300-646c8d7f45e4
+	github.com/ethereum-optimism/optimism/op-proposer v0.3.1-0.20220809151300-646c8d7f45e4
+	github.com/ethereum/go-ethereum v1.10.21
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/miguelmota/go-ethereum-hdwallet v0.1.1
+	github.com/stretchr/testify v1.8.0
 )
 
 require (
@@ -24,6 +25,7 @@ require (
 	github.com/containerd/cgroups v1.0.3 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
@@ -43,6 +45,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
+	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
 	github.com/ipfs/go-cid v0.0.7 // indirect
@@ -111,6 +114,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.0.2 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.12.2 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.35.0 // indirect
@@ -141,6 +145,7 @@ require (
 	google.golang.org/grpc v1.46.2 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/ethereum/go-ethereum v1.10.20 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220715235548-70b02481016d
+replace github.com/ethereum/go-ethereum v1.10.21 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220803173305-1c9d4cc76a6e
