@@ -160,7 +160,9 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		select {
 		case <-ctx.Done():
 			// Close the node when the context is done
-			g.Close()
+			if err := g.Close(); err != nil {
+				panic(err)
+			}
 		}
 	}(testContext)
 
@@ -574,13 +576,17 @@ func (n *GethNode) Close() error {
 	n.closing()
 	if n.ethashEngine != nil {
 		n.ethashWaitGroup.Wait()
-		n.ethashEngine.Close()
+		if err := n.ethashEngine.Close(); err != nil {
+			panic(err)
+		}
 	}
 	err := n.node.Close()
 	if err != nil {
 		return err
 	}
-	os.RemoveAll(n.datadir)
+	if err := os.RemoveAll(n.datadir); err != nil {
+		panic(err)
+	}
 	return nil
 }
 
