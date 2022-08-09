@@ -6,14 +6,20 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math/big"
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/eth/protocols/eth"
+	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/hive/hivesim"
 	diff "github.com/yudai/gojsondiff"
 	"github.com/yudai/gojsondiff/formatter"
@@ -34,6 +40,7 @@ var (
 		"HIVE_FORK_ISTANBUL":       "0",
 		"HIVE_FORK_BERLIN":         "0",
 		"HIVE_FORK_LONDON":         "0",
+		"HIVE_LOGLEVEL":            "5",
 	}
 	files = map[string]string{
 		"genesis.json": "./tests/genesis.json",
@@ -84,6 +91,96 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 			},
 		})
 	}
+
+	// Run one-off test for debug_badBlocks.
+	t.Run(hivesim.TestSpec{
+		Name: fmt.Sprintf("%s (%s)", "debug_badBlocks", clientName),
+		Run: func(t *hivesim.T) {
+			// Run devp2p cmd with RLP encoded msg at enode.
+			badBlock := loadBlock(t, "tests/bad.rlp", 0)
+			td := getTotalDifficulty(t, "tests/chain.rlp")
+
+			enode, err := c.EnodeURL()
+			if err != nil {
+				t.Fatalf("unable to get enode: %w", err)
+			}
+
+			newBlock := eth.NewBlockPacket{
+				Block: badBlock,
+				TD:    td,
+			}
+			newBlockRaw, err := rlp.EncodeToBytes(newBlock)
+			if err != nil {
+				t.Fatalf("unable to encode new block announcemnet: %s", err)
+			}
+
+			cmd := exec.Command(
+				"/source/devp2p",
+				"eth",
+				"--genesis=tests/genesis.json",
+				"--chain=tests/chain.rlp",
+				"new-block",
+				enode,
+				common.Bytes2Hex(newBlockRaw),
+			)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				t.Fatalf("devp2p cmd failed: %s", err)
+			}
+
+			time.Sleep(2 * time.Second)
+
+			// Check debug_badBlocks to make sure the client registered it.
+			var bad []interface{}
+			if err := c.RPC().Call(&bad, "debug_getBadBlocks"); err != nil {
+				t.Fatalf("failed to call debug_getBadBlocks: %s", err)
+			}
+			if len(bad) != 1 {
+				t.Fatalf("expected 1 bad block, got %d", len(bad))
+			}
+		},
+	})
+
+}
+
+// getTotalDifficulty gets the total difficulty from a chain.rlp file at
+// the given path.
+func getTotalDifficulty(t *hivesim.T, path string) *big.Int {
+	chain, err := readChain(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	td := big.NewInt(0)
+	for _, block := range chain {
+		td.Add(td, block.Difficulty())
+	}
+	return td
+}
+
+// readChain reads a chain.rlp file to a slice of Block.
+func readChain(filename string) ([]*types.Block, error) {
+	f, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var (
+		stream = rlp.NewStream(f, 0)
+		blocks = make([]*types.Block, 0)
+		i      = 0
+	)
+	for {
+		var b types.Block
+		if err := stream.Decode(&b); err == io.EOF {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("at block %d: %v", i, err)
+		}
+		blocks = append(blocks, &b)
+		i++
+	}
+	return blocks, nil
 }
 
 func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
@@ -226,4 +323,32 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
 		return nil
 	})
 	return tests
+}
+
+// loadBlock loads a block from file.
+func loadBlock(t *hivesim.T, filename string, index int) *types.Block {
+	f, err := os.Open(filename)
+	if err != nil {
+		t.Fatalf("unable to load %s: %w", filename, err)
+	}
+	defer f.Close()
+	var (
+		stream = rlp.NewStream(f, 0)
+		blocks = make([]*types.Block, 0)
+		i      = 0
+	)
+	for {
+		var b types.Block
+		if err := stream.Decode(&b); err == io.EOF {
+			break
+		} else if err != nil {
+			t.Fatalf("at block %d: %v", i, err)
+		}
+		blocks = append(blocks, &b)
+		i++
+	}
+	if len(blocks) <= index {
+		t.Fatalf("index out of range, (got: %d, len: %d)", index, len(blocks))
+	}
+	return blocks[index]
 }
