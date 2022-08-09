@@ -51,7 +51,7 @@ var (
 	}
 
 	SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE = map[string]*big.Int{
-		"teku":       big.NewInt(128),
+		"teku":       big.NewInt(16),
 		"lighthouse": big.NewInt(128),
 	}
 )
@@ -1436,8 +1436,10 @@ func SyncingWithChainHavingInvalidPostTransitionBlock(t *hivesim.T, env *testEnv
 	exceptions := NewSyncHashes(transitionPayloadHash)
 	importerProxy.AddResponseCallback(EngineForkchoiceUpdatedV1, InvalidateExecutionPayloads(EngineForkchoiceUpdatedV1, exceptions, &transitionPayloadHash, callbackCalled))
 
-	// Wait here until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` slots have passed
-	safeSlotsTimeout := testnet.SlotsTimeout(beacon.Slot(safeSlotsToImportOptimistically.Uint64() + safeSlotsImportThreshold))
+	// Wait here until `SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY` + safe slots have passed
+	time.Sleep(time.Duration((safeSlotsToImportOptimistically.Uint64()+safeSlotsImportThreshold)*config.SlotTime.Uint64()) * time.Second)
+	// Wait for callback or until timeout
+	safeSlotsTimeout := testnet.SlotsTimeout(beacon.Slot(safeSlotsImportThreshold))
 forloop:
 	for {
 		select {
