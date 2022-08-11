@@ -4,7 +4,19 @@ use (
 	.
 	./hiveproxy
 	./optimism
-	./simulators/optimism/p2p
 	./simulators/optimism/rpc
+	./simulators/optimism/p2p
 	./simulators/optimism/testnet
+	./simulators/eth2/engine
+	./simulators/eth2/testnet
+	./simulators/ethereum/engine
+	./simulators/ethereum/rpc
+	./simulators/ethereum/consensus
+	./simulators/ethereum/sync
+	./simulators/ethereum/rpc-compat
+	./simulators/ethereum/graphql
+	./simulators/devp2p
+	./simulators/smoke/genesis
+	./simulators/smoke/network
+	./simulators/smoke/clique
 )
