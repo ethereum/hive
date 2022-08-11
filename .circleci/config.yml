@@ -43,7 +43,7 @@ jobs:
               "op-node"
               "op-contracts"
             )
-            for cl in clients; do
+            for cl in "${clients[@]}"; do
                docker save -o "/tmp/build/hive-clients/$cl" hive/clients/$cl
             done
       - persist_to_workspace:
@@ -72,7 +72,7 @@ jobs:
               "op-node"
               "op-contracts"
             )
-            for cl in clients; do
+            for cl in "${clients[@]}"; do
                docker load -i "/tmp/build/hive-clients/$cl"
             done
       - run:
