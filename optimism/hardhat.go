@@ -2,6 +2,7 @@ package optimism
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -34,7 +35,6 @@ type HardhatDeployConfig struct {
 
 	L1BlockTime                 uint64         `json:"l1BlockTime"`
 	L1GenesisBlockNonce         hexutil.Uint64 `json:"l1GenesisBlockNonce"`
-	L1GenesisBlockTimestamp     uint64         `json:"l1GenesisBlockTimestamp"`
 	CliqueSignerAddress         common.Address `json:"cliqueSignerAddress"`
 	L1GenesisBlockGasLimit      hexutil.Uint64 `json:"l1GenesisBlockGasLimit"`
 	L1GenesisBlockDifficulty    hexutil.Uint64 `json:"l1GenesisBlockDifficulty"`
@@ -116,7 +116,6 @@ func (d *Devnet) InitHardhatDeployConfig() {
 
 		L1BlockTime:                 15,
 		L1GenesisBlockNonce:         0,
-		L1GenesisBlockTimestamp:     uint64(time.Now().Unix()),
 		CliqueSignerAddress:         d.Addresses.CliqueSigner,
 		L1GenesisBlockGasLimit:      15_000_000,
 		L1GenesisBlockDifficulty:    1,
@@ -173,7 +172,7 @@ func (d *Devnet) InitL1Hardhat() {
 		d.T.Fatalf("already initialized L1 chain config: %v", d.L1Cfg)
 		return
 	}
-	execInfo := d.RunScript("L1 config", "config_l1.sh")
+	execInfo := d.RunScript("L1 config", "config_l1.sh", fmt.Sprintf("%d", time.Now().Unix()))
 
 	var l1Cfg core.Genesis
 	if err := json.Unmarshal([]byte(execInfo.Stdout), &l1Cfg); err != nil {
