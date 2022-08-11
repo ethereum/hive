@@ -231,7 +231,7 @@ func (d *Devnet) AddOpProposer(eth1Index int, l2EngIndex int, opNodeIndex int, o
 		oppf.ResubmissionTimeoutFlag.EnvVar:       "30s",
 		oppf.MnemonicFlag.EnvVar:                  d.MnemonicCfg.Mnemonic,
 		oppf.L2OutputHDPathFlag.EnvVar:            d.MnemonicCfg.Proposer,
-		oppf.LogLevelFlag.EnvVar:                  "debug",
+		"OP_PROPOSER_LOG_LEVEL":                   "debug",
 	}
 	input := []hivesim.StartOption{defaultSettings.Params()}
 	input = append(input, opts...)
@@ -272,7 +272,7 @@ func (d *Devnet) AddOpBatcher(eth1Index int, l2EngIndex int, opNodeIndex int, op
 		opbf.MnemonicFlag.EnvVar:                   d.MnemonicCfg.Mnemonic,
 		opbf.SequencerHDPathFlag.EnvVar:            d.MnemonicCfg.Batcher,
 		opbf.SequencerBatchInboxAddressFlag.EnvVar: d.RollupCfg.BatchInboxAddress.String(),
-		opbf.LogLevelFlag.EnvVar:                   "debug",
+		"OP_BATCHER_LOG_LEVEL":                     "debug",
 	}
 	input := []hivesim.StartOption{defaultSettings.Params()}
 	input = append(input, opts...)

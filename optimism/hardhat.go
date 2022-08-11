@@ -88,7 +88,7 @@ func (d *Devnet) RunScript(name string, command ...string) *hivesim.ExecInfo {
 	return execInfo
 }
 
-func (d *Devnet) InitHardhatDeployConfig() {
+func (d *Devnet) InitHardhatDeployConfig(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout uint64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.T.Log("creating hardhat deploy config")
@@ -98,9 +98,9 @@ func (d *Devnet) InitHardhatDeployConfig() {
 		L2ChainID:          902,
 		L2BlockTime:        2,
 
-		MaxSequencerDrift:      100,
-		SequencerWindowSize:    4,
-		ChannelTimeout:         40,
+		MaxSequencerDrift:      maxSeqDrift,
+		SequencerWindowSize:    seqWindowSize,
+		ChannelTimeout:         chanTimeout,
 		P2pSequencerAddress:    d.Addresses.SequencerP2P,
 		OptimismL2FeeRecipient: common.Address{0: 0x42, 19: 0xf0}, // tbd
 		BatchInboxAddress:      common.Address{0: 0x42, 19: 0xff}, // tbd

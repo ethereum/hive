@@ -97,7 +97,7 @@ func runAllTests(t *hivesim.T) {
 	d := optimism.NewDevnet(t)
 
 	d.InitContracts()
-	d.InitHardhatDeployConfig()
+	d.InitHardhatDeployConfig(10, 4, 30)
 	d.InitL1Hardhat()
 	d.AddEth1() // l1 eth1 node is required for l2 config init
 	d.WaitUpEth1(0, time.Second*10)
