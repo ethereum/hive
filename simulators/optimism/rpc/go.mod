@@ -4,9 +4,9 @@ go 1.18
 
 replace github.com/ethereum/go-ethereum v1.10.21 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220810221227-a68e5aa189e1
 
-replace github.com/ethereum/hive v0.0.0-20220726101544-19cb1f8cc162 => github.com/ethereum-optimism/hive v0.0.0-20220727114344-022fad9696a4
+replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c
 
-replace github.com/ethereum/hive/optimism => ../../../optimism
+replace github.com/ethereum/hive/optimism v0.0.0 => github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c
 
 require (
 	github.com/ethereum/go-ethereum v1.10.21

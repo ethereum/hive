@@ -234,6 +234,10 @@ github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1m
 github.com/envoyproxy/go-control-plane v0.9.9-0.20201210154907-fd9021fe5dad/go.mod h1:cXg6YxExXjJnVBQHBLXeUAgxn2UodCpnH306RInaBQk=
 github.com/envoyproxy/go-control-plane v0.9.9-0.20210512163311-63b5d3c536b0/go.mod h1:hliV/p42l8fGbc6Y9bQ70uLwIvmJyVE5k4iMKlh8wCQ=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
+github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c h1:3x34MBRX1+pjTU8nFI/cy8XGZFsEArt09dXdU7VSzqo=
+github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c/go.mod h1:SH5X2jsgBzhSFkcG2OD9O8gTC4iXU1HycjLiWp/oDs0=
+github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c h1:8Y5Y5BNWoAQ+bB2tiP5NpftwZqd5uitlEkCOCtixD/4=
+github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c/go.mod h1:dFaAz4daQyhcod7abU8GbbyFYFHpg+nUEjB+acs34RE=
 github.com/ethereum-optimism/optimism/op-batcher v0.4.0 h1:e28OtJIIjRKC1tlVAfh4ZARIcXmvfXEH1Lkj2Cit0ps=
 github.com/ethereum-optimism/optimism/op-batcher v0.4.0/go.mod h1:C5R5pqQTUDyC37tXRQZKWLi+vsuSPwWYi1/8zrrLx3w=
 github.com/ethereum-optimism/optimism/op-bindings v0.4.0 h1:4Yop9PGMBUhRtg12aR/ydTTut72s/1J+ztl0lv8UvSI=
@@ -247,8 +251,6 @@ github.com/ethereum-optimism/optimism/op-service v0.4.0/go.mod h1:PMl9VqIC3FPH/T
 github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220810221227-a68e5aa189e1 h1:cLAkNAHg/ByqMvyMdcHaOLuJJeQY+YxHUYOPg6zDvjg=
 github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220810221227-a68e5aa189e1/go.mod h1:EYFyF19u3ezGLD4RqOkLq+ZCXzYbLoNDdZlMt7kyKFg=
 github.com/ethereum/go-ethereum v1.10.4/go.mod h1:nEE0TP5MtxGzOMd7egIrbPJMQBnhVU3ELNxhBglIzhg=
-github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 h1:/9pjERGkOhfngQJ8wAxx+pjrM5lnml+dUxD3HVDaE8g=
-github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1/go.mod h1:G8XiiUErpj6++yb93r6y6T1nWBh4Bgoi3QFwUSbzt/U=
 github.com/fatih/color v1.7.0/go.mod h1:Zm6kSWBoL9eyXnKyktHP6abPY2pDugNf5KwzbycvMj4=
 github.com/fjl/memsize v0.0.0-20190710130421-bcb5799ab5e5/go.mod h1:VvhXpOYNQvB+uIk2RvXzuaQtkQJzzIx6lSBe1xv7hi0=
 github.com/fjl/memsize v0.0.1 h1:+zhkb+dhUgx0/e+M8sF0QqiouvMQUiKR+QYvdxIOKcQ=
