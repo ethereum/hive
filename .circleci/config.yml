@@ -30,9 +30,28 @@ jobs:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
       - run:
-          command: "/tmp/build/hive -sim=optimism/rpc -client=op-l1,op-l2,op-proposer,op-batcher,op-node |& tee /tmp/build/hive-rpc.log"
+          command: "/tmp/build/hive -sim=optimism/rpc -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts |& tee /tmp/build/hive-rpc.log"
       - run:
           command: "! grep 'pass.*=false' /tmp/build/hive-rpc.log"
+      - slack/notify:
+          channel: C03N11M0BBN
+          event: fail
+          template: basic_fail_1
+      - slack/notify:
+          channel: C03N11M0BBN
+          event: pass
+          template: basic_success_1
+
+  hive-testnet-tests:
+    machine:
+      image: ubuntu-2004:202201-02
+    steps:
+      - checkout
+      - attach_workspace: {at: "/tmp/build"}
+      - run:
+          command: "/tmp/build/hive -sim=optimism/testnet -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts |& tee /tmp/build/hive-testnet.log"
+      - run:
+          command: "! grep 'pass.*=false' /tmp/build/hive-testnet.log"
       - slack/notify:
           channel: C03N11M0BBN
           event: fail
@@ -49,7 +68,7 @@ jobs:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
       - run:
-          command: "/tmp/build/hive -sim=optimism/p2p -client=op-l1,op-l2,op-proposer,op-batcher,op-node |& tee /tmp/build/hive-p2p.log"
+          command: "/tmp/build/hive -sim=optimism/p2p -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts |& tee /tmp/build/hive-p2p.log"
       - run:
           command: "! grep 'pass.*=false' /tmp/build/hive-p2p.log"
       - slack/notify:
@@ -89,6 +108,9 @@ workflows:
       - go-test
       - build
       - hive-rpc-tests:
+          requires: ["build"]
+          context: slack
+      - hive-testnet-tests:
           requires: ["build"]
           context: slack
       - hive-p2p-tests:
