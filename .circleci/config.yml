@@ -146,9 +146,10 @@ jobs:
           name: "hiveproxy module tests"
           command: "go test -cover ./..."
           working_directory: "./hiveproxy"
-      - run:
-          name: "Compile Go simulators"
-          command: ".circleci/compile-simulators.sh"
+# some upstream simulators are broken, don't use latest, geth, etc.
+#      - run:
+#          name: "Compile Go simulators"
+#          command: ".circleci/compile-simulators.sh"
 
 workflows:
   main:
