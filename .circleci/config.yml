@@ -20,105 +20,19 @@ jobs:
           root: .
           paths: ["hive"]
 
-  # We run hive once without any simulators to build the client images, which can then be reused in all test jobs.
-  hive-clients-build:
-    machine:
-      image: ubuntu-2004:202201-02
-    steps:
-      - checkout
-      - attach_workspace: { at: "/tmp/build" }
-      - run:
-          name: Build hive client docker images
-          command: "/tmp/build/hive -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts"
-      - run:
-          name: Save hive client docker images
-          command: |
-            printf "Saving docker images\n"
-            mkdir -p /tmp/build/hive-clients
-            clients=(
-              "go-ethereum"
-              "op-geth"
-              "op-proposer"
-              "op-batcher"
-              "op-node"
-              "op-contracts"
-            )
-            for cl in "${clients[@]}"; do
-               docker save -o "/tmp/build/hive-clients/$cl" hive/clients/$cl
-            done
-      - persist_to_workspace:
-          root: "/tmp/build"
-          paths: [ "hive-clients" ]
-
-  # The below hive-*-tests jobs runs the optimism test simulations. This requires a virtual
+  # The below job runs the optimism test simulations. This requires a virtual
   # machine instead of the container-based build environment because hive needs
   # to be able to talk to the docker containers it creates.
-
-  hive-rpc-tests:
+  hive-optimism-tests:
     machine:
       image: ubuntu-2004:202201-02
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
-      - run: &load_client_docker_images
-          name: Load hive clients
-          command: |
-            printf "Loading client docker images\n"
-            clients=(
-              "go-ethereum"
-              "op-geth"
-              "op-proposer"
-              "op-batcher"
-              "op-node"
-              "op-contracts"
-            )
-            for cl in "${clients[@]}"; do
-               docker load -i "/tmp/build/hive-clients/$cl"
-            done
       - run:
-          command: "/tmp/build/hive -sim=optimism/rpc -sim.loglevel=5 -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts |& tee /tmp/build/hive-rpc.log"
+          command: "/tmp/build/hive -sim=\"optimism/*\" -sim.loglevel=5 -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts |& tee /tmp/build/hive.log"
       - run:
-          command: "! grep 'pass.*=false' /tmp/build/hive-rpc.log"
-      - slack/notify:
-          channel: C03N11M0BBN
-          event: fail
-          template: basic_fail_1
-      - slack/notify:
-          channel: C03N11M0BBN
-          event: pass
-          template: basic_success_1
-
-  hive-testnet-tests:
-    machine:
-      image: ubuntu-2004:202201-02
-    steps:
-      - checkout
-      - attach_workspace: {at: "/tmp/build"}
-      - run: *load_client_docker_images
-      - run:
-          command: "/tmp/build/hive -sim=optimism/testnet -sim.loglevel=5 -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts |& tee /tmp/build/hive-testnet.log"
-      - run:
-          command: "! grep 'pass.*=false' /tmp/build/hive-testnet.log"
-      - slack/notify:
-          channel: C03N11M0BBN
-          event: fail
-          template: basic_fail_1
-      - slack/notify:
-          channel: C03N11M0BBN
-          event: pass
-          template: basic_success_1
-
-  hive-p2p-tests:
-    machine:
-      image: ubuntu-2004:202201-02
-    steps:
-      - checkout
-      - attach_workspace: {at: "/tmp/build"}
-      - run: *load_client_docker_images
-      - run:
-          command: "/tmp/build/hive -sim=optimism/p2p -sim.loglevel=5 -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts |& tee /tmp/build/hive-p2p.log"
-      - run:
-          command: "! grep 'pass.*=false' /tmp/build/hive-p2p.log"
+          command: "! grep 'pass.*=false' /tmp/build/hive.log"
       - slack/notify:
           channel: C03N11M0BBN
           event: fail
@@ -156,14 +70,6 @@ workflows:
     jobs:
       - go-test
       - build
-      - hive-clients-build:
+      - hive-optimism-tests:
           requires: ["build"]
-      - hive-rpc-tests:
-          requires: ["hive-clients-build"]
-          context: slack
-      - hive-testnet-tests:
-          requires: ["hive-clients-build"]
-          context: slack
-      - hive-p2p-tests:
-          requires: ["hive-clients-build"]
           context: slack
