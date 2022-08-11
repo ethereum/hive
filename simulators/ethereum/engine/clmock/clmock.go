@@ -510,7 +510,7 @@ func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableDataV1) []Execute
 			cl.Errorf("CLMocker: Could not ExecutePayloadV1: %v", err)
 			responses[i].Error = err
 		} else {
-			cl.Logf("CLMocker: Executed payload: %v", execPayloadResp)
+			cl.Logf("CLMocker: Executed payload on %s: %v", ec.ID(), execPayloadResp)
 			responses[i].ExecutePayloadResponse = &execPayloadResp
 		}
 	}
