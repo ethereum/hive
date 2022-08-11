@@ -134,7 +134,9 @@ func (cl *CLMocker) RemoveEngineClient(ec client.EngineClient) {
 // Close all the engine clients
 func (cl *CLMocker) CloseClients() {
 	for _, engine := range cl.EngineClients {
-		engine.Close()
+		if err := engine.Close(); err != nil {
+			panic(err)
+		}
 	}
 }
 

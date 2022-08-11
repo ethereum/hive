@@ -45,7 +45,9 @@ type GethNodeTestConfiguration struct {
 	// The node mines proof of work blocks
 	PoWMiner          bool
 	PoWMinerEtherBase common.Address
-	DisableGossiping  bool
+	// Prepare the Ethash instance even if we don't mine (to seal blocks)
+	Ethash           bool
+	DisableGossiping bool
 
 	// Block Modifier
 	BlockModifier helper.BlockModifier
@@ -131,6 +133,10 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 
 	if s.ChainFile != "" {
 		s.Config.ChainFile = "./chains/" + s.ChainFile
+	} else {
+		if chainFilePath, ok := ClientFiles["/chain.rlp"]; ok {
+			s.Config.ChainFile = chainFilePath
+		}
 	}
 
 	if s.Config.PoWMiner && s.Config.PoWMinerEtherBase == (common.Address{}) {
@@ -154,7 +160,9 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		select {
 		case <-ctx.Done():
 			// Close the node when the context is done
-			g.Close()
+			if err := g.Close(); err != nil {
+				panic(err)
+			}
 		}
 	}(testContext)
 
@@ -166,9 +174,10 @@ type AccountTransactionInfo struct {
 	PreviousNonce uint64
 }
 type GethNode struct {
-	node      *node.Node
-	eth       *eth.Ethereum
-	powEngine *ethash.Ethash
+	node            *node.Node
+	eth             *eth.Ethereum
+	ethashEngine    *ethash.Ethash
+	ethashWaitGroup sync.WaitGroup
 
 	mustHeadBlock *types.Block
 
@@ -278,6 +287,14 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 	}
 
 	g.running, g.closing = context.WithCancel(context.Background())
+	if startConfig.PoWMiner || startConfig.Ethash {
+		// Create the ethash consensus module
+		ethashConfig := ethconfig.Defaults.Ethash
+		ethashConfig.PowMode = ethash.ModeNormal
+		ethashConfig.CacheDir = "/ethash"
+		ethashConfig.DatasetDir = ethashConfig.CacheDir
+		g.ethashEngine = ethash.New(ethashConfig, nil, false)
+	}
 	if startConfig.PoWMiner {
 		// Enable mining
 		go g.EnablePoWMining()
@@ -287,6 +304,17 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 	go g.SubscribeP2PEvents()
 
 	return g, err
+}
+
+func (n *GethNode) AddPeer(ec client.EngineClient) error {
+	bootnode, err := ec.EnodeURL()
+	if err != nil {
+		return err
+	}
+	node := enode.MustParse(bootnode)
+	n.node.Server().AddTrustedPeer(node)
+	n.node.Server().AddPeer(node)
+	return nil
 }
 
 func (n *GethNode) isBlockTerminal(b *types.Block) (bool, *big.Int, error) {
@@ -301,7 +329,11 @@ func (n *GethNode) isBlockTerminal(b *types.Block) (bool, *big.Int, error) {
 }
 
 func (n *GethNode) EnablePoWMining() {
-	// Delay mining start
+	// Delay mining start:
+	// This is useful in some cases where we try to test gossip blocks,
+	// because subsequent client docker container might take a while to
+	// start, and miss some of the gossipped blocks, thus failing the
+	// test.
 	select {
 	case <-time.After(time.Second * time.Duration(n.config.MiningStartDelaySeconds.Int64())):
 	case <-n.running.Done():
@@ -310,7 +342,6 @@ func (n *GethNode) EnablePoWMining() {
 
 	// Start PoW Mining Loop
 	go n.PoWMiningLoop()
-
 }
 
 func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, *types.Block, error) {
@@ -353,7 +384,7 @@ func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, 
 		}
 	}
 
-	if err := n.powEngine.Prepare(n.eth.BlockChain(), nextHeader); err != nil {
+	if err := n.ethashEngine.Prepare(n.eth.BlockChain(), nextHeader); err != nil {
 		log.Error("Failed to prepare header for sealing", "err", err)
 		return nil, nil, err
 	}
@@ -362,19 +393,13 @@ func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, 
 	if err != nil {
 		panic(err)
 	}
-	b, err := n.powEngine.FinalizeAndAssemble(n.eth.BlockChain(), nextHeader, state, nil, nil, nil)
+	b, err := n.ethashEngine.FinalizeAndAssemble(n.eth.BlockChain(), nextHeader, state, nil, nil, nil)
 	return state, b, err
 }
 
 func (n *GethNode) PoWMiningLoop() {
-	// Start a ethash instance to seal blocks
-	ethashConfig := ethconfig.Defaults.Ethash
-	ethashConfig.PowMode = ethash.ModeNormal
-	ethashConfig.CacheDir = "/ethash"
-	ethashConfig.DatasetDir = ethashConfig.CacheDir
-	n.powEngine = ethash.New(ethashConfig, nil, false)
-	defer n.powEngine.Close()
-
+	n.ethashWaitGroup.Add(1)
+	defer n.ethashWaitGroup.Done()
 	currentBlock := n.eth.BlockChain().CurrentBlock()
 	// During the Pow mining, the node must respond with the latest mined block, not what the blockchain actually states
 	n.mustHeadBlock = currentBlock
@@ -413,7 +438,7 @@ func (n *GethNode) PoWMiningLoop() {
 		// Seal the next block to broadcast
 		rChan := make(chan *types.Block, 0)
 		stopChan := make(chan struct{})
-		n.powEngine.Seal(n.eth.BlockChain(), b, rChan, stopChan)
+		n.ethashEngine.Seal(n.eth.BlockChain(), b, rChan, stopChan)
 		select {
 		case b := <-rChan:
 			if b == nil {
@@ -422,7 +447,7 @@ func (n *GethNode) PoWMiningLoop() {
 			// Modify the sealed block if necessary
 			if n.config.BlockModifier != nil {
 				sealVerifier := func(h *types.Header) bool {
-					return n.powEngine.VerifyHeader(n.eth.BlockChain(), h, true) == nil
+					return n.ethashEngine.VerifyHeader(n.eth.BlockChain(), h, true) == nil
 				}
 				b, err = n.config.BlockModifier.ModifySealedBlock(sealVerifier, b)
 				if err != nil {
@@ -460,6 +485,36 @@ func (n *GethNode) PoWMiningLoop() {
 			close(stopChan)
 			return
 		}
+	}
+}
+
+// Seal a block for testing purposes
+func (n *GethNode) SealBlock(ctx context.Context, block *types.Block) (*types.Block, error) {
+	if n.ethashEngine == nil {
+		return nil, fmt.Errorf("Node was not configured with an ethash instance")
+	}
+	n.ethashWaitGroup.Add(1)
+	defer n.ethashWaitGroup.Done()
+	newHeader := types.CopyHeader(block.Header())
+	// Reset nonce and mixHash
+	newHeader.Nonce = types.BlockNonce{}
+	newHeader.MixDigest = common.Hash{}
+
+	rChan := make(chan *types.Block, 0)
+	stopChan := make(chan struct{})
+	blockToSeal := types.NewBlockWithHeader(newHeader).WithBody(block.Transactions(), block.Uncles())
+
+	n.ethashEngine.Seal(n.eth.BlockChain(), blockToSeal, rChan, stopChan)
+
+	select {
+	case b := <-rChan:
+		if b == nil {
+			panic(fmt.Errorf("no block got sealed"))
+		}
+		return b, nil
+	case <-ctx.Done():
+		close(stopChan)
+		return nil, ctx.Err()
 	}
 }
 
@@ -518,12 +573,20 @@ func (n *GethNode) Close() error {
 		return nil
 	default:
 	}
-	defer n.closing()
+	n.closing()
+	if n.ethashEngine != nil {
+		n.ethashWaitGroup.Wait()
+		if err := n.ethashEngine.Close(); err != nil {
+			panic(err)
+		}
+	}
 	err := n.node.Close()
 	if err != nil {
 		return err
 	}
-	os.RemoveAll(n.datadir)
+	if err := os.RemoveAll(n.datadir); err != nil {
+		panic(err)
+	}
 	return nil
 }
 
@@ -738,6 +801,9 @@ func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 
 func (n *GethNode) GetBlockTotalDifficulty(ctx context.Context, hash common.Hash) (*big.Int, error) {
 	block := n.eth.BlockChain().GetBlockByHash(hash)
+	if block == nil {
+		return big.NewInt(0), nil
+	}
 	return n.eth.BlockChain().GetTd(hash, block.NumberU64()), nil
 }
 

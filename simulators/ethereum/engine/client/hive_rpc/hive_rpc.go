@@ -76,8 +76,10 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 			}
 		}
 	} else {
+		// Real TTD must be calculated adding the genesis difficulty
 		ttdInt := helper.CalculateRealTTD(ClientFiles["/genesis.json"], ttd.Int64())
 		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttdInt))
+		ttd = big.NewInt(ttdInt)
 	}
 	if bootClients != nil && len(bootClients) > 0 {
 		var (

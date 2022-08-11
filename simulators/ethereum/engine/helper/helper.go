@@ -66,6 +66,28 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	return &respCopy, nil
 }
 
+type InvalidPayloadBlockField string
+
+const (
+	InvalidParentHash             InvalidPayloadBlockField = "ParentHash"
+	InvalidStateRoot                                       = "StateRoot"
+	InvalidReceiptsRoot                                    = "ReceiptsRoot"
+	InvalidNumber                                          = "Number"
+	InvalidGasLimit                                        = "GasLimit"
+	InvalidGasUsed                                         = "GasUsed"
+	InvalidTimestamp                                       = "Timestamp"
+	InvalidPrevRandao                                      = "PrevRandao"
+	InvalidOmmers                                          = "Ommers"
+	RemoveTransaction                                      = "Incomplete Transactions"
+	InvalidTransactionSignature                            = "Transaction Signature"
+	InvalidTransactionNonce                                = "Transaction Nonce"
+	InvalidTransactionGas                                  = "Transaction Gas"
+	InvalidTransactionGasPrice                             = "Transaction GasPrice"
+	InvalidTransactionGasTipPrice                          = "Transaction GasTipCapPrice"
+	InvalidTransactionValue                                = "Transaction Value"
+	InvalidTransactionChainID                              = "Transaction ChainID"
+)
+
 func TransactionInPayload(payload *api.ExecutableDataV1, tx *types.Transaction) bool {
 	for _, bytesTx := range payload.Transactions {
 		var currentTx types.Transaction
