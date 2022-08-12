@@ -122,7 +122,7 @@ func runAllTests(t *hivesim.T) {
 	c := d.GetOpL2Engine(0).Client
 
 	vault := newVault()
-	genesis, err := json.Marshal(d.L1Cfg)
+	genesis, err := json.Marshal(d.L2Cfg)
 	handleErr(err)
 
 	s := newSemaphore(40)
