@@ -48,7 +48,7 @@ func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, g []byte, fn func(*TestE
 		},
 	}
 
-	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:9545/", c.IP), client)
+	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
 	defer rpcClient.Close()
 	env := &TestEnv{
 		T:       t,
@@ -66,7 +66,7 @@ func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, g []byte, fn func(*TestE
 // runWS runs the given test function using the WebSocket RPC client.
 func runWS(t *hivesim.T, c *hivesim.Client, v *vault, g []byte, fn func(*TestEnv)) {
 	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
-	rpcClient, err := rpc.DialWebsocket(ctx, fmt.Sprintf("ws://%v:9546/", c.IP), "")
+	rpcClient, err := rpc.DialWebsocket(ctx, fmt.Sprintf("ws://%v:8546/", c.IP), "")
 	done()
 	if err != nil {
 		t.Fatal("WebSocket connection failed:", err)
