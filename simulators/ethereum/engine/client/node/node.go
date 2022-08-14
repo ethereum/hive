@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
@@ -43,8 +44,9 @@ type GethNodeTestConfiguration struct {
 	Name string
 
 	// The node mines proof of work blocks
-	PoWMiner          bool
-	PoWMinerEtherBase common.Address
+	PoWMiner              bool
+	PoWMinerEtherBase     common.Address
+	PoWRandomTransactions bool
 	// Prepare the Ethash instance even if we don't mine (to seal blocks)
 	Ethash           bool
 	DisableGossiping bool
@@ -137,10 +139,6 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		if chainFilePath, ok := ClientFiles["/chain.rlp"]; ok {
 			s.Config.ChainFile = chainFilePath
 		}
-	}
-
-	if s.Config.PoWMiner && s.Config.PoWMinerEtherBase == (common.Address{}) {
-		s.Config.PoWMinerEtherBase = common.HexToAddress("0x" + globals.MinerAddrHex)
 	}
 
 	if s.Config.MiningStartDelaySeconds == nil {
@@ -372,6 +370,11 @@ func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, 
 		Coinbase:   n.config.PoWMinerEtherBase,
 	}
 
+	if nextHeader.Coinbase == (common.Address{}) {
+		// Coinbase was not specified, use a random address here to have a different stateRoot each mined block
+		rand.Read(nextHeader.Coinbase[:])
+	}
+
 	// Always randomize extra to try to generate different seal hash
 	rand.Read(nextHeader.Extra)
 
@@ -444,6 +447,9 @@ func (n *GethNode) PoWMiningLoop() {
 			if b == nil {
 				panic(fmt.Errorf("no block got sealed"))
 			}
+			jsH, _ := json.MarshalIndent(b.Header(), "", " ")
+			fmt.Printf("INFO (%s): Mined block:\n%s\n", n.config.Name, jsH)
+
 			// Modify the sealed block if necessary
 			if n.config.BlockModifier != nil {
 				sealVerifier := func(h *types.Header) bool {
