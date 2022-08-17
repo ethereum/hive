@@ -1715,3 +1715,257 @@ forloop:
 		t.Fatalf("FAIL: Invalid beacon block (incorrect TTD) was incorporated after optimistic sync: %v", b)
 	}
 }
+
+func NoViableHeadDueToOptimisticSync(t *hivesim.T, env *testEnv, n node) {
+	var (
+		safeSlotsToImportOptimistically = big.NewInt(8)
+		// safeSlotsImportThreshold        = uint64(4)
+	)
+	if clientSafeSlots, ok := SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE[n.ConsensusClient]; ok {
+		safeSlotsToImportOptimistically = clientSafeSlots
+	}
+
+	config := getClientConfig(n).join(&Config{
+		Nodes: Nodes{
+			// Builder 1
+			node{
+				ExecutionClient: n.ExecutionClient,
+				ConsensusClient: n.ConsensusClient,
+				ValidatorShares: 1,
+			},
+			// Importer
+			node{
+				ExecutionClient:      n.ExecutionClient,
+				ConsensusClient:      n.ConsensusClient,
+				ValidatorShares:      0,
+				TestVerificationNode: true,
+			},
+			// Builder 2
+			node{
+				ExecutionClient: n.ExecutionClient,
+				ConsensusClient: n.ConsensusClient,
+				// We are going to duplicate keys from builder 1
+				ValidatorShares: 0,
+				// Don't start until later in the run
+				DisableStartup: true,
+			},
+		},
+		AltairForkEpoch: common.Big1,
+		MergeForkEpoch:  big.NewInt(4), // Slot 128
+		Eth1Consensus: setup.Eth1EthashConsensus{
+			MiningNodes: 2,
+		},
+		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
+	})
+
+	testnet := startTestnet(t, env, config)
+	defer testnet.stopTestnet()
+
+	var (
+		builder1      = testnet.BeaconClients()[0]
+		importer      = testnet.BeaconClients()[1]
+		builder1Proxy = testnet.Proxies().Running()[0]
+		importerProxy = testnet.Proxies().Running()[1]
+		builder2Proxy *Proxy // Not yet started
+	)
+
+	importerNewPayloadResponseMocker := NewEngineResponseMocker(nil)
+	importerFcUResponseMocker := NewEngineResponseMocker(nil)
+	importerNewPayloadResponseMocker.AddNewPayloadCallbackToProxy(importerProxy)
+	importerFcUResponseMocker.AddForkchoiceUpdatedCallbackToProxy(importerProxy)
+
+	// We will count the number of payloads produced by builder 1.
+	// On Payload 33, the test continues.
+	var (
+		getPayloadCount int
+		latestValidHash common.Hash
+		invalidHashes   = make([]common.Hash, 0)
+		invalidPayload  common.Hash
+	)
+	getPayloadCallback := func(res []byte, req []byte) *proxy.Spoof {
+		getPayloadCount++
+		var (
+			payload ExecutableDataV1
+			err     error
+		)
+		err = UnmarshalFromJsonRPCResponse(res, &payload)
+		if err != nil {
+			panic(err)
+		}
+		if getPayloadCount >= 10 && getPayloadCount <= 32 {
+			if getPayloadCount == 10 {
+				latestValidHash = payload.BlockHash
+			} else {
+				invalidHashes = append(invalidHashes, payload.BlockHash)
+			}
+
+			// Return syncing for these payloads
+			importerNewPayloadResponseMocker.AddResponse(payload.BlockHash, &EngineResponse{
+				Status:          Syncing,
+				LatestValidHash: nil,
+			})
+			importerFcUResponseMocker.AddResponse(payload.BlockHash, &EngineResponse{
+				Status:          Syncing,
+				LatestValidHash: nil,
+			})
+		} else if getPayloadCount >= 33 {
+			// Invalidate these payloads
+			if getPayloadCount == 33 {
+				invalidPayload = payload.BlockHash
+				for _, h := range invalidHashes {
+					importerNewPayloadResponseMocker.AddResponse(h, &EngineResponse{
+						Status:          Invalid,
+						LatestValidHash: &latestValidHash,
+					})
+					importerFcUResponseMocker.AddResponse(h, &EngineResponse{
+						Status:          Invalid,
+						LatestValidHash: &latestValidHash,
+					})
+				}
+
+				// Validate latest valid hash too
+				importerNewPayloadResponseMocker.AddResponse(latestValidHash, &EngineResponse{
+					Status:          Valid,
+					LatestValidHash: &latestValidHash,
+				})
+				importerFcUResponseMocker.AddResponse(latestValidHash, &EngineResponse{
+					Status:          Valid,
+					LatestValidHash: &latestValidHash,
+				})
+
+			}
+
+			invalidHashes = append(invalidHashes, payload.BlockHash)
+			importerNewPayloadResponseMocker.AddResponse(payload.BlockHash, &EngineResponse{
+				Status:          Invalid,
+				LatestValidHash: &latestValidHash,
+			})
+			importerFcUResponseMocker.AddResponse(payload.BlockHash, &EngineResponse{
+				Status:          Invalid,
+				LatestValidHash: &latestValidHash,
+			})
+
+		}
+		return nil
+	}
+	builder1Proxy.AddResponseCallback(EngineGetPayloadV1, getPayloadCallback)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	var err error
+	_, err = testnet.WaitForExecutionPayload(ctx, 1000)
+	if err != nil {
+		t.Fatalf("Error waiting for execution payload")
+	}
+forloop:
+	for {
+		select {
+		case eR := <-importerNewPayloadResponseMocker.NewPayloadCalled:
+			if invalidPayload != (common.Hash{}) && eR.Hash == invalidPayload && eR.Response.Status == Invalid {
+				// The payload has been invalidated
+				t.Logf("INFO: Payload %s was correctly invalidated (NewPayload)", invalidPayload)
+				break forloop
+			}
+		case eR := <-importerFcUResponseMocker.ForkchoiceUpdatedCalled:
+			if invalidPayload != (common.Hash{}) && eR.Hash == invalidPayload {
+				if eR.Response.Status == Invalid {
+					// The payload has been invalidated
+					t.Logf("INFO: Payload %s was correctly invalidated (ForkchoiceUpdated)", invalidPayload)
+					break forloop
+				} else {
+					t.Fatalf("FAIL: Payload was not invalidated")
+				}
+			}
+		case <-ctx.Done():
+			t.Fatalf("FAIL: Context done while waiting for invalidated payload")
+		}
+	}
+
+	// Sleep a few seconds so the invalid payload is incorporated into the chain
+	time.Sleep(time.Duration(new(big.Int).Div(config.SlotTime, common.Big2).Int64()/2) * time.Second)
+
+	// We need to check that the latestValidHash Block is indeed optimistic
+	// First look for the block on the builder
+	lvhBeaconBlock, err := builder1.GetBeaconBlockByExecutionHash(ctx, latestValidHash)
+	if err != nil {
+		t.Fatalf("FAIL: Error querying latest valid hash from builder 1: %v", err)
+	}
+	t.Logf("INFO: latest valid hash from builder 1: slot %d, root %v", lvhBeaconBlock.Message.Slot, lvhBeaconBlock.Message.StateRoot)
+
+	lastInvalidBeaconBlock, err := builder1.GetBeaconBlockByExecutionHash(ctx, invalidPayload)
+	if err != nil {
+		t.Fatalf("FAIL: Error querying latest invalid hash from builder 1: %v", err)
+	}
+	t.Logf("INFO: latest invalid hash from builder 1: slot %d, root %v", lastInvalidBeaconBlock.Message.Slot, lastInvalidBeaconBlock.Message.StateRoot)
+
+	// Check whether the importer is still optimistic for these blocks
+	var (
+		retriesLeft = 20
+	)
+	for {
+		// Retry several times in order to give the node some time to re-org if necessary
+		if retriesLeft--; retriesLeft == 0 {
+			importer.PrintAllBeaconBlocks(ctx)
+			t.Fatalf("FAIL: Unable to get latestValidHash block: %v", err)
+		}
+		time.Sleep(time.Second)
+		t.Logf("INFO: retry %d to obtain beacon block at height %d", 20-retriesLeft, lvhBeaconBlock.Message.Slot)
+
+		if opt, err := importer.CheckBlockIsOptimistic(ctx, eth2api.BlockIdSlot(lvhBeaconBlock.Message.Slot)); err != nil {
+			continue
+		} else if opt {
+			t.Logf("INFO: Payload %s is optimistic from the importer's perspective", latestValidHash)
+			break
+		} else {
+			t.Logf("INFO: Payload %s is NOT optimistic from the importer's perspective", latestValidHash)
+			break
+		}
+	}
+
+	// Shutdown the builder 1
+	builder1.Shutdown()
+
+	// Start builder 2
+	// First start the execution node to set the proxy
+	testnet.ExecutionClients()[2].Start()
+
+	builder2Proxy = testnet.ExecutionClients()[2].Proxy()
+
+	if builder2Proxy == nil {
+		t.Fatalf("FAIL: Proxy failed to start")
+	}
+
+	importerNewPayloadResponseMocker.AddNewPayloadCallbackToProxy(builder2Proxy)
+	importerFcUResponseMocker.AddForkchoiceUpdatedCallbackToProxy(builder2Proxy)
+
+	// Then start the beacon node
+	testnet.BeaconClients()[2].Start()
+	// Finally start the validator client reusing the keys of the first builder
+	testnet.ValidatorClients()[2].Keys = testnet.ValidatorClients()[0].Keys
+	testnet.ValidatorClients()[2].Start()
+
+	c, err := testnet.WaitForCurrentEpochFinalization(ctx, testnet.spec.SLOTS_PER_EPOCH*3)
+	if err != nil {
+		t.Fatalf("FAIL: Error waiting for finality after builder 2 started: %v", err)
+	}
+	t.Logf("INFO: Finality reached after builder 2 started: epoch %v", c.Epoch)
+
+	// Check that importer is no longer optimistic
+	if opt, err := importer.CheckBlockIsOptimistic(ctx, eth2api.BlockHead); err != nil {
+		t.Fatalf("FAIL: Error querying optimistic status after finalization on importer: %v", err)
+	} else if opt {
+		t.Fatalf("FAIL: Importer is still optimistic after finalization: execution_optimistic=%t", opt)
+	}
+
+	// Check that neither the first invalid payload nor the last invalid payload are included in the importer
+	if b, err := importer.GetBeaconBlockByExecutionHash(ctx, invalidHashes[0]); err != nil {
+		t.Fatalf("FAIL: Error querying invalid payload: %v", err)
+	} else if b != nil {
+		t.Fatalf("FAIL: Invalid payload found in importer chain: %d, %v", b.Message.Slot, b.Message.StateRoot)
+	}
+	if b, err := importer.GetBeaconBlockByExecutionHash(ctx, invalidPayload); err != nil {
+		t.Fatalf("FAIL: Error querying invalid payload: %v", err)
+	} else if b != nil {
+		t.Fatalf("FAIL: Invalid payload found in importer chain: %d, %v", b.Message.Slot, b.Message.StateRoot)
+	}
+}
