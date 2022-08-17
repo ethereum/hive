@@ -1,7 +1,13 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/stretchr/testify/require"
+	"math/big"
 	"time"
 
 	"fmt"
@@ -94,23 +100,52 @@ func runAllTests(t *hivesim.T) {
 		}
 	}
 
+	seqWindowSize := uint64(4)
 	d := optimism.NewDevnet(t)
 
 	d.InitContracts()
-	d.InitHardhatDeployConfig(10, 4, 30)
+	d.InitHardhatDeployConfig("earliest", 10, seqWindowSize, 30)
 	d.InitL1Hardhat()
 	d.AddEth1() // l1 eth1 node is required for l2 config init
 	d.WaitUpEth1(0, time.Second*10)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
+	var block *types.Block
+	for {
+		height, err := d.GetEth1(0).EthClient().BlockNumber(ctx)
+		require.NoError(t, err)
+		d.T.Logf("waiting for one sequencing window. size: %d, height: %d", seqWindowSize, height)
+		if height < seqWindowSize {
+			time.Sleep(time.Second)
+			continue
+		}
+		block, err = d.GetEth1(0).EthClient().BlockByNumber(ctx, big.NewInt(int64(height)))
+		require.NoError(t, err)
+		break
+	}
+	d.InitHardhatDeployConfig(block.Hash().Hex(), 10, seqWindowSize, 30)
+
 	// deploy contracts
 	d.DeployL1Hardhat()
 
-	d.InitL2Hardhat()
+	d.InitL2Hardhat(core.GenesisAlloc{
+		common.HexToAddress("0x0000000000000000000000000000000000000314"): {
+			Balance: big.NewInt(0),
+			Code:    runtimeCode,
+			Storage: map[common.Hash]common.Hash{
+				common.Hash{}: common.BytesToHash(common.LeftPadBytes(big.NewInt(0x1234).Bytes(), 32)),
+				common.HexToHash("0x6661e9d6d8b923d5bbaab1b96e1dd51ff6ea2a93520fdc9eb75d059238b8c5e9"): common.BytesToHash(common.LeftPadBytes(big.NewInt(1).Bytes(), 32)),
+			},
+		},
+	})
+
 	d.AddOpL2() // l2 engine is required for rollup config init
 	d.WaitUpOpL2Engine(0, time.Second*10)
 	d.InitRollupHardhat()
 
 	// sequencer stack, on top of first eth1 node
-	d.AddOpNode(0, 0)
+	d.AddOpNode(0, 0, true)
 	d.AddOpBatcher(0, 0, 0)
 	// proposer does not need to run for L2 to be stable
 	//d.AddOpProposer(0, 0, 0)
@@ -119,6 +154,18 @@ func runAllTests(t *hivesim.T) {
 	//d.AddOpL2()
 	//d.AddOpNode(0, 1)  // can use the same eth1 node
 
+	expHeight := uint64(time.Now().Sub(time.Unix(int64(block.Time()), 0)).Seconds() / 2)
+	ec := d.GetOpL2Engine(0).EthClient()
+	for {
+		height, err := ec.BlockNumber(ctx)
+		require.NoError(t, err)
+		d.T.Logf("waiting for l2 to create empty blocks. height: %d, expected height: %d", height, expHeight)
+		if height < expHeight {
+			time.Sleep(time.Second)
+			continue
+		}
+		break
+	}
 	c := d.GetOpL2Engine(0).Client
 
 	vault := newVault()

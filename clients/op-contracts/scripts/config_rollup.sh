@@ -2,7 +2,7 @@
 
 set -eu
 
-cd /hive/optimism/packages/contracts-bedrock
+cd /opt/optimism/packages/contracts-bedrock
 
 # we use the L1 RPC to fetch L1 block info in hardhat
 export L1_RPC="$1"

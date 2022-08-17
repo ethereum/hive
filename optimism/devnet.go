@@ -162,7 +162,7 @@ func (d *Devnet) AddOpL2(opts ...hivesim.StartOption) {
 }
 
 // AddOpNode creates a new Optimism rollup node. This requires a rollup config to be created previously.
-func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, opts ...hivesim.StartOption) {
+func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, sequencer bool, opts ...hivesim.StartOption) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -176,16 +176,22 @@ func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, opts ...hivesim.StartO
 	}
 	eth1Node := d.GetEth1(eth1Index)
 	l2Engine := d.GetOpL2Engine(l2EngIndex)
-
+	seqStr := "false"
+	if sequencer {
+		seqStr = "true"
+	}
 	defaultSettings := HiveUnpackParams{
-		opnf.L1NodeAddr.EnvVar:        eth1Node.WsRpcEndpoint(),
-		opnf.L2EngineAddr.EnvVar:      l2Engine.WsRpcEndpoint(),
-		opnf.RollupConfig.EnvVar:      "/rollup_config.json",
-		opnf.RPCListenAddr.EnvVar:     "0.0.0.0",
-		opnf.RPCListenPort.EnvVar:     fmt.Sprintf("%d", RollupRPCPort),
-		opnf.L1TrustRPC.EnvVar:        "false",
-		opnf.L2EngineJWTSecret.EnvVar: defaultJWTPath,
-		opnf.LogLevelFlag.EnvVar:      "debug",
+		opnf.L1NodeAddr.EnvVar:           eth1Node.WsRpcEndpoint(),
+		opnf.L2EngineAddr.EnvVar:         l2Engine.WsRpcEndpoint(),
+		opnf.RollupConfig.EnvVar:         "/rollup_config.json",
+		opnf.RPCListenAddr.EnvVar:        "0.0.0.0",
+		opnf.RPCListenPort.EnvVar:        fmt.Sprintf("%d", RollupRPCPort),
+		opnf.L1TrustRPC.EnvVar:           "false",
+		opnf.L2EngineJWTSecret.EnvVar:    defaultJWTPath,
+		opnf.LogLevelFlag.EnvVar:         "debug",
+		opnf.SequencerEnabledFlag.EnvVar: seqStr,
+		opnf.SequencerL1Confs.EnvVar:     "0",
+		opnf.SequencerP2PKeyFlag.EnvVar:  defaultP2PSequencerKeyPath,
 	}
 	input := []hivesim.StartOption{defaultSettings.Params()}
 
@@ -196,6 +202,7 @@ func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, opts ...hivesim.StartO
 	}
 	input = append(input, bytesFile("/rollup_config.json", rollupCfg))
 	input = append(input, defaultJWTFile)
+	input = append(input, defaultP2pSequencerKeyFile)
 	input = append(input, opts...)
 
 	c := &OpNode{d.T.StartClient(d.Clients.OpNode[0].Name, input...)}

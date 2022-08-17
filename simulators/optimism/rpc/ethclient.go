@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"github.com/ethereum/hive/optimism"
 	"math/big"
 	"math/rand"
 	"strings"
@@ -17,12 +18,8 @@ import (
 
 var (
 	// parameters used for signing transactions
-	chainID  = big.NewInt(901)
-	gasPrice = big.NewInt(30 * params.GWei)
-
-	// would be nice to use a networkID that's different from chainID,
-	// but some clients don't support the distinction properly.
-	networkID = big.NewInt(901)
+	l2ChainID = big.NewInt(int64(optimism.L2ChainID))
+	gasPrice  = big.NewInt(30 * params.GWei)
 )
 
 var (
@@ -517,7 +514,7 @@ func transactionInBlockTest(t *TestEnv) {
 
 		block, err := t.Eth.BlockByNumber(t.Ctx(), blockNumber)
 		if err == ethereum.NotFound { // end of chain
-			rawTx := types.NewTransaction(nonce, predeployedVaultAddr, big1, 100000, gasPrice, nil)
+			rawTx := types.NewTransaction(nonce, vaultAddr, big1, 100000, gasPrice, nil)
 			nonce++
 
 			tx, err := t.Vault.signTransaction(key, rawTx)
@@ -558,7 +555,7 @@ func transactionInBlockSubscriptionTest(t *TestEnv) {
 
 	key := t.Vault.createAccount(t, big.NewInt(params.Ether))
 	for i := 0; i < 5; i++ {
-		rawTx := types.NewTransaction(uint64(i), predeployedVaultAddr, big1, 100000, gasPrice, nil)
+		rawTx := types.NewTransaction(uint64(i), vaultAddr, big1, 100000, gasPrice, nil)
 		tx, err := t.Vault.signTransaction(key, rawTx)
 		if err != nil {
 			t.Fatalf("Unable to sign deploy tx: %v", err)
@@ -755,8 +752,8 @@ func balanceAndNonceAtTest(t *TestEnv) {
 	exp.Sub(exp, amount)
 	exp.Sub(exp, new(big.Int).Mul(big.NewInt(int64(receipt.GasUsed)), valueTx.GasPrice()))
 
-	if exp.Cmp(accountBalanceAfter) != 0 {
-		t.Errorf("Expected sender account to have a balance of %d, got %d", exp, accountBalanceAfter)
+	if accountBalanceAfter.Cmp(exp) >= 0 {
+		t.Errorf("Expected sender account to be less than %d, got %d", exp, accountBalanceAfter)
 	}
 	if balanceTargetAccountAfter.Cmp(amount) != 0 {
 		t.Errorf("Expected new account to have a balance of %d, got %d", valueTx.Value(), balanceTargetAccountAfter)
@@ -807,7 +804,7 @@ func transactionCountTest(t *TestEnv) {
 	)
 
 	for i := 0; i < 60; i++ {
-		rawTx := types.NewTransaction(uint64(i), predeployedVaultAddr, big1, 100000, gasPrice, nil)
+		rawTx := types.NewTransaction(uint64(i), vaultAddr, big1, 100000, gasPrice, nil)
 		tx, err := t.Vault.signTransaction(key, rawTx)
 		if err != nil {
 			t.Fatalf("Unable to sign deploy tx: %v", err)

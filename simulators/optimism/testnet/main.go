@@ -38,20 +38,20 @@ func runTestnet(t *hivesim.T) {
 	d := optimism.NewDevnet(t)
 
 	d.InitContracts()
-	d.InitHardhatDeployConfig(10, 4, 30)
+	d.InitHardhatDeployConfig("earliest", 10, 4, 30)
 	d.InitL1Hardhat()
 	d.AddEth1() // l1 eth1 node is required for l2 config init
 	d.WaitUpEth1(0, time.Second*10)
 	// deploy contracts
 	d.DeployL1Hardhat()
 
-	d.InitL2Hardhat()
+	d.InitL2Hardhat(nil)
 	d.AddOpL2() // l2 engine is required for rollup config init
 	d.WaitUpOpL2Engine(0, time.Second*10)
 	d.InitRollupHardhat()
 
 	// sequencer stack, on top of first eth1 node
-	d.AddOpNode(0, 0)
+	d.AddOpNode(0, 0, true)
 	d.AddOpBatcher(0, 0, 0)
 	d.AddOpProposer(0, 0, 0)
 
@@ -60,11 +60,11 @@ func runTestnet(t *hivesim.T) {
 
 	// verifier A
 	d.AddOpL2()
-	d.AddOpNode(0, 1) // we attach to the same L1 node, so we don't need to configure L1 networking.
+	d.AddOpNode(0, 1, false) // we attach to the same L1 node, so we don't need to configure L1 networking.
 
 	// verifier B
 	d.AddOpL2()
-	d.AddOpNode(0, 2)
+	d.AddOpNode(0, 2, false)
 
 	t.Log("waiting for nodes to get onto the network")
 

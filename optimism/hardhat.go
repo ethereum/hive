@@ -2,13 +2,15 @@ package optimism
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
-	"time"
+)
+
+var (
+	L2ChainID = 902
 )
 
 type HardhatDeployConfig struct {
@@ -25,13 +27,10 @@ type HardhatDeployConfig struct {
 	BatchInboxAddress      common.Address `json:"batchInboxAddress"`
 	BatchSenderAddress     common.Address `json:"batchSenderAddress"`
 
-	L2OutputOracleSubmissionInterval    uint64         `json:"l2OutputOracleSubmissionInterval"`
-	L2OutputOracleGenesisL2Output       common.Hash    `json:"l2OutputOracleGenesisL2Output"`
-	L2OutputOracleHistoricalTotalBlocks uint64         `json:"l2OutputOracleHistoricalTotalBlocks"`
-	L2OutputOracleStartingBlockNumber   uint64         `json:"l2OutputOracleStartingBlockNumber"`
-	L2OutputOracleStartingTimestamp     int            `json:"l2OutputOracleStartingTimestamp"`
-	L2OutputOracleProposer              common.Address `json:"l2OutputOracleProposer"`
-	L2OutputOracleOwner                 common.Address `json:"l2OutputOracleOwner"`
+	L2OutputOracleSubmissionInterval uint64         `json:"l2OutputOracleSubmissionInterval"`
+	L2OutputOracleStartingTimestamp  int            `json:"l2OutputOracleStartingTimestamp"`
+	L2OutputOracleProposer           common.Address `json:"l2OutputOracleProposer"`
+	L2OutputOracleOwner              common.Address `json:"l2OutputOracleOwner"`
 
 	L1BlockTime                 uint64         `json:"l1BlockTime"`
 	L1GenesisBlockNonce         hexutil.Uint64 `json:"l1GenesisBlockNonce"`
@@ -88,14 +87,15 @@ func (d *Devnet) RunScript(name string, command ...string) *hivesim.ExecInfo {
 	return execInfo
 }
 
-func (d *Devnet) InitHardhatDeployConfig(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout uint64) {
+func (d *Devnet) InitHardhatDeployConfig(l1StartingBlockTag string, maxSeqDrift uint64, seqWindowSize uint64, chanTimeout uint64) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.T.Log("creating hardhat deploy config")
+
 	deployConf := HardhatDeployConfig{
-		L1StartingBlockTag: "earliest",
+		L1StartingBlockTag: l1StartingBlockTag,
 		L1ChainID:          901,
-		L2ChainID:          902,
+		L2ChainID:          uint64(L2ChainID),
 		L2BlockTime:        2,
 
 		MaxSequencerDrift:      maxSeqDrift,
@@ -106,13 +106,10 @@ func (d *Devnet) InitHardhatDeployConfig(maxSeqDrift uint64, seqWindowSize uint6
 		BatchInboxAddress:      common.Address{0: 0x42, 19: 0xff}, // tbd
 		BatchSenderAddress:     d.Addresses.Batcher,
 
-		L2OutputOracleSubmissionInterval:    6,
-		L2OutputOracleGenesisL2Output:       common.Hash{},
-		L2OutputOracleHistoricalTotalBlocks: 0,
-		L2OutputOracleStartingBlockNumber:   0,
-		L2OutputOracleStartingTimestamp:     -1,
-		L2OutputOracleProposer:              d.Addresses.Proposer,
-		L2OutputOracleOwner:                 common.Address{}, // tbd
+		L2OutputOracleSubmissionInterval: 6,
+		L2OutputOracleStartingTimestamp:  -1,
+		L2OutputOracleProposer:           d.Addresses.Proposer,
+		L2OutputOracleOwner:              common.Address{}, // tbd
 
 		L1BlockTime:                 15,
 		L1GenesisBlockNonce:         0,
@@ -172,7 +169,7 @@ func (d *Devnet) InitL1Hardhat() {
 		d.T.Fatalf("already initialized L1 chain config: %v", d.L1Cfg)
 		return
 	}
-	execInfo := d.RunScript("L1 config", "config_l1.sh", fmt.Sprintf("%d", time.Now().Unix()))
+	execInfo := d.RunScript("L1 config", "config_l1.sh")
 
 	var l1Cfg core.Genesis
 	if err := json.Unmarshal([]byte(execInfo.Stdout), &l1Cfg); err != nil {
@@ -183,7 +180,7 @@ func (d *Devnet) InitL1Hardhat() {
 	return
 }
 
-func (d *Devnet) InitL2Hardhat() {
+func (d *Devnet) InitL2Hardhat(additionalAlloc core.GenesisAlloc) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.T.Log("creating L2 genesis with hardhat")
@@ -203,6 +200,13 @@ func (d *Devnet) InitL2Hardhat() {
 	if err := json.Unmarshal([]byte(execInfo.Stdout), &l2Cfg); err != nil {
 		d.T.Fatalf("failed to decode hardhat L2 chain config")
 	}
+
+	if additionalAlloc != nil {
+		for k, v := range additionalAlloc {
+			l2Cfg.Alloc[k] = v
+		}
+	}
+
 	d.L2Cfg = &l2Cfg
 	d.T.Log("created L2 genesis with hardhat")
 	return
@@ -264,8 +268,8 @@ func (d *Devnet) DeployL1Hardhat() {
 	d.Deployments.DeploymentsL1 = DeploymentsL1{
 		L1CrossDomainMessengerProxy: hhDeployments.L1CrossDomainMessengerProxy.Address,
 		L1StandardBridgeProxy:       hhDeployments.L1StandardBridgeProxy.Address,
-		L2OutputOracleProxy:         hhDeployments.L1StandardBridgeProxy.Address,
-		OptimismPortalProxy:         hhDeployments.L1StandardBridgeProxy.Address,
+		L2OutputOracleProxy:         hhDeployments.L2OutputOracleProxy.Address,
+		OptimismPortalProxy:         hhDeployments.OptimismPortalProxy.Address,
 	}
 	d.T.Log("deployed L1 contracts with hardhat")
 	return

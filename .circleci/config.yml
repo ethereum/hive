@@ -26,11 +26,24 @@ jobs:
   hive-optimism-tests:
     machine:
       image: ubuntu-2004:202201-02
+      docker_layer_caching: true
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
       - run:
-          command: "/tmp/build/hive -sim=\"optimism/*\" -sim.loglevel=5 -client=go-ethereum,op-geth,op-proposer,op-batcher,op-node,op-contracts |& tee /tmp/build/hive.log"
+          command: |
+            /tmp/build/hive \
+            -sim=optimism \
+            -sim.loglevel=5 \
+            -docker.pull=true \
+            -client=go-ethereum,op-geth_optimism-history,op-proposer_develop,op-batcher_develop,op-node_develop,op-contracts_develop |& tee /tmp/build/hive.log
+      - run:
+          command: |
+            tar -cvf /tmp/workspace.tgz -C /home/circleci/project /home/circleci/project/workspace
+          name: "Archive workspace"
+      - store_artifacts:
+          path: /tmp/workspace.tgz
+          destination: hive-workspace.tgz
       - run:
           command: "! grep 'pass.*=false' /tmp/build/hive.log"
       - slack/notify:
@@ -69,6 +82,19 @@ workflows:
   main:
     jobs:
       - go-test
+      - build
+      - hive-optimism-tests:
+          requires: ["build"]
+          context: slack
+  scheduled:
+    triggers:
+      - schedule:
+          # run every 4 hours
+          cron: "0 0,4,8,12,16 * * *"
+          filters:
+            branches:
+              only: [ "optimism" ]
+    jobs:
       - build
       - hive-optimism-tests:
           requires: ["build"]

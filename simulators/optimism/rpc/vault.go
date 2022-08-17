@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/params"
 	"math/big"
 	"sync"
 	"time"
@@ -15,11 +17,10 @@ import (
 )
 
 var (
-	// This is the account that sends vault funding transactions.
-	vaultAccountAddr = common.HexToAddress("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
-	vaultKey, _      = crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	// Address of the vault in genesis.
-	predeployedVaultAddr = common.HexToAddress("0000000000000000000000000000000000000315")
+	vaultAddr = common.HexToAddress("0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266")
+	// This is the account that sends vault funding transactions.
+	vaultKey, _ = crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	// Number of blocks to wait before funding tx is considered valid.
 	vaultTxConfirmationCount = uint64(5)
 )
@@ -72,7 +73,7 @@ func (v *vault) signTransaction(sender common.Address, tx *types.Transaction) (*
 	if key == nil {
 		return nil, fmt.Errorf("sender account %v not in vault", sender)
 	}
-	signer := types.LatestSignerForChainID(chainID)
+	signer := types.LatestSignerForChainID(l2ChainID)
 	return types.SignTx(tx, signer, key)
 }
 
@@ -149,31 +150,19 @@ func (v *vault) createAccount(t *TestEnv, amount *big.Int) common.Address {
 		t.Fatalf("unable to send funding transaction: %v", err)
 	}
 
-	txBlock, err := t.Eth.BlockNumber(t.Ctx())
-	if err != nil {
-		t.Fatalf("can't get block number:", err)
-	}
-
-	// wait for vaultTxConfirmationCount confirmation by checking the balance vaultTxConfirmationCount blocks back.
-	// createAndFundAccountWithSubscription for a better solution using logs
-	for i := uint64(0); i < vaultTxConfirmationCount*20; i++ {
-		number, err := t.Eth.BlockNumber(t.Ctx())
-		if err != nil {
-			t.Fatalf("can't get block number:", err)
+	for i := 0; i < 60; i++ {
+		receipt, err := t.Eth.TransactionReceipt(t.Ctx(), tx.Hash())
+		if err != nil && !errors.Is(err, ethereum.NotFound) {
+			t.Fatal("error getting transaction receipt:", err)
 		}
-		if number > txBlock+vaultTxConfirmationCount {
-			checkBlock := number - vaultTxConfirmationCount
-			balance, err := t.Eth.BalanceAt(t.Ctx(), address, new(big.Int).SetUint64(checkBlock))
-			if err != nil {
-				panic(err)
-			}
-			if balance.Cmp(amount) >= 0 {
-				return address
-			}
+		if receipt != nil {
+			return address
 		}
 		time.Sleep(time.Second)
 	}
-	panic(fmt.Sprintf("could not fund account %v in transaction %v", address, tx.Hash()))
+
+	t.Fatal("timed out getting transaction receipt")
+	return common.Address{}
 }
 
 func (v *vault) makeFundingTx(t *TestEnv, recipient common.Address, amount *big.Int) *types.Transaction {
@@ -181,8 +170,15 @@ func (v *vault) makeFundingTx(t *TestEnv, recipient common.Address, amount *big.
 		nonce    = v.nextNonce()
 		gasLimit = uint64(75000)
 	)
-	tx := types.NewTransaction(nonce, recipient, amount, gasLimit, gasPrice, nil)
-	signer := types.LatestSignerForChainID(chainID)
+	tx := types.NewTx(&types.DynamicFeeTx{
+		Nonce:     nonce,
+		Gas:       gasLimit,
+		GasTipCap: big.NewInt(1 * params.GWei),
+		GasFeeCap: gasPrice,
+		To:        &recipient,
+		Value:     amount,
+	})
+	signer := types.LatestSignerForChainID(l2ChainID)
 	signedTx, err := types.SignTx(tx, signer, vaultKey)
 	if err != nil {
 		t.Fatal("can't sign vault funding tx:", err)
