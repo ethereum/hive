@@ -34,6 +34,10 @@ RUN usr/bin/nimbus_beacon_node --version > /version.txt
 
 ADD nimbus_bn.sh /nimbus_bn.sh
 RUN chmod +x /nimbus_bn.sh
+ADD nimbus_shutdown.sh /hive-bin/shutdown.sh
+RUN chmod +x /hive-bin/shutdown.sh
+
+RUN apt-get update -y && apt-get install -y procps
 
 # TODO: output accurate client version
 RUN usr/bin/nimbus_beacon_node --version > /version.txt
