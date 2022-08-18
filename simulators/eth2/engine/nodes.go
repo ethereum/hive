@@ -102,8 +102,7 @@ func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
 }
 
 func (en *ExecutionClient) Shutdown() error {
-	_, err := en.HiveClient.Exec("shutdown.sh")
-	if err != nil {
+	if err := en.T.Sim.StopClient(en.T.SuiteID, en.T.TestID, en.HiveClient.Container); err != nil {
 		return err
 	}
 	en.HiveClient = nil
@@ -208,8 +207,7 @@ func (bn *BeaconClient) Start(extraOptions ...hivesim.StartOption) error {
 }
 
 func (bn *BeaconClient) Shutdown() error {
-	_, err := bn.HiveClient.Exec("shutdown.sh")
-	if err != nil {
+	if err := bn.T.Sim.StopClient(bn.T.SuiteID, bn.T.TestID, bn.HiveClient.Container); err != nil {
 		return err
 	}
 	bn.HiveClient = nil
@@ -515,6 +513,14 @@ func (vc *ValidatorClient) Start(extraOptions ...hivesim.StartOption) error {
 	return nil
 }
 
+func (vc *ValidatorClient) Shutdown() error {
+	if err := vc.T.Sim.StopClient(vc.T.SuiteID, vc.T.TestID, vc.HiveClient.Container); err != nil {
+		return err
+	}
+	vc.HiveClient = nil
+	return nil
+}
+
 func (vc *ValidatorClient) IsRunning() bool {
 	return vc.HiveClient != nil
 }
@@ -577,6 +583,19 @@ func (cb *NodeClientBundle) Start(extraOptions ...hivesim.StartOption) error {
 		}
 	} else {
 		cb.T.Logf("No validator client started")
+	}
+	return nil
+}
+
+func (cb *NodeClientBundle) Shutdown() error {
+	if err := cb.ExecutionClient.Shutdown(); err != nil {
+		return err
+	}
+	if err := cb.BeaconClient.Shutdown(); err != nil {
+		return err
+	}
+	if err := cb.ValidatorClient.Shutdown(); err != nil {
+		return err
 	}
 	return nil
 }
