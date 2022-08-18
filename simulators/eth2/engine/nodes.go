@@ -71,7 +71,7 @@ func (en *ExecutionClient) MustGetEnode() string {
 	return addr
 }
 
-func (en *ExecutionClient) Start() error {
+func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
 	if en.HiveClient != nil {
 		return fmt.Errorf("Client already started")
 	}
@@ -79,6 +79,9 @@ func (en *ExecutionClient) Start() error {
 	opts, err := en.OptionsGenerator()
 	if err != nil {
 		return fmt.Errorf("Unable to get start options: %v", err)
+	}
+	for _, opt := range extraOptions {
+		opts = append(opts, opt)
 	}
 	en.HiveClient = en.T.StartClient(en.ClientType, opts...)
 
@@ -183,7 +186,7 @@ func NewBeaconClient(t *hivesim.T, beaconDef *hivesim.ClientDefinition, optionsG
 	}
 }
 
-func (bn *BeaconClient) Start() error {
+func (bn *BeaconClient) Start(extraOptions ...hivesim.StartOption) error {
 	if bn.HiveClient != nil {
 		return fmt.Errorf("Client already started")
 	}
@@ -191,6 +194,9 @@ func (bn *BeaconClient) Start() error {
 	opts, err := bn.OptionsGenerator()
 	if err != nil {
 		return fmt.Errorf("Unable to get start options: %v", err)
+	}
+	for _, opt := range extraOptions {
+		opts = append(opts, opt)
 	}
 	bn.HiveClient = bn.T.StartClient(bn.ClientType, opts...)
 	bn.API = &eth2api.Eth2HttpClient{
@@ -489,7 +495,7 @@ func NewValidatorClient(t *hivesim.T, validatorDef *hivesim.ClientDefinition, op
 	}
 }
 
-func (vc *ValidatorClient) Start() error {
+func (vc *ValidatorClient) Start(extraOptions ...hivesim.StartOption) error {
 	if vc.HiveClient != nil {
 		return fmt.Errorf("Client already started")
 	}
@@ -501,6 +507,9 @@ func (vc *ValidatorClient) Start() error {
 	opts, err := vc.OptionsGenerator(vc.Keys)
 	if err != nil {
 		return fmt.Errorf("Unable to get start options: %v", err)
+	}
+	for _, opt := range extraOptions {
+		opts = append(opts, opt)
 	}
 	vc.HiveClient = vc.T.StartClient(vc.ClientType, opts...)
 	return nil
@@ -546,24 +555,24 @@ type NodeClientBundle struct {
 }
 
 // Starts all clients included in the bundle
-func (cb *NodeClientBundle) Start() error {
+func (cb *NodeClientBundle) Start(extraOptions ...hivesim.StartOption) error {
 	cb.T.Logf("Starting validator client bundle %d", cb.Index)
 	if cb.ExecutionClient != nil {
-		if err := cb.ExecutionClient.Start(); err != nil {
+		if err := cb.ExecutionClient.Start(extraOptions...); err != nil {
 			return err
 		}
 	} else {
 		cb.T.Logf("No execution client started")
 	}
 	if cb.BeaconClient != nil {
-		if err := cb.BeaconClient.Start(); err != nil {
+		if err := cb.BeaconClient.Start(extraOptions...); err != nil {
 			return err
 		}
 	} else {
 		cb.T.Logf("No beacon client started")
 	}
 	if cb.ValidatorClient != nil {
-		if err := cb.ValidatorClient.Start(); err != nil {
+		if err := cb.ValidatorClient.Start(extraOptions...); err != nil {
 			return err
 		}
 	} else {
