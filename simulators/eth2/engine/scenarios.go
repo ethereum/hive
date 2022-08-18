@@ -1882,7 +1882,7 @@ forloop:
 	}
 
 	// Sleep a few seconds so the invalid payload is incorporated into the chain
-	time.Sleep(time.Duration(new(big.Int).Div(config.SlotTime, common.Big2).Int64()/2) * time.Second)
+	time.Sleep(time.Duration(config.SlotTime.Int64()/2) * time.Second)
 
 	// We need to check that the latestValidHash Block is indeed optimistic
 	// First look for the block on the builder
@@ -1911,14 +1911,13 @@ forloop:
 		time.Sleep(time.Second)
 		t.Logf("INFO: retry %d to obtain beacon block at height %d", 20-retriesLeft, lvhBeaconBlock.Message.Slot)
 
-		if opt, err := importer.CheckBlockIsOptimistic(ctx, eth2api.BlockIdSlot(lvhBeaconBlock.Message.Slot)); err != nil {
+		if opt, err := importer.CheckBlockIsOptimistic(ctx, eth2api.BlockHead); err != nil {
 			continue
 		} else if opt {
-			t.Logf("INFO: Payload %s is optimistic from the importer's perspective", latestValidHash)
+			t.Logf("INFO: Head is optimistic from the importer's perspective")
 			break
 		} else {
-			t.Logf("INFO: Payload %s is NOT optimistic from the importer's perspective", latestValidHash)
-			break
+			t.Fatalf("FAIL: Head is NOT optimistic from the importer's perspective")
 		}
 	}
 
@@ -1927,7 +1926,9 @@ forloop:
 
 	// Start builder 2
 	// First start the execution node to set the proxy
-	testnet.ExecutionClients()[2].Start()
+	if err := testnet.ExecutionClients()[2].Start(); err != nil {
+		t.Fatalf("FAIL: Unable to start execution client: %v", err)
+	}
 
 	builder2Proxy = testnet.ExecutionClients()[2].Proxy()
 
@@ -1939,10 +1940,14 @@ forloop:
 	importerFcUResponseMocker.AddForkchoiceUpdatedCallbackToProxy(builder2Proxy)
 
 	// Then start the beacon node
-	testnet.BeaconClients()[2].Start()
+	if err := testnet.BeaconClients()[2].Start(); err != nil {
+		t.Fatalf("FAIL: Unable to start beacon client: %v", err)
+	}
 	// Finally start the validator client reusing the keys of the first builder
 	testnet.ValidatorClients()[2].Keys = testnet.ValidatorClients()[0].Keys
-	testnet.ValidatorClients()[2].Start()
+	if err := testnet.ValidatorClients()[2].Start(); err != nil {
+		t.Fatalf("FAIL: Unable to start validator client: %v", err)
+	}
 
 	c, err := testnet.WaitForCurrentEpochFinalization(ctx, testnet.spec.SLOTS_PER_EPOCH*3)
 	if err != nil {
