@@ -48,7 +48,8 @@ type GethNodeTestConfiguration struct {
 	PoWMinerEtherBase     common.Address
 	PoWRandomTransactions bool
 	// Prepare the Ethash instance even if we don't mine (to seal blocks)
-	Ethash           bool
+	Ethash bool
+	// Disable gossiping of newly mined blocks (peers need to sync to obtain the blocks)
 	DisableGossiping bool
 
 	// Block Modifier
