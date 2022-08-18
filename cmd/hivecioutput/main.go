@@ -5,18 +5,19 @@ import (
 	"encoding/xml"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
 
-	"gopkg.in/inconshreveable/log15.v2"
-
 	"github.com/ethereum/hive/internal/libhive"
+	"gopkg.in/inconshreveable/log15.v2"
 )
 
 const (
@@ -30,6 +31,7 @@ type Testsuites struct {
 	Name      string   `xml:"name,attr"`
 	Tests     int      `xml:"tests,attr"`
 	Failures  int      `xml:"failures,attr"`
+	Skips     int      `xml:"skips,attr"`
 	Time      string   `xml:"time,attr"`
 	Testsuite []Testsuite
 }
@@ -41,6 +43,7 @@ type Testsuite struct {
 	Name     string   `xml:"name,attr"`
 	Tests    int      `xml:"tests,attr"`
 	Failures int      `xml:"failures,attr"`
+	Skips    int      `xml:"skips,attr"`
 	Time     string   `xml:"time,attr"`
 	Testcase []Testcase
 }
@@ -52,6 +55,7 @@ type Testcase struct {
 	Name    string   `xml:"name,attr"`
 	Time    string   `xml:"time,attr"`
 	Failure *Failure
+	Skipped *Skipped
 }
 
 type Failure struct {
@@ -61,52 +65,103 @@ type Failure struct {
 	Type    string   `xml:"type,attr"`
 }
 
+type Skipped struct {
+	XMLName xml.Name `xml:"skipped"`
+	Text    string   `xml:",chardata"`
+	Message string   `xml:"message,attr"`
+	Type    string   `xml:"type,attr"`
+}
+
+type Exclusions struct {
+	TestSuites []struct {
+		Name      string   `json:"name"`
+		TestCases []string `json:"testcases"`
+	} `json:"testSuites"`
+}
+
 func main() {
 	var exitcode bool
-	flag.BoolVar(&exitcode, "exitcode", true, "Return exit code 1 on failed tests")
+	flag.BoolVar(&exitcode, "exitcode", false, "Return exit code 1 on failed tests")
 
 	var (
-		resultsdir = flag.String("resultsdir", "/tmp/TestResults", "Results dir to scan")
-		outdir     = flag.String("outdir", "/tmp/", "Output dir for xunit xml")
+		resultsdir     = flag.String("resultsdir", "/tmp/TestResults", "Results dir to scan")
+		outdir         = flag.String("outdir", "/tmp/", "Output dir for xunit xml")
+		exclusionsFile = flag.String("exclusionsfile", "", "File containing list of test names to exclude")
 	)
 	flag.Parse()
 
 	log15.Info(fmt.Sprintf("loading results from %s", *resultsdir))
 	log15.Info(fmt.Sprintf("outputting xunit xml to %s", *outdir))
 	log15.Info(fmt.Sprintf("return exit code 1 on failed tests %v", exitcode))
+	log15.Info(fmt.Sprintf("exclusions file %s", *exclusionsFile))
+
+	// load exclusions
+	exclusions := &Exclusions{}
+	if *exclusionsFile != "" {
+		file, err := os.Open(*exclusionsFile)
+		if err != nil {
+			log15.Info(fmt.Sprintf("error opening exclusions file %s", *exclusionsFile))
+		}
+		bytes, err := io.ReadAll(file)
+		if err != nil {
+			log15.Info(fmt.Sprintf("error reading exclusions file %s", *exclusionsFile))
+		}
+		err = json.Unmarshal(bytes, &exclusions)
+		if err != nil {
+			log15.Info(fmt.Sprintf("error unmarshalling exclusions file %s", *exclusionsFile))
+		}
+		file.Close()
+
+		// print exclusions
+		if len(exclusions.TestSuites) > 0 {
+			log15.Info(fmt.Sprintf("excluded tests: %v", exclusions))
+		}
+	}
 
 	outputs := []*libhive.TestSuite{}
 
 	rd := os.DirFS(*resultsdir)
-	op, err := walkSummaryFiles(rd, ".", collectOutput, &outputs)
+	err := walkSummaryFiles(rd, ".", collectOutput, &outputs)
 	if err != nil {
 		log15.Info(fmt.Errorf("error reading results: %w", err).Error())
 		os.Exit(1)
 	}
 
-	outputXUnitXmlFile(&outputs, *outdir)
+	pass, run := outputXUnitXmlFile(&outputs, *outdir, exclusions)
 
-	if op {
+	// tests run and passed
+	if pass && run {
 		log15.Info("tests passed!")
 		os.Exit(0)
 	}
 
+	// no tests run
+	if !run {
+		log15.Info("no tests run!")
+		if exitcode {
+			os.Exit(1)
+		}
+	}
+
+	// tests run but failed
 	log15.Info("tests failed!")
 	if exitcode {
 		os.Exit(1)
 	}
 }
 
-func outputXUnitXmlFile(outputs *[]*libhive.TestSuite, path string) {
+func outputXUnitXmlFile(outputs *[]*libhive.TestSuite, path string, exclusions *Exclusions) (bool, bool) {
 	opTs := Testsuites{}
 	totalTests := 0
 	totalFailures := 0
+	totalSkipped := 0
 	suiteNo := 0
 
 	for _, ts := range *outputs {
 		log15.Info("test suite", "name", ts.Name)
 		tests := 0
 		failures := 0
+		skipped := 0
 		caseNo := 0
 		tsTime := time.Second * 0
 		suiteNo++
@@ -121,6 +176,7 @@ func outputXUnitXmlFile(outputs *[]*libhive.TestSuite, path string) {
 
 		for _, tc := range ts.TestCases {
 			caseNo++
+			testSkipped := false
 
 			tcTime := tc.End.Sub(tc.Start)
 			tsTime += tcTime
@@ -132,8 +188,11 @@ func outputXUnitXmlFile(outputs *[]*libhive.TestSuite, path string) {
 				Time: fmt.Sprintf("%v", tcTime.Seconds()),
 			}
 
-			tests++
-			if !tc.SummaryResult.Pass {
+			if contains(exclusions, ts.Name, tc.Name) {
+				testSkipped = true
+			}
+
+			if !tc.SummaryResult.Pass && !testSkipped {
 				failures++
 				oTc.Failure = &Failure{
 					Text:    tc.SummaryResult.Details,
@@ -142,9 +201,22 @@ func outputXUnitXmlFile(outputs *[]*libhive.TestSuite, path string) {
 				}
 			}
 
+			// only skip on failure, if we pass, might as well include in results
+			if !tc.SummaryResult.Pass && testSkipped {
+				skipped++
+				log15.Info("test skipped", "name", tc.Name)
+				oTc.Skipped = &Skipped{
+					Text:    tc.SummaryResult.Details,
+					Message: "Skipped",
+					Type:    "SKIPPED",
+				}
+			}
+
+			tests++
 			oTs.Testcase = append(oTs.Testcase, oTc)
 			oTs.Tests = tests
 			oTs.Failures = failures
+			oTs.Skips = skipped
 			oTs.Time = fmt.Sprintf("%v", tsTime.Seconds())
 		}
 
@@ -152,10 +224,12 @@ func outputXUnitXmlFile(outputs *[]*libhive.TestSuite, path string) {
 
 		totalTests += tests
 		totalFailures += failures
+		totalSkipped += skipped
 	}
 
 	opTs.Tests = totalTests
 	opTs.Failures = totalFailures
+	opTs.Skips = totalSkipped
 	opTs.ID = "0"
 	opTs.Name = "Hive Test Run"
 	opTs.Time = ""
@@ -166,37 +240,30 @@ func outputXUnitXmlFile(outputs *[]*libhive.TestSuite, path string) {
 	if err != nil {
 		log15.Error(err.Error())
 	}
-}
 
-func collectOutput(ts *libhive.TestSuite, outputs *[]*libhive.TestSuite) (bool, error) {
-	// collect output
-	*outputs = append(*outputs, ts)
+	testsRun := totalTests > 0
 
-	// determine whether any cases failed and break to return early if so
-	pass := true
-	for _, tc := range ts.TestCases {
-		if !tc.SummaryResult.Pass {
-			pass = false
-			break
-		}
+	if totalFailures > 0 {
+		return false, testsRun
 	}
-
-	return pass, nil
+	return true, testsRun
 }
 
-type parseTs func(*libhive.TestSuite, *[]*libhive.TestSuite) (bool, error)
+func collectOutput(ts *libhive.TestSuite, outputs *[]*libhive.TestSuite) {
+	*outputs = append(*outputs, ts)
+}
 
-func walkSummaryFiles(fsys fs.FS, dir string, parse parseTs, ts *[]*libhive.TestSuite) (bool, error) {
+type parseTs func(*libhive.TestSuite, *[]*libhive.TestSuite)
+
+func walkSummaryFiles(fsys fs.FS, dir string, parse parseTs, ts *[]*libhive.TestSuite) error {
 	logfiles, err := fs.ReadDir(fsys, dir)
 	if err != nil {
-		return false, err
+		return err
 	}
 	// Sort by name newest-first.
 	sort.Slice(logfiles, func(i, j int) bool {
 		return logfiles[i].Name() > logfiles[j].Name()
 	})
-
-	overallPass := true
 
 	for _, entry := range logfiles {
 		name := entry.Name()
@@ -205,19 +272,10 @@ func walkSummaryFiles(fsys fs.FS, dir string, parse parseTs, ts *[]*libhive.Test
 		}
 		suite, _ := parseSuite(fsys, filepath.Join(dir, name))
 		if suite != nil {
-			pass, err := parse(suite, ts)
-			if err != nil {
-				return false, err
-			}
-
-			// set overall pass false on failure, allow for
-			// loop to continue to collect all results
-			if !pass {
-				overallPass = false
-			}
+			parse(suite, ts)
 		}
 	}
-	return overallPass, nil
+	return nil
 }
 
 func parseSuite(fsys fs.FS, path string) (*libhive.TestSuite, fs.FileInfo) {
@@ -252,4 +310,23 @@ func suiteValid(s *libhive.TestSuite) bool {
 
 func skipFile(f string) bool {
 	return f == "errorReport.json" || f == "containerErrorReport.json" || strings.HasPrefix(f, ".")
+}
+
+func contains(ex *Exclusions, tsName, tcName string) bool {
+	for _, ts := range ex.TestSuites {
+		if tsName == ts.Name {
+			for _, tc := range ts.TestCases {
+				if removeImageName(tcName) == tc {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func removeImageName(s string) string {
+	// regex to remove the last bracketed string (image name appended to test name)
+	reg := regexp.MustCompile(`\([^)]*\)$`)
+	return strings.Trim(reg.ReplaceAllString(s, ""), " ")
 }
