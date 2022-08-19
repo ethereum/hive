@@ -69,7 +69,7 @@ echo Starting Prysm Beacon Node
     --p2p-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --p2p-host-ip="${CONTAINER_IP}" \
     --p2p-local-ip="${CONTAINER_IP}" \
-    --http-web3provider="$HIVE_ETH2_ETH1_RPC_ADDRS" \
+    --execution-endpoint="$HIVE_ETH2_ETH1_RPC_ADDRS" \
     --jwt-secret=/jwtsecret \
     --min-sync-peers=1 \
     --subscribe-all-subnets=true \
