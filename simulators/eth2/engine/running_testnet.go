@@ -313,8 +313,6 @@ func (t *Testnet) WaitForCurrentEpochFinalization(ctx context.Context, timeoutSl
 						head      string
 						justified string
 						finalized string
-						execution string
-						health    float64
 					)
 
 					var headInfo eth2api.BeaconBlockHeaderAndInfo
@@ -337,36 +335,12 @@ func (t *Testnet) WaitForCurrentEpochFinalization(ctx context.Context, timeoutSl
 						}
 					}
 
-					var versionedBlock eth2api.VersionedSignedBeaconBlock
-					if exists, err := beaconapi.BlockV2(ctx, b.API, eth2api.BlockIdRoot(headInfo.Root), &versionedBlock); err != nil {
-						ch <- res{err: fmt.Errorf("beacon %d: failed to retrieve block: %v", i, err)}
-						return
-					} else if !exists {
-						ch <- res{err: fmt.Errorf("beacon %d: block not found", i)}
-						return
-					}
-					switch versionedBlock.Version {
-					case "phase0":
-						execution = "0x0000..0000"
-					case "altair":
-						execution = "0x0000..0000"
-					case "bellatrix":
-						block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
-						execution = shorten(block.Message.Body.ExecutionPayload.BlockHash.String())
-					}
-
 					slot = headInfo.Header.Message.Slot
 					head = shorten(headInfo.Root.String())
 					justified = shorten(checkpoints.CurrentJustified.String())
 					finalized = shorten(checkpoints.Finalized.String())
-					health, err := getHealth(ctx, b.API, t.spec, slot)
-					if err != nil {
-						// warning is printed here instead because some clients
-						// don't support the required REST endpoint.
-						fmt.Printf("WARN: beacon %d: %s\n", i, err)
-					}
 
-					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s, justified=%s, finalized=%s, epoch_to_finalize=%d", i, slot, head, health, execution, justified, finalized, epochToBeFinalized), nil}
+					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s justified=%s, finalized=%s, epoch_to_finalize=%d", i, slot, head, justified, finalized, epochToBeFinalized), nil}
 
 					if checkpoints.Finalized != (common.Checkpoint{}) && checkpoints.Finalized.Epoch >= epochToBeFinalized {
 						done <- checkpoints.Finalized
