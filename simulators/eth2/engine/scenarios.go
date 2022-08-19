@@ -1766,7 +1766,9 @@ func NoViableHeadDueToOptimisticSync(t *hivesim.T, env *testEnv, n node) {
 		importer      = testnet.BeaconClients()[1]
 		builder1Proxy = testnet.Proxies().Running()[0]
 		importerProxy = testnet.Proxies().Running()[1]
-		builder2Proxy *Proxy // Not yet started
+		// Not yet started
+		builder2      = testnet.BeaconClients()[2]
+		builder2Proxy *Proxy
 	)
 
 	importerNewPayloadResponseMocker := NewEngineResponseMocker(nil)
@@ -1951,6 +1953,8 @@ forloop:
 
 	c, err := testnet.WaitForCurrentEpochFinalization(ctx, testnet.spec.SLOTS_PER_EPOCH*3)
 	if err != nil {
+		importer.PrintAllBeaconBlocks(ctx)
+		builder2.PrintAllBeaconBlocks(ctx)
 		t.Fatalf("FAIL: Error waiting for finality after builder 2 started: %v", err)
 	}
 	t.Logf("INFO: Finality reached after builder 2 started: epoch %v", c.Epoch)

@@ -272,6 +272,7 @@ func (b *BeaconClient) PrintAllBeaconBlocks(ctx context.Context) error {
 	} else if !exists {
 		return fmt.Errorf("PrintAllBeaconBlocks: failed to poll head: !exists")
 	}
+	fmt.Printf("PrintAllBeaconBlocks: Printing beacon chain from %s\n", b.HiveClient.Container)
 	fmt.Printf("PrintAllBeaconBlocks: Head, slot %d, root %v\n", headInfo.Header.Message.Slot, headInfo.Root)
 	for i := 1; i <= int(headInfo.Header.Message.Slot); i++ {
 		var bHeader eth2api.BeaconBlockHeaderAndInfo
