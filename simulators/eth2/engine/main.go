@@ -42,6 +42,7 @@ var transitionTests = []testSpec{
 	{Name: "syncing-with-chain-having-invalid-transition-block", Run: SyncingWithChainHavingInvalidTransitionBlock},
 	{Name: "syncing-with-chain-having-invalid-post-transition-block", Run: SyncingWithChainHavingInvalidPostTransitionBlock},
 	{Name: "re-org-and-sync-with-chain-having-invalid-terminal-block", Run: ReOrgSyncWithChainHavingInvalidTerminalBlock},
+	{Name: "no-viable-head-due-to-optimistic-sync", Run: NoViableHeadDueToOptimisticSync},
 }
 
 func main() {

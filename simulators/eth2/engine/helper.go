@@ -42,6 +42,7 @@ type node struct {
 	ExecutionClientTTD   *big.Int
 	BeaconNodeTTD        *big.Int
 	TestVerificationNode bool
+	DisableStartup       bool
 	ChainGenerator       ChainGenerator
 	Chain                []*types.Block
 }
@@ -562,106 +563,205 @@ func forkchoiceResponseSpoof(method string, status PayloadStatusV1, payloadID *P
 	}, nil
 }
 
-// List of Hashes that can be accessed concurrently
-type SyncHashes struct {
-	Hashes []common.Hash
-	Lock   *sync.Mutex
+type EngineResponse struct {
+	Status          PayloadStatus
+	LatestValidHash *common.Hash
 }
 
-func NewSyncHashes(hashes ...common.Hash) *SyncHashes {
-	newSyncHashes := &SyncHashes{
-		Hashes: make([]common.Hash, 0),
-		Lock:   &sync.Mutex{},
-	}
-	for _, h := range hashes {
-		newSyncHashes.Hashes = append(newSyncHashes.Hashes, h)
-	}
-	return newSyncHashes
+type EngineResponseHash struct {
+	Response *EngineResponse
+	Hash     common.Hash
 }
 
-func (syncHashes *SyncHashes) Contains(hash common.Hash) bool {
-	syncHashes.Lock.Lock()
-	defer syncHashes.Lock.Unlock()
-	if syncHashes.Hashes == nil {
-		return false
+//
+type EngineResponseMocker struct {
+	Lock                    sync.Mutex
+	DefaultResponse         *EngineResponse
+	HashToResponse          map[common.Hash]*EngineResponse
+	HashPassthrough         map[common.Hash]bool
+	NewPayloadCalled        chan EngineResponseHash
+	ForkchoiceUpdatedCalled chan EngineResponseHash
+	Mocking                 bool
+}
+
+func NewEngineResponseMocker(defaultResponse *EngineResponse, perHashResponses ...*EngineResponseHash) *EngineResponseMocker {
+	e := &EngineResponseMocker{
+		DefaultResponse:         defaultResponse,
+		HashToResponse:          make(map[common.Hash]*EngineResponse),
+		HashPassthrough:         make(map[common.Hash]bool),
+		NewPayloadCalled:        make(chan EngineResponseHash),
+		ForkchoiceUpdatedCalled: make(chan EngineResponseHash),
+		Mocking:                 true,
 	}
-	for _, h := range syncHashes.Hashes {
-		if h == hash {
-			return true
-		}
+	for _, r := range perHashResponses {
+		e.AddResponse(r.Hash, r.Response)
+	}
+	return e
+}
+
+func (e *EngineResponseMocker) AddResponse(h common.Hash, r *EngineResponse) {
+	e.Lock.Lock()
+	defer e.Lock.Unlock()
+	if e.HashToResponse == nil {
+		e.HashToResponse = make(map[common.Hash]*EngineResponse)
+	}
+	e.HashToResponse[h] = r
+}
+
+func (e *EngineResponseMocker) AddPassthrough(h common.Hash, pass bool) {
+	e.Lock.Lock()
+	defer e.Lock.Unlock()
+	e.HashPassthrough[h] = pass
+}
+
+func (e *EngineResponseMocker) CanPassthrough(h common.Hash) bool {
+	e.Lock.Lock()
+	defer e.Lock.Unlock()
+	if pass, ok := e.HashPassthrough[h]; ok && pass {
+		return true
 	}
 	return false
 }
 
-func (syncHashes *SyncHashes) Add(hash common.Hash) {
-	syncHashes.Lock.Lock()
-	defer syncHashes.Lock.Unlock()
-	syncHashes.Hashes = append(syncHashes.Hashes, hash)
+func (e *EngineResponseMocker) GetResponse(h common.Hash) *EngineResponse {
+	e.Lock.Lock()
+	defer e.Lock.Unlock()
+	if e.HashToResponse != nil {
+		if r, ok := e.HashToResponse[h]; ok {
+			return r
+		}
+	}
+	return e.DefaultResponse
 }
 
-// Generate a callback that invalidates either a call to `engine_forkchoiceUpdatedV1` or `engine_newPayloadV1`
-// for all hashes with given exceptions, and a given LatestValidHash.
-func InvalidateExecutionPayloads(method string, exceptions *SyncHashes, latestValidHash *common.Hash, invalidated chan<- common.Hash) func([]byte, []byte) *proxy.Spoof {
-	if method == EngineForkchoiceUpdatedV1 {
-		return func(res []byte, req []byte) *proxy.Spoof {
-			var (
-				fcState ForkchoiceStateV1
-				pAttr   PayloadAttributesV1
-				spoof   *proxy.Spoof
-				err     error
-			)
-			err = UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+func (e *EngineResponseMocker) SetDefaultResponse(r *EngineResponse) {
+	e.Lock.Lock()
+	defer e.Lock.Unlock()
+	e.DefaultResponse = r
+}
+
+func (e *EngineResponseMocker) AddGetPayloadPassthroughToProxy(p *Proxy) {
+	p.AddResponseCallback(EngineGetPayloadV1, func(res []byte, req []byte) *proxy.Spoof {
+		// Hash of the payload built is being added to the passthrough list
+		var (
+			payload ExecutableDataV1
+		)
+		err := UnmarshalFromJsonRPCResponse(res, &payload)
+		if err != nil {
+			panic(err)
+		}
+		e.AddPassthrough(payload.BlockHash, true)
+		return nil
+	})
+}
+
+func (e *EngineResponseMocker) AddNewPayloadCallbackToProxy(p *Proxy) {
+	p.AddResponseCallback(EngineNewPayloadV1, func(res []byte, req []byte) *proxy.Spoof {
+		var (
+			payload ExecutableDataV1
+			status  PayloadStatusV1
+			spoof   *proxy.Spoof
+			err     error
+		)
+		err = UnmarshalFromJsonRPCRequest(req, &payload)
+		if err != nil {
+			panic(err)
+		}
+		err = UnmarshalFromJsonRPCResponse(res, &status)
+		if err != nil {
+			panic(err)
+		}
+		if r := e.GetResponse(payload.BlockHash); e.Mocking && !e.CanPassthrough(payload.BlockHash) && r != nil {
+			// We are mocking this specific response, either with a hash specific response, or the default response
+			spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &PayloadStatusV1{
+				Status:          r.Status,
+				LatestValidHash: r.LatestValidHash,
+				ValidationError: nil,
+			})
 			if err != nil {
 				panic(err)
 			}
-			if !exceptions.Contains(fcState.HeadBlockHash) {
-				spoof, err = forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, PayloadStatusV1{
-					Status:          Invalid,
-					LatestValidHash: latestValidHash,
-					ValidationError: nil,
-				}, nil)
-				if err != nil {
-					panic(err)
-				}
-				select {
-				case invalidated <- fcState.HeadBlockHash:
-				default:
-				}
-				return spoof
+			select {
+			case e.NewPayloadCalled <- EngineResponseHash{
+				Response: r,
+				Hash:     payload.BlockHash,
+			}:
+			default:
 			}
-			return nil
+			return spoof
+		} else {
+			select {
+			case e.NewPayloadCalled <- EngineResponseHash{
+				Response: &EngineResponse{
+					Status:          status.Status,
+					LatestValidHash: status.LatestValidHash,
+				},
+				Hash: payload.BlockHash,
+			}:
+			default:
+			}
 		}
-	}
-	if method == EngineNewPayloadV1 {
-		return func(res []byte, req []byte) *proxy.Spoof {
-			var (
-				payload ExecutableDataV1
-				spoof   *proxy.Spoof
-				err     error
-			)
-			err = UnmarshalFromJsonRPCRequest(req, &payload)
+		return nil
+	})
+}
+
+func (e *EngineResponseMocker) AddForkchoiceUpdatedCallbackToProxy(p *Proxy) {
+	p.AddResponseCallback(EngineForkchoiceUpdatedV1, func(res []byte, req []byte) *proxy.Spoof {
+		var (
+			fcState ForkchoiceStateV1
+			pAttr   PayloadAttributesV1
+			fResp   ForkChoiceResponse
+			spoof   *proxy.Spoof
+			err     error
+		)
+		err = UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+		if err != nil {
+			panic(err)
+		}
+		err = UnmarshalFromJsonRPCResponse(res, &fResp)
+		if err != nil {
+			panic(err)
+		}
+
+		if r := e.GetResponse(fcState.HeadBlockHash); e.Mocking && !e.CanPassthrough(fcState.HeadBlockHash) && r != nil {
+			// We are mocking this specific response, either with a hash specific response, or the default response
+			spoof, err = forkchoiceResponseSpoof(EngineForkchoiceUpdatedV1, PayloadStatusV1{
+				Status:          r.Status,
+				LatestValidHash: r.LatestValidHash,
+				ValidationError: nil,
+			}, nil)
 			if err != nil {
 				panic(err)
 			}
-			if !exceptions.Contains(payload.BlockHash) {
-				spoof, err = payloadStatusSpoof(EngineNewPayloadV1, &PayloadStatusV1{
-					Status:          Invalid,
-					LatestValidHash: latestValidHash,
-					ValidationError: nil,
-				})
-				if err != nil {
-					panic(err)
-				}
-				select {
-				case invalidated <- payload.BlockHash:
-				default:
-				}
-				return spoof
+
+			select {
+			case e.ForkchoiceUpdatedCalled <- EngineResponseHash{
+				Response: r,
+				Hash:     fcState.HeadBlockHash,
+			}:
+			default:
 			}
-			return nil
+			return spoof
+		} else {
+			// Let the original response pass through
+			select {
+			case e.ForkchoiceUpdatedCalled <- EngineResponseHash{
+				Response: &EngineResponse{
+					Status:          fResp.PayloadStatus.Status,
+					LatestValidHash: fResp.PayloadStatus.LatestValidHash,
+				},
+				Hash: fcState.HeadBlockHash,
+			}:
+			default:
+			}
 		}
-	}
-	panic(fmt.Errorf("ERROR: Invalid method to generate callback: %s", method))
+		return nil
+	})
+}
+
+func (e *EngineResponseMocker) AddCallbacksToProxy(p *Proxy) {
+	e.AddForkchoiceUpdatedCallbackToProxy(p)
+	e.AddNewPayloadCallbackToProxy(p)
 }
 
 // Generates a callback that detects when a ForkchoiceUpdated with Payload Attributes fails.
@@ -716,6 +816,11 @@ func combine(a, b *proxy.Spoof) *proxy.Spoof {
 	return a
 }
 
+func ContextWithSlotsTimeout(parent context.Context, t *Testnet, slots beacon.Slot) (context.Context, context.CancelFunc) {
+	timeout := time.Duration(uint64(slots)*uint64(t.spec.SECONDS_PER_SLOT)) * time.Second
+	return context.WithTimeout(parent, timeout)
+}
+
 // Try to approximate how much time until the merge based on current time, bellatrix fork epoch,
 // TTD, execution clients' consensus mechanism, current total difficulty.
 // This function is used to calculate timeouts, so it will always return a pessimistic value.
@@ -723,7 +828,7 @@ func SlotsUntilMerge(t *Testnet, c *Config) beacon.Slot {
 	l := make([]beacon.Slot, 0)
 	l = append(l, SlotsUntilBellatrix(t.genesisTime, t.spec))
 
-	for i, e := range t.eth1 {
+	for i, e := range t.ExecutionClients().Running() {
 		l = append(l, beacon.Slot(TimeUntilTerminalBlock(e, c.Eth1Consensus, c.TerminalTotalDifficulty, c.Nodes[i])/uint64(t.spec.SECONDS_PER_SLOT)))
 	}
 
@@ -755,7 +860,7 @@ func SlotsUntilBellatrix(genesisTime beacon.Timestamp, spec *beacon.Spec) beacon
 	return s
 }
 
-func TimeUntilTerminalBlock(e *Eth1Node, c setup.Eth1Consensus, defaultTTD *big.Int, n node) uint64 {
+func TimeUntilTerminalBlock(e *ExecutionClient, c setup.Eth1Consensus, defaultTTD *big.Int, n node) uint64 {
 	var ttd = defaultTTD
 	if n.ExecutionClientTTD != nil {
 		ttd = n.ExecutionClientTTD
