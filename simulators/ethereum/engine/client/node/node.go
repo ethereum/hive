@@ -433,7 +433,7 @@ func (n *GethNode) PoWMiningLoop() {
 
 		// Modify the block before sealing
 		if n.config.BlockModifier != nil {
-			b, err = n.config.BlockModifier.ModifyUnsealedBlock(b)
+			b, err = n.config.BlockModifier.ModifyUnsealedBlock(n.eth.BlockChain(), s, b)
 			if err != nil {
 				panic(err)
 			}
