@@ -48,7 +48,8 @@ type GethNodeTestConfiguration struct {
 	PoWMinerEtherBase     common.Address
 	PoWRandomTransactions bool
 	// Prepare the Ethash instance even if we don't mine (to seal blocks)
-	Ethash           bool
+	Ethash bool
+	// Disable gossiping of newly mined blocks (peers need to sync to obtain the blocks)
 	DisableGossiping bool
 
 	// Block Modifier
@@ -432,7 +433,7 @@ func (n *GethNode) PoWMiningLoop() {
 
 		// Modify the block before sealing
 		if n.config.BlockModifier != nil {
-			b, err = n.config.BlockModifier.ModifyUnsealedBlock(b)
+			b, err = n.config.BlockModifier.ModifyUnsealedBlock(n.eth.BlockChain(), s, b)
 			if err != nil {
 				panic(err)
 			}

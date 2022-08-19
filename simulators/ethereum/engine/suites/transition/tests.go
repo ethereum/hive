@@ -649,6 +649,36 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
+		Name:                        "Syncing on an Invalid Terminal Execution - Difficulty",
+		TTD:                         696608,
+		TimeoutSeconds:              30,
+		MainChainFile:               "blocks_1_td_196608.rlp",
+		DisableMining:               true,
+		SkipMainClientTTDWait:       true,
+		TransitionPayloadStatusSync: test.Invalid,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							Difficulty: big.NewInt(500000),
+						},
+						// Mined blocks are not gossiped, peers have to sync
+						DisableGossiping: true,
+					},
+					TerminalTotalDifficulty: big.NewInt(696608),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSBlocksForSync: 1,
+				BuildPoSChainOnTop:    true,
+				MainClientShallSync:   false,
+			},
+		},
+	},
+	{
 		Name:                     "Transition on an Invalid Terminal Execution - Distant Future",
 		TTD:                      290000,
 		TimeoutSeconds:           30,
@@ -703,6 +733,36 @@ var mergeTestSpecs = []MergeTestSpec{
 		},
 	},
 	{
+		Name:                        "Syncing on an Invalid Terminal Execution - Sealed MixHash",
+		TTD:                         290000,
+		TimeoutSeconds:              30,
+		MainChainFile:               "blocks_1_td_196608.rlp",
+		DisableMining:               true,
+		SkipMainClientTTDWait:       true,
+		TransitionPayloadStatusSync: test.Invalid,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							InvalidSealedMixHash: true,
+						},
+						// Mined blocks are not gossiped, peers have to sync
+						DisableGossiping: true,
+					},
+					TerminalTotalDifficulty: big.NewInt(290000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSBlocksForSync: 1,
+				BuildPoSChainOnTop:    true,
+				MainClientShallSync:   false,
+			},
+		},
+	},
+	{
 		Name:                     "Transition on an Invalid Terminal Execution - Sealed Nonce",
 		TTD:                      290000,
 		TimeoutSeconds:           30,
@@ -726,6 +786,93 @@ var mergeTestSpecs = []MergeTestSpec{
 				},
 				BuildPoSChainOnTop:  true,
 				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                        "Syncing on an Invalid Terminal Execution - Sealed Nonce",
+		TTD:                         290000,
+		TimeoutSeconds:              30,
+		MainChainFile:               "blocks_1_td_196608.rlp",
+		DisableMining:               true,
+		SkipMainClientTTDWait:       true,
+		TransitionPayloadStatusSync: test.Invalid,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							InvalidSealedNonce: true,
+						},
+						// Mined blocks are not gossiped, peers have to sync
+						DisableGossiping: true,
+					},
+					TerminalTotalDifficulty: big.NewInt(290000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSBlocksForSync: 1,
+				BuildPoSChainOnTop:    true,
+				MainClientShallSync:   false,
+			},
+		},
+	},
+	{
+		Name:                     "Transition on an Invalid Terminal Execution - Balance Mismatch",
+		TTD:                      290000,
+		TimeoutSeconds:           30,
+		MainChainFile:            "blocks_1_td_196608.rlp",
+		DisableMining:            true,
+		SkipMainClientTTDWait:    true,
+		KeepCheckingUntilTimeout: true,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							BalanceIncrease: true,
+						},
+					},
+					TerminalTotalDifficulty: big.NewInt(290000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSChainOnTop:  true,
+				MainClientShallSync: false,
+			},
+		},
+	},
+	{
+		Name:                        "Syncing on an Invalid Terminal Execution - Balance Mismatch",
+		TTD:                         290000,
+		TimeoutSeconds:              30,
+		MainChainFile:               "blocks_1_td_196608.rlp",
+		DisableMining:               true,
+		SkipMainClientTTDWait:       true,
+		TransitionPayloadStatusSync: test.Invalid,
+		SecondaryClientSpecs: []SecondaryClientSpec{
+			{
+				ClientStarter: node.GethNodeEngineStarter{
+					Config: node.GethNodeTestConfiguration{
+						Name:     "PoW Producer",
+						PoWMiner: true,
+						MaxPeers: big.NewInt(1),
+						BlockModifier: helper.PoWBlockModifier{
+							BalanceIncrease: true,
+						},
+						// Mined blocks are not gossiped, peers have to sync
+						DisableGossiping: true,
+					},
+					TerminalTotalDifficulty: big.NewInt(290000),
+					ChainFile:               "blocks_1_td_196608.rlp",
+				},
+				BuildPoSBlocksForSync: 1,
+				BuildPoSChainOnTop:    true,
+				MainClientShallSync:   false,
 			},
 		},
 	},
