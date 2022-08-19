@@ -366,7 +366,7 @@ func (t *Testnet) WaitForCurrentEpochFinalization(ctx context.Context, timeoutSl
 						fmt.Printf("WARN: beacon %d: %s\n", i, err)
 					}
 
-					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s, justified=%s, finalized=%s", i, slot, head, health, execution, justified, finalized), nil}
+					ch <- res{i, fmt.Sprintf("beacon %d: slot=%d, head=%s, health=%.2f, exec_payload=%s, justified=%s, finalized=%s, epoch_to_finalize=%d", i, slot, head, health, execution, justified, finalized, epochToBeFinalized), nil}
 
 					if checkpoints.Finalized != (common.Checkpoint{}) && checkpoints.Finalized.Epoch >= epochToBeFinalized {
 						done <- checkpoints.Finalized
