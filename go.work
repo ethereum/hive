@@ -4,6 +4,7 @@ use (
 	.
 	./hiveproxy
 	./optimism
+	./simulators/optimism/l1ops
 	./simulators/optimism/rpc
 	./simulators/optimism/p2p
 	./simulators/optimism/testnet

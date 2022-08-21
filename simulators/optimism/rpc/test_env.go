@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/hive/optimism"
 	"net/http"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -19,15 +19,12 @@ import (
 	"github.com/kr/pretty"
 )
 
-// default timeout for RPC calls
-var rpcTimeout = 10 * time.Second
-
-// TestClient is the environment of a single test.
-type TestEnv struct {
+// LegacyTestEnv is the environment of a single test.
+type LegacyTestEnv struct {
 	*hivesim.T
 	RPC   *rpc.Client
 	Eth   *ethclient.Client
-	Vault *vault
+	Vault *optimism.Vault
 
 	genesis []byte
 
@@ -39,22 +36,23 @@ type TestEnv struct {
 }
 
 // runHTTP runs the given test function using the HTTP RPC client.
-func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, g []byte, fn func(*TestEnv)) {
+func RunHTTP(t *hivesim.T, c *hivesim.Client, vault *optimism.Vault, g []byte, fn func(*LegacyTestEnv)) {
 	// This sets up debug logging of the requests and responses.
 	client := &http.Client{
-		Transport: &loggingRoundTrip{
-			t:     t,
-			inner: http.DefaultTransport,
+		Transport: &optimism.LoggingRoundTrip{
+			T:     t,
+			Inner: http.DefaultTransport,
 		},
 	}
 
 	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%v:8545/", c.IP), client)
 	defer rpcClient.Close()
-	env := &TestEnv{
+	ethClient := ethclient.NewClient(rpcClient)
+	env := &LegacyTestEnv{
 		T:       t,
 		RPC:     rpcClient,
-		Eth:     ethclient.NewClient(rpcClient),
-		Vault:   v,
+		Eth:     ethClient,
+		Vault:   vault,
 		genesis: g,
 	}
 	fn(env)
@@ -63,8 +61,8 @@ func runHTTP(t *hivesim.T, c *hivesim.Client, v *vault, g []byte, fn func(*TestE
 	}
 }
 
-// runWS runs the given test function using the WebSocket RPC client.
-func runWS(t *hivesim.T, c *hivesim.Client, v *vault, g []byte, fn func(*TestEnv)) {
+// RunWS runs the given test function using the WebSocket RPC client.
+func RunWS(t *hivesim.T, c *hivesim.Client, vault *optimism.Vault, g []byte, fn func(*LegacyTestEnv)) {
 	ctx, done := context.WithTimeout(context.Background(), 5*time.Second)
 	rpcClient, err := rpc.DialWebsocket(ctx, fmt.Sprintf("ws://%v:8546/", c.IP), "")
 	done()
@@ -72,12 +70,12 @@ func runWS(t *hivesim.T, c *hivesim.Client, v *vault, g []byte, fn func(*TestEnv
 		t.Fatal("WebSocket connection failed:", err)
 	}
 	defer rpcClient.Close()
-
-	env := &TestEnv{
+	ethClient := ethclient.NewClient(rpcClient)
+	env := &LegacyTestEnv{
 		T:       t,
 		RPC:     rpcClient,
-		Eth:     ethclient.NewClient(rpcClient),
-		Vault:   v,
+		Eth:     ethClient,
+		Vault:   vault,
 		genesis: g,
 	}
 	fn(env)
@@ -89,12 +87,12 @@ func runWS(t *hivesim.T, c *hivesim.Client, v *vault, g []byte, fn func(*TestEnv
 // CallContext is a helper method that forwards a raw RPC request to
 // the underlying RPC client. This can be used to call RPC methods
 // that are not supported by the ethclient.Client.
-func (t *TestEnv) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
+func (t *LegacyTestEnv) CallContext(ctx context.Context, result interface{}, method string, args ...interface{}) error {
 	return t.RPC.CallContext(ctx, result, method, args...)
 }
 
 // LoadGenesis returns the genesis block.
-func (t *TestEnv) LoadGenesis() *types.Block {
+func (t *LegacyTestEnv) LoadGenesis() *types.Block {
 	var genesis core.Genesis
 	if err := json.Unmarshal(t.genesis, &genesis); err != nil {
 		panic(fmt.Errorf("can't parse genesis JSON: %v", err))
@@ -104,47 +102,17 @@ func (t *TestEnv) LoadGenesis() *types.Block {
 
 // Ctx returns a context with the default timeout.
 // For subsequent calls to Ctx, it also cancels the previous context.
-func (t *TestEnv) Ctx() context.Context {
+func (t *LegacyTestEnv) Ctx() context.Context {
 	if t.lastCtx != nil {
 		t.lastCancel()
 	}
-	t.lastCtx, t.lastCancel = context.WithTimeout(context.Background(), rpcTimeout)
+	t.lastCtx, t.lastCancel = context.WithTimeout(context.Background(), optimism.RPCTimeout)
 	return t.lastCtx
-}
-
-func waitSynced(c *rpc.Client) (err error) {
-	var (
-		timeout     = 20 * time.Second
-		end         = time.Now().Add(timeout)
-		ctx, cancel = context.WithDeadline(context.Background(), end)
-	)
-	defer func() {
-		cancel()
-		if err == context.DeadlineExceeded {
-			err = fmt.Errorf("didn't sync within timeout of %v", 20*time.Second)
-		}
-	}()
-
-	ec := ethclient.NewClient(c)
-	for {
-		progress, err := ec.SyncProgress(ctx)
-		if err != nil {
-			return err
-		}
-		head, err := ec.BlockNumber(ctx)
-		if err != nil {
-			return err
-		}
-		if progress == nil && head > 0 {
-			return nil // success!
-		}
-		time.Sleep(100 * time.Millisecond)
-	}
 }
 
 // Naive generic function that works in all situations.
 // A better solution is to use logs to wait for confirmations.
-func waitForTxConfirmations(t *TestEnv, txHash common.Hash, n uint64) (*types.Receipt, error) {
+func WaitForTxConfirmations(t *LegacyTestEnv, txHash common.Hash, n uint64) (*types.Receipt, error) {
 	var (
 		receipt    *types.Receipt
 		startBlock *types.Block
@@ -180,7 +148,7 @@ func waitForTxConfirmations(t *TestEnv, txHash common.Hash, n uint64) (*types.Re
 				if bytes.Compare(receipt.PostState, checkReceipt.PostState) == 0 {
 					return receipt, nil
 				} else { // chain reorg
-					waitForTxConfirmations(t, txHash, n)
+					return WaitForTxConfirmations(t, txHash, n)
 				}
 			} else {
 				return nil, err
@@ -193,44 +161,9 @@ func waitForTxConfirmations(t *TestEnv, txHash common.Hash, n uint64) (*types.Re
 	return nil, ethereum.NotFound
 }
 
-// loggingRoundTrip writes requests and responses to the test log.
-type loggingRoundTrip struct {
-	t     *hivesim.T
-	inner http.RoundTripper
-}
-
-func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Read and log the request body.
-	reqBytes, err := ioutil.ReadAll(req.Body)
-	req.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-	rt.t.Logf(">>  %s", bytes.TrimSpace(reqBytes))
-	reqCopy := *req
-	reqCopy.Body = ioutil.NopCloser(bytes.NewReader(reqBytes))
-
-	// Do the round trip.
-	resp, err := rt.inner.RoundTrip(&reqCopy)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Read and log the response bytes.
-	respBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	respCopy := *resp
-	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
-	rt.t.Logf("<<  %s", bytes.TrimSpace(respBytes))
-	return &respCopy, nil
-}
-
-// diff checks whether x and y are deeply equal, returning a description
+// Diff checks whether x and y are deeply equal, returning a description
 // of their differences if they are not equal.
-func diff(x, y interface{}) (d string) {
+func Diff(x, y interface{}) (d string) {
 	for _, l := range pretty.Diff(x, y) {
 		d += l + "\n"
 	}

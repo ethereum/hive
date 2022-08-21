@@ -2,11 +2,17 @@ package optimism
 
 import (
 	"bytes"
+	"context"
+	"errors"
+	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/hive/hivesim"
 	"io"
 	"io/ioutil"
 	"strings"
+	"time"
 )
 
 func bytesFile(name string, data []byte) hivesim.StartOption {
@@ -46,5 +52,40 @@ func (u HiveUnpackParams) Params() hivesim.Params {
 func (u HiveUnpackParams) Merge(other HiveUnpackParams) {
 	for k, v := range other {
 		u[k] = v
+	}
+}
+
+func WaitBlock(ctx context.Context, client *ethclient.Client, n uint64) error {
+	for {
+		height, err := client.BlockNumber(ctx)
+		if err != nil {
+			return err
+		}
+		if height < n {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		break
+	}
+
+	return nil
+}
+
+func WaitReceipt(ctx context.Context, client *ethclient.Client, hash common.Hash) (*types.Receipt, error) {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		receipt, err := client.TransactionReceipt(ctx, hash)
+		if receipt != nil && err == nil {
+			return receipt, nil
+		} else if err != nil && !errors.Is(err, ethereum.NotFound) {
+			return nil, err
+		}
+
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-ticker.C:
+		}
 	}
 }

@@ -7,10 +7,15 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
+	"math/big"
 )
 
 var (
-	L2ChainID = 902
+	L1ChainID    = 901
+	L1ChainIDBig = big.NewInt(int64(L1ChainID))
+
+	L2ChainID    = 902
+	L2ChainIDBig = big.NewInt(int64(L2ChainID))
 )
 
 type HardhatDeployConfig struct {
@@ -94,7 +99,7 @@ func (d *Devnet) InitHardhatDeployConfig(l1StartingBlockTag string, maxSeqDrift 
 
 	deployConf := HardhatDeployConfig{
 		L1StartingBlockTag: l1StartingBlockTag,
-		L1ChainID:          901,
+		L1ChainID:          uint64(L1ChainID),
 		L2ChainID:          uint64(L2ChainID),
 		L2BlockTime:        2,
 

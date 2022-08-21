@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/stretchr/testify/require"
 	"math/big"
 	"time"
@@ -20,7 +19,7 @@ import (
 type testSpec struct {
 	Name  string
 	About string
-	Run   func(*TestEnv)
+	Run   func(*LegacyTestEnv)
 }
 
 var tests = []testSpec{
@@ -100,120 +99,53 @@ func runAllTests(t *hivesim.T) {
 		}
 	}
 
-	seqWindowSize := uint64(4)
-	d := optimism.NewDevnet(t)
-
-	d.InitContracts()
-	d.InitHardhatDeployConfig("earliest", 10, seqWindowSize, 30)
-	d.InitL1Hardhat()
-	d.AddEth1() // l1 eth1 node is required for l2 config init
-	d.WaitUpEth1(0, time.Second*10)
-
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
-	var block *types.Block
-	for {
-		height, err := d.GetEth1(0).EthClient().BlockNumber(ctx)
-		require.NoError(t, err)
-		d.T.Logf("waiting for one sequencing window. size: %d, height: %d", seqWindowSize, height)
-		if height < seqWindowSize {
-			time.Sleep(time.Second)
-			continue
-		}
-		block, err = d.GetEth1(0).EthClient().BlockByNumber(ctx, big.NewInt(int64(height)))
-		require.NoError(t, err)
-		break
-	}
-	d.InitHardhatDeployConfig(block.Hash().Hex(), 10, seqWindowSize, 30)
 
-	// deploy contracts
-	d.DeployL1Hardhat()
-
-	d.InitL2Hardhat(core.GenesisAlloc{
-		common.HexToAddress("0x0000000000000000000000000000000000000314"): {
-			Balance: big.NewInt(0),
-			Code:    runtimeCode,
-			Storage: map[common.Hash]common.Hash{
-				common.Hash{}: common.BytesToHash(common.LeftPadBytes(big.NewInt(0x1234).Bytes(), 32)),
-				common.HexToHash("0x6661e9d6d8b923d5bbaab1b96e1dd51ff6ea2a93520fdc9eb75d059238b8c5e9"): common.BytesToHash(common.LeftPadBytes(big.NewInt(1).Bytes(), 32)),
+	seqWindowSize := uint64(4)
+	d := optimism.NewDevnet(t)
+	require.NoError(t, optimism.StartSequencerDevnet(ctx, d, &optimism.SequencerDevnetParams{
+		MaxSeqDrift:   10,
+		SeqWindowSize: seqWindowSize,
+		ChanTimeout:   30,
+		AdditionalGenesisAllocs: core.GenesisAlloc{
+			common.HexToAddress("0x0000000000000000000000000000000000000314"): {
+				Balance: big.NewInt(0),
+				Code:    runtimeCode,
+				Storage: map[common.Hash]common.Hash{
+					common.Hash{}: common.BytesToHash(common.LeftPadBytes(big.NewInt(0x1234).Bytes(), 32)),
+					common.HexToHash("0x6661e9d6d8b923d5bbaab1b96e1dd51ff6ea2a93520fdc9eb75d059238b8c5e9"): common.BytesToHash(common.LeftPadBytes(big.NewInt(1).Bytes(), 32)),
+				},
 			},
 		},
-	})
+	}))
 
-	d.AddOpL2() // l2 engine is required for rollup config init
-	d.WaitUpOpL2Engine(0, time.Second*10)
-	d.InitRollupHardhat()
-
-	// sequencer stack, on top of first eth1 node
-	d.AddOpNode(0, 0, true)
-	d.AddOpBatcher(0, 0, 0)
-	// proposer does not need to run for L2 to be stable
-	//d.AddOpProposer(0, 0, 0)
-
-	// verifier stack (optional)
-	//d.AddOpL2()
-	//d.AddOpNode(0, 1)  // can use the same eth1 node
-
-	expHeight := uint64(time.Now().Sub(time.Unix(int64(block.Time()), 0)).Seconds() / 2)
-	ec := d.GetOpL2Engine(0).EthClient()
-	for {
-		height, err := ec.BlockNumber(ctx)
-		require.NoError(t, err)
-		d.T.Logf("waiting for l2 to create empty blocks. height: %d, expected height: %d", height, expHeight)
-		if height < expHeight {
-			time.Sleep(time.Second)
-			continue
-		}
-		break
-	}
 	c := d.GetOpL2Engine(0).Client
-
-	vault := newVault()
 	genesis, err := json.Marshal(d.L2Cfg)
 	handleErr(err)
 
-	s := newSemaphore(40)
-	for _, test := range tests {
-		test := test
-		s.get()
-		go func() {
-			defer s.put()
-			t.Run(hivesim.TestSpec{
-				Name:        fmt.Sprintf("%s (%s)", test.Name, "ops-l2"),
-				Description: test.About,
-				Run: func(t *hivesim.T) {
-					switch test.Name[:strings.IndexByte(test.Name, '/')] {
-					case "http":
-						runHTTP(t, c, vault, genesis, test.Run)
-					case "ws":
-						runWS(t, c, vault, genesis, test.Run)
-					default:
-						panic("bad test prefix in name " + test.Name)
-					}
-				},
-			})
-			// TODO: debug re-org issue and remove
-			time.Sleep(5 * time.Second)
-		}()
+	// Need to adapt the tests a bit to work with the common
+	// libraries in the optimism package.
+	adaptedTests := make([]*optimism.TestSpec, len(tests))
+	for i, test := range tests {
+		adaptedTests[i] = &optimism.TestSpec{
+			Name:        fmt.Sprintf("%s (%s)", test.Name, "ops-l2"),
+			Description: test.About,
+			Run: func(t *hivesim.T, env *optimism.TestEnv) {
+				switch test.Name[:strings.IndexByte(test.Name, '/')] {
+				case "http":
+					RunHTTP(t, c, d.L2Vault, genesis, test.Run)
+				case "ws":
+					RunWS(t, c, d.L2Vault, genesis, test.Run)
+				default:
+					panic("bad test prefix in name " + test.Name)
+				}
+			},
+		}
 	}
-	s.drain()
-}
-
-type semaphore chan struct{}
-
-func newSemaphore(n int) semaphore {
-	s := make(semaphore, n)
-	for i := 0; i < n; i++ {
-		s <- struct{}{}
-	}
-	return s
-}
-
-func (s semaphore) get() { <-s }
-func (s semaphore) put() { s <- struct{}{} }
-
-func (s semaphore) drain() {
-	for i := 0; i < cap(s); i++ {
-		<-s
-	}
+	optimism.RunTests(ctx, t, &optimism.RunTestsParams{
+		Devnet:      d,
+		Tests:       adaptedTests,
+		Concurrency: 40,
+	})
 }

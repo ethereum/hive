@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
 	"sync"
 	"time"
@@ -26,6 +27,8 @@ type Devnet struct {
 	Eth1s       []*Eth1Node
 	OpL2Engines []*OpL2Engine
 	OpNodes     []*OpNode
+	L1Vault     *Vault
+	L2Vault     *Vault
 
 	Proposer *ProposerNode
 	Batcher  *BatcherNode
@@ -59,6 +62,8 @@ func NewDevnet(t *hivesim.T) *Devnet {
 		Clients:     roles,
 		MnemonicCfg: DefaultMnemonicConfig,
 		Secrets:     secrets,
+		L1Vault:     NewVault(t, L1ChainIDBig),
+		L2Vault:     NewVault(t, L2ChainIDBig),
 		Addresses:   secrets.Addresses(),
 	}
 }
@@ -325,4 +330,52 @@ func (d *Devnet) WaitUpOpL2Engine(i int, wait time.Duration) {
 	defer cancel()
 	_, err := d.GetOpL2Engine(i).EthClient().ChainID(ctx)
 	require.NoError(d.T, err, "op l2 engine node should be up within %s", wait)
+}
+
+func (d *Devnet) L1Client(i int) *ethclient.Client {
+	return d.GetEth1(i).EthClient()
+}
+
+func (d *Devnet) L2Client(i int) *ethclient.Client {
+	return d.GetOpL2Engine(i).EthClient()
+}
+
+type SequencerDevnetParams struct {
+	MaxSeqDrift             uint64
+	SeqWindowSize           uint64
+	ChanTimeout             uint64
+	AdditionalGenesisAllocs core.GenesisAlloc
+}
+
+func StartSequencerDevnet(ctx context.Context, d *Devnet, params *SequencerDevnetParams) error {
+	d.InitContracts()
+	d.InitHardhatDeployConfig("earliest", params.MaxSeqDrift, params.SeqWindowSize, params.ChanTimeout)
+	d.InitL1Hardhat()
+	d.AddEth1()
+	d.WaitUpEth1(0, time.Second*10)
+
+	//var block *types.Block
+	//if err := WaitBlock(ctx, d.L1Client(0), params.SeqWindowSize); err != nil {
+	//	return err
+	//}
+
+	d.DeployL1Hardhat()
+	d.InitL2Hardhat(params.AdditionalGenesisAllocs)
+	d.AddOpL2()
+	d.WaitUpOpL2Engine(0, time.Second*10)
+	d.InitRollupHardhat()
+
+	d.AddOpNode(0, 0, true)
+	d.AddOpBatcher(0, 0, 0)
+	d.AddOpProposer(0, 0, 0)
+
+	block, err := d.L1Client(0).BlockByNumber(ctx, nil)
+	if err != nil {
+		return err
+	}
+	expHeight := uint64(time.Now().Sub(time.Unix(int64(block.Time()), 0)).Seconds() / 2)
+	if err := WaitBlock(ctx, d.L2Client(0), expHeight); err != nil {
+		return err
+	}
+	return nil
 }

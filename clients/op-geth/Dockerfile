@@ -1,5 +1,5 @@
 ARG branch=develop
-FROM ethereumoptimism/reference-optimistic-geth:$branch
+FROM ethereumoptimism/op-geth:$branch
 
 RUN apk add curl jq bash
 RUN apk add --no-cache ca-certificates

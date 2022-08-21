@@ -2,7 +2,7 @@ module github.com/ethereum/hive/simulators/optimism/rpc
 
 go 1.18
 
-replace github.com/ethereum/go-ethereum v1.10.21 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220810221227-a68e5aa189e1
+replace github.com/ethereum/go-ethereum v1.10.21 => github.com/ethereum-optimism/op-geth v0.0.0-20220819161933-acfde114de61
 
 replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c
 
@@ -13,6 +13,7 @@ require (
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/ethereum/hive/optimism v0.0.0
 	github.com/kr/pretty v0.3.0
+	github.com/stretchr/testify v1.8.0
 )
 
 require (
@@ -128,7 +129,6 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
-	github.com/stretchr/testify v1.8.0 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tklauser/go-sysconf v0.3.10 // indirect
 	github.com/tklauser/numcpus v0.5.0 // indirect

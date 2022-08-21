@@ -2,7 +2,7 @@ module github.com/ethereum/hive/simulators/optimism/testnet
 
 go 1.18
 
-replace github.com/ethereum/go-ethereum v1.10.21 => github.com/ethereum-optimism/reference-optimistic-geth v0.0.0-20220810221227-a68e5aa189e1
+replace github.com/ethereum/go-ethereum v1.10.21 => github.com/ethereum-optimism/op-geth v0.0.0-20220819161933-acfde114de61
 
 replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c
 
