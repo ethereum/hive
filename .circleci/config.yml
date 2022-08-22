@@ -36,7 +36,7 @@ jobs:
             -sim=optimism \
             -sim.loglevel=5 \
             -docker.pull=true \
-            -client=go-ethereum,op-geth_optimism-history,op-proposer_develop,op-batcher_develop,op-node_develop,op-contracts_develop |& tee /tmp/build/hive.log
+            -client=go-ethereum,op-geth_optimism-history,op-proposer_develop,op-batcher_develop,op-node_develop,op-contracts_develop |& tee /tmp/build/hive.log || echo "failed."
       - run:
           command: |
             tar -cvf /tmp/workspace.tgz -C /home/circleci/project /home/circleci/project/workspace
