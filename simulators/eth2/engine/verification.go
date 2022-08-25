@@ -23,7 +23,7 @@ import (
 
 // Interface to specify on which slot the verification will be performed
 type VerificationSlot interface {
-	Slot(t *Testnet, ctx context.Context, bn *BeaconNode) (common.Slot, error)
+	Slot(t *Testnet, ctx context.Context, bn *BeaconClient) (common.Slot, error)
 }
 
 // Return the slot at the start of the checkpoint's following epoch
@@ -31,7 +31,7 @@ type FirstSlotAfterCheckpoint struct {
 	*common.Checkpoint
 }
 
-func (c FirstSlotAfterCheckpoint) Slot(t *Testnet, _ context.Context, _ *BeaconNode) (common.Slot, error) {
+func (c FirstSlotAfterCheckpoint) Slot(t *Testnet, _ context.Context, _ *BeaconClient) (common.Slot, error) {
 	return t.spec.EpochStartSlot(c.Checkpoint.Epoch + 1)
 }
 
@@ -40,21 +40,21 @@ type LastSlotAtCheckpoint struct {
 	*common.Checkpoint
 }
 
-func (c LastSlotAtCheckpoint) Slot(t *Testnet, _ context.Context, _ *BeaconNode) (common.Slot, error) {
+func (c LastSlotAtCheckpoint) Slot(t *Testnet, _ context.Context, _ *BeaconClient) (common.Slot, error) {
 	return t.spec.SLOTS_PER_EPOCH * common.Slot(c.Checkpoint.Epoch), nil
 }
 
 // Get last slot according to current time
 type LastestSlotByTime struct{}
 
-func (l LastestSlotByTime) Slot(t *Testnet, _ context.Context, _ *BeaconNode) (common.Slot, error) {
+func (l LastestSlotByTime) Slot(t *Testnet, _ context.Context, _ *BeaconClient) (common.Slot, error) {
 	return t.spec.TimeToSlot(common.Timestamp(time.Now().Unix()), t.genesisTime), nil
 }
 
 // Get last slot according to current head of a beacon node
 type LastestSlotByHead struct{}
 
-func (l LastestSlotByHead) Slot(t *Testnet, ctx context.Context, bn *BeaconNode) (common.Slot, error) {
+func (l LastestSlotByHead) Slot(t *Testnet, ctx context.Context, bn *BeaconClient) (common.Slot, error) {
 	var headInfo eth2api.BeaconBlockHeaderAndInfo
 	if exists, err := beaconapi.BlockHeader(ctx, bn.API, eth2api.BlockHead, &headInfo); err != nil {
 		return common.Slot(0), fmt.Errorf("failed to poll head: %v", err)
@@ -67,7 +67,8 @@ func (l LastestSlotByHead) Slot(t *Testnet, ctx context.Context, bn *BeaconNode)
 // VerifyParticipation ensures that the participation of the finialized epoch
 // of a given checkpoint is above the expected threshold.
 func VerifyParticipation(t *Testnet, ctx context.Context, vs VerificationSlot, expected float64) error {
-	slot, err := vs.Slot(t, ctx, t.verificationBeacons()[0])
+	runningBeacons := t.VerificationNodes().BeaconClients().Running()
+	slot, err := vs.Slot(t, ctx, runningBeacons[0])
 	if err != nil {
 		return err
 	}
@@ -75,7 +76,7 @@ func VerifyParticipation(t *Testnet, ctx context.Context, vs VerificationSlot, e
 		// slot-1 to target last slot in finalized epoch
 		slot = slot - 1
 	}
-	for i, b := range t.verificationBeacons() {
+	for i, b := range runningBeacons {
 		health, err := getHealth(ctx, b.API, t.spec, slot)
 		if err != nil {
 			return err
@@ -83,7 +84,7 @@ func VerifyParticipation(t *Testnet, ctx context.Context, vs VerificationSlot, e
 		if health < expected {
 			return fmt.Errorf("beacon %d: participation not healthy (got: %.2f, expected: %.2f)", i, health, expected)
 		}
-		t.t.Logf("beacon %d: epoch=%d participation=%.2f", i, t.spec.SlotToEpoch(slot), health)
+		t.Logf("beacon %d: epoch=%d participation=%.2f", i, t.spec.SlotToEpoch(slot), health)
 	}
 	return nil
 }
@@ -92,14 +93,15 @@ func VerifyParticipation(t *Testnet, ctx context.Context, vs VerificationSlot, e
 // finalized block and verifies that is in the execution client's canonical
 // chain.
 func VerifyExecutionPayloadIsCanonical(t *Testnet, ctx context.Context, vs VerificationSlot) error {
-	slot, err := vs.Slot(t, ctx, t.verificationBeacons()[0])
+	runningBeacons := t.VerificationNodes().BeaconClients().Running()
+	slot, err := vs.Slot(t, ctx, runningBeacons[0])
 	if err != nil {
 		return err
 	}
 	var blockId eth2api.BlockIdSlot
 	blockId = eth2api.BlockIdSlot(slot)
 	var versionedBlock eth2api.VersionedSignedBeaconBlock
-	if exists, err := beaconapi.BlockV2(ctx, t.verificationBeacons()[0].API, blockId, &versionedBlock); err != nil {
+	if exists, err := beaconapi.BlockV2(ctx, runningBeacons[0].API, blockId, &versionedBlock); err != nil {
 		return fmt.Errorf("beacon %d: failed to retrieve block: %v", 0, err)
 	} else if !exists {
 		return fmt.Errorf("beacon %d: block not found", 0)
@@ -109,7 +111,7 @@ func VerifyExecutionPayloadIsCanonical(t *Testnet, ctx context.Context, vs Verif
 	}
 	payload := versionedBlock.Data.(*bellatrix.SignedBeaconBlock).Message.Body.ExecutionPayload
 
-	for i, proxy := range t.verificationProxies() {
+	for i, proxy := range t.VerificationNodes().Proxies().Running() {
 		client := ethclient.NewClient(proxy.RPC())
 		block, err := client.BlockByNumber(ctx, big.NewInt(int64(payload.BlockNumber)))
 		if err != nil {
@@ -126,7 +128,7 @@ func VerifyExecutionPayloadIsCanonical(t *Testnet, ctx context.Context, vs Verif
 // finalized block and verifies that is in the execution client's canonical
 // chain.
 func VerifyExecutionPayloadHashInclusion(t *Testnet, ctx context.Context, vs VerificationSlot, hash ethcommon.Hash) (*bellatrix.SignedBeaconBlock, error) {
-	for _, bn := range t.verificationBeacons() {
+	for _, bn := range t.VerificationNodes().BeaconClients().Running() {
 		b, err := VerifyExecutionPayloadHashInclusionNode(t, ctx, vs, bn, hash)
 		if err != nil || b != nil {
 			return b, err
@@ -135,37 +137,25 @@ func VerifyExecutionPayloadHashInclusion(t *Testnet, ctx context.Context, vs Ver
 	return nil, nil
 }
 
-func VerifyExecutionPayloadHashInclusionNode(t *Testnet, ctx context.Context, vs VerificationSlot, bn *BeaconNode, hash ethcommon.Hash) (*bellatrix.SignedBeaconBlock, error) {
+func VerifyExecutionPayloadHashInclusionNode(t *Testnet, ctx context.Context, vs VerificationSlot, bn *BeaconClient, hash ethcommon.Hash) (*bellatrix.SignedBeaconBlock, error) {
 	lastSlot, err := vs.Slot(t, ctx, bn)
 	if err != nil {
 		return nil, err
 	}
-	/*
-		enr, _ := bn.ENR()
-		t.t.Logf("INFO: Looking for block %v in node %v, from slot %d", hash, enr, lastSlot)
-	*/
 	for slot := lastSlot; slot > 0; slot -= 1 {
 		var versionedBlock eth2api.VersionedSignedBeaconBlock
 		if exists, err := beaconapi.BlockV2(ctx, bn.API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
-			// t.t.Logf("INFO: Error getting block at slot %d: %v", slot, err)
 			continue
 		} else if !exists {
-			// t.t.Logf("INFO: Error getting block at slot %d", slot)
 			continue
 		}
 		if versionedBlock.Version != "bellatrix" {
 			// Block can't contain an executable payload
-			// t.t.Logf("INFO: Breaking at slot %d", slot)
 			break
 		}
 		block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
 		payload := block.Message.Body.ExecutionPayload
-		/*
-			payloadS, _ := json.MarshalIndent(payload, "", "  ")
-			t.t.Logf("DEBUG: Comparing payload of slot %d: %s", slot, payloadS)
-		*/
 		if bytes.Compare(payload.BlockHash[:], hash[:]) == 0 {
-			// t.t.Logf("INFO: Execution block %v found in %d: %v", hash, block.Message.Slot, ethcommon.BytesToHash(payload.BlockHash[:]))
 			return block, nil
 		}
 	}
@@ -175,14 +165,15 @@ func VerifyExecutionPayloadHashInclusionNode(t *Testnet, ctx context.Context, vs
 // VerifyProposers checks that all validator clients have proposed a block on
 // the finalized beacon chain that includes an execution payload.
 func VerifyProposers(t *Testnet, ctx context.Context, vs VerificationSlot, allow_empty_blocks bool) error {
-	lastSlot, err := vs.Slot(t, ctx, t.verificationBeacons()[0])
+	runningBeacons := t.VerificationNodes().BeaconClients().Running()
+	lastSlot, err := vs.Slot(t, ctx, runningBeacons[0])
 	if err != nil {
 		return err
 	}
-	proposers := make([]bool, len(t.verificationBeacons()))
+	proposers := make([]bool, len(runningBeacons))
 	for slot := common.Slot(0); slot <= lastSlot; slot += 1 {
 		var versionedBlock eth2api.VersionedSignedBeaconBlock
-		if exists, err := beaconapi.BlockV2(ctx, t.verificationBeacons()[0].API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
+		if exists, err := beaconapi.BlockV2(ctx, runningBeacons[0].API, eth2api.BlockIdSlot(slot), &versionedBlock); err != nil {
 			if allow_empty_blocks {
 				continue
 			}
@@ -207,7 +198,7 @@ func VerifyProposers(t *Testnet, ctx context.Context, vs VerificationSlot, allow
 		}
 
 		var validator eth2api.ValidatorResponse
-		if exists, err := beaconapi.StateValidator(ctx, t.verificationBeacons()[0].API, eth2api.StateIdSlot(slot), eth2api.ValidatorIdIndex(proposerIndex), &validator); err != nil {
+		if exists, err := beaconapi.StateValidator(ctx, runningBeacons[0].API, eth2api.StateIdSlot(slot), eth2api.ValidatorIdIndex(proposerIndex), &validator); err != nil {
 			return fmt.Errorf("beacon %d: failed to retrieve validator: %v", 0, err)
 		} else if !exists {
 			return fmt.Errorf("beacon %d: validator not found", 0)
@@ -227,9 +218,11 @@ func VerifyProposers(t *Testnet, ctx context.Context, vs VerificationSlot, allow
 }
 
 func VerifyELBlockLabels(t *Testnet, ctx context.Context) error {
-	for i := 0; i < len(t.verificationExecution()); i++ {
-		el := t.verificationExecution()[i]
-		bn := t.verificationBeacons()[i]
+	runningExecution := t.VerificationNodes().ExecutionClients().Running()
+	runningBeacons := t.VerificationNodes().BeaconClients().Running()
+	for i := 0; i < len(runningExecution); i++ {
+		el := runningExecution[i]
+		bn := runningBeacons[i]
 		// Get the head
 		var headInfo eth2api.BeaconBlockHeaderAndInfo
 		if exists, err := beaconapi.BlockHeader(ctx, bn.API, eth2api.BlockHead, &headInfo); err != nil {
@@ -296,15 +289,16 @@ func VerifyELBlockLabels(t *Testnet, ctx context.Context) error {
 }
 
 func VerifyELHeads(t *Testnet, ctx context.Context) error {
-	client := ethclient.NewClient(t.verificationExecution()[0].RPC())
+	runningExecution := t.VerificationNodes().ExecutionClients().Running()
+	client := ethclient.NewClient(runningExecution[0].HiveClient.RPC())
 	head, err := client.HeaderByNumber(ctx, nil)
 	if err != nil {
 		return err
 	}
 
-	t.t.Logf("Verifying EL heads at %v", head.Hash())
-	for i, node := range t.verificationExecution() {
-		client := ethclient.NewClient(node.RPC())
+	t.Logf("Verifying EL heads at %v", head.Hash())
+	for i, node := range runningExecution {
+		client := ethclient.NewClient(node.HiveClient.RPC())
 		head2, err := client.HeaderByNumber(ctx, nil)
 		if err != nil {
 			return err

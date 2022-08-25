@@ -50,7 +50,7 @@ type EngineClient struct {
 }
 
 // NewClient creates a engine client that uses the given RPC client.
-func NewEngineClient(t *hivesim.T, n *Eth1Node, ttd *big.Int) *EngineClient {
+func NewEngineClient(t *hivesim.T, n *ExecutionClient, ttd *big.Int) *EngineClient {
 	engineRPCAddress, err := n.EngineRPCAddress()
 	if err != nil {
 		panic(err)

@@ -7,23 +7,32 @@ import (
 	"math/rand"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type BlockModifier interface {
-	ModifyUnsealedBlock(*types.Block) (*types.Block, error)
+	ModifyUnsealedBlock(consensus.ChainHeaderReader, *state.StateDB, *types.Block) (*types.Block, error)
 	ModifySealedBlock(func(*types.Header) bool, *types.Block) (*types.Block, error)
 }
 
 type PoWBlockModifier struct {
-	Difficulty           *big.Int
-	RandomStateRoot      bool
+	// Modify the difficulty of the block by a given amount, block will be correctly sealed
+	Difficulty *big.Int
+	// Increase the balance of a random account by 1 wei
+	BalanceIncrease bool
+	// Randomize the state root value
+	RandomStateRoot bool
+	// Invalidate the sealed mixHash of the block according to ethash consensus
 	InvalidSealedMixHash bool
-	InvalidSealedNonce   bool
-	TimeSecondsInFuture  uint64
+	// Invalidate the sealed nonce of the block according to ethash consensus
+	InvalidSealedNonce bool
+	// Modify the timestamp by a given amount of seconds
+	TimeSecondsInFuture uint64
 }
 
-func (m PoWBlockModifier) ModifyUnsealedBlock(baseBlock *types.Block) (*types.Block, error) {
+func (m PoWBlockModifier) ModifyUnsealedBlock(chain consensus.ChainHeaderReader, state *state.StateDB, baseBlock *types.Block) (*types.Block, error) {
 	modifiedHeader := types.CopyHeader(baseBlock.Header())
 
 	if m.Difficulty != nil {
@@ -34,6 +43,12 @@ func (m PoWBlockModifier) ModifyUnsealedBlock(baseBlock *types.Block) (*types.Bl
 	}
 	if m.TimeSecondsInFuture > 0 {
 		modifiedHeader.Time += m.TimeSecondsInFuture
+	}
+	if m.BalanceIncrease {
+		var acc common.Address
+		rand.Read(acc[:])
+		state.AddBalance(acc, common.Big1)
+		modifiedHeader.Root = state.IntermediateRoot(chain.Config().IsEIP158(modifiedHeader.Number))
 	}
 
 	modifiedBlock := types.NewBlockWithHeader(modifiedHeader)
