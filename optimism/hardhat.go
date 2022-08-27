@@ -268,13 +268,17 @@ func (d *Devnet) DeployL1Hardhat() {
 	execInfo = d.RunScript("deployments", "deployments.sh")
 	var hhDeployments HardhatDeploymentsL1
 	if err := json.Unmarshal([]byte(execInfo.Stdout), &hhDeployments); err != nil {
-		d.T.Fatalf("failed to decode hardhat deployments")
+		d.T.Fatalf("failed to decode hardhat deployments: %v", err)
 	}
 	d.Deployments.DeploymentsL1 = DeploymentsL1{
 		L1CrossDomainMessengerProxy: hhDeployments.L1CrossDomainMessengerProxy.Address,
 		L1StandardBridgeProxy:       hhDeployments.L1StandardBridgeProxy.Address,
 		L2OutputOracleProxy:         hhDeployments.L2OutputOracleProxy.Address,
 		OptimismPortalProxy:         hhDeployments.OptimismPortalProxy.Address,
+		L1CrossDomainMessenger:      hhDeployments.L1CrossDomainMessenger.Address,
+		L1StandardBridge:            hhDeployments.L1StandardBridge.Address,
+		L2OutputOracle:              hhDeployments.L2OutputOracle.Address,
+		OptimismPortal:              hhDeployments.OptimismPortal.Address,
 	}
 	d.T.Log("deployed L1 contracts with hardhat")
 	return

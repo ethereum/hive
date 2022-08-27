@@ -3,14 +3,15 @@ module github.com/ethereum/hive/optimism
 go 1.18
 
 require (
-	github.com/ethereum-optimism/optimism/op-batcher v0.4.0
-	github.com/ethereum-optimism/optimism/op-bindings v0.4.0
-	github.com/ethereum-optimism/optimism/op-node v0.4.0
-	github.com/ethereum-optimism/optimism/op-proposer v0.4.0
+	github.com/ethereum-optimism/optimism/op-batcher v0.6.0
+	github.com/ethereum-optimism/optimism/op-bindings v0.6.0
+	github.com/ethereum-optimism/optimism/op-node v0.6.0
+	github.com/ethereum-optimism/optimism/op-proposer v0.6.0
 	github.com/ethereum/go-ethereum v1.10.21
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/miguelmota/go-ethereum-hdwallet v0.1.1
 	github.com/stretchr/testify v1.8.0
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
 )
 
 require (
@@ -31,7 +32,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/ethereum-optimism/optimism/op-service v0.4.0 // indirect
+	github.com/ethereum-optimism/optimism/op-service v0.5.0 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
@@ -134,7 +135,6 @@ require (
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/net v0.0.0-20220805013720-a33c5aa5df48 // indirect
-	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4 // indirect
 	golang.org/x/sys v0.0.0-20220808155132-1c4a2a72c664 // indirect
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035 // indirect
 	golang.org/x/tools v0.1.12 // indirect

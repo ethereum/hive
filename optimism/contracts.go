@@ -46,12 +46,12 @@ type HardhatDeployment struct {
 		Status            int    `json:"status"`
 		Byzantium         bool   `json:"byzantium"`
 	} `json:"receipt"`
-	Args             []string `json:"args"`
-	NumDeployments   int      `json:"numDeployments"`
-	SolcInputHash    string   `json:"solcInputHash"`
-	Metadata         string   `json:"metadata"`
-	Bytecode         string   `json:"bytecode"`
-	DeployedBytecode string   `json:"deployedBytecode"`
+	Args             []interface{} `json:"args"`
+	NumDeployments   int           `json:"numDeployments"`
+	SolcInputHash    string        `json:"solcInputHash"`
+	Metadata         string        `json:"metadata"`
+	Bytecode         string        `json:"bytecode"`
+	DeployedBytecode string        `json:"deployedBytecode"`
 	Devdoc           struct {
 		Version int    `json:"version"`
 		Kind    string `json:"kind"`
@@ -143,6 +143,10 @@ type HardhatDeploymentsL1 struct {
 	L1StandardBridgeProxy       HardhatDeployment `json:"L1StandardBridgeProxy"`
 	L2OutputOracleProxy         HardhatDeployment `json:"L2OutputOracleProxy"`
 	OptimismPortalProxy         HardhatDeployment `json:"OptimismPortalProxy"`
+	L1CrossDomainMessenger      HardhatDeployment `json:"L1CrossDomainMessenger"`
+	L1StandardBridge            HardhatDeployment `json:"L1StandardBridge"`
+	L2OutputOracle              HardhatDeployment `json:"L2OutputOracle"`
+	OptimismPortal              HardhatDeployment `json:"OptimismPortal"`
 }
 
 type DeploymentsL1 struct {
@@ -150,6 +154,10 @@ type DeploymentsL1 struct {
 	L1StandardBridgeProxy       common.Address
 	L2OutputOracleProxy         common.Address
 	OptimismPortalProxy         common.Address
+	L1CrossDomainMessenger      common.Address
+	L1StandardBridge            common.Address
+	L2OutputOracle              common.Address
+	OptimismPortal              common.Address
 }
 
 type DeploymentsL2 struct {

@@ -15,6 +15,13 @@ var depositTests = []*optimism.TestSpec{
 	},
 }
 
+var withdrawalTests = []*optimism.TestSpec{
+	{
+		Name: "simple withdrawal",
+		Run:  simpleWithdrawalTest,
+	},
+}
+
 func main() {
 	suite := hivesim.Suite{
 		Name: "optimism l1ops",
@@ -27,6 +34,11 @@ Tests deposits, withdrawals, and other L1-related operations against a running n
 		Name:        "deposits",
 		Description: "Tests deposits.",
 		Run:         runAllTests(depositTests),
+	})
+	suite.Add(&hivesim.TestSpec{
+		Name:        "withdrawals",
+		Description: "Tests withdrawals.",
+		Run:         runAllTests(withdrawalTests),
 	})
 
 	sim := hivesim.New()

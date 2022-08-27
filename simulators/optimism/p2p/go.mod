@@ -9,8 +9,8 @@ replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.co
 replace github.com/ethereum/hive/optimism v0.0.0 => github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c
 
 require (
-	github.com/ethereum-optimism/optimism/op-node v0.5.0
-	github.com/ethereum-optimism/optimism/op-proposer v0.5.0
+	github.com/ethereum-optimism/optimism/op-node v0.6.0
+	github.com/ethereum-optimism/optimism/op-proposer v0.6.0
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/ethereum/hive/optimism v0.0.0
 	github.com/stretchr/testify v1.8.0
@@ -35,8 +35,8 @@ require (
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/ethereum-optimism/optimism/op-batcher v0.4.0 // indirect
-	github.com/ethereum-optimism/optimism/op-bindings v0.4.0 // indirect
-	github.com/ethereum-optimism/optimism/op-service v0.4.0 // indirect
+	github.com/ethereum-optimism/optimism/op-bindings v0.6.0 // indirect
+	github.com/ethereum-optimism/optimism/op-service v0.5.0 // indirect
 	github.com/ethereum/go-ethereum v1.10.21 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
 	github.com/flynn/noise v1.0.0 // indirect
