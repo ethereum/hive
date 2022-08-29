@@ -81,15 +81,17 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec) {
 		if currentTest.DisableMining {
 			delete(newParams, "HIVE_MINER")
 		}
-		suite.Add(hivesim.ClientTestSpec{
+		suite.Add(hivesim.TestSpec{
 			Name:        currentTest.Name,
 			Description: currentTest.About,
-			Parameters:  newParams,
-			Files:       testFiles,
-			Run: func(t *hivesim.T, c *hivesim.Client) {
-				t.Logf("Start test (%s): %s", c.Type, currentTest.Name)
+			Run: func(t *hivesim.T) {
+				testClientTypes, err := t.Sim.ClientTypes()
+				if err != nil {
+					t.Fatalf("No client types")
+				}
+				t.Logf("Start test (%s): %s", testClientTypes[0].Name, currentTest.Name)
 				defer func() {
-					t.Logf("End test (%s): %s", c.Type, currentTest.Name)
+					t.Logf("End test (%s): %s", testClientTypes[0].Name, currentTest.Name)
 				}()
 				timeout := globals.DefaultTestCaseTimeout
 				// If a test.Spec specifies a timeout, use that instead
@@ -97,7 +99,7 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec) {
 					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
 				}
 				// Run the test case
-				test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, newParams, testFiles, currentTest.TestTransactionType, currentTest.SafeSlotsToImportOptimistically)
+				test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, currentTest.Run, newParams, testFiles, currentTest.TestTransactionType, currentTest.SafeSlotsToImportOptimistically)
 			},
 		})
 	}

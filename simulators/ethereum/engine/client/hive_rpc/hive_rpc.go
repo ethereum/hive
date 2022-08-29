@@ -147,6 +147,7 @@ type HiveRPCEngineClient struct {
 	h              *hivesim.Client
 	c              *rpc.Client
 	cEth           *rpc.Client
+	clientType     string
 	ttd            *big.Int
 	JWTSecretBytes []byte
 
@@ -189,6 +190,14 @@ func NewHiveRPCEngineClient(h *hivesim.Client, enginePort int, ethPort int, jwtS
 
 func (ec *HiveRPCEngineClient) ID() string {
 	return ec.h.Container
+}
+
+func (ec *HiveRPCEngineClient) ClientType() string {
+	return ec.clientType
+}
+
+func (ec *HiveRPCEngineClient) RPC() *rpc.Client {
+	return ec.c
 }
 
 func (ec *HiveRPCEngineClient) EnodeURL() (string, error) {

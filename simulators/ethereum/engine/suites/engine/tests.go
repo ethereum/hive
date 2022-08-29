@@ -9,7 +9,6 @@ import (
 
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
-	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/node"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -1697,10 +1696,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 
 		if syncing {
 			// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
-			secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-			}
+			secondaryClient := t.StartNextClient(t.ClientParams, t.ClientFiles)
 			t.CLMock.AddEngineClient(secondaryClient)
 		}
 
@@ -3168,10 +3164,7 @@ func inOrderPayloads(t *test.Env) {
 	r.ExpectBalanceEqual(expectedBalance)
 
 	// Start a second client to send newPayload consecutively without fcU
-	secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
-	}
+	secondaryClient := t.StartNextClient(t.ClientParams, t.ClientFiles)
 	secondaryTestEngineClient := test.NewTestEngineClient(t, secondaryClient)
 
 	// Send the forkchoiceUpdated with the LatestExecutedPayload hash, we should get SYNCING back
@@ -3219,12 +3212,7 @@ func validPayloadFcUSyncingClient(t *test.Env) {
 	)
 	{
 		// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
-		var err error
-		secondaryClient, err = hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-
-		if err != nil {
-			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-		}
+		secondaryClient = t.StartNextClient(t.ClientParams, t.ClientFiles)
 		t.CLMock.AddEngineClient(secondaryClient)
 	}
 
@@ -3304,11 +3292,7 @@ func missingFcu(t *test.Env) {
 
 	var secondaryEngineTest *test.TestEngineClient
 	{
-		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-
-		if err != nil {
-			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-		}
+		secondaryEngine := t.StartNextClient(t.ClientParams, t.ClientFiles)
 		secondaryEngineTest = test.NewTestEngineClient(t, secondaryEngine)
 		t.CLMock.AddEngineClient(secondaryEngine)
 	}
@@ -3345,11 +3329,7 @@ func missingFcu(t *test.Env) {
 // P <- INV_P, newPayload(INV_P), fcU(head: P, payloadAttributes: attrs) + getPayload(…)
 func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 	// Add a second client to build the invalid payload
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-	}
+	secondaryEngine := t.StartNextClient(t.ClientParams, t.ClientFiles)
 	secondaryEngineTest := test.NewTestEngineClient(t, secondaryEngine)
 	t.CLMock.AddEngineClient(secondaryEngine)
 
@@ -3368,7 +3348,10 @@ func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 			if t.CLMock.NextBlockProducer == invalidPayloadProducer.Engine {
 				invalidPayloadProducer = secondaryEngineTest
 			}
-			var inv_p *api.ExecutableDataV1
+			var (
+				inv_p *api.ExecutableDataV1
+				err   error
+			)
 
 			{
 				// Get a payload from the invalid payload producer and invalidate it
@@ -3586,7 +3569,7 @@ func prevRandaoOpcodeTx(t *test.Env) {
 			expectedPrevRandao := t.CLMock.PrevRandaoHistory[t.CLMock.LatestHeader.Number.Uint64()+1]
 			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 			defer cancel()
-			if err := helper.DebugPrevRandaoTransaction(ctx, t.Client.RPC(), t.Client.Type, txs[currentTxIndex-1],
+			if err := helper.DebugPrevRandaoTransaction(ctx, t.Engine.RPC(), t.Engine.ClientType(), txs[currentTxIndex-1],
 				&expectedPrevRandao); err != nil {
 				t.Fatalf("FAIL (%s): Error during transaction tracing: %v", t.TestName, err)
 			}

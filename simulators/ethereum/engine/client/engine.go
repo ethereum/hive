@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type Eth interface {
@@ -38,8 +39,10 @@ type Engine interface {
 type EngineClient interface {
 	// General Methods
 	ID() string
+	ClientType() string
 	Close() error
 	EnodeURL() (string, error)
+	RPC() *rpc.Client
 
 	// Local Test Account Management
 	GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error)

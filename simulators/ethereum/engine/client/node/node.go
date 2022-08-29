@@ -836,6 +836,14 @@ func (n *GethNode) ID() string {
 	return n.node.Config().Name
 }
 
+func (n *GethNode) ClientType() string {
+	return n.node.Config().Name
+}
+
+func (n *GethNode) RPC() *rpc.Client {
+	return nil
+}
+
 func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
 	// First get the current head of the client where we will send the tx
 	head, err := n.eth.APIBackend.BlockByNumber(testCtx, LatestBlockNumber)
