@@ -2,6 +2,7 @@ package helper
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,6 +18,8 @@ import (
 	"os"
 
 	api "github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 
@@ -350,13 +353,13 @@ func MakeTransaction(nonce uint64, recipient *common.Address, gasLimit uint64, a
 			Data:     payload,
 		}
 	case types.DynamicFeeTxType:
-		gasFeeCap := new(big.Int).Set(globals.GasPrice)
-		gasTipCap := new(big.Int).Set(globals.GasTipPrice)
+		gasFeeCap := new(big.Int).Set(globals.GasFeeCap)
+		gasTipCap := new(big.Int).Set(globals.GasTipCap)
 		newTxData = &types.DynamicFeeTx{
 			Nonce:     nonce,
 			Gas:       gasLimit,
-			GasTipCap: gasTipCap,
 			GasFeeCap: gasFeeCap,
+			GasTipCap: gasTipCap,
 			To:        recipient,
 			Value:     amount,
 			Data:      payload,
@@ -371,6 +374,37 @@ func MakeTransaction(nonce uint64, recipient *common.Address, gasLimit uint64, a
 	return signedTx, nil
 }
 
+func MakeContractTransaction(nonce uint64, gasLimit uint64, amount *big.Int, contractCode []byte, txType TestTransactionType) (common.Address, *types.Transaction, error) {
+	// Create a contract based on the contract code without any specialized initialization
+	var initCode []byte
+	if len(contractCode) > 32 {
+		return common.Address{}, nil, fmt.Errorf("contract too big")
+	} else {
+		// Push the entire contract code onto the stack and init from there
+		initCode = []byte{ // Push contract code onto stack
+			byte(vm.PUSH1) + byte(len(contractCode)-1)}
+		initCode = append(initCode, contractCode...)
+		initCode = append(initCode, []byte{
+			byte(vm.PUSH1), 0x0, // memory start on stack
+			byte(vm.MSTORE),
+			byte(vm.PUSH1), byte(len(contractCode)), // size
+			byte(vm.PUSH1), byte(32 - len(contractCode)), // offset
+			byte(vm.RETURN),
+		}...)
+	}
+
+	contractAddress := crypto.CreateAddress(globals.VaultAccountAddress, nonce)
+	tx, err := MakeTransaction(nonce, nil, gasLimit, amount, initCode, txType)
+	return contractAddress, tx, err
+}
+
+// Determines if the error we got from sending the raw tx is because the client
+// already knew the tx (might happen if we produced a re-org where the tx was
+// unwind back into the txpool)
+func SentTxAlreadyKnown(err error) bool {
+	return strings.Contains(err.Error(), "already known")
+}
+
 func SendNextTransaction(testCtx context.Context, node client.EngineClient, recipient common.Address, amount *big.Int, payload []byte, txType TestTransactionType) (*types.Transaction, error) {
 	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
 	if err != nil {
@@ -382,6 +416,8 @@ func SendNextTransaction(testCtx context.Context, node client.EngineClient, reci
 		defer cancel()
 		err := node.SendTransaction(ctx, tx)
 		if err == nil {
+			return tx, nil
+		} else if SentTxAlreadyKnown(err) {
 			return tx, nil
 		}
 		select {

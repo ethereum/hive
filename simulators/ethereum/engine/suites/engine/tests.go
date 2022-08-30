@@ -1,6 +1,7 @@
 package suite_engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"math/big"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 // Execution specification reference:
@@ -1190,6 +1192,11 @@ var Tests = []test.Spec{
 		Run:                 prevRandaoOpcodeTx,
 		TTD:                 10,
 		TestTransactionType: helper.DynamicFeeTxOnly,
+	},
+	{
+		Name:           "High PrevRandao Transaction Count (Payload Cross-Check)",
+		Run:            highTxPrevRandaoOpcodeTx,
+		TimeoutSeconds: 400,
 	},
 }
 
@@ -3585,5 +3592,103 @@ func prevRandaoOpcodeTx(t *test.Env) {
 	for i := ttdBlockNumber + 1; i <= lastBlockNumber; i++ {
 		checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[i], i)
 	}
+
+}
+
+// Multi-client High Transaction Count PrevRandao
+func highTxPrevRandaoOpcodeTx(t *test.Env) {
+	// Wait for TTD to be reached
+	t.CLMock.WaitForTTD()
+
+	// Start a secondary client to cross check payloads
+	secondaryClient := t.StartNextClient(t.ClientParams, t.ClientFiles, t.Engine)
+	t.CLMock.AddEngineClient(secondaryClient)
+
+	// Create a smart contract that puts something in the log bloom
+	contractCode := []byte{
+		// Launch an event with the prevRandao as topic
+		byte(vm.DIFFICULTY), // topic0
+		byte(vm.PUSH1), 0x0, // length
+		byte(vm.PUSH1), 0x0, // offset
+		byte(vm.LOG1), // log1
+		// Also store prevrandao to storage
+		byte(vm.DIFFICULTY), // value
+		byte(vm.NUMBER),     // key
+		byte(vm.SSTORE),     // Set slot[block.Number]=prevRandao
+	}
+
+	var (
+		nonce                   = uint64(0)
+		blockCount              = 128
+		MaxTransactionsPerBlock = 100
+		totalTxsIncluded        = 0
+		contractAddress         common.Address
+	)
+
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			var (
+				tx  *types.Transaction
+				err error
+			)
+			contractAddress, tx, err = helper.MakeContractTransaction(nonce, 75000, big0, contractCode, t.TestTransactionType)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to create contract transaction: %v", t.TestName, err)
+			}
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			err = t.Engine.SendTransaction(ctx, tx)
+			if err != nil && !helper.SentTxAlreadyKnown(err) {
+				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+			}
+			nonce++
+		},
+	})
+	ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+	defer cancel()
+	code, err := t.Engine.CodeAt(ctx, contractAddress, nil)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to get contract code: %v", t.TestName, err)
+	}
+	if bytes.Compare(code, contractCode) != 0 {
+		t.Fatalf("FAIL (%s): Contract not set correctly: %s", t.TestName, common.Bytes2Hex(code))
+	}
+
+	t.CLMock.ProduceBlocks(blockCount, clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			// Limit the number of transactions per block to limit the basefee
+			blockTxCount := MaxTransactionsPerBlock
+			if (t.CLMock.LatestExecutedPayload.Number % 2) == 0 {
+				blockTxCount /= 2
+			}
+			for i := 0; i < blockTxCount; i++ {
+				tx, _ := helper.MakeTransaction(nonce, &contractAddress, 75000, big0, nil, t.TestTransactionType)
+				// Send transaction to both clients
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				err := t.Engine.SendTransaction(ctx, tx)
+				if err != nil && !helper.SentTxAlreadyKnown(err) {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
+				ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				err = secondaryClient.SendTransaction(ctx, tx)
+				if err != nil && !helper.SentTxAlreadyKnown(err) {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
+				nonce++
+			}
+		},
+		OnForkchoiceBroadcast: func() {
+			// Verify the payload built contained transactions
+			if len(t.CLMock.LatestPayloadBuilt.Transactions) == 0 {
+				t.Fatalf("FAIL (%s): Payload %d contained no transactions", t.TestName, t.CLMock.LatestPayloadBuilt.Number)
+			}
+			t.Logf("INFO (%s): Transactions in payload %d (Producer %s): %d", t.TestName, t.CLMock.LatestPayloadBuilt.Number, t.CLMock.NextBlockProducer.ID(), len(t.CLMock.LatestPayloadBuilt.Transactions))
+			totalTxsIncluded += len(t.CLMock.LatestPayloadBuilt.Transactions)
+			t.Logf("INFO (%s): Total Transactions Included: %d", t.TestName, totalTxsIncluded)
+			t.Logf("INFO (%s): Total Transactions Sent: %d", t.TestName, nonce+1)
+		},
+	})
 
 }
