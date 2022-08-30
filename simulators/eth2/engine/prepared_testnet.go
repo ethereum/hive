@@ -282,12 +282,16 @@ func (p *PreparedTestnet) prepareBeaconNode(testnet *Testnet, beaconDef *hivesim
 			"HIVE_ETH2_BEACON_NODE_INDEX":     fmt.Sprintf("%d", beaconIndex),
 		})
 
-		bootnodeENRs, err := testnet.BeaconClients().Running().ENRs()
-		if err != nil {
+		if bootnodeENRs, err := testnet.BeaconClients().Running().ENRs(); err != nil {
 			return nil, fmt.Errorf("failed to get ENR as bootnode for every beacon node: %v", err)
-		}
-		if bootnodeENRs != "" {
+		} else if bootnodeENRs != "" {
 			opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENRs})
+		}
+
+		if staticPeers, err := testnet.BeaconClients().Running().P2PAddrs(); err != nil {
+			return nil, fmt.Errorf("failed to get p2paddr for every beacon node: %v", err)
+		} else if staticPeers != "" {
+			opts = append(opts, hivesim.Params{"HIVE_ETH2_STATIC_PEERS": staticPeers})
 		}
 
 		if ttd != nil {
