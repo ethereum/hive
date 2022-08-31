@@ -21,7 +21,6 @@ var (
 		"HIVE_FORK_TANGERINE": "0",
 		"HIVE_FORK_SPURIOUS":  "0",
 		"HIVE_FORK_BYZANTIUM": "0",
-		"HIVE_NODETYPE":       "",
 	}
 	sourceFiles = map[string]string{
 		"genesis.json": "./simplechain/genesis.json",
@@ -29,6 +28,13 @@ var (
 	}
 	sinkFiles = map[string]string{
 		"genesis.json": "./simplechain/genesis.json",
+	}
+	nodeTypes = []string{
+		"archive",
+		"full",
+		"light",
+		"snap",
+		"", // Default node type
 	}
 )
 
@@ -43,14 +49,18 @@ func main() {
 		Description: `This suite of tests verifies that clients can sync from each other in different modes.
 For each client, we test if it can serve as a sync source for all other clients (including itself).`,
 	}
-	suite.Add(hivesim.ClientTestSpec{
-		Role:        "eth1",
-		Name:        "CLIENT as sync source",
-		Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
-		Parameters:  params,
-		Files:       sourceFiles,
-		Run:         runSourceTest,
-	})
+	for _, nodeType := range nodeTypes {
+		newParams := params.Set("HIVE_NODETYPE", nodeType)
+		suite.Add(hivesim.ClientTestSpec{
+			Role:        "eth1",
+			Name:        fmt.Sprintf("CLIENT as sync source, syncmode %v", nodeType),
+			Description: "This loads the test chain into the client and verifies whether it was imported correctly.",
+			Parameters:  newParams,
+			Files:       sourceFiles,
+			Run:         runSourceTest,
+		})
+	}
+
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
