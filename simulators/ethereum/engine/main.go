@@ -44,9 +44,9 @@ func main() {
 
 	simulator := hivesim.New()
 
-	addTestsToSuite(&engine, suite_engine.Tests)
-	addTestsToSuite(&transition, suite_transition.Tests)
-	addTestsToSuite(&auth, suite_auth.Tests)
+	addTestsToSuite(&engine, suite_engine.Tests, "full")
+	addTestsToSuite(&transition, suite_transition.Tests, "full")
+	addTestsToSuite(&auth, suite_auth.Tests, "full")
 	suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 
 	// Mark suites for execution
@@ -57,7 +57,7 @@ func main() {
 }
 
 // Add test cases to a given test suite
-func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec) {
+func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec, nodeType string) {
 	for _, currentTest := range tests {
 		currentTest := currentTest
 		genesisPath := "./init/genesis.json"
@@ -69,6 +69,9 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec) {
 		// Calculate and set the TTD for this test
 		ttd := helper.CalculateRealTTD(genesisPath, currentTest.TTD)
 		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+		if nodeType != "" {
+			newParams = newParams.Set("HIVE_NODETYPE", nodeType)
+		}
 		if currentTest.ChainFile != "" {
 			// We are using a Proof of Work chain file, remove all clique-related settings
 			// TODO: Nethermind still requires HIVE_MINER for the Engine API
