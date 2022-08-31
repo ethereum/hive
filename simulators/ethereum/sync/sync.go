@@ -21,7 +21,7 @@ var (
 		"HIVE_FORK_TANGERINE": "0",
 		"HIVE_FORK_SPURIOUS":  "0",
 		"HIVE_FORK_BYZANTIUM": "0",
-		"HIVE_NODETYPE":       "full",
+		"HIVE_NODETYPE":       "",
 	}
 	sourceFiles = map[string]string{
 		"genesis.json": "./simplechain/genesis.json",
