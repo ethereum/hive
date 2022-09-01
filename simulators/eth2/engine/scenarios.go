@@ -148,9 +148,9 @@ func BlockLatestSafeFinalized(t *hivesim.T, env *testEnv, n node) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := testnet.WaitForFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+1))
+	_, err := testnet.WaitForExecutionFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+2))
 	if err != nil {
-		t.Fatalf("FAIL: Waiting for finality: %v", err)
+		t.Fatalf("FAIL: Waiting for execution finality: %v", err)
 	}
 	if err := VerifyELBlockLabels(testnet, ctx); err != nil {
 		t.Fatalf("FAIL: Verifying EL block labels: %v", err)
