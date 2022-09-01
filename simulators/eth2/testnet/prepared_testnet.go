@@ -214,6 +214,18 @@ func (p *PreparedTestnet) startBeaconNode(testnet *Testnet, beaconDef *hivesim.C
 		opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENR})
 	}
 
+	if len(testnet.beacons) > 0 {
+		var staticPeers []string
+		for _, bn := range testnet.beacons {
+			staticPeer, err := bn.P2PAddr()
+			if err != nil {
+				testnet.t.Fatalf("failed to get multiaddr for beacon node: %v", err)
+			}
+			staticPeers = append(staticPeers, staticPeer)
+		}
+		opts = append(opts, hivesim.Params{"HIVE_ETH2_STATIC_PEERS": strings.Join(staticPeers, ",")})
+	}
+
 	// TODO
 	//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
 	//	opts = append(opts, hivesim.WithBuildTarget(p.configName))

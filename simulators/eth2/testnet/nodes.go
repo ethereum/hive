@@ -75,6 +75,15 @@ func (bn *BeaconNode) ENR() (string, error) {
 	return out.ENR, nil
 }
 
+func (bn *BeaconNode) P2PAddr() (string, error) {
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+	var out eth2api.NetworkIdentity
+	if err := nodeapi.Identity(ctx, bn.API, &out); err != nil {
+		return "", err
+	}
+	return out.P2PAddresses[0], nil
+}
+
 func (bn *BeaconNode) EnodeURL() (string, error) {
 	return "", errors.New("beacon node does not have an discv4 Enode URL, use ENR or multi-address instead")
 }

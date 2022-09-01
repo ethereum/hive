@@ -230,6 +230,15 @@ func (bn *BeaconClient) ENR() (string, error) {
 	return out.ENR, nil
 }
 
+func (bn *BeaconClient) P2PAddr() (string, error) {
+	ctx, _ := context.WithTimeout(context.Background(), time.Second*10)
+	var out eth2api.NetworkIdentity
+	if err := nodeapi.Identity(ctx, bn.API, &out); err != nil {
+		return "", err
+	}
+	return out.P2PAddresses[0], nil
+}
+
 func (bn *BeaconClient) EnodeURL() (string, error) {
 	return "", errors.New("beacon node does not have an discv4 Enode URL, use ENR or multi-address instead")
 }
@@ -263,6 +272,24 @@ func (beacons BeaconClients) ENRs() (string, error) {
 		}
 	}
 	return strings.Join(enrs, ","), nil
+}
+
+// Returns comma-separated P2PAddr of all running beacon nodes
+func (beacons BeaconClients) P2PAddrs() (string, error) {
+	if len(beacons) == 0 {
+		return "", nil
+	}
+	staticPeers := make([]string, 0)
+	for _, bn := range beacons {
+		if bn.IsRunning() {
+			p2p, err := bn.P2PAddr()
+			if err != nil {
+				return "", err
+			}
+			staticPeers = append(staticPeers, p2p)
+		}
+	}
+	return strings.Join(staticPeers, ","), nil
 }
 
 func (b *BeaconClient) PrintAllBeaconBlocks(ctx context.Context) error {
