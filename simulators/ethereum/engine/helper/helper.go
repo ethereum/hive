@@ -66,26 +66,38 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	return &respCopy, nil
 }
 
-type InvalidPayloadBlockField string
+type InvalidityType string
 
 const (
-	InvalidParentHash             InvalidPayloadBlockField = "ParentHash"
-	InvalidStateRoot                                       = "StateRoot"
-	InvalidReceiptsRoot                                    = "ReceiptsRoot"
-	InvalidNumber                                          = "Number"
-	InvalidGasLimit                                        = "GasLimit"
-	InvalidGasUsed                                         = "GasUsed"
-	InvalidTimestamp                                       = "Timestamp"
-	InvalidPrevRandao                                      = "PrevRandao"
-	InvalidOmmers                                          = "Ommers"
-	RemoveTransaction                                      = "Incomplete Transactions"
-	InvalidTransactionSignature                            = "Transaction Signature"
-	InvalidTransactionNonce                                = "Transaction Nonce"
-	InvalidTransactionGas                                  = "Transaction Gas"
-	InvalidTransactionGasPrice                             = "Transaction GasPrice"
-	InvalidTransactionGasTipPrice                          = "Transaction GasTipCapPrice"
-	InvalidTransactionValue                                = "Transaction Value"
-	InvalidTransactionChainID                              = "Transaction ChainID"
+	InvalidParentHash             InvalidityType = "ParentHash"
+	InvalidStateRoot                             = "StateRoot"
+	InvalidReceiptsRoot                          = "ReceiptsRoot"
+	InvalidNumber                                = "Number"
+	InvalidGasLimit                              = "GasLimit"
+	InvalidGasUsed                               = "GasUsed"
+	InvalidTimestamp                             = "Timestamp"
+	InvalidPrevRandao                            = "PrevRandao"
+	InvalidOmmers                                = "Ommers"
+	RemoveTransaction                            = "Incomplete Transactions"
+	InvalidTransactionSignature                  = "Transaction Signature"
+	InvalidTransactionNonce                      = "Transaction Nonce"
+	InvalidTransactionGas                        = "Transaction Gas"
+	InvalidTransactionGasPrice                   = "Transaction GasPrice"
+	InvalidTransactionGasTipPrice                = "Transaction GasTipCapPrice"
+	InvalidTransactionValue                      = "Transaction Value"
+	InvalidTransactionChainID                    = "Transaction ChainID"
+)
+
+var (
+	AllTransactionInvalidityTypes = []InvalidityType{
+		InvalidTransactionSignature,
+		InvalidTransactionNonce,
+		InvalidTransactionGas,
+		InvalidTransactionGasPrice,
+		InvalidTransactionGasTipPrice,
+		InvalidTransactionValue,
+		InvalidTransactionChainID,
+	}
 )
 
 func TransactionInPayload(payload *api.ExecutableDataV1, tx *types.Transaction) bool {

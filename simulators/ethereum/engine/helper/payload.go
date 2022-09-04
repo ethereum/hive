@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -165,7 +164,7 @@ func (customData *CustomPayloadData) String() string {
 
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
 // One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
-func GenerateInvalidPayload(basePayload *api.ExecutableDataV1, payloadField InvalidPayloadBlockField) (*api.ExecutableDataV1, error) {
+func GenerateInvalidPayload(basePayload *api.ExecutableDataV1, payloadField InvalidityType) (*api.ExecutableDataV1, error) {
 
 	var customPayloadMod *CustomPayloadData
 	switch payloadField {
@@ -231,38 +230,13 @@ func GenerateInvalidPayload(basePayload *api.ExecutableDataV1, payloadField Inva
 		if len(basePayload.Transactions) == 0 {
 			return nil, fmt.Errorf("No transactions available for modification")
 		}
+
 		var baseTx types.Transaction
 		if err := baseTx.UnmarshalBinary(basePayload.Transactions[0]); err != nil {
 			return nil, err
 		}
-		var customTxData CustomTransactionData
-		switch payloadField {
-		case InvalidTransactionSignature:
-			modifiedSignature := SignatureValuesFromRaw(baseTx.RawSignatureValues())
-			modifiedSignature.R = modifiedSignature.R.Sub(modifiedSignature.R, common.Big1)
-			customTxData.Signature = &modifiedSignature
-		case InvalidTransactionNonce:
-			customNonce := baseTx.Nonce() - 1
-			customTxData.Nonce = &customNonce
-		case InvalidTransactionGas:
-			customGas := uint64(0)
-			customTxData.Gas = &customGas
-		case InvalidTransactionGasPrice:
-			customTxData.GasPriceOrGasFeeCap = common.Big0
-		case InvalidTransactionGasTipPrice:
-			invalidGasTip := new(big.Int).Set(globals.GasTipPrice)
-			invalidGasTip.Mul(invalidGasTip, big.NewInt(2))
-			customTxData.GasTipCap = invalidGasTip
-		case InvalidTransactionValue:
-			// Vault account initially has 0x123450000000000000000, so this value should overflow
-			customTxData.Value, _ = hexutil.DecodeBig("0x123450000000000000001")
-		case InvalidTransactionChainID:
-			customChainID := new(big.Int).Set(globals.ChainID)
-			customChainID.Add(customChainID, common.Big1)
-			customTxData.ChainID = customChainID
-		}
 
-		modifiedTx, err := customizeTransaction(&baseTx, globals.VaultKey, &customTxData)
+		modifiedTx, err := InvalidateTransaction(&baseTx, globals.VaultKey, payloadField)
 		if err != nil {
 			return nil, err
 		}

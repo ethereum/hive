@@ -1051,6 +1051,11 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 
+	{
+		Name: "Invalid Transaction on Payload Build",
+		Run:  invalidTxInPayloadBuild,
+	},
+
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{
 		Name: "latest Block after NewPayload",
@@ -1692,7 +1697,7 @@ func invalidTransitionPayload(t *test.Env) {
 }
 
 // Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
-func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syncing bool, emptyTxs bool) func(*test.Env) {
+func invalidPayloadTestCaseGen(payloadField helper.InvalidityType, syncing bool, emptyTxs bool) func(*test.Env) {
 	return func(t *test.Env) {
 
 		if syncing {
@@ -1902,7 +1907,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 // Then reveal the invalid payload and expect that the client rejects it and rejects forkchoice updated calls to this chain.
 // The invalid_index parameter determines how many payloads apart is the common ancestor from the block that invalidates the chain,
 // with a value of 1 meaning that the immediate payload after the common ancestor will be invalid.
-func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.InvalidPayloadBlockField, emptyTxs bool) func(*test.Env) {
+func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.InvalidityType, emptyTxs bool) func(*test.Env) {
 	return func(t *test.Env) {
 
 		// Wait until TTD is reached by this client
@@ -2026,7 +2031,7 @@ type InvalidMissingAncestorReOrgSpec struct {
 	// Value must be greater than 0.
 	PayloadInvalidIndex int
 	// Field of the payload to invalidate (see helper module)
-	PayloadField helper.InvalidPayloadBlockField
+	PayloadField helper.InvalidityType
 	// Whether to create payloads with empty transactions or not:
 	// Used to test scenarios where the stateRoot is invalidated but its invalidation
 	// goes unnoticed by the client because of the lack of transactions.
@@ -2359,6 +2364,93 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 		})
 
 	}
+}
+
+// Test sending invalid transactions into the transaction pool and verify they are not included in the built payload
+func invalidTxInPayloadBuild(t *test.Env) {
+	// Wait until this client catches up with latest PoS Block
+	t.CLMock.WaitForTTD()
+
+	// Generate the base valid transaction
+	validNonce, err := t.Engine.GetNextAccountNonce(t.TimeoutContext, globals.VaultAccountAddress)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to get main account nonce: %v", t.TestName, err)
+	}
+	txLegacy, err := helper.MakeTransaction(validNonce, &globals.PrevRandaoContractAddr, 75000, big1, nil, helper.LegacyTxOnly)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to get base legacy transaction: %v", t.TestName, err)
+	}
+	data, _ := txLegacy.MarshalBinary()
+	t.Logf("INFO (%s): txLegacy: %x", t.TestName, data)
+
+	txLondon, err := helper.MakeTransaction(validNonce, &globals.PrevRandaoContractAddr, 75000, big1, nil, helper.DynamicFeeTxOnly)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to get base london transaction: %v", t.TestName, err)
+	}
+
+	var (
+		baseTransactions = []*types.Transaction{
+			txLegacy,
+			txLondon,
+		}
+	)
+
+	// Send a invalid transactions
+	type InvTransaction struct {
+		Invalidity  string
+		Transaction *types.Transaction
+	}
+
+	// Try to create a payload with the invalid transaction, verify that the transaction is not included
+	for _, baseTransaction := range baseTransactions {
+		for _, invalidityType := range helper.AllTransactionInvalidityTypes {
+			t.Logf("INFO (%s): Tx type %d, invalidity type %s", t.TestName, baseTransaction.Type(), invalidityType)
+			if baseTransaction.Type() == types.LegacyTxType && invalidityType == "Transaction GasTipCapPrice" {
+				continue
+			}
+			invalidTransaction, err := helper.InvalidateTransaction(baseTransaction, globals.VaultKey, invalidityType)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Unable to generate invalid tx (%s): %v", t.TestName, invalidityType, err)
+			}
+			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+				OnPayloadProducerSelected: func() {
+					// Send the invalid payload
+					ctx, cancel := context.WithTimeout(t.TimeoutContext, globals.RPCTimeout)
+					defer cancel()
+					// We ignore the error because the transaction could be discarded rightaway
+					t.Engine.SendTransaction(ctx, invalidTransaction)
+				},
+				OnNewPayloadBroadcast: func() {
+					// Verify that the produced payload does not include the invalid transaction
+					if helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, invalidTransaction) {
+						t.Fatalf("FAIL (%s): Invalid transaction included in payload (%s): %v", t.TestName, invalidityType, t.CLMock.LatestPayloadBuilt)
+					}
+					if len(t.CLMock.LatestPayloadBuilt.Transactions) > 0 {
+						t.Fatalf("FAIL (%s): Payload contains transactions but no valid transactions have been produced: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
+					}
+				},
+			})
+		}
+	}
+
+	data, _ = txLegacy.MarshalBinary()
+	t.Logf("INFO (%s): txLegacy after: %x", t.TestName, data)
+	// Lastly send the base transaction and verify it is included
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			// Send the invalid payload
+			ctx, cancel := context.WithTimeout(t.TimeoutContext, globals.RPCTimeout)
+			defer cancel()
+			// We ignore the error because the transaction could be discarded rightaway
+			t.Engine.SendTransaction(ctx, txLegacy)
+		},
+		OnNewPayloadBroadcast: func() {
+			// Verify that the produced payload does not include the invalid transaction
+			if !helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, txLegacy) {
+				t.Fatalf("FAIL (%s): Valid base transaction not included in payload: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
+			}
+		},
+	})
 }
 
 // Test to verify Block information available at the Eth RPC after NewPayload

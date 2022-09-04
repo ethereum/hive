@@ -86,7 +86,7 @@ func (m PoWBlockModifier) ModifySealedBlock(f func(*types.Header) bool, baseBloc
 	return modifiedBlock, nil
 }
 
-func GenerateInvalidPayloadBlock(baseBlock *types.Block, uncle *types.Block, payloadField InvalidPayloadBlockField) (*types.Block, error) {
+func GenerateInvalidPayloadBlock(baseBlock *types.Block, uncle *types.Block, payloadField InvalidityType) (*types.Block, error) {
 	if payloadField == InvalidOmmers {
 		if uncle == nil {
 			return nil, fmt.Errorf("No ommer provided")

@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -151,6 +152,35 @@ func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateK
 		}
 	}
 	return modifiedTx, nil
+}
+
+func InvalidateTransaction(baseTx *types.Transaction, pk *ecdsa.PrivateKey, invType InvalidityType) (*types.Transaction, error) {
+	var customTxData CustomTransactionData
+	switch invType {
+	case InvalidTransactionSignature:
+		modifiedSignature := SignatureValuesFromRaw(baseTx.RawSignatureValues())
+		modifiedSignature.R = new(big.Int).Sub(modifiedSignature.R, common.Big1)
+		customTxData.Signature = &modifiedSignature
+	case InvalidTransactionNonce:
+		customNonce := baseTx.Nonce() - 1
+		customTxData.Nonce = &customNonce
+	case InvalidTransactionGas:
+		customGas := uint64(0)
+		customTxData.Gas = &customGas
+	case InvalidTransactionGasPrice:
+		customTxData.GasPriceOrGasFeeCap = common.Big0
+	case InvalidTransactionGasTipPrice:
+		invalidGasTip, _ := hexutil.DecodeBig("0x123450000000000000001")
+		customTxData.GasTipCap = invalidGasTip
+	case InvalidTransactionValue:
+		// Vault account initially has 0x123450000000000000000, so this value should overflow
+		customTxData.Value, _ = hexutil.DecodeBig("0x123450000000000000001")
+	case InvalidTransactionChainID:
+		customChainID := new(big.Int).Set(globals.ChainID)
+		customChainID.Add(customChainID, common.Big1)
+		customTxData.ChainID = customChainID
+	}
+	return customizeTransaction(baseTx, pk, &customTxData)
 }
 
 func calcTxsHash(txsBytes [][]byte) (common.Hash, error) {
