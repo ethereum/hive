@@ -65,7 +65,10 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet
 	if err != nil {
 		t.Fatal(err)
 	}
-	execNodeOpts := hivesim.Params{"HIVE_LOGLEVEL": os.Getenv("HIVE_LOGLEVEL")}
+	execNodeOpts := hivesim.Params{
+		"HIVE_LOGLEVEL": os.Getenv("HIVE_LOGLEVEL"),
+		"HIVE_NODETYPE": "full",
+	}
 	jwtSecret := hivesim.Params{"HIVE_JWTSECRET": "true"}
 	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts, jwtSecret)
 
