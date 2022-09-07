@@ -56,7 +56,10 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	if err != nil {
 		t.Fatal(err)
 	}
-	execNodeOpts := hivesim.Params{"HIVE_LOGLEVEL": os.Getenv("HIVE_LOGLEVEL")}
+	execNodeOpts := hivesim.Params{
+		"HIVE_LOGLEVEL": os.Getenv("HIVE_LOGLEVEL"),
+		"HIVE_NODETYPE": "full",
+	}
 	executionOpts := hivesim.Bundle(eth1ConfigOpt, eth1Bundle, execNodeOpts)
 
 	// Generate beacon spec
