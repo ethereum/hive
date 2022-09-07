@@ -102,7 +102,7 @@ func TestRPCError(t *hivesim.T, env *testEnv, n node) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	finalized, err := testnet.WaitForFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+1))
+	finalized, err := testnet.WaitForExecutionFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+2))
 	if err != nil {
 		t.Fatalf("FAIL: Waiting for finality: %v", err)
 	}
