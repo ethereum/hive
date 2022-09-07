@@ -482,6 +482,59 @@ func IncorrectHeaderPrevRandaoPayload(t *hivesim.T, env *testEnv, n node) {
 	}
 }
 
+// The responses for `engine_newPayloadV1` and `engine_forkchoiceUpdatedV1` are delayed by `timeout` - 1s.
+func Timeouts(t *hivesim.T, env *testEnv, n node) {
+	var (
+		ForkchoiceUpdatedTimeoutSeconds = 8
+		NewPayloadTimeoutSeconds        = 8
+		ToleranceSeconds                = 1
+	)
+
+	config := getClientConfig(n).join(&Config{
+		Nodes: Nodes{
+			n,
+			n,
+		},
+		// Use the default mainnet slot time to allow the timeout value to make sense
+		SlotTime: big.NewInt(int64(12)),
+	})
+
+	testnet := startTestnet(t, env, config)
+	defer testnet.stopTestnet()
+
+	var (
+		delayEnabled = make(chan interface{})
+	)
+
+	// The EL mock will intercept an `engine_newPayloadV1` and `engine_forkchoiceUpdatedV1` to
+	// introduce an artificial delay which should almost max out the time limit of the beacon client.
+	gen := func(delaySeconds int) func([]byte, []byte) *proxy.Spoof {
+		return func(res []byte, req []byte) *proxy.Spoof {
+			select {
+			case <-time.After(time.Duration(delaySeconds) * time.Second):
+			case <-delayEnabled:
+			}
+			return nil
+		}
+	}
+
+	var (
+		p0 = testnet.Proxies().Running()[0]
+		p1 = testnet.Proxies().Running()[1]
+	)
+	p0.AddResponseCallback(EngineNewPayloadV1, gen(NewPayloadTimeoutSeconds-ToleranceSeconds))
+	p1.AddResponseCallback(EngineForkchoiceUpdatedV1, gen(ForkchoiceUpdatedTimeoutSeconds-ToleranceSeconds))
+
+	// Finality should be reached anyway because the time limit is not reached on the engine calls
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_, err := testnet.WaitForFinality(ctx, testnet.spec.SLOTS_PER_EPOCH*beacon.Slot(EPOCHS_TO_FINALITY+1))
+	if err != nil {
+		t.Fatalf("FAIL: Waiting for finality: %v", err)
+	}
+
+}
+
 // The payload produced by the execution client contains an invalid timestamp value.
 // This test covers scenario where the value of the timestamp is so high such that
 // the next validators' attempts to produce payloads could fail by invalid payload

@@ -28,6 +28,7 @@ var engineTests = []testSpec{
 	{Name: "syncing-with-invalid-chain", Run: SyncingWithInvalidChain},
 	{Name: "basefee-encoding-check", Run: BaseFeeEncodingCheck},
 	{Name: "invalid-quantity-fields", Run: InvalidQuantityPayloadFields},
+	{Name: "timeouts", Run: Timeouts},
 }
 var transitionTests = []testSpec{
 	// Transition (TERMINAL_TOTAL_DIFFICULTY) tests
