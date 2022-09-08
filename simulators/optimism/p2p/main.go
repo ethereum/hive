@@ -35,18 +35,12 @@ func main() {
 func runP2PTests(t *hivesim.T) {
 	d := optimism.NewDevnet(t)
 
-	d.InitContracts()
-	d.InitHardhatDeployConfig("earliest", 10, 4, 30)
-	d.InitL1Hardhat()
+	d.InitChain(10, 4, 30, nil)
 	d.AddEth1() // l1 eth1 node is required for l2 config init
 	d.WaitUpEth1(0, time.Second*10)
-	// deploy contracts
-	d.DeployL1Hardhat()
 
-	d.InitL2Hardhat(nil)
 	d.AddOpL2() // l2 engine is required for rollup config init
 	d.WaitUpOpL2Engine(0, time.Second*10)
-	d.InitRollupHardhat()
 
 	// sequencer stack, on top of first eth1 node
 	d.AddOpNode(0, 0, true)

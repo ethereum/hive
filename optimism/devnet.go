@@ -4,10 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum-optimism/optimism/op-bindings/predeploys"
+	"github.com/ethereum-optimism/optimism/op-chain-ops/genesis"
+	"github.com/ethereum-optimism/optimism/op-node/eth"
 	"github.com/ethereum-optimism/optimism/op-node/rollup"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
+	"math/big"
 	"sync"
 	"time"
 
@@ -15,6 +21,14 @@ import (
 	opnf "github.com/ethereum-optimism/optimism/op-node/flags"
 	oppf "github.com/ethereum-optimism/optimism/op-proposer/flags"
 	"github.com/ethereum/hive/hivesim"
+)
+
+var (
+	L1ChainID    = 901
+	L1ChainIDBig = big.NewInt(int64(L1ChainID))
+
+	L2ChainID    = 902
+	L2ChainIDBig = big.NewInt(int64(L2ChainID))
 )
 
 type Devnet struct {
@@ -66,24 +80,6 @@ func NewDevnet(t *hivesim.T) *Devnet {
 		L2Vault:     NewVault(t, L2ChainIDBig),
 		Addresses:   secrets.Addresses(),
 	}
-}
-
-func (d *Devnet) InitContracts(opts ...hivesim.StartOption) {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
-	if len(d.Clients.OpContracts) == 0 {
-		d.T.Fatal("no op-contracts client types found")
-		return
-	}
-	if d.Contracts != nil {
-		d.T.Fatalf("already initialized op contracts client: %v", d.Contracts)
-		return
-	}
-	clDef := d.Clients.OpContracts[0]
-	cl := d.T.StartClient(clDef.Name, opts...)
-	d.Contracts = &OpContracts{cl}
-	return
 }
 
 // AddEth1 creates a new L1 eth1 client. This requires a L1 chain config to be created previously.
@@ -340,6 +336,140 @@ func (d *Devnet) L2Client(i int) *ethclient.Client {
 	return d.GetOpL2Engine(i).EthClient()
 }
 
+func (d *Devnet) RunScript(name string, command ...string) *hivesim.ExecInfo {
+	execInfo, err := d.Contracts.Client.Exec(command...)
+	if err != nil {
+		if execInfo != nil {
+			d.T.Log(execInfo.Stdout)
+			d.T.Error(execInfo.Stderr)
+		}
+		d.T.Fatalf("failed to run %s: %v", name, err)
+		return nil
+	}
+	if execInfo.ExitCode != 0 {
+		d.T.Log(execInfo.Stdout)
+		d.T.Error(execInfo.Stderr)
+		d.T.Fatalf("script %s exit code non-zero: %d", name, execInfo.ExitCode)
+		return nil
+	}
+	return execInfo
+}
+
+func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout uint64, additionalAlloc core.GenesisAlloc) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.T.Log("creating hardhat deploy config")
+
+	config := &genesis.DeployConfig{
+		L1ChainID:   uint64(L1ChainID),
+		L2ChainID:   uint64(L2ChainID),
+		L2BlockTime: 2,
+
+		MaxSequencerDrift:      maxSeqDrift,
+		SequencerWindowSize:    seqWindowSize,
+		ChannelTimeout:         chanTimeout,
+		P2PSequencerAddress:    d.Addresses.SequencerP2P,
+		OptimismL2FeeRecipient: common.Address{0: 0x42, 19: 0xf0}, // tbd
+		BatchInboxAddress:      common.Address{0: 0x42, 19: 0xff}, // tbd
+		BatchSenderAddress:     d.Addresses.Batcher,
+
+		L2OutputOracleSubmissionInterval: 6,
+		L2OutputOracleStartingTimestamp:  -1,
+		L2OutputOracleProposer:           d.Addresses.Proposer,
+		L2OutputOracleOwner:              common.Address{}, // tbd
+
+		L1BlockTime:                 15,
+		L1GenesisBlockNonce:         0,
+		CliqueSignerAddress:         d.Addresses.CliqueSigner,
+		L1GenesisBlockTimestamp:     hexutil.Uint64(time.Now().Unix()),
+		L1GenesisBlockGasLimit:      15_000_000,
+		L1GenesisBlockDifficulty:    uint642big(1),
+		L1GenesisBlockMixHash:       common.Hash{},
+		L1GenesisBlockCoinbase:      common.Address{},
+		L1GenesisBlockNumber:        0,
+		L1GenesisBlockGasUsed:       0,
+		L1GenesisBlockParentHash:    common.Hash{},
+		L1GenesisBlockBaseFeePerGas: uint642big(1000_000_000), // 1 gwei
+
+		L2GenesisBlockNonce:         0,
+		L2GenesisBlockExtraData:     []byte{},
+		L2GenesisBlockGasLimit:      15_000_000,
+		L2GenesisBlockDifficulty:    uint642big(0),
+		L2GenesisBlockMixHash:       common.Hash{},
+		L2GenesisBlockCoinbase:      common.Address{0: 0x42, 19: 0xf0}, // matching OptimismL2FeeRecipient
+		L2GenesisBlockNumber:        0,
+		L2GenesisBlockGasUsed:       0,
+		L2GenesisBlockParentHash:    common.Hash{},
+		L2GenesisBlockBaseFeePerGas: uint642big(1000_000_000),
+
+		OptimismBaseFeeRecipient:    common.Address{0: 0x42, 19: 0xf1}, // tbd
+		OptimismL1FeeRecipient:      d.Addresses.Batcher,
+		L2CrossDomainMessengerOwner: common.Address{0: 0x42, 19: 0xf2}, // tbd
+		GasPriceOracleOwner:         common.Address{0: 0x42, 19: 0xf3}, // tbd
+		GasPriceOracleOverhead:      2100,
+		GasPriceOracleScalar:        1000_000,
+		GasPriceOracleDecimals:      6,
+		DeploymentWaitConfirmations: 1,
+	}
+
+	l1Genesis, err := genesis.BuildL1DeveloperGenesis(config)
+	if err != nil {
+		d.T.Fatalf("failed to create l1 genesis: %v", err)
+	}
+	d.L1Cfg = l1Genesis
+
+	l1Block := l1Genesis.ToBlock()
+	l2Addrs := &genesis.L2Addresses{
+		ProxyAdmin:                  predeploys.DevProxyAdminAddr,
+		L1StandardBridgeProxy:       predeploys.DevL1StandardBridgeAddr,
+		L1CrossDomainMessengerProxy: predeploys.DevL1CrossDomainMessengerAddr,
+	}
+
+	l2Genesis, err := genesis.BuildL2DeveloperGenesis(config, l1Block, l2Addrs)
+	if err != nil {
+		d.T.Fatalf("failed to create l2 genesis: %v", err)
+	}
+	d.L2Cfg = l2Genesis
+
+	for addr, alloc := range additionalAlloc {
+		d.L2Cfg.Alloc[addr] = alloc
+	}
+
+	d.RollupCfg = &rollup.Config{
+		Genesis: rollup.Genesis{
+			L1: eth.BlockID{
+				Hash:   l1Block.Hash(),
+				Number: 0,
+			},
+			L2: eth.BlockID{
+				Hash:   l2Genesis.ToBlock().Hash(),
+				Number: 0,
+			},
+			L2Time: uint64(config.L1GenesisBlockTimestamp),
+		},
+		BlockTime:              config.L2BlockTime,
+		MaxSequencerDrift:      config.MaxSequencerDrift,
+		SeqWindowSize:          config.SequencerWindowSize,
+		ChannelTimeout:         config.ChannelTimeout,
+		L1ChainID:              new(big.Int).SetUint64(config.L1ChainID),
+		L2ChainID:              new(big.Int).SetUint64(config.L2ChainID),
+		P2PSequencerAddress:    config.P2PSequencerAddress,
+		FeeRecipientAddress:    config.OptimismL2FeeRecipient,
+		BatchInboxAddress:      config.BatchInboxAddress,
+		BatchSenderAddress:     config.BatchSenderAddress,
+		DepositContractAddress: predeploys.DevOptimismPortalAddr,
+	}
+
+	d.Deployments.DeploymentsL1 = DeploymentsL1{
+		L1CrossDomainMessengerProxy: predeploys.DevL1CrossDomainMessengerAddr,
+		L1StandardBridgeProxy:       predeploys.DevL1StandardBridgeAddr,
+		L2OutputOracleProxy:         predeploys.DevL2OutputOracleAddr,
+		OptimismPortalProxy:         predeploys.DevOptimismPortalAddr,
+	}
+
+	d.T.Log("created genesis files")
+}
+
 type SequencerDevnetParams struct {
 	MaxSeqDrift             uint64
 	SeqWindowSize           uint64
@@ -348,22 +478,11 @@ type SequencerDevnetParams struct {
 }
 
 func StartSequencerDevnet(ctx context.Context, d *Devnet, params *SequencerDevnetParams) error {
-	d.InitContracts()
-	d.InitHardhatDeployConfig("earliest", params.MaxSeqDrift, params.SeqWindowSize, params.ChanTimeout)
-	d.InitL1Hardhat()
+	d.InitChain(params.MaxSeqDrift, params.SeqWindowSize, params.ChanTimeout, params.AdditionalGenesisAllocs)
 	d.AddEth1()
 	d.WaitUpEth1(0, time.Second*10)
-
-	//var block *types.Block
-	//if err := WaitBlock(ctx, d.L1Client(0), params.SeqWindowSize); err != nil {
-	//	return err
-	//}
-
-	d.DeployL1Hardhat()
-	d.InitL2Hardhat(params.AdditionalGenesisAllocs)
 	d.AddOpL2()
 	d.WaitUpOpL2Engine(0, time.Second*10)
-	d.InitRollupHardhat()
 
 	d.AddOpNode(0, 0, true)
 	d.AddOpBatcher(0, 0, 0)
@@ -378,4 +497,10 @@ func StartSequencerDevnet(ctx context.Context, d *Devnet, params *SequencerDevne
 		return err
 	}
 	return nil
+}
+
+func uint642big(in uint64) *hexutil.Big {
+	b := new(big.Int).SetUint64(in)
+	hu := hexutil.Big(*b)
+	return &hu
 }

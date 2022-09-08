@@ -97,7 +97,7 @@ func (t *LegacyTestEnv) LoadGenesis() *types.Block {
 	if err := json.Unmarshal(t.genesis, &genesis); err != nil {
 		panic(fmt.Errorf("can't parse genesis JSON: %v", err))
 	}
-	return genesis.ToBlock(nil)
+	return genesis.ToBlock()
 }
 
 // Ctx returns a context with the default timeout.

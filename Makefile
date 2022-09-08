@@ -5,5 +5,6 @@ hive:
 mod-tidy:
 	cd simulators/optimism/l1ops && go mod tidy && cd .. && \
 	cd p2p && go mod tidy && cd .. && \
-	cd rpc && go mod tidy
+	cd rpc && go mod tidy && \
+	cd ../../../ && go mod tidy
 .PHONY: mod-tidy

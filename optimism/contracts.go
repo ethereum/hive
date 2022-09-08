@@ -154,10 +154,6 @@ type DeploymentsL1 struct {
 	L1StandardBridgeProxy       common.Address
 	L2OutputOracleProxy         common.Address
 	OptimismPortalProxy         common.Address
-	L1CrossDomainMessenger      common.Address
-	L1StandardBridge            common.Address
-	L2OutputOracle              common.Address
-	OptimismPortal              common.Address
 }
 
 type DeploymentsL2 struct {

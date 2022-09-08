@@ -98,8 +98,8 @@ mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis
-echo "Supplied genesis state:"
-cat /genesis.json
+#echo "Supplied genesis state:"
+#cat /genesis.json
 
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."

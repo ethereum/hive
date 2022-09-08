@@ -2,14 +2,14 @@ module github.com/ethereum/hive/simulators/optimism/rpc
 
 go 1.18
 
-replace github.com/ethereum/go-ethereum v1.10.21 => github.com/ethereum-optimism/op-geth v0.0.0-20220819161933-acfde114de61
+replace github.com/ethereum/go-ethereum v1.10.23 => github.com/ethereum-optimism/op-geth v0.0.0-20220907143004-2aacc679d638
 
 replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c
 
 replace github.com/ethereum/hive/optimism v0.0.0 => github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c
 
 require (
-	github.com/ethereum/go-ethereum v1.10.21
+	github.com/ethereum/go-ethereum v1.10.23
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/ethereum/hive/optimism v0.0.0
 	github.com/kr/pretty v0.3.0
@@ -34,10 +34,10 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
-	github.com/ethereum-optimism/optimism/op-batcher v0.6.0 // indirect
-	github.com/ethereum-optimism/optimism/op-bindings v0.6.0 // indirect
-	github.com/ethereum-optimism/optimism/op-node v0.6.0 // indirect
-	github.com/ethereum-optimism/optimism/op-proposer v0.6.0 // indirect
+	github.com/ethereum-optimism/optimism/op-batcher v0.7.0 // indirect
+	github.com/ethereum-optimism/optimism/op-bindings v0.7.0 // indirect
+	github.com/ethereum-optimism/optimism/op-node v0.7.0 // indirect
+	github.com/ethereum-optimism/optimism/op-proposer v0.7.0 // indirect
 	github.com/ethereum-optimism/optimism/op-service v0.5.0 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
 	github.com/flynn/noise v1.0.0 // indirect

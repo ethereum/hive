@@ -217,7 +217,7 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 	}
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, err := core.NewBlockChain(db, nil, config, engine, vm.Config{}, nil, nil)
+	blockchain, err := core.NewBlockChain(db, nil, &cfg.genesis, nil, engine, vm.Config{}, nil, nil)
 	if err != nil {
 		return fmt.Errorf("can't create blockchain: %v", err)
 	}

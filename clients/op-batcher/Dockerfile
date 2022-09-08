@@ -1,8 +1,7 @@
 ARG branch=develop
 FROM us-central1-docker.pkg.dev/bedrock-goerli-development/images/op-batcher:$branch
 
-RUN apk add curl jq bash
-RUN apk add --no-cache ca-certificates
+RUN apk add bash
 
 COPY ./entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
