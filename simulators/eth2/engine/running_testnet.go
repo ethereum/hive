@@ -48,6 +48,11 @@ func startTestnet(t *hivesim.T, env *testEnv, config *Config) *Testnet {
 
 	testnet.NodeClientBundles = make(NodeClientBundles, len(config.Nodes))
 
+	// Init all client bundles
+	for nodeIndex := range testnet.NodeClientBundles {
+		testnet.NodeClientBundles[nodeIndex] = new(NodeClientBundle)
+	}
+
 	// For each key partition, we start a client bundle that consists of:
 	// - 1 execution client
 	// - 1 beacon client
@@ -55,9 +60,7 @@ func startTestnet(t *hivesim.T, env *testEnv, config *Config) *Testnet {
 	for nodeIndex, node := range config.Nodes {
 		// Prepare clients for this node
 		var (
-			ec *ExecutionClient
-			bc *BeaconClient
-			vc *ValidatorClient
+			nodeClient = testnet.NodeClientBundles[nodeIndex]
 
 			executionDef = env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1")
 			beaconDef    = env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon")
@@ -69,25 +72,20 @@ func startTestnet(t *hivesim.T, env *testEnv, config *Config) *Testnet {
 		}
 
 		// Prepare the client objects with all the information necessary to eventually start
-		ec = prep.prepareExecutionNode(testnet, executionDef, config.Eth1Consensus, node.ExecutionClientTTD, nodeIndex, node.Chain)
+		nodeClient.ExecutionClient = prep.prepareExecutionNode(testnet, executionDef, config.Eth1Consensus, node.ExecutionClientTTD, nodeIndex, node.Chain, node.ExecutionSubnet)
 		if node.ConsensusClient != "" {
-			bc = prep.prepareBeaconNode(testnet, beaconDef, node.BeaconNodeTTD, nodeIndex, ec)
-			vc = prep.prepareValidatorClient(testnet, validatorDef, bc, nodeIndex)
+			nodeClient.BeaconClient = prep.prepareBeaconNode(testnet, beaconDef, node.BeaconNodeTTD, nodeIndex, nodeClient.ExecutionClient)
+			nodeClient.ValidatorClient = prep.prepareValidatorClient(testnet, validatorDef, nodeClient.BeaconClient, nodeIndex)
 		}
 
-		// Bundle all the clients together
-		testnet.NodeClientBundles[nodeIndex] = NodeClientBundle{
-			T:               t,
-			Index:           nodeIndex,
-			Verification:    node.TestVerificationNode,
-			ExecutionClient: ec,
-			BeaconClient:    bc,
-			ValidatorClient: vc,
-		}
+		// Add rest of properties
+		nodeClient.T = t
+		nodeClient.Index = nodeIndex
+		nodeClient.Verification = node.TestVerificationNode
 
 		// Start the node clients if specified so
 		if !node.DisableStartup {
-			testnet.NodeClientBundles[nodeIndex].Start()
+			nodeClient.Start()
 		}
 	}
 

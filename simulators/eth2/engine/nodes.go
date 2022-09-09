@@ -42,15 +42,17 @@ type ExecutionClient struct {
 	OptionsGenerator func() ([]hivesim.StartOption, error)
 	proxy            **Proxy
 	proxyPort        int
+	subnet           string
 }
 
-func NewExecutionClient(t *hivesim.T, eth1Def *hivesim.ClientDefinition, optionsGenerator func() ([]hivesim.StartOption, error), proxyPort int) *ExecutionClient {
+func NewExecutionClient(t *hivesim.T, eth1Def *hivesim.ClientDefinition, optionsGenerator func() ([]hivesim.StartOption, error), proxyPort int, subnet string) *ExecutionClient {
 	return &ExecutionClient{
 		T:                t,
 		ClientType:       eth1Def.Name,
 		OptionsGenerator: optionsGenerator,
 		proxyPort:        proxyPort,
 		proxy:            new(*Proxy),
+		subnet:           subnet,
 	}
 }
 
@@ -127,6 +129,20 @@ func (all ExecutionClients) Running() ExecutionClients {
 	res := make(ExecutionClients, 0)
 	for _, ec := range all {
 		if ec.IsRunning() {
+			res = append(res, ec)
+		}
+	}
+	return res
+}
+
+// Return subset of clients that are part of an specific subnet
+func (all ExecutionClients) Subnet(subnet string) ExecutionClients {
+	if subnet == "" {
+		return all
+	}
+	res := make(ExecutionClients, 0)
+	for _, ec := range all {
+		if ec.subnet == subnet {
 			res = append(res, ec)
 		}
 	}
@@ -628,7 +644,7 @@ func (cb *NodeClientBundle) Shutdown() error {
 	return nil
 }
 
-type NodeClientBundles []NodeClientBundle
+type NodeClientBundles []*NodeClientBundle
 
 // Return all execution clients, even the ones not currently running
 func (cbs NodeClientBundles) ExecutionClients() ExecutionClients {
