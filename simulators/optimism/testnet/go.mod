@@ -2,15 +2,15 @@ module github.com/ethereum/hive/simulators/optimism/testnet
 
 go 1.18
 
-replace github.com/ethereum/go-ethereum v1.10.23 => github.com/ethereum-optimism/op-geth v0.0.0-20220907143004-2aacc679d638
+replace github.com/ethereum/go-ethereum v1.10.23 => github.com/ethereum-optimism/op-geth v0.0.0-20220909213840-e6575c0168f1
 
 replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c
 
 replace github.com/ethereum/hive/optimism v0.0.0 => github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c
 
 require (
-	github.com/ethereum-optimism/optimism/op-node v0.8.3
-	github.com/ethereum-optimism/optimism/op-proposer v0.8.3
+	github.com/ethereum-optimism/optimism/op-node v0.8.6
+	github.com/ethereum-optimism/optimism/op-proposer v0.8.6
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/ethereum/hive/optimism v0.0.0
 	github.com/stretchr/testify v1.8.0

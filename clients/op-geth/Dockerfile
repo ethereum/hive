@@ -1,4 +1,4 @@
-ARG branch=develop
+ARG branch=optimism-history
 FROM ethereumoptimism/op-geth:$branch
 
 RUN apk add curl jq bash

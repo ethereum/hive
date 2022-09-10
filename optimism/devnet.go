@@ -410,6 +410,11 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 		GasPriceOracleScalar:        1000_000,
 		GasPriceOracleDecimals:      6,
 		DeploymentWaitConfirmations: 1,
+
+		EIP1559Elasticity:  10,
+		EIP1559Denominator: 50,
+
+		FundDevAccounts: false,
 	}
 
 	l1Genesis, err := genesis.BuildL1DeveloperGenesis(config)
