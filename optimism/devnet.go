@@ -2,6 +2,7 @@ package optimism
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"github.com/ethereum-optimism/optimism/op-bindings/predeploys"
@@ -14,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
 	"math/big"
+	"strconv"
 	"sync"
 	"time"
 
@@ -105,7 +107,7 @@ func (d *Devnet) AddEth1(opts ...hivesim.StartOption) {
 	if err != nil {
 		d.T.Fatalf("failed to serialize genesis state: %v", err)
 	}
-	eth1CfgOpt := bytesFile("/genesis.json", eth1Cfg)
+	eth1CfgOpt := BytesFile("/genesis.json", eth1Cfg)
 
 	input := []hivesim.StartOption{eth1CfgOpt, eth1Params}
 	if len(d.Eth1s) == 0 {
@@ -153,7 +155,7 @@ func (d *Devnet) AddOpL2(opts ...hivesim.StartOption) {
 		d.T.Fatalf("failed to encode l2 genesis: %v", err)
 		return
 	}
-	input = append(input, bytesFile("/genesis.json", l2GenesisCfg))
+	input = append(input, BytesFile("/genesis.json", l2GenesisCfg))
 	input = append(input, defaultJWTFile)
 	input = append(input, opts...)
 
@@ -188,11 +190,14 @@ func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, sequencer bool, opts .
 		opnf.RPCListenAddr.EnvVar:        "0.0.0.0",
 		opnf.RPCListenPort.EnvVar:        fmt.Sprintf("%d", RollupRPCPort),
 		opnf.L1TrustRPC.EnvVar:           "false",
-		opnf.L2EngineJWTSecret.EnvVar:    defaultJWTPath,
+		opnf.L2EngineJWTSecret.EnvVar:    DefaultJWTPath,
 		opnf.LogLevelFlag.EnvVar:         "debug",
 		opnf.SequencerEnabledFlag.EnvVar: seqStr,
 		opnf.SequencerL1Confs.EnvVar:     "0",
-		opnf.SequencerP2PKeyFlag.EnvVar:  defaultP2PSequencerKeyPath,
+		opnf.VerifierL1Confs.EnvVar:      "0",
+		opnf.P2PPrivPath.EnvVar:          DefaultP2PPrivPath,
+		opnf.AdvertiseTCPPort.EnvVar:     strconv.Itoa(OpnodeP2PPort),
+		opnf.ListenTCPPort.EnvVar:        strconv.Itoa(OpnodeP2PPort),
 	}
 	input := []hivesim.StartOption{defaultSettings.Params()}
 
@@ -201,13 +206,34 @@ func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, sequencer bool, opts .
 		d.T.Fatalf("failed to encode l2 genesis: %v", err)
 		return
 	}
-	input = append(input, bytesFile("/rollup_config.json", rollupCfg))
+	input = append(input, BytesFile("/rollup_config.json", rollupCfg))
 	input = append(input, defaultJWTFile)
-	input = append(input, defaultP2pSequencerKeyFile)
+
+	opNodeIndex := len(d.OpNodes)
+
+	// configure p2p keys
+	p2pKey, err := d.MnemonicCfg.P2PKeyFor(opNodeIndex)
+	require.NoError(d.T, err)
+	input = append(input, StringFile(DefaultP2PPrivPath, hex.EncodeToString(EncodePrivKey(p2pKey))))
+	if sequencer {
+		input = append(input,
+			HiveUnpackParams{opnf.SequencerP2PKeyFlag.EnvVar: DefaultP2PSequencerPrivPath}.Params(),
+			StringFile(DefaultP2PSequencerPrivPath, hex.EncodeToString(EncodePrivKey(d.Secrets.SequencerP2P))),
+		)
+	}
+
 	input = append(input, opts...)
 
-	c := &OpNode{d.T.StartClient(d.Clients.OpNode[0].Name, input...)}
-	d.T.Logf("added op-node %d: %s", len(d.OpNodes), c.IP)
+	c := &OpNode{
+		Client: d.T.StartClient(d.Clients.OpNode[0].Name, input...),
+		p2pKey: p2pKey,
+	}
+
+	addr, err := asMultiAddr(c.Client.IP.String(), p2pKey, OpnodeP2PPort)
+	require.NoError(d.T, err, "failed to get op node multi addr from p2p key")
+	c.p2pAddr = addr
+
+	d.T.Logf("added op-node %d: %s", opNodeIndex, c.IP)
 	d.OpNodes = append(d.OpNodes, c)
 }
 
@@ -414,7 +440,7 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 		EIP1559Elasticity:  10,
 		EIP1559Denominator: 50,
 
-		FundDevAccounts: false,
+		FundDevAccounts: true,
 	}
 
 	l1Genesis, err := genesis.BuildL1DeveloperGenesis(config)

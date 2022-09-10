@@ -2,17 +2,23 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-node/eth"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
-	"github.com/ethereum-optimism/optimism/op-proposer/rollupclient"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/optimism"
 )
+
+const replicaCount = 2
+const maxReplicaLag = 5
 
 func main() {
 	suite := hivesim.Suite{
@@ -35,94 +41,186 @@ func main() {
 func runP2PTests(t *hivesim.T) {
 	d := optimism.NewDevnet(t)
 
-	d.InitChain(10, 4, 30, nil)
+	d.InitChain(30, 4, 30, nil)
 	d.AddEth1() // l1 eth1 node is required for l2 config init
 	d.WaitUpEth1(0, time.Second*10)
 
-	d.AddOpL2() // l2 engine is required for rollup config init
-	d.WaitUpOpL2Engine(0, time.Second*10)
+	var wg sync.WaitGroup
+	for i := 0; i <= replicaCount; i++ {
+		isSeq := i == 0
+		d.AddOpL2()
+		d.AddOpNode(0, i, isSeq)
 
-	// sequencer stack, on top of first eth1 node
-	d.AddOpNode(0, 0, true)
-	d.AddOpBatcher(0, 0, 0)
-	d.AddOpProposer(0, 0, 0)
+		if isSeq {
+			d.AddOpBatcher(0, 0, 0, optimism.HiveUnpackParams{}.Params())
+			d.AddOpProposer(0, 0, 0)
+		}
 
-	// TODO: pass optimism.HiveUnpackParams{flag env vars here}.Params()
-	//  hivesim start option to the op nodes to configure p2p networking
+		wg.Add(1)
+		go func(i int) {
+			d.WaitUpOpL2Engine(i, time.Second*10)
+			wg.Done()
+		}(i)
+	}
 
-	// verifier A
-	d.AddOpL2()
-	d.AddOpNode(0, 1, false) // we attach to the same L1 node, so we don't need to configure L1 networking.
+	t.Log("waiting for nodes to come up")
+	wg.Wait()
 
-	// verifier B
-	d.AddOpL2()
-	d.AddOpNode(0, 2, false)
+	for i := 1; i <= replicaCount; i++ {
+		node := d.GetOpNode(i)
+		p2pClient := node.P2PClient()
 
-	t.Log("waiting for nodes to get onto the network")
-
-	seq := d.GetOpNode(0)
-	verifA := d.GetOpNode(1)
-	verifB := d.GetOpNode(2)
+		for j := 0; j <= replicaCount; j++ {
+			if i == j {
+				continue
+			}
+			peer := d.GetOpNode(j)
+			t.Logf("peering node %d (%s) with %d", j, peer.P2PAddr(), i)
+			require.NoError(t, p2pClient.ConnectPeer(context.Background(), peer.P2PAddr()))
+		}
+	}
 
 	seqEng := d.GetOpL2Engine(0)
 	seqEthCl := seqEng.EthClient()
+	seqRollupCl := d.GetOpNode(0).RollupClient()
+	sender := d.L2Vault.CreateAccount(context.Background(), seqEthCl, big.NewInt(params.Ether))
 
-	seqCl := seq.RollupClient()
-	verifACl := verifA.RollupClient()
-	verifBCl := verifB.RollupClient()
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	checkCanon := func(name string, id eth.BlockID) {
-		bl, err := seqEthCl.BlockByNumber(ctx, big.NewInt(int64(id.Number)))
-		if err != nil {
-			t.Fatalf("%s: sequencer does not have block at height %d", name, id.Number)
-		}
-		if h := bl.Hash(); h != id.Hash {
-			t.Fatalf("%s: sequencer diverged, height %d does not match: sequencer: %s <> verifier: %s", name, h, id.Hash)
-		}
-	}
-
-	syncStat := func(name string, cl *rollupclient.RollupClient) *driver.SyncStatus {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*4)
-		seqStat, err := cl.SyncStatus(ctx)
-		cancel()
-		if err != nil {
-			t.Errorf("failed to get sync status from %s op-node: %v", name, err)
-		}
-		t.Log(name,
-			"currentL1", seqStat.CurrentL1.TerminalString(),
-			"headL1", seqStat.HeadL1.TerminalString(),
-			"finalizedL2", seqStat.FinalizedL2.TerminalString(),
-			"safeL2", seqStat.SafeL2.TerminalString(),
-			"unsafeL2", seqStat.UnsafeL2.TerminalString())
-		return seqStat // may be nil
-	}
-
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	readyCh := make(chan struct{})
+	t.Log("awaiting initial sync")
 	go func() {
-		ticker := time.NewTicker(time.Second * 4)
-		defer ticker.Stop()
+		tick := time.NewTicker(250 * time.Millisecond)
 		for {
 			select {
-			case <-ticker.C:
-				// Check that all clients are synced
-				seqStat := syncStat("sequencer ", seqCl)
-				verAStat := syncStat("verifier-A", verifACl)
-				verBStat := syncStat("verifier-B", verifBCl)
-				checkCanon("verifier A", verAStat.UnsafeL2.ID())
-				checkCanon("verifier B", verBStat.UnsafeL2.ID())
-				require.LessOrEqual(t, seqStat.CurrentL1.Number, verAStat.CurrentL1.Number+d.RollupCfg.SeqWindowSize, "verifier A is not behind sequencer by more than the sequence window")
-				require.LessOrEqual(t, seqStat.CurrentL1.Number, verBStat.CurrentL1.Number+d.RollupCfg.SeqWindowSize, "verifier B is not behind sequencer by more than the sequence window")
+			case <-tick.C:
+				seqHead, err := seqRollupCl.SyncStatus(ctx)
+				require.NoError(t, err)
+				if seqHead.UnsafeL2.Number == seqHead.SafeL2.Number {
+					continue
+				}
+				ready := true
+				for i := 1; i <= replicaCount; i++ {
+					repRollupCl := d.GetOpNode(i).RollupClient()
+					repHead, err := repRollupCl.SyncStatus(ctx)
+					require.NoError(t, err)
+					if seqHead.UnsafeL2.Number-repHead.UnsafeL2.Number >= 2 {
+						ready = false
+						break
+					}
+				}
+				if ready {
+					readyCh <- struct{}{}
+				}
 			case <-ctx.Done():
-				t.Log("exiting sync checking loop")
 				return
 			}
 		}
 	}()
 
-	// Run testnet for duration of 3 sequence windows
-	time.Sleep(time.Second * time.Duration(d.L1Cfg.Config.Clique.Period*d.RollupCfg.SeqWindowSize*3))
-	cancel()
+	select {
+	case <-readyCh:
+		cancel()
+		t.Log("initial sync complete")
+	case <-ctx.Done():
+		t.Fatalf("timed out waiting for initial sync")
+	}
 
-	// TODO: Add P2P tests
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
+	errCh := make(chan error, 20)
+	defer cancel()
+
+	getSyncStat := func(ctx context.Context, i int) *driver.SyncStatus {
+		cl := d.GetOpNode(i).RollupClient()
+		seqStat, err := cl.SyncStatus(ctx)
+		require.NoError(t, err)
+		t.Log(fmt.Sprintf("replica-%d", i),
+			"currentL1", seqStat.CurrentL1.TerminalString(),
+			"headL1", seqStat.HeadL1.TerminalString(),
+			"finalizedL2", seqStat.FinalizedL2.TerminalString(),
+			"safeL2", seqStat.SafeL2.TerminalString(),
+			"unsafeL2", seqStat.UnsafeL2.TerminalString())
+		return seqStat
+	}
+
+	checkCanon := func(i int, head uint64, id eth.BlockID) error {
+		if head-id.Number > maxReplicaLag {
+			return fmt.Errorf("replica %d: too far behind sequencer. seq head: %d, replica head: %d", i, head, id.Number)
+		}
+		bl, err := seqEthCl.BlockByNumber(ctx, big.NewInt(int64(id.Number)))
+		if err != nil {
+			return fmt.Errorf("replica %d: sequencer does not have block at height %d", i, id.Number)
+		}
+		if h := bl.Hash(); h != id.Hash {
+			return fmt.Errorf("replica %d: sequencer diverged, height %d does not match: sequencer: %s <> verifier: %s", i, id.Number, h, id.Hash)
+		}
+		return nil
+	}
+
+	go func() {
+		tick := time.NewTicker(100 * time.Millisecond)
+		for {
+			select {
+			case <-tick.C:
+				nonce, err := seqEthCl.NonceAt(ctx, sender, nil)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				tx := types.NewTx(&types.DynamicFeeTx{
+					ChainID:   optimism.L2ChainIDBig,
+					Nonce:     nonce,
+					Gas:       75000,
+					GasTipCap: big.NewInt(1),
+					GasFeeCap: big.NewInt(2),
+					Value:     big.NewInt(0.0001 * params.Ether),
+				})
+				tx, err = d.L2Vault.SignTransaction(sender, tx)
+				if err != nil {
+					errCh <- err
+					return
+				}
+				require.NoError(t, seqEthCl.SendTransaction(ctx, tx))
+				_, err = optimism.WaitReceipt(ctx, seqEthCl, tx.Hash())
+				if err != nil {
+					errCh <- err
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	go func() {
+		tick := time.NewTicker(100 * time.Millisecond)
+		for {
+			select {
+			case <-tick.C:
+				head, err := seqEthCl.BlockByNumber(ctx, nil)
+				if err != nil {
+					errCh <- err
+					return
+				}
+
+				for i := 1; i <= replicaCount; i++ {
+					seqStat := getSyncStat(ctx, i)
+					if err := checkCanon(i, head.NumberU64(), seqStat.UnsafeL2.ID()); err != nil {
+						errCh <- err
+						return
+					}
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	select {
+	case <-time.NewTimer(time.Minute).C:
+		break
+	case err := <-errCh:
+		t.Fatalf("unhandled error: %v", err)
+	}
+
+	cancel()
 }

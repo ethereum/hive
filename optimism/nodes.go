@@ -1,6 +1,7 @@
 package optimism
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
 	"github.com/ethereum-optimism/optimism/op-proposer/rollupclient"
@@ -19,6 +20,7 @@ const (
 	// RollupRPCPort is set to the default EL RPC port,
 	// since Hive defaults to RPC / caching / liveness checks on this port.
 	RollupRPCPort = 8545
+	OpnodeP2PPort = 9300
 )
 
 type ELNode struct {
@@ -60,6 +62,8 @@ type OpL2Engine struct {
 
 type OpNode struct {
 	*hivesim.Client
+	p2pKey  *ecdsa.PrivateKey
+	p2pAddr string
 }
 
 func (e *OpNode) HttpRpcEndpoint() string {
@@ -72,6 +76,14 @@ func (e *OpNode) RollupClient() *rollupclient.RollupClient {
 
 func (e *OpNode) P2PClient() *p2p.Client {
 	return p2p.NewClient(e.RPC())
+}
+
+func (e *OpNode) P2PKey() *ecdsa.PrivateKey {
+	return e.p2pKey
+}
+
+func (e *OpNode) P2PAddr() string {
+	return e.p2pAddr
 }
 
 type ProposerNode struct {
