@@ -308,29 +308,6 @@ func (beacons BeaconClients) P2PAddrs() (string, error) {
 	return strings.Join(staticPeers, ","), nil
 }
 
-func (b *BeaconClient) PrintAllBeaconBlocks(ctx context.Context) error {
-	var headInfo eth2api.BeaconBlockHeaderAndInfo
-	if exists, err := beaconapi.BlockHeader(ctx, b.API, eth2api.BlockHead, &headInfo); err != nil {
-		return fmt.Errorf("PrintAllBeaconBlocks: failed to poll head: %v", err)
-	} else if !exists {
-		return fmt.Errorf("PrintAllBeaconBlocks: failed to poll head: !exists")
-	}
-	fmt.Printf("PrintAllBeaconBlocks: Printing beacon chain from %s\n", b.HiveClient.Container)
-	fmt.Printf("PrintAllBeaconBlocks: Head, slot %d, root %v\n", headInfo.Header.Message.Slot, headInfo.Root)
-	for i := 1; i <= int(headInfo.Header.Message.Slot); i++ {
-		var bHeader eth2api.BeaconBlockHeaderAndInfo
-		if exists, err := beaconapi.BlockHeader(ctx, b.API, eth2api.BlockIdSlot(i), &bHeader); err != nil {
-			fmt.Printf("PrintAllBeaconBlocks: Slot %d, not found\n", i)
-			continue
-		} else if !exists {
-			fmt.Printf("PrintAllBeaconBlocks: Slot %d, not found\n", i)
-			continue
-		}
-		fmt.Printf("PrintAllBeaconBlocks: Slot %d, root %v\n", i, bHeader.Root)
-	}
-	return nil
-}
-
 func (b *BeaconClient) WaitForExecutionPayload(ctx context.Context, timeoutSlots common.Slot) (ethcommon.Hash, error) {
 	fmt.Printf("Waiting for execution payload on beacon %d\n", b.index)
 	slotDuration := time.Duration(b.spec.SECONDS_PER_SLOT) * time.Second
@@ -356,10 +333,15 @@ func (b *BeaconClient) WaitForExecutionPayload(ctx context.Context, timeoutSlots
 			} else if !exists {
 				return ethcommon.Hash{}, fmt.Errorf("WaitForExecutionPayload: failed to poll head: !exists")
 			}
+			if !headInfo.Canonical {
+				continue
+			}
 
 			var versionedBlock eth2api.VersionedSignedBeaconBlock
 			if exists, err := beaconapi.BlockV2(ctx, b.API, eth2api.BlockIdRoot(headInfo.Root), &versionedBlock); err != nil {
-				return ethcommon.Hash{}, fmt.Errorf("WaitForExecutionPayload: failed to retrieve block: %v", err)
+				// some clients fail to return the head because the client recently re-org'd,
+				// keep checking anyway...
+				continue
 			} else if !exists {
 				return ethcommon.Hash{}, fmt.Errorf("WaitForExecutionPayload: block not found")
 			}
@@ -369,7 +351,7 @@ func (b *BeaconClient) WaitForExecutionPayload(ctx context.Context, timeoutSlots
 				copy(execution[:], block.Message.Body.ExecutionPayload.BlockHash[:])
 			}
 			zero := ethcommon.Hash{}
-			fmt.Printf("beacon %d: slot=%d, realTimeSlot=%d, head=%s, exec=%s\n", b.index, headInfo.Header.Message.Slot, realTimeSlot, shorten(headInfo.Root.String()), shorten(execution.Hex()))
+			fmt.Printf("WaitForExecutionPayload: beacon %d: slot=%d, realTimeSlot=%d, head=%s, exec=%s\n", b.index, headInfo.Header.Message.Slot, realTimeSlot, shorten(headInfo.Root.String()), shorten(execution.Hex()))
 			if bytes.Compare(execution[:], zero[:]) != 0 {
 				return execution, nil
 			}
