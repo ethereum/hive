@@ -37,6 +37,10 @@ type testEnv struct {
 	Secrets *[]blsu.SecretKey
 }
 
+type Logging interface {
+	Logf(format string, values ...interface{})
+}
+
 type node struct {
 	ExecutionClient      string
 	ConsensusClient      string
@@ -889,6 +893,10 @@ func TimeUntilTerminalBlock(e *ExecutionClient, c setup.Eth1Consensus, defaultTT
 	return td.Uint64()
 }
 
+func SlotsToDuration(slots beacon.Slot, spec *beacon.Spec) time.Duration {
+	return time.Duration(slots) * time.Duration(spec.SECONDS_PER_SLOT) * time.Second
+}
+
 // Gets the head of the execution client
 func GetHead(ctx context.Context, en *ExecutionClient) (ethcommon.Hash, error) {
 	ctx, cancel := context.WithCancel(ctx)
@@ -925,6 +933,7 @@ func CheckHeads(ctx context.Context, all ExecutionClients) (bool, error) {
 				fmt.Printf("Hash mismatch between heads: %s != %s\n", h, hash)
 				return false, nil
 			}
+			fmt.Printf("Hash match between heads: %s == %s\n", h, hash)
 		}
 	}
 	return true, nil
