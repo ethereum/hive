@@ -314,7 +314,7 @@ var Tests = []test.Spec{
 	// Invalid Ancestor Re-Org/Sync Tests (Reveal via sync through secondary client)
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -324,7 +324,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid StateRoot, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -334,7 +334,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -345,7 +345,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid StateRoot, Empty Txs, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -356,7 +356,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P8', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -366,7 +366,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid ReceiptsRoot, Invalid P8'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -378,7 +378,7 @@ var Tests = []test.Spec{
 		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
 		{
 			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
-			TimeoutSeconds:   30,
+			TimeoutSeconds:   60,
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex: 9,
@@ -388,7 +388,7 @@ var Tests = []test.Spec{
 		},
 		{
 			Name:             "Invalid Ancestor Chain Sync, Invalid Number, Invalid P9'",
-			TimeoutSeconds:   30,
+			TimeoutSeconds:   60,
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex: 9,
@@ -399,7 +399,7 @@ var Tests = []test.Spec{
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -409,7 +409,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid GasLimit, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -419,7 +419,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -429,7 +429,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid GasUsed, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -439,7 +439,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -449,7 +449,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Timestamp, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -461,7 +461,7 @@ var Tests = []test.Spec{
 			TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
 		{
 			Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
-			TimeoutSeconds:   30,
+			TimeoutSeconds:   60,
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex: 8,
@@ -471,7 +471,7 @@ var Tests = []test.Spec{
 		},
 		{
 			Name:             "Invalid Ancestor Chain Sync, Invalid PrevRandao, Invalid P9'",
-			TimeoutSeconds:   30,
+			TimeoutSeconds:   60,
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex: 8,
@@ -482,7 +482,7 @@ var Tests = []test.Spec{
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -492,7 +492,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Incomplete Transactions, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -502,7 +502,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -512,7 +512,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction Signature, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -522,7 +522,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -532,7 +532,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction Nonce, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -542,7 +542,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -552,7 +552,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction Gas, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -562,7 +562,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -572,7 +572,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction GasPrice, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -582,7 +582,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -592,7 +592,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction Value, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -602,7 +602,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Ommers, Invalid P9', Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -612,7 +612,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Ommers, Invalid P9'",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -624,7 +624,7 @@ var Tests = []test.Spec{
 	// Invalid Transition Payload Re-Org/Sync Tests (Reveal via sync through secondary client)
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid StateRoot, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -638,7 +638,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid StateRoot",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -652,7 +652,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid StateRoot, Empty Txs, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -667,7 +667,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid StateRoot, Empty Txs",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -682,7 +682,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid ReceiptsRoot, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -696,7 +696,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid ReceiptsRoot",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -712,7 +712,7 @@ var Tests = []test.Spec{
 		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
 		{
 			Name:             "Invalid Transition Payload Re-Org, Invalid Number, Reveal using sync",
-			TimeoutSeconds:   30,
+			TimeoutSeconds:   60,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
@@ -726,7 +726,7 @@ var Tests = []test.Spec{
 		},
 		{
 			Name:             "Invalid Transition Payload Sync, Invalid Number",
-			TimeoutSeconds:   30,
+			TimeoutSeconds:   60,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
@@ -741,7 +741,7 @@ var Tests = []test.Spec{
 	*/
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid GasLimit, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -755,7 +755,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid GasLimit",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -769,7 +769,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid GasUsed, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -783,7 +783,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid GasUsed",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -797,7 +797,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Timestamp, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -811,7 +811,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Timestamp",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -827,7 +827,7 @@ var Tests = []test.Spec{
 		TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
 		{
 			Name:             "Invalid Transition Payload Re-Org, Invalid PrevRandao, Reveal using sync",
-			TimeoutSeconds:   30,
+			TimeoutSeconds:   60,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
@@ -841,7 +841,7 @@ var Tests = []test.Spec{
 		},
 		{
 			Name:             "Invalid Transition Payload Sync, Invalid PrevRandao",
-			TimeoutSeconds:   30,
+			TimeoutSeconds:   60,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
@@ -856,7 +856,7 @@ var Tests = []test.Spec{
 	*/
 	{
 		Name:             "Invalid Transition Payload Re-Org, Incomplete Transactions, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -870,7 +870,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Incomplete Transactions",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -884,7 +884,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Signature, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -898,7 +898,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction Signature",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -912,7 +912,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Nonce, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -926,7 +926,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction Nonce",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -940,7 +940,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Gas, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -954,7 +954,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction Gas",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -968,7 +968,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction GasPrice, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -982,7 +982,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction GasPrice",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -996,7 +996,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Value, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -1010,7 +1010,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction Value",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -1024,7 +1024,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Ommers, Reveal using sync",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -1038,7 +1038,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Ommers",
-		TimeoutSeconds:   30,
+		TimeoutSeconds:   60,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
