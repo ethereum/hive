@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"math/big"
-	"net/http"
 	"time"
 
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
@@ -20,7 +19,6 @@ import (
 type Env struct {
 	*hivesim.T
 	TestName string
-	Client   *hivesim.Client
 
 	// Timeout context signals that the test must wrap up its execution
 	TimeoutContext context.Context
@@ -29,10 +27,10 @@ type Env struct {
 	TestContext context.Context
 
 	// RPC Clients
+	Clients    []client.EngineClient
 	Engine     client.EngineClient
 	Eth        client.Eth
 	TestEngine *TestEngineClient
-	HiveEngine *hive_rpc.HiveRPCEngineClient
 
 	// Consensus Layer Mocker Instance
 	CLMock *clmock.CLMocker
@@ -45,7 +43,8 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*Env), cParams hivesim.Params, cFiles hivesim.Params, testTransactionType helper.TestTransactionType, safeSlotsToImportOptimistically int64) {
+func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, fn func(*Env), cParams hivesim.Params, cFiles hivesim.Params, testTransactionType helper.TestTransactionType, safeSlotsToImportOptimistically int64) {
+
 	// Setup the CL Mocker for this test
 	clMocker := clmock.NewCLMocker(t, slotsToSafe, slotsToFinalized, big.NewInt(safeSlotsToImportOptimistically))
 	// Defer closing all clients
@@ -53,49 +52,38 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 		clMocker.CloseClients()
 	}()
 
-	// Create Engine client from main hivesim.Client to be used by tests
-	ec := hive_rpc.NewHiveRPCEngineClient(c, globals.EnginePortHTTP, globals.EthPortHTTP, globals.DefaultJwtTokenSecretBytes, ttd, &helper.LoggingRoundTrip{
-		T:     t,
-		Hc:    c,
-		Inner: http.DefaultTransport,
-	})
-	defer ec.Close()
-
-	// Add main client to CLMocker
-	clMocker.AddEngineClient(ec)
+	// Set up test context, which has a few more seconds to finish up after timeout happens
+	ctx, cancel := context.WithTimeout(context.Background(), timeout+(time.Second*10))
+	defer cancel()
+	clMocker.TestContext = ctx
 
 	env := &Env{
 		T:                   t,
 		TestName:            testName,
-		Client:              c,
-		Engine:              ec,
-		Eth:                 ec,
-		HiveEngine:          ec,
+		Clients:             make([]client.EngineClient, 0),
 		CLMock:              clMocker,
 		ClientParams:        cParams,
 		ClientFiles:         cFiles,
 		TestTransactionType: testTransactionType,
+		TestContext:         ctx,
 	}
 
-	// Before running the test, make sure Eth and Engine ports are open for the client
-	if err := hive_rpc.CheckEthEngineLive(c); err != nil {
-		t.Fatalf("FAIL (%s): Ports were never open for client: %v", env.TestName, err)
-	}
+	// Setup the main test client
+	var ec client.EngineClient
+	ec = env.StartNextClient(cParams, cFiles)
+	defer ec.Close()
 
-	// Full test context has a few more seconds to finish up after timeout happens
-	ctx, cancel := context.WithTimeout(context.Background(), timeout+(time.Second*10))
-	defer cancel()
-	env.TestContext = ctx
-	clMocker.TestContext = ctx
+	// Create the test-expect object
+	env.TestEngine = NewTestEngineClient(env, ec)
+
+	// Add main client to CLMocker
+	clMocker.AddEngineClient(ec)
 
 	// Setup context timeout
 	ctx, cancel = context.WithTimeout(ctx, timeout)
 	defer cancel()
 	env.TimeoutContext = ctx
 	clMocker.TimeoutContext = ctx
-
-	// Create the test-expect object
-	env.TestEngine = NewTestEngineClient(env, ec)
 
 	// Defer producing one last block to verify Execution client did not break after the test
 	defer func() {
@@ -111,6 +99,51 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 
 func (t *Env) MainTTD() *big.Int {
 	return t.Engine.TerminalTotalDifficulty()
+}
+
+func (t *Env) NextClientType() *hivesim.ClientDefinition {
+	testClientTypes, err := t.Sim.ClientTypes()
+	if err != nil {
+		t.Fatalf("No client types")
+	}
+	nextClientTypeIndex := len(t.Clients) % len(testClientTypes)
+	return testClientTypes[nextClientTypeIndex]
+}
+
+func (t *Env) ClientStarter(clientType string) client.EngineStarter {
+	return hive_rpc.HiveRPCEngineStarter{
+		ClientType: clientType,
+	}
+}
+
+func (t *Env) NextClientStarter() client.EngineStarter {
+	return t.ClientStarter(t.NextClientType().Name)
+}
+
+func (t *Env) StartClient(clientType string, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootclients ...client.EngineClient) client.EngineClient {
+	ec, err := t.ClientStarter(clientType).StartClient(t.T, t.TestContext, ClientParams, ClientFiles, bootclients...)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to start client: %v", t.TestName, err)
+	}
+	if len(t.Clients) == 0 {
+		t.Engine = ec
+		t.Eth = ec
+	}
+	t.Clients = append(t.Clients, ec)
+	return ec
+}
+
+func (t *Env) StartNextClient(ClientParams hivesim.Params, ClientFiles hivesim.Params, bootclients ...client.EngineClient) client.EngineClient {
+	ec, err := t.NextClientStarter().StartClient(t.T, t.TestContext, ClientParams, ClientFiles, bootclients...)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to start client: %v", t.TestName, err)
+	}
+	if len(t.Clients) == 0 {
+		t.Engine = ec
+		t.Eth = ec
+	}
+	t.Clients = append(t.Clients, ec)
+	return ec
 }
 
 func (t *Env) HandleClientPostRunVerification(ec client.EngineClient) {

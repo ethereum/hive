@@ -331,6 +331,9 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 				if resp.ExecutePayloadResponse.LatestValidHash != nil && *resp.ExecutePayloadResponse.LatestValidHash != (common.Hash{}) {
 					cl.Fatalf("CLMocker: NewPayload returned ACCEPTED status with incorrect LatestValidHash==%v", resp.ExecutePayloadResponse.LatestValidHash)
 				}
+			} else if resp.ExecutePayloadResponse.Status == api.INVALID {
+				// At any point during the CLMock workflow there mustn't be any INVALID payload
+				cl.Fatalf("CLMocker: An invalid payload was produced by one of the clients during the payload building process: Payload builder=%s, invalidating client=%s, hash=%s", cl.NextBlockProducer.ID(), resp.Container, cl.LatestPayloadBuilt.BlockHash)
 			} else {
 				cl.Logf("CLMocker: BroadcastNewPayload Response (%v): %v\n", resp.Container, resp.ExecutePayloadResponse)
 			}
@@ -356,7 +359,10 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 			if resp.ForkchoiceResponse.PayloadID != nil {
 				cl.Fatalf("CLMocker: Expected empty PayloadID: %v\n", resp.Container, resp.ForkchoiceResponse.PayloadID)
 			}
-		} else if resp.ForkchoiceResponse.PayloadStatus.Status != api.VALID {
+		} else if resp.ForkchoiceResponse.PayloadStatus.Status == api.INVALID {
+			// At any point during the CLMock workflow there mustn't be any INVALID payload
+			cl.Fatalf("CLMocker: An invalid payload was produced by one of the clients during the payload building process (ForkchoiceUpdated): Payload builder=%s, invalidating client=%s, hash=%s", cl.NextBlockProducer.ID(), resp.Container, cl.LatestPayloadBuilt.BlockHash)
+		} else {
 			cl.Logf("CLMocker: BroadcastForkchoiceUpdated Response (%v): %v\n", resp.Container, resp.ForkchoiceResponse)
 		}
 	}

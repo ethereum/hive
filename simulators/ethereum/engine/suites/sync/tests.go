@@ -8,6 +8,7 @@ import (
 
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -39,69 +40,115 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 		panic(err)
 	}
 	for _, currentTest := range tests {
-		for _, clientDef := range clientDefs {
-			clientSyncVariantGenerator, ok := ClientToSyncVariantGenerator[clientDef.Name]
-			if !ok {
-				clientSyncVariantGenerator = DefaultSyncVariantGenerator{}
-			}
-			currentTest := currentTest
-			genesisPath := "./init/genesis.json"
-			// If the test.Spec specified a custom genesis file, use that instead.
-			if currentTest.GenesisFile != "" {
-				genesisPath = "./init/" + currentTest.GenesisFile
-			}
-			testFiles := hivesim.Params{"/genesis.json": genesisPath}
-			// Calculate and set the TTD for this test
-			ttd := helper.CalculateRealTTD(genesisPath, currentTest.TTD)
-			newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
-			if currentTest.ChainFile != "" {
-				// We are using a Proof of Work chain file, remove all clique-related settings
-				// TODO: Nethermind still requires HIVE_MINER for the Engine API
-				// delete(newParams, "HIVE_MINER")
-				delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
-				delete(newParams, "HIVE_CLIQUE_PERIOD")
-				// Add the new file to be loaded as chain.rlp
-			}
-			for _, variant := range clientSyncVariantGenerator.Configure(big.NewInt(ttd), genesisPath, currentTest.ChainFile) {
-				variant := variant
-				clientDef := clientDef
-				suite.Add(hivesim.TestSpec{
-					Name:        fmt.Sprintf("%s (%s, sync/%s)", currentTest.Name, clientDef.Name, variant.Name),
-					Description: currentTest.About,
-					Run: func(t *hivesim.T) {
+		clientSyncVariantGenerator, ok := ClientToSyncVariantGenerator[clientDefs[0].Name]
+		if !ok {
+			clientSyncVariantGenerator = DefaultSyncVariantGenerator{}
+		}
+		currentTest := currentTest
+		genesisPath := "./init/genesis.json"
+		// If the test.Spec specified a custom genesis file, use that instead.
+		if currentTest.GenesisFile != "" {
+			genesisPath = "./init/" + currentTest.GenesisFile
+		}
+		testFiles := hivesim.Params{"/genesis.json": genesisPath}
+		// Calculate and set the TTD for this test
+		ttd := helper.CalculateRealTTD(genesisPath, currentTest.TTD)
+		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+		if currentTest.ChainFile != "" {
+			// We are using a Proof of Work chain file, remove all clique-related settings
+			// TODO: Nethermind still requires HIVE_MINER for the Engine API
+			// delete(newParams, "HIVE_MINER")
+			delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
+			delete(newParams, "HIVE_CLIQUE_PERIOD")
+			// Add the new file to be loaded as chain.rlp
+		}
+		for _, variant := range clientSyncVariantGenerator.Configure(big.NewInt(ttd), genesisPath, currentTest.ChainFile) {
+			variant := variant
+			clientDef := clientDefs[0]
+			suite.Add(hivesim.TestSpec{
+				Name:        fmt.Sprintf("%s (%s, sync/%s)", currentTest.Name, clientDef.Name, variant.Name),
+				Description: currentTest.About,
+				Run: func(t *hivesim.T) {
 
-						mainClientParams := newParams.Copy()
-						for k, v := range variant.MainClientConfig {
-							mainClientParams = mainClientParams.Set(k, v)
+					mainClientParams := newParams.Copy()
+					for k, v := range variant.MainClientConfig {
+						mainClientParams = mainClientParams.Set(k, v)
+					}
+					mainClientFiles := testFiles.Copy()
+					if currentTest.ChainFile != "" {
+						mainClientFiles = mainClientFiles.Set("/chain.rlp", "./chains/"+currentTest.ChainFile)
+					}
+					// c := t.StartClient(clientDef.Name, mainClientParams, hivesim.WithStaticFiles(mainClientFiles))
+
+					t.Logf("Start test (%s, %s, sync/%s)", clientDef.Name, currentTest.Name, variant.Name)
+					defer func() {
+						t.Logf("End test (%s, %s, sync/%s)", clientDef.Name, currentTest.Name, variant.Name)
+					}()
+
+					timeout := globals.DefaultTestCaseTimeout
+					// If a test.Spec specifies a timeout, use that instead
+					if currentTest.TimeoutSeconds != 0 {
+						timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
+					}
+
+					// Prepare sync client parameters
+					syncClientParams := newParams.Copy()
+					for k, v := range variant.SyncClientConfig {
+						syncClientParams = syncClientParams.Set(k, v)
+					}
+
+					// Setup the CL Mocker for this test
+					clMocker := clmock.NewCLMocker(t, currentTest.SlotsToSafe, currentTest.SlotsToFinalized, big.NewInt(currentTest.SafeSlotsToImportOptimistically))
+					// Defer closing all clients
+					defer func() {
+						clMocker.CloseClients()
+					}()
+
+					// Set up test context, which has a few more seconds to finish up after timeout happens
+					ctx, cancel := context.WithTimeout(context.Background(), timeout+(time.Second*10))
+					defer cancel()
+					clMocker.TestContext = ctx
+
+					env := &test.Env{
+						T:                   t,
+						TestName:            currentTest.Name,
+						Clients:             make([]client.EngineClient, 0),
+						CLMock:              clMocker,
+						ClientParams:        syncClientParams,
+						ClientFiles:         testFiles.Copy(),
+						TestTransactionType: currentTest.TestTransactionType,
+						TestContext:         ctx,
+					}
+
+					// Setup the main test client
+					var ec client.EngineClient
+					ec = env.StartNextClient(mainClientParams, mainClientFiles)
+					defer ec.Close()
+
+					// Create the test-expect object
+					env.TestEngine = test.NewTestEngineClient(env, ec)
+
+					// Add main client to CLMocker
+					clMocker.AddEngineClient(ec)
+
+					// Setup context timeout
+					ctx, cancel = context.WithTimeout(ctx, timeout)
+					defer cancel()
+					env.TimeoutContext = ctx
+					clMocker.TimeoutContext = ctx
+
+					// Defer producing one last block to verify Execution client did not break after the test
+					defer func() {
+						// Only run if the TTD was reached during test, and test had not failed at this point.
+						if clMocker.TTDReached && !t.Failed() {
+							clMocker.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 						}
-						mainClientFiles := testFiles.Copy()
-						if currentTest.ChainFile != "" {
-							mainClientFiles = mainClientFiles.Set("/chain.rlp", "./chains/"+currentTest.ChainFile)
-						}
-						c := t.StartClient(clientDef.Name, mainClientParams, hivesim.WithStaticFiles(mainClientFiles))
+					}()
 
-						t.Logf("Start test (%s, %s, sync/%s)", c.Type, currentTest.Name, variant.Name)
-						defer func() {
-							t.Logf("End test (%s, %s, sync/%s)", c.Type, currentTest.Name, variant.Name)
-						}()
-
-						timeout := globals.DefaultTestCaseTimeout
-						// If a test.Spec specifies a timeout, use that instead
-						if currentTest.TimeoutSeconds != 0 {
-							timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
-						}
-
-						// Prepare sync client parameters
-						syncClientParams := newParams.Copy()
-						for k, v := range variant.SyncClientConfig {
-							syncClientParams = syncClientParams.Set(k, v)
-						}
-
-						// Run the test case
-						test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, syncClientParams, testFiles.Copy(), currentTest.TestTransactionType, currentTest.SafeSlotsToImportOptimistically)
-					},
-				})
-			}
+					// Run the test
+					currentTest.Run(env)
+				},
+			})
 		}
 	}
 

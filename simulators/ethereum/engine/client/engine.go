@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 )
 
 type Eth interface {
@@ -21,6 +22,7 @@ type Eth interface {
 	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
+	CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error)
 }
 
 type Engine interface {
@@ -38,8 +40,10 @@ type Engine interface {
 type EngineClient interface {
 	// General Methods
 	ID() string
+	ClientType() string
 	Close() error
 	EnodeURL() (string, error)
+	RPC() *rpc.Client
 
 	// Local Test Account Management
 	GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error)

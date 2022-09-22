@@ -1,6 +1,7 @@
 package suite_engine
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"math/big"
@@ -9,7 +10,6 @@ import (
 
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
-	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/node"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -18,6 +18,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/core/vm"
 )
 
 // Execution specification reference:
@@ -1192,6 +1193,11 @@ var Tests = []test.Spec{
 		TTD:                 10,
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
+	{
+		Name:           "High PrevRandao Transaction Count (Payload Cross-Check)",
+		Run:            highTxPrevRandaoOpcodeTx,
+		TimeoutSeconds: 400,
+	},
 }
 
 // Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
@@ -1697,10 +1703,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 
 		if syncing {
 			// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
-			secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-			}
+			secondaryClient := t.StartNextClient(t.ClientParams, t.ClientFiles)
 			t.CLMock.AddEngineClient(secondaryClient)
 		}
 
@@ -3168,10 +3171,7 @@ func inOrderPayloads(t *test.Env) {
 	r.ExpectBalanceEqual(expectedBalance)
 
 	// Start a second client to send newPayload consecutively without fcU
-	secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
-	}
+	secondaryClient := t.StartNextClient(t.ClientParams, t.ClientFiles)
 	secondaryTestEngineClient := test.NewTestEngineClient(t, secondaryClient)
 
 	// Send the forkchoiceUpdated with the LatestExecutedPayload hash, we should get SYNCING back
@@ -3219,12 +3219,7 @@ func validPayloadFcUSyncingClient(t *test.Env) {
 	)
 	{
 		// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
-		var err error
-		secondaryClient, err = hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-
-		if err != nil {
-			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-		}
+		secondaryClient = t.StartNextClient(t.ClientParams, t.ClientFiles)
 		t.CLMock.AddEngineClient(secondaryClient)
 	}
 
@@ -3304,11 +3299,7 @@ func missingFcu(t *test.Env) {
 
 	var secondaryEngineTest *test.TestEngineClient
 	{
-		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-
-		if err != nil {
-			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-		}
+		secondaryEngine := t.StartNextClient(t.ClientParams, t.ClientFiles)
 		secondaryEngineTest = test.NewTestEngineClient(t, secondaryEngine)
 		t.CLMock.AddEngineClient(secondaryEngine)
 	}
@@ -3345,11 +3336,7 @@ func missingFcu(t *test.Env) {
 // P <- INV_P, newPayload(INV_P), fcU(head: P, payloadAttributes: attrs) + getPayload(…)
 func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 	// Add a second client to build the invalid payload
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
-
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-	}
+	secondaryEngine := t.StartNextClient(t.ClientParams, t.ClientFiles)
 	secondaryEngineTest := test.NewTestEngineClient(t, secondaryEngine)
 	t.CLMock.AddEngineClient(secondaryEngine)
 
@@ -3368,7 +3355,10 @@ func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 			if t.CLMock.NextBlockProducer == invalidPayloadProducer.Engine {
 				invalidPayloadProducer = secondaryEngineTest
 			}
-			var inv_p *api.ExecutableDataV1
+			var (
+				inv_p *api.ExecutableDataV1
+				err   error
+			)
 
 			{
 				// Get a payload from the invalid payload producer and invalidate it
@@ -3586,7 +3576,7 @@ func prevRandaoOpcodeTx(t *test.Env) {
 			expectedPrevRandao := t.CLMock.PrevRandaoHistory[t.CLMock.LatestHeader.Number.Uint64()+1]
 			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 			defer cancel()
-			if err := helper.DebugPrevRandaoTransaction(ctx, t.Client.RPC(), t.Client.Type, txs[currentTxIndex-1],
+			if err := helper.DebugPrevRandaoTransaction(ctx, t.Engine.RPC(), t.Engine.ClientType(), txs[currentTxIndex-1],
 				&expectedPrevRandao); err != nil {
 				t.Fatalf("FAIL (%s): Error during transaction tracing: %v", t.TestName, err)
 			}
@@ -3602,5 +3592,103 @@ func prevRandaoOpcodeTx(t *test.Env) {
 	for i := ttdBlockNumber + 1; i <= lastBlockNumber; i++ {
 		checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[i], i)
 	}
+
+}
+
+// Multi-client High Transaction Count PrevRandao
+func highTxPrevRandaoOpcodeTx(t *test.Env) {
+	// Wait for TTD to be reached
+	t.CLMock.WaitForTTD()
+
+	// Start a secondary client to cross check payloads
+	secondaryClient := t.StartNextClient(t.ClientParams, t.ClientFiles, t.Engine)
+	t.CLMock.AddEngineClient(secondaryClient)
+
+	// Create a smart contract that puts something in the log bloom
+	contractCode := []byte{
+		// Launch an event with the prevRandao as topic
+		byte(vm.DIFFICULTY), // topic0
+		byte(vm.PUSH1), 0x0, // length
+		byte(vm.PUSH1), 0x0, // offset
+		byte(vm.LOG1), // log1
+		// Also store prevrandao to storage
+		byte(vm.DIFFICULTY), // value
+		byte(vm.NUMBER),     // key
+		byte(vm.SSTORE),     // Set slot[block.Number]=prevRandao
+	}
+
+	var (
+		nonce                   = uint64(0)
+		blockCount              = 128
+		MaxTransactionsPerBlock = 100
+		totalTxsIncluded        = 0
+		contractAddress         common.Address
+	)
+
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			var (
+				tx  *types.Transaction
+				err error
+			)
+			contractAddress, tx, err = helper.MakeContractTransaction(nonce, 75000, big0, contractCode, t.TestTransactionType)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to create contract transaction: %v", t.TestName, err)
+			}
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			err = t.Engine.SendTransaction(ctx, tx)
+			if err != nil && !helper.SentTxAlreadyKnown(err) {
+				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+			}
+			nonce++
+		},
+	})
+	ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+	defer cancel()
+	code, err := t.Engine.CodeAt(ctx, contractAddress, nil)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to get contract code: %v", t.TestName, err)
+	}
+	if bytes.Compare(code, contractCode) != 0 {
+		t.Fatalf("FAIL (%s): Contract not set correctly: %s", t.TestName, common.Bytes2Hex(code))
+	}
+
+	t.CLMock.ProduceBlocks(blockCount, clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			// Limit the number of transactions per block to limit the basefee
+			blockTxCount := MaxTransactionsPerBlock
+			if (t.CLMock.LatestExecutedPayload.Number % 2) == 0 {
+				blockTxCount /= 2
+			}
+			for i := 0; i < blockTxCount; i++ {
+				tx, _ := helper.MakeTransaction(nonce, &contractAddress, 75000, big0, nil, t.TestTransactionType)
+				// Send transaction to both clients
+				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				err := t.Engine.SendTransaction(ctx, tx)
+				if err != nil && !helper.SentTxAlreadyKnown(err) {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
+				ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
+				defer cancel()
+				err = secondaryClient.SendTransaction(ctx, tx)
+				if err != nil && !helper.SentTxAlreadyKnown(err) {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
+				nonce++
+			}
+		},
+		OnForkchoiceBroadcast: func() {
+			// Verify the payload built contained transactions
+			if len(t.CLMock.LatestPayloadBuilt.Transactions) == 0 {
+				t.Fatalf("FAIL (%s): Payload %d contained no transactions", t.TestName, t.CLMock.LatestPayloadBuilt.Number)
+			}
+			t.Logf("INFO (%s): Transactions in payload %d (Producer %s): %d", t.TestName, t.CLMock.LatestPayloadBuilt.Number, t.CLMock.NextBlockProducer.ID(), len(t.CLMock.LatestPayloadBuilt.Transactions))
+			totalTxsIncluded += len(t.CLMock.LatestPayloadBuilt.Transactions)
+			t.Logf("INFO (%s): Total Transactions Included: %d", t.TestName, totalTxsIncluded)
+			t.Logf("INFO (%s): Total Transactions Sent: %d", t.TestName, nonce+1)
+		},
+	})
 
 }

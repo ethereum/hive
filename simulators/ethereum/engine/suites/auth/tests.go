@@ -2,11 +2,13 @@ package suite_auth
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	api "github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
@@ -100,12 +102,16 @@ func GenerateAuthTestSpec(authTestSpec AuthTestSpec) test.Spec {
 			if authTestSpec.TimeDriftSeconds != 0 {
 				testTime = testTime.Add(time.Second * time.Duration(authTestSpec.TimeDriftSeconds))
 			}
-			if err := t.HiveEngine.PrepareAuthCallToken(testSecret, testTime); err != nil {
+			hiveEngine, ok := t.Engine.(*hive_rpc.HiveRPCEngineClient)
+			if !ok {
+				panic(fmt.Errorf("Invalid cast to HiveRPCEngineClient"))
+			}
+			if err := hiveEngine.PrepareAuthCallToken(testSecret, testTime); err != nil {
 				t.Fatalf("FAIL (%s): Unable to prepare the auth token: %v", t.TestName, err)
 			}
 			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 			defer cancel()
-			_, err := t.HiveEngine.ExchangeTransitionConfigurationV1(ctx, &tConf)
+			_, err := hiveEngine.ExchangeTransitionConfigurationV1(ctx, &tConf)
 			if (authTestSpec.AuthOk && err == nil) || (!authTestSpec.AuthOk && err != nil) {
 				// Test passed
 				return

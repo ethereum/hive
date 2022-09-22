@@ -806,6 +806,14 @@ func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 	return stateDB.GetNonce(account), nil
 }
 
+func (n *GethNode) CodeAt(ctx context.Context, account common.Address, blockNumber *big.Int) ([]byte, error) {
+	stateDB, err := n.getStateDB(ctx, blockNumber)
+	if err != nil {
+		return nil, err
+	}
+	return stateDB.GetCode(account), nil
+}
+
 func (n *GethNode) GetBlockTotalDifficulty(ctx context.Context, hash common.Hash) (*big.Int, error) {
 	block := n.eth.BlockChain().GetBlockByHash(hash)
 	if block == nil {
@@ -834,6 +842,14 @@ func (n *GethNode) EnodeURL() (string, error) {
 
 func (n *GethNode) ID() string {
 	return n.node.Config().Name
+}
+
+func (n *GethNode) ClientType() string {
+	return n.node.Config().Name
+}
+
+func (n *GethNode) RPC() *rpc.Client {
+	return nil
 }
 
 func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {

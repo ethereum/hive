@@ -250,7 +250,7 @@ func GenerateInvalidPayload(basePayload *api.ExecutableDataV1, payloadField Inva
 		case InvalidTransactionGasPrice:
 			customTxData.GasPriceOrGasFeeCap = common.Big0
 		case InvalidTransactionGasTipPrice:
-			invalidGasTip := new(big.Int).Set(globals.GasTipPrice)
+			invalidGasTip := new(big.Int).Set(globals.GasTipCap)
 			invalidGasTip.Mul(invalidGasTip, big.NewInt(2))
 			customTxData.GasTipCap = invalidGasTip
 		case InvalidTransactionValue:
