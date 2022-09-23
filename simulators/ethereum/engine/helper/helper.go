@@ -2,6 +2,7 @@ package helper
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -371,6 +372,13 @@ func MakeTransaction(nonce uint64, recipient *common.Address, gasLimit uint64, a
 	return signedTx, nil
 }
 
+// Determines if the error we got from sending the raw tx is because the client
+// already knew the tx (might happen if we produced a re-org where the tx was
+// unwind back into the txpool)
+func SentTxAlreadyKnown(err error) bool {
+	return strings.Contains(err.Error(), "already known")
+}
+
 func SendNextTransaction(testCtx context.Context, node client.EngineClient, recipient common.Address, amount *big.Int, payload []byte, txType TestTransactionType) (*types.Transaction, error) {
 	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
 	if err != nil {
@@ -382,6 +390,8 @@ func SendNextTransaction(testCtx context.Context, node client.EngineClient, reci
 		defer cancel()
 		err := node.SendTransaction(ctx, tx)
 		if err == nil {
+			return tx, nil
+		} else if SentTxAlreadyKnown(err) {
 			return tx, nil
 		}
 		select {

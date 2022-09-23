@@ -65,6 +65,9 @@ type MergeTestSpec struct {
 	// Chain file to initialize the main client.
 	MainChainFile string
 
+	// Transaction type to use throughout the test
+	TestTransactionType helper.TestTransactionType
+
 	// Introduce PREVRANDAO transactions on the PoS blocks, including transition,
 	// which could overwrite an existing transaction in the PoW chain (if re-org
 	// occurred to a lower-height chain)
@@ -213,6 +216,8 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile:            "blocks_2_td_393120.rlp",
 		KeepCheckingUntilTimeout: true,
 		PrevRandaoTransactions:   true,
+		// Tx included in the proof-of-work chain is legacy
+		TestTransactionType: helper.LegacyTxOnly,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ClientStarter: hive_rpc.HiveRPCEngineStarter{
@@ -1152,6 +1157,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 		GenesisFile:                     mergeTestSpec.GenesisFile,
 		DisableMining:                   mergeTestSpec.DisableMining,
 		ChainFile:                       mergeTestSpec.MainChainFile,
+		TestTransactionType:             mergeTestSpec.TestTransactionType,
 		SafeSlotsToImportOptimistically: mergeTestSpec.SafeSlotsToImportOptimistically,
 	}
 }
