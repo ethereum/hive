@@ -18,6 +18,9 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+const testTimeout = 90
+const testTimeoutLong = 220
+
 type SecondaryClientSpec struct {
 	ClientStarter client.EngineStarter
 
@@ -316,7 +319,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile:         "blocks_1_td_196416.rlp",
 		SkipMainClientFcU:     true,
 		SkipMainClientTTDWait: true,
-		TimeoutSeconds:        300,
+		TimeoutSeconds:        testTimeout0,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ClientStarter: hive_rpc.HiveRPCEngineStarter{
@@ -526,7 +529,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                  "Terminal blocks are gossiped (Common Ancestor Depth 5)",
 		TTD:                   1040000,
-		TimeoutSeconds:        180,
+		TimeoutSeconds:        testTimeoutLong,
 		MainChainFile:         "blocks_1_td_196608.rlp",
 		DisableMining:         true,
 		SkipMainClientTTDWait: true,
@@ -599,7 +602,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		// TTD is important in this test case, it guarantees that the CLMocker
 		// selects the PoW Producer as transition payload creator.
 		TTD:                             1230000,
-		TimeoutSeconds:                  180,
+		TimeoutSeconds::                  testTimeoutLong,
 		MainChainFile:                   "blocks_1_td_196608.rlp",
 		DisableMining:                   true,
 		SkipMainClientTTDWait:           true,
@@ -629,7 +632,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                     "Transition on an Invalid Terminal Execution - Difficulty",
 		TTD:                      696608,
-		TimeoutSeconds:           30,
+		TimeoutSeconds:           testTimeout,
 		MainChainFile:            "blocks_1_td_196608.rlp",
 		DisableMining:            true,
 		SkipMainClientTTDWait:    true,
@@ -656,7 +659,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                        "Syncing on an Invalid Terminal Execution - Difficulty",
 		TTD:                         696608,
-		TimeoutSeconds:              30,
+		TimeoutSeconds:              testTimeout,
 		MainChainFile:               "blocks_1_td_196608.rlp",
 		DisableMining:               true,
 		SkipMainClientTTDWait:       true,
@@ -686,7 +689,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                     "Transition on an Invalid Terminal Execution - Distant Future",
 		TTD:                      290000,
-		TimeoutSeconds:           30,
+		TimeoutSeconds:           testTimeout,
 		MainChainFile:            "blocks_1_td_196608.rlp",
 		DisableMining:            true,
 		SkipMainClientTTDWait:    true,
@@ -713,7 +716,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                     "Transition on an Invalid Terminal Execution - Sealed MixHash",
 		TTD:                      290000,
-		TimeoutSeconds:           30,
+		TimeoutSeconds:           testTimeout,
 		MainChainFile:            "blocks_1_td_196608.rlp",
 		DisableMining:            true,
 		SkipMainClientTTDWait:    true,
@@ -740,7 +743,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                        "Syncing on an Invalid Terminal Execution - Sealed MixHash",
 		TTD:                         290000,
-		TimeoutSeconds:              30,
+		TimeoutSeconds:              testTimeout,
 		MainChainFile:               "blocks_1_td_196608.rlp",
 		DisableMining:               true,
 		SkipMainClientTTDWait:       true,
@@ -770,7 +773,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                     "Transition on an Invalid Terminal Execution - Sealed Nonce",
 		TTD:                      290000,
-		TimeoutSeconds:           30,
+		TimeoutSeconds:           testTimeout,
 		MainChainFile:            "blocks_1_td_196608.rlp",
 		DisableMining:            true,
 		SkipMainClientTTDWait:    true,
@@ -797,7 +800,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                        "Syncing on an Invalid Terminal Execution - Sealed Nonce",
 		TTD:                         290000,
-		TimeoutSeconds:              30,
+		TimeoutSeconds:              testTimeout,
 		MainChainFile:               "blocks_1_td_196608.rlp",
 		DisableMining:               true,
 		SkipMainClientTTDWait:       true,
@@ -827,7 +830,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                     "Transition on an Invalid Terminal Execution - Balance Mismatch",
 		TTD:                      290000,
-		TimeoutSeconds:           30,
+		TimeoutSeconds:           testTimeout,
 		MainChainFile:            "blocks_1_td_196608.rlp",
 		DisableMining:            true,
 		SkipMainClientTTDWait:    true,
@@ -854,7 +857,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                        "Syncing on an Invalid Terminal Execution - Balance Mismatch",
 		TTD:                         290000,
-		TimeoutSeconds:              30,
+		TimeoutSeconds:              testTimeout,
 		MainChainFile:               "blocks_1_td_196608.rlp",
 		DisableMining:               true,
 		SkipMainClientTTDWait:       true,
