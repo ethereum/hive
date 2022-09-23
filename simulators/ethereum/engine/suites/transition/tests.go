@@ -18,8 +18,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-const testTimeout = 90
-const testTimeoutLong = 220
+const testTimeout = 180
+const testTimeoutLong = 300
 
 type SecondaryClientSpec struct {
 	ClientStarter client.EngineStarter
@@ -319,7 +319,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		MainChainFile:         "blocks_1_td_196416.rlp",
 		SkipMainClientFcU:     true,
 		SkipMainClientTTDWait: true,
-		TimeoutSeconds:        testTimeout0,
+		TimeoutSeconds:        testTimeoutLong,
 		SecondaryClientSpecs: []SecondaryClientSpec{
 			{
 				ClientStarter: hive_rpc.HiveRPCEngineStarter{
@@ -602,7 +602,7 @@ var mergeTestSpecs = []MergeTestSpec{
 		// TTD is important in this test case, it guarantees that the CLMocker
 		// selects the PoW Producer as transition payload creator.
 		TTD:                             1230000,
-		TimeoutSeconds::                  testTimeoutLong,
+		TimeoutSeconds:                  testTimeoutLong,
 		MainChainFile:                   "blocks_1_td_196608.rlp",
 		DisableMining:                   true,
 		SkipMainClientTTDWait:           true,
@@ -659,7 +659,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                        "Syncing on an Invalid Terminal Execution - Difficulty",
 		TTD:                         696608,
-		TimeoutSeconds:              testTimeout,
+		TimeoutSeconds:              testTimeoutLong,
 		MainChainFile:               "blocks_1_td_196608.rlp",
 		DisableMining:               true,
 		SkipMainClientTTDWait:       true,
@@ -743,7 +743,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                        "Syncing on an Invalid Terminal Execution - Sealed MixHash",
 		TTD:                         290000,
-		TimeoutSeconds:              testTimeout,
+		TimeoutSeconds:              testTimeoutLong,
 		MainChainFile:               "blocks_1_td_196608.rlp",
 		DisableMining:               true,
 		SkipMainClientTTDWait:       true,
@@ -800,7 +800,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                        "Syncing on an Invalid Terminal Execution - Sealed Nonce",
 		TTD:                         290000,
-		TimeoutSeconds:              testTimeout,
+		TimeoutSeconds:              testTimeoutLong,
 		MainChainFile:               "blocks_1_td_196608.rlp",
 		DisableMining:               true,
 		SkipMainClientTTDWait:       true,
@@ -857,7 +857,7 @@ var mergeTestSpecs = []MergeTestSpec{
 	{
 		Name:                        "Syncing on an Invalid Terminal Execution - Balance Mismatch",
 		TTD:                         290000,
-		TimeoutSeconds:              testTimeout,
+		TimeoutSeconds:              testTimeoutLong,
 		MainChainFile:               "blocks_1_td_196608.rlp",
 		DisableMining:               true,
 		SkipMainClientTTDWait:       true,

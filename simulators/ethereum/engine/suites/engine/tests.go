@@ -23,7 +23,7 @@ import (
 // Execution specification reference:
 // https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
 
-const testTimeout = 90
+const testTimeout = 180
 
 var (
 	big0      = new(big.Int)
@@ -37,251 +37,307 @@ var (
 var Tests = []test.Spec{
 	// Engine API Negative Test Cases
 	{
-		Name: "Invalid Terminal Block in ForkchoiceUpdated",
-		Run:  invalidTerminalBlockForkchoiceUpdated,
-		TTD:  1000000,
+		Name:           "Invalid Terminal Block in ForkchoiceUpdated",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidTerminalBlockForkchoiceUpdated,
+		TTD:            1000000,
 	},
 	{
-		Name: "Invalid GetPayload Under PoW",
-		Run:  invalidGetPayloadUnderPoW,
-		TTD:  1000000,
+		Name:           "Invalid GetPayload Under PoW",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidGetPayloadUnderPoW,
+		TTD:            1000000,
 	},
 	{
-		Name: "Invalid Terminal Block in NewPayload",
-		Run:  invalidTerminalBlockNewPayload,
-		TTD:  1000000,
+		Name:           "Invalid Terminal Block in NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidTerminalBlockNewPayload,
+		TTD:            1000000,
 	},
 	{
-		Name: "Inconsistent Head in ForkchoiceState",
-		Run:  inconsistentForkchoiceStateGen("Head"),
+		Name:           "Inconsistent Head in ForkchoiceState",
+		TimeoutSeconds: testTimeout,
+		Run:            inconsistentForkchoiceStateGen("Head"),
 	},
 	{
-		Name: "Inconsistent Safe in ForkchoiceState",
-		Run:  inconsistentForkchoiceStateGen("Safe"),
+		Name:           "Inconsistent Safe in ForkchoiceState",
+		TimeoutSeconds: testTimeout,
+		Run:            inconsistentForkchoiceStateGen("Safe"),
 	},
 	{
-		Name: "Inconsistent Finalized in ForkchoiceState",
-		Run:  inconsistentForkchoiceStateGen("Finalized"),
+		Name:           "Inconsistent Finalized in ForkchoiceState",
+		TimeoutSeconds: testTimeout,
+		Run:            inconsistentForkchoiceStateGen("Finalized"),
 	},
 	{
-		Name: "Unknown HeadBlockHash",
-		Run:  unknownHeadBlockHash,
+		Name:           "Unknown HeadBlockHash",
+		TimeoutSeconds: testTimeout,
+		Run:            unknownHeadBlockHash,
 	},
 	{
-		Name: "Unknown SafeBlockHash",
-		Run:  unknownSafeBlockHash,
+		Name:           "Unknown SafeBlockHash",
+		TimeoutSeconds: testTimeout,
+		Run:            unknownSafeBlockHash,
 	},
 	{
-		Name: "Unknown FinalizedBlockHash",
-		Run:  unknownFinalizedBlockHash,
+		Name:           "Unknown FinalizedBlockHash",
+		TimeoutSeconds: testTimeout,
+		Run:            unknownFinalizedBlockHash,
 	},
 	{
-		Name: "ForkchoiceUpdated Invalid Payload Attributes",
-		Run:  invalidPayloadAttributesGen(false),
+		Name:           "ForkchoiceUpdated Invalid Payload Attributes",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadAttributesGen(false),
 	},
 	{
-		Name: "ForkchoiceUpdated Invalid Payload Attributes (Syncing)",
-		Run:  invalidPayloadAttributesGen(true),
+		Name:           "ForkchoiceUpdated Invalid Payload Attributes (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadAttributesGen(true),
 	},
 	{
-		Name: "Pre-TTD ForkchoiceUpdated After PoS Switch",
-		Run:  preTTDFinalizedBlockHash,
-		TTD:  2,
+		Name:           "Pre-TTD ForkchoiceUpdated After PoS Switch",
+		TimeoutSeconds: testTimeout,
+		Run:            preTTDFinalizedBlockHash,
+		TTD:            2,
 	},
 	// Invalid Payload Tests
 	{
-		Name: "Bad Hash on NewPayload",
-		Run:  badHashOnNewPayloadGen(false, false),
+		Name:           "Bad Hash on NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            badHashOnNewPayloadGen(false, false),
 	},
 	{
-		Name: "Bad Hash on NewPayload Syncing",
-		Run:  badHashOnNewPayloadGen(true, false),
+		Name:           "Bad Hash on NewPayload Syncing",
+		TimeoutSeconds: testTimeout,
+		Run:            badHashOnNewPayloadGen(true, false),
 	},
 	{
-		Name: "Bad Hash on NewPayload Side Chain",
-		Run:  badHashOnNewPayloadGen(false, true),
+		Name:           "Bad Hash on NewPayload Side Chain",
+		TimeoutSeconds: testTimeout,
+		Run:            badHashOnNewPayloadGen(false, true),
 	},
 	{
-		Name: "Bad Hash on NewPayload Side Chain Syncing",
-		Run:  badHashOnNewPayloadGen(true, true),
+		Name:           "Bad Hash on NewPayload Side Chain Syncing",
+		TimeoutSeconds: testTimeout,
+		Run:            badHashOnNewPayloadGen(true, true),
 	},
 	{
-		Name: "ParentHash==BlockHash on NewPayload",
-		Run:  parentHashOnExecPayload,
+		Name:           "ParentHash==BlockHash on NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            parentHashOnExecPayload,
 	},
 	{
-		Name:      "Invalid Transition Payload",
-		Run:       invalidTransitionPayload,
-		TTD:       393504,
-		ChainFile: "blocks_2_td_393504.rlp",
+		Name:           "Invalid Transition Payload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidTransitionPayload,
+		TTD:            393504,
+		ChainFile:      "blocks_2_td_393504.rlp",
 	},
 	{
-		Name: "Invalid ParentHash NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidParentHash, false, false),
+		Name:           "Invalid ParentHash NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidParentHash, false, false),
 	},
 	{
-		Name: "Invalid ParentHash NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidParentHash, true, false),
+		Name:           "Invalid ParentHash NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidParentHash, true, false),
 	},
 	{
-		Name: "Invalid StateRoot NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidStateRoot, false, false),
+		Name:           "Invalid StateRoot NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidStateRoot, false, false),
 	},
 	{
-		Name: "Invalid StateRoot NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidStateRoot, true, false),
+		Name:           "Invalid StateRoot NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidStateRoot, true, false),
 	},
 	{
-		Name: "Invalid StateRoot NewPayload, Empty Transactions",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidStateRoot, false, true),
+		Name:           "Invalid StateRoot NewPayload, Empty Transactions",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidStateRoot, false, true),
 	},
 	{
-		Name: "Invalid StateRoot NewPayload, Empty Transactions (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidStateRoot, true, true),
+		Name:           "Invalid StateRoot NewPayload, Empty Transactions (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidStateRoot, true, true),
 	},
 	{
-		Name: "Invalid ReceiptsRoot NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidReceiptsRoot, false, false),
+		Name:           "Invalid ReceiptsRoot NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidReceiptsRoot, false, false),
 	},
 	{
-		Name: "Invalid ReceiptsRoot NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidReceiptsRoot, true, false),
+		Name:           "Invalid ReceiptsRoot NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidReceiptsRoot, true, false),
 	},
 	{
-		Name: "Invalid Number NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidNumber, false, false),
+		Name:           "Invalid Number NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidNumber, false, false),
 	},
 	{
-		Name: "Invalid Number NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidNumber, true, false),
+		Name:           "Invalid Number NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidNumber, true, false),
 	},
 	{
-		Name: "Invalid GasLimit NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidGasLimit, false, false),
+		Name:           "Invalid GasLimit NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidGasLimit, false, false),
 	},
 	{
-		Name: "Invalid GasLimit NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidGasLimit, true, false),
+		Name:           "Invalid GasLimit NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidGasLimit, true, false),
 	},
 	{
-		Name: "Invalid GasUsed NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidGasUsed, false, false),
+		Name:           "Invalid GasUsed NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidGasUsed, false, false),
 	},
 	{
-		Name: "Invalid GasUsed NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidGasUsed, true, false),
+		Name:           "Invalid GasUsed NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidGasUsed, true, false),
 	},
 	{
-		Name: "Invalid Timestamp NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidTimestamp, false, false),
+		Name:           "Invalid Timestamp NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidTimestamp, false, false),
 	},
 	{
-		Name: "Invalid Timestamp NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidTimestamp, true, false),
+		Name:           "Invalid Timestamp NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidTimestamp, true, false),
 	},
 	{
-		Name: "Invalid PrevRandao NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidPrevRandao, false, false),
+		Name:           "Invalid PrevRandao NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidPrevRandao, false, false),
 	},
 	{
-		Name: "Invalid PrevRandao NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.InvalidPrevRandao, true, false),
+		Name:           "Invalid PrevRandao NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.InvalidPrevRandao, true, false),
 	},
 	{
-		Name: "Invalid Incomplete Transactions NewPayload",
-		Run:  invalidPayloadTestCaseGen(helper.RemoveTransaction, false, false),
+		Name:           "Invalid Incomplete Transactions NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.RemoveTransaction, false, false),
 	},
 	{
-		Name: "Invalid Incomplete Transactions NewPayload (Syncing)",
-		Run:  invalidPayloadTestCaseGen(helper.RemoveTransaction, true, false),
+		Name:           "Invalid Incomplete Transactions NewPayload (Syncing)",
+		TimeoutSeconds: testTimeout,
+		Run:            invalidPayloadTestCaseGen(helper.RemoveTransaction, true, false),
 	},
 	{
 		Name:                "Invalid Transaction Signature NewPayload",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionSignature, false, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Signature NewPayload (EIP-1559)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionSignature, false, false),
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Signature NewPayload (Syncing)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionSignature, true, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Nonce NewPayload",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionNonce, false, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Nonce NewPayload (EIP-1559)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionNonce, false, false),
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Nonce NewPayload (Syncing)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionNonce, true, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction GasPrice NewPayload",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasPrice, false, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction GasPrice NewPayload (EIP-1559)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasPrice, false, false),
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction GasPrice NewPayload (Syncing)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasPrice, true, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas Tip NewPayload (EIP-1559)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasTipPrice, false, false),
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas Tip NewPayload (EIP-1559, Syncing)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGasTipPrice, true, false),
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas NewPayload",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGas, false, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas NewPayload (EIP-1559)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGas, false, false),
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Gas NewPayload (Syncing)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionGas, true, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Value NewPayload",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionValue, false, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Value NewPayload (EIP-1559)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionValue, false, false),
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction Value NewPayload (Syncing)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionValue, true, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Invalid Transaction ChainID NewPayload",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionChainID, false, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
@@ -292,6 +348,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:                "Invalid Transaction ChainID NewPayload (Syncing)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 invalidPayloadTestCaseGen(helper.InvalidTransactionChainID, true, false),
 		TestTransactionType: helper.LegacyTxOnly,
 	},
@@ -299,16 +356,19 @@ var Tests = []test.Spec{
 	// Invalid Ancestor Re-Org Tests (Reveal via newPayload)
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P1', Reveal using newPayload",
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run:              invalidMissingAncestorReOrgGen(1, helper.InvalidStateRoot, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P9', Reveal using newPayload",
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run:              invalidMissingAncestorReOrgGen(9, helper.InvalidStateRoot, true),
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Invalid P10', Reveal using newPayload",
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run:              invalidMissingAncestorReOrgGen(10, helper.InvalidStateRoot, true),
 	},
@@ -326,7 +386,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid StateRoot, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -336,7 +396,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid StateRoot, Empty Txs, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -347,7 +407,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid StateRoot, Empty Txs, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -358,7 +418,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid ReceiptsRoot, Invalid P8', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -368,7 +428,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid ReceiptsRoot, Invalid P8'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -380,7 +440,7 @@ var Tests = []test.Spec{
 		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
 		{
 			Name:             "Invalid Ancestor Chain Re-Org, Invalid Number, Invalid P9', Reveal using sync",
-			TimeoutSeconds::   testTimeout,
+			TimeoutSeconds:   testTimeout,
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex: 9,
@@ -390,7 +450,7 @@ var Tests = []test.Spec{
 		},
 		{
 			Name:             "Invalid Ancestor Chain Sync, Invalid Number, Invalid P9'",
-			TimeoutSeconds::   testTimeout,
+			TimeoutSeconds:   testTimeout,
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex: 9,
@@ -401,7 +461,7 @@ var Tests = []test.Spec{
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasLimit, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -411,7 +471,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid GasLimit, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -421,7 +481,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid GasUsed, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -431,7 +491,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid GasUsed, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -441,7 +501,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Timestamp, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -451,7 +511,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Timestamp, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 8,
@@ -463,7 +523,7 @@ var Tests = []test.Spec{
 			TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
 		{
 			Name:             "Invalid Ancestor Chain Re-Org, Invalid PrevRandao, Invalid P9', Reveal using sync",
-			TimeoutSeconds::   testTimeout,
+			TimeoutSeconds:   testTimeout,
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex: 8,
@@ -473,7 +533,7 @@ var Tests = []test.Spec{
 		},
 		{
 			Name:             "Invalid Ancestor Chain Sync, Invalid PrevRandao, Invalid P9'",
-			TimeoutSeconds::   testTimeout,
+			TimeoutSeconds:   testTimeout,
 			SlotsToFinalized: big.NewInt(20),
 			Run: InvalidMissingAncestorReOrgSpec{
 				PayloadInvalidIndex: 8,
@@ -484,7 +544,7 @@ var Tests = []test.Spec{
 	*/
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Incomplete Transactions, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -494,7 +554,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Incomplete Transactions, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -504,7 +564,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Signature, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -514,7 +574,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction Signature, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -524,7 +584,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Nonce, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -534,7 +594,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction Nonce, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -544,7 +604,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Gas, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -554,7 +614,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction Gas, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -564,7 +624,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction GasPrice, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -574,7 +634,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction GasPrice, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -584,7 +644,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Transaction Value, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -594,7 +654,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Transaction Value, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -604,7 +664,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Re-Org, Invalid Ommers, Invalid P9', Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -614,7 +674,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Ancestor Chain Sync, Invalid Ommers, Invalid P9'",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		SlotsToFinalized: big.NewInt(20),
 		Run: InvalidMissingAncestorReOrgSpec{
 			PayloadInvalidIndex: 9,
@@ -626,7 +686,7 @@ var Tests = []test.Spec{
 	// Invalid Transition Payload Re-Org/Sync Tests (Reveal via sync through secondary client)
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid StateRoot, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -640,7 +700,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid StateRoot",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -654,7 +714,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid StateRoot, Empty Txs, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -669,7 +729,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid StateRoot, Empty Txs",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -684,7 +744,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid ReceiptsRoot, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -698,7 +758,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid ReceiptsRoot",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -714,7 +774,7 @@ var Tests = []test.Spec{
 		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
 		{
 			Name:             "Invalid Transition Payload Re-Org, Invalid Number, Reveal using sync",
-			TimeoutSeconds::   testTimeout,
+			TimeoutSeconds:   testTimeout,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
@@ -728,7 +788,7 @@ var Tests = []test.Spec{
 		},
 		{
 			Name:             "Invalid Transition Payload Sync, Invalid Number",
-			TimeoutSeconds::   testTimeout,
+			TimeoutSeconds:   testTimeout,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
@@ -743,7 +803,7 @@ var Tests = []test.Spec{
 	*/
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid GasLimit, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -757,7 +817,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid GasLimit",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -771,7 +831,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid GasUsed, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -785,7 +845,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid GasUsed",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -799,7 +859,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Timestamp, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -813,7 +873,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Timestamp",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -829,7 +889,7 @@ var Tests = []test.Spec{
 		TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
 		{
 			Name:             "Invalid Transition Payload Re-Org, Invalid PrevRandao, Reveal using sync",
-			TimeoutSeconds::   testTimeout,
+			TimeoutSeconds:   testTimeout,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
@@ -843,7 +903,7 @@ var Tests = []test.Spec{
 		},
 		{
 			Name:             "Invalid Transition Payload Sync, Invalid PrevRandao",
-			TimeoutSeconds::   testTimeout,
+			TimeoutSeconds:   testTimeout,
 			TTD:              393504,
 			ChainFile:        "blocks_2_td_393504.rlp",
 			SlotsToFinalized: big.NewInt(20),
@@ -858,7 +918,7 @@ var Tests = []test.Spec{
 	*/
 	{
 		Name:             "Invalid Transition Payload Re-Org, Incomplete Transactions, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -872,7 +932,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Incomplete Transactions",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -886,7 +946,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Signature, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -900,7 +960,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction Signature",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -914,7 +974,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Nonce, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -928,7 +988,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction Nonce",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -942,7 +1002,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Gas, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -956,7 +1016,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction Gas",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -970,7 +1030,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction GasPrice, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -984,7 +1044,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction GasPrice",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -998,7 +1058,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Value, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -1012,7 +1072,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Transaction Value",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -1026,7 +1086,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Re-Org, Invalid Ommers, Reveal using sync",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -1040,7 +1100,7 @@ var Tests = []test.Spec{
 	},
 	{
 		Name:             "Invalid Transition Payload Sync, Invalid Ommers",
-		TimeoutSeconds::   testTimeout,
+		TimeoutSeconds:   testTimeout,
 		TTD:              393504,
 		ChainFile:        "blocks_2_td_393504.rlp",
 		SlotsToFinalized: big.NewInt(20),
@@ -1055,115 +1115,139 @@ var Tests = []test.Spec{
 
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{
-		Name: "latest Block after NewPayload",
-		Run:  blockStatusExecPayloadGen(false),
+		Name:           "latest Block after NewPayload",
+		TimeoutSeconds: testTimeout,
+		Run:            blockStatusExecPayloadGen(false),
 	},
 	{
-		Name: "latest Block after NewPayload (Transition Block)",
-		Run:  blockStatusExecPayloadGen(true),
-		TTD:  5,
+		Name:           "latest Block after NewPayload (Transition Block)",
+		TimeoutSeconds: testTimeout,
+		Run:            blockStatusExecPayloadGen(true),
+		TTD:            5,
 	},
 	{
-		Name: "latest Block after New HeadBlockHash",
-		Run:  blockStatusHeadBlockGen(false),
+		Name:           "latest Block after New HeadBlockHash",
+		TimeoutSeconds: testTimeout,
+		Run:            blockStatusHeadBlockGen(false),
 	},
 	{
-		Name: "latest Block after New HeadBlockHash (Transition Block)",
-		Run:  blockStatusHeadBlockGen(true),
-		TTD:  5,
+		Name:           "latest Block after New HeadBlockHash (Transition Block)",
+		TimeoutSeconds: testTimeout,
+		Run:            blockStatusHeadBlockGen(true),
+		TTD:            5,
 	},
 	{
-		Name: "safe Block after New SafeBlockHash",
-		Run:  blockStatusSafeBlock,
-		TTD:  5,
+		Name:           "safe Block after New SafeBlockHash",
+		TimeoutSeconds: testTimeout,
+		Run:            blockStatusSafeBlock,
+		TTD:            5,
 	},
 	{
-		Name: "finalized Block after New FinalizedBlockHash",
-		Run:  blockStatusFinalizedBlock,
-		TTD:  5,
+		Name:           "finalized Block after New FinalizedBlockHash",
+		TimeoutSeconds: testTimeout,
+		Run:            blockStatusFinalizedBlock,
+		TTD:            5,
 	},
 	{
 		Name:             "safe, finalized on Canonical Chain",
+		TimeoutSeconds:   testTimeout,
 		Run:              safeFinalizedCanonicalChain,
 		SlotsToSafe:      big.NewInt(1),
 		SlotsToFinalized: big.NewInt(2),
 	},
 	{
-		Name: "latest Block after Reorg",
-		Run:  blockStatusReorg,
+		Name:           "latest Block after Reorg",
+		TimeoutSeconds: testTimeout,
+		Run:            blockStatusReorg,
 	},
 
 	// Payload Tests
 	{
-		Name: "Re-Execute Payload",
-		Run:  reExecPayloads,
+		Name:           "Re-Execute Payload",
+		TimeoutSeconds: testTimeout,
+		Run:            reExecPayloads,
 	},
 	{
-		Name: "Multiple New Payloads Extending Canonical Chain",
-		Run:  multipleNewCanonicalPayloads,
+		Name:           "Multiple New Payloads Extending Canonical Chain",
+		TimeoutSeconds: testTimeout,
+		Run:            multipleNewCanonicalPayloads,
 	},
 	{
-		Name: "Consecutive Payload Execution",
-		Run:  inOrderPayloads,
+		Name:           "Consecutive Payload Execution",
+		TimeoutSeconds: testTimeout,
+		Run:            inOrderPayloads,
 	},
 	{
-		Name: "Valid NewPayload->ForkchoiceUpdated on Syncing Client",
-		Run:  validPayloadFcUSyncingClient,
+		Name:           "Valid NewPayload->ForkchoiceUpdated on Syncing Client",
+		TimeoutSeconds: testTimeout,
+		Run:            validPayloadFcUSyncingClient,
 	},
 	{
-		Name:      "NewPayload with Missing ForkchoiceUpdated",
-		Run:       missingFcu,
-		TTD:       393120,
-		ChainFile: "blocks_2_td_393504.rlp",
+		Name:           "NewPayload with Missing ForkchoiceUpdated",
+		TimeoutSeconds: testTimeout,
+		Run:            missingFcu,
+		TTD:            393120,
+		ChainFile:      "blocks_2_td_393504.rlp",
 	},
 	{
-		Name: "Payload Build after New Invalid Payload",
-		Run:  payloadBuildAfterNewInvalidPayload,
+		Name:           "Payload Build after New Invalid Payload",
+		TimeoutSeconds: testTimeout,
+		Run:            payloadBuildAfterNewInvalidPayload,
 	},
 	{
 		Name:                "Build Payload with Invalid ChainID Transaction (Legacy Tx)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 buildPayloadWithInvalidChainIDTx,
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Build Payload with Invalid ChainID Transaction (EIP-1559)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 buildPayloadWithInvalidChainIDTx,
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
 
 	// Re-org using Engine API
 	{
-		Name: "Transaction Reorg",
-		Run:  transactionReorg,
+		Name:           "Transaction Reorg",
+		TimeoutSeconds: testTimeout,
+		Run:            transactionReorg,
 	},
 	{
-		Name: "Transaction Reorg - Check Blockhash",
-		Run:  transactionReorgBlockhash(false),
+		Name:           "Transaction Reorg - Check Blockhash",
+		TimeoutSeconds: testTimeout,
+		Run:            transactionReorgBlockhash(false),
 	},
 	{
-		Name: "Transaction Reorg - Check Blockhash with NP on revert",
-		Run:  transactionReorgBlockhash(true),
+		Name:           "Transaction Reorg - Check Blockhash with NP on revert",
+		TimeoutSeconds: testTimeout,
+		Run:            transactionReorgBlockhash(true),
 	},
 	{
-		Name: "Sidechain Reorg",
-		Run:  sidechainReorg,
+		Name:           "Sidechain Reorg",
+		TimeoutSeconds: testTimeout,
+		Run:            sidechainReorg,
 	},
 	{
-		Name: "Re-Org Back into Canonical Chain",
-		Run:  reorgBack,
+		Name:           "Re-Org Back into Canonical Chain",
+		TimeoutSeconds: testTimeout,
+		Run:            reorgBack,
 	},
 	{
-		Name: "Re-Org Back to Canonical Chain From Syncing Chain",
-		Run:  reorgBackFromSyncing,
+		Name:           "Re-Org Back to Canonical Chain From Syncing Chain",
+		TimeoutSeconds: testTimeout,
+		Run:            reorgBackFromSyncing,
 	},
 	{
 		Name:             "Import and re-org to previously validated payload on a side chain",
+		TimeoutSeconds:   testTimeout,
 		SlotsToSafe:      big.NewInt(15),
 		SlotsToFinalized: big.NewInt(20),
 		Run:              reorgPrevValidatedPayloadOnSideChain,
 	},
 	{
 		Name:             "Safe Re-Org to Side Chain",
+		TimeoutSeconds:   testTimeout,
 		Run:              safeReorgToSideChain,
 		SlotsToSafe:      big.NewInt(1),
 		SlotsToFinalized: big.NewInt(2),
@@ -1172,11 +1256,13 @@ var Tests = []test.Spec{
 	// Suggested Fee Recipient in Payload creation
 	{
 		Name:                "Suggested Fee Recipient Test",
+		TimeoutSeconds:      testTimeout,
 		Run:                 suggestedFeeRecipient,
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "Suggested Fee Recipient Test (EIP-1559 Transactions)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 suggestedFeeRecipient,
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
@@ -1184,12 +1270,14 @@ var Tests = []test.Spec{
 	// PrevRandao opcode tests
 	{
 		Name:                "PrevRandao Opcode Transactions",
+		TimeoutSeconds:      testTimeout,
 		Run:                 prevRandaoOpcodeTx,
 		TTD:                 10,
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "PrevRandao Opcode Transactions (EIP-1559 Transactions)",
+		TimeoutSeconds:      testTimeout,
 		Run:                 prevRandaoOpcodeTx,
 		TTD:                 10,
 		TestTransactionType: helper.DynamicFeeTxOnly,
