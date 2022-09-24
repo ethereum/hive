@@ -145,8 +145,6 @@ func (d *Devnet) AddOpL2(opts ...hivesim.StartOption) {
 	}
 	defaultSettings := hivesim.Params{
 		"HIVE_ETH1_LOGLEVEL": "3",
-		// just repeat that of the genesis block (rollup cfg is not initialized yet)
-		"HIVE_ETHERBASE": d.L2Cfg.Coinbase.String(),
 	}
 	input := []hivesim.StartOption{defaultSettings}
 
