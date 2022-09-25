@@ -31,6 +31,10 @@ func (e *ELNode) HttpRpcEndpoint() string {
 	return fmt.Sprintf("http://%v:%d", e.IP, HttpRPCPort)
 }
 
+func (e *ELNode) EngineEndpoint() string {
+	return fmt.Sprintf("ws://%v:%d", e.IP, EnginePort)
+}
+
 func (e *ELNode) WsRpcEndpoint() string {
 	// carried over from older mergenet ws connection problems, idk why clients are different
 	switch e.Client.Type {

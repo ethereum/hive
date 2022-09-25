@@ -183,7 +183,7 @@ func (d *Devnet) AddOpNode(eth1Index int, l2EngIndex int, sequencer bool, opts .
 	}
 	defaultSettings := HiveUnpackParams{
 		opnf.L1NodeAddr.EnvVar:           eth1Node.WsRpcEndpoint(),
-		opnf.L2EngineAddr.EnvVar:         l2Engine.WsRpcEndpoint(),
+		opnf.L2EngineAddr.EnvVar:         l2Engine.EngineEndpoint(),
 		opnf.RollupConfig.EnvVar:         "/rollup_config.json",
 		opnf.RPCListenAddr.EnvVar:        "0.0.0.0",
 		opnf.RPCListenPort.EnvVar:        fmt.Sprintf("%d", RollupRPCPort),
