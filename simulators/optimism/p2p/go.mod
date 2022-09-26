@@ -2,14 +2,14 @@ module github.com/ethereum/hive/simulators/optimism/p2p
 
 go 1.18
 
-replace github.com/ethereum/go-ethereum v1.10.23 => github.com/ethereum-optimism/op-geth v0.0.0-20220921202220-511148385c73
+replace github.com/ethereum/go-ethereum v1.10.23 => github.com/ethereum-optimism/op-geth v0.0.0-20220926184707-53d23c240afd
 
 replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c
 
 replace github.com/ethereum/hive/optimism v0.0.0 => github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c
 
 require (
-	github.com/ethereum-optimism/optimism/op-node v0.8.7
+	github.com/ethereum-optimism/optimism/op-node v0.8.8
 	github.com/ethereum/go-ethereum v1.10.23
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/ethereum/hive/optimism v0.0.0
@@ -35,7 +35,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
 	github.com/ethereum-optimism/optimism/op-batcher v0.4.0 // indirect
-	github.com/ethereum-optimism/optimism/op-bindings v0.8.7 // indirect
+	github.com/ethereum-optimism/optimism/op-bindings v0.8.8 // indirect
 	github.com/ethereum-optimism/optimism/op-proposer v0.8.7 // indirect
 	github.com/ethereum-optimism/optimism/op-service v0.8.7 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
