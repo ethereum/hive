@@ -238,8 +238,8 @@ github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c h1:3x34MBRX
 github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c/go.mod h1:SH5X2jsgBzhSFkcG2OD9O8gTC4iXU1HycjLiWp/oDs0=
 github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c h1:8Y5Y5BNWoAQ+bB2tiP5NpftwZqd5uitlEkCOCtixD/4=
 github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c/go.mod h1:dFaAz4daQyhcod7abU8GbbyFYFHpg+nUEjB+acs34RE=
-github.com/ethereum-optimism/op-geth v0.0.0-20220907143004-2aacc679d638 h1:LcvgHjeooGBobfEIEYikMzx1MoIAjRqa/ZDdkrhV3Hw=
-github.com/ethereum-optimism/op-geth v0.0.0-20220907143004-2aacc679d638/go.mod h1:/6CsT5Ceen2WPLI/oCA3xMcZ5sWMF/D46SjM/ayY0Oo=
+github.com/ethereum-optimism/op-geth v0.0.0-20220921202220-511148385c73 h1:eXnnByFF0QiN1Qrq0wYmvI5lbDM8QQM0pv6AHx2FLnk=
+github.com/ethereum-optimism/op-geth v0.0.0-20220921202220-511148385c73/go.mod h1:/6CsT5Ceen2WPLI/oCA3xMcZ5sWMF/D46SjM/ayY0Oo=
 github.com/ethereum-optimism/optimism/op-batcher v0.7.0 h1:gE3v1NQA+x/02CUHkelNJO8iXKWTDFgPTYdgY4oKtsk=
 github.com/ethereum-optimism/optimism/op-batcher v0.7.0/go.mod h1:ir6uju6GWVojOdQx2xh92nEGtrjFuTnqMM5VbtvrO5M=
 github.com/ethereum-optimism/optimism/op-bindings v0.7.0 h1:kIZKDSXi5MZh9BtCk8/PxK6AOK1ytANVrezveuC9WhI=

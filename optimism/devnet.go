@@ -5,6 +5,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"strconv"
+	"sync"
+	"time"
+
 	"github.com/ethereum-optimism/optimism/op-bindings/predeploys"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/genesis"
 	"github.com/ethereum-optimism/optimism/op-node/eth"
@@ -14,10 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"
-	"math/big"
-	"strconv"
-	"sync"
-	"time"
 
 	opbf "github.com/ethereum-optimism/optimism/op-batcher/flags"
 	opnf "github.com/ethereum-optimism/optimism/op-node/flags"
@@ -389,13 +390,14 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 		L2ChainID:   uint64(L2ChainID),
 		L2BlockTime: 2,
 
-		MaxSequencerDrift:      maxSeqDrift,
-		SequencerWindowSize:    seqWindowSize,
-		ChannelTimeout:         chanTimeout,
-		P2PSequencerAddress:    d.Addresses.SequencerP2P,
-		OptimismL2FeeRecipient: common.Address{0: 0x42, 19: 0xf0}, // tbd
-		BatchInboxAddress:      common.Address{0: 0x42, 19: 0xff}, // tbd
-		BatchSenderAddress:     d.Addresses.Batcher,
+		FinalizationPeriodSeconds: 2,
+		MaxSequencerDrift:         maxSeqDrift,
+		SequencerWindowSize:       seqWindowSize,
+		ChannelTimeout:            chanTimeout,
+		P2PSequencerAddress:       d.Addresses.SequencerP2P,
+		OptimismL2FeeRecipient:    common.Address{0: 0x42, 19: 0xf0}, // tbd
+		BatchInboxAddress:         common.Address{0: 0x42, 19: 0xff}, // tbd
+		BatchSenderAddress:        d.Addresses.Batcher,
 
 		L2OutputOracleSubmissionInterval: 6,
 		L2OutputOracleStartingTimestamp:  -1,

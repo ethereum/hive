@@ -2,15 +2,15 @@ module github.com/ethereum/hive/simulators/optimism/l1ops
 
 go 1.18
 
-replace github.com/ethereum/go-ethereum v1.10.23 => github.com/ethereum-optimism/op-geth v0.0.0-20220909213840-e6575c0168f1
+replace github.com/ethereum/go-ethereum v1.10.23 => github.com/ethereum-optimism/op-geth v0.0.0-20220921202220-511148385c73
 
 replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.com/ethereum-optimism/hive v0.0.0-20220811164854-8d8a3893710c
 
 replace github.com/ethereum/hive/optimism v0.0.0 => github.com/ethereum-optimism/hive/optimism v0.0.0-20220811164854-8d8a3893710c
 
 require (
-	github.com/ethereum-optimism/optimism/op-bindings v0.8.6
-	github.com/ethereum-optimism/optimism/op-node v0.8.6
+	github.com/ethereum-optimism/optimism/op-bindings v0.8.7
+	github.com/ethereum-optimism/optimism/op-node v0.8.7
 	github.com/ethereum/go-ethereum v1.10.23
 	github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1
 	github.com/ethereum/hive/optimism v0.0.0
@@ -69,12 +69,10 @@ require (
 	github.com/koron/go-ssdp v0.0.3 // indirect
 	github.com/libp2p/go-buffer-pool v0.1.0 // indirect
 	github.com/libp2p/go-cidranger v1.1.0 // indirect
-	github.com/libp2p/go-eventbus v0.3.0 // indirect
 	github.com/libp2p/go-flow-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p v0.22.0 // indirect
 	github.com/libp2p/go-libp2p-asn-util v0.2.0 // indirect
 	github.com/libp2p/go-libp2p-core v0.20.1 // indirect
-	github.com/libp2p/go-libp2p-discovery v0.7.0 // indirect
 	github.com/libp2p/go-libp2p-peerstore v0.8.0 // indirect
 	github.com/libp2p/go-libp2p-pubsub v0.8.0 // indirect
 	github.com/libp2p/go-libp2p-testing v0.12.0 // indirect
