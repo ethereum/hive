@@ -19,10 +19,13 @@ else
 	echo "$GETH_CHAINDATA_DIR exists."
 fi
 
+# We must set miner.gaslimit to the gas limit in genesis
+# in the command below!
+GAS_LIMIT_HEX=$(jq -r .gasLimit < /genesis.json | sed s/0x//i | tr '[:lower:]' '[:upper:]')
+GAS_LIMIT=$(echo "obase=10; ibase=16; $GAS_LIMIT_HEX" | bc)
+
 # Warning: Archive mode is required, otherwise old trie nodes will be
 # pruned within minutes of starting the devnet.
-
-# TODO: increase max peers, enable p2p, once we get to snap sync testing in Hive.
 
 geth \
 	--datadir="$GETH_DATA_DIR" \
@@ -44,8 +47,10 @@ geth \
 	--syncmode=full \
 	--nodiscover \
 	--maxpeers=0 \
+	--miner.gaslimit=$GAS_LIMIT \
 	--networkid="$CHAIN_ID" \
 	--password="$GETH_DATA_DIR"/password \
 	--allow-insecure-unlock \
 	--gcmode=archive \
+	--rollup.disabletxpoolgossip=true \
 	"$@"

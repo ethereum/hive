@@ -40,8 +40,8 @@ func runAllTests(tests []*optimism.TestSpec) func(t *hivesim.T) {
 
 		d := optimism.NewDevnet(t)
 		require.NoError(t, optimism.StartSequencerDevnet(ctx, d, &optimism.SequencerDevnetParams{
-			MaxSeqDrift:   10,
-			SeqWindowSize: 4,
+			MaxSeqDrift:   120,
+			SeqWindowSize: 120,
 			ChanTimeout:   30,
 		}))
 

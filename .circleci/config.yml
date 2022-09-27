@@ -23,17 +23,22 @@ jobs:
   # The below job runs the optimism test simulations. This requires a virtual
   # machine instead of the container-based build environment because hive needs
   # to be able to talk to the docker containers it creates.
-  hive-optimism-tests:
+  run-hive-sim:
     machine:
       image: ubuntu-2004:202201-02
       docker_layer_caching: true
+    parameters:
+      sim:
+        type: string
+        default: optimism
+        description: Sims to run
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
       - run:
           command: |
             /tmp/build/hive \
-            -sim=optimism \
+            -sim=<<parameters.sim>> \
             -sim.loglevel=5 \
             -docker.pull=true \
             -client=go-ethereum,op-geth_optimism-history,op-proposer_develop,op-batcher_develop,op-node_develop |& tee /tmp/build/hive.log || echo "failed."
@@ -83,9 +88,26 @@ workflows:
     jobs:
       - go-test
       - build
-      - hive-optimism-tests:
+      - run-hive-sim:
+          name: hive-test-l1ops
           requires: ["build"]
           context: slack
+          sim: optimism/l1ops
+      - run-hive-sim:
+          name: hive-test-p2p
+          requires: [ "build" ]
+          context: slack
+          sim: optimism/p2p
+      - run-hive-sim:
+          name: hive-test-rpc
+          requires: [ "build" ]
+          context: slack
+          sim: optimism/rpc
+      - run-hive-sim:
+          name: hive-test-testnet
+          requires: [ "build" ]
+          context: slack
+          sim: optimism/testnet
   scheduled:
     triggers:
       - schedule:
@@ -96,6 +118,6 @@ workflows:
               only: [ "optimism" ]
     jobs:
       - build
-      - hive-optimism-tests:
+      - run-hive-sim:
           requires: ["build"]
           context: slack
