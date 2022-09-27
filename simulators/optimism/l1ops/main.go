@@ -2,24 +2,17 @@ package main
 
 import (
 	"context"
+	"time"
+
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/optimism"
 	"github.com/stretchr/testify/require"
-	"time"
 )
 
-var depositTests = []*optimism.TestSpec{
-	{
-		Name: "deposit simple tx through the portal",
-		Run:  simplePortalDepositTest,
-	},
-}
-
-var withdrawalTests = []*optimism.TestSpec{
-	{
-		Name: "simple withdrawal",
-		Run:  simpleWithdrawalTest,
-	},
+var tests = []*optimism.TestSpec{
+	{Name: "deposit simple tx through the portal", Run: simplePortalDepositTest},
+	{Name: "deposit contract creation through the portal", Run: contractPortalDepositTest},
+	{Name: "simple withdrawal", Run: simpleWithdrawalTest},
 }
 
 func main() {
@@ -31,14 +24,9 @@ Tests deposits, withdrawals, and other L1-related operations against a running n
 	}
 
 	suite.Add(&hivesim.TestSpec{
-		Name:        "deposits",
-		Description: "Tests deposits.",
-		Run:         runAllTests(depositTests),
-	})
-	suite.Add(&hivesim.TestSpec{
-		Name:        "withdrawals",
-		Description: "Tests withdrawals.",
-		Run:         runAllTests(withdrawalTests),
+		Name:        "l1ops",
+		Description: "Tests L1 operations.",
+		Run:         runAllTests(tests),
 	})
 
 	sim := hivesim.New()

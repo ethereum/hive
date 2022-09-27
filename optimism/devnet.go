@@ -527,6 +527,10 @@ func StartSequencerDevnet(ctx context.Context, d *Devnet, params *SequencerDevne
 	if err := WaitBlock(ctx, d.L2Client(0), expHeight); err != nil {
 		return err
 	}
+
+	d.InitBindingsL1(0)
+	d.InitBindingsL2(0)
+
 	return nil
 }
 
