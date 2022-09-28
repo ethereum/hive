@@ -519,17 +519,12 @@ func StartSequencerDevnet(ctx context.Context, d *Devnet, params *SequencerDevne
 	d.AddOpBatcher(0, 0, 0)
 	d.AddOpProposer(0, 0, 0)
 
-	block, err := d.L1Client(0).BlockByNumber(ctx, nil)
-	if err != nil {
-		return err
-	}
-	expHeight := uint64(time.Now().Sub(time.Unix(int64(block.Time()), 0)).Seconds() / 2)
-	if err := WaitBlock(ctx, d.L2Client(0), expHeight); err != nil {
-		return err
-	}
-
 	d.InitBindingsL1(0)
 	d.InitBindingsL2(0)
+
+	if err := WaitBlock(ctx, d.L1Client(0), 2); err != nil {
+		return err
+	}
 
 	return nil
 }

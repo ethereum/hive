@@ -4,15 +4,18 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+	"io/ioutil"
+	"time"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/hive/hivesim"
-	"io"
-	"io/ioutil"
-	"time"
 )
+
+var ErrTransactionFailed = errors.New("transaction failed")
 
 func BytesFile(name string, data []byte) hivesim.StartOption {
 	return hivesim.WithDynamicFile(name, func() (io.ReadCloser, error) {
@@ -74,16 +77,20 @@ func WaitReceipt(ctx context.Context, client *ethclient.Client, hash common.Hash
 	defer ticker.Stop()
 	for {
 		receipt, err := client.TransactionReceipt(ctx, hash)
-		if receipt != nil && err == nil {
-			return receipt, nil
-		} else if err != nil && !errors.Is(err, ethereum.NotFound) {
+		if errors.Is(err, ethereum.NotFound) {
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-ticker.C:
+				continue
+			}
+		}
+		if err != nil {
 			return nil, err
 		}
-
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-ticker.C:
+		if receipt.Status == types.ReceiptStatusFailed {
+			return receipt, ErrTransactionFailed
 		}
+		return receipt, nil
 	}
 }
