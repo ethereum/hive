@@ -14,6 +14,7 @@ var tests = []*optimism.TestSpec{
 	{Name: "deposit contract creation through the portal", Run: contractPortalDepositTest},
 	{Name: "erc20 roundtrip through the bridge", Run: erc20RoundtripTest},
 	{Name: "simple withdrawal", Run: simpleWithdrawalTest},
+	{Name: "failing deposit with mint", Run: failingDepositWithMintTest},
 }
 
 func main() {

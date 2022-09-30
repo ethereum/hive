@@ -1,6 +1,9 @@
 package main
 
 import (
+	"math/big"
+	"time"
+
 	"github.com/ethereum-optimism/optimism/op-bindings/bindings"
 	"github.com/ethereum-optimism/optimism/op-bindings/predeploys"
 	"github.com/ethereum-optimism/optimism/op-node/withdrawals"
@@ -9,8 +12,6 @@ import (
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/optimism"
 	"github.com/stretchr/testify/require"
-	"math/big"
-	"time"
 )
 
 func simpleWithdrawalTest(t *hivesim.T, env *optimism.TestEnv) {
@@ -22,7 +23,7 @@ func simpleWithdrawalTest(t *hivesim.T, env *optimism.TestEnv) {
 	l2Vault.InsertKey(l1Vault.FindKey(depositor))
 
 	mintAmount := big.NewInt(0.5 * params.Ether)
-	doDeposit(t, env, depositor, mintAmount)
+	doDeposit(t, env, depositor, mintAmount, false, nil)
 
 	l2Wd, err := bindings.NewL2ToL1MessagePasser(predeploys.L2ToL1MessagePasserAddr, l2)
 	require.Nil(t, err, "binding withdrawer on L2")

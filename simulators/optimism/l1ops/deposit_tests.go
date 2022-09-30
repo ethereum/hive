@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-bindings/bindings"
 	"github.com/ethereum-optimism/optimism/op-bindings/predeploys"
 	"github.com/ethereum-optimism/optimism/op-chain-ops/crossdomain"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/derive"
+	"github.com/ethereum-optimism/optimism/op-node/testutils"
 	"github.com/ethereum-optimism/optimism/op-node/withdrawals"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -36,7 +38,7 @@ func simplePortalDepositTest(t *hivesim.T, env *optimism.TestEnv) {
 	require.EqualValues(t, 0, startBalance.Int64())
 
 	mintAmount := big.NewInt(0.5 * params.Ether)
-	doDeposit(t, env, depositor, mintAmount)
+	doDeposit(t, env, depositor, mintAmount, false, nil)
 
 	endBalance, err := l2.BalanceAt(env.Ctx(), depositor, nil)
 	require.Nil(t, err)
@@ -105,7 +107,7 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 	require.NoError(t, err)
 
 	// Deposit some ETH onto L2
-	doDeposit(t, env, depositor, big.NewInt(0.5*params.Ether))
+	doDeposit(t, env, depositor, big.NewInt(0.5*params.Ether), false, nil)
 
 	// Deploy the bridged ERC20
 	l2Opts := l2Vault.KeyedTransactor(depositor)
@@ -270,13 +272,75 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 	require.EqualValues(t, big.NewInt(500), balL2)
 }
 
-func doDeposit(t *hivesim.T, env *optimism.TestEnv, depositor common.Address, mintAmount *big.Int) {
-	depositContract, err := bindings.NewOptimismPortal(
-		env.Devnet.Deployments.DeploymentsL1.OptimismPortalProxy,
-		env.Devnet.L1Client(0),
-	)
+func failingDepositWithMintTest(t *hivesim.T, env *optimism.TestEnv) {
+	// Initial setup
+	l1 := env.Devnet.L1Client(0)
+	l2 := env.Devnet.L2Client(0)
+	l1Vault := env.Devnet.L1Vault
+	l2Vault := env.Devnet.L2Vault
+	depositContract := env.Devnet.Bindings.BindingsL1.OptimismPortal
+	depositor := l1Vault.CreateAccount(env.TimeoutCtx(time.Minute), l1, big.NewInt(3*params.Ether))
+	l2Vault.InsertKey(l1Vault.FindKey(depositor))
+	l2Opts := l2Vault.KeyedTransactor(depositor)
+
+	// Fund account on L2
+	doDeposit(t, env, depositor, big.NewInt(0.5*params.Ether), false, nil)
+
+	// Deploy the failure contract on L2
+
+	_, deployTx, failureContract, err := hivebindings.DeployFailure(l2Opts, l2)
+	require.NoError(t, err)
+	_, err = optimism.WaitReceipt(env.TimeoutCtx(30*time.Second), l2, deployTx.Hash())
 	require.NoError(t, err)
 
+	// Create the revert() call
+	l2Opts.NoSend = true
+	l2Opts.GasLimit = 1_000_000
+	revertTx, err := failureContract.Fail(l2Opts)
+	require.NoError(t, err)
+
+	// Create garbage data
+	randData := make([]byte, 32)
+	_, err = rand.Read(randData)
+	require.NoError(t, err)
+
+	testData := [][]byte{
+		randData,
+		revertTx.Data(),
+	}
+	mintAmount := big.NewInt(0.5 * params.Ether)
+	opts := l1Vault.KeyedTransactor(depositor)
+	opts.Value = mintAmount
+	opts.GasLimit = 3_000_000
+	for _, data := range testData {
+		startBal, err := l2.BalanceAt(env.Ctx(), depositor, nil)
+		require.NoError(t, err)
+		tx, err := depositContract.DepositTransaction(
+			opts,
+			depositor,
+			mintAmount,
+			1_000_000,
+			false,
+			data,
+		)
+		require.NoError(t, err)
+		receipt, err := optimism.WaitReceipt(env.TimeoutCtx(time.Minute), l1, tx.Hash())
+		require.NoError(t, err)
+
+		reconstructedDep, err := derive.UnmarshalDepositLogEvent(receipt.Logs[0])
+		require.NoError(t, err, "could not reconstruct L2 deposit")
+		tx = types.NewTx(reconstructedDep)
+		_, err = optimism.WaitReceipt(env.TimeoutCtx(45*time.Second), l2, tx.Hash())
+		require.NoError(t, err)
+
+		endBal, err := l2.BalanceAt(env.Ctx(), depositor, nil)
+		require.Nil(t, err)
+		require.True(t, testutils.BigEqual(mintAmount, new(big.Int).Sub(endBal, startBal)))
+	}
+}
+
+func doDeposit(t *hivesim.T, env *optimism.TestEnv, depositor common.Address, mintAmount *big.Int, isCreation bool, data []byte) {
+	depositContract := env.Devnet.Bindings.BindingsL1.OptimismPortal
 	l1 := env.Devnet.L1Client(0)
 	l2 := env.Devnet.L2Client(0)
 	l1Vault := env.Devnet.L1Vault
@@ -287,7 +351,7 @@ func doDeposit(t *hivesim.T, env *optimism.TestEnv, depositor common.Address, mi
 	// can sometimes be off by a bit as a result of the resource
 	// metering code.
 	opts.GasLimit = 3_000_000
-	tx, err := depositContract.DepositTransaction(opts, depositor, common.Big0, 1_000_000, false, nil)
+	tx, err := depositContract.DepositTransaction(opts, depositor, common.Big0, 1_000_000, isCreation, data)
 	require.NoError(t, err)
 	receipt, err := optimism.WaitReceipt(env.TimeoutCtx(time.Minute), l1, tx.Hash())
 	require.NoError(t, err)
