@@ -30,8 +30,8 @@ var (
 
 // FailureMetaData contains all meta data concerning the Failure contract.
 var FailureMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"fail\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}]",
-	Bin: "0x608060405234801561001057600080fd5b5061010f806100206000396000f3fe608060405260043610601c5760003560e01c8063a9cc4718146021575b600080fd5b60276029565b005b6040517f08c379a000000000000000000000000000000000000000000000000000000000815260040160599060bb565b60405180910390fd5b600082825260208201905092915050565b7f626967206661696c210000000000000000000000000000000000000000000000600082015250565b600060a76009836062565b915060b0826073565b602082019050919050565b6000602082019050818103600083015260d281609c565b905091905056fea264697066735822122068a0ae7d220da2e9f14cc48aec07eb227130c4a4ae2d89dca9c16c132f2c64fe64736f6c634300080d0033",
+	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"ok\",\"type\":\"uint256\"}],\"name\":\"Yep\",\"type\":\"event\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"_amount\",\"type\":\"uint256\"}],\"name\":\"burn\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"fail\",\"outputs\":[],\"stateMutability\":\"payable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b50610285806100206000396000f3fe6080604052600436106100295760003560e01c806342966c681461002e578063a9cc47181461004a575b600080fd5b610048600480360381019061004391906100fa565b610054565b005b610052610084565b005b6000805a90505b825a826100689190610156565b101561007f57816100789061018a565b915061005b565b505050565b6040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016100b69061022f565b60405180910390fd5b600080fd5b6000819050919050565b6100d7816100c4565b81146100e257600080fd5b50565b6000813590506100f4816100ce565b92915050565b6000602082840312156101105761010f6100bf565b5b600061011e848285016100e5565b91505092915050565b7f4e487b7100000000000000000000000000000000000000000000000000000000600052601160045260246000fd5b6000610161826100c4565b915061016c836100c4565b92508282101561017f5761017e610127565b5b828203905092915050565b6000610195826100c4565b91507fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82036101c7576101c6610127565b5b600182019050919050565b600082825260208201905092915050565b7f626967206661696c210000000000000000000000000000000000000000000000600082015250565b60006102196009836101d2565b9150610224826101e3565b602082019050919050565b600060208201905081810360008301526102488161020c565b905091905056fea26469706673582212206c9066085641202e49d5d997c43f820e5bc6b3985fe0eafd9d8362a2e9522b2664736f6c634300080d0033",
 }
 
 // FailureABI is the input ABI used to generate the binding from.
@@ -201,6 +201,27 @@ func (_Failure *FailureTransactorRaw) Transact(opts *bind.TransactOpts, method s
 	return _Failure.Contract.contract.Transact(opts, method, params...)
 }
 
+// Burn is a paid mutator transaction binding the contract method 0x42966c68.
+//
+// Solidity: function burn(uint256 _amount) payable returns()
+func (_Failure *FailureTransactor) Burn(opts *bind.TransactOpts, _amount *big.Int) (*types.Transaction, error) {
+	return _Failure.contract.Transact(opts, "burn", _amount)
+}
+
+// Burn is a paid mutator transaction binding the contract method 0x42966c68.
+//
+// Solidity: function burn(uint256 _amount) payable returns()
+func (_Failure *FailureSession) Burn(_amount *big.Int) (*types.Transaction, error) {
+	return _Failure.Contract.Burn(&_Failure.TransactOpts, _amount)
+}
+
+// Burn is a paid mutator transaction binding the contract method 0x42966c68.
+//
+// Solidity: function burn(uint256 _amount) payable returns()
+func (_Failure *FailureTransactorSession) Burn(_amount *big.Int) (*types.Transaction, error) {
+	return _Failure.Contract.Burn(&_Failure.TransactOpts, _amount)
+}
+
 // Fail is a paid mutator transaction binding the contract method 0xa9cc4718.
 //
 // Solidity: function fail() payable returns()
@@ -220,4 +241,138 @@ func (_Failure *FailureSession) Fail() (*types.Transaction, error) {
 // Solidity: function fail() payable returns()
 func (_Failure *FailureTransactorSession) Fail() (*types.Transaction, error) {
 	return _Failure.Contract.Fail(&_Failure.TransactOpts)
+}
+
+// FailureYepIterator is returned from FilterYep and is used to iterate over the raw logs and unpacked data for Yep events raised by the Failure contract.
+type FailureYepIterator struct {
+	Event *FailureYep // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *FailureYepIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(FailureYep)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(FailureYep)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *FailureYepIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *FailureYepIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// FailureYep represents a Yep event raised by the Failure contract.
+type FailureYep struct {
+	Ok  *big.Int
+	Raw types.Log // Blockchain specific contextual infos
+}
+
+// FilterYep is a free log retrieval operation binding the contract event 0x14806dfe21dd426fa23d551967947bd5266cc1e2eb26850ed515c8df9c841280.
+//
+// Solidity: event Yep(uint256 ok)
+func (_Failure *FailureFilterer) FilterYep(opts *bind.FilterOpts) (*FailureYepIterator, error) {
+
+	logs, sub, err := _Failure.contract.FilterLogs(opts, "Yep")
+	if err != nil {
+		return nil, err
+	}
+	return &FailureYepIterator{contract: _Failure.contract, event: "Yep", logs: logs, sub: sub}, nil
+}
+
+// WatchYep is a free log subscription operation binding the contract event 0x14806dfe21dd426fa23d551967947bd5266cc1e2eb26850ed515c8df9c841280.
+//
+// Solidity: event Yep(uint256 ok)
+func (_Failure *FailureFilterer) WatchYep(opts *bind.WatchOpts, sink chan<- *FailureYep) (event.Subscription, error) {
+
+	logs, sub, err := _Failure.contract.WatchLogs(opts, "Yep")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(FailureYep)
+				if err := _Failure.contract.UnpackLog(event, "Yep", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// ParseYep is a log parse operation binding the contract event 0x14806dfe21dd426fa23d551967947bd5266cc1e2eb26850ed515c8df9c841280.
+//
+// Solidity: event Yep(uint256 ok)
+func (_Failure *FailureFilterer) ParseYep(log types.Log) (*FailureYep, error) {
+	event := new(FailureYep)
+	if err := _Failure.contract.UnpackLog(event, "Yep", log); err != nil {
+		return nil, err
+	}
+	event.Raw = log
+	return event, nil
 }

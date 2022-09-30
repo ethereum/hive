@@ -33,7 +33,7 @@ func simpleWithdrawalTest(t *hivesim.T, env *optimism.TestEnv) {
 	l2Opts.Value = withdrawAmount
 	initTx, err := l2Wd.InitiateWithdrawal(l2Opts, depositor, big.NewInt(21000), nil)
 	require.NoError(t, err)
-	initReceipt, err := optimism.WaitReceipt(env.TimeoutCtx(time.Minute), l2, initTx.Hash())
+	initReceipt, err := optimism.WaitReceiptOK(env.TimeoutCtx(time.Minute), l2, initTx.Hash())
 	require.NoError(t, err)
 	require.Equal(t, initReceipt.Status, types.ReceiptStatusSuccessful)
 
@@ -78,7 +78,7 @@ func simpleWithdrawalTest(t *hivesim.T, env *optimism.TestEnv) {
 	)
 	require.NoError(t, err)
 
-	finReceipt, err := optimism.WaitReceipt(env.TimeoutCtx(time.Minute), l1, finTx.Hash())
+	finReceipt, err := optimism.WaitReceiptOK(env.TimeoutCtx(time.Minute), l1, finTx.Hash())
 	require.NoError(t, err)
 	require.Equal(t, types.ReceiptStatusSuccessful, finReceipt.Status)
 

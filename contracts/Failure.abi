@@ -1,1 +1,1 @@
-[{"inputs":[],"name":"fail","outputs":[],"stateMutability":"payable","type":"function"}]
+[{"inputs":[{"internalType":"uint256","name":"_amount","type":"uint256"}],"name":"burn","outputs":[],"stateMutability":"payable","type":"function"},{"inputs":[],"name":"fail","outputs":[],"stateMutability":"payable","type":"function"}]

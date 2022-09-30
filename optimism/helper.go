@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"time"
@@ -72,7 +73,15 @@ func WaitBlock(ctx context.Context, client *ethclient.Client, n uint64) error {
 	return nil
 }
 
-func WaitReceipt(ctx context.Context, client *ethclient.Client, hash common.Hash) (*types.Receipt, error) {
+func WaitReceiptOK(ctx context.Context, client *ethclient.Client, hash common.Hash) (*types.Receipt, error) {
+	return WaitReceipt(ctx, client, hash, types.ReceiptStatusSuccessful)
+}
+
+func WaitReceiptFail(ctx context.Context, client *ethclient.Client, hash common.Hash) (*types.Receipt, error) {
+	return WaitReceipt(ctx, client, hash, types.ReceiptStatusFailed)
+}
+
+func WaitReceipt(ctx context.Context, client *ethclient.Client, hash common.Hash, status uint64) (*types.Receipt, error) {
 	ticker := time.NewTicker(100 * time.Millisecond)
 	defer ticker.Stop()
 	for {
@@ -88,8 +97,8 @@ func WaitReceipt(ctx context.Context, client *ethclient.Client, hash common.Hash
 		if err != nil {
 			return nil, err
 		}
-		if receipt.Status == types.ReceiptStatusFailed {
-			return receipt, ErrTransactionFailed
+		if receipt.Status != status {
+			return receipt, fmt.Errorf("expected status %d, but got %d", status, receipt.Status)
 		}
 		return receipt, nil
 	}

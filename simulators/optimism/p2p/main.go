@@ -3,14 +3,14 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/params"
 	"math/big"
 	"sync"
 	"time"
 
 	"github.com/ethereum-optimism/optimism/op-node/eth"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ethereum/hive/hivesim"
@@ -180,7 +180,7 @@ func runP2PTests(t *hivesim.T) {
 					return
 				}
 				require.NoError(t, seqEthCl.SendTransaction(ctx, tx))
-				_, err = optimism.WaitReceipt(ctx, seqEthCl, tx.Hash())
+				_, err = optimism.WaitReceiptOK(ctx, seqEthCl, tx.Hash())
 				if err != nil {
 					errCh <- err
 					return

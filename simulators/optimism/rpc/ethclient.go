@@ -2,11 +2,12 @@ package main
 
 import (
 	"bytes"
-	"github.com/ethereum/hive/optimism"
 	"math/big"
 	"math/rand"
 	"strings"
 	"time"
+
+	"github.com/ethereum/hive/optimism"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -126,7 +127,7 @@ func estimateGasTest(t *LegacyTestEnv) {
 		t.Fatalf("Could not send tx: %v", err)
 	}
 
-	receipt, err := optimism.WaitReceipt(t.Ctx(), t.Eth, tx.Hash())
+	receipt, err := optimism.WaitReceiptOK(t.Ctx(), t.Eth, tx.Hash())
 	if err != nil {
 		t.Fatalf("Could not wait for confirmations: %v", err)
 	}
@@ -291,7 +292,7 @@ func deployContractTest(t *LegacyTestEnv) {
 
 	// fetch transaction receipt for contract address
 	var contractAddress common.Address
-	receipt, err := optimism.WaitReceipt(t.Ctx(), t.Eth, deployTx.Hash())
+	receipt, err := optimism.WaitReceiptOK(t.Ctx(), t.Eth, deployTx.Hash())
 	if err != nil {
 		t.Fatalf("Unable to retrieve receipt %v: %v", deployTx.Hash(), err)
 	}
@@ -362,7 +363,7 @@ func deployContractOutOfGasTest(t *LegacyTestEnv) {
 	}
 
 	// Wait for the transaction receipt.
-	receipt, err := optimism.WaitReceipt(t.Ctx(), t.Eth, deployTx.Hash())
+	receipt, err := optimism.WaitReceiptOK(t.Ctx(), t.Eth, deployTx.Hash())
 	if err != nil {
 		t.Fatalf("unable to fetch tx receipt %v: %v", deployTx.Hash(), err)
 	}
@@ -416,7 +417,7 @@ func receiptTest(t *LegacyTestEnv) {
 	}
 
 	// wait for transaction
-	receipt, err := optimism.WaitReceipt(t.Ctx(), t.Eth, tx.Hash())
+	receipt, err := optimism.WaitReceiptOK(t.Ctx(), t.Eth, tx.Hash())
 	if err != nil {
 		t.Fatalf("Unable to retrieve tx receipt %v: %v", tx.Hash(), err)
 	}

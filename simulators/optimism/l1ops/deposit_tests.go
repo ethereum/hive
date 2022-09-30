@@ -103,7 +103,7 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 	// Deploy the ERC20 on L1
 	l1Opts := l1Vault.KeyedTransactor(depositor)
 	l1ERC20Addr, tx, l1ERC20, err := hivebindings.DeploySimpleERC20(l1Opts, l1, big.NewInt(1_000_000), "Test L1", 18, "L1")
-	_, err = optimism.WaitReceipt(env.TimeoutCtx(30*time.Second), l1, tx.Hash())
+	_, err = optimism.WaitReceiptOK(env.TimeoutCtx(30*time.Second), l1, tx.Hash())
 	require.NoError(t, err)
 
 	// Deposit some ETH onto L2
@@ -114,7 +114,7 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 	factory := env.Devnet.Bindings.BindingsL2.OptimismMintableERC20Factory
 	tx, err = factory.CreateOptimismMintableERC20(l2Opts, l1ERC20Addr, "Test L1", "L2")
 	require.NoError(t, err)
-	receipt, err := optimism.WaitReceipt(env.TimeoutCtx(30*time.Second), l2, tx.Hash())
+	receipt, err := optimism.WaitReceiptOK(env.TimeoutCtx(30*time.Second), l2, tx.Hash())
 	var creationEvent *bindings.OptimismMintableERC20FactoryOptimismMintableERC20Created
 	for _, log := range receipt.Logs {
 		if log.Topics[0] != optimismMintableERC20CreatedEvent {
@@ -139,7 +139,7 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 	// approve
 	tx, err = l1ERC20.Approve(l1Opts, predeploys.DevL1StandardBridgeAddr, abi.MaxUint256)
 	require.NoError(t, err)
-	_, err = optimism.WaitReceipt(env.TimeoutCtx(30*time.Second), l1, tx.Hash())
+	_, err = optimism.WaitReceiptOK(env.TimeoutCtx(30*time.Second), l1, tx.Hash())
 	require.NoError(t, err)
 
 	// Remember starting L2 block to find the relay
@@ -149,7 +149,7 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 	// Do the deposit
 	tx, err = l1SB.DepositERC20(l1Opts, l1ERC20Addr, l2ERC20Addr, big.NewInt(1000), 200_000, nil)
 	require.NoError(t, err)
-	receipt, err = optimism.WaitReceipt(env.TimeoutCtx(30*time.Second), l1, tx.Hash())
+	receipt, err = optimism.WaitReceiptOK(env.TimeoutCtx(30*time.Second), l1, tx.Hash())
 	require.NoError(t, err)
 	var l1SentMessage *bindings.L1CrossDomainMessengerSentMessage
 	for _, log := range receipt.Logs {
@@ -218,7 +218,7 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 	// Perform the withdrawal
 	tx, err = l2SB.Withdraw(l2Opts, l2ERC20Addr, big.NewInt(500), 0, nil)
 	require.NoError(t, err)
-	receipt, err = optimism.WaitReceipt(env.TimeoutCtx(30*time.Second), l2, tx.Hash())
+	receipt, err = optimism.WaitReceiptOK(env.TimeoutCtx(30*time.Second), l2, tx.Hash())
 	require.NoError(t, err)
 
 	// Await finalization period
@@ -259,7 +259,7 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 		wParams.WithdrawalProof,
 	)
 	require.NoError(t, err)
-	_, err = optimism.WaitReceipt(env.TimeoutCtx(time.Minute), l1, finTx.Hash())
+	_, err = optimism.WaitReceiptOK(env.TimeoutCtx(time.Minute), l1, finTx.Hash())
 	require.NoError(t, err)
 
 	// Verify L1/L2 balances
@@ -287,10 +287,9 @@ func failingDepositWithMintTest(t *hivesim.T, env *optimism.TestEnv) {
 	doDeposit(t, env, depositor, big.NewInt(0.5*params.Ether), false, nil)
 
 	// Deploy the failure contract on L2
-
 	_, deployTx, failureContract, err := hivebindings.DeployFailure(l2Opts, l2)
 	require.NoError(t, err)
-	_, err = optimism.WaitReceipt(env.TimeoutCtx(30*time.Second), l2, deployTx.Hash())
+	_, err = optimism.WaitReceiptOK(env.TimeoutCtx(30*time.Second), l2, deployTx.Hash())
 	require.NoError(t, err)
 
 	// Create the revert() call
@@ -299,38 +298,44 @@ func failingDepositWithMintTest(t *hivesim.T, env *optimism.TestEnv) {
 	revertTx, err := failureContract.Fail(l2Opts)
 	require.NoError(t, err)
 
+	// Create transaction that burns more gas on L2 than allotted
+	// in the deposit transaction.
+	l2Opts.GasLimit = 3_000_000
+	burnTx, err := failureContract.Burn(l2Opts, big.NewInt(2_000_000))
+	require.NoError(t, err)
+
 	// Create garbage data
 	randData := make([]byte, 32)
 	_, err = rand.Read(randData)
 	require.NoError(t, err)
 
-	testData := [][]byte{
-		randData,
-		revertTx.Data(),
+	testData := []*types.Transaction{
+		revertTx,
+		burnTx,
 	}
 	mintAmount := big.NewInt(0.5 * params.Ether)
 	opts := l1Vault.KeyedTransactor(depositor)
 	opts.Value = mintAmount
 	opts.GasLimit = 3_000_000
-	for _, data := range testData {
+	for _, testTx := range testData {
 		startBal, err := l2.BalanceAt(env.Ctx(), depositor, nil)
 		require.NoError(t, err)
 		tx, err := depositContract.DepositTransaction(
 			opts,
-			depositor,
+			*testTx.To(),
 			mintAmount,
 			1_000_000,
 			false,
-			data,
+			testTx.Data(),
 		)
 		require.NoError(t, err)
-		receipt, err := optimism.WaitReceipt(env.TimeoutCtx(time.Minute), l1, tx.Hash())
+		receipt, err := optimism.WaitReceiptOK(env.TimeoutCtx(time.Minute), l1, tx.Hash())
 		require.NoError(t, err)
 
 		reconstructedDep, err := derive.UnmarshalDepositLogEvent(receipt.Logs[0])
 		require.NoError(t, err, "could not reconstruct L2 deposit")
 		tx = types.NewTx(reconstructedDep)
-		_, err = optimism.WaitReceipt(env.TimeoutCtx(45*time.Second), l2, tx.Hash())
+		_, err = optimism.WaitReceiptFail(env.TimeoutCtx(45*time.Second), l2, tx.Hash())
 		require.NoError(t, err)
 
 		endBal, err := l2.BalanceAt(env.Ctx(), depositor, nil)
@@ -353,23 +358,23 @@ func doDeposit(t *hivesim.T, env *optimism.TestEnv, depositor common.Address, mi
 	opts.GasLimit = 3_000_000
 	tx, err := depositContract.DepositTransaction(opts, depositor, common.Big0, 1_000_000, isCreation, data)
 	require.NoError(t, err)
-	receipt, err := optimism.WaitReceipt(env.TimeoutCtx(time.Minute), l1, tx.Hash())
+	receipt, err := optimism.WaitReceiptOK(env.TimeoutCtx(time.Minute), l1, tx.Hash())
 	require.NoError(t, err)
 
 	reconstructedDep, err := derive.UnmarshalDepositLogEvent(receipt.Logs[0])
 	require.NoError(t, err, "could not reconstruct L2 deposit")
 	tx = types.NewTx(reconstructedDep)
-	_, err = optimism.WaitReceipt(env.TimeoutCtx(45*time.Second), l2, tx.Hash())
+	_, err = optimism.WaitReceiptOK(env.TimeoutCtx(45*time.Second), l2, tx.Hash())
 	require.NoError(t, err)
 }
 
 func awaitDeposit(t *hivesim.T, env *optimism.TestEnv, tx *types.Transaction, l1, l2 *ethclient.Client) *types.Receipt {
-	receipt, err := optimism.WaitReceipt(env.TimeoutCtx(time.Minute), l1, tx.Hash())
+	receipt, err := optimism.WaitReceiptOK(env.TimeoutCtx(time.Minute), l1, tx.Hash())
 	require.NoError(t, err)
 	reconstructedDep, err := derive.UnmarshalDepositLogEvent(receipt.Logs[0])
 	require.NoError(t, err, "could not reconstruct L2 deposit")
 	tx = types.NewTx(reconstructedDep)
-	receipt, err = optimism.WaitReceipt(env.TimeoutCtx(45*time.Second), l2, tx.Hash())
+	receipt, err = optimism.WaitReceiptOK(env.TimeoutCtx(45*time.Second), l2, tx.Hash())
 	require.NoError(t, err)
 	return receipt
 }

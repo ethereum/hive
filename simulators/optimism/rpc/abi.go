@@ -1,6 +1,10 @@
 package main
 
 import (
+	"math/big"
+	"math/rand"
+	"strings"
+
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
@@ -9,9 +13,6 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/optimism"
 	"github.com/ethereum/hive/simulators/optimism/rpc/testcontract"
-	"math/big"
-	"math/rand"
-	"strings"
 )
 
 //go:generate abigen -abi ./contractABI.json -pkg testcontract -type Contract -out ./testcontract/contract.go
@@ -93,7 +94,7 @@ func transactContractTest(t *LegacyTestEnv) {
 
 	// fetch transaction receipt for contract address
 	var contractAddress common.Address
-	receipt, err := optimism.WaitReceipt(t.Ctx(), t.Eth, deployTx.Hash())
+	receipt, err := optimism.WaitReceiptOK(t.Ctx(), t.Eth, deployTx.Hash())
 	if err != nil {
 		t.Fatalf("Unable to retrieve receipt %v: %v", deployTx.Hash(), err)
 	}
@@ -124,7 +125,7 @@ func transactContractTest(t *LegacyTestEnv) {
 	t.Logf("Waiting for receipt for events tx %v", tx.Hash())
 
 	// wait for transaction
-	receipt, err = optimism.WaitReceipt(t.Ctx(), t.Eth, tx.Hash())
+	receipt, err = optimism.WaitReceiptOK(t.Ctx(), t.Eth, tx.Hash())
 	if err != nil {
 		t.Fatalf("Unable to send transaction to events method: %v", err)
 	}
