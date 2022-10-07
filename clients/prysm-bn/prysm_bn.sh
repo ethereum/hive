@@ -73,6 +73,7 @@ echo Starting Prysm Beacon Node
     --jwt-secret=/jwtsecret \
     --min-sync-peers=1 \
     --subscribe-all-subnets=true \
+    --enable-debug-rpc-endpoints=true \
     $metrics_option \
     --deposit-contract="${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" \
     --contract-deployment-block="${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" \
