@@ -24,6 +24,16 @@ fi
 GAS_LIMIT_HEX=$(jq -r .gasLimit < /genesis.json | sed s/0x//i | tr '[:lower:]' '[:upper:]')
 GAS_LIMIT=$(echo "obase=10; ibase=16; $GAS_LIMIT_HEX" | bc)
 
+
+EXTRA_FLAGS="--rollup.disabletxpoolgossip=true"
+
+# We check for env variables that may not be bound so we need to disable `set -u` for this section.
+set +u
+if [ "$HIVE_OP_GETH_SEQUENCER_HTTP" != "" ]; then
+    EXTRA_FLAGS="$EXTRA_FLAGS --rollup.sequencerhttp $HIVE_OP_GETH_SEQUENCER_HTTP"
+fi
+set -u
+
 # Warning: Archive mode is required, otherwise old trie nodes will be
 # pruned within minutes of starting the devnet.
 
@@ -52,5 +62,5 @@ geth \
 	--password="$GETH_DATA_DIR"/password \
 	--allow-insecure-unlock \
 	--gcmode=archive \
-	--rollup.disabletxpoolgossip=true \
+	$EXTRA_FLAGS \
 	"$@"

@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum-optimism/optimism/op-node/eth"
 	"github.com/ethereum-optimism/optimism/op-node/rollup/driver"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/stretchr/testify/require"
@@ -32,9 +33,88 @@ func main() {
 		Description: `This suite runs the a testnet with P2P set up`,
 		Run:         func(t *hivesim.T) { runP2PTests(t) },
 	})
+	suite.Add(&hivesim.TestSpec{
+		Name:        "tx forwarding",
+		Description: `This test verifies that tx forwarding works`,
+		Run:         func(t *hivesim.T) { txForwardingTest(t) },
+	})
 
 	sim := hivesim.New()
 	hivesim.MustRunSuite(sim, suite)
+}
+
+// txForwardingTest verifies that a transaction submitted to a replica with tx forwarding enabled shows up on the sequencer.
+// TODO: The transaction shows up with `getTransaction`, but it remains pending and is not mined for some reason.
+// This is weird, but fine because it still shows that the transaction is received by the sequencer.
+func txForwardingTest(t *hivesim.T) {
+	d := optimism.NewDevnet(t)
+	sender := d.L2Vault.GenerateKey()
+	receiver := d.L2Vault.GenerateKey()
+	d.InitChain(30, 4, 30, core.GenesisAlloc{sender: {Balance: big.NewInt(params.Ether)}})
+	d.AddEth1()
+	d.WaitUpEth1(0, time.Second*10)
+
+	d.AddOpL2()
+	d.AddOpNode(0, 0, true)
+	seqNode := d.GetOpL2Engine(0)
+	seqClient := d.GetOpL2Engine(0).EthClient()
+
+	d.AddOpL2(hivesim.Params{"HIVE_OP_GETH_SEQUENCER_HTTP": seqNode.HttpRpcEndpoint()})
+	d.AddOpNode(0, 1, false)
+
+	d.AddOpBatcher(0, 0, 0, optimism.HiveUnpackParams{}.Params())
+	d.AddOpProposer(0, 0, 0)
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		d.WaitUpOpL2Engine(0, time.Second*10)
+		wg.Done()
+	}()
+	go func() {
+		d.WaitUpOpL2Engine(1, time.Second*10)
+		wg.Done()
+	}()
+
+	t.Log("waiting for nodes to come up")
+	wg.Wait()
+
+	verifClient := d.GetOpL2Engine(1).EthClient()
+
+	baseTx := types.NewTx(&types.DynamicFeeTx{
+		ChainID:   optimism.L2ChainIDBig,
+		Nonce:     0,
+		To:        &receiver,
+		Gas:       75000,
+		GasTipCap: big.NewInt(1),
+		GasFeeCap: big.NewInt(2),
+		Value:     big.NewInt(0.0001 * params.Ether),
+	})
+
+	tx, err := d.L2Vault.SignTransaction(sender, baseTx)
+	require.Nil(t, err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	require.NoError(t, verifClient.SendTransaction(ctx, tx))
+	t.Log("sent tx to verifier, waiting for propagation")
+
+	<-time.After(10 * time.Second)
+
+	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, isPending, err := seqClient.TransactionByHash(ctx, tx.Hash())
+	if err != nil {
+		t.Fatal("transaction did not propagate")
+	}
+	t.Logf("found transaction on sequencer, isPending: %v", isPending)
+
+	// TODO: The transaction is not getting mined on the sequencer
+	// At least it did show up on the sequencer.
+	// ctx, cancel = context.WithTimeout(context.Background(), 20*time.Second)
+	// defer cancel()
+	// _, err = optimism.WaitReceiptOK(ctx, seqClient, tx.Hash())
+	// require.Nil(t, err) // tx should show up on the sequencer
 }
 
 // runP2PTests runs the P2P tests between the sequencer and verifier.

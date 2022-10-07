@@ -7,7 +7,7 @@ jobs:
   # This job builds the hive executable and stores it in the workspace.
   build:
     docker:
-      - image: cimg/go:1.18
+      - image: cimg/go:1.19
     steps:
       # Build it.
       - checkout
@@ -25,7 +25,7 @@ jobs:
   # to be able to talk to the docker containers it creates.
   run-hive-sim:
     machine:
-      image: ubuntu-2004:202201-02
+      image: ubuntu-2204:2022.07.1
       docker_layer_caching: true
     parameters:
       sim:
@@ -63,7 +63,7 @@ jobs:
   # This job runs the go unit tests.
   go-test:
     docker:
-      - image: cimg/go:1.18
+      - image: cimg/go:1.19
     steps:
       # Get the source.
       - checkout
