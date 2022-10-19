@@ -87,8 +87,8 @@ func txForwardingTest(t *hivesim.T) {
 		Nonce:     0,
 		To:        &receiver,
 		Gas:       75000,
-		GasTipCap: big.NewInt(1),
-		GasFeeCap: big.NewInt(2),
+		GasTipCap: big.NewInt(10 * params.GWei),
+		GasFeeCap: big.NewInt(20 * params.GWei),
 		Value:     big.NewInt(0.0001 * params.Ether),
 	})
 
@@ -109,12 +109,10 @@ func txForwardingTest(t *hivesim.T) {
 	}
 	t.Logf("found transaction on sequencer, isPending: %v", isPending)
 
-	// TODO: The transaction is not getting mined on the sequencer
-	// At least it did show up on the sequencer.
-	// ctx, cancel = context.WithTimeout(context.Background(), 20*time.Second)
-	// defer cancel()
-	// _, err = optimism.WaitReceiptOK(ctx, seqClient, tx.Hash())
-	// require.Nil(t, err) // tx should show up on the sequencer
+	ctx, cancel = context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	_, err = optimism.WaitReceiptOK(ctx, seqClient, tx.Hash())
+	require.Nil(t, err) // tx should show up on the sequencer
 }
 
 // runP2PTests runs the P2P tests between the sequencer and verifier.
