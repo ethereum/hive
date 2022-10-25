@@ -39,7 +39,7 @@ set -e
 erigon=/usr/local/bin/erigon
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
-    FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL"
+    FLAGS="$FLAGS --log.console.verbosity=$HIVE_LOGLEVEL"
 fi
 
 if [ "$HIVE_BOOTNODE" != "" ]; then
