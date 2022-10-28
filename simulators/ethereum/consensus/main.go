@@ -261,6 +261,7 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_PETERSBURG":     0,
 		"HIVE_FORK_ISTANBUL":       0,
 		"HIVE_FORK_BERLIN":         0,
+		"HIVE_FORK_LONDON":         0,
 		"HIVE_FORK_MERGE":          0,
 	},
 }
