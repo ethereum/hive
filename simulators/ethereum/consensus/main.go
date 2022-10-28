@@ -250,6 +250,18 @@ var ruleset = map[string]envvars{
 		"HIVE_FORK_BERLIN":         0,
 		"HIVE_FORK_LONDON":         0,
 	},
+	"Merge": {
+		"HIVE_FORK_HOMESTEAD": 0,
+		//"HIVE_FORK_DAO_BLOCK":      2000,
+		"HIVE_FORK_TANGERINE":      0,
+		"HIVE_FORK_SPURIOUS":       0,
+		"HIVE_FORK_BYZANTIUM":      0,
+		"HIVE_FORK_CONSTANTINOPLE": 0,
+		"HIVE_FORK_PETERSBURG":     0,
+		"HIVE_FORK_ISTANBUL":       0,
+		"HIVE_FORK_BERLIN":         0,
+		"HIVE_FORK_MERGE":          0,
+	},
 }
 
 func main() {
