@@ -264,6 +264,7 @@ func (d *Devnet) AddOpProposer(eth1Index int, l2EngIndex int, opNodeIndex int, o
 		oppf.ResubmissionTimeoutFlag.EnvVar:       "30s",
 		oppf.MnemonicFlag.EnvVar:                  d.MnemonicCfg.Mnemonic,
 		oppf.L2OutputHDPathFlag.EnvVar:            d.MnemonicCfg.Proposer,
+		"OP_PROPOSER_ALLOW_NON_FINALIZED":         "true",
 		"OP_PROPOSER_LOG_LEVEL":                   "debug",
 	}
 	input := []hivesim.StartOption{defaultSettings.Params()}
