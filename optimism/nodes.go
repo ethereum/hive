@@ -3,8 +3,9 @@ package optimism
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"github.com/ethereum-optimism/optimism/op-node/client"
 	"github.com/ethereum-optimism/optimism/op-node/p2p"
-	"github.com/ethereum-optimism/optimism/op-proposer/rollupclient"
+	"github.com/ethereum-optimism/optimism/op-node/sources"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/hive/hivesim"
 )
@@ -74,8 +75,8 @@ func (e *OpNode) HttpRpcEndpoint() string {
 	return fmt.Sprintf("http://%v:%d", e.IP, RollupRPCPort)
 }
 
-func (e *OpNode) RollupClient() *rollupclient.RollupClient {
-	return rollupclient.NewRollupClient(e.RPC())
+func (e *OpNode) RollupClient() *sources.RollupClient {
+	return sources.NewRollupClient(client.NewBaseRPCClient(e.RPC()))
 }
 
 func (e *OpNode) P2PClient() *p2p.Client {

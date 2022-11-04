@@ -22,6 +22,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	opbf "github.com/ethereum-optimism/optimism/op-batcher/flags"
+	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
 	opnf "github.com/ethereum-optimism/optimism/op-node/flags"
 	oppf "github.com/ethereum-optimism/optimism/op-proposer/flags"
 	"github.com/ethereum/hive/hivesim"
@@ -251,11 +252,9 @@ func (d *Devnet) AddOpProposer(eth1Index int, l2EngIndex int, opNodeIndex int, o
 
 	eth1Node := d.GetEth1(eth1Index)
 	opNode := d.GetOpNode(opNodeIndex)
-	l2Engine := d.GetOpL2Engine(l2EngIndex)
 
 	defaultSettings := HiveUnpackParams{
 		oppf.L1EthRpcFlag.EnvVar:                  eth1Node.WsRpcEndpoint(),
-		oppf.L2EthRpcFlag.EnvVar:                  l2Engine.WsRpcEndpoint(),
 		oppf.RollupRpcFlag.EnvVar:                 opNode.HttpRpcEndpoint(),
 		oppf.L2OOAddressFlag.EnvVar:               d.Deployments.L2OutputOracleProxy.String(),
 		oppf.PollIntervalFlag.EnvVar:              "10s",
@@ -264,7 +263,7 @@ func (d *Devnet) AddOpProposer(eth1Index int, l2EngIndex int, opNodeIndex int, o
 		oppf.ResubmissionTimeoutFlag.EnvVar:       "30s",
 		oppf.MnemonicFlag.EnvVar:                  d.MnemonicCfg.Mnemonic,
 		oppf.L2OutputHDPathFlag.EnvVar:            d.MnemonicCfg.Proposer,
-		"OP_PROPOSER_ALLOW_NON_FINALIZED":         "true",
+		oppf.AllowNonFinalizedFlag.EnvVar:         "true",
 		"OP_PROPOSER_LOG_LEVEL":                   "debug",
 	}
 	input := []hivesim.StartOption{defaultSettings.Params()}
@@ -396,7 +395,6 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 		SequencerWindowSize:       seqWindowSize,
 		ChannelTimeout:            chanTimeout,
 		P2PSequencerAddress:       d.Addresses.SequencerP2P,
-		OptimismL2FeeRecipient:    common.Address{0: 0x42, 19: 0xf0}, // tbd
 		BatchInboxAddress:         common.Address{0: 0x42, 19: 0xff}, // tbd
 		BatchSenderAddress:        d.Addresses.Batcher,
 
@@ -404,6 +402,8 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 		L2OutputOracleStartingTimestamp:  -1,
 		L2OutputOracleProposer:           d.Addresses.Proposer,
 		L2OutputOracleOwner:              common.Address{}, // tbd
+
+		SystemConfigOwner: common.Address{0: 0x42, 1: 43},
 
 		L1BlockTime:                 15,
 		L1GenesisBlockNonce:         0,
@@ -435,7 +435,6 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 		GasPriceOracleOwner:         common.Address{0: 0x42, 19: 0xf3}, // tbd
 		GasPriceOracleOverhead:      2100,
 		GasPriceOracleScalar:        1000_000,
-		GasPriceOracleDecimals:      6,
 		DeploymentWaitConfirmations: 1,
 
 		EIP1559Elasticity:  10,
@@ -452,9 +451,9 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 
 	l1Block := l1Genesis.ToBlock()
 	l2Addrs := &genesis.L2Addresses{
-		ProxyAdmin:                  predeploys.DevProxyAdminAddr,
 		L1StandardBridgeProxy:       predeploys.DevL1StandardBridgeAddr,
 		L1CrossDomainMessengerProxy: predeploys.DevL1CrossDomainMessengerAddr,
+		L1ERC721BridgeProxy:         predeploys.DevL1ERC721BridgeAddr,
 	}
 
 	l2Genesis, err := genesis.BuildL2DeveloperGenesis(config, l1Block, l2Addrs)
@@ -477,7 +476,8 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 				Hash:   l2Genesis.ToBlock().Hash(),
 				Number: 0,
 			},
-			L2Time: uint64(config.L1GenesisBlockTimestamp),
+			L2Time:       uint64(config.L1GenesisBlockTimestamp),
+			SystemConfig: e2eutils.SystemConfigFromDeployConfig(config),
 		},
 		BlockTime:              config.L2BlockTime,
 		MaxSequencerDrift:      config.MaxSequencerDrift,
@@ -486,10 +486,9 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 		L1ChainID:              new(big.Int).SetUint64(config.L1ChainID),
 		L2ChainID:              new(big.Int).SetUint64(config.L2ChainID),
 		P2PSequencerAddress:    config.P2PSequencerAddress,
-		FeeRecipientAddress:    config.OptimismL2FeeRecipient,
 		BatchInboxAddress:      config.BatchInboxAddress,
-		BatchSenderAddress:     config.BatchSenderAddress,
 		DepositContractAddress: predeploys.DevOptimismPortalAddr,
+		L1SystemConfigAddress:  predeploys.DevSystemConfigAddr,
 	}
 
 	d.Deployments.DeploymentsL1 = DeploymentsL1{

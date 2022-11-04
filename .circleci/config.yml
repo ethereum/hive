@@ -103,11 +103,6 @@ workflows:
           requires: [ "build" ]
           context: slack
           sim: optimism/rpc
-      - run-hive-sim:
-          name: hive-test-testnet
-          requires: [ "build" ]
-          context: slack
-          sim: optimism/testnet
   scheduled:
     triggers:
       - schedule:

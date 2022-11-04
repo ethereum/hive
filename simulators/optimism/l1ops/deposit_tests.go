@@ -1,8 +1,7 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
+	"github.com/ethereum/go-ethereum/ethclient/gethclient"
 	"math/big"
 	"math/rand"
 	"time"
@@ -234,12 +233,9 @@ func erc20RoundtripTest(t *hivesim.T, env *optimism.TestEnv) {
 	finHeader, err := l2.HeaderByNumber(env.Ctx(), big.NewInt(int64(finBlockNum)))
 	require.NoError(t, err)
 
-	j, _ := json.MarshalIndent(receipt, "", "  ")
-	fmt.Println(string(j))
-
 	// Get withdrawal parameters
-	l2Client := withdrawals.NewClient(env.Devnet.GetOpL2Engine(0).RPC())
-	wParams, err := withdrawals.FinalizeWithdrawalParameters(env.Ctx(), l2Client, tx.Hash(), finHeader)
+	proofClient := gethclient.New(env.Devnet.GetOpL2Engine(0).RPC())
+	wParams, err := withdrawals.FinalizeWithdrawalParameters(env.Ctx(), proofClient, l2, tx.Hash(), finHeader)
 	require.NoError(t, err)
 
 	// Finalize the withdrawal

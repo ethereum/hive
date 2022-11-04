@@ -16,7 +16,6 @@ use (
 	./simulators/optimism/l1ops
 	./simulators/optimism/p2p
 	./simulators/optimism/rpc
-	./simulators/optimism/testnet
 	./simulators/smoke/clique
 	./simulators/smoke/genesis
 	./simulators/smoke/network

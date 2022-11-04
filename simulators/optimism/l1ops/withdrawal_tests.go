@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/ethereum/go-ethereum/ethclient/gethclient"
 	"math/big"
 	"time"
 
@@ -47,8 +48,8 @@ func simpleWithdrawalTest(t *hivesim.T, env *optimism.TestEnv) {
 	finHeader, err := l2.HeaderByNumber(env.Ctx(), big.NewInt(int64(finBlockNum)))
 	require.NoError(t, err)
 
-	l2Client := withdrawals.NewClient(env.Devnet.GetOpL2Engine(0).RPC())
-	wParams, err := withdrawals.FinalizeWithdrawalParameters(env.Ctx(), l2Client, initTx.Hash(), finHeader)
+	proofClient := gethclient.New(env.Devnet.GetOpL2Engine(0).RPC())
+	wParams, err := withdrawals.FinalizeWithdrawalParameters(env.Ctx(), proofClient, l2, initTx.Hash(), finHeader)
 	require.NoError(t, err)
 
 	portal, err := bindings.NewOptimismPortal(
