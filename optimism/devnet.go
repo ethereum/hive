@@ -451,17 +451,7 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 	d.L1Cfg = l1Genesis
 
 	l1Block := l1Genesis.ToBlock()
-	l2Addrs := &genesis.L2Addresses{
-		ProxyAdminOwner:             predeploys.ProxyAdminAddr,
-		L1StandardBridgeProxy:       predeploys.DevL1StandardBridgeAddr,
-		L1CrossDomainMessengerProxy: predeploys.DevL1CrossDomainMessengerAddr,
-		L1ERC721BridgeProxy:         predeploys.DevL1ERC721BridgeAddr,
-		SequencerFeeVaultRecipient:  predeploys.SequencerFeeVaultAddr,
-		L1FeeVaultRecipient:         predeploys.L1FeeVaultAddr,
-		BaseFeeVaultRecipient:       predeploys.BaseFeeVaultAddr,
-	}
-
-	l2Genesis, err := genesis.BuildL2DeveloperGenesis(config, l1Block, l2Addrs)
+	l2Genesis, err := genesis.BuildL2DeveloperGenesis(config, l1Block, nil)
 	if err != nil {
 		d.T.Fatalf("failed to create l2 genesis: %v", err)
 	}
