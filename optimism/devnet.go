@@ -25,6 +25,7 @@ import (
 	"github.com/ethereum-optimism/optimism/op-e2e/e2eutils"
 	opnf "github.com/ethereum-optimism/optimism/op-node/flags"
 	oppf "github.com/ethereum-optimism/optimism/op-proposer/flags"
+
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -451,9 +452,13 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 
 	l1Block := l1Genesis.ToBlock()
 	l2Addrs := &genesis.L2Addresses{
+		ProxyAdminOwner:             predeploys.ProxyAdminAddr,
 		L1StandardBridgeProxy:       predeploys.DevL1StandardBridgeAddr,
 		L1CrossDomainMessengerProxy: predeploys.DevL1CrossDomainMessengerAddr,
 		L1ERC721BridgeProxy:         predeploys.DevL1ERC721BridgeAddr,
+		SequencerFeeVaultRecipient:  predeploys.SequencerFeeVaultAddr,
+		L1FeeVaultRecipient:         predeploys.L1FeeVaultAddr,
+		BaseFeeVaultRecipient:       predeploys.BaseFeeVaultAddr,
 	}
 
 	l2Genesis, err := genesis.BuildL2DeveloperGenesis(config, l1Block, l2Addrs)
@@ -490,6 +495,7 @@ func (d *Devnet) InitChain(maxSeqDrift uint64, seqWindowSize uint64, chanTimeout
 		DepositContractAddress: predeploys.DevOptimismPortalAddr,
 		L1SystemConfigAddress:  predeploys.DevSystemConfigAddr,
 	}
+	require.NoError(d.T, d.RollupCfg.Check(), "rollup config needs to be setup correctly")
 
 	d.Deployments.DeploymentsL1 = DeploymentsL1{
 		L1CrossDomainMessengerProxy: predeploys.DevL1CrossDomainMessengerAddr,
