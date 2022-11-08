@@ -9,6 +9,7 @@ type BindingsL1 struct {
 	OptimismPortal         *bindings.OptimismPortal
 	L1CrossDomainMessenger *bindings.L1CrossDomainMessenger
 	L1StandardBridge       *bindings.L1StandardBridge
+	SystemConfig           *bindings.SystemConfig
 }
 
 func (d *Devnet) InitBindingsL1(eth1Index int) {
@@ -34,6 +35,13 @@ func (d *Devnet) InitBindingsL1(eth1Index int) {
 		return
 	}
 	d.Bindings.BindingsL1.L1StandardBridge = l1SB
+
+	systemCfg, err := bindings.NewSystemConfig(predeploys.DevSystemConfigAddr, cl)
+	if err != nil {
+		d.T.Fatalf("failed system config binding: %v", err)
+		return
+	}
+	d.Bindings.BindingsL1.SystemConfig = systemCfg
 }
 
 type BindingsL2 struct {
