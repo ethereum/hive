@@ -6,7 +6,7 @@ replace github.com/ethereum/go-ethereum v1.10.26 => github.com/ethereum-optimism
 
 replace github.com/ethereum/hive v0.0.0-20220727121216-02ad57aaf9c1 => github.com/ethereum-optimism/hive v0.0.0-20220929220349-8cbb5d7fffe7
 
-replace github.com/ethereum/hive/optimism v0.0.0 => ../../../optimism
+replace github.com/ethereum/hive/optimism v0.0.0 => github.com/ethereum-optimism/hive/optimism v0.0.0-20221108003315-927ff05b256c
 
 require (
 	github.com/ethereum-optimism/optimism/op-bindings v0.10.0
