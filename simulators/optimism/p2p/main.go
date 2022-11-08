@@ -165,6 +165,7 @@ func runP2PTests(t *hivesim.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	readyCh := make(chan struct{})
+	errCh := make(chan error, 20)
 	t.Log("awaiting initial sync")
 	go func() {
 		tick := time.NewTicker(250 * time.Millisecond)
@@ -172,7 +173,10 @@ func runP2PTests(t *hivesim.T) {
 			select {
 			case <-tick.C:
 				seqHead, err := seqRollupCl.SyncStatus(ctx)
-				require.NoError(t, err)
+				if err != nil {
+					errCh <- err
+					return
+				}
 				if seqHead.UnsafeL2.Number == seqHead.SafeL2.Number {
 					continue
 				}
@@ -180,7 +184,10 @@ func runP2PTests(t *hivesim.T) {
 				for i := 1; i <= replicaCount; i++ {
 					repRollupCl := d.GetOpNode(i).RollupClient()
 					repHead, err := repRollupCl.SyncStatus(ctx)
-					require.NoError(t, err)
+					if err != nil {
+						errCh <- err
+						return
+					}
 					if seqHead.UnsafeL2.Number-repHead.UnsafeL2.Number >= 2 {
 						ready = false
 						break
@@ -196,6 +203,9 @@ func runP2PTests(t *hivesim.T) {
 	}()
 
 	select {
+	case err := <-errCh:
+		t.Fatalf("Error awaiting for initial sync", "err", err)
+
 	case <-readyCh:
 		cancel()
 		t.Log("initial sync complete")
@@ -204,7 +214,7 @@ func runP2PTests(t *hivesim.T) {
 	}
 
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
-	errCh := make(chan error, 20)
+	errCh = make(chan error, 20)
 	defer cancel()
 
 	getSyncStat := func(ctx context.Context, i int) *driver.SyncStatus {
