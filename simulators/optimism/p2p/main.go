@@ -178,6 +178,7 @@ func runP2PTests(t *hivesim.T) {
 					return
 				}
 				if seqHead.UnsafeL2.Number == seqHead.SafeL2.Number {
+					t.Log("Sequencer is unsafe head is at safe head", seqHead.SafeL2)
 					continue
 				}
 				ready := true
@@ -189,6 +190,7 @@ func runP2PTests(t *hivesim.T) {
 						return
 					}
 					if seqHead.UnsafeL2.Number-repHead.UnsafeL2.Number >= 2 {
+						t.Logf("Replica %d is not ready. Seq Unsafe Head: %v, Replica Unsafe Head: %v", i, seqHead.UnsafeL2, repHead.UnsafeL2)
 						ready = false
 						break
 					}
