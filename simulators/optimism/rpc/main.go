@@ -105,7 +105,7 @@ func runAllTests(t *hivesim.T) {
 	seqWindowSize := uint64(4)
 	d := optimism.NewDevnet(t)
 	require.NoError(t, optimism.StartSequencerDevnet(ctx, d, &optimism.SequencerDevnetParams{
-		MaxSeqDrift:   10,
+		MaxSeqDrift:   120,
 		SeqWindowSize: seqWindowSize,
 		ChanTimeout:   30,
 		AdditionalGenesisAllocs: core.GenesisAlloc{
