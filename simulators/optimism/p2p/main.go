@@ -123,7 +123,7 @@ func runP2PTests(t *hivesim.T) {
 	d.AddEth1() // l1 eth1 node is required for l2 config init
 	d.WaitUpEth1(0, time.Second*10)
 
-	var wg sync.WaitGroup
+	// Start all replicas
 	for i := 0; i <= replicaCount; i++ {
 		isSeq := i == 0
 		d.AddOpL2()
@@ -133,16 +133,12 @@ func runP2PTests(t *hivesim.T) {
 			d.AddOpBatcher(0, 0, 0, optimism.HiveUnpackParams{}.Params())
 			d.AddOpProposer(0, 0, 0)
 		}
-
-		wg.Add(1)
-		go func(i int) {
-			d.WaitUpOpL2Engine(i, time.Second*10)
-			wg.Done()
-		}(i)
 	}
-
 	t.Log("waiting for nodes to come up")
-	wg.Wait()
+	// Wait for them to come up. Don't do in a separate thread b/c WaitUpOpL2Engine calls t.FailNow on error
+	for i := 0; i <= replicaCount; i++ {
+		d.WaitUpOpL2Engine(i, time.Second*10)
+	}
 
 	for i := 1; i <= replicaCount; i++ {
 		node := d.GetOpNode(i)
@@ -163,73 +159,58 @@ func runP2PTests(t *hivesim.T) {
 	seqRollupCl := d.GetOpNode(0).RollupClient()
 	sender := d.L2Vault.CreateAccount(context.Background(), seqEthCl, big.NewInt(params.Ether))
 
+	// Wait until all replicas have an unsafe head within 2 blocks of the verifier unsafe head
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	readyCh := make(chan struct{})
-	errCh := make(chan error, 20)
 	t.Log("awaiting initial sync")
-	go func() {
-		tick := time.NewTicker(250 * time.Millisecond)
-		for {
-			select {
-			case <-tick.C:
-				seqHead, err := seqRollupCl.SyncStatus(ctx)
-				if err != nil {
-					errCh <- err
-					return
-				}
-				if seqHead.UnsafeL2.Number == seqHead.SafeL2.Number {
-					t.Log("Sequencer is unsafe head is at safe head", seqHead.SafeL2)
-					continue
-				}
-				ready := true
-				for i := 1; i <= replicaCount; i++ {
-					repRollupCl := d.GetOpNode(i).RollupClient()
-					repHead, err := repRollupCl.SyncStatus(ctx)
-					if err != nil {
-						errCh <- err
-						return
-					}
-					if seqHead.UnsafeL2.Number-repHead.UnsafeL2.Number >= 2 {
-						t.Logf("Replica %d is not ready. Seq Unsafe Head: %v, Replica Unsafe Head: %v", i, seqHead.UnsafeL2, repHead.UnsafeL2)
-						ready = false
-						break
-					}
-				}
-				if ready {
-					readyCh <- struct{}{}
-				}
-			case <-ctx.Done():
-				return
+	tick := time.NewTicker(250 * time.Millisecond)
+waitLoop:
+	for {
+		select {
+		case <-tick.C:
+			seqHead, err := seqRollupCl.SyncStatus(ctx)
+			require.NoError(t, err)
+			if seqHead.UnsafeL2.Number == seqHead.SafeL2.Number {
+				t.Log("Sequencer is unsafe head is at safe head", seqHead.SafeL2)
+				continue
 			}
+			ready := true
+			for i := 1; i <= replicaCount; i++ {
+				repRollupCl := d.GetOpNode(i).RollupClient()
+				repHead, err := repRollupCl.SyncStatus(ctx)
+				require.NoError(t, err)
+
+				if seqHead.UnsafeL2.Number-repHead.UnsafeL2.Number >= 2 {
+					t.Logf("Replica %d is not ready. Seq Unsafe Head: %v, Replica Unsafe Head: %v", i, seqHead.UnsafeL2, repHead.UnsafeL2)
+					ready = false
+					break
+				}
+			}
+			if ready {
+				break waitLoop
+			}
+		case <-ctx.Done():
+			t.Fatal("Context expired while waiting for nodes to come up")
 		}
-	}()
-
-	select {
-	case err := <-errCh:
-		t.Fatalf("Error awaiting for initial sync", "err", err)
-
-	case <-readyCh:
-		cancel()
-		t.Log("initial sync complete")
-	case <-ctx.Done():
-		t.Fatalf("timed out waiting for initial sync")
 	}
+	t.Log("Initial sync done")
 
 	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
-	errCh = make(chan error, 20)
+	errCh := make(chan error, 20)
 	defer cancel()
 
-	getSyncStat := func(ctx context.Context, i int) *driver.SyncStatus {
+	getSyncStat := func(ctx context.Context, i int) (*driver.SyncStatus, error) {
 		cl := d.GetOpNode(i).RollupClient()
 		seqStat, err := cl.SyncStatus(ctx)
-		require.NoError(t, err)
+		if err != nil {
+			return nil, err
+		}
 		t.Log(fmt.Sprintf("replica-%d", i),
 			"currentL1", seqStat.CurrentL1.TerminalString(),
 			"headL1", seqStat.HeadL1.TerminalString(),
 			"finalizedL2", seqStat.FinalizedL2.TerminalString(),
 			"safeL2", seqStat.SafeL2.TerminalString(),
 			"unsafeL2", seqStat.UnsafeL2.TerminalString())
-		return seqStat
+		return seqStat, nil
 	}
 
 	checkCanon := func(i int, head uint64, id eth.BlockID) error {
@@ -269,7 +250,11 @@ func runP2PTests(t *hivesim.T) {
 					errCh <- err
 					return
 				}
-				require.NoError(t, seqEthCl.SendTransaction(ctx, tx))
+
+				if err := seqEthCl.SendTransaction(ctx, tx); err != nil {
+					errCh <- err
+					return
+				}
 				_, err = optimism.WaitReceiptOK(ctx, seqEthCl, tx.Hash())
 				if err != nil {
 					errCh <- err
@@ -293,7 +278,11 @@ func runP2PTests(t *hivesim.T) {
 				}
 
 				for i := 1; i <= replicaCount; i++ {
-					seqStat := getSyncStat(ctx, i)
+					seqStat, err := getSyncStat(ctx, i)
+					if err != nil {
+						errCh <- err
+						return
+					}
 					if err := checkCanon(i, head.NumberU64(), seqStat.UnsafeL2.ID()); err != nil {
 						errCh <- err
 						return
