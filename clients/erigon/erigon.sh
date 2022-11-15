@@ -135,6 +135,6 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
 fi
 
 # Launch the main client.
-FLAGS="$FLAGS --nat=none"
+FLAGS="$FLAGS --nat=none --externalcl"
 echo "Running erigon with flags $FLAGS"
 $erigon $FLAGS
