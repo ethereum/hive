@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/hivesim"
@@ -35,6 +37,10 @@ type testEnv struct {
 	Secrets *[]blsu.SecretKey
 }
 
+type Logging interface {
+	Logf(format string, values ...interface{})
+}
+
 type node struct {
 	ExecutionClient      string
 	ConsensusClient      string
@@ -45,6 +51,7 @@ type node struct {
 	DisableStartup       bool
 	ChainGenerator       ChainGenerator
 	Chain                []*types.Block
+	ExecutionSubnet      string
 }
 
 type Nodes []node
@@ -884,4 +891,50 @@ func TimeUntilTerminalBlock(e *ExecutionClient, c setup.Eth1Consensus, defaultTT
 	fmt.Printf("INFO: ttd:%d, td:%d, diffPerBlock:%d, secondsPerBlock:%d\n", ttd, td, c.DifficultyPerBlock(), c.SecondsPerBlock())
 	td.Sub(ttd, td).Div(td, c.DifficultyPerBlock()).Mul(td, big.NewInt(int64(c.SecondsPerBlock())))
 	return td.Uint64()
+}
+
+func SlotsToDuration(slots beacon.Slot, spec *beacon.Spec) time.Duration {
+	return time.Duration(slots) * time.Duration(spec.SECONDS_PER_SLOT) * time.Second
+}
+
+// Gets the head of the execution client
+func GetHead(ctx context.Context, en *ExecutionClient) (ethcommon.Hash, error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	userRPCAddress, err := en.UserRPCAddress()
+	if err != nil {
+		panic(err)
+	}
+	client := &http.Client{}
+	rpcClient, _ := rpc.DialHTTPWithClient(userRPCAddress, client)
+	eth := ethclient.NewClient(rpcClient)
+	b, err := eth.BlockByNumber(ctx, nil)
+	if err != nil {
+		return ethcommon.Hash{}, err
+	}
+	return b.Hash(), nil
+}
+
+// Returns true if all head hashes match
+func CheckHeads(ctx context.Context, all ExecutionClients) (bool, error) {
+	if len(all) <= 1 {
+		return true, nil
+	}
+	var hash ethcommon.Hash
+	for i, en := range all {
+		h, err := GetHead(ctx, en)
+		if err != nil {
+			return false, err
+		}
+		if i == 0 {
+			hash = h
+		} else {
+			if h != hash {
+				fmt.Printf("Hash mismatch between heads: %s != %s\n", h, hash)
+				return false, nil
+			}
+			fmt.Printf("Hash match between heads: %s == %s\n", h, hash)
+		}
+	}
+	return true, nil
 }

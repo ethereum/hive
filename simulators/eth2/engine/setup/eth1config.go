@@ -102,6 +102,27 @@ func (c Eth1EthashConsensus) SecondsPerBlock() uint64 {
 	return 10
 }
 
+// A pre-existing chain is imported by the client, and it is not
+// expected that the client mines or produces any blocks.
+type Eth1PreChain struct{}
+
+func (c Eth1PreChain) Configure(*Eth1Genesis) error {
+	return nil
+}
+
+func (c Eth1PreChain) HiveParams(node int) hivesim.Params {
+	return hivesim.Params{}
+}
+
+func (c Eth1PreChain) DifficultyPerBlock() *big.Int {
+	// Approximately 0x20000
+	return big.NewInt(131072)
+}
+
+func (c Eth1PreChain) SecondsPerBlock() uint64 {
+	return 1
+}
+
 type Eth1CliqueConsensus struct {
 	CliquePeriod uint64
 	PrivateKey   string
@@ -162,7 +183,7 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64, consensus Eth1Consensus)
 	genesis := Eth1Genesis{
 		Genesis: &core.Genesis{
 			Config: &params.ChainConfig{
-				ChainID:                 big.NewInt(1),
+				ChainID:                 big.NewInt(7),
 				HomesteadBlock:          big.NewInt(0),
 				DAOForkBlock:            nil,
 				DAOForkSupport:          false,
@@ -194,7 +215,7 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64, consensus Eth1Consensus)
 			},
 		},
 		DepositAddress: depositContractAddr,
-		NetworkID:      1,
+		NetworkID:      7,
 	}
 
 	// Configure consensus

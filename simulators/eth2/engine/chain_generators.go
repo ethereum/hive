@@ -60,3 +60,14 @@ func (p *PoWChainGenerator) Generate(genesis *setup.Eth1Genesis) ([]*types.Block
 	p.blocks, _ = core.GenerateChain(genesis.Genesis.Config, genesisBlock, insta, db, p.BlockCount, p.GenFunction)
 	return p.blocks, nil
 }
+
+func (p *PoWChainGenerator) Blocks() []*types.Block {
+	return p.blocks
+}
+
+func (p *PoWChainGenerator) Head() *types.Block {
+	if p.blocks == nil || len(p.blocks) == 0 {
+		return nil
+	}
+	return p.blocks[len(p.blocks)-1]
+}

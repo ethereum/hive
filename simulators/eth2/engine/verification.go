@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"sort"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
@@ -307,5 +308,163 @@ func VerifyELHeads(t *Testnet, ctx context.Context) error {
 			return fmt.Errorf("different heads: %v: %v %v: %v", 0, head, i, head2)
 		}
 	}
+	return nil
+}
+
+// Helper debugging functions
+func (b *BeaconClient) PrintAllBeaconBlocks(ctx context.Context) error {
+	var headInfo eth2api.BeaconBlockHeaderAndInfo
+	if exists, err := beaconapi.BlockHeader(ctx, b.API, eth2api.BlockHead, &headInfo); err != nil {
+		return fmt.Errorf("PrintAllBeaconBlocks: failed to poll head: %v", err)
+	} else if !exists {
+		return fmt.Errorf("PrintAllBeaconBlocks: failed to poll head: !exists")
+	}
+	fmt.Printf("PrintAllBeaconBlocks: Printing beacon chain from %s\n", b.HiveClient.Container)
+	fmt.Printf("PrintAllBeaconBlocks: Head, slot %d, root %v\n", headInfo.Header.Message.Slot, headInfo.Root)
+	for i := 1; i <= int(headInfo.Header.Message.Slot); i++ {
+		var bHeader eth2api.BeaconBlockHeaderAndInfo
+		if exists, err := beaconapi.BlockHeader(ctx, b.API, eth2api.BlockIdSlot(i), &bHeader); err != nil {
+			fmt.Printf("PrintAllBeaconBlocks: Slot %d, not found\n", i)
+			continue
+		} else if !exists {
+			fmt.Printf("PrintAllBeaconBlocks: Slot %d, not found\n", i)
+			continue
+		}
+		var (
+			root      = bHeader.Root
+			execution = "0x0000..0000"
+		)
+
+		var versionedBlock eth2api.VersionedSignedBeaconBlock
+		if exists, err := beaconapi.BlockV2(ctx, b.API, eth2api.BlockIdRoot(root), &versionedBlock); err == nil && exists {
+			switch versionedBlock.Version {
+			case "bellatrix":
+				block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+				execution = shorten(block.Message.Body.ExecutionPayload.BlockHash.String())
+			}
+		}
+
+		fmt.Printf("PrintAllBeaconBlocks: Slot=%d, root=%v, exec=%s\n", i, root, execution)
+	}
+	return nil
+}
+
+type BeaconBlockInfo struct {
+	Root      tree.Root
+	Parent    tree.Root
+	Execution ethcommon.Hash
+	Nodes     []int
+}
+
+type BeaconBlockList []*BeaconBlockInfo
+
+func (bl BeaconBlockList) Add(root tree.Root, parent tree.Root, execution ethcommon.Hash, nodeId int) (BeaconBlockList, error) {
+	for _, b := range bl {
+		if root == b.Root {
+			if parent != b.Parent {
+				return bl, fmt.Errorf("roots equal (%s), parent root mismatch: %s != %s", root.String(), parent.String(), b.Parent.String())
+			}
+			if execution != b.Execution {
+				return bl, fmt.Errorf("roots equal (%s), exec hash mismatch: %s != %s", root.String(), execution.String(), b.Execution.String())
+			}
+			for _, n := range b.Nodes {
+				if nodeId == n {
+					return bl, nil
+				}
+			}
+			b.Nodes = append(b.Nodes, nodeId)
+			return bl, nil
+		}
+	}
+	return append(bl, &BeaconBlockInfo{
+		Root:      root,
+		Parent:    parent,
+		Execution: execution,
+		Nodes:     []int{nodeId},
+	}), nil
+}
+
+type BeaconBlockMap map[common.Slot]BeaconBlockList
+
+func (bm BeaconBlockMap) Add(slot common.Slot, root tree.Root, parent tree.Root, execution ethcommon.Hash, nodeId int) error {
+	if _, found := bm[slot]; !found {
+		bm[slot] = make(BeaconBlockList, 0)
+	}
+	var err error
+	bm[slot], err = bm[slot].Add(root, parent, execution, nodeId)
+	if err != nil {
+		return fmt.Errorf("Conflicting block on slot %d: %v", slot, err)
+	}
+	return nil
+}
+func (bm BeaconBlockMap) Print(l Logging) error {
+	slots := make([]int, 0, len(bm))
+	for s := range bm {
+		slots = append(slots, int(s))
+	}
+	sort.Ints(slots)
+	for _, s := range slots {
+		l.Logf("- Slot=%d\n", s)
+		for i, b := range bm[common.Slot(s)] {
+			l.Logf("    Fork %d: root=%v, parent=%v, exec=%s, nodes=%v \n", i, shorten(b.Root.String()), shorten(b.Parent.String()), shorten(b.Execution.String()), b.Nodes)
+		}
+	}
+	return nil
+}
+func PrintAllBeaconBlocks(t *Testnet, ctx context.Context) error {
+	runningBeacons := t.VerificationNodes().BeaconClients().Running()
+
+	beaconTree := make(BeaconBlockMap)
+
+	for nodeId, beaconNode := range runningBeacons {
+
+		var (
+			nextBlock eth2api.BlockId
+		)
+
+		nextBlock = eth2api.BlockHead
+
+		for {
+			if nextBlock.BlockId() == eth2api.BlockIdRoot(tree.Root{}).BlockId() {
+				break
+			}
+			// Get block header
+			var bHeader eth2api.BeaconBlockHeaderAndInfo
+			if exists, err := beaconapi.BlockHeader(ctx, beaconNode.API, nextBlock, &bHeader); err != nil {
+				t.Logf("Error fetching block (%s) from beacon node %d: %v", nextBlock.BlockId(), nodeId, err)
+				break
+			} else if !exists {
+				t.Logf("Unable to fetch block (%s) from beacon node %d: !exists", nextBlock.BlockId(), nodeId)
+				break
+			}
+
+			var (
+				root      = bHeader.Root
+				parent    = bHeader.Header.Message.ParentRoot
+				execution = ethcommon.Hash{}
+			)
+			var versionedBlock eth2api.VersionedSignedBeaconBlock
+			if exists, err := beaconapi.BlockV2(ctx, beaconNode.API, eth2api.BlockIdRoot(root), &versionedBlock); err == nil && exists {
+				switch versionedBlock.Version {
+				case "bellatrix":
+					block := versionedBlock.Data.(*bellatrix.SignedBeaconBlock)
+					execution = ethcommon.BytesToHash(block.Message.Body.ExecutionPayload.BlockHash[:])
+					t.Logf("Node %d: Execution payload: hash=%s", nodeId, shorten(execution.String()))
+				}
+			} else if err != nil {
+				t.Logf("Error getting versioned block=%s node=%d: %v", nextBlock.BlockId(), nodeId, err)
+				break
+			} else if !exists {
+				t.Logf("Error getting versioned block=%s node=%d: !exists", nextBlock.BlockId(), nodeId)
+				break
+			}
+			if err := beaconTree.Add(bHeader.Header.Message.Slot, root, parent, execution, nodeId); err != nil {
+				return err
+			}
+			nextBlock = eth2api.BlockIdRoot(parent)
+		}
+
+	}
+	beaconTree.Print(t)
 	return nil
 }

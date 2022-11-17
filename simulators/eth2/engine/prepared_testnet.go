@@ -212,7 +212,7 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 
 // Prepares an execution client object with all the necessary information
 // to start
-func (p *PreparedTestnet) prepareExecutionNode(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus setup.Eth1Consensus, ttd *big.Int, executionIndex int, chain []*types.Block) *ExecutionClient {
+func (p *PreparedTestnet) prepareExecutionNode(testnet *Testnet, eth1Def *hivesim.ClientDefinition, consensus setup.Eth1Consensus, ttd *big.Int, executionIndex int, chain []*types.Block, subnet string) *ExecutionClient {
 	testnet.Logf("Preparing execution node: %s (%s)", eth1Def.Name, eth1Def.Version)
 
 	// This method will return the options used to run the client.
@@ -222,7 +222,7 @@ func (p *PreparedTestnet) prepareExecutionNode(testnet *Testnet, eth1Def *hivesi
 		opts := []hivesim.StartOption{p.executionOpts}
 		opts = append(opts, consensus.HiveParams(executionIndex))
 
-		currentlyRunningEcs := testnet.ExecutionClients().Running()
+		currentlyRunningEcs := testnet.ExecutionClients().Running().Subnet(subnet)
 		if len(currentlyRunningEcs) > 0 {
 			bootnode, err := currentlyRunningEcs.Enodes()
 			if err != nil {
@@ -245,7 +245,7 @@ func (p *PreparedTestnet) prepareExecutionNode(testnet *Testnet, eth1Def *hivesi
 		}
 		return opts, nil
 	}
-	return NewExecutionClient(testnet.T, eth1Def, optionsGenerator, PortEngineRPC+executionIndex)
+	return NewExecutionClient(testnet.T, eth1Def, optionsGenerator, PortEngineRPC+executionIndex, subnet)
 }
 
 // Prepares a beacon client object with all the necessary information
