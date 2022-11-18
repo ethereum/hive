@@ -21,6 +21,9 @@ type Spec struct {
 	// Default: 0
 	TTD int64
 
+	// Shanghai Timestamp
+	ShanghaiTimestamp *big.Int
+
 	// CL Mocker configuration for slots to `safe` and `finalized` respectively
 	SlotsToSafe      *big.Int
 	SlotsToFinalized *big.Int

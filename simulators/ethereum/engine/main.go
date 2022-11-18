@@ -14,6 +14,7 @@ import (
 	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	suite_sync "github.com/ethereum/hive/simulators/ethereum/engine/suites/sync"
 	suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
+	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
 func main() {
@@ -40,6 +41,11 @@ func main() {
 			Description: `
 	Test Engine API sync, pre/post merge.`[1:],
 		}
+		withdrawals = hivesim.Suite{
+			Name: "engine-withdrawals",
+			Description: `
+	Test Engine API withdrawals, pre/post Shanghai.`[1:],
+		}
 	)
 
 	simulator := hivesim.New()
@@ -48,12 +54,14 @@ func main() {
 	addTestsToSuite(&transition, suite_transition.Tests, "full")
 	addTestsToSuite(&auth, suite_auth.Tests, "full")
 	suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
+	addTestsToSuite(&withdrawals, suite_withdrawals.Tests, "full")
 
 	// Mark suites for execution
 	hivesim.MustRunSuite(simulator, engine)
 	hivesim.MustRunSuite(simulator, transition)
 	hivesim.MustRunSuite(simulator, auth)
 	hivesim.MustRunSuite(simulator, sync)
+	hivesim.MustRunSuite(simulator, withdrawals)
 }
 
 // Add test cases to a given test suite
@@ -65,13 +73,20 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec, nodeType string) {
 		if currentTest.GenesisFile != "" {
 			genesisPath = "./init/" + currentTest.GenesisFile
 		}
+		// Load genesis for it to be modified before starting the client
 		testFiles := hivesim.Params{"/genesis.json": genesisPath}
 		// Calculate and set the TTD for this test
 		ttd := helper.CalculateRealTTD(genesisPath, currentTest.TTD)
+		// Configure Forks
 		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+		if currentTest.ShanghaiTimestamp != nil {
+			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", currentTest.ShanghaiTimestamp))
+		}
+
 		if nodeType != "" {
 			newParams = newParams.Set("HIVE_NODETYPE", nodeType)
 		}
+
 		if currentTest.ChainFile != "" {
 			// We are using a Proof of Work chain file, remove all clique-related settings
 			// TODO: Nethermind still requires HIVE_MINER for the Engine API
@@ -100,7 +115,7 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec, nodeType string) {
 					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
 				}
 				// Run the test case
-				test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, newParams, testFiles, currentTest.TestTransactionType, currentTest.SafeSlotsToImportOptimistically)
+				test.Run(currentTest, big.NewInt(ttd), timeout, t, c, newParams, testFiles)
 			},
 		})
 	}

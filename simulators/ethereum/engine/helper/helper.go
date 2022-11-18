@@ -79,6 +79,7 @@ const (
 	InvalidTimestamp                                       = "Timestamp"
 	InvalidPrevRandao                                      = "PrevRandao"
 	InvalidOmmers                                          = "Ommers"
+	InvalidWithdrawals                                     = "Withdrawals"
 	RemoveTransaction                                      = "Incomplete Transactions"
 	InvalidTransactionSignature                            = "Transaction Signature"
 	InvalidTransactionNonce                                = "Transaction Nonce"
@@ -89,7 +90,7 @@ const (
 	InvalidTransactionChainID                              = "Transaction ChainID"
 )
 
-func TransactionInPayload(payload *api.ExecutableDataV1, tx *types.Transaction) bool {
+func TransactionInPayload(payload *api.ExecutableData, tx *types.Transaction) bool {
 	for _, bytesTx := range payload.Transactions {
 		var currentTx types.Transaction
 		if err := currentTx.UnmarshalBinary(bytesTx); err == nil {

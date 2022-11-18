@@ -45,9 +45,9 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*Env), cParams hivesim.Params, cFiles hivesim.Params, testTransactionType helper.TestTransactionType, safeSlotsToImportOptimistically int64) {
+func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
-	clMocker := clmock.NewCLMocker(t, slotsToSafe, slotsToFinalized, big.NewInt(safeSlotsToImportOptimistically))
+	clMocker := clmock.NewCLMocker(t, testSpec.SlotsToSafe, testSpec.SlotsToFinalized, big.NewInt(testSpec.SafeSlotsToImportOptimistically), testSpec.ShanghaiTimestamp)
 	// Defer closing all clients
 	defer func() {
 		clMocker.CloseClients()
@@ -66,7 +66,7 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 
 	env := &Env{
 		T:                   t,
-		TestName:            testName,
+		TestName:            testSpec.Name,
 		Client:              c,
 		Engine:              ec,
 		Eth:                 ec,
@@ -74,7 +74,7 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 		CLMock:              clMocker,
 		ClientParams:        cParams,
 		ClientFiles:         cFiles,
-		TestTransactionType: testTransactionType,
+		TestTransactionType: testSpec.TestTransactionType,
 	}
 
 	// Before running the test, make sure Eth and Engine ports are open for the client
@@ -106,7 +106,7 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 	}()
 
 	// Run the test
-	fn(env)
+	testSpec.Run(env)
 }
 
 func (t *Env) MainTTD() *big.Int {
