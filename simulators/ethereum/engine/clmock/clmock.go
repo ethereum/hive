@@ -48,15 +48,15 @@ type CLMocker struct {
 
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
-	ExecutedPayloadHistory map[uint64]api.ExecutableDataV1
+	ExecutedPayloadHistory map[uint64]api.ExecutableData
 	HeadHashHistory        []common.Hash
 
 	// Latest broadcasted data using the PoS Engine API
 	LatestHeadNumber        *big.Int
 	LatestHeader            *types.Header
-	LatestPayloadBuilt      api.ExecutableDataV1
-	LatestPayloadAttributes api.PayloadAttributesV1
-	LatestExecutedPayload   api.ExecutableDataV1
+	LatestPayloadBuilt      api.ExecutableData
+	LatestPayloadAttributes api.PayloadAttributes
+	LatestExecutedPayload   api.ExecutableData
 	LatestForkchoice        api.ForkchoiceStateV1
 
 	// Merge related
@@ -65,12 +65,20 @@ type CLMocker struct {
 	TransitionPayloadTimestamp      *big.Int
 	SafeSlotsToImportOptimistically *big.Int
 
+	// Shanghai Related
+	ShanghaiTimestamp *big.Int
+	NextWithdrawals   types.Withdrawals
+
 	// Global context which all procedures shall stop
 	TestContext    context.Context
 	TimeoutContext context.Context
 }
 
-func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int) *CLMocker {
+func isShanghai(blockTimestamp uint64, shanghaiTimestamp *big.Int) bool {
+	return shanghaiTimestamp != nil && big.NewInt(int64(blockTimestamp)).Cmp(shanghaiTimestamp) >= 0
+}
+
+func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int, shanghaiTime *big.Int) *CLMocker {
 	// Init random seed for different purposes
 	seed := time.Now().Unix()
 	t.Logf("Randomness seed: %v\n", seed)
@@ -89,7 +97,7 @@ func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportO
 		T:                               t,
 		EngineClients:                   make([]client.EngineClient, 0),
 		PrevRandaoHistory:               map[uint64]common.Hash{},
-		ExecutedPayloadHistory:          map[uint64]api.ExecutableDataV1{},
+		ExecutedPayloadHistory:          map[uint64]api.ExecutableData{},
 		SlotsToSafe:                     slotsToSafe,
 		SlotsToFinalized:                slotsToFinalized,
 		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
@@ -104,7 +112,8 @@ func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportO
 			SafeBlockHash:      common.Hash{},
 			FinalizedBlockHash: common.Hash{},
 		},
-		TestContext: context.Background(),
+		ShanghaiTimestamp: shanghaiTime,
+		TestContext:       context.Background(),
 	}
 
 	return newCLMocker
@@ -244,12 +253,16 @@ func (cl *CLMocker) pickNextPayloadProducer() {
 	}
 }
 
+func (cl *CLMocker) SetNextWithdrawals(nextWithdrawals types.Withdrawals) {
+	cl.NextWithdrawals = nextWithdrawals
+}
+
 func (cl *CLMocker) GetNextPayloadID() {
 	// Generate a random value for the PrevRandao field
 	nextPrevRandao := common.Hash{}
 	rand.Read(nextPrevRandao[:])
 
-	cl.LatestPayloadAttributes = api.PayloadAttributesV1{
+	cl.LatestPayloadAttributes = api.PayloadAttributes{
 		Random:                nextPrevRandao,
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
 	}
@@ -261,12 +274,25 @@ func (cl *CLMocker) GetNextPayloadID() {
 		cl.LatestPayloadAttributes.Timestamp = cl.LatestHeader.Time + 1
 	}
 
+	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) && cl.NextWithdrawals != nil {
+		cl.LatestPayloadAttributes.Withdrawals = cl.NextWithdrawals
+	}
+
 	// Save random value
 	cl.PrevRandaoHistory[cl.LatestHeader.Number.Uint64()+1] = nextPrevRandao
 
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
-	resp, err := cl.NextBlockProducer.ForkchoiceUpdatedV1(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
+	var (
+		resp api.ForkChoiceResponse
+		err  error
+	)
+	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
+		resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV2(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
+
+	} else {
+		resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV1(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
+	}
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.ID(), err)
 	}
@@ -283,7 +309,12 @@ func (cl *CLMocker) GetNextPayload() {
 	var err error
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
-	cl.LatestPayloadBuilt, err = cl.NextBlockProducer.GetPayloadV1(ctx, cl.NextPayloadID)
+	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
+		cl.LatestPayloadBuilt, err = cl.NextBlockProducer.GetPayloadV2(ctx, cl.NextPayloadID)
+
+	} else {
+		cl.LatestPayloadBuilt, err = cl.NextBlockProducer.GetPayloadV1(ctx, cl.NextPayloadID)
+	}
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.ID(), cl.NextPayloadID, err)
 	}
@@ -341,7 +372,11 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 }
 
 func (cl *CLMocker) broadcastLatestForkchoice() {
-	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil) {
+	version := 1
+	if isShanghai(cl.LatestExecutedPayload.Timestamp, cl.ShanghaiTimestamp) {
+		version = 2
+	}
+	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, version) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
 		} else if resp.ForkchoiceResponse.PayloadStatus.Status == api.VALID {
@@ -385,11 +420,19 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 
 	cl.pickNextPayloadProducer()
 
+	// Check if next withdrawals necessary, test can override this value on
+	// `OnPayloadProducerSelected` callback
+	if cl.NextWithdrawals == nil {
+		cl.SetNextWithdrawals(make(types.Withdrawals, 0))
+	}
+
 	if callbacks.OnPayloadProducerSelected != nil {
 		callbacks.OnPayloadProducerSelected()
 	}
 
 	cl.GetNextPayloadID()
+
+	cl.SetNextWithdrawals(nil)
 
 	if callbacks.OnGetPayloadID != nil {
 		callbacks.OnGetPayloadID()
@@ -499,13 +542,21 @@ type ExecutePayloadOutcome struct {
 	Error                  error
 }
 
-func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableDataV1) []ExecutePayloadOutcome {
+func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableData) []ExecutePayloadOutcome {
 	responses := make([]ExecutePayloadOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.ID()
 		ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 		defer cancel()
-		execPayloadResp, err := ec.NewPayloadV1(ctx, payload)
+		var (
+			execPayloadResp api.PayloadStatusV1
+			err             error
+		)
+		if isShanghai(payload.Timestamp, cl.ShanghaiTimestamp) {
+			execPayloadResp, err = ec.NewPayloadV2(ctx, payload)
+		} else {
+			execPayloadResp, err = ec.NewPayloadV1(ctx, payload)
+		}
 		if err != nil {
 			cl.Errorf("CLMocker: Could not ExecutePayloadV1: %v", err)
 			responses[i].Error = err
@@ -523,7 +574,7 @@ type ForkChoiceOutcome struct {
 	Error              error
 }
 
-func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, payloadAttr *api.PayloadAttributesV1) []ForkChoiceOutcome {
+func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, payloadAttr *api.PayloadAttributes, version int) []ForkChoiceOutcome {
 	responses := make([]ForkChoiceOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.ID()
@@ -531,7 +582,15 @@ func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, p
 		if cl.IsOptimisticallySyncing() || newPayloadStatus.Status == "VALID" {
 			ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 			defer cancel()
-			fcUpdatedResp, err := ec.ForkchoiceUpdatedV1(ctx, fcstate, payloadAttr)
+			var (
+				fcUpdatedResp api.ForkChoiceResponse
+				err           error
+			)
+			if version == 2 {
+				fcUpdatedResp, err = ec.ForkchoiceUpdatedV2(ctx, fcstate, payloadAttr)
+			} else if version == 1 {
+				fcUpdatedResp, err = ec.ForkchoiceUpdatedV1(ctx, fcstate, payloadAttr)
+			}
 			if err != nil {
 				cl.Errorf("CLMocker: Could not ForkchoiceUpdatedV1: %v", err)
 				responses[i].Error = err

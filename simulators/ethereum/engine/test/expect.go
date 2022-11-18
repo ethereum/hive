@@ -79,10 +79,21 @@ type ForkchoiceResponseExpectObject struct {
 	Error    error
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) *ForkchoiceResponseExpectObject {
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) *ForkchoiceResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	resp, err := tec.Engine.ForkchoiceUpdatedV1(ctx, fcState, pAttributes)
+	return &ForkchoiceResponseExpectObject{
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Response:  resp,
+		Error:     err,
+	}
+}
+
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) *ForkchoiceResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	resp, err := tec.Engine.ForkchoiceUpdatedV2(ctx, fcState, pAttributes)
 	return &ForkchoiceResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Response:  resp,
@@ -156,10 +167,21 @@ type NewPayloadResponseExpectObject struct {
 	Error  error
 }
 
-func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableDataV1) *NewPayloadResponseExpectObject {
+func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	status, err := tec.Engine.NewPayloadV1(ctx, payload)
+	return &NewPayloadResponseExpectObject{
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Status:    status,
+		Error:     err,
+	}
+}
+
+func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	status, err := tec.Engine.NewPayloadV2(ctx, payload)
 	return &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Status:    status,
@@ -221,7 +243,7 @@ func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Has
 // GetPayloadV1
 type GetPayloadResponseExpectObject struct {
 	*ExpectEnv
-	Payload api.ExecutableDataV1
+	Payload api.ExecutableData
 	Error   error
 }
 
@@ -229,6 +251,17 @@ func (tec *TestEngineClient) TestEngineGetPayloadV1(payloadID *api.PayloadID) *G
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	payload, err := tec.Engine.GetPayloadV1(ctx, payloadID)
+	return &GetPayloadResponseExpectObject{
+		ExpectEnv: &ExpectEnv{tec.Env},
+		Payload:   payload,
+		Error:     err,
+	}
+}
+
+func (tec *TestEngineClient) TestEngineGetPayloadV2(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	payload, err := tec.Engine.GetPayloadV2(ctx, payloadID)
 	return &GetPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Payload:   payload,

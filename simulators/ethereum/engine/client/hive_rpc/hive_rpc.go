@@ -152,10 +152,10 @@ type HiveRPCEngineClient struct {
 
 	// Engine updates info
 	latestFcUStateSent *api.ForkchoiceStateV1
-	latestPAttrSent    *api.PayloadAttributesV1
+	latestPAttrSent    *api.PayloadAttributes
 	latestFcUResponse  *api.ForkChoiceResponse
 
-	latestPayloadSent          *api.ExecutableDataV1
+	latestPayloadSent          *api.ExecutableData
 	latestPayloadStatusReponse *api.PayloadStatusV1
 
 	// Test account nonces
@@ -293,36 +293,64 @@ func (ec *HiveRPCEngineClient) PrepareDefaultAuthCallToken() error {
 }
 
 // Engine API Call Methods
-func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) (api.ForkChoiceResponse, error) {
+func (ec *HiveRPCEngineClient) ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
 	var result api.ForkChoiceResponse
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 	ec.latestFcUStateSent = fcState
 	ec.latestPAttrSent = pAttributes
-	err := ec.c.CallContext(ctx, &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
+	err := ec.c.CallContext(ctx,
+		&result,
+		fmt.Sprintf("engine_forkchoiceUpdatedV%d", version),
+		fcState,
+		pAttributes)
 	ec.latestFcUResponse = &result
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableDataV1, error) {
-	var result api.ExecutableDataV1
+func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
+	return ec.ForkchoiceUpdated(ctx, 1, fcState, pAttributes)
+}
+
+func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
+	return ec.ForkchoiceUpdated(ctx, 2, fcState, pAttributes)
+}
+
+func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (api.ExecutableData, error) {
+	var result api.ExecutableData
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
-	err := ec.c.CallContext(ctx, &result, "engine_getPayloadV1", payloadId)
+	err := ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_getPayloadV%d", version), payloadId)
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *api.ExecutableDataV1) (api.PayloadStatusV1, error) {
+func (ec *HiveRPCEngineClient) GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error) {
+	return ec.GetPayload(ctx, 1, payloadId)
+}
+
+func (ec *HiveRPCEngineClient) GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error) {
+	return ec.GetPayload(ctx, 2, payloadId)
+}
+
+func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
 	var result api.PayloadStatusV1
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 	ec.latestPayloadSent = payload
-	err := ec.c.CallContext(ctx, &result, "engine_newPayloadV1", payload)
+	err := ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload)
 	ec.latestPayloadStatusReponse = &result
 	return result, err
+}
+
+func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
+	return ec.NewPayload(ctx, 1, payload)
+}
+
+func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
+	return ec.NewPayload(ctx, 2, payload)
 }
 
 func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Context, tConf *api.TransitionConfigurationV1) (api.TransitionConfigurationV1, error) {
@@ -366,11 +394,11 @@ func (ec *HiveRPCEngineClient) PostRunVerifications() error {
 	return nil
 }
 
-func (ec *HiveRPCEngineClient) LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) {
+func (ec *HiveRPCEngineClient) LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) {
 	return ec.latestFcUStateSent, ec.latestPAttrSent
 }
 
-func (ec *HiveRPCEngineClient) LatestNewPayloadSent() *api.ExecutableDataV1 {
+func (ec *HiveRPCEngineClient) LatestNewPayloadSent() *api.ExecutableData {
 	return ec.latestPayloadSent
 }
 
