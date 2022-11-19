@@ -2,6 +2,7 @@ package clmock
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -180,6 +181,8 @@ func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 		cl.Fatalf("CLMocker: Attempted to set TTD Block when TTD had not been reached: %d > %d", ec.TerminalTotalDifficulty(), ttd)
 	} else {
 		cl.Logf("CLMocker: TTD has been reached at block %d (%d>=%d)\n", cl.LatestHeader.Number, ttd, ec.TerminalTotalDifficulty())
+		jsH, _ := json.MarshalIndent(cl.LatestHeader, "", " ")
+		cl.Logf("CLMocker: Block %d: %s\n", cl.LatestHeader.Number, jsH)
 	}
 
 	cl.TTDReached = true
@@ -257,7 +260,7 @@ func (cl *CLMocker) SetNextWithdrawals(nextWithdrawals types.Withdrawals) {
 	cl.NextWithdrawals = nextWithdrawals
 }
 
-func (cl *CLMocker) GetNextPayloadID() {
+func (cl *CLMocker) RequestNextPayload() {
 	// Generate a random value for the PrevRandao field
 	nextPrevRandao := common.Hash{}
 	rand.Read(nextPrevRandao[:])
@@ -284,17 +287,20 @@ func (cl *CLMocker) GetNextPayloadID() {
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
 	var (
-		resp api.ForkChoiceResponse
-		err  error
+		resp       api.ForkChoiceResponse
+		fcUVersion int
+		err        error
 	)
 	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
+		fcUVersion = 2
 		resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV2(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 
 	} else {
+		fcUVersion = 1
 		resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV1(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	}
 	if err != nil {
-		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV1 (%v): %v", cl.NextBlockProducer.ID(), err)
+		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV%d (%v): %v", fcUVersion, cl.NextBlockProducer.ID(), err)
 	}
 	if resp.PayloadStatus.Status != api.VALID {
 		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated Response from Payload builder: %v", resp)
@@ -430,7 +436,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 		callbacks.OnPayloadProducerSelected()
 	}
 
-	cl.GetNextPayloadID()
+	cl.RequestNextPayload()
 
 	cl.SetNextWithdrawals(nil)
 
