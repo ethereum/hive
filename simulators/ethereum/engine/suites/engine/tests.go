@@ -2803,7 +2803,7 @@ func transactionReorg(t *test.Env) {
 			OnPayloadProducerSelected: func() {
 				// At this point we have not broadcast the transaction,
 				// therefore any payload we get should not contain any
-				t.CLMock.GetNextPayloadID()
+				t.CLMock.RequestNextPayload()
 				t.CLMock.GetNextPayload()
 				noTxnPayload = t.CLMock.LatestPayloadBuilt
 				if len(noTxnPayload.Transactions) != 0 {
@@ -2907,7 +2907,7 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
 				OnPayloadProducerSelected: func() {
 					// At this point we have not broadcast the transaction,
 					// therefore any payload we get should not contain any
-					t.CLMock.GetNextPayloadID()
+					t.CLMock.RequestNextPayload()
 					t.CLMock.GetNextPayload()
 
 					// Create the transaction
