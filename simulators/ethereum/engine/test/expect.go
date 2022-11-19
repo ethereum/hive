@@ -71,11 +71,12 @@ func NewTestEngineClient(t *Env, ec client.EngineClient) *TestEngineClient {
 	}
 }
 
-// ForkchoiceUpdatedV1
+// ForkchoiceUpdated
 
 type ForkchoiceResponseExpectObject struct {
 	*ExpectEnv
 	Response api.ForkChoiceResponse
+	Version  int
 	Error    error
 }
 
@@ -86,6 +87,7 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.Forkchoi
 	return &ForkchoiceResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Response:  resp,
+		Version:   1,
 		Error:     err,
 	}
 }
@@ -97,39 +99,40 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.Forkchoi
 	return &ForkchoiceResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Response:  resp,
+		Version:   2,
 		Error:     err,
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Unexpected error on EngineForkchoiceUpdatedV1: %v, expected=<None>", exp.TestName, exp.Error)
+		exp.Fatalf("FAIL (%s): Unexpected error on EngineForkchoiceUpdatedV%d: %v, expected=<None>", exp.TestName, exp.Version, exp.Error)
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectNoValidationError() {
 	if exp.Response.PayloadStatus.ValidationError != nil {
-		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineForkchoiceUpdatedV1: %v, expected=<None>", exp.TestName, exp.Response.PayloadStatus.ValidationError)
+		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineForkchoiceUpdatedV%d: %v, expected=<None>", exp.TestName, exp.Version, exp.Response.PayloadStatus.ValidationError)
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectError() {
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV1: response=%v", exp.TestName, exp.Response)
+		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV%d: response=%v", exp.TestName, exp.Version, exp.Response)
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectErrorCode(code int) {
 	// TODO: Actually check error code
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV1: response=%v", exp.TestName, exp.Response)
+		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV%d: response=%v", exp.TestName, exp.Version, exp.Response)
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectPayloadStatus(ps PayloadStatus) {
 	exp.ExpectNoError()
 	if PayloadStatus(exp.Response.PayloadStatus.Status) != ps {
-		exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.Status, ps)
+		exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadStatus.Status, ps)
 	}
 }
 
@@ -140,14 +143,14 @@ func (exp *ForkchoiceResponseExpectObject) ExpectAnyPayloadStatus(statuses ...Pa
 			return
 		}
 	}
-	exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.Status, StatusesToString(statuses))
+	exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadStatus.Status, StatusesToString(statuses))
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectLatestValidHash(lvh *common.Hash) {
 	exp.ExpectNoError()
 	if ((lvh == nil || exp.Response.PayloadStatus.LatestValidHash == nil) && exp.Response.PayloadStatus.LatestValidHash != lvh) ||
 		(lvh != nil && exp.Response.PayloadStatus.LatestValidHash != nil && *exp.Response.PayloadStatus.LatestValidHash != *lvh) {
-		exp.Fatalf("FAIL (%v): Unexpected LatestValidHash on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.LatestValidHash, lvh)
+		exp.Fatalf("FAIL (%v): Unexpected LatestValidHash on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadStatus.LatestValidHash, lvh)
 	}
 }
 
@@ -155,16 +158,17 @@ func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *api.PayloadID) {
 	exp.ExpectNoError()
 	if ((exp.Response.PayloadID == nil || pid == nil) && exp.Response.PayloadID != pid) ||
 		(exp.Response.PayloadID != nil && pid != nil && *exp.Response.PayloadID != *pid) {
-		exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadID, pid)
+		exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadID, pid)
 	}
 }
 
-// NewPayloadV1
+// NewPayload
 
 type NewPayloadResponseExpectObject struct {
 	*ExpectEnv
-	Status api.PayloadStatusV1
-	Error  error
+	Status  api.PayloadStatusV1
+	Version int
+	Error   error
 }
 
 func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
@@ -174,6 +178,7 @@ func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData)
 	return &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Status:    status,
+		Version:   1,
 		Error:     err,
 	}
 }
@@ -185,39 +190,40 @@ func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *api.ExecutableData)
 	return &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Status:    status,
+		Version:   2,
 		Error:     err,
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Expected no error on EngineNewPayloadV1: error=%v", exp.TestName, exp.Error)
+		exp.Fatalf("FAIL (%s): Expected no error on EngineNewPayloadV%d: error=%v", exp.TestName, exp.Version, exp.Error)
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectError() {
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV1: status=%v", exp.TestName, exp.Status)
+		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV%d: status=%v", exp.TestName, exp.Version, exp.Status)
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectErrorCode(code int) {
 	// TODO: Actually check error code
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV1: status=%v", exp.TestName, exp.Status)
+		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV%d: status=%v", exp.TestName, exp.Version, exp.Status)
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectNoValidationError() {
 	if exp.Status.ValidationError != nil {
-		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineNewPayloadV1: %v, expected=<None>", exp.TestName, exp.Status.ValidationError)
+		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineNewPayloadV%d: %v, expected=<None>", exp.TestName, exp.Version, exp.Status.ValidationError)
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectStatus(ps PayloadStatus) {
 	exp.ExpectNoError()
 	if PayloadStatus(exp.Status.Status) != ps {
-		exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.Status, ps)
+		exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Status.Status, ps)
 	}
 }
 
@@ -229,14 +235,14 @@ func (exp *NewPayloadResponseExpectObject) ExpectStatusEither(statuses ...Payloa
 		}
 	}
 
-	exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.Status, strings.Join(StatusesToString(statuses), ","))
+	exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Status.Status, strings.Join(StatusesToString(statuses), ","))
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Hash) {
 	exp.ExpectNoError()
 	if ((lvh == nil || exp.Status.LatestValidHash == nil) && exp.Status.LatestValidHash != lvh) ||
 		(lvh != nil && exp.Status.LatestValidHash != nil && *exp.Status.LatestValidHash != *lvh) {
-		exp.Fatalf("FAIL (%v): Unexpected LatestValidHash on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.LatestValidHash, lvh)
+		exp.Fatalf("FAIL (%v): Unexpected LatestValidHash on EngineNewPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Status.LatestValidHash, lvh)
 	}
 }
 
@@ -452,6 +458,15 @@ func (exp *BlockResponseExpectObject) ExpectHash(expHash common.Hash) {
 	exp.ExpectNoError()
 	if exp.Block.Hash() != expHash {
 		exp.Fatalf("FAIL (%s): Unexpected hash on %s: %v, expected=%v", exp.TestName, exp.Call, exp.Block.Hash(), expHash)
+	}
+}
+
+func (exp *BlockResponseExpectObject) ExpectWithdrawalsRoot(expectedRoot *common.Hash) {
+	exp.ExpectNoError()
+	actualWithdrawalsRoot := exp.Block.Header().WithdrawalsHash
+	if ((expectedRoot == nil || actualWithdrawalsRoot == nil) && actualWithdrawalsRoot != expectedRoot) ||
+		(expectedRoot != nil && actualWithdrawalsRoot != nil && *actualWithdrawalsRoot != *expectedRoot) {
+		exp.Fatalf("FAIL (%s): Unexpected WithdrawalsRoot on %s: %v, expected=%v", exp.TestName, exp.Call, actualWithdrawalsRoot, expectedRoot)
 	}
 }
 
