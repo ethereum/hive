@@ -29,7 +29,7 @@ type CustomPayloadData struct {
 	BaseFeePerGas *big.Int
 	BlockHash     *common.Hash
 	Transactions  *[][]byte
-	Withdrawals   *[]*types.Withdrawal
+	Withdrawals   types.Withdrawals
 }
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
@@ -63,11 +63,6 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		Nonce:       types.BlockNonce{0}, // could be overwritten
 		BaseFee:     basePayload.BaseFeePerGas,
 	}
-	if basePayload.Withdrawals != nil {
-		h := types.DeriveSha(types.Withdrawals(basePayload.Withdrawals), trie.NewStackTrie(nil))
-		customPayloadHeader.WithdrawalsHash = &h
-	}
-
 	// Overwrite custom information
 	if customData.ParentHash != nil {
 		customPayloadHeader.ParentHash = *customData.ParentHash
@@ -106,12 +101,15 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		customPayloadHeader.BaseFee = customData.BaseFeePerGas
 	}
 	if customData.Withdrawals != nil {
-		h := types.DeriveSha(types.Withdrawals(*customData.Withdrawals), trie.NewStackTrie(nil))
+		h := types.DeriveSha(customData.Withdrawals, trie.NewStackTrie(nil))
+		customPayloadHeader.WithdrawalsHash = &h
+	} else if basePayload.Withdrawals != nil {
+		h := types.DeriveSha(types.Withdrawals(basePayload.Withdrawals), trie.NewStackTrie(nil))
 		customPayloadHeader.WithdrawalsHash = &h
 	}
 
 	// Return the new payload
-	return &api.ExecutableData{
+	result := &api.ExecutableData{
 		ParentHash:    customPayloadHeader.ParentHash,
 		FeeRecipient:  customPayloadHeader.Coinbase,
 		StateRoot:     customPayloadHeader.Root,
@@ -126,7 +124,13 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		BaseFeePerGas: customPayloadHeader.BaseFee,
 		BlockHash:     customPayloadHeader.Hash(),
 		Transactions:  txs,
-	}, nil
+	}
+	if customData.Withdrawals != nil {
+		result.Withdrawals = customData.Withdrawals
+	} else if basePayload.Withdrawals != nil {
+		result.Withdrawals = basePayload.Withdrawals
+	}
+	return result, nil
 }
 
 func (customData *CustomPayloadData) String() string {

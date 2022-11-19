@@ -45,10 +45,10 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 	if clientType == "" {
 		cs, err := T.Sim.ClientTypes()
 		if err != nil {
-			return nil, fmt.Errorf("Client type was not supplied and simulator returned error on trying to get all client types: %v", err)
+			return nil, fmt.Errorf("client type was not supplied and simulator returned error on trying to get all client types: %v", err)
 		}
-		if cs == nil || len(cs) == 0 {
-			return nil, fmt.Errorf("Client type was not supplied and simulator returned empty client types: %v", cs)
+		if len(cs) == 0 {
+			return nil, fmt.Errorf("client type was not supplied and simulator returned empty client types: %v", cs)
 		}
 		clientType = cs[0].Name
 	}
@@ -65,14 +65,14 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		ClientFiles = ClientFiles.Set("/chain.rlp", "./chains/"+s.ChainFile)
 	}
 	if _, ok := ClientFiles["/genesis.json"]; !ok {
-		return nil, fmt.Errorf("Cannot start without genesis file")
+		return nil, fmt.Errorf("cannot start without genesis file")
 	}
 	if ttd == nil {
 		if ttdStr, ok := ClientParams["HIVE_TERMINAL_TOTAL_DIFFICULTY"]; ok {
 			// Retrieve TTD from parameters
 			ttd, ok = new(big.Int).SetString(ttdStr, 10)
 			if !ok {
-				return nil, fmt.Errorf("Unable to parse TTD from parameters")
+				return nil, fmt.Errorf("unable to parse TTD from parameters")
 			}
 		}
 	} else {
@@ -81,7 +81,7 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttdInt))
 		ttd = big.NewInt(ttdInt)
 	}
-	if bootClients != nil && len(bootClients) > 0 {
+	if len(bootClients) > 0 {
 		var (
 			enodes = make([]string, len(bootClients))
 			err    error
@@ -89,7 +89,7 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		for i, bootClient := range bootClients {
 			enodes[i], err = bootClient.EnodeURL()
 			if err != nil {
-				return nil, fmt.Errorf("Unable to obtain bootnode: %v", err)
+				return nil, fmt.Errorf("unable to obtain bootnode: %v", err)
 			}
 		}
 		enodeString := strings.Join(enodes, ",")
@@ -164,17 +164,17 @@ type HiveRPCEngineClient struct {
 
 // NewClient creates a engine client that uses the given RPC client.
 func NewHiveRPCEngineClient(h *hivesim.Client, enginePort int, ethPort int, jwtSecretBytes []byte, ttd *big.Int, transport http.RoundTripper) *HiveRPCEngineClient {
-	client := &http.Client{
-		Transport: transport,
-	}
 	// Prepare HTTP Client
-	rpcHttpClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%s:%d/", h.IP, enginePort), client)
+	rpcHttpClient, err := rpc.DialHTTPWithClient(fmt.Sprintf("http://%s:%d/", h.IP, enginePort), &http.Client{Transport: transport})
+	if err != nil {
+		panic(err)
+	}
 
 	// Prepare ETH Client
-	client = &http.Client{
-		Transport: transport,
+	rpcClient, err := rpc.DialHTTPWithClient(fmt.Sprintf("http://%s:%d/", h.IP, ethPort), &http.Client{Transport: transport})
+	if err != nil {
+		panic(err)
 	}
-	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%s:%d/", h.IP, ethPort), client)
 	eth := ethclient.NewClient(rpcClient)
 	return &HiveRPCEngineClient{
 		h:              h,
