@@ -136,6 +136,9 @@ def clique_engine:
     # Merge
     "MergeForkIdTransition": env.HIVE_MERGE_BLOCK_ID|to_hex,
 
+    # Shanghai
+    "eip4895TransitionTimestamp": env.HIVE_SHANGHAI_TIMESTAMP|to_hex,
+
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
