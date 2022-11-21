@@ -6,6 +6,31 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
 
+type ForkConfig struct {
+	// Shanghai Fork Timestamp
+	ShanghaiTimestamp *big.Int
+}
+
+type ConsensusConfig struct {
+	SlotsToSafe                     *big.Int
+	SlotsToFinalized                *big.Int
+	SafeSlotsToImportOptimistically int64
+}
+
+type SpecInterface interface {
+	Execute(*Env)
+	GetAbout() string
+	GetConsensusConfig() ConsensusConfig
+	GetChainFile() string
+	GetForkConfig() ForkConfig
+	GetGenesisFile() string
+	GetName() string
+	GetTestTransactionType() helper.TestTransactionType
+	GetTimeout() int
+	GetTTD() int64
+	IsMiningDisabled() bool
+}
+
 type Spec struct {
 	// Name of the test
 	Name string
@@ -48,6 +73,52 @@ type Spec struct {
 	TestTransactionType helper.TestTransactionType
 
 	// Fork Config
-	// Shanghai Fork Timestamp
-	ShanghaiTimestamp *big.Int
+	ForkConfig
+}
+
+func (s Spec) Execute(env *Env) {
+	s.Run(env)
+}
+
+func (s Spec) GetAbout() string {
+	return s.About
+}
+
+func (s Spec) GetConsensusConfig() ConsensusConfig {
+	return ConsensusConfig{
+		SlotsToSafe:                     s.SlotsToSafe,
+		SlotsToFinalized:                s.SlotsToFinalized,
+		SafeSlotsToImportOptimistically: s.SafeSlotsToImportOptimistically,
+	}
+}
+func (s Spec) GetChainFile() string {
+	return s.ChainFile
+}
+
+func (s Spec) GetForkConfig() ForkConfig {
+	return s.ForkConfig
+}
+
+func (s Spec) GetGenesisFile() string {
+	return s.GenesisFile
+}
+
+func (s Spec) GetName() string {
+	return s.Name
+}
+
+func (s Spec) GetTestTransactionType() helper.TestTransactionType {
+	return s.TestTransactionType
+}
+
+func (s Spec) GetTimeout() int {
+	return s.TimeoutSeconds
+}
+
+func (s Spec) GetTTD() int64 {
+	return s.TTD
+}
+
+func (s Spec) IsMiningDisabled() bool {
+	return s.DisableMining
 }
