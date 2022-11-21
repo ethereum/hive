@@ -496,6 +496,8 @@ func (exp *BlockResponseExpectObject) ExpectCoinbase(expCoinbase common.Address)
 type BalanceResponseExpectObject struct {
 	*ExpectEnv
 	Call    string
+	Account common.Address
+	Block   *big.Int
 	Balance *big.Int
 	Error   error
 }
@@ -507,7 +509,9 @@ func (tec *TestEngineClient) TestBalanceAt(account common.Address, number *big.I
 	return &BalanceResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
 		Call:      "BalanceAt",
+		Account:   account,
 		Balance:   balance,
+		Block:     number,
 		Error:     err,
 	}
 }
@@ -522,7 +526,7 @@ func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) 
 	exp.ExpectNoError()
 	if ((expBalance == nil || exp.Balance == nil) && expBalance != exp.Balance) ||
 		(expBalance != nil && exp.Balance != nil && expBalance.Cmp(exp.Balance) != 0) {
-		exp.Fatalf("FAIL (%s): Unexpected balance on %s: %v, expected=%v", exp.TestName, exp.Call, exp.Balance, expBalance)
+		exp.Fatalf("FAIL (%s): Unexpected balance on %s, for account %s at block %v: %v, expected=%v", exp.TestName, exp.Call, exp.Account, exp.Block, exp.Balance, expBalance)
 	}
 }
 

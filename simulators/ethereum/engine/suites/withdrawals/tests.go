@@ -93,11 +93,12 @@ var Tests = []test.SpecInterface{
 	},
 	WithdrawalsBasicSpec{
 		Spec: test.Spec{
-			Name: "Withdraw to many accounts",
+			Name: "Withdraw many accounts",
 			About: `
 			Make multiple withdrawals to 1024 different accounts.
 			Execute many blocks this way.
 			`,
+			TimeoutSeconds: 120,
 		},
 		PreWithdrawalsBlocks:     1,
 		WithdrawalsBlockCount:    16,
@@ -233,7 +234,7 @@ func (ws WithdrawalsBasicSpec) Execute(t *test.Env) {
 	var (
 		withdrawnAccounts    = make(map[common.Address]bool)
 		withdrawalsHistory   = make(WithdrawalsHistory)
-		startAccount         = int64(0x100)
+		startAccount         = int64(0x1000)
 		nextAccount          = startAccount
 		nextIndex            = uint64(0)
 		differentAccounts    = ws.WithdrawableAccountCount
