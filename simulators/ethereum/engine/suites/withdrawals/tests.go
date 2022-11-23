@@ -187,9 +187,9 @@ var Tests = []test.SpecInterface{
 	WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 1 Block Deep Re-Org",
+				Name: "Withdrawals Fork on Block 1 - 1 Block Re-Org",
 				About: `
-				Tests a simple 1 block deep re-org 
+				Tests a simple 1 block re-org 
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
@@ -198,14 +198,15 @@ var Tests = []test.SpecInterface{
 			WithdrawalsBlockCount: 16,
 			WithdrawalsPerBlock:   16,
 		},
-		ReOrgDepth: 1,
+		ReOrgDepth:   1,
+		ReOrgViaSync: false,
 	},
 	WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 8 Block Deep Re-Org NewPayload",
+				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org NewPayload",
 				About: `
-				Tests a 8 block deep re-org using NewPayload
+				Tests a 8 block re-org using NewPayload
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
@@ -214,14 +215,15 @@ var Tests = []test.SpecInterface{
 			WithdrawalsBlockCount: 16,
 			WithdrawalsPerBlock:   16,
 		},
-		ReOrgDepth: 8,
+		ReOrgDepth:   8,
+		ReOrgViaSync: false,
 	},
 	WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 8 Block Deep Re-Org, Sync",
+				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org, Sync",
 				About: `
-				Tests a 8 block deep re-org using sync
+				Tests a 8 block re-org using sync
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
@@ -233,7 +235,42 @@ var Tests = []test.SpecInterface{
 		ReOrgDepth:   8,
 		ReOrgViaSync: true,
 	},
-	// REORG WHERE THE FORK HAPPENS ON A DIFFERENT BLOCK HEIGHT!!!!
+	WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org NewPayload",
+				About: `
+				Tests a 8 block re-org using sync
+				`,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+			WithdrawalsBlockCount: 8,
+			WithdrawalsPerBlock:   128,
+		},
+		ReOrgDepth:   10,
+		ReOrgViaSync: false,
+	},
+	WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org Sync",
+				About: `
+				Tests a 8 block re-org using sync
+				`,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+			WithdrawalsBlockCount: 8,
+			WithdrawalsPerBlock:   128,
+		},
+		ReOrgDepth:   10,
+		ReOrgViaSync: true,
+	},
+	// TODO: REORG WHERE THE FORK HAPPENS ON A DIFFERENT BLOCK HEIGHT
+	// TODO: REORG SYNC WHERE SYNCED BLOCKS HAVE WITHDRAWALS BEFORE TIME
 }
 
 // Helper structure used to keep history of the amounts withdrawn to each test account.
@@ -599,16 +636,6 @@ func (ws WithdrawalsReorgSpec) Execute(t *test.Env) {
 	}
 	secondaryEngineTest := test.NewTestEngineClient(t, secondaryEngine)
 	t.CLMock.AddEngineClient(secondaryEngine)
-
-	if ws.ReOrgDepth > ws.WithdrawalsBlockCount {
-		// TODO: We are doing a re-org to pre-withdrawals state.
-		panic("Reorg depth to before withdrawals is not yet supported")
-	} else {
-		// We are simply doing a re-org afterwithdrawals had already happened
-		// First reach withdrawals fork
-		t.CLMock.ProduceBlocks(ws.GetPreWithdrawalsBlockCount(), clmock.BlockProcessCallbacks{})
-
-	}
 
 	var (
 		canonicalStartAccount       = big.NewInt(0x1000)
