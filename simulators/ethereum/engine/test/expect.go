@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"runtime"
@@ -104,6 +105,13 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.Forkchoi
 	}
 }
 
+func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
+	if version == 2 {
+		return tec.TestEngineForkchoiceUpdatedV2(fcState, pAttributes)
+	}
+	return tec.TestEngineForkchoiceUpdatedV1(fcState, pAttributes)
+}
+
 func (exp *ForkchoiceResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
 		exp.Fatalf("FAIL (%s): Unexpected error on EngineForkchoiceUpdatedV%d: %v, expected=<None>", exp.TestName, exp.Version, exp.Error)
@@ -166,6 +174,7 @@ func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *api.PayloadID) {
 
 type NewPayloadResponseExpectObject struct {
 	*ExpectEnv
+	Payload *api.ExecutableData
 	Status  api.PayloadStatusV1
 	Version int
 	Error   error
@@ -177,6 +186,7 @@ func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData)
 	status, err := tec.Engine.NewPayloadV1(ctx, payload)
 	return &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
+		Payload:   payload,
 		Status:    status,
 		Version:   1,
 		Error:     err,
@@ -189,28 +199,41 @@ func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *api.ExecutableData)
 	status, err := tec.Engine.NewPayloadV2(ctx, payload)
 	return &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{tec.Env},
+		Payload:   payload,
 		Status:    status,
 		Version:   2,
 		Error:     err,
 	}
 }
 
+func (tec *TestEngineClient) TestEngineNewPayload(payload *api.ExecutableData, version int) *NewPayloadResponseExpectObject {
+	if version == 2 {
+		return tec.TestEngineNewPayloadV2(payload)
+	}
+	return tec.TestEngineNewPayloadV1(payload)
+}
+
+func (exp *NewPayloadResponseExpectObject) PayloadJson() string {
+	jsonPayload, _ := json.MarshalIndent(exp.Payload, "", " ")
+	return string(jsonPayload)
+}
+
 func (exp *NewPayloadResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Expected no error on EngineNewPayloadV%d: error=%v", exp.TestName, exp.Version, exp.Error)
+		exp.Fatalf("FAIL (%s): Expected no error on EngineNewPayloadV%d: error=%v, payload=%s", exp.TestName, exp.Version, exp.Error, exp.PayloadJson())
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectError() {
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV%d: status=%v", exp.TestName, exp.Version, exp.Status)
+		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV%d: status=%v, payload=%s", exp.TestName, exp.Version, exp.Status, exp.PayloadJson())
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectErrorCode(code int) {
 	// TODO: Actually check error code
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV%d: status=%v", exp.TestName, exp.Version, exp.Status)
+		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV%d: status=%v, payload=%s", exp.TestName, exp.Version, exp.Status, exp.PayloadJson())
 	}
 }
 
@@ -223,7 +246,7 @@ func (exp *NewPayloadResponseExpectObject) ExpectNoValidationError() {
 func (exp *NewPayloadResponseExpectObject) ExpectStatus(ps PayloadStatus) {
 	exp.ExpectNoError()
 	if PayloadStatus(exp.Status.Status) != ps {
-		exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Status.Status, ps)
+		exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV%d: %v, expected=%v, payload=%s", exp.TestName, exp.Version, exp.Status.Status, ps, exp.PayloadJson())
 	}
 }
 
@@ -235,7 +258,7 @@ func (exp *NewPayloadResponseExpectObject) ExpectStatusEither(statuses ...Payloa
 		}
 	}
 
-	exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Status.Status, strings.Join(StatusesToString(statuses), ","))
+	exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV%d: %v, expected=%v, payload=%s", exp.TestName, exp.Version, exp.Status.Status, strings.Join(StatusesToString(statuses), ","), exp.PayloadJson())
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Hash) {
@@ -273,6 +296,13 @@ func (tec *TestEngineClient) TestEngineGetPayloadV2(payloadID *api.PayloadID) *G
 		Payload:   payload,
 		Error:     err,
 	}
+}
+
+func (tec *TestEngineClient) TestEngineGetPayload(payloadID *api.PayloadID, version int) *GetPayloadResponseExpectObject {
+	if version == 2 {
+		return tec.TestEngineGetPayloadV2(payloadID)
+	}
+	return tec.TestEngineGetPayloadV1(payloadID)
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectNoError() {

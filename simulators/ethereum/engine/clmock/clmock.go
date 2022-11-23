@@ -43,9 +43,10 @@ type CLMocker struct {
 	PayloadProductionClientDelay time.Duration
 
 	// Block Production State
-	NextBlockProducer client.EngineClient
-	NextFeeRecipient  common.Address
-	NextPayloadID     *api.PayloadID
+	NextBlockProducer    client.EngineClient
+	NextFeeRecipient     common.Address
+	NextPayloadID        *api.PayloadID
+	CurrentPayloadNumber uint64
 
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
@@ -406,7 +407,7 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 
 type BlockProcessCallbacks struct {
 	OnPayloadProducerSelected func()
-	OnGetPayloadID            func()
+	OnRequestNextPayload      func()
 	OnGetPayload              func()
 	OnNewPayloadBroadcast     func()
 	OnForkchoiceBroadcast     func()
@@ -424,6 +425,8 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
 
+	cl.CurrentPayloadNumber = cl.LatestHeader.Number.Uint64() + 1
+
 	cl.pickNextPayloadProducer()
 
 	// Check if next withdrawals necessary, test can override this value on
@@ -440,8 +443,8 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 
 	cl.SetNextWithdrawals(nil)
 
-	if callbacks.OnGetPayloadID != nil {
-		callbacks.OnGetPayloadID()
+	if callbacks.OnRequestNextPayload != nil {
+		callbacks.OnRequestNextPayload()
 	}
 
 	// Give the client a delay between getting the payload ID and actually retrieving the payload
