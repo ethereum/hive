@@ -228,6 +228,10 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// Set default client loglevel to sim loglevel.
+	if env == nil {
+		env = make(map[string]string)
+	}
+
 	if env["HIVE_LOGLEVEL"] == "" {
 		env["HIVE_LOGLEVEL"] = strconv.Itoa(api.env.SimLogLevel)
 	}
