@@ -36,7 +36,7 @@ var Tests = []test.SpecInterface{
 			testnet).
 			`,
 		},
-		PreWithdrawalsBlocks:  0,
+		WithdrawalsForkHeight: 0,
 		WithdrawalsBlockCount: 2, // Genesis is a withdrawals block
 		WithdrawalsPerBlock:   16,
 	},
@@ -48,7 +48,7 @@ var Tests = []test.SpecInterface{
 			Tests the withdrawals fork happening directly after genesis.
 			`,
 		},
-		PreWithdrawalsBlocks:  1, // Only Genesis is Pre-Withdrawals
+		WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
 		WithdrawalsPerBlock:   16,
 	},
@@ -61,7 +61,7 @@ var Tests = []test.SpecInterface{
 			has happened.
 			`,
 		},
-		PreWithdrawalsBlocks:  2, // Genesis and Block 1 are Pre-Withdrawals
+		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
 		WithdrawalsPerBlock:   16,
 	},
@@ -72,7 +72,7 @@ var Tests = []test.SpecInterface{
 			Make multiple withdrawals to a single account.
 			`,
 		},
-		PreWithdrawalsBlocks:     1,
+		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    1,
 		WithdrawalsPerBlock:      64,
 		WithdrawableAccountCount: 1,
@@ -88,7 +88,7 @@ var Tests = []test.SpecInterface{
 			is not in ordered sequence.
 			`,
 		},
-		PreWithdrawalsBlocks:     1,
+		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    1,
 		WithdrawalsPerBlock:      64,
 		WithdrawableAccountCount: 2,
@@ -102,7 +102,7 @@ var Tests = []test.SpecInterface{
 			`,
 			TimeoutSeconds: 120,
 		},
-		PreWithdrawalsBlocks:     1,
+		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    16,
 		WithdrawalsPerBlock:      1024,
 		WithdrawableAccountCount: 1024,
@@ -120,7 +120,7 @@ var Tests = []test.SpecInterface{
 			- Wait for sync and verify withdrawn account's balance
 			`,
 			},
-			PreWithdrawalsBlocks:     1,
+			WithdrawalsForkHeight:    1,
 			WithdrawalsBlockCount:    2,
 			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1,
@@ -138,7 +138,7 @@ var Tests = []test.SpecInterface{
 			- Wait for sync and verify withdrawn account's balance
 			`,
 			},
-			PreWithdrawalsBlocks:     0,
+			WithdrawalsForkHeight:    0,
 			WithdrawalsBlockCount:    2,
 			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1,
@@ -157,7 +157,7 @@ var Tests = []test.SpecInterface{
 			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
 			`,
 			},
-			PreWithdrawalsBlocks:     2,
+			WithdrawalsForkHeight:    2,
 			WithdrawalsBlockCount:    2,
 			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1,
@@ -177,13 +177,63 @@ var Tests = []test.SpecInterface{
 			`,
 				TimeoutSeconds: 300,
 			},
-			PreWithdrawalsBlocks:     2,
+			WithdrawalsForkHeight:    2,
 			WithdrawalsBlockCount:    128,
 			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1024,
 		},
 		SyncSteps: 1,
 	},
+	WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 1 - 1 Block Deep Re-Org",
+				About: `
+				Tests a simple 1 block deep re-org 
+				`,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
+			WithdrawalsBlockCount: 16,
+			WithdrawalsPerBlock:   16,
+		},
+		ReOrgDepth: 1,
+	},
+	WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 1 - 8 Block Deep Re-Org NewPayload",
+				About: `
+				Tests a 8 block deep re-org using NewPayload
+				`,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
+			WithdrawalsBlockCount: 16,
+			WithdrawalsPerBlock:   16,
+		},
+		ReOrgDepth: 8,
+	},
+	WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 1 - 8 Block Deep Re-Org, Sync",
+				About: `
+				Tests a 8 block deep re-org using sync
+				`,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
+			WithdrawalsBlockCount: 16,
+			WithdrawalsPerBlock:   16,
+		},
+		ReOrgDepth:   8,
+		ReOrgViaSync: true,
+	},
+	// REORG WHERE THE FORK HAPPENS ON A DIFFERENT BLOCK HEIGHT!!!!
 }
 
 // Helper structure used to keep history of the amounts withdrawn to each test account.
@@ -254,24 +304,82 @@ func (wh WithdrawalsHistory) VerifyWithdrawals(block uint64, rpcBlock *big.Int, 
 	}
 }
 
+// Create a new copy of the withdrawals history
+func (wh WithdrawalsHistory) Copy() WithdrawalsHistory {
+	result := make(WithdrawalsHistory)
+	for k, v := range wh {
+		result[k] = v
+	}
+	return result
+}
+
 // Withdrawals base spec:
 // Specifies a simple withdrawals test where the withdrawals fork can happen
 // on genesis or afterwards.
 type WithdrawalsBaseSpec struct {
 	test.Spec
-	PreWithdrawalsBlocks     int64              // Number of blocks before withdrawals fork activation
+	WithdrawalsForkHeight    int64              // Withdrawals activation fork height
 	WithdrawalsBlockCount    int                // Number of blocks on and after withdrawals fork activation
 	WithdrawalsPerBlock      int                // Number of withdrawals per block
-	WithdrawableAccountCount int64              // Number of accounts to withdraw to (round-robin)
+	WithdrawableAccountCount uint64             // Number of accounts to withdraw to (round-robin)
 	WithdrawalsHistory       WithdrawalsHistory // Internal withdrawals history that keeps track of all withdrawals
+	SkipBaseVerifications    bool               // For code reuse of the base spec procedure
 }
 
 // Calculates Shanghai fork timestamp given the amount of blocks that need to be
 // produced beforehand (CLMock produces 1 block each second).
+func (ws WithdrawalsBaseSpec) WithdrawalsTimestamp() int64 {
+	return globals.GenesisTimestamp + ws.WithdrawalsForkHeight
+}
+
+// Generates the fork config, including withdrawals fork timestamp.
 func (ws WithdrawalsBaseSpec) GetForkConfig() test.ForkConfig {
 	return test.ForkConfig{
-		ShanghaiTimestamp: big.NewInt(globals.GenesisTimestamp + ws.PreWithdrawalsBlocks),
+		ShanghaiTimestamp: big.NewInt(ws.WithdrawalsTimestamp()),
 	}
+}
+
+// Number of blocks to be produced (not counting genesis) before withdrawals
+// fork.
+func (ws WithdrawalsBaseSpec) GetPreWithdrawalsBlockCount() int {
+	if ws.WithdrawalsForkHeight == 0 {
+		return 0
+	} else {
+		return int(ws.WithdrawalsForkHeight - 1)
+	}
+}
+
+// Number of payloads to be produced (pre and post withdrawals) during the entire test
+func (ws WithdrawalsBaseSpec) GetTotalPayloadCount() int {
+	return ws.GetPreWithdrawalsBlockCount() + ws.WithdrawalsBlockCount
+}
+
+func (ws WithdrawalsBaseSpec) GetWithdrawableAccountCount() uint64 {
+	if ws.WithdrawableAccountCount == 0 {
+		// Withdraw to 16 accounts by default
+		return 16
+	}
+	return ws.WithdrawableAccountCount
+}
+
+// Generates a list of withdrawals based on current configuration
+func (ws WithdrawalsBaseSpec) GenerateWithdrawalsForBlock(nextIndex uint64, startAccount *big.Int) (types.Withdrawals, uint64) {
+	differentAccounts := ws.GetWithdrawableAccountCount()
+
+	nextWithdrawals := make(types.Withdrawals, 0)
+	for i := 0; i < ws.WithdrawalsPerBlock; i++ {
+		nextAccount := new(big.Int).Set(startAccount)
+		nextAccount.Add(nextAccount, big.NewInt(int64(nextIndex%differentAccounts)))
+		nextWithdrawal := &types.Withdrawal{
+			Index:     nextIndex,
+			Validator: uint64(nextIndex),
+			Address:   common.BigToAddress(nextAccount),
+			Amount:    big.NewInt(1),
+		}
+		nextWithdrawals = append(nextWithdrawals, nextWithdrawal)
+		nextIndex++
+	}
+	return nextWithdrawals, nextIndex
 }
 
 func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
@@ -280,101 +388,74 @@ func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 
 	t.CLMock.WaitForTTD()
 
-	shanghaiTimestamp := globals.GenesisTimestamp + ws.PreWithdrawalsBlocks
-
 	// Check if we have pre-Shanghai blocks
-	if shanghaiTimestamp > globals.GenesisTimestamp {
+	if ws.WithdrawalsTimestamp() > globals.GenesisTimestamp {
 		// Check `latest` during all pre-shanghai blocks, none should
 		// contain `withdrawalsRoot`, including genesis.
 
 		// Genesis should not contain `withdrawalsRoot` either
 		r := t.TestEngine.TestBlockByNumber(nil)
 		r.ExpectWithdrawalsRoot(nil)
-
-		preShanghaiBlocks := shanghaiTimestamp - globals.GenesisTimestamp - 1
-		if preShanghaiBlocks > 0 {
-			t.CLMock.ProduceBlocks(int(preShanghaiBlocks), clmock.BlockProcessCallbacks{
-				OnPayloadProducerSelected: func() {
-					// Try to send a ForkchoiceUpdatedV2 with non-null
-					// withdrawals before Shanghai
-					r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
-						&beacon.ForkchoiceStateV1{
-							HeadBlockHash: t.CLMock.LatestHeader.Hash(),
-						},
-						&beacon.PayloadAttributes{
-							Timestamp:             t.CLMock.LatestHeader.Time + 1,
-							Random:                common.Hash{},
-							SuggestedFeeRecipient: common.Address{},
-							Withdrawals:           make(types.Withdrawals, 0),
-						},
-					)
-					r.ExpectError()
-				},
-				OnGetPayload: func() {
-					// Send produced payload but try to include non-nil
-					// `withdrawals`, it should fail.
-					emptyWithdrawalsList := make(types.Withdrawals, 0)
-					payloadPlusWithdrawals, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
-						Withdrawals: emptyWithdrawalsList,
-					})
-					if err != nil {
-						t.Fatalf("Unable to append withdrawals: %v", err)
-					}
-					r := t.TestEngine.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
-					r.ExpectStatus(test.Invalid)
-				},
-				OnNewPayloadBroadcast: func() {
-					// We sent a pre-shanghai FCU.
-					// Keep expecting `nil` until Shanghai.
-					r := t.TestEngine.TestBlockByNumber(nil)
-					r.ExpectWithdrawalsRoot(nil)
-				},
-			})
-		}
-
 	} else {
 		// Genesis is post shanghai, it should contain EmptyWithdrawalsRoot
 		r := t.TestEngine.TestBlockByNumber(nil)
 		r.ExpectWithdrawalsRoot(&types.EmptyRootHash)
 	}
 
+	// Produce any blocks necessary to reach withdrawals fork
+	t.CLMock.ProduceBlocks(ws.GetPreWithdrawalsBlockCount(), clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			// Try to send a ForkchoiceUpdatedV2 with non-null
+			// withdrawals before Shanghai
+			r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
+				&beacon.ForkchoiceStateV1{
+					HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+				},
+				&beacon.PayloadAttributes{
+					Timestamp:             t.CLMock.LatestHeader.Time + 1,
+					Random:                common.Hash{},
+					SuggestedFeeRecipient: common.Address{},
+					Withdrawals:           make(types.Withdrawals, 0),
+				},
+			)
+			r.ExpectError()
+		},
+		OnGetPayload: func() {
+			// Send produced payload but try to include non-nil
+			// `withdrawals`, it should fail.
+			emptyWithdrawalsList := make(types.Withdrawals, 0)
+			payloadPlusWithdrawals, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				Withdrawals: emptyWithdrawalsList,
+			})
+			if err != nil {
+				t.Fatalf("Unable to append withdrawals: %v", err)
+			}
+			r := t.TestEngine.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
+			r.ExpectStatus(test.Invalid)
+		},
+		OnNewPayloadBroadcast: func() {
+			// We sent a pre-shanghai FCU.
+			// Keep expecting `nil` until Shanghai.
+			r := t.TestEngine.TestBlockByNumber(nil)
+			r.ExpectWithdrawalsRoot(nil)
+		},
+	})
+
 	// Produce requested post-shanghai blocks
 	// (At least 1 block will be produced after this procedure ends).
 	var (
-		withdrawnAccounts    = make(map[common.Address]bool)
-		startAccount         = int64(0x1000)
-		nextAccount          = startAccount
-		nextIndex            = uint64(0)
-		differentAccounts    = ws.WithdrawableAccountCount
-		firstWithdrawalBlock = uint64(shanghaiTimestamp - globals.GenesisTimestamp)
+		startAccount = big.NewInt(0x1000)
+		nextIndex    = uint64(0)
 	)
-
-	if differentAccounts == 0 {
-		// We can't have 0 different accounts to withdraw to
-		differentAccounts = int64(16)
-	}
 
 	t.CLMock.ProduceBlocks(ws.WithdrawalsBlockCount, clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			// Send some withdrawals
-			nextWithdrawals := make(types.Withdrawals, 0)
-			for i := 0; i < ws.WithdrawalsPerBlock; i++ {
-				nextWithdrawal := &types.Withdrawal{
-					Index:     nextIndex,
-					Validator: uint64(nextIndex),
-					Address:   common.BigToAddress(big.NewInt(nextAccount)),
-					Amount:    big.NewInt(1),
-				}
-				nextWithdrawals = append(nextWithdrawals, nextWithdrawal)
-				withdrawnAccounts[common.BigToAddress(big.NewInt(nextAccount))] = true
-				nextIndex++
-				nextAccount = (((nextAccount - startAccount) + 1) % differentAccounts) + startAccount
-			}
-			t.CLMock.NextWithdrawals = nextWithdrawals
-			ws.WithdrawalsHistory[t.CLMock.LatestHeader.Number.Uint64()+1] = nextWithdrawals
+			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
+			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
 		},
 		OnGetPayload: func() {
-			// Send new payload with `withdrawals=null` and expect error
+			// TODO: Send new payload with `withdrawals=null` and expect error
 		},
 		OnNewPayloadBroadcast: func() {
 			// Check withdrawal addresses and verify withdrawal balances
@@ -422,8 +503,7 @@ func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 		// Check the correct withdrawal root on past blocks
 		r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
 		var expectedWithdrawalsRoot *common.Hash = nil
-		t.Logf("INFO (%s): firstWithdrawalBlock=%d, block=%d", t.TestName, firstWithdrawalBlock, block)
-		if block >= firstWithdrawalBlock {
+		if block >= uint64(ws.WithdrawalsForkHeight) {
 			calcWithdrawalsRoot := types.DeriveSha(
 				ws.WithdrawalsHistory.GetWithdrawals(block),
 				trie.NewStackTrie(nil),
@@ -453,7 +533,6 @@ func (ws WithdrawalsSyncSpec) Execute(t *test.Env) {
 
 	// Spawn a secondary client which will need to sync to the primary client
 	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
-
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 	}
@@ -494,6 +573,219 @@ func (ws WithdrawalsSyncSpec) Execute(t *test.Env) {
 // withdrawals block.
 type WithdrawalsReorgSpec struct {
 	WithdrawalsBaseSpec
-	ReOrgOriginBlockHeight uint64 // Height of the block where the re-org will happen
-	ReOrgDestBlockHeight   uint64 // Height of the block to which the re-org will rollback
+
+	ReOrgDepth                      int  // Depth of the block re-org
+	ReOrgViaSync                    bool // Whether the client should fetch the sidechain from the secondary client
+	SidechainBlockTimestampIncrease int
+}
+
+func (ws WithdrawalsReorgSpec) ReOrgHeight() uint64 {
+	if ws.ReOrgDepth > ws.GetTotalPayloadCount() {
+		panic("invalid payload/re-org configuration")
+	}
+	return uint64(ws.GetTotalPayloadCount() - ws.ReOrgDepth + 1)
+}
+
+func (ws WithdrawalsReorgSpec) Execute(t *test.Env) {
+	// Create the withdrawals history object
+	ws.WithdrawalsHistory = make(WithdrawalsHistory)
+
+	t.CLMock.WaitForTTD()
+
+	// Spawn a secondary client which will produce the sidechain
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
+	}
+	secondaryEngineTest := test.NewTestEngineClient(t, secondaryEngine)
+	t.CLMock.AddEngineClient(secondaryEngine)
+
+	if ws.ReOrgDepth > ws.WithdrawalsBlockCount {
+		// TODO: We are doing a re-org to pre-withdrawals state.
+		panic("Reorg depth to before withdrawals is not yet supported")
+	} else {
+		// We are simply doing a re-org afterwithdrawals had already happened
+		// First reach withdrawals fork
+		t.CLMock.ProduceBlocks(ws.GetPreWithdrawalsBlockCount(), clmock.BlockProcessCallbacks{})
+
+	}
+
+	var (
+		canonicalStartAccount       = big.NewInt(0x1000)
+		canonicalNextIndex          = uint64(0)
+		sidechainStartAccount       = new(big.Int).SetBit(common.Big0, 160, 1)
+		sidechainNextIndex          = uint64(0)
+		sidechainWithdrawalsHistory = make(WithdrawalsHistory)
+		sidechain                   = make(map[uint64]*beacon.ExecutableData)
+		sidechainPayloadId          *beacon.PayloadID
+	)
+
+	// Sidechain withdraws on the max account value range 0xffffffffffffffffffffffffffffffffffffffff
+	sidechainStartAccount.Sub(sidechainStartAccount, big.NewInt(int64(ws.GetWithdrawableAccountCount())+1))
+
+	t.CLMock.ProduceBlocks(ws.GetPreWithdrawalsBlockCount()+ws.WithdrawalsBlockCount, clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			if t.CLMock.CurrentPayloadNumber >= uint64(ws.WithdrawalsForkHeight) {
+				// Send some withdrawals
+				t.CLMock.NextWithdrawals, canonicalNextIndex = ws.GenerateWithdrawalsForBlock(canonicalNextIndex, canonicalStartAccount)
+				ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+				if t.CLMock.CurrentPayloadNumber >= ws.ReOrgHeight() {
+					// We also need to generate withdrawals for the sidechain
+					sidechainWithdrawalsHistory[t.CLMock.CurrentPayloadNumber], sidechainNextIndex = ws.GenerateWithdrawalsForBlock(sidechainNextIndex, sidechainStartAccount)
+				} else {
+					sidechainWithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+					sidechainNextIndex = canonicalNextIndex
+				}
+			}
+		},
+		OnRequestNextPayload: func() {
+			if t.CLMock.CurrentPayloadNumber >= ws.ReOrgHeight() {
+				// Also request a payload from the sidechain
+				fcU := beacon.ForkchoiceStateV1{
+					HeadBlockHash: t.CLMock.LatestForkchoice.HeadBlockHash,
+				}
+
+				if t.CLMock.CurrentPayloadNumber > ws.ReOrgHeight() {
+					if lastSidePayload, ok := sidechain[t.CLMock.CurrentPayloadNumber-1]; !ok {
+						panic("sidechain payload not found")
+					} else {
+						fcU.HeadBlockHash = lastSidePayload.BlockHash
+					}
+				}
+
+				t.Logf("INFO (%s): Requesting sidechain payload %d", t.TestName, t.CLMock.CurrentPayloadNumber)
+
+				var version int
+				pAttributes := beacon.PayloadAttributes{
+					Timestamp:             t.CLMock.LatestPayloadAttributes.Timestamp,
+					Random:                t.CLMock.LatestPayloadAttributes.Random,
+					SuggestedFeeRecipient: t.CLMock.LatestPayloadAttributes.SuggestedFeeRecipient,
+				}
+				if t.CLMock.CurrentPayloadNumber >= uint64(ws.WithdrawalsForkHeight) {
+					// Withdrawals
+					version = 2
+					pAttributes.Withdrawals = sidechainWithdrawalsHistory[t.CLMock.CurrentPayloadNumber]
+				} else {
+					// No withdrawals
+					version = 1
+				}
+				r := secondaryEngineTest.TestEngineForkchoiceUpdated(&fcU, &pAttributes, version)
+				r.ExpectNoError()
+				r.ExpectPayloadStatus(test.Valid)
+				if r.Response.PayloadID == nil {
+					t.Fatalf("FAIL (%s): Unable to get a payload ID on the sidechain", t.TestName)
+				}
+				sidechainPayloadId = r.Response.PayloadID
+			}
+		},
+		OnGetPayload: func() {
+			var (
+				version int
+				payload *beacon.ExecutableData
+			)
+			if t.CLMock.CurrentPayloadNumber >= uint64(ws.WithdrawalsForkHeight) {
+				version = 2
+			} else {
+				version = 1
+			}
+			if t.CLMock.LatestPayloadBuilt.Number >= ws.ReOrgHeight() {
+				// This payload is built on top of a sidechain payload, get the payload for that too
+				r := secondaryEngineTest.TestEngineGetPayload(sidechainPayloadId, version)
+				r.ExpectNoError()
+				payload = &r.Payload
+				sidechain[payload.Number] = payload
+			} else {
+				// This block is part of both chains, simply forward it to the secondary client
+				payload = &t.CLMock.LatestPayloadBuilt
+			}
+			r := secondaryEngineTest.TestEngineNewPayload(payload, version)
+			r.ExpectStatus(test.Valid)
+			p := secondaryEngineTest.TestEngineForkchoiceUpdated(
+				&beacon.ForkchoiceStateV1{
+					HeadBlockHash: payload.BlockHash,
+				},
+				nil,
+				version,
+			)
+			p.ExpectPayloadStatus(test.Valid)
+		},
+	})
+
+	latestPayloadHeight := t.CLMock.LatestExecutedPayload.Number
+
+	// Check the withdrawals on the latest
+	ws.WithdrawalsHistory.VerifyWithdrawals(
+		latestPayloadHeight,
+		nil,
+		t.TestEngine,
+	)
+
+	if ws.ReOrgViaSync {
+		// Send latest sidechain payload as NewPayload + FCU and wait for sync
+	loop:
+		for {
+			r := t.TestEngine.TestEngineNewPayloadV2(sidechain[latestPayloadHeight])
+			r.ExpectNoError()
+			p := t.TestEngine.TestEngineForkchoiceUpdatedV2(
+				&beacon.ForkchoiceStateV1{
+					HeadBlockHash: sidechain[latestPayloadHeight].BlockHash,
+				},
+				nil,
+			)
+			p.ExpectNoError()
+			select {
+			case <-t.TimeoutContext.Done():
+				t.Fatalf("FAIL (%s): Timeout waiting for sync", t.TestName)
+			case <-time.After(time.Second):
+				b := t.TestEngine.TestBlockByNumber(nil)
+				if b.Block.Hash() == sidechain[latestPayloadHeight].BlockHash {
+					// sync successful
+					break loop
+				}
+			}
+		}
+	} else {
+		// Send all payloads one by one to the primary client
+		for payloadNumber := latestPayloadHeight - uint64(ws.ReOrgDepth) + 1; payloadNumber <= latestPayloadHeight; payloadNumber++ {
+			payload, ok := sidechain[payloadNumber]
+			if !ok {
+				t.Fatalf("FAIL (%s): Invalid payload %d requested.", t.TestName, payloadNumber)
+			}
+			var version int
+			if payloadNumber >= uint64(ws.WithdrawalsForkHeight) {
+				version = 2
+			} else {
+				version = 1
+			}
+			t.Logf("INFO (%s): Sending sidechain payload %d, hash=%s, parent=%s", t.TestName, payloadNumber, payload.BlockHash, payload.ParentHash)
+			r := t.TestEngine.TestEngineNewPayload(payload, version)
+			r.ExpectStatusEither(test.Valid, test.Accepted)
+			p := t.TestEngine.TestEngineForkchoiceUpdated(
+				&beacon.ForkchoiceStateV1{
+					HeadBlockHash: payload.BlockHash,
+				},
+				nil,
+				version,
+			)
+			p.ExpectPayloadStatus(test.Valid)
+		}
+	}
+
+	// Verify withdrawals changed
+	sidechainWithdrawalsHistory.VerifyWithdrawals(
+		latestPayloadHeight,
+		nil,
+		t.TestEngine,
+	)
+	// Verify all balances of accounts in the original chain didn't increase
+	// after the fork.
+	// We are using different accounts credited between the canonical chain
+	// and the fork.
+	// We check on `latest`.
+	ws.WithdrawalsHistory.VerifyWithdrawals(
+		uint64(ws.WithdrawalsForkHeight)-1,
+		nil,
+		t.TestEngine,
+	)
+
 }
