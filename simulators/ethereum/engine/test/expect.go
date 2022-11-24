@@ -553,6 +553,13 @@ func (exp *BalanceResponseExpectObject) ExpectNoError() {
 }
 
 func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) {
+	exp.Logf("INFO (%s): Testing balance for account %s on block %d: actual=%d, expected=%d",
+		exp.TestName,
+		exp.Account,
+		exp.Block,
+		exp.Balance,
+		expBalance,
+	)
 	exp.ExpectNoError()
 	if ((expBalance == nil || exp.Balance == nil) && expBalance != exp.Balance) ||
 		(expBalance != nil && exp.Balance != nil && expBalance.Cmp(exp.Balance) != 0) {

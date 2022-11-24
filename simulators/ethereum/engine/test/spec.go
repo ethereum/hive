@@ -3,6 +3,7 @@ package test
 import (
 	"math/big"
 
+	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
 
@@ -19,6 +20,7 @@ type ConsensusConfig struct {
 
 type SpecInterface interface {
 	Execute(*Env)
+	ConfigureCLMock(*clmock.CLMocker)
 	GetAbout() string
 	GetConsensusConfig() ConsensusConfig
 	GetChainFile() string
@@ -78,6 +80,10 @@ type Spec struct {
 
 func (s Spec) Execute(env *Env) {
 	s.Run(env)
+}
+
+func (s Spec) ConfigureCLMock(*clmock.CLMocker) {
+	// No-op
 }
 
 func (s Spec) GetAbout() string {
