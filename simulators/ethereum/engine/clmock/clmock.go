@@ -42,6 +42,9 @@ type CLMocker struct {
 	// Wait time before attempting to get the payload
 	PayloadProductionClientDelay time.Duration
 
+	// Block production related
+	BlockTimestampIncrement *big.Int
+
 	// Block Production State
 	NextBlockProducer    client.EngineClient
 	NextFeeRecipient     common.Address
@@ -218,6 +221,24 @@ func (cl *CLMocker) IsBlockPoS(bn *big.Int) bool {
 	return true
 }
 
+// Return the per-block timestamp value increment
+func (cl *CLMocker) GetTimestampIncrement() uint64 {
+	if cl.BlockTimestampIncrement == nil {
+		return 1
+	}
+	return cl.BlockTimestampIncrement.Uint64()
+}
+
+// Returns the timestamp value to be included in the next payload attributes
+func (cl *CLMocker) GetNextBlockTimestamp() uint64 {
+	if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
+		// We are producing the transition payload and there's a value specified
+		// for this specific payload
+		return cl.TransitionPayloadTimestamp.Uint64()
+	}
+	return cl.LatestHeader.Time + cl.GetTimestampIncrement()
+}
+
 // Picks the next payload producer from the set of clients registered
 func (cl *CLMocker) pickNextPayloadProducer() {
 	if len(cl.EngineClients) == 0 {
@@ -269,13 +290,7 @@ func (cl *CLMocker) RequestNextPayload() {
 	cl.LatestPayloadAttributes = api.PayloadAttributes{
 		Random:                nextPrevRandao,
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
-	}
-
-	if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
-		// We are producing the transition payload
-		cl.LatestPayloadAttributes.Timestamp = cl.TransitionPayloadTimestamp.Uint64()
-	} else {
-		cl.LatestPayloadAttributes.Timestamp = cl.LatestHeader.Time + 1
+		Timestamp:             cl.GetNextBlockTimestamp(),
 	}
 
 	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) && cl.NextWithdrawals != nil {
