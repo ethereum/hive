@@ -54,6 +54,10 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 		consensusConfig.SlotsToFinalized,
 		big.NewInt(consensusConfig.SafeSlotsToImportOptimistically),
 		testSpec.GetForkConfig().ShanghaiTimestamp)
+
+	// Send the CLMocker for configuration by the spec, if any.
+	testSpec.ConfigureCLMock(clMocker)
+
 	// Defer closing all clients
 	defer func() {
 		clMocker.CloseClients()
