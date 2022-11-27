@@ -26,9 +26,15 @@ type Config struct {
 	// These two are log destinations for output from docker.
 	ContainerOutput io.Writer
 	BuildOutput     io.Writer
+
+	// DockerRegistry is the base registries to reference if/when configuring authentication
+	DockerRegistries []string
+
+	//AuthType determines which type of authentication to add to docker requests
+	AuthType AuthType
 }
 
-func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, error) {
+func Connect(dockerEndpoint string, cfg *Config) (libhive.Builder, *ContainerBackend, error) {
 	logger := cfg.Logger
 	if logger == nil {
 		logger = log15.Root()
@@ -48,7 +54,19 @@ func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, e
 		return nil, nil, fmt.Errorf("can't get docker version: %v", err)
 	}
 	logger.Debug("docker daemon online", "version", env.Get("Version"))
-	builder := NewBuilder(client, cfg)
+
+	builder, err := createBuilder(client, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
 	backend := NewContainerBackend(client, cfg)
 	return builder, backend, nil
+}
+
+func createBuilder(client *docker.Client, cfg *Config) (*Builder, error) {
+	authenticator, err := NewAuthenticator(cfg.AuthType, cfg.DockerRegistries...)
+	if err != nil {
+		return nil, err
+	}
+	return NewBuilder(client, cfg, authenticator), nil
 }
