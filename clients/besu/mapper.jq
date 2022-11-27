@@ -21,6 +21,13 @@ def to_int:
   if . == null then . else .|tonumber end
 ;
 
+# Converts "1" / "0" to boolean.
+def to_bool:
+  if . == null then . else
+    if . == "1" then true else false end
+  end
+;
+
 # Replace 'config' section in input JSON.
 . + {
   "config": {
@@ -43,6 +50,7 @@ def to_int:
     "muirGlacierBlock": env.HIVE_FORK_MUIR_GLACIER|to_int,
     "berlinBlock": env.HIVE_FORK_BERLIN|to_int,
     "londonBlock": env.HIVE_FORK_LONDON|to_int,
+    "zeroBaseFee": env.HIVE_ZERO_BASE_FEE|to_bool,
     "parisBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
     "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
   }|remove_empty

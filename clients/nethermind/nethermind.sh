@@ -45,6 +45,7 @@
 #  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
 #  - HIVE_GRAPHQL_ENABLED      if set, GraphQL is enabled on port 8545
 #  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
+#  - HIVE_ZERO_BASE_FEE        If set, remove base fee and permit zero gas network
 
 # Immediately abort the script on any error encountered
 set -e

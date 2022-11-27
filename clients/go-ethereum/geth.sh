@@ -44,6 +44,10 @@
 #  - HIVE_LOGLEVEL                client loglevel (0-5)
 #  - HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 #  - HIVE_LES_SERVER              set to '1' to enable LES server
+#
+# These variables are NOT supported by go-ethereum
+#
+#  - HIVE_ZERO_BASE_FEE           If set, remove base fee and permit zero gas network
 
 # Immediately abort the script on any error encountered
 set -e
