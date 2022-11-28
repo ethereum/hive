@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core"
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -34,7 +35,7 @@ type HiveRPCEngineStarter struct {
 	JWTSecret               []byte
 }
 
-func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
 	var (
 		clientType = s.ClientType
 		enginePort = s.EnginePort
@@ -64,9 +65,6 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 	if s.ChainFile != "" {
 		ClientFiles = ClientFiles.Set("/chain.rlp", "./chains/"+s.ChainFile)
 	}
-	if _, ok := ClientFiles["/genesis.json"]; !ok {
-		return nil, fmt.Errorf("cannot start without genesis file")
-	}
 	if ttd == nil {
 		if ttdStr, ok := ClientParams["HIVE_TERMINAL_TOTAL_DIFFICULTY"]; ok {
 			// Retrieve TTD from parameters
@@ -77,7 +75,7 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		}
 	} else {
 		// Real TTD must be calculated adding the genesis difficulty
-		ttdInt := helper.CalculateRealTTD(ClientFiles["/genesis.json"], ttd.Int64())
+		ttdInt := helper.CalculateRealTTD(genesis, ttd.Int64())
 		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttdInt))
 		ttd = big.NewInt(ttdInt)
 	}
@@ -97,7 +95,11 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 	}
 
 	// Start the client and create the engine client object
-	c := T.StartClient(clientType, ClientParams, hivesim.WithStaticFiles(ClientFiles))
+	genesisStart, err := helper.GenesisStartOption(genesis)
+	if err != nil {
+		return nil, err
+	}
+	c := T.StartClient(clientType, genesisStart, ClientParams, hivesim.WithStaticFiles(ClientFiles))
 	if err := CheckEthEngineLive(c); err != nil {
 		return nil, fmt.Errorf("Engine/Eth ports were never open for client: %v", err)
 	}

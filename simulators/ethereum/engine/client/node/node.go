@@ -91,20 +91,15 @@ var (
 	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
 )
 
-func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
-	return s.StartGethNode(T, testContext, ClientParams, ClientFiles, bootClients...)
+func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+	return s.StartGethNode(T, testContext, genesis, ClientParams, ClientFiles, bootClients...)
 }
 
-func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
+func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
 	var (
 		ttd = s.TerminalTotalDifficulty
 		err error
 	)
-	genesisPath, ok := ClientFiles["/genesis.json"]
-	if !ok {
-		return nil, fmt.Errorf("Cannot start without genesis file")
-	}
-	genesis := helper.LoadGenesis(genesisPath)
 
 	if ttd == nil {
 		if ttdStr, ok := ClientParams["HIVE_TERMINAL_TOTAL_DIFFICULTY"]; ok {
@@ -115,10 +110,15 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 			}
 		}
 	} else {
-		ttd = big.NewInt(helper.CalculateRealTTD(genesisPath, ttd.Int64()))
+		ttd = big.NewInt(helper.CalculateRealTTD(genesis, ttd.Int64()))
 		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 	}
-	genesis.Config.TerminalTotalDifficulty = ttd
+
+	// Not sure if this hack works
+	genesisCopy := *genesis
+	configCopy := *genesisCopy.Config
+	configCopy.TerminalTotalDifficulty = ttd
+	genesisCopy.Config = &configCopy
 
 	var enodes []string
 	if bootClients != nil && len(bootClients) > 0 {
@@ -151,7 +151,7 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		s.Config.TerminalBlockSiblingDepth = DefaultTerminalBlockSiblingDepth
 	}
 
-	g, err := newNode(s.Config, enodes, &genesis)
+	g, err := newNode(s.Config, enodes, &genesisCopy)
 	if err != nil {
 		return nil, err
 	}
