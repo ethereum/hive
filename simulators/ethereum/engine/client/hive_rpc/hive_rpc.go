@@ -167,22 +167,24 @@ type HiveRPCEngineClient struct {
 // NewClient creates a engine client that uses the given RPC client.
 func NewHiveRPCEngineClient(h *hivesim.Client, enginePort int, ethPort int, jwtSecretBytes []byte, ttd *big.Int, transport http.RoundTripper) *HiveRPCEngineClient {
 	// Prepare HTTP Client
-	rpcHttpClient, err := rpc.DialHTTPWithClient(fmt.Sprintf("http://%s:%d/", h.IP, enginePort), &http.Client{Transport: transport})
+	httpClient := rpc.WithHTTPClient(&http.Client{Transport: transport})
+
+	engineRpcClient, err := rpc.DialOptions(context.Background(), fmt.Sprintf("http://%s:%d/", h.IP, enginePort), httpClient)
 	if err != nil {
 		panic(err)
 	}
 
 	// Prepare ETH Client
-	rpcClient, err := rpc.DialHTTPWithClient(fmt.Sprintf("http://%s:%d/", h.IP, ethPort), &http.Client{Transport: transport})
+	ethRpcClient, err := rpc.DialOptions(context.Background(), fmt.Sprintf("http://%s:%d/", h.IP, ethPort), httpClient)
 	if err != nil {
 		panic(err)
 	}
-	eth := ethclient.NewClient(rpcClient)
+	eth := ethclient.NewClient(ethRpcClient)
 	return &HiveRPCEngineClient{
 		h:              h,
-		c:              rpcHttpClient,
+		c:              engineRpcClient,
 		Client:         eth,
-		cEth:           rpcClient,
+		cEth:           ethRpcClient,
 		ttd:            ttd,
 		JWTSecretBytes: jwtSecretBytes,
 		accTxInfoMap:   make(map[common.Address]*AccountTransactionInfo),
