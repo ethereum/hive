@@ -9,7 +9,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
@@ -63,26 +62,15 @@ func (b *Builder) BuildClientImage(ctx context.Context, name string) (string, er
 	dir := b.config.Inventory.ClientDirectory(name)
 	_, branch := libhive.SplitClientName(name)
 	tag := fmt.Sprintf("hive/clients/%s:latest", name)
-	err := b.buildImage(ctx, dir, "Dockerfile", branch, tag)
+	err := b.buildImage(ctx, dir, branch, tag)
 	return tag, err
 }
 
 // BuildSimulatorImage builds a docker image of a simulator.
 func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string, error) {
 	dir := b.config.Inventory.SimulatorDirectory(name)
-	buildContextPath := dir
-	buildDockerfile := "Dockerfile"
-	// build context dir of simulator can be overridden with "context.txt" file containing the desired build path
-	if contextPathBytes, err := os.ReadFile(filepath.Join(filepath.FromSlash(dir), "context.txt")); err == nil {
-		buildContextPath = filepath.Join(dir, strings.TrimSpace(string(contextPathBytes)))
-		if p, err := filepath.Rel(buildContextPath, filepath.Join(filepath.FromSlash(dir), "Dockerfile")); err != nil {
-			return "", fmt.Errorf("failed to derive relative simulator Dockerfile path: %v", err)
-		} else {
-			buildDockerfile = p
-		}
-	}
 	tag := fmt.Sprintf("hive/simulators/%s:latest", name)
-	err := b.buildImage(ctx, buildContextPath, buildDockerfile, "", tag)
+	err := b.buildImage(ctx, dir, "", tag)
 	return tag, err
 }
 
@@ -220,7 +208,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch.
-func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, branch, imageTag string) error {
+func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag string) error {
 	nocache := false
 	if b.config.NoCachePattern != nil {
 		nocache = b.config.NoCachePattern.MatchString(imageTag)
@@ -237,7 +225,7 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, branch
 		Name:         imageTag,
 		ContextDir:   context,
 		OutputStream: io.Discard,
-		Dockerfile:   dockerFile,
+		Dockerfile:   "Dockerfile",
 		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
 		AuthConfigs:  b.AuthConfigs(),
