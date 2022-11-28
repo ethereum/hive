@@ -104,9 +104,9 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		return nil, fmt.Errorf("Engine/Eth ports were never open for client: %v", err)
 	}
 	ec := NewHiveRPCEngineClient(c, enginePort, ethPort, jwtSecret, ttd, &helper.LoggingRoundTrip{
-		T:     T,
-		Hc:    c,
-		Inner: http.DefaultTransport,
+		Logger: T,
+		ID:     c.Container,
+		Inner:  http.DefaultTransport,
 	})
 	return ec, nil
 }

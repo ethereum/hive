@@ -67,9 +67,9 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 
 	// Create Engine client from main hivesim.Client to be used by tests
 	ec := hive_rpc.NewHiveRPCEngineClient(c, globals.EnginePortHTTP, globals.EthPortHTTP, globals.DefaultJwtTokenSecretBytes, ttd, &helper.LoggingRoundTrip{
-		T:     t,
-		Hc:    c,
-		Inner: http.DefaultTransport,
+		Logger: t,
+		ID:     c.Container,
+		Inner:  http.DefaultTransport,
 	})
 	defer ec.Close()
 
