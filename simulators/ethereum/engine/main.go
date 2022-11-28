@@ -10,6 +10,9 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 
+	suite_auth "github.com/ethereum/hive/simulators/ethereum/engine/suites/auth"
+	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
+	suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
@@ -46,11 +49,11 @@ func main() {
 
 	simulator := hivesim.New()
 
-	//addTestsToSuite(&engine, suite_engine.Tests, "full")
-	//addTestsToSuite(&transition, suite_transition.Tests, "full")
-	//addTestsToSuite(&auth, suite_auth.Tests, "full")
+	addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
+	addTestsToSuite(simulator, &transition, specToInterface(suite_transition.Tests), "full")
+	addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
-	addTestsToSuite(&withdrawals, suite_withdrawals.Tests, "full")
+	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
 
 	// Mark suites for execution
 	hivesim.MustRunSuite(simulator, engine)
@@ -60,19 +63,28 @@ func main() {
 	hivesim.MustRunSuite(simulator, withdrawals)
 }
 
+func specToInterface(src []test.Spec) []test.SpecInterface {
+	res := make([]test.SpecInterface, len(src))
+	for i := 0; i < len(src); i++ {
+		res[i] = src[i]
+	}
+	return res
+}
+
 // Add test cases to a given test suite
-func addTestsToSuite(suite *hivesim.Suite, tests []test.SpecInterface, nodeType string) {
+func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.SpecInterface, nodeType string) {
 	for _, currentTest := range tests {
 		currentTest := currentTest
-		genesisPath := "./init/genesis.json"
-		// If the test.Spec specified a custom genesis file, use that instead.
-		if currentTest.GetGenesisFile() != "" {
-			genesisPath = "./init/" + currentTest.GetGenesisFile()
+
+		// Load the genesis file specified and dynamically bundle it.
+		genesis := currentTest.GetGenesis()
+		genesisStartOption, err := helper.GenesisStartOption(genesis)
+		if err != nil {
+			panic("unable to inject genesis")
 		}
-		// Load genesis for it to be modified before starting the client
-		testFiles := hivesim.Params{"/genesis.json": genesisPath}
+
 		// Calculate and set the TTD for this test
-		ttd := helper.CalculateRealTTD(genesisPath, currentTest.GetTTD())
+		ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
 		// Configure Forks
 		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 		if currentTest.GetForkConfig().ShanghaiTimestamp != nil {
@@ -83,6 +95,7 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.SpecInterface, nodeType 
 			newParams = newParams.Set("HIVE_NODETYPE", nodeType)
 		}
 
+		testFiles := hivesim.Params{}
 		if currentTest.GetChainFile() != "" {
 			// We are using a Proof of Work chain file, remove all clique-related settings
 			// TODO: Nethermind still requires HIVE_MINER for the Engine API
@@ -95,24 +108,44 @@ func addTestsToSuite(suite *hivesim.Suite, tests []test.SpecInterface, nodeType 
 		if currentTest.IsMiningDisabled() {
 			delete(newParams, "HIVE_MINER")
 		}
-		suite.Add(hivesim.ClientTestSpec{
-			Name:        currentTest.GetName(),
-			Description: currentTest.GetAbout(),
-			Parameters:  newParams,
-			Files:       testFiles,
-			Run: func(t *hivesim.T, c *hivesim.Client) {
-				t.Logf("Start test (%s): %s", c.Type, currentTest.GetName())
-				defer func() {
-					t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
-				}()
-				timeout := globals.DefaultTestCaseTimeout
-				// If a test.Spec specifies a timeout, use that instead
-				if currentTest.GetTimeout() != 0 {
-					timeout = time.Second * time.Duration(currentTest.GetTimeout())
-				}
-				// Run the test case
-				test.Run(currentTest, big.NewInt(ttd), timeout, t, c, newParams, testFiles)
-			},
-		})
+
+		if clientTypes, err := sim.ClientTypes(); err == nil {
+			for _, clientType := range clientTypes {
+				suite.Add(hivesim.TestSpec{
+					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), clientType.Name),
+					Description: currentTest.GetAbout(),
+					Run: func(t *hivesim.T) {
+						// Start the client with given options
+						c := t.StartClient(
+							clientType.Name,
+							newParams,
+							genesisStartOption,
+							hivesim.WithStaticFiles(testFiles),
+						)
+						t.Logf("Start test (%s): %s", c.Type, currentTest.GetName())
+						defer func() {
+							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
+						}()
+						timeout := globals.DefaultTestCaseTimeout
+						// If a test.Spec specifies a timeout, use that instead
+						if currentTest.GetTimeout() != 0 {
+							timeout = time.Second * time.Duration(currentTest.GetTimeout())
+						}
+						// Run the test case
+						test.Run(
+							currentTest,
+							big.NewInt(ttd),
+							timeout,
+							t,
+							c,
+							genesis,
+							newParams,
+							testFiles,
+						)
+					},
+				})
+			}
+		}
+
 	}
 }

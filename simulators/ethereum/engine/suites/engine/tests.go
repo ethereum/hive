@@ -1697,7 +1697,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 
 		if syncing {
 			// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
-			secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
+			secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 			}
@@ -2067,9 +2067,9 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 		}
 		if spec.ReOrgFromCanonical {
 			// If we are doing a re-org from canonical, we can add both nodes as peers from the start
-			secondaryClient, err = starter.StartGethNode(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+			secondaryClient, err = starter.StartGethNode(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 		} else {
-			secondaryClient, err = starter.StartGethNode(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
+			secondaryClient, err = starter.StartGethNode(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
 		}
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
@@ -3168,7 +3168,7 @@ func inOrderPayloads(t *test.Env) {
 	r.ExpectBalanceEqual(expectedBalance)
 
 	// Start a second client to send newPayload consecutively without fcU
-	secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
+	secondaryClient, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
 	}
@@ -3220,7 +3220,7 @@ func validPayloadFcUSyncingClient(t *test.Env) {
 	{
 		// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
 		var err error
-		secondaryClient, err = hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
+		secondaryClient, err = hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
 
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
@@ -3304,7 +3304,7 @@ func missingFcu(t *test.Env) {
 
 	var secondaryEngineTest *test.TestEngineClient
 	{
-		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
+		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
 
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
@@ -3345,7 +3345,7 @@ func missingFcu(t *test.Env) {
 // P <- INV_P, newPayload(INV_P), fcU(head: P, payloadAttributes: attrs) + getPayload(…)
 func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 	// Add a second client to build the invalid payload
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles)
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
 
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)

@@ -1,8 +1,10 @@
 package test
 
 import (
+	"fmt"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
@@ -25,7 +27,7 @@ type SpecInterface interface {
 	GetConsensusConfig() ConsensusConfig
 	GetChainFile() string
 	GetForkConfig() ForkConfig
-	GetGenesisFile() string
+	GetGenesis() *core.Genesis
 	GetName() string
 	GetTestTransactionType() helper.TestTransactionType
 	GetTimeout() int
@@ -105,8 +107,13 @@ func (s Spec) GetForkConfig() ForkConfig {
 	return s.ForkConfig
 }
 
-func (s Spec) GetGenesisFile() string {
-	return s.GenesisFile
+func (s Spec) GetGenesis() *core.Genesis {
+	genesisPath := "./init/genesis.json"
+	if s.GenesisFile != "" {
+		genesisPath = fmt.Sprintf("./init/%s", s.GenesisFile)
+	}
+	genesis := helper.LoadGenesis(genesisPath)
+	return &genesis
 }
 
 func (s Spec) GetName() string {

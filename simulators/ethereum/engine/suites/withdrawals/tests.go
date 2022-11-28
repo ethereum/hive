@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/trie"
@@ -122,7 +123,22 @@ var Tests = []test.SpecInterface{
 		WithdrawalsBlockCount:    1,
 		WithdrawalsPerBlock:      64,
 		WithdrawableAccountCount: 2,
-		WithdrawAmounts:          []*big.Int{common.Big0, common.Big1},
+		WithdrawAmounts: []*big.Int{
+			common.Big0,
+			common.Big1,
+		},
+	},
+
+	WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Empty Withdrawals",
+			About: `
+			Produce withdrawals block with zero withdrawals.
+			`,
+		},
+		WithdrawalsForkHeight: 1,
+		WithdrawalsBlockCount: 1,
+		WithdrawalsPerBlock:   0,
 	},
 
 	// Sync Tests
@@ -202,6 +218,8 @@ var Tests = []test.SpecInterface{
 		},
 		SyncSteps: 1,
 	},
+
+	//Re-Org tests
 	WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
 			Spec: test.Spec{
@@ -443,6 +461,11 @@ func (wh WithdrawalsHistory) VerifyWithdrawals(block uint64, rpcBlock *big.Int, 
 	for account, expectedBalance := range accounts {
 		r := testEngine.TestBalanceAt(account, rpcBlock)
 		r.ExpectBalanceEqual(expectedBalance)
+		// All withdrawals account have a bytecode that unconditionally set the
+		// zero storage key to one on EVM execution.
+		// Withdrawals must not trigger EVM so we expect zero.
+		s := testEngine.TestStorageAt(account, common.BigToHash(common.Big0), rpcBlock)
+		s.ExpectBigIntStorageEqual(common.Big0)
 	}
 }
 
@@ -496,6 +519,38 @@ func (ws WithdrawalsBaseSpec) GetForkConfig() test.ForkConfig {
 	}
 }
 
+// Adds bytecode that unconditionally sets an storage key to specified account range
+func AddUnconditionalBytecode(g *core.Genesis, start *big.Int, end *big.Int) {
+	for ; start.Cmp(end) <= 0; start.Add(start, common.Big1) {
+		accountAddress := common.BigToAddress(start)
+		// Bytecode to unconditionally set a storage key
+		g.Alloc[accountAddress] = core.GenesisAccount{
+			Code: []byte{
+				0x60,
+				0x01,
+				0x60,
+				0x00,
+				0x55,
+				0x00,
+			}, // sstore(0, 1)
+			Nonce:   0,
+			Balance: common.Big0,
+		}
+	}
+}
+
+// Append the accounts we are going to withdraw to, which should also include
+// bytecode for testing purposes.
+func (ws WithdrawalsBaseSpec) GetGenesis() *core.Genesis {
+	genesis := ws.Spec.GetGenesis()
+	startAccount := big.NewInt(0x1000)
+	endAccount := big.NewInt(0x1000 + int64(ws.GetWithdrawableAccountCount()) - 1)
+	AddUnconditionalBytecode(genesis, startAccount, endAccount)
+	return genesis
+}
+
+// Changes the CL Mocker default time increments of 1 to the value specified
+// in the test spec.
 func (ws WithdrawalsBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
 	cl.BlockTimestampIncrement = big.NewInt(int64(ws.GetBlockTimeIncrements()))
 }
@@ -679,6 +734,7 @@ func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 			)
 			expectedWithdrawalsRoot = &calcWithdrawalsRoot
 		}
+		t.Logf("INFO (%s): Verifying withdrawals root on block %d (%s) to be %s", t.TestName, block, t.CLMock.ExecutedPayloadHistory[block].BlockHash, expectedWithdrawalsRoot)
 		r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
 
 	}
@@ -701,7 +757,7 @@ func (ws WithdrawalsSyncSpec) Execute(t *test.Env) {
 	ws.WithdrawalsBaseSpec.Execute(t)
 
 	// Spawn a secondary client which will need to sync to the primary client
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 	}
@@ -723,10 +779,13 @@ func (ws WithdrawalsSyncSpec) Execute(t *test.Env) {
 				)
 				r := secondaryEngineTest.TestEngineForkchoiceUpdatedV2(
 					&t.CLMock.LatestForkchoice,
-					&beacon.PayloadAttributes{},
+					nil,
 				)
 				if r.Response.PayloadStatus.Status == test.Valid {
 					break loop
+				}
+				if r.Response.PayloadStatus.Status == test.Invalid {
+					t.Fatalf("FAIL (%s): Syncing client rejected valid chain: %s", t.TestName, r.Response)
 				}
 			}
 		}
@@ -790,7 +849,7 @@ func (ws WithdrawalsReorgSpec) Execute(t *test.Env) {
 	t.CLMock.WaitForTTD()
 
 	// Spawn a secondary client which will produce the sidechain
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 	}
