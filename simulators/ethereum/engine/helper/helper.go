@@ -32,10 +32,14 @@ import (
 // From ethereum/rpc:
 
 // LoggingRoundTrip writes requests and responses to the test log.
+type LogF interface {
+	Logf(format string, values ...interface{})
+}
+
 type LoggingRoundTrip struct {
-	T     *hivesim.T
-	Hc    *hivesim.Client
-	Inner http.RoundTripper
+	Logger LogF
+	ID     string
+	Inner  http.RoundTripper
 }
 
 func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -45,7 +49,7 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	rt.T.Logf(">> (%s) %s", rt.Hc.Container, bytes.TrimSpace(reqBytes))
+	rt.Logger.Logf(">> (%s) %s", rt.ID, bytes.TrimSpace(reqBytes))
 	reqCopy := *req
 	reqCopy.Body = ioutil.NopCloser(bytes.NewReader(reqBytes))
 
@@ -63,7 +67,7 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	respCopy := *resp
 	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
-	rt.T.Logf("<< (%s) %s", rt.Hc.Container, bytes.TrimSpace(respBytes))
+	rt.Logger.Logf("<< (%s) %s", rt.ID, bytes.TrimSpace(respBytes))
 	return &respCopy, nil
 }
 
