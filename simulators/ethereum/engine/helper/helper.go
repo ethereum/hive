@@ -172,6 +172,12 @@ func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx
 	return nil
 }
 
+func bytesSource(data []byte) func() (io.ReadCloser, error) {
+	return func() (io.ReadCloser, error) {
+		return ioutil.NopCloser(bytes.NewReader(data)), nil
+	}
+}
+
 func LoadChain(path string) types.Blocks {
 	fh, err := os.Open(path)
 	if err != nil {
@@ -211,6 +217,14 @@ func LoadGenesisBlock(path string) *types.Block {
 	return genesis.ToBlock()
 }
 
+func GenesisStartOption(genesis *core.Genesis) (hivesim.StartOption, error) {
+	out, err := json.Marshal(genesis)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
+	}
+	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
+}
+
 func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
 	result := new(big.Int).Set(genesis.Difficulty)
 	for _, b := range chain {
@@ -223,8 +237,7 @@ func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBloc
 }
 
 // TTD is the value specified in the test.Spec + Genesis.Difficulty
-func CalculateRealTTD(genesisPath string, ttdValue int64) int64 {
-	g := LoadGenesis(genesisPath)
+func CalculateRealTTD(g *core.Genesis, ttdValue int64) int64 {
 	return g.Difficulty.Int64() + ttdValue
 }
 

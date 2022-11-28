@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -38,6 +39,7 @@ type Env struct {
 	CLMock *clmock.CLMocker
 
 	// Client parameters used to launch the default client
+	Genesis      *core.Genesis
 	ClientParams hivesim.Params
 	ClientFiles  hivesim.Params
 
@@ -45,7 +47,7 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	consensusConfig := testSpec.GetConsensusConfig()
 	clMocker := clmock.NewCLMocker(
@@ -82,6 +84,7 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 		Eth:                 ec,
 		HiveEngine:          ec,
 		CLMock:              clMocker,
+		Genesis:             genesis,
 		ClientParams:        cParams,
 		ClientFiles:         cFiles,
 		TestTransactionType: testSpec.GetTestTransactionType(),
