@@ -173,5 +173,10 @@ fi
 
 # Run the go-ethereum implementation with the requested flags.
 FLAGS="$FLAGS --nat=none"
-echo "Running go-ethereum with flags $FLAGS"
-$geth $FLAGS
+if [ "$HIVE_CLIENT_DEBUGGING" != "" ]; then
+    echo "Running go-ethereum in debugger mode with flags $FLAGS"
+    "dlv" "--listen=:40000" "--headless=true" "--api-version=2" "--accept-multiclient" "--allow-non-terminal-interactive" "exec" $geth -- $FLAGS
+else
+    echo "Running go-ethereum with flags $FLAGS"
+    $geth $FLAGS
+fi
