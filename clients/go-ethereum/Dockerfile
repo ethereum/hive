@@ -13,8 +13,9 @@ FROM alpine:latest
 ARG branch=master
 
 # Build go-ethereum on the fly and delete all build tools afterwards
+RUN echo https://dl-cdn.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositories
 RUN \
-  apk add --update bash curl jq go git make gcc musl-dev              \
+  apk add --update bash curl jq go delve git make gcc musl-dev              \
         ca-certificates linux-headers                           && \
   git clone --depth 1 --branch withdrawals-timestamp  https://github.com/lightclient/go-ethereum && \
   (cd go-ethereum && make geth)                               && \
@@ -26,7 +27,7 @@ RUN \
   > /version.json)                                            && \
   cp go-ethereum/build/bin/geth /usr/local/bin/geth           && \
   apk del go git make gcc musl-dev linux-headers              && \
-  rm -rf /go-ethereum && rm -rf /var/cache/apk/*
+  rm -rf /var/cache/apk/*
 
 RUN /usr/local/bin/geth console --exec 'console.log(admin.nodeInfo.name)' --maxpeers=0 --nodiscover --dev 2>/dev/null | head -1 > /version.txt
 
@@ -43,7 +44,7 @@ RUN chmod +x /hive-bin/enode.sh
 ADD genesis.json /genesis.json
 
 # Export the usual networking ports to allow outside access to the node
-EXPOSE 8545 8546 8547 8551 30303 30303/udp
+EXPOSE 8545 8546 8547 8551 30303 30303/udp 40000
 
 # Generate the ethash verification caches
 RUN \
