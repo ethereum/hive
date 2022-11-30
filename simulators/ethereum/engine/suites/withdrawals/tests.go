@@ -145,6 +145,27 @@ var Tests = []test.SpecInterface{
 	WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
 			Spec: test.Spec{
+				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No transactions",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 1
+			- Withdraw to a single account 16 times each block for 8 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync and verify withdrawn account's balance
+			`,
+				TimeoutSeconds: 6000,
+			},
+			WithdrawalsForkHeight:    1,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1,
+			TransactionsPerBlock:     common.Big0,
+		},
+		SyncSteps: 1,
+	},
+	WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			Spec: test.Spec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account",
 				About: `
 			- Spawn a first client
@@ -176,6 +197,26 @@ var Tests = []test.SpecInterface{
 			WithdrawalsBlockCount:    2,
 			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1,
+		},
+		SyncSteps: 1,
+	},
+	WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Single Withdrawal Account - No Transactions",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 2
+			- Withdraw to a single account 16 times each block for 8 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+			`,
+			},
+			WithdrawalsForkHeight:    2,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1,
+			TransactionsPerBlock:     common.Big0,
 		},
 		SyncSteps: 1,
 	},
@@ -490,6 +531,7 @@ type WithdrawalsBaseSpec struct {
 	WithdrawableAccountCount uint64             // Number of accounts to withdraw to (round-robin)
 	WithdrawalsHistory       WithdrawalsHistory // Internal withdrawals history that keeps track of all withdrawals
 	WithdrawAmounts          []*big.Int         // Amounts of withdrawn wei on each withdrawal (round-robin)
+	TransactionsPerBlock     *big.Int           // Amount of test transactions to include in withdrawal blocks
 	SkipBaseVerifications    bool               // For code reuse of the base spec procedure
 }
 
@@ -604,6 +646,13 @@ func (ws WithdrawalsBaseSpec) GenerateWithdrawalsForBlock(nextIndex uint64, star
 	return nextWithdrawals, nextIndex
 }
 
+func (ws WithdrawalsBaseSpec) GetTransactionCountPerPayload() uint64 {
+	if ws.TransactionsPerBlock == nil {
+		return 16
+	}
+	return ws.TransactionsPerBlock.Uint64()
+}
+
 // Base test case execution procedure for withdrawals
 func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
@@ -677,6 +726,13 @@ func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 			// Send some withdrawals
 			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
 			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+			// Send some transactions
+			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
+				_, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, common.Big1, nil, t.TestTransactionType)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
+			}
 		},
 		OnGetPayload: func() {
 			// TODO: Send new payload with `withdrawals=null` and expect error
@@ -893,6 +949,16 @@ func (ws WithdrawalsReorgSpec) Execute(t *test.Env) {
 
 		},
 		OnRequestNextPayload: func() {
+			// Send transactions to be included in the payload
+			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
+				tx, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, common.Big1, nil, t.TestTransactionType)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
+				// Error will be ignored here since the tx could have been already relayed
+				secondaryEngine.SendTransaction(t.TestContext, tx)
+			}
+
 			if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainSplitHeight() {
 				// Also request a payload from the sidechain
 				fcU := beacon.ForkchoiceStateV1{
