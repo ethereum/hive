@@ -107,7 +107,7 @@ var Tests = []test.SpecInterface{
 			TimeoutSeconds: 120,
 		},
 		WithdrawalsForkHeight:    1,
-		WithdrawalsBlockCount:    16,
+		WithdrawalsBlockCount:    4,
 		WithdrawalsPerBlock:      1024,
 		WithdrawableAccountCount: 1024,
 	},
