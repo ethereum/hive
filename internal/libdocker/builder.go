@@ -65,7 +65,11 @@ func (b *Builder) BuildClientImage(ctx context.Context, name string) (string, er
 func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string, error) {
 	dir := b.config.Inventory.SimulatorDirectory(name)
 	tag := fmt.Sprintf("hive/simulators/%s:latest", name)
-	err := b.buildImage(ctx, dir, "", tag)
+	opt := buildkitOptions{
+		buildCtx: dir,
+		tag:      tag,
+	}
+	err := b.buildWithBuildkit(ctx, &opt)
 	return tag, err
 }
 
