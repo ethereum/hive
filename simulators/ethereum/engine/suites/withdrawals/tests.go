@@ -145,7 +145,7 @@ var Tests = []test.SpecInterface{
 	WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No transactions",
+				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 1
@@ -1094,6 +1094,9 @@ func (ws WithdrawalsReorgSpec) Execute(t *test.Env) {
 				nil,
 			)
 			p.ExpectNoError()
+			if p.Response.PayloadStatus.Status == test.Invalid {
+				t.Fatalf("FAIL (%s): Primary client invalidated side chain", t.TestName)
+			}
 			select {
 			case <-t.TimeoutContext.Done():
 				t.Fatalf("FAIL (%s): Timeout waiting for sync", t.TestName)
