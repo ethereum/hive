@@ -15,18 +15,20 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
 
+const testTimeoutLong = 300
+
 var Tests = []test.Spec{
 	{
 		Name:           "Sync Client Post Merge",
 		Run:            postMergeSync,
-		TimeoutSeconds: 180,
+		TimeoutSeconds: testTimeoutLong,
 		ChainFile:      "blocks_1024_td_135112316.rlp",
 		TTD:            135112316,
 	},
 	{
 		Name:           "Incremental Post Merge Sync",
 		Run:            incrementalPostMergeSync,
-		TimeoutSeconds: 180,
+		TimeoutSeconds: testTimeoutLong,
 		ChainFile:      "blocks_1024_td_135112316.rlp",
 		TTD:            135112316,
 	},

@@ -1,0 +1,10 @@
+{
+    "testSuites": [
+      {
+        "name": "engine-transition",
+        "testCases": [
+          "Terminal blocks are gossiped"
+        ]
+      }
+    ]
+  }
