@@ -27,11 +27,8 @@ type Config struct {
 	ContainerOutput io.Writer
 	BuildOutput     io.Writer
 
-	// DockerRegistry is the base registries to reference if/when configuring authentication
-	DockerRegistries []string
-
-	//AuthType determines which type of authentication to add to docker requests
-	AuthType AuthType
+	// This tells the docker client whether to authenticate requests with credential helper
+	UseCredentialHelper bool
 }
 
 func Connect(dockerEndpoint string, cfg *Config) (libhive.Builder, *ContainerBackend, error) {
@@ -64,7 +61,7 @@ func Connect(dockerEndpoint string, cfg *Config) (libhive.Builder, *ContainerBac
 }
 
 func createBuilder(client *docker.Client, cfg *Config) (*Builder, error) {
-	authenticator, err := NewAuthenticator(cfg.AuthType, cfg.DockerRegistries...)
+	authenticator, err := NewAuthenticator(cfg.UseCredentialHelper)
 	if err != nil {
 		return nil, err
 	}

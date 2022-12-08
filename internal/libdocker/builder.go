@@ -18,10 +18,10 @@ import (
 
 // Builder takes care of building docker images.
 type Builder struct {
-	client *docker.Client
-	config *Config
-	logger log15.Logger
-	Authenticator
+	client        *docker.Client
+	config        *Config
+	logger        log15.Logger
+	authenticator Authenticator
 }
 
 func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder {
@@ -29,7 +29,7 @@ func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder
 		client:        client,
 		config:        cfg,
 		logger:        cfg.Logger,
-		Authenticator: auth,
+		authenticator: auth,
 	}
 	if b.logger == nil {
 		b.logger = log15.Root()
@@ -92,7 +92,7 @@ func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error
 		OutputStream: io.Discard,
 		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
-		AuthConfigs:  b.AuthConfigs(),
+		AuthConfigs:  b.authenticator.AuthConfigs(),
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput
@@ -228,7 +228,7 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, branch, imageTag s
 		Dockerfile:   "Dockerfile",
 		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
-		AuthConfigs:  b.AuthConfigs(),
+		AuthConfigs:  b.authenticator.AuthConfigs(),
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput

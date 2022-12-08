@@ -1,33 +1,25 @@
 package libdocker
 
 import (
-	"fmt"
+	"encoding/json"
+	"os"
+	"path"
 
 	docker "github.com/fsouza/go-dockerclient"
 )
 
-type AuthType string
-
-const (
-	AuthTypeNone       AuthType = ""
-	AuthTypeCredHelper AuthType = "cred-helper"
-)
-
-type ErrUnsupportedAuthType struct{ authType string }
-
-func (e ErrUnsupportedAuthType) Error() string {
-	return fmt.Sprintf("unsupported auth type: %q", e.authType)
+// CredHelpers represents the data stored by default in $HOME/.docker/config.json
+type CredHelpers struct {
+	CredHelpers map[string]string `json:"credHelpers"`
+	CredsStore  string            `json:"credsStore"`
 }
 
-func NewAuthenticator(authType AuthType, registries ...string) (Authenticator, error) {
-	switch authType {
-	case AuthTypeNone:
-		return NullAuthenticator{}, nil
-	case AuthTypeCredHelper:
-		return NewCredHelperAuthenticator(registries...)
-	default:
-		return nil, ErrUnsupportedAuthType{authType: string(authType)}
+func NewAuthenticator(useCredentialHelper bool) (Authenticator, error) {
+
+	if useCredentialHelper {
+		return NewCredHelperAuthenticator()
 	}
+	return NullAuthenticator{}, nil
 }
 
 // Authenticator is able to return the 2 go-dockerclient authentication primitives
@@ -47,8 +39,8 @@ func (n NullAuthenticator) AuthConfig(registry string) (a docker.AuthConfigurati
 // AuthConfigs returns the auth configurations for all configured registries
 func (n NullAuthenticator) AuthConfigs() (a docker.AuthConfigurations) { return }
 
-func NewCredHelperAuthenticator(registries ...string) (CredHelperAuthenticator, error) {
-	authConfigs, err := configureCredHelperAuth(registries...)
+func NewCredHelperAuthenticator() (CredHelperAuthenticator, error) {
+	authConfigs, err := configureCredHelperAuth()
 	return CredHelperAuthenticator{authConfigs}, err
 }
 
@@ -64,10 +56,15 @@ func (c CredHelperAuthenticator) AuthConfig(registry string) (a docker.AuthConfi
 // AuthConfigs returns the auth configurations for all configured registries
 func (c CredHelperAuthenticator) AuthConfigs() (a docker.AuthConfigurations) { return c.configs }
 
-// configureAuth - configures authentication for the specified registry based on $HOME/.docker/config.json
-func configureCredHelperAuth(registries ...string) (docker.AuthConfigurations, error) {
+// configureCredHelperAuth - configures authentication for the specified registry based on $HOME/.docker/config.json
+func configureCredHelperAuth() (docker.AuthConfigurations, error) {
 	authConfigurations := make(map[string]docker.AuthConfiguration)
-	for _, registry := range registries {
+	credsHelpers, err := loadCredsHelpers()
+	if err != nil {
+		return docker.AuthConfigurations{}, err
+	}
+
+	for registry := range credsHelpers.CredHelpers {
 		authConfig, err := docker.NewAuthConfigurationsFromCredsHelpers(registry)
 		if err != nil {
 			return docker.AuthConfigurations{
@@ -77,4 +74,27 @@ func configureCredHelperAuth(registries ...string) (docker.AuthConfigurations, e
 		authConfigurations[registry] = *authConfig
 	}
 	return docker.AuthConfigurations{Configs: authConfigurations}, nil
+}
+
+func loadCredsHelpers() (c CredHelpers, err error) {
+	cfgPath, err := dockerConfigPath()
+	if err != nil {
+		return
+	}
+	b, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return
+	}
+	err = json.Unmarshal(b, &c)
+
+	return
+}
+
+func dockerConfigPath() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return homeDir, err
+	}
+
+	return path.Join(homeDir, ".docker", "config.json"), nil
 }
