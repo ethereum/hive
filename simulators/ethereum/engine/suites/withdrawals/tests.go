@@ -60,9 +60,28 @@ var Tests = []test.SpecInterface{
 			About: `
 			Tests the transition to the withdrawals fork after a single block
 			has happened.
+			Block 1 is sent with invalid non-null withdrawals payload and
+			client is expected to respond 'INVALID' with the appropriate
+			'latestValidHash'=='genesis.Hash'.
 			`,
 		},
 		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+		WithdrawalsBlockCount: 1,
+		WithdrawalsPerBlock:   16,
+	},
+
+	WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdrawals Fork on Block 3",
+			About: `
+			Tests the transition to the withdrawals fork after a single block
+			has happened.
+			Block 2 is sent with invalid non-null withdrawals payload and
+			client is expected to respond 'INVALID' with the appropriate
+			'latestValidHash'=='block1.Hash'.
+			`,
+		},
+		WithdrawalsForkHeight: 3, // Genesis, Block 1 and 2 are Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
 		WithdrawalsPerBlock:   16,
 	},
@@ -104,7 +123,7 @@ var Tests = []test.SpecInterface{
 			Make multiple withdrawals to 1024 different accounts.
 			Execute many blocks this way.
 			`,
-			TimeoutSeconds: 120,
+			TimeoutSeconds: 240,
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    4,
@@ -116,7 +135,7 @@ var Tests = []test.SpecInterface{
 		Spec: test.Spec{
 			Name: "Withdraw zero amount",
 			About: `
-			Make multiple withdrawals with amount==0.
+			Make multiple withdrawals where the amount withdrawn is 0.
 			`,
 		},
 		WithdrawalsForkHeight:    1,
@@ -149,7 +168,7 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 1
-			- Withdraw to a single account 16 times each block for 8 blocks
+			- Withdraw to a single account 16 times each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync and verify withdrawn account's balance
 			`,
@@ -170,7 +189,7 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 1
-			- Withdraw to a single account 16 times each block for 8 blocks
+			- Withdraw to a single account 16 times each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync and verify withdrawn account's balance
 			`,
@@ -568,12 +587,12 @@ func AddUnconditionalBytecode(g *core.Genesis, start *big.Int, end *big.Int) {
 		// Bytecode to unconditionally set a storage key
 		g.Alloc[accountAddress] = core.GenesisAccount{
 			Code: []byte{
-				0x60,
+				0x60, // PUSH1(0x01)
 				0x01,
-				0x60,
+				0x60, // PUSH1(0x00)
 				0x00,
-				0x55,
-				0x00,
+				0x55, // SSTORE
+				0x00, // STOP
 			}, // sstore(0, 1)
 			Nonce:   0,
 			Balance: common.Big0,
