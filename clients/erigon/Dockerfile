@@ -1,4 +1,4 @@
-ARG branch=devel
+ARG branch=docker_withdrawals
 FROM thorax/erigon:$branch
 
 # The upstream erigon container uses a non-root user, but we need
