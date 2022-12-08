@@ -15,7 +15,6 @@ type CredHelpers struct {
 }
 
 func NewAuthenticator(useCredentialHelper bool) (Authenticator, error) {
-
 	if useCredentialHelper {
 		return NewCredHelperAuthenticator()
 	}
@@ -86,7 +85,6 @@ func loadCredsHelpers() (c CredHelpers, err error) {
 		return
 	}
 	err = json.Unmarshal(b, &c)
-
 	return
 }
 
@@ -95,6 +93,5 @@ func dockerConfigPath() (string, error) {
 	if err != nil {
 		return homeDir, err
 	}
-
 	return path.Join(homeDir, ".docker", "config.json"), nil
 }
