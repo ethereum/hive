@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 )
 
@@ -56,7 +57,7 @@ func (p *PoWChainGenerator) Generate(genesis *setup.Eth1Genesis) ([]*types.Block
 	db := rawdb.NewMemoryDatabase()
 	engine := ethash.New(p.Config, nil, false)
 	insta := instaSeal{engine}
-	genesisBlock := genesis.Genesis.ToBlock(db)
+	genesisBlock := genesis.Genesis.ToBlock()
 	p.blocks, _ = core.GenerateChain(genesis.Genesis.Config, genesisBlock, insta, db, p.BlockCount, p.GenFunction)
 	return p.blocks, nil
 }

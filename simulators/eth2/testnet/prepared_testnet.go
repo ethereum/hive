@@ -10,10 +10,11 @@ import (
 	blsu "github.com/protolambda/bls12-381-util"
 	"github.com/protolambda/ztyp/view"
 
-	"github.com/ethereum/hive/hivesim"
-	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/configs"
+
+	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 )
 
 var depositAddress common.Eth1Address
@@ -69,13 +70,13 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *config) *PreparedTestnet
 	specCpy := *configs.Mainnet
 	spec := &specCpy
 	spec.Config.DEPOSIT_CONTRACT_ADDRESS = depositAddress
-	spec.Config.DEPOSIT_CHAIN_ID = eth1Genesis.Genesis.Config.ChainID.Uint64()
-	spec.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
+	spec.Config.DEPOSIT_CHAIN_ID = view.Uint64View(eth1Genesis.Genesis.Config.ChainID.Uint64())
+	spec.Config.DEPOSIT_NETWORK_ID = view.Uint64View(eth1Genesis.NetworkID)
 	spec.Config.ETH1_FOLLOW_DISTANCE = 1
 
 	spec.Config.ALTAIR_FORK_EPOCH = common.Epoch(config.AltairForkEpoch)
 	spec.Config.BELLATRIX_FORK_EPOCH = common.Epoch(config.MergeForkEpoch)
-	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount
+	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = view.Uint64View(config.ValidatorCount)
 	spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime)
 	tdd, _ := uint256.FromBig(config.TerminalTotalDifficulty)
 	spec.Config.TERMINAL_TOTAL_DIFFICULTY = view.Uint256View(*tdd)

@@ -8,12 +8,12 @@ import (
 	"io/ioutil"
 
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/hive/hivesim"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/codec"
 	"gopkg.in/yaml.v2"
+
+	"github.com/ethereum/hive/hivesim"
 )
 
 func bytesSource(data []byte) func() (io.ReadCloser, error) {
@@ -55,8 +55,7 @@ func ConsensusConfigsBundle(spec *common.Spec, genesis *core.Genesis, valCount u
 	if err != nil {
 		return nil, err
 	}
-	db := rawdb.NewMemoryDatabase()
-	genesisHash := genesis.ToBlock(db).Hash()
+	genesisHash := genesis.ToBlock().Hash()
 	return hivesim.Bundle(
 		hivesim.WithDynamicFile("/hive/input/config.yaml", bytesSource(config)),
 		hivesim.WithDynamicFile("/hive/input/preset_phase0.yaml", bytesSource(phase0Preset)),
