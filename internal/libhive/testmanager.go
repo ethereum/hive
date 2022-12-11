@@ -1,6 +1,7 @@
 package libhive
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
 	"errors"
@@ -48,6 +49,16 @@ type SimEnv struct {
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
 	ClientStartTimeout time.Duration
+
+	// Metrics configures optional metrics collection to run.
+	Metrics MetricsEnvOptions
+}
+
+// MetricsEnvOptions configures whether metrics are enabled, and how they are exposed to the host.
+type MetricsEnvOptions struct {
+	Enabled        bool
+	GrafanaPort    uint
+	PrometheusPort uint
 }
 
 // SimResult summarizes the results of a simulation run.
@@ -346,6 +357,7 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 			return ErrTestSuiteRunning
 		}
 	}
+	suite.End = time.Now()
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
@@ -362,6 +374,10 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 	// Move the suite to results.
 	delete(manager.runningTestSuites, testSuite)
 	manager.results[testSuite] = suite
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	_ = manager.backend.AnnotateMetrics(ctx, suite.Start, suite.End, fmt.Sprintf("test-suite %s (%s)", suite.Name, testSuite))
+	cancel()
 	return nil
 }
 
@@ -371,19 +387,25 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 	defer manager.testSuiteMutex.Unlock()
 
 	var newSuiteID = TestSuiteID(manager.testSuiteCounter)
-	manager.runningTestSuites[newSuiteID] = &TestSuite{
+	suite := &TestSuite{
 		ID:             newSuiteID,
 		Name:           name,
 		Description:    description,
 		ClientVersions: make(map[string]string),
 		TestCases:      make(map[TestID]*TestCase),
 		SimulatorLog:   manager.simLogFile,
+		Start:          time.Now(),
 	}
+	manager.runningTestSuites[newSuiteID] = suite
 	manager.testSuiteCounter++
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	_ = manager.backend.AnnotateMetrics(ctx, suite.Start, suite.Start, fmt.Sprintf("start of test-suite %s (%s)", suite.Name, newSuiteID))
+	cancel()
 	return newSuiteID, nil
 }
 
-//StartTest starts a new test case, returning the testcase id as a context identifier
+// StartTest starts a new test case, returning the testcase id as a context identifier
 func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, description string) (TestID, error) {
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()
@@ -437,6 +459,10 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 			v.wait = nil
 		}
 	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	_ = manager.backend.AnnotateMetrics(ctx, testCase.Start, testCase.End, fmt.Sprintf("test-case %s (%s)", testCase.Name, testID))
+	cancel()
 
 	// Delete from running, if it's still there.
 	delete(manager.runningTestCases, testID)

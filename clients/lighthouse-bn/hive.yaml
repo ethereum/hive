@@ -3,3 +3,7 @@ roles:
 build_targets:
   - mainnet
   - minimal
+metrics:
+  port: 5054
+  labels:
+    vendor: lighthouse

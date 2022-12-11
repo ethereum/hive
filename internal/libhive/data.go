@@ -27,7 +27,9 @@ type TestSuite struct {
 	ClientVersions map[string]string    `json:"clientVersions"`
 	TestCases      map[TestID]*TestCase `json:"testCases"`
 	// the log-file pertaining to the simulator. (may encompass more than just one TestSuite)
-	SimulatorLog string `json:"simLog"`
+	SimulatorLog string    `json:"simLog"`
+	Start        time.Time `json:"start"`
+	End          time.Time `json:"end"`
 }
 
 // TestCase represents a single test case in a test suite.

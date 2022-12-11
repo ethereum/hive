@@ -15,9 +15,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/hive/internal/simapi"
 	"github.com/gorilla/mux"
 	"gopkg.in/inconshreveable/log15.v2"
+
+	"github.com/ethereum/hive/internal/simapi"
 )
 
 // hiveEnvvarPrefix is the prefix of the environment variables names that should
@@ -278,6 +279,29 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		options.CheckLive = uint16(v)
+	}
+
+	// Optional metrics, may be nil.
+	if clientDef.Meta.Metrics != nil {
+		options.Metrics = &MetricsOptions{
+			Port: clientDef.Meta.Metrics.Port,
+			Labels: map[string]string{
+				"suite":   suiteID.String(),
+				"test":    testID.String(),
+				"client":  clientDef.Name,
+				"version": clientDef.Version,
+				"roles":   strings.Join(clientDef.Meta.Roles, ","),
+			},
+		}
+		for _, role := range clientDef.Meta.Roles {
+			options.Metrics.Labels["role_"+role] = "true"
+		}
+		for k, v := range clientDef.Meta.Metrics.Labels {
+			options.Metrics.Labels[k] = v
+		}
+		if name := env["HIVE_METRICS_NAME"]; name != "" {
+			options.Metrics.Labels["name"] = name
+		}
 	}
 
 	// Start it!

@@ -86,6 +86,24 @@ directory (note the first `/`, matching any suite name):
 
     ./hive --sim ethereum/consensus --sim.limit /stBugs/
 
+## Metrics
+
+Hive integrates prometheus and grafana to provide metrics of clients during testing.
+Metrics are disabled by default, but can be enabled with the `--metrics` flag.
+
+When enabled, Hive starts a prometheus container, and automatically scrapes metrics of
+the clients that have configured metrics endpoints.
+
+Clients, test cases and test suites will show up in grafana as annotations, and all of 
+the client metrics are labeled with client and test meta-data as well.
+See [Clients] docs for more details.
+
+The port used for grafana can be configured with an optional flag: `--metrics.grafana=3000`.
+Grafana can be disabled by setting the port to 0, to only run prometheus.
+
+Prometheus is not exposed to the host by default,
+but can be configured with an optional flag: `--metrics.prometheus=9090`.
+
 ## Viewing simulation results (hiveview)
 
 The results of hive simulation runs are stored in JSON files containing test results, and

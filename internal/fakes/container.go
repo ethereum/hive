@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/ethereum/hive/internal/libhive"
 )
@@ -62,6 +63,17 @@ func NewContainerBackend(hooks *BackendHooks) libhive.ContainerBackend {
 }
 
 func (b *fakeBackend) Build(context.Context, libhive.Builder) error {
+	return nil
+}
+
+func (b *fakeBackend) InitMetrics(ctx context.Context, grafanaPort uint, prometheusPort uint) error {
+	return nil
+}
+
+func (b *fakeBackend) CloseMetrics() {
+}
+
+func (b *fakeBackend) AnnotateMetrics(ctx context.Context, startTime, endTime time.Time, text string) error {
 	return nil
 }
 

@@ -1,0 +1,16 @@
+apiVersion: 1
+
+providers:
+  - name: 'hive dashboards provider'
+    orgId: 1
+    folder: ''
+    folderUid: ''  # auto-generate one for us
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 1000  # dashboards don't change on disk after starting hive
+    # allow updates for convenience. Changes will not be persisted across hive runs without
+    # exporting and checking them into the hive source though.
+    allowUiUpdates: true
+    options:
+      path: /hive/grafana-dashboards
+      foldersFromFilesStructure: true

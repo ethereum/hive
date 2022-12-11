@@ -14,10 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/hive/hiveproxy"
-	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
+
+	"github.com/ethereum/hive/hiveproxy"
+	"github.com/ethereum/hive/internal/libhive"
 )
 
 type ContainerBackend struct {
@@ -26,6 +27,8 @@ type ContainerBackend struct {
 	logger log15.Logger
 
 	proxy *hiveproxy.Proxy
+
+	metrics *Metrics
 }
 
 func NewContainerBackend(c *docker.Client, cfg *Config) *ContainerBackend {
@@ -84,6 +87,19 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 			Image: imageName,
 			Env:   vars,
 		},
+		HostConfig: &docker.HostConfig{},
+	}
+	if len(opt.HostPorts) > 0 {
+		createOpts.Config.ExposedPorts = make(map[docker.Port]struct{})
+		createOpts.HostConfig.PortBindings = make(map[docker.Port][]docker.PortBinding)
+	}
+	for k, vs := range opt.HostPorts {
+		createOpts.Config.ExposedPorts[docker.Port(k)] = struct{}{}
+		var bindings []docker.PortBinding
+		for _, v := range vs {
+			bindings = append(bindings, docker.PortBinding{HostIP: "127.0.0.1", HostPort: v})
+		}
+		createOpts.HostConfig.PortBindings[docker.Port(k)] = bindings
 	}
 
 	if opt.Input != nil {
@@ -189,17 +205,43 @@ func (b *ContainerBackend) StartContainer(ctx context.Context, containerID strin
 		info.Wait()
 		info.Wait = nil
 	}
+
+	if checkErr == nil && opt.Metrics != nil {
+		if err := b.AnnotateMetrics(ctx, startTime, time.Now(), fmt.Sprintf("creating container %s (IP %s)", containerID, info.IP)); err != nil {
+			logger.Error("failed to annotate client creation", "err", err)
+		}
+		// If a metrics endpoint is specified, register the container to be scraped
+		if err := b.metrics.ScrapeMetrics(ctx, info, opt.Metrics); err != nil {
+			b.DeleteContainer(containerID)
+			info.Wait()
+			info.Wait = nil
+			return info, fmt.Errorf("failed to start scraping metrics of container")
+		}
+	}
+
 	return info, checkErr
 }
 
 // DeleteContainer removes the given container. If the container is running, it is stopped.
 func (b *ContainerBackend) DeleteContainer(containerID string) error {
 	b.logger.Debug("removing container", "container", containerID[:8])
+	startTime := time.Now()
 	err := b.client.RemoveContainer(docker.RemoveContainerOptions{ID: containerID, Force: true})
 	if err != nil {
 		b.logger.Error("can't remove container", "container", containerID[:8], "err", err)
+		return err
 	}
-	return err
+	if b.metrics != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+		defer cancel()
+		if err := b.AnnotateMetrics(ctx, startTime, time.Now(), fmt.Sprintf("closing container %s", containerID)); err != nil {
+			b.logger.Error("failed to annotate client deletion", "container", containerID, "err", err)
+		}
+		if err := b.metrics.StopScrapingMetrics(ctx, containerID); err != nil {
+			b.logger.Error("failed to remove scrape target", "container", containerID, "err", err)
+		}
+	}
+	return nil
 }
 
 // CreateNetwork creates a docker network.

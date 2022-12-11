@@ -2,20 +2,25 @@ package libdocker
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"sync"
 
+	"gopkg.in/inconshreveable/log15.v2"
+
 	"github.com/ethereum/hive/hiveproxy"
 	"github.com/ethereum/hive/internal/libhive"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 const hiveproxyTag = "hive/hiveproxy"
 
-// Build builds the hiveproxy image.
+// Build builds the metrics setup and hiveproxy image.
 func (cb *ContainerBackend) Build(ctx context.Context, b libhive.Builder) error {
+	if err := cb.BuildMetrics(ctx, b); err != nil {
+		return fmt.Errorf("failed to build metrics image: %w", err)
+	}
 	return b.BuildImage(ctx, hiveproxyTag, hiveproxy.Source)
 }
 

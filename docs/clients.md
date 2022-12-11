@@ -26,17 +26,49 @@ Dockerfile.
 ### hive.yaml
 
 Hive reads additional metadata from the `hive.yaml` file in the client directory (next to
-the Dockerfile). Currently, the only purpose of this file is specifying the client's role
-list:
+the Dockerfile).
 
-    roles:
-      - "eth1"
-      - "eth1_light_client"
+#### Role definitions
+
+In this YAML, the client's role list can be defined:
+
+```yaml
+roles:
+  - "eth1"
+  - "eth1_light_client"
+```
 
 The role list is available to simulators and can be used to differentiate between clients
 based on features. Declaring a client role also signals that the client supports certain
 role-specific environment variables and files. If `hive.yml` is missing or doesn't declare
 roles, the `eth1` role is assumed.
+
+#### Metrics definition
+
+Additionally, a metrics scrape target can be defined:
+```yaml
+metrics:
+  port: 6060   # the port of the /metrics to scrape with prometheus
+  labels:
+    my_special_label: "foobar"
+```
+
+This is optional, no metrics will be collected if this is not specified.
+
+Hive automatically inserts the following labels by default:
+- `suite`: test suite the client was started in.
+- `test`: test case the client was started in.
+- `client`: name of the client definition.
+- `version`: version of the client.
+- `roles`: comma-separated list of roles assigned to the client.
+- For each of the roles: `role_` + the role name, set to `true`
+
+These labels can be used by dashboards to specialize for certain client types,
+display client differences, or enable filtering per test-suite and/or test-case. 
+
+Client instances started by hive can also get a `name` label by specifying the
+`HIVE_METRICS_NAME` environment variable when starting the client as simulator.
+
 
 ### /version.txt
 

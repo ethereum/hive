@@ -137,6 +137,14 @@ func (r *Runner) RunDevMode(ctx context.Context, env SimEnv, endpoint string) er
 	}
 	defer shutdownServer(proxy)
 
+	if env.Metrics.Enabled {
+		if err := r.container.InitMetrics(ctx, env.Metrics.GrafanaPort, env.Metrics.PrometheusPort); err != nil {
+			log15.Error("can't init metrics", "err", err)
+			return err
+		}
+		defer r.container.CloseMetrics()
+	}
+
 	log15.Debug("starting local API server")
 	listener, err := net.Listen("tcp", endpoint)
 	if err != nil {
@@ -194,6 +202,14 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 		return SimResult{}, err
 	}
 	defer shutdownServer(server)
+
+	if env.Metrics.Enabled {
+		if err := r.container.InitMetrics(ctx, env.Metrics.GrafanaPort, env.Metrics.PrometheusPort); err != nil {
+			log15.Error("can't init metrics", "err", err)
+			return SimResult{}, err
+		}
+		defer r.container.CloseMetrics()
+	}
 
 	// Create the simulator container.
 	opts := ContainerOptions{
