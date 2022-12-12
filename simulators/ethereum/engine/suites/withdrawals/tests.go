@@ -723,7 +723,8 @@ func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 			}
 			r := t.TestEngine.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
 			r.ExpectStatus(test.Invalid)
-			r.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
+			expectedLvh := t.CLMock.LatestHeader.Hash()
+			r.ExpectLatestValidHash(&expectedLvh)
 		},
 		OnNewPayloadBroadcast: func() {
 			// We sent a pre-shanghai FCU.
