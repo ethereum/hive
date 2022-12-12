@@ -207,7 +207,7 @@ func LoadGenesis(path string) core.Genesis {
 
 func LoadGenesisBlock(path string) *types.Block {
 	genesis := LoadGenesis(path)
-	return genesis.ToBlock(nil)
+	return genesis.ToBlock()
 }
 
 func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
