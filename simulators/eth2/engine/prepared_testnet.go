@@ -13,10 +13,11 @@ import (
 	"github.com/protolambda/ztyp/view"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/hive/hivesim"
-	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/configs"
+
+	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/eth2/engine/setup"
 )
 
 var (
@@ -94,8 +95,8 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet
 	specCpy := *configs.Mainnet
 	spec := &specCpy
 	spec.Config.DEPOSIT_CONTRACT_ADDRESS = depositAddress
-	spec.Config.DEPOSIT_CHAIN_ID = eth1Genesis.Genesis.Config.ChainID.Uint64()
-	spec.Config.DEPOSIT_NETWORK_ID = eth1Genesis.NetworkID
+	spec.Config.DEPOSIT_CHAIN_ID = view.Uint64View(eth1Genesis.Genesis.Config.ChainID.Uint64())
+	spec.Config.DEPOSIT_NETWORK_ID = view.Uint64View(eth1Genesis.NetworkID)
 	spec.Config.ETH1_FOLLOW_DISTANCE = 1
 
 	// Alter versions to avoid conflicts with mainnet values
@@ -119,7 +120,7 @@ func prepareTestnet(t *hivesim.T, env *testEnv, config *Config) *PreparedTestnet
 	if config.ValidatorCount == nil {
 		t.Fatal(fmt.Errorf("ValidatorCount was not configured"))
 	}
-	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = config.ValidatorCount.Uint64()
+	spec.Config.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT = view.Uint64View(config.ValidatorCount.Uint64())
 	if config.SlotTime != nil {
 		spec.Config.SECONDS_PER_SLOT = common.Timestamp(config.SlotTime.Uint64())
 	}

@@ -1,0 +1,18 @@
+go 1.18
+
+use (
+	.
+	./hiveproxy
+	./simulators/devp2p
+	./simulators/eth2/engine
+	./simulators/eth2/testnet
+	./simulators/ethereum/consensus
+	./simulators/ethereum/engine
+	./simulators/ethereum/graphql
+	./simulators/ethereum/rpc
+	./simulators/ethereum/rpc-compat
+	./simulators/ethereum/sync
+	./simulators/smoke/clique
+	./simulators/smoke/genesis
+	./simulators/smoke/network
+)
