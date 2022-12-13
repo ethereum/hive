@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/hive/hivesim"
-	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/eth2api/client/beaconapi"
 	"github.com/protolambda/eth2api/client/debugapi"
@@ -18,6 +16,9 @@ import (
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"github.com/protolambda/zrnt/eth2/util/math"
+
+	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
 )
 
 var MAX_PARTICIPATION_SCORE = 7
@@ -346,6 +347,6 @@ func legacyCalcHealth(spec *common.Spec, before, after []eth2api.ValidatorBalanc
 	count := big.NewInt(int64(len(before)))
 	avg_before := big.NewInt(0).Div(sum_before, count).Uint64()
 	avg_after := sum_after.Div(sum_after, count).Uint64()
-	reward := avg_before * spec.BASE_REWARD_FACTOR / math.IntegerSquareRootPrysm(sum_before.Uint64()) / spec.HYSTERESIS_QUOTIENT
+	reward := avg_before * uint64(spec.BASE_REWARD_FACTOR) / math.IntegerSquareRootPrysm(sum_before.Uint64()) / uint64(spec.HYSTERESIS_QUOTIENT)
 	return float64(avg_after-avg_before) / float64(reward*common.BASE_REWARDS_PER_EPOCH)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/params"
+
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -85,7 +86,7 @@ func BuildEth1Genesis(ttd *big.Int, genesisTime uint64, clique bool) *Eth1Genesi
 				BerlinBlock:             big.NewInt(0),
 				LondonBlock:             big.NewInt(0),
 				ArrowGlacierBlock:       big.NewInt(0),
-				MergeForkBlock:          big.NewInt(0),
+				MergeNetsplitBlock:      big.NewInt(0),
 				TerminalTotalDifficulty: ttd,
 				Clique:                  nil,
 			},
@@ -127,7 +128,7 @@ func (conf *Eth1Genesis) ToParams(depositAddress [20]byte) hivesim.Params {
 		"HIVE_FORK_BERLIN":               conf.Genesis.Config.BerlinBlock.String(),
 		"HIVE_FORK_LONDON":               conf.Genesis.Config.LondonBlock.String(),
 		"HIVE_FORK_ARROWGLACIER":         conf.Genesis.Config.ArrowGlacierBlock.String(),
-		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeForkBlock.String(),
+		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeNetsplitBlock.String(),
 		"HIVE_TERMINAL_TOTAL_DIFFICULTY": conf.Genesis.Config.TerminalTotalDifficulty.String(),
 	}
 	if conf.Genesis.Config.Clique != nil {

@@ -224,7 +224,7 @@ func loadGenesis() *types.Block {
 	if err := json.Unmarshal(contents, &genesis); err != nil {
 		panic(fmt.Errorf("can't parse genesis JSON: %v", err))
 	}
-	return genesis.ToBlock(nil)
+	return genesis.ToBlock()
 }
 
 // diff checks whether x and y are deeply equal, returning a description

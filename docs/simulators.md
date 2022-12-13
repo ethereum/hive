@@ -37,6 +37,55 @@ results of the other tests as individual test cases.
 The simulator must report the results of all running test cases before ending the test
 suite.
 
+### Simulators with shared modules
+
+To share common code between Hive simulators, the code can be defined as a Go module
+anywhere in the Hive repository, and added to the `go.work` file for local development.
+This [Go workspace](https://go.dev/blog/get-familiar-with-workspaces) links the simulators
+and library code for local development across different modules.
+
+Hive also supports pulling the local modules into the Docker build of the simulator by
+changing the build context of the simulator with a `hive_context.txt` file in the
+simulator directory root. This defines a relative path to start the docker build from.
+Local Go modules within the docker build can be linked by defining a `go.work`
+specifically for the Go modules copied into the docker build.
+
+Example:
+
+`/simulators/my-simulator/hive_context.txt`:
+```
+../..
+```
+`/simulators/my-simulator/hive.go.work`:
+```
+go 1.18
+
+use (
+	./my-shared-code
+	./my-simulator
+)
+```
+`/simulators/my-simulator/Dockerfile`:
+```Dockerfile
+# ...
+ADD ./simulators/my-simulator/hive.go.work /source/go.work
+ADD ./my-shared-code /source/my-shared-code
+ADD ./simulators/my-simulator /source/my-simulator
+WORKDIR /source/my-simulator
+RUN go build -v .
+# ...
+```
+`/go.work`:
+```
+go 1.18
+
+use (
+	// ... -- other go modules in hive
+	./simulators/my-shared-code
+	./simulators/my-simulator
+)
+```
+
 ### Simulator Environment Variables
 
 This is the list of all environment variables that hive sets when launching simulators.
