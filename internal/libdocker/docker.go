@@ -31,7 +31,7 @@ type Config struct {
 	UseCredentialHelper bool
 }
 
-func Connect(dockerEndpoint string, cfg *Config) (libhive.Builder, *ContainerBackend, error) {
+func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, error) {
 	logger := cfg.Logger
 	if logger == nil {
 		logger = log15.Root()
