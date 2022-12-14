@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,13 +20,19 @@ import (
 
 // Builder takes care of building docker images.
 type Builder struct {
-	client *docker.Client
-	config *Config
-	logger log15.Logger
+	client        *docker.Client
+	config        *Config
+	logger        log15.Logger
+	authenticator Authenticator
 }
 
-func NewBuilder(client *docker.Client, cfg *Config) *Builder {
-	b := &Builder{client: client, config: cfg, logger: cfg.Logger}
+func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder {
+	b := &Builder{
+		client:        client,
+		config:        cfg,
+		logger:        cfg.Logger,
+		authenticator: auth,
+	}
 	if b.logger == nil {
 		b.logger = log15.Root()
 	}
@@ -88,31 +93,38 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 // BuildImage creates a container by archiving the given file system,
 // which must contain a file called "Dockerfile".
 func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error {
-	nocache := false
-	if b.config.NoCachePattern != nil {
-		nocache = b.config.NoCachePattern.MatchString(name)
-	}
-
+	opts := b.buildConfig(ctx, name)
 	pipeR, pipeW := io.Pipe()
+	opts.InputStream = pipeR
 	go b.archiveFS(ctx, pipeW, fsys)
 
-	opts := docker.BuildImageOptions{
-		Context:      ctx,
-		Name:         name,
-		InputStream:  pipeR,
-		OutputStream: ioutil.Discard,
-		NoCache:      nocache,
-		Pull:         b.config.PullEnabled,
-	}
-	if b.config.BuildOutput != nil {
-		opts.OutputStream = b.config.BuildOutput
-	}
-	b.logger.Info("building image", "image", name, "nocache", nocache, "pull", b.config.PullEnabled)
+	b.logger.Info("building image", "image", name, "nocache", opts.NoCache, "pull", b.config.PullEnabled)
 	if err := b.client.BuildImage(opts); err != nil {
 		b.logger.Error("image build failed", "image", name, "err", err)
 		return err
 	}
 	return nil
+}
+
+func (b *Builder) buildConfig(ctx context.Context, name string) docker.BuildImageOptions {
+	nocache := false
+	if b.config.NoCachePattern != nil {
+		nocache = b.config.NoCachePattern.MatchString(name)
+	}
+	opts := docker.BuildImageOptions{
+		Context:      ctx,
+		Name:         name,
+		OutputStream: io.Discard,
+		NoCache:      nocache,
+		Pull:         b.config.PullEnabled,
+	}
+	if b.authenticator != nil {
+		opts.AuthConfigs = b.authenticator.AuthConfigs()
+	}
+	if b.config.BuildOutput != nil {
+		opts.OutputStream = b.config.BuildOutput
+	}
+	return opts
 }
 
 func (b *Builder) archiveFS(ctx context.Context, out io.WriteCloser, fsys fs.FS) error {
@@ -219,29 +231,16 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch.
 func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, branch, imageTag string) error {
-	nocache := false
-	if b.config.NoCachePattern != nil {
-		nocache = b.config.NoCachePattern.MatchString(imageTag)
-	}
-
 	logger := b.logger.New("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
 		logger.Error("can't find path to context directory", "err", err)
 		return err
 	}
-	opts := docker.BuildImageOptions{
-		Context:      ctx,
-		Name:         imageTag,
-		ContextDir:   context,
-		OutputStream: ioutil.Discard,
-		Dockerfile:   dockerFile,
-		NoCache:      nocache,
-		Pull:         b.config.PullEnabled,
-	}
-	if b.config.BuildOutput != nil {
-		opts.OutputStream = b.config.BuildOutput
-	}
+
+	opts := b.buildConfig(ctx, imageTag)
+	opts.ContextDir = context
+	opts.Dockerfile = dockerFile
 	logctx := []interface{}{"dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull}
 	if branch != "" {
 		logctx = append(logctx, "branch", branch)

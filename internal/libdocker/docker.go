@@ -26,6 +26,9 @@ type Config struct {
 	// These two are log destinations for output from docker.
 	ContainerOutput io.Writer
 	BuildOutput     io.Writer
+
+	// This tells the docker client whether to authenticate requests with credential helper
+	UseCredentialHelper bool
 }
 
 func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, error) {
@@ -48,7 +51,23 @@ func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, e
 		return nil, nil, fmt.Errorf("can't get docker version: %v", err)
 	}
 	logger.Debug("docker daemon online", "version", env.Get("Version"))
-	builder := NewBuilder(client, cfg)
+
+	builder, err := createBuilder(client, cfg)
+	if err != nil {
+		return nil, nil, err
+	}
 	backend := NewContainerBackend(client, cfg)
 	return builder, backend, nil
+}
+
+func createBuilder(client *docker.Client, cfg *Config) (*Builder, error) {
+	var auth Authenticator
+	var err error
+	if cfg.UseCredentialHelper {
+		auth, err = NewCredHelperAuthenticator()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return NewBuilder(client, cfg, auth), nil
 }
