@@ -61,9 +61,13 @@ func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, e
 }
 
 func createBuilder(client *docker.Client, cfg *Config) (*Builder, error) {
-	authenticator, err := NewAuthenticator(cfg.UseCredentialHelper)
-	if err != nil {
-		return nil, err
+	var auth Authenticator
+	var err error
+	if cfg.UseCredentialHelper {
+		auth, err = NewCredHelperAuthenticator()
+		if err != nil {
+			return nil, err
+		}
 	}
-	return NewBuilder(client, cfg, authenticator), nil
+	return NewBuilder(client, cfg, auth), nil
 }

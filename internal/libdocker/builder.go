@@ -108,7 +108,9 @@ func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error
 		OutputStream: io.Discard,
 		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
-		AuthConfigs:  b.authenticator.AuthConfigs(),
+	}
+	if b.authenticator != nil {
+		opts.AuthConfigs = b.authenticator.AuthConfigs()
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput
@@ -244,7 +246,9 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, branch
 		Dockerfile:   dockerFile,
 		NoCache:      nocache,
 		Pull:         b.config.PullEnabled,
-		AuthConfigs:  b.authenticator.AuthConfigs(),
+	}
+	if b.authenticator != nil {
+		opts.AuthConfigs = b.authenticator.AuthConfigs()
 	}
 	if b.config.BuildOutput != nil {
 		opts.OutputStream = b.config.BuildOutput

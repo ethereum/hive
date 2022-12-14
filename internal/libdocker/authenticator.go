@@ -14,29 +14,11 @@ type CredHelpers struct {
 	CredsStore  string            `json:"credsStore"`
 }
 
-func NewAuthenticator(useCredentialHelper bool) (Authenticator, error) {
-	if useCredentialHelper {
-		return NewCredHelperAuthenticator()
-	}
-	return NullAuthenticator{}, nil
-}
-
-// Authenticator is able to return the 2 go-dockerclient authentication primitives
+// Authenticator holds the configuration for docker registry authentication.
 type Authenticator interface {
-	// AuthConfig returns the auth configuration for a specific registry
-	AuthConfig(registry string) docker.AuthConfiguration
-	// AuthConfigs returns the auth configurations for all configured registries
+	// AuthConfigs returns the auth configurations for all configured registries.
 	AuthConfigs() docker.AuthConfigurations
 }
-
-// NullAuthenticator returns empty authentication configs
-type NullAuthenticator struct{}
-
-// AuthConfig returns the auth configuration for a specific registry
-func (n NullAuthenticator) AuthConfig(registry string) (a docker.AuthConfiguration) { return }
-
-// AuthConfigs returns the auth configurations for all configured registries
-func (n NullAuthenticator) AuthConfigs() (a docker.AuthConfigurations) { return }
 
 func NewCredHelperAuthenticator() (CredHelperAuthenticator, error) {
 	authConfigs, err := configureCredHelperAuth()
@@ -47,13 +29,10 @@ type CredHelperAuthenticator struct {
 	configs docker.AuthConfigurations
 }
 
-// AuthConfig returns the auth configuration for a specific registry
-func (c CredHelperAuthenticator) AuthConfig(registry string) (a docker.AuthConfiguration) {
-	return c.configs.Configs[registry]
-}
-
 // AuthConfigs returns the auth configurations for all configured registries
-func (c CredHelperAuthenticator) AuthConfigs() (a docker.AuthConfigurations) { return c.configs }
+func (c CredHelperAuthenticator) AuthConfigs() (a docker.AuthConfigurations) {
+	return c.configs
+}
 
 // configureCredHelperAuth - configures authentication for the specified registry based on $HOME/.docker/config.json
 func configureCredHelperAuth() (docker.AuthConfigurations, error) {
