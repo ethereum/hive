@@ -726,12 +726,12 @@ func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID
 	return *p, err
 }
 
-func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableData, error) {
-	p, err := n.api.GetPayloadV1(*payloadId)
+func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableData, *big.Int, error) {
+	p, err := n.api.GetPayloadV2(*payloadId)
 	if p == nil || err != nil {
-		return beacon.ExecutableData{}, err
+		return beacon.ExecutableData{}, nil, err
 	}
-	return *p, err
+	return *p, common.Big0, err
 }
 
 // Eth JSON RPC

@@ -272,8 +272,9 @@ func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Has
 // GetPayloadV1
 type GetPayloadResponseExpectObject struct {
 	*ExpectEnv
-	Payload api.ExecutableData
-	Error   error
+	Payload    api.ExecutableData
+	BlockValue *big.Int
+	Error      error
 }
 
 func (tec *TestEngineClient) TestEngineGetPayloadV1(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
@@ -281,20 +282,22 @@ func (tec *TestEngineClient) TestEngineGetPayloadV1(payloadID *api.PayloadID) *G
 	defer cancel()
 	payload, err := tec.Engine.GetPayloadV1(ctx, payloadID)
 	return &GetPayloadResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
-		Payload:   payload,
-		Error:     err,
+		ExpectEnv:  &ExpectEnv{tec.Env},
+		Payload:    payload,
+		BlockValue: nil,
+		Error:      err,
 	}
 }
 
 func (tec *TestEngineClient) TestEngineGetPayloadV2(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	payload, err := tec.Engine.GetPayloadV2(ctx, payloadID)
+	payload, blockValue, err := tec.Engine.GetPayloadV2(ctx, payloadID)
 	return &GetPayloadResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
-		Payload:   payload,
-		Error:     err,
+		ExpectEnv:  &ExpectEnv{tec.Env},
+		Payload:    payload,
+		BlockValue: blockValue,
+		Error:      err,
 	}
 }
 
