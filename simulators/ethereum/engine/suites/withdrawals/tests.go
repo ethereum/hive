@@ -723,8 +723,13 @@ func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 			}
 			r := t.TestEngine.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
 			r.ExpectStatus(test.Invalid)
-			expectedLvh := t.CLMock.LatestHeader.Hash()
-			r.ExpectLatestValidHash(&expectedLvh)
+			if t.CLMock.LatestHeader.Number.Int64() > 0 {
+				// Only do this check when the latest valid payload is
+				// post-genesis, because genesis could be interpreted as a
+				// Proof-of-work block by some clients, which is not an error.
+				expectedLvh := t.CLMock.LatestHeader.Hash()
+				r.ExpectLatestValidHash(&expectedLvh)
+			}
 		},
 		OnNewPayloadBroadcast: func() {
 			// We sent a pre-shanghai FCU.
