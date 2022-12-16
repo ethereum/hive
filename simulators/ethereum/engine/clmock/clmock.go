@@ -60,6 +60,7 @@ type CLMocker struct {
 	LatestHeadNumber        *big.Int
 	LatestHeader            *types.Header
 	LatestPayloadBuilt      api.ExecutableData
+	LatestBlockValue        *big.Int
 	LatestPayloadAttributes api.PayloadAttributes
 	LatestExecutedPayload   api.ExecutableData
 	LatestForkchoice        api.ForkchoiceStateV1
@@ -332,10 +333,11 @@ func (cl *CLMocker) GetNextPayload() {
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
 	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
-		cl.LatestPayloadBuilt, err = cl.NextBlockProducer.GetPayloadV2(ctx, cl.NextPayloadID)
+		cl.LatestPayloadBuilt, cl.LatestBlockValue, err = cl.NextBlockProducer.GetPayloadV2(ctx, cl.NextPayloadID)
 
 	} else {
 		cl.LatestPayloadBuilt, err = cl.NextBlockProducer.GetPayloadV1(ctx, cl.NextPayloadID)
+		cl.LatestBlockValue = nil
 	}
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.ID(), cl.NextPayloadID, err)

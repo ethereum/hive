@@ -29,7 +29,7 @@ type Engine interface {
 	ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
 
 	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error)
-	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error)
+	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error)
 	NewPayloadV1(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
 	NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
 
