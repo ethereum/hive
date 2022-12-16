@@ -321,20 +321,45 @@ func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV2(ctx context.Context, fcState 
 	return ec.ForkchoiceUpdated(ctx, 2, fcState, pAttributes)
 }
 
-func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (api.ExecutableData, error) {
-	var result api.ExecutableData
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return result, err
+//go:generate go run github.com/fjl/gencodec -type GetPayloadV2Response -field-override getPayloadV2ResponseMarshaling -out gen_getpayloadv2resp.go
+type GetPayloadV2Response struct {
+	ExecutableData api.ExecutableData `json:"executionPayload"    gencodec:"required"`
+	BlockValue     *big.Int           `json:"blockValue"    gencodec:"required"`
+}
+type getPayloadV2ResponseMarshaling struct {
+	BlockValue *hexutil.Big
+}
+
+func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error) {
+	var (
+		executableData api.ExecutableData
+		blockValue     *big.Int
+		err            error
+		rpcString      = fmt.Sprintf("engine_getPayloadV%d", version)
+	)
+
+	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
+		return executableData, nil, err
 	}
-	err := ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_getPayloadV%d", version), payloadId)
-	return result, err
+
+	if version == 2 {
+		var response GetPayloadV2Response
+		err = ec.c.CallContext(ctx, &response, rpcString, payloadId)
+		executableData = response.ExecutableData
+		blockValue = response.BlockValue
+	} else {
+		err = ec.c.CallContext(ctx, &executableData, rpcString, payloadId)
+	}
+
+	return executableData, blockValue, err
 }
 
 func (ec *HiveRPCEngineClient) GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error) {
-	return ec.GetPayload(ctx, 1, payloadId)
+	ed, _, err := ec.GetPayload(ctx, 1, payloadId)
+	return ed, err
 }
 
-func (ec *HiveRPCEngineClient) GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error) {
+func (ec *HiveRPCEngineClient) GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error) {
 	return ec.GetPayload(ctx, 2, payloadId)
 }
 
