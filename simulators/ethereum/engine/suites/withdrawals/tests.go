@@ -29,7 +29,7 @@ var (
 
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdrawals Fork On Genesis",
 			About: `
@@ -42,7 +42,7 @@ var Tests = []test.SpecInterface{
 		WithdrawalsPerBlock:   16,
 	},
 
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdrawals Fork on Block 1",
 			About: `
@@ -54,7 +54,7 @@ var Tests = []test.SpecInterface{
 		WithdrawalsPerBlock:   16,
 	},
 
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdrawals Fork on Block 2",
 			About: `
@@ -70,7 +70,7 @@ var Tests = []test.SpecInterface{
 		WithdrawalsPerBlock:   16,
 	},
 
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdrawals Fork on Block 3",
 			About: `
@@ -86,7 +86,7 @@ var Tests = []test.SpecInterface{
 		WithdrawalsPerBlock:   16,
 	},
 
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdraw to a single account",
 			About: `
@@ -99,7 +99,7 @@ var Tests = []test.SpecInterface{
 		WithdrawableAccountCount: 1,
 	},
 
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdraw to two accounts",
 			About: `
@@ -116,7 +116,7 @@ var Tests = []test.SpecInterface{
 		WithdrawableAccountCount: 2,
 	},
 
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdraw many accounts",
 			About: `
@@ -131,7 +131,7 @@ var Tests = []test.SpecInterface{
 		WithdrawableAccountCount: 1024,
 	},
 
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdraw zero amount",
 			About: `
@@ -148,7 +148,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	WithdrawalsBaseSpec{
+	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Empty Withdrawals",
 			About: `
@@ -161,8 +161,8 @@ var Tests = []test.SpecInterface{
 	},
 
 	// Sync Tests
-	WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
 				About: `
@@ -182,8 +182,8 @@ var Tests = []test.SpecInterface{
 		},
 		SyncSteps: 1,
 	},
-	WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account",
 				About: `
@@ -201,8 +201,8 @@ var Tests = []test.SpecInterface{
 		},
 		SyncSteps: 1,
 	},
-	WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Sync after 2 blocks - Withdrawals on Genesis - Single Withdrawal Account",
 				About: `
@@ -219,8 +219,8 @@ var Tests = []test.SpecInterface{
 		},
 		SyncSteps: 1,
 	},
-	WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Single Withdrawal Account - No Transactions",
 				About: `
@@ -239,8 +239,8 @@ var Tests = []test.SpecInterface{
 		},
 		SyncSteps: 1,
 	},
-	WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Single Withdrawal Account",
 				About: `
@@ -258,8 +258,8 @@ var Tests = []test.SpecInterface{
 		},
 		SyncSteps: 1,
 	},
-	WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
 				About: `
@@ -281,8 +281,8 @@ var Tests = []test.SpecInterface{
 	},
 
 	//Re-Org tests
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Block 1 - 1 Block Re-Org",
 				About: `
@@ -298,8 +298,8 @@ var Tests = []test.SpecInterface{
 		ReOrgBlockCount: 1,
 		ReOrgViaSync:    false,
 	},
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org NewPayload",
 				About: `
@@ -316,8 +316,8 @@ var Tests = []test.SpecInterface{
 		ReOrgBlockCount: 8,
 		ReOrgViaSync:    false,
 	},
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org, Sync",
 				About: `
@@ -334,8 +334,8 @@ var Tests = []test.SpecInterface{
 		ReOrgBlockCount: 8,
 		ReOrgViaSync:    true,
 	},
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org NewPayload",
 				About: `
@@ -353,8 +353,8 @@ var Tests = []test.SpecInterface{
 		ReOrgBlockCount: 10,
 		ReOrgViaSync:    false,
 	},
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org Sync",
 				About: `
@@ -372,8 +372,8 @@ var Tests = []test.SpecInterface{
 		ReOrgBlockCount: 10,
 		ReOrgViaSync:    true,
 	},
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org",
 				About: `
@@ -392,8 +392,8 @@ var Tests = []test.SpecInterface{
 		ReOrgViaSync:            false,
 		SidechainTimeIncrements: 2,
 	},
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org Sync",
 				About: `
@@ -412,8 +412,8 @@ var Tests = []test.SpecInterface{
 		ReOrgViaSync:            true,
 		SidechainTimeIncrements: 2,
 	},
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org",
 				About: `
@@ -433,8 +433,8 @@ var Tests = []test.SpecInterface{
 		ReOrgViaSync:            false,
 		SidechainTimeIncrements: 1,
 	},
-	WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
 				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org Sync",
 				About: `
@@ -556,7 +556,7 @@ type WithdrawalsBaseSpec struct {
 }
 
 // Get the per-block timestamp increments configured for this test
-func (ws WithdrawalsBaseSpec) GetBlockTimeIncrements() uint64 {
+func (ws *WithdrawalsBaseSpec) GetBlockTimeIncrements() uint64 {
 	if ws.TimeIncrements == 0 {
 		return 1
 	}
@@ -564,18 +564,18 @@ func (ws WithdrawalsBaseSpec) GetBlockTimeIncrements() uint64 {
 }
 
 // Timestamp delta between genesis and the withdrawals fork
-func (ws WithdrawalsBaseSpec) GetWithdrawalsGenesisTimeDelta() uint64 {
+func (ws *WithdrawalsBaseSpec) GetWithdrawalsGenesisTimeDelta() uint64 {
 	return ws.WithdrawalsForkHeight * ws.GetBlockTimeIncrements()
 }
 
 // Calculates Shanghai fork timestamp given the amount of blocks that need to be
 // produced beforehand.
-func (ws WithdrawalsBaseSpec) GetWithdrawalsForkTime() uint64 {
+func (ws *WithdrawalsBaseSpec) GetWithdrawalsForkTime() uint64 {
 	return uint64(globals.GenesisTimestamp) + ws.GetWithdrawalsGenesisTimeDelta()
 }
 
 // Generates the fork config, including withdrawals fork timestamp.
-func (ws WithdrawalsBaseSpec) GetForkConfig() test.ForkConfig {
+func (ws *WithdrawalsBaseSpec) GetForkConfig() test.ForkConfig {
 	return test.ForkConfig{
 		ShanghaiTimestamp: big.NewInt(int64(ws.GetWithdrawalsForkTime())),
 	}
@@ -603,7 +603,7 @@ func AddUnconditionalBytecode(g *core.Genesis, start *big.Int, end *big.Int) {
 
 // Append the accounts we are going to withdraw to, which should also include
 // bytecode for testing purposes.
-func (ws WithdrawalsBaseSpec) GetGenesis() *core.Genesis {
+func (ws *WithdrawalsBaseSpec) GetGenesis() *core.Genesis {
 	genesis := ws.Spec.GetGenesis()
 	startAccount := big.NewInt(0x1000)
 	endAccount := big.NewInt(0x1000 + int64(ws.GetWithdrawableAccountCount()) - 1)
@@ -613,13 +613,13 @@ func (ws WithdrawalsBaseSpec) GetGenesis() *core.Genesis {
 
 // Changes the CL Mocker default time increments of 1 to the value specified
 // in the test spec.
-func (ws WithdrawalsBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
+func (ws *WithdrawalsBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
 	cl.BlockTimestampIncrement = big.NewInt(int64(ws.GetBlockTimeIncrements()))
 }
 
 // Number of blocks to be produced (not counting genesis) before withdrawals
 // fork.
-func (ws WithdrawalsBaseSpec) GetPreWithdrawalsBlockCount() uint64 {
+func (ws *WithdrawalsBaseSpec) GetPreWithdrawalsBlockCount() uint64 {
 	if ws.WithdrawalsForkHeight == 0 {
 		return 0
 	} else {
@@ -628,11 +628,11 @@ func (ws WithdrawalsBaseSpec) GetPreWithdrawalsBlockCount() uint64 {
 }
 
 // Number of payloads to be produced (pre and post withdrawals) during the entire test
-func (ws WithdrawalsBaseSpec) GetTotalPayloadCount() uint64 {
+func (ws *WithdrawalsBaseSpec) GetTotalPayloadCount() uint64 {
 	return ws.GetPreWithdrawalsBlockCount() + ws.WithdrawalsBlockCount
 }
 
-func (ws WithdrawalsBaseSpec) GetWithdrawableAccountCount() uint64 {
+func (ws *WithdrawalsBaseSpec) GetWithdrawableAccountCount() uint64 {
 	if ws.WithdrawableAccountCount == 0 {
 		// Withdraw to 16 accounts by default
 		return 16
@@ -641,7 +641,7 @@ func (ws WithdrawalsBaseSpec) GetWithdrawableAccountCount() uint64 {
 }
 
 // Generates a list of withdrawals based on current configuration
-func (ws WithdrawalsBaseSpec) GenerateWithdrawalsForBlock(nextIndex uint64, startAccount *big.Int) (types.Withdrawals, uint64) {
+func (ws *WithdrawalsBaseSpec) GenerateWithdrawalsForBlock(nextIndex uint64, startAccount *big.Int) (types.Withdrawals, uint64) {
 	differentAccounts := ws.GetWithdrawableAccountCount()
 	withdrawAmounts := ws.WithdrawAmounts
 	if withdrawAmounts == nil {
@@ -666,7 +666,7 @@ func (ws WithdrawalsBaseSpec) GenerateWithdrawalsForBlock(nextIndex uint64, star
 	return nextWithdrawals, nextIndex
 }
 
-func (ws WithdrawalsBaseSpec) GetTransactionCountPerPayload() uint64 {
+func (ws *WithdrawalsBaseSpec) GetTransactionCountPerPayload() uint64 {
 	if ws.TransactionsPerBlock == nil {
 		return 16
 	}
@@ -674,7 +674,7 @@ func (ws WithdrawalsBaseSpec) GetTransactionCountPerPayload() uint64 {
 }
 
 // Base test case execution procedure for withdrawals
-func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
+func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
 	ws.WithdrawalsHistory = make(WithdrawalsHistory)
 
@@ -835,12 +835,12 @@ func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 // Specifies a withdrawals test where the withdrawals happen and then a
 // client needs to sync and apply the withdrawals.
 type WithdrawalsSyncSpec struct {
-	WithdrawalsBaseSpec
+	*WithdrawalsBaseSpec
 	SyncSteps      int  // Sync block chunks that will be passed as head through FCUs to the syncing client
 	SyncShouldFail bool //
 }
 
-func (ws WithdrawalsSyncSpec) Execute(t *test.Env) {
+func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 	// Do the base withdrawal test first
 	ws.WithdrawalsBaseSpec.Execute(t)
 
@@ -878,7 +878,7 @@ func (ws WithdrawalsSyncSpec) Execute(t *test.Env) {
 			}
 		}
 	}
-	ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestHeader.Nonce.Uint64(), nil, secondaryEngineTest)
+	ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestHeader.Number.Uint64(), nil, secondaryEngineTest)
 }
 
 // Withdrawals re-org spec:
@@ -886,28 +886,28 @@ func (ws WithdrawalsSyncSpec) Execute(t *test.Env) {
 // even to a point before withdrawals were enabled, or simply to a previous
 // withdrawals block.
 type WithdrawalsReorgSpec struct {
-	WithdrawalsBaseSpec
+	*WithdrawalsBaseSpec
 
 	ReOrgBlockCount         uint64 // How many blocks the re-org will replace, including the head
 	ReOrgViaSync            bool   // Whether the client should fetch the sidechain by syncing from the secondary client
 	SidechainTimeIncrements uint64
 }
 
-func (ws WithdrawalsReorgSpec) GetSidechainSplitHeight() uint64 {
+func (ws *WithdrawalsReorgSpec) GetSidechainSplitHeight() uint64 {
 	if ws.ReOrgBlockCount > ws.GetTotalPayloadCount() {
 		panic("invalid payload/re-org configuration")
 	}
 	return ws.GetTotalPayloadCount() + 1 - ws.ReOrgBlockCount
 }
 
-func (ws WithdrawalsReorgSpec) GetSidechainBlockTimeIncrements() uint64 {
+func (ws *WithdrawalsReorgSpec) GetSidechainBlockTimeIncrements() uint64 {
 	if ws.SidechainTimeIncrements == 0 {
 		return ws.GetBlockTimeIncrements()
 	}
 	return ws.SidechainTimeIncrements
 }
 
-func (ws WithdrawalsReorgSpec) GetSidechainWithdrawalsForkHeight() uint64 {
+func (ws *WithdrawalsReorgSpec) GetSidechainWithdrawalsForkHeight() uint64 {
 	if ws.GetSidechainBlockTimeIncrements() != ws.GetBlockTimeIncrements() {
 		// Block timestamp increments in both chains are different so need to calculate different heights, only if split happens before fork
 		if ws.GetSidechainSplitHeight() == 0 {
@@ -928,7 +928,7 @@ func (ws WithdrawalsReorgSpec) GetSidechainWithdrawalsForkHeight() uint64 {
 	return ws.WithdrawalsForkHeight
 }
 
-func (ws WithdrawalsReorgSpec) Execute(t *test.Env) {
+func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
 	ws.WithdrawalsHistory = make(WithdrawalsHistory)
 
