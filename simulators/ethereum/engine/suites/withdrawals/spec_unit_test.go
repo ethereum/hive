@@ -7,7 +7,7 @@ import (
 )
 
 type BaseSpecExpected struct {
-	Spec                             WithdrawalsBaseSpec
+	Spec                             *WithdrawalsBaseSpec
 	ExpectedBlockTimeIncrements      uint64
 	ExpectedWithdrawalsTimestamp     uint64
 	ExpectedPreWithdrawalsBlockCount uint64
@@ -16,14 +16,14 @@ type BaseSpecExpected struct {
 
 var baseSpecTestCases = []BaseSpecExpected{
 	{
-		Spec:                             WithdrawalsBaseSpec{},
+		Spec:                             &WithdrawalsBaseSpec{},
 		ExpectedBlockTimeIncrements:      1,
 		ExpectedWithdrawalsTimestamp:     uint64(globals.GenesisTimestamp),
 		ExpectedPreWithdrawalsBlockCount: 0,
 		ExpectedTotalPayloadCount:        0,
 	},
 	{
-		Spec: WithdrawalsBaseSpec{
+		Spec: &WithdrawalsBaseSpec{
 			WithdrawalsBlockCount: 1,
 		},
 		ExpectedBlockTimeIncrements:      1,
@@ -61,7 +61,7 @@ type ReOrgSpecExpected struct {
 var reorgSpecTestCases = []ReOrgSpecExpected{
 	{
 		Spec: WithdrawalsReorgSpec{
-			WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 				WithdrawalsForkHeight: 1,
 				WithdrawalsBlockCount: 16,
 			},
@@ -73,7 +73,7 @@ var reorgSpecTestCases = []ReOrgSpecExpected{
 	},
 	{
 		Spec: WithdrawalsReorgSpec{
-			WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 				TimeIncrements:        12,
 				WithdrawalsForkHeight: 4,
 				WithdrawalsBlockCount: 1,
@@ -87,7 +87,7 @@ var reorgSpecTestCases = []ReOrgSpecExpected{
 	},
 	{
 		Spec: WithdrawalsReorgSpec{
-			WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 				TimeIncrements:        1,
 				WithdrawalsForkHeight: 4,
 				WithdrawalsBlockCount: 4,
@@ -101,7 +101,7 @@ var reorgSpecTestCases = []ReOrgSpecExpected{
 	},
 	{
 		Spec: WithdrawalsReorgSpec{
-			WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 				TimeIncrements:        1,
 				WithdrawalsForkHeight: 8,
 				WithdrawalsBlockCount: 8,
@@ -115,7 +115,7 @@ var reorgSpecTestCases = []ReOrgSpecExpected{
 	},
 	{
 		Spec: WithdrawalsReorgSpec{
-			WithdrawalsBaseSpec: WithdrawalsBaseSpec{
+			WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 				TimeIncrements:        2,
 				WithdrawalsForkHeight: 8,
 				WithdrawalsBlockCount: 8,
