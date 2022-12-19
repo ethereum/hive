@@ -275,6 +275,7 @@ var Tests = []test.SpecInterface{
 			WithdrawalsBlockCount:    128,
 			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1024,
+			SkipBaseVerifications:    true, // Otherwise test runs too long
 		},
 		SyncSteps: 1,
 	},
@@ -765,63 +766,69 @@ func (ws WithdrawalsBaseSpec) Execute(t *test.Env) {
 		OnNewPayloadBroadcast: func() {
 			// Check withdrawal addresses and verify withdrawal balances
 			// have not yet been applied
-			for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
-				// Test balance at `latest`, which should not yet have the
-				// withdrawal applied.
-				r := t.TestEngine.TestBalanceAt(addr, nil)
-				r.ExpectBalanceEqual(
-					ws.WithdrawalsHistory.GetExpectedAccountBalance(
-						addr,
-						t.CLMock.LatestExecutedPayload.Number-1),
-				)
+			if !ws.SkipBaseVerifications {
+				for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
+					// Test balance at `latest`, which should not yet have the
+					// withdrawal applied.
+					r := t.TestEngine.TestBalanceAt(addr, nil)
+					r.ExpectBalanceEqual(
+						ws.WithdrawalsHistory.GetExpectedAccountBalance(
+							addr,
+							t.CLMock.LatestExecutedPayload.Number-1),
+					)
+				}
 			}
 		},
 		OnForkchoiceBroadcast: func() {
 			// Check withdrawal addresses and verify withdrawal balances
 			// have been applied
-			for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
-				// Test balance at `latest`, which should not yet have the
-				// withdrawal applied.
-				r := t.TestEngine.TestBalanceAt(addr, nil)
-				r.ExpectBalanceEqual(
-					ws.WithdrawalsHistory.GetExpectedAccountBalance(
-						addr,
-						t.CLMock.LatestExecutedPayload.Number),
+			if !ws.SkipBaseVerifications {
+				for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
+					// Test balance at `latest`, which should not yet have the
+					// withdrawal applied.
+					r := t.TestEngine.TestBalanceAt(addr, nil)
+					r.ExpectBalanceEqual(
+						ws.WithdrawalsHistory.GetExpectedAccountBalance(
+							addr,
+							t.CLMock.LatestExecutedPayload.Number),
+					)
+				}
+				// Check the correct withdrawal root on `latest` block
+				r := t.TestEngine.TestBlockByNumber(nil)
+				expectedWithdrawalsRoot := types.DeriveSha(
+					ws.WithdrawalsHistory.GetWithdrawals(t.CLMock.LatestExecutedPayload.Number),
+					trie.NewStackTrie(nil),
 				)
+				r.ExpectWithdrawalsRoot(&expectedWithdrawalsRoot)
 			}
-			// Check the correct withdrawal root on `latest` block
-			r := t.TestEngine.TestBlockByNumber(nil)
-			expectedWithdrawalsRoot := types.DeriveSha(
-				ws.WithdrawalsHistory.GetWithdrawals(t.CLMock.LatestExecutedPayload.Number),
-				trie.NewStackTrie(nil),
-			)
-			r.ExpectWithdrawalsRoot(&expectedWithdrawalsRoot)
 		},
 	})
 	// Iterate over balance history of withdrawn accounts using RPC and
 	// check that the balances match expected values.
 	// Also check one block before the withdrawal took place, verify that
 	// withdrawal has not been updated.
-	for block := uint64(0); block <= t.CLMock.LatestExecutedPayload.Number; block++ {
-		ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
+	if !ws.SkipBaseVerifications {
+		for block := uint64(0); block <= t.CLMock.LatestExecutedPayload.Number; block++ {
+			ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
 
-		// Check the correct withdrawal root on past blocks
-		r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
-		var expectedWithdrawalsRoot *common.Hash = nil
-		if block >= ws.WithdrawalsForkHeight {
-			calcWithdrawalsRoot := types.DeriveSha(
-				ws.WithdrawalsHistory.GetWithdrawals(block),
-				trie.NewStackTrie(nil),
-			)
-			expectedWithdrawalsRoot = &calcWithdrawalsRoot
+			// Check the correct withdrawal root on past blocks
+			r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
+			var expectedWithdrawalsRoot *common.Hash = nil
+			if block >= ws.WithdrawalsForkHeight {
+				calcWithdrawalsRoot := types.DeriveSha(
+					ws.WithdrawalsHistory.GetWithdrawals(block),
+					trie.NewStackTrie(nil),
+				)
+				expectedWithdrawalsRoot = &calcWithdrawalsRoot
+			}
+			t.Logf("INFO (%s): Verifying withdrawals root on block %d (%s) to be %s", t.TestName, block, t.CLMock.ExecutedPayloadHistory[block].BlockHash, expectedWithdrawalsRoot)
+			r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
+
 		}
-		t.Logf("INFO (%s): Verifying withdrawals root on block %d (%s) to be %s", t.TestName, block, t.CLMock.ExecutedPayloadHistory[block].BlockHash, expectedWithdrawalsRoot)
-		r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
 
+		// Verify on `latest`
+		ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
 	}
-
-	// Verify on `latest`
-	ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
 }
 
 // Withdrawals sync spec:
@@ -870,10 +877,8 @@ func (ws WithdrawalsSyncSpec) Execute(t *test.Env) {
 				}
 			}
 		}
-
-		ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestHeader.Nonce.Uint64(), nil, secondaryEngineTest)
-
 	}
+	ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestHeader.Nonce.Uint64(), nil, secondaryEngineTest)
 }
 
 // Withdrawals re-org spec:
