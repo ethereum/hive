@@ -7,6 +7,7 @@ use (
 	./simulators/eth2/common
 	./simulators/eth2/engine
 	./simulators/eth2/testnet
+	./simulators/eth2/withdrawals
 	./simulators/ethereum/consensus
 	./simulators/ethereum/engine
 	./simulators/ethereum/graphql
