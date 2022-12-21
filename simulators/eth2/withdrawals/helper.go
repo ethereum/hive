@@ -8,18 +8,11 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
-
-type testSpec struct {
-	Name  string
-	About string
-	Run   func(*hivesim.T, *testnet.Environment, clients.NodeDefinition)
-}
 
 // API call names
 const (

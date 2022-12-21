@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	consensus_config "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
+	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
 var (
@@ -23,60 +24,61 @@ var (
 	)
 )
 
-var engineTests = []testSpec{
-	//{Name: "transition-testnet", Run: TransitionTestnet},
-	{Name: "test-rpc-error", Run: TestRPCError},
-	{Name: "block-latest-safe-finalized", Run: BlockLatestSafeFinalized},
-	{Name: "invalid-canonical-payload", Run: InvalidPayloadGen(2, Invalid)},
-	{
-		Name: "invalid-payload-block-hash",
-		Run:  InvalidPayloadGen(2, InvalidBlockHash),
-	},
-	{Name: "invalid-header-prevrandao", Run: IncorrectHeaderPrevRandaoPayload},
-	{Name: "invalid-timestamp", Run: InvalidTimestampPayload},
-	{Name: "syncing-with-invalid-chain", Run: SyncingWithInvalidChain},
-	{Name: "basefee-encoding-check", Run: BaseFeeEncodingCheck},
-	{Name: "invalid-quantity-fields", Run: InvalidQuantityPayloadFields},
-	{Name: "timeouts", Run: Timeouts},
+type TestSpec interface {
+	GetName() string
+	GetDescription() string
+	Execute(*hivesim.T, *testnet.Environment, clients.NodeDefinition)
+	GetValidatorKeys(string) []*consensus_config.KeyDetails
 }
 
-var transitionTests = []testSpec{
-	// Transition (TERMINAL_TOTAL_DIFFICULTY) tests
-	{Name: "invalid-transition-payload", Run: InvalidPayloadGen(1, Invalid)},
-	{Name: "unknown-pow-parent-transition-payload", Run: UnknownPoWParent},
-	{Name: "ttd-before-bellatrix", Run: TTDBeforeBellatrix},
-	{
-		Name: "equal-timestamp-terminal-transition-block",
-		Run:  EqualTimestampTerminalTransitionBlock,
+var engineTests = []TestSpec{
+	BaseWithdrawalsTestSpec{
+		Name: "test-capella-fork",
+		Run:  TestCapellaFork,
+		Description: `
+		Sanity test to check the fork transition to capella.
+		`,
+		CapellaGenesis: false,
 	},
-	{
-		Name: "invalid-terminal-block-payload-lower-ttd",
-		Run:  IncorrectTerminalBlockGen(-2),
+
+	BaseWithdrawalsTestSpec{
+		Name: "test-capella-genesis",
+		Run:  TestCapellaFork,
+		Description: `
+		Sanity test to check the beacon clients can start with capella genesis.
+		`,
+		CapellaGenesis: true,
 	},
-	{
-		Name: "invalid-terminal-block-payload-higher-ttd",
-		Run:  IncorrectTerminalBlockGen(1),
+
+	BaseWithdrawalsTestSpec{
+		Name: "test-bls-to-execution-changes-capella-genesis",
+		Run:  TestCapellaBLSToExecutionChanges,
+		Description: `
+		Send BLS-To-Execution-Changes after capella fork has happened.
+		`,
+		CapellaGenesis: true,
 	},
-	{Name: "build-atop-invalid-terminal-block", Run: IncorrectTTDConfigEL},
-	{
-		Name: "syncing-with-chain-having-valid-transition-block",
-		Run:  SyncingWithChainHavingValidTransitionBlock,
+
+	BaseWithdrawalsTestSpec{
+		Name: "test-bls-to-execution-changes-bellatrix-genesis",
+		Run:  TestCapellaBLSToExecutionChanges,
+		Description: `
+		Send BLS-To-Execution-Changes before capella fork has happened,
+		and verify they are included after the fork happens.
+		`,
+		CapellaGenesis: false,
 	},
-	{
-		Name: "syncing-with-chain-having-invalid-transition-block",
-		Run:  SyncingWithChainHavingInvalidTransitionBlock,
-	},
-	{
-		Name: "syncing-with-chain-having-invalid-post-transition-block",
-		Run:  SyncingWithChainHavingInvalidPostTransitionBlock,
-	},
-	{
-		Name: "re-org-and-sync-with-chain-having-invalid-terminal-block",
-		Run:  ReOrgSyncWithChainHavingInvalidTerminalBlock,
-	},
-	{
-		Name: "no-viable-head-due-to-optimistic-sync",
-		Run:  NoViableHeadDueToOptimisticSync,
+
+	BaseWithdrawalsTestSpec{
+		Name: "test-partial-withdrawals-without-bls-to-execution-changes-bellatrix-genesis",
+		Description: `
+		Test partial withdrawals from accounts that already had the
+		Eth1 withdrawal prefix since before the capella fork.
+		`,
+		Run:                            TestCapellaPartialWithdrawalsWithoutBLSChanges,
+		ValidatorsExtraBalance:         beacon.Gwei(1),
+		ExecutionWithdrawalCredentials: true,
+		CapellaGenesis:                 false,
 	},
 }
 
@@ -99,64 +101,50 @@ func main() {
 		panic("choose 1 validator client type")
 	}
 	// Create the test suites
-	var (
-		engineSuite = hivesim.Suite{
-			Name:        "eth2-engine",
-			Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet.`,
-		}
-		transitionSuite = hivesim.Suite{
-			Name:        "eth2-engine-transition",
-			Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient transition testnet.`,
-		}
-	)
+
+	engineSuite := hivesim.Suite{
+		Name:        "eth2-engine",
+		Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet.`,
+	}
+
 	// Add all tests to the suites
 	addAllTests(&engineSuite, c, engineTests)
-	addAllTests(&transitionSuite, c, transitionTests)
 
 	// Mark suites for execution
 	hivesim.MustRunSuite(sim, engineSuite)
-	hivesim.MustRunSuite(sim, transitionSuite)
 }
 
 func addAllTests(
 	suite *hivesim.Suite,
 	c *clients.ClientDefinitionsByRole,
-	tests []testSpec,
+	tests []TestSpec,
 ) {
 	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 
-	// Generate validator keys to use for all tests.
-	keySrc := &consensus_config.MnemonicsKeySource{
-		From:       0,
-		To:         64,
-		Validator:  mnemonic,
-		Withdrawal: mnemonic,
-	}
-	keys, err := keySrc.Keys()
-	if err != nil {
-		panic(err)
-	}
-	secrets, err := consensus_config.SecretKeys(keys)
-	if err != nil {
-		panic(err)
-	}
 	for _, nodeDefinition := range c.Combinations() {
 		for _, test := range tests {
 			test := test
+			// Generate validator keys to use for this test.
+
 			suite.Add(hivesim.TestSpec{
 				Name: fmt.Sprintf(
 					"%s-%s",
-					test.Name,
+					test.GetName(),
 					nodeDefinition.String(),
 				),
-				Description: test.About,
+				Description: test.GetDescription(),
 				Run: func(t *hivesim.T) {
+					keys := test.GetValidatorKeys(mnemonic)
+					secrets, err := consensus_config.SecretKeys(keys)
+					if err != nil {
+						panic(err)
+					}
 					env := &testnet.Environment{
 						Clients: c,
 						Keys:    keys,
 						Secrets: secrets,
 					}
-					test.Run(t, env, nodeDefinition)
+					test.Execute(t, env, nodeDefinition)
 				},
 			},
 			)
