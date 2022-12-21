@@ -2,5 +2,5 @@ go 1.18
 
 use (
 	./common
-	./engine
+	./withdrawals
 )
