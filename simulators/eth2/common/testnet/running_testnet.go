@@ -388,6 +388,19 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 	}
 }
 
+// Wait a certain amount of slots while printing the current status.
+func (t *Testnet) WaitSlots(ctx context.Context, slots common.Slot) error {
+	for s := common.Slot(0); s < slots; s++ {
+		t.BeaconClients().Running().PrintStatus(ctx, t)
+		select {
+		case <-time.After(time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second):
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
 // WaitForFinality blocks until a beacon client reaches finality,
 // or timeoutSlots have passed, whichever happens first.
 func (t *Testnet) WaitForFinality(ctx context.Context) (
