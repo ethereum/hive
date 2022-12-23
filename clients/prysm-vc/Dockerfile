@@ -1,4 +1,4 @@
-ARG branch=latest-debug
+ARG branch=HEAD-29dfca
 FROM gcr.io/prysmaticlabs/prysm/validator:$branch as upstream
 
 FROM debian:buster-slim
