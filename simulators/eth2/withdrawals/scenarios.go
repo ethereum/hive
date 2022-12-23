@@ -67,6 +67,7 @@ loop:
 type BLSToExecutionChangeTestSpec struct {
 	BaseWithdrawalsTestSpec
 	SubmitAfterCapellaFork bool
+	IgnoreRPCError         bool
 }
 
 func (ts BLSToExecutionChangeTestSpec) Execute(
@@ -114,7 +115,8 @@ func (ts BLSToExecutionChangeTestSpec) Execute(
 
 	// Send the signed bls changes to the beacon client
 	if !ts.SubmitAfterCapellaFork {
-		if err := testnet.BeaconClients().Running()[0].SubmitPoolBLSToExecutionChange(ctx, blsChanges); err != nil {
+		if err := testnet.BeaconClients().Running()[0].SubmitPoolBLSToExecutionChange(ctx, blsChanges); err != nil &&
+			!ts.IgnoreRPCError {
 			t.Fatalf(
 				"FAIL: Unable to submit bls-to-execution changes: %v",
 				err,
@@ -129,7 +131,8 @@ func (ts BLSToExecutionChangeTestSpec) Execute(
 			testnet.WaitSlots(ctx, slotsUntilCapella)
 		}
 		// Then send the bls changes
-		if err := testnet.BeaconClients().Running()[0].SubmitPoolBLSToExecutionChange(ctx, blsChanges); err != nil {
+		if err := testnet.BeaconClients().Running()[0].SubmitPoolBLSToExecutionChange(ctx, blsChanges); err != nil &&
+			!ts.IgnoreRPCError {
 			t.Fatalf(
 				"FAIL: Unable to submit bls-to-execution changes: %v",
 				err,
