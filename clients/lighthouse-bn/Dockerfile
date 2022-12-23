@@ -1,4 +1,4 @@
-ARG branch=latest-unstable
+ARG branch=capella
 
 FROM sigp/lighthouse:$branch
 
