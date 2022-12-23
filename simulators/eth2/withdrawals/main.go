@@ -50,23 +50,38 @@ var engineTests = []TestSpec{
 		CapellaGenesis: true,
 	},
 
-	BaseWithdrawalsTestSpec{
-		Name: "test-bls-to-execution-changes-capella-genesis",
-		Run:  TestCapellaBLSToExecutionChanges,
-		Description: `
-		Send BLS-To-Execution-Changes after capella fork has happened.
-		`,
-		CapellaGenesis: true,
+	BLSToExecutionChangeTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-bls-to-execution-changes-on-capella-genesis",
+			Description: `
+			Send BLS-To-Execution-Changes after capella fork has happened.
+			`,
+			CapellaGenesis: true,
+		},
 	},
 
-	BaseWithdrawalsTestSpec{
-		Name: "test-bls-to-execution-changes-bellatrix-genesis",
-		Run:  TestCapellaBLSToExecutionChanges,
-		Description: `
-		Send BLS-To-Execution-Changes before capella fork has happened,
-		and verify they are included after the fork happens.
-		`,
-		CapellaGenesis: false,
+	BLSToExecutionChangeTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-bls-to-execution-changes-after-fork-on-bellatrix-genesis",
+			Description: `
+			Send BLS-To-Execution-Changes before capella fork has happened,
+			and verify they are included after the fork happens.
+			`,
+			CapellaGenesis: false,
+		},
+		SubmitAfterCapellaFork: true,
+	},
+
+	BLSToExecutionChangeTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-bls-to-execution-changes-bellatrix-genesis",
+			Description: `
+			Send BLS-To-Execution-Changes before capella fork has happened,
+			and verify they are included after the fork happens.
+			`,
+			CapellaGenesis: false,
+		},
+		SubmitAfterCapellaFork: false,
 	},
 
 	BaseWithdrawalsTestSpec{

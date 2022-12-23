@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
 	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
@@ -62,9 +64,17 @@ loop:
 	}
 }
 
-func TestCapellaBLSToExecutionChanges(t *hivesim.T, env *tn.Environment,
-	config *tn.Config,
+type BLSToExecutionChangeTestSpec struct {
+	BaseWithdrawalsTestSpec
+	SubmitAfterCapellaFork bool
+}
+
+func (ts BLSToExecutionChangeTestSpec) Execute(
+	t *hivesim.T,
+	env *tn.Environment,
+	n clients.NodeDefinition,
 ) {
+	config := ts.GetTestnetConfig(n)
 	ctx := context.Background()
 
 	testnet := tn.StartTestnet(ctx, t, env, config)
@@ -84,6 +94,7 @@ func TestCapellaBLSToExecutionChanges(t *hivesim.T, env *tn.Environment,
 		testnet.Spec().CAPELLA_FORK_VERSION,
 		testnet.GenesisValidatorsRoot(),
 	)
+
 	blsChanges := make(beacon.SignedBLSToExecutionChanges, 0)
 	for index, key := range env.Keys {
 		executionAddress := beacon.Eth1Address{byte(index + 0x100)}
@@ -98,28 +109,39 @@ func TestCapellaBLSToExecutionChanges(t *hivesim.T, env *tn.Environment,
 		}
 	}
 
+	blsChangesJson, _ := json.MarshalIndent(blsChanges, "", " ")
+	t.Logf("INFO: Prepared bls changes:\n%s", blsChangesJson)
+
 	// Send the signed bls changes to the beacon client
-	if err := testnet.BeaconClients().Running()[0].SubmitPoolBLSToExecutionChange(blsChanges); err != nil {
-		t.Fatalf("FAIL: Unable to submit bls-to-execution changes: %v", err)
+	if !ts.SubmitAfterCapellaFork {
+		if err := testnet.BeaconClients().Running()[0].SubmitPoolBLSToExecutionChange(ctx, blsChanges); err != nil {
+			t.Fatalf(
+				"FAIL: Unable to submit bls-to-execution changes: %v",
+				err,
+			)
+		}
+	} else {
+		// First wait for Capella
+		if config.CapellaForkEpoch.Uint64() > 0 {
+			slotsUntilCapella := beacon.Slot(
+				config.CapellaForkEpoch.Uint64(),
+			) * testnet.Spec().SLOTS_PER_EPOCH
+			testnet.WaitSlots(ctx, slotsUntilCapella)
+		}
+		// Then send the bls changes
+		if err := testnet.BeaconClients().Running()[0].SubmitPoolBLSToExecutionChange(ctx, blsChanges); err != nil {
+			t.Fatalf(
+				"FAIL: Unable to submit bls-to-execution changes: %v",
+				err,
+			)
+		}
 	}
 
 	// Wait for all BLS to execution to be included
 	slotsForAllBlsInclusion := beacon.Slot(
 		len(env.Keys) / int(testnet.Spec().MAX_BLS_TO_EXECUTION_CHANGES),
 	)
-	slotCtx, cancel := testnet.Spec().
-		SlotTimeoutContext(ctx, slotsForAllBlsInclusion+1+(beacon.Slot(config.CapellaForkEpoch.Uint64())*testnet.Spec().SLOTS_PER_EPOCH))
-	defer cancel()
-loop:
-	for {
-		select {
-		case <-slotCtx.Done():
-			break loop
-		case <-time.After(time.Duration(testnet.Spec().SECONDS_PER_SLOT) * time.Second):
-			// Print all info
-			testnet.BeaconClients().Running().PrintStatus(slotCtx, t)
-		}
-	}
+	testnet.WaitSlots(ctx, slotsForAllBlsInclusion)
 
 	// Get the beacon state and verify the credentials were updated
 	bn := testnet.BeaconClients().Running()[0]
