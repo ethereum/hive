@@ -2,5 +2,7 @@ go 1.18
 
 use (
 	./common
+	./eth2api
 	./withdrawals
+	./zrnt
 )
