@@ -80,13 +80,14 @@ func (ts BLSToExecutionChangeTestSpec) Execute(
 	capellaBLSToExecDomain := ComputeBLSToExecutionDomain(testnet)
 
 	blsChanges := make(beacon.SignedBLSToExecutionChanges, 0)
-	for index, key := range env.Keys {
+	for index := range env.Keys {
 		executionAddress := beacon.Eth1Address{byte(index + 0x100)}
-		if signedBlsChange, err := key.SignBLSToExecutionChange(
-			capellaBLSToExecDomain,
-			beacon.ValidatorIndex(index),
-			executionAddress,
-		); err != nil {
+		if signedBlsChange, err := testnet.ValidatorClients().
+			SignBLSToExecutionChange(
+				capellaBLSToExecDomain,
+				beacon.ValidatorIndex(index),
+				executionAddress,
+			); err != nil {
 			t.Fatalf("FAIL: Unable to sign bls-to-execution change: %v", err)
 		} else {
 			blsChanges = append(blsChanges, *signedBlsChange)
