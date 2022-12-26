@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
@@ -47,20 +46,8 @@ loop:
 
 	// Query the execution chain to check the balances, all most be !=0
 	ec := testnet.ExecutionClients().Running()[0]
-	for index := range env.Keys {
-		execAddress := common.Address{byte(index + 0x100)}
-		balance, err := ec.BalanceAt(ctx, execAddress, nil)
-		if err != nil {
-			t.Fatalf(
-				"FAIL: Unable to fetch account (%s) balance: %v",
-				execAddress,
-				err,
-			)
-		}
-		t.Logf("INFO: Balance of %s: %d", execAddress, balance)
-		if balance.Cmp(common.Big0) <= 0 {
-			t.Fatalf("FAIL: Account (%s) did not withdraw", execAddress)
-		}
+	if err := CheckCorrectWithdrawalBalances(ctx, ec, env.Keys); err != nil {
+		t.Fatalf("FAIL: balance incongruence found: %v", err)
 	}
 }
 
@@ -90,11 +77,7 @@ func (ts BLSToExecutionChangeTestSpec) Execute(
 	)
 
 	// Submit BLS-to-execution directives for all validators
-	capellaBLSToExecDomain := beacon.ComputeDomain(
-		beacon.DOMAIN_BLS_TO_EXECUTION_CHANGE,
-		testnet.Spec().CAPELLA_FORK_VERSION,
-		testnet.GenesisValidatorsRoot(),
-	)
+	capellaBLSToExecDomain := ComputeBLSToExecutionDomain(testnet)
 
 	blsChanges := make(beacon.SignedBLSToExecutionChanges, 0)
 	for index, key := range env.Keys {
