@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math/big"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
@@ -163,6 +165,160 @@ func (ts BLSToExecutionChangeTestSpec) Execute(
 			)
 		}
 		t.Logf("INFO: Successful BLS to execution change: %x", credentials)
+	}
+}
+
+type FullBLSToExecutionChangeTestSpec struct {
+	BaseWithdrawalsTestSpec
+	ValidatorsExitCount    uint64
+	SubmitAfterCapellaFork bool
+	IgnoreRPCError         bool
+}
+
+func (ts FullBLSToExecutionChangeTestSpec) Execute(
+	t *hivesim.T,
+	env *tn.Environment,
+	n clients.NodeDefinition,
+) {
+	config := ts.GetTestnetConfig(n)
+	ctx := context.Background()
+
+	testnet := tn.StartTestnet(ctx, t, env, config)
+	defer testnet.Stop()
+
+	// Wait for beacon chain genesis to happen
+	testnet.WaitForGenesis(ctx)
+
+	// Wait for 3 slots to pass
+	<-time.After(
+		3 * time.Second * time.Duration(testnet.Spec().SECONDS_PER_SLOT),
+	)
+
+	// Exit validators, and submit BLS-to-execution directives
+	withdrawingValidators := make(
+		[]beacon.ValidatorIndex,
+		ts.ValidatorsExitCount,
+	)
+	withdrawingValidatorsIndexes := make(
+		[]eth2api.ValidatorId,
+		ts.ValidatorsExitCount,
+	)
+	withdrawingAddresses := make(
+		[]beacon.Eth1Address,
+		ts.ValidatorsExitCount,
+	)
+	for i := uint64(0); i < ts.ValidatorsExitCount; i++ {
+		validatorIndex := beacon.ValidatorIndex(
+			i + (ts.GetValidatorCount() / 2) - (ts.ValidatorsExitCount / 2),
+		)
+		n := testnet.Nodes.ByValidatorIndex(validatorIndex)
+
+		if err := n.SignSubmitVoluntaryExit(ctx, beacon.Epoch(0), validatorIndex); err != nil {
+			// TODO: Debug this error because the exit is processed but we fail on
+			// parsing the response for some reason
+			// t.Fatalf("FAIL: unable to send voluntary exit: %v", err)
+		}
+
+		executionAddress := beacon.Eth1Address{byte(i + 0x100)}
+
+		withdrawingValidators[i] = validatorIndex
+		withdrawingValidatorsIndexes[i] = eth2api.ValidatorIdIndex(
+			validatorIndex,
+		)
+		withdrawingAddresses[i] = executionAddress
+	}
+
+	// Send the signed bls changes to the beacon client
+	if !ts.SubmitAfterCapellaFork {
+		if err := testnet.Nodes.SignSubmitBLSToExecutionChanges(ctx, withdrawingValidators, withdrawingAddresses); err != nil {
+			if !ts.IgnoreRPCError {
+				t.Fatalf(
+					"FAIL: unable to submit bls-to-execution changes: %v",
+					err,
+				)
+			} else {
+				t.Logf(
+					"INFO: unable to submit bls-to-execution changes: %v",
+					err,
+				)
+			}
+		}
+	} else {
+		// First wait for Capella
+		if config.CapellaForkEpoch.Uint64() > 0 {
+			slotsUntilCapella := beacon.Slot(
+				config.CapellaForkEpoch.Uint64(),
+			) * testnet.Spec().SLOTS_PER_EPOCH
+			testnet.WaitSlots(ctx, slotsUntilCapella)
+		}
+		// Then send the bls changes
+		if err := testnet.Nodes.SignSubmitBLSToExecutionChanges(ctx, withdrawingValidators, withdrawingAddresses); err != nil {
+			if !ts.IgnoreRPCError {
+				t.Fatalf(
+					"FAIL: unable to submit bls-to-execution changes: %v",
+					err,
+				)
+			} else {
+				t.Logf(
+					"INFO: unable to submit bls-to-execution changes: %v",
+					err,
+				)
+			}
+		}
+	}
+
+	// Wait for all accounts to be drained or timeout
+	maxSlots := 16
+loop:
+	for {
+		time.Sleep(time.Second * time.Duration(testnet.Spec().SECONDS_PER_SLOT))
+		testnet.BeaconClients().Running().PrintStatus(ctx, t)
+		if balances, err := testnet.BeaconClients().
+			Running()[0].
+			StateValidatorBalances(
+				ctx,
+				eth2api.StateHead,
+				withdrawingValidatorsIndexes,
+			); err != nil {
+			t.Fatalf("FAIL: Error getting balances: %v", err)
+		} else {
+			allZero := true
+			for i, b := range balances {
+				if b.Balance != 0 {
+					t.Logf("INFO: validator %d balance not zero yet: %d", withdrawingValidatorsIndexes[i], b.Balance)
+					allZero = false
+					break
+				}
+			}
+			if allZero {
+				// All balances have dropped to zero
+				t.Logf("INFO: all exited validators have dropped their balance to zero")
+				break loop
+			}
+		}
+
+		maxSlots -= 1
+		if maxSlots == 0 {
+			t.Fatalf("FAIL: Timeout waiting for full withdrawals")
+		}
+	}
+
+	// Check the execution address balances
+	expectedMinimumBalance := big.NewInt(
+		int64(testnet.Spec().MAX_EFFECTIVE_BALANCE),
+	)
+	expectedMinimumBalance.Mul(expectedMinimumBalance, big.NewInt(1e9))
+	for _, addr := range withdrawingAddresses {
+		address := common.Address{}
+		copy(address[:], addr[:])
+		if balance, err := testnet.ExecutionClients().Running()[0].BalanceAt(ctx, address, nil); err != nil {
+			t.Fatalf("FAIL: error obtaining account balance: %v", err)
+		} else {
+			// check balance is what we actually expect
+			if balance.Cmp(expectedMinimumBalance) < 0 {
+				t.Fatalf("FAIL: withdrawn balance less than minimum expected: want=%s, got=%s", expectedMinimumBalance.String(), balance.String())
+			}
+		}
 	}
 }
 

@@ -31,7 +31,7 @@ type TestSpec interface {
 	GetValidatorKeys(string) []*consensus_config.KeyDetails
 }
 
-var engineTests = []TestSpec{
+var tests = []TestSpec{
 	BaseWithdrawalsTestSpec{
 		Name: "test-capella-fork",
 		Run:  TestCapellaFork,
@@ -98,6 +98,21 @@ var engineTests = []TestSpec{
 		ExecutionWithdrawalCredentials: true,
 		CapellaGenesis:                 false,
 	},
+
+	FullBLSToExecutionChangeTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-full-withdrawals-exit-bls-to-execution-changes-bellatrix-genesis",
+			Description: `
+			Test BLS-To-Execution-Changes to fully exit validators.
+			`,
+			ValidatorCount:                 128,
+			ExecutionWithdrawalCredentials: false,
+			CapellaGenesis:                 false,
+		},
+		ValidatorsExitCount:    32,
+		SubmitAfterCapellaFork: true,
+		IgnoreRPCError:         true, // TODO: REMOVE!
+	},
 }
 
 func main() {
@@ -126,7 +141,7 @@ func main() {
 	}
 
 	// Add all tests to the suites
-	addAllTests(&engineSuite, c, engineTests)
+	addAllTests(&engineSuite, c, tests)
 
 	// Mark suites for execution
 	hivesim.MustRunSuite(sim, engineSuite)

@@ -113,16 +113,19 @@ func (ts BaseWithdrawalsTestSpec) GetDescription() string {
 	return ts.Description
 }
 
+func (ts BaseWithdrawalsTestSpec) GetValidatorCount() uint64 {
+	if ts.ValidatorCount != 0 {
+		return ts.ValidatorCount
+	}
+	return DEFAULT_VALIDATOR_COUNT
+}
+
 func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 	mnemonic string,
 ) []*cl.KeyDetails {
-	var validatorCount uint64 = DEFAULT_VALIDATOR_COUNT
-	if ts.ValidatorCount != 0 {
-		validatorCount = ts.ValidatorCount
-	}
 	keySrc := &cl.MnemonicsKeySource{
 		From:       0,
-		To:         validatorCount,
+		To:         ts.GetValidatorCount(),
 		Validator:  mnemonic,
 		Withdrawal: mnemonic,
 	}
