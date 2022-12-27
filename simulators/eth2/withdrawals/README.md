@@ -15,7 +15,7 @@ document.
 
 ### Capella/Shanghai Transition
 
-* [ ] Capella/Shanghai Transition
+* [x] Capella/Shanghai Transition
   <details>
   <summary>Click for details</summary>
   
@@ -26,7 +26,7 @@ document.
 
 ### Capella/Shanghai Genesis
 
-* [ ] Capella/Shanghai Genesis
+* [x] Capella/Shanghai Genesis
   <details>
   <summary>Click for details</summary>
   
@@ -37,7 +37,7 @@ document.
 
 ### BLS-To-Execution-Change
 
-* [ ] BLS-To-Execution-Changes
+* [x] BLS-To-Execution-Changes
   <details>
   <summary>Click for details</summary>
   
@@ -47,9 +47,9 @@ document.
   - Verify on the beacon state that withdrawal credentials are updated
   - Verify on the execution client that all validators partially withdraw (Balances above 1 gwei)
 
-  * [ ] Test on Capella/Shanghai genesis
-  * [ ] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes before transition to Capella/Shanghai
-  * [ ] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes after transition to Capella/Shanghai
+  * [x] Test on Capella/Shanghai genesis
+  * [x] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes before transition to Capella/Shanghai
+  * [x] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes after transition to Capella/Shanghai
 
   </details>
 
@@ -62,8 +62,8 @@ document.
   - All genesis validators have BLS withdrawal credentials
   - Capella/Shanghai transition occurs on Epoch 1
   - During Epoch 0 of the Beacon Chain:
-    - Slash 32 validators
-    - Exit 32 validators
+    [ ] Slash 32 validators
+    [x] Exit 32 validators
   - Sign and submit BLS-To-Execution-Changes of all validators to change withdrawal credentials to different execution addresses
   - Verify on the beacon state:
     - Withdrawal credentials are updated
