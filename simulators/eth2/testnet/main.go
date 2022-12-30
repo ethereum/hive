@@ -4,8 +4,16 @@ import (
 	"fmt"
 
 	"github.com/ethereum/hive/hivesim"
-	"github.com/ethereum/hive/simulators/eth2/testnet/setup"
+	"github.com/ethereum/hive/simulators/eth2/common/clients"
+	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
+	"github.com/ethereum/hive/simulators/eth2/common/testnet"
 )
+
+type testSpec struct {
+	Name  string
+	About string
+	Run   func(*hivesim.T, *testnet.Environment, clients.NodeDefinition)
+}
 
 var tests = []testSpec{
 	// {Name: "single-client-testnet", Run: Phase0Testnet},
@@ -25,7 +33,7 @@ func main() {
 			if err != nil {
 				t.Fatal(err)
 			}
-			c := ClientsByRole(clientTypes)
+			c := clients.ClientsByRole(clientTypes)
 			if len(c.Eth1) != 1 {
 				t.Fatalf("choose 1 eth1 client type")
 			}
@@ -41,11 +49,11 @@ func main() {
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
+func runAllTests(t *hivesim.T, c *clients.ClientDefinitionsByRole) {
 	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 
 	// Generate validator keys to use for all tests.
-	keySrc := &setup.MnemonicsKeySource{
+	keySrc := &cl.MnemonicsKeySource{
 		From:       0,
 		To:         64,
 		Validator:  mnemonic,
@@ -55,7 +63,7 @@ func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	secrets, err := setup.SecretKeys(keys)
+	secrets, err := cl.SecretKeys(keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,10 +71,14 @@ func runAllTests(t *hivesim.T, c *ClientDefinitionsByRole) {
 		for _, test := range tests {
 			test := test
 			t.Run(hivesim.TestSpec{
-				Name:        fmt.Sprintf("%s-%s", test.Name, node),
+				Name:        fmt.Sprintf("%s-%s", test.Name, node.String()),
 				Description: test.About,
 				Run: func(t *hivesim.T) {
-					env := &testEnv{c, keys, secrets}
+					env := &testnet.Environment{
+						Clients: c,
+						Keys:    keys,
+						Secrets: secrets,
+					}
 					test.Run(t, env, node)
 				},
 			})
