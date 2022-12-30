@@ -8,14 +8,21 @@ RUN \
 # Build the simulator binary
 FROM golang:1-alpine AS builder
 RUN apk --no-cache add gcc musl-dev linux-headers cmake make clang build-base clang-static clang-dev
-ADD . /source
-WORKDIR /source
+
+# Prepare workspace
+ADD ./engine/hive.go.work /source/go.work
+ADD ./common /source/common
+ADD ./engine /source/engine
+ADD ./engine/hive.go.work /source/go.work
+
+# Build within simulator folder
+WORKDIR /source/engine
 RUN go build -o ./sim .
 
 # Build the runner container.
 FROM alpine:latest
 ADD . /
-COPY --from=builder /source/sim /
+COPY --from=builder /source/engine/sim /
 COPY --from=geth    /ethash /ethash
 
 ENTRYPOINT ["./sim"]

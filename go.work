@@ -4,6 +4,7 @@ use (
 	.
 	./hiveproxy
 	./simulators/devp2p
+	./simulators/eth2/common
 	./simulators/eth2/engine
 	./simulators/eth2/testnet
 	./simulators/ethereum/consensus

@@ -7,7 +7,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/hive/hivesim"
-	"github.com/ethereum/hive/simulators/eth2/engine/setup"
+	"github.com/ethereum/hive/simulators/eth2/common/clients"
+	consensus_config "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
+	"github.com/ethereum/hive/simulators/eth2/common/testnet"
 )
 
 var (
@@ -47,7 +49,6 @@ var transitionTests = []testSpec{
 }
 
 func main() {
-
 	// Create simulator that runs all tests
 	sim := hivesim.New()
 	// From the simulator we can get all client types provided
@@ -55,7 +56,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	c := ClientsByRole(clientTypes)
+	c := clients.ClientsByRole(clientTypes)
 	if len(c.Eth1) != 1 {
 		panic("choose 1 eth1 client type")
 	}
@@ -85,11 +86,11 @@ func main() {
 	hivesim.MustRunSuite(sim, transitionSuite)
 }
 
-func addAllTests(suite *hivesim.Suite, c *ClientDefinitionsByRole, tests []testSpec) {
+func addAllTests(suite *hivesim.Suite, c *clients.ClientDefinitionsByRole, tests []testSpec) {
 	mnemonic := "couple kiwi radio river setup fortune hunt grief buddy forward perfect empty slim wear bounce drift execute nation tobacco dutch chapter festival ice fog"
 
 	// Generate validator keys to use for all tests.
-	keySrc := &setup.MnemonicsKeySource{
+	keySrc := &consensus_config.MnemonicsKeySource{
 		From:       0,
 		To:         64,
 		Validator:  mnemonic,
@@ -99,19 +100,23 @@ func addAllTests(suite *hivesim.Suite, c *ClientDefinitionsByRole, tests []testS
 	if err != nil {
 		panic(err)
 	}
-	secrets, err := setup.SecretKeys(keys)
+	secrets, err := consensus_config.SecretKeys(keys)
 	if err != nil {
 		panic(err)
 	}
-	for _, node := range c.Combinations() {
+	for _, nodeDefinition := range c.Combinations() {
 		for _, test := range tests {
 			test := test
 			suite.Add(hivesim.TestSpec{
-				Name:        fmt.Sprintf("%s-%s", test.Name, node.String()),
+				Name:        fmt.Sprintf("%s-%s", test.Name, nodeDefinition.String()),
 				Description: test.About,
 				Run: func(t *hivesim.T) {
-					env := &testEnv{c, keys, secrets}
-					test.Run(t, env, node)
+					env := &testnet.Environment{
+						Clients: c,
+						Keys:    keys,
+						Secrets: secrets,
+					}
+					test.Run(t, env, nodeDefinition)
 				},
 			},
 			)
