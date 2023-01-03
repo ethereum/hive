@@ -32,7 +32,6 @@
 #  - HIVE_GRAPHQL_ENABLED      turns on GraphQL server
 #  - HIVE_CLIQUE_PRIVATEKEY    private key for clique mining
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
-#  - HIVE_ZERO_BASE_FEE        If set, remove base fee and permit zero gas network
 
 # Immediately abort the script on any error encountered
 set -e

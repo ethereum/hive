@@ -38,7 +38,6 @@
 #  - HIVE_SKIP_POW             If set, skip PoW verification
 #  - HIVE_LOGLEVEL             Client log level
 #  - HIVE_GRAPHQL_ENABLED      If set, GraphQL is enabled on port 8545 and RPC is disabled
-#  - HIVE_ZERO_BASE_FEE        If set, remove base fee and permit zero gas network
 #
 # These flags are not supported by the Besu hive client
 #
