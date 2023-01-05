@@ -4,5 +4,4 @@ use (
 	./common
 	./eth2api
 	./withdrawals
-	./zrnt
 )
