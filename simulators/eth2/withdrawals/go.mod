@@ -11,7 +11,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/protolambda/eth2api v0.0.0-20220822011642-f7735dd471e0
 	github.com/protolambda/go-keystorev4 v0.0.0-20211007151826-f20444f6d564
-	github.com/protolambda/zrnt v0.28.0
+	github.com/protolambda/zrnt v0.29.0
 	github.com/protolambda/ztyp v0.2.2
 	github.com/rauljordan/engine-proxy v0.0.0-20220517190449-e62b2e2f6e27
 	github.com/tyler-smith/go-bip39 v1.1.0
