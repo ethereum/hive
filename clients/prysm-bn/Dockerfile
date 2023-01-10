@@ -1,4 +1,4 @@
-ARG branch=HEAD-29dfca
+ARG branch=capella-6b2721
 FROM gcr.io/prysmaticlabs/prysm/beacon-chain:$branch as upstream
 
 FROM debian:buster-slim
