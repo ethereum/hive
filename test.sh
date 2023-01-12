@@ -17,7 +17,7 @@ FLAGS="$FLAGS --results-root $RESULTS "
 FLAGS="$FLAGS --sim.parallelism 1 --client.checktimelimit=20s"
 
 echo "Running the quick'n'dirty version of the Hive tests, for local development"
-echo "To the the hive viewer up, you can do"
+echo "To get the hive viewer up, you can do"
 echo ""
 echo "  cd $HIVEHOME/hiveviewer && ln -s /tmp/TestResults/ Results && python -m SimpleHTTPServer"
 echo ""
