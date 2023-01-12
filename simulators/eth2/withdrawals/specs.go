@@ -61,7 +61,7 @@ var (
 )
 
 func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
-	nodeDefinition clients.NodeDefinition,
+	allNodeDefinitions []clients.NodeDefinition,
 ) *testnet.Config {
 	config := DEFAULT_CONFIG
 
@@ -74,7 +74,13 @@ func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
 	if ts.CapellaGenesis {
 		config.CapellaForkEpoch = common.Big0
 	}
+
 	nodeCount := 2
+	if len(allNodeDefinitions) == 0 {
+		panic("incorrect number of node definitions")
+	} else if len(allNodeDefinitions) > 1 {
+		nodeCount = len(allNodeDefinitions)
+	}
 	if ts.NodeCount > 0 {
 		nodeCount = ts.NodeCount
 	}
@@ -84,7 +90,7 @@ func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
 	}
 	nodeDefinitions := make(clients.NodeDefinitions, 0)
 	for i := 0; i < nodeCount; i++ {
-		n := nodeDefinition
+		n := allNodeDefinitions[i%len(allNodeDefinitions)]
 		if i <= maxValidatingNodeIndex {
 			n.ValidatorShares = 1
 		} else {
@@ -100,9 +106,14 @@ func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
 func (ts BaseWithdrawalsTestSpec) Execute(
 	t *hivesim.T,
 	env *testnet.Environment,
-	n clients.NodeDefinition,
+	n []clients.NodeDefinition,
 ) {
 	ts.Run(t, env, ts.GetTestnetConfig(n))
+}
+
+func (ts BaseWithdrawalsTestSpec) CanRun(clients.NodeDefinitions) bool {
+	// Base test specs can always run
+	return true
 }
 
 func (ts BaseWithdrawalsTestSpec) GetName() string {
