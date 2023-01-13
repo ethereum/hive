@@ -731,7 +731,7 @@ func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID
 	if p == nil || err != nil {
 		return beacon.ExecutableData{}, nil, err
 	}
-	return *p, common.Big0, err
+	return *p.ExecutionPayload, p.BlockValue, err
 }
 
 // Eth JSON RPC
