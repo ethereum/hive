@@ -142,9 +142,9 @@ var Tests = []test.SpecInterface{
 		WithdrawalsBlockCount:    1,
 		WithdrawalsPerBlock:      64,
 		WithdrawableAccountCount: 2,
-		WithdrawAmounts: []*big.Int{
-			common.Big0,
-			common.Big1,
+		WithdrawAmounts: []uint64{
+			0,
+			1,
 		},
 	},
 
@@ -457,6 +457,11 @@ var Tests = []test.SpecInterface{
 	// TODO: REORG SYNC WHERE SYNCED BLOCKS HAVE WITHDRAWALS BEFORE TIME
 }
 
+// Helper types to convert gwei into wei more easily
+func WeiAmount(w *types.Withdrawal) *big.Int {
+	return new(big.Int).Mul(new(big.Int).SetUint64(w.Amount), big.NewInt(1e9))
+}
+
 // Helper structure used to keep history of the amounts withdrawn to each test account.
 type WithdrawalsHistory map[uint64]types.Withdrawals
 
@@ -468,7 +473,7 @@ func (wh WithdrawalsHistory) GetExpectedAccountBalance(account common.Address, b
 		if withdrawals, ok := wh[b]; ok && withdrawals != nil {
 			for _, withdrawal := range withdrawals {
 				if withdrawal.Address == account {
-					balance.Add(balance, withdrawal.Amount)
+					balance.Add(balance, WeiAmount(withdrawal))
 				}
 			}
 		}
@@ -506,9 +511,9 @@ func (wh WithdrawalsHistory) GetWithdrawnAccounts(blockHeight uint64) map[common
 		if withdrawals, ok := wh[block]; ok && withdrawals != nil {
 			for _, withdrawal := range withdrawals {
 				if currentBalance, ok2 := accounts[withdrawal.Address]; ok2 {
-					currentBalance.Add(currentBalance, withdrawal.Amount)
+					currentBalance.Add(currentBalance, WeiAmount(withdrawal))
 				} else {
-					accounts[withdrawal.Address] = new(big.Int).Set(withdrawal.Amount)
+					accounts[withdrawal.Address] = new(big.Int).Set(WeiAmount(withdrawal))
 				}
 			}
 		}
@@ -550,7 +555,7 @@ type WithdrawalsBaseSpec struct {
 	WithdrawalsPerBlock      uint64             // Number of withdrawals per block
 	WithdrawableAccountCount uint64             // Number of accounts to withdraw to (round-robin)
 	WithdrawalsHistory       WithdrawalsHistory // Internal withdrawals history that keeps track of all withdrawals
-	WithdrawAmounts          []*big.Int         // Amounts of withdrawn wei on each withdrawal (round-robin)
+	WithdrawAmounts          []uint64           // Amounts of withdrawn wei on each withdrawal (round-robin)
 	TransactionsPerBlock     *big.Int           // Amount of test transactions to include in withdrawal blocks
 	SkipBaseVerifications    bool               // For code reuse of the base spec procedure
 }
@@ -645,8 +650,8 @@ func (ws *WithdrawalsBaseSpec) GenerateWithdrawalsForBlock(nextIndex uint64, sta
 	differentAccounts := ws.GetWithdrawableAccountCount()
 	withdrawAmounts := ws.WithdrawAmounts
 	if withdrawAmounts == nil {
-		withdrawAmounts = []*big.Int{
-			big.NewInt(1),
+		withdrawAmounts = []uint64{
+			1,
 		}
 	}
 

@@ -321,15 +321,6 @@ func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV2(ctx context.Context, fcState 
 	return ec.ForkchoiceUpdated(ctx, 2, fcState, pAttributes)
 }
 
-//go:generate go run github.com/fjl/gencodec -type GetPayloadV2Response -field-override getPayloadV2ResponseMarshaling -out gen_getpayloadv2resp.go
-type GetPayloadV2Response struct {
-	ExecutableData api.ExecutableData `json:"executionPayload"    gencodec:"required"`
-	BlockValue     *big.Int           `json:"blockValue"    gencodec:"required"`
-}
-type getPayloadV2ResponseMarshaling struct {
-	BlockValue *hexutil.Big
-}
-
 func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error) {
 	var (
 		executableData api.ExecutableData
@@ -343,9 +334,9 @@ func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payl
 	}
 
 	if version == 2 {
-		var response GetPayloadV2Response
+		var response api.ExecutableDataV2
 		err = ec.c.CallContext(ctx, &response, rpcString, payloadId)
-		executableData = response.ExecutableData
+		executableData = *response.ExecutionPayload
 		blockValue = response.BlockValue
 	} else {
 		err = ec.c.CallContext(ctx, &executableData, rpcString, payloadId)
