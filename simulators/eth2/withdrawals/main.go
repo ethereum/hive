@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	consensus_config "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
-	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
 var (
@@ -30,112 +29,51 @@ type TestSpec interface {
 	GetDescription() string
 	Execute(*hivesim.T, *testnet.Environment, []clients.NodeDefinition)
 	GetValidatorKeys(string) []*consensus_config.KeyDetails
-	CanRun(clients.NodeDefinitions) bool
 }
 
 var tests = []TestSpec{
 	BaseWithdrawalsTestSpec{
 		Name: "test-capella-fork",
-		Run:  TestCapellaFork,
 		Description: `
 		Sanity test to check the fork transition to capella.
+		All validators start with Execution Withdrawal Credentials,
+		therefore no BLS-To-Execution changes are tested here.
 		`,
-		CapellaGenesis: false,
+		GenesisExecutionWithdrawalCredentialsShares: 1,
 	},
 
 	BaseWithdrawalsTestSpec{
 		Name: "test-capella-genesis",
-		Run:  TestCapellaFork,
 		Description: `
 		Sanity test to check the beacon clients can start with capella genesis.
+		All validators start with Execution Withdrawal Credentials,
+		therefore no BLS-To-Execution changes are tested here.
 		`,
 		CapellaGenesis: true,
-	},
-
-	BLSToExecutionChangeTestSpec{
-		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
-			Name: "test-bls-to-execution-changes-on-capella",
-			Description: `
-			Send BLS-To-Execution-Changes after capella fork has happened.
-			`,
-			CapellaGenesis: true,
-		},
-	},
-
-	BLSToExecutionChangeTestSpec{
-		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
-			Name: "test-bls-to-execution-changes-wait-for-capella-fork",
-			Description: `
-			Send BLS-To-Execution-Changes before capella fork has happened,
-			and verify they are included after the fork happens.
-			`,
-			CapellaGenesis: false,
-		},
-	},
-
-	BLSToExecutionChangeTestSpec{
-		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
-			Name: "test-bls-to-execution-changes-on-bellatrix",
-			Description: `
-			Send BLS-To-Execution-Changes before capella fork has happened,
-			and verify they are included after the fork happens.
-			`,
-			CapellaGenesis: false,
-		},
-		SubmitBLSChangesOnBellatrix: true,
+		GenesisExecutionWithdrawalCredentialsShares: 1,
 	},
 
 	BaseWithdrawalsTestSpec{
-		Name: "test-partial-withdrawals-without-bls-to-execution-changes-bellatrix-genesis",
+		Name: "test-bls-to-execution-changes-on-capella",
 		Description: `
-		Test partial withdrawals from accounts that already had the
-		Eth1 withdrawal prefix since before the capella fork.
+		Send BLS-To-Execution-Changes after capella fork has happened.
+		Half of the validators still on BLS withdrawal credentials, and the
+		BLS-To-Execution-Change directives are sent for all the remaining
+		validators.
 		`,
-		Run:                            TestCapellaPartialWithdrawalsWithoutBLSChanges,
-		ValidatorsExtraBalance:         beacon.Gwei(1),
-		ExecutionWithdrawalCredentials: true,
-		CapellaGenesis:                 false,
+		GenesisExecutionWithdrawalCredentialsShares: 2,
+		SubmitBLSChangesOnBellatrix:                 true,
 	},
 
-	FullBLSToExecutionChangeTestSpec{
-		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
-			Name: "test-full-withdrawals-exit-bls-to-execution-changes-bellatrix-genesis",
-			Description: `
+	BaseWithdrawalsTestSpec{
+		Name: "test-full-withdrawals-bls-to-execution-changes-bellatrix-genesis",
+		Description: `
 			Test BLS-To-Execution-Changes to fully exit validators.
 			`,
-			ValidatorCount:                 128,
-			ExecutionWithdrawalCredentials: false,
-			CapellaGenesis:                 false,
-		},
-		ValidatorsExitCount: 32,
-		SlashedValidators:   false,
-	},
-
-	FullBLSToExecutionChangeTestSpec{
-		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
-			Name: "test-full-withdrawals-slashed-bls-to-execution-changes-bellatrix-genesis",
-			Description: `
-			Test BLS-To-Execution-Changes to fully exit validators.
-			`,
-			ValidatorCount:                 128,
-			ExecutionWithdrawalCredentials: false,
-			CapellaGenesis:                 false,
-		},
-		ValidatorsExitCount: 32,
-		SlashedValidators:   true,
-	},
-
-	FullBLSToExecutionChangeTestSpec{
-		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
-			Name: "test-full-withdrawals-exit-bls-to-execution-changes-capella-genesis",
-			Description: `
-			Test BLS-To-Execution-Changes to fully exit validators.
-			`,
-			ValidatorCount:                 128,
-			ExecutionWithdrawalCredentials: false,
-			CapellaGenesis:                 true,
-		},
-		ValidatorsExitCount: 32,
+		GenesisExecutionWithdrawalCredentialsShares: 2,
+		GenesisExitedShares:                         8,
+		GenesisSlashedShares:                        8,
+		CapellaGenesis:                              false,
 	},
 }
 
@@ -172,30 +110,27 @@ func addAllTests(
 	clientCombinations := c.Combinations()
 	for _, test := range tests {
 		test := test
-		// Determine if we have the necessary clients to run
-		if test.CanRun(clientCombinations) {
-			suite.Add(hivesim.TestSpec{
-				Name: fmt.Sprintf(
-					"%s-%s",
-					test.GetName(),
-					strings.Join(clientCombinations.ClientTypes(), "-"),
-				),
-				Description: test.GetDescription(),
-				Run: func(t *hivesim.T) {
-					keys := test.GetValidatorKeys(mnemonic)
-					secrets, err := consensus_config.SecretKeys(keys)
-					if err != nil {
-						panic(err)
-					}
-					env := &testnet.Environment{
-						Clients: c,
-						Keys:    keys,
-						Secrets: secrets,
-					}
-					test.Execute(t, env, clientCombinations)
-				},
+		suite.Add(hivesim.TestSpec{
+			Name: fmt.Sprintf(
+				"%s-%s",
+				test.GetName(),
+				strings.Join(clientCombinations.ClientTypes(), "-"),
+			),
+			Description: test.GetDescription(),
+			Run: func(t *hivesim.T) {
+				keys := test.GetValidatorKeys(mnemonic)
+				secrets, err := consensus_config.SecretKeys(keys)
+				if err != nil {
+					panic(err)
+				}
+				env := &testnet.Environment{
+					Clients: c,
+					Keys:    keys,
+					Secrets: secrets,
+				}
+				test.Execute(t, env, clientCombinations)
 			},
-			)
-		}
+		},
+		)
 	}
 }
