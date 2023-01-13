@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
@@ -16,20 +16,27 @@ type BaseWithdrawalsTestSpec struct {
 	// Spec
 	Name        string
 	Description string
+
 	// Testnet Nodes
 	NodeCount           int
 	ValidatingNodeCount int
+
 	// Beacon Chain
-	ValidatorCount                 uint64
-	ValidatorsExtraBalance         beacon.Gwei
-	ExecutionWithdrawalCredentials bool
-	CapellaGenesis                 bool
-	// Test Function
-	Run func(*hivesim.T, *testnet.Environment, *testnet.Config)
+	ValidatorCount uint64
+	CapellaGenesis bool
+
+	// Genesis Validators Configuration
+	// (One every Nth validator, 1 means all validators, 2 means half, etc...)
+	GenesisExecutionWithdrawalCredentialsShares int
+	GenesisExitedShares                         int
+	GenesisSlashedShares                        int
+
+	// Other Testing Configuration
+	SubmitBLSChangesOnBellatrix bool
 }
 
 var (
-	DEFAULT_VALIDATOR_COUNT uint64 = 64
+	DEFAULT_VALIDATOR_COUNT uint64 = 128
 	DEFAULT_SLOT_TIME       uint64 = 6
 
 	EPOCHS_TO_FINALITY beacon.Epoch = 4
@@ -103,14 +110,6 @@ func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
 	})
 }
 
-func (ts BaseWithdrawalsTestSpec) Execute(
-	t *hivesim.T,
-	env *testnet.Environment,
-	n []clients.NodeDefinition,
-) {
-	ts.Run(t, env, ts.GetTestnetConfig(n))
-}
-
 func (ts BaseWithdrawalsTestSpec) CanRun(clients.NodeDefinitions) bool {
 	// Base test specs can always run
 	return true
@@ -146,13 +145,29 @@ func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 	}
 
 	for index, key := range keys {
-		if ts.ValidatorsExtraBalance > 0 {
-			key.ExtraInitialBalance = ts.ValidatorsExtraBalance
-		}
-		if ts.ExecutionWithdrawalCredentials {
+		// All validators have idiosyncratic balance amounts to identify them
+		key.ExtraInitialBalance = beacon.Gwei(index + 1)
+
+		if ts.GenesisExecutionWithdrawalCredentialsShares > 0 &&
+			(index%ts.GenesisExecutionWithdrawalCredentialsShares) == 0 {
 			key.WithdrawalCredentialType = beacon.ETH1_ADDRESS_WITHDRAWAL_PREFIX
 			key.WithdrawalExecAddress = beacon.Eth1Address{byte(index + 0x100)}
 		}
+		if ts.GenesisExitedShares > 1 && (index%ts.GenesisExitedShares) == 1 {
+			key.Exited = true
+		}
+		if ts.GenesisSlashedShares > 2 &&
+			(index%ts.GenesisSlashedShares) == 2 {
+			key.Slashed = true
+		}
+		fmt.Printf(
+			"INFO: Validator %d, extra_gwei=%d, exited=%v, slashed=%v, key_type=%d\n",
+			index,
+			key.ExtraInitialBalance,
+			key.Exited,
+			key.Slashed,
+			key.WithdrawalCredentialType,
+		)
 	}
 
 	return keys
