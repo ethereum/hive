@@ -2221,7 +2221,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 						defer cancel()
 
-						p := api.BlockToExecutableData(altChainPayloads[i])
+						p := api.BlockToExecutableData(altChainPayloads[i], common.Big0).ExecutionPayload
 						status, err := secondaryClient.NewPayloadV1(ctx, p)
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
@@ -2284,7 +2284,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 				}
 				// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
 				for {
-					r := t.TestEngine.TestEngineNewPayloadV1(api.BlockToExecutableData(altChainPayloads[n]))
+					r := t.TestEngine.TestEngineNewPayloadV1(api.BlockToExecutableData(altChainPayloads[n], common.Big0).ExecutionPayload)
 					t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
 					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 						HeadBlockHash:      altChainPayloads[n].Hash(),
