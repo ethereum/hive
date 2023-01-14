@@ -1196,7 +1196,7 @@ var Tests = []test.Spec{
 
 // Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
 func invalidTerminalBlockForkchoiceUpdated(t *test.Env) {
-	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
+	gblock := t.Genesis.ToBlock()
 
 	forkchoiceState := api.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
@@ -1218,7 +1218,7 @@ func invalidTerminalBlockForkchoiceUpdated(t *test.Env) {
 
 // Invalid GetPayload Under PoW: Client must reject GetPayload directives under PoW.
 func invalidGetPayloadUnderPoW(t *test.Env) {
-	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
+	gblock := t.Genesis.ToBlock()
 	// We start in PoW and try to get an invalid Payload, which should produce an error but nothing should be disrupted.
 	r := t.TestEngine.TestEngineGetPayloadV1(&api.PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
 	r.ExpectError()
@@ -1229,7 +1229,7 @@ func invalidGetPayloadUnderPoW(t *test.Env) {
 
 // Invalid Terminal Block in NewPayload: Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
 func invalidTerminalBlockNewPayload(t *test.Env) {
-	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
+	gblock := t.Genesis.ToBlock()
 
 	// Create a dummy payload to send in the NewPayload call
 	payload := api.ExecutableData{
@@ -1496,7 +1496,7 @@ func preTTDFinalizedBlockHash(t *test.Env) {
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	// Send the Genesis block as forkchoice
-	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
+	gblock := t.Genesis.ToBlock()
 
 	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 		HeadBlockHash:      gblock.Hash(),
@@ -2479,7 +2479,7 @@ func blockStatusFinalizedBlock(t *test.Env) {
 func safeFinalizedCanonicalChain(t *test.Env) {
 	// Wait until this client catches up with latest PoS Block
 	t.CLMock.WaitForTTD()
-	gblock := helper.LoadGenesisBlock(t.ClientFiles["/genesis.json"])
+	gblock := t.Genesis.ToBlock()
 
 	// At the merge we need to have head equal to the last PoW block, and safe/finalized must return error
 	h := t.TestEngine.TestHeaderByNumber(Head)
