@@ -2,6 +2,8 @@
 package suite_withdrawals
 
 import (
+	"encoding/json"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -9,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -18,10 +19,11 @@ import (
 )
 
 var (
-	Head      *big.Int // Nil
-	Pending   = big.NewInt(-2)
-	Finalized = big.NewInt(-3)
-	Safe      = big.NewInt(-4)
+	Head               *big.Int // Nil
+	Pending            = big.NewInt(-2)
+	Finalized          = big.NewInt(-3)
+	Safe               = big.NewInt(-4)
+	InvalidParamsError = -32602
 )
 
 // Execution specification reference:
@@ -275,7 +277,6 @@ var Tests = []test.SpecInterface{
 			WithdrawalsBlockCount:    128,
 			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1024,
-			SkipBaseVerifications:    true, // Otherwise test runs too long
 		},
 		SyncSteps: 1,
 	},
@@ -692,56 +693,71 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 
 		// Genesis should not contain `withdrawalsRoot` either
 		r := t.TestEngine.TestBlockByNumber(nil)
+		r.ExpectationDescription = `
+		Requested "latest" block expecting genesis to contain
+		withdrawalRoot=nil, because genesis.timestamp < shanghaiTime
+		`
 		r.ExpectWithdrawalsRoot(nil)
 	} else {
 		// Genesis is post shanghai, it should contain EmptyWithdrawalsRoot
 		r := t.TestEngine.TestBlockByNumber(nil)
-		r.ExpectWithdrawalsRoot(&types.EmptyRootHash)
+		r.ExpectationDescription = `
+		Requested "latest" block expecting genesis to contain
+		withdrawalRoot=EmptyTrieRoot, because genesis.timestamp >= shanghaiTime
+		`
+		r.ExpectWithdrawalsRoot(helper.EmptyWithdrawalsRootHash)
 	}
 
 	// Produce any blocks necessary to reach withdrawals fork
 	t.CLMock.ProduceBlocks(int(ws.GetPreWithdrawalsBlockCount()), clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
-			// Try to send a ForkchoiceUpdatedV2 with non-null
-			// withdrawals before Shanghai
-			r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
-				&beacon.ForkchoiceStateV1{
-					HeadBlockHash: t.CLMock.LatestHeader.Hash(),
-				},
-				&beacon.PayloadAttributes{
-					Timestamp:             t.CLMock.LatestHeader.Time + 1,
-					Random:                common.Hash{},
-					SuggestedFeeRecipient: common.Address{},
-					Withdrawals:           make(types.Withdrawals, 0),
-				},
-			)
-			r.ExpectError()
+			if !ws.SkipBaseVerifications {
+				// Try to send a ForkchoiceUpdatedV2 with non-null
+				// withdrawals before Shanghai
+				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
+					&beacon.ForkchoiceStateV1{
+						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+					},
+					&beacon.PayloadAttributes{
+						Timestamp:             t.CLMock.LatestHeader.Time + 1,
+						Random:                common.Hash{},
+						SuggestedFeeRecipient: common.Address{},
+						Withdrawals:           make(types.Withdrawals, 0),
+					},
+				)
+				r.ExpectationDescription = "Sent pre-shanghai fcu using EngineForkchoiceUpdatedV2+Withdrawals, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
+			}
 		},
 		OnGetPayload: func() {
-			// Send produced payload but try to include non-nil
-			// `withdrawals`, it should fail.
-			emptyWithdrawalsList := make(types.Withdrawals, 0)
-			payloadPlusWithdrawals, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
-				Withdrawals: emptyWithdrawalsList,
-			})
-			if err != nil {
-				t.Fatalf("Unable to append withdrawals: %v", err)
-			}
-			r := t.TestEngine.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
-			r.ExpectStatus(test.Invalid)
-			if t.CLMock.LatestHeader.Number.Int64() > 0 {
-				// Only do this check when the latest valid payload is
-				// post-genesis, because genesis could be interpreted as a
-				// Proof-of-work block by some clients, which is not an error.
-				expectedLvh := t.CLMock.LatestHeader.Hash()
-				r.ExpectLatestValidHash(&expectedLvh)
+			if !ws.SkipBaseVerifications {
+				// Send produced payload but try to include non-nil
+				// `withdrawals`, it should fail.
+				emptyWithdrawalsList := make(types.Withdrawals, 0)
+				payloadPlusWithdrawals, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+					Withdrawals: emptyWithdrawalsList,
+				})
+				if err != nil {
+					t.Fatalf("Unable to append withdrawals: %v", err)
+				}
+				r := t.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
+				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2+Withdrawals, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
 			}
 		},
 		OnNewPayloadBroadcast: func() {
-			// We sent a pre-shanghai FCU.
-			// Keep expecting `nil` until Shanghai.
-			r := t.TestEngine.TestBlockByNumber(nil)
-			r.ExpectWithdrawalsRoot(nil)
+			if !ws.SkipBaseVerifications {
+				// We sent a pre-shanghai FCU.
+				// Keep expecting `nil` until Shanghai.
+				r := t.TestEngine.TestBlockByNumber(nil)
+				r.ExpectationDescription = fmt.Sprintf(`
+				Requested "latest" block expecting block to contain
+				withdrawalRoot=nil, because (block %d).timestamp < shanghaiTime
+				`,
+					t.CLMock.LatestPayloadBuilt.Number,
+				)
+				r.ExpectWithdrawalsRoot(nil)
+			}
 		},
 	})
 
@@ -775,12 +791,20 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
 					// Test balance at `latest`, which should not yet have the
 					// withdrawal applied.
+					expectedAccountBalance := ws.WithdrawalsHistory.GetExpectedAccountBalance(
+						addr,
+						t.CLMock.LatestExecutedPayload.Number-1)
 					r := t.TestEngine.TestBalanceAt(addr, nil)
-					r.ExpectBalanceEqual(
-						ws.WithdrawalsHistory.GetExpectedAccountBalance(
-							addr,
-							t.CLMock.LatestExecutedPayload.Number-1),
+					r.ExpectationDescription = fmt.Sprintf(`
+						Requested balance for account %s on "latest" block
+						after engine_newPayloadV2, expecting balance to be equal
+						to value on previous block (%d), since the new payload
+						has not yet been applied.
+						`,
+						addr,
+						t.CLMock.LatestExecutedPayload.Number-1,
 					)
+					r.ExpectBalanceEqual(expectedAccountBalance)
 				}
 			}
 		},
@@ -789,9 +813,18 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			// have been applied
 			if !ws.SkipBaseVerifications {
 				for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
-					// Test balance at `latest`, which should not yet have the
+					// Test balance at `latest`, which should have the
 					// withdrawal applied.
 					r := t.TestEngine.TestBalanceAt(addr, nil)
+					r.ExpectationDescription = fmt.Sprintf(`
+						Requested balance for account %s on "latest" block
+						after engine_forkchoiceUpdatedV2, expecting balance to
+						be equal to value on latest payload (%d), since the new payload
+						has not yet been applied.
+						`,
+						addr,
+						t.CLMock.LatestExecutedPayload.Number,
+					)
 					r.ExpectBalanceEqual(
 						ws.WithdrawalsHistory.GetExpectedAccountBalance(
 							addr,
@@ -800,10 +833,16 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				}
 				// Check the correct withdrawal root on `latest` block
 				r := t.TestEngine.TestBlockByNumber(nil)
-				expectedWithdrawalsRoot := types.DeriveSha(
-					ws.WithdrawalsHistory.GetWithdrawals(t.CLMock.LatestExecutedPayload.Number),
-					trie.NewStackTrie(nil),
+				expectedWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
+					ws.WithdrawalsHistory.GetWithdrawals(
+						t.CLMock.LatestExecutedPayload.Number,
+					),
 				)
+				jsWithdrawals, _ := json.MarshalIndent(ws.WithdrawalsHistory.GetWithdrawals(t.CLMock.LatestExecutedPayload.Number), "", " ")
+				r.ExpectationDescription = fmt.Sprintf(`
+						Requested "latest" block after engine_forkchoiceUpdatedV2,
+						to verify withdrawalsRoot with the following withdrawals:
+						%s`, jsWithdrawals)
 				r.ExpectWithdrawalsRoot(&expectedWithdrawalsRoot)
 			}
 		},
@@ -820,13 +859,17 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
 			var expectedWithdrawalsRoot *common.Hash = nil
 			if block >= ws.WithdrawalsForkHeight {
-				calcWithdrawalsRoot := types.DeriveSha(
+				calcWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
 					ws.WithdrawalsHistory.GetWithdrawals(block),
-					trie.NewStackTrie(nil),
 				)
 				expectedWithdrawalsRoot = &calcWithdrawalsRoot
 			}
-			t.Logf("INFO (%s): Verifying withdrawals root on block %d (%s) to be %s", t.TestName, block, t.CLMock.ExecutedPayloadHistory[block].BlockHash, expectedWithdrawalsRoot)
+			jsWithdrawals, _ := json.MarshalIndent(ws.WithdrawalsHistory.GetWithdrawals(block), "", " ")
+			r.ExpectationDescription = fmt.Sprintf(`
+						Requested block %d to verify withdrawalsRoot with the
+						following withdrawals:
+						%s`, block, jsWithdrawals)
+
 			r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
 
 		}
@@ -846,7 +889,8 @@ type WithdrawalsSyncSpec struct {
 }
 
 func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
-	// Do the base withdrawal test first
+	// Do the base withdrawal test first, skipping base verifications
+	ws.WithdrawalsBaseSpec.SkipBaseVerifications = true
 	ws.WithdrawalsBaseSpec.Execute(t)
 
 	// Spawn a secondary client which will need to sync to the primary client
