@@ -388,7 +388,7 @@ func ComputeBLSToExecutionDomain(
 ) beacon.BLSDomain {
 	return beacon.ComputeDomain(
 		beacon.DOMAIN_BLS_TO_EXECUTION_CHANGE,
-		t.Spec().CAPELLA_FORK_VERSION, // TODO: CHANGE TO GENESIS
+		t.Spec().GENESIS_FORK_VERSION,
 		t.GenesisValidatorsRoot(),
 	)
 }
