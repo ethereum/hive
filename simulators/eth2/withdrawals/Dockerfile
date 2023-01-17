@@ -3,7 +3,6 @@ FROM golang:1-alpine AS builder
 RUN apk --no-cache add gcc musl-dev linux-headers cmake make clang build-base clang-static clang-dev
 
 # Prepare workspace
-ADD ./eth2api /source/eth2api
 ADD ./withdrawals/hive.go.work /source/go.work
 ADD ./common /source/common
 ADD ./withdrawals /source/withdrawals
