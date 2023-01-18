@@ -19,8 +19,13 @@ document.
   <details>
   <summary>Click for details</summary>
   
-  - Start two validating nodes that start on Bellatrix/Merge genesis and transition to Capella/Shanghai on Epoch 1
-  - Verify that both nodes reach finality and produce execution blocks after transition
+  - Start two validating nodes that begin on Bellatrix/Merge genesis
+  - Capella/Shanghai transition occurs on Epoch 1
+  - Total of 128 Validators, 64 for each validating node
+  - All validators contain 0x01 withdrawal credentials
+  - Wait for Capella fork + `128 / MAX_WITHDRAWALS_PER_PAYLOAD` slots
+  - Verify on the execution client:
+    - All active validators' balances increase
   
   </details>
 
@@ -30,8 +35,12 @@ document.
   <details>
   <summary>Click for details</summary>
   
-  - Start two validating nodes that start on Capella/Shanghai genesis
-  - Verify that both nodes progress the chain and produce execution blocks after genesis
+  - Start two validating nodes that begin on Capella genesis
+  - Total of 128 Validators, 64 for each validating node
+  - All validators contain 0x01 withdrawal credentials
+  - Wait `128 / MAX_WITHDRAWALS_PER_PAYLOAD` slots
+  - Verify on the execution client:
+    - All active validators' balances increase
   
   </details>
 
@@ -41,34 +50,46 @@ document.
   <details>
   <summary>Click for details</summary>
   
-  - Start two validating nodes on either Capella/Shanghai or Bellatrix/Merge genesis (Depending on test case)
-  - All genesis validators have BLS withdrawal credentials
-  - Sign and submit BLS-To-Execution-Changes of all validators to change withdrawal credentials to different execution addresses
-  - Verify on the beacon state that withdrawal credentials are updated
-  - Verify on the execution client that all validators partially withdraw (Balances above 1 gwei)
+  - Start two validating nodes on Bellatrix/Merge genesis
+  - Capella/Shanghai transition occurs on Epoch 1
+  - Half genesis validators have BLS withdrawal credentials
+  - If any of the clients supports receiving BLS-To-Execution-Changes during Bellatrix, sign and submit half of the BLS validators during the first epoch.
+  - Wait for Capella fork
+  - Submit the remaining BLS-To-Execution-Changes to all nodes
+  - Wait and verify on the beacon state that withdrawal credentials are updated
+  - Verify on the execution client:
+    - All active validators' balances increase
 
-  * [x] Test on Capella/Shanghai genesis
   * [x] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes before transition to Capella/Shanghai
   * [x] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes after transition to Capella/Shanghai
 
   </details>
 
-* [ ] BLS-To-Execution-Changes of Exited/Slashed Validators
+* [x] BLS-To-Execution-Changes of Exited/Slashed Validators
   <details>
   <summary>Click for details</summary>
   
   - Start two validating nodes on Bellatrix/Merge genesis
-  - Genesis must contain at least 128 validators
-  - All genesis validators have BLS withdrawal credentials
   - Capella/Shanghai transition occurs on Epoch 1
-  - During Epoch 0 of the Beacon Chain:
-    [ ] Slash 32 validators
-    [x] Exit 32 validators
-  - Sign and submit BLS-To-Execution-Changes of all validators to change withdrawal credentials to different execution addresses
+  - Total of 128 Validators, 64 for each validating node
+  - Half genesis validators have BLS withdrawal credentials
+  - 1 every 8 validators start on Voluntary Exit state
+  - 1 every 8 validators start on Slashed state
+  - If any of the clients supports receiving BLS-To-Execution-Changes during Bellatrix, sign and submit half of the BLS validators during the first epoch.
+  - Wait for Capella fork
+  - Submit the remaining BLS-To-Execution-Changes to all nodes
+  - Wait and verify on the beacon state that withdrawal credentials are updated
   - Verify on the beacon state:
     - Withdrawal credentials are updated
-    - Validators' balances drop to zero
-  - Verify on the execution client that exited/slashed validators fully withdraw 
+    - Fully exited validators' balances drop to zero
+  - Verify on the execution client:
+    - All active validators' balances increase
+    - Fully exited validators' balances are equal to the full withdrawn amount
+
+  * [x] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes before transition to Capella/Shanghai
+  * [x] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes after transition to Capella/Shanghai
+
+  
 
   </details>
 
@@ -76,47 +97,17 @@ document.
   <details>
   <summary>Click for details</summary>
   
-  - Start two validating nodes and one importer node on either Capella/Shanghai or Bellatrix/Merge genesis (Depending on test case)
+  - Start two validating nodes and one importer node on Capella/Shanghai genesis
   - All genesis validators have BLS withdrawal credentials
   - Sign and submit BLS-To-Execution-Changes to the importer node of all validators to change withdrawal credentials to different execution addresses
-  - Verify on the beacon state that withdrawal credentials are updated
-  - Verify on the execution client that all validators partially withdraw (Balances above 1 gwei)
+  - Wait until the importer node broadcasts the BLS-To-Execution-Changes
+  - Verify on the beacon state:
+    - Withdrawal credentials are updated
+  - Verify on the execution client:
+    - All active validators' balances increase
 
-  * [ ] Test on Capella/Shanghai genesis
   * [ ] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes before transition to Capella/Shanghai
   * [ ] Test on Bellatrix/Merge genesis, submit BLS-To-Execution-Changes after transition to Capella/Shanghai
-
-  </details>
-
-### Full Withdrawals
-
-* [ ] Full Withdrawal of Exited/Slashed Validators
-  <details>
-  <summary>Click for details</summary>
-  
-  - Start two validating nodes on Capella/Shanghai genesis
-  - Genesis must contain at least 128 validators
-  - All genesis validators have Execution Address credentials
-  - During Epoch 0 of the Beacon Chain:
-    - Slash 32 validators
-    - Exit 32 validators
-  - Verify on the beacon state:
-    - Validators' balances drop to zero immediatelly on exit/slash (consider max withdrawals per payload)
-  - Verify on the execution client that exited/slashed validators fully withdraw 
-
-  </details>
-
-### Partial Withdrawals
-
-* [ ] Partial Withdrawal of Validators
-  <details>
-  <summary>Click for details</summary>
-  
-  - Start two validating nodes on Capella/Shanghai genesis
-  - All genesis validators have Execution Address credentials
-  - Verify on the beacon state:
-    - Withdrawal credentials match the expected execution addresses
-  - Verify on the execution client that validators are partially withdrawing 
 
   </details>
 
@@ -128,9 +119,12 @@ document.
   
   - Start three validating nodes on Capella/Shanghai genesis
   - Two nodes, `A` and `B`, are connected to each other, and one node `C` is disconnected from the others
+  - Total of 128 Validators, 42 for each validating node
   - All genesis validators have BLS withdrawal credentials
   - On Epoch 0, submit BLS-To-Execution changes to node `C` of all the validating keys contained in this same node
-  - Verify that the BLS-To-Execution changes eventually happen on the chain that is being consutructed by this node. Also verify the partial withdrawals on the execution chain
+  - Verify that:
+    - BLS-To-Execution changes are included in node `C` chain
+    - Partial withdrawals on node `C` execution client
   - Submit BLS-To-Execution changes to nodes `A` and `B` of all the validating keys contained in node `C`, but the execution addresses must differ of the ones originally submitted to node `C`
   - Connect node `C` to nodes `A` and `B`
   - Wait until node `C` re-orgs to chain formed by nodes `A` and `B`
@@ -148,11 +142,14 @@ document.
   
   - Start three validating nodes on Capella/Shanghai genesis
   - Two nodes, `A` and `B`, are connected to each other, and one node `C` is disconnected from the others
-  - Genesis must contain at least 128 validators
+  - Total of 128 Validators, 42 for each validating node
   - All genesis validators have BLS withdrawal credentials
-  - On Epoch 0, submit voluntary exits of 10 validators from each node to all nodes
-  - On Epoch 0, submit BLS-To-Execution changes to node `C` of all the exited validating keys
-  - Verify that the BLS-To-Execution changes eventually happen on the chain that is being consutructed by this node. Also verify the full and partial withdrawals on the execution chain
+  - 1 every 8 validators start on Voluntary Exit state
+  - 1 every 8 validators start on Slashed state
+  - On Epoch 0, submit BLS-To-Execution changes to node `C` of all the inactive validating keys
+  - Verify that:
+    - BLS-To-Execution changes are included in node `C` chain
+    - Full withdrawals on node `C` execution client
   - Submit BLS-To-Execution changes to nodes `A` and `B` of all the exited validating keys, but the execution addresses must differ of the ones originally submitted to node `C`
   - Connect node `C` to nodes `A` and `B`
   - Wait until node `C` re-orgs to chain formed by nodes `A` and `B`
