@@ -1,4 +1,4 @@
-ARG branch=withdrawals
+ARG branch=withdrawals_yolo
 FROM nethermindeth/nethermind:$branch
 
 RUN apt-get update && apt-get install -y wget
