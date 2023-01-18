@@ -456,3 +456,6 @@ Invalid token error is expected.
 - Positive time drift, within limit, correct secret:  
 Engine API call where the `iat` claim contains a positive time drift smaller than the maximum threshold, and the secret to calculate the token is correct.
 No error is expected.
+
+## Engine API Shanghai Upgrade Tests:
+See [withdrawals](suites/withdrawals/README.md).
