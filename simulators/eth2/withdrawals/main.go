@@ -39,6 +39,7 @@ var tests = []TestSpec{
 		All validators start with Execution Withdrawal Credentials,
 		therefore no BLS-To-Execution changes are tested here.
 		`,
+		CapellaGenesis: false,
 		GenesisExecutionWithdrawalCredentialsShares: 1,
 	},
 
@@ -61,6 +62,7 @@ var tests = []TestSpec{
 		BLS-To-Execution-Change directives are sent for all the remaining
 		validators.
 		`,
+		CapellaGenesis: false,
 		GenesisExecutionWithdrawalCredentialsShares: 2,
 		SubmitBLSChangesOnBellatrix:                 true,
 	},
@@ -70,10 +72,10 @@ var tests = []TestSpec{
 		Description: `
 			Test BLS-To-Execution-Changes to fully exit validators.
 			`,
+		CapellaGenesis: false,
 		GenesisExecutionWithdrawalCredentialsShares: 2,
 		GenesisExitedShares:                         8,
 		GenesisSlashedShares:                        8,
-		CapellaGenesis:                              false,
 	},
 }
 
