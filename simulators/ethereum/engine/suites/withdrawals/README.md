@@ -61,6 +61,7 @@ This test suite verifies behavior of the Engine API on each client after the Sha
   - Wait for sync and verify that `engine_newPayload` and `engine_forkchoiceUpdated` return `INVALID` for Block 2.
 
 ## Shanghai Fork Re-Org Tests
+
 - Shanghai Fork on Block 1 - 16 Post-Fork Blocks - 1 Block Re-Org via NewPayload:
   - Spawn a two clients `A` and `B`
   - Go through Shanghai fork on Block 1
@@ -69,8 +70,78 @@ This test suite verifies behavior of the Engine API on each client after the Sha
   - Produce a side chain `B` block 16 on client `B`, withdrawing to different 16 accounts
   - Send `NewPayload(B[16])+FcU(B[16])` to client `A`
   - Verify the re-org was correctly applied along with the withdrawal balances.
-- Withdrawals Fork on Block 1 - 8 Block Re-Org NewPayload
 
+- Shanghai Fork on Block 1 - 8 Block Re-Org NewPayload
+  - Spawn a two clients `A` and `B`
+  - Go through Shanghai fork on Block 1
+  - Produce 8 blocks on both clients `A` and `B`, withdrawing to 16 accounts each block
+  - Produce canonical chain `A` blocks 9-16 on client `A`, withdrawing to the same 16 accounts
+  - Produce side chain `B` blocks 9-16 on client `B`, withdrawing to different 16 accounts
+  - Send `NewPayload(B[9])+FcU(B[9])..NewPayload(B[16])+FcU(B[16])` to client `A`
+  - Verify the re-org was correctly applied along with the withdrawal balances.
+
+- Shanghai Fork on Block 1 - 8 Block Re-Org Sync
+  - Spawn a two clients `A` and `B`
+  - Go through Shanghai fork on Block 1
+  - Produce 8 blocks on both clients `A` and `B`, withdrawing to 16 accounts each block
+  - Produce canonical chain `A` blocks 9-16 on client `A`, withdrawing to the same 16 accounts
+  - Produce side chain `B` blocks 9-16 on client `B`, withdrawing to different 16 accounts
+  - Send `NewPayload(B[16])+FcU(B[16])` to client `A`
+  - Verify client `A` syncs side chain blocks from client `B` re-org was correctly applied along with the withdrawal balances.
+
+- Shanghai Fork on Block 8 - 10 Block Re-Org NewPayload
+  - Spawn a two clients `A` and `B`
+  - Produce 6 blocks on both clients `A` and `B`
+  - Produce canonical chain `A` blocks 7-16 on client `A`
+  - Produce side chain `B` blocks 7-16 on client `B`
+  - Shanghai fork occurs on blocks `A[8]` and `B[8]`
+  - Send `NewPayload(B[7])+FcU(B[7])..NewPayload(B[16])+FcU(B[16])` to client `A`
+  - Verify the re-org was correctly applied along with the withdrawal balances.
+
+- Shanghai Fork on Block 8 - 10 Block Re-Org Sync
+  - Spawn a two clients `A` and `B`
+  - Produce 6 blocks on both clients `A` and `B`
+  - Produce canonical chain `A` blocks 7-16 on client `A`
+  - Produce side chain `B` blocks 7-16 on client `B`
+  - Shanghai fork occurs on blocks `A[8]` and `B[8]`
+  - Send `NewPayload(B[16])+FcU(B[16])` to client `A`
+  - Verify client `A` syncs side chain blocks from client `B` re-org was correctly applied along with the withdrawal balances.
+
+- Shanghai Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org NewPayload
+  - Spawn a two clients `A` and `B`
+  - Produce 6 blocks on both clients `A` and `B`
+  - Produce canonical chain `A` blocks 7-16 on client `A` with timestamp increments of 1.
+  - Produce side chain `B` blocks 7-16 on client `B` with timestamp increments of 2
+  - Shanghai fork occurs on blocks `A[8]` and `B[7]`
+  - Send `NewPayload(B[7])+FcU(B[7])..NewPayload(B[16])+FcU(B[16])` to client `A`
+  - Verify the re-org was correctly applied along with the withdrawal balances.
+
+- Shanghai Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org Sync
+  - Spawn a two clients `A` and `B`
+  - Produce 6 blocks on both clients `A` and `B`
+  - Produce canonical chain `A` blocks 7-16 on client `A` with timestamp increments of 1.
+  - Produce side chain `B` blocks 7-16 on client `B` with timestamp increments of 2
+  - Shanghai fork occurs on blocks `A[8]` and `B[7]`
+  - Send `NewPayload(B[16])+FcU(B[16])` to client `A`
+  - Verify client `A` syncs side chain blocks from client `B` re-org was correctly applied along with the withdrawal balances.
+
+- Shanghai Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org NewPayload
+  - Spawn a two clients `A` and `B`
+  - Produce 6 blocks on both clients `A` and `B`, with timestamp increments of 2
+  - Produce canonical chain `A` blocks 7-16 on client `A` with timestamp increments of 2.
+  - Produce side chain `B` blocks 7-16 on client `B` with timestamp increments of 1
+  - Shanghai fork occurs on blocks `A[8]` and `B[9]`
+  - Send `NewPayload(B[7])+FcU(B[7])..NewPayload(B[16])+FcU(B[16])` to client `A`
+  - Verify the re-org was correctly applied along with the withdrawal balances.
+
+- Shanghai Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org Sync
+  - Spawn a two clients `A` and `B`
+  - Produce 6 blocks on both clients `A` and `B`, with timestamp increments of 2
+  - Produce canonical chain `A` blocks 7-16 on client `A` with timestamp increments of 2.
+  - Produce side chain `B` blocks 7-16 on client `B` with timestamp increments of 1
+  - Shanghai fork occurs on blocks `A[8]` and `B[9]`
+  - Send `NewPayload(B[16])+FcU(B[16])` to client `A`
+  - Verify client `A` syncs side chain blocks from client `B` re-org was correctly applied along with the withdrawal balances.
 
 ## Max Initcode Tests
 - [NOT IMPLEMENTED] Transactions exceeding max initcode should be immediately rejected:
