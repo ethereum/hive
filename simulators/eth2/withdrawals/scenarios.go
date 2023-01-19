@@ -180,11 +180,12 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 	}
 
 	// Wait for all validators to withdraw
-	slotsForAllPartialWithdrawals := beacon.Slot(
-		len(validators) / int(testnet.Spec().MAX_WITHDRAWALS_PER_PAYLOAD),
+	waitSlotsForAllWithdrawals := beacon.Slot(
+		(len(validators)/int(testnet.Spec().MAX_WITHDRAWALS_PER_PAYLOAD) +
+			5), // Wiggle room
 	)
 	slotCtx, cancel := testnet.Spec().
-		SlotTimeoutContext(ctx, slotsForAllPartialWithdrawals+5+(beacon.Slot(config.CapellaForkEpoch.Uint64())*testnet.Spec().SLOTS_PER_EPOCH))
+		SlotTimeoutContext(ctx, waitSlotsForAllWithdrawals)
 	defer cancel()
 loop:
 	for {
