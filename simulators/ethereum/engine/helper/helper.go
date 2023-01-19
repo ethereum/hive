@@ -32,10 +32,14 @@ import (
 // From ethereum/rpc:
 
 // LoggingRoundTrip writes requests and responses to the test log.
+type LogF interface {
+	Logf(format string, values ...interface{})
+}
+
 type LoggingRoundTrip struct {
-	T     *hivesim.T
-	Hc    *hivesim.Client
-	Inner http.RoundTripper
+	Logger LogF
+	ID     string
+	Inner  http.RoundTripper
 }
 
 func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -45,7 +49,7 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	rt.T.Logf(">> (%s) %s", rt.Hc.Container, bytes.TrimSpace(reqBytes))
+	rt.Logger.Logf(">> (%s) %s", rt.ID, bytes.TrimSpace(reqBytes))
 	reqCopy := *req
 	reqCopy.Body = ioutil.NopCloser(bytes.NewReader(reqBytes))
 
@@ -63,33 +67,34 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	respCopy := *resp
 	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
-	rt.T.Logf("<< (%s) %s", rt.Hc.Container, bytes.TrimSpace(respBytes))
+	rt.Logger.Logf("<< (%s) %s", rt.ID, bytes.TrimSpace(respBytes))
 	return &respCopy, nil
 }
 
 type InvalidPayloadBlockField string
 
 const (
-	InvalidParentHash             InvalidPayloadBlockField = "ParentHash"
-	InvalidStateRoot                                       = "StateRoot"
-	InvalidReceiptsRoot                                    = "ReceiptsRoot"
-	InvalidNumber                                          = "Number"
-	InvalidGasLimit                                        = "GasLimit"
-	InvalidGasUsed                                         = "GasUsed"
-	InvalidTimestamp                                       = "Timestamp"
-	InvalidPrevRandao                                      = "PrevRandao"
-	InvalidOmmers                                          = "Ommers"
-	RemoveTransaction                                      = "Incomplete Transactions"
-	InvalidTransactionSignature                            = "Transaction Signature"
-	InvalidTransactionNonce                                = "Transaction Nonce"
-	InvalidTransactionGas                                  = "Transaction Gas"
-	InvalidTransactionGasPrice                             = "Transaction GasPrice"
-	InvalidTransactionGasTipPrice                          = "Transaction GasTipCapPrice"
-	InvalidTransactionValue                                = "Transaction Value"
-	InvalidTransactionChainID                              = "Transaction ChainID"
+	InvalidParentHash             = "ParentHash"
+	InvalidStateRoot              = "StateRoot"
+	InvalidReceiptsRoot           = "ReceiptsRoot"
+	InvalidNumber                 = "Number"
+	InvalidGasLimit               = "GasLimit"
+	InvalidGasUsed                = "GasUsed"
+	InvalidTimestamp              = "Timestamp"
+	InvalidPrevRandao             = "PrevRandao"
+	InvalidOmmers                 = "Ommers"
+	InvalidWithdrawals            = "Withdrawals"
+	RemoveTransaction             = "Incomplete Transactions"
+	InvalidTransactionSignature   = "Transaction Signature"
+	InvalidTransactionNonce       = "Transaction Nonce"
+	InvalidTransactionGas         = "Transaction Gas"
+	InvalidTransactionGasPrice    = "Transaction GasPrice"
+	InvalidTransactionGasTipPrice = "Transaction GasTipCapPrice"
+	InvalidTransactionValue       = "Transaction Value"
+	InvalidTransactionChainID     = "Transaction ChainID"
 )
 
-func TransactionInPayload(payload *api.ExecutableDataV1, tx *types.Transaction) bool {
+func TransactionInPayload(payload *api.ExecutableData, tx *types.Transaction) bool {
 	for _, bytesTx := range payload.Transactions {
 		var currentTx types.Transaction
 		if err := currentTx.UnmarshalBinary(bytesTx); err == nil {
@@ -144,16 +149,16 @@ func gethDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx *type
 	for i, l := range er.StructLogs {
 		if l.Op == "DIFFICULTY" || l.Op == "PREVRANDAO" {
 			if i+1 >= len(er.StructLogs) {
-				return errors.New(fmt.Sprintf("No information after PREVRANDAO operation"))
+				return errors.New("no information after PREVRANDAO operation")
 			}
 			prevRandaoFound = true
 			stack := *(er.StructLogs[i+1].Stack)
 			if len(stack) < 1 {
-				return errors.New(fmt.Sprintf("Invalid stack after PREVRANDAO operation: %v", l.Stack))
+				return fmt.Errorf("invalid stack after PREVRANDAO operation: %v", l.Stack)
 			}
 			stackHash := common.HexToHash(stack[0])
 			if stackHash != *expectedPrevRandao {
-				return errors.New(fmt.Sprintf("Invalid stack after PREVRANDAO operation, %v != %v", stackHash, expectedPrevRandao))
+				return fmt.Errorf("invalid stack after PREVRANDAO operation, %v != %v", stackHash, expectedPrevRandao)
 			}
 		}
 	}
@@ -169,6 +174,12 @@ func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx
 		return err
 	}
 	return nil
+}
+
+func bytesSource(data []byte) func() (io.ReadCloser, error) {
+	return func() (io.ReadCloser, error) {
+		return ioutil.NopCloser(bytes.NewReader(data)), nil
+	}
 }
 
 func LoadChain(path string) types.Blocks {
@@ -210,6 +221,14 @@ func LoadGenesisBlock(path string) *types.Block {
 	return genesis.ToBlock()
 }
 
+func GenesisStartOption(genesis *core.Genesis) (hivesim.StartOption, error) {
+	out, err := json.Marshal(genesis)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
+	}
+	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
+}
+
 func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
 	result := new(big.Int).Set(genesis.Difficulty)
 	for _, b := range chain {
@@ -222,8 +241,7 @@ func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBloc
 }
 
 // TTD is the value specified in the test.Spec + Genesis.Difficulty
-func CalculateRealTTD(genesisPath string, ttdValue int64) int64 {
-	g := LoadGenesis(genesisPath)
+func CalculateRealTTD(g *core.Genesis, ttdValue int64) int64 {
 	return g.Difficulty.Int64() + ttdValue
 }
 
@@ -285,7 +303,7 @@ func WaitForTTDWithTimeout(ec client.EngineClient, ctx context.Context) error {
 				return nil
 			}
 		case <-ctx.Done():
-			return fmt.Errorf("Timeout reached")
+			return fmt.Errorf("timeout reached")
 		}
 	}
 }
@@ -385,6 +403,9 @@ func SendNextTransaction(testCtx context.Context, node client.EngineClient, reci
 		return nil, err
 	}
 	tx, err := MakeTransaction(nonce, &recipient, 75000, amount, payload, txType)
+	if err != nil {
+		return nil, err
+	}
 	for {
 		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
 		defer cancel()

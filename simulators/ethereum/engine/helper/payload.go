@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 )
 
@@ -28,11 +29,12 @@ type CustomPayloadData struct {
 	BaseFeePerGas *big.Int
 	BlockHash     *common.Hash
 	Transactions  *[][]byte
+	Withdrawals   types.Withdrawals
 }
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
 // BlockHash is calculated automatically.
-func CustomizePayload(basePayload *api.ExecutableDataV1, customData *CustomPayloadData) (*api.ExecutableDataV1, error) {
+func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayloadData) (*api.ExecutableData, error) {
 	txs := basePayload.Transactions
 	if customData.Transactions != nil {
 		txs = *customData.Transactions
@@ -61,7 +63,6 @@ func CustomizePayload(basePayload *api.ExecutableDataV1, customData *CustomPaylo
 		Nonce:       types.BlockNonce{0}, // could be overwritten
 		BaseFee:     basePayload.BaseFeePerGas,
 	}
-
 	// Overwrite custom information
 	if customData.ParentHash != nil {
 		customPayloadHeader.ParentHash = *customData.ParentHash
@@ -99,9 +100,16 @@ func CustomizePayload(basePayload *api.ExecutableDataV1, customData *CustomPaylo
 	if customData.BaseFeePerGas != nil {
 		customPayloadHeader.BaseFee = customData.BaseFeePerGas
 	}
+	if customData.Withdrawals != nil {
+		h := types.DeriveSha(customData.Withdrawals, trie.NewStackTrie(nil))
+		customPayloadHeader.WithdrawalsHash = &h
+	} else if basePayload.Withdrawals != nil {
+		h := types.DeriveSha(types.Withdrawals(basePayload.Withdrawals), trie.NewStackTrie(nil))
+		customPayloadHeader.WithdrawalsHash = &h
+	}
 
 	// Return the new payload
-	return &api.ExecutableDataV1{
+	result := &api.ExecutableData{
 		ParentHash:    customPayloadHeader.ParentHash,
 		FeeRecipient:  customPayloadHeader.Coinbase,
 		StateRoot:     customPayloadHeader.Root,
@@ -116,7 +124,13 @@ func CustomizePayload(basePayload *api.ExecutableDataV1, customData *CustomPaylo
 		BaseFeePerGas: customPayloadHeader.BaseFee,
 		BlockHash:     customPayloadHeader.Hash(),
 		Transactions:  txs,
-	}, nil
+	}
+	if customData.Withdrawals != nil {
+		result.Withdrawals = customData.Withdrawals
+	} else if basePayload.Withdrawals != nil {
+		result.Withdrawals = basePayload.Withdrawals
+	}
+	return result, nil
 }
 
 func (customData *CustomPayloadData) String() string {
@@ -160,12 +174,15 @@ func (customData *CustomPayloadData) String() string {
 	if customData.Transactions != nil {
 		customFieldsList = append(customFieldsList, fmt.Sprintf("Transactions=%v", customData.Transactions))
 	}
+	if customData.Withdrawals != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("Withdrawals=%v", customData.Withdrawals))
+	}
 	return strings.Join(customFieldsList, ", ")
 }
 
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
 // One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
-func GenerateInvalidPayload(basePayload *api.ExecutableDataV1, payloadField InvalidPayloadBlockField) (*api.ExecutableDataV1, error) {
+func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField InvalidPayloadBlockField) (*api.ExecutableData, error) {
 
 	var customPayloadMod *CustomPayloadData
 	switch payloadField {

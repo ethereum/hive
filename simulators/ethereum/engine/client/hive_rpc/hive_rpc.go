@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/go-ethereum/core"
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -34,7 +35,7 @@ type HiveRPCEngineStarter struct {
 	JWTSecret               []byte
 }
 
-func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
 	var (
 		clientType = s.ClientType
 		enginePort = s.EnginePort
@@ -45,10 +46,10 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 	if clientType == "" {
 		cs, err := T.Sim.ClientTypes()
 		if err != nil {
-			return nil, fmt.Errorf("Client type was not supplied and simulator returned error on trying to get all client types: %v", err)
+			return nil, fmt.Errorf("client type was not supplied and simulator returned error on trying to get all client types: %v", err)
 		}
-		if cs == nil || len(cs) == 0 {
-			return nil, fmt.Errorf("Client type was not supplied and simulator returned empty client types: %v", cs)
+		if len(cs) == 0 {
+			return nil, fmt.Errorf("client type was not supplied and simulator returned empty client types: %v", cs)
 		}
 		clientType = cs[0].Name
 	}
@@ -64,24 +65,21 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 	if s.ChainFile != "" {
 		ClientFiles = ClientFiles.Set("/chain.rlp", "./chains/"+s.ChainFile)
 	}
-	if _, ok := ClientFiles["/genesis.json"]; !ok {
-		return nil, fmt.Errorf("Cannot start without genesis file")
-	}
 	if ttd == nil {
 		if ttdStr, ok := ClientParams["HIVE_TERMINAL_TOTAL_DIFFICULTY"]; ok {
 			// Retrieve TTD from parameters
 			ttd, ok = new(big.Int).SetString(ttdStr, 10)
 			if !ok {
-				return nil, fmt.Errorf("Unable to parse TTD from parameters")
+				return nil, fmt.Errorf("unable to parse TTD from parameters")
 			}
 		}
 	} else {
 		// Real TTD must be calculated adding the genesis difficulty
-		ttdInt := helper.CalculateRealTTD(ClientFiles["/genesis.json"], ttd.Int64())
+		ttdInt := helper.CalculateRealTTD(genesis, ttd.Int64())
 		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttdInt))
 		ttd = big.NewInt(ttdInt)
 	}
-	if bootClients != nil && len(bootClients) > 0 {
+	if len(bootClients) > 0 {
 		var (
 			enodes = make([]string, len(bootClients))
 			err    error
@@ -89,7 +87,7 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		for i, bootClient := range bootClients {
 			enodes[i], err = bootClient.EnodeURL()
 			if err != nil {
-				return nil, fmt.Errorf("Unable to obtain bootnode: %v", err)
+				return nil, fmt.Errorf("unable to obtain bootnode: %v", err)
 			}
 		}
 		enodeString := strings.Join(enodes, ",")
@@ -97,14 +95,18 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 	}
 
 	// Start the client and create the engine client object
-	c := T.StartClient(clientType, ClientParams, hivesim.WithStaticFiles(ClientFiles))
+	genesisStart, err := helper.GenesisStartOption(genesis)
+	if err != nil {
+		return nil, err
+	}
+	c := T.StartClient(clientType, genesisStart, ClientParams, hivesim.WithStaticFiles(ClientFiles))
 	if err := CheckEthEngineLive(c); err != nil {
 		return nil, fmt.Errorf("Engine/Eth ports were never open for client: %v", err)
 	}
 	ec := NewHiveRPCEngineClient(c, enginePort, ethPort, jwtSecret, ttd, &helper.LoggingRoundTrip{
-		T:     T,
-		Hc:    c,
-		Inner: http.DefaultTransport,
+		Logger: T,
+		ID:     c.Container,
+		Inner:  http.DefaultTransport,
 	})
 	return ec, nil
 }
@@ -152,10 +154,10 @@ type HiveRPCEngineClient struct {
 
 	// Engine updates info
 	latestFcUStateSent *api.ForkchoiceStateV1
-	latestPAttrSent    *api.PayloadAttributesV1
+	latestPAttrSent    *api.PayloadAttributes
 	latestFcUResponse  *api.ForkChoiceResponse
 
-	latestPayloadSent          *api.ExecutableDataV1
+	latestPayloadSent          *api.ExecutableData
 	latestPayloadStatusReponse *api.PayloadStatusV1
 
 	// Test account nonces
@@ -164,23 +166,25 @@ type HiveRPCEngineClient struct {
 
 // NewClient creates a engine client that uses the given RPC client.
 func NewHiveRPCEngineClient(h *hivesim.Client, enginePort int, ethPort int, jwtSecretBytes []byte, ttd *big.Int, transport http.RoundTripper) *HiveRPCEngineClient {
-	client := &http.Client{
-		Transport: transport,
-	}
 	// Prepare HTTP Client
-	rpcHttpClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%s:%d/", h.IP, enginePort), client)
+	httpClient := rpc.WithHTTPClient(&http.Client{Transport: transport})
+
+	engineRpcClient, err := rpc.DialOptions(context.Background(), fmt.Sprintf("http://%s:%d/", h.IP, enginePort), httpClient)
+	if err != nil {
+		panic(err)
+	}
 
 	// Prepare ETH Client
-	client = &http.Client{
-		Transport: transport,
+	ethRpcClient, err := rpc.DialOptions(context.Background(), fmt.Sprintf("http://%s:%d/", h.IP, ethPort), httpClient)
+	if err != nil {
+		panic(err)
 	}
-	rpcClient, _ := rpc.DialHTTPWithClient(fmt.Sprintf("http://%s:%d/", h.IP, ethPort), client)
-	eth := ethclient.NewClient(rpcClient)
+	eth := ethclient.NewClient(ethRpcClient)
 	return &HiveRPCEngineClient{
 		h:              h,
-		c:              rpcHttpClient,
+		c:              engineRpcClient,
 		Client:         eth,
-		cEth:           rpcClient,
+		cEth:           ethRpcClient,
 		ttd:            ttd,
 		JWTSecretBytes: jwtSecretBytes,
 		accTxInfoMap:   make(map[common.Address]*AccountTransactionInfo),
@@ -293,36 +297,80 @@ func (ec *HiveRPCEngineClient) PrepareDefaultAuthCallToken() error {
 }
 
 // Engine API Call Methods
-func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) (api.ForkChoiceResponse, error) {
+func (ec *HiveRPCEngineClient) ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
 	var result api.ForkChoiceResponse
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 	ec.latestFcUStateSent = fcState
 	ec.latestPAttrSent = pAttributes
-	err := ec.c.CallContext(ctx, &result, "engine_forkchoiceUpdatedV1", fcState, pAttributes)
+	err := ec.c.CallContext(ctx,
+		&result,
+		fmt.Sprintf("engine_forkchoiceUpdatedV%d", version),
+		fcState,
+		pAttributes)
 	ec.latestFcUResponse = &result
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableDataV1, error) {
-	var result api.ExecutableDataV1
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return result, err
-	}
-	err := ec.c.CallContext(ctx, &result, "engine_getPayloadV1", payloadId)
-	return result, err
+func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
+	return ec.ForkchoiceUpdated(ctx, 1, fcState, pAttributes)
 }
 
-func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *api.ExecutableDataV1) (api.PayloadStatusV1, error) {
+func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
+	return ec.ForkchoiceUpdated(ctx, 2, fcState, pAttributes)
+}
+
+func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error) {
+	var (
+		executableData api.ExecutableData
+		blockValue     *big.Int
+		err            error
+		rpcString      = fmt.Sprintf("engine_getPayloadV%d", version)
+	)
+
+	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
+		return executableData, nil, err
+	}
+
+	if version == 2 {
+		var response api.ExecutableDataV2
+		err = ec.c.CallContext(ctx, &response, rpcString, payloadId)
+		executableData = *response.ExecutionPayload
+		blockValue = response.BlockValue
+	} else {
+		err = ec.c.CallContext(ctx, &executableData, rpcString, payloadId)
+	}
+
+	return executableData, blockValue, err
+}
+
+func (ec *HiveRPCEngineClient) GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error) {
+	ed, _, err := ec.GetPayload(ctx, 1, payloadId)
+	return ed, err
+}
+
+func (ec *HiveRPCEngineClient) GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error) {
+	return ec.GetPayload(ctx, 2, payloadId)
+}
+
+func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
 	var result api.PayloadStatusV1
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 	ec.latestPayloadSent = payload
-	err := ec.c.CallContext(ctx, &result, "engine_newPayloadV1", payload)
+	err := ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload)
 	ec.latestPayloadStatusReponse = &result
 	return result, err
+}
+
+func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
+	return ec.NewPayload(ctx, 1, payload)
+}
+
+func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
+	return ec.NewPayload(ctx, 2, payload)
 }
 
 func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Context, tConf *api.TransitionConfigurationV1) (api.TransitionConfigurationV1, error) {
@@ -366,11 +414,11 @@ func (ec *HiveRPCEngineClient) PostRunVerifications() error {
 	return nil
 }
 
-func (ec *HiveRPCEngineClient) LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) {
+func (ec *HiveRPCEngineClient) LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) {
 	return ec.latestFcUStateSent, ec.latestPAttrSent
 }
 
-func (ec *HiveRPCEngineClient) LatestNewPayloadSent() *api.ExecutableDataV1 {
+func (ec *HiveRPCEngineClient) LatestNewPayloadSent() *api.ExecutableData {
 	return ec.latestPayloadSent
 }
 

@@ -52,7 +52,8 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 			}
 			testFiles := hivesim.Params{"/genesis.json": genesisPath}
 			// Calculate and set the TTD for this test
-			ttd := helper.CalculateRealTTD(genesisPath, currentTest.TTD)
+			genesis := helper.LoadGenesis(genesisPath)
+			ttd := helper.CalculateRealTTD(&genesis, currentTest.TTD)
 			newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 			if currentTest.ChainFile != "" {
 				// We are using a Proof of Work chain file, remove all clique-related settings
@@ -98,7 +99,7 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 						}
 
 						// Run the test case
-						test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, syncClientParams, testFiles.Copy(), currentTest.TestTransactionType, currentTest.SafeSlotsToImportOptimistically)
+						test.Run(currentTest, big.NewInt(ttd), timeout, t, c, &genesis, syncClientParams, testFiles.Copy())
 					},
 				})
 			}
@@ -126,7 +127,7 @@ func postMergeSync(t *test.Env) {
 	// Reset block production delay
 	t.CLMock.PayloadProductionClientDelay = time.Second
 
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams.Set("HIVE_MINER", ""), t.ClientFiles, t.Engine)
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams.Set("HIVE_MINER", ""), t.ClientFiles, t.Engine)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 	}
@@ -182,7 +183,7 @@ func incrementalPostMergeSync(t *test.Env) {
 	// Reset block production delay
 	t.CLMock.PayloadProductionClientDelay = time.Second
 
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.ClientParams.Set("HIVE_MINER", ""), t.ClientFiles, t.Engine)
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams.Set("HIVE_MINER", ""), t.ClientFiles, t.Engine)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 	}

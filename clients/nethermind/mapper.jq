@@ -134,7 +134,10 @@ def clique_engine:
     "eip3198Transition": env.HIVE_FORK_LONDON|to_hex,
 
     # Merge
-    "MergeForkIdTransition": env.HIVE_MERGE_BLOCK_ID|to_hex,
+    # "MergeForkIdTransition": env.HIVE_MERGE_BLOCK_ID|to_hex,
+
+    # Shanghai
+    "eip4895TransitionTimestamp": env.HIVE_SHANGHAI_TIMESTAMP|to_hex,
 
     # Shanghai
     "eip4895TransitionTimestamp": env.HIVE_SHANGHAI_TIMESTAMP|to_hex,
