@@ -210,7 +210,7 @@ func (en *ExecutionClient) PrepareDefaultAuthCallToken() error {
 func (en *ExecutionClient) EngineForkchoiceUpdated(
 	parentCtx context.Context,
 	fcState *api.ForkchoiceStateV1,
-	pAttributes *api.PayloadAttributesV1,
+	pAttributes *api.PayloadAttributes,
 	version int,
 ) (*api.ForkChoiceResponse, error) {
 	var result api.ForkChoiceResponse
@@ -234,8 +234,8 @@ func (en *ExecutionClient) EngineGetPayload(
 	parentCtx context.Context,
 	payloadID *api.PayloadID,
 	version int,
-) (*api.ExecutableDataV1, error) {
-	var result api.ExecutableDataV1
+) (*api.ExecutableData, error) {
+	var result api.ExecutableData
 	if err := en.PrepareDefaultAuthCallToken(); err != nil {
 		return nil, err
 	}
@@ -248,7 +248,7 @@ func (en *ExecutionClient) EngineGetPayload(
 
 func (en *ExecutionClient) EngineNewPayload(
 	parentCtx context.Context,
-	payload *api.ExecutableDataV1,
+	payload *api.ExecutableData,
 	version int,
 ) (*api.PayloadStatusV1, error) {
 	var result api.PayloadStatusV1

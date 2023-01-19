@@ -66,13 +66,11 @@ func prepareExecutionForkConfig(
 ) *params.ChainConfig {
 	chainConfig := params.ChainConfig{}
 	if config.CapellaForkEpoch != nil {
-		/* TODO: Enable
 		if config.CapellaForkEpoch.Uint64() == 0 {
 			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime))
 		} else {
 			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime) + config.SlotTime.Int64()*32)
 		}
-		*/
 	}
 	return &chainConfig
 }
@@ -157,7 +155,13 @@ func prepareTestnet(
 		)
 	}
 	spec.Config.BELLATRIX_FORK_VERSION = common.Version{0x02, 0x00, 0x00, 0x0a}
-	spec.Config.SHARDING_FORK_VERSION = common.Version{0x04, 0x00, 0x00, 0x0a}
+	if config.CapellaForkEpoch != nil {
+		spec.Config.CAPELLA_FORK_EPOCH = common.Epoch(
+			config.CapellaForkEpoch.Uint64(),
+		)
+	}
+	spec.Config.CAPELLA_FORK_VERSION = common.Version{0x03, 0x00, 0x00, 0x0a}
+	spec.Config.DENEB_FORK_VERSION = common.Version{0x04, 0x00, 0x00, 0x0a}
 	if config.ValidatorCount == nil {
 		t.Fatal(fmt.Errorf("ValidatorCount was not configured"))
 	}
@@ -178,6 +182,13 @@ func prepareTestnet(
 		)
 		spec.Config.TERMINAL_BLOCK_HASH_ACTIVATION_EPOCH = common.Timestamp(0)
 	}
+
+	// Validators can exit immediately
+	spec.Config.SHARD_COMMITTEE_PERIOD = 0
+	spec.Config.CHURN_LIMIT_QUOTIENT = 2
+
+	// Validators can withdraw immediately
+	spec.Config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY = 0
 
 	// Generate keys opts for validators
 	shares := config.NodeDefinitions.Shares()
@@ -287,6 +298,7 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 		genesisValidatorsRoot: genesisValidatorsRoot,
 		spec:                  p.spec,
 		eth1Genesis:           p.eth1Genesis,
+		eth2GenesisState:      p.eth2Genesis,
 	}
 }
 
@@ -337,7 +349,31 @@ func (p *PreparedTestnet) prepareExecutionNode(
 					),
 				},
 			)
+		} else {
+			genesis := testnet.ExecutionGenesis()
+			genesisBlock := genesis.ToBlock()
+			if genesis.Config.TerminalTotalDifficulty.Cmp(genesisBlock.Difficulty()) <= 0 {
+				opts = append(
+					opts,
+					hivesim.Params{
+						"HIVE_TERMINAL_BLOCK_HASH": fmt.Sprintf(
+							"%s",
+							genesisBlock.Hash(),
+						),
+					},
+				)
+				opts = append(
+					opts,
+					hivesim.Params{
+						"HIVE_TERMINAL_BLOCK_NUMBER": fmt.Sprintf(
+							"%d",
+							genesisBlock.NumberU64(),
+						),
+					},
+				)
+			}
 		}
+
 		if len(chain) > 0 {
 			// Bundle the chain into the container
 			chainParam, err := el.ChainBundle(chain)

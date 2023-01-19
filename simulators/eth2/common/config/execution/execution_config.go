@@ -233,6 +233,11 @@ func BuildExecutionGenesis(
 		NetworkID:      7,
 	}
 
+	// Configure post-merge forks
+	if forkConfig.ShanghaiTime != nil {
+		genesis.Genesis.Config.ShanghaiTime = forkConfig.ShanghaiTime
+	}
+
 	// Configure consensus
 	if err := consensus.Configure(&genesis); err != nil {
 		panic(err)
@@ -263,6 +268,12 @@ func (conf *ExecutionGenesis) ToParams(
 		"HIVE_FORK_ARROWGLACIER":         conf.Genesis.Config.ArrowGlacierBlock.String(),
 		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeNetsplitBlock.String(),
 		"HIVE_TERMINAL_TOTAL_DIFFICULTY": conf.Genesis.Config.TerminalTotalDifficulty.String(),
+	}
+	if conf.Genesis.Config.ShanghaiTime != nil {
+		params = params.Set(
+			"HIVE_SHANGHAI_TIMESTAMP",
+			conf.Genesis.Config.ShanghaiTime.String(),
+		)
 	}
 	if conf.Genesis.Config.Clique != nil {
 		params["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(

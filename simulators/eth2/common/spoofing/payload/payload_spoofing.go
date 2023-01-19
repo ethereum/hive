@@ -161,7 +161,7 @@ func calcTxsHash(txsBytes [][]byte) (common.Hash, error) {
 // BlockHash is calculated automatically.
 func CustomizePayloadSpoof(
 	method string,
-	basePayload *api.ExecutableDataV1,
+	basePayload *api.ExecutableData,
 	customData *CustomPayloadData,
 ) (common.Hash, *spoof.Spoof, error) {
 	fields := make(map[string]interface{})
@@ -368,7 +368,7 @@ const (
 // One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
 func GenerateInvalidPayloadSpoof(
 	method string,
-	basePayload *api.ExecutableDataV1,
+	basePayload *api.ExecutableData,
 	payloadField InvalidPayloadField,
 	signer SignerWithKey,
 ) (common.Hash, *spoof.Spoof, error) {
@@ -634,7 +634,7 @@ func (e *EngineResponseMocker) AddGetPayloadPassthroughToProxy(
 		func(res []byte, req []byte) *spoof.Spoof {
 			// Hash of the payload built is being added to the passthrough list
 			var (
-				payload api.ExecutableDataV1 // ExecutableDataV1
+				payload api.ExecutableData // ExecutableDataV1
 			)
 			err := proxy.UnmarshalFromJsonRPCResponse(res, &payload)
 			if err != nil {
@@ -651,7 +651,7 @@ func (e *EngineResponseMocker) AddNewPayloadCallbackToProxy(p *proxy.Proxy) {
 		EngineNewPayloadV1,
 		func(res []byte, req []byte) *spoof.Spoof {
 			var (
-				payload api.ExecutableDataV1
+				payload api.ExecutableData
 				status  api.PayloadStatusV1
 				spoof   *spoof.Spoof
 				err     error
@@ -709,7 +709,7 @@ func (e *EngineResponseMocker) AddForkchoiceUpdatedCallbackToProxy(
 		func(res []byte, req []byte) *spoof.Spoof {
 			var (
 				fcState api.ForkchoiceStateV1
-				pAttr   api.PayloadAttributesV1
+				pAttr   api.PayloadAttributes
 				fResp   api.ForkChoiceResponse
 				spoof   *spoof.Spoof
 				err     error
@@ -781,7 +781,7 @@ func CheckErrorOnForkchoiceUpdatedPayloadAttributes(
 	return func(res []byte, req []byte) *spoof.Spoof {
 		var (
 			fcS api.ForkchoiceStateV1
-			pA  *api.PayloadAttributesV1
+			pA  *api.PayloadAttributes
 		)
 		if err := proxy.UnmarshalFromJsonRPCRequest(req, &fcS, &pA); err != nil {
 			panic(

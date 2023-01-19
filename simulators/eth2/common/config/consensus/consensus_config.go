@@ -44,6 +44,10 @@ func ConsensusConfigsBundle(
 	if err != nil {
 		return nil, err
 	}
+	capellaPreset, err := yaml.Marshal(spec.CapellaPreset)
+	if err != nil {
+		return nil, err
+	}
 	genesisHash := genesis.ToBlock().Hash()
 	return hivesim.Bundle(
 		hivesim.WithDynamicFile(
@@ -61,6 +65,10 @@ func ConsensusConfigsBundle(
 		hivesim.WithDynamicFile(
 			"/hive/input/preset_bellatrix.yaml",
 			config.BytesSource(bellatrixPreset),
+		),
+		hivesim.WithDynamicFile(
+			"/hive/input/preset_capella.yaml",
+			config.BytesSource(capellaPreset),
 		),
 		hivesim.Params{
 			"HIVE_ETH2_ETH1_GENESIS_HASH": genesisHash.String(),

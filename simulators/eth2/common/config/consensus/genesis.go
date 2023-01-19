@@ -8,6 +8,7 @@ import (
 	"github.com/holiman/uint256"
 	"github.com/protolambda/zrnt/eth2/beacon/altair"
 	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
+	"github.com/protolambda/zrnt/eth2/beacon/capella"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"github.com/protolambda/zrnt/eth2/configs"
@@ -18,7 +19,7 @@ import (
 func genesisPayloadHeader(
 	eth1GenesisBlock *types.Block,
 	spec *common.Spec,
-) (*common.ExecutionPayloadHeader, error) {
+) (*bellatrix.ExecutionPayloadHeader, error) {
 	extra := eth1GenesisBlock.Extra()
 	if len(extra) > common.MAX_EXTRA_DATA_BYTES {
 		return nil, fmt.Errorf(
@@ -38,7 +39,7 @@ func genesisPayloadHeader(
 		return nil, fmt.Errorf("basefee larger than 2^256-1")
 	}
 
-	return &common.ExecutionPayloadHeader{
+	return &bellatrix.ExecutionPayloadHeader{
 		ParentHash:    common.Root(eth1GenesisBlock.ParentHash()),
 		FeeRecipient:  common.Eth1Address(eth1GenesisBlock.Coinbase()),
 		StateRoot:     common.Bytes32(eth1GenesisBlock.Root()),
@@ -102,7 +103,15 @@ func BuildBeaconState(
 	var state common.BeaconState
 	var forkVersion common.Version
 	var emptyBodyRoot common.Root
-	if spec.BELLATRIX_FORK_EPOCH == 0 {
+	if spec.CAPELLA_FORK_EPOCH == 0 {
+		stateView := capella.NewBeaconStateView(spec)
+		forkVersion = spec.CAPELLA_FORK_VERSION
+		emptyBodyRoot = capella.BeaconBlockBodyType(configs.Mainnet).
+			New().
+			HashTreeRoot(hFn)
+		// TODO: Check if we need to add execution payload to the state
+		state = stateView
+	} else if spec.BELLATRIX_FORK_EPOCH == 0 {
 		stateView := bellatrix.NewBeaconStateView(spec)
 		forkVersion = spec.BELLATRIX_FORK_VERSION
 		emptyBodyRoot = bellatrix.BeaconBlockBodyType(configs.Mainnet).
@@ -167,7 +176,7 @@ func BuildBeaconState(
 	if err != nil {
 		return nil, err
 	}
-	// Process activations
+	// Process activations and exits
 	for i := 0; i < len(validators); i++ {
 		val, err := vals.Validator(common.ValidatorIndex(i))
 		if err != nil {
@@ -185,7 +194,32 @@ func BuildBeaconState(
 				return nil, err
 			}
 		}
+		// Process exits/slashings
+		slashings, err := state.Slashings()
+		if err != nil {
+			return nil, err
+		}
+		if keys[i].Exited || keys[i].Slashed {
+			exit_epoch := common.GENESIS_EPOCH
+			val.SetExitEpoch(exit_epoch)
+			val.SetWithdrawableEpoch(
+				exit_epoch + spec.MIN_VALIDATOR_WITHDRAWABILITY_DELAY,
+			)
+			if keys[i].Slashed {
+				val.MakeSlashed()
+
+				bal, err := val.EffectiveBalance()
+				if err != nil {
+					return nil, err
+				}
+
+				if err := slashings.AddSlashing(exit_epoch, bal); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
+
 	if err := state.SetGenesisValidatorsRoot(vals.HashTreeRoot(tree.GetHashFn())); err != nil {
 		return nil, err
 	}
@@ -233,7 +267,7 @@ func BuildBeaconState(
 		tdd := uint256.Int(spec.TERMINAL_TOTAL_DIFFICULTY)
 		embedExecAtGenesis := tdd.ToBig().Cmp(eth1Genesis.Difficulty) < 0
 
-		var execPayloadHeader *common.ExecutionPayloadHeader
+		var execPayloadHeader *bellatrix.ExecutionPayloadHeader
 		if embedExecAtGenesis {
 			execPayloadHeader, err = genesisPayloadHeader(
 				eth1GenesisBlock,
@@ -245,7 +279,7 @@ func BuildBeaconState(
 		} else {
 			// we didn't build any on the eth1 chain though,
 			// so we just put the genesis hash here (it could be any block from eth1 chain before TTD that is not ahead of eth2)
-			execPayloadHeader = new(common.ExecutionPayloadHeader)
+			execPayloadHeader = new(bellatrix.ExecutionPayloadHeader)
 		}
 
 		if err := st.SetLatestExecutionPayloadHeader(execPayloadHeader); err != nil {

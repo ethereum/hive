@@ -4,7 +4,6 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	execution_config "github.com/ethereum/hive/simulators/eth2/common/config/execution"
@@ -37,6 +36,7 @@ func (e instaSeal) FinalizeAndAssemble(
 	txs []*types.Transaction,
 	uncles []*types.Header,
 	receipts []*types.Receipt,
+	withdrawals []*types.Withdrawal,
 ) (*types.Block, error) {
 	block, err := e.Engine.FinalizeAndAssemble(
 		chain,
@@ -45,6 +45,7 @@ func (e instaSeal) FinalizeAndAssemble(
 		txs,
 		uncles,
 		receipts,
+		withdrawals,
 	)
 	if err != nil {
 		return nil, err
@@ -65,15 +66,11 @@ func (p *ChainGenerator) Generate(
 	if p.blocks != nil {
 		return p.blocks, nil
 	}
-	db := rawdb.NewMemoryDatabase()
 	engine := ethash.New(p.Config, nil, false)
 	insta := instaSeal{engine}
-	genesisBlock := genesis.Genesis.ToBlock()
-	p.blocks, _ = core.GenerateChain(
-		genesis.Genesis.Config,
-		genesisBlock,
+	_, p.blocks, _ = core.GenerateChainWithGenesis(
+		genesis.Genesis,
 		insta,
-		db,
 		p.BlockCount,
 		p.GenFunction,
 	)

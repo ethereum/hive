@@ -85,8 +85,8 @@ func (t *Testnet) VerifyParticipation(
 	vs VerificationSlot,
 	expected float64,
 ) error {
-	runningBeacons := t.VerificationNodes().BeaconClients().Running()
-	slot, err := vs.Slot(parentCtx, t, runningBeacons[0])
+	runningNodes := t.VerificationNodes().Running()
+	slot, err := vs.Slot(parentCtx, t, runningNodes[0].BeaconClient)
 	if err != nil {
 		return err
 	}
@@ -94,10 +94,10 @@ func (t *Testnet) VerifyParticipation(
 		// slot-1 to target last slot in finalized epoch
 		slot = slot - 1
 	}
-	for i, b := range runningBeacons {
+	for i, n := range runningNodes {
 		health, err := GetHealth(
 			parentCtx,
-			b,
+			n.BeaconClient,
 			t.Spec().Spec,
 			slot,
 		)
@@ -106,15 +106,17 @@ func (t *Testnet) VerifyParticipation(
 		}
 		if health < expected {
 			return fmt.Errorf(
-				"beacon %d: participation not healthy (got:%.2f, want:%.2f)",
+				"node %d (%s): participation not healthy (got:%.2f, want:%.2f)",
 				i,
+				n.ClientNames(),
 				health,
 				expected,
 			)
 		}
 		t.Logf(
-			"beacon %d: epoch=%d participation=%.2f",
+			"node %d (%s): epoch=%d participation=%.2f",
 			i,
+			n.ClientNames(),
 			t.Spec().SlotToEpoch(slot),
 			health,
 		)
@@ -129,18 +131,24 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(
 	parentCtx context.Context,
 	vs VerificationSlot,
 ) error {
-	runningBeacons := t.VerificationNodes().BeaconClients().Running()
-	slot, err := vs.Slot(parentCtx, t, runningBeacons[0])
+	runningNodes := t.VerificationNodes().Running()
+	b := runningNodes[0].BeaconClient
+	slot, err := vs.Slot(parentCtx, t, b)
 	if err != nil {
 		return err
 	}
 
-	versionedBlock, err := runningBeacons[0].BlockV2(
+	versionedBlock, err := b.BlockV2(
 		parentCtx,
 		eth2api.BlockIdSlot(slot),
 	)
 	if err != nil {
-		return fmt.Errorf("beacon %d: failed to retrieve block: %v", 0, err)
+		return fmt.Errorf(
+			"node %d (%s): failed to retrieve block: %v",
+			0,
+			runningNodes[0].ClientNames(),
+			err,
+		)
 	}
 
 	payload, err := versionedBlock.ExecutionPayload()
@@ -148,7 +156,8 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(
 		return err
 	}
 
-	for i, ec := range t.VerificationNodes().ExecutionClients().Running() {
+	for i, n := range runningNodes {
+		ec := n.ExecutionClient
 		if block, err := ec.BlockByNumber(
 			parentCtx,
 			big.NewInt(int64(payload.Number)),
@@ -158,8 +167,9 @@ func (t *Testnet) VerifyExecutionPayloadIsCanonical(
 			blockHash := block.Hash()
 			if !bytes.Equal(blockHash[:], payload.BlockHash[:]) {
 				return fmt.Errorf(
-					"eth1 %d: blocks don't match (got=%s, expected=%s)",
+					"node %d (%s): execution blocks don't match (got=%s, expected=%s)",
 					i,
+					n.ClientNames(),
 					utils.Shorten(blockHash.String()),
 					utils.Shorten(payload.BlockHash.String()),
 				)
@@ -224,13 +234,13 @@ func (t *Testnet) VerifyProposers(
 	vs VerificationSlot,
 	allow_empty_blocks bool,
 ) error {
-	runningBeacons := t.VerificationNodes().BeaconClients().Running()
-	bn := runningBeacons[0]
+	runningNodes := t.VerificationNodes().Running()
+	bn := runningNodes[0].BeaconClient
 	lastSlot, err := vs.Slot(parentCtx, t, bn)
 	if err != nil {
 		return err
 	}
-	proposers := make([]bool, len(runningBeacons))
+	proposers := make([]bool, len(runningNodes))
 	for slot := common.Slot(0); slot <= lastSlot; slot += 1 {
 		versionedBlock, err := bn.BlockV2(parentCtx, eth2api.BlockIdSlot(slot))
 		if err != nil {
@@ -238,8 +248,9 @@ func (t *Testnet) VerifyProposers(
 				continue
 			}
 			return fmt.Errorf(
-				"beacon %d: failed to retrieve block: %v",
+				"node %d (%s): failed to retrieve beacon block: %v",
 				0,
+				runningNodes[0].ClientNames(),
 				err,
 			)
 		}
@@ -251,8 +262,9 @@ func (t *Testnet) VerifyProposers(
 		)
 		if err != nil {
 			return fmt.Errorf(
-				"beacon %d: failed to retrieve validator: %v",
+				"node %d (%s): failed to retrieve validator: %v",
 				0,
+				runningNodes[0].ClientNames(),
 				err,
 			)
 		}
@@ -266,18 +278,22 @@ func (t *Testnet) VerifyProposers(
 	}
 	for i, proposed := range proposers {
 		if !proposed {
-			return fmt.Errorf("beacon %d: did not propose a block", i)
+			return fmt.Errorf(
+				"node %d (%s): did not propose a block",
+				i,
+				runningNodes[i].ClientNames(),
+			)
 		}
 	}
 	return nil
 }
 
 func (t *Testnet) VerifyELBlockLabels(parentCtx context.Context) error {
-	runningExecution := t.VerificationNodes().ExecutionClients().Running()
-	runningBeacons := t.VerificationNodes().BeaconClients().Running()
-	for i := 0; i < len(runningExecution); i++ {
-		el := runningExecution[i]
-		bn := runningBeacons[i]
+	runningNodes := t.VerificationNodes().Running()
+	for i := 0; i < len(runningNodes); i++ {
+		n := runningNodes[i]
+		el := n.ExecutionClient
+		bn := n.BeaconClient
 		// Get the head
 		headInfo, err := bn.BlockHeader(parentCtx, eth2api.BlockHead)
 		if err != nil {
@@ -317,15 +333,23 @@ func (t *Testnet) VerifyELBlockLabels(parentCtx context.Context) error {
 				} else {
 					if h.Hash() != executionPayload.BlockHash {
 						return fmt.Errorf(
-							"beacon %d: Execution hash found in checkpoint block "+
+							"node %d (%s): Execution hash found in checkpoint block "+
 								"(%s) does not match what the el returns: %v != %v",
-							i, label, executionPayload.BlockHash, h.Hash(),
+							i,
+							n.ClientNames(),
+							label,
+							executionPayload.BlockHash,
+							h.Hash(),
 						)
 					}
 					fmt.Printf(
-						"beacon %d: Execution hash matches beacon "+
+						"node %d (%s): Execution hash matches beacon "+
 							"checkpoint block (%s) information: %v\n",
-						i, label, h.Hash())
+						i,
+						n.ClientNames(),
+						label,
+						h.Hash(),
+					)
 				}
 			}
 
