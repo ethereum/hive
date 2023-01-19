@@ -264,7 +264,7 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 			// Invalidate the transition payload
 			if getPayloadCount == 1 {
 				var (
-					payload api.ExecutableDataV1
+					payload api.ExecutableData
 					spoof   *spoof.Spoof
 					err     error
 				)
@@ -302,7 +302,7 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 	newPayloadCallbackGen := func(node int) func([]byte, []byte) *spoof.Spoof {
 		return func(res []byte, req []byte) *spoof.Spoof {
 			var (
-				payload api.ExecutableDataV1
+				payload api.ExecutableData
 				spoof   *spoof.Spoof
 				err     error
 			)
@@ -342,7 +342,7 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 		return func(res []byte, req []byte) *spoof.Spoof {
 			var (
 				fcState api.ForkchoiceStateV1
-				pAttr   api.PayloadAttributesV1
+				pAttr   api.PayloadAttributes
 				spoof   *spoof.Spoof
 				err     error
 			)
@@ -472,7 +472,7 @@ func InvalidPayloadGen(
 					// We are not going to spoof anything here, we just need to save the transition payload hash and the id of the validator that generated it
 					// to invalidate it in other clients.
 					var (
-						payload api.ExecutableDataV1
+						payload api.ExecutableData
 					)
 					err := proxy.UnmarshalFromJsonRPCResponse(res, &payload)
 					if err != nil {
@@ -492,7 +492,7 @@ func InvalidPayloadGen(
 			return func(res []byte, req []byte) *spoof.Spoof {
 				t.Logf("INFO: newPayload callback node %d", id)
 				var (
-					payload api.ExecutableDataV1
+					payload api.ExecutableData
 					spoof   *spoof.Spoof
 					err     error
 				)
@@ -612,7 +612,7 @@ func IncorrectHeaderPrevRandaoPayload(
 		// Invalidate a payload after the transition payload
 		if getPayloadCount == 2 {
 			var (
-				payload api.ExecutableDataV1
+				payload api.ExecutableData
 				spoof   *spoof.Spoof
 				err     error
 			)
@@ -766,7 +766,7 @@ func InvalidTimestampPayload(
 		defer getPayloadLock.Unlock()
 		getPayloadCount++
 		var (
-			payload   api.ExecutableDataV1
+			payload   api.ExecutableData
 			payloadID api.PayloadID
 			spoof     *spoof.Spoof
 			err       error
@@ -1090,7 +1090,7 @@ func SyncingWithInvalidChain(
 		transitionPayloadHeight uint64
 		lastValidHash           common.Hash
 		invalidPayloadHashes    = make([]common.Hash, 0)
-		payloadMap              = make(map[common.Hash]api.ExecutableDataV1)
+		payloadMap              = make(map[common.Hash]api.ExecutableData)
 		done                    = make(chan interface{})
 	)
 
@@ -1099,7 +1099,7 @@ func SyncingWithInvalidChain(
 	// `latestValidHash==p1.Hash`
 	newPayloadCallback := func(res []byte, req []byte) *spoof.Spoof {
 		var (
-			payload api.ExecutableDataV1
+			payload api.ExecutableData
 			spoof   *spoof.Spoof
 			err     error
 		)
@@ -1156,7 +1156,7 @@ func SyncingWithInvalidChain(
 	forkchoiceUpdatedCallback := func(res []byte, req []byte) *spoof.Spoof {
 		var (
 			fcState api.ForkchoiceStateV1
-			pAttr   api.PayloadAttributesV1
+			pAttr   api.PayloadAttributes
 			spoof   *spoof.Spoof
 			err     error
 		)
@@ -1579,7 +1579,7 @@ func InvalidQuantityPayloadFields(
 			defer func() {
 				getPayloadCount++
 			}()
-			var payload api.ExecutableDataV1
+			var payload api.ExecutableData
 			err := proxy.UnmarshalFromJsonRPCResponse(res, &payload)
 			if err != nil {
 				panic(err)
@@ -2485,7 +2485,7 @@ func NoViableHeadDueToOptimisticSync(
 	getPayloadCallback := func(res []byte, req []byte) *spoof.Spoof {
 		getPayloadCount++
 		var (
-			payload api.ExecutableDataV1
+			payload api.ExecutableData
 			err     error
 		)
 		err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)

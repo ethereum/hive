@@ -10,7 +10,6 @@ FROM golang:1-alpine AS builder
 RUN apk --no-cache add gcc musl-dev linux-headers cmake make clang build-base clang-static clang-dev
 
 # Prepare workspace
-ADD ./engine/hive.go.work /source/go.work
 ADD ./common /source/common
 ADD ./engine /source/engine
 ADD ./engine/hive.go.work /source/go.work
