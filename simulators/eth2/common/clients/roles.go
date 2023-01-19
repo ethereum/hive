@@ -53,8 +53,8 @@ func byName(
 	return nil
 }
 
-func (c *ClientDefinitionsByRole) Combinations() []NodeDefinition {
-	var nodes []NodeDefinition
+func (c *ClientDefinitionsByRole) Combinations() NodeDefinitions {
+	var nodes NodeDefinitions
 	for _, beacon := range c.Beacon {
 		for _, eth1 := range c.Eth1 {
 			nodes = append(

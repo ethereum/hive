@@ -11,6 +11,7 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/core/beacon"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
 	"github.com/holiman/uint256"
@@ -20,6 +21,7 @@ import (
 	"github.com/protolambda/eth2api/client/nodeapi"
 	"github.com/protolambda/zrnt/eth2/beacon/altair"
 	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
+	"github.com/protolambda/zrnt/eth2/beacon/capella"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"github.com/protolambda/ztyp/tree"
@@ -126,6 +128,14 @@ func (bn *BeaconClient) EnodeURL() (string, error) {
 	)
 }
 
+func (bn *BeaconClient) ClientName() string {
+	name := bn.ClientType
+	if len(name) > 3 && name[len(name)-3:] == "-bn" {
+		name = name[:len(name)-3]
+	}
+	return name
+}
+
 // Beacon API wrappers
 type VersionedSignedBeaconBlock struct {
 	*eth2api.VersionedSignedBeaconBlock
@@ -136,8 +146,8 @@ func (versionedBlock *VersionedSignedBeaconBlock) ContainsExecutionPayload() boo
 		versionedBlock.Version == "capella"
 }
 
-func (versionedBlock *VersionedSignedBeaconBlock) ExecutionPayload() (api.ExecutableDataV1, error) {
-	var result = api.ExecutableDataV1{}
+func (versionedBlock *VersionedSignedBeaconBlock) ExecutionPayload() (api.ExecutableData, error) {
+	result := api.ExecutableData{}
 	switch v := versionedBlock.Data.(type) {
 	case *bellatrix.SignedBeaconBlock:
 		execPayload := v.Message.Body.ExecutionPayload
@@ -158,6 +168,34 @@ func (versionedBlock *VersionedSignedBeaconBlock) ExecutionPayload() (api.Execut
 		for _, t := range execPayload.Transactions {
 			result.Transactions = append(result.Transactions, t)
 		}
+	case *capella.SignedBeaconBlock:
+		execPayload := v.Message.Body.ExecutionPayload
+		copy(result.ParentHash[:], execPayload.ParentHash[:])
+		copy(result.FeeRecipient[:], execPayload.FeeRecipient[:])
+		copy(result.StateRoot[:], execPayload.StateRoot[:])
+		copy(result.ReceiptsRoot[:], execPayload.ReceiptsRoot[:])
+		copy(result.LogsBloom[:], execPayload.LogsBloom[:])
+		copy(result.Random[:], execPayload.PrevRandao[:])
+		result.Number = uint64(execPayload.BlockNumber)
+		result.GasLimit = uint64(execPayload.GasLimit)
+		result.GasUsed = uint64(execPayload.GasUsed)
+		result.Timestamp = uint64(execPayload.Timestamp)
+		copy(result.ExtraData[:], execPayload.ExtraData[:])
+		result.BaseFeePerGas = (*uint256.Int)(&execPayload.BaseFeePerGas).ToBig()
+		copy(result.BlockHash[:], execPayload.BlockHash[:])
+		result.Transactions = make([][]byte, 0)
+		for _, t := range execPayload.Transactions {
+			result.Transactions = append(result.Transactions, t)
+		}
+		result.Withdrawals = make([]*types.Withdrawal, 0)
+		for _, w := range execPayload.Withdrawals {
+			withdrawal := new(types.Withdrawal)
+			withdrawal.Index = uint64(w.Index)
+			withdrawal.Validator = uint64(w.ValidatorIndex)
+			copy(withdrawal.Address[:], w.Address[:])
+			withdrawal.Amount = uint64(w.Amount)
+			result.Withdrawals = append(result.Withdrawals, withdrawal)
+		}
 	default:
 		return result, fmt.Errorf(
 			"beacon block version can't contain execution payload",
@@ -174,6 +212,8 @@ func (b *VersionedSignedBeaconBlock) StateRoot() tree.Root {
 		return v.Message.StateRoot
 	case *bellatrix.SignedBeaconBlock:
 		return v.Message.StateRoot
+	case *capella.SignedBeaconBlock:
+		return v.Message.StateRoot
 	}
 	panic("badly formatted beacon block")
 }
@@ -186,6 +226,8 @@ func (b *VersionedSignedBeaconBlock) Slot() common.Slot {
 		return v.Message.Slot
 	case *bellatrix.SignedBeaconBlock:
 		return v.Message.Slot
+	case *capella.SignedBeaconBlock:
+		return v.Message.Slot
 	}
 	panic("badly formatted beacon block")
 }
@@ -197,6 +239,8 @@ func (b *VersionedSignedBeaconBlock) ProposerIndex() common.ValidatorIndex {
 	case *altair.SignedBeaconBlock:
 		return v.Message.ProposerIndex
 	case *bellatrix.SignedBeaconBlock:
+		return v.Message.ProposerIndex
+	case *capella.SignedBeaconBlock:
 		return v.Message.ProposerIndex
 	}
 	panic("badly formatted beacon block")
@@ -355,6 +399,8 @@ func (vbs *VersionedBeaconStateResponse) CurrentVersion() common.Version {
 		return state.Fork.CurrentVersion
 	case *bellatrix.BeaconState:
 		return state.Fork.CurrentVersion
+	case *capella.BeaconState:
+		return state.Fork.CurrentVersion
 	}
 	panic("badly formatted beacon state")
 }
@@ -367,6 +413,8 @@ func (vbs *VersionedBeaconStateResponse) PreviousVersion() common.Version {
 		return state.Fork.PreviousVersion
 	case *bellatrix.BeaconState:
 		return state.Fork.PreviousVersion
+	case *capella.BeaconState:
+		return state.Fork.PreviousVersion
 	}
 	panic("badly formatted beacon state")
 }
@@ -376,6 +424,8 @@ func (vbs *VersionedBeaconStateResponse) CurrentEpochParticipation() altair.Part
 	case *altair.BeaconState:
 		return state.CurrentEpochParticipation
 	case *bellatrix.BeaconState:
+		return state.CurrentEpochParticipation
+	case *capella.BeaconState:
 		return state.CurrentEpochParticipation
 	}
 	return nil
@@ -389,6 +439,8 @@ func (vbs *VersionedBeaconStateResponse) Balances() phase0.Balances {
 		return state.Balances
 	case *bellatrix.BeaconState:
 		return state.Balances
+	case *capella.BeaconState:
+		return state.Balances
 	}
 	panic("badly formatted beacon state")
 }
@@ -400,6 +452,8 @@ func (vbs *VersionedBeaconStateResponse) Validators() phase0.ValidatorRegistry {
 	case *altair.BeaconState:
 		return state.Validators
 	case *bellatrix.BeaconState:
+		return state.Validators
+	case *capella.BeaconState:
 		return state.Validators
 	}
 	panic("badly formatted beacon state")
@@ -446,6 +500,36 @@ func (bn *BeaconClient) BeaconStateV2ByBlock(
 		parentCtx,
 		eth2api.StateIdRoot(headInfo.Header.Message.StateRoot),
 	)
+}
+
+func (bn *BeaconClient) StateValidators(
+	parentCtx context.Context,
+	stateId eth2api.StateId,
+	validatorIds []eth2api.ValidatorId,
+	statusFilter []eth2api.ValidatorStatus,
+) ([]eth2api.ValidatorResponse, error) {
+	var (
+		stateValidatorResponse = make(
+			[]eth2api.ValidatorResponse,
+			0,
+		)
+		exists bool
+		err    error
+	)
+	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
+	defer cancel()
+	exists, err = beaconapi.StateValidators(
+		ctx,
+		bn.API,
+		stateId,
+		validatorIds,
+		statusFilter,
+		&stateValidatorResponse,
+	)
+	if !exists {
+		return nil, fmt.Errorf("endpoint not found on beacon client")
+	}
+	return stateValidatorResponse, err
 }
 
 func (bn *BeaconClient) StateValidatorBalances(
@@ -500,6 +584,15 @@ func (bn *BeaconClient) ComputeDomain(
 	), nil
 }
 
+func (bn *BeaconClient) SubmitPoolBLSToExecutionChange(
+	parentCtx context.Context,
+	l common.SignedBLSToExecutionChanges,
+) error {
+	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
+	defer cancel()
+	return beaconapi.SubmitBLSToExecutionChanges(ctx, bn.API, l)
+}
+
 func (bn *BeaconClient) SubmitVoluntaryExit(
 	parentCtx context.Context,
 	exit *phase0.SignedVoluntaryExit,
@@ -512,7 +605,11 @@ func (bn *BeaconClient) SubmitVoluntaryExit(
 func (b *BeaconClient) WaitForExecutionPayload(
 	ctx context.Context,
 ) (ethcommon.Hash, error) {
-	fmt.Printf("Waiting for execution payload on beacon %d\n", b.index)
+	fmt.Printf(
+		"Waiting for execution payload on beacon %d (%s)\n",
+		b.index,
+		b.ClientName(),
+	)
 	slotDuration := time.Duration(b.spec.SECONDS_PER_SLOT) * time.Second
 	timer := time.NewTicker(slotDuration)
 
@@ -547,8 +644,9 @@ func (b *BeaconClient) WaitForExecutionPayload(
 			}
 			zero := ethcommon.Hash{}
 			fmt.Printf(
-				"WaitForExecutionPayload: beacon %d: slot=%d, realTimeSlot=%d, head=%s, exec=%s\n",
+				"WaitForExecutionPayload: beacon %d (%s): slot=%d, realTimeSlot=%d, head=%s, exec=%s\n",
 				b.index,
+				b.ClientName(),
 				headInfo.Header.Message.Slot,
 				realTimeSlot,
 				utils.Shorten(headInfo.Root.String()),
@@ -566,7 +664,10 @@ func (b *BeaconClient) WaitForOptimisticState(
 	blockID eth2api.BlockId,
 	optimistic bool,
 ) (*eth2api.BeaconBlockHeaderAndInfo, error) {
-	fmt.Printf("Waiting for optimistic sync on beacon %d\n", b.index)
+	fmt.Printf("Waiting for optimistic sync on beacon %d (%s)\n",
+		b.index,
+		b.ClientName(),
+	)
 	slotDuration := time.Duration(b.spec.SECONDS_PER_SLOT) * time.Second
 	timer := time.NewTicker(slotDuration)
 
@@ -717,6 +818,7 @@ func (beacons BeaconClients) P2PAddrs(
 	}
 	return strings.Join(staticPeers, ","), nil
 }
+
 func (b BeaconClients) GetBeaconBlockByExecutionHash(
 	parentCtx context.Context,
 	hash ethcommon.Hash,
@@ -737,6 +839,7 @@ func (runningBeacons BeaconClients) PrintStatus(
 	for i, b := range runningBeacons {
 		var (
 			slot      common.Slot
+			version   string
 			head      string
 			justified string
 			finalized string
@@ -758,6 +861,7 @@ func (runningBeacons BeaconClients) PrintStatus(
 			finalized = utils.Shorten(checkpoints.Finalized.String())
 		}
 		if versionedBlock, err := b.BlockV2(ctx, eth2api.BlockHead); err == nil {
+			version = versionedBlock.Version
 			if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
 				execution = utils.Shorten(
 					executionPayload.BlockHash.String(),
@@ -766,8 +870,10 @@ func (runningBeacons BeaconClients) PrintStatus(
 		}
 
 		l.Logf(
-			"beacon %d: slot=%d, head=%s, exec_payload=%s, justified=%s, finalized=%s",
+			"beacon %d (%s): fork=%s, slot=%d, head=%s, exec_payload=%s, justified=%s, finalized=%s",
 			i,
+			b.ClientName(),
+			version,
 			slot,
 			head,
 			execution,
@@ -775,4 +881,16 @@ func (runningBeacons BeaconClients) PrintStatus(
 			finalized,
 		)
 	}
+}
+
+func (all BeaconClients) SubmitPoolBLSToExecutionChange(
+	parentCtx context.Context,
+	l common.SignedBLSToExecutionChanges,
+) error {
+	for _, b := range all {
+		if err := b.SubmitPoolBLSToExecutionChange(parentCtx, l); err != nil {
+			return err
+		}
+	}
+	return nil
 }

@@ -51,6 +51,10 @@ type KeyDetails struct {
 	WithdrawalExecAddress [20]byte
 	// Extra initial balance
 	ExtraInitialBalance common.Gwei
+	// Validator starts in exit state
+	Exited bool
+	// Validator starts in slashed state
+	Slashed bool
 }
 
 func (kd *KeyDetails) WithdrawalCredentials() (out common.Root) {

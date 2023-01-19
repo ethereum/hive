@@ -80,6 +80,46 @@ func (v *ValidatorClient) ContainsValidatorIndex(
 	return ok
 }
 
+type BLSToExecutionChangeInfo struct {
+	common.ValidatorIndex
+	common.Eth1Address
+}
+
+func (v *ValidatorClient) SignBLSToExecutionChange(
+	domain common.BLSDomain,
+	c BLSToExecutionChangeInfo,
+) (*common.SignedBLSToExecutionChange, error) {
+	kd, ok := v.Keys[c.ValidatorIndex]
+	if !ok {
+		return nil, fmt.Errorf(
+			"validator client does not contain validator index %d",
+			c.ValidatorIndex,
+		)
+	}
+	if len(c.Eth1Address) != 20 {
+		return nil, fmt.Errorf("invalid length for execution address")
+	}
+	kdPubKey := common.BLSPubkey{}
+	copy(kdPubKey[:], kd.WithdrawalPubkey[:])
+	blsToExecChange := common.BLSToExecutionChange{
+		ValidatorIndex:     c.ValidatorIndex,
+		FromBLSPubKey:      kdPubKey,
+		ToExecutionAddress: c.Eth1Address,
+	}
+	sigRoot := common.ComputeSigningRoot(
+		blsToExecChange.HashTreeRoot(tree.GetHashFn()),
+		domain,
+	)
+
+	sk := new(blsu.SecretKey)
+	sk.Deserialize(&kd.WithdrawalSecretKey)
+	signature := blsu.Sign(sk, sigRoot[:]).Serialize()
+	return &common.SignedBLSToExecutionChange{
+		BLSToExecutionChange: blsToExecChange,
+		Signature:            common.BLSSignature(signature),
+	}, nil
+}
+
 func (v *ValidatorClient) SignVoluntaryExit(
 	domain common.BLSDomain,
 	epoch common.Epoch,
@@ -104,7 +144,7 @@ func (v *ValidatorClient) SignVoluntaryExit(
 	)
 
 	sk := new(blsu.SecretKey)
-	sk.Deserialize(&kd.WithdrawalSecretKey)
+	sk.Deserialize(&kd.ValidatorSecretKey)
 	signature := blsu.Sign(sk, sigRoot[:]).Serialize()
 	return &phase0.SignedVoluntaryExit{
 		Message:   voluntaryExit,
@@ -135,4 +175,21 @@ func (all ValidatorClients) ByValidatorIndex(
 		}
 	}
 	return nil
+}
+
+func (all ValidatorClients) SignBLSToExecutionChange(
+	domain common.BLSDomain,
+	c BLSToExecutionChangeInfo,
+) (*common.SignedBLSToExecutionChange, error) {
+	if v := all.ByValidatorIndex(c.ValidatorIndex); v == nil {
+		return nil, fmt.Errorf(
+			"validator index %d not found",
+			c.ValidatorIndex,
+		)
+	} else {
+		return v.SignBLSToExecutionChange(
+			domain,
+			c,
+		)
+	}
 }

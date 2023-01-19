@@ -13,11 +13,12 @@ require (
 	github.com/protolambda/bls12-381-util v0.0.0-20210720105258-a772f2aac13e
 	github.com/protolambda/eth2api v0.0.0-20220822011642-f7735dd471e0
 	github.com/protolambda/go-keystorev4 v0.0.0-20211007151826-f20444f6d564
-	github.com/protolambda/zrnt v0.28.1-0.20221128142902-0cb0f07c59ea
+	github.com/protolambda/zrnt v0.30.0
 	github.com/protolambda/ztyp v0.2.2
 	github.com/rauljordan/engine-proxy v0.0.0-20220517190449-e62b2e2f6e27
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wealdtech/go-eth2-util v1.8.0
+	golang.org/x/exp v0.0.0-20230108222341-4b8118a2686a
 	gopkg.in/yaml.v2 v2.4.0
 )
 
@@ -25,7 +26,7 @@ require (
 	github.com/VictoriaMetrics/fastcache v1.12.0 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
-	github.com/deckarep/golang-set v1.8.0 // indirect
+	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
 	github.com/ferranbt/fastssz v0.1.2 // indirect
@@ -34,7 +35,7 @@ require (
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
-	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d // indirect
+	github.com/holiman/big v0.0.0-20221017200358-a027dc42d04e // indirect
 	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
 	github.com/julienschmidt/httprouter v1.3.0 // indirect
 	github.com/kilic/bls12-381 v0.1.0 // indirect
@@ -63,3 +64,7 @@ require (
 )
 
 replace github.com/rauljordan/engine-proxy => github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea
+
+replace github.com/ethereum/go-ethereum v1.10.26 => github.com/lightclient/go-ethereum v1.10.10-0.20230116085521-6ab6d738866f
+
+replace github.com/protolambda/eth2api => github.com/marioevz/eth2api v0.0.0-20230110222620-e349e704f20c
