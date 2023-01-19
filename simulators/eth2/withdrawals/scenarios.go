@@ -124,21 +124,30 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 
 	// Wait for all BLS to execution to be included
 	slotsForAllBlsInclusion := beacon.Slot(
-		len(genesisNonWithdrawable) / int(
+		len(genesisNonWithdrawable)/int(
 			testnet.Spec().MAX_BLS_TO_EXECUTION_CHANGES,
-		),
+		) + 1,
 	)
 	testnet.WaitSlots(ctx, slotsForAllBlsInclusion)
 
 	// Get the beacon state and verify the credentials were updated
-	bn := testnet.BeaconClients().Running()[0]
-	versionedBeaconState, err := bn.BeaconStateV2ByBlock(
-		ctx,
-		eth2api.BlockHead,
-	)
-	if err != nil {
-		t.Fatalf("FAIL: Unable to get latest beacon state: %v", err)
+	var versionedBeaconState *clients.VersionedBeaconStateResponse
+	for _, bn := range testnet.BeaconClients().Running() {
+		versionedBeaconState, err = bn.BeaconStateV2ByBlock(
+			ctx,
+			eth2api.BlockHead,
+		)
+		if err != nil || versionedBeaconState == nil {
+			t.Logf("WARN: Unable to get latest beacon state: %v", err)
+		}
 	}
+	if versionedBeaconState == nil {
+		t.Fatalf(
+			"FAIL: Unable to get latest beacon state from any client: %v",
+			err,
+		)
+	}
+
 	validators := versionedBeaconState.Validators()
 	for _, v := range genesisNonWithdrawable {
 		validator := validators[v.Index]
@@ -197,4 +206,9 @@ loop:
 			}
 		}
 	}
+
+	// Lastly check all clients are on the same head
+	testnet.VerifyELHeads(ctx)
+
+	// TODO: Should we wait for finalization every time?
 }
