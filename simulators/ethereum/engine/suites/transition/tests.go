@@ -1025,7 +1025,16 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 				// Get the address nonce:
 				// This is because we could have included transactions in the PoW chain of the block
 				// producer, or re-orged.
-				tx, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, common.Big0, nil, t.TestTransactionType)
+				tx, err := helper.SendNextTransaction(
+					t.TestContext,
+					t.CLMock.NextBlockProducer,
+					&helper.BaseTransactionCreator{
+						Recipient: &globals.PrevRandaoContractAddr,
+						Amount:    common.Big0,
+						Payload:   nil,
+						TxType:    t.TestTransactionType,
+					},
+				)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable create next transaction: %v", t.TestName, err)
 				}

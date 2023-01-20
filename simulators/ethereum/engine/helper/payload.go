@@ -133,6 +133,20 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 	return result, nil
 }
 
+func CustomizePayloadTransactions(basePayload *api.ExecutableData, customTransactions types.Transactions) (*api.ExecutableData, error) {
+	byteTxs := make([][]byte, 0)
+	for _, tx := range customTransactions {
+		bytes, err := tx.MarshalBinary()
+		if err != nil {
+			return nil, err
+		}
+		byteTxs = append(byteTxs, bytes)
+	}
+	return CustomizePayload(basePayload, &CustomPayloadData{
+		Transactions: &byteTxs,
+	})
+}
+
 func (customData *CustomPayloadData) String() string {
 	customFieldsList := make([]string, 0)
 	if customData.ParentHash != nil {
