@@ -144,9 +144,11 @@ This test suite verifies behavior of the Engine API on each client after the Sha
   - Verify client `A` syncs side chain blocks from client `B` re-org was correctly applied along with the withdrawal balances.
 
 ## Max Initcode Tests
-- [NOT IMPLEMENTED] Transactions exceeding max initcode should be immediately rejected:
+- Transactions exceeding max initcode should be immediately rejected:
   - Send two transactions with valid nonces each
     - `TxA`, a smart contract creating transaction with an initcode length equal to MAX_INITCODE_SIZE ([EIP-3860](https://eips.ethereum.org/EIPS/eip-3860))
     - `TxB`, a smart contract creating transaction with an initcode length equal to MAX_INITCODE_SIZE+1.
-  - Verify that `TxB` returns error on `eth_sendRawTransaction` and also should be absend from the transaction pool of the client
+  - Verify that `TxB` returns error on `eth_sendRawTransaction` and also should be absent from the transaction pool of the client
   - Request a new payload from the client and verify that the payload built only includes `TxA`, and `TxB` is not included, nor the contract it could create is present in the `stateRoot`.
+  - Create a modified payload where `TxA` is replaced by `TxB` and send using `engine_newPayloadV2`
+  - Verify that `engine_newPayloadV2` returns `INVALID` nad `latestValidHash` points to the latest valid payload in the canonical chain.
