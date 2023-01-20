@@ -2,6 +2,7 @@
 package suite_withdrawals
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -24,6 +25,7 @@ var (
 	Finalized          = big.NewInt(-3)
 	Safe               = big.NewInt(-4)
 	InvalidParamsError = -32602
+	MAX_INITCODE_SIZE  = 49152
 )
 
 // Execution specification reference:
@@ -454,6 +456,19 @@ var Tests = []test.SpecInterface{
 		SidechainTimeIncrements: 1,
 	},
 	// TODO: REORG SYNC WHERE SYNCED BLOCKS HAVE WITHDRAWALS BEFORE TIME
+
+	// EVM Tests (EIP-3651, EIP-3855, EIP-3860)
+	&MaxInitcodeSizeSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Max Initcode Size",
+			},
+			WithdrawalsForkHeight: 2, // Block 1 is Pre-Withdrawals
+			WithdrawalsBlockCount: 2,
+		},
+		OverflowMaxInitcodeTxCountBeforeFork: 0,
+		OverflowMaxInitcodeTxCountAfterFork:  1,
+	},
 }
 
 // Helper types to convert gwei into wei more easily
@@ -773,7 +788,16 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
 			// Send some transactions
 			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-				_, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, common.Big1, nil, t.TestTransactionType)
+				_, err := helper.SendNextTransaction(
+					t.TestContext,
+					t.CLMock.NextBlockProducer,
+					&helper.BaseTransactionCreator{
+						Recipient: &globals.PrevRandaoContractAddr,
+						Amount:    common.Big1,
+						Payload:   nil,
+						TxType:    t.TestTransactionType,
+					},
+				)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
 				}
@@ -1028,7 +1052,16 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		OnRequestNextPayload: func() {
 			// Send transactions to be included in the payload
 			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-				tx, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, common.Big1, nil, t.TestTransactionType)
+				tx, err := helper.SendNextTransaction(
+					t.TestContext,
+					t.CLMock.NextBlockProducer,
+					&helper.BaseTransactionCreator{
+						Recipient: &globals.PrevRandaoContractAddr,
+						Amount:    common.Big1,
+						Payload:   nil,
+						TxType:    t.TestTransactionType,
+					},
+				)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
 				}
@@ -1234,4 +1267,117 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		HeadBlockHash: t.CLMock.LatestPayloadBuilt.BlockHash,
 	}, nil)
 	r.ExpectPayloadStatus(test.Valid)
+}
+
+// EIP-3860 Shanghai Tests:
+// Send transactions overflowing the MAX_INITCODE_SIZE
+// limit set in EIP-3860, before and after the Shanghai
+// fork.
+type MaxInitcodeSizeSpec struct {
+	*WithdrawalsBaseSpec
+	OverflowMaxInitcodeTxCountBeforeFork uint64
+	OverflowMaxInitcodeTxCountAfterFork  uint64
+}
+
+func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
+	t.CLMock.WaitForTTD()
+
+	invalidTxCreator := &helper.BigInitcodeTransactionCreator{
+		InitcodeLength: MAX_INITCODE_SIZE + 1,
+		BaseTransactionCreator: helper.BaseTransactionCreator{
+			GasLimit: 2000000,
+		},
+	}
+	validTxCreator := &helper.BigInitcodeTransactionCreator{
+		InitcodeLength: MAX_INITCODE_SIZE,
+		BaseTransactionCreator: helper.BaseTransactionCreator{
+			GasLimit: 2000000,
+		},
+	}
+
+	if s.OverflowMaxInitcodeTxCountBeforeFork > 0 {
+		if s.GetPreWithdrawalsBlockCount() == 0 {
+			panic("invalid test configuration")
+		}
+
+		for i := uint64(0); i < s.OverflowMaxInitcodeTxCountBeforeFork; i++ {
+			tx, err := invalidTxCreator.MakeTransaction(i)
+			if err != nil {
+				t.Fatalf("FAIL: Error creating max initcode transaction: %v", err)
+			}
+			err = t.Engine.SendTransaction(t.TestContext, tx)
+			if err != nil {
+				t.Fatalf("FAIL: Error sending max initcode transaction before Shanghai: %v", err)
+			}
+		}
+	}
+
+	// Produce all blocks needed to reach Shanghai
+	t.Logf("INFO: Blocks until Shanghai=%d", s.GetPreWithdrawalsBlockCount())
+	txIncluded := uint64(0)
+	t.CLMock.ProduceBlocks(int(s.GetPreWithdrawalsBlockCount()), clmock.BlockProcessCallbacks{
+		OnGetPayload: func() {
+			t.Logf("INFO: Got Pre-Shanghai block=%d", t.CLMock.LatestPayloadBuilt.Number)
+			txIncluded += uint64(len(t.CLMock.LatestPayloadBuilt.Transactions))
+		},
+	})
+
+	// Check how many transactions were included
+	if txIncluded == 0 && s.OverflowMaxInitcodeTxCountBeforeFork > 0 {
+		t.Fatalf("FAIL: No max initcode txs included before Shanghai. Txs must have been included before the MAX_INITCODE_SIZE limit was enabled")
+	}
+
+	// Create a payload, no txs should be included
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		OnGetPayload: func() {
+			if len(t.CLMock.LatestPayloadBuilt.Transactions) > 0 {
+				t.Fatalf("FAIL: Client included tx exceeding the MAX_INITCODE_SIZE in payload")
+			}
+		},
+	})
+
+	// Send transactions after the fork
+	for i := txIncluded; i < (txIncluded + s.OverflowMaxInitcodeTxCountAfterFork); i++ {
+		tx, err := invalidTxCreator.MakeTransaction(i)
+		if err != nil {
+			t.Fatalf("FAIL: Error creating max initcode transaction: %v", err)
+		}
+		err = t.Engine.SendTransaction(t.TestContext, tx)
+		if err == nil {
+			t.Fatalf("FAIL: Client accepted tx exceeding the MAX_INITCODE_SIZE: %v", tx)
+		}
+		txBack, isPending, err := t.Engine.TransactionByHash(t.TestContext, tx.Hash())
+		if txBack != nil || isPending || err == nil {
+			t.Fatalf("FAIL: Invalid tx was not unknown to the client: txBack=%v, isPending=%t, err=%v", txBack, isPending, err)
+		}
+	}
+
+	// Try to include an invalid tx in new payload
+	var (
+		validTx, _   = validTxCreator.MakeTransaction(txIncluded)
+		invalidTx, _ = invalidTxCreator.MakeTransaction(txIncluded)
+	)
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			t.Engine.SendTransaction(t.TestContext, validTx)
+		},
+		OnGetPayload: func() {
+			validTxBytes, err := validTx.MarshalBinary()
+			if err != nil {
+				t.Fatalf("FAIL: Unable to marshal valid tx to binary: %v", err)
+			}
+			if len(t.CLMock.LatestPayloadBuilt.Transactions) != 1 || !bytes.Equal(validTxBytes, t.CLMock.LatestPayloadBuilt.Transactions[0]) {
+				t.Fatalf("FAIL: Client did not include valid tx with MAX_INITCODE_SIZE")
+			}
+			// Customize the payload to include a tx with an invalid initcode
+			customPayload, err := helper.CustomizePayloadTransactions(&t.CLMock.LatestPayloadBuilt, types.Transactions{invalidTx})
+			if err != nil {
+				t.Fatalf("FAIL: Unable to customize payload: %v", err)
+			}
+
+			r := t.TestEngine.TestEngineNewPayloadV2(customPayload)
+			r.ExpectStatus(test.Invalid)
+			r.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.ParentHash)
+		},
+	})
 }
