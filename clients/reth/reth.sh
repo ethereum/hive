@@ -50,6 +50,11 @@ esac
 mkdir /reth-hive-db
 FLAGS="$FLAGS --db /reth-hive-db"
 
+# It doesn't make sense to dial out, use only a pre-set bootnode.
+if [ "$HIVE_BOOTNODE" != "" ]; then
+    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+fi
+
 # TODO If a specific network ID is requested, use that
 #if [ "$HIVE_NETWORK_ID" != "" ]; then
 #    FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
@@ -135,6 +140,9 @@ set -e
 #    FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt.secret"
 #fi
 
+# Configure NAT
+FLAGS="$FLAGS --nat none"
+
 # Launch the main client.
-echo "Running reth with flags $FLAGS"
+echo "Running reth with flags: $FLAGS"
 $reth node $FLAGS
