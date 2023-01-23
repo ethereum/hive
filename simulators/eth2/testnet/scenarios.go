@@ -2,97 +2,80 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/hive/hivesim"
+	"github.com/ethereum/hive/simulators/eth2/common/clients"
+	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
+	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
 )
 
 var (
-	VALIDATOR_COUNT           uint64 = 64
-	SLOT_TIME                 uint64 = 6
-	TERMINAL_TOTAL_DIFFICULTY        = big.NewInt(100)
+	VALIDATOR_COUNT           = big.NewInt(64)
+	SLOT_TIME                 = big.NewInt(6)
+	TERMINAL_TOTAL_DIFFICULTY = big.NewInt(100)
 )
 
-func startTestnet(t *hivesim.T, env *testEnv, config *config) *Testnet {
-	prep := prepareTestnet(t, env, config)
-	testnet := prep.createTestnet(t)
-
-	genesisTime := testnet.GenesisTime()
-	countdown := genesisTime.Sub(time.Now())
-	t.Logf("Created new testnet, genesis at %s (%s from now)", genesisTime, countdown)
-
-	// for each key partition, we start a validator client with its own beacon node and eth1 node
-	for i, node := range config.Nodes {
-		prep.startEth1Node(testnet, env.Clients.ClientByNameAndRole(node.ExecutionClient, "eth1"), config.Eth1Consensus)
-		prep.startBeaconNode(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-bn", node.ConsensusClient), "beacon"), []int{i})
-		prep.startValidatorClient(testnet, env.Clients.ClientByNameAndRole(fmt.Sprintf("%s-vc", node.ConsensusClient), "validator"), i, i)
-	}
-
-	return testnet
-}
-
-func Phase0Testnet(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         10,
-		MergeForkEpoch:          20,
+func Phase0Testnet(t *hivesim.T, env *tn.Environment, n clients.NodeDefinition) {
+	config := tn.Config{
+		AltairForkEpoch:         big.NewInt(10),
+		BellatrixForkEpoch:      big.NewInt(20),
 		ValidatorCount:          VALIDATOR_COUNT,
 		SlotTime:                SLOT_TIME,
 		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
-		Nodes: []node{
+		NodeDefinitions: []clients.NodeDefinition{
 			n,
 			n,
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: el.ExecutionCliqueConsensus{},
 	}
 
-	testnet := startTestnet(t, env, &config)
-
 	ctx := context.Background()
+	testnet := tn.StartTestnet(ctx, t, env, &config)
+
 	finalized, err := testnet.WaitForFinality(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
+	if err := testnet.VerifyParticipation(ctx, tn.FirstSlotAfterCheckpoint{Checkpoint: &finalized}, 0.95); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, finalized); err != nil {
+	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, tn.LastSlotAtCheckpoint{Checkpoint: &finalized}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := testnet.VerifyProposers(ctx, finalized); err != nil {
+	if err := testnet.VerifyProposers(ctx, tn.LastSlotAtCheckpoint{Checkpoint: &finalized}, false); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
 
-func TransitionTestnet(t *hivesim.T, env *testEnv, n node) {
-	config := config{
-		AltairForkEpoch:         0,
-		MergeForkEpoch:          0,
+func TransitionTestnet(t *hivesim.T, env *tn.Environment, n clients.NodeDefinition) {
+	config := tn.Config{
+		AltairForkEpoch:         big.NewInt(0),
+		BellatrixForkEpoch:      big.NewInt(0),
 		ValidatorCount:          VALIDATOR_COUNT,
 		SlotTime:                SLOT_TIME,
 		TerminalTotalDifficulty: TERMINAL_TOTAL_DIFFICULTY,
-		Nodes: []node{
+		NodeDefinitions: []clients.NodeDefinition{
 			n,
 			n,
 		},
-		Eth1Consensus: Clique,
+		Eth1Consensus: el.ExecutionCliqueConsensus{},
 	}
 
-	testnet := startTestnet(t, env, &config)
-
 	ctx := context.Background()
+	testnet := tn.StartTestnet(ctx, t, env, &config)
+
 	finalized, err := testnet.WaitForFinality(ctx)
 	if err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := testnet.VerifyParticipation(ctx, finalized, 0.95); err != nil {
+	if err := testnet.VerifyParticipation(ctx, tn.FirstSlotAfterCheckpoint{Checkpoint: &finalized}, 0.95); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, finalized); err != nil {
+	if err := testnet.VerifyExecutionPayloadIsCanonical(ctx, tn.LastSlotAtCheckpoint{Checkpoint: &finalized}); err != nil {
 		t.Fatalf("%v", err)
 	}
-	if err := testnet.VerifyProposers(ctx, finalized); err != nil {
+	if err := testnet.VerifyProposers(ctx, tn.LastSlotAtCheckpoint{Checkpoint: &finalized}, false); err != nil {
 		t.Fatalf("%v", err)
 	}
 }
