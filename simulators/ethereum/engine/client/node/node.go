@@ -19,6 +19,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
@@ -90,20 +91,15 @@ var (
 	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
 )
 
-func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
-	return s.StartGethNode(T, testContext, ClientParams, ClientFiles, bootClients...)
+func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+	return s.StartGethNode(T, testContext, genesis, ClientParams, ClientFiles, bootClients...)
 }
 
-func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
+func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
 	var (
 		ttd = s.TerminalTotalDifficulty
 		err error
 	)
-	genesisPath, ok := ClientFiles["/genesis.json"]
-	if !ok {
-		return nil, fmt.Errorf("Cannot start without genesis file")
-	}
-	genesis := helper.LoadGenesis(genesisPath)
 
 	if ttd == nil {
 		if ttdStr, ok := ClientParams["HIVE_TERMINAL_TOTAL_DIFFICULTY"]; ok {
@@ -114,10 +110,15 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 			}
 		}
 	} else {
-		ttd = big.NewInt(helper.CalculateRealTTD(genesisPath, ttd.Int64()))
+		ttd = big.NewInt(helper.CalculateRealTTD(genesis, ttd.Int64()))
 		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 	}
-	genesis.Config.TerminalTotalDifficulty = ttd
+
+	// Not sure if this hack works
+	genesisCopy := *genesis
+	configCopy := *genesisCopy.Config
+	configCopy.TerminalTotalDifficulty = ttd
+	genesisCopy.Config = &configCopy
 
 	var enodes []string
 	if bootClients != nil && len(bootClients) > 0 {
@@ -150,7 +151,7 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		s.Config.TerminalBlockSiblingDepth = DefaultTerminalBlockSiblingDepth
 	}
 
-	g, err := newNode(s.Config, enodes, &genesis)
+	g, err := newNode(s.Config, enodes, &genesisCopy)
 	if err != nil {
 		return nil, err
 	}
@@ -190,10 +191,10 @@ type GethNode struct {
 
 	// Engine updates info
 	latestFcUStateSent *beacon.ForkchoiceStateV1
-	latestPAttrSent    *beacon.PayloadAttributesV1
+	latestPAttrSent    *beacon.PayloadAttributes
 	latestFcUResponse  *beacon.ForkChoiceResponse
 
-	latestPayloadSent          *beacon.ExecutableDataV1
+	latestPayloadSent          *beacon.ExecutableData
 	latestPayloadStatusReponse *beacon.PayloadStatusV1
 
 	// Test specific configuration
@@ -237,7 +238,7 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		SyncMode:         downloader.FullSync,
 		DatabaseCache:    256,
 		DatabaseHandles:  256,
-		TxPool:           core.DefaultTxPoolConfig,
+		TxPool:           txpool.DefaultConfig,
 		GPO:              ethconfig.Defaults.GPO,
 		Ethash:           ethconfig.Defaults.Ethash,
 		Miner:            ethconfig.Defaults.Miner,
@@ -383,7 +384,7 @@ func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, 
 	if n.eth.BlockChain().Config().IsLondon(nextHeader.Number) {
 		nextHeader.BaseFee = misc.CalcBaseFee(n.eth.BlockChain().Config(), currentBlock.Header())
 		if !n.eth.BlockChain().Config().IsLondon(currentBlock.Number()) {
-			parentGasLimit := currentBlock.GasLimit() * params.ElasticityMultiplier
+			parentGasLimit := currentBlock.GasLimit() * n.eth.BlockChain().Config().ElasticityMultiplier()
 			nextHeader.GasLimit = parentGasLimit
 		}
 	}
@@ -397,7 +398,7 @@ func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, 
 	if err != nil {
 		panic(err)
 	}
-	b, err := n.ethashEngine.FinalizeAndAssemble(n.eth.BlockChain(), nextHeader, state, nil, nil, nil)
+	b, err := n.ethashEngine.FinalizeAndAssemble(n.eth.BlockChain(), nextHeader, state, nil, nil, nil, nil)
 	return state, b, err
 }
 
@@ -688,14 +689,20 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 }
 
 // Engine API
-func (n *GethNode) NewPayloadV1(ctx context.Context, pl *beacon.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
+func (n *GethNode) NewPayloadV1(ctx context.Context, pl *beacon.ExecutableData) (beacon.PayloadStatusV1, error) {
 	n.latestPayloadSent = pl
 	resp, err := n.api.NewPayloadV1(*pl)
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
+func (n *GethNode) NewPayloadV2(ctx context.Context, pl *beacon.ExecutableData) (beacon.PayloadStatusV1, error) {
+	n.latestPayloadSent = pl
+	resp, err := n.api.NewPayloadV2(*pl)
+	n.latestPayloadStatusReponse = &resp
+	return resp, err
+}
 
-func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributesV1) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
 	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, payload)
@@ -703,12 +710,28 @@ func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.Forkchoi
 	return fcr, err
 }
 
-func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableDataV1, error) {
+func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+	n.latestFcUStateSent = fcs
+	n.latestPAttrSent = payload
+	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, payload)
+	n.latestFcUResponse = &fcr
+	return fcr, err
+}
+
+func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableData, error) {
 	p, err := n.api.GetPayloadV1(*payloadId)
 	if p == nil || err != nil {
-		return beacon.ExecutableDataV1{}, err
+		return beacon.ExecutableData{}, err
 	}
 	return *p, err
+}
+
+func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableData, *big.Int, error) {
+	p, err := n.api.GetPayloadV2(*payloadId)
+	if p == nil || err != nil {
+		return beacon.ExecutableData{}, nil, err
+	}
+	return *p.ExecutionPayload, p.BlockValue, err
 }
 
 // Eth JSON RPC
@@ -806,6 +829,10 @@ func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 	return stateDB.GetNonce(account), nil
 }
 
+func (n *GethNode) TransactionByHash(ctx context.Context, hash common.Hash) (tx *types.Transaction, isPending bool, err error) {
+	panic("NOT IMPLEMENTED")
+}
+
 func (n *GethNode) GetBlockTotalDifficulty(ctx context.Context, hash common.Hash) (*big.Int, error) {
 	block := n.eth.BlockChain().GetBlockByHash(hash)
 	if block == nil {
@@ -878,11 +905,11 @@ func (n *GethNode) PostRunVerifications() error {
 	return nil
 }
 
-func (n *GethNode) LatestForkchoiceSent() (fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributesV1) {
+func (n *GethNode) LatestForkchoiceSent() (fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributes) {
 	return n.latestFcUStateSent, n.latestPAttrSent
 }
 
-func (n *GethNode) LatestNewPayloadSent() (payload *beacon.ExecutableDataV1) {
+func (n *GethNode) LatestNewPayloadSent() (payload *beacon.ExecutableData) {
 	return n.latestPayloadSent
 }
 

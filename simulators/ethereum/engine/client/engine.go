@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/ethereum/go-ethereum/core"
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/hivesim"
 
@@ -21,15 +22,20 @@ type Eth interface {
 	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
+	TransactionByHash(ctx context.Context, hash common.Hash) (tx *types.Transaction, isPending bool, err error)
 }
 
 type Engine interface {
-	ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) (api.ForkChoiceResponse, error)
-	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableDataV1, error)
-	NewPayloadV1(ctx context.Context, payload *api.ExecutableDataV1) (api.PayloadStatusV1, error)
+	ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
+	ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
 
-	LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1)
-	LatestNewPayloadSent() (payload *api.ExecutableDataV1)
+	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error)
+	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error)
+	NewPayloadV1(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
+	NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
+
+	LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes)
+	LatestNewPayloadSent() (payload *api.ExecutableData)
 
 	LatestForkchoiceResponse() (fcuResponse *api.ForkChoiceResponse)
 	LatestNewPayloadResponse() (payloadResponse *api.PayloadStatusV1)
@@ -57,7 +63,7 @@ type EngineClient interface {
 }
 
 type EngineStarter interface {
-	StartClient(T *hivesim.T, testContext context.Context, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...EngineClient) (EngineClient, error)
+	StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...EngineClient) (EngineClient, error)
 }
 
 var (

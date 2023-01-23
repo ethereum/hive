@@ -946,7 +946,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 
 		for i, secondaryClientSpec := range mergeTestSpec.SecondaryClientSpecs {
 			// Start the secondary client with the alternative chain
-			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.CLMock.TestContext, t.ClientParams, t.ClientFiles, t.Engine)
+			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.CLMock.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 			t.Logf("INFO (%s): Started secondary client: %v", t.TestName, secondaryClient.ID())
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
@@ -1025,7 +1025,17 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 				// Get the address nonce:
 				// This is because we could have included transactions in the PoW chain of the block
 				// producer, or re-orged.
-				tx, err := helper.SendNextTransaction(t.TestContext, t.CLMock.NextBlockProducer, globals.PrevRandaoContractAddr, common.Big0, nil, t.TestTransactionType)
+				tx, err := helper.SendNextTransaction(
+					t.TestContext,
+					t.CLMock.NextBlockProducer,
+					&helper.BaseTransactionCreator{
+						Recipient: &globals.PrevRandaoContractAddr,
+						Amount:    common.Big0,
+						Payload:   nil,
+						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
+					},
+				)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable create next transaction: %v", t.TestName, err)
 				}

@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -38,6 +39,7 @@ type Env struct {
 	CLMock *clmock.CLMocker
 
 	// Client parameters used to launch the default client
+	Genesis      *core.Genesis
 	ClientParams hivesim.Params
 	ClientFiles  hivesim.Params
 
@@ -45,9 +47,19 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, fn func(*Env), cParams hivesim.Params, cFiles hivesim.Params, testTransactionType helper.TestTransactionType, safeSlotsToImportOptimistically int64) {
+func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
-	clMocker := clmock.NewCLMocker(t, slotsToSafe, slotsToFinalized, big.NewInt(safeSlotsToImportOptimistically))
+	consensusConfig := testSpec.GetConsensusConfig()
+	clMocker := clmock.NewCLMocker(
+		t,
+		consensusConfig.SlotsToSafe,
+		consensusConfig.SlotsToFinalized,
+		big.NewInt(consensusConfig.SafeSlotsToImportOptimistically),
+		testSpec.GetForkConfig().ShanghaiTimestamp)
+
+	// Send the CLMocker for configuration by the spec, if any.
+	testSpec.ConfigureCLMock(clMocker)
+
 	// Defer closing all clients
 	defer func() {
 		clMocker.CloseClients()
@@ -55,9 +67,9 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 
 	// Create Engine client from main hivesim.Client to be used by tests
 	ec := hive_rpc.NewHiveRPCEngineClient(c, globals.EnginePortHTTP, globals.EthPortHTTP, globals.DefaultJwtTokenSecretBytes, ttd, &helper.LoggingRoundTrip{
-		T:     t,
-		Hc:    c,
-		Inner: http.DefaultTransport,
+		Logger: t,
+		ID:     c.Container,
+		Inner:  http.DefaultTransport,
 	})
 	defer ec.Close()
 
@@ -66,15 +78,16 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 
 	env := &Env{
 		T:                   t,
-		TestName:            testName,
+		TestName:            testSpec.GetName(),
 		Client:              c,
 		Engine:              ec,
 		Eth:                 ec,
 		HiveEngine:          ec,
 		CLMock:              clMocker,
+		Genesis:             genesis,
 		ClientParams:        cParams,
 		ClientFiles:         cFiles,
-		TestTransactionType: testTransactionType,
+		TestTransactionType: testSpec.GetTestTransactionType(),
 	}
 
 	// Before running the test, make sure Eth and Engine ports are open for the client
@@ -106,7 +119,7 @@ func Run(testName string, ttd *big.Int, slotsToSafe *big.Int, slotsToFinalized *
 	}()
 
 	// Run the test
-	fn(env)
+	testSpec.Execute(env)
 }
 
 func (t *Env) MainTTD() *big.Int {

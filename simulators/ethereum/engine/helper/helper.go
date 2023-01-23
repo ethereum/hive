@@ -2,6 +2,7 @@ package helper
 
 import (
 	"context"
+	"crypto/ecdsa"
 	"strings"
 	"sync"
 	"time"
@@ -32,10 +33,14 @@ import (
 // From ethereum/rpc:
 
 // LoggingRoundTrip writes requests and responses to the test log.
+type LogF interface {
+	Logf(format string, values ...interface{})
+}
+
 type LoggingRoundTrip struct {
-	T     *hivesim.T
-	Hc    *hivesim.Client
-	Inner http.RoundTripper
+	Logger LogF
+	ID     string
+	Inner  http.RoundTripper
 }
 
 func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -45,7 +50,7 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	rt.T.Logf(">> (%s) %s", rt.Hc.Container, bytes.TrimSpace(reqBytes))
+	rt.Logger.Logf(">> (%s) %s", rt.ID, bytes.TrimSpace(reqBytes))
 	reqCopy := *req
 	reqCopy.Body = ioutil.NopCloser(bytes.NewReader(reqBytes))
 
@@ -63,33 +68,34 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	respCopy := *resp
 	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
-	rt.T.Logf("<< (%s) %s", rt.Hc.Container, bytes.TrimSpace(respBytes))
+	rt.Logger.Logf("<< (%s) %s", rt.ID, bytes.TrimSpace(respBytes))
 	return &respCopy, nil
 }
 
 type InvalidPayloadBlockField string
 
 const (
-	InvalidParentHash             InvalidPayloadBlockField = "ParentHash"
-	InvalidStateRoot                                       = "StateRoot"
-	InvalidReceiptsRoot                                    = "ReceiptsRoot"
-	InvalidNumber                                          = "Number"
-	InvalidGasLimit                                        = "GasLimit"
-	InvalidGasUsed                                         = "GasUsed"
-	InvalidTimestamp                                       = "Timestamp"
-	InvalidPrevRandao                                      = "PrevRandao"
-	InvalidOmmers                                          = "Ommers"
-	RemoveTransaction                                      = "Incomplete Transactions"
-	InvalidTransactionSignature                            = "Transaction Signature"
-	InvalidTransactionNonce                                = "Transaction Nonce"
-	InvalidTransactionGas                                  = "Transaction Gas"
-	InvalidTransactionGasPrice                             = "Transaction GasPrice"
-	InvalidTransactionGasTipPrice                          = "Transaction GasTipCapPrice"
-	InvalidTransactionValue                                = "Transaction Value"
-	InvalidTransactionChainID                              = "Transaction ChainID"
+	InvalidParentHash             = "ParentHash"
+	InvalidStateRoot              = "StateRoot"
+	InvalidReceiptsRoot           = "ReceiptsRoot"
+	InvalidNumber                 = "Number"
+	InvalidGasLimit               = "GasLimit"
+	InvalidGasUsed                = "GasUsed"
+	InvalidTimestamp              = "Timestamp"
+	InvalidPrevRandao             = "PrevRandao"
+	InvalidOmmers                 = "Ommers"
+	InvalidWithdrawals            = "Withdrawals"
+	RemoveTransaction             = "Incomplete Transactions"
+	InvalidTransactionSignature   = "Transaction Signature"
+	InvalidTransactionNonce       = "Transaction Nonce"
+	InvalidTransactionGas         = "Transaction Gas"
+	InvalidTransactionGasPrice    = "Transaction GasPrice"
+	InvalidTransactionGasTipPrice = "Transaction GasTipCapPrice"
+	InvalidTransactionValue       = "Transaction Value"
+	InvalidTransactionChainID     = "Transaction ChainID"
 )
 
-func TransactionInPayload(payload *api.ExecutableDataV1, tx *types.Transaction) bool {
+func TransactionInPayload(payload *api.ExecutableData, tx *types.Transaction) bool {
 	for _, bytesTx := range payload.Transactions {
 		var currentTx types.Transaction
 		if err := currentTx.UnmarshalBinary(bytesTx); err == nil {
@@ -144,16 +150,16 @@ func gethDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx *type
 	for i, l := range er.StructLogs {
 		if l.Op == "DIFFICULTY" || l.Op == "PREVRANDAO" {
 			if i+1 >= len(er.StructLogs) {
-				return errors.New(fmt.Sprintf("No information after PREVRANDAO operation"))
+				return errors.New("no information after PREVRANDAO operation")
 			}
 			prevRandaoFound = true
 			stack := *(er.StructLogs[i+1].Stack)
 			if len(stack) < 1 {
-				return errors.New(fmt.Sprintf("Invalid stack after PREVRANDAO operation: %v", l.Stack))
+				return fmt.Errorf("invalid stack after PREVRANDAO operation: %v", l.Stack)
 			}
 			stackHash := common.HexToHash(stack[0])
 			if stackHash != *expectedPrevRandao {
-				return errors.New(fmt.Sprintf("Invalid stack after PREVRANDAO operation, %v != %v", stackHash, expectedPrevRandao))
+				return fmt.Errorf("invalid stack after PREVRANDAO operation, %v != %v", stackHash, expectedPrevRandao)
 			}
 		}
 	}
@@ -169,6 +175,12 @@ func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx
 		return err
 	}
 	return nil
+}
+
+func bytesSource(data []byte) func() (io.ReadCloser, error) {
+	return func() (io.ReadCloser, error) {
+		return ioutil.NopCloser(bytes.NewReader(data)), nil
+	}
 }
 
 func LoadChain(path string) types.Blocks {
@@ -210,6 +222,14 @@ func LoadGenesisBlock(path string) *types.Block {
 	return genesis.ToBlock()
 }
 
+func GenesisStartOption(genesis *core.Genesis) (hivesim.StartOption, error) {
+	out, err := json.Marshal(genesis)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
+	}
+	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
+}
+
 func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
 	result := new(big.Int).Set(genesis.Difficulty)
 	for _, b := range chain {
@@ -222,8 +242,7 @@ func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBloc
 }
 
 // TTD is the value specified in the test.Spec + Genesis.Difficulty
-func CalculateRealTTD(genesisPath string, ttdValue int64) int64 {
-	g := LoadGenesis(genesisPath)
+func CalculateRealTTD(g *core.Genesis, ttdValue int64) int64 {
 	return g.Difficulty.Int64() + ttdValue
 }
 
@@ -285,7 +304,7 @@ func WaitForTTDWithTimeout(ec client.EngineClient, ctx context.Context) error {
 				return nil
 			}
 		case <-ctx.Done():
-			return fmt.Errorf("Timeout reached")
+			return fmt.Errorf("timeout reached")
 		}
 	}
 }
@@ -319,11 +338,24 @@ const (
 	DynamicFeeTxOnly
 )
 
-func MakeTransaction(nonce uint64, recipient *common.Address, gasLimit uint64, amount *big.Int, payload []byte, txType TestTransactionType) (*types.Transaction, error) {
+type TransactionCreator interface {
+	MakeTransaction(nonce uint64) (*types.Transaction, error)
+}
+
+type BaseTransactionCreator struct {
+	Recipient  *common.Address
+	GasLimit   uint64
+	Amount     *big.Int
+	Payload    []byte
+	TxType     TestTransactionType
+	PrivateKey *ecdsa.PrivateKey
+}
+
+func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transaction, error) {
 	var newTxData types.TxData
 
 	var txTypeToUse int
-	switch txType {
+	switch tc.TxType {
 	case UnspecifiedTransactionType:
 		// Test case has no specific type of transaction to use.
 		// Select the type of tx based on the nonce.
@@ -344,32 +376,100 @@ func MakeTransaction(nonce uint64, recipient *common.Address, gasLimit uint64, a
 	case types.LegacyTxType:
 		newTxData = &types.LegacyTx{
 			Nonce:    nonce,
-			To:       recipient,
-			Value:    amount,
-			Gas:      gasLimit,
+			To:       tc.Recipient,
+			Value:    tc.Amount,
+			Gas:      tc.GasLimit,
 			GasPrice: globals.GasPrice,
-			Data:     payload,
+			Data:     tc.Payload,
 		}
 	case types.DynamicFeeTxType:
 		gasFeeCap := new(big.Int).Set(globals.GasPrice)
 		gasTipCap := new(big.Int).Set(globals.GasTipPrice)
 		newTxData = &types.DynamicFeeTx{
 			Nonce:     nonce,
-			Gas:       gasLimit,
+			Gas:       tc.GasLimit,
 			GasTipCap: gasTipCap,
 			GasFeeCap: gasFeeCap,
-			To:        recipient,
-			Value:     amount,
-			Data:      payload,
+			To:        tc.Recipient,
+			Value:     tc.Amount,
+			Data:      tc.Payload,
 		}
 	}
 
 	tx := types.NewTx(newTxData)
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(globals.ChainID), globals.VaultKey)
+	key := tc.PrivateKey
+	if key == nil {
+		key = globals.VaultKey
+	}
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(globals.ChainID), key)
 	if err != nil {
 		return nil, err
 	}
 	return signedTx, nil
+}
+
+// Create a contract filled with zeros without going over the specified GasLimit
+type BigContractTransactionCreator struct {
+	BaseTransactionCreator
+}
+
+func (tc *BigContractTransactionCreator) MakeTransaction(nonce uint64) (*types.Transaction, error) {
+	// Total GAS: Gtransaction == 21000, Gcreate == 32000, Gcodedeposit == 200
+	contractLength := uint64(0)
+	if tc.GasLimit > (21000 + 32000) {
+		contractLength = (tc.GasLimit - 21000 - 32000) / 200
+		if contractLength >= 1 {
+			// Reduce by 1 to guarantee using less gas than requested
+			contractLength -= 1
+		}
+	}
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, contractLength)
+
+	tc.Payload = []byte{
+		0x67, // PUSH8
+	}
+	tc.Payload = append(tc.Payload, buf...) // Size of the contract in byte length
+	tc.Payload = append(tc.Payload, 0x38)   // CODESIZE == 0x00
+	tc.Payload = append(tc.Payload, 0xF3)   // RETURN(offset, length)
+	if tc.Recipient != nil {
+		panic("invalid configuration for big contract tx creator")
+	}
+	return tc.BaseTransactionCreator.MakeTransaction(nonce)
+}
+
+// Create a tx with the specified initcode length (all zeros)
+type BigInitcodeTransactionCreator struct {
+	BaseTransactionCreator
+	InitcodeLength int
+	PadByte        uint8
+	Initcode       []byte
+}
+
+func (tc *BigInitcodeTransactionCreator) MakeTransaction(nonce uint64) (*types.Transaction, error) {
+	// This method caches the payload with the crafted initcode after first execution.
+	if tc.Payload == nil {
+		// Prepare initcode payload
+		if tc.Initcode != nil {
+			if len(tc.Initcode) > tc.InitcodeLength {
+				panic(fmt.Errorf("invalid initcode (too big)"))
+			}
+			tc.Payload = tc.Initcode
+		} else {
+			tc.Payload = []byte{}
+		}
+
+		for {
+			if len(tc.Payload) == tc.InitcodeLength {
+				break
+			}
+			tc.Payload = append(tc.Payload, tc.PadByte)
+		}
+	}
+	if tc.Recipient != nil {
+		panic("invalid configuration for big contract tx creator")
+	}
+	return tc.BaseTransactionCreator.MakeTransaction(nonce)
 }
 
 // Determines if the error we got from sending the raw tx is because the client
@@ -379,59 +479,12 @@ func SentTxAlreadyKnown(err error) bool {
 	return strings.Contains(err.Error(), "already known")
 }
 
-func SendNextTransaction(testCtx context.Context, node client.EngineClient, recipient common.Address, amount *big.Int, payload []byte, txType TestTransactionType) (*types.Transaction, error) {
+func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (*types.Transaction, error) {
 	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
 	if err != nil {
 		return nil, err
 	}
-	tx, err := MakeTransaction(nonce, &recipient, 75000, amount, payload, txType)
-	for {
-		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
-		defer cancel()
-		err := node.SendTransaction(ctx, tx)
-		if err == nil {
-			return tx, nil
-		} else if SentTxAlreadyKnown(err) {
-			return tx, nil
-		}
-		select {
-		case <-time.After(time.Second):
-		case <-testCtx.Done():
-			return nil, testCtx.Err()
-		}
-	}
-}
-
-// Method that attempts to create a contract filled with zeros without going over the specified gasLimit
-func MakeBigContractTransaction(nonce uint64, gasLimit uint64, txType TestTransactionType) (*types.Transaction, error) {
-	// Total GAS: Gtransaction == 21000, Gcreate == 32000, Gcodedeposit == 200
-	contractLength := uint64(0)
-	if gasLimit > (21000 + 32000) {
-		contractLength = (gasLimit - 21000 - 32000) / 200
-		if contractLength >= 1 {
-			// Reduce by 1 to guarantee using less gas than requested
-			contractLength -= 1
-		}
-	}
-	buf := make([]byte, 8)
-	binary.BigEndian.PutUint64(buf, contractLength)
-
-	initCode := []byte{
-		0x67, // PUSH8
-	}
-	initCode = append(initCode, buf...) // Size of the contract in byte length
-	initCode = append(initCode, 0x38)   // CODESIZE == 0x00
-	initCode = append(initCode, 0xF3)   // RETURN(offset, length)
-
-	return MakeTransaction(nonce, nil, gasLimit, common.Big0, initCode, txType)
-}
-
-func SendNextBigContractTransaction(testCtx context.Context, node client.EngineClient, gasLimit uint64, txType TestTransactionType) (*types.Transaction, error) {
-	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
-	if err != nil {
-		return nil, err
-	}
-	tx, err := MakeBigContractTransaction(nonce, gasLimit, txType)
+	tx, err := txCreator.MakeTransaction(nonce)
 	if err != nil {
 		return nil, err
 	}
@@ -440,6 +493,8 @@ func SendNextBigContractTransaction(testCtx context.Context, node client.EngineC
 		defer cancel()
 		err := node.SendTransaction(ctx, tx)
 		if err == nil {
+			return tx, nil
+		} else if SentTxAlreadyKnown(err) {
 			return tx, nil
 		}
 		select {

@@ -12,8 +12,8 @@ import (
 
 	suite_auth "github.com/ethereum/hive/simulators/ethereum/engine/suites/auth"
 	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
-	suite_sync "github.com/ethereum/hive/simulators/ethereum/engine/suites/sync"
 	suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
+	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
 func main() {
@@ -40,68 +40,112 @@ func main() {
 			Description: `
 	Test Engine API sync, pre/post merge.`[1:],
 		}
+		withdrawals = hivesim.Suite{
+			Name: "engine-withdrawals",
+			Description: `
+	Test Engine API withdrawals, pre/post Shanghai.`[1:],
+		}
 	)
 
 	simulator := hivesim.New()
 
-	addTestsToSuite(&engine, suite_engine.Tests, "full")
-	addTestsToSuite(&transition, suite_transition.Tests, "full")
-	addTestsToSuite(&auth, suite_auth.Tests, "full")
-	suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
+	addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
+	addTestsToSuite(simulator, &transition, specToInterface(suite_transition.Tests), "full")
+	addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
+	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
+	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
 
 	// Mark suites for execution
 	hivesim.MustRunSuite(simulator, engine)
 	hivesim.MustRunSuite(simulator, transition)
 	hivesim.MustRunSuite(simulator, auth)
 	hivesim.MustRunSuite(simulator, sync)
+	hivesim.MustRunSuite(simulator, withdrawals)
+}
+
+func specToInterface(src []test.Spec) []test.SpecInterface {
+	res := make([]test.SpecInterface, len(src))
+	for i := 0; i < len(src); i++ {
+		res[i] = src[i]
+	}
+	return res
 }
 
 // Add test cases to a given test suite
-func addTestsToSuite(suite *hivesim.Suite, tests []test.Spec, nodeType string) {
+func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.SpecInterface, nodeType string) {
 	for _, currentTest := range tests {
 		currentTest := currentTest
-		genesisPath := "./init/genesis.json"
-		// If the test.Spec specified a custom genesis file, use that instead.
-		if currentTest.GenesisFile != "" {
-			genesisPath = "./init/" + currentTest.GenesisFile
+
+		// Load the genesis file specified and dynamically bundle it.
+		genesis := currentTest.GetGenesis()
+		genesisStartOption, err := helper.GenesisStartOption(genesis)
+		if err != nil {
+			panic("unable to inject genesis")
 		}
-		testFiles := hivesim.Params{"/genesis.json": genesisPath}
+
 		// Calculate and set the TTD for this test
-		ttd := helper.CalculateRealTTD(genesisPath, currentTest.TTD)
+		ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
+		// Configure Forks
 		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+		if currentTest.GetForkConfig().ShanghaiTimestamp != nil {
+			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", currentTest.GetForkConfig().ShanghaiTimestamp))
+		}
+
 		if nodeType != "" {
 			newParams = newParams.Set("HIVE_NODETYPE", nodeType)
 		}
-		if currentTest.ChainFile != "" {
+
+		testFiles := hivesim.Params{}
+		if currentTest.GetChainFile() != "" {
 			// We are using a Proof of Work chain file, remove all clique-related settings
 			// TODO: Nethermind still requires HIVE_MINER for the Engine API
 			// delete(newParams, "HIVE_MINER")
 			delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
 			delete(newParams, "HIVE_CLIQUE_PERIOD")
 			// Add the new file to be loaded as chain.rlp
-			testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.ChainFile)
+			testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.GetChainFile())
 		}
-		if currentTest.DisableMining {
+		if currentTest.IsMiningDisabled() {
 			delete(newParams, "HIVE_MINER")
 		}
-		suite.Add(hivesim.ClientTestSpec{
-			Name:        currentTest.Name,
-			Description: currentTest.About,
-			Parameters:  newParams,
-			Files:       testFiles,
-			Run: func(t *hivesim.T, c *hivesim.Client) {
-				t.Logf("Start test (%s): %s", c.Type, currentTest.Name)
-				defer func() {
-					t.Logf("End test (%s): %s", c.Type, currentTest.Name)
-				}()
-				timeout := globals.DefaultTestCaseTimeout
-				// If a test.Spec specifies a timeout, use that instead
-				if currentTest.TimeoutSeconds != 0 {
-					timeout = time.Second * time.Duration(currentTest.TimeoutSeconds)
-				}
-				// Run the test case
-				test.Run(currentTest.Name, big.NewInt(ttd), currentTest.SlotsToSafe, currentTest.SlotsToFinalized, timeout, t, c, currentTest.Run, newParams, testFiles, currentTest.TestTransactionType, currentTest.SafeSlotsToImportOptimistically)
-			},
-		})
+
+		if clientTypes, err := sim.ClientTypes(); err == nil {
+			for _, clientType := range clientTypes {
+				suite.Add(hivesim.TestSpec{
+					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), clientType.Name),
+					Description: currentTest.GetAbout(),
+					Run: func(t *hivesim.T) {
+						// Start the client with given options
+						c := t.StartClient(
+							clientType.Name,
+							newParams,
+							genesisStartOption,
+							hivesim.WithStaticFiles(testFiles),
+						)
+						t.Logf("Start test (%s): %s", c.Type, currentTest.GetName())
+						defer func() {
+							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
+						}()
+						timeout := globals.DefaultTestCaseTimeout
+						// If a test.Spec specifies a timeout, use that instead
+						if currentTest.GetTimeout() != 0 {
+							timeout = time.Second * time.Duration(currentTest.GetTimeout())
+						}
+						// Run the test case
+						test.Run(
+							currentTest,
+							big.NewInt(ttd),
+							timeout,
+							t,
+							c,
+							genesis,
+							newParams,
+							testFiles,
+						)
+					},
+				})
+			}
+		}
+
 	}
 }

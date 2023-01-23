@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"runtime"
@@ -10,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 )
@@ -52,10 +54,14 @@ func StatusesToString(statuses []PayloadStatus) []string {
 // Test Engine API Helper Structs
 type ExpectEnv struct {
 	*Env
+	ExpectationDescription string
 }
 
 func (e ExpectEnv) Fatalf(format string, values ...interface{}) {
 	PrintExpectStack(e.Env)
+	if e.ExpectationDescription != "" {
+		e.Env.Logf("DEBUG (%s): %s", e.TestName, e.ExpectationDescription)
+	}
 	e.Env.Fatalf(format, values...)
 }
 
@@ -66,59 +72,89 @@ type TestEngineClient struct {
 
 func NewTestEngineClient(t *Env, ec client.EngineClient) *TestEngineClient {
 	return &TestEngineClient{
-		ExpectEnv: &ExpectEnv{t},
+		ExpectEnv: &ExpectEnv{Env: t},
 		Engine:    ec,
 	}
 }
 
-// ForkchoiceUpdatedV1
+// ForkchoiceUpdated
 
 type ForkchoiceResponseExpectObject struct {
 	*ExpectEnv
-	Response api.ForkChoiceResponse
-	Error    error
+	Response  api.ForkChoiceResponse
+	Version   int
+	Error     error
+	ErrorCode int
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributesV1) *ForkchoiceResponseExpectObject {
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) *ForkchoiceResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	resp, err := tec.Engine.ForkchoiceUpdatedV1(ctx, fcState, pAttributes)
-	return &ForkchoiceResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &ForkchoiceResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Response:  resp,
+		Version:   1,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) *ForkchoiceResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	resp, err := tec.Engine.ForkchoiceUpdatedV2(ctx, fcState, pAttributes)
+	ret := &ForkchoiceResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
+		Response:  resp,
+		Version:   2,
+		Error:     err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
+	if version == 2 {
+		return tec.TestEngineForkchoiceUpdatedV2(fcState, pAttributes)
+	}
+	return tec.TestEngineForkchoiceUpdatedV1(fcState, pAttributes)
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Unexpected error on EngineForkchoiceUpdatedV1: %v, expected=<None>", exp.TestName, exp.Error)
+		exp.Fatalf("FAIL (%s): Unexpected error on EngineForkchoiceUpdatedV%d: %v, expected=<None>", exp.TestName, exp.Version, exp.Error)
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectNoValidationError() {
 	if exp.Response.PayloadStatus.ValidationError != nil {
-		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineForkchoiceUpdatedV1: %v, expected=<None>", exp.TestName, exp.Response.PayloadStatus.ValidationError)
+		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineForkchoiceUpdatedV%d: %v, expected=<None>", exp.TestName, exp.Version, exp.Response.PayloadStatus.ValidationError)
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectError() {
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV1: response=%v", exp.TestName, exp.Response)
+		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV%d: response=%v", exp.TestName, exp.Version, exp.Response)
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectErrorCode(code int) {
-	// TODO: Actually check error code
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineForkchoiceUpdatedV1: response=%v", exp.TestName, exp.Response)
+	exp.ExpectError()
+	if exp.ErrorCode != code {
+		exp.Fatalf("FAIL (%s): Expected error code on EngineForkchoiceUpdatedV%d: want=%d, got=%d", exp.TestName, exp.Version, code, exp.ErrorCode)
 	}
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectPayloadStatus(ps PayloadStatus) {
 	exp.ExpectNoError()
 	if PayloadStatus(exp.Response.PayloadStatus.Status) != ps {
-		exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.Status, ps)
+		exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadStatus.Status, ps)
 	}
 }
 
@@ -129,14 +165,14 @@ func (exp *ForkchoiceResponseExpectObject) ExpectAnyPayloadStatus(statuses ...Pa
 			return
 		}
 	}
-	exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.Status, StatusesToString(statuses))
+	exp.Fatalf("FAIL (%s): Unexpected status response on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadStatus.Status, StatusesToString(statuses))
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectLatestValidHash(lvh *common.Hash) {
 	exp.ExpectNoError()
 	if ((lvh == nil || exp.Response.PayloadStatus.LatestValidHash == nil) && exp.Response.PayloadStatus.LatestValidHash != lvh) ||
 		(lvh != nil && exp.Response.PayloadStatus.LatestValidHash != nil && *exp.Response.PayloadStatus.LatestValidHash != *lvh) {
-		exp.Fatalf("FAIL (%v): Unexpected LatestValidHash on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadStatus.LatestValidHash, lvh)
+		exp.Fatalf("FAIL (%v): Unexpected LatestValidHash on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadStatus.LatestValidHash, lvh)
 	}
 }
 
@@ -144,58 +180,96 @@ func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *api.PayloadID) {
 	exp.ExpectNoError()
 	if ((exp.Response.PayloadID == nil || pid == nil) && exp.Response.PayloadID != pid) ||
 		(exp.Response.PayloadID != nil && pid != nil && *exp.Response.PayloadID != *pid) {
-		exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV1: %v, expected=%v", exp.TestName, exp.Response.PayloadID, pid)
+		exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadID, pid)
 	}
 }
 
-// NewPayloadV1
+// NewPayload
 
 type NewPayloadResponseExpectObject struct {
 	*ExpectEnv
-	Status api.PayloadStatusV1
-	Error  error
+	Payload   *api.ExecutableData
+	Status    api.PayloadStatusV1
+	Version   int
+	Error     error
+	ErrorCode int
 }
 
-func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableDataV1) *NewPayloadResponseExpectObject {
+func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	status, err := tec.Engine.NewPayloadV1(ctx, payload)
-	return &NewPayloadResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &NewPayloadResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
+		Payload:   payload,
 		Status:    status,
+		Version:   1,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	status, err := tec.Engine.NewPayloadV2(ctx, payload)
+	ret := &NewPayloadResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
+		Payload:   payload,
+		Status:    status,
+		Version:   2,
+		Error:     err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (tec *TestEngineClient) TestEngineNewPayload(payload *api.ExecutableData, version int) *NewPayloadResponseExpectObject {
+	if version == 2 {
+		return tec.TestEngineNewPayloadV2(payload)
+	}
+	return tec.TestEngineNewPayloadV1(payload)
+}
+
+func (exp *NewPayloadResponseExpectObject) PayloadJson() string {
+	jsonPayload, _ := json.MarshalIndent(exp.Payload, "", " ")
+	return string(jsonPayload)
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Expected no error on EngineNewPayloadV1: error=%v", exp.TestName, exp.Error)
+		exp.Fatalf("FAIL (%s): Expected no error on EngineNewPayloadV%d: error=%v, payload=%s", exp.TestName, exp.Version, exp.Error, exp.PayloadJson())
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectError() {
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV1: status=%v", exp.TestName, exp.Status)
+		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV%d: status=%v, payload=%s", exp.TestName, exp.Version, exp.Status, exp.PayloadJson())
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectErrorCode(code int) {
-	// TODO: Actually check error code
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineNewPayloadV1: status=%v", exp.TestName, exp.Status)
+	exp.ExpectError()
+	if exp.ErrorCode != code {
+		exp.Fatalf("FAIL (%s): Expected error code on EngineNewPayloadV%d: want=%d, got=%d", exp.TestName, exp.Version, code, exp.ErrorCode)
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectNoValidationError() {
 	if exp.Status.ValidationError != nil {
-		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineNewPayloadV1: %v, expected=<None>", exp.TestName, exp.Status.ValidationError)
+		exp.Fatalf("FAIL (%s): Unexpected validation error on EngineNewPayloadV%d: %v, expected=<None>", exp.TestName, exp.Version, exp.Status.ValidationError)
 	}
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectStatus(ps PayloadStatus) {
 	exp.ExpectNoError()
 	if PayloadStatus(exp.Status.Status) != ps {
-		exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.Status, ps)
+		exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV%d: %v, expected=%v, payload=%s", exp.TestName, exp.Version, exp.Status.Status, ps, exp.PayloadJson())
 	}
 }
 
@@ -207,100 +281,138 @@ func (exp *NewPayloadResponseExpectObject) ExpectStatusEither(statuses ...Payloa
 		}
 	}
 
-	exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.Status, strings.Join(StatusesToString(statuses), ","))
+	exp.Fatalf("FAIL (%s): Unexpected status response on EngineNewPayloadV%d: %v, expected=%v, payload=%s", exp.TestName, exp.Version, exp.Status.Status, strings.Join(StatusesToString(statuses), ","), exp.PayloadJson())
 }
 
 func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Hash) {
 	exp.ExpectNoError()
 	if ((lvh == nil || exp.Status.LatestValidHash == nil) && exp.Status.LatestValidHash != lvh) ||
 		(lvh != nil && exp.Status.LatestValidHash != nil && *exp.Status.LatestValidHash != *lvh) {
-		exp.Fatalf("FAIL (%v): Unexpected LatestValidHash on EngineNewPayloadV1: %v, expected=%v", exp.TestName, exp.Status.LatestValidHash, lvh)
+		exp.Fatalf("FAIL (%v): Unexpected LatestValidHash on EngineNewPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Status.LatestValidHash, lvh)
 	}
 }
 
 // GetPayloadV1
 type GetPayloadResponseExpectObject struct {
 	*ExpectEnv
-	Payload api.ExecutableDataV1
-	Error   error
+	Payload    api.ExecutableData
+	BlockValue *big.Int
+	Version    int
+	Error      error
+	ErrorCode  int
 }
 
 func (tec *TestEngineClient) TestEngineGetPayloadV1(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	payload, err := tec.Engine.GetPayloadV1(ctx, payloadID)
-	return &GetPayloadResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
-		Payload:   payload,
-		Error:     err,
+	ret := &GetPayloadResponseExpectObject{
+		ExpectEnv:  &ExpectEnv{Env: tec.Env},
+		Payload:    payload,
+		Version:    1,
+		BlockValue: nil,
+		Error:      err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (tec *TestEngineClient) TestEngineGetPayloadV2(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	payload, blockValue, err := tec.Engine.GetPayloadV2(ctx, payloadID)
+	ret := &GetPayloadResponseExpectObject{
+		ExpectEnv:  &ExpectEnv{Env: tec.Env},
+		Payload:    payload,
+		Version:    2,
+		BlockValue: blockValue,
+		Error:      err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (tec *TestEngineClient) TestEngineGetPayload(payloadID *api.PayloadID, version int) *GetPayloadResponseExpectObject {
+	if version == 2 {
+		return tec.TestEngineGetPayloadV2(payloadID)
+	}
+	return tec.TestEngineGetPayloadV1(payloadID)
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Expected no error on EngineGetPayloadV1: error=%v", exp.TestName, exp.Error)
+		exp.Fatalf("FAIL (%s): Expected no error on EngineGetPayloadV%d: error=%v", exp.TestName, exp.Version, exp.Error)
 	}
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectError() {
 	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineGetPayloadV1: payload=%v", exp.TestName, exp.Payload)
+		exp.Fatalf("FAIL (%s): Expected error on EngineGetPayloadV%d: payload=%v", exp.TestName, exp.Version, exp.Payload)
 	}
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectErrorCode(code int) {
-	// TODO: Actually check error code
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on EngineGetPayloadV1: payload=%v", exp.TestName, exp.Payload)
+	exp.ExpectError()
+	if exp.ErrorCode != code {
+		exp.Fatalf("FAIL (%s): Expected error code on EngineGetPayloadV%d: want=%d, got=%d", exp.TestName, exp.Version, code, exp.ErrorCode)
 	}
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectPayloadParentHash(expectedParentHash common.Hash) {
 	exp.ExpectNoError()
 	if exp.Payload.ParentHash != expectedParentHash {
-		exp.Fatalf("FAIL (%s): Unexpected parent hash for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.ParentHash, expectedParentHash)
+		exp.Fatalf("FAIL (%s): Unexpected parent hash for payload on EngineGetPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Payload.ParentHash, expectedParentHash)
 	}
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectPayloadBlockNumber(expectedBlockNumber uint64) {
 	exp.ExpectNoError()
 	if exp.Payload.Number != expectedBlockNumber {
-		exp.Fatalf("FAIL (%s): Unexpected block number for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.Number, expectedBlockNumber)
+		exp.Fatalf("FAIL (%s): Unexpected block number for payload on EngineGetPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Payload.Number, expectedBlockNumber)
 	}
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectPrevRandao(expectedPrevRandao common.Hash) {
 	exp.ExpectNoError()
 	if exp.Payload.Random != expectedPrevRandao {
-		exp.Fatalf("FAIL (%s): Unexpected prevRandao for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.Random, expectedPrevRandao)
+		exp.Fatalf("FAIL (%s): Unexpected prevRandao for payload on EngineGetPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Payload.Random, expectedPrevRandao)
 	}
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectTimestamp(expectedTimestamp uint64) {
 	exp.ExpectNoError()
 	if exp.Payload.Timestamp != expectedTimestamp {
-		exp.Fatalf("FAIL (%s): Unexpected timestamp for payload on EngineGetPayloadV1: %v, expected=%v", exp.TestName, exp.Payload.Timestamp, expectedTimestamp)
+		exp.Fatalf("FAIL (%s): Unexpected timestamp for payload on EngineGetPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Payload.Timestamp, expectedTimestamp)
 	}
 }
 
 // BlockNumber
 type BlockNumberResponseExpectObject struct {
 	*ExpectEnv
-	Call   string
-	Number uint64
-	Error  error
+	Call      string
+	Number    uint64
+	Error     error
+	ErrorCode int
 }
 
 func (tec *TestEngineClient) TestBlockNumber() *BlockNumberResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	number, err := tec.Engine.BlockNumber(ctx)
-	return &BlockNumberResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &BlockNumberResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "BlockNumber",
 		Number:    number,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (exp *BlockNumberResponseExpectObject) ExpectNoError() {
@@ -320,21 +432,26 @@ func (exp *BlockNumberResponseExpectObject) ExpectNumber(number uint64) {
 
 type HeaderResponseExpectObject struct {
 	*ExpectEnv
-	Call   string
-	Header *types.Header
-	Error  error
+	Call      string
+	Header    *types.Header
+	Error     error
+	ErrorCode int
 }
 
 func (tec *TestEngineClient) TestHeaderByNumber(number *big.Int) *HeaderResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	header, err := tec.Engine.HeaderByNumber(ctx, number)
-	return &HeaderResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &HeaderResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "HeaderByNumber",
 		Header:    header,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (exp *HeaderResponseExpectObject) ExpectNoError() {
@@ -350,9 +467,9 @@ func (exp *HeaderResponseExpectObject) ExpectError() {
 }
 
 func (exp *HeaderResponseExpectObject) ExpectErrorCode(code int) {
-	// TODO: Actually check error code
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on %s: header=%v", exp.TestName, exp.Call, exp.Header)
+	exp.ExpectError()
+	if exp.ErrorCode != code {
+		exp.Fatalf("FAIL (%s): Expected error code on %s: want=%d, got=%d", exp.TestName, exp.Call, code, exp.ErrorCode)
 	}
 }
 
@@ -367,33 +484,42 @@ func (exp *HeaderResponseExpectObject) ExpectHash(expHash common.Hash) {
 
 type BlockResponseExpectObject struct {
 	*ExpectEnv
-	Call  string
-	Block *types.Block
-	Error error
+	Call      string
+	Block     *types.Block
+	Error     error
+	ErrorCode int
 }
 
 func (tec *TestEngineClient) TestBlockByNumber(number *big.Int) *BlockResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	block, err := tec.Engine.BlockByNumber(ctx, number)
-	return &BlockResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &BlockResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "BlockByNumber",
 		Block:     block,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (tec *TestEngineClient) TestBlockByHash(hash common.Hash) *BlockResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	block, err := tec.Engine.BlockByHash(ctx, hash)
-	return &BlockResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &BlockResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "BlockByHash",
 		Block:     block,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (exp *BlockResponseExpectObject) ExpectError() {
@@ -403,9 +529,9 @@ func (exp *BlockResponseExpectObject) ExpectError() {
 }
 
 func (exp *BlockResponseExpectObject) ExpectErrorCode(code int) {
-	// TODO: Actually check error code
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Block)
+	exp.ExpectError()
+	if exp.ErrorCode != code {
+		exp.Fatalf("FAIL (%s): Expected error code on %s: want=%d, got=%d", exp.TestName, exp.Call, code, exp.ErrorCode)
 	}
 }
 
@@ -419,6 +545,15 @@ func (exp *BlockResponseExpectObject) ExpectHash(expHash common.Hash) {
 	exp.ExpectNoError()
 	if exp.Block.Hash() != expHash {
 		exp.Fatalf("FAIL (%s): Unexpected hash on %s: %v, expected=%v", exp.TestName, exp.Call, exp.Block.Hash(), expHash)
+	}
+}
+
+func (exp *BlockResponseExpectObject) ExpectWithdrawalsRoot(expectedRoot *common.Hash) {
+	exp.ExpectNoError()
+	actualWithdrawalsRoot := exp.Block.Header().WithdrawalsHash
+	if ((expectedRoot == nil || actualWithdrawalsRoot == nil) && actualWithdrawalsRoot != expectedRoot) ||
+		(expectedRoot != nil && actualWithdrawalsRoot != nil && *actualWithdrawalsRoot != *expectedRoot) {
+		exp.Fatalf("FAIL (%s): Unexpected WithdrawalsRoot on %s: %v, expected=%v", exp.TestName, exp.Call, actualWithdrawalsRoot, expectedRoot)
 	}
 }
 
@@ -447,21 +582,30 @@ func (exp *BlockResponseExpectObject) ExpectCoinbase(expCoinbase common.Address)
 
 type BalanceResponseExpectObject struct {
 	*ExpectEnv
-	Call    string
-	Balance *big.Int
-	Error   error
+	Call      string
+	Account   common.Address
+	Block     *big.Int
+	Balance   *big.Int
+	Error     error
+	ErrorCode int
 }
 
 func (tec *TestEngineClient) TestBalanceAt(account common.Address, number *big.Int) *BalanceResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	balance, err := tec.Engine.BalanceAt(ctx, account, number)
-	return &BalanceResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &BalanceResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "BalanceAt",
+		Account:   account,
 		Balance:   balance,
+		Block:     number,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (exp *BalanceResponseExpectObject) ExpectNoError() {
@@ -471,10 +615,17 @@ func (exp *BalanceResponseExpectObject) ExpectNoError() {
 }
 
 func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) {
+	exp.Logf("INFO (%s): Testing balance for account %s on block %d: actual=%d, expected=%d",
+		exp.TestName,
+		exp.Account,
+		exp.Block,
+		exp.Balance,
+		expBalance,
+	)
 	exp.ExpectNoError()
 	if ((expBalance == nil || exp.Balance == nil) && expBalance != exp.Balance) ||
 		(expBalance != nil && exp.Balance != nil && expBalance.Cmp(exp.Balance) != 0) {
-		exp.Fatalf("FAIL (%s): Unexpected balance on %s: %v, expected=%v", exp.TestName, exp.Call, exp.Balance, expBalance)
+		exp.Fatalf("FAIL (%s): Unexpected balance on %s, for account %s at block %v: %v, expected=%v", exp.TestName, exp.Call, exp.Account, exp.Block, exp.Balance, expBalance)
 	}
 }
 
@@ -482,21 +633,26 @@ func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) 
 
 type StorageResponseExpectObject struct {
 	*ExpectEnv
-	Call    string
-	Storage []byte
-	Error   error
+	Call      string
+	Storage   []byte
+	Error     error
+	ErrorCode int
 }
 
 func (tec *TestEngineClient) TestStorageAt(account common.Address, key common.Hash, number *big.Int) *StorageResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	storage, err := tec.Engine.StorageAt(ctx, account, key, number)
-	return &StorageResponseExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &StorageResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "StorageAt",
 		Storage:   storage,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (exp *StorageResponseExpectObject) ExpectNoError() {
@@ -525,21 +681,26 @@ func (exp *StorageResponseExpectObject) ExpectStorageEqual(expStorage common.Has
 // Transaction Receipt
 type TransactionReceiptExpectObject struct {
 	*ExpectEnv
-	Call    string
-	Receipt *types.Receipt
-	Error   error
+	Call      string
+	Receipt   *types.Receipt
+	Error     error
+	ErrorCode int
 }
 
 func (tec *TestEngineClient) TestTransactionReceipt(txHash common.Hash) *TransactionReceiptExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	receipt, err := tec.Engine.TransactionReceipt(ctx, txHash)
-	return &TransactionReceiptExpectObject{
-		ExpectEnv: &ExpectEnv{tec.Env},
+	ret := &TransactionReceiptExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "TransactionReceipt",
 		Receipt:   receipt,
 		Error:     err,
 	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (exp *TransactionReceiptExpectObject) ExpectError() {
@@ -549,9 +710,9 @@ func (exp *TransactionReceiptExpectObject) ExpectError() {
 }
 
 func (exp *TransactionReceiptExpectObject) ExpectErrorCode(code int) {
-	// TODO: Actually check error code
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Receipt)
+	exp.ExpectError()
+	if exp.ErrorCode != code {
+		exp.Fatalf("FAIL (%s): Expected error code on %s: want=%d, got=%d", exp.TestName, exp.Call, code, exp.ErrorCode)
 	}
 }
 
