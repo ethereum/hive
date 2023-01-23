@@ -34,8 +34,8 @@ echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
 CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 echo Container IP: $CONTAINER_IP
-bootnodes_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "" || echo "--network.discv5.bootEnrs ${HIVE_ETH2_BOOTNODE_ENRS//,/ }")
-metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics.enabled --metrics.listenAddr=$CONTAINER_IP --metrics.port=$HIVE_ETH2_METRICS_PORT")
+bootnodes_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "" || echo "--bootnodes ${HIVE_ETH2_BOOTNODE_ENRS//,/ }")
+metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics.address=$CONTAINER_IP --metrics.port=$HIVE_ETH2_METRICS_PORT")
 
 echo "bootnodes option : ${bootnodes_option}"
 
@@ -46,17 +46,15 @@ echo Starting Lodestar Beacon Node
 node /usr/app/node_modules/.bin/lodestar \
     beacon \
     --logLevel="$LOG" \
-    --rootDir=/data/beacon \
+    --dataDir=/data/beacon \
     --port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --discoveryPort="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --paramsFile=/hive/input/config.yaml \
     --genesisStateFile=/hive/input/genesis.ssz \
-    --api.rest.enabled=true \
-    --api.rest.host=0.0.0.0 \
-    --api.rest.api="*" \
-    --api.rest.port="${HIVE_ETH2_BN_API_PORT:-4000}" \
-    --eth1.enabled=true \
-    --eth1.providerUrls="$HIVE_ETH2_ETH1_RPC_ADDRS" \
+    --rest \
+    --rest.address=0.0.0.0 \
+    --rest.port="${HIVE_ETH2_BN_API_PORT:-4000}" \
+    --eth1 \
     --execution.urls="$HIVE_ETH2_ETH1_ENGINE_RPC_ADDRS" \
     --eth1.depositContractDeployBlock=${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0} \
     --jwt-secret=/jwtsecret \
@@ -66,7 +64,6 @@ node /usr/app/node_modules/.bin/lodestar \
     --enr.tcp="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --enr.udp="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --network.connectToDiscv5Bootnodes=true \
-    --network.discv5.enabled=true \
-    --network.subscribeAllSubnets=true \
-    --network.targetPeers="${HIVE_ETH2_P2P_TARGET_PEERS:-10}" \
-    --network.discv5FirstQueryDelayMs=5000
+    --discv5 \
+    --subscribeAllSubnets=true \
+    --targetPeers="${HIVE_ETH2_P2P_TARGET_PEERS:-10}"
