@@ -1033,6 +1033,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 						Amount:    common.Big0,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
 					},
 				)
 				if err != nil {

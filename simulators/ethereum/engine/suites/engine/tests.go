@@ -1662,6 +1662,7 @@ func invalidTransitionPayload(t *test.Env) {
 					Amount:    big1,
 					Payload:   nil,
 					TxType:    t.TestTransactionType,
+					GasLimit:  75000,
 				},
 			)
 			if err != nil {
@@ -1729,6 +1730,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 						Amount:    big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
 					},
 				)
 				if err != nil {
@@ -1961,6 +1963,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 							Amount:    big1,
 							Payload:   nil,
 							TxType:    t.TestTransactionType,
+							GasLimit:  75000,
 						},
 					)
 					if err != nil {
@@ -2172,6 +2175,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 							Amount:    big1,
 							Payload:   nil,
 							TxType:    t.TestTransactionType,
+							GasLimit:  75000,
 						},
 					)
 					if err != nil {
@@ -2420,6 +2424,7 @@ func blockStatusExecPayloadGen(transitionBlock bool) func(t *test.Env) {
 						Amount:    big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
 					},
 				)
 				if err != nil {
@@ -2468,6 +2473,7 @@ func blockStatusHeadBlockGen(transitionBlock bool) func(t *test.Env) {
 						Amount:    big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
 					},
 				)
 				if err != nil {
@@ -2877,6 +2883,7 @@ func transactionReorg(t *test.Env) {
 						Amount:    big0,
 						Payload:   data,
 						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
 					},
 				)
 				if err != nil {
@@ -2985,6 +2992,7 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
 							Amount:    big0,
 							Payload:   data,
 							TxType:    t.TestTransactionType,
+							GasLimit:  75000,
 						},
 					)
 					if err != nil {
@@ -3090,6 +3098,7 @@ func sidechainReorg(t *test.Env) {
 			Amount:    big0,
 			Payload:   nil,
 			TxType:    t.TestTransactionType,
+			GasLimit:  75000,
 		},
 	)
 	if err != nil {
@@ -3237,6 +3246,7 @@ func inOrderPayloads(t *test.Env) {
 						Amount:    amountPerTx,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
 					},
 				)
 				if err != nil {
@@ -3569,6 +3579,7 @@ func suggestedFeeRecipient(t *test.Env) {
 				Amount:    big0,
 				Payload:   nil,
 				TxType:    t.TestTransactionType,
+				GasLimit:  75000,
 			},
 		)
 		if err != nil {
@@ -3638,6 +3649,7 @@ func prevRandaoOpcodeTx(t *test.Env) {
 					Amount:    big0,
 					Payload:   nil,
 					TxType:    t.TestTransactionType,
+					GasLimit:  75000,
 				},
 			)
 			if err != nil {
@@ -3690,6 +3702,7 @@ func prevRandaoOpcodeTx(t *test.Env) {
 					Amount:    big0,
 					Payload:   nil,
 					TxType:    t.TestTransactionType,
+					GasLimit:  75000,
 				},
 			)
 			if err != nil {
