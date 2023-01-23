@@ -796,6 +796,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						Amount:    common.Big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
 					},
 				)
 				if err != nil {
@@ -1060,6 +1061,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 						Amount:    common.Big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
 					},
 				)
 				if err != nil {
