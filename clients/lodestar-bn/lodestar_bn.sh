@@ -52,6 +52,7 @@ node /usr/app/node_modules/.bin/lodestar \
     --paramsFile=/hive/input/config.yaml \
     --genesisStateFile=/hive/input/genesis.ssz \
     --rest \
+    --rest.namespace="*" \
     --rest.address=0.0.0.0 \
     --rest.port="${HIVE_ETH2_BN_API_PORT:-4000}" \
     --eth1 \
