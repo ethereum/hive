@@ -1,10 +1,9 @@
 FROM golang:1-alpine AS builder
 RUN apk --no-cache add gcc musl-dev linux-headers cmake make clang build-base clang-static clang-dev
 
-# Prepare workspace
-ADD ./testnet/hive.go.work /source/go.work
-ADD ./common /source/common
-ADD ./testnet /source/testnet
+# Prepare workspace.
+# Note: the build context of this simulator image is the parent directory!
+ADD . /source
 
 # Build within simulator folder
 WORKDIR /source/testnet
