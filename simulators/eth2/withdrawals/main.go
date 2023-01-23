@@ -91,7 +91,7 @@ func main() {
 
 	// Create the test suites
 	engineSuite := hivesim.Suite{
-		Name:        "eth2-engine",
+		Name:        "eth2-withdrawals",
 		Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet.`,
 	}
 
