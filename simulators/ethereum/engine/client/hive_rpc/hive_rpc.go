@@ -336,7 +336,9 @@ func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payl
 	if version == 2 {
 		var response api.ExecutableDataV2
 		err = ec.c.CallContext(ctx, &response, rpcString, payloadId)
-		executableData = *response.ExecutionPayload
+		if response.ExecutionPayload != nil {
+			executableData = *response.ExecutionPayload
+		}
 		blockValue = response.BlockValue
 	} else {
 		err = ec.c.CallContext(ctx, &executableData, rpcString, payloadId)
