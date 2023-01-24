@@ -85,10 +85,13 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 
 		// Calculate and set the TTD for this test
 		ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
+
 		// Configure Forks
 		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 		if currentTest.GetForkConfig().ShanghaiTimestamp != nil {
 			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", currentTest.GetForkConfig().ShanghaiTimestamp))
+			// Ensure the merge transition is activated before shanghai.
+			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
 		}
 
 		if nodeType != "" {
