@@ -36,6 +36,7 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 	// Get all validators info
 	allValidators, err := ValidatorsFromBeaconState(
 		testnet.GenesisBeaconState(),
+		*testnet.Spec().Spec,
 		env.Keys,
 		&blsDomain,
 	)
@@ -118,17 +119,17 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 				)
 			}
 		}
+
+		// Wait for all BLS to execution to be included
+		slotsForAllBlsInclusion := beacon.Slot(
+			len(genesisNonWithdrawable)/int(
+				testnet.Spec().MAX_BLS_TO_EXECUTION_CHANGES,
+			) + 1,
+		)
+		testnet.WaitSlots(ctx, slotsForAllBlsInclusion)
 	} else {
 		t.Logf("INFO: no validators left on BLS credentials")
 	}
-
-	// Wait for all BLS to execution to be included
-	slotsForAllBlsInclusion := beacon.Slot(
-		len(genesisNonWithdrawable)/int(
-			testnet.Spec().MAX_BLS_TO_EXECUTION_CHANGES,
-		) + 1,
-	)
-	testnet.WaitSlots(ctx, slotsForAllBlsInclusion)
 
 	// Get the beacon state and verify the credentials were updated
 	var versionedBeaconState *clients.VersionedBeaconStateResponse
@@ -139,6 +140,8 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 		)
 		if err != nil || versionedBeaconState == nil {
 			t.Logf("WARN: Unable to get latest beacon state: %v", err)
+		} else {
+			break
 		}
 	}
 	if versionedBeaconState == nil {
@@ -197,8 +200,14 @@ loop:
 			testnet.BeaconClients().Running().PrintStatus(slotCtx, t)
 
 			// Check all accounts
-			for _, ec := range testnet.ExecutionClients().Running() {
-				if allAccountsWithdrawn, err := allValidators.Withdrawable().VerifyWithdrawnBalance(ctx, ec); err != nil {
+			for _, n := range testnet.Nodes.Running() {
+				ec := n.ExecutionClient
+				bc := n.BeaconClient
+				headBlockRoot, err := bc.BlockV2Root(ctx, eth2api.BlockHead)
+				if err != nil {
+					t.Fatalf("FAIL: Error getting head block: %v", err)
+				}
+				if allAccountsWithdrawn, err := allValidators.Withdrawable().VerifyWithdrawnBalance(ctx, bc, ec, headBlockRoot); err != nil {
 					t.Fatalf("FAIL: %v", err)
 				} else if allAccountsWithdrawn {
 					t.Logf("INFO: All accounts have successfully withdrawn")

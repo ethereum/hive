@@ -12,6 +12,7 @@ import (
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
 	blsu "github.com/protolambda/bls12-381-util"
+	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/tree"
 )
@@ -56,6 +57,77 @@ var VaultSigner = Signer{
 	PrivateKey: VAULT_KEY,
 }
 
+func WithdrawalsContainValidator(
+	ws []*types.Withdrawal,
+	vId beacon.ValidatorIndex,
+) bool {
+	for _, w := range ws {
+		if w.Validator == uint64(vId) {
+			return true
+		}
+	}
+	return false
+}
+
+type BeaconBlockState struct {
+	*clients.VersionedBeaconStateResponse
+	*clients.VersionedSignedBeaconBlock
+}
+
+type BeaconCache map[tree.Root]BeaconBlockState
+
+func (c BeaconCache) GetBlockStateByRoot(
+	ctx context.Context,
+	bc *clients.BeaconClient,
+	blockroot tree.Root,
+) (BeaconBlockState, error) {
+	if s, ok := c[blockroot]; ok {
+		return s, nil
+	}
+	b, err := bc.BlockV2(ctx, eth2api.BlockIdRoot(blockroot))
+	if err != nil {
+		return BeaconBlockState{}, err
+	}
+	s, err := bc.BeaconStateV2(ctx, eth2api.StateIdRoot(b.StateRoot()))
+	if err != nil {
+		return BeaconBlockState{}, err
+	}
+	both := BeaconBlockState{
+		VersionedBeaconStateResponse: s,
+		VersionedSignedBeaconBlock:   b,
+	}
+	c[blockroot] = both
+	return both, nil
+}
+
+func (c BeaconCache) GetBlockStateBySlotFromHeadRoot(
+	ctx context.Context,
+	bc *clients.BeaconClient,
+	headblockroot tree.Root,
+	slot beacon.Slot,
+) (*BeaconBlockState, error) {
+	current, err := c.GetBlockStateByRoot(ctx, bc, headblockroot)
+	if err != nil {
+		return nil, err
+	}
+	if current.Slot() < slot {
+		return nil, fmt.Errorf("requested for slot above head")
+	}
+	for {
+		if current.Slot() == slot {
+			return &current, nil
+		}
+		if current.Slot() < slot || current.Slot() == 0 {
+			// Skipped slot probably, not a fatal error
+			return nil, nil
+		}
+		current, err = c.GetBlockStateByRoot(ctx, bc, current.ParentRoot())
+		if err != nil {
+			return nil, err
+		}
+	}
+}
+
 // Helper struct to keep track of current status of a validator withdrawal state
 type Validator struct {
 	Index                      beacon.ValidatorIndex
@@ -66,11 +138,16 @@ type Validator struct {
 	Keys                       *cl.KeyDetails
 	BLSToExecutionChangeDomain *beacon.BLSDomain
 	Verified                   bool
+	InitialBalance             beacon.Gwei
+	Spec                       beacon.Spec
+	BlockStateCache            BeaconCache
 }
 
 func (v *Validator) VerifyWithdrawnBalance(
 	ctx context.Context,
+	bc *clients.BeaconClient,
 	ec *clients.ExecutionClient,
+	headBlockRoot tree.Root,
 ) (bool, error) {
 	if v.Verified {
 		// Validator already verified on a previous iteration
@@ -84,11 +161,41 @@ func (v *Validator) VerifyWithdrawnBalance(
 	}
 	execAddress := *v.WithdrawAddress
 
-	// First get the balance
-	balance, err := ec.BalanceAt(ctx, execAddress, nil)
+	// First get the head block
+	headBlockState, err := v.BlockStateCache.GetBlockStateByRoot(
+		ctx,
+		bc,
+		headBlockRoot,
+	)
 	if err != nil {
 		return false, err
 	}
+	fmt.Printf(
+		"INFO: Verifying balance validator %d on slot %d\n",
+		v.Index,
+		headBlockState.Slot(),
+	)
+
+	// Then get the balance
+	execPayload, err := headBlockState.ExecutionPayload()
+	if err != nil {
+		return false, err
+	}
+	balance, err := ec.BalanceAt(
+		ctx,
+		execAddress,
+		big.NewInt(int64(execPayload.Number)),
+	)
+	if err != nil {
+		return false, err
+	}
+
+	fmt.Printf(
+		"INFO: Balance of validator %d in the execution chain (block %d): %d\n",
+		v.Index,
+		execPayload.Number,
+		balance,
+	)
 
 	// If balance is zero, there have not been any withdrawals yet,
 	// but this is not an error
@@ -110,16 +217,56 @@ func (v *Validator) VerifyWithdrawnBalance(
 		} else {
 			return true, fmt.Errorf("unexepected balance: want=%d, got=%d", v.ExactWithdrawableBalance, balance)
 		}
-	}
+	} else {
+		// We need to traverse the beacon state history to be able to compute
+		// the expected partial balance withdrawn
+		previousBalance := v.InitialBalance
+		expectedPartialWithdrawnBalance := beacon.Gwei(0)
+		for slot := beacon.Slot(0); slot <= headBlockState.Slot(); slot++ {
+			blockState, err := v.BlockStateCache.GetBlockStateBySlotFromHeadRoot(ctx, bc, headBlockRoot, slot)
+			if err != nil {
+				return false, err
+			}
+			if blockState == nil {
+				return false, nil
+			}
 
-	// Otherwise simply return true, as a signal that a - potentially partial - withdrawal has taken place
-	fmt.Printf(
-		"INFO: Validator %d partially withdrawn: %d\n",
-		v.Index,
-		balance,
-	)
-	v.Verified = true
-	return true, nil
+			execPayload, err := blockState.ExecutionPayload()
+			if err != nil {
+				return false, err
+			}
+
+			if WithdrawalsContainValidator(execPayload.Withdrawals, v.Index) {
+				expectedPartialWithdrawnBalance += previousBalance - (v.Spec.MAX_EFFECTIVE_BALANCE)
+			}
+
+			previousBalance = blockState.Balance(v.Index)
+		}
+
+		if expectedPartialWithdrawnBalance != 0 {
+			expectedBalanceWei := new(big.Int).SetUint64(uint64(expectedPartialWithdrawnBalance))
+			expectedBalanceWei.Mul(expectedBalanceWei, big.NewInt(1e9))
+			if balance.Cmp(expectedBalanceWei) == 0 {
+				fmt.Printf(
+					"INFO: Validator %d partially withdrawn: %d\n",
+					v.Index,
+					balance,
+				)
+				v.Verified = true
+				return true, nil
+			} else {
+				return true, fmt.Errorf("unexepected balance: want=%d, got=%d", expectedBalanceWei, balance)
+			}
+
+		} else {
+			fmt.Printf(
+				"INFO: Validator %d expected withdraw balance is zero\n",
+				v.Index,
+			)
+		}
+
+	}
+	return false, nil
 }
 
 // Signs the BLS-to-execution-change for the given address
@@ -183,10 +330,12 @@ type Validators []*Validator
 // Verify all validators have withdrawn
 func (vs Validators) VerifyWithdrawnBalance(
 	ctx context.Context,
+	bc *clients.BeaconClient,
 	ec *clients.ExecutionClient,
+	headBlockRoot tree.Root,
 ) (bool, error) {
 	for i, v := range vs {
-		if withdrawn, err := v.VerifyWithdrawnBalance(ctx, ec); err != nil {
+		if withdrawn, err := v.VerifyWithdrawnBalance(ctx, bc, ec, headBlockRoot); err != nil {
 			return withdrawn, fmt.Errorf(
 				"error verifying validator %d balance: %v",
 				i,
@@ -253,20 +402,24 @@ func (vs Validators) Chunks(totalShares int) []Validators {
 }
 
 func ValidatorFromBeaconValidator(
+	spec beacon.Spec,
 	index beacon.ValidatorIndex,
 	source beacon.Validator,
 	balance beacon.Gwei,
 	keys *cl.KeyDetails,
 	domain *beacon.BLSDomain,
+	beaconCache BeaconCache,
 ) (*Validator, error) {
 	// Assume genesis state
 	currentEpoch := beacon.Epoch(0)
 
 	v := new(Validator)
 
+	v.Spec = spec
 	v.Index = index
 	v.Keys = keys
 	v.BLSToExecutionChangeDomain = domain
+	v.BlockStateCache = beaconCache
 
 	wc, err := source.WithdrawalCredentials()
 	if err != nil {
@@ -302,14 +455,17 @@ func ValidatorFromBeaconValidator(
 			big.NewInt(1e9),
 		)
 	}
+	v.InitialBalance = balance
 	return v, nil
 }
 
 func ValidatorFromBeaconState(
+	spec beacon.Spec,
 	state beacon.BeaconState,
 	index beacon.ValidatorIndex,
 	keys *cl.KeyDetails,
 	domain *beacon.BLSDomain,
+	beaconCache BeaconCache,
 ) (*Validator, error) {
 	stateVals, err := state.Validators()
 	if err != nil {
@@ -328,16 +484,19 @@ func ValidatorFromBeaconState(
 		return nil, err
 	}
 	return ValidatorFromBeaconValidator(
+		spec,
 		index,
 		beaconVal,
 		balance,
 		keys,
 		domain,
+		beaconCache,
 	)
 }
 
 func ValidatorsFromBeaconState(
 	state beacon.BeaconState,
+	spec beacon.Spec,
 	keys []*cl.KeyDetails,
 	domain *beacon.BLSDomain,
 ) (Validators, error) {
@@ -357,6 +516,7 @@ func ValidatorsFromBeaconState(
 	} else if validatorCount != uint64(len(keys)) {
 		return nil, fmt.Errorf("incorrect amount of keys: want=%d, got=%d", validatorCount, len(keys))
 	}
+	beaconCache := make(BeaconCache)
 	validators := make(Validators, 0)
 	for i := beacon.ValidatorIndex(0); i < beacon.ValidatorIndex(validatorCount); i++ {
 		beaconVal, err := stateVals.Validator(beacon.ValidatorIndex(i))
@@ -368,11 +528,13 @@ func ValidatorsFromBeaconState(
 			return nil, err
 		}
 		validator, err := ValidatorFromBeaconValidator(
+			spec,
 			i,
 			beaconVal,
 			balance,
 			keys[i],
 			domain,
+			beaconCache,
 		)
 		if err != nil {
 			return nil, err
