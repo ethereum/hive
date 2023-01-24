@@ -105,24 +105,25 @@ func (c BeaconCache) GetBlockStateBySlotFromHeadRoot(
 	bc *clients.BeaconClient,
 	headblockroot tree.Root,
 	slot beacon.Slot,
-) (BeaconBlockState, error) {
+) (*BeaconBlockState, error) {
 	current, err := c.GetBlockStateByRoot(ctx, bc, headblockroot)
 	if err != nil {
-		return BeaconBlockState{}, err
+		return nil, err
 	}
 	if current.Slot() < slot {
-		return BeaconBlockState{}, fmt.Errorf("requested for slot above head")
+		return nil, fmt.Errorf("requested for slot above head")
 	}
 	for {
 		if current.Slot() == slot {
-			return current, nil
+			return &current, nil
 		}
-		if current.Slot() == 0 {
-			return BeaconBlockState{}, fmt.Errorf("couldn't find slot")
+		if current.Slot() < slot || current.Slot() == 0 {
+			// Skipped slot probably, not a fatal error
+			return nil, nil
 		}
 		current, err = c.GetBlockStateByRoot(ctx, bc, current.ParentRoot())
 		if err != nil {
-			return BeaconBlockState{}, err
+			return nil, err
 		}
 	}
 }
@@ -189,6 +190,13 @@ func (v *Validator) VerifyWithdrawnBalance(
 		return false, err
 	}
 
+	fmt.Printf(
+		"INFO: Balance of validator %d in the execution chain (block %d): %d\n",
+		v.Index,
+		execPayload.Number,
+		balance,
+	)
+
 	// If balance is zero, there have not been any withdrawals yet,
 	// but this is not an error
 	if balance.Cmp(common.Big0) == 0 {
@@ -215,12 +223,15 @@ func (v *Validator) VerifyWithdrawnBalance(
 		previousBalance := v.InitialBalance
 		expectedPartialWithdrawnBalance := beacon.Gwei(0)
 		for slot := beacon.Slot(0); slot <= headBlockState.Slot(); slot++ {
-			block, err := bc.BlockV2(ctx, eth2api.BlockIdSlot(slot))
+			blockState, err := v.BlockStateCache.GetBlockStateBySlotFromHeadRoot(ctx, bc, headBlockRoot, slot)
 			if err != nil {
 				return false, err
 			}
+			if blockState == nil {
+				return false, nil
+			}
 
-			execPayload, err := block.ExecutionPayload()
+			execPayload, err := blockState.ExecutionPayload()
 			if err != nil {
 				return false, err
 			}
@@ -229,11 +240,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 				expectedPartialWithdrawnBalance += previousBalance - (v.Spec.MAX_EFFECTIVE_BALANCE)
 			}
 
-			slotState, err := v.BlockStateCache.GetBlockStateBySlotFromHeadRoot(ctx, bc, headBlockRoot, slot)
-			if err != nil {
-				return false, err
-			}
-			previousBalance = slotState.Balance(v.Index)
+			previousBalance = blockState.Balance(v.Index)
 		}
 
 		if expectedPartialWithdrawnBalance != 0 {
@@ -251,6 +258,11 @@ func (v *Validator) VerifyWithdrawnBalance(
 				return true, fmt.Errorf("unexepected balance: want=%d, got=%d", expectedBalanceWei, balance)
 			}
 
+		} else {
+			fmt.Printf(
+				"INFO: Validator %d expected withdraw balance is zero\n",
+				v.Index,
+			)
 		}
 
 	}
