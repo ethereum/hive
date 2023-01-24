@@ -5,7 +5,7 @@
 This page explains how client containers work in Hive.
 
 Clients are docker images which can be instantiated by a simulation. A client definition
-consist of a Dockerfile and associated resources. Client definitions live in
+consists of a Dockerfile and associated resources. Client definitions live in
 subdirectories of `clients/` in the hive repository.
 
 When hive runs a simulation, it first builds all client docker images using their
@@ -108,7 +108,7 @@ URL of the running instance.
 ### Environment
 
 Clients must support the following environment variables. The client's entry point script
-may map these to command line flags or use them generate a config file, for example.
+may map these to command line flags or use them to generate a config file, for example.
 
 | Variable                   | Value         |                                                |
 |----------------------------|---------------|------------------------------------------------|
