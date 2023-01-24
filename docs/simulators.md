@@ -343,7 +343,7 @@ Response:
 
     {"id": "<container-id>", "ip": "172.1.2.4"}
 
-#### Geting client information
+#### Getting client information
 
     GET /testsuite/{suite}/test/{test}/node/{container}
 
