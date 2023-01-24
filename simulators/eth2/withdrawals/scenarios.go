@@ -36,6 +36,7 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 	// Get all validators info
 	allValidators, err := ValidatorsFromBeaconState(
 		testnet.GenesisBeaconState(),
+		*testnet.Spec().Spec,
 		env.Keys,
 		&blsDomain,
 	)
@@ -197,8 +198,14 @@ loop:
 			testnet.BeaconClients().Running().PrintStatus(slotCtx, t)
 
 			// Check all accounts
-			for _, ec := range testnet.ExecutionClients().Running() {
-				if allAccountsWithdrawn, err := allValidators.Withdrawable().VerifyWithdrawnBalance(ctx, ec); err != nil {
+			for _, n := range testnet.Nodes.Running() {
+				ec := n.ExecutionClient
+				bc := n.BeaconClient
+				headBlockRoot, err := bc.BlockV2Root(ctx, eth2api.BlockHead)
+				if err != nil {
+					t.Fatalf("FAIL: Error getting head block: %v", err)
+				}
+				if allAccountsWithdrawn, err := allValidators.Withdrawable().VerifyWithdrawnBalance(ctx, bc, ec, headBlockRoot); err != nil {
 					t.Fatalf("FAIL: %v", err)
 				} else if allAccountsWithdrawn {
 					t.Logf("INFO: All accounts have successfully withdrawn")
