@@ -119,17 +119,17 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 				)
 			}
 		}
+
+		// Wait for all BLS to execution to be included
+		slotsForAllBlsInclusion := beacon.Slot(
+			len(genesisNonWithdrawable)/int(
+				testnet.Spec().MAX_BLS_TO_EXECUTION_CHANGES,
+			) + 1,
+		)
+		testnet.WaitSlots(ctx, slotsForAllBlsInclusion)
 	} else {
 		t.Logf("INFO: no validators left on BLS credentials")
 	}
-
-	// Wait for all BLS to execution to be included
-	slotsForAllBlsInclusion := beacon.Slot(
-		len(genesisNonWithdrawable)/int(
-			testnet.Spec().MAX_BLS_TO_EXECUTION_CHANGES,
-		) + 1,
-	)
-	testnet.WaitSlots(ctx, slotsForAllBlsInclusion)
 
 	// Get the beacon state and verify the credentials were updated
 	var versionedBeaconState *clients.VersionedBeaconStateResponse
@@ -140,6 +140,8 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 		)
 		if err != nil || versionedBeaconState == nil {
 			t.Logf("WARN: Unable to get latest beacon state: %v", err)
+		} else {
+			break
 		}
 	}
 	if versionedBeaconState == nil {
