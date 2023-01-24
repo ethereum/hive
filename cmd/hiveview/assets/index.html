@@ -4,39 +4,33 @@
   <!-- Lovingly handcrafted by Martin Holst Swende @mhswende in 2017, updated in 2020 -->
   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <!-- Scripts are jquery, bootstrap and datatables -->
-  <script src="https://code.jquery.com/jquery-3.5.0.min.js" integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="  crossorigin="anonymous"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
-  <script src="//cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
-  <!-- CSS resources are bootstrap default, plus datatables default -->
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-  <link rel="stylesheet" href="//cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="/extlib/bootstrap-4.4.1.min.css">
+  <link rel="stylesheet" href="/extlib/jquery.dataTables-1.10.20.min.css">
+  <style>
+    .replaceme{
+        max-width: 1000px;
+    }
+    #execresults, #filetable {
+        table-layout: fixed;
+        min-width: 900px;
+    }
+    #execresults .details-box {
+        overflow-x: auto;
+    }
+    td.details-control {
+        background: url('/images/details_open.png') no-repeat center center;
+        cursor: pointer;
+    }
+    tr.shown td.details-control {
+        background: url('/images/details_close.png') no-repeat center center;
+    }
+    td.ellipsis {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+  </style>
 </head>
-
-<style>
-  .replaceme{
-      max-width: 1000px;
-  }
-  #execresults, #filetable {
-      table-layout: fixed;
-      min-width: 900px;
-  }
-  #execresults .details-box {
-      overflow-x: auto;
-  }
-  td.details-control {
-      background: url('/details_open.png') no-repeat center center;
-      cursor: pointer;
-  }
-  tr.shown td.details-control {
-      background: url('/details_close.png') no-repeat center center;
-  }
-  td.ellipsis {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-  }
-</style>
 
 <body>
   <div class="container-fluid">
@@ -112,5 +106,5 @@
 </body>
 
 <!-- load the app -->
-<script type="text/javascript" src="/app.js"></script>
+<script src="/lib/app-index.js" type="module"></script>
 </html>

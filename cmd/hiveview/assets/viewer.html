@@ -5,7 +5,7 @@
   <title>file viewer</title>
   <meta name="description" content="A small viewer for text content, inspired by github source viewer">
   <meta name="author" content="holiman">
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+  <link rel="stylesheet" href="/extlib/bootstrap-4.4.1.min.css">
   <style>
     .num::before {
         content: attr(line);
@@ -53,8 +53,6 @@
     }
   </style>
 
-  <script src="https://code.jquery.com/jquery-3.5.0.min.js" integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ=" crossorigin="anonymous"></script>
-  <script type="text/javascript" src="/app-viewer.js"></script>
   <script id="exampletext" type="text/foo">
     This is some sample text. You can load new files via the little input above, and also
     via the url. E.g. "?file=sample.txt", and even link to particular lines.
@@ -65,7 +63,7 @@
 <body>
   <div id="main">
     <div>
-      <form onsubmit="javascript:fetchFile();return false">
+      <form id="fetchFileForm">
         <div class="input-group">
           <input type="text" class="form-control" placeholder="/file.txt" id="fileload"/>
           <div class="input-group-append">
@@ -84,4 +82,7 @@
     <table class="code" id="viewer"></table>
   </div>
 <body>
+
+<!-- load the app -->
+<script src="/lib/app-viewer.js" type="module"></script>
 </html>
