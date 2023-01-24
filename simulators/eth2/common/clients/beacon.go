@@ -218,6 +218,20 @@ func (b *VersionedSignedBeaconBlock) StateRoot() tree.Root {
 	panic("badly formatted beacon block")
 }
 
+func (b *VersionedSignedBeaconBlock) ParentRoot() tree.Root {
+	switch v := b.Data.(type) {
+	case *phase0.SignedBeaconBlock:
+		return v.Message.ParentRoot
+	case *altair.SignedBeaconBlock:
+		return v.Message.ParentRoot
+	case *bellatrix.SignedBeaconBlock:
+		return v.Message.ParentRoot
+	case *capella.SignedBeaconBlock:
+		return v.Message.ParentRoot
+	}
+	panic("badly formatted beacon block")
+}
+
 func (b *VersionedSignedBeaconBlock) Slot() common.Slot {
 	switch v := b.Data.(type) {
 	case *phase0.SignedBeaconBlock:
@@ -244,6 +258,26 @@ func (b *VersionedSignedBeaconBlock) ProposerIndex() common.ValidatorIndex {
 		return v.Message.ProposerIndex
 	}
 	panic("badly formatted beacon block")
+}
+
+func (bn *BeaconClient) BlockV2Root(
+	parentCtx context.Context,
+	blockId eth2api.BlockId,
+) (tree.Root, error) {
+	var (
+		root   tree.Root
+		exists bool
+		err    error
+	)
+	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
+	defer cancel()
+	root, exists, err = beaconapi.BlockRoot(ctx, bn.API, blockId)
+	if !exists {
+		return root, fmt.Errorf(
+			"endpoint not found on beacon client",
+		)
+	}
+	return root, err
 }
 
 func (bn *BeaconClient) BlockV2(
@@ -443,6 +477,16 @@ func (vbs *VersionedBeaconStateResponse) Balances() phase0.Balances {
 		return state.Balances
 	}
 	panic("badly formatted beacon state")
+}
+
+func (vbs *VersionedBeaconStateResponse) Balance(
+	id common.ValidatorIndex,
+) common.Gwei {
+	balances := vbs.Balances()
+	if int(id) >= len(balances) {
+		panic("invalid validator requested")
+	}
+	return balances[id]
 }
 
 func (vbs *VersionedBeaconStateResponse) Validators() phase0.ValidatorRegistry {
