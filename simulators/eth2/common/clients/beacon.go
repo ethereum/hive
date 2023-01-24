@@ -109,6 +109,7 @@ func (bn *BeaconClient) ENR(parentCtx context.Context) (string, error) {
 	}
 	fmt.Printf("p2p addrs: %v\n", out.P2PAddresses)
 	fmt.Printf("peer id: %s\n", out.PeerID)
+	fmt.Printf("enr: %s\n", out.ENR)
 	return out.ENR, nil
 }
 
@@ -119,7 +120,12 @@ func (bn *BeaconClient) P2PAddr(parentCtx context.Context) (string, error) {
 	if err := nodeapi.Identity(ctx, bn.API, &out); err != nil {
 		return "", err
 	}
-	return out.P2PAddresses[0], nil
+	return fmt.Sprintf(
+		"/ip4/%s/tcp/%d/p2p/%s",
+		bn.HiveClient.IP.String(),
+		PortBeaconTCP,
+		out.PeerID,
+	), nil
 }
 
 func (bn *BeaconClient) EnodeURL() (string, error) {
