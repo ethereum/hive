@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"strings"
 
 	"golang.org/x/exp/slices"
 
@@ -41,14 +42,24 @@ func (n *NodeDefinition) ExecutionClientName() string {
 }
 
 func (n *NodeDefinition) ConsensusClientName() string {
-	return fmt.Sprintf("%s-bn", n.ConsensusClient)
+	return fmt.Sprintf("%s", n.ConsensusClient)
 }
 
 func (n *NodeDefinition) ValidatorClientName() string {
 	if n.ValidatorClient == "" {
-		return fmt.Sprintf("%s-vc", n.ConsensusClient)
+		return beaconNodeToValidator(n.ConsensusClient)
 	}
-	return fmt.Sprintf("%s-vc", n.ValidatorClient)
+	return fmt.Sprintf("%s", n.ValidatorClient)
+}
+
+func beaconNodeToValidator(name string) string {
+	name, branch, hasBranch := strings.Cut(name, "_")
+	name = strings.TrimSuffix(name, "-bn")
+	validator := name + "-vc"
+	if hasBranch {
+		validator += "_" + branch
+	}
+	return validator
 }
 
 type NodeDefinitions []NodeDefinition

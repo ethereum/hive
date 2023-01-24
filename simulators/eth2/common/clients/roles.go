@@ -61,7 +61,7 @@ func (c *ClientDefinitionsByRole) Combinations() NodeDefinitions {
 				nodes,
 				NodeDefinition{
 					ExecutionClient: eth1.Name,
-					ConsensusClient: beacon.Name[:len(beacon.Name)-3],
+					ConsensusClient: beacon.Name,
 				},
 			)
 		}
