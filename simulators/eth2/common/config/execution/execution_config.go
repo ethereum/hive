@@ -268,7 +268,6 @@ func (conf *ExecutionGenesis) ToParams(
 		"HIVE_FORK_ARROWGLACIER":         conf.Genesis.Config.ArrowGlacierBlock.String(),
 		"HIVE_MERGE_BLOCK_ID":            conf.Genesis.Config.MergeNetsplitBlock.String(),
 		"HIVE_TERMINAL_TOTAL_DIFFICULTY": conf.Genesis.Config.TerminalTotalDifficulty.String(),
-		"HIVE_SHANGHAI_TIMESTAMP":        conf.Genesis.Config.ShanghaiTime.String(),
 	}
 	if conf.Genesis.Config.ShanghaiTime != nil {
 		params = params.Set(
