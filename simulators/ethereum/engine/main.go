@@ -99,16 +99,24 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		testFiles := hivesim.Params{}
-		if currentTest.GetChainFile() != "" {
-			// We are using a Proof of Work chain file, remove all clique-related settings
-			// TODO: Nethermind still requires HIVE_MINER for the Engine API
-			// delete(newParams, "HIVE_MINER")
+		if genesis.Difficulty.Cmp(big.NewInt(ttd)) < 0 {
+
+			if currentTest.GetChainFile() != "" {
+				// We are using a Proof of Work chain file, remove all clique-related settings
+				// TODO: Nethermind still requires HIVE_MINER for the Engine API
+				// delete(newParams, "HIVE_MINER")
+				delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
+				delete(newParams, "HIVE_CLIQUE_PERIOD")
+				// Add the new file to be loaded as chain.rlp
+				testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.GetChainFile())
+			}
+			if currentTest.IsMiningDisabled() {
+				delete(newParams, "HIVE_MINER")
+			}
+		} else {
+			// This is a post-merge test
 			delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
 			delete(newParams, "HIVE_CLIQUE_PERIOD")
-			// Add the new file to be loaded as chain.rlp
-			testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.GetChainFile())
-		}
-		if currentTest.IsMiningDisabled() {
 			delete(newParams, "HIVE_MINER")
 		}
 
