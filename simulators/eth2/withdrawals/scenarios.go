@@ -205,10 +205,12 @@ loop:
 				bc := n.BeaconClient
 				headBlockRoot, err := bc.BlockV2Root(ctx, eth2api.BlockHead)
 				if err != nil {
-					t.Fatalf("FAIL: Error getting head block: %v", err)
+					t.Logf("INFO: error getting head block: %v", err)
+					continue
 				}
 				if allAccountsWithdrawn, err := allValidators.Withdrawable().VerifyWithdrawnBalance(ctx, bc, ec, headBlockRoot); err != nil {
-					t.Fatalf("FAIL: %v", err)
+					t.Logf("INFO: error getting withdrawals balances: %v", err)
+					continue
 				} else if allAccountsWithdrawn {
 					t.Logf("INFO: All accounts have successfully withdrawn")
 					break loop
