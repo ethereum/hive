@@ -32,7 +32,9 @@ def merge_config:
       "Merge": {
         "Enabled": true,
         "TerminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY,
-      }
+        "TerminalBlockHash": env.HIVE_TERMINAL_BLOCK_HASH,
+        "TerminalBlockNumber": env.HIVE_TERMINAL_BLOCK_NUMBER,
+      } | remove_empty
     }
   else
     {}
