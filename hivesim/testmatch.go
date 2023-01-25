@@ -13,12 +13,12 @@ type testMatcher struct {
 
 func parseTestPattern(p string) (m testMatcher, err error) {
 	parts := splitRegexp(p)
-	m.suite, err = regexp.Compile(parts[0])
+	m.suite, err = regexp.Compile("(?i:" + parts[0] + ")")
 	if err != nil {
 		return m, err
 	}
 	if len(parts) > 1 {
-		m.test, err = regexp.Compile(strings.Join(parts[1:], "/"))
+		m.test, err = regexp.Compile("(?i:" + strings.Join(parts[1:], "/") + ")")
 		if err != nil {
 			return m, err
 		}
