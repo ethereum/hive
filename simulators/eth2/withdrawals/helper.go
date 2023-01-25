@@ -228,7 +228,8 @@ func (v *Validator) VerifyWithdrawnBalance(
 				return false, err
 			}
 			if blockState == nil {
-				return false, nil
+				// Probably a skipped slot
+				continue
 			}
 
 			execPayload, err := blockState.ExecutionPayload()
