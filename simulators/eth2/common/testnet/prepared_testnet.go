@@ -81,7 +81,8 @@ func prepareTestnet(
 	env *Environment,
 	config *Config,
 ) *PreparedTestnet {
-	eth1GenesisTime := common.Timestamp(time.Now().Unix())
+	genesisTime := time.Now().Add(time.Second * time.Duration(big.NewInt(0).Mul(config.GenesisDelaySlots, config.SlotTime).Int64()))
+	eth1GenesisTime := common.Timestamp(genesisTime.Unix())
 	eth2GenesisTime := eth1GenesisTime + 30
 
 	// Generate genesis for execution clients
@@ -171,6 +172,11 @@ func prepareTestnet(
 	if config.SlotTime != nil {
 		spec.Config.SECONDS_PER_SLOT = common.Timestamp(
 			config.SlotTime.Uint64(),
+		)
+	}
+	if config.GenesisDelaySlots != nil {
+		spec.Config.GENESIS_DELAY = common.Timestamp(
+			config.GenesisDelaySlots.Uint64(),
 		)
 	}
 	tdd, _ := uint256.FromBig(config.TerminalTotalDifficulty)

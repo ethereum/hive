@@ -22,6 +22,7 @@ type Config struct {
 	TerminalTotalDifficulty         *big.Int
 	SafeSlotsToImportOptimistically *big.Int
 	ExtraShares                     *big.Int
+	GenesisDelaySlots               *big.Int
 
 	// Node configurations to launch. Each node as a proportional share of
 	// validators.
@@ -50,6 +51,7 @@ func (a *Config) Join(b *Config) *Config {
 	c.AltairForkEpoch = choose(a.AltairForkEpoch, b.AltairForkEpoch)
 	c.BellatrixForkEpoch = choose(a.BellatrixForkEpoch, b.BellatrixForkEpoch)
 	c.CapellaForkEpoch = choose(a.CapellaForkEpoch, b.CapellaForkEpoch)
+	c.GenesisDelaySlots = choose(a.GenesisDelaySlots, b.GenesisDelaySlots)
 
 	// Testnet config
 	c.ValidatorCount = choose(a.ValidatorCount, b.ValidatorCount)
