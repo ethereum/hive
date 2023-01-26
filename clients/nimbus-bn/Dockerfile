@@ -11,10 +11,10 @@ ENV NPROC=2
 
 RUN git clone --depth 1 --branch unstable https://github.com/status-im/nimbus-eth2.git \
  && cd nimbus-eth2 \
- && make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC} -d:SECONDS_PER_SLOT=6" V=1 update
+ && make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" V=1 update
 
 RUN cd nimbus-eth2 && \
-    make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC} -d:SECONDS_PER_SLOT=6" nimbus_beacon_node && \
+    make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" nimbus_beacon_node && \
     mv build/nimbus_beacon_node /usr/bin/
 
 # --------------------------------- #
@@ -34,9 +34,10 @@ RUN usr/bin/nimbus_beacon_node --version > /version.txt
 
 ADD nimbus_bn.sh /nimbus_bn.sh
 RUN chmod +x /nimbus_bn.sh
+ADD nimbus_version.sh /nimbus_version.sh
+RUN chmod +x /nimbus_version.sh
 
-# TODO: output accurate client version
-RUN usr/bin/nimbus_beacon_node --version > /version.txt
+RUN /nimbus_version.sh > /version.txt
 
 EXPOSE 9000 9000/udp 4000 4000/udp
 
