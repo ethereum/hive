@@ -55,7 +55,18 @@ var tests = []TestSpec{
 	},
 
 	BaseWithdrawalsTestSpec{
-		Name: "test-bls-to-execution-changes-on-capella",
+		Name: "test-large-withdrawal-amounts",
+		Description: `
+		Test withdrawing large amounts, such that:
+		- The amount multiplied by 1e9 overflows uint64 (on conversion from gwei to wei)
+		`,
+		CapellaGenesis: true,
+		GenesisExecutionWithdrawalCredentialsShares: 1,
+		ExtraGwei: 68719476736, // ((2 ** 35) * (1e9)) > (2 ** 64)
+	},
+
+	BaseWithdrawalsTestSpec{
+		Name: "test-bls-to-execution-changes-on-capella-bellatrix-genesis",
 		Description: `
 		Send BLS-To-Execution-Changes after capella fork has happened.
 		Half of the validators still on BLS withdrawal credentials, and the

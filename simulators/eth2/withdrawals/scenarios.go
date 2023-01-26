@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
-	"github.com/ethereum/hive/simulators/eth2/common/testnet"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
 	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
@@ -16,13 +15,14 @@ import (
 
 var ConsensusClientsSupportingBLSChangesBeforeCapella = []string{
 	"prysm",
+	// "lodestar",
 }
 
 // Generic withdrawals test routine, capable of running most of the test
 // scenarios.
 func (ts BaseWithdrawalsTestSpec) Execute(
 	t *hivesim.T,
-	env *testnet.Environment,
+	env *tn.Environment,
 	n []clients.NodeDefinition,
 ) {
 	config := ts.GetTestnetConfig(n)
@@ -80,6 +80,8 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 							"FAIL: Unable to submit bls-to-execution changes: %v",
 							err,
 						)
+					} else {
+						t.Logf("INFO: Sent validator %d BLS-To-Exec-Change on Bellatrix (%s)", v.Index, b.ClientName())
 					}
 				}
 
@@ -117,6 +119,8 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 					"FAIL: Unable to submit bls-to-execution changes: %v",
 					err,
 				)
+			} else {
+				t.Logf("INFO: Sent validator %d BLS-To-Exec-Change on Capella (%s)", v.Index, b.ClientName())
 			}
 		}
 
@@ -222,5 +226,21 @@ loop:
 	// Lastly check all clients are on the same head
 	testnet.VerifyELHeads(ctx)
 
-	// TODO: Should we wait for finalization every time?
+	// Check for optimistic sync
+	for i, n := range testnet.Nodes.Running() {
+		bc := n.BeaconClient
+		if op, err := bc.BlockIsOptimistic(ctx, eth2api.BlockHead); op {
+			t.Fatalf(
+				"FAIL: client %d (%s) is optimistic, it should be synced.",
+				i,
+				n.ClientNames(),
+			)
+		} else if err != nil {
+			t.Fatalf("FAIL: error querying optimistic state on client %d (%s): %v", i, n.ClientNames(), err)
+		}
+	}
+
+	if ts.WaitForFinality {
+		testnet.WaitForFinality(ctx)
+	}
 }
