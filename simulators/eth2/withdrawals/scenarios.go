@@ -15,7 +15,7 @@ import (
 
 var ConsensusClientsSupportingBLSChangesBeforeCapella = []string{
 	"prysm",
-	// "lodestar",
+	"lodestar",
 }
 
 // Generic withdrawals test routine, capable of running most of the test
