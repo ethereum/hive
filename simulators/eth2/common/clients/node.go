@@ -85,21 +85,27 @@ func (nodes NodeDefinitions) Shares() []uint64 {
 	return shares
 }
 
-func (all NodeDefinitions) FilterByCL(filter []string) NodeDefinitions {
+func (all NodeDefinitions) FilterByCL(filters []string) NodeDefinitions {
 	ret := make(NodeDefinitions, 0)
 	for _, n := range all {
-		if slices.Contains(filter, n.ConsensusClient) {
-			ret = append(ret, n)
+		for _, filter := range filters {
+			if strings.Contains(n.ConsensusClient, filter) {
+				ret = append(ret, n)
+				break
+			}
 		}
 	}
 	return ret
 }
 
-func (all NodeDefinitions) FilterByEL(filter []string) NodeDefinitions {
+func (all NodeDefinitions) FilterByEL(filters []string) NodeDefinitions {
 	ret := make(NodeDefinitions, 0)
 	for _, n := range all {
-		if slices.Contains(filter, n.ExecutionClient) {
-			ret = append(ret, n)
+		for _, filter := range filters {
+			if strings.Contains(n.ExecutionClient, filter) {
+				ret = append(ret, n)
+				break
+			}
 		}
 	}
 	return ret
@@ -333,21 +339,27 @@ func (all Nodes) Running() Nodes {
 	return res
 }
 
-func (all Nodes) FilterByCL(filter []string) Nodes {
+func (all Nodes) FilterByCL(filters []string) Nodes {
 	ret := make(Nodes, 0)
 	for _, n := range all {
-		if slices.Contains(filter, n.BeaconClient.ClientName()) {
-			ret = append(ret, n)
+		for _, filter := range filters {
+			if strings.Contains(n.BeaconClient.ClientName(), filter) {
+				ret = append(ret, n)
+				break
+			}
 		}
 	}
 	return ret
 }
 
-func (all Nodes) FilterByEL(filter []string) Nodes {
+func (all Nodes) FilterByEL(filters []string) Nodes {
 	ret := make(Nodes, 0)
 	for _, n := range all {
-		if slices.Contains(filter, n.ExecutionClient.ClientType) {
-			ret = append(ret, n)
+		for _, filter := range filters {
+			if strings.Contains(n.ExecutionClient.ClientType, filter) {
+				ret = append(ret, n)
+				break
+			}
 		}
 	}
 	return ret
