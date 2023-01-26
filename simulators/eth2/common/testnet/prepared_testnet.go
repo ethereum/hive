@@ -190,6 +190,8 @@ func prepareTestnet(
 	// Validators can withdraw immediately
 	spec.Config.MIN_VALIDATOR_WITHDRAWABILITY_DELAY = 0
 
+	spec.Config.PROPOSER_SCORE_BOOST = 40
+
 	// Generate keys opts for validators
 	shares := config.NodeDefinitions.Shares()
 	// ExtraShares defines an extra set of keys that none of the nodes will have.
@@ -249,6 +251,10 @@ func prepareTestnet(
 			clients.PortMetrics,
 		),
 		"HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS": depositAddress.String(),
+		"HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_HASH": fmt.Sprintf(
+			"%s",
+			eth1Genesis.Genesis.ToBlock().Hash(),
+		),
 	}
 	beaconOpts := hivesim.Bundle(
 		commonOpts,
