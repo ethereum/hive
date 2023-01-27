@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -468,6 +470,54 @@ var Tests = []test.SpecInterface{
 		},
 		OverflowMaxInitcodeTxCountBeforeFork: 0,
 		OverflowMaxInitcodeTxCountAfterFork:  1,
+	},
+
+	// Get Payload Bodies Requests
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodies",
+				About: `
+				Make multiple withdrawals to 1024 different accounts.
+				Execute many blocks this way.
+				`,
+				TimeoutSeconds: 240,
+			},
+			WithdrawalsForkHeight:    1,
+			WithdrawalsBlockCount:    32,
+			WithdrawalsPerBlock:      1024,
+			WithdrawableAccountCount: 1024,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByRange{
+				Start: 1,
+				Count: 4,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 1,
+				Count: 8,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 1,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 4,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 1,
+				Count: 32,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 33,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 33,
+				Count: 32,
+			},
+		},
 	},
 }
 
@@ -1389,4 +1439,97 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 			r.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.ParentHash)
 		},
 	})
+}
+
+// Withdrawals sync spec:
+// Specifies a withdrawals test where the withdrawals happen and then a
+// client needs to sync and apply the withdrawals.
+type GetPayloadBodiesSpec struct {
+	*WithdrawalsBaseSpec
+
+	GetPayloadBodiesRequests []GetPayloadBodyRequest
+}
+
+type GetPayloadBodyRequest interface {
+	Verify(*test.Env)
+}
+
+type GetPayloadBodyRequestByRange struct {
+	Start uint64
+	Count uint64
+}
+
+func (req GetPayloadBodyRequestByRange) Verify(t *test.Env) {
+	r := t.TestEngine.TestEngineGetPayloadBodiesByRangeV1(req.Start, req.Count)
+	if req.Start < 1 || req.Count < 1 {
+		r.ExpectationDescription = fmt.Sprintf(`
+			Sent start (%d) or count (%d) to engine_getPayloadBodiesByRangeV1 with a
+			value less than 1, therefore error is expected.
+			`, req.Start, req.Count)
+		r.ExpectErrorCode(32602)
+	}
+	if req.Start > t.CLMock.CurrentPayloadNumber {
+		r.ExpectationDescription = fmt.Sprintf(`
+			Sent start=%d and count=%d to engine_getPayloadBodiesByRangeV1, latest known block is %d, hence an empty list is expected.
+			`, req.Start, req.Count, t.CLMock.LatestExecutedPayload.Number)
+		r.ExpectPayloadBodiesCount(0)
+	} else {
+		var count = req.Count
+		if req.Start+req.Count-1 > t.CLMock.CurrentPayloadNumber {
+			count = t.CLMock.CurrentPayloadNumber - req.Start + 1
+		}
+		r.ExpectPayloadBodiesCount(count)
+		for i := req.Start; i < req.Start+count; i++ {
+			p := t.CLMock.ExecutedPayloadHistory[i]
+
+			r.ExpectPayloadBody(i-req.Start, &client_types.ExecutionPayloadBodyV1{
+				Transactions: p.Transactions,
+				Withdrawals:  p.Withdrawals,
+			})
+		}
+	}
+}
+
+type GetPayloadBodyRequestByHashIndex struct {
+	BlockNumbers []uint64
+}
+
+func (req GetPayloadBodyRequestByHashIndex) Verify(t *test.Env) {
+	payloads := make([]*beacon.ExecutableData, 0)
+	hashes := make([]common.Hash, 0)
+	for _, n := range req.BlockNumbers {
+		if p, ok := t.CLMock.ExecutedPayloadHistory[n]; ok {
+			payloads = append(payloads, &p)
+			hashes = append(hashes, p.BlockHash)
+		} else {
+			// signal to request an unknown hash (random)
+			randHash := common.Hash{}
+			rand.Read(randHash[:])
+			payloads = append(payloads, nil)
+			hashes = append(hashes, randHash)
+		}
+	}
+
+	r := t.TestEngine.TestEngineGetPayloadBodiesByHashV1(hashes)
+	r.ExpectPayloadBodiesCount(uint64(len(payloads)))
+	for i, p := range payloads {
+		var expectedPayloadBody *client_types.ExecutionPayloadBodyV1
+		if p != nil {
+			expectedPayloadBody = &client_types.ExecutionPayloadBodyV1{
+				Transactions: p.Transactions,
+				Withdrawals:  p.Withdrawals,
+			}
+		}
+		r.ExpectPayloadBody(uint64(i), expectedPayloadBody)
+	}
+
+}
+
+func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
+	// Do the base withdrawal test first, skipping base verifications
+	ws.WithdrawalsBaseSpec.SkipBaseVerifications = true
+	ws.WithdrawalsBaseSpec.Execute(t)
+	for _, req := range ws.GetPayloadBodiesRequests {
+		req.Verify(t)
+	}
 }

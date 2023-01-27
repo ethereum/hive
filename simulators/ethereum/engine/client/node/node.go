@@ -36,6 +36,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
@@ -732,6 +733,14 @@ func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID
 		return beacon.ExecutableData{}, nil, err
 	}
 	return *p.ExecutionPayload, p.BlockValue, err
+}
+
+func (n *GethNode) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*client_types.ExecutionPayloadBodyV1, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (n *GethNode) GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*client_types.ExecutionPayloadBodyV1, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 // Eth JSON RPC
