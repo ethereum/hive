@@ -219,10 +219,6 @@ export let appRoutes = {
 	},
 
 	testInSuite: function(suiteID, suiteName, testIndex) {
-		let params = new URLSearchParams();
-		params.set("suiteid", suiteID);
-		params.set("suitename", suiteName);
-		params.set("testid", testIndex);
-		return "/suite.html?" + params.toString();
+		return appRoutes.suite(suiteID, suiteName) + "#test-" + escape(testIndex);
 	},
 }

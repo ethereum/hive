@@ -15,7 +15,9 @@ $(document).ready(function () {
 		showError("no suite ID in URL");
 		return;
 	}
-	let testid = nav.load("testid");
+	if (window.location.hash.match(/^#test-/)) {
+		var testid = parseInt(window.location.hash.replace(/^#test-/, ''));
+	}
 
 	console.log("Loading:", filename, "name:", name);
 	$.ajax({
@@ -40,24 +42,11 @@ function showError(message) {
 	$("#testsuite_desc").text("Error: " + message);
 }
 
-// linkToTest returns an <a> Element that links to the given testID.
-function linkToTest(testID, text) {
-	let loc = new URL(document.location);
-	loc.searchParams.set('testid', ''+testID);
-	return html.get_link(loc.toString(), text);
-}
-
 // formatting function for row details.
 // `d` is the original data object for the row
 function formatTestDetails(tableData, d) {
 	let container = document.createElement("div");
 	container.classList.add("details-box");
-
-	let linkP = document.createElement("p")
-	linkP.classList.add("details-test-link")
-	let link = linkToTest(d.testIndex, "[test link]");
-	linkP.appendChild(link)
-	container.appendChild(linkP);
 
 	if (d.description != "") {
 		let descP = document.createElement("p")
@@ -304,6 +293,9 @@ function toggleTestDetails(table, tr, data) {
 		let details = formatTestDetails(data, row.data());
 		row.child(details).show();
 		$(tr).addClass('shown');
+
+		// Set test reference in URL.
+		history.replaceState(null, null, '#test-' + row.data().testIndex);
 	}
 }
 
@@ -317,7 +309,7 @@ function scrollToTest(testIndex) {
 			table.page(row.page()).draw(false);
 		}
 		row.node().scrollIntoView();
-		toggleTestDetails(table, row.node());
+		toggleTestDetails(table.data(), row.node(), row.data());
 	} else {
 		console.error("invalid row in scrollToTest:", testIndex);
 	}

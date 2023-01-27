@@ -24,10 +24,6 @@ main {
 /*     overflow-x: auto; */
 /* } */
 
-#execresults .details-test-link {
-    float: right;
-}
-
 td.test-name-column {
     background: url('/images/details_open.svg') no-repeat left center;
     background-size: 32px;
