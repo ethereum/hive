@@ -25,10 +25,10 @@ $(document).ready(function () {
 		type: 'GET',
 		url: resultsRoot + filename,
 		dataType: 'json',
-		success: function(data) {
-			showSuiteData(data, filename);
+		success: function(suiteData) {
+			showSuiteData(suiteData, filename);
 			if (testid) {
-				scrollToTest(testid);
+				scrollToTest(suiteData, testid);
 			}
 		},
 		error: function(xhr, status, error) {
@@ -44,7 +44,7 @@ function showError(message) {
 
 // formatting function for row details.
 // `d` is the original data object for the row
-function formatTestDetails(tableData, d) {
+function formatTestDetails(suiteData, d) {
 	let container = document.createElement("div");
 	container.classList.add("details-box");
 
@@ -62,7 +62,7 @@ function formatTestDetails(tableData, d) {
 		detailsP.appendChild(detailsTitle);
 		container.appendChild(detailsP);
 
-		let detailsOutput = formatTestLog(tableData, d);
+		let detailsOutput = formatTestLog(suiteData, d);
 		container.appendChild(detailsOutput);
 	}
 
@@ -85,7 +85,7 @@ function countLines(text) {
 
 // formatTestLog processes the test output. Log output from the test is shortened
 // to avoid freezing the browser.
-function formatTestLog(data, test) {
+function formatTestLog(suiteData, test) {
 	const maxLines = 30;
 
 	let text = test.summaryResult.details;
@@ -139,7 +139,7 @@ function formatTestLog(data, test) {
 	if (hiddenLines > 0) {
 		// Create the truncation marker.
 		let linkText = "... " + hiddenLines + " lines hidden, click to see full output...";
-		let linkURL = appRoutes.testLogInViewer(data.suiteID, data.name, test.testIndex);
+		let linkURL = appRoutes.testLogInViewer(suiteData.suiteID, suiteData.name, test.testIndex);
 		let trunc = html.get_link(linkURL, linkText);
 		trunc.classList.add("output-trunc");
 		output.appendChild(trunc);
@@ -280,18 +280,18 @@ function showSuiteData(data, filename) {
 	// https://www.datatables.net/examples/api/row_details.html
 	$('#execresults tbody').on('click', 'td.test-name-column', function() {
 		let tr = $(this).closest('tr');
-		toggleTestDetails(table, tr, data);
+		toggleTestDetails(data, table, tr);
 	});
 }
 
 // toggleTestDetails shows/hides the test details panel.
-function toggleTestDetails(table, tr, data) {
+function toggleTestDetails(suiteData, table, tr) {
 	let row = table.row(tr);
 	if (row.child.isShown()) {
 		row.child.hide();
 		$(tr).removeClass('shown');
 	} else {
-		let details = formatTestDetails(data, row.data());
+		let details = formatTestDetails(suiteData, row.data());
 		row.child(details).show();
 		$(tr).addClass('shown');
 
@@ -301,7 +301,7 @@ function toggleTestDetails(table, tr, data) {
 }
 
 // scrollToTest scrolls to the given test row index.
-function scrollToTest(testIndex) {
+function scrollToTest(suiteData, testIndex) {
 	let table = $('#execresults').dataTable().api();
 	let currentPage = table.page();
 	let row = table.row(testIndex);
@@ -310,7 +310,7 @@ function scrollToTest(testIndex) {
 			table.page(row.page()).draw(false);
 		}
 		row.node().scrollIntoView();
-		toggleTestDetails(table.data(), row.node(), row.data());
+		toggleTestDetails(suiteData, table, row.node());
 	} else {
 		console.error("invalid row in scrollToTest:", testIndex);
 	}
