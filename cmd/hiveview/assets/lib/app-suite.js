@@ -300,12 +300,12 @@ function toggleTestDetails(suiteData, table, tr) {
 	}
 }
 
+
 // scrollToTest scrolls to the given test row index.
 function scrollToTest(suiteData, testIndex) {
 	let table = $('#execresults').dataTable().api();
-	let currentPage = table.page();
-	let row = table.row(testIndex);
-	if (row && row.node()) {
+	let row = findRowByTestIndex(table, testIndex);
+	if (row) {
 		if (row.page() != table.page()) {
 			table.page(row.page()).draw(false);
 		}
@@ -314,4 +314,15 @@ function scrollToTest(suiteData, testIndex) {
 	} else {
 		console.error("invalid row in scrollToTest:", testIndex);
 	}
+}
+
+// findRowByTestIndex finds the dataTables row corresponding to a testIndex.
+function findRowByTestIndex(table, testIndex) {
+	let tests = table.data();
+	for (var i = 0; i < tests.length; i++) {
+		if (tests[i].testIndex == testIndex) {
+			return table.row(i);
+		}
+	}
+	return null;
 }
