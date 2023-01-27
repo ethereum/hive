@@ -83,7 +83,8 @@ function countLines(text) {
 	}
 }
 
-// formatTestLog processes the test output text so it's not too long for display.
+// formatTestLog processes the test output. Log output from the test is shortened
+// to avoid freezing the browser.
 function formatTestLog(data, test) {
 	const maxLines = 30;
 
