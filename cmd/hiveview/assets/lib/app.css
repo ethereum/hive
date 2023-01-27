@@ -1,0 +1,84 @@
+@import "../extlib/bootstrap-4.4.1.min.css";
+@import "../extlib/jquery.dataTables-1.10.20.min.css";
+
+main {
+    margin: 8px 8px;
+}
+
+.pageheader {
+    border-bottom: 1px solid #777;
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+}
+
+#execresults, #filetable {
+    table-layout: fixed;
+    min-width: 900px;
+}
+
+.dataTable, .dataTable th {
+    border-bottom: 1px solid #bbb !important;
+}
+
+/* #execresults .details-box { */
+/*     overflow-x: auto; */
+/* } */
+
+#execresults .details-test-link {
+    float: right;
+}
+
+td.test-name-column {
+    background: url('/images/details_open.svg') no-repeat left center;
+    background-size: 32px;
+    cursor: pointer;
+    user-select: none;
+    padding-left: 32px !important;
+}
+
+tr.failed td.test-name-column {
+    background-image: url('/images/details_open_err.svg');
+}
+
+tr.shown td.test-name-column {
+    background-image: url('/images/details_close.svg');
+}
+
+tr.shown.failed td.test-name-column {
+    background-image: url('/images/details_close_err.svg');
+}
+
+td.ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.test-output {
+    overflow: scroll;
+}
+
+.test-output code {
+    color: black;
+    white-space: pre;
+    border-left: 2px solid #777;
+    display: block;
+    padding-left: 5px;
+}
+
+.test-output .output-prefix::before,
+.test-output .output-suffix::after {
+    content: "";
+    width: 20px;
+    border-top: 2px solid #777;
+    display: block;
+    padding-left: 5px;
+    margin-left: -5px;
+}
+
+.test-output .output-trunc {
+    display: inline-block;
+    background-color: #777;
+    color: #fff;
+    padding: 0 10px;
+}

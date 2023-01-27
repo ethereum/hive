@@ -1,3 +1,5 @@
+import { $ } from '../extlib/jquery.module.js'
+
 export let html = {
 	// encode does HTML-encoding/escaping.
 	encode: function(str) {
@@ -26,14 +28,14 @@ export let html = {
 		return all.substring(6, all.length - 6);
 	},
 
+	// get_link creates an anchor-element from 'untrusted' link data.
 	get_link: function(url, text) {
-		// get_link creates an anchor-element from 'untrusted' link data.
 		var a = document.createElement('a');
 		a.setAttribute("href", url);
 		a.text = text;
-		return a.outerHTML;
+		return a;
 	},
-	
+
 	get_js_link: function(js, text) {
 		var a = document.createElement('a');
 		a.setAttribute("href", "javascript:" + js);
@@ -46,18 +48,18 @@ export let html = {
 		// Thanks, http://urlregex.com/
 		let re = /(((?:http[s]?:\/\/)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/;
 		return String(str).replace(re, function (match) {
-			return html.get_link(match, match);
+			return html.get_link(match, match).outerHTML;
 		});
 	},
 
-	// get_button creates <button type="button" class="btn btn-default">Default</button>
-	get_button: function(onclick, text) {
+	// get_button creates a <button> element.
+	get_button: function(text) {
 		var a = document.createElement('button');
 		a.setAttribute("type", "button");
 		a.setAttribute("class", "btn btn-primary btn-xs")
 		a.textContent = text;
 		a.setAttribute("onclick", onclick)
-		return a.outerHTML;
+		return a
 	},
 
 	// Takes { "a": "1", ... }
@@ -127,19 +129,19 @@ export let nav = {
 		}
 		return retval;
 	},
-	
+
 	// load returns the value of 'key' in the URL query.
 	load: function(key) {
 		if (!URLSearchParams) {
 			console.error("Error: browser doesn't support URLSearchParams. IE or what?")
 			return null
 		}
-		return new URLSearchParams(location.search).get(key);
+		return new URLSearchParams(document.location.search).get(key);
 	},
 
 	// store stores the given keys and values in the URL query.
 	store: function(keys) {
-		let params = new URLSearchParams(location.search);
+		let params = new URLSearchParams(document.location.search);
 		for (let key in keys) {
 			params.set(key, keys[key]);
 		}
@@ -147,5 +149,80 @@ export let nav = {
 		if (newsearch != location.search) {
 			history.pushState(null, null, newsearch);
 		}
+	},
+}
+
+export let loader = {
+	newXhrWithProgressBar: function () {
+		let xhr = new window.XMLHttpRequest();
+		xhr.addEventListener("progress", function(evt) {
+			if (evt.lengthComputable) {
+				loader.showProgress(evt.loaded / evt.total);
+			} else {
+				loader.showProgress(true);
+			}
+		});
+		xhr.addEventListener("loadend", function(evt) {
+			loader.showProgress(false);
+		});
+		return xhr;
+	},
+
+	showProgress: function (loadState) {
+		if (!loadState) {
+			console.log("load finished");
+			$("#load-progress-bar-container").hide();
+			return;
+		}
+
+		var animated = false;
+		if (typeof loading == "boolean") {
+			loadState = 1.0;
+			animated = true;
+		}
+		let percent = Math.floor(loadState * 100);
+		console.log("loading: " + percent);
+
+		$("#load-progress-bar-container").show();
+		let bar = $("#load-progress-bar");
+		bar.toggleClass("progress-bar-animated", animated);
+		bar.toggleClass("progress-bar-striped", animated);
+		bar.attr("aria-valuenow", "" + percent);
+		bar.width("" + percent + "%");
+	},
+}
+
+// This object has constructor function for various app-internal URLs.
+export let appRoutes = {
+	logFileInViewer: function(suiteID, suiteName, file) {
+		let params = new URLSearchParams();
+		params.set("suiteid", suiteID);
+		params.set("suitename", suiteName);
+		params.set("file", file);
+		return "/viewer.html?" + params.toString();
+	},
+
+	testLogInViewer: function(suiteID, suiteName, testIndex) {
+		let params = new URLSearchParams();
+		params.set("suiteid", suiteID);
+		params.set("suitename", suiteName);
+		params.set("testid", testIndex);
+		params.set("showtestlog", "1");
+		return "/viewer.html?" + params.toString();
+	},
+
+	suite: function(suiteID, suiteName) {
+		let params = new URLSearchParams();
+		params.set("suiteid", suiteID);
+		params.set("suitename", suiteName);
+		return "/suite.html?" + params.toString();
+	},
+
+	testInSuite: function(suiteID, suiteName, testIndex) {
+		let params = new URLSearchParams();
+		params.set("suiteid", suiteID);
+		params.set("suitename", suiteName);
+		params.set("testid", testIndex);
+		return "/suite.html?" + params.toString();
 	},
 }

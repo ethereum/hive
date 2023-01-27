@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="icon" href="/images/favicon.svg">
+    <link rel="stylesheet" href="/lib/app.css">
+  </head>
+
+  <body>
+    <main role="main">
+      <div class="pageheader">
+        <a href="/"><img height=40 src="/images/hive3.svg"></a>
+      </div>
+      
+      <h2><span id="testsuite_state">Results:</span> <span id="testsuite_name"></span></h2>
+
+      <div id="load-progress-bar-container" class="progress" style="display: none;">
+        <div id="load-progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+
+      <p><span id="testsuite_desc"></span></p>
+      <p><span id="testsuite_clients"></span></p>
+      <table id="execresults" class="hover cell-border" width="100%"></table>
+    </main>
+  </body>
+
+  <!-- load the app -->
+  <script src="/lib/app-suite.js" type="module"></script>
+</html>
