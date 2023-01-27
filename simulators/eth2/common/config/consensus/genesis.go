@@ -102,10 +102,12 @@ func BuildBeaconState(
 
 	var state common.BeaconState
 	var forkVersion common.Version
+	var previousForkVersion common.Version
 	var emptyBodyRoot common.Root
 	if spec.CAPELLA_FORK_EPOCH == 0 {
 		stateView := capella.NewBeaconStateView(spec)
 		forkVersion = spec.CAPELLA_FORK_VERSION
+		previousForkVersion = spec.BELLATRIX_FORK_VERSION
 		emptyBodyRoot = capella.BeaconBlockBodyType(configs.Mainnet).
 			New().
 			HashTreeRoot(hFn)
@@ -114,6 +116,7 @@ func BuildBeaconState(
 	} else if spec.BELLATRIX_FORK_EPOCH == 0 {
 		stateView := bellatrix.NewBeaconStateView(spec)
 		forkVersion = spec.BELLATRIX_FORK_VERSION
+		previousForkVersion = spec.ALTAIR_FORK_VERSION
 		emptyBodyRoot = bellatrix.BeaconBlockBodyType(configs.Mainnet).
 			New().
 			HashTreeRoot(hFn)
@@ -121,12 +124,14 @@ func BuildBeaconState(
 	} else if spec.ALTAIR_FORK_EPOCH == 0 {
 		state = bellatrix.NewBeaconStateView(spec)
 		forkVersion = spec.ALTAIR_FORK_VERSION
+		previousForkVersion = spec.GENESIS_FORK_VERSION
 		emptyBodyRoot = altair.BeaconBlockBodyType(configs.Mainnet).
 			New().
 			HashTreeRoot(hFn)
 	} else {
 		state = phase0.NewBeaconStateView(spec)
 		forkVersion = spec.GENESIS_FORK_VERSION
+		previousForkVersion = spec.GENESIS_FORK_VERSION
 		emptyBodyRoot = phase0.BeaconBlockBodyType(configs.Mainnet).
 			New().
 			HashTreeRoot(hFn)
@@ -137,7 +142,7 @@ func BuildBeaconState(
 	}
 
 	if err := state.SetFork(common.Fork{
-		PreviousVersion: forkVersion, // duplicate, since there is nothing before genesis.
+		PreviousVersion: previousForkVersion,
 		CurrentVersion:  forkVersion,
 		Epoch:           common.GENESIS_EPOCH,
 	}); err != nil {

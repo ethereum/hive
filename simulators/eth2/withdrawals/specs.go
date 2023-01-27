@@ -33,23 +33,37 @@ type BaseWithdrawalsTestSpec struct {
 
 	// Other Testing Configuration
 	SubmitBLSChangesOnBellatrix bool
+
+	// Verifications
+	WaitForFinality bool
+
+	// Extra Gwei
+	ExtraGwei beacon.Gwei
 }
 
 var (
 	DEFAULT_VALIDATOR_COUNT uint64 = 128
-	DEFAULT_SLOT_TIME       uint64 = 6
+	MAINNET_SLOT_TIME       int64  = 12
+	MINIMAL_SLOT_TIME       int64  = 6
 
 	EPOCHS_TO_FINALITY beacon.Epoch = 4
 
 	// Default config used for all tests unless a client specific config exists
 	DEFAULT_CONFIG = &testnet.Config{
 		ValidatorCount:          big.NewInt(int64(DEFAULT_VALIDATOR_COUNT)),
-		SlotTime:                big.NewInt(int64(DEFAULT_SLOT_TIME)),
+		SlotTime:                big.NewInt(MAINNET_SLOT_TIME),
 		TerminalTotalDifficulty: common.Big0,
 		AltairForkEpoch:         common.Big0,
 		BellatrixForkEpoch:      common.Big0,
 		CapellaForkEpoch:        common.Big1,
 		Eth1Consensus:           &el.ExecutionCliqueConsensus{},
+	}
+
+	MINIMAL_SLOT_TIME_CLIENTS = []string{
+		"lighthouse",
+		"teku",
+		"prysm",
+		"lodestar",
 	}
 
 	// Clients that do not support starting on epoch 0 with all forks enabled.
@@ -65,18 +79,29 @@ var (
 			"prysm":  true,
 		}
 	*/
+
 )
 
 func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
-	allNodeDefinitions []clients.NodeDefinition,
+	allNodeDefinitions clients.NodeDefinitions,
 ) *testnet.Config {
-	config := DEFAULT_CONFIG
+	config := *DEFAULT_CONFIG
 
 	/*
 		if INCREMENTAL_FORKS_CLIENTS[n.ConsensusClient] {
 			config = config.Join(INCREMENTAL_FORKS_CONFIG)
 		}
 	*/
+
+	if len(
+		allNodeDefinitions.FilterByCL(MINIMAL_SLOT_TIME_CLIENTS),
+	) == len(
+		allNodeDefinitions,
+	) {
+		// If all clients support using minimal 6 second slot time, use it
+		config.SlotTime = big.NewInt(MINIMAL_SLOT_TIME)
+	}
+	fmt.Printf("INFO: using %d second slot time\n", config.SlotTime)
 
 	if ts.CapellaGenesis {
 		config.CapellaForkEpoch = common.Big0
@@ -146,7 +171,7 @@ func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 
 	for index, key := range keys {
 		// All validators have idiosyncratic balance amounts to identify them
-		key.ExtraInitialBalance = beacon.Gwei(index + 1)
+		key.ExtraInitialBalance = beacon.Gwei(index+1) + ts.ExtraGwei
 
 		if ts.GenesisExecutionWithdrawalCredentialsShares > 0 &&
 			(index%ts.GenesisExecutionWithdrawalCredentialsShares) == 0 {
