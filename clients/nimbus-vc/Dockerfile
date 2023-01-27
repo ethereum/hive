@@ -11,10 +11,10 @@ ENV NPROC=2
 
 RUN git clone --depth 1 --branch unstable https://github.com/status-im/nimbus-eth2.git \
  && cd nimbus-eth2 \
- && make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC} -d:SECONDS_PER_SLOT=6" V=1 update
+ && make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" V=1 update
 
 RUN cd nimbus-eth2 && \
-    make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC} -d:SECONDS_PER_SLOT=6" nimbus_validator_client && \
+    make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" nimbus_validator_client && \
     mv build/nimbus_validator_client /usr/bin/
 
 # --------------------------------- #
@@ -30,10 +30,13 @@ RUN apt-get update \
 
 COPY --from=build /usr/bin/nimbus_validator_client /usr/bin/nimbus_validator_client
 
-RUN usr/bin/nimbus_validator_client --version > /version.txt
-
 # Add the startup script.
 ADD nimbus_vc.sh /nimbus_vc.sh
 RUN chmod +x /nimbus_vc.sh
+
+ADD nimbus_version.sh /nimbus_version.sh
+RUN chmod +x /nimbus_version.sh
+
+RUN /nimbus_version.sh > /version.txt
 
 ENTRYPOINT ["/nimbus_vc.sh"]
