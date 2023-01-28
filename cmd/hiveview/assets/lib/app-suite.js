@@ -241,7 +241,7 @@ function showSuiteData(data, suiteID) {
 	// Fill info box.
 	let suiteTimes = testSuiteTimes(cases);
 	$("#testsuite_start").html("🕒 " + suiteTimes.start.toLocaleString());
-	$("#testsuite_duration").html("⌛ " + format.duration(suiteTimes.duration));
+	$("#testsuite_duration").html("⌛️ " + format.duration(suiteTimes.duration));
 	if (data.simLog) {
 		let logfile = app.resultsRoot + data.simLog;
 		let url = app.route.logFileInViewer(suiteID, suiteName, logfile);
@@ -279,7 +279,7 @@ function showSuiteData(data, suiteID) {
 			},
 			// Test duration.
 			{
-				title: "⌛",
+				title: "⌛️",
 				data: "duration",
 				className: "test-duration-column",
 				width: "60px",
