@@ -285,26 +285,6 @@ function showSuiteData(data, filename) {
 	});
 }
 
-// toggleTestDetails shows/hides the test details panel.
-function toggleTestDetails(suiteData, table, tr) {
-	$('.highlighted').removeClass('highlighted');
-
-	let row = table.row(tr);
-	if (row.child.isShown()) {
-		row.child.hide();
-		$(tr).removeClass('shown');
-		history.replaceState(null, null, '#');
-	} else {
-		let details = formatTestDetails(suiteData, row.data());
-		row.child(details).show();
-		$(tr).addClass('shown');
-		$(tr).addClass('highlighted');
-		$(row.child()).addClass('highlighted');
-		// Set test reference in URL.
-		history.replaceState(null, null, '#test-' + row.data().testIndex);
-	}
-}
-
 // scrollToTest scrolls to the given test row index.
 function scrollToTest(suiteData, testIndex) {
 	let table = $('#execresults').dataTable().api();
@@ -329,4 +309,46 @@ function findRowByTestIndex(table, testIndex) {
 		}
 	}
 	return null;
+}
+
+// toggleTestDetails shows/hides the test details panel.
+function toggleTestDetails(suiteData, table, tr) {
+	let row = table.row(tr);
+	if (row.child.isShown()) {
+		if (!$(row.node()).hasClass('highlighted')) {
+			// When clicking a test that is expanded, but not selected,
+			// the click only changes selection.
+			selectTest(table, row);
+		} else {
+			// This test is the selected one, clicking deselects and closes it.
+			deselectTest(row, true);
+		}
+	} else {
+		let details = formatTestDetails(suiteData, row.data());
+		row.child(details).show();
+		$(tr).addClass('shown');
+		selectTest(table, row);
+	}
+}
+
+function selectTest(table, row) {
+	let selected = $('#execresults tr.dt-hasChild.highlighted');
+	if (selected) {
+		let selectedRow = table.row(selected[0]);
+		deselectTest(selectedRow, false);
+	}
+	console.log('select:', row.data().testIndex);
+	$(row.node()).addClass('highlighted');
+	$(row.child()).addClass('highlighted');
+	history.replaceState(null, null, '#test-' + row.data().testIndex);
+}
+
+function deselectTest(row, closeDetails) {
+	if (closeDetails) {
+		row.child.hide();
+		$(row.node()).removeClass('shown');
+	}
+	$(row.node()).removeClass('highlighted');
+	$(row.child()).removeClass('highlighted');
+	history.replaceState(null, null, '#');
 }
