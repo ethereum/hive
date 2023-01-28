@@ -105,6 +105,10 @@ td.ellipsis {
     text-decoration: none;
 }
 
+.test-output .output-error {
+    font-weight: bold;
+}
+
 .highlighted {
     background-color: #fffaea !important;
 }

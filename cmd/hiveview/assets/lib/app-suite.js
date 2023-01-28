@@ -112,7 +112,7 @@ function formatTestLog(suiteData, test) {
 		let inSuffix = lineNumber > (totalLines-maxLines);
 		if (inPrefix || inSuffix) {
 			let line = text.substring(begin, end);
-			let content = html.encode(line);
+			let content = highlightErrorsInTestOutput(html.encode(line));
 			if (inPrefix) {
 				prefixOutput += content + "\n";
 			} else {
@@ -160,6 +160,12 @@ function formatTestLog(suiteData, test) {
 	}
 
 	return output;
+}
+
+function highlightErrorsInTestOutput(content) {
+	return content.replace(/(ERROR|FAIL|Error)(:)?.*/, function (m) {
+		return '<span class="output-error">' + m + '</span>';
+	});
 }
 
 // showSuiteName displays the suite title.
