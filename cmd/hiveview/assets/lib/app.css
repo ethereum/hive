@@ -98,6 +98,7 @@ td.ellipsis {
     background-color: #777;
     color: #fff;
     padding: 0 10px;
+    text-decoration: none;
 }
 
 .highlighted {
