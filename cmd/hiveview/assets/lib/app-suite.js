@@ -116,7 +116,10 @@ function formatTestLog(suiteData, test) {
 			if (inPrefix) {
 				prefixOutput += content + "\n";
 			} else {
-				suffixOutput += content + "\n";
+				suffixOutput += content;
+				if (lineNumber < totalLines-1) {
+					suffixOutput += "\n";
+				}
 			}
 		} else {
 			hiddenLines++;
