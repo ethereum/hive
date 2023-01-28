@@ -140,6 +140,7 @@ func (manager *TestManager) IsTestRunning(test TestID) (*TestCase, bool) {
 func (manager *TestManager) Terminate() error {
 	terminationSummary := &TestResult{
 		Pass:    false,
+		Timeout: true,
 		Details: "Test was terminated by host",
 	}
 	manager.testSuiteMutex.Lock()
@@ -383,7 +384,7 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 	return newSuiteID, nil
 }
 
-//StartTest starts a new test case, returning the testcase id as a context identifier
+// StartTest starts a new test case, returning the testcase id as a context identifier
 func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, description string) (TestID, error) {
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()

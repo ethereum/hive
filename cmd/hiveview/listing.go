@@ -59,6 +59,7 @@ type listingEntry struct {
 	// Info about this run.
 	Passes   int       `json:"passes"`
 	Fails    int       `json:"fails"`
+	Timeout  bool      `json:"timeout"`
 	Clients  []string  `json:"clients"`  // client names involved in this run
 	Start    time.Time `json:"start"`    // timestamp of test start (ISO 8601 format)
 	FileName string    `json:"fileName"` // hive output file
@@ -80,6 +81,9 @@ func suiteToEntry(s *libhive.TestSuite, file fs.FileInfo) listingEntry {
 			e.Passes++
 		} else {
 			e.Fails++
+		}
+		if test.SummaryResult.Timeout {
+			e.Timeout = true
 		}
 		if e.Start.IsZero() || test.Start.Before(e.Start) {
 			e.Start = test.Start

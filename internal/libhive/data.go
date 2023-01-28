@@ -43,6 +43,7 @@ type TestCase struct {
 // TestResult is the payload submitted to the EndTest endpoint.
 type TestResult struct {
 	Pass    bool   `json:"pass"`
+	Timeout bool   `json:"timeout,omitempty"`
 	Details string `json:"details"`
 }
 
