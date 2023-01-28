@@ -69,15 +69,18 @@ function showFileListing(data, error) {
 				title: "Start time",
 				data: "start",
 				type: "date",
-				width: "12.5em",
-				render: function(data) {
-					return new Date(data).toISOString();
+				width: "11em",
+				render: function(v, type) {
+					if (type === 'display') {
+						return new Date(v).toLocaleString();
+					}
+					return v;
 				},
 			},
 			{
 				title: "Suite",
 				data: "name",
-				width: "20%",
+				width: "10em",
 			},
 			{
 				title: "Clients",

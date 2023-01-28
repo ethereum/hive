@@ -85,6 +85,7 @@ export let format = {
 		format.duration(d2 - d1);
 	},
 
+	// duration formats a duration value (given in ms).
 	duration: function(diff) {
 		var _s = "";
 		if (diff < 0) {

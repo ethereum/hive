@@ -6,7 +6,7 @@ import * as app from './app.js'
 
 $(document).ready(function () {
 	app.init();
-	
+
 	let name = nav.load("suitename");
 	if (name) {
 		showSuiteName(name);
@@ -231,7 +231,7 @@ function showSuiteData(data, suiteID) {
 
 	// Fill info box.
 	let suiteTimes = testSuiteTimes(cases);
-	$("#testsuite_start").html("🕒 " + suiteTimes.start);
+	$("#testsuite_start").html("🕒 " + suiteTimes.start.toLocaleString());
 	$("#testsuite_duration").html("⌛ " + format.duration(suiteTimes.duration));
 	if (data.simLog) {
 		let logfile = app.resultsRoot + data.simLog;
@@ -246,7 +246,7 @@ function showSuiteData(data, suiteID) {
 		data: cases,
 		pageLength: 100,
 		autoWidth: false,
-		order: [[2, 'desc']],
+		order: [[1, 'desc']],
 		columns: [
 			{
 				title: "Test",
@@ -254,20 +254,7 @@ function showSuiteData(data, suiteID) {
 				className: "test-name-column",
 				width: "79%",
 			},
-			{
-				title: "⌛",
-				data: "duration",
-				className: "test-duration-column",
-				width: "50px",
-				type: "num",
-				render: function (v, type, row) {
-					if (type === 'display' || type === 'filter') {
-						return format.duration(v);
-					}
-					return v;
-				},
-			},
-			// Status: pass or not
+			// Status: pass or not.
 			{
 				title: "Status",
 				data: "summaryResult",
@@ -280,6 +267,20 @@ function showSuiteData(data, suiteID) {
 					return "&#x2715; <b>" + s + "</b>";
 				},
 				width: "70px",
+			},
+			// Test duration.
+			{
+				title: "⌛",
+				data: "duration",
+				className: "test-duration-column",
+				width: "60px",
+				type: "num",
+				render: function (v, type, row) {
+					if (type === 'display' || type === 'filter') {
+						return format.duration(v);
+					}
+					return v;
+				},
 			},
 			// The logs for clients related to the test.
 			{
@@ -315,6 +316,7 @@ function showSuiteData(data, suiteID) {
 }
 
 // testSuiteTimes computes start/end/duration of a test suite.
+// The duration is returned in milliseconds.
 function testSuiteTimes(cases) {
 	if (cases.length == 0) {
 		return 0;
@@ -331,13 +333,13 @@ function testSuiteTimes(cases) {
 		}
 	}
 	return {
-		start: start,
-		end: end,
+		start: new Date(start),
+		end: new Date(end),
 		duration: Date.parse(end) - Date.parse(start),
 	}
 }
 
-// testCaseDuration computes the duration of a single test case in seconds.
+// testCaseDuration computes the duration of a single test case in milliseconds.
 function testCaseDuration(test) {
 	return Date.parse(test.end) - Date.parse(test.start);
 }

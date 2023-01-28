@@ -57,7 +57,8 @@ function hiveInfoHTML(data) {
 		txt += '<span>commit: ' + link + '</span>';
 	}
 	if (data.buildDate) {
-		txt += '<span>built: ' + data.buildDate + '</span>';
+		let date = new Date(data.buildDate).toLocaleString();
+		txt += '<span>built: ' + date + '</span>';
 	}
 	return txt;
 }
