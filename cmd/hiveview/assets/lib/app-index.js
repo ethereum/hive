@@ -98,7 +98,7 @@ function showFileListing(data, error) {
 			{
 				title: "",
 				data: null,
-				width: "200px",
+				width: "180px",
 				orderable: false,
 				render: function(data) {
 					let loadText = "Load (" + format.units(data.size) + ")";
