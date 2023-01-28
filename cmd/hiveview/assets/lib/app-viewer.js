@@ -1,9 +1,10 @@
 import { $ } from '../extlib/jquery.module.js'
-import { html, nav, format, loader, appRoutes } from './utils.js'
-
-const resultsRoot = "/results/"
+import { html, nav, format, loader } from './utils.js'
+import * as app from './app.js'
 
 function navigate() {
+    app.init();
+    
     // Check for line number in hash.
     var line = null;
     if (window.location.hash.substr(1, 1) == "L") {
@@ -25,7 +26,7 @@ function navigate() {
             showError("Invalid parameters! Missing 'suitefile' or 'testid' in URL.");
             return;
         }
-        fetchTestLog(resultsRoot + suiteFile, testIndex, line);
+        fetchTestLog(app.resultsRoot + suiteFile, testIndex, line);
         return;
     }
 
@@ -73,9 +74,9 @@ function showLinkBack(suiteID, suiteName, testID) {
     let linkText = "Back to test suite: " + suiteName;
     var linkURL;
     if (testID) {
-        linkURL = appRoutes.testInSuite(suiteID, suiteName, testID);
+        linkURL = app.route.testInSuite(suiteID, suiteName, testID);
     } else {
-        linkURL = appRoutes.suite(suiteID, suiteName);
+        linkURL = app.route.suite(suiteID, suiteName);
     }
     $('#link-back').html(html.get_link(linkURL, linkText));
 }
@@ -155,7 +156,7 @@ function fetchFile(url, line /* optional jump to line */ ) {
         url: url,
         dataType: "text",
         success: function(data) {
-            let title = url.replace(/\/results\//, '');
+            let title = url.replace("^"+app.resultsRoot, '');
             showTitle(null, title);
             showFileContent(data, url);
             setHL(line, true);

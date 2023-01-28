@@ -105,7 +105,7 @@ export let format = {
 		a += s + "s";
 		return _s + a;
 	},
-	
+
 	// units returns human readable units for the given data size in bytes.
 	units: function(loc) {
 		if (loc < 1024) {
@@ -193,36 +193,5 @@ export let loader = {
 		bar.toggleClass("progress-bar-striped", animated);
 		bar.attr("aria-valuenow", "" + percent);
 		bar.width("" + percent + "%");
-	},
-}
-
-// This object has constructor function for various app-internal URLs.
-export let appRoutes = {
-	logFileInViewer: function(suiteID, suiteName, file) {
-		let params = new URLSearchParams();
-		params.set("suiteid", suiteID);
-		params.set("suitename", suiteName);
-		params.set("file", file);
-		return "/viewer.html?" + params.toString();
-	},
-
-	testLogInViewer: function(suiteID, suiteName, testIndex) {
-		let params = new URLSearchParams();
-		params.set("suiteid", suiteID);
-		params.set("suitename", suiteName);
-		params.set("testid", testIndex);
-		params.set("showtestlog", "1");
-		return "/viewer.html?" + params.toString();
-	},
-
-	suite: function(suiteID, suiteName) {
-		let params = new URLSearchParams();
-		params.set("suiteid", suiteID);
-		params.set("suitename", suiteName);
-		return "/suite.html?" + params.toString();
-	},
-
-	testInSuite: function(suiteID, suiteName, testIndex) {
-		return appRoutes.suite(suiteID, suiteName) + "#test-" + escape(testIndex);
 	},
 }

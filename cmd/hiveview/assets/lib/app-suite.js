@@ -1,11 +1,12 @@
 import '../extlib/bootstrap.module.js'
 import '../extlib/dataTables.module.js'
 import { $ } from '../extlib/jquery.module.js'
-import { html, nav, format, loader, appRoutes } from './utils.js'
-
-const resultsRoot = "/results/"
+import { html, nav, format, loader } from './utils.js'
+import * as app from './app.js'
 
 $(document).ready(function () {
+	app.init();
+	
 	let name = nav.load("suitename");
 	if (name) {
 		showSuiteName(name);
@@ -24,7 +25,7 @@ $(document).ready(function () {
 	$.ajax({
 		xhr: loader.newXhrWithProgressBar,
 		type: 'GET',
-		url: resultsRoot + filename,
+		url: app.resultsRoot + filename,
 		dataType: 'json',
 		success: function(suiteData) {
 			showSuiteData(suiteData, filename);
@@ -141,7 +142,7 @@ function formatTestLog(suiteData, test) {
 	if (hiddenLines > 0) {
 		// Create the truncation marker.
 		let linkText = "..." + hiddenLines + " lines hidden, click to see full output...";
-		let linkURL = appRoutes.testLogInViewer(suiteData.suiteID, suiteData.name, test.testIndex);
+		let linkURL = app.route.testLogInViewer(suiteData.suiteID, suiteData.name, test.testIndex);
 		let trunc = html.get_link(linkURL, linkText);
 		trunc.classList.add("output-trunc");
 		output.appendChild(trunc);
@@ -233,7 +234,8 @@ function showSuiteData(data, suiteID) {
 	$("#testsuite_start").html("🕒 " + suiteTimes.start);
 	$("#testsuite_duration").html("⌛ " + format.duration(suiteTimes.duration));
 	if (data.simLog) {
-		let url = appRoutes.logFileInViewer(suiteID, suiteName, resultsRoot + data.simLog);
+		let logfile = app.resultsRoot + data.simLog;
+		let url = app.route.logFileInViewer(suiteID, suiteName, logfile);
 		$("#sim-log-link").attr("href", url);
 		$("#sim-log-link").text("simulator log file");
 	}
@@ -286,8 +288,8 @@ function showSuiteData(data, suiteID) {
 					let logs = []
 					for (let instanceID in clientInfo) {
 						let instanceInfo = clientInfo[instanceID]
-						let logfile = resultsRoot + instanceInfo.logFile;
-						let url = appRoutes.logFileInViewer(suiteID, suiteName, logfile);
+						let logfile = app.resultsRoot + instanceInfo.logFile;
+						let url = app.route.logFileInViewer(suiteID, suiteName, logfile);
 						let link = html.get_link(url, instanceInfo.name)
 						logs.push(link.outerHTML);
 					}

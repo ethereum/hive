@@ -1,16 +1,19 @@
 import '../extlib/bootstrap.module.js'
 import '../extlib/dataTables.module.js'
 import { $ } from '../extlib/jquery.module.js'
-import { html, format, nav, appRoutes } from './utils.js'
+import { html, format, nav } from './utils.js'
+import * as app from './app.js'
 
 $(document).ready(function() {
-	console.log("Loading file list...")
+	app.init();
+	
+	console.log("Loading file list...");
 	$.ajax("listing.jsonl", {
 		success: showFileListing,
 		failure: function(status, err) {
 			alert(err);
 		},
-	})
+	});
 });
 
 function resultStats(fails, success, total) {
@@ -25,7 +28,7 @@ function resultStats(fails, success, total) {
 }
 
 function linkToSuite(suiteID, suiteName, linkText) {
-	let url = appRoutes.suite(suiteID, suiteName);
+	let url = app.route.suite(suiteID, suiteName);
 	return html.get_link(url, linkText);
 }
 

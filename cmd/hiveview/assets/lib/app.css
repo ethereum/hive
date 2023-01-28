@@ -5,19 +5,35 @@ main {
     margin: 8px 8px;
 }
 
-.pageheader {
+#hive-header {
     border-bottom: 1px solid #bbb;
-    padding-bottom: 8px;
+    padding-bottom: 0px;
     margin-bottom: 8px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: begin;
+}
+
+#hive-logo {
+    margin-bottom: 3px;
+}
+
+#hive-static-nav {
+    margin: 0 6px 0 auto;
+    font-size: 80%;
+}
+
+#hive-static-nav span {
+    margin: 0 6px;
+}
+
+#hive-static-nav a {
+    text-decoration: none;
 }
 
 #execresults, #filetable {
     table-layout: fixed;
     min-width: 900px;
-}
-
-#hive-static-nav {
-    float: right;
 }
 
 #sim-log-link {
