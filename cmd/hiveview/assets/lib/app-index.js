@@ -93,9 +93,10 @@ function showFileListing(data, error) {
 				width: "9em",
 				render: function(data) {
 					if (data.fails > 0) {
-						return "&#x2715; <b>Fail (" + data.fails + " / " + (data.fails + data.passes) + ")</b>"
+						let prefix = data.timeout ? "Timeout" : "Fail";
+						return "&#x2715; <b>" + prefix + " (" + data.fails + " / " + (data.fails + data.passes) + ")</b>";
 					}
-					return "&#x2713 (" + data.passes + ")"
+					return "&#x2713 (" + data.passes + ")";
 				},
 			},
 			{

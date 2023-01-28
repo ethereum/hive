@@ -276,9 +276,10 @@ function showSuiteData(data, suiteID) {
 					if (summaryResult.pass) {
 						return "&#x2713"
 					};
-					return "&#x2715; <b>Fail</b>";
+					let s = summaryResult.timeout ? "Timeout" : "Fail";
+					return "&#x2715; <b>" + s + "</b>";
 				},
-				width: "50px",
+				width: "70px",
 			},
 			// The logs for clients related to the test.
 			{
