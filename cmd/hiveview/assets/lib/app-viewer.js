@@ -44,39 +44,27 @@ function navigate() {
 
 $(document).ready(navigate);
 
-/*
-  makeLine creates an element like the template here:
-  <tr>
-  <td id="L{{ line }}" class="num" line="{{ line }} "></td>
-  <td>{{ content }}</td>
-  </tr>
-*/
-function makeLine(number, text) {
-    let tr = document.createElement("tr")
-    let td1 = document.createElement("td")
-    td1.setAttribute("id", "L" + parseInt(number))
-    td1.setAttribute("class", "num")
-    td1.setAttribute("line", parseInt(number))
-    let td2 = document.createElement("td")
-    td2.innerText = text
-    tr.appendChild(td1);
-    tr.appendChild(td2);
-    return tr
-}
-
-// setHL sets the highlight
+// setHL sets the highlight on a line number.
 function setHL(num, scroll) {
-    $(".highlighted").removeClass("highlighted"); // out with the old
-    if (num) {
-        let el = $("#L" + num);
-        if (!el) {
-            console.error("invalid line number:", num);
-            return;
-        }
-        el.parent().addClass("highlighted"); // in with the new
-        if (scroll) {
-            el[0].scrollIntoView();
-        }
+    // out with the old
+    $(".highlighted").removeClass("highlighted");
+    if (!num) {
+        return;
+    }
+
+    let contentArea = $('#file-content');
+    let gutter = $('#gutter');
+    let numElem = gutter.children().eq(num - 1);
+    if (!numElem) {
+        console.error("invalid line number:", num);
+        return;
+    }
+    // in with the new
+    let lineElem = contentArea.children().eq(num - 1);
+    numElem.addClass("highlighted");
+    lineElem.addClass("highlighted");
+    if (scroll) {
+        numElem[0].scrollIntoView();
     }
 }
 
@@ -109,23 +97,24 @@ function showError(text) {
 // This is called by the loader, after a successful fetch.
 function showFileContent(text, filename) {
     showText(text);
-    let raw = $("raw-url");
+    let raw = $("#raw-url");
     raw.attr("href", filename);
     raw.show();
 }
 
 // showText sets the content of the viewer.
 function showText(text) {
-    let container = document.getElementById("viewer");
+    let contentArea = document.getElementById("file-content");
+    let gutter = document.getElementById("gutter");
 
     // Clear content.
-    container.innerHTML = "";
+    contentArea.innerHTML = "";
+    gutter.innerHTML = "";
 
     // Add the lines.
     let lines = text.split("\n")
     for (let i = 0; i < lines.length; i++) {
-        let elem = makeLine(i + 1, lines[i]);
-        container.appendChild(elem);
+        appendLine(contentArea, gutter, i + 1, lines[i]);
     }
 
     // Text showing done, now let's wire up the gutter-clicking
@@ -139,9 +128,24 @@ function showText(text) {
     });
 
     // Set meta-info.
-    let meta = lines.length + " Lines, " + format.units(text.length);
-    document.getElementById("meta").innerText = meta;
-    return lines.length
+    let meta = $("#meta");
+    meta.text(lines.length + " Lines, " + format.units(text.length));
+
+    // Ensure viewer is visible.
+    $('#viewer-header').show();
+    $('#viewer').show();
+}
+
+function appendLine(contentArea, gutter, number, text) {
+    let num = document.createElement("span");
+    num.setAttribute("id", "L" + number);
+    num.setAttribute("class", "num");
+    num.setAttribute("line", number.toString());
+    gutter.appendChild(num);
+
+    let line = document.createElement("span")
+    line.innerText = text + "\n";
+    contentArea.appendChild(line);
 }
 
 // fetchFile loads up a new file to view

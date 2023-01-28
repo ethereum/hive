@@ -2,4 +2,4 @@
 // bootstrap needs jQuery, so we load that first.
 
 import './jquery.module.js'
-import './bootstrap-4.4.1.min.js'
+import './bootstrap-5.2.3.min.js'

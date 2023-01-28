@@ -1,5 +1,5 @@
 import '../extlib/bootstrap.module.js'
-import '../extlib/jquery.dataTables.module.js'
+import '../extlib/dataTables.module.js'
 import { $ } from '../extlib/jquery.module.js'
 import { html, nav, loader, appRoutes } from './utils.js'
 
@@ -15,8 +15,9 @@ $(document).ready(function () {
 		showError("no suite ID in URL");
 		return;
 	}
+	var testid = null;
 	if (window.location.hash.match(/^#test-/)) {
-		var testid = parseInt(window.location.hash.replace(/^#test-/, ''));
+		testid = parseInt(window.location.hash.replace(/^#test-/, ''));
 	}
 
 	console.log("Loading:", filename, "name:", name);
@@ -86,7 +87,7 @@ function countLines(text) {
 // formatTestLog processes the test output. Log output from the test is shortened
 // to avoid freezing the browser.
 function formatTestLog(suiteData, test) {
-	const maxLines = 30;
+	const maxLines = 25;
 
 	let text = test.summaryResult.details;
 	let totalLines = countLines(text);
@@ -109,7 +110,7 @@ function formatTestLog(suiteData, test) {
 		let inSuffix = lineNumber > (totalLines-maxLines);
 		if (inPrefix || inSuffix) {
 			let line = text.substring(begin, end);
-			let content = html.urls_to_links(html.encode(line));
+			let content = html.encode(line);
 			if (inPrefix) {
 				prefixOutput += content + "\n";
 			} else {
@@ -138,7 +139,7 @@ function formatTestLog(suiteData, test) {
 
 	if (hiddenLines > 0) {
 		// Create the truncation marker.
-		let linkText = "... " + hiddenLines + " lines hidden, click to see full output...";
+		let linkText = "..." + hiddenLines + " lines hidden, click to see full output...";
 		let linkURL = appRoutes.testLogInViewer(suiteData.suiteID, suiteData.name, test.testIndex);
 		let trunc = html.get_link(linkURL, linkText);
 		trunc.classList.add("output-trunc");
@@ -286,20 +287,23 @@ function showSuiteData(data, filename) {
 
 // toggleTestDetails shows/hides the test details panel.
 function toggleTestDetails(suiteData, table, tr) {
+	$('.highlighted').removeClass('highlighted');
+
 	let row = table.row(tr);
 	if (row.child.isShown()) {
 		row.child.hide();
 		$(tr).removeClass('shown');
+		history.replaceState(null, null, '#');
 	} else {
 		let details = formatTestDetails(suiteData, row.data());
 		row.child(details).show();
 		$(tr).addClass('shown');
-
+		$(tr).addClass('highlighted');
+		$(row.child()).addClass('highlighted');
 		// Set test reference in URL.
 		history.replaceState(null, null, '#test-' + row.data().testIndex);
 	}
 }
-
 
 // scrollToTest scrolls to the given test row index.
 function scrollToTest(suiteData, testIndex) {

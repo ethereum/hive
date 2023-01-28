@@ -1,12 +1,12 @@
-@import "../extlib/bootstrap-4.4.1.min.css";
-@import "../extlib/jquery.dataTables-1.10.20.min.css";
+@import "../extlib/bootstrap-5.2.3.min.css";
+@import "../extlib/dataTables-1.13.1.bootstrap5.min.css";
 
 main {
     margin: 8px 8px;
 }
 
 .pageheader {
-    border-bottom: 1px solid #777;
+    border-bottom: 1px solid #bbb;
     padding-bottom: 8px;
     margin-bottom: 8px;
 }
@@ -15,14 +15,6 @@ main {
     table-layout: fixed;
     min-width: 900px;
 }
-
-.dataTable, .dataTable th {
-    border-bottom: 1px solid #bbb !important;
-}
-
-/* #execresults .details-box { */
-/*     overflow-x: auto; */
-/* } */
 
 td.test-name-column {
     background: url('/images/details_open.svg') no-repeat left center;
@@ -77,4 +69,8 @@ td.ellipsis {
     background-color: #777;
     color: #fff;
     padding: 0 10px;
+}
+
+.highlighted {
+    background-color: #fffaea !important;
 }

@@ -1,5 +1,5 @@
 import '../extlib/bootstrap.module.js'
-import '../extlib/jquery.dataTables.module.js'
+import '../extlib/dataTables.module.js'
 import { $ } from '../extlib/jquery.module.js'
 import { html, format, nav, appRoutes } from './utils.js'
 
@@ -46,15 +46,16 @@ function showFileListing(data, error) {
 			"ntests": 0
 	}
 	*/
-	let table = $("#filetable")
-	var suites = []
+
+	let table = $("#filetable");
+	var suites = [];
 	data.split("\n").forEach(function(elem, index) {
 		if (!elem) {
 			return;
 		}
-		let obj = JSON.parse(elem)
-		suites.push(obj)
-	})
+		suites.push(JSON.parse(elem));
+	});
+
 	filetable = $("#filetable").DataTable({
 		data: suites,
 		pageLength: 50,
