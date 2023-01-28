@@ -16,6 +16,10 @@ main {
     min-width: 900px;
 }
 
+#hive-static-nav {
+    float: right;
+}
+
 #sim-log-link {
     color: black;
 }
