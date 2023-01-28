@@ -82,7 +82,10 @@ export let format = {
 	// format_timespan gives the difference between times d1 and d2
 	// in human readable time units.
 	format_timespan: function(d1, d2) {
-		var diff = d2 - d1;
+		format.duration(d2 - d1);
+	},
+
+	duration: function(diff) {
 		var _s = "";
 		if (diff < 0) {
 			_s = "-";
@@ -96,12 +99,13 @@ export let format = {
 		diff %= 60000;
 		var s = Math.floor(diff / 1000);
 
-		var a = d ? (d + "d") : "";
-		a += ((a || h) ? (h + "h") : "");
-		a += ((a || m) ? (m + "m") : "") + s + "s";
+		var a = d ? (' ' + d + "d") : "";
+		a += ((a || h) ? (' ' + h + "h") : "");
+		a += ((a || m) ? (' ' + m + "min") : "");
+		a += s + "s";
 		return _s + a;
 	},
-
+	
 	// units returns human readable units for the given data size in bytes.
 	units: function(loc) {
 		if (loc < 1024) {

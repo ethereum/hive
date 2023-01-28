@@ -23,6 +23,10 @@ td.test-name-column {
     padding-left: 32px !important;
 }
 
+td.test-duration-column {
+    text-align: right;
+}
+
 tr.failed td.test-name-column {
     background-image: url('/images/details_open_err.svg');
 }

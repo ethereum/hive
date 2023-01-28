@@ -1,7 +1,7 @@
 import '../extlib/bootstrap.module.js'
 import '../extlib/dataTables.module.js'
 import { $ } from '../extlib/jquery.module.js'
-import { html, nav, loader, appRoutes } from './utils.js'
+import { html, nav, format, loader, appRoutes } from './utils.js'
 
 const resultsRoot = "/results/"
 
@@ -50,8 +50,9 @@ function formatTestDetails(suiteData, d) {
 	container.classList.add("details-box");
 
 	if (d.description != "") {
-		let descP = document.createElement("p")
-		let txt = "<b>Description</b><br/>" + html.urls_to_links(html.encode(d.description));
+		let descP = document.createElement("p");
+		let description = html.urls_to_links(html.encode(d.description.trim()));
+		let txt = "<b>Description</b><br/>" + description;
 		descP.innerHTML = txt;
 		container.appendChild(descP)
 	}
@@ -222,28 +223,46 @@ function showSuiteData(data, filename) {
 	for (var k in data.testCases) {
 		let tc = data.testCases[k];
 		tc['testIndex'] = k;
+		tc['duration'] = testCaseDuration(tc);
 		cases.push(tc);
 	}
 	console.log("got " + cases.length + " testcases");
+
+	// Set duration.
+	let duration = testSuiteDuration(cases);
+	$("#testsuite_duration").html("<b>Suite run time:</b> " + format.duration(duration));
 
 	// Initialize the DataTable.
 	let table = $('#execresults').DataTable({
 		data: cases,
 		pageLength: 100,
 		autoWidth: false,
-		order: [[1, 'desc']],
+		order: [[2, 'desc']],
 		columns: [
-			// The test name.
 			{
 				title: "Test",
 				data: "name",
 				className: "test-name-column",
 				width: "79%",
 			},
+			{
+				title: "⌛",
+				data: "duration",
+				className: "test-duration-column",
+				width: "50px",
+				type: "num",
+				render: function (v, type, row) {
+					if (type === 'display' || type === 'filter') {
+						return format.duration(v);
+					}
+					return v;
+				},
+			},
 			// Status: pass or not
 			{
 				title: "Status",
 				data: "summaryResult",
+				className: "test-status-column",
 				render: function(summaryResult) {
 					if (summaryResult.pass) {
 						return "&#x2713"
@@ -283,6 +302,30 @@ function showSuiteData(data, filename) {
 		let tr = $(this).closest('tr');
 		toggleTestDetails(data, table, tr);
 	});
+}
+
+// testSuiteDuration computes the total duration of a suite in seconds.
+function testSuiteDuration(cases) {
+	if (cases.length == 0) {
+		return 0;
+	}
+	var start = cases[0].start;
+	var end = cases[0].end;
+	for (var i = 1; i < cases.length; i++) {
+		let test = cases[i];
+		if (test.start < start) {
+			start = test.start;
+		}
+		if (test.end > end) {
+			end = test.end;
+		}
+	}
+	return Date.parse(end) - Date.parse(start);
+}
+
+// testCaseDuration computes the duration of a single test case in seconds.
+function testCaseDuration(test) {
+	return Date.parse(test.end) - Date.parse(test.start);
 }
 
 // scrollToTest scrolls to the given test row index.
