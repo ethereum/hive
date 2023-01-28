@@ -38,6 +38,10 @@ main {
     min-width: 900px;
 }
 
+.dataTables_wrapper {
+    text-align: left;
+}
+
 #sim-log-link {
     color: black;
 }
