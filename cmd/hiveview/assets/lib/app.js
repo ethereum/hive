@@ -29,7 +29,7 @@ export let route = {
 	},
 
 	testInSuite: function(suiteID, suiteName, testIndex) {
-		return appRoutes.suite(suiteID, suiteName) + "#test-" + escape(testIndex);
+		return route.suite(suiteID, suiteName) + "#test-" + escape(testIndex);
 	},
 }
 
