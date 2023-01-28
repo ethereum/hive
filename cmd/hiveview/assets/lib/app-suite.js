@@ -113,13 +113,13 @@ function formatTestLog(suiteData, test) {
 		if (inPrefix || inSuffix) {
 			let line = text.substring(begin, end);
 			let content = highlightErrorsInTestOutput(html.encode(line));
+			if (lineNumber < totalLines-1) {
+				content += "\n";
+			}
 			if (inPrefix) {
-				prefixOutput += content + "\n";
+				prefixOutput += content;
 			} else {
 				suffixOutput += content;
-				if (lineNumber < totalLines-1) {
-					suffixOutput += "\n";
-				}
 			}
 		} else {
 			hiddenLines++;
