@@ -2,6 +2,8 @@ package libhive_test
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -52,6 +54,9 @@ func TestRunner(t *testing.T) {
 	if _, err := runner.Run(context.Background(), "sim-1", simOpt); err != nil {
 		t.Fatal("Run() failed:", err)
 	}
+
+	content, _ := os.ReadFile(filepath.Join(simOpt.LogDir, "hive.json"))
+	t.Logf("hive.json content: %s", content)
 }
 
 func makeTestInventory() libhive.Inventory {

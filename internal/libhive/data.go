@@ -57,6 +57,13 @@ type ClientInfo struct {
 	wait func()
 }
 
+// HiveInstance contains information about hive itself.
+type HiveInstance struct {
+	SourceCommit string `json:"sourceCommit"`
+	SourceDate   string `json:"sourceDate"`
+	BuildDate    string `json:"buildDate"`
+}
+
 // ClientDefinition is served by the /clients API endpoint to list the available clients
 type ClientDefinition struct {
 	Name    string         `json:"name"`

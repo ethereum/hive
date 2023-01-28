@@ -2,12 +2,14 @@ package libhive
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -109,6 +111,7 @@ func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 	if err := createWorkspace(env.LogDir); err != nil {
 		return SimResult{}, err
 	}
+	writeInstanceInfo(env.LogDir)
 	return r.run(ctx, sim, env)
 }
 
@@ -297,4 +300,45 @@ func createWorkspace(logdir string) error {
 		return errors.New("log output directory is a file")
 	}
 	return nil
+}
+
+func writeInstanceInfo(logdir string) {
+	var obj HiveInstance
+	obj.SourceCommit, obj.SourceDate = hiveVersion()
+	buildDate := hiveBuildTime()
+	if !buildDate.IsZero() {
+		obj.BuildDate = buildDate.Format("2006-01-02T15:04:05Z")
+	}
+
+	enc, _ := json.Marshal(&obj)
+	err := os.WriteFile(filepath.Join(logdir, "hive.json"), enc, 0644)
+	if err != nil {
+		log15.Warn("can't write hive.json", "err", err)
+	}
+}
+
+func hiveVersion() (commit, date string) {
+	if buildInfo, ok := debug.ReadBuildInfo(); ok {
+		for _, v := range buildInfo.Settings {
+			switch v.Key {
+			case "vcs.revision":
+				commit = v.Value
+			case "vcs.time":
+				date = v.Value
+			}
+		}
+	}
+	return commit, date
+}
+
+func hiveBuildTime() time.Time {
+	exe, err := os.Executable()
+	if err != nil {
+		return time.Time{}
+	}
+	stat, err := os.Stat(exe)
+	if err != nil {
+		return time.Time{}
+	}
+	return stat.ModTime()
 }
