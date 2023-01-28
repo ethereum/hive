@@ -49,7 +49,7 @@ td.test-name-column {
     padding-left: 32px !important;
 }
 
-td.test-duration-column {
+.test-duration-column {
     text-align: right;
 }
 
