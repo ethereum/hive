@@ -39,7 +39,7 @@ main {
 }
 
 .dataTables_wrapper {
-    text-align: left;
+    margin-top: 10px;
 }
 
 #sim-log-link {
@@ -107,4 +107,12 @@ td.ellipsis {
 
 .highlighted {
     background-color: #fffaea !important;
+}
+
+/* workaround for weird DataTables controls styling at small screen size */
+@media screen and (max-width: 767px) {
+    div.dataTables_wrapper div.dataTables_length, div.dataTables_wrapper div.dataTables_filter, div.dataTables_wrapper div.dataTables_info, div.dataTables_wrapper div.dataTables_paginate {
+        text-align: left !important;
+        margin-top: 5px;
+    }
 }
