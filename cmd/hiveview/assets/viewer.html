@@ -1,87 +1,111 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>file viewer</title>
-  <meta name="description" content="A small viewer for text content, inspired by github source viewer">
-  <meta name="author" content="holiman">
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-  <style>
-    .num::before {
-        content: attr(line);
-    }
-    .num{
-        border-right:1px solid #d1d5da;
-        width: 3em;
-        color: rgba(27,31,35,.3);
-    }
-    .code {
-        overflow: visible;
-        font-family: SFMono-Regular,Consolas,Liberation Mono,Menlo,monospace;
-        font-size: 12px;
-        color: #24292e;
-        word-wrap: normal;
-        white-space: pre;
-    }
-    tr.highlighted {
-        background-color: #fffbdd;
-    }
-    #main{
-        padding: 12px;
-    }
-    #loadbutton {
-        width: 6em;
-    }
-    table.code {
-        background-color: #fff;
-        border: 1px solid #d1d5da;
-        border-radius: 3px;
-        width: 100%;
-    }
-    div.header{
-        margin: 8px 0 0 0;
-        padding: 16px;
-        padding-top: 8px;
-        padding-bottom: 8px;
-        background-color: #f6f8fa;
-        border: 1px solid #d1d5da;
-        border-top-left-radius: 3px;
-        border-top-right-radius: 3px;
-    }
-    .text-mono {
-        font-family: SFMono-Regular,Consolas,Liberation Mono,Menlo,monospace !important;
-    }
-  </style>
+  <head>
+    <title>file viewer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="icon" href="/images/favicon.svg">
+    <link rel="stylesheet" href="/lib/app.css">
 
-  <script src="https://code.jquery.com/jquery-3.5.0.min.js" integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ=" crossorigin="anonymous"></script>
-  <script type="text/javascript" src="/app-viewer.js"></script>
-  <script id="exampletext" type="text/foo">
-    This is some sample text. You can load new files via the little input above, and also
-    via the url. E.g. "?file=sample.txt", and even link to particular lines.
+    <style>
+      h3 {
+          word-wrap: anywhere;
+      }
 
-    like "?file=sample.txt#L50"
-  </script>
-</head>
-<body>
-  <div id="main">
-    <div>
-      <form onsubmit="javascript:fetchFile();return false">
-        <div class="input-group">
-          <input type="text" class="form-control" placeholder="/file.txt" id="fileload"/>
-          <div class="input-group-append">
-            <button type="submit" id="loadbutton" class="btn btn-primary">
-              Fetch
-              <div class="loader" role="status" aria-hidden="true"></div>
-            </button>
-          </div>
-        </div>
-      </form>
-    </div>
-    <div class="header small text-mono">
-      <span id="meta">5 lines 199 B</span>
-      <a id="raw-url">Raw</a>
-    </div>
-    <table class="code" id="viewer"></table>
-  </div>
-<body>
+      #load-progress-bar-container {
+          margin: 8px 0;
+      }
+
+      #viewer {
+          display: flex;
+          flex-wrap: nowrap;
+          background-color: #fff;
+          border: 1px solid #d1d5da;
+          border-radius: 3px;
+          width: 100%;
+          font-size: 14px;
+      }
+
+      #viewer-header {
+          margin: 8px 0 0 0;
+          padding: 8px 16px;
+          background-color: #f6f8fa;
+          border: 1px solid #d1d5da;
+          border-bottom: none;
+          border-top-left-radius: 3px;
+          border-top-right-radius: 3px;
+          font-size: 80%;
+      }
+
+      #gutter {
+          width: 4.5em;
+      }
+
+      #file-content {
+          overflow-x: auto;
+      }
+
+      #file-content span {
+          padding-left: 5px;
+          white-space: pre;
+          display: block;
+          float: left;
+          min-width: 100%;
+      }
+
+      .num::before {
+          content: attr(line);
+      }
+      .num {
+          border-right: 1px solid #d1d5da;
+          color: #bbb;
+          padding: 0 5px;
+          text-align: right;
+          display: block;
+      }
+
+      .text-mono {
+          font-family: SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace !important;
+      }
+    </style>
+
+    <script id="exampletext" type="text/foo">
+      This is some sample text. You can load new files via the little input above, and also
+      via the url. E.g. "?file=sample.txt", and even link to particular lines.
+
+      like "?file=sample.txt#L50"
+    </script>
+  </head>
+
+  <body>
+    <script>0</script>
+    <main role="main">
+      <div id="hive-header">
+        <a href="/"><img id="hive-logo" height="35" src="/images/hive3.svg"></a>
+        <nav id="hive-static-nav">
+          <span class="nav-item" id="hive-instance-info"></span>
+          <a class="nav-item" href="https://github.com/ethereum/hive/blob/master/docs/overview.md#what-is-hive">What is Hive?</a>
+        </nav>
+      </div>
+
+      <h3 id="file-title">Loading file...</h3>
+      <span id="link-back"></span>
+
+      <div id="load-progress-bar-container" class="progress" style="display: none;">
+        <div id="load-progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+      </div>
+
+      <div id="viewer-header" class="text-mono" style="display: none;">
+        <span id="meta">5 lines 199 B</span>
+        <a id="raw-url" style="display: none;">Raw</a>
+      </div>
+      <div id="viewer" style="display: none;">
+        <div id="gutter" class="text-mono"></div>
+        <div id="file-content" class="text-mono"></div>
+      </div>
+    </main>
+  </body>
+
+  <!-- load the app -->
+  <script src="/lib/app-viewer.js" type="module"></script>
 </html>

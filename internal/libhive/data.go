@@ -43,6 +43,7 @@ type TestCase struct {
 // TestResult is the payload submitted to the EndTest endpoint.
 type TestResult struct {
 	Pass    bool   `json:"pass"`
+	Timeout bool   `json:"timeout,omitempty"`
 	Details string `json:"details"`
 }
 
@@ -55,6 +56,13 @@ type ClientInfo struct {
 	LogFile        string    `json:"logFile"` //Absolute path to the logfile.
 
 	wait func()
+}
+
+// HiveInstance contains information about hive itself.
+type HiveInstance struct {
+	SourceCommit string `json:"sourceCommit"`
+	SourceDate   string `json:"sourceDate"`
+	BuildDate    string `json:"buildDate"`
 }
 
 // ClientDefinition is served by the /clients API endpoint to list the available clients

@@ -1,0 +1,122 @@
+@import "../extlib/bootstrap-5.2.3.min.css";
+@import "../extlib/dataTables-1.13.1.bootstrap5.min.css";
+
+main {
+    margin: 8px 12px;
+}
+
+#hive-header {
+    border-bottom: 1px solid #bbb;
+    padding-bottom: 0px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: begin;
+}
+
+#hive-logo {
+    margin: 0 8px 3px 1px;
+}
+
+#hive-static-nav {
+    margin: 0 16px 0 auto;
+    font-size: 80%;
+}
+
+#hive-static-nav span {
+    margin: 0 6px 0 0;
+    white-space: nowrap;
+}
+
+#hive-static-nav a {
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+#execresults, #filetable {
+    table-layout: fixed;
+    min-width: 900px;
+}
+
+.dataTables_wrapper {
+    margin-top: 10px;
+}
+
+#sim-log-link {
+    color: black;
+}
+
+td.test-name-column {
+    background: url('/images/details_open.svg') no-repeat left 4px;
+    background-size: 32px;
+    cursor: pointer;
+    padding-left: 32px !important;
+}
+
+.test-duration-column {
+    text-align: right;
+}
+
+tr.failed td.test-name-column {
+    background-image: url('/images/details_open_err.svg');
+}
+
+tr.shown td.test-name-column {
+    background-image: url('/images/details_close.svg');
+}
+
+tr.shown.failed td.test-name-column {
+    background-image: url('/images/details_close_err.svg');
+}
+
+td.ellipsis {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.test-output {
+    overflow: scroll;
+}
+
+.test-output code {
+    color: black;
+    white-space: pre;
+    border-left: 2px solid #777;
+    display: block;
+    padding-left: 5px;
+}
+
+.test-output .output-prefix::before,
+.test-output .output-suffix::after {
+    content: "";
+    width: 20px;
+    border-top: 2px solid #777;
+    display: block;
+    padding-left: 5px;
+    margin-left: -5px;
+}
+
+.test-output .output-trunc {
+    display: inline-block;
+    background-color: #777;
+    color: #fff;
+    padding: 0 10px;
+    text-decoration: none;
+}
+
+.test-output .output-error {
+    font-weight: bold;
+}
+
+.highlighted {
+    background-color: #fffaea !important;
+}
+
+/* workaround for weird DataTables controls styling at small screen size */
+@media screen and (max-width: 767px) {
+    div.dataTables_wrapper div.dataTables_length, div.dataTables_wrapper div.dataTables_filter, div.dataTables_wrapper div.dataTables_info, div.dataTables_wrapper div.dataTables_paginate {
+        text-align: left !important;
+        margin-top: 5px;
+    }
+}

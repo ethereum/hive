@@ -1,116 +1,31 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <!-- Lovingly handcrafted by Martin Holst Swende @mhswende in 2017, updated in 2020 -->
-  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  <!-- Scripts are jquery, bootstrap and datatables -->
-  <script src="https://code.jquery.com/jquery-3.5.0.min.js" integrity="sha256-xNzN2a4ltkB44Mc/Jz3pT4iU1cmeR0FkXs4pru/JxaQ="  crossorigin="anonymous"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
-  <script src="//cdn.datatables.net/1.10.25/js/jquery.dataTables.min.js"></script>
-  <!-- CSS resources are bootstrap default, plus datatables default -->
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
-  <link rel="stylesheet" href="//cdn.datatables.net/1.10.20/css/jquery.dataTables.min.css">
-</head>
+  <head>
+    <title>hive</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <link rel="icon" href="/images/favicon.svg">
+    <link rel="stylesheet" href="/lib/app.css">
+  </head>
 
-<style>
-  .replaceme{
-      max-width: 1000px;
-  }
-  #execresults, #filetable {
-      table-layout: fixed;
-      min-width: 900px;
-  }
-  #execresults .details-box {
-      overflow-x: auto;
-  }
-  td.details-control {
-      background: url('/details_open.png') no-repeat center center;
-      cursor: pointer;
-  }
-  tr.shown td.details-control {
-      background: url('/details_close.png') no-repeat center center;
-  }
-  td.ellipsis {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-  }
-</style>
-
-<body>
-  <div class="container-fluid">
-    <h1>Hive</h1><hr/>
-    <div class="row">
-      <div class="col-1">
-        <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
-          <a class="nav-link active" id="v-pills-home-tab" data-toggle="pill" href="#v-pills-home" role="tab" aria-controls="v-pills-home" aria-selected="true">Test suites</a>
-          <a class="nav-link" id="v-pills-results-tab" data-toggle="pill" href="#v-pills-results" role="tab" aria-controls="v-pills-results" aria-selected="false">Tests</a>
-          <a class="nav-link" id="v-pills-messages-tab" data-toggle="pill" href="#v-pills-messages" role="tab" aria-controls="v-pills-messages" aria-selected="false">About</a>
-        </div>
+  <body>
+    <script>0</script>
+    <main role="main">
+      <div id="hive-header">
+        <a href="/"><img id="hive-logo" height="35" src="/images/hive3.svg"></a>
+        <nav id="hive-static-nav">
+          <span class="nav-item" id="hive-instance-info"></span>
+          <a class="nav-item" href="https://github.com/ethereum/hive/blob/master/docs/overview.md#what-is-hive">What is Hive?</a>
+        </nav>
       </div>
-      <div class="col-11">
-        <div class="tab-content" id="v-pills-tabContent">
-          <div class="tab-pane fade show active" id="v-pills-home" role="tabpanel" aria-labelledby="v-pills-home-tab">
-            <h2>Executed testsuites</h2>
-            <p>These test suites are available, and can be loaded. Click on 'Load' to load a certain suite.</p>
-            <table id="filetable" class="hover cell-border"></table>
-          </div>
-          <div class="tab-pane fade" id="v-pills-results" role="tabpanel" aria-labelledby="v-pills-results-tab">
-            <h2>Execution results: <span id="testsuite_name">Nothing loaded yet</span></h2>
-            <p><span id="testsuite_desc"></span></p>
-            <p><span id="testsuite_clients"></span></p>
-            <table id="execresults" class="hover cell-border" width="100%"></table>
-          </div>
-          <div class="tab-pane fade" id="v-pills-messages" role="tabpanel" aria-labelledby="v-pills-messages-tab">
-            <h2>About Hive</h2>
-            <p>Before Hive, we did have consensus-tests, in mainly two forms -- statetests
-              and blockchain tests (yeah there are a few more). The tests were generated
-              via aleth/testeth, and put on a repository. From that repo, it was expected
-              that client teams import the tests and execute within their own custom
-              test-harnesses.</p>
-            <p>Now, that didn't work out perfectly. Client teams didn't always pull in the
-              latest tests, and whether they actually executed the tests as intended was
-              not sure. Did they correctly verify everything? It was especially
-              troublesome when hardforks were approaching, and "oops, hey, we commented
-              out test XX because it was failing".</p>
-            <p>Then Péter Szilágyi (@karalabe) had this idea, to run clients totally black
-              box. You spin up a node inside a docker container, start it with the
-              client-specific config, and feed it the blocks. Another docker container
-              'orchestrates' the test, and downloads the entire test repo from github
-              (blockchain tests contain the RLP-blocks). So, after asking the client to
-              import the blocks, all the 'orchestrator' needs to do is query "what's your
-              latest block?", and verify it aginst the expected lastblock from the
-              testcase.</p>
-            <p>Those tests are what one normally talks about when talking about
-              "hive-tests". However, Hive is even more versatile, since another
-              "orchestrator" can do other things -- they can send any network message they
-              want to the node-under-test. So far, we also have tests that verify that
-              fast-sync can be performed, and tests to check that the p2p implementation
-              does not make it possible to do DoS via amplification attacks. So those are
-              also hive-tests. </p>
-            <p>However, an important distinction: Hive is, in essence, a tool to
-              <ul>
-                <li>execute tests</li>
-                <li>in an automated way,</li>
-                <li>treating the clients as black boxes as far as possible.</li>
-              </ul>
-            </p>
-            <h2>About the EF Hive executor</h2>
-            <p>For the last ~3 years, we have had a hive-server running in production.
-              https://hivetests.ethdevops.io/. It runs 24/7, and always fetches the latest
-              tests from ethereum/tests repo.
-            </p>
-            <hr/>
-            <h3>Debug log</h3>
-            <pre id="debug"></pre>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</body>
 
-<!-- load the app -->
-<script type="text/javascript" src="/app.js"></script>
+      <h2>Recent results</h2>
+      <p>These test suites are available, and can be loaded. Click on 'Load' to load a certain suite.</p>
+
+      <table id="filetable" class="table table-bordered"></table>
+    </main>
+  </body>
+
+  <!-- load the app -->
+  <script src="/lib/app-index.js" type="module"></script>
 </html>
