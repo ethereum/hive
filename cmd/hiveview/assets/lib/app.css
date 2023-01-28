@@ -15,20 +15,22 @@ main {
 }
 
 #hive-logo {
-    margin-bottom: 3px;
+    margin: 0 8px 3px 1px;
 }
 
 #hive-static-nav {
-    margin: 0 6px 0 auto;
+    margin: 0 16px 0 auto;
     font-size: 80%;
 }
 
 #hive-static-nav span {
     margin: 0 6px;
+    white-space: nowrap;
 }
 
 #hive-static-nav a {
     text-decoration: none;
+    white-space: nowrap;
 }
 
 #execresults, #filetable {
