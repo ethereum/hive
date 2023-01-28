@@ -166,10 +166,9 @@ function showSuiteName(name) {
 
 // showSuiteData displays the suite and its tests in the table.
 // This is called after loading the suite.
-function showSuiteData(data, filename) {
-	let suiteID = filename;
+function showSuiteData(data, suiteID) {
 	let suiteName = data.name;
-	data['suiteID'] = filename;
+	data['suiteID'] = suiteID;
 
 	// data structure of suite data:
 	/*
@@ -177,7 +176,8 @@ function showSuiteData(data, filename) {
 		"id": 0,
 		"name": "Devp2p discovery v4 test suite",
 		"description": "This suite of tests checks...",
-		"clientVersions": "",
+		"simLog": "1674486996-simulator-0ee…eb2e3f04a893bff1017.log",
+		"clientVersions": { "parity_latest": "..." },
 		"testCases": {
 			"1": {
 				"id": 1,
@@ -228,9 +228,16 @@ function showSuiteData(data, filename) {
 	}
 	console.log("got " + cases.length + " testcases");
 
-	// Set duration.
-	let duration = testSuiteDuration(cases);
-	$("#testsuite_duration").html("<b>Suite run time:</b> " + format.duration(duration));
+	// Fill info box.
+	let suiteTimes = testSuiteTimes(cases);
+	$("#testsuite_start").html("🕒 " + suiteTimes.start);
+	$("#testsuite_duration").html("⌛ " + format.duration(suiteTimes.duration));
+	if (data.simLog) {
+		let url = appRoutes.logFileInViewer(suiteID, suiteName, resultsRoot + data.simLog);
+		$("#sim-log-link").attr("href", url);
+		$("#sim-log-link").text("simulator log file");
+	}
+	$("#testsuite_info").show();
 
 	// Initialize the DataTable.
 	let table = $('#execresults').DataTable({
@@ -304,8 +311,8 @@ function showSuiteData(data, filename) {
 	});
 }
 
-// testSuiteDuration computes the total duration of a suite in seconds.
-function testSuiteDuration(cases) {
+// testSuiteTimes computes start/end/duration of a test suite.
+function testSuiteTimes(cases) {
 	if (cases.length == 0) {
 		return 0;
 	}
@@ -320,7 +327,11 @@ function testSuiteDuration(cases) {
 			end = test.end;
 		}
 	}
-	return Date.parse(end) - Date.parse(start);
+	return {
+		start: start,
+		end: end,
+		duration: Date.parse(end) - Date.parse(start),
+	}
 }
 
 // testCaseDuration computes the duration of a single test case in seconds.
