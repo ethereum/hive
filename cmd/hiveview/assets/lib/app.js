@@ -51,14 +51,14 @@ export function init() {
 
 function hiveInfoHTML(data) {
 	var txt = "";
+	if (data.buildDate) {
+		let date = new Date(data.buildDate).toLocaleString();
+		txt += '<span>built: ' + date + '</span>';
+	}
 	if (data.sourceCommit) {
 		let url = "https://github.com/ethereum/hive/commit/" + escape(data.sourceCommit);
 		let link = '<a href="' + url + '">' + data.sourceCommit.substring(0, 8) + '</a>';
 		txt += '<span>commit: ' + link + '</span>';
-	}
-	if (data.buildDate) {
-		let date = new Date(data.buildDate).toLocaleString();
-		txt += '<span>built: ' + date + '</span>';
 	}
 	return txt;
 }

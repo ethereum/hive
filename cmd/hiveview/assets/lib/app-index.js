@@ -6,7 +6,7 @@ import * as app from './app.js'
 
 $(document).ready(function() {
 	app.init();
-	
+
 	console.log("Loading file list...");
 	$.ajax("listing.jsonl", {
 		success: showFileListing,
@@ -56,7 +56,9 @@ function showFileListing(data, error) {
 		if (!elem) {
 			return;
 		}
-		suites.push(JSON.parse(elem));
+		let suite = JSON.parse(elem);
+		suite.start = new Date(suite.start);
+		suites.push(suite);
 	});
 
 	filetable = $("#filetable").DataTable({
@@ -66,26 +68,26 @@ function showFileListing(data, error) {
 		order: [[0, 'desc']],
 		columns: [
 			{
-				title: "Start time",
+				title: "🕒",
 				data: "start",
 				type: "date",
-				width: "11em",
+				width: "13%",
 				render: function(v, type) {
-					if (type === 'display') {
-						return new Date(v).toLocaleString();
+					if (type === 'display' || type == 'filter') {
+						return v.toLocaleString();
 					}
-					return v;
+					return v.toISOString();
 				},
 			},
 			{
 				title: "Suite",
 				data: "name",
-				width: "10em",
+				width: "12%",
 			},
 			{
 				title: "Clients",
 				data: "clients",
-				width: "30%",
+				width: "40%",
 				render: function(data) {
 					return data.join(", ")
 				},
@@ -93,7 +95,8 @@ function showFileListing(data, error) {
 			{
 				title: "Status",
 				data: null,
-				width: "9em",
+				width: "7em",
+				className: "suite-status-column",
 				render: function(data) {
 					if (data.fails > 0) {
 						let prefix = data.timeout ? "Timeout" : "Fail";
@@ -105,7 +108,7 @@ function showFileListing(data, error) {
 			{
 				title: "",
 				data: null,
-				width: "180px",
+				width: "8.5em",
 				orderable: false,
 				render: function(data) {
 					let loadText = "Load (" + format.units(data.size) + ")";

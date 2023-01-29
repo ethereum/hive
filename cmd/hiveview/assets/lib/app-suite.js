@@ -261,7 +261,7 @@ function showSuiteData(data, suiteID) {
 				title: "Test",
 				data: "name",
 				className: "test-name-column",
-				width: "79%",
+				width: "65%",
 			},
 			// Status: pass or not.
 			{
@@ -275,7 +275,7 @@ function showSuiteData(data, suiteID) {
 					let s = summaryResult.timeout ? "Timeout" : "Fail";
 					return "&#x2715; <b>" + s + "</b>";
 				},
-				width: "70px",
+				width: "80px",
 			},
 			// Test duration.
 			{

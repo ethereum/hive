@@ -3,6 +3,7 @@
 
 main {
     margin: 8px 12px;
+    font-size: 12pt;
 }
 
 #hive-header {
@@ -25,7 +26,6 @@ main {
 
 #hive-static-nav span {
     margin: 0 6px 0 0;
-    white-space: nowrap;
 }
 
 #hive-static-nav a {
@@ -33,9 +33,9 @@ main {
     white-space: nowrap;
 }
 
-#execresults, #filetable {
+.dataTable {
     table-layout: fixed;
-    min-width: 900px;
+    min-width: 780px;
 }
 
 .dataTables_wrapper {
@@ -57,6 +57,10 @@ td.test-name-column {
     text-align: right;
 }
 
+.suite-status-column {
+    white-space: nowrap;
+}
+
 tr.failed td.test-name-column {
     background-image: url('/images/details_open_err.svg');
 }
@@ -76,7 +80,7 @@ td.ellipsis {
 }
 
 .test-output {
-    overflow: scroll;
+    overflow-x: auto;
 }
 
 .test-output code {
