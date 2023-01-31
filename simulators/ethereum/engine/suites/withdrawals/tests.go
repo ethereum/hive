@@ -1684,7 +1684,8 @@ func (req GetPayloadBodyRequestByRange) Verify(t *test.Env) {
 			Sent start (%d) or count (%d) to engine_getPayloadBodiesByRangeV1 with a
 			value less than 1, therefore error is expected.
 			`, req.Start, req.Count)
-		r.ExpectErrorCode(32602)
+		r.ExpectErrorCode(InvalidParamsError)
+		return
 	}
 	if req.Start > t.CLMock.CurrentPayloadNumber {
 		r.ExpectationDescription = fmt.Sprintf(`
