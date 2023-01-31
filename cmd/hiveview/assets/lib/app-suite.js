@@ -254,7 +254,7 @@ function showSuiteData(data, suiteID) {
 		pageLength: 100,
 		autoWidth: false,
 		responsive: {
-			// Turn off display of hidden columns becaue it conflicts with our own use of
+			// Turn off display of hidden columns because it conflicts with our own use of
 			// child rows. This should be OK since the only column that will be ever be
 			// hidden is 'duration'.
 			details: {
