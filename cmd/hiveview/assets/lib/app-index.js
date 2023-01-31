@@ -63,6 +63,7 @@ function showFileListing(data, error) {
 
 	filetable = $("#filetable").DataTable({
 		data: suites,
+		responsive: true,
 		pageLength: 50,
 		autoWidth: false,
 		order: [[0, 'desc']],
@@ -82,7 +83,7 @@ function showFileListing(data, error) {
 			{
 				title: "Suite",
 				data: "name",
-				width: "12%",
+				width: "15%",
 			},
 			{
 				title: "Clients",
@@ -95,7 +96,7 @@ function showFileListing(data, error) {
 			{
 				title: "Status",
 				data: null,
-				width: "7em",
+				width: "5em",
 				className: "suite-status-column",
 				render: function(data) {
 					if (data.fails > 0) {

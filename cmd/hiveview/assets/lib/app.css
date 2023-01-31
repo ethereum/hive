@@ -34,11 +34,6 @@ main {
     white-space: nowrap;
 }
 
-.dataTable {
-    table-layout: fixed;
-    min-width: 780px;
-}
-
 .dataTables_wrapper {
     margin-top: 10px;
 }
