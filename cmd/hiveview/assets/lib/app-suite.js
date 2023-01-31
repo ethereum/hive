@@ -242,12 +242,10 @@ function showSuiteData(data, suiteID) {
 	let suiteTimes = testSuiteTimes(cases);
 	$("#testsuite_start").html("🕒 " + suiteTimes.start.toLocaleString());
 	$("#testsuite_duration").html("⌛️ " + format.duration(suiteTimes.duration));
-	if (data.simLog) {
-		let logfile = app.resultsRoot + data.simLog;
-		let url = app.route.logFileInViewer(suiteID, suiteName, logfile);
-		$("#sim-log-link").attr("href", url);
-		$("#sim-log-link").text("simulator log file");
-	}
+	let logfile = app.resultsRoot + data.simLog;
+	let url = app.route.logFileInViewer(suiteID, suiteName, logfile);
+	$("#sim-log-link").attr("href", url);
+	$("#sim-log-link").text("simulator log");
 	$("#testsuite_info").show();
 
 	// Initialize the DataTable.
