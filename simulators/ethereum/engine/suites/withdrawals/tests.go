@@ -535,6 +535,14 @@ var Tests = []test.SpecInterface{
 				Start: 33,
 				Count: 32,
 			},
+			GetPayloadBodyRequestByRange{
+				Start: 32,
+				Count: 0,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 0,
+				Count: 1,
+			},
 		},
 	},
 
