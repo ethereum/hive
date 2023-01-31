@@ -77,6 +77,15 @@ td.ellipsis {
 
 .test-output {
     overflow-x: auto;
+    /*
+      Settings below are crucial to make scrolling of log output actually work. Without
+      these, the table will just expand to the width of the longest line. Since the
+      content of .test-output is preformatted text, the browser will measure its width
+      first and set the width of the table based on that. This behavior is disabled by
+      width: 0. However, we do want the element to expand to the available width.
+      The min-width: 100% does that.
+   */
+    width: 0; min-width: 100%;
 }
 
 .test-output code {
