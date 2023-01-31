@@ -63,9 +63,26 @@ function showFileListing(data, error) {
 
 	filetable = $("#filetable").DataTable({
 		data: suites,
-		responsive: true,
 		pageLength: 50,
 		autoWidth: false,
+		responsive: {
+			details: {
+				type: 'none',
+				display: $.fn.dataTable.Responsive.display.childRowImmediate,
+				renderer: function (table, rowIdx, columns) {
+					var output = '<div class="responsive-overflow">';
+					columns.forEach(function (col, i) {
+						if (col.hidden) {
+							output += '<span class="responsive-overflow-col">'
+							output += col.data;
+							output += '</span> ';
+						}
+					});
+					output += '</div>';
+					return output;
+				},
+			},
+		},
 		order: [[0, 'desc']],
 		columns: [
 			{

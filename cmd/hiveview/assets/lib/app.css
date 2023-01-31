@@ -5,6 +5,7 @@
 main {
     margin: 8px 12px;
     font-size: 12pt;
+    min-width: 340px;
 }
 
 #hive-header {
@@ -73,6 +74,16 @@ td.ellipsis {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.responsive-overflow {
+    display: flex;
+    justify-content: space-between;
+}
+
+.responsive-overflow-col {
+    align-self: center;
+    display: inline-block;
 }
 
 .test-output {
