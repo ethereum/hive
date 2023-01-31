@@ -490,32 +490,34 @@ func ComparePayloadBodies(want *client_types.ExecutionPayloadBodyV1, got *client
 		return fmt.Errorf("wanted object, got null")
 	}
 
-	if len(want.Transactions) != len(got.Transactions) {
-		return fmt.Errorf("incorrect tx length: want=%d, got=%d", len(want.Transactions), len(got.Transactions))
-	}
-
-	if want.Withdrawals == nil && got.Withdrawals != nil {
-		return fmt.Errorf("wanted null withdrawals, got object")
-	} else if want.Withdrawals != nil && got.Withdrawals == nil {
-		return fmt.Errorf("wanted object, got null withdrawals")
-	}
-
-	if len(want.Withdrawals) != len(got.Withdrawals) {
-		return fmt.Errorf("incorrect withdrawals length: want=%d, got=%d", len(want.Withdrawals), len(got.Withdrawals))
-	}
-
-	for i, a_tx := range want.Transactions {
-		b_tx := got.Transactions[i]
-		if !bytes.Equal(a_tx, b_tx) {
-			return fmt.Errorf("tx %d not equal: want=%x, got=%x", i, a_tx, b_tx)
+	if want != nil {
+		if len(want.Transactions) != len(got.Transactions) {
+			return fmt.Errorf("incorrect tx length: want=%d, got=%d", len(want.Transactions), len(got.Transactions))
 		}
-	}
 
-	if want.Withdrawals != nil {
-		for i, a_w := range want.Withdrawals {
-			b_w := got.Withdrawals[i]
-			if err := CompareWithdrawals(a_w, b_w); err != nil {
-				return fmt.Errorf("withdrawal %d not equal: %v", i, err)
+		if want.Withdrawals == nil && got.Withdrawals != nil {
+			return fmt.Errorf("wanted null withdrawals, got object")
+		} else if want.Withdrawals != nil && got.Withdrawals == nil {
+			return fmt.Errorf("wanted object, got null withdrawals")
+		}
+
+		if len(want.Withdrawals) != len(got.Withdrawals) {
+			return fmt.Errorf("incorrect withdrawals length: want=%d, got=%d", len(want.Withdrawals), len(got.Withdrawals))
+		}
+
+		for i, a_tx := range want.Transactions {
+			b_tx := got.Transactions[i]
+			if !bytes.Equal(a_tx, b_tx) {
+				return fmt.Errorf("tx %d not equal: want=%x, got=%x", i, a_tx, b_tx)
+			}
+		}
+
+		if want.Withdrawals != nil {
+			for i, a_w := range want.Withdrawals {
+				b_w := got.Withdrawals[i]
+				if err := CompareWithdrawals(a_w, b_w); err != nil {
+					return fmt.Errorf("withdrawal %d not equal: %v", i, err)
+				}
 			}
 		}
 	}
@@ -784,6 +786,9 @@ func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) 
 type StorageResponseExpectObject struct {
 	*ExpectEnv
 	Call      string
+	Account   common.Address
+	Key       common.Hash
+	Number    *big.Int
 	Storage   []byte
 	Error     error
 	ErrorCode int
@@ -796,6 +801,9 @@ func (tec *TestEngineClient) TestStorageAt(account common.Address, key common.Ha
 	ret := &StorageResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "StorageAt",
+		Account:   account,
+		Key:       key,
+		Number:    number,
 		Storage:   storage,
 		Error:     err,
 	}
@@ -817,7 +825,7 @@ func (exp *StorageResponseExpectObject) ExpectBigIntStorageEqual(expBigInt *big.
 	bigInt.SetBytes(exp.Storage)
 	if ((bigInt == nil || expBigInt == nil) && bigInt != expBigInt) ||
 		(bigInt != nil && expBigInt != nil && bigInt.Cmp(expBigInt) != 0) {
-		exp.Fatalf("FAIL (%s): Unexpected storage on %s: %v, expected=%v", exp.TestName, exp.Call, bigInt, expBigInt)
+		exp.Fatalf("FAIL (%s): Unexpected storage on %s (addr=%s, key=%s, block=%d): got=%d, expected=%d", exp.TestName, exp.Call, exp.Account, exp.Key, exp.Number, bigInt, expBigInt)
 	}
 }
 

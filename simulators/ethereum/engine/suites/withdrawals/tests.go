@@ -484,10 +484,10 @@ var Tests = []test.SpecInterface{
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "GetPayloadBodies",
+				Name: "GetPayloadBodiesByRange",
 				About: `
-				Make multiple withdrawals to 1024 different accounts.
-				Execute many blocks this way.
+				Make multiple withdrawals to 16 accounts each payload.
+				Retrieve many of the payloads' bodies by number range.
 				`,
 				TimeoutSeconds:   240,
 				SlotsToSafe:      big.NewInt(32),
@@ -495,7 +495,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight:    17,
 			WithdrawalsBlockCount:    16,
-			WithdrawalsPerBlock:      1024,
+			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1024,
 		},
 		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
@@ -535,6 +535,51 @@ var Tests = []test.SpecInterface{
 				Start: 33,
 				Count: 32,
 			},
+		},
+	},
+
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodiesByRange (Empty Transactions/Withdrawals)",
+				About: `
+				Make no withdrawals and no transactions in many payloads.
+				Retrieve many of the payloads' bodies by number range.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 17,
+			WithdrawalsBlockCount: 16,
+			WithdrawalsPerBlock:   0,
+			TransactionsPerBlock:  common.Big0,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByRange{
+				Start: 16,
+				Count: 2,
+			},
+		},
+	},
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodiesByHash",
+				About: `
+				Make multiple withdrawals to 16 accounts each payload.
+				Retrieve many of the payloads' bodies by hash.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight:    17,
+			WithdrawalsBlockCount:    16,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1024,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
 			GetPayloadBodyRequestByHashIndex{
 				BlockNumbers: []uint64{
 					1,
@@ -556,6 +601,31 @@ var Tests = []test.SpecInterface{
 					30,
 					1000,
 				},
+			},
+		},
+	},
+
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodiesByHash (Empty Transactions/Withdrawals)",
+				About: `
+				Make no withdrawals and no transactions in many payloads.
+				Retrieve many of the payloads' bodies by hash.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 17,
+			WithdrawalsBlockCount: 16,
+			WithdrawalsPerBlock:   0,
+			TransactionsPerBlock:  common.Big0,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByHashIndex{
+				Start: 16,
+				End:   17,
 			},
 		},
 	},
