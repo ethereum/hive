@@ -481,10 +481,12 @@ var Tests = []test.SpecInterface{
 				Make multiple withdrawals to 1024 different accounts.
 				Execute many blocks this way.
 				`,
-				TimeoutSeconds: 240,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
 			},
-			WithdrawalsForkHeight:    1,
-			WithdrawalsBlockCount:    32,
+			WithdrawalsForkHeight:    17,
+			WithdrawalsBlockCount:    16,
 			WithdrawalsPerBlock:      1024,
 			WithdrawableAccountCount: 1024,
 		},
@@ -506,6 +508,14 @@ var Tests = []test.SpecInterface{
 				Count: 1,
 			},
 			GetPayloadBodyRequestByRange{
+				Start: 15,
+				Count: 2,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 16,
+				Count: 16,
+			},
+			GetPayloadBodyRequestByRange{
 				Start: 1,
 				Count: 32,
 			},
@@ -516,6 +526,28 @@ var Tests = []test.SpecInterface{
 			GetPayloadBodyRequestByRange{
 				Start: 33,
 				Count: 32,
+			},
+			GetPayloadBodyRequestByHashIndex{
+				BlockNumbers: []uint64{
+					1,
+					16,
+					2,
+					17,
+				},
+			},
+			GetPayloadBodyRequestByHashIndex{
+				Start: 1,
+				End:   32,
+			},
+			GetPayloadBodyRequestByHashIndex{
+				BlockNumbers: []uint64{
+					32,
+					1000,
+					31,
+					1000,
+					30,
+					1000,
+				},
 			},
 		},
 	},
@@ -1492,22 +1524,43 @@ func (req GetPayloadBodyRequestByRange) Verify(t *test.Env) {
 
 type GetPayloadBodyRequestByHashIndex struct {
 	BlockNumbers []uint64
+	Start        uint64
+	End          uint64
 }
 
 func (req GetPayloadBodyRequestByHashIndex) Verify(t *test.Env) {
 	payloads := make([]*beacon.ExecutableData, 0)
 	hashes := make([]common.Hash, 0)
-	for _, n := range req.BlockNumbers {
-		if p, ok := t.CLMock.ExecutedPayloadHistory[n]; ok {
-			payloads = append(payloads, &p)
-			hashes = append(hashes, p.BlockHash)
-		} else {
-			// signal to request an unknown hash (random)
-			randHash := common.Hash{}
-			rand.Read(randHash[:])
-			payloads = append(payloads, nil)
-			hashes = append(hashes, randHash)
+	if len(req.BlockNumbers) > 0 {
+		for _, n := range req.BlockNumbers {
+			if p, ok := t.CLMock.ExecutedPayloadHistory[n]; ok {
+				payloads = append(payloads, &p)
+				hashes = append(hashes, p.BlockHash)
+			} else {
+				// signal to request an unknown hash (random)
+				randHash := common.Hash{}
+				rand.Read(randHash[:])
+				payloads = append(payloads, nil)
+				hashes = append(hashes, randHash)
+			}
 		}
+	}
+	if req.Start > 0 && req.End > 0 {
+		for n := req.Start; n <= req.End; n++ {
+			if p, ok := t.CLMock.ExecutedPayloadHistory[n]; ok {
+				payloads = append(payloads, &p)
+				hashes = append(hashes, p.BlockHash)
+			} else {
+				// signal to request an unknown hash (random)
+				randHash := common.Hash{}
+				rand.Read(randHash[:])
+				payloads = append(payloads, nil)
+				hashes = append(hashes, randHash)
+			}
+		}
+	}
+	if len(payloads) == 0 {
+		panic("invalid test")
 	}
 
 	r := t.TestEngine.TestEngineGetPayloadBodiesByHashV1(hashes)
