@@ -1592,8 +1592,9 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*test.Env) {
 
 				// Execution specification::
 				// - {status: INVALID_BLOCK_HASH, latestValidHash: null, validationError: null} if the blockHash validation has failed
+				// Starting from Shanghai, INVALID should be returned instead (https://github.com/ethereum/execution-apis/pull/338)
 				r := t.TestEngine.TestEngineNewPayloadV1(&alteredPayload)
-				r.ExpectStatus(test.InvalidBlockHash)
+				r.ExpectStatusEither(test.InvalidBlockHash, test.Invalid)
 				r.ExpectLatestValidHash(nil)
 			},
 		})
@@ -1638,8 +1639,9 @@ func parentHashOnExecPayload(t *test.Env) {
 			alteredPayload.BlockHash = alteredPayload.ParentHash
 			// Execution specification::
 			// - {status: INVALID_BLOCK_HASH, latestValidHash: null, validationError: null} if the blockHash validation has failed
+			// Starting from Shanghai, INVALID should be returned instead (https://github.com/ethereum/execution-apis/pull/338)
 			r := t.TestEngine.TestEngineNewPayloadV1(&alteredPayload)
-			r.ExpectStatus(test.InvalidBlockHash)
+			r.ExpectStatusEither(test.InvalidBlockHash, test.Invalid)
 			r.ExpectLatestValidHash(nil)
 		},
 	})
