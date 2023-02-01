@@ -1,8 +1,11 @@
 @import "../extlib/bootstrap-5.2.3.min.css";
 @import "../extlib/dataTables-1.13.1.bootstrap5.min.css";
+@import "../extlib/responsive-2.4.0.bootstrap5.min.css";
 
 main {
     margin: 8px 12px;
+    font-size: 12pt;
+    min-width: 340px;
 }
 
 #hive-header {
@@ -25,17 +28,11 @@ main {
 
 #hive-static-nav span {
     margin: 0 6px 0 0;
-    white-space: nowrap;
 }
 
 #hive-static-nav a {
     text-decoration: none;
     white-space: nowrap;
-}
-
-#execresults, #filetable {
-    table-layout: fixed;
-    min-width: 900px;
 }
 
 .dataTables_wrapper {
@@ -57,6 +54,10 @@ td.test-name-column {
     text-align: right;
 }
 
+.suite-status-column {
+    white-space: nowrap;
+}
+
 tr.failed td.test-name-column {
     background-image: url('/images/details_open_err.svg');
 }
@@ -75,8 +76,27 @@ td.ellipsis {
     white-space: nowrap;
 }
 
+.responsive-overflow {
+    display: flex;
+    justify-content: space-between;
+}
+
+.responsive-overflow-col {
+    align-self: center;
+    display: inline-block;
+}
+
 .test-output {
-    overflow: scroll;
+    overflow-x: auto;
+    /*
+      Settings below are crucial to make scrolling of log output actually work. Without
+      these, the table will just expand to the width of the longest line. Since the
+      content of .test-output is preformatted text, the browser will measure its width
+      first and set the width of the table based on that. This behavior is disabled by
+      width: 0. However, we do want the element to expand to the available width.
+      The min-width: 100% does that.
+   */
+    width: 0; min-width: 100%;
 }
 
 .test-output code {

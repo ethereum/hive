@@ -144,7 +144,7 @@ function formatTestLog(suiteData, test) {
 
 	if (hiddenLines > 0) {
 		// Create the truncation marker.
-		let linkText = "..." + hiddenLines + " lines hidden, click to see full output...";
+		let linkText = "..." + hiddenLines + " lines hidden: click for full output...";
 		let linkURL = app.route.testLogInViewer(suiteData.suiteID, suiteData.name, test.testIndex);
 		let trunc = html.get_link(linkURL, linkText);
 		trunc.classList.add("output-trunc");
@@ -242,12 +242,10 @@ function showSuiteData(data, suiteID) {
 	let suiteTimes = testSuiteTimes(cases);
 	$("#testsuite_start").html("🕒 " + suiteTimes.start.toLocaleString());
 	$("#testsuite_duration").html("⌛️ " + format.duration(suiteTimes.duration));
-	if (data.simLog) {
-		let logfile = app.resultsRoot + data.simLog;
-		let url = app.route.logFileInViewer(suiteID, suiteName, logfile);
-		$("#sim-log-link").attr("href", url);
-		$("#sim-log-link").text("simulator log file");
-	}
+	let logfile = app.resultsRoot + data.simLog;
+	let url = app.route.logFileInViewer(suiteID, suiteName, logfile);
+	$("#sim-log-link").attr("href", url);
+	$("#sim-log-link").text("simulator log");
 	$("#testsuite_info").show();
 
 	// Initialize the DataTable.
@@ -255,19 +253,31 @@ function showSuiteData(data, suiteID) {
 		data: cases,
 		pageLength: 100,
 		autoWidth: false,
+		responsive: {
+			// Turn off display of hidden columns because it conflicts with our own use of
+			// child rows. This should be OK since the only column that will be ever be
+			// hidden is 'duration'.
+			details: {
+				type: 'none',
+				display: function (row, update, render) {},
+			},
+		},
 		order: [[1, 'desc']],
 		columns: [
 			{
 				title: "Test",
 				data: "name",
 				className: "test-name-column",
-				width: "79%",
+				width: "65%",
+				responsivePriority: 0,
 			},
 			// Status: pass or not.
 			{
 				title: "Status",
 				data: "summaryResult",
 				className: "test-status-column",
+				width: "80px",
+				responsivePriority: 0,
 				render: function(summaryResult) {
 					if (summaryResult.pass) {
 						return "&#x2713"
@@ -275,14 +285,14 @@ function showSuiteData(data, suiteID) {
 					let s = summaryResult.timeout ? "Timeout" : "Fail";
 					return "&#x2715; <b>" + s + "</b>";
 				},
-				width: "70px",
 			},
 			// Test duration.
 			{
 				title: "⌛️",
 				data: "duration",
 				className: "test-duration-column",
-				width: "60px",
+				width: "6em",
+				responsivePriority: 2,
 				type: "num",
 				render: function (v, type, row) {
 					if (type === 'display' || type === 'filter') {
@@ -295,6 +305,8 @@ function showSuiteData(data, suiteID) {
 			{
 				title: "Logs",
 				data: "clientInfo",
+				width: "20%",
+				responsivePriority: 1,
 				render: function(clientInfo) {
 					let logs = []
 					for (let instanceID in clientInfo) {
@@ -306,7 +318,6 @@ function showSuiteData(data, suiteID) {
 					}
 					return logs.join(", ")
 				},
-				width: "19%",
 			},
 		],
 		rowCallback: function(row, data, displayNum, displayIndex, dataIndex) {
