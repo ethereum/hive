@@ -15,21 +15,22 @@ import (
 )
 
 type CustomPayloadData struct {
-	ParentHash    *common.Hash
-	FeeRecipient  *common.Address
-	StateRoot     *common.Hash
-	ReceiptsRoot  *common.Hash
-	LogsBloom     *[]byte
-	PrevRandao    *common.Hash
-	Number        *uint64
-	GasLimit      *uint64
-	GasUsed       *uint64
-	Timestamp     *uint64
-	ExtraData     *[]byte
-	BaseFeePerGas *big.Int
-	BlockHash     *common.Hash
-	Transactions  *[][]byte
-	Withdrawals   types.Withdrawals
+	ParentHash        *common.Hash
+	FeeRecipient      *common.Address
+	StateRoot         *common.Hash
+	ReceiptsRoot      *common.Hash
+	LogsBloom         *[]byte
+	PrevRandao        *common.Hash
+	Number            *uint64
+	GasLimit          *uint64
+	GasUsed           *uint64
+	Timestamp         *uint64
+	ExtraData         *[]byte
+	BaseFeePerGas     *big.Int
+	BlockHash         *common.Hash
+	Transactions      *[][]byte
+	Withdrawals       types.Withdrawals
+	RemoveWithdrawals bool
 }
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
@@ -100,7 +101,9 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 	if customData.BaseFeePerGas != nil {
 		customPayloadHeader.BaseFee = customData.BaseFeePerGas
 	}
-	if customData.Withdrawals != nil {
+	if customData.RemoveWithdrawals {
+		customPayloadHeader.WithdrawalsHash = nil
+	} else if customData.Withdrawals != nil {
 		h := types.DeriveSha(customData.Withdrawals, trie.NewStackTrie(nil))
 		customPayloadHeader.WithdrawalsHash = &h
 	} else if basePayload.Withdrawals != nil {
@@ -125,7 +128,9 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		BlockHash:     customPayloadHeader.Hash(),
 		Transactions:  txs,
 	}
-	if customData.Withdrawals != nil {
+	if customData.RemoveWithdrawals {
+		result.Withdrawals = nil
+	} else if customData.Withdrawals != nil {
 		result.Withdrawals = customData.Withdrawals
 	} else if basePayload.Withdrawals != nil {
 		result.Withdrawals = basePayload.Withdrawals

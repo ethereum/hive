@@ -172,6 +172,20 @@ var Tests = []test.SpecInterface{
 		WithdrawalsPerBlock:   0,
 	},
 
+	// Block value tests
+	&BlockValueSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadV2 Block Value",
+				About: `
+				Verify the block value returned in GetPayloadV2.
+				`,
+			},
+			WithdrawalsForkHeight: 1,
+			WithdrawalsBlockCount: 1,
+		},
+	},
+
 	// Sync Tests
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
@@ -997,14 +1011,30 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
 					&beacon.PayloadAttributes{
-						Timestamp:             t.CLMock.LatestHeader.Time + 1,
+						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
 						Withdrawals:           make(types.Withdrawals, 0),
 					},
 				)
-				r.ExpectationDescription = "Sent pre-shanghai fcu using EngineForkchoiceUpdatedV2+Withdrawals, error is expected"
+				r.ExpectationDescription = "Sent pre-shanghai Forkchoice using ForkchoiceUpdatedV2 + Withdrawals, error is expected"
 				r.ExpectErrorCode(InvalidParamsError)
+
+				// Send a valid Pre-Shanghai request using ForkchoiceUpdatedV2
+				// (CLMock uses V1 by default)
+				r = t.TestEngine.TestEngineForkchoiceUpdatedV2(
+					&beacon.ForkchoiceStateV1{
+						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+					},
+					&beacon.PayloadAttributes{
+						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
+						Random:                common.Hash{},
+						SuggestedFeeRecipient: common.Address{},
+						Withdrawals:           nil,
+					},
+				)
+				r.ExpectationDescription = "Sent pre-shanghai Forkchoice ForkchoiceUpdatedV2 + null withdrawals, no error is expected"
+				r.ExpectNoError()
 			}
 		},
 		OnGetPayload: func() {
@@ -1021,6 +1051,11 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				r := t.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
 				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2+Withdrawals, error is expected"
 				r.ExpectErrorCode(InvalidParamsError)
+
+				// Send valid ExecutionPayloadV1 using engine_newPayloadV2
+				r = t.TestEngine.TestEngineNewPayloadV2(&t.CLMock.LatestPayloadBuilt)
+				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2, no error is expected"
+				r.ExpectStatus(test.Valid)
 			}
 		},
 		OnNewPayloadBroadcast: func() {
@@ -1053,6 +1088,25 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 
 	t.CLMock.ProduceBlocks(int(ws.WithdrawalsBlockCount), clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
+
+			if !ws.SkipBaseVerifications {
+				// Try to send a PayloadAttributesV1 with null withdrawals after
+				// Shanghai
+				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
+					&beacon.ForkchoiceStateV1{
+						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+					},
+					&beacon.PayloadAttributes{
+						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
+						Random:                common.Hash{},
+						SuggestedFeeRecipient: common.Address{},
+						Withdrawals:           nil,
+					},
+				)
+				r.ExpectationDescription = "Sent shanghai fcu using PayloadAttributesV1, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
+			}
+
 			// Send some withdrawals
 			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
 			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
@@ -1078,7 +1132,38 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			}
 		},
 		OnGetPayload: func() {
-			// TODO: Send new payload with `withdrawals=null` and expect error
+			if !ws.SkipBaseVerifications {
+				// Send invalid `ExecutionPayloadV1` by replacing withdrawals list
+				// with null, and client must respond with `InvalidParamsError`.
+				// Note that StateRoot is also incorrect but null withdrawals should
+				// be checked first instead of responding `INVALID`
+				nilWithdrawalsPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+					RemoveWithdrawals: true,
+				})
+				if err != nil {
+					t.Fatalf("Unable to append withdrawals: %v", err)
+				}
+				r := t.TestEngine.TestEngineNewPayloadV2(nilWithdrawalsPayload)
+				r.ExpectationDescription = "Sent shanghai payload using ExecutionPayloadV1, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
+
+				// Verify the list of withdrawals returned on the payload built
+				// completely matches the list provided in the
+				// engine_forkchoiceUpdatedV2 method call
+				if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
+					panic("withdrawals sent list was not saved")
+				} else {
+					if len(sentList) != len(t.CLMock.LatestPayloadBuilt.Withdrawals) {
+						t.Fatalf("FAIL (%s): Incorrect list of withdrawals on built payload: want=%d, got=%d", t.TestName, len(sentList), len(t.CLMock.LatestPayloadBuilt.Withdrawals))
+					}
+					for i := 0; i < len(sentList); i++ {
+						if err := test.CompareWithdrawals(sentList[i], t.CLMock.LatestPayloadBuilt.Withdrawals[i]); err != nil {
+							t.Fatalf("FAIL (%s): Incorrect withdrawal on index %d: %v", t.TestName, i, err)
+						}
+					}
+
+				}
+			}
 		},
 		OnNewPayloadBroadcast: func() {
 			// Check withdrawal addresses and verify withdrawal balances
@@ -1771,5 +1856,39 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 	ws.WithdrawalsBaseSpec.Execute(t)
 	for _, req := range ws.GetPayloadBodiesRequests {
 		req.Verify(t)
+	}
+}
+
+type BlockValueSpec struct {
+	*WithdrawalsBaseSpec
+}
+
+func (s *BlockValueSpec) Execute(t *test.Env) {
+	s.WithdrawalsBaseSpec.SkipBaseVerifications = true
+	s.WithdrawalsBaseSpec.Execute(t)
+
+	// Get the latest block and the transactions included
+	b := t.TestEngine.TestBlockByNumber(nil)
+	b.ExpectNoError()
+
+	totalValue := new(big.Int)
+	txs := b.Block.Transactions()
+	if len(txs) == 0 {
+		t.Fatalf("FAIL (%s): No transactions included in latest block", t.TestName)
+	}
+	for _, tx := range txs {
+		r := t.TestEngine.TestTransactionReceipt(tx.Hash())
+		r.ExpectNoError()
+
+		receipt := r.Receipt
+
+		gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
+		txTip, _ := tx.EffectiveGasTip(b.Block.Header().BaseFee)
+		txTip.Mul(txTip, gasUsed)
+		totalValue.Add(totalValue, txTip)
+	}
+
+	if totalValue.Cmp(t.CLMock.LatestBlockValue) != 0 {
+		t.Fatalf("FAIL (%s): Unexpected block value returned on GetPayloadV2: want=%d, got=%d", t.TestName, totalValue, t.CLMock.LatestBlockValue)
 	}
 }
