@@ -48,24 +48,24 @@ $(document).ready(navigate);
 // setHL sets the highlight on a line number.
 function setHL(num, scroll) {
     // out with the old
-    $(".highlighted").removeClass("highlighted");
+    $('.highlighted').removeClass("highlighted");
     if (!num) {
         return;
     }
 
-    let contentArea = $('#file-content');
-    let gutter = $('#gutter');
-    let numElem = gutter.children().eq(num - 1);
+    let contentArea = document.getElementById('file-content');
+    let gutter = document.getElementById('gutter');
+    let numElem = gutter.children[num - 1];
     if (!numElem) {
         console.error("invalid line number:", num);
         return;
     }
     // in with the new
-    let lineElem = contentArea.children().eq(num - 1);
-    numElem.addClass("highlighted");
-    lineElem.addClass("highlighted");
+    let lineElem = contentArea.children[num - 1];
+    $(numElem).addClass("highlighted");
+    $(lineElem).addClass("highlighted");
     if (scroll) {
-        numElem[0].scrollIntoView();
+        numElem.scrollIntoView();
     }
 }
 
@@ -118,16 +118,6 @@ function showText(text) {
         appendLine(contentArea, gutter, i + 1, lines[i]);
     }
 
-    // Text showing done, now let's wire up the gutter-clicking
-    // so if a line number is clicked,
-    // 1. Previous highlight is removed
-    // 2. The line is highlighted,
-    // 3. The id is added to the URL hash
-    $(".num").on('click', function(obj) {
-        setHL($(this).attr("line"), false);
-        history.replaceState(null, null, "#" + $(this).attr("id"));
-    });
-
     // Set meta-info.
     let meta = $("#meta");
     meta.text(lines.length + " Lines, " + format.units(text.length));
@@ -142,11 +132,17 @@ function appendLine(contentArea, gutter, number, text) {
     num.setAttribute("id", "L" + number);
     num.setAttribute("class", "num");
     num.setAttribute("line", number.toString());
+    num.addEventListener('click', lineNumberClicked);
     gutter.appendChild(num);
 
     let line = document.createElement("pre")
     line.innerText = text + "\n";
     contentArea.appendChild(line);
+}
+
+function lineNumberClicked() {
+    setHL($(this).attr("line"), false);
+    history.replaceState(null, null, "#" + $(this).attr("id"));
 }
 
 // fetchFile loads up a new file to view

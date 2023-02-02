@@ -11,9 +11,8 @@ h3 {
     flex-wrap: nowrap;
     background-color: #fff;
     border: 1px solid #d1d5da;
-    border-radius: 3px;
+    border-radius: 0 0 3px 3px;
     width: 100%;
-    font-size: 14px;
 }
 
 #viewer-header {
@@ -22,82 +21,90 @@ h3 {
     background-color: #f6f8fa;
     border: 1px solid #d1d5da;
     border-bottom: none;
-    border-top-left-radius: 3px;
-    border-top-right-radius: 3px;
+    border-radius: 3px 3px 0 0;
     font-size: 80%;
-}
-
-#gutter {
-    flex: 1 0 3em;
-    z-index: 20;
-    position: relative;
 }
 
 #file-content-container {
     overflow-x: auto;
     flex: 99 0 auto;
     width: 90%;
-    z-index: 10;
-    position: relative;
+    padding: 2px 0;
+}
+
+#file-content {
+    box-sizing: border-box;
 }
 
 #file-content pre {
     border: 0;
     margin: 0;
-    overflow: visible;
     padding: 0 0 0 8px;
-    font-size: 13px;
     line-height: 18px;
+    font-size: 14px;
+}
+
+#gutter {
+    flex: 1 0 3em;
+    border-right: 1px solid #d1d5da;
+    padding: 2px 0;
+    text-align: right;
 }
 
 .num {
     display: block;
+    clear: right;
     height: 18px;
     line-height: 18px;
-    font-size: 11px;
-    border-right: 1px solid #d1d5da;
+    font-size: 12px;
     color: #bbb;
     padding: 0 5px;
     text-align: right;
     box-sizing: border-box;
     margin-left: 4px;
     scroll-margin: 10em 0 0 0;
-
-    -webkit-user-select: none; /* Safari */
     user-select: none;
+    -webkit-user-select: none; /* Safari */
 }
 
 .num::before {
     content: attr(line);
     position: relative;
-    z-index: 20;
 }
 
 .num.highlighted {
+    float: right;
     display: flex;
-    justify-content: end;
     align-items: center;
-    border: solid #a8a8a8;
-    border-width: 1px 0 1px 1px;
-    border-radius: 2px 2px 2px 2px;
+    justify-content: end;
+    position: relative;
+    right: 2px;
+    padding: 0;
+    border-radius: 2px 1px 1px 2px;
+    background: #fffaea;
 }
 
 .num.highlighted::before {
-    margin-right: -7px;
+    border: solid #d5d0bd;
+    border-width: 1px 0 1px 1px;
+    padding: 0 3px 0 8px;
+    border-radius: 2px;
+    height: 20px;
+    min-width: 2em;
 }
 
 .num.highlighted::after {
     content: '';
     box-sizing: border-box;
     display: block;
-    margin-right: -9px;
-    height: 17px;
-    width: 17px;
+    position: absolute;
+    right: -5px;
+    height: 18px;
+    width: 18px;
+    border: solid #d5d0bd;
     border-radius: 0 2px 2px 2px;
-    background-color: #fffaea;
-    border: solid #a8a8a8;
     border-width: 0 1px 1px 0;
     transform: rotate(-45deg);
-    clip-path: inset(5px 0 0 5px);
-    z-index: 10;
+    clip-path: inset(4px 0 0 4px);
+    background: linear-gradient(to bottom right, #fffaea00 15px, #fffaea 16px, #fffaea);
 }
