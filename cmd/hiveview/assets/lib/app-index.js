@@ -100,7 +100,7 @@ function showFileListing(data, error) {
 			{
 				title: "Suite",
 				data: "name",
-				width: "10em",
+				width: "14em",
 			},
 			{
 				title: "Clients",
