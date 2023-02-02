@@ -163,7 +163,7 @@ function formatTestLog(suiteData, test) {
 }
 
 function highlightErrorsInTestOutput(content) {
-	let p = /\b(error|fail(ed)?|can't launch node)\b/i
+	let p = /\b(error:|fail(ed)?|can't launch node)\b/i
 	if (p.test(content)) {
 		return '<span class="output-error">' + content + '</span>';
 	}
