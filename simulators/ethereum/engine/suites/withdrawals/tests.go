@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -26,6 +28,14 @@ var (
 	Safe               = big.NewInt(-4)
 	InvalidParamsError = -32602
 	MAX_INITCODE_SIZE  = 49152
+
+	WARM_COINBASE_ADDRESS = common.HexToAddress("0x0101010101010101010101010101010101010101")
+	PUSH0_ADDRESS         = common.HexToAddress("0x0202020202020202020202020202020202020202")
+
+	TX_CONTRACT_ADDRESSES = []common.Address{
+		WARM_COINBASE_ADDRESS,
+		PUSH0_ADDRESS,
+	}
 )
 
 // Execution specification reference:
@@ -469,6 +479,164 @@ var Tests = []test.SpecInterface{
 		OverflowMaxInitcodeTxCountBeforeFork: 0,
 		OverflowMaxInitcodeTxCountAfterFork:  1,
 	},
+
+	// Get Payload Bodies Requests
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodiesByRange",
+				About: `
+				Make multiple withdrawals to 16 accounts each payload.
+				Retrieve many of the payloads' bodies by number range.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight:    17,
+			WithdrawalsBlockCount:    16,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1024,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByRange{
+				Start: 1,
+				Count: 4,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 1,
+				Count: 8,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 1,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 4,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 15,
+				Count: 2,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 16,
+				Count: 16,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 1,
+				Count: 32,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 33,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 33,
+				Count: 32,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 32,
+				Count: 0,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 0,
+				Count: 1,
+			},
+		},
+	},
+
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodiesByRange (Empty Transactions/Withdrawals)",
+				About: `
+				Make no withdrawals and no transactions in many payloads.
+				Retrieve many of the payloads' bodies by number range.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 17,
+			WithdrawalsBlockCount: 16,
+			WithdrawalsPerBlock:   0,
+			TransactionsPerBlock:  common.Big0,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByRange{
+				Start: 16,
+				Count: 2,
+			},
+		},
+	},
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodiesByHash",
+				About: `
+				Make multiple withdrawals to 16 accounts each payload.
+				Retrieve many of the payloads' bodies by hash.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight:    17,
+			WithdrawalsBlockCount:    16,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1024,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByHashIndex{
+				BlockNumbers: []uint64{
+					1,
+					16,
+					2,
+					17,
+				},
+			},
+			GetPayloadBodyRequestByHashIndex{
+				Start: 1,
+				End:   32,
+			},
+			GetPayloadBodyRequestByHashIndex{
+				BlockNumbers: []uint64{
+					32,
+					1000,
+					31,
+					1000,
+					30,
+					1000,
+				},
+			},
+		},
+	},
+
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodiesByHash (Empty Transactions/Withdrawals)",
+				About: `
+				Make no withdrawals and no transactions in many payloads.
+				Retrieve many of the payloads' bodies by hash.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight: 17,
+			WithdrawalsBlockCount: 16,
+			WithdrawalsPerBlock:   0,
+			TransactionsPerBlock:  common.Big0,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByHashIndex{
+				Start: 16,
+				End:   17,
+			},
+		},
+	},
 }
 
 // Helper types to convert gwei into wei more easily
@@ -631,10 +799,77 @@ func (ws *WithdrawalsBaseSpec) GetGenesis() *core.Genesis {
 	genesis.Config.Clique = nil
 	genesis.ExtraData = []byte{}
 
+	// Add some accounts to withdraw to with unconditional SSTOREs
 	startAccount := big.NewInt(0x1000)
 	endAccount := big.NewInt(0x1000 + int64(ws.GetWithdrawableAccountCount()) - 1)
 	AddUnconditionalBytecode(genesis, startAccount, endAccount)
+
+	// Add accounts that use the coinbase (EIP-3651)
+	warmCoinbaseCode := []byte{
+		0x5A, // GAS
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x41, // COINBASE
+		0x60, // PUSH1(0xFF)
+		0xFF,
+		0xF1, // CALL
+		0x5A, // GAS
+		0x90, // SWAP1
+		0x50, // POP - Call result
+		0x90, // SWAP1
+		0x03, // SUB
+		0x60, // PUSH1(0x16) - GAS + PUSH * 6 + COINBASE
+		0x16,
+		0x90, // SWAP1
+		0x03, // SUB
+		0x43, // NUMBER
+		0x55, // SSTORE
+	}
+	genesis.Alloc[WARM_COINBASE_ADDRESS] = core.GenesisAccount{
+		Code:    warmCoinbaseCode,
+		Balance: common.Big0,
+	}
+
+	// Add accounts that use the PUSH0 (EIP-3855)
+	push0Code := []byte{
+		0x43, // NUMBER
+		0x5F, // PUSH0
+		0x55, // SSTORE
+	}
+	genesis.Alloc[PUSH0_ADDRESS] = core.GenesisAccount{
+		Code:    push0Code,
+		Balance: common.Big0,
+	}
 	return genesis
+}
+
+func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
+	if ws.GetTransactionCountPerPayload() < uint64(len(TX_CONTRACT_ADDRESSES)) {
+		return
+	}
+	// Assume that forkchoice updated has been already sent
+	latestPayloadNumber := t.CLMock.LatestExecutedPayload.Number
+	latestPayloadNumberBig := big.NewInt(int64(latestPayloadNumber))
+
+	r := t.TestEngine.TestStorageAt(WARM_COINBASE_ADDRESS, common.BigToHash(latestPayloadNumberBig), latestPayloadNumberBig)
+	p := t.TestEngine.TestStorageAt(PUSH0_ADDRESS, common.Hash{}, latestPayloadNumberBig)
+	if latestPayloadNumber >= ws.WithdrawalsForkHeight {
+		// Shanghai
+		r.ExpectBigIntStorageEqual(big.NewInt(100))        // WARM_STORAGE_READ_COST
+		p.ExpectBigIntStorageEqual(latestPayloadNumberBig) // tx succeeded
+	} else {
+		// Pre-Shanghai
+		r.ExpectBigIntStorageEqual(big.NewInt(2600)) // COLD_ACCOUNT_ACCESS_COST
+		p.ExpectBigIntStorageEqual(big.NewInt(0))    // tx must've failed
+	}
 }
 
 // Changes the CL Mocker default time increments of 1 to the value specified
@@ -731,6 +966,29 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	// Produce any blocks necessary to reach withdrawals fork
 	t.CLMock.ProduceBlocks(int(ws.GetPreWithdrawalsBlockCount()), clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
+
+			// Send some transactions
+			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
+
+				var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
+
+				_, err := helper.SendNextTransaction(
+					t.TestContext,
+					t.CLMock.NextBlockProducer,
+					&helper.BaseTransactionCreator{
+						Recipient: &destAddr,
+						Amount:    common.Big1,
+						Payload:   nil,
+						TxType:    t.TestTransactionType,
+						GasLimit:  75000,
+					},
+				)
+
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
+			}
+
 			if !ws.SkipBaseVerifications {
 				// Try to send a ForkchoiceUpdatedV2 with non-null
 				// withdrawals before Shanghai
@@ -779,6 +1037,11 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				r.ExpectWithdrawalsRoot(nil)
 			}
 		},
+		OnForkchoiceBroadcast: func() {
+			if !ws.SkipBaseVerifications {
+				ws.VerifyContractsStorage(t)
+			}
+		},
 	})
 
 	// Produce requested post-shanghai blocks
@@ -795,17 +1058,20 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
 			// Send some transactions
 			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
+				var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
+
 				_, err := helper.SendNextTransaction(
 					t.TestContext,
 					t.CLMock.NextBlockProducer,
 					&helper.BaseTransactionCreator{
-						Recipient: &globals.PrevRandaoContractAddr,
+						Recipient: &destAddr,
 						Amount:    common.Big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
 						GasLimit:  75000,
 					},
 				)
+
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
 				}
@@ -874,6 +1140,8 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						to verify withdrawalsRoot with the following withdrawals:
 						%s`, jsWithdrawals)
 				r.ExpectWithdrawalsRoot(&expectedWithdrawalsRoot)
+
+				ws.VerifyContractsStorage(t)
 			}
 		},
 	})
@@ -1389,4 +1657,119 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 			r.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.ParentHash)
 		},
 	})
+}
+
+// Withdrawals sync spec:
+// Specifies a withdrawals test where the withdrawals happen and then a
+// client needs to sync and apply the withdrawals.
+type GetPayloadBodiesSpec struct {
+	*WithdrawalsBaseSpec
+
+	GetPayloadBodiesRequests []GetPayloadBodyRequest
+}
+
+type GetPayloadBodyRequest interface {
+	Verify(*test.Env)
+}
+
+type GetPayloadBodyRequestByRange struct {
+	Start uint64
+	Count uint64
+}
+
+func (req GetPayloadBodyRequestByRange) Verify(t *test.Env) {
+	r := t.TestEngine.TestEngineGetPayloadBodiesByRangeV1(req.Start, req.Count)
+	if req.Start < 1 || req.Count < 1 {
+		r.ExpectationDescription = fmt.Sprintf(`
+			Sent start (%d) or count (%d) to engine_getPayloadBodiesByRangeV1 with a
+			value less than 1, therefore error is expected.
+			`, req.Start, req.Count)
+		r.ExpectErrorCode(InvalidParamsError)
+		return
+	}
+	if req.Start > t.CLMock.CurrentPayloadNumber {
+		r.ExpectationDescription = fmt.Sprintf(`
+			Sent start=%d and count=%d to engine_getPayloadBodiesByRangeV1, latest known block is %d, hence an empty list is expected.
+			`, req.Start, req.Count, t.CLMock.LatestExecutedPayload.Number)
+		r.ExpectPayloadBodiesCount(0)
+	} else {
+		var count = req.Count
+		if req.Start+req.Count-1 > t.CLMock.CurrentPayloadNumber {
+			count = t.CLMock.CurrentPayloadNumber - req.Start + 1
+		}
+		r.ExpectPayloadBodiesCount(count)
+		for i := req.Start; i < req.Start+count; i++ {
+			p := t.CLMock.ExecutedPayloadHistory[i]
+
+			r.ExpectPayloadBody(i-req.Start, &client_types.ExecutionPayloadBodyV1{
+				Transactions: p.Transactions,
+				Withdrawals:  p.Withdrawals,
+			})
+		}
+	}
+}
+
+type GetPayloadBodyRequestByHashIndex struct {
+	BlockNumbers []uint64
+	Start        uint64
+	End          uint64
+}
+
+func (req GetPayloadBodyRequestByHashIndex) Verify(t *test.Env) {
+	payloads := make([]*beacon.ExecutableData, 0)
+	hashes := make([]common.Hash, 0)
+	if len(req.BlockNumbers) > 0 {
+		for _, n := range req.BlockNumbers {
+			if p, ok := t.CLMock.ExecutedPayloadHistory[n]; ok {
+				payloads = append(payloads, &p)
+				hashes = append(hashes, p.BlockHash)
+			} else {
+				// signal to request an unknown hash (random)
+				randHash := common.Hash{}
+				rand.Read(randHash[:])
+				payloads = append(payloads, nil)
+				hashes = append(hashes, randHash)
+			}
+		}
+	}
+	if req.Start > 0 && req.End > 0 {
+		for n := req.Start; n <= req.End; n++ {
+			if p, ok := t.CLMock.ExecutedPayloadHistory[n]; ok {
+				payloads = append(payloads, &p)
+				hashes = append(hashes, p.BlockHash)
+			} else {
+				// signal to request an unknown hash (random)
+				randHash := common.Hash{}
+				rand.Read(randHash[:])
+				payloads = append(payloads, nil)
+				hashes = append(hashes, randHash)
+			}
+		}
+	}
+	if len(payloads) == 0 {
+		panic("invalid test")
+	}
+
+	r := t.TestEngine.TestEngineGetPayloadBodiesByHashV1(hashes)
+	r.ExpectPayloadBodiesCount(uint64(len(payloads)))
+	for i, p := range payloads {
+		var expectedPayloadBody *client_types.ExecutionPayloadBodyV1
+		if p != nil {
+			expectedPayloadBody = &client_types.ExecutionPayloadBodyV1{
+				Transactions: p.Transactions,
+				Withdrawals:  p.Withdrawals,
+			}
+		}
+		r.ExpectPayloadBody(uint64(i), expectedPayloadBody)
+	}
+
+}
+
+func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
+	// Do the base withdrawal test first, skipping base verifications
+	ws.WithdrawalsBaseSpec.SkipBaseVerifications = true
+	ws.WithdrawalsBaseSpec.Execute(t)
+	for _, req := range ws.GetPayloadBodiesRequests {
+		req.Verify(t)
+	}
 }

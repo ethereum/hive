@@ -20,6 +20,7 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/golang-jwt/jwt/v4"
@@ -334,7 +335,7 @@ func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payl
 	}
 
 	if version == 2 {
-		var response api.ExecutableDataV2
+		var response api.ExecutionPayloadEnvelope
 		err = ec.c.CallContext(ctx, &response, rpcString, payloadId)
 		if response.ExecutionPayload != nil {
 			executableData = *response.ExecutionPayload
@@ -354,6 +355,32 @@ func (ec *HiveRPCEngineClient) GetPayloadV1(ctx context.Context, payloadId *api.
 
 func (ec *HiveRPCEngineClient) GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error) {
 	return ec.GetPayload(ctx, 2, payloadId)
+}
+
+func (ec *HiveRPCEngineClient) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*client_types.ExecutionPayloadBodyV1, error) {
+	var (
+		result []*client_types.ExecutionPayloadBodyV1
+		err    error
+	)
+	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
+		return nil, err
+	}
+
+	err = ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByRangeV1", start, count)
+	return result, err
+}
+
+func (ec *HiveRPCEngineClient) GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*client_types.ExecutionPayloadBodyV1, error) {
+	var (
+		result []*client_types.ExecutionPayloadBodyV1
+		err    error
+	)
+	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
+		return nil, err
+	}
+
+	err = ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByHashV1", hashes)
+	return result, err
 }
 
 func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
@@ -378,6 +405,15 @@ func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *api.Ex
 func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Context, tConf *api.TransitionConfigurationV1) (api.TransitionConfigurationV1, error) {
 	var result api.TransitionConfigurationV1
 	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", tConf)
+	return result, err
+}
+
+func (ec *HiveRPCEngineClient) ExchangeCapabilities(ctx context.Context, clCapabilities []string) ([]string, error) {
+	var result []string
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
+		return result, err
+	}
+	err := ec.c.CallContext(ctx, &result, "engine_exchangeCapabilities", clCapabilities)
 	return result, err
 }
 

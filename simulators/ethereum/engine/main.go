@@ -12,6 +12,7 @@ import (
 
 	suite_auth "github.com/ethereum/hive/simulators/ethereum/engine/suites/auth"
 	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
+	suite_ex_cap "github.com/ethereum/hive/simulators/ethereum/engine/suites/exchange_capabilities"
 	suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
@@ -35,6 +36,11 @@ func main() {
 			Description: `
 	Test Engine API authentication features.`[1:],
 		}
+		excap = hivesim.Suite{
+			Name: "engine-exchange-capabilities",
+			Description: `
+	Test Engine API exchange capabilities.`[1:],
+		}
 		sync = hivesim.Suite{
 			Name: "engine-sync",
 			Description: `
@@ -52,6 +58,7 @@ func main() {
 	addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
 	addTestsToSuite(simulator, &transition, specToInterface(suite_transition.Tests), "full")
 	addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
+	addTestsToSuite(simulator, &excap, specToInterface(suite_ex_cap.Tests), "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
 
@@ -59,6 +66,7 @@ func main() {
 	hivesim.MustRunSuite(simulator, engine)
 	hivesim.MustRunSuite(simulator, transition)
 	hivesim.MustRunSuite(simulator, auth)
+	hivesim.MustRunSuite(simulator, excap)
 	hivesim.MustRunSuite(simulator, sync)
 	hivesim.MustRunSuite(simulator, withdrawals)
 }
@@ -118,6 +126,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 			delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
 			delete(newParams, "HIVE_CLIQUE_PERIOD")
 			delete(newParams, "HIVE_MINER")
+			newParams = newParams.Set("HIVE_POST_MERGE_GENESIS", "true")
 		}
 
 		if clientTypes, err := sim.ClientTypes(); err == nil {

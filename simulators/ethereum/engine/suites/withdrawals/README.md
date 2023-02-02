@@ -152,3 +152,27 @@ This test suite verifies behavior of the Engine API on each client after the Sha
   - Request a new payload from the client and verify that the payload built only includes `TxA`, and `TxB` is not included, nor the contract it could create is present in the `stateRoot`.
   - Create a modified payload where `TxA` is replaced by `TxB` and send using `engine_newPayloadV2`
   - Verify that `engine_newPayloadV2` returns `INVALID` nad `latestValidHash` points to the latest valid payload in the canonical chain.
+
+## GetPayloadBodies Tests
+
+- Payload Bodies By Range - Shanghai Fork on Block 16 - 16 Withdrawal Blocks
+  - Launch client `A` and create a canonical chain consisting of 32 blocks, where the first shanghai block is number 17
+  - Payloads produced of the following characteristics
+    - [x] 16 Transactions, 16 Withdrawals
+    - [x] 0 Transactions, 0 Withdrawals
+  - Make multiple requests to obtain the payload bodies from the canonical chain (see `./tests.go` for full list).
+  - Verify that:
+    - Payload bodies of blocks before the Shanghai fork contain `withdrawals==null`
+    - All transactions and withdrawals are in the correct format and order.
+    - Requested payload bodies past the highest known block are ignored and absent from the returned list
+
+- Payload Bodies By Hash - Shanghai Fork on Block 16 - 16 Withdrawal Blocks
+  - Launch client `A` and create a canonical chain consisting of 32 blocks, where the first shanghai block is number 17
+  - Payloads produced of the following characteristics
+    - [x] 16 Transactions, 16 Withdrawals
+    - [x] 0 Transactions, 0 Withdrawals
+  - Make multiple requests to obtain the payload bodies from the canonical chain (see `./tests.go` for full list).
+  - Verify that:
+    - Payload bodies of blocks before the Shanghai fork contain `withdrawals==null`
+    - All transactions and withdrawals are in the correct format and order.
+    - Requested payload bodies of unknown hashes are returned as null in the returned list

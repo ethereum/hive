@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -13,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 )
 
@@ -292,7 +294,7 @@ func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Has
 	}
 }
 
-// GetPayloadV1
+// GetPayload
 type GetPayloadResponseExpectObject struct {
 	*ExpectEnv
 	Payload    api.ExecutableData
@@ -387,6 +389,156 @@ func (exp *GetPayloadResponseExpectObject) ExpectTimestamp(expectedTimestamp uin
 	exp.ExpectNoError()
 	if exp.Payload.Timestamp != expectedTimestamp {
 		exp.Fatalf("FAIL (%s): Unexpected timestamp for payload on EngineGetPayloadV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Payload.Timestamp, expectedTimestamp)
+	}
+}
+
+// GetPayloadBodies
+type GetPayloadBodiesResponseExpectObject struct {
+	*ExpectEnv
+	PayloadBodies []*client_types.ExecutionPayloadBodyV1
+	BlockValue    *big.Int
+	Version       int
+	Error         error
+	ErrorCode     int
+}
+
+func (tec *TestEngineClient) TestEngineGetPayloadBodiesByRangeV1(start uint64, count uint64) *GetPayloadBodiesResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	payloadBodies, err := tec.Engine.GetPayloadBodiesByRangeV1(ctx, start, count)
+	ret := &GetPayloadBodiesResponseExpectObject{
+		ExpectEnv:     &ExpectEnv{Env: tec.Env},
+		PayloadBodies: payloadBodies,
+		Version:       1,
+		BlockValue:    nil,
+		Error:         err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (tec *TestEngineClient) TestEngineGetPayloadBodiesByHashV1(hashes []common.Hash) *GetPayloadBodiesResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	payloadBodies, err := tec.Engine.GetPayloadBodiesByHashV1(ctx, hashes)
+	ret := &GetPayloadBodiesResponseExpectObject{
+		ExpectEnv:     &ExpectEnv{Env: tec.Env},
+		PayloadBodies: payloadBodies,
+		Version:       1,
+		BlockValue:    nil,
+		Error:         err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (exp *GetPayloadBodiesResponseExpectObject) ExpectNoError() {
+	if exp.Error != nil {
+		exp.Fatalf("FAIL (%s): Expected no error on EngineGetPayloadBodiesV%d: error=%v", exp.TestName, exp.Version, exp.Error)
+	}
+}
+
+func (exp *GetPayloadBodiesResponseExpectObject) ExpectError() {
+	if exp.Error == nil {
+		exp.Fatalf("FAIL (%s): Expected error on EngineGetPayloadBodiesV%d: payload=%v", exp.TestName, exp.Version, exp.PayloadBodies)
+	}
+}
+
+func (exp *GetPayloadBodiesResponseExpectObject) ExpectErrorCode(code int) {
+	exp.ExpectError()
+	if exp.ErrorCode != code {
+		exp.Fatalf("FAIL (%s): Expected error code on EngineGetPayloadBodiesV%d: want=%d, got=%d", exp.TestName, exp.Version, code, exp.ErrorCode)
+	}
+}
+
+func (exp *GetPayloadBodiesResponseExpectObject) ExpectPayloadBodiesCount(count uint64) {
+	exp.ExpectNoError()
+	if exp.PayloadBodies == nil {
+		exp.Fatalf("FAIL (%s): Expected payload bodies list count on EngineGetPayloadBodiesV%d: want=%d, got=nil", exp.TestName, exp.Version, count)
+	}
+	if uint64(len(exp.PayloadBodies)) != count {
+		exp.Fatalf("FAIL (%s): Expected payload bodies list count on EngineGetPayloadBodiesV%d: want=%d, got=%d", exp.TestName, exp.Version, count, len(exp.PayloadBodies))
+	}
+}
+
+func CompareWithdrawals(want *types.Withdrawal, got *types.Withdrawal) error {
+	if want == nil && got != nil || want != nil && got == nil {
+		return fmt.Errorf("want=%v, got=%v", want, got)
+	}
+	if want != nil {
+		if want.Amount != got.Amount ||
+			!bytes.Equal(want.Address[:], got.Address[:]) ||
+			want.Index != got.Index ||
+			want.Validator != got.Validator {
+			wantStr, _ := json.MarshalIndent(want, "", " ")
+			gotStr, _ := json.MarshalIndent(got, "", " ")
+			return fmt.Errorf("want=%v, got=%v", wantStr, gotStr)
+		}
+	}
+	return nil
+}
+
+func ComparePayloadBodies(want *client_types.ExecutionPayloadBodyV1, got *client_types.ExecutionPayloadBodyV1) error {
+	if (want == nil || got == nil) && want != got {
+		if want == nil {
+			return fmt.Errorf("wanted null, got object")
+		}
+		return fmt.Errorf("wanted object, got null")
+	}
+
+	if want != nil {
+		if len(want.Transactions) != len(got.Transactions) {
+			return fmt.Errorf("incorrect tx length: want=%d, got=%d", len(want.Transactions), len(got.Transactions))
+		}
+
+		if want.Withdrawals == nil && got.Withdrawals != nil {
+			return fmt.Errorf("wanted null withdrawals, got object")
+		} else if want.Withdrawals != nil && got.Withdrawals == nil {
+			return fmt.Errorf("wanted object, got null withdrawals")
+		}
+
+		if len(want.Withdrawals) != len(got.Withdrawals) {
+			return fmt.Errorf("incorrect withdrawals length: want=%d, got=%d", len(want.Withdrawals), len(got.Withdrawals))
+		}
+
+		for i, a_tx := range want.Transactions {
+			b_tx := got.Transactions[i]
+			if !bytes.Equal(a_tx, b_tx) {
+				return fmt.Errorf("tx %d not equal: want=%x, got=%x", i, a_tx, b_tx)
+			}
+		}
+
+		if want.Withdrawals != nil {
+			for i, a_w := range want.Withdrawals {
+				b_w := got.Withdrawals[i]
+				if err := CompareWithdrawals(a_w, b_w); err != nil {
+					return fmt.Errorf("withdrawal %d not equal: %v", i, err)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (exp *GetPayloadBodiesResponseExpectObject) ExpectPayloadBody(index uint64, payloadBody *client_types.ExecutionPayloadBodyV1) {
+	exp.ExpectNoError()
+	if exp.PayloadBodies == nil {
+		exp.Fatalf("FAIL (%s): Expected payload body in list on EngineGetPayloadBodiesV%d, but list is nil", exp.TestName, exp.Version)
+	}
+	if index >= uint64(len(exp.PayloadBodies)) {
+		exp.Fatalf("FAIL (%s): Expected payload body in list on EngineGetPayloadBodiesV%d, list is smaller than index: want=%s", exp.TestName, exp.Version, index)
+	}
+
+	checkItem := exp.PayloadBodies[index]
+
+	if err := ComparePayloadBodies(payloadBody, checkItem); err != nil {
+		exp.Fatalf("FAIL (%s): Unexpected payload body on EngineGetPayloadBodiesV%d at index %d: %v", exp.TestName, exp.Version, index, err)
+
 	}
 }
 
@@ -634,6 +786,9 @@ func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) 
 type StorageResponseExpectObject struct {
 	*ExpectEnv
 	Call      string
+	Account   common.Address
+	Key       common.Hash
+	Number    *big.Int
 	Storage   []byte
 	Error     error
 	ErrorCode int
@@ -646,6 +801,9 @@ func (tec *TestEngineClient) TestStorageAt(account common.Address, key common.Ha
 	ret := &StorageResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "StorageAt",
+		Account:   account,
+		Key:       key,
+		Number:    number,
 		Storage:   storage,
 		Error:     err,
 	}
@@ -667,7 +825,7 @@ func (exp *StorageResponseExpectObject) ExpectBigIntStorageEqual(expBigInt *big.
 	bigInt.SetBytes(exp.Storage)
 	if ((bigInt == nil || expBigInt == nil) && bigInt != expBigInt) ||
 		(bigInt != nil && expBigInt != nil && bigInt.Cmp(expBigInt) != 0) {
-		exp.Fatalf("FAIL (%s): Unexpected storage on %s: %v, expected=%v", exp.TestName, exp.Call, bigInt, expBigInt)
+		exp.Fatalf("FAIL (%s): Unexpected storage on %s (addr=%s, key=%s, block=%d): got=%d, expected=%d", exp.TestName, exp.Call, exp.Account, exp.Key, exp.Number, bigInt, expBigInt)
 	}
 }
 
