@@ -49,7 +49,7 @@ var (
 		AltairForkEpoch:         common.Big0,
 		BellatrixForkEpoch:      common.Big0,
 		CapellaForkEpoch:        common.Big1,
-		GenesisDelaySlots:       big.NewInt(10), // To avoid skipped slots in the start
+		GenesisDelaySlots:       big.NewInt(5), // To avoid skipped slots in the start
 		Eth1Consensus:           &el.ExecutionCliqueConsensus{},
 	}
 
