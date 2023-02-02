@@ -130,7 +130,7 @@ td.ellipsis {
 }
 
 .highlighted {
-    background-color: #fffaea !important;
+    background: #fffaea;
     scroll-margin: 5em 0 0 0;
 }
 
