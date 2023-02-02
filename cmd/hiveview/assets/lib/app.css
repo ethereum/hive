@@ -55,7 +55,7 @@ td.test-name-column {
     text-align: right;
 }
 
-.suite-status-column {
+.suite-status-column, .test-status-column {
     white-space: nowrap;
 }
 
