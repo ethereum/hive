@@ -74,7 +74,7 @@ func (v *vault) signTransaction(sender common.Address, tx *types.Transaction) (*
 	if key == nil {
 		return nil, fmt.Errorf("sender account %v not in vault", sender)
 	}
-	signer := types.NewEIP155Signer(chainID)
+	signer := types.NewDankSigner(chainID)
 	return types.SignTx(tx, signer, key)
 }
 

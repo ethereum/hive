@@ -28,6 +28,7 @@ type CustomPayloadData struct {
 	ExtraData     *[]byte
 	BaseFeePerGas *big.Int
 	BlockHash     *common.Hash
+	ExcessDataGas *big.Int
 	Transactions  *[][]byte
 	Withdrawals   types.Withdrawals
 }
@@ -107,6 +108,9 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		h := types.DeriveSha(types.Withdrawals(basePayload.Withdrawals), trie.NewStackTrie(nil))
 		customPayloadHeader.WithdrawalsHash = &h
 	}
+	if customData.ExcessDataGas != nil {
+		customPayloadHeader.ExcessDataGas = customData.ExcessDataGas
+	}
 
 	// Return the new payload
 	result := &api.ExecutableData{
@@ -123,6 +127,7 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		ExtraData:     customPayloadHeader.Extra,
 		BaseFeePerGas: customPayloadHeader.BaseFee,
 		BlockHash:     customPayloadHeader.Hash(),
+		ExcessDataGas: customPayloadHeader.ExcessDataGas,
 		Transactions:  txs,
 	}
 	if customData.Withdrawals != nil {
@@ -190,6 +195,9 @@ func (customData *CustomPayloadData) String() string {
 	}
 	if customData.Withdrawals != nil {
 		customFieldsList = append(customFieldsList, fmt.Sprintf("Withdrawals=%v", customData.Withdrawals))
+	}
+	if customData.ExcessDataGas != nil {
+		customFieldsList = append(customFieldsList, fmt.Sprintf("ExcessDataGas=%s", customData.ExcessDataGas.String()))
 	}
 	return strings.Join(customFieldsList, ", ")
 }
@@ -307,6 +315,11 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 		}
 		customPayloadMod = &CustomPayloadData{
 			Transactions: &modifiedTransactions,
+		}
+	case InvalidExcessDataGas:
+		modExcessDataGas := new(big.Int).Add(basePayload.ExcessDataGas, big.NewInt(1))
+		customPayloadMod = &CustomPayloadData{
+			ExcessDataGas: modExcessDataGas,
 		}
 	}
 

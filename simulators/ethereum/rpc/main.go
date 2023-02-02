@@ -81,6 +81,7 @@ var tests = []testSpec{
 	{Name: "ws/TransactionCount", Run: transactionCountTest},
 	{Name: "ws/TransactionInBlock", Run: transactionInBlockTest},
 	{Name: "ws/TransactionReceipt", Run: TransactionReceiptTest},
+	//{Name: "http/BlobTransactionTest", Run: blobTransactionTest},
 
 	// WebSocket subscription tests.
 	{Name: "ws/NewHeadSubscription", Run: newHeadSubscriptionTest},

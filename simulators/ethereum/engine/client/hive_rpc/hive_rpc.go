@@ -333,7 +333,7 @@ func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payl
 		return executableData, nil, err
 	}
 
-	if version == 2 {
+	if version == 2 || version == 3 {
 		var response api.ExecutableDataV2
 		err = ec.c.CallContext(ctx, &response, rpcString, payloadId)
 		if response.ExecutionPayload != nil {
@@ -356,6 +356,20 @@ func (ec *HiveRPCEngineClient) GetPayloadV2(ctx context.Context, payloadId *api.
 	return ec.GetPayload(ctx, 2, payloadId)
 }
 
+func (ec *HiveRPCEngineClient) GetPayloadV3(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error) {
+	return ec.GetPayload(ctx, 3, payloadId)
+}
+
+func (ec *HiveRPCEngineClient) GetBlobsBundleV1(ctx context.Context, payloadId *api.PayloadID) (api.BlobsBundle, error) {
+	var blobsBundle api.BlobsBundle
+
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
+		return blobsBundle, err
+	}
+	err := ec.c.CallContext(ctx, &blobsBundle, "engine_getBlobsBundleV1", payloadId)
+	return blobsBundle, err
+}
+
 func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
 	var result api.PayloadStatusV1
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
@@ -373,6 +387,10 @@ func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *api.Ex
 
 func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
 	return ec.NewPayload(ctx, 2, payload)
+}
+
+func (ec *HiveRPCEngineClient) NewPayloadV3(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
+	return ec.NewPayload(ctx, 3, payload)
 }
 
 func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Context, tConf *api.TransitionConfigurationV1) (api.TransitionConfigurationV1, error) {

@@ -64,6 +64,7 @@ type CLMocker struct {
 	LatestPayloadAttributes api.PayloadAttributes
 	LatestExecutedPayload   api.ExecutableData
 	LatestForkchoice        api.ForkchoiceStateV1
+	LatestBlobsBundle       api.BlobsBundle
 
 	// Merge related
 	FirstPoSBlockNumber             *big.Int
@@ -75,6 +76,9 @@ type CLMocker struct {
 	ShanghaiTimestamp *big.Int
 	NextWithdrawals   types.Withdrawals
 
+	// Cancun (EIP-4844) Related
+	ShardingTimestamp *big.Int
+
 	// Global context which all procedures shall stop
 	TestContext    context.Context
 	TimeoutContext context.Context
@@ -84,7 +88,11 @@ func isShanghai(blockTimestamp uint64, shanghaiTimestamp *big.Int) bool {
 	return shanghaiTimestamp != nil && big.NewInt(int64(blockTimestamp)).Cmp(shanghaiTimestamp) >= 0
 }
 
-func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int, shanghaiTime *big.Int) *CLMocker {
+func isSharding(blockTimestamp uint64, shardingTimestamp *big.Int) bool {
+	return shardingTimestamp != nil && big.NewInt(int64(blockTimestamp)).Cmp(shardingTimestamp) >= 0
+}
+
+func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int, shanghaiTime *big.Int, shardingTime *big.Int) *CLMocker {
 	// Init random seed for different purposes
 	seed := time.Now().Unix()
 	t.Logf("Randomness seed: %v\n", seed)
@@ -119,6 +127,7 @@ func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportO
 			FinalizedBlockHash: common.Hash{},
 		},
 		ShanghaiTimestamp: shanghaiTime,
+		ShardingTimestamp: shardingTime,
 		TestContext:       context.Background(),
 	}
 
@@ -332,7 +341,10 @@ func (cl *CLMocker) GetNextPayload() {
 	var err error
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
-	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
+	if isSharding(cl.LatestPayloadAttributes.Timestamp, cl.ShardingTimestamp) {
+		cl.LatestPayloadBuilt, cl.LatestBlockValue, err = cl.NextBlockProducer.GetPayloadV3(ctx, cl.NextPayloadID)
+
+	} else if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
 		cl.LatestPayloadBuilt, cl.LatestBlockValue, err = cl.NextBlockProducer.GetPayloadV2(ctx, cl.NextPayloadID)
 
 	} else {
@@ -356,6 +368,26 @@ func (cl *CLMocker) GetNextPayload() {
 	}
 	if cl.LatestPayloadBuilt.Number != cl.LatestHeader.Number.Uint64()+1 {
 		cl.Fatalf("CLMocker: Incorrect Number on payload built: %v != %v", cl.LatestPayloadBuilt.Number, cl.LatestHeader.Number.Uint64()+1)
+	}
+}
+
+func (cl *CLMocker) GetNextBlobsBundle() {
+	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
+	defer cancel()
+	if !isSharding(cl.LatestPayloadAttributes.Timestamp, cl.ShardingTimestamp) {
+		return
+	}
+
+	var err error
+	cl.LatestBlobsBundle, err = cl.NextBlockProducer.GetBlobsBundleV1(ctx, cl.NextPayloadID)
+	if err != nil {
+		cl.Fatalf("CLMocker: Could not getBlobsBundle (%v, %v): %v", cl.NextBlockProducer.ID(), cl.NextPayloadID, err)
+	}
+	if cl.LatestBlobsBundle.BlockHash != cl.LatestPayloadBuilt.BlockHash {
+		cl.Fatalf("CLMocker: Incorrect BlockHash on blobs bundle: %v. expected: %v", cl.LatestBlobsBundle.BlockHash, cl.LatestPayloadBuilt.BlockHash)
+	}
+	if len(cl.LatestBlobsBundle.Blobs) != len(cl.LatestBlobsBundle.KZGs) {
+		cl.Fatalf("CLMocker: Mismatched number of blobs and kzgs: %d != %d", len(cl.LatestBlobsBundle.Blobs), len(cl.LatestBlobsBundle.KZGs))
 	}
 }
 
@@ -399,6 +431,9 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 	version := 1
 	if isShanghai(cl.LatestExecutedPayload.Timestamp, cl.ShanghaiTimestamp) {
 		version = 2
+	}
+	if isSharding(cl.LatestExecutedPayload.Timestamp, cl.ShardingTimestamp) {
+		version = 3
 	}
 	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, version) {
 		if resp.Error != nil {
@@ -468,6 +503,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 	time.Sleep(cl.PayloadProductionClientDelay)
 
 	cl.GetNextPayload()
+	cl.GetNextBlobsBundle()
 
 	if callbacks.OnGetPayload != nil {
 		callbacks.OnGetPayload()
@@ -578,7 +614,9 @@ func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableData) []ExecutePa
 			execPayloadResp api.PayloadStatusV1
 			err             error
 		)
-		if isShanghai(payload.Timestamp, cl.ShanghaiTimestamp) {
+		if isSharding(payload.Timestamp, cl.ShardingTimestamp) {
+			execPayloadResp, err = ec.NewPayloadV3(ctx, payload)
+		} else if isShanghai(payload.Timestamp, cl.ShanghaiTimestamp) {
 			execPayloadResp, err = ec.NewPayloadV2(ctx, payload)
 		} else {
 			execPayloadResp, err = ec.NewPayloadV1(ctx, payload)
@@ -612,7 +650,7 @@ func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, p
 				fcUpdatedResp api.ForkChoiceResponse
 				err           error
 			)
-			if version == 2 {
+			if version == 2 || version == 3 {
 				fcUpdatedResp, err = ec.ForkchoiceUpdatedV2(ctx, fcstate, payloadAttr)
 			} else if version == 1 {
 				fcUpdatedResp, err = ec.ForkchoiceUpdatedV1(ctx, fcstate, payloadAttr)

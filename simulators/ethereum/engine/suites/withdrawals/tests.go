@@ -473,7 +473,9 @@ var Tests = []test.SpecInterface{
 
 // Helper types to convert gwei into wei more easily
 func WeiAmount(w *types.Withdrawal) *big.Int {
-	return new(big.Int).Mul(new(big.Int).SetUint64(w.Amount), big.NewInt(1e9))
+	return nil
+	// TODO(inphi): gwei harmonization
+	//return new(big.Int).Mul(new(big.Int).SetUint64(w.Amount), big.NewInt(1e9))
 }
 
 // Helper structure used to keep history of the amounts withdrawn to each test account.
@@ -684,7 +686,8 @@ func (ws *WithdrawalsBaseSpec) GenerateWithdrawalsForBlock(nextIndex uint64, sta
 			Index:     nextIndex,
 			Validator: nextIndex,
 			Address:   common.BigToAddress(nextAccount),
-			Amount:    withdrawAmounts[int(nextIndex)%len(withdrawAmounts)],
+			// TODO(inphi): gwei harmonization
+			//Amount:    withdrawAmounts[int(nextIndex)%len(withdrawAmounts)],
 		}
 		nextWithdrawals = append(nextWithdrawals, nextWithdrawal)
 		nextIndex++

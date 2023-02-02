@@ -5,4 +5,5 @@ use (
 	./engine
 	./testnet
 	./withdrawals
+	./eip4844
 )

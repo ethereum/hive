@@ -18,9 +18,12 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"github.com/holiman/uint256"
+	"github.com/protolambda/ztyp/view"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
@@ -50,7 +53,8 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	rt.Logger.Logf(">> (%s) %s", rt.ID, bytes.TrimSpace(reqBytes))
+	minifiedRequest, method := minifyRequest(reqBytes)
+	rt.Logger.Logf(">> (%s) %s", rt.ID, bytes.TrimSpace(minifiedRequest))
 	reqCopy := *req
 	reqCopy.Body = ioutil.NopCloser(bytes.NewReader(reqBytes))
 
@@ -68,8 +72,96 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	respCopy := *resp
 	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
-	rt.Logger.Logf("<< (%s) %s", rt.ID, bytes.TrimSpace(respBytes))
+	minifiedResponse := minifyResponse(respBytes, method)
+	rt.Logger.Logf("<< (%s) %s", rt.ID, bytes.TrimSpace(minifiedResponse))
 	return &respCopy, nil
+}
+
+func minifyResponse(b []byte, method string) []byte {
+	if method != "engine_getBlobsBundleV1" {
+		return b
+	}
+
+	type resp struct {
+		JSONRPC string          `json:"jsonrpc"`
+		ID      json.RawMessage `json:"id"`
+		Result  struct {
+			Blockhash common.Hash           `json:"blockHash"`
+			KZGs      []types.KZGCommitment `json:"kzgs"`
+			Blobs     []hexutil.Bytes       `json:"blobs"`
+		} `json:"result"`
+		Minified bool `json:"minified,omitempty"`
+	}
+	r := new(resp)
+	if err := json.Unmarshal(b, r); err != nil {
+		return b
+	}
+	for i := range r.Result.Blobs {
+		if len(r.Result.Blobs[i]) <= 128 {
+			return b // fallback to the original response
+		}
+		minBlob := r.Result.Blobs[i][:128]
+		r.Result.Blobs[i] = minBlob
+	}
+	r.Minified = len(r.Result.Blobs) != 0
+
+	minB, err := json.Marshal(r)
+	if err != nil {
+		return b
+	}
+	return minB
+}
+
+// minifyRequest returns the minimal representation of a blob transaction request.
+// Otherwise it returns the original request.
+func minifyRequest(b []byte) ([]byte, string) {
+	type req struct {
+		JSONRPC  string          `json:"jsonrpc"`
+		Method   string          `json:"method"`
+		Params   json.RawMessage `json:"params"`
+		ID       json.RawMessage `json:"id"`
+		Minified bool            `json:"minified,omitempty"`
+	}
+	r := new(req)
+	if err := json.Unmarshal(b, r); err != nil {
+		return b, "" // fallback
+	}
+	if r.Method != "eth_sendRawTransaction" {
+		return b, r.Method
+	}
+	var params []string
+	if err := json.Unmarshal(r.Params, &params); err != nil {
+		return b, r.Method
+	}
+	if len(params) != 1 {
+		return b, r.Method
+	}
+	var rlp hexutil.Bytes
+	if err := rlp.UnmarshalText([]byte(params[0])); err != nil {
+		return b, r.Method
+	}
+	if len(rlp) == 0 || rlp[0] != types.BlobTxType {
+		return b, r.Method
+	}
+	tx := new(types.Transaction)
+	if err := tx.UnmarshalBinary(rlp); err != nil {
+		return b, r.Method
+	}
+	minRLP, err := tx.MarshalMinimal()
+	if err != nil {
+		return b, r.Method
+	}
+	minParams := []string{hexutil.Encode(minRLP)}
+	r.Params, err = json.Marshal(minParams)
+	if err != nil {
+		return b, r.Method
+	}
+	r.Minified = true
+	minB, err := json.Marshal(r)
+	if err != nil {
+		return b, r.Method
+	}
+	return minB, r.Method
 }
 
 type InvalidPayloadBlockField string
@@ -93,6 +185,7 @@ const (
 	InvalidTransactionGasTipPrice = "Transaction GasTipCapPrice"
 	InvalidTransactionValue       = "Transaction Value"
 	InvalidTransactionChainID     = "Transaction ChainID"
+	InvalidExcessDataGas          = "ExcessDataGas"
 )
 
 func TransactionInPayload(payload *api.ExecutableData, tx *types.Transaction) bool {
@@ -336,6 +429,7 @@ const (
 	UnspecifiedTransactionType TestTransactionType = iota
 	LegacyTxOnly
 	DynamicFeeTxOnly
+	BlobTxOnly
 )
 
 type TransactionCreator interface {
@@ -347,12 +441,14 @@ type BaseTransactionCreator struct {
 	GasLimit   uint64
 	Amount     *big.Int
 	Payload    []byte
+	Blobs      types.Blobs
 	TxType     TestTransactionType
 	PrivateKey *ecdsa.PrivateKey
 }
 
 func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transaction, error) {
 	var newTxData types.TxData
+	var txOptions []types.TxOption
 
 	var txTypeToUse int
 	switch tc.TxType {
@@ -369,6 +465,8 @@ func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transact
 		txTypeToUse = types.LegacyTxType
 	case DynamicFeeTxOnly:
 		txTypeToUse = types.DynamicFeeTxType
+	case BlobTxOnly:
+		txTypeToUse = types.BlobTxType
 	}
 
 	// Build the transaction depending on the specified type
@@ -394,14 +492,44 @@ func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transact
 			Value:     tc.Amount,
 			Data:      tc.Payload,
 		}
+	case types.BlobTxType:
+		gasFeeCap256 := new(uint256.Int)
+		gasFeeCap256.SetFromBig(globals.GasPrice)
+		gasTipCap256 := new(uint256.Int)
+		gasTipCap256.SetFromBig(globals.GasTipPrice)
+		value := new(uint256.Int)
+		value.SetFromBig(tc.Amount)
+		commitments, versionedHashes, aggregatedProof, err := tc.Blobs.ComputeCommitmentsAndAggregatedProof()
+		if err != nil {
+			return nil, err
+		}
+		newTxData = &types.SignedBlobTx{
+			Message: types.BlobTxMessage{
+				ChainID:             view.Uint256View(*uint256.NewInt(globals.ChainID.Uint64())),
+				Nonce:               view.Uint64View(nonce),
+				Gas:                 view.Uint64View(tc.GasLimit),
+				GasFeeCap:           view.Uint256View(*gasFeeCap256),
+				GasTipCap:           view.Uint256View(*gasTipCap256),
+				MaxFeePerDataGas:    view.MustUint256("3000000000"), // must be at least the min fee
+				To:                  types.AddressOptionalSSZ{Address: (*types.AddressSSZ)(tc.Recipient)},
+				Value:               view.Uint256View(*value),
+				Data:                types.TxDataView(tc.Payload),
+				BlobVersionedHashes: versionedHashes,
+			},
+		}
+		txOptions = append(txOptions, types.WithTxWrapData(&types.BlobTxWrapData{
+			BlobKzgs:           commitments,
+			Blobs:              tc.Blobs,
+			KzgAggregatedProof: aggregatedProof,
+		}))
 	}
 
-	tx := types.NewTx(newTxData)
+	tx := types.NewTx(newTxData, txOptions...)
 	key := tc.PrivateKey
 	if key == nil {
 		key = globals.VaultKey
 	}
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(globals.ChainID), key)
+	signedTx, err := types.SignTx(tx, types.NewDankSigner(globals.ChainID), key)
 	if err != nil {
 		return nil, err
 	}

@@ -12,6 +12,7 @@ import (
 type ForkConfig struct {
 	// Shanghai Fork Timestamp
 	ShanghaiTimestamp *big.Int
+	ShardingTimestamp *big.Int
 }
 
 type ConsensusConfig struct {

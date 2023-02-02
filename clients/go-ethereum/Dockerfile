@@ -4,8 +4,9 @@
 # produce a very minimalistic container that can be reused many times without
 # needing to constantly rebuild.
 
-ARG branch=latest
-FROM ethereum/client-go:$branch
+ARG branch=eip4844-39ef7d7
+#FROM ethereum/client-go:$branch
+FROM inphi/geth:$branch as geth
 
 RUN apk add --update bash curl jq
 
@@ -47,7 +48,7 @@ EXPOSE 8545 8546 8547 8551 30303 30303/udp
 
 # Generate the ethash verification caches
 RUN \
- /usr/local/bin/geth makecache     1 ~/.ethereum/geth/ethash && \
- /usr/local/bin/geth makecache 30001 ~/.ethereum/geth/ethash
+    /usr/local/bin/geth makecache     1 ~/.ethereum/geth/ethash && \
+    /usr/local/bin/geth makecache 30001 ~/.ethereum/geth/ethash
 
 ENTRYPOINT ["/geth.sh"]

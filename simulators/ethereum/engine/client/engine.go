@@ -31,8 +31,11 @@ type Engine interface {
 
 	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error)
 	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error)
+	GetPayloadV3(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error)
+	GetBlobsBundleV1(ctx context.Context, payloadId *api.PayloadID) (api.BlobsBundle, error)
 	NewPayloadV1(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
 	NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
+	NewPayloadV3(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
 
 	LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes)
 	LatestNewPayloadSent() (payload *api.ExecutableData)

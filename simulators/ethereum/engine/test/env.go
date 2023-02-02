@@ -55,7 +55,8 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 		consensusConfig.SlotsToSafe,
 		consensusConfig.SlotsToFinalized,
 		big.NewInt(consensusConfig.SafeSlotsToImportOptimistically),
-		testSpec.GetForkConfig().ShanghaiTimestamp)
+		testSpec.GetForkConfig().ShanghaiTimestamp,
+		testSpec.GetForkConfig().ShardingTimestamp)
 
 	// Send the CLMocker for configuration by the spec, if any.
 	testSpec.ConfigureCLMock(clMocker)

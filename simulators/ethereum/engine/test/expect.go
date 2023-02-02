@@ -120,7 +120,7 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.Forkchoi
 }
 
 func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
-	if version == 2 {
+	if version == 2 || version == 3 {
 		return tec.TestEngineForkchoiceUpdatedV2(fcState, pAttributes)
 	}
 	return tec.TestEngineForkchoiceUpdatedV1(fcState, pAttributes)
@@ -229,7 +229,27 @@ func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *api.ExecutableData)
 	return ret
 }
 
+func (tec *TestEngineClient) TestEngineNewPayloadV3(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	status, err := tec.Engine.NewPayloadV3(ctx, payload)
+	ret := &NewPayloadResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
+		Payload:   payload,
+		Status:    status,
+		Version:   3,
+		Error:     err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
 func (tec *TestEngineClient) TestEngineNewPayload(payload *api.ExecutableData, version int) *NewPayloadResponseExpectObject {
+	if version == 3 {
+		return tec.TestEngineNewPayloadV3(payload)
+	}
 	if version == 2 {
 		return tec.TestEngineNewPayloadV2(payload)
 	}
@@ -336,7 +356,27 @@ func (tec *TestEngineClient) TestEngineGetPayloadV2(payloadID *api.PayloadID) *G
 	return ret
 }
 
+func (tec *TestEngineClient) TestEngineGetPayloadV3(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	payload, blockValue, err := tec.Engine.GetPayloadV3(ctx, payloadID)
+	ret := &GetPayloadResponseExpectObject{
+		ExpectEnv:  &ExpectEnv{Env: tec.Env},
+		Payload:    payload,
+		Version:    3,
+		BlockValue: blockValue,
+		Error:      err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
 func (tec *TestEngineClient) TestEngineGetPayload(payloadID *api.PayloadID, version int) *GetPayloadResponseExpectObject {
+	if version == 3 {
+		return tec.TestEngineGetPayloadV3(payloadID)
+	}
 	if version == 2 {
 		return tec.TestEngineGetPayloadV2(payloadID)
 	}
@@ -554,6 +594,15 @@ func (exp *BlockResponseExpectObject) ExpectWithdrawalsRoot(expectedRoot *common
 	if ((expectedRoot == nil || actualWithdrawalsRoot == nil) && actualWithdrawalsRoot != expectedRoot) ||
 		(expectedRoot != nil && actualWithdrawalsRoot != nil && *actualWithdrawalsRoot != *expectedRoot) {
 		exp.Fatalf("FAIL (%s): Unexpected WithdrawalsRoot on %s: %v, expected=%v", exp.TestName, exp.Call, actualWithdrawalsRoot, expectedRoot)
+	}
+}
+
+func (exp *BlockResponseExpectObject) ExpectExcessDataGas(expectedExcessDataGas *big.Int) {
+	exp.ExpectNoError()
+	actualExcessDataGas := exp.Block.Header().ExcessDataGas
+	if ((expectedExcessDataGas == nil || actualExcessDataGas == nil) && actualExcessDataGas != expectedExcessDataGas) ||
+		(expectedExcessDataGas != nil && actualExcessDataGas != nil && actualExcessDataGas.Cmp(expectedExcessDataGas) != 0) {
+		exp.Fatalf("FAIL (%s): Unexpected ExcessDataGas on %s: %v, expected=%v", exp.TestName, exp.Call, actualExcessDataGas, expectedExcessDataGas)
 	}
 }
 

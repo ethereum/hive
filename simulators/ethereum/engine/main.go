@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 
 	suite_auth "github.com/ethereum/hive/simulators/ethereum/engine/suites/auth"
+	suite_eip4844 "github.com/ethereum/hive/simulators/ethereum/engine/suites/eip4844"
 	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
@@ -45,6 +46,11 @@ func main() {
 			Description: `
 	Test Engine API withdrawals, pre/post Shanghai.`[1:],
 		}
+		eip4844 = hivesim.Suite{
+			Name: "engine-eip4844",
+			Description: `
+	Test Engine API EIP-4844. pre/post Cancun. `[1:],
+		}
 	)
 
 	simulator := hivesim.New()
@@ -54,6 +60,7 @@ func main() {
 	addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
+	addTestsToSuite(simulator, &eip4844, suite_eip4844.Tests, "full")
 
 	// Mark suites for execution
 	hivesim.MustRunSuite(simulator, engine)
@@ -61,6 +68,7 @@ func main() {
 	hivesim.MustRunSuite(simulator, auth)
 	hivesim.MustRunSuite(simulator, sync)
 	hivesim.MustRunSuite(simulator, withdrawals)
+	hivesim.MustRunSuite(simulator, eip4844)
 }
 
 func specToInterface(src []test.Spec) []test.SpecInterface {
@@ -91,6 +99,11 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		if currentTest.GetForkConfig().ShanghaiTimestamp != nil {
 			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", currentTest.GetForkConfig().ShanghaiTimestamp))
 			// Ensure the merge transition is activated before shanghai.
+			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
+		}
+		if currentTest.GetForkConfig().ShardingTimestamp != nil {
+			newParams = newParams.Set("HIVE_SHARDING_TIMESTAMP", fmt.Sprintf("%d", currentTest.GetForkConfig().ShardingTimestamp))
+			// Ensure the merge transition is activated before sharding/cancun.
 			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
 		}
 
