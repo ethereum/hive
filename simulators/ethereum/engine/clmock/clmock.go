@@ -28,6 +28,18 @@ var (
 	DefaultPayloadProductionClientDelay = time.Second
 )
 
+type ExecutableDataHistory map[uint64]*api.ExecutableData
+
+func (h ExecutableDataHistory) LatestPayloadNumber() uint64 {
+	latest := uint64(0)
+	for n := range h {
+		if n > latest {
+			latest = n
+		}
+	}
+	return latest
+}
+
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
 	*hivesim.T
@@ -53,7 +65,7 @@ type CLMocker struct {
 
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
-	ExecutedPayloadHistory map[uint64]api.ExecutableData
+	ExecutedPayloadHistory ExecutableDataHistory
 	HeadHashHistory        []common.Hash
 
 	// Latest broadcasted data using the PoS Engine API
@@ -103,7 +115,7 @@ func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportO
 		T:                               t,
 		EngineClients:                   make([]client.EngineClient, 0),
 		PrevRandaoHistory:               map[uint64]common.Hash{},
-		ExecutedPayloadHistory:          map[uint64]api.ExecutableData{},
+		ExecutedPayloadHistory:          ExecutableDataHistory{},
 		SlotsToSafe:                     slotsToSafe,
 		SlotsToFinalized:                slotsToFinalized,
 		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
@@ -392,7 +404,8 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 		}
 	}
 	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
-	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = cl.LatestPayloadBuilt
+	payload := cl.LatestPayloadBuilt
+	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = &payload
 }
 
 func (cl *CLMocker) broadcastLatestForkchoice() {

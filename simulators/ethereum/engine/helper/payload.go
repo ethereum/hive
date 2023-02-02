@@ -316,7 +316,8 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 	}
 
 	if customPayloadMod == nil {
-		return basePayload, nil
+		copyPayload := *basePayload
+		return &copyPayload, nil
 	}
 
 	alteredPayload, err := CustomizePayload(basePayload, customPayloadMod)
