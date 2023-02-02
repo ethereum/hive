@@ -130,8 +130,8 @@ td.ellipsis {
     font-weight: bold;
 }
 
-.highlighted {
-    background: #fffaea;
+.highlighted, .dataTable tr.highlighted {
+    background-color: #fffaea;
     scroll-margin: 5em 0 0 0;
 }
 
