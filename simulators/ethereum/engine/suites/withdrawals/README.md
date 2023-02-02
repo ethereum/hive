@@ -8,6 +8,7 @@ This test suite verifies behavior of the Engine API on each client after the Sha
 - Shanghai Fork on Block 1: Tests the withdrawals fork happening directly after genesis.
 - Shanghai Fork on Block 2: Tests the transition to the withdrawals fork after a single block has happened. Block 1 is used to send invalid non-null withdrawals payload.
 - Shanghai Fork on Block 3: Tests the transition to the withdrawals fork after two blocks have happened. Block 1 and 2 are used to send invalid non-null withdrawals payload.
+- `INVALID` response on corrupted block hash on `engine_newPayloadV2`
 
 All test cases contain following verifications:
 - Verify client responds with error -32602 on the following scenarios:

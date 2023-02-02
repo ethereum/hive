@@ -172,6 +172,18 @@ var Tests = []test.SpecInterface{
 		WithdrawalsPerBlock:   0,
 	},
 
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Corrupted Block Hash Payload (INVALID)",
+			About: `
+			Send a valid payload with a corrupted hash using engine_newPayloadV2.
+			`,
+		},
+		WithdrawalsForkHeight:    1,
+		WithdrawalsBlockCount:    1,
+		TestCorrupedHashPayloads: true,
+	},
+
 	// Block value tests
 	&BlockValueSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
@@ -661,13 +673,23 @@ var Tests = []test.SpecInterface{
 				Start: 1,
 				End:   32,
 			},
-			GetPayloadBodyRequestByHashIndex{
+			GetPayloadBodyRequestByHashIndex{ // Existing+Random hashes
 				BlockNumbers: []uint64{
 					32,
 					1000,
 					31,
 					1000,
 					30,
+					1000,
+				},
+			},
+			GetPayloadBodyRequestByHashIndex{ // All Random hashes
+				BlockNumbers: []uint64{
+					1000,
+					1000,
+					1000,
+					1000,
+					1000,
 					1000,
 				},
 			},
@@ -800,6 +822,7 @@ type WithdrawalsBaseSpec struct {
 	WithdrawalsHistory       WithdrawalsHistory // Internal withdrawals history that keeps track of all withdrawals
 	WithdrawAmounts          []uint64           // Amounts of withdrawn wei on each withdrawal (round-robin)
 	TransactionsPerBlock     *big.Int           // Amount of test transactions to include in withdrawal blocks
+	TestCorrupedHashPayloads bool               // Send a valid payload with corrupted hash
 	SkipBaseVerifications    bool               // For code reuse of the base spec procedure
 }
 
@@ -1242,6 +1265,18 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						t.CLMock.LatestExecutedPayload.Number-1,
 					)
 					r.ExpectBalanceEqual(expectedAccountBalance)
+				}
+
+				if ws.TestCorrupedHashPayloads {
+					payload := t.CLMock.LatestExecutedPayload
+
+					// Corrupt the hash
+					rand.Read(payload.BlockHash[:])
+
+					// On engine_newPayloadV2 `INVALID_BLOCK_HASH` is deprecated
+					// in favor of reusing `INVALID`
+					n := t.TestEngine.TestEngineNewPayloadV2(&payload)
+					n.ExpectStatus(test.Invalid)
 				}
 			}
 		},
