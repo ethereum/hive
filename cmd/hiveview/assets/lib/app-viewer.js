@@ -144,7 +144,7 @@ function appendLine(contentArea, gutter, number, text) {
     num.setAttribute("line", number.toString());
     gutter.appendChild(num);
 
-    let line = document.createElement("span")
+    let line = document.createElement("pre")
     line.innerText = text + "\n";
     contentArea.appendChild(line);
 }
