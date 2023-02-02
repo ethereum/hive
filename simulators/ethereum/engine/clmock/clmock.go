@@ -40,6 +40,20 @@ func (h ExecutableDataHistory) LatestPayloadNumber() uint64 {
 	return latest
 }
 
+func (h ExecutableDataHistory) LatestWithdrawalsIndex() uint64 {
+	latest := uint64(0)
+	for _, p := range h {
+		if p.Withdrawals != nil {
+			for _, w := range p.Withdrawals {
+				if w.Index > latest {
+					latest = w.Index
+				}
+			}
+		}
+	}
+	return latest
+}
+
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
 	*hivesim.T

@@ -173,11 +173,13 @@ All test cases contain the following verifications:
   - Payloads produced of the following characteristics
     - [x] 16 Transactions, 16 Withdrawals
     - [x] 0 Transactions, 0 Withdrawals
+  - Send extra payloads `32'` and `33'` such that `31 <- 32' <- 33'` using `engine_newPayloadV2` 
   - Make multiple requests to obtain the payload bodies from the canonical chain (see `./tests.go` for full list).
   - Verify that:
     - Payload bodies of blocks before the Shanghai fork contain `withdrawals==null`
     - All transactions and withdrawals are in the correct format and order.
     - Requested payload bodies past the highest known block are ignored and absent from the returned list
+    - Payloads `32'` and `33'` are ignored by all requests since they are not part of the canonical chain.
 
 - Payload Bodies By Hash - Shanghai Fork on Block 16 - 16 Withdrawal Blocks
   - Launch client `A` and create a canonical chain consisting of 32 blocks, where the first shanghai block is number 17

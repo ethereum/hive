@@ -265,7 +265,7 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 		InvalidTransactionChainID:
 
 		if len(basePayload.Transactions) == 0 {
-			return nil, fmt.Errorf("No transactions available for modification")
+			return nil, fmt.Errorf("no transactions available for modification")
 		}
 		var baseTx types.Transaction
 		if err := baseTx.UnmarshalBinary(basePayload.Transactions[0]); err != nil {
@@ -326,4 +326,18 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 	}
 
 	return alteredPayload, nil
+}
+
+/*
+	 Generates an alternative withdrawals list that contains the same
+		amounts and accounts, but the order in the list is different, so
+		stateRoot of the resulting payload should be the same.
+*/
+func RandomizeWithdrawalsOrder(src types.Withdrawals) types.Withdrawals {
+	dest := make(types.Withdrawals, len(src))
+	perm := rand.Perm(len(src))
+	for i, v := range perm {
+		dest[v] = src[i]
+	}
+	return dest
 }
