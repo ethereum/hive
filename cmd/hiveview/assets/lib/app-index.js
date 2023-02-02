@@ -89,7 +89,7 @@ function showFileListing(data, error) {
 				title: "🕒",
 				data: "start",
 				type: "date",
-				width: "13%",
+				width: "10em",
 				render: function(v, type) {
 					if (type === 'display' || type == 'filter') {
 						return v.toLocaleString();
@@ -100,12 +100,12 @@ function showFileListing(data, error) {
 			{
 				title: "Suite",
 				data: "name",
-				width: "15%",
+				width: "10em",
 			},
 			{
 				title: "Clients",
 				data: "clients",
-				width: "40%",
+				width: "auto",
 				render: function(data) {
 					return data.join(", ")
 				},
@@ -113,7 +113,7 @@ function showFileListing(data, error) {
 			{
 				title: "Status",
 				data: null,
-				width: "5em",
+				width: "5.5em",
 				className: "suite-status-column",
 				render: function(data) {
 					if (data.fails > 0) {

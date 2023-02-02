@@ -4,7 +4,7 @@ import * as app from './app.js'
 
 function navigate() {
     app.init();
-    
+
     // Check for line number in hash.
     var line = null;
     if (window.location.hash.substr(1, 1) == "L") {
@@ -144,19 +144,20 @@ function appendLine(contentArea, gutter, number, text) {
     num.setAttribute("line", number.toString());
     gutter.appendChild(num);
 
-    let line = document.createElement("span")
+    let line = document.createElement("pre")
     line.innerText = text + "\n";
     contentArea.appendChild(line);
 }
 
 // fetchFile loads up a new file to view
 function fetchFile(url, line /* optional jump to line */ ) {
+    let resultsRE = new RegExp("^" + app.resultsRoot);
     $.ajax({
         xhr: loader.newXhrWithProgressBar,
         url: url,
         dataType: "text",
         success: function(data) {
-            let title = url.replace("^"+app.resultsRoot, '');
+            let title = url.replace(resultsRE, '');
             showTitle(null, title);
             showFileContent(data, url);
             setHL(line, true);
