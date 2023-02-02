@@ -3,9 +3,10 @@
 @import "../extlib/responsive-2.4.0.bootstrap5.min.css";
 
 main {
-    margin: 8px 12px;
+    margin: 8px 8px;
     font-size: 12pt;
     min-width: 340px;
+    overflow: hidden;
 }
 
 #hive-header {
