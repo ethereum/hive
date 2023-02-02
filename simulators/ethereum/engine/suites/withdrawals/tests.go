@@ -1091,6 +1091,10 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		},
 		OnGetPayload: func() {
 			if !ws.SkipBaseVerifications {
+				// Try to get the same payload but use `engine_getPayloadV2`
+				g := t.TestEngine.TestEngineGetPayloadV2(t.CLMock.NextPayloadID)
+				g.ExpectPayload(&t.CLMock.LatestPayloadBuilt)
+
 				// Send produced payload but try to include non-nil
 				// `withdrawals`, it should fail.
 				emptyWithdrawalsList := make(types.Withdrawals, 0)
@@ -1209,7 +1213,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						t.Fatalf("FAIL (%s): Incorrect list of withdrawals on built payload: want=%d, got=%d", t.TestName, len(sentList), len(t.CLMock.LatestPayloadBuilt.Withdrawals))
 					}
 					for i := 0; i < len(sentList); i++ {
-						if err := test.CompareWithdrawals(sentList[i], t.CLMock.LatestPayloadBuilt.Withdrawals[i]); err != nil {
+						if err := test.CompareWithdrawal(sentList[i], t.CLMock.LatestPayloadBuilt.Withdrawals[i]); err != nil {
 							t.Fatalf("FAIL (%s): Incorrect withdrawal on index %d: %v", t.TestName, i, err)
 						}
 					}

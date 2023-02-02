@@ -16,6 +16,7 @@ All test cases contain following verifications:
   - Send `ExecutionPayloadV1` using a custom valid (correct BlockHash) execution payload that includes `null` as withdrawals on `timestamp >= SHANGHAI_TIMESTAMP` using `engine_newPayloadV2`
   - Send `PayloadAttributesV2` using `null` for withdrawals on `timestamp < SHANGHAI_TIMESTAMP` using `engine_forkchoiceUpdatedV2`
 - Use `engine_forkchoiceUpdatedV2` and `engine_newPayloadV2` to send pre-Shanghai payloads/payload attributes, and verify method call succeeds.
+- Use `engine_getPayloadV2` to get a pre-Shanghai payload, and verify method call succeeds
 
 ## Withdrawals
 - Withdraw to a single account: Make multiple withdrawals to a single account.
