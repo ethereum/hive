@@ -44,18 +44,19 @@ main {
     color: black;
 }
 
-td.test-name-column {
+.test-name-column {
     background: url('/images/details_open.svg') no-repeat left 4px;
     background-size: 32px;
     cursor: pointer;
     padding-left: 32px !important;
+    min-width: 8em;
 }
 
 .test-duration-column {
     text-align: right;
 }
 
-.suite-status-column, .test-status-column {
+.suite-status-column, .test-status-column, .log-link {
     white-space: nowrap;
 }
 
