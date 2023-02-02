@@ -163,9 +163,11 @@ function formatTestLog(suiteData, test) {
 }
 
 function highlightErrorsInTestOutput(content) {
-	return content.replace(/(ERROR|FAIL|Error)(:)?.*/, function (m) {
-		return '<span class="output-error">' + m + '</span>';
-	});
+	let p = /\b(error|fail(ed)?|can't launch node)\b/i
+	if (p.test(content)) {
+		return '<span class="output-error">' + content + '</span>';
+	}
+	return content;
 }
 
 // showSuiteName displays the suite title.
