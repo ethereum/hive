@@ -690,9 +690,10 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 }
 
 // Engine API
-func (n *GethNode) NewPayloadV1(ctx context.Context, pl *beacon.ExecutableData) (beacon.PayloadStatusV1, error) {
-	n.latestPayloadSent = pl
-	resp, err := n.api.NewPayloadV1(*pl)
+func (n *GethNode) NewPayloadV1(ctx context.Context, pl *client_types.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
+	ed := pl.ToExecutableData()
+	n.latestPayloadSent = &ed
+	resp, err := n.api.NewPayloadV1(ed)
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }

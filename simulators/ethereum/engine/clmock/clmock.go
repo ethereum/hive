@@ -11,6 +11,7 @@ import (
 
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 
@@ -608,7 +609,9 @@ func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableData) []ExecutePa
 		if isShanghai(payload.Timestamp, cl.ShanghaiTimestamp) {
 			execPayloadResp, err = ec.NewPayloadV2(ctx, payload)
 		} else {
-			execPayloadResp, err = ec.NewPayloadV1(ctx, payload)
+			edv1 := &client_types.ExecutableDataV1{}
+			edv1.FromExecutableData(payload)
+			execPayloadResp, err = ec.NewPayloadV1(ctx, edv1)
 		}
 		if err != nil {
 			cl.Errorf("CLMocker: Could not ExecutePayloadV1: %v", err)

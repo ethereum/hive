@@ -200,7 +200,9 @@ type NewPayloadResponseExpectObject struct {
 func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	status, err := tec.Engine.NewPayloadV1(ctx, payload)
+	edv1 := &client_types.ExecutableDataV1{}
+	edv1.FromExecutableData(payload)
+	status, err := tec.Engine.NewPayloadV1(ctx, edv1)
 	ret := &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Payload:   payload,

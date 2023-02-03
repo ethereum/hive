@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/node"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -2265,7 +2266,9 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 						defer cancel()
 
 						p := api.BlockToExecutableData(altChainPayloads[i], common.Big0).ExecutionPayload
-						status, err := secondaryClient.NewPayloadV1(ctx, p)
+						pv1 := &client_types.ExecutableDataV1{}
+						pv1.FromExecutableData(p)
+						status, err := secondaryClient.NewPayloadV1(ctx, pv1)
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
 						}
