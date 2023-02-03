@@ -561,18 +561,23 @@ func CompareTransactions(want [][]byte, got [][]byte) error {
 }
 
 func CompareWithdrawal(want *types.Withdrawal, got *types.Withdrawal) error {
-	if want == nil && got != nil || want != nil && got == nil {
-		return fmt.Errorf("want=%v, got=%v", want, got)
-	}
-	if want != nil {
-		if want.Amount != got.Amount ||
-			!bytes.Equal(want.Address[:], got.Address[:]) ||
-			want.Index != got.Index ||
-			want.Validator != got.Validator {
-			wantStr, _ := json.MarshalIndent(want, "", " ")
-			gotStr, _ := json.MarshalIndent(got, "", " ")
-			return fmt.Errorf("want=%v, got=%v", wantStr, gotStr)
+	if want == nil || got == nil {
+		if want == nil && got != nil {
+			got, _ := json.MarshalIndent(got, "", " ")
+			return fmt.Errorf("want=null, got=%s", got)
+		} else if want != nil && got == nil {
+			want, _ := json.MarshalIndent(want, "", " ")
+			return fmt.Errorf("want=%s, got=null", want)
 		}
+		return nil
+	}
+	if want.Amount != got.Amount ||
+		!bytes.Equal(want.Address[:], got.Address[:]) ||
+		want.Index != got.Index ||
+		want.Validator != got.Validator {
+		want, _ := json.MarshalIndent(want, "", " ")
+		got, _ := json.MarshalIndent(got, "", " ")
+		return fmt.Errorf("want=%s, got=%s", want, got)
 	}
 	return nil
 }
