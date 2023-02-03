@@ -366,7 +366,7 @@ func (ec *HiveRPCEngineClient) GetPayloadBodiesByRangeV1(ctx context.Context, st
 		return nil, err
 	}
 
-	err = ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByRangeV1", start, count)
+	err = ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByRangeV1", hexutil.Uint64(start), hexutil.Uint64(count))
 	return result, err
 }
 
