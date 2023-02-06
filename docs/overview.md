@@ -20,8 +20,10 @@ documentation].
 
 Ethereum Foundation operates a public instance of Hive to check for consensus
 compatibility, peer-to-peer networking spec compliance, and user API support for most
-Ethereum client implementations. You can find the latest test results at
-<https://hivetests.ethdevops.io/>.
+Ethereum client implementations.
+
+You can find the latest test results at <https://hivetests.ethdevops.io/>
+\and <https://hivetests2.ethdevops.io/>.
 
 ## Overview of available simulators
 
@@ -55,9 +57,16 @@ continuously on the production hive instance:
   enables the GraphQL API endpoint. It then performs certain queries and compares their
   output to known good outputs.
 
+- `ethereum/engine`: The engine API simulator verifies specification compliance of the
+  [Engine API] implementation of execution clients. The test suite 'pretends' to be a
+  consensus client and has checks for many scenarios that could occur during progression
+  of a PoS chain.
+
+[Engine API]: https://github.com/ethereum/execution-apis/tree/main/src/engine
+
 ## How it works
 
-This section explains how a single simulation run works.
+This section explains what happens during a simulation run.
 
 For a single run, the user provides the name of the simulator to run, and a set of client
 names to run against. For example:
