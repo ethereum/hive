@@ -2,20 +2,21 @@
 
 FROM debian:buster-slim AS build
 
+ARG branch=master
+
 RUN apt-get update \
  && apt-get install -y --fix-missing build-essential make git libpcre3-dev librocksdb-dev \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-ENV NPROC=2
+RUN git clone --recurse-submodules --depth 1 --branch "${branch}" \
+    https://github.com/status-im/nimbus-eth1.git
 
-RUN git clone --depth 1 --branch master https://github.com/status-im/nimbus-eth1.git \
- && cd nimbus-eth1 \
- && git checkout master \
- && make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" V=1 update
+WORKDIR /nimbus-eth1
 
-RUN cd nimbus-eth1 && \
-    make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" nimbus && \
+RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" V=1 update
+
+RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" nimbus && \
     mv build/nimbus /usr/bin/
 
 # --------------------------------- #
