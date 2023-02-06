@@ -71,14 +71,15 @@ function setHL(num, scroll) {
 
 // showLinkBack displays the link to the test viewer.
 function showLinkBack(suiteID, suiteName, testID) {
-    let linkText = "Back to test suite: " + suiteName;
-    var linkURL;
+    var text, url;
     if (testID) {
-        linkURL = app.route.testInSuite(suiteID, suiteName, testID);
+        text = "Back to test " + testID + " in suite ‘" + suiteName + "’";
+        url = app.route.testInSuite(suiteID, suiteName, testID);
     } else {
-        linkURL = app.route.suite(suiteID, suiteName);
+        text = "Back to test suite ‘" + suiteName + "’";
+        url = app.route.suite(suiteID, suiteName);
     }
-    $('#link-back').html(html.get_link(linkURL, linkText));
+    $('#link-back').html(html.get_link(url, text));
 }
 
 function showTitle(type, title) {
