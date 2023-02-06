@@ -6,7 +6,7 @@ Ethereum Foundation maintains two public Hive instances to check for consensus, 
 blockchain compatibility:
 
 - eth1 consensus, rpc, p2p tests are on <https://hivetests.ethdevops.io>
-- 'merge' testing runs on <https://hivetests2.ethdevops.io>
+- Engine API integration tests are on <https://hivetests2.ethdevops.io>
 
 **To read more about hive, please check [the documentation][doc].**
 
