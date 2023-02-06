@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/node"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -1679,7 +1680,7 @@ func invalidTransitionPayload(t *test.Env) {
 		// process simply to be able to re-org back.
 		OnGetPayload: func() {
 			basePayload := t.CLMock.ExecutedPayloadHistory[t.CLMock.FirstPoSBlockNumber.Uint64()]
-			alteredPayload, err := helper.GenerateInvalidPayload(&basePayload, helper.InvalidStateRoot)
+			alteredPayload, err := helper.GenerateInvalidPayload(basePayload, helper.InvalidStateRoot)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
 			}
@@ -2213,9 +2214,9 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 				if len(altChainPayloads) == invalidIndex {
 					var uncle *types.Block
 					if spec.PayloadField == helper.InvalidOmmers {
-						if unclePayload, ok := t.CLMock.ExecutedPayloadHistory[sideBlock.NumberU64()-1]; ok {
+						if unclePayload, ok := t.CLMock.ExecutedPayloadHistory[sideBlock.NumberU64()-1]; ok && unclePayload != nil {
 							// Uncle is a PoS payload
-							uncle, err = api.ExecutableDataToBlock(unclePayload)
+							uncle, err = api.ExecutableDataToBlock(*unclePayload)
 							if err != nil {
 								t.Fatalf("FAIL (%s): Unable to get uncle block: %v", t.TestName, err)
 							}
@@ -2265,7 +2266,9 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 						defer cancel()
 
 						p := api.BlockToExecutableData(altChainPayloads[i], common.Big0).ExecutionPayload
-						status, err := secondaryClient.NewPayloadV1(ctx, p)
+						pv1 := &client_types.ExecutableDataV1{}
+						pv1.FromExecutableData(p)
+						status, err := secondaryClient.NewPayloadV1(ctx, pv1)
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
 						}
@@ -2388,7 +2391,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					// We need to send the canonical chain to the main client here
 					for i := t.CLMock.FirstPoSBlockNumber.Uint64(); i <= t.CLMock.LatestExecutedPayload.Number; i++ {
 						if payload, ok := t.CLMock.ExecutedPayloadHistory[i]; ok {
-							r := t.TestEngine.TestEngineNewPayloadV1(&payload)
+							r := t.TestEngine.TestEngineNewPayloadV1(payload)
 							r.ExpectStatus(test.Valid)
 						}
 					}
@@ -3181,7 +3184,7 @@ func reExecPayloads(t *test.Env) {
 			t.Fatalf("FAIL (%s): (test issue) Payload with index %d does not exist", i)
 		}
 
-		r := t.TestEngine.TestEngineNewPayloadV1(&payload)
+		r := t.TestEngine.TestEngineNewPayloadV1(payload)
 		r.ExpectStatus(test.Valid)
 		r.ExpectLatestValidHash(&payload.BlockHash)
 	}
@@ -3292,7 +3295,7 @@ func inOrderPayloads(t *test.Env) {
 	for k := t.CLMock.FirstPoSBlockNumber.Uint64(); k <= t.CLMock.LatestExecutedPayload.Number; k++ {
 		payload := t.CLMock.ExecutedPayloadHistory[k]
 
-		s := secondaryTestEngineClient.TestEngineNewPayloadV1(&payload)
+		s := secondaryTestEngineClient.TestEngineNewPayloadV1(payload)
 		s.ExpectStatus(test.Valid)
 		s.ExpectLatestValidHash(&payload.BlockHash)
 
@@ -3418,7 +3421,7 @@ func missingFcu(t *test.Env) {
 	// Send each payload in the correct order but skip the ForkchoiceUpdated for each
 	for i := t.CLMock.FirstPoSBlockNumber.Uint64(); i <= t.CLMock.LatestHeadNumber.Uint64(); i++ {
 		payload := t.CLMock.ExecutedPayloadHistory[i]
-		p := secondaryEngineTest.TestEngineNewPayloadV1(&payload)
+		p := secondaryEngineTest.TestEngineNewPayloadV1(payload)
 		p.ExpectStatus(test.Valid)
 		p.ExpectLatestValidHash(&payload.BlockHash)
 	}

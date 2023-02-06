@@ -6,8 +6,18 @@ This test suite verifies behavior of the Engine API on each client after the Sha
 ## Shanghai Fork
 - Genesis Shanghai: Tests the withdrawals fork happening since genesis (e.g. on a testnet).
 - Shanghai Fork on Block 1: Tests the withdrawals fork happening directly after genesis.
-- Shanghai Fork on Block 2: Tests the transition to the withdrawals fork after a single block has happened. Block 1 is sent with invalid non-null withdrawals payload and client is expected to respond with the appropriate error.
-- Shanghai Fork on Block 3: Tests the transition to the withdrawals fork after two blocks have happened. Block 2 is sent with invalid non-null withdrawals payload (both in `engine_newPayloadV2` and the attributes of `engine_forkchoiceUpdatedV2`) and client is expected to respond with the appropriate error.
+- Shanghai Fork on Block 2: Tests the transition to the withdrawals fork after a single block has happened. Block 1 is used to send invalid non-null withdrawals payload.
+- Shanghai Fork on Block 3: Tests the transition to the withdrawals fork after two blocks have happened. Block 1 and 2 are used to send invalid non-null withdrawals payload.
+- `INVALID` response on corrupted block hash on `engine_newPayloadV2`
+
+All test cases contain following verifications:
+- Verify client responds with error -32602 on the following scenarios:
+  - Send `ExecutionPayloadV2` using a custom valid (correct BlockHash) execution payload that includes an empty array for withdrawals on `timestamp < SHANGHAI_TIMESTAMP` using `engine_newPayloadV2`
+  - Send `PayloadAttributesV2` using an empty array for withdrawals on `timestamp < SHANGHAI_TIMESTAMP` using `engine_forkchoiceUpdatedV2`
+  - Send `ExecutionPayloadV1` using a custom valid (correct BlockHash) execution payload that includes `null` as withdrawals on `timestamp >= SHANGHAI_TIMESTAMP` using `engine_newPayloadV2`
+  - Send `PayloadAttributesV2` using `null` for withdrawals on `timestamp < SHANGHAI_TIMESTAMP` using `engine_forkchoiceUpdatedV2`
+- Use `engine_forkchoiceUpdatedV2` and `engine_newPayloadV2` to send pre-Shanghai payloads/payload attributes, and verify method call succeeds.
+- Use `engine_getPayloadV2` to get a pre-Shanghai payload, and verify method call succeeds
 
 ## Withdrawals
 - Withdraw to a single account: Make multiple withdrawals to a single account.
@@ -15,6 +25,11 @@ This test suite verifies behavior of the Engine API on each client after the Sha
 - Withdraw to many accounts: Make multiple withdrawals to 1024 different accounts. Execute many blocks this way.
 - Withdraw zero amount: Make multiple withdrawals where the amount withdrawn is 0.
 - Empty Withdrawals: Produce withdrawals block with zero withdrawals.
+
+All test cases contain the following verifications:
+- Verify all withdrawal amounts (sent in Gwei) correctly translate to a wei balance increase in the execution client (after the payload has been set as head using `engine_forkchoiceUpdatedV2`).
+- Verify using `eth_getBalance` that the balance of all withdrawn accounts match the expected amount on each block of the chain and `latest`.
+- Payload returned by `engine_getPayloadV2` contains the same list of withdrawals as were passed by `PayloadAttributesV2` in the `engine_forkchoiceUpdatedV2` method call.
 
 ## Sync to Shanghai
 - Sync after 2 blocks - Shanghai on Block 1 - Single Withdrawal Account - No Transactions:
@@ -160,11 +175,13 @@ This test suite verifies behavior of the Engine API on each client after the Sha
   - Payloads produced of the following characteristics
     - [x] 16 Transactions, 16 Withdrawals
     - [x] 0 Transactions, 0 Withdrawals
+  - Send extra payloads `32'` and `33'` such that `31 <- 32' <- 33'` using `engine_newPayloadV2` 
   - Make multiple requests to obtain the payload bodies from the canonical chain (see `./tests.go` for full list).
   - Verify that:
     - Payload bodies of blocks before the Shanghai fork contain `withdrawals==null`
     - All transactions and withdrawals are in the correct format and order.
     - Requested payload bodies past the highest known block are ignored and absent from the returned list
+    - Payloads `32'` and `33'` are ignored by all requests since they are not part of the canonical chain.
 
 - Payload Bodies By Hash - Shanghai Fork on Block 16 - 16 Withdrawal Blocks
   - Launch client `A` and create a canonical chain consisting of 32 blocks, where the first shanghai block is number 17
@@ -176,3 +193,12 @@ This test suite verifies behavior of the Engine API on each client after the Sha
     - Payload bodies of blocks before the Shanghai fork contain `withdrawals==null`
     - All transactions and withdrawals are in the correct format and order.
     - Requested payload bodies of unknown hashes are returned as null in the returned list
+
+## Block Value Tests
+- Block Value on GetPayloadV2 Post-Shanghai
+  - Create a Shanghai chain where the fork transition happens at block 1
+  - Send transactions, submit forkchoice and get payload built
+  - Verify transactions were included in payload created
+  - Set forkchoice head to the new payload
+  - Calculate the block value by requesting the transaction receipts
+  - Verify that the `blockValue` returned by `engine_getPayloadV2` matches the expected calculated value

@@ -172,6 +172,32 @@ var Tests = []test.SpecInterface{
 		WithdrawalsPerBlock:   0,
 	},
 
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Corrupted Block Hash Payload (INVALID)",
+			About: `
+			Send a valid payload with a corrupted hash using engine_newPayloadV2.
+			`,
+		},
+		WithdrawalsForkHeight:    1,
+		WithdrawalsBlockCount:    1,
+		TestCorrupedHashPayloads: true,
+	},
+
+	// Block value tests
+	&BlockValueSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadV2 Block Value",
+				About: `
+				Verify the block value returned in GetPayloadV2.
+				`,
+			},
+			WithdrawalsForkHeight: 1,
+			WithdrawalsBlockCount: 1,
+		},
+	},
+
 	// Sync Tests
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
@@ -516,16 +542,24 @@ var Tests = []test.SpecInterface{
 				Count: 1,
 			},
 			GetPayloadBodyRequestByRange{
-				Start: 15,
+				Start: 16,
 				Count: 2,
 			},
 			GetPayloadBodyRequestByRange{
-				Start: 16,
+				Start: 17,
 				Count: 16,
 			},
 			GetPayloadBodyRequestByRange{
 				Start: 1,
 				Count: 32,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 31,
+				Count: 3,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 32,
+				Count: 2,
 			},
 			GetPayloadBodyRequestByRange{
 				Start: 33,
@@ -549,6 +583,37 @@ var Tests = []test.SpecInterface{
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
+				Name: "GetPayloadBodiesByRange (Sidechain)",
+				About: `
+				Make multiple withdrawals to 16 accounts each payload.
+				Retrieve many of the payloads' bodies by number range.
+				Create a sidechain extending beyond the canonical chain block number.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight:    17,
+			WithdrawalsBlockCount:    16,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1024,
+		},
+		GenerateSidechain: true,
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByRange{
+				Start: 33,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 32,
+				Count: 2,
+			},
+		},
+	},
+
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
 				Name: "GetPayloadBodiesByRange (Empty Transactions/Withdrawals)",
 				About: `
 				Make no withdrawals and no transactions in many payloads.
@@ -558,14 +623,22 @@ var Tests = []test.SpecInterface{
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
 			},
-			WithdrawalsForkHeight: 17,
-			WithdrawalsBlockCount: 16,
+			WithdrawalsForkHeight: 2,
+			WithdrawalsBlockCount: 1,
 			WithdrawalsPerBlock:   0,
 			TransactionsPerBlock:  common.Big0,
 		},
 		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
 			GetPayloadBodyRequestByRange{
-				Start: 16,
+				Start: 1,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 2,
+				Count: 1,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 1,
 				Count: 2,
 			},
 		},
@@ -600,13 +673,23 @@ var Tests = []test.SpecInterface{
 				Start: 1,
 				End:   32,
 			},
-			GetPayloadBodyRequestByHashIndex{
+			GetPayloadBodyRequestByHashIndex{ // Existing+Random hashes
 				BlockNumbers: []uint64{
 					32,
 					1000,
 					31,
 					1000,
 					30,
+					1000,
+				},
+			},
+			GetPayloadBodyRequestByHashIndex{ // All Random hashes
+				BlockNumbers: []uint64{
+					1000,
+					1000,
+					1000,
+					1000,
+					1000,
 					1000,
 				},
 			},
@@ -739,6 +822,7 @@ type WithdrawalsBaseSpec struct {
 	WithdrawalsHistory       WithdrawalsHistory // Internal withdrawals history that keeps track of all withdrawals
 	WithdrawAmounts          []uint64           // Amounts of withdrawn wei on each withdrawal (round-robin)
 	TransactionsPerBlock     *big.Int           // Amount of test transactions to include in withdrawal blocks
+	TestCorrupedHashPayloads bool               // Send a valid payload with corrupted hash
 	SkipBaseVerifications    bool               // For code reuse of the base spec procedure
 }
 
@@ -766,6 +850,11 @@ func (ws *WithdrawalsBaseSpec) GetForkConfig() test.ForkConfig {
 	return test.ForkConfig{
 		ShanghaiTimestamp: big.NewInt(int64(ws.GetWithdrawalsForkTime())),
 	}
+}
+
+// Get the start account for all withdrawals.
+func (ws *WithdrawalsBaseSpec) GetWithdrawalsStartAccount() *big.Int {
+	return big.NewInt(0x1000)
 }
 
 // Adds bytecode that unconditionally sets an storage key to specified account range
@@ -997,18 +1086,38 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
 					&beacon.PayloadAttributes{
-						Timestamp:             t.CLMock.LatestHeader.Time + 1,
+						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
 						Withdrawals:           make(types.Withdrawals, 0),
 					},
 				)
-				r.ExpectationDescription = "Sent pre-shanghai fcu using EngineForkchoiceUpdatedV2+Withdrawals, error is expected"
+				r.ExpectationDescription = "Sent pre-shanghai Forkchoice using ForkchoiceUpdatedV2 + Withdrawals, error is expected"
 				r.ExpectErrorCode(InvalidParamsError)
+
+				// Send a valid Pre-Shanghai request using ForkchoiceUpdatedV2
+				// (CLMock uses V1 by default)
+				r = t.TestEngine.TestEngineForkchoiceUpdatedV2(
+					&beacon.ForkchoiceStateV1{
+						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+					},
+					&beacon.PayloadAttributes{
+						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
+						Random:                common.Hash{},
+						SuggestedFeeRecipient: common.Address{},
+						Withdrawals:           nil,
+					},
+				)
+				r.ExpectationDescription = "Sent pre-shanghai Forkchoice ForkchoiceUpdatedV2 + null withdrawals, no error is expected"
+				r.ExpectNoError()
 			}
 		},
 		OnGetPayload: func() {
 			if !ws.SkipBaseVerifications {
+				// Try to get the same payload but use `engine_getPayloadV2`
+				g := t.TestEngine.TestEngineGetPayloadV2(t.CLMock.NextPayloadID)
+				g.ExpectPayload(&t.CLMock.LatestPayloadBuilt)
+
 				// Send produced payload but try to include non-nil
 				// `withdrawals`, it should fail.
 				emptyWithdrawalsList := make(types.Withdrawals, 0)
@@ -1021,6 +1130,11 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				r := t.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
 				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2+Withdrawals, error is expected"
 				r.ExpectErrorCode(InvalidParamsError)
+
+				// Send valid ExecutionPayloadV1 using engine_newPayloadV2
+				r = t.TestEngine.TestEngineNewPayloadV2(&t.CLMock.LatestPayloadBuilt)
+				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2, no error is expected"
+				r.ExpectStatus(test.Valid)
 			}
 		},
 		OnNewPayloadBroadcast: func() {
@@ -1047,12 +1161,31 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	// Produce requested post-shanghai blocks
 	// (At least 1 block will be produced after this procedure ends).
 	var (
-		startAccount = big.NewInt(0x1000)
+		startAccount = ws.GetWithdrawalsStartAccount()
 		nextIndex    = uint64(0)
 	)
 
 	t.CLMock.ProduceBlocks(int(ws.WithdrawalsBlockCount), clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
+
+			if !ws.SkipBaseVerifications {
+				// Try to send a PayloadAttributesV1 with null withdrawals after
+				// Shanghai
+				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
+					&beacon.ForkchoiceStateV1{
+						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+					},
+					&beacon.PayloadAttributes{
+						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
+						Random:                common.Hash{},
+						SuggestedFeeRecipient: common.Address{},
+						Withdrawals:           nil,
+					},
+				)
+				r.ExpectationDescription = "Sent shanghai fcu using PayloadAttributesV1, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
+			}
+
 			// Send some withdrawals
 			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
 			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
@@ -1078,7 +1211,38 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			}
 		},
 		OnGetPayload: func() {
-			// TODO: Send new payload with `withdrawals=null` and expect error
+			if !ws.SkipBaseVerifications {
+				// Send invalid `ExecutionPayloadV1` by replacing withdrawals list
+				// with null, and client must respond with `InvalidParamsError`.
+				// Note that StateRoot is also incorrect but null withdrawals should
+				// be checked first instead of responding `INVALID`
+				nilWithdrawalsPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+					RemoveWithdrawals: true,
+				})
+				if err != nil {
+					t.Fatalf("Unable to append withdrawals: %v", err)
+				}
+				r := t.TestEngine.TestEngineNewPayloadV2(nilWithdrawalsPayload)
+				r.ExpectationDescription = "Sent shanghai payload using ExecutionPayloadV1, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
+
+				// Verify the list of withdrawals returned on the payload built
+				// completely matches the list provided in the
+				// engine_forkchoiceUpdatedV2 method call
+				if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
+					panic("withdrawals sent list was not saved")
+				} else {
+					if len(sentList) != len(t.CLMock.LatestPayloadBuilt.Withdrawals) {
+						t.Fatalf("FAIL (%s): Incorrect list of withdrawals on built payload: want=%d, got=%d", t.TestName, len(sentList), len(t.CLMock.LatestPayloadBuilt.Withdrawals))
+					}
+					for i := 0; i < len(sentList); i++ {
+						if err := test.CompareWithdrawal(sentList[i], t.CLMock.LatestPayloadBuilt.Withdrawals[i]); err != nil {
+							t.Fatalf("FAIL (%s): Incorrect withdrawal on index %d: %v", t.TestName, i, err)
+						}
+					}
+
+				}
+			}
 		},
 		OnNewPayloadBroadcast: func() {
 			// Check withdrawal addresses and verify withdrawal balances
@@ -1101,6 +1265,18 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						t.CLMock.LatestExecutedPayload.Number-1,
 					)
 					r.ExpectBalanceEqual(expectedAccountBalance)
+				}
+
+				if ws.TestCorrupedHashPayloads {
+					payload := t.CLMock.LatestExecutedPayload
+
+					// Corrupt the hash
+					rand.Read(payload.BlockHash[:])
+
+					// On engine_newPayloadV2 `INVALID_BLOCK_HASH` is deprecated
+					// in favor of reusing `INVALID`
+					n := t.TestEngine.TestEngineNewPayloadV2(&payload)
+					n.ExpectStatus(test.Invalid)
 				}
 			}
 		},
@@ -1664,12 +1840,12 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 // client needs to sync and apply the withdrawals.
 type GetPayloadBodiesSpec struct {
 	*WithdrawalsBaseSpec
-
 	GetPayloadBodiesRequests []GetPayloadBodyRequest
+	GenerateSidechain        bool
 }
 
 type GetPayloadBodyRequest interface {
-	Verify(*test.Env)
+	Verify(*test.TestEngineClient, clmock.ExecutableDataHistory)
 }
 
 type GetPayloadBodyRequestByRange struct {
@@ -1677,8 +1853,8 @@ type GetPayloadBodyRequestByRange struct {
 	Count uint64
 }
 
-func (req GetPayloadBodyRequestByRange) Verify(t *test.Env) {
-	r := t.TestEngine.TestEngineGetPayloadBodiesByRangeV1(req.Start, req.Count)
+func (req GetPayloadBodyRequestByRange) Verify(testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
+	r := testEngine.TestEngineGetPayloadBodiesByRangeV1(req.Start, req.Count)
 	if req.Start < 1 || req.Count < 1 {
 		r.ExpectationDescription = fmt.Sprintf(`
 			Sent start (%d) or count (%d) to engine_getPayloadBodiesByRangeV1 with a
@@ -1687,19 +1863,21 @@ func (req GetPayloadBodyRequestByRange) Verify(t *test.Env) {
 		r.ExpectErrorCode(InvalidParamsError)
 		return
 	}
-	if req.Start > t.CLMock.CurrentPayloadNumber {
+	latestPayloadNumber := payloadHistory.LatestPayloadNumber()
+	if req.Start > latestPayloadNumber {
 		r.ExpectationDescription = fmt.Sprintf(`
 			Sent start=%d and count=%d to engine_getPayloadBodiesByRangeV1, latest known block is %d, hence an empty list is expected.
-			`, req.Start, req.Count, t.CLMock.LatestExecutedPayload.Number)
+			`, req.Start, req.Count, latestPayloadNumber)
 		r.ExpectPayloadBodiesCount(0)
 	} else {
 		var count = req.Count
-		if req.Start+req.Count-1 > t.CLMock.CurrentPayloadNumber {
-			count = t.CLMock.CurrentPayloadNumber - req.Start + 1
+		if req.Start+req.Count-1 > latestPayloadNumber {
+			count = latestPayloadNumber - req.Start + 1
 		}
+		r.ExpectationDescription = fmt.Sprintf("Sent engine_getPayloadBodiesByRange(start=%d, count=%d), latest payload number in canonical chain is %d", req.Start, req.Count, latestPayloadNumber)
 		r.ExpectPayloadBodiesCount(count)
 		for i := req.Start; i < req.Start+count; i++ {
-			p := t.CLMock.ExecutedPayloadHistory[i]
+			p := payloadHistory[i]
 
 			r.ExpectPayloadBody(i-req.Start, &client_types.ExecutionPayloadBodyV1{
 				Transactions: p.Transactions,
@@ -1715,13 +1893,13 @@ type GetPayloadBodyRequestByHashIndex struct {
 	End          uint64
 }
 
-func (req GetPayloadBodyRequestByHashIndex) Verify(t *test.Env) {
+func (req GetPayloadBodyRequestByHashIndex) Verify(testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
 	payloads := make([]*beacon.ExecutableData, 0)
 	hashes := make([]common.Hash, 0)
 	if len(req.BlockNumbers) > 0 {
 		for _, n := range req.BlockNumbers {
-			if p, ok := t.CLMock.ExecutedPayloadHistory[n]; ok {
-				payloads = append(payloads, &p)
+			if p, ok := payloadHistory[n]; ok {
+				payloads = append(payloads, p)
 				hashes = append(hashes, p.BlockHash)
 			} else {
 				// signal to request an unknown hash (random)
@@ -1734,8 +1912,8 @@ func (req GetPayloadBodyRequestByHashIndex) Verify(t *test.Env) {
 	}
 	if req.Start > 0 && req.End > 0 {
 		for n := req.Start; n <= req.End; n++ {
-			if p, ok := t.CLMock.ExecutedPayloadHistory[n]; ok {
-				payloads = append(payloads, &p)
+			if p, ok := payloadHistory[n]; ok {
+				payloads = append(payloads, p)
 				hashes = append(hashes, p.BlockHash)
 			} else {
 				// signal to request an unknown hash (random)
@@ -1750,7 +1928,7 @@ func (req GetPayloadBodyRequestByHashIndex) Verify(t *test.Env) {
 		panic("invalid test")
 	}
 
-	r := t.TestEngine.TestEngineGetPayloadBodiesByHashV1(hashes)
+	r := testEngine.TestEngineGetPayloadBodiesByHashV1(hashes)
 	r.ExpectPayloadBodiesCount(uint64(len(payloads)))
 	for i, p := range payloads {
 		var expectedPayloadBody *client_types.ExecutionPayloadBodyV1
@@ -1769,7 +1947,94 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 	// Do the base withdrawal test first, skipping base verifications
 	ws.WithdrawalsBaseSpec.SkipBaseVerifications = true
 	ws.WithdrawalsBaseSpec.Execute(t)
+
+	payloadHistory := t.CLMock.ExecutedPayloadHistory
+
+	if ws.GenerateSidechain {
+
+		// First generate an extra payload on top of the canonical chain
+		// Generate more withdrawals
+		nextWithdrawals, _ := ws.GenerateWithdrawalsForBlock(payloadHistory.LatestWithdrawalsIndex(), ws.GetWithdrawalsStartAccount())
+
+		f := t.TestEngine.TestEngineForkchoiceUpdatedV2(
+			&beacon.ForkchoiceStateV1{
+				HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+			},
+			&beacon.PayloadAttributes{
+				Timestamp:   t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
+				Withdrawals: nextWithdrawals,
+			},
+		)
+		f.ExpectPayloadStatus(test.Valid)
+
+		// Wait for payload to be built
+		time.Sleep(time.Second)
+
+		// Get the next canonical payload
+		p := t.TestEngine.TestEngineGetPayloadV2(f.Response.PayloadID)
+		p.ExpectNoError()
+		nextCanonicalPayload := &p.Payload
+
+		// Now we have an extra payload that follows the canonical chain,
+		// but we need a side chain for the test.
+		sidechainCurrent, err := helper.CustomizePayload(&t.CLMock.LatestExecutedPayload, &helper.CustomPayloadData{
+			Withdrawals: helper.RandomizeWithdrawalsOrder(t.CLMock.LatestExecutedPayload.Withdrawals),
+		})
+		if err != nil {
+			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
+		}
+
+		sidechainHead, err := helper.CustomizePayload(nextCanonicalPayload, &helper.CustomPayloadData{
+			ParentHash:  &sidechainCurrent.BlockHash,
+			Withdrawals: helper.RandomizeWithdrawalsOrder(nextCanonicalPayload.Withdrawals),
+		})
+		if err != nil {
+			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
+		}
+
+		// Send both sidechain payloads as engine_newPayloadV2
+		n1 := t.TestEngine.TestEngineNewPayloadV2(sidechainCurrent)
+		n1.ExpectStatus(test.Valid)
+		n2 := t.TestEngine.TestEngineNewPayloadV2(sidechainHead)
+		n2.ExpectStatus(test.Valid)
+	}
+
+	// Now send the range request, which should ignore the sidechain
 	for _, req := range ws.GetPayloadBodiesRequests {
-		req.Verify(t)
+		req.Verify(t.TestEngine, payloadHistory)
+	}
+}
+
+type BlockValueSpec struct {
+	*WithdrawalsBaseSpec
+}
+
+func (s *BlockValueSpec) Execute(t *test.Env) {
+	s.WithdrawalsBaseSpec.SkipBaseVerifications = true
+	s.WithdrawalsBaseSpec.Execute(t)
+
+	// Get the latest block and the transactions included
+	b := t.TestEngine.TestBlockByNumber(nil)
+	b.ExpectNoError()
+
+	totalValue := new(big.Int)
+	txs := b.Block.Transactions()
+	if len(txs) == 0 {
+		t.Fatalf("FAIL (%s): No transactions included in latest block", t.TestName)
+	}
+	for _, tx := range txs {
+		r := t.TestEngine.TestTransactionReceipt(tx.Hash())
+		r.ExpectNoError()
+
+		receipt := r.Receipt
+
+		gasUsed := new(big.Int).SetUint64(receipt.GasUsed)
+		txTip, _ := tx.EffectiveGasTip(b.Block.Header().BaseFee)
+		txTip.Mul(txTip, gasUsed)
+		totalValue.Add(totalValue, txTip)
+	}
+
+	if totalValue.Cmp(t.CLMock.LatestBlockValue) != 0 {
+		t.Fatalf("FAIL (%s): Unexpected block value returned on GetPayloadV2: want=%d, got=%d", t.TestName, totalValue, t.CLMock.LatestBlockValue)
 	}
 }

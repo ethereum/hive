@@ -15,21 +15,22 @@ import (
 )
 
 type CustomPayloadData struct {
-	ParentHash    *common.Hash
-	FeeRecipient  *common.Address
-	StateRoot     *common.Hash
-	ReceiptsRoot  *common.Hash
-	LogsBloom     *[]byte
-	PrevRandao    *common.Hash
-	Number        *uint64
-	GasLimit      *uint64
-	GasUsed       *uint64
-	Timestamp     *uint64
-	ExtraData     *[]byte
-	BaseFeePerGas *big.Int
-	BlockHash     *common.Hash
-	Transactions  *[][]byte
-	Withdrawals   types.Withdrawals
+	ParentHash        *common.Hash
+	FeeRecipient      *common.Address
+	StateRoot         *common.Hash
+	ReceiptsRoot      *common.Hash
+	LogsBloom         *[]byte
+	PrevRandao        *common.Hash
+	Number            *uint64
+	GasLimit          *uint64
+	GasUsed           *uint64
+	Timestamp         *uint64
+	ExtraData         *[]byte
+	BaseFeePerGas     *big.Int
+	BlockHash         *common.Hash
+	Transactions      *[][]byte
+	Withdrawals       types.Withdrawals
+	RemoveWithdrawals bool
 }
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
@@ -100,7 +101,9 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 	if customData.BaseFeePerGas != nil {
 		customPayloadHeader.BaseFee = customData.BaseFeePerGas
 	}
-	if customData.Withdrawals != nil {
+	if customData.RemoveWithdrawals {
+		customPayloadHeader.WithdrawalsHash = nil
+	} else if customData.Withdrawals != nil {
 		h := types.DeriveSha(customData.Withdrawals, trie.NewStackTrie(nil))
 		customPayloadHeader.WithdrawalsHash = &h
 	} else if basePayload.Withdrawals != nil {
@@ -125,7 +128,9 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		BlockHash:     customPayloadHeader.Hash(),
 		Transactions:  txs,
 	}
-	if customData.Withdrawals != nil {
+	if customData.RemoveWithdrawals {
+		result.Withdrawals = nil
+	} else if customData.Withdrawals != nil {
 		result.Withdrawals = customData.Withdrawals
 	} else if basePayload.Withdrawals != nil {
 		result.Withdrawals = basePayload.Withdrawals
@@ -260,7 +265,7 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 		InvalidTransactionChainID:
 
 		if len(basePayload.Transactions) == 0 {
-			return nil, fmt.Errorf("No transactions available for modification")
+			return nil, fmt.Errorf("no transactions available for modification")
 		}
 		var baseTx types.Transaction
 		if err := baseTx.UnmarshalBinary(basePayload.Transactions[0]); err != nil {
@@ -311,7 +316,8 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 	}
 
 	if customPayloadMod == nil {
-		return basePayload, nil
+		copyPayload := *basePayload
+		return &copyPayload, nil
 	}
 
 	alteredPayload, err := CustomizePayload(basePayload, customPayloadMod)
@@ -320,4 +326,18 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 	}
 
 	return alteredPayload, nil
+}
+
+/*
+	 Generates an alternative withdrawals list that contains the same
+		amounts and accounts, but the order in the list is different, so
+		stateRoot of the resulting payload should be the same.
+*/
+func RandomizeWithdrawalsOrder(src types.Withdrawals) types.Withdrawals {
+	dest := make(types.Withdrawals, len(src))
+	perm := rand.Perm(len(src))
+	for i, v := range perm {
+		dest[v] = src[i]
+	}
+	return dest
 }

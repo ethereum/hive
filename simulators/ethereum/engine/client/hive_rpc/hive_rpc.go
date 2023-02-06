@@ -366,7 +366,7 @@ func (ec *HiveRPCEngineClient) GetPayloadBodiesByRangeV1(ctx context.Context, st
 		return nil, err
 	}
 
-	err = ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByRangeV1", start, count)
+	err = ec.c.CallContext(ctx, &result, "engine_getPayloadBodiesByRangeV1", hexutil.Uint64(start), hexutil.Uint64(count))
 	return result, err
 }
 
@@ -383,23 +383,25 @@ func (ec *HiveRPCEngineClient) GetPayloadBodiesByHashV1(ctx context.Context, has
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
+func (ec *HiveRPCEngineClient) newPayload(ctx context.Context, version int, payload interface{}) (api.PayloadStatusV1, error) {
 	var result api.PayloadStatusV1
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
-	ec.latestPayloadSent = payload
 	err := ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload)
 	ec.latestPayloadStatusReponse = &result
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
-	return ec.NewPayload(ctx, 1, payload)
+func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *client_types.ExecutableDataV1) (api.PayloadStatusV1, error) {
+	ed := payload.ToExecutableData()
+	ec.latestPayloadSent = &ed
+	return ec.newPayload(ctx, 1, payload)
 }
 
 func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
-	return ec.NewPayload(ctx, 2, payload)
+	ec.latestPayloadSent = payload
+	return ec.newPayload(ctx, 2, payload)
 }
 
 func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Context, tConf *api.TransitionConfigurationV1) (api.TransitionConfigurationV1, error) {

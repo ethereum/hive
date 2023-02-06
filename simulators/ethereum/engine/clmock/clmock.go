@@ -11,6 +11,7 @@ import (
 
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 
@@ -27,6 +28,32 @@ var (
 	// to produce a new Payload
 	DefaultPayloadProductionClientDelay = time.Second
 )
+
+type ExecutableDataHistory map[uint64]*api.ExecutableData
+
+func (h ExecutableDataHistory) LatestPayloadNumber() uint64 {
+	latest := uint64(0)
+	for n := range h {
+		if n > latest {
+			latest = n
+		}
+	}
+	return latest
+}
+
+func (h ExecutableDataHistory) LatestWithdrawalsIndex() uint64 {
+	latest := uint64(0)
+	for _, p := range h {
+		if p.Withdrawals != nil {
+			for _, w := range p.Withdrawals {
+				if w.Index > latest {
+					latest = w.Index
+				}
+			}
+		}
+	}
+	return latest
+}
 
 // Consensus Layer Client Mock used to sync the Execution Clients once the TTD has been reached
 type CLMocker struct {
@@ -53,7 +80,7 @@ type CLMocker struct {
 
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
-	ExecutedPayloadHistory map[uint64]api.ExecutableData
+	ExecutedPayloadHistory ExecutableDataHistory
 	HeadHashHistory        []common.Hash
 
 	// Latest broadcasted data using the PoS Engine API
@@ -103,7 +130,7 @@ func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportO
 		T:                               t,
 		EngineClients:                   make([]client.EngineClient, 0),
 		PrevRandaoHistory:               map[uint64]common.Hash{},
-		ExecutedPayloadHistory:          map[uint64]api.ExecutableData{},
+		ExecutedPayloadHistory:          ExecutableDataHistory{},
 		SlotsToSafe:                     slotsToSafe,
 		SlotsToFinalized:                slotsToFinalized,
 		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
@@ -392,7 +419,8 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 		}
 	}
 	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
-	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = cl.LatestPayloadBuilt
+	payload := cl.LatestPayloadBuilt
+	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = &payload
 }
 
 func (cl *CLMocker) broadcastLatestForkchoice() {
@@ -581,7 +609,9 @@ func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableData) []ExecutePa
 		if isShanghai(payload.Timestamp, cl.ShanghaiTimestamp) {
 			execPayloadResp, err = ec.NewPayloadV2(ctx, payload)
 		} else {
-			execPayloadResp, err = ec.NewPayloadV1(ctx, payload)
+			edv1 := &client_types.ExecutableDataV1{}
+			edv1.FromExecutableData(payload)
+			execPayloadResp, err = ec.NewPayloadV1(ctx, edv1)
 		}
 		if err != nil {
 			cl.Errorf("CLMocker: Could not ExecutePayloadV1: %v", err)

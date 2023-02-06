@@ -200,7 +200,9 @@ type NewPayloadResponseExpectObject struct {
 func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	status, err := tec.Engine.NewPayloadV1(ctx, payload)
+	edv1 := &client_types.ExecutableDataV1{}
+	edv1.FromExecutableData(payload)
+	status, err := tec.Engine.NewPayloadV1(ctx, edv1)
 	ret := &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Payload:   payload,
@@ -364,6 +366,84 @@ func (exp *GetPayloadResponseExpectObject) ExpectErrorCode(code int) {
 	}
 }
 
+func ComparePayloads(want *api.ExecutableData, got *api.ExecutableData) error {
+	if want == nil || got == nil {
+		if want == nil && got == nil {
+			return nil
+		}
+		return fmt.Errorf("want: %v, got: %v", want, got)
+	}
+
+	if !bytes.Equal(want.ParentHash[:], got.ParentHash[:]) {
+		return fmt.Errorf("unexpected ParentHash: want=%v, got=%v", want.ParentHash, got.ParentHash)
+	}
+
+	if !bytes.Equal(want.FeeRecipient[:], got.FeeRecipient[:]) {
+		return fmt.Errorf("unexpected FeeRecipient: want=%v, got=%v", want.FeeRecipient, got.FeeRecipient)
+	}
+
+	if !bytes.Equal(want.StateRoot[:], got.StateRoot[:]) {
+		return fmt.Errorf("unexpected StateRoot: want=%v, got=%v", want.StateRoot, got.StateRoot)
+	}
+
+	if !bytes.Equal(want.ReceiptsRoot[:], got.ReceiptsRoot[:]) {
+		return fmt.Errorf("unexpected ReceiptsRoot: want=%v, got=%v", want.ReceiptsRoot, got.ReceiptsRoot)
+	}
+
+	if !bytes.Equal(want.Random[:], got.Random[:]) {
+		return fmt.Errorf("unexpected Random: want=%v, got=%v", want.Random, got.Random)
+	}
+
+	if !bytes.Equal(want.BlockHash[:], got.BlockHash[:]) {
+		return fmt.Errorf("unexpected BlockHash: want=%v, got=%v", want.BlockHash, got.BlockHash)
+	}
+
+	if !bytes.Equal(want.LogsBloom, got.LogsBloom) {
+		return fmt.Errorf("unexpected LogsBloom: want=%v, got=%v", want.LogsBloom, got.LogsBloom)
+	}
+
+	if !bytes.Equal(want.ExtraData, got.ExtraData) {
+		return fmt.Errorf("unexpected ExtraData: want=%v, got=%v", want.ExtraData, got.ExtraData)
+	}
+
+	if want.Number != got.Number {
+		return fmt.Errorf("unexpected Number: want=%d, got=%d", want.Number, got.Number)
+	}
+
+	if want.GasLimit != got.GasLimit {
+		return fmt.Errorf("unexpected GasLimit: want=%d, got=%d", want.GasLimit, got.GasLimit)
+	}
+
+	if want.GasUsed != got.GasUsed {
+		return fmt.Errorf("unexpected GasUsed: want=%d, got=%d", want.GasUsed, got.GasUsed)
+	}
+
+	if want.Timestamp != got.Timestamp {
+		return fmt.Errorf("unexpected Timestamp: want=%d, got=%d", want.Timestamp, got.Timestamp)
+	}
+
+	if want.BaseFeePerGas.Cmp(got.BaseFeePerGas) != 0 {
+		return fmt.Errorf("unexpected BaseFeePerGas: want=%d, got=%d", want.BaseFeePerGas, got.BaseFeePerGas)
+	}
+
+	if err := CompareTransactions(want.Transactions, got.Transactions); err != nil {
+		return err
+	}
+
+	if err := CompareWithdrawals(want.Withdrawals, got.Withdrawals); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (exp *GetPayloadResponseExpectObject) ExpectPayload(expectedPayload *api.ExecutableData) {
+	exp.ExpectNoError()
+	if err := ComparePayloads(expectedPayload, &exp.Payload); err != nil {
+		exp.Fatalf("FAIL (%s): Unexpected payload returned on EngineGetPayloadV%d: %v", exp.TestName, exp.Version, err)
+	}
+}
+
 func (exp *GetPayloadResponseExpectObject) ExpectPayloadParentHash(expectedParentHash common.Hash) {
 	exp.ExpectNoError()
 	if exp.Payload.ParentHash != expectedParentHash {
@@ -465,61 +545,86 @@ func (exp *GetPayloadBodiesResponseExpectObject) ExpectPayloadBodiesCount(count 
 	}
 }
 
-func CompareWithdrawals(want *types.Withdrawal, got *types.Withdrawal) error {
-	if want == nil && got != nil || want != nil && got == nil {
-		return fmt.Errorf("want=%v, got=%v", want, got)
+func CompareTransactions(want [][]byte, got [][]byte) error {
+	if len(want) != len(got) {
+		return fmt.Errorf("incorrect tx length: want=%d, got=%d", len(want), len(got))
 	}
-	if want != nil {
-		if want.Amount != got.Amount ||
-			!bytes.Equal(want.Address[:], got.Address[:]) ||
-			want.Index != got.Index ||
-			want.Validator != got.Validator {
-			wantStr, _ := json.MarshalIndent(want, "", " ")
-			gotStr, _ := json.MarshalIndent(got, "", " ")
-			return fmt.Errorf("want=%v, got=%v", wantStr, gotStr)
+
+	for i, a_tx := range want {
+		b_tx := got[i]
+		if !bytes.Equal(a_tx, b_tx) {
+			return fmt.Errorf("tx %d not equal: want=%x, got=%x", i, a_tx, b_tx)
 		}
+	}
+
+	return nil
+}
+
+func CompareWithdrawal(want *types.Withdrawal, got *types.Withdrawal) error {
+	if want == nil || got == nil {
+		if want == nil && got != nil {
+			got, _ := json.MarshalIndent(got, "", " ")
+			return fmt.Errorf("want=null, got=%s", got)
+		} else if want != nil && got == nil {
+			want, _ := json.MarshalIndent(want, "", " ")
+			return fmt.Errorf("want=%s, got=null", want)
+		}
+		return nil
+	}
+	if want.Amount != got.Amount ||
+		!bytes.Equal(want.Address[:], got.Address[:]) ||
+		want.Index != got.Index ||
+		want.Validator != got.Validator {
+		want, _ := json.MarshalIndent(want, "", " ")
+		got, _ := json.MarshalIndent(got, "", " ")
+		return fmt.Errorf("want=%s, got=%s", want, got)
 	}
 	return nil
 }
 
-func ComparePayloadBodies(want *client_types.ExecutionPayloadBodyV1, got *client_types.ExecutionPayloadBodyV1) error {
-	if (want == nil || got == nil) && want != got {
-		if want == nil {
-			return fmt.Errorf("wanted null, got object")
+func CompareWithdrawals(want []*types.Withdrawal, got []*types.Withdrawal) error {
+	if want == nil || got == nil {
+		if want == nil && got == nil {
+			return nil
 		}
-		return fmt.Errorf("wanted object, got null")
+		if want == nil && got != nil {
+			got, _ := json.MarshalIndent(got, "", " ")
+			return fmt.Errorf("incorrect withdrawals: want: null, got: %s", got)
+		} else {
+			want, _ := json.MarshalIndent(want, "", " ")
+			return fmt.Errorf("incorrect withdrawals: want: %s, got: null", want)
+		}
+
 	}
 
-	if want != nil {
-		if len(want.Transactions) != len(got.Transactions) {
-			return fmt.Errorf("incorrect tx length: want=%d, got=%d", len(want.Transactions), len(got.Transactions))
-		}
+	if len(want) != len(got) {
+		return fmt.Errorf("incorrect withdrawals length: want=%d, got=%d", len(want), len(got))
+	}
 
-		if want.Withdrawals == nil && got.Withdrawals != nil {
-			return fmt.Errorf("wanted null withdrawals, got object")
-		} else if want.Withdrawals != nil && got.Withdrawals == nil {
-			return fmt.Errorf("wanted object, got null withdrawals")
+	for i, a_w := range want {
+		b_w := got[i]
+		if err := CompareWithdrawal(a_w, b_w); err != nil {
+			return fmt.Errorf("withdrawal %d not equal: %v", i, err)
 		}
+	}
 
-		if len(want.Withdrawals) != len(got.Withdrawals) {
-			return fmt.Errorf("incorrect withdrawals length: want=%d, got=%d", len(want.Withdrawals), len(got.Withdrawals))
-		}
+	return nil
+}
 
-		for i, a_tx := range want.Transactions {
-			b_tx := got.Transactions[i]
-			if !bytes.Equal(a_tx, b_tx) {
-				return fmt.Errorf("tx %d not equal: want=%x, got=%x", i, a_tx, b_tx)
-			}
+func ComparePayloadBodies(want *client_types.ExecutionPayloadBodyV1, got *client_types.ExecutionPayloadBodyV1) error {
+	if want == nil || got == nil {
+		if want == nil && got == nil {
+			return nil
 		}
+		return fmt.Errorf("want: %v, got: %v", want, got)
+	}
 
-		if want.Withdrawals != nil {
-			for i, a_w := range want.Withdrawals {
-				b_w := got.Withdrawals[i]
-				if err := CompareWithdrawals(a_w, b_w); err != nil {
-					return fmt.Errorf("withdrawal %d not equal: %v", i, err)
-				}
-			}
-		}
+	if err := CompareTransactions(want.Transactions, got.Transactions); err != nil {
+		return err
+	}
+
+	if err := CompareWithdrawals(want.Withdrawals, got.Withdrawals); err != nil {
+		return err
 	}
 
 	return nil

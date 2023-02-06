@@ -201,7 +201,7 @@ func incrementalPostMergeSync(t *test.Env) {
 			t.Fatalf("FAIL (%s): TEST ISSUE - Payload not found: %d", t.TestName, i)
 		}
 		for {
-			secondaryEngineTest.TestEngineNewPayloadV1(&payload)
+			secondaryEngineTest.TestEngineNewPayloadV1(payload)
 			secondaryEngineTest.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 				HeadBlockHash: payload.BlockHash,
 			}, nil)
