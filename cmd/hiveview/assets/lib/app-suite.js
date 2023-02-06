@@ -297,6 +297,10 @@ function deselectTest(row, closeDetails) {
 	history.replaceState(null, null, '#');
 }
 
+function testHasClients(testData) {
+	return testData.clientInfo && Object.getOwnPropertyNames(testData.clientInfo).length > 0;
+}
+
 // formatClientLogsList turns the clientInfo part of a test into a list of links.
 function formatClientLogsList(suiteData, clientInfo) {
 	let links = [];
@@ -336,7 +340,7 @@ function formatTestDetails(suiteData, row) {
 		p.innerHTML = formatTestStatus(d.summaryResult);
 		container.appendChild(p);
 	}
-	if (!row.column('logs:name').responsiveHidden()) {
+	if (!row.column('logs:name').responsiveHidden() && testHasClients(d)) {
 		let p = document.createElement("p");
 		p.innerHTML = '<b>Clients:</b> ' + formatClientLogsList(suiteData, d.clientInfo);
 		container.appendChild(p);
@@ -350,7 +354,7 @@ function formatTestDetails(suiteData, row) {
 	if (d.description != "") {
 		let p = document.createElement("p");
 		let description = html.urls_to_links(html.encode(d.description.trim()));
-		let txt = "<b>Description</b><br/>" + description;
+		let txt = "<b>Description:</b><br/>" + description;
 		p.innerHTML = txt;
 		container.appendChild(p)
 	}
