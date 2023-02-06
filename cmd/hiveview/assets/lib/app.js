@@ -4,27 +4,37 @@ export const resultsRoot = "/results/"
 
 // This object has constructor function for various app-internal URLs.
 export let route = {
-	logFileInViewer: function(suiteID, suiteName, file) {
-		let params = new URLSearchParams();
-		params.set("suiteid", suiteID);
-		params.set("suitename", suiteName);
-		params.set("file", file);
+	simulatorLog: function(suiteID, suiteName, file) {
+		let params = new URLSearchParams({
+			"suiteid": suiteID,
+			"suitename": suiteName,
+			"file": file,
+		});
 		return "/viewer.html?" + params.toString();
 	},
 
-	testLogInViewer: function(suiteID, suiteName, testIndex) {
-		let params = new URLSearchParams();
-		params.set("suiteid", suiteID);
-		params.set("suitename", suiteName);
-		params.set("testid", testIndex);
-		params.set("showtestlog", "1");
+	testLog: function(suiteID, suiteName, testIndex) {
+		let params = new URLSearchParams({
+			"suiteid": suiteID,
+			"suitename": suiteName,
+			"testid": testIndex,
+			"showtestlog": "1",
+		});
+		return "/viewer.html?" + params.toString();
+	},
+
+	clientLog: function(suiteID, suiteName, testIndex, file) {
+		let params = new URLSearchParams({
+			"suiteid": suiteID,
+			"suitename": suiteName,
+			"testid": testIndex,
+			"file": file,
+		});
 		return "/viewer.html?" + params.toString();
 	},
 
 	suite: function(suiteID, suiteName) {
-		let params = new URLSearchParams();
-		params.set("suiteid", suiteID);
-		params.set("suitename", suiteName);
+		let params = new URLSearchParams({"suiteid": suiteID, "suitename": suiteName});
 		return "/suite.html?" + params.toString();
 	},
 
