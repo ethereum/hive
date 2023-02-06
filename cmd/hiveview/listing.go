@@ -164,5 +164,5 @@ func suiteValid(s *libhive.TestSuite) bool {
 }
 
 func skipFile(f string) bool {
-	return f == "errorReport.json" || f == "containerErrorReport.json" || strings.HasPrefix(f, ".")
+	return f == "errorReport.json" || f == "containerErrorReport.json" || f == "hive.json" || strings.HasPrefix(f, ".")
 }
