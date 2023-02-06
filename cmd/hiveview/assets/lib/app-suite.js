@@ -119,7 +119,7 @@ function showSuiteData(data, suiteID) {
 	$("#testsuite_start").html("🕒 " + suiteTimes.start.toLocaleString());
 	$("#testsuite_duration").html("⌛️ " + format.duration(suiteTimes.duration));
 	let logfile = app.resultsRoot + data.simLog;
-	let url = app.route.logFileInViewer(suiteID, suiteName, logfile);
+	let url = app.route.simulatorLog(suiteID, suiteName, logfile);
 	$("#sim-log-link").attr("href", url);
 	$("#sim-log-link").text("simulator log");
 	$("#testsuite_info").show();
@@ -180,8 +180,8 @@ function showSuiteData(data, suiteID) {
 				data: "clientInfo",
 				width: "20%",
 				responsivePriority: 1,
-				render: function (clientInfo) {
-					return formatClientLogsList(data, clientInfo);
+				render: function (clientInfo, type, row) {
+					return formatClientLogsList(data, row.testIndex, clientInfo);
 				}
 			},
 		],
@@ -302,13 +302,13 @@ function testHasClients(testData) {
 }
 
 // formatClientLogsList turns the clientInfo part of a test into a list of links.
-function formatClientLogsList(suiteData, clientInfo) {
+function formatClientLogsList(suiteData, testIndex, clientInfo) {
 	let links = [];
 	for (let instanceID in clientInfo) {
 		let instanceInfo = clientInfo[instanceID]
 		let logfile = app.resultsRoot + instanceInfo.logFile;
-		let url = app.route.logFileInViewer(suiteData.suiteID, suiteData.name, logfile);
-		let link = html.get_link(url, instanceInfo.name)
+		let url = app.route.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
+		let link = html.get_link(url, instanceInfo.name);
 		link.classList.add('log-link');
 		links.push(link.outerHTML);
 	}
@@ -342,7 +342,7 @@ function formatTestDetails(suiteData, row) {
 	}
 	if (!row.column('logs:name').responsiveHidden() && testHasClients(d)) {
 		let p = document.createElement("p");
-		p.innerHTML = '<b>Clients:</b> ' + formatClientLogsList(suiteData, d.clientInfo);
+		p.innerHTML = '<b>Clients:</b> ' + formatClientLogsList(suiteData, d.testIndex, d.clientInfo);
 		container.appendChild(p);
 	}
 	if (!row.column('duration:name').responsiveHidden()) {
@@ -443,7 +443,7 @@ function formatTestLog(suiteData, test) {
 	if (hiddenLines > 0) {
 		// Create the truncation marker.
 		let linkText = "..." + hiddenLines + " lines hidden: click for full output...";
-		let linkURL = app.route.testLogInViewer(suiteData.suiteID, suiteData.name, test.testIndex);
+		let linkURL = app.route.testLog(suiteData.suiteID, suiteData.name, test.testIndex);
 		let trunc = html.get_link(linkURL, linkText);
 		trunc.classList.add("output-trunc");
 		output.appendChild(trunc);

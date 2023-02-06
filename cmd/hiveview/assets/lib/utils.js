@@ -181,7 +181,7 @@ export let loader = {
 		}
 
 		var animated = false;
-		if (typeof loading == "boolean") {
+		if (typeof loadState == "boolean") {
 			loadState = 1.0;
 			animated = true;
 		}

@@ -131,9 +131,12 @@ td.ellipsis {
     font-weight: bold;
 }
 
-.highlighted, .dataTable tr.highlighted {
+.dataTable tr {
+    scroll-margin: 8em 0 0 0;
+}
+
+.dataTable tr.highlighted {
     background-color: #fffaea;
-    scroll-margin: 5em 0 0 0;
 }
 
 /* workaround for weird DataTables controls styling at small screen size */

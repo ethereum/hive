@@ -81,7 +81,11 @@ h3 {
     right: 2px;
     padding: 0;
     border-radius: 2px 1px 1px 2px;
-    background: #fffaea;
+    background: #f9f2dc;
+}
+
+pre.highlighted {
+    background-color: #f9f2dc;
 }
 
 .num.highlighted::before {
@@ -106,5 +110,5 @@ h3 {
     border-width: 0 1px 1px 0;
     transform: rotate(-45deg);
     clip-path: inset(4px 0 0 4px);
-    background: linear-gradient(to bottom right, #fffaea00 15px, #fffaea 16px, #fffaea);
+    background: linear-gradient(to bottom right, #f9f2dc00 15px, #f9f2dc 16px, #f9f2dc);
 }
