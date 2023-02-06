@@ -7,11 +7,18 @@ import * as app from './app.js'
 $(document).ready(function() {
 	app.init();
 
+	$('#loading').show();
 	console.log("Loading file list...");
 	$.ajax("listing.jsonl", {
-		success: showFileListing,
+		success: function(data) {
+			$('#page-text').show();
+			showFileListing(data);
+		},
 		failure: function(status, err) {
 			alert(err);
+		},
+		complete: function () {
+			$('#loading').hide();
 		},
 	});
 });
@@ -32,7 +39,7 @@ function linkToSuite(suiteID, suiteName, linkText) {
 	return html.get_link(url, linkText);
 }
 
-function showFileListing(data, error) {
+function showFileListing(data) {
 	console.log("Got file list")
 	// the data is jsonlines
 	/*
