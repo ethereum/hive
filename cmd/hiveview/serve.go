@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"io/fs"
 	"log"
 	"net"
@@ -59,6 +60,7 @@ func (h serveListing) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Generating listing...")
 	err := generateListing(h.fsys, ".", w)
 	if err != nil {
+		fmt.Println("error:", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 }
