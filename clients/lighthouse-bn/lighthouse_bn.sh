@@ -36,21 +36,6 @@ echo "${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" > /data/testnet_setup/deploy_
 mkdir -p /data/beacon
 mkdir -p /data/network
 
-# Set static private keys to be able to always set nodes as trusted peers
-trustedpeers="16Uiu2HAmKJJED6835NsYwwT3MZVVi4idg2jiULBYb1kPzqw9jzAM,16Uiu2HAm9XVoQGJGQJ9SAbMuGcCFG81Ch2EGCukmAix8g5yw9mcp,16Uiu2HAm3CnjeveoribYTQiWjkxUq2R6QrQwvZsyAzm75UXTL8aL,16Uiu2HAm96eiZf7YktvxfJ3AeXyrRNq4Cqf2Ypda6Y4nL17xwsXX,16Uiu2HAmNWiGjii9thAP6dzMcRxwQF317NraEri6qnYswvFVP1Mg"
-
-pks=("fd5fd778baa59f457bd671d61839f6dbf8f4ef4d4df67d621598a60ff212f07c" "b97bb33696dfb44e9bf3376b4247753ae4e55ba7b90b26153e0f40a00e63fc2f" "822c4f5856e7a5a7f7c1d4ca4d262df368f7d1323225bbe2c7c015401e422be5" "b09f940d452b33069aba7d3b7fc21725b5a0f6a0c2b2bb7eb6954c6c3295dfdb" "f87b71646c9850e5f7e4976c388d183832d6408491788afb5edba467617a9bd6")
-
-echo "beacon index: $HIVE_ETH2_BEACON_NODE_INDEX"
-if [[ "$HIVE_ETH2_BEACON_NODE_INDEX" != "" ]]; then
-    pk="${pks[HIVE_ETH2_BEACON_NODE_INDEX]}"
-    if [[ "$pk" != "" ]]; then
-        key="$(echo $pk | xxd -r -p)"
-        echo "networking pk: $pk"
-        echo -n $key > /data/network/key
-    fi
-fi
-
 LOG=info
 case "$HIVE_LOGLEVEL" in
     0|1) LOG=error ;;
@@ -85,7 +70,6 @@ lighthouse \
     --port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --discovery-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}"  \
     --target-peers="${HIVE_ETH2_P2P_TARGET_PEERS:-10}" \
-    --trusted-peers="$trustedpeers" \
     --subscribe-all-subnets \
     --boot-nodes="${HIVE_ETH2_BOOTNODE_ENRS:-""}" \
     --max-skip-slots="${HIVE_ETH2_MAX_SKIP_SLOTS:-1000}" \
