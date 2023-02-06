@@ -23,7 +23,7 @@ compatibility, peer-to-peer networking spec compliance, and user API support for
 Ethereum client implementations.
 
 You can find the latest test results at <https://hivetests.ethdevops.io/>
-\and <https://hivetests2.ethdevops.io/>.
+and <https://hivetests2.ethdevops.io/>.
 
 ## Overview of available simulators
 
