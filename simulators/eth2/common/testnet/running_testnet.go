@@ -177,6 +177,7 @@ func StartTestnet(
 			nodeIndex,
 			node.Chain,
 			node.ExecutionSubnet,
+			env.LogEngineCalls,
 		)
 
 		if node.ConsensusClient != "" {
