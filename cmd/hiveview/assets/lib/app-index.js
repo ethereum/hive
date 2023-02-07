@@ -1,12 +1,8 @@
-import '../extlib/bootstrap.module.js'
-import '../extlib/dataTables.module.js'
-import { $ } from '../extlib/jquery.module.js'
+import { $ } from 'jquery'
 import { html, format, nav } from './utils.js'
-import * as app from './app.js'
+import * as routes from './routes.js'
 
-$(document).ready(function() {
-	app.init();
-
+export default function navigate() {
 	$('#loading').show();
 	console.log("Loading file list...");
 	$.ajax("listing.jsonl", {
@@ -21,7 +17,7 @@ $(document).ready(function() {
 			$('#loading').hide();
 		},
 	});
-});
+}
 
 function resultStats(fails, success, total) {
 	f = parseInt(fails), s = parseInt(success);
@@ -35,7 +31,7 @@ function resultStats(fails, success, total) {
 }
 
 function linkToSuite(suiteID, suiteName, linkText) {
-	let url = app.route.suite(suiteID, suiteName);
+	let url = routes.suite(suiteID, suiteName);
 	return html.get_link(url, linkText);
 }
 

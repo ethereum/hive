@@ -1,10 +1,8 @@
-import { $ } from '../extlib/jquery.module.js'
+import { $ } from 'jquery'
 import { html, nav, format, loader } from './utils.js'
-import * as app from './app.js'
+import * as routes from './routes.js'
 
-function navigate() {
-    app.init();
-
+export default function navigate() {
     // Check for line number in hash.
     var line = null;
     if (window.location.hash.substr(1, 1) == "L") {
@@ -26,7 +24,7 @@ function navigate() {
             showError("Invalid parameters! Missing 'suitefile' or 'testid' in URL.");
             return;
         }
-        fetchTestLog(app.resultsRoot + suiteFile, testIndex, line);
+        fetchTestLog(routes.resultsRoot + suiteFile, testIndex, line);
         return;
     }
 
@@ -42,8 +40,6 @@ function navigate() {
     // Show default text because nothing was loaded.
     showText(document.getElementById("exampletext").innerHTML);
 }
-
-$(document).ready(navigate);
 
 // setHL sets the highlight on a line number.
 function setHL(num, scroll) {
@@ -74,10 +70,10 @@ function showLinkBack(suiteID, suiteName, testID) {
     var text, url;
     if (testID) {
         text = "Back to test " + testID + " in suite ‘" + suiteName + "’";
-        url = app.route.testInSuite(suiteID, suiteName, testID);
+        url = routes.testInSuite(suiteID, suiteName, testID);
     } else {
         text = "Back to test suite ‘" + suiteName + "’";
-        url = app.route.suite(suiteID, suiteName);
+        url = routes.suite(suiteID, suiteName);
     }
     $('#link-back').html(html.get_link(url, text));
 }
@@ -148,7 +144,7 @@ function lineNumberClicked() {
 
 // fetchFile loads up a new file to view
 function fetchFile(url, line /* optional jump to line */ ) {
-    let resultsRE = new RegExp("^" + app.resultsRoot);
+    let resultsRE = new RegExp("^" + routes.resultsRoot);
     $.ajax({
         xhr: loader.newXhrWithProgressBar,
         url: url,

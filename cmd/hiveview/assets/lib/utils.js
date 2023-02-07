@@ -1,4 +1,4 @@
-import { $ } from '../extlib/jquery.module.js'
+import { $ } from 'jquery'
 
 export let html = {
 	// encode does HTML-encoding/escaping.
