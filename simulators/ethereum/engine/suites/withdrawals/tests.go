@@ -1171,7 +1171,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			if !ws.SkipBaseVerifications {
 				// Try to send a PayloadAttributesV1 with null withdrawals after
 				// Shanghai
-				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
+				r := t.TestEngine.TestEngineForkchoiceUpdatedV1(
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
@@ -1182,7 +1182,21 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						Withdrawals:           nil,
 					},
 				)
-				r.ExpectationDescription = "Sent shanghai fcu using PayloadAttributesV1, error is expected"
+				r.ExpectationDescription = "Sent fcuV1 post-Shanghai, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
+
+				r = t.TestEngine.TestEngineForkchoiceUpdatedV2(
+					&beacon.ForkchoiceStateV1{
+						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+					},
+					&beacon.PayloadAttributes{
+						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
+						Random:                common.Hash{},
+						SuggestedFeeRecipient: common.Address{},
+						Withdrawals:           nil,
+					},
+				)
+				r.ExpectationDescription = "Sent shanghai fcuV2 using PayloadAttributesV1, error is expected"
 				r.ExpectErrorCode(InvalidParamsError)
 			}
 
