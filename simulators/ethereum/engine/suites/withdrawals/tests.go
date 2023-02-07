@@ -1236,7 +1236,11 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
-				r := t.TestEngine.TestEngineNewPayloadV2(nilWithdrawalsPayload)
+				r := t.TestEngine.TestEngineNewPayloadV1(nilWithdrawalsPayload)
+				r.ExpectationDescription = "Sent post-shanghai payload using NewPayloadV1, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
+
+				r = t.TestEngine.TestEngineNewPayloadV2(nilWithdrawalsPayload)
 				r.ExpectationDescription = "Sent shanghai payload using ExecutionPayloadV1, error is expected"
 				r.ExpectErrorCode(InvalidParamsError)
 
