@@ -44,7 +44,7 @@ main {
     color: black;
 }
 
-.test-name-column {
+td.test-name-column {
     background: url('/images/details_open.svg') no-repeat left 4px;
     background-size: 32px;
     cursor: pointer;
