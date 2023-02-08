@@ -6,8 +6,11 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/ethereum/hive/hiveproxy v0.0.0-20220708193637-ec524d7345a1
+	github.com/evanw/esbuild v0.17.6
 	github.com/fsouza/go-dockerclient v1.8.1
 	github.com/gorilla/mux v1.8.0
+	github.com/liamg/memoryfs v1.6.0
+	golang.org/x/net v0.5.0
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -64,8 +67,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
-	golang.org/x/net v0.4.0 // indirect
-	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/sys v0.4.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )

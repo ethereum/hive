@@ -1,12 +1,9 @@
-import '../extlib/bootstrap.module.js'
-import '../extlib/dataTables.module.js'
-import { $ } from '../extlib/jquery.module.js'
+import 'datatables.net'
+import { $ } from 'jquery'
 import { html, nav, format, loader } from './utils.js'
-import * as app from './app.js'
+import * as routes from './routes.js'
 
-$(document).ready(function () {
-	app.init();
-
+export default function navigate() {
 	let name = nav.load("suitename");
 	if (name) {
 		showSuiteName(name);
@@ -25,7 +22,7 @@ $(document).ready(function () {
 	$.ajax({
 		xhr: loader.newXhrWithProgressBar,
 		type: 'GET',
-		url: app.resultsRoot + filename,
+		url: routes.resultsRoot + filename,
 		dataType: 'json',
 		success: function(suiteData) {
 			showSuiteData(suiteData, filename);
@@ -37,7 +34,7 @@ $(document).ready(function () {
 			showError("error fetching " + filename + " : " + error);
 		},
 	});
-})
+}
 
 // showSuiteName displays the suite title.
 function showSuiteName(name) {
@@ -118,8 +115,8 @@ function showSuiteData(data, suiteID) {
 	let suiteTimes = testSuiteTimes(cases);
 	$("#testsuite_start").html("🕒 " + suiteTimes.start.toLocaleString());
 	$("#testsuite_duration").html("⌛️ " + format.duration(suiteTimes.duration));
-	let logfile = app.resultsRoot + data.simLog;
-	let url = app.route.simulatorLog(suiteID, suiteName, logfile);
+	let logfile = routes.resultsRoot + data.simLog;
+	let url = routes.simulatorLog(suiteID, suiteName, logfile);
 	$("#sim-log-link").attr("href", url);
 	$("#sim-log-link").text("simulator log");
 	$("#testsuite_info").show();
@@ -306,8 +303,8 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
 	let links = [];
 	for (let instanceID in clientInfo) {
 		let instanceInfo = clientInfo[instanceID]
-		let logfile = app.resultsRoot + instanceInfo.logFile;
-		let url = app.route.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
+		let logfile = routes.resultsRoot + instanceInfo.logFile;
+		let url = routes.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
 		let link = html.get_link(url, instanceInfo.name);
 		link.classList.add('log-link');
 		links.push(link.outerHTML);
@@ -443,7 +440,7 @@ function formatTestLog(suiteData, test) {
 	if (hiddenLines > 0) {
 		// Create the truncation marker.
 		let linkText = "..." + hiddenLines + " lines hidden: click for full output...";
-		let linkURL = app.route.testLog(suiteData.suiteID, suiteData.name, test.testIndex);
+		let linkURL = routes.testLog(suiteData.suiteID, suiteData.name, test.testIndex);
 		let trunc = html.get_link(linkURL, linkText);
 		trunc.classList.add("output-trunc");
 		output.appendChild(trunc);

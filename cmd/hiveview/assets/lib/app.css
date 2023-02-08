@@ -1,6 +1,6 @@
-@import "../extlib/bootstrap-5.2.3.min.css";
-@import "../extlib/dataTables-1.13.1.bootstrap5.min.css";
-@import "../extlib/responsive-2.4.0.bootstrap5.min.css";
+@import "../extlib/bootstrap-5.2.3.css";
+@import "../extlib/dataTables-1.13.1.bootstrap5.css";
+@import "../extlib/responsive-2.4.0.bootstrap5.css";
 
 main {
     margin: 8px 8px;

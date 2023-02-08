@@ -9,7 +9,7 @@
   </head>
 
   <body>
-    <script>0</script>
+    <script id="app" src="/lib/app.js" type="module" data-main="index"></script>
     <main role="main">
       <div id="hive-header">
         <a href="/"><img id="hive-logo" height="35" src="/images/hive3.svg"></a>
@@ -19,14 +19,12 @@
         </nav>
       </div>
 
-      <h2>Recent results
-        <div id="loading" class="spinner-border text-secondary" role="status" style="width: 1em; display: none;"></div>
+      <h2>
+        Recent results
+        <div id="loading" class="spinner-border text-secondary" role="status" style="width: 26px; height: 26px; display: none;"></div>
       </h2>
       <p id="page-text" style="display: none;">These test suites are available, and can be loaded. Click on 'Load' to load a certain suite.</p>
       <table id="filetable" class="table table-bordered"></table>
     </main>
   </body>
-
-  <!-- load the app -->
-  <script src="/lib/app-index.js" type="module"></script>
 </html>
