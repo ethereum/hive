@@ -583,6 +583,56 @@ var Tests = []test.SpecInterface{
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
+				Name: "GetPayloadBodies After Sync",
+				About: `
+				Make multiple withdrawals to 16 accounts each payload.
+				Spawn a secondary client which must sync the canonical chain
+				from the first client.
+				Retrieve many of the payloads' bodies by number range from
+				this secondary client.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight:    17,
+			WithdrawalsBlockCount:    16,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1024,
+		},
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByRange{
+				Start: 16,
+				Count: 2,
+			},
+			GetPayloadBodyRequestByRange{
+				Start: 31,
+				Count: 3,
+			},
+			GetPayloadBodyRequestByHashIndex{
+				BlockNumbers: []uint64{
+					1,
+					16,
+					2,
+					17,
+				},
+			},
+			GetPayloadBodyRequestByHashIndex{ // Existing+Random hashes
+				BlockNumbers: []uint64{
+					32,
+					1000,
+					31,
+					1000,
+					30,
+					1000,
+				},
+			},
+		},
+	},
+
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
 				Name: "GetPayloadBodiesByRange (Sidechain)",
 				About: `
 				Make multiple withdrawals to 16 accounts each payload.
@@ -1842,6 +1892,7 @@ type GetPayloadBodiesSpec struct {
 	*WithdrawalsBaseSpec
 	GetPayloadBodiesRequests []GetPayloadBodyRequest
 	GenerateSidechain        bool
+	AfterSync                bool
 }
 
 type GetPayloadBodyRequest interface {
@@ -1950,6 +2001,8 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 
 	payloadHistory := t.CLMock.ExecutedPayloadHistory
 
+	testEngine := t.TestEngine
+
 	if ws.GenerateSidechain {
 
 		// First generate an extra payload on top of the canonical chain
@@ -1997,11 +2050,44 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 		n1.ExpectStatus(test.Valid)
 		n2 := t.TestEngine.TestEngineNewPayloadV2(sidechainHead)
 		n2.ExpectStatus(test.Valid)
+	} else if ws.AfterSync {
+		// Spawn a secondary client which will need to sync to the primary client
+		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
+		if err != nil {
+			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
+		}
+		secondaryEngineTest := test.NewTestEngineClient(t, secondaryEngine)
+		t.CLMock.AddEngineClient(secondaryEngine)
+
+	loop:
+		for {
+			select {
+			case <-t.TimeoutContext.Done():
+				t.Fatalf("FAIL (%s): Timeout while waiting for secondary client to sync", t.TestName)
+			case <-time.After(time.Second):
+				secondaryEngineTest.TestEngineNewPayloadV2(
+					&t.CLMock.LatestExecutedPayload,
+				)
+				r := secondaryEngineTest.TestEngineForkchoiceUpdatedV2(
+					&t.CLMock.LatestForkchoice,
+					nil,
+				)
+				if r.Response.PayloadStatus.Status == test.Valid {
+					break loop
+				}
+				if r.Response.PayloadStatus.Status == test.Invalid {
+					t.Fatalf("FAIL (%s): Syncing client rejected valid chain: %s", t.TestName, r.Response)
+				}
+			}
+		}
+
+		// GetPayloadBodies will be sent to the secondary client
+		testEngine = secondaryEngineTest
 	}
 
-	// Now send the range request, which should ignore the sidechain
+	// Now send the range request, which should ignore any sidechain
 	for _, req := range ws.GetPayloadBodiesRequests {
-		req.Verify(t.TestEngine, payloadHistory)
+		req.Verify(testEngine, payloadHistory)
 	}
 }
 
