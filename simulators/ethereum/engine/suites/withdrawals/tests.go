@@ -198,125 +198,6 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	// Sync Tests
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 1
-			- Withdraw to a single account 16 times each block for 2 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync and verify withdrawn account's balance
-			`,
-				TimeoutSeconds: 6000,
-			},
-			WithdrawalsForkHeight:    1,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1,
-			TransactionsPerBlock:     common.Big0,
-		},
-		SyncSteps: 1,
-	},
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 1
-			- Withdraw to a single account 16 times each block for 2 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync and verify withdrawn account's balance
-			`,
-			},
-			WithdrawalsForkHeight:    1,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1,
-		},
-		SyncSteps: 1,
-	},
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Genesis - Single Withdrawal Account",
-				About: `
-			- Spawn a first client, with Withdrawals since genesis
-			- Withdraw to a single account 16 times each block for 2 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync and verify withdrawn account's balance
-			`,
-			},
-			WithdrawalsForkHeight:    0,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1,
-		},
-		SyncSteps: 1,
-	},
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts - No Transactions",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 2
-			- Withdraw to 16 accounts each block for 2 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
-			`,
-			},
-			WithdrawalsForkHeight:    2,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 16,
-			TransactionsPerBlock:     common.Big0,
-		},
-		SyncSteps: 1,
-	},
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 2
-			- Withdraw to 16 accounts each block for 2 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
-			`,
-			},
-			WithdrawalsForkHeight:    2,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 16,
-		},
-		SyncSteps: 1,
-	},
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 2
-			- Withdraw to many accounts 16 times each block for 128 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
-			`,
-				TimeoutSeconds: 300,
-			},
-			WithdrawalsForkHeight:    2,
-			WithdrawalsBlockCount:    128,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1024,
-		},
-		SyncSteps: 1,
-	},
-
 	//Re-Org tests
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
@@ -769,6 +650,145 @@ var Tests = []test.SpecInterface{
 				End:   17,
 			},
 		},
+	},
+}
+
+var SyncTests = []test.SpecInterface{
+	// Sync Tests
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 1
+			- Withdraw to a single account 16 times each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync and verify withdrawn account's balance
+			`,
+				TimeoutSeconds: 6000,
+			},
+			WithdrawalsForkHeight:    1,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1,
+			TransactionsPerBlock:     common.Big0,
+		},
+		SyncSteps: 1,
+	},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 1
+			- Withdraw to a single account 16 times each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync and verify withdrawn account's balance
+			`,
+			},
+			WithdrawalsForkHeight:    1,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1,
+		},
+		SyncSteps: 1,
+	},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 2 blocks - Withdrawals on Genesis - Single Withdrawal Account",
+				About: `
+			- Spawn a first client, with Withdrawals since genesis
+			- Withdraw to a single account 16 times each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync and verify withdrawn account's balance
+			`,
+			},
+			WithdrawalsForkHeight:    0,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1,
+		},
+		SyncSteps: 1,
+	},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 3 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts - No Transactions",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 2
+			- Withdraw to 16 accounts each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+			`,
+			},
+			WithdrawalsForkHeight:    2,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 16,
+			TransactionsPerBlock:     common.Big0,
+		},
+		SyncSteps: 1,
+	},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 3 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 2
+			- Withdraw to 16 accounts each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+			`,
+			},
+			WithdrawalsForkHeight:    2,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 16,
+		},
+		SyncSteps: 1,
+	},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 3 blocks - Withdrawals on Block 2 - No Withdrawals",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 2
+			- Withdraw to 16 accounts each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+			`,
+			},
+			WithdrawalsForkHeight: 2,
+			WithdrawalsBlockCount: 2,
+			WithdrawalsPerBlock:   0,
+		},
+		SyncSteps: 1,
+	},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 2
+			- Withdraw to many accounts 16 times each block for 128 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+			`,
+				TimeoutSeconds: 300,
+			},
+			WithdrawalsForkHeight:    2,
+			WithdrawalsBlockCount:    128,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1024,
+		},
+		SyncSteps: 1,
 	},
 }
 
