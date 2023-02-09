@@ -36,23 +36,20 @@ type HiveRPCEngineStarter struct {
 	JWTSecret               []byte
 }
 
-func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+func (s HiveRPCEngineStarter) StartClient(T client.ClientStarter, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
 	var (
 		clientType = s.ClientType
 		enginePort = s.EnginePort
 		ethPort    = s.EthPort
 		jwtSecret  = s.JWTSecret
 		ttd        = s.TerminalTotalDifficulty
+		err        error
 	)
 	if clientType == "" {
-		cs, err := T.Sim.ClientTypes()
+		clientType, err = T.GetNextClientType()
 		if err != nil {
-			return nil, fmt.Errorf("client type was not supplied and simulator returned error on trying to get all client types: %v", err)
+			return nil, fmt.Errorf("client type was not supplied and clientTypeSource returned error: %v", err)
 		}
-		if len(cs) == 0 {
-			return nil, fmt.Errorf("client type was not supplied and simulator returned empty client types: %v", cs)
-		}
-		clientType = cs[0].Name
 	}
 	if enginePort == 0 {
 		enginePort = globals.EnginePortHTTP

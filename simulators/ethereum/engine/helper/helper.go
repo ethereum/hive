@@ -30,7 +30,36 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
-// From ethereum/rpc:
+type ClientTypeCombinator []*hivesim.ClientDefinition
+
+func (all ClientTypeCombinator) Combinations() [][]*hivesim.ClientDefinition {
+	ret := make([][]*hivesim.ClientDefinition, 0)
+	if len(all) == 1 {
+		ret = append(ret, all)
+		return ret
+	}
+	for i := 0; i < len(all); i++ {
+		for j := 0; j < len(all); j++ {
+			if i == j {
+				continue
+			}
+			comb := []*hivesim.ClientDefinition{
+				all[i],
+				all[j],
+			}
+			ret = append(ret, comb)
+		}
+	}
+	return ret
+}
+
+func ClientTypesNames(c []*hivesim.ClientDefinition) string {
+	var names []string
+	for _, t := range c {
+		names = append(names, t.Name)
+	}
+	return strings.Join(names, "/")
+}
 
 // LoggingRoundTrip writes requests and responses to the test log.
 type LogF interface {

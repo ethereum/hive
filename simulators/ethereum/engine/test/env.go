@@ -2,6 +2,7 @@ package test
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 	"net/http"
 	"time"
@@ -45,9 +46,13 @@ type Env struct {
 
 	// Sets the type of transactions to use during the test
 	TestTransactionType helper.TestTransactionType
+
+	// Client types
+	clientTypes []*hivesim.ClientDefinition
+	clientCount int
 }
 
-func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, clientTypes []*hivesim.ClientDefinition, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	consensusConfig := testSpec.GetConsensusConfig()
 	clMocker := clmock.NewCLMocker(
@@ -88,11 +93,8 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 		ClientParams:        cParams,
 		ClientFiles:         cFiles,
 		TestTransactionType: testSpec.GetTestTransactionType(),
-	}
-
-	// Before running the test, make sure Eth and Engine ports are open for the client
-	if err := hive_rpc.CheckEthEngineLive(c); err != nil {
-		t.Fatalf("FAIL (%s): Ports were never open for client: %v", env.TestName, err)
+		clientTypes:         clientTypes,
+		clientCount:         1, // We already started one before calling this fn
 	}
 
 	// Full test context has a few more seconds to finish up after timeout happens
@@ -120,6 +122,22 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 
 	// Run the test
 	testSpec.Execute(env)
+}
+
+func (t *Env) StartClient(clientType string, option ...hivesim.StartOption) *hivesim.Client {
+	result := t.T.StartClient(clientType, option...)
+	if result != nil {
+		t.clientCount += 1
+	}
+	return result
+}
+
+func (t *Env) GetNextClientType() (string, error) {
+	if len(t.clientTypes) == 0 {
+		return "", fmt.Errorf("no client types provided")
+	}
+	nextDef := t.clientTypes[t.clientCount%len(t.clientTypes)]
+	return nextDef.Name, nil
 }
 
 func (t *Env) MainTTD() *big.Int {

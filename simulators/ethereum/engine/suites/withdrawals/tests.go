@@ -1418,7 +1418,7 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 	ws.WithdrawalsBaseSpec.Execute(t)
 
 	// Spawn a secondary client which will need to sync to the primary client
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 	}
@@ -1508,7 +1508,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 	t.CLMock.WaitForTTD()
 
 	// Spawn a secondary client which will produce the sidechain
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 	}
@@ -2052,7 +2052,7 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 		n2.ExpectStatus(test.Valid)
 	} else if ws.AfterSync {
 		// Spawn a secondary client which will need to sync to the primary client
-		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
+		secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
 		}

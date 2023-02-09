@@ -129,15 +129,19 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 			newParams = newParams.Set("HIVE_POST_MERGE_GENESIS", "true")
 		}
 
-		if clientTypes, err := sim.ClientTypes(); err == nil {
-			for _, clientType := range clientTypes {
+		if allClientTypes, err := sim.ClientTypes(); err == nil {
+			for _, combination := range helper.ClientTypeCombinator(allClientTypes).Combinations() {
+				clientTypes := combination
+				if len(clientTypes) == 0 {
+					panic(fmt.Errorf("client types length zero"))
+				}
 				suite.Add(hivesim.TestSpec{
-					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), clientType.Name),
+					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), helper.ClientTypesNames(clientTypes)),
 					Description: currentTest.GetAbout(),
 					Run: func(t *hivesim.T) {
 						// Start the client with given options
 						c := t.StartClient(
-							clientType.Name,
+							clientTypes[0].Name,
 							newParams,
 							genesisStartOption,
 							hivesim.WithStaticFiles(testFiles),
@@ -158,6 +162,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 							timeout,
 							t,
 							c,
+							clientTypes,
 							genesis,
 							newParams,
 							testFiles,

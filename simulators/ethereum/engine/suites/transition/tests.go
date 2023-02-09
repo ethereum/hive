@@ -946,7 +946,7 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 
 		for i, secondaryClientSpec := range mergeTestSpec.SecondaryClientSpecs {
 			// Start the secondary client with the alternative chain
-			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.CLMock.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
+			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t, t.CLMock.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 			t.Logf("INFO (%s): Started secondary client: %v", t.TestName, secondaryClient.ID())
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
