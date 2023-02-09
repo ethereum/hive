@@ -1,9 +1,16 @@
 import 'datatables.net'
+import 'datatables.net-bs5'
+import 'datatables.net-responsive'
+import 'datatables.net-responsive-bs5'
 import { $ } from 'jquery'
+
 import { html, nav, format, loader } from './utils.js'
 import * as routes from './routes.js'
+import * as common from './common.js'
 
-export default function navigate() {
+$(document).ready(function () {
+	common.updateHeader();
+
 	let name = nav.load("suitename");
 	if (name) {
 		showSuiteName(name);
@@ -34,7 +41,7 @@ export default function navigate() {
 			showError("error fetching " + filename + " : " + error);
 		},
 	});
-}
+})
 
 // showSuiteName displays the suite title.
 function showSuiteName(name) {

@@ -15,7 +15,9 @@ import (
 // hiveviewBundler creates the esbuild bundler and registers JS/CSS targets.
 func hiveviewBundler(fsys fs.FS) *bundler {
 	entrypoints := []string{
-		"lib/app.js",
+		"lib/app-index.js",
+		"lib/app-suite.js",
+		"lib/app-viewer.js",
 		"lib/app.css",
 		"lib/viewer.css",
 	}

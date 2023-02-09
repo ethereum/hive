@@ -1,23 +1,9 @@
-// Pull in dependencies.
-import 'datatables.net'
-import 'datatables.net-bs5'
-import 'datatables.net-responsive'
-import 'datatables.net-responsive-bs5'
 import 'bootstrap'
 import { $ } from 'jquery'
 
-// Pull in app files.
 import * as routes from './routes.js'
-import { default as index } from './app-index.js'
-import { default as suite } from './app-suite.js'
-import { default as viewer } from './app-viewer.js'
 
-$(document).ready(function() {
-    // Kick off the page main function.
-    let pages = { index, suite, viewer };
-    let name = $('script[type=module]').attr('data-main');
-    pages[name]();
-
+export function updateHeader() {
     // Update the header with version info from hive.json.
     $.ajax({
         type: 'GET',
@@ -31,7 +17,7 @@ $(document).ready(function() {
             console.log("error fetching hive.json:", error);
         },
     });
-})
+}
 
 function hiveInfoHTML(data) {
     var txt = "";
