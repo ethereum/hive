@@ -9,7 +9,6 @@ require (
 	github.com/evanw/esbuild v0.17.6
 	github.com/fsouza/go-dockerclient v1.8.1
 	github.com/gorilla/mux v1.8.0
-	github.com/liamg/memoryfs v1.6.0
 	golang.org/x/net v0.5.0
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1
 	gopkg.in/yaml.v3 v3.0.1

@@ -164,7 +164,7 @@ func (dfs *deployFS) openHTML(name string) (fs.File, error) {
 			if bundle.buildTime.After(modTime) {
 				modTime = bundle.buildTime
 			}
-			ref.Val = "/bundle/" + bundle.outputFile
+			ref.Val = bundle.outputFile
 		})
 	}
 

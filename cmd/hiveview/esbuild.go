@@ -11,10 +11,10 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"testing/fstest"
 	"time"
 
 	esbuild "github.com/evanw/esbuild/pkg/api"
-	"github.com/liamg/memoryfs"
 )
 
 // bundler creates JS/CSS bundles and caches them in memory.
@@ -24,7 +24,7 @@ type bundler struct {
 	mu              sync.Mutex
 	files           map[string]*bundleFile
 	buildContext    esbuild.BuildContext
-	mem             *memoryfs.FS
+	mem             fstest.MapFS
 	lastBuild       time.Time
 	lastBuildFailed bool
 }
@@ -44,9 +44,9 @@ func newBundler(fsys fs.FS, entrypoints []string, aliases map[string]string) *bu
 	}
 
 	return &bundler{
-		mem:          memoryfs.New(),
 		fsys:         fsys,
 		files:        make(map[string]*bundleFile),
+		mem:          make(fstest.MapFS),
 		buildContext: ctx,
 	}
 }
@@ -55,22 +55,23 @@ func makeBuildOptions(fsys fs.FS) esbuild.BuildOptions {
 	loader := fsLoaderPlugin(fsys)
 	return esbuild.BuildOptions{
 		Bundle:            true,
-		Outdir:            "/",
+		Metafile:          true,
 		AbsWorkingDir:     "/",
-		PublicPath:        "/bundle",
-		EntryNames:        "[dir]/[name].[hash]",
-		AssetNames:        "assets/[dir]/[name].[hash]",
+		Outdir:            "/bundle",
+		EntryNames:        "[name].[hash]",
+		AssetNames:        "assets/[name].[hash]",
 		ChunkNames:        "chunks/chunk-[hash]",
 		Splitting:         true,
 		Format:            esbuild.FormatESModule,
-		LogLevel:          esbuild.LogLevelWarning,
 		Plugins:           []esbuild.Plugin{loader},
 		Platform:          esbuild.PlatformBrowser,
 		Target:            esbuild.ES2020,
-		Metafile:          true,
 		MinifyIdentifiers: true,
 		MinifyWhitespace:  true,
 		MinifySyntax:      true,
+		Sourcemap:         esbuild.SourceMapLinked,
+		SourcesContent:    esbuild.SourcesContentExclude,
+		LogLevel:          esbuild.LogLevelWarning,
 	}
 }
 
@@ -92,12 +93,11 @@ func (b *bundler) rebuild() ([]esbuild.Message, fs.FS, error) {
 	if !b.lastBuild.IsZero() && time.Since(b.lastBuild) < 1*time.Second && !b.lastBuildFailed {
 		return nil, b.mem, nil
 	}
-	b.lastBuild = time.Now()
 
-	start := time.Now()
+	b.lastBuild = time.Now()
+	res := b.buildContext.Rebuild()
 	var msg []esbuild.Message
 	var err error
-	res := b.buildContext.Rebuild()
 	msg = append(msg, res.Errors...)
 	msg = append(msg, res.Warnings...)
 	b.lastBuildFailed = len(res.Errors) > 0
@@ -107,7 +107,7 @@ func (b *bundler) rebuild() ([]esbuild.Message, fs.FS, error) {
 		b.handleBuildResult(&res)
 	}
 
-	fmt.Println("build done:", time.Since(start))
+	fmt.Println("build done:", time.Since(b.lastBuild))
 	return msg, b.mem, err
 }
 
@@ -127,42 +127,40 @@ func (b *bundler) handleBuildResult(res *esbuild.BuildResult) {
 	}
 
 	// Write output files to a new memfs.
-	memfs := memoryfs.New()
+	memfs := make(fstest.MapFS, len(res.OutputFiles))
 	now := time.Now()
 	for _, f := range res.OutputFiles {
-		outputName := strings.TrimPrefix(filepath.ToSlash(f.Path), "/")
-		outputPath := "bundle/" + outputName
-		m := meta.Outputs[outputName]
+		outputPath := strings.TrimPrefix(filepath.ToSlash(f.Path), "/")
+		m := meta.Outputs[outputPath]
 		if m == nil {
 			panic("unknown output file: " + f.Path)
 		}
 
 		// Carry over modification time from the previous memfs.
 		modTime := now
-		info, err := b.mem.Stat(outputPath)
-		if err == nil {
-			modTime = info.ModTime()
+		if prevFile := b.mem[outputPath]; prevFile != nil {
+			modTime = prevFile.ModTime
 		}
 
 		// For output files that correspond to an entry point,
 		// assign the bundle file name.
 		if m.EntryPoint != "" {
-			ep := strings.TrimPrefix(m.EntryPoint, "fsLoader:")
-			prev := b.files[ep]
-			bf := &bundleFile{outputFile: outputName, buildTime: modTime}
-			if prev == nil || prev.outputFile != outputName {
+			prev := b.files[m.EntryPoint]
+			bf := &bundleFile{outputFile: outputPath, buildTime: modTime}
+			if prev == nil || prev.outputFile != outputPath {
 				// File has changed, log it.
-				log.Println("esbuild", ep, "=>", outputName)
+				log.Println("esbuild", m.EntryPoint, "=>", outputPath)
 			}
-			b.files[ep] = bf
+			b.files[m.EntryPoint] = bf
 		}
 
 		// fmt.Println("store:", outputPath)
-		memfs.MkdirAll(path.Dir(outputPath), 0755)
-		if err := memfs.WriteFile(outputPath, f.Contents, 0644); err != nil {
-			panic("can't write to memfs: " + err.Error())
+		memfs[outputPath] = &fstest.MapFile{
+			Data:    f.Contents,
+			Mode:    0644,
+			ModTime: modTime,
+			Sys:     b,
 		}
-		memfs.SetModified(outputPath, modTime)
 	}
 
 	// Flip over to the new memfs.
@@ -186,7 +184,7 @@ func fsLoaderPlugin(fsys fs.FS) esbuild.Plugin {
 					// For the initial entry point in the bundle, args.Importer is set
 					// to the absolute working directory, which can't be used, so just treat
 					// it as a raw path into the FS.
-					p = strings.TrimPrefix(args.Path, "/")
+					p = args.Path
 				} else {
 					alias, isAlias := build.InitialOptions.Alias[args.Path]
 					if isAlias {
@@ -194,11 +192,12 @@ func fsLoaderPlugin(fsys fs.FS) esbuild.Plugin {
 					} else {
 						// Relative import paths are resolved relative to the
 						// importing file's location.
-						p = path.Join(path.Dir(args.Importer), args.Path)
+						imp := strings.TrimPrefix(args.Importer, "/")
+						p = path.Clean(path.Join(path.Dir(imp), args.Path))
 					}
 				}
 
-				res := esbuild.OnResolveResult{Path: p, Namespace: "fsLoader"}
+				res := esbuild.OnResolveResult{Path: "/" + p}
 				_, err := fs.Stat(fsys, p)
 				if errors.Is(err, fs.ErrNotExist) && !strings.HasPrefix(args.Path, ".") {
 					err = fmt.Errorf("File %s does not exist. Missing definition in moduleAliases?", p)
@@ -206,17 +205,17 @@ func fsLoaderPlugin(fsys fs.FS) esbuild.Plugin {
 				return res, err
 			})
 
-			loadOpt := esbuild.OnLoadOptions{Filter: ".*", Namespace: "fsLoader"}
+			loadOpt := esbuild.OnLoadOptions{Filter: ".*"}
 			build.OnLoad(loadOpt, func(args esbuild.OnLoadArgs) (esbuild.OnLoadResult, error) {
-				text, err := fs.ReadFile(fsys, args.Path)
+				p := strings.TrimPrefix(args.Path, "/")
+				text, err := fs.ReadFile(fsys, p)
 				if err != nil {
 					return esbuild.OnLoadResult{}, err
 				}
 				str := string(text)
 				return esbuild.OnLoadResult{
-					Contents:   &str,
-					ResolveDir: path.Dir(args.Path),
-					Loader:     loaderFromExt(args.Path),
+					Contents: &str,
+					Loader:   loaderFromExt(p),
 				}, nil
 			})
 		},
@@ -225,16 +224,10 @@ func fsLoaderPlugin(fsys fs.FS) esbuild.Plugin {
 
 func loaderFromExt(name string) esbuild.Loader {
 	switch path.Ext(name) {
-	case ".css":
-		return esbuild.LoaderCSS
-	case ".js", ".mjs":
-		return esbuild.LoaderJS
-	case ".ts":
-		return esbuild.LoaderTS
-	case ".json":
-		return esbuild.LoaderJSON
-	default:
+	case ".svg":
 		return esbuild.LoaderFile
+	default:
+		return esbuild.LoaderDefault
 	}
 }
 
