@@ -1,8 +1,11 @@
 import { $ } from 'jquery'
 import { html, nav, format, loader } from './utils.js'
 import * as routes from './routes.js'
+import * as common from './common.js'
 
-export default function navigate() {
+$(document).ready(function () {
+    common.updateHeader();
+
     // Check for line number in hash.
     var line = null;
     if (window.location.hash.substr(1, 1) == "L") {
@@ -39,7 +42,7 @@ export default function navigate() {
 
     // Show default text because nothing was loaded.
     showText(document.getElementById("exampletext").innerHTML);
-}
+})
 
 // setHL sets the highlight on a line number.
 function setHL(num, scroll) {

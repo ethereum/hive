@@ -1,11 +1,20 @@
+import 'datatables.net'
+import 'datatables.net-bs5'
+import 'datatables.net-responsive'
+import 'datatables.net-responsive-bs5'
 import { $ } from 'jquery'
-import { html, format, nav } from './utils.js'
-import * as routes from './routes.js'
 
-export default function navigate() {
+import { html, format } from './utils.js'
+import * as routes from './routes.js'
+import * as common from './common.js'
+
+$(document).ready(function () {
+	common.updateHeader();
+
 	$('#loading').show();
 	console.log("Loading file list...");
 	$.ajax("listing.jsonl", {
+		cache: false,
 		success: function(data) {
 			$('#page-text').show();
 			showFileListing(data);
@@ -17,18 +26,7 @@ export default function navigate() {
 			$('#loading').hide();
 		},
 	});
-}
-
-function resultStats(fails, success, total) {
-	f = parseInt(fails), s = parseInt(success);
-	t = parseInt(total);
-	f = isNaN(f) ? "?" : f;
-	s = isNaN(s) ? "?" : s;
-	t = isNaN(t) ? "?" : t;
-	return '<b><span class="text-danger">' + f +
-		'</span>&nbsp;:&nbsp;<span class="text-success">' + s +
-		'</span> &nbsp;/&nbsp;' + t + '</b>';
-}
+})
 
 function linkToSuite(suiteID, suiteName, linkText) {
 	let url = routes.suite(suiteID, suiteName);

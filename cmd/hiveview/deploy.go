@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"io"
 	"io/fs"
 	"sort"
@@ -15,10 +14,14 @@ import (
 
 // hiveviewBundler creates the esbuild bundler and registers JS/CSS targets.
 func hiveviewBundler(fsys fs.FS) *bundler {
-	b := newBundler(fsys)
-	b.add("lib/app.js")
-	b.add("lib/app.css")
-	b.add("lib/viewer.css")
+	entrypoints := []string{
+		"lib/app-index.js",
+		"lib/app-suite.js",
+		"lib/app-viewer.js",
+		"lib/app.css",
+		"lib/viewer.css",
+	}
+	b := newBundler(fsys, entrypoints, moduleAliases)
 	return b
 }
 
@@ -48,17 +51,16 @@ func importMapScript() string {
 //     against the bundler, and URLs in the HTML will be replaced by references to
 //     bundle files.
 type deployFS struct {
-	assets    fs.FS
-	bundler   *bundler
-	useBundle bool
+	assets  fs.FS
+	bundler *bundler
 }
 
 func newDeployFS(assets fs.FS, useBundle bool) *deployFS {
-	return &deployFS{
-		assets:    assets,
-		bundler:   hiveviewBundler(assets),
-		useBundle: useBundle,
+	dfs := &deployFS{assets: assets}
+	if useBundle {
+		dfs.bundler = hiveviewBundler(assets)
 	}
+	return dfs
 }
 
 func isBundlePath(name string) bool {
@@ -75,8 +77,9 @@ func (dfs *deployFS) Open(name string) (f fs.File, err error) {
 	switch {
 	case !strings.Contains(name, "/") && strings.HasSuffix(name, ".html"):
 		return dfs.openHTML(name)
-	case isBundlePath(name):
-		return dfs.bundler.fs().Open(name)
+	case dfs.bundler != nil && isBundlePath(name):
+		_, memfs, _ := dfs.bundler.rebuild()
+		return memfs.Open(name)
 	default:
 		return dfs.assets.Open(name)
 	}
@@ -92,8 +95,9 @@ func (dfs *deployFS) ReadDir(name string) ([]fs.DirEntry, error) {
 	switch {
 	case name == ".":
 		return dfs.readDirRoot()
-	case isBundlePath(name):
-		return fs.ReadDir(dfs.bundler.fs(), name)
+	case dfs.bundler != nil && isBundlePath(name):
+		_, memfs, _ := dfs.bundler.rebuild()
+		return fs.ReadDir(memfs, name)
 	default:
 		return fs.ReadDir(dfs.assets, name)
 	}
@@ -104,8 +108,12 @@ func (dfs *deployFS) readDirRoot() ([]fs.DirEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	bundleEntries, _ := fs.ReadDir(dfs.bundler.fs(), ".")
-	entries = append(entries, bundleEntries...)
+	if dfs.bundler != nil {
+		_, memfs, _ := dfs.bundler.rebuild()
+		bundleEntries, _ := fs.ReadDir(memfs, ".")
+		entries = append(entries, bundleEntries...)
+	}
+
 	sort.Slice(entries, func(i, j int) bool {
 		return entries[i].Name() < entries[j].Name()
 	})
@@ -128,35 +136,35 @@ func (dfs *deployFS) openHTML(name string) (fs.File, error) {
 	output := new(bytes.Buffer)
 	modTime := inputInfo.ModTime()
 
-	if !dfs.useBundle {
+	if dfs.bundler == nil {
 		// JS bundle is disabled. To make ES module loading work without the bundle,
 		// the document needs an importmap.
 		insertAfterTag(inputFile, output, "head", importMapScript())
 		modTime = time.Now()
 	} else {
 		// Replace script/style references with bundle paths, if possible.
+		buildmsg, _, _ := dfs.bundler.rebuild()
 		var errorShown bool
 		modifyHTML(inputFile, output, func(token *html.Token, errlog io.Writer) {
+			if len(buildmsg) > 0 && !errorShown {
+				io.WriteString(errlog, "** ESBUILD ERRORS **\n\n")
+				renderBuildMsg(buildmsg, errlog)
+				modTime = time.Now()
+				errorShown = true
+			}
+
 			ref := scriptOrStyleReference(token)
 			if ref == nil {
 				return // not script
 			}
-			bundle, buildmsg, err := dfs.bundler.build(ref.Val)
-			if errors.Is(err, fs.ErrNotExist) {
-				return
-			} else if err != nil {
-				if !errorShown {
-					io.WriteString(errlog, "** ESBUILD ERRORS **\n\n")
-					errorShown = true
-				}
-				renderBuildMsg(buildmsg, errlog)
-				modTime = time.Now()
-				return
+			bundle := dfs.bundler.bundle(ref.Val)
+			if bundle == nil || bundle.outputFile == "" {
+				return // not a bundle target
 			}
 			if bundle.buildTime.After(modTime) {
 				modTime = bundle.buildTime
 			}
-			ref.Val = "/bundle/" + bundle.name()
+			ref.Val = "/bundle/" + bundle.outputFile
 		})
 	}
 

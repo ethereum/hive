@@ -45,7 +45,7 @@ main {
 }
 
 td.test-name-column {
-    background: url('/images/details_open.svg') no-repeat left 4px;
+    background: url('../images/details_open.svg') no-repeat left 4px;
     background-size: 32px;
     cursor: pointer;
     padding-left: 32px !important;
@@ -61,15 +61,15 @@ td.test-name-column {
 }
 
 tr.failed td.test-name-column {
-    background-image: url('/images/details_open_err.svg');
+    background-image: url('../images/details_open_err.svg');
 }
 
 tr.shown td.test-name-column {
-    background-image: url('/images/details_close.svg');
+    background-image: url('../images/details_close.svg');
 }
 
 tr.shown.failed td.test-name-column {
-    background-image: url('/images/details_close_err.svg');
+    background-image: url('../images/details_close_err.svg');
 }
 
 td.ellipsis {
