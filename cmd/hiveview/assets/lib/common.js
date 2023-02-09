@@ -9,6 +9,7 @@ export function updateHeader() {
         type: 'GET',
         url: routes.resultsRoot + "hive.json",
         dataType: 'json',
+        cache: false,
         success: function(data) {
             console.log("hive.json:", data);
             $("#hive-instance-info").html(hiveInfoHTML(data));

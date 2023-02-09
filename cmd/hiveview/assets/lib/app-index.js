@@ -13,7 +13,9 @@ $(document).ready(function () {
 
 	$('#loading').show();
 	console.log("Loading file list...");
-	$.ajax("listing.jsonl", {
+	$.ajax({
+		type: 'GET',
+		url: "listing.jsonl",
 		cache: false,
 		success: function(data) {
 			$('#page-text').show();
