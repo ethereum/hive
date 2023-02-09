@@ -237,7 +237,7 @@ func renderBuildMsg(msgs []esbuild.Message, w io.Writer) {
 			fmt.Fprintln(w, msg.Text)
 			continue
 		}
-		file := strings.Replace(msg.Location.File, "fsLoader:", "assets/", 1)
+		file := filepath.FromSlash(path.Join("assets", msg.Location.File))
 		fmt.Fprintf(w, "%s:%d   %s\n", file, msg.Location.Line, msg.Text)
 		fmt.Fprintln(w, "  |")
 		fmt.Fprintln(w, "  |", msg.Location.LineText)
