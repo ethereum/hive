@@ -100,11 +100,12 @@ func (b *bundler) rebuild() ([]esbuild.Message, fs.FS, error) {
 	res := b.buildContext.Rebuild()
 	msg = append(msg, res.Errors...)
 	msg = append(msg, res.Warnings...)
-	if len(res.Errors) > 0 {
+	b.lastBuildFailed = len(res.Errors) > 0
+	if b.lastBuildFailed {
 		err = errors.New("build failed")
+	} else {
+		b.handleBuildResult(&res)
 	}
-	b.lastBuildFailed = err != nil
-	b.handleBuildResult(&res)
 
 	fmt.Println("build done:", time.Since(start))
 	return msg, b.mem, err
