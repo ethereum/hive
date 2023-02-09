@@ -142,8 +142,9 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 				if len(clientTypes) == 0 {
 					panic(fmt.Errorf("client types length zero"))
 				}
+				clientTypesNames := helper.ClientTypesNames(clientTypes)
 				suite.Add(hivesim.TestSpec{
-					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), helper.ClientTypesNames(clientTypes)),
+					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), clientTypesNames),
 					Description: currentTest.GetAbout(),
 					Run: func(t *hivesim.T) {
 						// Start the client with given options
@@ -153,9 +154,9 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 							genesisStartOption,
 							hivesim.WithStaticFiles(testFiles),
 						)
-						t.Logf("Start test (%s): %s", c.Type, currentTest.GetName())
+						t.Logf("Start test: %s (%s)", currentTest.GetName(), clientTypesNames)
 						defer func() {
-							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
+							t.Logf("End test: %s (%s)", currentTest.GetName(), clientTypesNames)
 						}()
 						timeout := globals.DefaultTestCaseTimeout
 						// If a test.Spec specifies a timeout, use that instead
