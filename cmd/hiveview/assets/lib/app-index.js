@@ -14,6 +14,7 @@ $(document).ready(function () {
 	$('#loading').show();
 	console.log("Loading file list...");
 	$.ajax("listing.jsonl", {
+		cache: false,
 		success: function(data) {
 			$('#page-text').show();
 			showFileListing(data);
@@ -26,17 +27,6 @@ $(document).ready(function () {
 		},
 	});
 })
-
-function resultStats(fails, success, total) {
-	f = parseInt(fails), s = parseInt(success);
-	t = parseInt(total);
-	f = isNaN(f) ? "?" : f;
-	s = isNaN(s) ? "?" : s;
-	t = isNaN(t) ? "?" : t;
-	return '<b><span class="text-danger">' + f +
-		'</span>&nbsp;:&nbsp;<span class="text-success">' + s +
-		'</span> &nbsp;/&nbsp;' + t + '</b>';
-}
 
 function linkToSuite(suiteID, suiteName, linkText) {
 	let url = routes.suite(suiteID, suiteName);
