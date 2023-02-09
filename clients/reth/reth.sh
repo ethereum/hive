@@ -34,7 +34,7 @@
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 
 # Immediately abort the script on any error encountered
-set -e
+set -ex
 
 reth=/usr/local/bin/reth
 
@@ -74,22 +74,23 @@ echo "Command flags till now:"
 echo $FLAGS
 
 # Initialize the local testchain with the genesis state
-# TODO
-#echo "Initializing database with genesis state..."
-#$reth $FLAGS init /genesis.json
+echo "Initializing database with genesis state..."
+$reth init $FLAGS --chain /genesis.json
+
+# make sure we use the same genesis each time
+FLAGS="$FLAGS --chain /genesis.json"
 
 # Don't immediately abort, some imports are meant to fail
-set +e
+set +ex
 
 # Load the test chain if present
-# TODO
-#echo "Loading initial blockchain..."
-#if [ -f /chain.rlp ]; then
-#    echo "Loading initial blockchain..."
-#    $reth $FLAGS import /chain.rlp
-#else
-#    echo "Warning: chain.rlp not found."
-#fi
+echo "Loading initial blockchain..."
+if [ -f /chain.rlp ]; then
+    echo "Loading initial blockchain..."
+    $reth import $FLAGS --path /chain.rlp
+else
+    echo "Warning: chain.rlp not found."
+fi
 
 # Load the remainder of the test chain
 # TODO
@@ -98,13 +99,13 @@ set +e
 #    echo "Loading remaining individual blocks..."
 #    for file in $(ls /blocks | sort -n); do
 #        echo "Importing " $file
-#        $reth $FLAGS import /blocks/$file
+#        $reth import $FLAGS --path /blocks/$file
 #    done
 #else
 #    echo "Warning: blocks folder not found."
 #fi
 
-set -e
+set -ex
 
 # Configure any mining operation
 # TODO
