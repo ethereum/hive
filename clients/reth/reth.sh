@@ -129,8 +129,7 @@ set -ex
 #fi
 
 # Configure RPC.
-# TODO
-#FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3"
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net"
 #FLAGS="$FLAGS --ws"
 
 # TODO
