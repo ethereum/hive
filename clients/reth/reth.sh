@@ -93,17 +93,16 @@ else
 fi
 
 # Load the remainder of the test chain
-# TODO
-#echo "Loading remaining individual blocks..."
-#if [ -d /blocks ]; then
-#    echo "Loading remaining individual blocks..."
-#    for file in $(ls /blocks | sort -n); do
-#        echo "Importing " $file
-#        $reth import $FLAGS --path /blocks/$file
-#    done
-#else
-#    echo "Warning: blocks folder not found."
-#fi
+echo "Loading remaining individual blocks..."
+if [ -d /blocks ]; then
+    echo "Loading remaining individual blocks..."
+    for file in $(ls /blocks | sort -n); do
+        echo "Importing " $file
+        $reth import $FLAGS --path /blocks/$file
+    done
+else
+    echo "Warning: blocks folder not found."
+fi
 
 set -ex
 
