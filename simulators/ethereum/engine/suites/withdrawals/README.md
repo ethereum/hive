@@ -183,6 +183,17 @@ All test cases contain the following verifications:
     - Requested payload bodies past the highest known block are ignored and absent from the returned list
     - Payloads `32'` and `33'` are ignored by all requests since they are not part of the canonical chain.
 
+- Payload Bodies By Hash/Range After Sync - Shanghai Fork on Block 16 - 16 Withdrawal Blocks
+  - Launch client `A` and create a canonical chain consisting of 32 blocks, where the first shanghai block is number 17
+  - Payloads produced have: 16 Transactions, 16 Withdrawals
+  - Launch client `B` and send `NewPayload(P32)` + `FcU(P32)` to it.
+  - Wait until client `B` syncs the canonical chain, or timeout.
+  - Make multiple requests to obtain the payload bodies from the canonical chain (see `./tests.go` for full list) to client `B`.
+  - Verify that:
+    - Payload bodies of blocks before the Shanghai fork contain `withdrawals==null`
+    - All transactions and withdrawals are in the correct format and order.
+    - Requested payload bodies past the highest known block are ignored and absent from the returned list
+
 - Payload Bodies By Hash - Shanghai Fork on Block 16 - 16 Withdrawal Blocks
   - Launch client `A` and create a canonical chain consisting of 32 blocks, where the first shanghai block is number 17
   - Payloads produced of the following characteristics
