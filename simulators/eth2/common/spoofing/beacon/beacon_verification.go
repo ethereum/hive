@@ -34,31 +34,34 @@ type FallibleLogger interface {
 
 func GetTimestampFromNewPayload(
 	req []byte,
-) (uint64, error) {
+) (*uint64, error) {
 	var payload api.ExecutableData
 	if err := proxy.UnmarshalFromJsonRPCRequest(req, &payload); err != nil {
-		return 0, err
+		return nil, err
 	}
-	return payload.Timestamp, nil
+	return &payload.Timestamp, nil
 }
 
 func GetTimestampFromFcU(
 	req []byte,
-) (uint64, error) {
+) (*uint64, error) {
 	var (
 		fcS api.ForkchoiceStateV1
 		pA  *api.PayloadAttributes
 	)
 	if err := proxy.UnmarshalFromJsonRPCRequest(req, &fcS, &pA); err != nil {
-		return 0, nil
+		return nil, err
 	}
-	return pA.Timestamp, nil
+	if pA == nil {
+		return nil, nil
+	}
+	return &pA.Timestamp, nil
 }
 
 type EngineEndpointMaxTimestampVerify struct {
 	Endpoint          string
 	ExpiringTimestamp uint64
-	GetTimestampFn    func([]byte) (uint64, error)
+	GetTimestampFn    func([]byte) (*uint64, error)
 	FallibleLogger    FallibleLogger
 }
 
@@ -72,14 +75,14 @@ func (v *EngineEndpointMaxTimestampVerify) Verify(
 	if err != nil {
 		panic(err)
 	}
-	if timestamp >= v.ExpiringTimestamp {
+	if timestamp != nil && *timestamp >= v.ExpiringTimestamp {
 		if v.FallibleLogger == nil {
 			panic(fmt.Errorf("test is nil"))
 		}
 		v.FallibleLogger.Logf(
 			"FAIL: received directive using expired endpoint %s: timestamp %d >= %d",
 			v.Endpoint,
-			timestamp,
+			*timestamp,
 			v.ExpiringTimestamp,
 		)
 		v.FallibleLogger.Fail()
@@ -103,7 +106,7 @@ func NewEngineMaxTimestampVerifier(
 	endpoint string,
 	expiringTimestamp uint64,
 ) *EngineEndpointMaxTimestampVerify {
-	var getTimestampFn func([]byte) (uint64, error)
+	var getTimestampFn func([]byte) (*uint64, error)
 	if slices.Contains(EngineNewPayload, endpoint) {
 		getTimestampFn = GetTimestampFromNewPayload
 	} else if slices.Contains(EngineForkchoiceUpdated, endpoint) {
