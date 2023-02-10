@@ -778,6 +778,26 @@ var SyncTests = []test.SpecInterface{
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
+				Name: "Sync after 17 blocks - Withdrawals on Block 2 - Alternating Empty Withdrawals - No Transactions",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 2
+			- Withdraw to 16 accounts each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+			`,
+				TimeoutSeconds: 300,
+			},
+			WithdrawalsForkHeight:      2,
+			WithdrawalsBlockCount:      16,
+			TransactionsPerBlock:       big.NewInt(0),
+			WithdrawalsPerBlockOptions: []uint64{16, 0},
+		},
+		SyncSteps: 1,
+	},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
 				Name: "Sync after 17 blocks - Withdrawals on Block 2 - Alternating Empty Withdrawals",
 				About: `
 			- Spawn a first client
@@ -1498,7 +1518,7 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 					break loop
 				}
 				if r.Response.PayloadStatus.Status == test.Invalid {
-					t.Fatalf("FAIL (%s): Syncing client rejected valid chain: %s", t.TestName, r.Response)
+					t.Fatalf("FAIL (%s): Syncing client rejected valid chain: %v", t.TestName, r.Response)
 				}
 			}
 		}
