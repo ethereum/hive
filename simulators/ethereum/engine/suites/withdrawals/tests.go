@@ -1553,24 +1553,24 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		},
 		OnRequestNextPayload: func() {
 			// Send transactions to be included in the payload
-			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-				tx, err := helper.SendNextTransaction(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient: &globals.PrevRandaoContractAddr,
-						Amount:    common.Big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
-					},
-				)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-				}
-				// Error will be ignored here since the tx could have been already relayed
-				secondaryEngine.SendTransaction(t.TestContext, tx)
+			txs, err := helper.SendNextTransactions(
+				t.TestContext,
+				t.CLMock.NextBlockProducer,
+				&helper.BaseTransactionCreator{
+					Recipient: &globals.PrevRandaoContractAddr,
+					Amount:    common.Big1,
+					Payload:   nil,
+					TxType:    t.TestTransactionType,
+					GasLimit:  75000,
+				},
+				ws.GetTransactionCountPerPayload(),
+			)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to send transactions: %v", t.TestName, err)
 			}
+
+			// Error will be ignored here since the tx could have been already relayed
+			secondaryEngine.SendTransactions(t.TestContext, txs)
 
 			if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainSplitHeight() {
 				// Also request a payload from the sidechain
