@@ -327,6 +327,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 16,
@@ -345,6 +346,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 16,
@@ -363,6 +365,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 16,
@@ -382,6 +385,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
@@ -401,6 +405,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
@@ -420,6 +425,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
@@ -440,6 +446,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
@@ -460,6 +467,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
@@ -481,6 +489,7 @@ var Tests = []test.SpecInterface{
 				`,
 				SlotsToSafe:      big.NewInt(32),
 				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
