@@ -449,6 +449,49 @@ func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, acco
 	return nonce, nil
 }
 
+func (ec *HiveRPCEngineClient) UpdateNonce(testCtx context.Context, account common.Address, newNonce uint64) error {
+	// First get the current head of the client where we will send the tx
+	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+	defer cancel()
+	head, err := ec.HeaderByNumber(ctx, nil)
+	if err != nil {
+		return err
+	}
+	ec.accTxInfoMap[account] = &AccountTransactionInfo{
+		PreviousBlock: head.Hash(),
+		PreviousNonce: newNonce,
+	}
+	return nil
+}
+
+func (ec *HiveRPCEngineClient) SendTransactions(ctx context.Context, txs []*types.Transaction) []error {
+	reqs := make([]rpc.BatchElem, len(txs))
+	hashes := make([]common.Hash, len(txs))
+	for i := range reqs {
+		data, err := txs[i].MarshalBinary()
+		if err != nil {
+			return []error{err}
+		}
+		reqs[i] = rpc.BatchElem{
+			Method: "eth_sendRawTransaction",
+			Args:   []interface{}{hexutil.Encode(data)},
+			Result: &hashes[i],
+		}
+	}
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
+		return []error{err}
+	}
+	if err := ec.c.BatchCallContext(ctx, reqs); err != nil {
+		return []error{err}
+	}
+
+	errs := make([]error, len(txs))
+	for i := range reqs {
+		errs[i] = reqs[i].Error
+	}
+	return nil
+}
+
 func (ec *HiveRPCEngineClient) PostRunVerifications() error {
 	// There are no post run verifications for RPC clients yet
 	return nil

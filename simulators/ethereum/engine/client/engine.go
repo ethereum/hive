@@ -21,6 +21,7 @@ type Eth interface {
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
+	SendTransactions(ctx context.Context, txs []*types.Transaction) []error
 	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
 	NonceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (uint64, error)
@@ -55,6 +56,7 @@ type EngineClient interface {
 
 	// Local Test Account Management
 	GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error)
+	UpdateNonce(testCtx context.Context, account common.Address, newNonce uint64) error
 
 	// TTD Methods
 	TerminalTotalDifficulty() *big.Int
