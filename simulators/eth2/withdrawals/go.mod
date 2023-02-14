@@ -76,4 +76,4 @@ replace github.com/rauljordan/engine-proxy => github.com/marioevz/engine-proxy v
 
 replace github.com/ethereum/go-ethereum v1.10.26 => github.com/lightclient/go-ethereum v1.10.10-0.20230116085521-6ab6d738866f
 
-replace github.com/protolambda/eth2api => github.com/marioevz/eth2api v0.0.0-20230110222620-e349e704f20c
+replace github.com/protolambda/eth2api => github.com/marioevz/eth2api v0.0.0-20230214151319-641a58f39ae4

@@ -113,8 +113,8 @@ github.com/lightclient/go-ethereum v1.10.10-0.20230116085521-6ab6d738866f h1:Pox
 github.com/lightclient/go-ethereum v1.10.10-0.20230116085521-6ab6d738866f/go.mod h1:n7VlOgCwYheLB/mi+V8ni2yf8K2qM3N9WAmalxkhk+c=
 github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea h1:9ahHMPkNvYf9Nn3+U072ZKMDm05gaXfRESAmwP07Q+M=
 github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea/go.mod h1:9OVXfWYnIV+wj1/SqfdREmE5mzN/OANAgdOJRtFtvpo=
-github.com/marioevz/eth2api v0.0.0-20230110222620-e349e704f20c h1:SMr9xLO/+oftAWC1oms31EQd22cOH7C9QRqdSKpV03A=
-github.com/marioevz/eth2api v0.0.0-20230110222620-e349e704f20c/go.mod h1:4WbGGB4Bv17hKsiytlJY4IQDNpRS234DvFvIBNLnd60=
+github.com/marioevz/eth2api v0.0.0-20230214151319-641a58f39ae4 h1:CN6XoCl13Dnnwn3I7zjwmn2byw2SW7/MfBX52C9Fa54=
+github.com/marioevz/eth2api v0.0.0-20230214151319-641a58f39ae4/go.mod h1:4WbGGB4Bv17hKsiytlJY4IQDNpRS234DvFvIBNLnd60=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
 github.com/mattn/go-isatty v0.0.16 h1:bq3VjFmv/sOjHtdEhmkEV4x1AJtvUvOJ2PFAZ5+peKQ=
 github.com/mattn/go-runewidth v0.0.9/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
