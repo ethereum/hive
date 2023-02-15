@@ -4,8 +4,8 @@ import (
 	"context"
 	"math/big"
 
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core"
-	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/hivesim"
 
 	"github.com/ethereum/go-ethereum/common"

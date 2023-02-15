@@ -238,8 +238,8 @@ github.com/mattn/go-runewidth v0.0.14/go.mod h1:Jdepj2loyihRzMpdS35Xk/zdY8IAYHsh
 github.com/mattn/go-sqlite3 v1.11.0/go.mod h1:FPy6KqzDD04eiIsT53CuJW3U88zkxoIYsOqkbpncsNc=
 github.com/mattn/go-tty v0.0.0-20180907095812-13ff1204f104/go.mod h1:XPvLUNfbS4fJH25nqRHfWLMa1ONC8Amw+mIA639KxkE=
 github.com/matttproud/golang_protobuf_extensions v1.0.1/go.mod h1:D8He9yQNgCq6Z5Ld7szi9bcBfOoFv/3dc6xSMkL2PC0=
-github.com/mdehoog/go-ethereum v1.10.19-0.20230203015352-e5ef298492dd h1:Yt7032Mde00AJ++61kiKvKXMNEb6b3uhVtT5aKDlIBk=
-github.com/mdehoog/go-ethereum v1.10.19-0.20230203015352-e5ef298492dd/go.mod h1:SuKTK9zoADpRWRW13dD/M0loEYRl0ahcxn99I+8Kn+8=
+github.com/mdehoog/go-ethereum v1.10.19-0.20230208185416-70c86798f76e h1:CSaM6D6Zwu5xM9KdzdeS4pnnXbEdBglP8oPZvAq++pg=
+github.com/mdehoog/go-ethereum v1.10.19-0.20230208185416-70c86798f76e/go.mod h1:cdINoBW8NJd8H1UCRyfQZpnhVu4NpAkFfzuxKbXT0no=
 github.com/mitchellh/mapstructure v1.4.1/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=
 github.com/mitchellh/mapstructure v1.5.0 h1:jeMsZIYE/09sWLaz43PL7Gy6RuMjD2eJVyuac5Z2hdY=
 github.com/mitchellh/mapstructure v1.5.0/go.mod h1:bFUtVrKA4DC2yAKiSyO/QUcy7e+RRV2QTWOzhPopBRo=

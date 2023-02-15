@@ -4,8 +4,7 @@
 # produce a very minimalistic container that can be reused many times without
 # needing to constantly rebuild.
 
-ARG branch=eip4844-39ef7d7
-#FROM ethereum/client-go:$branch
+ARG branch=eip4844-6cc08ec9
 FROM inphi/geth:$branch as geth
 
 RUN apk add --update bash curl jq

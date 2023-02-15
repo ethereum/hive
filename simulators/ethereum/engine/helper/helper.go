@@ -18,8 +18,8 @@ import (
 	"net/http"
 	"os"
 
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/holiman/uint256"
@@ -505,7 +505,6 @@ func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transact
 		}
 		newTxData = &types.SignedBlobTx{
 			Message: types.BlobTxMessage{
-				ChainID:             view.Uint256View(*uint256.NewInt(globals.ChainID.Uint64())),
 				Nonce:               view.Uint64View(nonce),
 				Gas:                 view.Uint64View(tc.GasLimit),
 				GasFeeCap:           view.Uint256View(*gasFeeCap256),
