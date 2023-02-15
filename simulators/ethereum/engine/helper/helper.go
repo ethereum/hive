@@ -476,7 +476,8 @@ func (tc *BigInitcodeTransactionCreator) MakeTransaction(nonce uint64) (*types.T
 // already knew the tx (might happen if we produced a re-org where the tx was
 // unwind back into the txpool)
 func SentTxAlreadyKnown(err error) bool {
-	return strings.Contains(err.Error(), "already known")
+	return strings.Contains(err.Error(), "already known") || strings.Contains(err.Error(), "already in the TxPool") ||
+		strings.Contains(err.Error(), "AlreadyKnown")
 }
 
 func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (*types.Transaction, error) {
@@ -503,4 +504,30 @@ func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCr
 			return nil, testCtx.Err()
 		}
 	}
+}
+
+func SendNextTransactions(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, txCount uint64) ([]*types.Transaction, error) {
+	var err error
+	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
+	if err != nil {
+		return nil, err
+	}
+	txs := make([]*types.Transaction, txCount)
+	for i := range txs {
+		txs[i], err = txCreator.MakeTransaction(nonce)
+		if err != nil {
+			return nil, err
+		}
+		nonce++
+	}
+	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+	defer cancel()
+	errs := node.SendTransactions(ctx, txs)
+	for _, err := range errs {
+		if err != nil && !SentTxAlreadyKnown(err) {
+			return txs, err
+		}
+	}
+	node.UpdateNonce(testCtx, globals.VaultAccountAddress, nonce+txCount)
+	return txs, nil
 }
