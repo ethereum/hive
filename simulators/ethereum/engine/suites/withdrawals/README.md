@@ -38,6 +38,12 @@ All test cases contain the following verifications:
   - Withdraw to a single account 16 times each block for 2 blocks
   - Spawn a secondary client and send FCUV2(head)
   - Wait for sync and verify withdrawn account's balance
+- Sync after 2 blocks - Shanghai on Block 1 - No Withdrawals - No Transactions:
+  - Spawn a first client
+  - Go through Shanghai fork on Block 1
+  - Do no withdrawals each block for 2 blocks
+  - Spawn a secondary client and send FCUV2(head)
+  - Wait for sync and verify accounts' balances
 - Sync after 2 blocks - Shanghai on Block 1 - Single Withdrawal Account:
   - Spawn a first client
   - Go through Shanghai fork on Block 1
@@ -54,19 +60,19 @@ All test cases contain the following verifications:
   - Go through Shanghai fork on Block 2
   - Withdraw to 16 accounts each block for 2 blocks
   - Spawn a secondary client and send FCUV2(head)
-  - Wait for sync and verify withdrawn account's balance
+  - Wait for sync and verify withdrawn accounts' balances
 - Sync after 2 blocks - Shanghai on Block 2 - Multiple Withdrawal Accounts:
   - Spawn a first client
   - Go through Shanghai fork on Block 2
   - Withdraw to 16 accounts each block for 2 blocks
   - Spawn a secondary client and send FCUV2(head)
-  - Wait for sync and verify withdrawn account's balance
+  - Wait for sync and verify withdrawn accounts' balances
 - Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts:
   - Spawn a first client
   - Go through Shanghai fork on Block 2
   - Withdraw to many accounts 16 times each block for 128 blocks
   - Spawn a secondary client and send FCUV2(head)
-  - Wait for sync and verify withdrawn account's balance
+  - Wait for sync and verify withdrawn accounts' balances
 - [NOT IMPLEMENTED] Error Syncing Null Withdrawals Block after Shanghai:
   - Spawn a first client with configuration `shanghaiTime==2`
   - Send Block 1 with `timestamp==1`

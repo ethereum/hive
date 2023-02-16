@@ -679,6 +679,27 @@ var SyncTests = []test.SpecInterface{
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
+				Name: "Sync after 2 blocks - Withdrawals on Block 1 - No Withdrawals - No Transactions",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 1
+			- Do no withdrawals each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync and verify accounts' balances
+			`,
+				TimeoutSeconds: 300,
+			},
+			WithdrawalsForkHeight:    1,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      0,
+			WithdrawableAccountCount: 1,
+			TransactionsPerBlock:     common.Big0,
+		},
+		SyncSteps: 1,
+	},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account",
 				About: `
 			- Spawn a first client
