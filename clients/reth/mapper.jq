@@ -28,40 +28,8 @@ def to_bool:
   end
 ;
 
-# Converts number to hex, from https://rosettacode.org/wiki/Non-decimal_radices/Convert#jq
-def int_to_hex:
-  def stream:
-    recurse(if . > 0 then ./16|floor else empty end) | . % 16 ;
-  if . == 0 then "0x0"
-  else "0x" + ([stream] | reverse | .[1:] | map(if .<10 then 48+. else 87+. end) | implode)
-  end
-;
-
-# Converts decimal number in string to hex.
-def to_hex:
-  if . != null and startswith("0x") then . else
-    if (. != null and . != "") then .|tonumber|int_to_hex else . end
-  end
-;
-
-# Zero-pads hex string.
-def infix_zeros_to_length(s;l):
-  if . != null then
-    (.[0:s])+("0"*(l-(.|length)))+(.[s:l])
-  else .
-  end
-;
-
 # Replace config in input.
 . + {
-  "coinbase": (if .coinbase == null then "0x0000000000000000000000000000000000000000" else .coinbase end)|to_hex,
-  "difficulty": (if .difficulty == null then "0x00" else .difficulty end)|to_hex|infix_zeros_to_length(2;8),
-  "extraData": (if .extraData == null then "0x00" else .extraData end)|to_hex,
-  "gasLimit": (if .gasLimit == null then "0x00" else .gasLimit end)|to_hex|infix_zeros_to_length(2;8),
-  "mixHash": (if .mixHash == null then "0x00" else .mixHash end)|to_hex|infix_zeros_to_length(2;66),
-  "nonce": (if .nonce == null then "0x00" else .nonce end)|to_hex,
-  "parentHash": (if .parentHash == null then "0x0000000000000000000000000000000000000000000000000000000000000000" else .parentHash end)|to_hex,
-  "timestamp": (if .timestamp == null then "0x00" else .timestamp end)|to_hex,
   "config": {
     "ethash": (if env.HIVE_CLIQUE_PERIOD then null else {} end),
     "clique": (if env.HIVE_CLIQUE_PERIOD == null then null else {
