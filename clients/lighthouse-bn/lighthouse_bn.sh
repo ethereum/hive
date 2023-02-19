@@ -64,7 +64,6 @@ echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
 CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 eth1_option=$([[ "$HIVE_ETH2_ETH1_RPC_ADDRS" == "" ]] && echo "--dummy-eth1" || echo "--eth1-endpoints=$HIVE_ETH2_ETH1_RPC_ADDRS")
-metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT --metrics-allow-origin=*")
 if [ "$HIVE_ETH2_MERGE_ENABLED" != "" ]; then
     echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
     merge_option="--execution-endpoints=$HIVE_ETH2_ETH1_ENGINE_RPC_ADDRS --jwt-secrets=/jwtsecret"
@@ -77,7 +76,7 @@ lighthouse \
     --testnet-dir=/data/testnet_setup \
     bn \
     --network-dir=/data/network \
-    $metrics_option $eth1_option $merge_option $opt_sync_option \
+    $eth1_option $merge_option $opt_sync_option \
     --enr-tcp-port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --enr-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --enr-address="${CONTAINER_IP}" \
@@ -89,4 +88,5 @@ lighthouse \
     --subscribe-all-subnets \
     --boot-nodes="${HIVE_ETH2_BOOTNODE_ENRS:-""}" \
     --max-skip-slots="${HIVE_ETH2_MAX_SKIP_SLOTS:-1000}" \
-    --http --http-address=0.0.0.0 --http-port="${HIVE_ETH2_BN_API_PORT:-4000}" --http-allow-origin="*"
+    --http --http-address=0.0.0.0 --http-port="${HIVE_ETH2_BN_API_PORT:-4000}" --http-allow-origin="*" \
+    --metrics --metrics-address=0.0.0.0 --metrics-port=5054

@@ -11,9 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"gopkg.in/inconshreveable/log15.v2"
+
 	"github.com/ethereum/hive/internal/libdocker"
 	"github.com/ethereum/hive/internal/libhive"
-	"gopkg.in/inconshreveable/log15.v2"
 )
 
 func main() {
@@ -33,6 +34,9 @@ func main() {
 		simDevMode            = flag.Bool("dev", false, "Only starts the simulator API endpoint (listening at 127.0.0.1:3000 by default) without starting any simulators.")
 		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
 		useCredHelper         = flag.Bool("docker.cred-helper", false, "configure docker authentication using locally-configured credential helper")
+		metrics               = flag.Bool("metrics", false, "Flag to enable metrics collection with prometheus")
+		metricsGrafanaPort    = flag.Uint("metrics.grafana", 8080, "Host port to bind grafana frontend to, grafana will not run if this is 0.")
+		metricsPrometheusPort = flag.Uint("metrics.prometheus", 0, "Host port to bind prometheus to, prometheus will run but not be exposed to the host if this is 0 (host port is not required for plugging into grafana).")
 
 		clients = flag.String("client", "go-ethereum", "Comma separated `list` of clients to use. Client names in the list may be given as\n"+
 			"just the client name, or a client_branch specifier. If a branch name is supplied,\n"+
@@ -109,6 +113,11 @@ func main() {
 		SimParallelism:     *simParallelism,
 		SimDurationLimit:   *simTimeLimit,
 		ClientStartTimeout: *clientTimeout,
+		Metrics: libhive.MetricsEnvOptions{
+			Enabled:        *metrics,
+			GrafanaPort:    *metricsGrafanaPort,
+			PrometheusPort: *metricsPrometheusPort,
+		},
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
 	clientList := splitAndTrim(*clients, ",")

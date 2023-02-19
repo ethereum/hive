@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+	"time"
 )
 
 // ContainerBackend captures the docker interactions of the simulation API.
@@ -18,6 +19,15 @@ type ContainerBackend interface {
 
 	// This is for launching the simulation API server.
 	ServeAPI(context.Context, http.Handler) (APIServer, error)
+
+	// InitMetrics starts prometheus as auxiliary container to scrape metrics with.
+	// The grafanaPort sets the host port that grafana will be exposed at. Grafana is completely disabled if set to 0.
+	// The prometheusPort sets the host port that prometheus will be exposed at, or not exposed if 0.
+	InitMetrics(ctx context.Context, grafanaPort uint, prometheusPort uint) error
+	// CloseMetrics shuts down the metrics collection services that InitMetrics started, if any.
+	CloseMetrics()
+	// AnnotateMetrics adds an annotation to the grafana metrics, if metrics are enabled and grafana is running.
+	AnnotateMetrics(ctx context.Context, startTime, endTime time.Time, text string) error
 
 	// These methods work with containers.
 	CreateContainer(ctx context.Context, image string, opt ContainerOptions) (string, error)
@@ -45,6 +55,14 @@ type APIServer interface {
 // This error is returned by NetworkNameToID if a docker network is not present.
 var ErrNetworkNotFound = fmt.Errorf("network not found")
 
+// MetricsOptions defines a scrape target:
+// - a port that can be scraped by prometheus for metrics
+// - a map of labels to apply to the scraped metrics
+type MetricsOptions struct {
+	Port   uint16            `json:"port"`
+	Labels map[string]string `json:"labels"`
+}
+
 // ContainerOptions contains the launch parameters for docker containers.
 type ContainerOptions struct {
 	Env   map[string]string
@@ -61,6 +79,13 @@ type ContainerOptions struct {
 
 	// Input: if set, container stdin draws from the given reader.
 	Input io.ReadCloser
+
+	// This requests metrics scraping of the given endpoint to be served by the container
+	Metrics *MetricsOptions
+
+	// HostPorts binds the container port (key, formatted as "1234/tcp") to the given ports of the host
+	// (values, formatted as "1234", or empty if host assigns one)
+	HostPorts map[string][]string
 }
 
 // ContainerInfo is returned by StartContainer.
@@ -90,4 +115,8 @@ type Builder interface {
 // ClientMetadata is metadata to describe the client in more detail, configured with a YAML file in the client dir.
 type ClientMetadata struct {
 	Roles []string `yaml:"roles" json:"roles"`
+
+	// Metrics describes a metrics endpoint with labels to scrape with prometheus.
+	// Metrics scraping will not be enabled if left unspecified.
+	Metrics *MetricsOptions `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 }
