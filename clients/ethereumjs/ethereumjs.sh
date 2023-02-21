@@ -49,7 +49,7 @@
 set -e
 
 ethereumjs="node /ethereumjs-monorepo/packages/client/dist/bin/cli.js"
-FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcEnginePort 8551 --ws --logLevel debug"
+FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcEnginePort 8551 --ws --logLevel debug --rpcDebug --transports rlpx --isSingleNode"
 
 
 # Configure the chain.
@@ -73,6 +73,15 @@ fi
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     FLAGS="$FLAGS --jwt-secret ./jwtsecret"
+fi
+
+
+# Load the test chain if present
+echo "Loading initial blockchain..."
+if [ -f /chain.rlp ]; then
+  FLAGS="$FLAGS --loadBlocksFromRlp=/chain.rlp"
+  else
+  echo "Warning: chain.rlp not found."
 fi
 
 FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
