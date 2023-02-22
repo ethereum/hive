@@ -99,7 +99,7 @@ if [ -d /blocks ]; then
     IMPORTFLAGS="$IMPORTFLAGS $blocks"
 fi
 
-if [ "$HIVE_BOOTNODE" != "" ]; then
+if [ "$HIVE_BOOTNODE" == "" ]; then
     # Configure mining.
     if [ "$HIVE_MINER" != "" ]; then
         FLAGS="$FLAGS --miner-enabled --miner-coinbase=$HIVE_MINER"
