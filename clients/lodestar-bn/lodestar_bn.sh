@@ -27,7 +27,7 @@ case "$HIVE_LOGLEVEL" in
     2)   LOG=warn  ;;
     3)   LOG=info  ;;
     4)   LOG=debug ;;
-    5)   LOG=silly ;;
+    5)   LOG=trace ;;
 esac
 
 echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
