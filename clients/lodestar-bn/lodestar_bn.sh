@@ -21,14 +21,14 @@ echo "${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x111111111111111111111111111
 mkdir -p /data/beacon
 mkdir -p /data/network
 
+LOG=info
 case "$HIVE_LOGLEVEL" in
     0|1) LOG=error ;;
     2)   LOG=warn  ;;
     3)   LOG=info  ;;
     4)   LOG=debug ;;
-    5)   LOG=silly ;;
+    5)   LOG=trace ;;
 esac
-LOG=debug
 
 echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
