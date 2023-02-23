@@ -99,8 +99,8 @@ github.com/julienschmidt/httprouter v1.3.0/go.mod h1:JR6WtHb+2LUe8TCKY3cZOxFyyO8
 github.com/kilic/bls12-381 v0.1.0 h1:encrdjqKMEvabVQ7qYOKu1OvhqpK4s47wDYtNiPtlp4=
 github.com/kilic/bls12-381 v0.1.0/go.mod h1:vDTTHJONJ6G+P2R74EhnyotQDTliQDnFEwhdmfzw1ig=
 github.com/klauspost/cpuid/v2 v2.0.4/go.mod h1:FInQzS24/EEf25PyTYn52gqo7WaD8xa0213Md/qVLRg=
-github.com/klauspost/cpuid/v2 v2.2.1 h1:U33DW0aiEj633gHYw3LoDNfkDiYnE5Q8M/TKJn2f2jI=
-github.com/klauspost/cpuid/v2 v2.2.1/go.mod h1:RVVoqg1df56z8g3pUjL/3lE5UfnlrJX8tyFgg4nqhuY=
+github.com/klauspost/cpuid/v2 v2.2.2 h1:xPMwiykqNK9VK0NYC3+jTMYv9I6Vl3YdjZgPZKG3zO0=
+github.com/klauspost/cpuid/v2 v2.2.2/go.mod h1:RVVoqg1df56z8g3pUjL/3lE5UfnlrJX8tyFgg4nqhuY=
 github.com/konsorten/go-windows-terminal-sequences v1.0.1/go.mod h1:T0+1ngSBFLxvqU3pZ+m/2kptfBszLMUkC4ZK/EgS/cQ=
 github.com/kr/logfmt v0.0.0-20140226030751-b84e30acd515/go.mod h1:+0opPa2QZZtGFBFZlji/RkVcI2GknAs/DXo4wKdlNEc=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
@@ -112,6 +112,8 @@ github.com/lightclient/go-ethereum v1.10.10-0.20230116085521-6ab6d738866f h1:Pox
 github.com/lightclient/go-ethereum v1.10.10-0.20230116085521-6ab6d738866f/go.mod h1:n7VlOgCwYheLB/mi+V8ni2yf8K2qM3N9WAmalxkhk+c=
 github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea h1:9ahHMPkNvYf9Nn3+U072ZKMDm05gaXfRESAmwP07Q+M=
 github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea/go.mod h1:9OVXfWYnIV+wj1/SqfdREmE5mzN/OANAgdOJRtFtvpo=
+github.com/marioevz/eth2api v0.0.0-20230214151319-641a58f39ae4 h1:CN6XoCl13Dnnwn3I7zjwmn2byw2SW7/MfBX52C9Fa54=
+github.com/marioevz/eth2api v0.0.0-20230214151319-641a58f39ae4/go.mod h1:4WbGGB4Bv17hKsiytlJY4IQDNpRS234DvFvIBNLnd60=
 github.com/mattn/go-colorable v0.1.13 h1:fFA4WZxdEF4tXPZVKMLwD8oUnCTTo08duU7wxecdEvA=
 github.com/mattn/go-isatty v0.0.16 h1:bq3VjFmv/sOjHtdEhmkEV4x1AJtvUvOJ2PFAZ5+peKQ=
 github.com/mattn/go-runewidth v0.0.9/go.mod h1:H031xJmbD/WCDINGzjvQ9THkh0rPKHF+m2gUSrubnMI=
@@ -159,15 +161,12 @@ github.com/prometheus/procfs v0.0.0-20181005140218-185b4288413d/go.mod h1:c3At6R
 github.com/prometheus/procfs v0.0.2/go.mod h1:TjEm7ze935MbeOT/UhFTIMYKhuLP4wbCsTZCD3I8kEA=
 github.com/prometheus/tsdb v0.10.0 h1:If5rVCMTp6W2SiRAQFlbpJNgVlgMEd+U2GZckwK38ic=
 github.com/prometheus/tsdb v0.10.0/go.mod h1:oi49uRhEe9dPUTlS3JRZOwJuVi6tmh10QSgwXEyGCt4=
-github.com/protolambda/bls12-381-util v0.0.0-20210720105258-a772f2aac13e h1:ugvwIKDzqL6ODJciRPMm+9xFQ5AlOYHeMpCOeEuP7LA=
 github.com/protolambda/bls12-381-util v0.0.0-20210720105258-a772f2aac13e/go.mod h1:MPZvj2Pr0N8/dXyTPS5REeg2sdLG7t8DRzC1rLv925w=
-github.com/protolambda/eth2api v0.0.0-20220822011642-f7735dd471e0 h1:/0Dm3GrX4sk0aAYdrjtFvJigvPZ8HcAQ3ZT7kW+da7M=
-github.com/protolambda/eth2api v0.0.0-20220822011642-f7735dd471e0/go.mod h1:dzegbgrVD+2MQZ86RHWQvgWfnFxEjlDNkzf69afaSnA=
+github.com/protolambda/bls12-381-util v0.0.0-20220416220906-d8552aa452c7 h1:cZC+usqsYgHtlBaGulVnZ1hfKAi8iWtujBnRLQE698c=
+github.com/protolambda/bls12-381-util v0.0.0-20220416220906-d8552aa452c7/go.mod h1:IToEjHuttnUzwZI5KBSM/LOOW3qLbbrHOEfp3SbECGY=
 github.com/protolambda/go-keystorev4 v0.0.0-20211007151826-f20444f6d564 h1:yCXGkFjrZ8EggxW+Y7ueRZesNcBk0avLU0mVU/I2KtU=
 github.com/protolambda/go-keystorev4 v0.0.0-20211007151826-f20444f6d564/go.mod h1:Xda3KO8+DMyWaTr+LwUUpVRTB5SdFzoKu0ivXNI6p1s=
 github.com/protolambda/messagediff v1.4.0/go.mod h1:LboJp0EwIbJsePYpzh5Op/9G1/4mIztMRYzzwR0dR2M=
-github.com/protolambda/zrnt v0.29.0 h1:pHCagNwM1KJztMnXXCZ6RAvQL4nVTCJ1v1tTyl/nP0o=
-github.com/protolambda/zrnt v0.29.0/go.mod h1:qcdX9CXFeVNCQK/q0nswpzhd+31RHMk2Ax/2lMsJ4Jw=
 github.com/protolambda/zrnt v0.30.0 h1:pHEn69ZgaDFGpLGGYG1oD7DvYI7RDirbMBPfbC+8p4g=
 github.com/protolambda/zrnt v0.30.0/go.mod h1:qcdX9CXFeVNCQK/q0nswpzhd+31RHMk2Ax/2lMsJ4Jw=
 github.com/protolambda/ztyp v0.2.2 h1:rVcL3vBu9W/aV646zF6caLS/dyn9BN8NYiuJzicLNyY=

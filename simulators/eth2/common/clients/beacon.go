@@ -509,6 +509,20 @@ func (vbs *VersionedBeaconStateResponse) Validators() phase0.ValidatorRegistry {
 	panic("badly formatted beacon state")
 }
 
+func (vbs *VersionedBeaconStateResponse) StateSlot() common.Slot {
+	switch state := vbs.Data.(type) {
+	case *phase0.BeaconState:
+		return state.Slot
+	case *altair.BeaconState:
+		return state.Slot
+	case *bellatrix.BeaconState:
+		return state.Slot
+	case *capella.BeaconState:
+		return state.Slot
+	}
+	panic("badly formatted beacon state")
+}
+
 func (bn *BeaconClient) BeaconStateV2(
 	parentCtx context.Context,
 	stateId eth2api.StateId,

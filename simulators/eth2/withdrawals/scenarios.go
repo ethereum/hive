@@ -177,34 +177,40 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 	}
 
 	validators := versionedBeaconState.Validators()
-	for _, v := range genesisNonWithdrawable {
-		validator := validators[v.Index]
-		credentials := validator.WithdrawalCredentials
-		if !bytes.Equal(
-			credentials[:1],
-			[]byte{beacon.ETH1_ADDRESS_WITHDRAWAL_PREFIX},
-		) {
-			t.Fatalf(
-				"FAIL: Withdrawal credential not updated for validator %d: %v",
-				v.Index,
-				credentials,
-			)
+
+	if len(genesisNonWithdrawable) > 0 {
+		t.Logf("INFO: Checking validator updates on slot %d",
+			versionedBeaconState.StateSlot())
+
+		for _, v := range genesisNonWithdrawable {
+			validator := validators[v.Index]
+			credentials := validator.WithdrawalCredentials
+			if !bytes.Equal(
+				credentials[:1],
+				[]byte{beacon.ETH1_ADDRESS_WITHDRAWAL_PREFIX},
+			) {
+				t.Fatalf(
+					"FAIL: Withdrawal credential not updated for validator %d: %v",
+					v.Index,
+					credentials,
+				)
+			}
+			if v.WithdrawAddress == nil {
+				t.Fatalf(
+					"FAIL: BLS-to-execution change was not sent for validator %d",
+					v.Index,
+				)
+			}
+			if !bytes.Equal(v.WithdrawAddress[:], credentials[12:]) {
+				t.Fatalf(
+					"FAIL: Incorrect withdrawal credential for validator %d: want=%x, got=%x",
+					v.Index,
+					v.WithdrawAddress,
+					credentials[12:],
+				)
+			}
+			t.Logf("INFO: Successful BLS to execution change: %s", credentials)
 		}
-		if v.WithdrawAddress == nil {
-			t.Fatalf(
-				"FAIL: BLS-to-execution change was not sent for validator %d",
-				v.Index,
-			)
-		}
-		if !bytes.Equal(v.WithdrawAddress[:], credentials[12:]) {
-			t.Fatalf(
-				"FAIL: Incorrect withdrawal credential for validator %d: want=%x, got=%x",
-				v.Index,
-				v.WithdrawAddress,
-				credentials[12:],
-			)
-		}
-		t.Logf("INFO: Successful BLS to execution change: %s", credentials)
 	}
 
 	// Wait for all validators to withdraw
