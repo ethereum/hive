@@ -319,6 +319,7 @@ func (p *PreparedTestnet) prepareExecutionNode(
 	executionIndex int,
 	chain []*types.Block,
 	subnet string,
+	logEngineCalls bool,
 ) *clients.ExecutionClient {
 	testnet.Logf(
 		"Preparing execution node: %s (%s)",
@@ -394,9 +395,11 @@ func (p *PreparedTestnet) prepareExecutionNode(
 		testnet.T,
 		eth1Def,
 		optionsGenerator,
+		executionIndex,
 		clients.PortEngineRPC+executionIndex,
 		subnet,
 		ttd,
+		logEngineCalls,
 	)
 }
 

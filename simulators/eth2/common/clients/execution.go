@@ -21,12 +21,22 @@ import (
 	"github.com/ethereum/hive/simulators/eth2/common/spoofing/proxy"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
 	"github.com/golang-jwt/jwt/v4"
+	spoof "github.com/rauljordan/engine-proxy/proxy"
 )
 
 const (
 	PortUserRPC   = 8545
 	PortEngineRPC = 8551
 )
+
+var AllEngineCallsLog = []string{
+	"engine_forkchoiceUpdatedV1",
+	"engine_forkchoiceUpdatedV2",
+	"engine_getPayloadV1",
+	"engine_getPayloadV2",
+	"engine_newPayloadV1",
+	"engine_newPayloadV2",
+}
 
 type ExecutionClient struct {
 	T                *hivesim.T
@@ -37,6 +47,8 @@ type ExecutionClient struct {
 	proxyPort        int
 	subnet           string
 	ttd              *big.Int
+	clientIndex      int
+	logEngineCalls   bool
 
 	engineRpcClient *rpc.Client
 	ethRpcClient    *rpc.Client
@@ -47,9 +59,11 @@ func NewExecutionClient(
 	t *hivesim.T,
 	eth1Def *hivesim.ClientDefinition,
 	optionsGenerator func() ([]hivesim.StartOption, error),
+	clientIndex int,
 	proxyPort int,
 	subnet string,
 	ttd *big.Int,
+	logEngineCalls bool,
 ) *ExecutionClient {
 	return &ExecutionClient{
 		T:                t,
@@ -59,6 +73,8 @@ func NewExecutionClient(
 		proxy:            new(*proxy.Proxy),
 		subnet:           subnet,
 		ttd:              ttd,
+		clientIndex:      clientIndex,
+		logEngineCalls:   logEngineCalls,
 	}
 }
 
@@ -142,12 +158,33 @@ func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
 		panic(err)
 	}
 
-	*en.proxy = proxy.NewProxy(
+	proxy := proxy.NewProxy(
 		net.ParseIP(simIP),
 		en.proxyPort,
 		dest,
 		secret,
 	)
+	if en.logEngineCalls {
+		logCallback := func(res []byte, req []byte) *spoof.Spoof {
+			en.T.Logf(
+				"DEBUG: execution client %d, request: %s",
+				en.clientIndex,
+				req,
+			)
+			en.T.Logf(
+				"DEBUG: execution client %d, response: %s",
+				en.clientIndex,
+				res,
+			)
+			return nil
+		}
+		for _, c := range AllEngineCallsLog {
+			proxy.AddResponseCallback(c, logCallback)
+		}
+	}
+
+	*en.proxy = proxy
+
 	return nil
 }
 
