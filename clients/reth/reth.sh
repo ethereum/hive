@@ -50,11 +50,6 @@ esac
 mkdir /reth-hive-db
 FLAGS="$FLAGS --db /reth-hive-db"
 
-# It doesn't make sense to dial out, use only a pre-set bootnode.
-if [ "$HIVE_BOOTNODE" != "" ]; then
-    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
-fi
-
 # TODO If a specific network ID is requested, use that
 #if [ "$HIVE_NETWORK_ID" != "" ]; then
 #    FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
@@ -102,6 +97,12 @@ if [ -d /blocks ]; then
     done
 else
     echo "Warning: blocks folder not found."
+fi
+
+# Only set boot nodes in online steps
+# It doesn't make sense to dial out, use only a pre-set bootnode.
+if [ "$HIVE_BOOTNODE" != "" ]; then
+    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 fi
 
 set -ex
