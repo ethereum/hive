@@ -1,6 +1,6 @@
 package main
 
-var envForks = map[string] map[string]int{
+var envForks = map[string]map[string]int{
 	"Merge": {
 		"HIVE_FORK_HOMESTEAD":            0,
 		"HIVE_FORK_TANGERINE":            0,

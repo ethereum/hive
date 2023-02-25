@@ -50,6 +50,7 @@ type block struct {
 	Transactions []transactions `json:"transactions"`
 	UncleHeaders []byte         `json:"uncleHeaders"`
 	Withdrawals  []withdrawals  `json:"withdrawals"`
+	Exception    string         `json:"expectException"`
 }
 
 //go:generate go run github.com/fjl/gencodec -type blockHeader -field-override blockHeader -out gen_bh.go

@@ -19,10 +19,7 @@ WORKDIR /pyspec
 COPY --from=builder /pyspec/pyspec .
 
 # Download the latest fixture release.
-RUN curl -s https://api.github.com/repos/ethereum/execution-spec-tests/releases/latest \
-    | grep "browser_download_url" \
-    | cut -d '"' -f 4 \
-    | wget -qi -
+RUN wget https://github.com/ethereum/execution-spec-tests/releases/latest/download/fixtures.tar.gz
 
 # Extract the latest fixtures.
 RUN tar -xzvf fixtures.tar.gz

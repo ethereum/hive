@@ -16,15 +16,15 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
-// -------------------------------------------------------------------------//
-// main() starts the pyspec test suite in hive and runs the fixture runner. //
-// -------------------------------------------------------------------------//
+// ------------------------------------------------------------------------- //
+// main() starts the pyspec test suite in hive and runs the fixture runner.  //
+// ------------------------------------------------------------------------- //
 func main() {
 	suite := hivesim.Suite{
 		Name: "pyspec",
 		Description: "The 'pyspec' test suite runs every test fixture from " +
 			"the execution-spec-tests repository (https://github.com/ethereum/execution-spec-tests)" +
-			"against each client specified in the hive simulation run for forks >= Merge. " + 
+			"against each client specified in the hive simulation run for forks >= Merge. " +
 			"The clients are first fed a fixture genesis field, followed by each fixture block. " +
 			"The last valid block is then queried for its storage, nonce & balance, that are compared" +
 			"against the expected values from the test fixture file. This is all achieved using the EngineAPI.",
@@ -40,9 +40,9 @@ func main() {
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-// -------------------------------------------------------------------------//
-// fixtureRunner() loads the pyspec test files and spawns the client tests. //
-// -------------------------------------------------------------------------//
+// ------------------------------------------------------------------------- //
+// fixtureRunner() loads the pyspec test files and spawns the client tests.  //
+// ------------------------------------------------------------------------- //
 func fixtureRunner(t *hivesim.T) {
 
 	// retrieve clients available for testing
@@ -70,7 +70,6 @@ func fixtureRunner(t *hivesim.T) {
 	fileRoot := fmt.Sprintf("%s/", testPath)
 	t.Log("File root directory:", fileRoot)
 
-
 	// spawn `parallelism` workers to run fixtures against clients
 	var wg sync.WaitGroup
 	var testCh = make(chan *testcase)
@@ -80,11 +79,10 @@ func fixtureRunner(t *hivesim.T) {
 			defer wg.Done()
 			for test := range testCh {
 				t.Run(hivesim.TestSpec{
-					Name:		 test.name,
-					Description: ( 
-						"Test Link: " + 
+					Name: test.name,
+					Description: ("Test Link: " +
 						repoLink(test.filepath)),
-					Run:		 test.run,
+					Run:       test.run,
 					AlwaysRun: true,
 				})
 			}
@@ -108,17 +106,16 @@ func fixtureRunner(t *hivesim.T) {
 	wg.Wait()
 }
 
-// ---------------------------------------------------------------------//
-// repoLink() coverts a pyspec test path into its respective repo link. //
-//  -> helper function used for test descriptions in fixtureRunner()    // 
-// ---------------------------------------------------------------------//
+// --------------------------------------------------------------------- //
+// repoLink() coverts a pyspec test path into its respective repo link.  //
+// --------------------------------------------------------------------- //
 func repoLink(testPath string) string {
 	// Example for withdrawals_zero_amout.json:
 	// Converts '/fixtures/withdrawals/withdrawals/withdrawals_zero_amount.json'
 	// into 'fillers/withdrawals/withdrawals.py',
 	// and appends onto main branch repo link.
 	filePath := strings.Replace(testPath, "/fixtures", "fillers", -1)
-	fileDir  := strings.TrimSuffix(filePath, "/" + filepath.Base(filePath)) + ".py"
+	fileDir := strings.TrimSuffix(filePath, "/"+filepath.Base(filePath)) + ".py"
 	repoLink := fmt.Sprintf(
 		"https://github.com/ethereum/execution-spec-tests/blob/main/%v",
 		fileDir)
