@@ -87,7 +87,7 @@ set +ex
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
     echo "Loading initial blockchain..."
-    $reth import $FLAGS --path /chain.rlp
+    $reth import $FLAGS /chain.rlp
 else
     echo "Warning: chain.rlp not found."
 fi
@@ -98,7 +98,7 @@ if [ -d /blocks ]; then
     echo "Loading remaining individual blocks..."
     for file in $(ls /blocks | sort -n); do
         echo "Importing " $file
-        $reth import $FLAGS --path /blocks/$file
+        $reth import $FLAGS /blocks/$file
     done
 else
     echo "Warning: blocks folder not found."
