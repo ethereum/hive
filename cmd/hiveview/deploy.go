@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	esbuild "github.com/evanw/esbuild/pkg/api"
 	"golang.org/x/net/html"
 )
 
@@ -51,14 +52,21 @@ func importMapScript() string {
 //     against the bundler, and URLs in the HTML will be replaced by references to
 //     bundle files.
 type deployFS struct {
-	assets  fs.FS
-	bundler *bundler
+	assets         fs.FS
+	bundler        *bundler
+	bundlefs       fs.FS
+	buildmsg       []esbuild.Message
+	rebuildEnabled bool
 }
 
-func newDeployFS(assets fs.FS, useBundle bool) *deployFS {
+func newDeployFS(assets fs.FS, config *serverConfig) *deployFS {
 	dfs := &deployFS{assets: assets}
-	if useBundle {
+	if !config.disableBundle {
 		dfs.bundler = hiveviewBundler(assets)
+		// There is no need to rebuild the frontend code on every request
+		// when using asset files embedded into the binary, because none of the
+		// sources will ever change.
+		dfs.rebuildEnabled = !config.useEmbeddedAssets()
 	}
 	return dfs
 }
@@ -78,7 +86,7 @@ func (dfs *deployFS) Open(name string) (f fs.File, err error) {
 	case !strings.Contains(name, "/") && strings.HasSuffix(name, ".html"):
 		return dfs.openHTML(name)
 	case dfs.bundler != nil && isBundlePath(name):
-		_, memfs, _ := dfs.bundler.rebuild()
+		_, memfs := dfs.rebuildBundleFS()
 		return memfs.Open(name)
 	default:
 		return dfs.assets.Open(name)
@@ -109,7 +117,7 @@ func (dfs *deployFS) readDirRoot() ([]fs.DirEntry, error) {
 		return nil, err
 	}
 	if dfs.bundler != nil {
-		_, memfs, _ := dfs.bundler.rebuild()
+		_, memfs := dfs.rebuildBundleFS()
 		bundleEntries, _ := fs.ReadDir(memfs, ".")
 		entries = append(entries, bundleEntries...)
 	}
@@ -118,6 +126,15 @@ func (dfs *deployFS) readDirRoot() ([]fs.DirEntry, error) {
 		return entries[i].Name() < entries[j].Name()
 	})
 	return entries, nil
+}
+
+func (dfs *deployFS) rebuildBundleFS() ([]esbuild.Message, fs.FS) {
+	if dfs.rebuildEnabled || dfs.bundlefs == nil {
+		buildmsg, memfs, _ := dfs.bundler.rebuild()
+		dfs.bundlefs = memfs
+		dfs.buildmsg = buildmsg
+	}
+	return dfs.buildmsg, dfs.bundlefs
 }
 
 // openHTML opens a HTML file in the root directory and modifies it to use
@@ -143,7 +160,7 @@ func (dfs *deployFS) openHTML(name string) (fs.File, error) {
 		modTime = time.Now()
 	} else {
 		// Replace script/style references with bundle paths, if possible.
-		buildmsg, _, _ := dfs.bundler.rebuild()
+		buildmsg, _ := dfs.rebuildBundleFS()
 		var errorShown bool
 		modifyHTML(inputFile, output, func(token *html.Token, errlog io.Writer) {
 			if len(buildmsg) > 0 && !errorShown {

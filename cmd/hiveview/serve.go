@@ -37,6 +37,10 @@ func (cfg *serverConfig) assetFS() (fs.FS, error) {
 	return sub, nil
 }
 
+func (cfg *serverConfig) useEmbeddedAssets() bool {
+	return cfg.assetsDir == ""
+}
+
 func runServer(config serverConfig) {
 	assetFS, err := config.assetFS()
 	if err != nil {
@@ -44,7 +48,7 @@ func runServer(config serverConfig) {
 	}
 
 	// Create handlers.
-	deployFS := newDeployFS(assetFS, !config.disableBundle)
+	deployFS := newDeployFS(assetFS, &config)
 	logDirFS := os.DirFS(config.logDir)
 	logHandler := http.FileServer(http.FS(logDirFS))
 	listingHandler := serveListing{fsys: logDirFS}

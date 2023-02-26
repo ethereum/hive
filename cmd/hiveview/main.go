@@ -64,7 +64,7 @@ func doDeploy(config *serverConfig) {
 		log.Fatal(err)
 	}
 
-	deploy := newDeployFS(assetFS, !config.disableBundle)
+	deploy := newDeployFS(assetFS, config)
 	if err := copyFS(outputDir, deploy); err != nil {
 		log.Fatal(err)
 	}
