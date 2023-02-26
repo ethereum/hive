@@ -1,5 +1,5 @@
 import 'bootstrap'
-import { $ } from 'jquery'
+import $ from 'jquery'
 
 import * as routes from './routes.js'
 

@@ -2,7 +2,7 @@ import 'datatables.net'
 import 'datatables.net-bs5'
 import 'datatables.net-responsive'
 import 'datatables.net-responsive-bs5'
-import { $ } from 'jquery'
+import $ from 'jquery'
 
 import { html, format } from './utils.js'
 import * as routes from './routes.js'

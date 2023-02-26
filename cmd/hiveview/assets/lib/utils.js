@@ -1,4 +1,4 @@
-import { $ } from 'jquery'
+import $ from 'jquery'
 
 export let html = {
 	// encode does HTML-encoding/escaping.

@@ -2,6 +2,9 @@
 
 import * as jq from './jquery-3.6.3.js';
 
-export const $ = jq.ajax ? jq.default : (jq.$ || window.jQuery);
-export const jQuery = $;
-export default $;
+// Importing jQuery as an ES module works a bit differently in browsers and esbuild. This
+// is because esbuild recognizes jquery.js as a CommonJS module, and creates a named
+// export called 'default' instead of the expected default export. In browsers, jQuery
+// registers itself on window.
+let $ = jq.default || window.jQuery;
+export default $.noConflict();

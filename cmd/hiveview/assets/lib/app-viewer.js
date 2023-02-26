@@ -1,4 +1,4 @@
-import { $ } from 'jquery'
+import $ from 'jquery'
 import { html, nav, format, loader } from './utils.js'
 import * as routes from './routes.js'
 import * as common from './common.js'
