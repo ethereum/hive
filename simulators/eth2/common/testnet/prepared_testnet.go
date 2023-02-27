@@ -69,7 +69,7 @@ func prepareExecutionForkConfig(
 		if config.CapellaForkEpoch.Uint64() == 0 {
 			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime))
 		} else {
-			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime) + config.SlotTime.Int64()*32)
+			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime) + config.CapellaForkEpoch.Int64()*config.SlotTime.Int64()*32)
 		}
 	}
 	return &chainConfig
