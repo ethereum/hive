@@ -107,7 +107,7 @@ func (b *bundler) rebuild() ([]esbuild.Message, fs.FS, error) {
 		b.handleBuildResult(&res)
 	}
 
-	fmt.Println("build done:", time.Since(b.lastBuild))
+	log.Println("esbuild done:", time.Since(b.lastBuild))
 	return msg, b.mem, err
 }
 
