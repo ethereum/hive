@@ -36,6 +36,10 @@ const (
 	PortValidatorAPI = 5000
 )
 
+var (
+	EMPTY_TREE_ROOT = tree.Root{}
+)
+
 type BeaconClient struct {
 	T                     *hivesim.T
 	HiveClient            *hivesim.Client
@@ -429,6 +433,7 @@ func (bn *BeaconClient) BlockFinalityCheckpoints(
 
 type VersionedBeaconStateResponse struct {
 	*eth2api.VersionedBeaconState
+	spec *common.Spec
 }
 
 func (vbs *VersionedBeaconStateResponse) CurrentVersion() common.Version {
@@ -509,6 +514,20 @@ func (vbs *VersionedBeaconStateResponse) Validators() phase0.ValidatorRegistry {
 	panic("badly formatted beacon state")
 }
 
+func (vbs *VersionedBeaconStateResponse) RandaoMixes() phase0.RandaoMixes {
+	switch state := vbs.Data.(type) {
+	case *phase0.BeaconState:
+		return state.RandaoMixes
+	case *altair.BeaconState:
+		return state.RandaoMixes
+	case *bellatrix.BeaconState:
+		return state.RandaoMixes
+	case *capella.BeaconState:
+		return state.RandaoMixes
+	}
+	panic("badly formatted beacon state")
+}
+
 func (vbs *VersionedBeaconStateResponse) StateSlot() common.Slot {
 	switch state := vbs.Data.(type) {
 	case *phase0.BeaconState:
@@ -521,6 +540,125 @@ func (vbs *VersionedBeaconStateResponse) StateSlot() common.Slot {
 		return state.Slot
 	}
 	panic("badly formatted beacon state")
+}
+
+func (vbs *VersionedBeaconStateResponse) LatestExecutionPayloadHeaderHash() tree.Root {
+	switch state := vbs.Data.(type) {
+	case *phase0.BeaconState:
+		return tree.Root{}
+	case *altair.BeaconState:
+		return tree.Root{}
+	case *bellatrix.BeaconState:
+		return state.LatestExecutionPayloadHeader.BlockHash
+	case *capella.BeaconState:
+		return state.LatestExecutionPayloadHeader.BlockHash
+	}
+	panic("badly formatted beacon state")
+}
+
+func (vbs *VersionedBeaconStateResponse) NextWithdrawals(
+	slot common.Slot,
+) (common.Withdrawals, error) {
+	var (
+		withdrawalIndex common.WithdrawalIndex
+		validatorIndex  common.ValidatorIndex
+		validators      phase0.ValidatorRegistry
+		balances        phase0.Balances
+		epoch           = vbs.spec.SlotToEpoch(slot)
+	)
+	switch state := vbs.Data.(type) {
+	case *bellatrix.BeaconState:
+		// withdrawalIndex and validatorIndex start at zero
+		validators = state.Validators
+		balances = state.Balances
+	case *capella.BeaconState:
+		withdrawalIndex = state.NextWithdrawalIndex
+		validatorIndex = state.NextWithdrawalValidatorIndex
+		validators = state.Validators
+		balances = state.Balances
+	default:
+		return nil, fmt.Errorf("badly formatted beacon state")
+	}
+	validatorCount := uint64(len(validators))
+	withdrawals := make(common.Withdrawals, 0)
+
+	i := uint64(0)
+	for {
+		if validatorIndex >= common.ValidatorIndex(validatorCount) ||
+			validatorIndex >= common.ValidatorIndex(len(balances)) {
+			return nil, fmt.Errorf("invalid validator index")
+		}
+		validator := validators[validatorIndex]
+		if validator == nil {
+			return nil, fmt.Errorf("invalid validator")
+		}
+		balance := balances[validatorIndex]
+		if i >= validatorCount ||
+			i >= uint64(vbs.spec.MAX_VALIDATORS_PER_WITHDRAWALS_SWEEP) {
+			break
+		}
+		if IsFullyWithdrawableValidator(validator, balance, epoch) {
+			withdrawals = append(withdrawals, common.Withdrawal{
+				Index:          withdrawalIndex,
+				ValidatorIndex: validatorIndex,
+				Address:        Eth1WithdrawalCredential(validator),
+				Amount:         balance,
+			})
+			withdrawalIndex += 1
+		} else if IsPartiallyWithdrawableValidator(vbs.spec, validator, balance, epoch) {
+			withdrawals = append(withdrawals, common.Withdrawal{
+				Index:          withdrawalIndex,
+				ValidatorIndex: validatorIndex,
+				Address:        Eth1WithdrawalCredential(validator),
+				Amount:         balance - vbs.spec.MAX_EFFECTIVE_BALANCE,
+			})
+			withdrawalIndex += 1
+		}
+		if len(withdrawals) == int(vbs.spec.MAX_WITHDRAWALS_PER_PAYLOAD) {
+			break
+		}
+		validatorIndex = common.ValidatorIndex(
+			uint64(validatorIndex+1) % validatorCount,
+		)
+		i += 1
+	}
+	return withdrawals, nil
+}
+
+func Eth1WithdrawalCredential(validator *phase0.Validator) common.Eth1Address {
+	var address common.Eth1Address
+	copy(address[:], validator.WithdrawalCredentials[12:])
+	return address
+}
+
+func IsFullyWithdrawableValidator(
+	validator *phase0.Validator,
+	balance common.Gwei,
+	epoch common.Epoch,
+) bool {
+	return HasEth1WithdrawalCredential(validator) &&
+		validator.WithdrawableEpoch <= epoch &&
+		balance > 0
+}
+
+func IsPartiallyWithdrawableValidator(
+	spec *common.Spec,
+	validator *phase0.Validator,
+	balance common.Gwei,
+	epoch common.Epoch,
+) bool {
+	effectiveBalance := validator.EffectiveBalance
+	hasMaxEffectiveBalance := effectiveBalance == spec.MAX_EFFECTIVE_BALANCE
+	hasExcessBalance := balance > spec.MAX_EFFECTIVE_BALANCE
+	return HasEth1WithdrawalCredential(validator) && hasMaxEffectiveBalance &&
+		hasExcessBalance
+}
+
+func HasEth1WithdrawalCredential(validator *phase0.Validator) bool {
+	return bytes.Equal(
+		validator.WithdrawalCredentials[:1],
+		[]byte{common.ETH1_ADDRESS_WITHDRAWAL_PREFIX},
+	)
 }
 
 func (bn *BeaconClient) BeaconStateV2(
@@ -545,6 +683,7 @@ func (bn *BeaconClient) BeaconStateV2(
 	}
 	return &VersionedBeaconStateResponse{
 		VersionedBeaconState: versionedBeaconStateResponse,
+		spec:                 bn.spec,
 	}, err
 }
 
@@ -779,8 +918,10 @@ func (bn *BeaconClient) GetLatestExecutionBeaconBlock(
 			return nil, fmt.Errorf("failed to retrieve block: %v", err)
 		}
 		if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
-			emptyRoot := tree.Root{}
-			if !bytes.Equal(executionPayload.BlockHash[:], emptyRoot[:]) {
+			if !bytes.Equal(
+				executionPayload.BlockHash[:],
+				EMPTY_TREE_ROOT[:],
+			) {
 				return versionedBlock, nil
 			}
 		}
@@ -801,8 +942,10 @@ func (bn *BeaconClient) GetFirstExecutionBeaconBlock(
 			continue
 		}
 		if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
-			emptyRoot := tree.Root{}
-			if !bytes.Equal(executionPayload.BlockHash[:], emptyRoot[:]) {
+			if !bytes.Equal(
+				executionPayload.BlockHash[:],
+				EMPTY_TREE_ROOT[:],
+			) {
 				return versionedBlock, nil
 			}
 		}

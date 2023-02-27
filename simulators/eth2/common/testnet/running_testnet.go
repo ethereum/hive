@@ -10,12 +10,14 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/pkg/errors"
 
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/zrnt/eth2/beacon/altair"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"github.com/protolambda/zrnt/eth2/util/math"
+	"github.com/protolambda/ztyp/tree"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
@@ -23,7 +25,14 @@ import (
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
 )
 
-var MAX_PARTICIPATION_SCORE = 7
+const (
+	MAX_PARTICIPATION_SCORE = 7
+)
+
+var (
+	EMPTY_EXEC_HASH = ethcommon.Hash{}
+	EMPTY_TREE_ROOT = tree.Root{}
+)
 
 type Testnet struct {
 	*hivesim.T
@@ -38,6 +47,9 @@ type Testnet struct {
 	eth1Genesis *execution_config.ExecutionGenesis
 	// Consensus genesis state
 	eth2GenesisState common.BeaconState
+
+	// Test configuration
+	maxConsecutiveErrorsOnWaits int
 }
 
 type ActiveSpec struct {
@@ -210,6 +222,9 @@ func StartTestnet(
 		}
 	}
 
+	// Default config
+	testnet.maxConsecutiveErrorsOnWaits = 3
+
 	return testnet
 }
 
@@ -253,17 +268,18 @@ func (t *Testnet) WaitSlots(ctx context.Context, slots common.Slot) error {
 // WaitForFork blocks until a beacon client reaches specified fork,
 // or context finalizes, whichever happens first.
 func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
-	genesis := t.GenesisTimeUnix()
-	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
-	timer := time.NewTicker(slotDuration)
-	runningNodes := t.VerificationNodes().Running()
-	done := make(chan error, len(runningNodes))
+	var (
+		genesis      = t.GenesisTimeUnix()
+		slotDuration = time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
+		timer        = time.NewTicker(slotDuration)
+		runningNodes = t.VerificationNodes().Running()
+		results      = makeResults(runningNodes, t.maxConsecutiveErrorsOnWaits)
+	)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case err := <-done:
-			return err
 		case tim := <-timer.C:
 			// start polling after first slot of genesis
 			if tim.Before(genesis.Add(slotDuration)) {
@@ -272,44 +288,29 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 			}
 
 			// new slot, log and check status of all beacon nodes
-			type res struct {
-				idx int
-				msg string
-				err error
-			}
 			var (
-				wg sync.WaitGroup
-				ch = make(chan res, len(runningNodes))
+				wg        sync.WaitGroup
+				clockSlot = t.spec.TimeToSlot(
+					common.Timestamp(time.Now().Unix()),
+					t.GenesisTime(),
+				)
 			)
+			results.Clear()
+
 			for i, n := range runningNodes {
 				wg.Add(1)
 				go func(
 					ctx context.Context,
-					i int,
 					n *clients.Node,
-					ch chan res,
+					r *result,
 				) {
 					defer wg.Done()
 
-					var (
-						b         = n.BeaconClient
-						slot      common.Slot
-						head      string
-						justified string
-						finalized string
-						execution = "0x0000..0000"
-					)
+					b := n.BeaconClient
 
 					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s): failed to poll head: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(err, "failed to poll head")
 						return
 					}
 
@@ -318,7 +319,10 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 						eth2api.BlockHead,
 					)
 					if err != nil {
-						ch <- res{err: fmt.Errorf("node %d (%s) failed to poll finality checkpoint: %v", i, n.ClientNames(), err)}
+						r.err = errors.Wrap(
+							err,
+							"failed to poll finality checkpoint",
+						)
 						return
 					}
 
@@ -327,63 +331,50 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 						eth2api.BlockIdRoot(headInfo.Root),
 					)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s) failed to retrieve block: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(err, "failed to retrieve block")
 						return
 					}
+
+					execution := ethcommon.Hash{}
 					if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
-						execution = utils.Shorten(
-							executionPayload.BlockHash.String(),
-						)
+						execution = executionPayload.BlockHash
 					}
 
-					slot = headInfo.Header.Message.Slot
-					head = utils.Shorten(headInfo.Root.String())
-					justified = utils.Shorten(
-						checkpoints.CurrentJustified.String(),
-					)
-					finalized = utils.Shorten(checkpoints.Finalized.String())
-
-					ch <- res{
-						i,
-						fmt.Sprintf(
-							"node %d (%s) fork=%s, slot=%d, head=%s, exec_payload=%s, justified=%s, finalized=%s",
-							i,
-							n.ClientNames(),
-							versionedBlock.Version,
+					slot := headInfo.Header.Message.Slot
+					if clockSlot > slot &&
+						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
+						r.fatal = fmt.Errorf(
+							"unable to sync for an entire epoch: clockSlot=%d, slot=%d",
+							clockSlot,
 							slot,
-							head,
-							execution,
-							justified,
-							finalized,
-						),
-						nil,
+						)
+						return
 					}
+
+					r.msg = fmt.Sprintf(
+						"fork=%s, clock_slot=%s, slot=%d, head=%s, exec_payload=%s, justified=%s, finalized=%s",
+						versionedBlock.Version,
+						clockSlot,
+						slot,
+						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(execution.String()),
+						utils.Shorten(checkpoints.CurrentJustified.String()),
+						utils.Shorten(checkpoints.Finalized.String()),
+					)
 
 					if versionedBlock.Version == fork {
-						done <- nil
+						r.done = true
 					}
-				}(ctx, i, n, ch)
+				}(ctx, n, results[i])
 			}
 			wg.Wait()
-			close(ch)
 
-			// print out logs in ascending idx order
-			sorted := make([]string, len(runningNodes))
-			for out := range ch {
-				if out.err != nil {
-					return out.err
-				}
-				sorted[out.idx] = out.msg
+			if err := results.CheckError(); err != nil {
+				return err
 			}
-			for _, msg := range sorted {
-				t.Logf(msg)
+			results.PrintMessages(t.Logf)
+			if results.AllDone() {
+				return nil
 			}
 		}
 	}
@@ -394,17 +385,18 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 func (t *Testnet) WaitForFinality(ctx context.Context) (
 	common.Checkpoint, error,
 ) {
-	genesis := t.GenesisTimeUnix()
-	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
-	timer := time.NewTicker(slotDuration)
-	runningNodes := t.VerificationNodes().Running()
-	done := make(chan common.Checkpoint, len(runningNodes))
+	var (
+		genesis      = t.GenesisTimeUnix()
+		slotDuration = time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
+		timer        = time.NewTicker(slotDuration)
+		runningNodes = t.VerificationNodes().Running()
+		results      = makeResults(runningNodes, t.maxConsecutiveErrorsOnWaits)
+	)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return common.Checkpoint{}, ctx.Err()
-		case finalized := <-done:
-			return finalized, nil
 		case tim := <-timer.C:
 			// start polling after first slot of genesis
 			if tim.Before(genesis.Add(slotDuration)) {
@@ -413,45 +405,25 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 			}
 
 			// new slot, log and check status of all beacon nodes
-			type res struct {
-				idx int
-				msg string
-				err error
-			}
 			var (
-				wg sync.WaitGroup
-				ch = make(chan res, len(runningNodes))
+				wg        sync.WaitGroup
+				clockSlot = t.spec.TimeToSlot(
+					common.Timestamp(time.Now().Unix()),
+					t.GenesisTime(),
+				)
 			)
+			results.Clear()
+
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(
-					ctx context.Context,
-					i int,
-					n *clients.Node,
-					ch chan res,
-				) {
+				go func(ctx context.Context, n *clients.Node, r *result) {
 					defer wg.Done()
 
-					var (
-						b         = n.BeaconClient
-						slot      common.Slot
-						head      string
-						justified string
-						finalized string
-						health    float64
-						execution = "0x0000..0000"
-					)
+					b := n.BeaconClient
 
 					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s) failed to poll head: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(err, "failed to poll head")
 						return
 					}
 
@@ -460,14 +432,10 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 						eth2api.BlockHead,
 					)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s) failed to poll finality checkpoint: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(
+							err,
+							"failed to poll finality checkpoint",
+						)
 						return
 					}
 
@@ -476,90 +444,57 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 						eth2api.BlockIdRoot(headInfo.Root),
 					)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s) failed to retrieve block: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(err, "failed to retrieve block")
 						return
 					}
+					execution := ethcommon.Hash{}
 					if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
-						execution = utils.Shorten(
-							executionPayload.BlockHash.String(),
-						)
+						execution = executionPayload.BlockHash
 					}
 
-					slot = headInfo.Header.Message.Slot
-					head = utils.Shorten(headInfo.Root.String())
-					justified = utils.Shorten(
-						checkpoints.CurrentJustified.String(),
+					slot := headInfo.Header.Message.Slot
+					if clockSlot > slot &&
+						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
+						r.fatal = fmt.Errorf(
+							"unable to sync for an entire epoch: clockSlot=%d, slot=%d",
+							clockSlot,
+							slot,
+						)
+						return
+					}
+
+					health, _ := GetHealth(ctx, b, t.spec, slot)
+
+					r.msg = fmt.Sprintf(
+						"fork=%s, clock_slot=%d, slot=%d, head=%s, "+
+							"health=%.2f, exec_payload=%s, justified=%s, "+
+							"finalized=%s",
+						versionedBlock.Version,
+						clockSlot,
+						slot,
+						utils.Shorten(headInfo.Root.String()),
+						health,
+						utils.Shorten(execution.String()),
+						utils.Shorten(checkpoints.CurrentJustified.String()),
+						utils.Shorten(checkpoints.Finalized.String()),
 					)
-					finalized = utils.Shorten(checkpoints.Finalized.String())
-					health, err = GetHealth(ctx, b, t.spec, slot)
-					if err != nil {
-						// warning is printed here instead because some clients
-						// don't support the required REST endpoint.
-						fmt.Printf(
-							"WARN: node %d (%s) %s\n",
-							i,
-							n.ClientNames(),
-							err,
-						)
-					}
-
-					ep := t.spec.SlotToEpoch(slot)
-					if ep > 4 && ep > checkpoints.Finalized.Epoch+2 {
-						ch <- res{
-							err: fmt.Errorf(
-								"failed to finalize, head slot %d (epoch %d) "+
-									"is more than 2 ahead of finality checkpoint %d",
-								slot,
-								ep,
-								checkpoints.Finalized.Epoch,
-							),
-						}
-					} else {
-						ch <- res{
-							i,
-							fmt.Sprintf(
-								"node %d (%s) fork=%s, slot=%d, head=%s, "+
-									"health=%.2f, exec_payload=%s, justified=%s, "+
-									"finalized=%s",
-								i,
-								n.ClientNames(),
-								versionedBlock.Version,
-								slot,
-								head,
-								health,
-								execution,
-								justified,
-								finalized,
-							),
-							nil,
-						}
-					}
 
 					if (checkpoints.Finalized != common.Checkpoint{}) {
-						done <- checkpoints.Finalized
+						r.done = true
+						r.result = checkpoints.Finalized
 					}
-				}(ctx, i, n, ch)
+				}(ctx, n, results[i])
 			}
 			wg.Wait()
-			close(ch)
 
-			// print out logs in ascending idx order
-			sorted := make([]string, len(runningNodes))
-			for out := range ch {
-				if out.err != nil {
-					return common.Checkpoint{}, out.err
-				}
-				sorted[out.idx] = out.msg
+			if err := results.CheckError(); err != nil {
+				return common.Checkpoint{}, err
 			}
-			for _, msg := range sorted {
-				t.Logf(msg)
+			results.PrintMessages(t.Logf)
+			if results.AllDone() {
+				if cp, ok := results[0].result.(common.Checkpoint); ok {
+					return cp, nil
+				}
 			}
 		}
 	}
@@ -571,17 +506,18 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 func (t *Testnet) WaitForExecutionFinality(
 	ctx context.Context,
 ) (common.Checkpoint, error) {
-	genesis := t.GenesisTimeUnix()
-	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
-	timer := time.NewTicker(slotDuration)
-	runningNodes := t.VerificationNodes().Running()
-	done := make(chan common.Checkpoint, len(runningNodes))
+	var (
+		genesis      = t.GenesisTimeUnix()
+		slotDuration = time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
+		timer        = time.NewTicker(slotDuration)
+		runningNodes = t.VerificationNodes().Running()
+		results      = makeResults(runningNodes, t.maxConsecutiveErrorsOnWaits)
+	)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return common.Checkpoint{}, ctx.Err()
-		case finalized := <-done:
-			return finalized, nil
 		case tim := <-timer.C:
 			// start polling after first slot of genesis
 			if tim.Before(genesis.Add(slotDuration)) {
@@ -590,129 +526,103 @@ func (t *Testnet) WaitForExecutionFinality(
 			}
 
 			// new slot, log and check status of all beacon nodes
-			type res struct {
-				idx int
-				msg string
-				err error
-			}
 			var (
-				wg sync.WaitGroup
-				ch = make(chan res, len(runningNodes))
+				wg        sync.WaitGroup
+				clockSlot = t.spec.TimeToSlot(
+					common.Timestamp(time.Now().Unix()),
+					t.GenesisTime(),
+				)
 			)
+			results.Clear()
+
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(ctx context.Context, i int, n *clients.Node, ch chan res) {
+				go func(ctx context.Context, n *clients.Node, r *result) {
 					defer wg.Done()
 					var (
-						b         = n.BeaconClient
-						slot      common.Slot
-						version   string
-						head      string
-						justified string
-						finalized string
+						b       = n.BeaconClient
+						version string
 					)
 
 					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s) failed to poll head: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(err, "failed to poll head")
 						return
 					}
-					slot = headInfo.Header.Message.Slot
-					head = utils.Shorten(headInfo.Root.String())
+					slot := headInfo.Header.Message.Slot
+					if clockSlot > slot &&
+						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
+						r.fatal = fmt.Errorf(
+							"unable to sync for an entire epoch: clockSlot=%d, slot=%d",
+							clockSlot,
+							slot,
+						)
+						return
+					}
 
 					checkpoints, err := b.BlockFinalityCheckpoints(
 						ctx,
 						eth2api.BlockHead,
 					)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s) failed to poll finality checkpoint: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(
+							err,
+							"failed to poll finality checkpoint",
+						)
 						return
 					}
-					justified = utils.Shorten(
-						checkpoints.CurrentJustified.String(),
-					)
-					finalized = utils.Shorten(checkpoints.Finalized.String())
 
-					var (
-						execution    ethcommon.Hash
-						executionStr = "0x0000..0000"
-					)
-
+					execution := ethcommon.Hash{}
 					if (checkpoints.Finalized != common.Checkpoint{}) {
 						if versionedBlock, err := b.BlockV2(
 							ctx,
 							eth2api.BlockIdRoot(checkpoints.Finalized.Root),
 						); err != nil {
-							ch <- res{
-								err: fmt.Errorf(
-									"node %d (%s) failed to retrieve block: %v",
-									i,
-									n.ClientNames(),
-									err,
-								),
-							}
+							r.err = errors.Wrap(
+								err,
+								"failed to retrieve block",
+							)
 							return
 						} else {
 							version = versionedBlock.Version
 							if exeuctionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
 								execution = exeuctionPayload.BlockHash
-								executionStr = utils.Shorten(execution.Hex())
 							}
 						}
 					}
 
-					ch <- res{
-						i,
-						fmt.Sprintf("node %d (%s) fork=%s, slot=%d, head=%s, "+"finalized_exec_payload=%s, justified=%s, finalized=%s",
-							i,
-							n.ClientNames(),
-							version,
-							slot,
-							head,
-							executionStr,
-							justified,
-							finalized,
-						),
-						nil,
-					}
-					emptyHash := ethcommon.Hash{}
-					if !bytes.Equal(execution[:], emptyHash[:]) {
-						done <- checkpoints.Finalized
+					r.msg = fmt.Sprintf(
+						"fork=%s, clock_slot=%s, slot=%d, head=%s, "+
+							"exec_payload=%s, justified=%s, finalized=%s",
+						version,
+						clockSlot,
+						slot,
+						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(execution.Hex()),
+						utils.Shorten(checkpoints.CurrentJustified.String()),
+						utils.Shorten(checkpoints.Finalized.String()),
+					)
+
+					if !bytes.Equal(execution[:], EMPTY_EXEC_HASH[:]) {
+						r.done = true
+						r.result = checkpoints.Finalized
 					}
 				}(
 					ctx,
-					i,
 					n,
-					ch,
+					results[i],
 				)
 			}
 			wg.Wait()
-			close(ch)
 
-			// print out logs in ascending idx order
-			sorted := make([]string, len(runningNodes))
-			for out := range ch {
-				if out.err != nil {
-					return common.Checkpoint{}, out.err
-				}
-				sorted[out.idx] = out.msg
+			if err := results.CheckError(); err != nil {
+				return common.Checkpoint{}, err
 			}
-			for _, msg := range sorted {
-				t.Logf(msg)
+			results.PrintMessages(t.Logf)
+			if results.AllDone() {
+				if cp, ok := results[0].result.(common.Checkpoint); ok {
+					return cp, nil
+				}
 			}
 		}
 	}
@@ -722,28 +632,27 @@ func (t *Testnet) WaitForExecutionFinality(
 func (t *Testnet) WaitForCurrentEpochFinalization(
 	ctx context.Context,
 ) (common.Checkpoint, error) {
-	genesis := t.GenesisTimeUnix()
-	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
-	timer := time.NewTicker(slotDuration)
-	runningNodes := t.VerificationNodes().Running()
-	done := make(chan common.Checkpoint, len(runningNodes))
-
-	// Get the current head root which must be finalized
-	headInfo, err := runningNodes[0].BeaconClient.BlockHeader(
-		ctx,
-		eth2api.BlockHead,
+	var (
+		genesis      = t.GenesisTimeUnix()
+		slotDuration = time.Duration(
+			t.spec.SECONDS_PER_SLOT,
+		) * time.Second
+		timer        = time.NewTicker(slotDuration)
+		runningNodes = t.VerificationNodes().Running()
+		results      = makeResults(
+			runningNodes,
+			t.maxConsecutiveErrorsOnWaits,
+		)
+		epochToBeFinalized = t.spec.SlotToEpoch(t.spec.TimeToSlot(
+			common.Timestamp(time.Now().Unix()),
+			t.GenesisTime(),
+		))
 	)
-	if err != nil {
-		return common.Checkpoint{}, fmt.Errorf("failed to poll head: %v", err)
-	}
-	epochToBeFinalized := t.spec.SlotToEpoch(headInfo.Header.Message.Slot)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return common.Checkpoint{}, ctx.Err()
-		case finalized := <-done:
-			return finalized, nil
 		case tim := <-timer.C:
 			// start polling after first slot of genesis
 			if tim.Before(genesis.Add(slotDuration)) {
@@ -752,103 +661,82 @@ func (t *Testnet) WaitForCurrentEpochFinalization(
 			}
 
 			// new slot, log and check status of all beacon nodes
-			type res struct {
-				idx int
-				msg string
-				err error
-			}
 			var (
-				wg sync.WaitGroup
-				ch = make(chan res, len(runningNodes))
+				wg        sync.WaitGroup
+				clockSlot = t.spec.TimeToSlot(
+					common.Timestamp(time.Now().Unix()),
+					t.GenesisTime(),
+				)
 			)
+			results.Clear()
+
 			for i, n := range runningNodes {
+				i := i
 				wg.Add(1)
-				go func(ctx context.Context, i int, n *clients.Node, ch chan res) {
+				go func(ctx context.Context, n *clients.Node, r *result) {
 					defer wg.Done()
 
-					var (
-						b         = n.BeaconClient
-						slot      common.Slot
-						head      string
-						justified string
-						finalized string
-					)
+					b := n.BeaconClient
 
 					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s) failed to poll head: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(err, "failed to poll head")
 						return
 					}
-					slot = headInfo.Header.Message.Slot
-					head = utils.Shorten(headInfo.Root.String())
+
+					slot := headInfo.Header.Message.Slot
+					if clockSlot > slot &&
+						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
+						r.fatal = fmt.Errorf(
+							"unable to sync for an entire epoch: clockSlot=%d, slot=%d",
+							clockSlot,
+							slot,
+						)
+						return
+					}
 
 					checkpoints, err := b.BlockFinalityCheckpoints(
 						ctx,
 						eth2api.BlockHead,
 					)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s) failed to poll finality checkpoint: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(
+							err,
+							"failed to poll finality checkpoint",
+						)
 						return
 					}
-					justified = utils.Shorten(
-						checkpoints.CurrentJustified.String(),
-					)
-					finalized = utils.Shorten(checkpoints.Finalized.String())
 
-					ch <- res{
-						i,
-						fmt.Sprintf(
-							"node %d (%s) slot=%d, head=%s justified=%s, "+
-								"finalized=%s, epoch_to_finalize=%d",
-							i,
-							n.ClientNames(),
-							slot,
-							head,
-							justified,
-							finalized,
-							epochToBeFinalized,
-						),
-						nil,
-					}
+					r.msg = fmt.Sprintf(
+						"clock_slot=%d, slot=%d, head=%s justified=%s, "+
+							"finalized=%s, epoch_to_finalize=%d",
+						clockSlot,
+						slot,
+						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(checkpoints.CurrentJustified.String()),
+						utils.Shorten(checkpoints.Finalized.String()),
+						epochToBeFinalized,
+					)
 
 					if checkpoints.Finalized != (common.Checkpoint{}) &&
 						checkpoints.Finalized.Epoch >= epochToBeFinalized {
-						done <- checkpoints.Finalized
+						r.done = true
+						r.result = checkpoints.Finalized
 					}
-				}(
-					ctx,
-					i,
-					n,
-					ch,
-				)
+				}(ctx, n, results[i])
+
 			}
 			wg.Wait()
-			close(ch)
 
-			// print out logs in ascending idx order
-			sorted := make([]string, len(runningNodes))
-			for out := range ch {
-				if out.err != nil {
-					return common.Checkpoint{}, out.err
-				}
-				sorted[out.idx] = out.msg
+			if err := results.CheckError(); err != nil {
+				return common.Checkpoint{}, err
 			}
-			for _, msg := range sorted {
-				t.Logf(msg)
+			results.PrintMessages(t.Logf)
+			if results.AllDone() {
+				t.Logf("INFO: Epoch %d finalized", epochToBeFinalized)
+				if cp, ok := results[0].result.(common.Checkpoint); ok {
+					return cp, nil
+				}
 			}
 		}
 	}
@@ -859,20 +747,23 @@ func (t *Testnet) WaitForCurrentEpochFinalization(
 func (t *Testnet) WaitForExecutionPayload(
 	ctx context.Context,
 ) (ethcommon.Hash, error) {
-	genesis := t.GenesisTimeUnix()
-	slotDuration := time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
-	timer := time.NewTicker(slotDuration)
-	runningNodes := t.VerificationNodes().Running()
-	done := make(chan ethcommon.Hash, len(runningNodes))
-	executionClient := runningNodes[0].ExecutionClient
-	ttdReached := false
+	var (
+		genesis      = t.GenesisTimeUnix()
+		slotDuration = time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
+		timer        = time.NewTicker(slotDuration)
+		runningNodes = t.VerificationNodes().Running()
+		results      = makeResults(
+			runningNodes,
+			t.maxConsecutiveErrorsOnWaits,
+		)
+		executionClient = runningNodes[0].ExecutionClient
+		ttdReached      = false
+	)
 
 	for {
 		select {
 		case <-ctx.Done():
 			return ethcommon.Hash{}, ctx.Err()
-		case result := <-done:
-			return result, nil
 		case tim := <-timer.C:
 			// start polling after first slot of genesis
 			if tim.Before(genesis.Add(slotDuration)) {
@@ -882,137 +773,96 @@ func (t *Testnet) WaitForExecutionPayload(
 
 			if !ttdReached {
 				// Check if TTD has been reached
-				if td, err := executionClient.TotalDifficultyByNumber(ctx, nil); err == nil &&
-					td.Cmp(t.eth1Genesis.Genesis.Config.TerminalTotalDifficulty) >= 0 {
-					ttdReached = true
+				if td, err := executionClient.TotalDifficultyByNumber(ctx, nil); err == nil {
+					if td.Cmp(
+						t.eth1Genesis.Genesis.Config.TerminalTotalDifficulty,
+					) >= 0 {
+						ttdReached = true
+					} else {
+						continue
+					}
 				} else {
 					t.Logf("Error querying eth1 for TTD: %v", err)
 				}
 			}
 
 			// new slot, log and check status of all beacon nodes
-			type res struct {
-				idx int
-				msg string
-				err error
-			}
-
 			var (
-				wg sync.WaitGroup
-				ch = make(chan res, len(runningNodes))
+				wg        sync.WaitGroup
+				clockSlot = t.spec.TimeToSlot(
+					common.Timestamp(time.Now().Unix()),
+					t.GenesisTime(),
+				)
 			)
+			results.Clear()
+
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(ctx context.Context, i int, n *clients.Node, ch chan res) {
+				go func(ctx context.Context, n *clients.Node, r *result) {
 					defer wg.Done()
 
-					var (
-						b       = n.BeaconClient
-						slot    common.Slot
-						version string
-						head    string
-						health  float64
-					)
+					b := n.BeaconClient
 
 					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
 					if err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s): failed to poll head: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
+						r.err = errors.Wrap(err, "failed to poll head")
 						return
 					}
-					slot = headInfo.Header.Message.Slot
-					head = utils.Shorten(headInfo.Root.String())
 
-					if versionedBlock, err := b.BlockV2(
+					slot := headInfo.Header.Message.Slot
+					if clockSlot > slot &&
+						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
+						r.fatal = fmt.Errorf(
+							"unable to sync for an entire epoch: clockSlot=%d, slot=%d",
+							clockSlot,
+							slot,
+						)
+						return
+					}
+
+					versionedBlock, err := b.BlockV2(
 						ctx,
 						eth2api.BlockIdRoot(headInfo.Root),
-					); err != nil {
-						ch <- res{
-							err: fmt.Errorf(
-								"node %d (%s): failed to retrieve block: %v",
-								i,
-								n.ClientNames(),
-								err,
-							),
-						}
-						return
-					} else {
-						version = versionedBlock.Version
-						if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
-							emptyHash := ethcommon.Hash{}
-							if !bytes.Equal(executionPayload.BlockHash[:], emptyHash[:]) {
-								ch <- res{
-									i,
-									fmt.Sprintf(
-										"node %d (%s): fork=%s, slot=%d, "+
-											"head=%s, health=%.2f, exec_payload=%s",
-										i,
-										n.ClientNames(),
-										version,
-										slot,
-										head,
-										health,
-										utils.Shorten(executionPayload.BlockHash.Hex()),
-									),
-									nil,
-								}
-								done <- executionPayload.BlockHash
-							}
-						}
-					}
-
-					health, err = GetHealth(ctx, b, t.spec, slot)
+					)
 					if err != nil {
-						// warning is printed here instead because some clients
-						// don't support the required REST endpoint.
-						fmt.Printf(
-							"WARN: node %d (%s): %s\n",
-							i,
-							n.ClientNames(),
-							err,
-						)
+						r.err = errors.Wrap(err, "failed to retrieve block")
+						return
 					}
 
-					ch <- res{
-						i,
-						fmt.Sprintf(
-							"node %d (%s): fork=%s, slot=%d, head=%s, "+
-								"health=%.2f, exec_payload=0x000..000",
-							i,
-							n.ClientNames(),
-							version,
-							slot,
-							head,
-							health,
-						),
-						nil,
+					executionHash := ethcommon.Hash{}
+					if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
+						executionHash = executionPayload.BlockHash
 					}
-				}(
-					ctx,
-					i,
-					n,
-					ch,
-				)
+
+					health, _ := GetHealth(ctx, b, t.spec, slot)
+
+					r.msg = fmt.Sprintf(
+						"fork=%s, clock_slot=%d, slot=%d, "+
+							"head=%s, health=%.2f, exec_payload=%s",
+						versionedBlock.Version,
+						clockSlot,
+						slot,
+						utils.Shorten(headInfo.Root.String()),
+						health,
+						utils.Shorten(executionHash.Hex()),
+					)
+
+					if !bytes.Equal(executionHash[:], EMPTY_EXEC_HASH[:]) {
+						r.done = true
+						r.result = executionHash
+					}
+				}(ctx, n, results[i])
 			}
 			wg.Wait()
-			close(ch)
 
-			// print out logs in ascending idx order
-			sorted := make([]string, len(runningNodes))
-			for out := range ch {
-				if out.err != nil {
-					return ethcommon.Hash{}, out.err
-				}
-				sorted[out.idx] = out.msg
+			if err := results.CheckError(); err != nil {
+				return ethcommon.Hash{}, err
 			}
-			for _, msg := range sorted {
-				t.Logf(msg)
+			results.PrintMessages(t.Logf)
+			if results.AllDone() {
+				if h, ok := results[0].result.(ethcommon.Hash); ok {
+					return h, nil
+				}
 			}
 
 		}
