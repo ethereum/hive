@@ -88,6 +88,9 @@ func NewExecutionClient(
 }
 
 func (en *ExecutionClient) UserRPCAddress() (string, error) {
+	if en.HiveClient == nil {
+		return "", fmt.Errorf("el hive client not yet launched")
+	}
 	return fmt.Sprintf("http://%v:%d", en.HiveClient.IP, PortUserRPC), nil
 }
 
@@ -299,16 +302,36 @@ func (en *ExecutionClient) EngineGetPayload(
 	parentCtx context.Context,
 	payloadID *api.PayloadID,
 	version int,
-) (*api.ExecutableData, error) {
-	var result api.ExecutableData
+) (*api.ExecutableData, *big.Int, error) {
+
+	var (
+		rpcString = fmt.Sprintf("engine_getPayloadV%d", version)
+	)
+
 	if err := en.PrepareDefaultAuthCallToken(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	request := fmt.Sprintf("engine_getPayload%d", version)
+
 	ctx, cancel := context.WithTimeout(parentCtx, time.Second*10)
 	defer cancel()
-	err := en.engineRpcClient.CallContext(ctx, &result, request, payloadID)
-	return &result, err
+	if version == 2 {
+		type ExecutionPayloadEnvelope struct {
+			ExecutionPayload *api.ExecutableData `json:"executionPayload" gencodec:"required"`
+			BlockValue       *hexutil.Big        `json:"blockValue"       gencodec:"required"`
+		}
+		var response ExecutionPayloadEnvelope
+		err := en.engineRpcClient.CallContext(
+			ctx,
+			&response,
+			rpcString,
+			payloadID,
+		)
+		return response.ExecutionPayload, (*big.Int)(response.BlockValue), err
+	} else {
+		var executableData api.ExecutableData
+		err := en.engineRpcClient.CallContext(ctx, &executableData, rpcString, payloadID)
+		return &executableData, common.Big0, err
+	}
 }
 
 func (en *ExecutionClient) EngineNewPayload(
@@ -320,7 +343,7 @@ func (en *ExecutionClient) EngineNewPayload(
 	if err := en.PrepareDefaultAuthCallToken(); err != nil {
 		return nil, err
 	}
-	request := fmt.Sprintf("engine_newPayload%d", version)
+	request := fmt.Sprintf("engine_newPayloadV%d", version)
 	ctx, cancel := context.WithTimeout(parentCtx, time.Second*10)
 	defer cancel()
 	err := en.engineRpcClient.CallContext(ctx, &result, request, payload)
