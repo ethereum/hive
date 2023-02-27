@@ -199,6 +199,8 @@ func StartTestnet(
 				beaconDef,
 				node.BeaconNodeTTD,
 				nodeIndex,
+				config.EnableBuilders,
+				config.BuilderOptions,
 				nodeClient.ExecutionClient,
 			)
 
@@ -231,6 +233,11 @@ func StartTestnet(
 func (t *Testnet) Stop() {
 	for _, p := range t.Proxies().Running() {
 		p.Cancel()
+	}
+	for _, b := range t.BeaconClients() {
+		if b.Builder != nil {
+			b.Builder.Cancel()
+		}
 	}
 }
 

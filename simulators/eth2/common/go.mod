@@ -7,6 +7,7 @@ require (
 	github.com/ethereum/hive v0.0.0-20221214152536-bfabd993ae7b
 	github.com/golang-jwt/jwt/v4 v4.3.0
 	github.com/google/uuid v1.3.0
+	github.com/gorilla/mux v1.8.0
 	github.com/herumi/bls-eth-go-binary v1.28.1
 	github.com/holiman/uint256 v1.2.1
 	github.com/pkg/errors v0.9.1
@@ -16,6 +17,7 @@ require (
 	github.com/protolambda/zrnt v0.30.0
 	github.com/protolambda/ztyp v0.2.2
 	github.com/rauljordan/engine-proxy v0.0.0-20220517190449-e62b2e2f6e27
+	github.com/sirupsen/logrus v1.9.0
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/wealdtech/go-eth2-util v1.8.0
 	golang.org/x/exp v0.0.0-20230108222341-4b8118a2686a
@@ -49,7 +51,6 @@ require (
 	github.com/rogpeppe/go-internal v1.8.1 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect

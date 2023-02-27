@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	execution_config "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 )
@@ -33,6 +34,10 @@ type Config struct {
 	// Execution Layer specific config
 	InitialBaseFeePerGas     *big.Int
 	GenesisExecutionAccounts map[common.Address]core.GenesisAccount
+
+	// Builders
+	EnableBuilders bool
+	BuilderOptions []mock_builder.Option
 }
 
 // Choose a configuration value. `b` takes precedence
@@ -91,6 +96,8 @@ func (a *Config) Join(b *Config) *Config {
 	} else {
 		c.GenesisExecutionAccounts = a.GenesisExecutionAccounts
 	}
+
+	c.EnableBuilders = b.EnableBuilders || a.EnableBuilders
 
 	return &c
 }

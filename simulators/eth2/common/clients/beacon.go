@@ -13,6 +13,8 @@ import (
 	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
+
+	"github.com/ethereum/hive/simulators/eth2/common/builder"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
 	"github.com/holiman/uint256"
 	"github.com/protolambda/eth2api"
@@ -50,6 +52,7 @@ type BeaconClient struct {
 	spec                  *common.Spec
 	index                 int
 	genesisValidatorsRoot tree.Root
+	Builder               builder.Builder
 }
 
 func NewBeaconClient(
@@ -82,6 +85,12 @@ func (bn *BeaconClient) Start(extraOptions ...hivesim.StartOption) error {
 		return fmt.Errorf("unable to get start options: %v", err)
 	}
 	opts = append(opts, extraOptions...)
+
+	if bn.Builder != nil {
+		opts = append(opts, hivesim.Params{
+			"HIVE_ETH2_BUILDER_ENDPOINT": bn.Builder.Address(),
+		})
+	}
 
 	bn.HiveClient = bn.T.StartClient(bn.ClientType, opts...)
 	bn.API = &eth2api.Eth2HttpClient{
