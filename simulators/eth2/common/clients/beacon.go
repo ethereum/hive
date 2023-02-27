@@ -984,6 +984,38 @@ func (bn *BeaconClient) GetBeaconBlockByExecutionHash(
 	return nil, nil
 }
 
+func (bn *BeaconClient) GetFilledSlotsCountPerEpoch(
+	parentCtx context.Context,
+) (map[common.Epoch]uint64, error) {
+	headInfo, err := bn.BlockHeader(parentCtx, eth2api.BlockHead)
+	epochMap := make(map[common.Epoch]uint64)
+	for {
+		if err != nil {
+			return nil, fmt.Errorf("failed to poll head: %v", err)
+		}
+		epoch := common.Epoch(
+			headInfo.Header.Message.Slot / bn.spec.SLOTS_PER_EPOCH,
+		)
+		if prev, ok := epochMap[epoch]; ok {
+			epochMap[epoch] = prev + 1
+		} else {
+			epochMap[epoch] = 1
+		}
+		if bytes.Equal(
+			headInfo.Header.Message.ParentRoot[:],
+			EMPTY_TREE_ROOT[:],
+		) {
+			break
+		}
+		headInfo, err = bn.BlockHeader(
+			parentCtx,
+			eth2api.BlockIdRoot(headInfo.Header.Message.ParentRoot),
+		)
+	}
+
+	return epochMap, nil
+}
+
 type BeaconClients []*BeaconClient
 
 // Return subset of clients that are currently running
