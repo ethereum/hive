@@ -53,50 +53,74 @@ type block struct {
 	Exception    string         `json:"expectException"`
 }
 
-//go:generate go run github.com/fjl/gencodec -type blockHeader -field-override blockHeader -out gen_bh.go
+//go:generate go run github.com/fjl/gencodec -type blockHeader -field-override blockHeaderUnmarshaling -out gen_bh.go
 type blockHeader struct {
-	ParentHash          *common.Hash          `json:"parentHash"`
-	UncleHash           *common.Hash          `json:"sha3Uncles"` // name in std json
-	UncleHashAlt        *common.Hash          `json:"uncleHash"`  // name in fixtures
-	Coinbase            *common.Address       `json:"coinbase"`   // name in fixtures
-	CoinbaseAlt         *common.Address       `json:"author"`     // nethermind/parity/oe name
-	CoinbaseAlt2        *common.Address       `json:"miner"`      // geth/besu name
-	StateRoot           *common.Hash          `json:"stateRoot"`
-	TransactionsTrie    *common.Hash          `json:"transactionsRoot"` // name in std json
-	TransactionsTrieAlt *common.Hash          `json:"transactionsTrie"` // name in fixtures
-	ReceiptTrie         *common.Hash          `json:"receiptsRoot"`     // name in std json
-	ReceiptTrieAlt      *common.Hash          `json:"receiptTrie"`      // name in fixturse
-	Bloom               *types.Bloom          `json:"bloom"`
-	Difficulty          *math.HexOrDecimal256 `json:"difficulty"`
-	Number              *math.HexOrDecimal256 `json:"number"`
-	GasLimit            *math.HexOrDecimal64  `json:"gasLimit"`
-	GasUsed             *math.HexOrDecimal64  `json:"gasUsed"`
-	Timestamp           *math.HexOrDecimal256 `json:"timestamp"`
-	ExtraData           *hexutil.Bytes        `json:"extraData"`
-	MixHash             *common.Hash          `json:"mixHash"`
-	Nonce               *types.BlockNonce     `json:"nonce"`
-	BaseFee             *math.HexOrDecimal256 `json:"baseFeePerGas"`
-	Hash                *common.Hash          `json:"hash"`
-	WithdrawalsRoot     *common.Hash          `json:"withdrawalsRoot"`
+	ParentHash          common.Hash      `json:"parentHash"`
+	UncleHash           common.Hash      `json:"sha3Uncles"`
+	UncleHashAlt        common.Hash      `json:"uncleHash"` // name in fixtures
+	Coinbase            common.Address   `json:"coinbase"`
+	CoinbaseAlt         common.Address   `json:"author"` // nethermind/parity/oe name
+	CoinbaseAlt2        common.Address   `json:"miner"`  // geth/besu name
+	StateRoot           common.Hash      `json:"stateRoot"`
+	TransactionsTrie    common.Hash      `json:"transactionsRoot"`
+	TransactionsTrieAlt common.Hash      `json:"transactionsTrie"` // name in fixtures
+	ReceiptTrie         common.Hash      `json:"receiptsRoot"`
+	ReceiptTrieAlt      common.Hash      `json:"receiptTrie"` // name in fixturse
+	Bloom               types.Bloom      `json:"bloom"`
+	Difficulty          *big.Int         `json:"difficulty`
+	Number              *big.Int         `json:"number"`
+	GasLimit            uint64           `json:"gasLimit"`
+	GasUsed             uint64           `json:"gasUsed"`
+	Timestamp           *big.Int         `json:"timestamp"`
+	ExtraData           []byte           `json:"extraData"`
+	MixHash             common.Hash      `json:"mixHash"`
+	Nonce               types.BlockNonce `json:"nonce"`
+	BaseFee             *big.Int         `json:"baseFeePerGas"`
+	Hash                common.Hash      `json:"hash"`
+	WithdrawalsRoot     common.Hash      `json:"withdrawalsRoot`
 }
 
-//go:generate go run github.com/fjl/gencodec -type transactions -field-override transactions -out gen_txs.go
+type blockHeaderUnmarshaling struct {
+	Difficulty *math.HexOrDecimal256 `json:"difficulty"`
+	Number     *math.HexOrDecimal256 `json:"number"`
+	GasLimit   math.HexOrDecimal64   `json:"gasLimit"`
+	GasUsed    math.HexOrDecimal64   `json:"gasUsed"`
+	Timestamp  *math.HexOrDecimal256 `json:"timestamp"`
+	ExtraData  hexutil.Bytes         `json:"extraData"`
+	BaseFee    *math.HexOrDecimal256 `json:"baseFeePerGas"`
+}
+
+//go:generate go run github.com/fjl/gencodec -type transactions -field-override transactionsUnmarshaling -out gen_txs.go
 type transactions struct {
-	Nonce     *math.HexOrDecimal256 `json:"nonce"`
-	To        *common.Address       `json:"to.omitempty"`
-	Value     *math.HexOrDecimal256 `json:"value"`
-	Data      *hexutil.Bytes        `json:"data"`
-	GasLimit  *math.HexOrDecimal64  `json:"gasLimit"`
-	GasUsed   *math.HexOrDecimal64  `json:"gasUsed"`
-	SecretKey *common.Hash          `json:"secretKey"`
+	Nonce     uint64         `json:"nonce"`
+	To        common.Address `json:"to.omitempty"`
+	Value     *big.Int       `json:"value"`
+	Data      []byte         `json:"data"`
+	GasLimit  uint64         `json:"gasLimit"`
+	GasUsed   uint64         `json:"gasUsed"`
+	SecretKey common.Hash    `json:"secretKey"`
 }
 
-//go:generate go run github.com/fjl/gencodec -type withdrawals -field-override withdrawals -out gen_wds.go
+type transactionsUnmarshaling struct {
+	Nonce    math.HexOrDecimal64   `json:"nonce"`
+	Value    *math.HexOrDecimal256 `json:"value"`
+	Data     hexutil.Bytes         `json:"data"`
+	GasLimit math.HexOrDecimal64   `json:"gasLimit"`
+	GasUsed  math.HexOrDecimal64   `json:"gasUsed"`
+}
+
+//go:generate go run github.com/fjl/gencodec -type withdrawals -field-override withdrawalsUnmarshaling -out gen_wds.go
 type withdrawals struct {
-	Index          *math.HexOrDecimal256 `json:"index"`
-	ValidatorIndex *math.HexOrDecimal256 `json:"validatorIndex"`
-	Address        *common.Address       `json:"address"`
-	Amount         *math.HexOrDecimal256 `json:"amount"`
+	Index          uint64         `json:"index"`
+	ValidatorIndex uint64         `json:"validatorIndex"`
+	Address        common.Address `json:"address"`
+	Amount         uint64         `json:"amount"`
+}
+
+type withdrawalsUnmarshaling struct {
+	Index          math.HexOrDecimal64 `json:"index"`
+	ValidatorIndex math.HexOrDecimal64 `json:"validatorIndex"`
+	Amount         math.HexOrDecimal64 `json:"amount"`
 }
 
 // -------------------------------------------------------------------------- //
@@ -126,17 +150,17 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) {
 // ------------------------------------------------------------------------------ //
 func extractGenesis(fixture fixtureJSON) *core.Genesis {
 	genesis := &core.Genesis{
-		Timestamp:  (*big.Int)(fixture.Genesis.Timestamp).Uint64(),
-		Number:     (*big.Int)(fixture.Genesis.Number).Uint64(),
-		Difficulty: (*big.Int)(fixture.Genesis.Difficulty),
-		BaseFee:    (*big.Int)(fixture.Genesis.BaseFee),
-		GasLimit:   uint64(*fixture.Genesis.GasLimit),
-		GasUsed:    uint64(*fixture.Genesis.GasUsed),
+		Timestamp:  fixture.Genesis.Timestamp.Uint64(),
+		Number:     fixture.Genesis.Number.Uint64(),
 		Nonce:      fixture.Genesis.Nonce.Uint64(),
-		ParentHash: *fixture.Genesis.ParentHash,
-		ExtraData:  *fixture.Genesis.ExtraData,
-		Mixhash:    *fixture.Genesis.MixHash,
-		Coinbase:   *fixture.Genesis.Coinbase,
+		Difficulty: fixture.Genesis.Difficulty,
+		BaseFee:    fixture.Genesis.BaseFee,
+		GasLimit:   fixture.Genesis.GasLimit,
+		GasUsed:    fixture.Genesis.GasUsed,
+		ParentHash: fixture.Genesis.ParentHash,
+		ExtraData:  fixture.Genesis.ExtraData,
+		Mixhash:    fixture.Genesis.MixHash,
+		Coinbase:   fixture.Genesis.Coinbase,
 		Alloc:      fixture.Pre,
 	}
 	return genesis

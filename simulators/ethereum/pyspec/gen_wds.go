@@ -9,47 +9,47 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 )
 
-var _ = (*withdrawals)(nil)
+var _ = (*withdrawalsUnmarshaling)(nil)
 
 // MarshalJSON marshals as JSON.
 func (w withdrawals) MarshalJSON() ([]byte, error) {
 	type withdrawals struct {
-		Index          *math.HexOrDecimal256 `json:"index"`
-		ValidatorIndex *math.HexOrDecimal256 `json:"validatorIndex"`
-		Address        *common.Address       `json:"address"`
-		Amount         *math.HexOrDecimal256 `json:"amount"`
+		Index          math.HexOrDecimal64 `json:"index"`
+		ValidatorIndex math.HexOrDecimal64 `json:"validatorIndex"`
+		Address        common.Address      `json:"address"`
+		Amount         math.HexOrDecimal64 `json:"amount"`
 	}
 	var enc withdrawals
-	enc.Index = w.Index
-	enc.ValidatorIndex = w.ValidatorIndex
+	enc.Index = math.HexOrDecimal64(w.Index)
+	enc.ValidatorIndex = math.HexOrDecimal64(w.ValidatorIndex)
 	enc.Address = w.Address
-	enc.Amount = w.Amount
+	enc.Amount = math.HexOrDecimal64(w.Amount)
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
 func (w *withdrawals) UnmarshalJSON(input []byte) error {
 	type withdrawals struct {
-		Index          *math.HexOrDecimal256 `json:"index"`
-		ValidatorIndex *math.HexOrDecimal256 `json:"validatorIndex"`
-		Address        *common.Address       `json:"address"`
-		Amount         *math.HexOrDecimal256 `json:"amount"`
+		Index          *math.HexOrDecimal64 `json:"index"`
+		ValidatorIndex *math.HexOrDecimal64 `json:"validatorIndex"`
+		Address        *common.Address      `json:"address"`
+		Amount         *math.HexOrDecimal64 `json:"amount"`
 	}
 	var dec withdrawals
 	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
 	}
 	if dec.Index != nil {
-		w.Index = dec.Index
+		w.Index = uint64(*dec.Index)
 	}
 	if dec.ValidatorIndex != nil {
-		w.ValidatorIndex = dec.ValidatorIndex
+		w.ValidatorIndex = uint64(*dec.ValidatorIndex)
 	}
 	if dec.Address != nil {
-		w.Address = dec.Address
+		w.Address = *dec.Address
 	}
 	if dec.Amount != nil {
-		w.Amount = dec.Amount
+		w.Amount = uint64(*dec.Amount)
 	}
 	return nil
 }
