@@ -24,6 +24,9 @@ case "$HIVE_LOGLEVEL" in
     5)   LOG=TRACE ;;
 esac
 
+builder_option=$([[ "$HIVE_ETH2_BUILDER_ENDPOINT" == "" ]] && echo "" || echo "--validators-proposer-blinded-blocks-enabled=true --validators-builder-registration-default-enabled=true")
+echo $builder_option
+
 echo Starting Teku Validator Client
 
 /opt/teku/bin/teku vc \
@@ -34,4 +37,5 @@ echo Starting Teku Validator Client
     --logging="$LOG" \
     --validator-keys=/data/validators/keys:/data/validators/passwords \
     --validators-proposer-default-fee-recipient="0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b" \
-    --validators-external-signer-slashing-protection-enabled=true
+    --validators-external-signer-slashing-protection-enabled=true \
+    $builder_option

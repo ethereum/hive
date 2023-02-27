@@ -46,6 +46,8 @@ metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--met
 enr_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "" || echo --p2p-discovery-bootnodes="$HIVE_ETH2_BOOTNODE_ENRS")
 static_option=$([[ "$HIVE_ETH2_STATIC_PEERS" == "" ]] && echo "" || echo --p2p-static-peers="$HIVE_ETH2_STATIC_PEERS")
 opt_sync_option=$([[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" == "" ]] && echo "" || echo "--Xnetwork-safe-slots-to-import-optimistically=$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY")
+builder_option=$([[ "$HIVE_ETH2_BUILDER_ENDPOINT" == "" ]] && echo "" || echo "--validators-builder-registration-default-enabled=true --validators-proposer-blinded-blocks-enabled=true --builder-endpoint=$HIVE_ETH2_BUILDER_ENDPOINT")
+echo $builder_option
 
 if [ "$HIVE_ETH2_MERGE_ENABLED" != "" ]; then
     echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
@@ -61,7 +63,7 @@ echo Starting Teku Beacon Node
     --eth1-deposit-contract-address="${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" \
     --log-destination console \
     --logging="$LOG" \
-    $metrics_option $eth1_option $merge_option $enr_option $static_option $opt_sync_option \
+    $metrics_option $eth1_option $merge_option $enr_option $static_option $opt_sync_option $builder_option \
     --validators-proposer-default-fee-recipient="0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b" \
     --p2p-port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --p2p-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
