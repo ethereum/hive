@@ -56,6 +56,9 @@ else
 fi
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics-address=0.0.0.0 --metrics-port=$HIVE_ETH2_METRICS_PORT")
 
+builder_option=$([[ "$HIVE_ETH2_BUILDER_ENDPOINT" == "" ]] && echo "" || echo "--payload-builder=true --payload-builder-url=$HIVE_ETH2_BUILDER_ENDPOINT")
+echo BUILDER=$builder_option
+
 echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
 
 echo Starting Nimbus Beacon Node
@@ -68,7 +71,7 @@ echo Starting Nimbus Beacon Node
     --web3-url="$HIVE_ETH2_ETH1_ENGINE_RPC_ADDRS" \
     --jwt-secret=/jwtsecret \
     --num-threads=4 \
-    $bootnodes_option $metrics_option \
+    $bootnodes_option $metrics_option $builder_option \
     --nat="extip:${CONTAINER_IP}" \
     --listen-address=0.0.0.0 \
     --tcp-port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
