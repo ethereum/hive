@@ -187,6 +187,7 @@ func BuildExecutionGenesis(
 	genesisTime uint64,
 	consensus ExecutionConsensus,
 	forkConfig *params.ChainConfig,
+	genesisExecAccounts map[common.Address]core.GenesisAccount,
 ) *ExecutionGenesis {
 	depositContractAddr := common.HexToAddress(
 		"0x4242424242424242424242424242424242424242",
@@ -231,6 +232,14 @@ func BuildExecutionGenesis(
 		},
 		DepositAddress: depositContractAddr,
 		NetworkID:      7,
+	}
+
+	for addr, acc := range genesisExecAccounts {
+		acc := acc
+		if acc.Balance == nil {
+			acc.Balance = common.Big0
+		}
+		genesis.Genesis.Alloc[addr] = acc
 	}
 
 	// Configure post-merge forks

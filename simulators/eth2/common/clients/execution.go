@@ -446,6 +446,15 @@ func (ec *ExecutionClient) BalanceAt(
 	return ec.eth.BalanceAt(ctx, account, n)
 }
 
+func (ec *ExecutionClient) SendTransaction(
+	parentCtx context.Context,
+	tx *types.Transaction,
+) error {
+	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
+	defer cancel()
+	return ec.eth.SendTransaction(ctx, tx)
+}
+
 type ExecutionClients []*ExecutionClient
 
 // Return subset of clients that are currently running

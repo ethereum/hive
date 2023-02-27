@@ -90,6 +90,7 @@ func prepareTestnet(
 		uint64(eth1GenesisTime),
 		config.Eth1Consensus,
 		prepareExecutionForkConfig(eth2GenesisTime, config),
+		config.GenesisExecutionAccounts,
 	)
 	if config.InitialBaseFeePerGas != nil {
 		eth1Genesis.Genesis.BaseFee = config.InitialBaseFeePerGas
