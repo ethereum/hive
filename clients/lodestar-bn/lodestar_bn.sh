@@ -36,6 +36,8 @@ CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 echo Container IP: $CONTAINER_IP
 bootnodes_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "" || echo "--bootnodes ${HIVE_ETH2_BOOTNODE_ENRS//,/ }")
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "" || echo "--metrics --metrics.address=$CONTAINER_IP --metrics.port=$HIVE_ETH2_METRICS_PORT")
+builder_option=$([[ "$HIVE_ETH2_BUILDER_ENDPOINT" == "" ]] && echo "" || echo "--builder --builder.urls $HIVE_ETH2_BUILDER_ENDPOINT")
+echo BUILDER=$builder_option
 
 echo "bootnodes option : ${bootnodes_option}"
 
@@ -61,6 +63,7 @@ node /usr/app/node_modules/.bin/lodestar \
     --jwt-secret=/jwtsecret \
     $metrics_option \
     $bootnodes_option \
+    $builder_option \
     --enr.ip="${CONTAINER_IP}" \
     --enr.tcp="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --enr.udp="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
