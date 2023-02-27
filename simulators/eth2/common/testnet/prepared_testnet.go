@@ -400,6 +400,7 @@ func (p *PreparedTestnet) prepareExecutionNode(
 		clients.PortEngineRPC+executionIndex,
 		subnet,
 		ttd,
+		true,
 		logEngineCalls,
 	)
 }

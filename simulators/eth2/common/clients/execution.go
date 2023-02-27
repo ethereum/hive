@@ -29,6 +29,11 @@ const (
 	PortEngineRPC = 8551
 )
 
+var AllForkchoiceUpdatedCalls = []string{
+	"engine_forkchoiceUpdatedV1",
+	"engine_forkchoiceUpdatedV2",
+}
+
 var AllEngineCallsLog = []string{
 	"engine_forkchoiceUpdatedV1",
 	"engine_forkchoiceUpdatedV2",
@@ -43,6 +48,8 @@ type ExecutionClient struct {
 	HiveClient       *hivesim.Client
 	ClientType       string
 	OptionsGenerator func() ([]hivesim.StartOption, error)
+	LatestForkchoice *api.ForkchoiceStateV1
+	trackFcU         bool
 	proxy            **proxy.Proxy
 	proxyPort        int
 	subnet           string
@@ -63,12 +70,14 @@ func NewExecutionClient(
 	proxyPort int,
 	subnet string,
 	ttd *big.Int,
+	trackFcu bool,
 	logEngineCalls bool,
 ) *ExecutionClient {
 	return &ExecutionClient{
 		T:                t,
 		ClientType:       eth1Def.Name,
 		OptionsGenerator: optionsGenerator,
+		trackFcU:         trackFcu,
 		proxyPort:        proxyPort,
 		proxy:            new(*proxy.Proxy),
 		subnet:           subnet,
@@ -158,12 +167,31 @@ func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
 		panic(err)
 	}
 
-	proxy := proxy.NewProxy(
+	p := proxy.NewProxy(
 		net.ParseIP(simIP),
 		en.proxyPort,
 		dest,
 		secret,
 	)
+
+	if en.trackFcU {
+		logCallback := func(req []byte) *spoof.Spoof {
+			var (
+				fcState api.ForkchoiceStateV1
+				pAttr   api.PayloadAttributes
+				err     error
+			)
+			err = proxy.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+			if err == nil {
+				en.LatestForkchoice = &fcState
+			}
+			return nil
+		}
+		for _, c := range AllForkchoiceUpdatedCalls {
+			p.AddRequestCallback(c, logCallback)
+		}
+	}
+
 	if en.logEngineCalls {
 		logCallback := func(res []byte, req []byte) *spoof.Spoof {
 			en.T.Logf(
@@ -179,11 +207,11 @@ func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
 			return nil
 		}
 		for _, c := range AllEngineCallsLog {
-			proxy.AddResponseCallback(c, logCallback)
+			p.AddResponseCallback(c, logCallback)
 		}
 	}
 
-	*en.proxy = proxy
+	*en.proxy = p
 
 	return nil
 }
