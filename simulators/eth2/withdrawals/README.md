@@ -160,3 +160,66 @@ document.
     - Withdrawal addresses specified on node `A` and `B` are fully withdrawing
 
   </details>
+
+
+### Builder API Fallback for Withdrawals
+
+* [x] Builder API Constructs Payloads with Invalid Withdrawals List
+  <details>
+  <summary>Click for details</summary>
+  
+  - Start two validating nodes on Bellatrix/Paris genesis
+  - Total of 128 Validators, 64 for each validating node
+  - All genesis validators have Execution address withdrawal credentials
+  - Both validating nodes are connected to a builder API mock server
+  - Builder API server is configured to return payloads with an invalid withdrawals list, starting from capella
+  - Wait for finalization, and verify at least one block was built by the builder API on each node
+  - Wait for capella and verify that the invalid payloads are correctly rejected from the canonical chain
+  - Verify that the chain is able to finalize even after the builder API returns payloads with invalid withdrawals on every request
+
+  </details>
+
+* [x] Builder API Returns Error on Header Request Starting from Capella
+  <details>
+  <summary>Click for details</summary>
+  
+  - Start two validating nodes on Bellatrix/Paris genesis
+  - Total of 128 Validators, 64 for each validating node
+  - All genesis validators have Execution address withdrawal credentials
+  - Both validating nodes are connected to a builder API mock server
+  - Builder API server is configured to return error on header request, starting from capella
+  - Wait for capella
+  - Wait for finalization, and verify at least one block was built by the builder API on each node
+  - Verify that the chain is able to finalize even after the builder API returns error on every header request
+
+  </details>
+
+* [x] Builder API Returns Error on Unblinded Block Request Starting from Capella
+  <details>
+  <summary>Click for details</summary>
+  
+  - Start two validating nodes on Bellatrix/Paris genesis
+  - Total of 128 Validators, 64 for each validating node
+  - All genesis validators have Execution address withdrawal credentials
+  - Both validating nodes are connected to a builder API mock server
+  - Builder API server is configured to return error on unblinded block request, starting from capella
+  - Wait for capella
+  - Wait for finalization, and verify at least one block was built by the builder API on each node
+  - Verify that the chain is able to finalize even after the builder API returns error on every unblinded block request
+
+  </details>
+
+* [x] Builder API Returns Constructs Valid Withdrawals/Invalid StateRoot Payload Starting from Capella
+  <details>
+  <summary>Click for details</summary>
+  
+  - Start two validating nodes on Bellatrix/Paris genesis
+  - Total of 128 Validators, 64 for each validating node
+  - All genesis validators have Execution address withdrawal credentials
+  - Both validating nodes are connected to a builder API mock server
+  - Builder API server is configured to produce payloads with valid withdrawals list, but invalid state root, starting from capella
+  - Wait for capella
+  - Verify that the consensus clients correctly circuit break the builder when the empty slots are detected
+  - Verify that the chain is able to finalize
+
+  </details>

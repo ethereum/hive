@@ -90,6 +90,72 @@ var tests = []TestSpec{
 	},
 }
 
+var builderTests = []TestSpec{
+	BuilderWithdrawalsTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-builders-capella-invalid-withdrawals",
+			Description: `
+			Test canonical chain can still finalize if the builders start
+			building payloads with invalid withdrawals list.
+			`,
+			// All validators can withdraw from the start
+			GenesisExecutionWithdrawalCredentialsShares: 1,
+		},
+		BuilderTestError: INVALID_WITHDRAWALS,
+	},
+	BuilderWithdrawalsTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-builders-capella-error-on-capella-header-request",
+			Description: `
+			Test canonical chain can still finalize if the builders start
+			returning error on header request after capella transition.
+			`,
+			// All validators can withdraw from the start
+			GenesisExecutionWithdrawalCredentialsShares: 1,
+		},
+		BuilderTestError: ERROR_ON_HEADER_REQUEST,
+	},
+	BuilderWithdrawalsTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-builders-capella-error-on-capella-unblind-payload-requestr",
+			Description: `
+			Test canonical chain can still finalize if the builders start
+			returning error on unblinded payload request after capella transition.
+			`,
+			// All validators can withdraw from the start
+			GenesisExecutionWithdrawalCredentialsShares: 1,
+		},
+		BuilderTestError: ERROR_ON_UNBLINDED_PAYLOAD_REQUEST,
+	},
+	BuilderWithdrawalsTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-builders-capella-invalid-payload",
+			Description: `
+			Test consensus clients correctly circuit break builder after a
+			period of empty blocks due to invalid unblinded blocks.
+			The payloads are built using an invalid state root, which can only
+			be caught after unblinding the entire payload and running it in the
+			local execution client, at which point another payload cannot be
+			produced locally and results in an empty slot.
+			`,
+			// All validators can withdraw from the start
+			GenesisExecutionWithdrawalCredentialsShares: 1,
+		},
+		BuilderTestError: VALID_WITHDRAWALS_INVALID_STATE_ROOT,
+	},
+	BuilderWithdrawalsTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-builders-capella-correct-withdrawals",
+			Description: `
+			Test canonical chain includes capella payloads built by the builder api.
+			`,
+			// All validators can withdraw from the start
+			GenesisExecutionWithdrawalCredentialsShares: 1,
+		},
+		BuilderTestError: NO_ERROR,
+	},
+}
+
 func main() {
 	// Create simulator that runs all tests
 	sim := hivesim.New()
@@ -101,16 +167,22 @@ func main() {
 	c := clients.ClientsByRole(clientTypes)
 
 	// Create the test suites
-	engineSuite := hivesim.Suite{
+	withdrawalsSuite := hivesim.Suite{
 		Name:        "eth2-withdrawals",
-		Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet.`,
+		Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet for Shanghai+Capella.`,
+	}
+	builderSuite := hivesim.Suite{
+		Name:        "eth2-withdrawals-builder",
+		Description: `Collection of test vectors that use a ExecutionClient+BeaconNode+ValidatorClient testnet and builder API for Shanghai+Capella.`,
 	}
 
 	// Add all tests to the suites
-	addAllTests(&engineSuite, c, tests)
+	addAllTests(&withdrawalsSuite, c, tests)
+	addAllTests(&builderSuite, c, builderTests)
 
 	// Mark suites for execution
-	hivesim.MustRunSuite(sim, engineSuite)
+	hivesim.MustRunSuite(sim, withdrawalsSuite)
+	hivesim.MustRunSuite(sim, builderSuite)
 }
 
 func addAllTests(

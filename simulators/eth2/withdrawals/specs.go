@@ -5,6 +5,9 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
@@ -80,6 +83,24 @@ var (
 		}
 	*/
 
+	// This is the account that sends vault funding transactions.
+	VaultAccountAddress = common.HexToAddress(
+		"0xcf49fda3be353c69b41ed96333cd24302da4556f",
+	)
+	VaultKey, _ = crypto.HexToECDSA(
+		"63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376",
+	)
+	VaultStartAmount, _ = new(big.Int).SetString("d3c21bcecceda1000000", 16)
+
+	CodeContractAddress = common.HexToAddress(
+		"0xcccccccccccccccccccccccccccccccccccccccc",
+	)
+	CodeContract = common.Hex2Bytes("0x328043558043600080a250")
+
+	GasPrice    = big.NewInt(30 * params.GWei)
+	GasTipPrice = big.NewInt(1 * params.GWei)
+
+	ChainID = big.NewInt(7)
 )
 
 func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
@@ -130,6 +151,19 @@ func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
 		}
 		nodeDefinitions = append(nodeDefinitions, n)
 	}
+
+	// Fund execution layer account for transactions
+
+	config.GenesisExecutionAccounts = map[common.Address]core.GenesisAccount{
+		VaultAccountAddress: {
+			Balance: VaultStartAmount,
+		},
+		CodeContractAddress: {
+			Balance: common.Big0,
+			Code:    CodeContract,
+		},
+	}
+
 	return config.Join(&testnet.Config{
 		NodeDefinitions: nodeDefinitions,
 	})
@@ -196,4 +230,52 @@ func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 	}
 
 	return keys
+}
+
+type BuilderTestError int
+
+const (
+	NO_ERROR BuilderTestError = iota
+	ERROR_ON_HEADER_REQUEST
+	ERROR_ON_UNBLINDED_PAYLOAD_REQUEST
+	INVALID_WITHDRAWALS
+	INVALIDATE_SINGLE_WITHDRAWAL_ADDRESS
+	INVALIDATE_SINGLE_WITHDRAWAL_AMOUNT
+	INVALIDATE_SINGLE_WITHDRAWAL_VALIDATOR_INDEX
+	INVALIDATE_SINGLE_WITHDRAWAL_INDEX
+	VALID_WITHDRAWALS_INVALID_STATE_ROOT
+	TIMEOUT
+)
+
+var REQUIRES_FINALIZATION_TO_ACTIVATE_BUILDER = []string{
+	"lighthouse",
+	"teku",
+}
+
+type BuilderWithdrawalsTestSpec struct {
+	BaseWithdrawalsTestSpec
+	BuilderTestError BuilderTestError
+}
+
+func (ts BuilderWithdrawalsTestSpec) GetTestnetConfig(
+	allNodeDefinitions clients.NodeDefinitions,
+) *testnet.Config {
+	tc := ts.BaseWithdrawalsTestSpec.GetTestnetConfig(allNodeDefinitions)
+
+	tc.CapellaForkEpoch = big.NewInt(2)
+
+	if len(
+		allNodeDefinitions.FilterByCL(
+			REQUIRES_FINALIZATION_TO_ACTIVATE_BUILDER,
+		),
+	) > 0 {
+		// At least one of the CLs require finalization to start requesting
+		// headers from the builder
+		tc.CapellaForkEpoch = big.NewInt(5)
+	}
+
+	// Builders are always enabled for these tests
+	tc.EnableBuilders = true
+
+	return tc
 }
