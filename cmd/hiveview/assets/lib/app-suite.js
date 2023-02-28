@@ -1,23 +1,24 @@
-import 'datatables.net'
-import 'datatables.net-bs5'
-import 'datatables.net-responsive'
-import 'datatables.net-responsive-bs5'
-import $ from 'jquery'
+import 'datatables.net';
+import 'datatables.net-bs5';
+import 'datatables.net-responsive';
+import 'datatables.net-responsive-bs5';
+import $ from 'jquery';
 
-import { html, nav, format, loader } from './utils.js'
-import * as routes from './routes.js'
-import * as common from './common.js'
+import * as common from './app-common.js';
+import * as routes from './routes.js';
+import * as html from './html.js';
+import { formatDuration, queryParam } from './utils.js';
 
 $(document).ready(function () {
     common.updateHeader();
 
-    let name = nav.load("suitename");
+    let name = queryParam('suitename');
     if (name) {
         showSuiteName(name);
     }
-    let filename = nav.load("suiteid");
+    let filename = queryParam('suiteid');
     if (!filename) {
-        showError("no suite ID in URL");
+        showError('no suite ID in URL');
         return;
     }
     var testid = null;
@@ -25,9 +26,9 @@ $(document).ready(function () {
         testid = parseInt(window.location.hash.replace(/^#test-/, ''));
     }
 
-    console.log("Loading:", filename, "name:", name);
+    console.log('Loading:', filename, 'name:', name);
     $.ajax({
-        xhr: loader.newXhrWithProgressBar,
+        xhr: common.newXhrWithProgressBar,
         type: 'GET',
         url: routes.resultsRoot + filename,
         dataType: 'json',
@@ -38,20 +39,20 @@ $(document).ready(function () {
             }
         },
         error: function(xhr, status, error) {
-            showError("error fetching " + filename + " : " + error);
+            showError('error fetching ' + filename + ' : ' + error);
         },
     });
-})
+});
 
 // showSuiteName displays the suite title.
 function showSuiteName(name) {
-    $("#testsuite_name").text(name);
-    document.title = name + " - hive";
+    $('#testsuite_name').text(name);
+    document.title = name + ' - hive';
 }
 
 function showError(message) {
     console.error(message);
-    $("#testsuite_desc").text("Error: " + message);
+    $('#testsuite_desc').text('Error: ' + message);
 }
 
 // showSuiteData displays the suite and its tests in the table.
@@ -95,7 +96,7 @@ function showSuiteData(data, suiteID) {
 
     // Set title info.
     showSuiteName(data.name);
-    $("#testsuite_desc").html(html.urls_to_links(html.encode(data.description)));
+    $('#testsuite_desc').html(html.urlsToLinks(html.encode(data.description)));
 
     // Set client versions.
     if (data.clientVersions) {
@@ -105,7 +106,7 @@ function showSuiteData(data, suiteID) {
                 delete data.clientVersions[key];
             }
         }
-        $("#testsuite_clients").html(html.make_definition_list(data.clientVersions));
+        $('#testsuite_clients').html(html.makeDefinitionList(data.clientVersions));
     }
 
     // Convert test cases to list.
@@ -116,17 +117,17 @@ function showSuiteData(data, suiteID) {
         tc['duration'] = testCaseDuration(tc);
         cases.push(tc);
     }
-    console.log("got " + cases.length + " testcases");
+    console.log('got ' + cases.length + ' testcases');
 
     // Fill info box.
     let suiteTimes = testSuiteTimes(cases);
-    $("#testsuite_start").html("🕒 " + suiteTimes.start.toLocaleString());
-    $("#testsuite_duration").html("⌛️ " + format.duration(suiteTimes.duration));
+    $('#testsuite_start').html('🕒 ' + suiteTimes.start.toLocaleString());
+    $('#testsuite_duration').html('⌛️ ' + formatDuration(suiteTimes.duration));
     let logfile = routes.resultsRoot + data.simLog;
     let url = routes.simulatorLog(suiteID, suiteName, logfile);
-    $("#sim-log-link").attr("href", url);
-    $("#sim-log-link").text("simulator log");
-    $("#testsuite_info").show();
+    $('#sim-log-link').attr('href', url);
+    $('#sim-log-link').text('simulator log');
+    $('#testsuite_info').show();
 
     // Initialize the DataTable.
     let table = $('#execresults').DataTable({
@@ -144,45 +145,45 @@ function showSuiteData(data, suiteID) {
         order: [[1, 'desc']],
         columns: [
             {
-                title: "Test",
-                data: "name",
-                name: "name",
-                className: "test-name-column",
-                width: "65%",
+                title: 'Test',
+                data: 'name',
+                name: 'name',
+                className: 'test-name-column',
+                width: '65%',
                 responsivePriority: 0,
             },
             // Status: pass or not.
             {
-                title: "Status",
-                data: "summaryResult",
-                className: "test-status-column",
-                name: "status",
-                width: "4em",
+                title: 'Status',
+                data: 'summaryResult',
+                className: 'test-status-column',
+                name: 'status',
+                width: '4em',
                 responsivePriority: 0,
                 render: formatTestStatus,
             },
             // Test duration.
             {
-                title: "⌛️",
-                data: "duration",
-                className: "test-duration-column",
-                name: "duration",
-                width: "6em",
+                title: '⌛️',
+                data: 'duration',
+                className: 'test-duration-column',
+                name: 'duration',
+                width: '6em',
                 responsivePriority: 2,
-                type: "num",
+                type: 'num',
                 render: function (v, type, row) {
                     if (type === 'display' || type === 'filter') {
-                        return format.duration(v);
+                        return formatDuration(v);
                     }
                     return v;
                 },
             },
             // The logs for clients related to the test.
             {
-                title: "Logs",
-                name: "logs",
-                data: "clientInfo",
-                width: "20%",
+                title: 'Logs',
+                name: 'logs',
+                data: 'clientInfo',
+                width: '20%',
                 responsivePriority: 1,
                 render: function (clientInfo, type, row) {
                     return formatClientLogsList(data, row.testIndex, clientInfo);
@@ -191,7 +192,7 @@ function showSuiteData(data, suiteID) {
         ],
         rowCallback: function(row, data, displayNum, displayIndex, dataIndex) {
             if (!cases[dataIndex].summaryResult.pass) {
-                row.classList.add("failed");
+                row.classList.add('failed');
             }
         },
     });
@@ -225,7 +226,7 @@ function testSuiteTimes(cases) {
         start: new Date(start),
         end: new Date(end),
         duration: Date.parse(end) - Date.parse(start),
-    }
+    };
 }
 
 // testCaseDuration computes the duration of a single test case in milliseconds.
@@ -244,7 +245,7 @@ function scrollToTest(suiteData, testIndex) {
         row.node().scrollIntoView();
         toggleTestDetails(suiteData, table, row.node());
     } else {
-        console.error("invalid row in scrollToTest:", testIndex);
+        console.error('invalid row in scrollToTest:', testIndex);
     }
 }
 
@@ -309,22 +310,22 @@ function testHasClients(testData) {
 function formatClientLogsList(suiteData, testIndex, clientInfo) {
     let links = [];
     for (let instanceID in clientInfo) {
-        let instanceInfo = clientInfo[instanceID]
+        let instanceInfo = clientInfo[instanceID];
         let logfile = routes.resultsRoot + instanceInfo.logFile;
         let url = routes.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
-        let link = html.get_link(url, instanceInfo.name);
+        let link = html.makeLink(url, instanceInfo.name);
         link.classList.add('log-link');
         links.push(link.outerHTML);
     }
-    return links.join(", ");
+    return links.join(', ');
 }
 
 function formatTestStatus(summaryResult) {
     if (summaryResult.pass) {
-        return "&#x2713"
-    };
-    let s = summaryResult.timeout ? "Timeout" : "Fail";
-    return "&#x2715; <b>" + s + "</b>";
+        return '&#x2713';
+    }
+    let s = summaryResult.timeout ? 'Timeout' : 'Fail';
+    return '&#x2715; <b>' + s + '</b>';
 }
 
 // formatting function for the test 'details box' - this is called when a test is opened.
@@ -332,40 +333,40 @@ function formatTestStatus(summaryResult) {
 function formatTestDetails(suiteData, row) {
     let d = row.data();
 
-    let container = document.createElement("div");
-    container.classList.add("details-box");
+    let container = document.createElement('div');
+    container.classList.add('details-box');
 
     // Display columns hidden by the Responsive addon.
     // Gotta do that here because they'll just be hidden otherwise.
     // Values shown here won't be un-displayed if the table width changes.
     // Note: responsiveHidden() returns false when the column is hidden!
     if (!row.column('status:name').responsiveHidden()) {
-        let p = document.createElement("p");
+        let p = document.createElement('p');
         p.innerHTML = formatTestStatus(d.summaryResult);
         container.appendChild(p);
     }
     if (!row.column('logs:name').responsiveHidden() && testHasClients(d)) {
-        let p = document.createElement("p");
+        let p = document.createElement('p');
         p.innerHTML = '<b>Clients:</b> ' + formatClientLogsList(suiteData, d.testIndex, d.clientInfo);
         container.appendChild(p);
     }
     if (!row.column('duration:name').responsiveHidden()) {
-        let p = document.createElement("p");
-        p.innerHTML = '<b>Duration:</b> ' + format.duration(d.duration);
+        let p = document.createElement('p');
+        p.innerHTML = '<b>Duration:</b> ' + formatDuration(d.duration);
         container.appendChild(p);
     }
 
-    if (d.description != "") {
-        let p = document.createElement("p");
-        let description = html.urls_to_links(html.encode(d.description.trim()));
-        let txt = "<b>Description:</b><br/>" + description;
+    if (d.description != '') {
+        let p = document.createElement('p');
+        let description = html.urlsToLinks(html.encode(d.description.trim()));
+        let txt = '<b>Description:</b><br/>' + description;
         p.innerHTML = txt;
-        container.appendChild(p)
+        container.appendChild(p);
     }
 
-    if (d.summaryResult.details != "") {
-        let p = document.createElement("p");
-        p.innerHTML = "<b>Details:</b>";
+    if (d.summaryResult.details != '') {
+        let p = document.createElement('p');
+        p.innerHTML = '<b>Details:</b>';
         container.appendChild(p);
         let detailsOutput = formatTestLog(suiteData, d);
         container.appendChild(detailsOutput);
@@ -377,7 +378,7 @@ function formatTestDetails(suiteData, row) {
 // countLines returns the number of lines in the given string.
 function countLines(text) {
     var lines = 0, offset = 0;
-    while (true) {
+    for (;;) {
         lines++;
         offset = text.indexOf('\n', offset);
         if (offset == -1) {
@@ -397,8 +398,8 @@ function formatTestLog(suiteData, test) {
     let totalLines = countLines(text);
 
     var offset = 0, end = 0, lineNumber = 0;
-    var prefixOutput = "";
-    var suffixOutput = "";
+    var prefixOutput = '';
+    var suffixOutput = '';
     var hiddenLines = 0;
     while (end < text.length) {
         // Find bounding indexes of the next line.
@@ -416,7 +417,7 @@ function formatTestLog(suiteData, test) {
             let line = text.substring(begin, end);
             let content = highlightErrorsInTestOutput(html.encode(line));
             if (lineNumber < totalLines-1) {
-                content += "\n";
+                content += '\n';
             }
             if (inPrefix) {
                 prefixOutput += content;
@@ -430,34 +431,34 @@ function formatTestLog(suiteData, test) {
     }
 
     // Create the output sections.
-    let output = document.createElement("div");
-    output.classList.add("test-output");
+    let output = document.createElement('div');
+    output.classList.add('test-output');
 
     if (prefixOutput.length > 0) {
         // Add the beginning of text.
-        let el = document.createElement("code");
+        let el = document.createElement('code');
         el.innerHTML = prefixOutput;
-        el.classList.add("output-prefix");
+        el.classList.add('output-prefix');
         if (suffixOutput.length == 0) {
-            el.classList.add("output-suffix");
+            el.classList.add('output-suffix');
         }
         output.appendChild(el);
     }
 
     if (hiddenLines > 0) {
         // Create the truncation marker.
-        let linkText = "..." + hiddenLines + " lines hidden: click for full output...";
+        let linkText = '...' + hiddenLines + ' lines hidden: click for full output...';
         let linkURL = routes.testLog(suiteData.suiteID, suiteData.name, test.testIndex);
-        let trunc = html.get_link(linkURL, linkText);
-        trunc.classList.add("output-trunc");
+        let trunc = html.makeLink(linkURL, linkText);
+        trunc.classList.add('output-trunc');
         output.appendChild(trunc);
     }
 
     if (suffixOutput.length > 0) {
         // Add the remaining text.
-        let el = document.createElement("code");
+        let el = document.createElement('code');
         el.innerHTML = suffixOutput;
-        el.classList.add("output-suffix");
+        el.classList.add('output-suffix');
         output.appendChild(el);
     }
 
@@ -465,7 +466,7 @@ function formatTestLog(suiteData, test) {
 }
 
 function highlightErrorsInTestOutput(content) {
-    let p = /\b(error:|fail(ed)?|can't launch node)\b/i
+    let p = /\b(error:|fail(ed)?|can't launch node)\b/i;
     if (p.test(content)) {
         return '<span class="output-error">' + content + '</span>';
     }

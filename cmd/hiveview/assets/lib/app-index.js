@@ -1,21 +1,22 @@
-import 'datatables.net'
-import 'datatables.net-bs5'
-import 'datatables.net-responsive'
-import 'datatables.net-responsive-bs5'
-import $ from 'jquery'
+import 'datatables.net';
+import 'datatables.net-bs5';
+import 'datatables.net-responsive';
+import 'datatables.net-responsive-bs5';
+import $ from 'jquery';
 
-import { html, format } from './utils.js'
-import * as routes from './routes.js'
-import * as common from './common.js'
+import * as common from './app-common.js';
+import * as routes from './routes.js';
+import { makeButton } from './html.js';
+import { formatBytes } from './utils.js';
 
 $(document).ready(function () {
     common.updateHeader();
 
     $('#loading').show();
-    console.log("Loading file list...");
+    console.log('Loading file list...');
     $.ajax({
         type: 'GET',
-        url: "listing.jsonl",
+        url: 'listing.jsonl',
         cache: false,
         success: function(data) {
             $('#page-text').show();
@@ -28,15 +29,10 @@ $(document).ready(function () {
             $('#loading').hide();
         },
     });
-})
-
-function linkToSuite(suiteID, suiteName, linkText) {
-    let url = routes.suite(suiteID, suiteName);
-    return html.get_link(url, linkText);
-}
+});
 
 function showFileListing(data) {
-    console.log("Got file list")
+    console.log('Got file list');
     // the data is jsonlines
     /*
         {
@@ -53,9 +49,8 @@ function showFileListing(data) {
     }
     */
 
-    let table = $("#filetable");
-    var suites = [];
-    data.split("\n").forEach(function(elem, index) {
+    let suites = [];
+    data.split('\n').forEach(function(elem) {
         if (!elem) {
             return;
         }
@@ -64,7 +59,7 @@ function showFileListing(data) {
         suites.push(suite);
     });
 
-    filetable = $("#filetable").DataTable({
+    $('#filetable').DataTable({
         data: suites,
         pageLength: 50,
         autoWidth: false,
@@ -76,7 +71,7 @@ function showFileListing(data) {
                     var output = '<div class="responsive-overflow">';
                     columns.forEach(function (col, i) {
                         if (col.hidden) {
-                            output += '<span class="responsive-overflow-col">'
+                            output += '<span class="responsive-overflow-col">';
                             output += col.data;
                             output += '</span> ';
                         }
@@ -89,10 +84,10 @@ function showFileListing(data) {
         order: [[0, 'desc']],
         columns: [
             {
-                title: "🕒",
-                data: "start",
-                type: "date",
-                width: "10em",
+                title: '🕒',
+                data: 'start',
+                type: 'date',
+                width: '10em',
                 render: function(v, type) {
                     if (type === 'display' || type == 'filter') {
                         return v.toLocaleString();
@@ -101,42 +96,40 @@ function showFileListing(data) {
                 },
             },
             {
-                title: "Suite",
-                data: "name",
-                width: "14em",
+                title: 'Suite',
+                data: 'name',
+                width: '14em',
             },
             {
-                title: "Clients",
-                data: "clients",
-                width: "auto",
+                title: 'Clients',
+                data: 'clients',
+                width: 'auto',
                 render: function(data) {
-                    return data.join(", ")
+                    return data.join(', ');
                 },
             },
             {
-                title: "Status",
+                title: 'Status',
                 data: null,
-                width: "5.5em",
-                className: "suite-status-column",
+                width: '5.5em',
+                className: 'suite-status-column',
                 render: function(data) {
                     if (data.fails > 0) {
-                        let prefix = data.timeout ? "Timeout" : "Fail";
-                        return "&#x2715; <b>" + prefix + " (" + data.fails + " / " + (data.fails + data.passes) + ")</b>";
+                        let prefix = data.timeout ? 'Timeout' : 'Fail';
+                        return '&#x2715; <b>' + prefix + ' (' + data.fails + ' / ' + (data.fails + data.passes) + ')</b>';
                     }
-                    return "&#x2713 (" + data.passes + ")";
+                    return '&#x2713 (' + data.passes + ')';
                 },
             },
             {
-                title: "",
+                title: '',
                 data: null,
-                width: "8.5em",
+                width: '8.5em',
                 orderable: false,
                 render: function(data) {
-                    let loadText = "Load (" + format.units(data.size) + ")";
-                    let loadLink = linkToSuite(data.fileName, data.name, loadText);
-                    const btnclass = ["btn", "btn-sm", "btn-primary"];
-                    loadLink.classList.add(...btnclass);
-                    return loadLink.outerHTML;
+                    let url = routes.suite(data.fileName, data.name);
+                    let loadText = 'Load (' + formatBytes(data.size) + ')';
+                    return makeButton(url, loadText).outerHTML;
                 },
             },
         ],
