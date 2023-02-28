@@ -16,9 +16,7 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
-// ------------------------------------------------------------------------- //
-// main() starts the pyspec test suite in hive and runs the fixture runner.  //
-// ------------------------------------------------------------------------- //
+// main() starts the pyspec test suite in hive and runs the fixture runner.
 func main() {
 	suite := hivesim.Suite{
 		Name: "pyspec",
@@ -40,9 +38,7 @@ func main() {
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-// ------------------------------------------------------------------------- //
-// fixtureRunner() loads the pyspec test files and spawns the client tests.  //
-// ------------------------------------------------------------------------- //
+// fixtureRunner() loads the pyspec test files and spawns the client tests.
 func fixtureRunner(t *hivesim.T) {
 
 	// retrieve clients available for testing
@@ -67,8 +63,7 @@ func fixtureRunner(t *hivesim.T) {
 	if !isset {
 		t.Fatal("$TESTPATH not set")
 	}
-	testCategory := "" // modify to run specific tests, e.g "withdrawals"
-	fileRoot := fmt.Sprintf("%s/%s", testPath, testCategory)
+	fileRoot := fmt.Sprintf("%s/", testPath)
 	t.Log("file root directory:", fileRoot)
 
 	// spawn `parallelism` workers to run fixtures against clients
@@ -84,7 +79,7 @@ func fixtureRunner(t *hivesim.T) {
 					Description: ("Test Link: " +
 						repoLink(test.filepath)),
 					Run:       test.run,
-					AlwaysRun: true,
+					AlwaysRun: false,
 				})
 			}
 		}()
@@ -107,9 +102,7 @@ func fixtureRunner(t *hivesim.T) {
 	wg.Wait()
 }
 
-// --------------------------------------------------------------------- //
-// repoLink() coverts a pyspec test path into its respective repo link.  //
-// --------------------------------------------------------------------- //
+// repoLink() coverts a pyspec test path into its respective repo link.
 func repoLink(testPath string) string {
 	// Example for withdrawals_zero_amout.json:
 	// Converts '/fixtures/withdrawals/withdrawals/withdrawals_zero_amount.json'

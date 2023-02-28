@@ -15,11 +15,9 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 )
 
-// ------------------------------------------------------------------------------- //
-// loadFixtureTests() extracts tests from fixture.json files in a given directory, //
-// creates a testcase struct for each test, and passes the testcase struct to a    //
-// func() parameter `fn`, which is used within fixtureRunner() to run the tests.   //
-// ------------------------------------------------------------------------------- //
+// loadFixtureTests() extracts tests from fixture.json files in a given directory,
+// creates a testcase struct for each test, and passes the testcase struct to a
+// func() parameter `fn`, which is used within fixtureRunner() to run the tests.
 func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// check file is actually a fixture
@@ -52,7 +50,7 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 			// define testcase (tc) struct with initial fields
 			tc := testcase{
 				fixture:  fixture,
-				name:     name,
+				name:     filepath.Dir(path)[10:] + "/" + name,
 				filepath: path,
 			}
 			// extract genesis, payloads & post allocation field to tc
@@ -64,11 +62,9 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 	})
 }
 
-// ----------------------------------------------------------------------------------------------------//
-// run() executes a testcase against the client, called within a test channel from fixtureRunner().    //
-// All testcase payloads are sent and executed using the EngineAPI. For verification all fixture       //
-// nonce, balance and storage values are checked against the response recieved from the lastest block. //
-// ----------------------------------------------------------------------------------------------------//
+// run() executes a testcase against the client, called within a test channel from fixtureRunner().
+// All testcase payloads are sent and executed using the EngineAPI. For verification all fixture
+// nonce, balance and storage values are checked against the response recieved from the lastest block.
 func (tc *testcase) run(t *hivesim.T) {
 	start := time.Now()
 
@@ -187,10 +183,8 @@ func (tc *testcase) run(t *hivesim.T) {
 			totalTestTime %v`, t0.Sub(start), t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), end.Sub(t3), end.Sub(start))
 }
 
-// ----------------------------------------------------------------------- //
-// updateEnv() updates the environment variables against the fork rules    //
-// defined in envForks, for the network specified in the testcase fixture. //
-// ----------------------------------------------------------------------- //
+// updateEnv() updates the environment variables against the fork rules
+// defined in envForks, for the network specified in the testcase fixture.
 func (tc *testcase) updateEnv(env hivesim.Params) {
 	forkRules := envForks[tc.fixture.json.Network]
 	for k, v := range forkRules {
