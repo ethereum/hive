@@ -133,12 +133,11 @@ set -ex
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net"
 #FLAGS="$FLAGS --ws"
 
-# TODO
-#if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
-#    JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
-#    echo -n $JWT_SECRET > /jwt.secret
-#    FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt.secret"
-#fi
+if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+    JWT_SECRET="7365637265747365637265747365637265747365637265747365637265747365"
+    echo -n $JWT_SECRET > /jwt.secret
+    FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt.secret"
+fi
 
 # Configure NAT
 FLAGS="$FLAGS --nat none"
