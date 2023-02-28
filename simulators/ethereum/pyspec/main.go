@@ -67,7 +67,8 @@ func fixtureRunner(t *hivesim.T) {
 	if !isset {
 		t.Fatal("$TESTPATH not set")
 	}
-	fileRoot := fmt.Sprintf("%s/", testPath)
+	testCategory := "" // modify to run specific tests, e.g "withdrawals"
+	fileRoot := fmt.Sprintf("%s/%s", testPath, testCategory)
 	t.Log("file root directory:", fileRoot)
 
 	// spawn `parallelism` workers to run fixtures against clients

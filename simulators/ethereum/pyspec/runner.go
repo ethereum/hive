@@ -30,6 +30,10 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 		if info.IsDir() || !strings.HasSuffix(info.Name(), ".json") {
 			return nil
 		}
+		excludePaths := []string{"example/"} // modify for tests to exclude
+		if strings.Contains(path, strings.Join(excludePaths, "")) {
+			return nil
+		}
 
 		// extract fixture.json tests (multiple forks) into fixtureTest structs
 		var fixtureTests map[string]fixtureTest
@@ -40,23 +44,19 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 
 		// create testcase structure from fixtureTests
 		for name, fixture := range fixtureTests {
-
 			// skip networks post merge or not supported
 			network := fixture.json.Network
 			if _, exist := envForks[network]; !exist {
 				continue
 			}
-
 			// define testcase (tc) struct with initial fields
 			tc := testcase{
 				fixture:  fixture,
 				name:     name,
 				filepath: path,
 			}
-
 			// extract genesis, payloads & post allocation field to tc
 			tc.extractFixtureFields(fixture.json)
-
 			// feed tc to single worker within fixtureRunner()
 			fn(tc)
 		}
@@ -92,7 +92,6 @@ func (tc *testcase) run(t *hivesim.T) {
 
 	// start client (also creates an engine RPC client internally)
 	t.Log("starting client with Engine API.")
-
 	engineClient, err := engineStarter.StartClient(t, ctx, tc.genesis, env, nil)
 	if err != nil {
 		t.Fatalf("can't start client with Engine API: %v", err)
@@ -135,7 +134,6 @@ func (tc *testcase) run(t *hivesim.T) {
 
 	// check nonce, balance & storage of accounts in final block against fixture values
 	for account, genesisAccount := range *tc.postAlloc {
-
 		// get nonce & balance from last block (end of test execution)
 		gotNonce, errN := engineClient.NonceAt(ctx, account, nil)
 		gotBalance, errB := engineClient.BalanceAt(ctx, account, nil)
@@ -144,7 +142,6 @@ func (tc *testcase) run(t *hivesim.T) {
 		} else if errB != nil {
 			t.Errorf("unable to call balance from account: %v, in test %s: %v", account, tc.name, errB)
 		}
-
 		// check final nonce & balance matches expected in fixture
 		if genesisAccount.Nonce != gotNonce {
 			t.Errorf(`nonce recieved from account %v doesn't match expected from fixture in test %s:
@@ -156,30 +153,26 @@ func (tc *testcase) run(t *hivesim.T) {
 			recieved from block: %v
 			expected in fixture: %v`, account, tc.name, gotBalance, genesisAccount.Balance)
 		}
-
+		// check final storage
 		if len(genesisAccount.Storage) > 0 {
-
 			// extract fixture storage keys
 			keys := make([]common.Hash, 0, len(genesisAccount.Storage))
 			for key := range genesisAccount.Storage {
 				keys = append(keys, key)
 			}
-
 			// get storage values for account with keys: keys
 			gotStorage, errS := engineClient.StorageAtKeys(ctx, account, keys, nil)
 			if errS != nil {
 				t.Errorf("unable to get storage values from account: %v, in test %s: %v", account, tc.name, errN)
 			}
-
 			// check values in storage match with fixture
 			for _, key := range keys {
 				if genesisAccount.Storage[key] != *gotStorage[key] {
 					t.Errorf(`storage recieved from account %v doesn't match expected from fixture in test %s:
 						from storage address: %v
-						recieved from block: %v
-						expected in fixture: %v`, account, tc.name, key, gotStorage[key], genesisAccount.Storage[key])
+						recieved from block:  %v
+						expected in fixture:  %v`, account, tc.name, key, gotStorage[key], genesisAccount.Storage[key])
 				}
-
 			}
 		}
 	}
