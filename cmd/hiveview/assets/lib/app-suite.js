@@ -4,18 +4,19 @@ import 'datatables.net-responsive';
 import 'datatables.net-responsive-bs5';
 import $ from 'jquery';
 
-import { html, nav, format, loader } from './utils.js';
+import * as common from './app-common.js';
 import * as routes from './routes.js';
-import * as common from './common.js';
+import * as html from './html.js';
+import { formatDuration, queryParam } from './utils.js';
 
 $(document).ready(function () {
     common.updateHeader();
 
-    let name = nav.load('suitename');
+    let name = queryParam('suitename');
     if (name) {
         showSuiteName(name);
     }
-    let filename = nav.load('suiteid');
+    let filename = queryParam('suiteid');
     if (!filename) {
         showError('no suite ID in URL');
         return;
@@ -27,7 +28,7 @@ $(document).ready(function () {
 
     console.log('Loading:', filename, 'name:', name);
     $.ajax({
-        xhr: loader.newXhrWithProgressBar,
+        xhr: common.newXhrWithProgressBar,
         type: 'GET',
         url: routes.resultsRoot + filename,
         dataType: 'json',
@@ -95,7 +96,7 @@ function showSuiteData(data, suiteID) {
 
     // Set title info.
     showSuiteName(data.name);
-    $('#testsuite_desc').html(html.urls_to_links(html.encode(data.description)));
+    $('#testsuite_desc').html(html.urlsToLinks(html.encode(data.description)));
 
     // Set client versions.
     if (data.clientVersions) {
@@ -105,7 +106,7 @@ function showSuiteData(data, suiteID) {
                 delete data.clientVersions[key];
             }
         }
-        $('#testsuite_clients').html(html.make_definition_list(data.clientVersions));
+        $('#testsuite_clients').html(html.makeDefinitionList(data.clientVersions));
     }
 
     // Convert test cases to list.
@@ -121,7 +122,7 @@ function showSuiteData(data, suiteID) {
     // Fill info box.
     let suiteTimes = testSuiteTimes(cases);
     $('#testsuite_start').html('🕒 ' + suiteTimes.start.toLocaleString());
-    $('#testsuite_duration').html('⌛️ ' + format.duration(suiteTimes.duration));
+    $('#testsuite_duration').html('⌛️ ' + formatDuration(suiteTimes.duration));
     let logfile = routes.resultsRoot + data.simLog;
     let url = routes.simulatorLog(suiteID, suiteName, logfile);
     $('#sim-log-link').attr('href', url);
@@ -172,7 +173,7 @@ function showSuiteData(data, suiteID) {
                 type: 'num',
                 render: function (v, type, row) {
                     if (type === 'display' || type === 'filter') {
-                        return format.duration(v);
+                        return formatDuration(v);
                     }
                     return v;
                 },
@@ -312,7 +313,7 @@ function formatClientLogsList(suiteData, testIndex, clientInfo) {
         let instanceInfo = clientInfo[instanceID];
         let logfile = routes.resultsRoot + instanceInfo.logFile;
         let url = routes.clientLog(suiteData.suiteID, suiteData.name, testIndex, logfile);
-        let link = html.get_link(url, instanceInfo.name);
+        let link = html.makeLink(url, instanceInfo.name);
         link.classList.add('log-link');
         links.push(link.outerHTML);
     }
@@ -351,13 +352,13 @@ function formatTestDetails(suiteData, row) {
     }
     if (!row.column('duration:name').responsiveHidden()) {
         let p = document.createElement('p');
-        p.innerHTML = '<b>Duration:</b> ' + format.duration(d.duration);
+        p.innerHTML = '<b>Duration:</b> ' + formatDuration(d.duration);
         container.appendChild(p);
     }
 
     if (d.description != '') {
         let p = document.createElement('p');
-        let description = html.urls_to_links(html.encode(d.description.trim()));
+        let description = html.urlsToLinks(html.encode(d.description.trim()));
         let txt = '<b>Description:</b><br/>' + description;
         p.innerHTML = txt;
         container.appendChild(p);
@@ -448,7 +449,7 @@ function formatTestLog(suiteData, test) {
         // Create the truncation marker.
         let linkText = '...' + hiddenLines + ' lines hidden: click for full output...';
         let linkURL = routes.testLog(suiteData.suiteID, suiteData.name, test.testIndex);
-        let trunc = html.get_link(linkURL, linkText);
+        let trunc = html.makeLink(linkURL, linkText);
         trunc.classList.add('output-trunc');
         output.appendChild(trunc);
     }

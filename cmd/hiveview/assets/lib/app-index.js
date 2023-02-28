@@ -4,9 +4,10 @@ import 'datatables.net-responsive';
 import 'datatables.net-responsive-bs5';
 import $ from 'jquery';
 
-import { html, format } from './utils.js';
+import * as common from './app-common.js';
 import * as routes from './routes.js';
-import * as common from './common.js';
+import { makeButton } from './html.js';
+import { formatBytes } from './utils.js';
 
 $(document).ready(function () {
     common.updateHeader();
@@ -29,11 +30,6 @@ $(document).ready(function () {
         },
     });
 });
-
-function linkToSuite(suiteID, suiteName, linkText) {
-    let url = routes.suite(suiteID, suiteName);
-    return html.get_link(url, linkText);
-}
 
 function showFileListing(data) {
     console.log('Got file list');
@@ -131,11 +127,9 @@ function showFileListing(data) {
                 width: '8.5em',
                 orderable: false,
                 render: function(data) {
-                    let loadText = 'Load (' + format.units(data.size) + ')';
-                    let loadLink = linkToSuite(data.fileName, data.name, loadText);
-                    const btnclass = ['btn', 'btn-sm', 'btn-primary'];
-                    loadLink.classList.add(...btnclass);
-                    return loadLink.outerHTML;
+                    let url = routes.suite(data.fileName, data.name);
+                    let loadText = 'Load (' + formatBytes(data.size) + ')';
+                    return makeButton(url, loadText).outerHTML;
                 },
             },
         ],

@@ -1,7 +1,9 @@
 import $ from 'jquery';
-import { html, nav, format, loader } from './utils.js';
+
+import * as common from './app-common.js';
 import * as routes from './routes.js';
-import * as common from './common.js';
+import { makeLink } from './html.js';
+import { formatBytes, queryParam } from './utils.js';
 
 $(document).ready(function () {
     common.updateHeader();
@@ -13,15 +15,15 @@ $(document).ready(function () {
     }
 
     // Get suite context.
-    let suiteFile = nav.load('suiteid');
-    let suiteName = nav.load('suitename');
-    let testIndex = nav.load('testid');
+    let suiteFile = queryParam('suiteid');
+    let suiteName = queryParam('suitename');
+    let testIndex = queryParam('testid');
     if (suiteFile) {
         showLinkBack(suiteFile, suiteName, testIndex);
     }
 
     // Check if we're supposed to show a test log.
-    let showTestLog = nav.load('showtestlog');
+    let showTestLog = queryParam('showtestlog');
     if (showTestLog === '1') {
         if (!suiteFile || !testIndex) {
             showError('Invalid parameters! Missing \'suitefile\' or \'testid\' in URL.');
@@ -32,7 +34,7 @@ $(document).ready(function () {
     }
 
     // Check for file name.
-    let file = nav.load('file');
+    let file = queryParam('file');
     if (file) {
         $('#fileload').val(file);
         showText('Loading file...');
@@ -78,7 +80,7 @@ function showLinkBack(suiteID, suiteName, testID) {
         text = 'Back to test suite ‘' + suiteName + '’';
         url = routes.suite(suiteID, suiteName);
     }
-    $('#link-back').html(html.get_link(url, text));
+    $('#link-back').html(makeLink(url, text));
 }
 
 function showTitle(type, title) {
@@ -120,7 +122,7 @@ function showText(text) {
 
     // Set meta-info.
     let meta = $('#meta');
-    meta.text(lines.length + ' Lines, ' + format.units(text.length));
+    meta.text(lines.length + ' Lines, ' + formatBytes(text.length));
 
     // Ensure viewer is visible.
     $('#viewer-header').show();
@@ -149,7 +151,7 @@ function lineNumberClicked() {
 function fetchFile(url, line /* optional jump to line */ ) {
     let resultsRE = new RegExp('^' + routes.resultsRoot);
     $.ajax({
-        xhr: loader.newXhrWithProgressBar,
+        xhr: common.newXhrWithProgressBar,
         url: url,
         dataType: 'text',
         success: function(data) {
@@ -167,7 +169,7 @@ function fetchFile(url, line /* optional jump to line */ ) {
 // fetchTestLog loads the suite file and displays the output of a test.
 function fetchTestLog(suiteFile, testIndex, line) {
     $.ajax({
-        xhr: loader.newXhrWithProgressBar,
+        xhr: common.newXhrWithProgressBar,
         url: suiteFile,
         dataType: 'json',
         success: function(data) {
