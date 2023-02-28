@@ -29,6 +29,11 @@ const (
 	PortEngineRPC = 8551
 )
 
+var AllForkchoiceUpdatedCalls = []string{
+	"engine_forkchoiceUpdatedV1",
+	"engine_forkchoiceUpdatedV2",
+}
+
 var AllEngineCallsLog = []string{
 	"engine_forkchoiceUpdatedV1",
 	"engine_forkchoiceUpdatedV2",
@@ -43,6 +48,8 @@ type ExecutionClient struct {
 	HiveClient       *hivesim.Client
 	ClientType       string
 	OptionsGenerator func() ([]hivesim.StartOption, error)
+	LatestForkchoice *api.ForkchoiceStateV1
+	trackFcU         bool
 	proxy            **proxy.Proxy
 	proxyPort        int
 	subnet           string
@@ -63,12 +70,14 @@ func NewExecutionClient(
 	proxyPort int,
 	subnet string,
 	ttd *big.Int,
+	trackFcu bool,
 	logEngineCalls bool,
 ) *ExecutionClient {
 	return &ExecutionClient{
 		T:                t,
 		ClientType:       eth1Def.Name,
 		OptionsGenerator: optionsGenerator,
+		trackFcU:         trackFcu,
 		proxyPort:        proxyPort,
 		proxy:            new(*proxy.Proxy),
 		subnet:           subnet,
@@ -79,6 +88,9 @@ func NewExecutionClient(
 }
 
 func (en *ExecutionClient) UserRPCAddress() (string, error) {
+	if en.HiveClient == nil {
+		return "", fmt.Errorf("el hive client not yet launched")
+	}
 	return fmt.Sprintf("http://%v:%d", en.HiveClient.IP, PortUserRPC), nil
 }
 
@@ -158,12 +170,31 @@ func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
 		panic(err)
 	}
 
-	proxy := proxy.NewProxy(
+	p := proxy.NewProxy(
 		net.ParseIP(simIP),
 		en.proxyPort,
 		dest,
 		secret,
 	)
+
+	if en.trackFcU {
+		logCallback := func(req []byte) *spoof.Spoof {
+			var (
+				fcState api.ForkchoiceStateV1
+				pAttr   api.PayloadAttributes
+				err     error
+			)
+			err = proxy.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+			if err == nil {
+				en.LatestForkchoice = &fcState
+			}
+			return nil
+		}
+		for _, c := range AllForkchoiceUpdatedCalls {
+			p.AddRequestCallback(c, logCallback)
+		}
+	}
+
 	if en.logEngineCalls {
 		logCallback := func(res []byte, req []byte) *spoof.Spoof {
 			en.T.Logf(
@@ -179,11 +210,11 @@ func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
 			return nil
 		}
 		for _, c := range AllEngineCallsLog {
-			proxy.AddResponseCallback(c, logCallback)
+			p.AddResponseCallback(c, logCallback)
 		}
 	}
 
-	*en.proxy = proxy
+	*en.proxy = p
 
 	return nil
 }
@@ -271,16 +302,36 @@ func (en *ExecutionClient) EngineGetPayload(
 	parentCtx context.Context,
 	payloadID *api.PayloadID,
 	version int,
-) (*api.ExecutableData, error) {
-	var result api.ExecutableData
+) (*api.ExecutableData, *big.Int, error) {
+
+	var (
+		rpcString = fmt.Sprintf("engine_getPayloadV%d", version)
+	)
+
 	if err := en.PrepareDefaultAuthCallToken(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	request := fmt.Sprintf("engine_getPayload%d", version)
+
 	ctx, cancel := context.WithTimeout(parentCtx, time.Second*10)
 	defer cancel()
-	err := en.engineRpcClient.CallContext(ctx, &result, request, payloadID)
-	return &result, err
+	if version == 2 {
+		type ExecutionPayloadEnvelope struct {
+			ExecutionPayload *api.ExecutableData `json:"executionPayload" gencodec:"required"`
+			BlockValue       *hexutil.Big        `json:"blockValue"       gencodec:"required"`
+		}
+		var response ExecutionPayloadEnvelope
+		err := en.engineRpcClient.CallContext(
+			ctx,
+			&response,
+			rpcString,
+			payloadID,
+		)
+		return response.ExecutionPayload, (*big.Int)(response.BlockValue), err
+	} else {
+		var executableData api.ExecutableData
+		err := en.engineRpcClient.CallContext(ctx, &executableData, rpcString, payloadID)
+		return &executableData, common.Big0, err
+	}
 }
 
 func (en *ExecutionClient) EngineNewPayload(
@@ -292,7 +343,7 @@ func (en *ExecutionClient) EngineNewPayload(
 	if err := en.PrepareDefaultAuthCallToken(); err != nil {
 		return nil, err
 	}
-	request := fmt.Sprintf("engine_newPayload%d", version)
+	request := fmt.Sprintf("engine_newPayloadV%d", version)
 	ctx, cancel := context.WithTimeout(parentCtx, time.Second*10)
 	defer cancel()
 	err := en.engineRpcClient.CallContext(ctx, &result, request, payload)
@@ -444,6 +495,15 @@ func (ec *ExecutionClient) BalanceAt(
 	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
 	defer cancel()
 	return ec.eth.BalanceAt(ctx, account, n)
+}
+
+func (ec *ExecutionClient) SendTransaction(
+	parentCtx context.Context,
+	tx *types.Transaction,
+) error {
+	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
+	defer cancel()
+	return ec.eth.SendTransaction(ctx, tx)
 }
 
 type ExecutionClients []*ExecutionClient

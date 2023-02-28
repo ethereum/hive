@@ -41,6 +41,9 @@ case "$HIVE_LOGLEVEL" in
     5)   LOG=trace ;;
 esac
 
+builder_option=$([[ "$HIVE_ETH2_BUILDER_ENDPOINT" == "" ]] && echo "" || echo "--enable-builder --suggested-fee-recipient=0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b")
+echo BUILDER=$builder_option
+
 echo Starting Prysm Validator Client
 
 /validator \
@@ -52,5 +55,6 @@ echo Starting Prysm Validator Client
     --datadir="/data/vc" \
     --wallet-dir="/data/validators" \
     --wallet-password-file="/wallet.pass" \
-    --chain-config-file="/hive/input/config.yaml"
+    --chain-config-file="/hive/input/config.yaml" \
+    $builder_option
 # NOTE: gRPC/RPC ports are inverted to allow the simulator to access the REST API

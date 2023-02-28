@@ -17,6 +17,7 @@ type ValidatorClient struct {
 	ClientType       string
 	OptionsGenerator func(map[common.ValidatorIndex]*consensus_config.KeyDetails) ([]hivesim.StartOption, error)
 	Keys             map[common.ValidatorIndex]*consensus_config.KeyDetails
+	beacon           *BeaconClient
 }
 
 func NewValidatorClient(
@@ -24,12 +25,14 @@ func NewValidatorClient(
 	validatorDef *hivesim.ClientDefinition,
 	optionsGenerator func(map[common.ValidatorIndex]*consensus_config.KeyDetails) ([]hivesim.StartOption, error),
 	keys map[common.ValidatorIndex]*consensus_config.KeyDetails,
+	bn *BeaconClient,
 ) *ValidatorClient {
 	return &ValidatorClient{
 		T:                t,
 		ClientType:       validatorDef.Name,
 		OptionsGenerator: optionsGenerator,
 		Keys:             keys,
+		beacon:           bn,
 	}
 }
 
@@ -47,6 +50,12 @@ func (vc *ValidatorClient) Start(extraOptions ...hivesim.StartOption) error {
 		return fmt.Errorf("unable to get start options: %v", err)
 	}
 	opts = append(opts, extraOptions...)
+
+	if vc.beacon.Builder != nil {
+		opts = append(opts, hivesim.Params{
+			"HIVE_ETH2_BUILDER_ENDPOINT": vc.beacon.Builder.Address(),
+		})
+	}
 
 	vc.HiveClient = vc.T.StartClient(vc.ClientType, opts...)
 	return nil

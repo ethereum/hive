@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/protolambda/zrnt/eth2/configs"
 
 	"github.com/ethereum/hive/hivesim"
+	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
@@ -69,7 +71,7 @@ func prepareExecutionForkConfig(
 		if config.CapellaForkEpoch.Uint64() == 0 {
 			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime))
 		} else {
-			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime) + config.SlotTime.Int64()*32)
+			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime) + config.CapellaForkEpoch.Int64()*config.SlotTime.Int64()*32)
 		}
 	}
 	return &chainConfig
@@ -90,6 +92,7 @@ func prepareTestnet(
 		uint64(eth1GenesisTime),
 		config.Eth1Consensus,
 		prepareExecutionForkConfig(eth2GenesisTime, config),
+		config.GenesisExecutionAccounts,
 	)
 	if config.InitialBaseFeePerGas != nil {
 		eth1Genesis.Genesis.BaseFee = config.InitialBaseFeePerGas
@@ -399,6 +402,7 @@ func (p *PreparedTestnet) prepareExecutionNode(
 		clients.PortEngineRPC+executionIndex,
 		subnet,
 		ttd,
+		true,
 		logEngineCalls,
 	)
 }
@@ -411,6 +415,8 @@ func (p *PreparedTestnet) prepareBeaconNode(
 	beaconDef *hivesim.ClientDefinition,
 	ttd *big.Int,
 	beaconIndex int,
+	enableBuilders bool,
+	builderOptions []mock_builder.Option,
 	eth1Endpoints ...*clients.ExecutionClient,
 ) *clients.BeaconClient {
 	testnet.Logf(
@@ -491,7 +497,7 @@ func (p *PreparedTestnet) prepareBeaconNode(
 	//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
 	//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 	//}
-	return clients.NewBeaconClient(
+	cl := clients.NewBeaconClient(
 		testnet.T,
 		beaconDef,
 		optionsGenerator,
@@ -500,6 +506,43 @@ func (p *PreparedTestnet) prepareBeaconNode(
 		beaconIndex,
 		testnet.genesisValidatorsRoot,
 	)
+
+	if enableBuilders {
+		simIP, err := testnet.T.Sim.ContainerNetworkIP(
+			testnet.T.SuiteID,
+			"bridge",
+			"simulation",
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		options := []mock_builder.Option{
+			mock_builder.WithExternalIP(net.ParseIP(simIP)),
+			mock_builder.WithPort(
+				mock_builder.DEFAULT_BUILDER_PORT + beaconIndex,
+			),
+			mock_builder.WithID(beaconIndex),
+			mock_builder.WithBeaconGenesisTime(testnet.genesisTime),
+		}
+
+		if builderOptions != nil {
+			options = append(options, builderOptions...)
+		}
+
+		mockBuilder, err := mock_builder.NewMockBuilder(
+			eth1Endpoints[0],
+			cl,
+			p.spec,
+			options...,
+		)
+		if err != nil {
+			panic(err)
+		}
+		cl.Builder = mockBuilder
+	}
+
+	return cl
 }
 
 // Prepares a validator client object with all the necessary information
@@ -548,5 +591,6 @@ func (p *PreparedTestnet) prepareValidatorClient(
 		validatorDef,
 		optionsGenerator,
 		p.keyTranches[keyIndex],
+		bn,
 	)
 }

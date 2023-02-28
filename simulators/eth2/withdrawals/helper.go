@@ -555,3 +555,44 @@ func ComputeBLSToExecutionDomain(
 		t.GenesisValidatorsRoot(),
 	)
 }
+
+type BaseTransactionCreator struct {
+	Recipient  *common.Address
+	GasLimit   uint64
+	Amount     *big.Int
+	Payload    []byte
+	PrivateKey *ecdsa.PrivateKey
+}
+
+func (tc *BaseTransactionCreator) MakeTransaction(
+	nonce uint64,
+) (*types.Transaction, error) {
+	var newTxData types.TxData
+
+	gasFeeCap := new(big.Int).Set(GasPrice)
+	gasTipCap := new(big.Int).Set(GasTipPrice)
+	newTxData = &types.DynamicFeeTx{
+		Nonce:     nonce,
+		Gas:       tc.GasLimit,
+		GasTipCap: gasTipCap,
+		GasFeeCap: gasFeeCap,
+		To:        tc.Recipient,
+		Value:     tc.Amount,
+		Data:      tc.Payload,
+	}
+
+	tx := types.NewTx(newTxData)
+	key := tc.PrivateKey
+	if key == nil {
+		key = VaultKey
+	}
+	signedTx, err := types.SignTx(
+		tx,
+		types.NewLondonSigner(ChainID),
+		key,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return signedTx, nil
+}
