@@ -53,9 +53,8 @@ function showFileListing(data) {
     }
     */
 
-    let table = $('#filetable');
-    var suites = [];
-    data.split('\n').forEach(function(elem, index) {
+    let suites = [];
+    data.split('\n').forEach(function(elem) {
         if (!elem) {
             return;
         }
@@ -64,7 +63,7 @@ function showFileListing(data) {
         suites.push(suite);
     });
 
-    filetable = $('#filetable').DataTable({
+    $('#filetable').DataTable({
         data: suites,
         pageLength: 50,
         autoWidth: false,

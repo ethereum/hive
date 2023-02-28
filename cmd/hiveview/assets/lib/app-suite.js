@@ -377,7 +377,7 @@ function formatTestDetails(suiteData, row) {
 // countLines returns the number of lines in the given string.
 function countLines(text) {
     var lines = 0, offset = 0;
-    while (true) {
+    for (;;) {
         lines++;
         offset = text.indexOf('\n', offset);
         if (offset == -1) {

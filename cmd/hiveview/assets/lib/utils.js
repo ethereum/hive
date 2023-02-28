@@ -4,7 +4,7 @@ export let html = {
     // encode does HTML-encoding/escaping.
     encode: function(str) {
         //Let the DOM do it for us.
-        var d = document.createElement('textarea');
+        let d = document.createElement('textarea');
         d.innerText = str;
         //Yes, I'm aware of
         // http://stackoverflow.com/questions/1219860/html-encoding-in-javascript-jquery
@@ -15,29 +15,29 @@ export let html = {
     // tag encapsulates data inside a tag
     tag: function(typ, str) {
         //Let the DOM do it for us.
-        var d = document.createElement(typ);
+        let d = document.createElement(typ);
         d.innerText = ('' + str);
         return d.outerHTML;
     },
 
     // HTML Attribute encoding
     attr_encode: function(str) {
-        x = document.createElement('x');
+        let x = document.createElement('x');
         x.setAttribute('b', str);
-        var all = x.outerHTML;
+        let all = x.outerHTML;
         return all.substring(6, all.length - 6);
     },
 
     // get_link creates an anchor-element from 'untrusted' link data.
     get_link: function(url, text) {
-        var a = document.createElement('a');
+        let a = document.createElement('a');
         a.setAttribute('href', url);
         a.text = text;
         return a;
     },
 
     get_js_link: function(js, text) {
-        var a = document.createElement('a');
+        let a = document.createElement('a');
         a.setAttribute('href', 'javascript:' + js);
         a.text = text;
         return a.outerHTML;
@@ -46,7 +46,7 @@ export let html = {
     // urls_to_links replaces URLs in input with HTML links.
     urls_to_links: function(str) {
         // Thanks, http://urlregex.com/
-        let re = /(((?:http[s]?:\/\/)(?:[\-;:&=\+\$,\w]+@)?[A-Za-z0-9\.\-]+|(?:www\.|[\-;:&=\+\$,\w]+@)[A-Za-z0-9\.\-]+)((?:\/[\+~%\/\.\w\-_]*)?\??(?:[\-\+=&;%@\.\w_]*)#?(?:[\.\!\/\\\w]*))?)/;
+        let re = /(((?:http[s]?:\/\/)(?:[\w;:&=+$,-]+@)?[A-Za-z0-9.-]+|(?:www\.|[\w;:&=+$,]+@)[A-Za-z0-9.-]+)((?:\/[\w+~%/._-]*)?\??(?:[\w+=&;%@._-]*)#?(?:[\w.!/\\]*))?)/;
         return String(str).replace(re, function (match) {
             return html.get_link(match, match).outerHTML;
         });
@@ -54,7 +54,7 @@ export let html = {
 
     // get_button creates a <button> element.
     get_button: function(text) {
-        var a = document.createElement('button');
+        let a = document.createElement('button');
         a.setAttribute('type', 'button');
         a.setAttribute('class', 'btn btn-primary btn-xs');
         a.textContent = text;
