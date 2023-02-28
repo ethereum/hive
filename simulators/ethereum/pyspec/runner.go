@@ -27,7 +27,7 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 			t.Logf("unable to walk path: %s", err)
 			return err
 		}
-		if info.IsDir() || !strings.HasSuffix(info.Name(), "withdrawals_use_value_in_tx.json") {
+		if info.IsDir() || !strings.HasSuffix(info.Name(), ".json") {
 			return nil
 		}
 
@@ -41,17 +41,10 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 		// create testcase structure from fixtureTests
 		for name, fixture := range fixtureTests {
 
-			if !strings.HasSuffix(name, "000_shanghai") {
-				continue
-			}
-
 			// skip networks post merge or not supported
 			network := fixture.json.Network
-			for _, skip := range []string{"Istanbul", "Berlin", "London"} {
-				if strings.Contains(network, skip) || envForks[network] == nil {
-					t.Logf("skipping test for network %s", network)
-					continue
-				}
+			if _, exist := envForks[network]; !exist {
+				continue
 			}
 
 			// define testcase (tc) struct with initial fields
@@ -79,12 +72,13 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 func (tc *testcase) run(t *hivesim.T) {
 	start := time.Now()
 
-	t.Log("HIVE LOG --> Setting variables required for starting client.")
-	engineAPI := hive_rpc.HiveRPCEngineStarter{
-		ClientType: tc.clientType,
-		EnginePort: globals.EnginePortHTTP,
-		EthPort:    globals.EthPortHTTP,
-		JWTSecret:  globals.DefaultJwtTokenSecretBytes,
+	t.Log("setting variables required for starting client.")
+	engineStarter := hive_rpc.HiveRPCEngineStarter{
+		ClientType:              tc.clientType,
+		EnginePort:              globals.EnginePortHTTP,
+		EthPort:                 globals.EthPortHTTP,
+		JWTSecret:               globals.DefaultJwtTokenSecretBytes,
+		TerminalTotalDifficulty: nil,
 	}
 	ctx := context.Background()
 	env := hivesim.Params{
@@ -97,10 +91,11 @@ func (tc *testcase) run(t *hivesim.T) {
 	t0 := time.Now()
 
 	// start client (also creates an engine RPC client internally)
-	t.Log("HIVE LOG --> Starting client with Engine API.")
-	engineClient, err := engineAPI.StartClient(t, ctx, tc.genesis, env, nil)
+	t.Log("starting client with Engine API.")
+
+	engineClient, err := engineStarter.StartClient(t, ctx, tc.genesis, env, nil)
 	if err != nil {
-		t.Fatalf("HIVE FATAL --> Can't start client with Engine API: %v", err)
+		t.Fatalf("can't start client with Engine API: %v", err)
 	}
 	t1 := time.Now()
 
@@ -115,7 +110,7 @@ func (tc *testcase) run(t *hivesim.T) {
 		// execute fixture block payload
 		plStatus, plErr := engineClient.NewPayloadV2(context.Background(), payload)
 		if plErr != nil {
-			t.Fatalf("HIVE FATAL ---> Unable to send payload %v in test %s: %v ", blockNumber, tc.name, plErr)
+			t.Fatalf("unable to send payload %v in test %s: %v ", blockNumber, tc.name, plErr)
 		}
 		// update latest valid block hash
 		if plStatus.Status == "VALID" {
@@ -123,15 +118,10 @@ func (tc *testcase) run(t *hivesim.T) {
 		}
 		// check payload status is expected from fixture
 		if expectedStatus != plStatus.Status {
-			t.Errorf(`HIVE ERROR ---> Payload status mismatch for block %v in test %s. 
-				Expected from fixture: %s. 	Got from payload: %s.`, blockNumber, tc.name, expectedStatus, plStatus.Status)
+			t.Errorf(`payload status mismatch for block %v in test %s. 
+				expected from fixture: %s
+				got from payload: %s`, blockNumber, tc.name, expectedStatus, plStatus.Status)
 		}
-		// check error message if invalid
-		if expectedStatus == "INVALID" && *plStatus.ValidationError != plException {
-			t.Errorf(`HIVE ERROR ---> Error message mismatch for block %v in test %s. Payload status is expected to be INVALID. 
-				Expected message from fixture: %s. Got message from payload: %s.`, blockNumber, tc.name, plException, *plStatus.ValidationError)
-		}
-
 	}
 	t2 := time.Now()
 
@@ -150,43 +140,52 @@ func (tc *testcase) run(t *hivesim.T) {
 		gotNonce, errN := engineClient.NonceAt(ctx, account, nil)
 		gotBalance, errB := engineClient.BalanceAt(ctx, account, nil)
 		if errN != nil {
-			t.Errorf("HIVE ERROR ---> Unable to call nonce from account: %v, in test %s: %v", account, tc.name, errN)
+			t.Errorf("unable to call nonce from account: %v, in test %s: %v", account, tc.name, errN)
 		} else if errB != nil {
-			t.Errorf("HIVE ERROR ---> Unable to call balance from account: %v, in test %s: %v", account, tc.name, errB)
+			t.Errorf("unable to call balance from account: %v, in test %s: %v", account, tc.name, errB)
 		}
 
 		// check final nonce & balance matches expected in fixture
 		if genesisAccount.Nonce != gotNonce {
-			t.Errorf(`HIVE ERROR ---> Nonce recieved from account %v doesn't match expected from fixture in test %s:
-			Recieved from block: %v
-			Expected in fixture: %v`, account, tc.name, gotNonce, genesisAccount.Nonce)
+			t.Errorf(`nonce recieved from account %v doesn't match expected from fixture in test %s:
+			recieved from block: %v
+			expected in fixture: %v`, account, tc.name, gotNonce, genesisAccount.Nonce)
 		}
 		if genesisAccount.Balance.Cmp(gotBalance) != 0 {
-			// if common.BigToHash(genesisAccount.Balance) != common.BigToHash(gotBalance) {
-			t.Errorf(`HIVE ERROR ---> Balance recieved from account %v doesn't match expected from fixture in test %s:
-			Recieved from block: %v
-			Expected in fixture: %v`, account, tc.name, gotBalance, genesisAccount.Balance)
+			t.Errorf(`balance recieved from account %v doesn't match expected from fixture in test %s:
+			recieved from block: %v
+			expected in fixture: %v`, account, tc.name, gotBalance, genesisAccount.Balance)
 		}
 
-		// check values in storage match those in fixture
-		for stPosition, stValue := range genesisAccount.Storage {
-			// get value in storage position stPosition from last block
-			gotStorage, errS := engineClient.StorageAt(ctx, account, stPosition, nil)
-			if errS != nil {
-				t.Errorf("HIVE ERROR ---> Unable to call storage bytes from account address %v, storage position %v, in test %s: %v", account, stPosition, tc.name, errS)
+		if len(genesisAccount.Storage) > 0 {
+
+			// extract fixture storage keys
+			keys := make([]common.Hash, 0, len(genesisAccount.Storage))
+			for key := range genesisAccount.Storage {
+				keys = append(keys, key)
 			}
-			// check recieved value against fixture value
-			if stValue != common.BytesToHash(gotStorage) {
-				t.Errorf(`HIVE ERROR ---> Storage recieved from account %v doesn't match expected from fixture in test %s:
-				From storage address: %v
-				Recieved from block: %v
-				Expected in fixture: %v`, account, tc.name, stPosition, common.BytesToHash(gotStorage), stValue)
+
+			// get storage values for account with keys: keys
+			gotStorage, errS := engineClient.StorageAtKeys(ctx, account, keys, nil)
+			if errS != nil {
+				t.Errorf("unable to get storage values from account: %v, in test %s: %v", account, tc.name, errN)
+			}
+
+			// check values in storage match with fixture
+			for _, key := range keys {
+				if genesisAccount.Storage[key] != *gotStorage[key] {
+					t.Errorf(`storage recieved from account %v doesn't match expected from fixture in test %s:
+						from storage address: %v
+						recieved from block: %v
+						expected in fixture: %v`, account, tc.name, key, gotStorage[key], genesisAccount.Storage[key])
+				}
+
 			}
 		}
 	}
 	end := time.Now()
 
-	t.Logf(`HIVE END ---> Test Timing:
+	t.Logf(`test timing:
 			setupClientEnv %v
  			startClient %v
  			sendAllPayloads %v

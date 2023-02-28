@@ -29,7 +29,7 @@ func (b blockHeader) MarshalJSON() ([]byte, error) {
 		ReceiptTrie         common.Hash           `json:"receiptsRoot"`
 		ReceiptTrieAlt      common.Hash           `json:"receiptTrie"`
 		Bloom               types.Bloom           `json:"bloom"`
-		Difficulty          *math.HexOrDecimal256 `json:"difficulty`
+		Difficulty          *math.HexOrDecimal256 `json:"difficulty"`
 		Number              *math.HexOrDecimal256 `json:"number"`
 		GasLimit            math.HexOrDecimal64   `json:"gasLimit"`
 		GasUsed             math.HexOrDecimal64   `json:"gasUsed"`
@@ -39,7 +39,7 @@ func (b blockHeader) MarshalJSON() ([]byte, error) {
 		Nonce               types.BlockNonce      `json:"nonce"`
 		BaseFee             *math.HexOrDecimal256 `json:"baseFeePerGas"`
 		Hash                common.Hash           `json:"hash"`
-		WithdrawalsRoot     common.Hash           `json:"withdrawalsRoot`
+		WithdrawalsRoot     common.Hash           `json:"withdrawalsRoot"`
 	}
 	var enc blockHeader
 	enc.ParentHash = b.ParentHash
@@ -83,7 +83,7 @@ func (b *blockHeader) UnmarshalJSON(input []byte) error {
 		ReceiptTrie         *common.Hash          `json:"receiptsRoot"`
 		ReceiptTrieAlt      *common.Hash          `json:"receiptTrie"`
 		Bloom               *types.Bloom          `json:"bloom"`
-		Difficulty          *math.HexOrDecimal256 `json:"difficulty`
+		Difficulty          *math.HexOrDecimal256 `json:"difficulty"`
 		Number              *math.HexOrDecimal256 `json:"number"`
 		GasLimit            *math.HexOrDecimal64  `json:"gasLimit"`
 		GasUsed             *math.HexOrDecimal64  `json:"gasUsed"`
@@ -93,7 +93,7 @@ func (b *blockHeader) UnmarshalJSON(input []byte) error {
 		Nonce               *types.BlockNonce     `json:"nonce"`
 		BaseFee             *math.HexOrDecimal256 `json:"baseFeePerGas"`
 		Hash                *common.Hash          `json:"hash"`
-		WithdrawalsRoot     *common.Hash          `json:"withdrawalsRoot`
+		WithdrawalsRoot     *common.Hash          `json:"withdrawalsRoot"`
 	}
 	var dec blockHeader
 	if err := json.Unmarshal(input, &dec); err != nil {

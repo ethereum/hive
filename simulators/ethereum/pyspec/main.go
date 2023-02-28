@@ -32,7 +32,7 @@ func main() {
 	suite.Add(hivesim.TestSpec{
 		Name: "pytest_fixture_runner",
 		Description: "This is a meta-test. It loads the test fixture files and " +
-			"launches the actual client tests.,w,w Any errors in test files will be reported " +
+			"launches the actual client tests. Any errors in test files will be reported " +
 			"through this test.",
 		Run:       fixtureRunner,
 		AlwaysRun: true,
@@ -55,12 +55,12 @@ func fixtureRunner(t *hivesim.T) {
 	parallelism := 16
 	if val, ok := os.LookupEnv("HIVE_PARALLELISM"); ok {
 		if p, err := strconv.Atoi(val); err != nil {
-			t.Logf("Warning: invalid HIVE_PARALLELISM value %q", val)
+			t.Logf("warning: invalid HIVE_PARALLELISM value %q", val)
 		} else {
 			parallelism = p
 		}
 	}
-	t.Log("Parallelism set to:", parallelism)
+	t.Log("parallelism set to:", parallelism)
 
 	// find and set the fixtures directory as root
 	testPath, isset := os.LookupEnv("TESTPATH")
@@ -68,7 +68,7 @@ func fixtureRunner(t *hivesim.T) {
 		t.Fatal("$TESTPATH not set")
 	}
 	fileRoot := fmt.Sprintf("%s/", testPath)
-	t.Log("File root directory:", fileRoot)
+	t.Log("file root directory:", fileRoot)
 
 	// spawn `parallelism` workers to run fixtures against clients
 	var wg sync.WaitGroup

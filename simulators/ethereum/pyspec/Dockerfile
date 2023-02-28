@@ -13,7 +13,7 @@ RUN go build -v .
 
 # 2) Create the simulator container.
 FROM alpine:latest as simulator
-RUN apk add --update wget curl
+RUN apk add --update wget
 ADD ./pyspec /pyspec
 WORKDIR /pyspec
 COPY --from=builder /source/pyspec/pyspec .

@@ -67,7 +67,7 @@ type blockHeader struct {
 	ReceiptTrie         common.Hash      `json:"receiptsRoot"`
 	ReceiptTrieAlt      common.Hash      `json:"receiptTrie"` // name in fixturse
 	Bloom               types.Bloom      `json:"bloom"`
-	Difficulty          *big.Int         `json:"difficulty`
+	Difficulty          *big.Int         `json:"difficulty"`
 	Number              *big.Int         `json:"number"`
 	GasLimit            uint64           `json:"gasLimit"`
 	GasUsed             uint64           `json:"gasUsed"`
@@ -77,7 +77,7 @@ type blockHeader struct {
 	Nonce               types.BlockNonce `json:"nonce"`
 	BaseFee             *big.Int         `json:"baseFeePerGas"`
 	Hash                common.Hash      `json:"hash"`
-	WithdrawalsRoot     common.Hash      `json:"withdrawalsRoot`
+	WithdrawalsRoot     common.Hash      `json:"withdrawalsRoot"`
 }
 
 type blockHeaderUnmarshaling struct {
