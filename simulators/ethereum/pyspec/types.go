@@ -151,17 +151,14 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) {
 func extractGenesis(fixture fixtureJSON) *core.Genesis {
 	genesis := &core.Genesis{
 		Timestamp:  fixture.Genesis.Timestamp.Uint64(),
-		Number:     fixture.Genesis.Number.Uint64(),
 		Nonce:      fixture.Genesis.Nonce.Uint64(),
 		Difficulty: fixture.Genesis.Difficulty,
-		BaseFee:    fixture.Genesis.BaseFee,
 		GasLimit:   fixture.Genesis.GasLimit,
-		GasUsed:    fixture.Genesis.GasUsed,
-		ParentHash: fixture.Genesis.ParentHash,
 		ExtraData:  fixture.Genesis.ExtraData,
 		Mixhash:    fixture.Genesis.MixHash,
 		Coinbase:   fixture.Genesis.Coinbase,
 		Alloc:      fixture.Pre,
+		BaseFee:    fixture.Genesis.BaseFee,
 	}
 	return genesis
 }

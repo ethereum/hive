@@ -19,7 +19,7 @@ By default all test fixtures will run. To run a specific test or set of test fix
 
 This can utilised in `pyspec` for running tests exclusive to  a specific fork. The pattern must match at least one hive simulation test name within the `pyspec` suite.
 
-Test names are of the type `path_to_json/fixture_name` omiting `/fixtures/` from the path. For example, the fixture test `000_push0_key_sstore_shanghai` within `push0.json`, will have a hive test name of: `eips/eip3855/000_push0_key_sstore_shanghai`.
+Test names are of the type `<path-to-json>_<fixture-name>` omiting `fixtures` from the path. For example, the fixture test `000_push0_key_sstore_shanghai` within `push0.json` will have a hive test name of: `eips_eip3855_000_push0_key_sstore_shanghai`.
 
 1) To run only this test, an example pattern could be:
    - `./hive --sim ethereum/pyspec --sim.limit /0_push0_key_sstore`

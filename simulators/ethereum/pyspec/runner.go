@@ -15,9 +15,9 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 )
 
-// loadFixtureTests() extracts tests from fixture.json files in a given directory,
+// extracts tests from fixture.json files in a given directory,
 // creates a testcase struct for each test, and passes the testcase struct to a
-// func() parameter `fn`, which is used within fixtureRunner() to run the tests.
+// func() parameter `fn`, which is used within fixtureRunner to run the tests.
 func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// check file is actually a fixture
@@ -50,7 +50,7 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 			// define testcase (tc) struct with initial fields
 			tc := testcase{
 				fixture:  fixture,
-				name:     filepath.Dir(path)[10:] + "/" + name,
+				name:     strings.ReplaceAll(path[10:len(path)-5]+"_", "/", "_") + name,
 				filepath: path,
 			}
 			// extract genesis, payloads & post allocation field to tc
@@ -62,19 +62,18 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 	})
 }
 
-// run() executes a testcase against the client, called within a test channel from fixtureRunner().
-// All testcase payloads are sent and executed using the EngineAPI. For verification all fixture
+// executes a testcase against the client, called within a test channel from fixtureRunner,
+// all testcase payloads are sent and executed using the EngineAPI. for verification all fixture
 // nonce, balance and storage values are checked against the response recieved from the lastest block.
 func (tc *testcase) run(t *hivesim.T) {
 	start := time.Now()
 
 	t.Log("setting variables required for starting client.")
 	engineStarter := hive_rpc.HiveRPCEngineStarter{
-		ClientType:              tc.clientType,
-		EnginePort:              globals.EnginePortHTTP,
-		EthPort:                 globals.EthPortHTTP,
-		JWTSecret:               globals.DefaultJwtTokenSecretBytes,
-		TerminalTotalDifficulty: nil,
+		ClientType: tc.clientType,
+		EnginePort: globals.EnginePortHTTP,
+		EthPort:    globals.EthPortHTTP,
+		JWTSecret:  globals.DefaultJwtTokenSecretBytes,
 	}
 	ctx := context.Background()
 	env := hivesim.Params{
@@ -113,7 +112,7 @@ func (tc *testcase) run(t *hivesim.T) {
 		}
 		// check payload status is expected from fixture
 		if expectedStatus != plStatus.Status {
-			t.Errorf(`payload status mismatch for block %v in test %s. 
+			t.Fatalf(`payload status mismatch for block %v in test %s.
 				expected from fixture: %s
 				got from payload: %s`, blockNumber, tc.name, expectedStatus, plStatus.Status)
 		}
@@ -124,7 +123,10 @@ func (tc *testcase) run(t *hivesim.T) {
 	if latestValidHash != (common.Hash{}) {
 		// update with latest valid response
 		fcState := &api.ForkchoiceStateV1{HeadBlockHash: latestValidHash}
-		engineClient.ForkchoiceUpdatedV2(ctx, fcState, nil)
+		_, fcErr := engineClient.ForkchoiceUpdatedV2(ctx, fcState, nil)
+		if fcErr != nil {
+			t.Fatalf("unable to update head of beacon chain in test %s: %v ", tc.name, fcErr)
+		}
 	}
 	t3 := time.Now()
 
@@ -183,7 +185,7 @@ func (tc *testcase) run(t *hivesim.T) {
 			totalTestTime %v`, t0.Sub(start), t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), end.Sub(t3), end.Sub(start))
 }
 
-// updateEnv() updates the environment variables against the fork rules
+// updates the environment variables against the fork rules
 // defined in envForks, for the network specified in the testcase fixture.
 func (tc *testcase) updateEnv(env hivesim.Params) {
 	forkRules := envForks[tc.fixture.json.Network]
