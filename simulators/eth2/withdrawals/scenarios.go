@@ -165,9 +165,9 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 	// Get the beacon state and verify the credentials were updated
 	var versionedBeaconState *clients.VersionedBeaconStateResponse
 	for _, bn := range testnet.BeaconClients().Running() {
-		versionedBeaconState, err = bn.BeaconStateV2ByBlock(
+		versionedBeaconState, err = bn.BeaconStateV2(
 			ctx,
-			eth2api.BlockHead,
+			eth2api.StateHead,
 		)
 		if err != nil || versionedBeaconState == nil {
 			t.Logf("WARN: Unable to get latest beacon state: %v", err)
