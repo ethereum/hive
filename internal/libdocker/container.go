@@ -421,9 +421,9 @@ func (b *ContainerBackend) attachLogs(ctx context.Context, logger log15.Logger, 
 		OutputStream: log,
 		ErrorStream:  log,
 		Follow:       true,
-		Timestamps:   true,
 		Stdout:       true,
 		Stderr:       true,
+		// Timestamps:   true,
 	}
 	var wg wgCloseWaiter
 	wg.Add(1)
