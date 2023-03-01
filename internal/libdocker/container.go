@@ -417,7 +417,6 @@ func (b *ContainerBackend) attachLogs(ctx context.Context, logger log15.Logger, 
 	closer.addFile(log)
 
 	logopt := docker.LogsOptions{
-		Context:      ctx,
 		Container:    id,
 		OutputStream: log,
 		ErrorStream:  log,
