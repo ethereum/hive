@@ -331,49 +331,47 @@ func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
 func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger, id string, opts libhive.ContainerOptions) (docker.CloseWaiter, error) {
+	var closer *fileCloser
+	var err error
+	switch {
+	case opts.Output != nil && opts.LogFile != "":
+		return nil, fmt.Errorf("can't use LogFile and Output options at the same time")
+	case opts.Output != nil:
+		closer, err = b.attachIO(ctx, logger, id, opts)
+	case opts.LogFile != "":
+		closer, err = b.attachLogs(ctx, logger, id, opts)
+	}
+	if err != nil {
+		if closer != nil {
+			closer.Close()
+		}
+		return nil, err
+	}
+
+	logger.Debug("starting container")
+	if err := b.client.StartContainerWithContext(id, nil, ctx); err != nil {
+		closer.Close()
+		logger.Error("failed to start container", "err", err)
+		return nil, err
+	}
+	return closer, nil
+}
+
+func (b *ContainerBackend) attachIO(ctx context.Context, logger log15.Logger, id string, opts libhive.ContainerOptions) (*fileCloser, error) {
 	var (
 		outStream io.Writer
 		errStream io.Writer
 		closer    = newFileCloser(logger)
 	)
+	closer.addFile(opts.Output)
+	outStream = opts.Output
 
-	switch {
-	case opts.Output != nil && opts.LogFile != "":
-		return nil, fmt.Errorf("can't use LogFile and Output options at the same time")
-
-	case opts.Output != nil:
-		outStream = opts.Output
-		closer.addFile(opts.Output)
-
-		// If console logging is requested, dump stderr there.
-		if b.config.ContainerOutput != nil {
-			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", id[:8]))
-			closer.addFile(prefixer)
-			errStream = prefixer
-
-			// outStream = io.MultiWriter(outStream, prefixer)
-		}
-
-	case opts.LogFile != "":
-		// Redirect container output to logfile.
-		if err := os.MkdirAll(filepath.Dir(opts.LogFile), 0755); err != nil {
-			return nil, err
-		}
-		log, err := os.OpenFile(opts.LogFile, os.O_WRONLY|os.O_CREATE|os.O_SYNC|os.O_TRUNC, 0644)
-		if err != nil {
-			return nil, err
-		}
-		closer.addFile(log)
-		outStream = log
-
-		// If console logging was requested, tee the output and tag it with the container id.
-		if b.config.ContainerOutput != nil {
-			prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", id[:8]))
-			closer.addFile(prefixer)
-			outStream = io.MultiWriter(log, prefixer)
-		}
-		// In LogFile mode, stderr is redirected to stdout.
-		errStream = outStream
+	// If console logging is requested, dump stderr there.
+	if b.config.ContainerOutput != nil {
+		prefixer := newLinePrefixWriter(b.config.ContainerOutput, fmt.Sprintf("[%s] ", id[:8]))
+		closer.addFile(prefixer)
+		errStream = prefixer
+		// outStream = io.MultiWriter(outStream, prefixer)
 	}
 
 	// Configure the streams and attach.
@@ -401,14 +399,56 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger
 		return nil, err
 	}
 	closer.w = waiter
+	return closer, nil
+}
 
-	logger.Debug("starting container")
-	if err := b.client.StartContainerWithContext(id, nil, ctx); err != nil {
-		closer.Close()
-		logger.Error("failed to start container", "err", err)
+func (b *ContainerBackend) attachLogs(ctx context.Context, logger log15.Logger, id string, opts libhive.ContainerOptions) (*fileCloser, error) {
+	if opts.Input != nil {
+		return nil, fmt.Errorf("container input is not supported in logFile mode")
+	}
+	if err := os.MkdirAll(filepath.Dir(opts.LogFile), 0755); err != nil {
 		return nil, err
 	}
+	log, err := os.OpenFile(opts.LogFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return nil, err
+	}
+
+	closer := new(fileCloser)
+	closer.addFile(log)
+	logopt := docker.LogsOptions{
+		Context:      ctx,
+		Container:    id,
+		Timestamps:   true,
+		Follow:       true,
+		OutputStream: log,
+		ErrorStream:  log,
+	}
+	var wg wgCloseWaiter
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		wg.err = b.client.Logs(logopt)
+		if err != nil {
+			logger.Error("client log stream failed", "err", err)
+		}
+	}()
+	closer.w = &wg
 	return closer, nil
+}
+
+type wgCloseWaiter struct {
+	sync.WaitGroup
+	err error
+}
+
+func (w *wgCloseWaiter) Wait() error {
+	w.WaitGroup.Wait()
+	return w.err
+}
+
+func (w *wgCloseWaiter) Close() error {
+	return nil
 }
 
 // fileCloser wraps a docker.CloseWaiter and closes all io.Closer instances held in it,
