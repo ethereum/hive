@@ -331,6 +331,12 @@ func (b *ContainerBackend) uploadFiles(ctx context.Context, id string, files map
 // starts executing the container and returns the CloseWaiter to allow the caller
 // to wait for termination.
 func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger, id string, opts libhive.ContainerOptions) (docker.CloseWaiter, error) {
+	logger.Debug("starting container")
+	if err := b.client.StartContainerWithContext(id, nil, ctx); err != nil {
+		logger.Error("failed to start container", "err", err)
+		return nil, err
+	}
+
 	var closer *fileCloser
 	var err error
 	switch {
@@ -345,13 +351,6 @@ func (b *ContainerBackend) runContainer(ctx context.Context, logger log15.Logger
 		if closer != nil {
 			closer.Close()
 		}
-		return nil, err
-	}
-
-	logger.Debug("starting container")
-	if err := b.client.StartContainerWithContext(id, nil, ctx); err != nil {
-		closer.Close()
-		logger.Error("failed to start container", "err", err)
 		return nil, err
 	}
 	return closer, nil
@@ -416,21 +415,27 @@ func (b *ContainerBackend) attachLogs(ctx context.Context, logger log15.Logger, 
 
 	closer := new(fileCloser)
 	closer.addFile(log)
+
 	logopt := docker.LogsOptions{
 		Context:      ctx,
 		Container:    id,
-		Timestamps:   true,
-		Follow:       true,
 		OutputStream: log,
 		ErrorStream:  log,
+		Follow:       true,
+		Timestamps:   true,
+		Stdout:       true,
+		Stderr:       true,
 	}
 	var wg wgCloseWaiter
 	wg.Add(1)
 	go func() {
+		logger.Debug("reading container logs")
 		defer wg.Done()
-		wg.err = b.client.Logs(logopt)
+		err := b.client.Logs(logopt)
 		if err != nil {
-			logger.Error("client log stream failed", "err", err)
+			wg.err = err
+			logger.Error("container log stream failed", "err", err)
+			return
 		}
 	}()
 	closer.w = &wg
