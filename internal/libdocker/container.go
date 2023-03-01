@@ -456,6 +456,10 @@ func (w *wgCloseWaiter) Close() error {
 	return nil
 }
 
+type flusher interface {
+	Flush() error
+}
+
 // fileCloser wraps a docker.CloseWaiter and closes all io.Closer instances held in it,
 // after it is done waiting.
 type fileCloser struct {
@@ -488,6 +492,9 @@ func (w *fileCloser) addFile(c io.Closer) {
 func (w *fileCloser) closeFiles() {
 	w.closeOnce.Do(func() {
 		for _, closer := range w.closers {
+			if f, ok := closer.(flusher); ok {
+				f.Flush()
+			}
 			if err := closer.Close(); err != nil {
 				w.logger.Error("failed to close fd", "err", err)
 			}
