@@ -238,15 +238,15 @@ function testCaseDuration(test) {
 function scrollToTest(suiteData, testIndex) {
     let table = $('#execresults').dataTable().api();
     let row = findRowByTestIndex(table, testIndex);
-    if (row) {
-        if (row.page() != table.page()) {
-            table.page(row.page()).draw(false);
-        }
-        row.node().scrollIntoView();
-        toggleTestDetails(suiteData, table, row.node());
-    } else {
+    if (!row) {
         console.error('invalid row in scrollToTest:', testIndex);
+        return;
     }
+    if (row.page() != table.page()) {
+        table.page(row.page()).draw(false);
+    }
+    row.node().scrollIntoView();
+    toggleTestDetails(suiteData, table, row.node());
 }
 
 // findRowByTestIndex finds the dataTables row corresponding to a testIndex.
@@ -383,9 +383,8 @@ function countLines(text) {
         offset = text.indexOf('\n', offset);
         if (offset == -1) {
             return lines;
-        } else {
-            offset++;
         }
+        offset++;
     }
 }
 

@@ -29,5 +29,23 @@ module.exports = {
         "no-unused-vars": [
             "error", { "vars": "all", "args": "none", "ignoreRestSiblings": false }
         ],
+        "no-unused-private-class-members": [
+            "error"
+        ],
+        "no-else-return": [
+            "error"
+        ],
+        "no-unreachable-loop": [
+            "error"
+        ],
+        "no-duplicate-imports": [
+            "error"
+        ],
+        "no-unmodified-loop-condition": [
+            "warn"
+        ],
+        // "no-use-before-define": [
+        //     "warn"
+        // ],
     }
 }
