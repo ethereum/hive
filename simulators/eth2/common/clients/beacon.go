@@ -445,6 +445,20 @@ type VersionedBeaconStateResponse struct {
 	spec *common.Spec
 }
 
+func (vbs *VersionedBeaconStateResponse) Root() tree.Root {
+	switch state := vbs.Data.(type) {
+	case *phase0.BeaconState:
+		return state.HashTreeRoot(vbs.spec, tree.GetHashFn())
+	case *altair.BeaconState:
+		return state.HashTreeRoot(vbs.spec, tree.GetHashFn())
+	case *bellatrix.BeaconState:
+		return state.HashTreeRoot(vbs.spec, tree.GetHashFn())
+	case *capella.BeaconState:
+		return state.HashTreeRoot(vbs.spec, tree.GetHashFn())
+	}
+	panic("badly formatted beacon state")
+}
+
 func (vbs *VersionedBeaconStateResponse) CurrentVersion() common.Version {
 	switch state := vbs.Data.(type) {
 	case *phase0.BeaconState:
