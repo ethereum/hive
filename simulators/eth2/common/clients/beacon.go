@@ -98,6 +98,11 @@ func (bn *BeaconClient) Start(extraOptions ...hivesim.StartOption) error {
 		Cli:   &http.Client{},
 		Codec: eth2api.JSONCodec{},
 	}
+	bn.T.Logf(
+		"Started client %s, container: %s",
+		bn.ClientType,
+		bn.HiveClient.Container,
+	)
 	return nil
 }
 

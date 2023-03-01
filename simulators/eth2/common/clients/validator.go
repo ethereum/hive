@@ -58,6 +58,11 @@ func (vc *ValidatorClient) Start(extraOptions ...hivesim.StartOption) error {
 	}
 
 	vc.HiveClient = vc.T.StartClient(vc.ClientType, opts...)
+	vc.T.Logf(
+		"Started client %s, container: %s",
+		vc.ClientType,
+		vc.HiveClient.Container,
+	)
 	return nil
 }
 

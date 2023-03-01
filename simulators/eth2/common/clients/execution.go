@@ -123,6 +123,11 @@ func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
 	opts = append(opts, extraOptions...)
 
 	en.HiveClient = en.T.StartClient(en.ClientType, opts...)
+	en.T.Logf(
+		"Started client %s, container: %s",
+		en.ClientType,
+		en.HiveClient.Container,
+	)
 
 	// Prepare Eth/Engine RPCs
 	engineRPCAddress, err := en.EngineRPCAddress()
