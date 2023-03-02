@@ -60,6 +60,59 @@ func genesisPayloadHeader(
 	}, nil
 }
 
+func genesisPayloadHeaderCapella(
+	eth1GenesisBlock *types.Block,
+	spec *common.Spec,
+) (*capella.ExecutionPayloadHeader, error) {
+	extra := eth1GenesisBlock.Extra()
+	if len(extra) > common.MAX_EXTRA_DATA_BYTES {
+		return nil, fmt.Errorf(
+			"extra data is %d bytes, max is %d",
+			len(extra),
+			common.MAX_EXTRA_DATA_BYTES,
+		)
+	}
+	if len(eth1GenesisBlock.Transactions()) != 0 {
+		return nil, fmt.Errorf(
+			"expected no transactions in genesis execution payload",
+		)
+	}
+	if len(eth1GenesisBlock.Withdrawals()) != 0 {
+		return nil, fmt.Errorf(
+			"expected no withdrawals in genesis execution payload",
+		)
+	}
+
+	baseFee, overflow := uint256.FromBig(eth1GenesisBlock.BaseFee())
+	if overflow {
+		return nil, fmt.Errorf("basefee larger than 2^256-1")
+	}
+
+	return &capella.ExecutionPayloadHeader{
+		ParentHash:    common.Root(eth1GenesisBlock.ParentHash()),
+		FeeRecipient:  common.Eth1Address(eth1GenesisBlock.Coinbase()),
+		StateRoot:     common.Bytes32(eth1GenesisBlock.Root()),
+		ReceiptsRoot:  common.Bytes32(eth1GenesisBlock.ReceiptHash()),
+		LogsBloom:     common.LogsBloom(eth1GenesisBlock.Bloom()),
+		PrevRandao:    common.Bytes32{},
+		BlockNumber:   view.Uint64View(eth1GenesisBlock.NumberU64()),
+		GasLimit:      view.Uint64View(eth1GenesisBlock.GasLimit()),
+		GasUsed:       view.Uint64View(eth1GenesisBlock.GasUsed()),
+		Timestamp:     common.Timestamp(eth1GenesisBlock.Time()),
+		ExtraData:     extra,
+		BaseFeePerGas: view.Uint256View(*baseFee),
+		BlockHash:     common.Root(eth1GenesisBlock.Hash()),
+		// empty transactions root
+		TransactionsRoot: common.PayloadTransactionsType(spec).
+			DefaultNode().
+			MerkleRoot(tree.GetHashFn()),
+		// empty withdrawals root
+		WithdrawalsRoot: common.WithdrawalsType(spec).
+			DefaultNode().
+			MerkleRoot(tree.GetHashFn()),
+	}, nil
+}
+
 func createValidators(
 	spec *common.Spec,
 	keys []*KeyDetails,
@@ -267,10 +320,10 @@ func BuildBeaconState(
 		}
 	}
 
-	if st, ok := state.(*bellatrix.BeaconStateView); ok {
-		// did we hit the TTD at genesis block?
+	switch st := state.(type) {
+	case *bellatrix.BeaconStateView:
 		tdd := uint256.Int(spec.TERMINAL_TOTAL_DIFFICULTY)
-		embedExecAtGenesis := tdd.ToBig().Cmp(eth1Genesis.Difficulty) < 0
+		embedExecAtGenesis := tdd.ToBig().Cmp(eth1Genesis.Difficulty) <= 0
 
 		var execPayloadHeader *bellatrix.ExecutionPayloadHeader
 		if embedExecAtGenesis {
@@ -285,6 +338,29 @@ func BuildBeaconState(
 			// we didn't build any on the eth1 chain though,
 			// so we just put the genesis hash here (it could be any block from eth1 chain before TTD that is not ahead of eth2)
 			execPayloadHeader = new(bellatrix.ExecutionPayloadHeader)
+		}
+
+		if err := st.SetLatestExecutionPayloadHeader(execPayloadHeader); err != nil {
+			return nil, err
+		}
+	case *capella.BeaconStateView:
+		// did we hit the TTD at genesis block?
+		tdd := uint256.Int(spec.TERMINAL_TOTAL_DIFFICULTY)
+		embedExecAtGenesis := tdd.ToBig().Cmp(eth1Genesis.Difficulty) <= 0
+
+		var execPayloadHeader *capella.ExecutionPayloadHeader
+		if embedExecAtGenesis {
+			execPayloadHeader, err = genesisPayloadHeaderCapella(
+				eth1GenesisBlock,
+				spec,
+			)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// we didn't build any on the eth1 chain though,
+			// so we just put the genesis hash here (it could be any block from eth1 chain before TTD that is not ahead of eth2)
+			execPayloadHeader = new(capella.ExecutionPayloadHeader)
 		}
 
 		if err := st.SetLatestExecutionPayloadHeader(execPayloadHeader); err != nil {
