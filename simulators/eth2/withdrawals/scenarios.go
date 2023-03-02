@@ -231,6 +231,7 @@ loop:
 	for {
 		select {
 		case <-slotCtx.Done():
+			PrintWithdrawalHistory(allValidators[0].BlockStateCache)
 			t.Fatalf("FAIL: Timeout waiting on all accounts to withdraw")
 		case <-time.After(time.Duration(testnet.Spec().SECONDS_PER_SLOT) * time.Second):
 			// Print all info
@@ -255,6 +256,8 @@ loop:
 			}
 		}
 	}
+
+	PrintWithdrawalHistory(allValidators[0].BlockStateCache)
 
 	// Lastly check all clients are on the same head
 	testnet.VerifyELHeads(ctx)

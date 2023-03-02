@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -148,6 +149,32 @@ func (c BeaconCache) GetBlockStateBySlotFromHeadRoot(
 			return nil, err
 		}
 	}
+}
+
+func PrintWithdrawalHistory(c BeaconCache) error {
+	slotMap := make(map[beacon.Slot]tree.Root)
+	slots := make([]beacon.Slot, 0)
+	for r, s := range c {
+		slot := s.StateSlot()
+		slotMap[slot] = r
+		slots = append(slots, slot)
+	}
+
+	sort.Slice(slots, func(i, j int) bool { return slots[j] > slots[i] })
+
+	for _, slot := range slots {
+		root := slotMap[slot]
+		s := c[root]
+		nextWithdrawalIndex, _ := s.NextWithdrawalIndex()
+		nextWithdrawalValidatorIndex, _ := s.NextWithdrawalValidatorIndex()
+		fmt.Printf(
+			"Slot=%d, NextWithdrawalIndex=%d, NextWithdrawalValidatorIndex=%d\n",
+			slot,
+			nextWithdrawalIndex,
+			nextWithdrawalValidatorIndex,
+		)
+	}
+	return nil
 }
 
 // Helper struct to keep track of current status of a validator withdrawal state
