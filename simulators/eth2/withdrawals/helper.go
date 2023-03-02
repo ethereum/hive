@@ -173,6 +173,16 @@ func PrintWithdrawalHistory(c BeaconCache) error {
 			nextWithdrawalIndex,
 			nextWithdrawalValidatorIndex,
 		)
+		fmt.Printf("Withdrawals:\n")
+		ws, _ := s.Withdrawals()
+		for i, w := range ws {
+			fmt.Printf(
+				"%d: Validator Index: %s, Amount: %d\n",
+				i,
+				w.ValidatorIndex,
+				w.Amount,
+			)
+		}
 	}
 	return nil
 }
