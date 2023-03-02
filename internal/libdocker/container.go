@@ -98,6 +98,16 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 		// but it's probably best to give Docker the info as early as possible.
 		createOpts.Config.AttachStdout = true
 	}
+	if opt.LogFile != "" {
+		createOpts.HostConfig = &docker.HostConfig{
+			LogConfig: docker.LogConfig{
+				Config: map[string]string{
+					"mode":            "non-blocking",
+					"max-buffer-size": "4m",
+				},
+			},
+		}
+	}
 
 	c, err := b.client.CreateContainer(createOpts)
 	if err != nil {
