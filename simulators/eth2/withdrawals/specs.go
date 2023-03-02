@@ -204,8 +204,9 @@ func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 	}
 
 	for index, key := range keys {
-		// All validators have idiosyncratic balance amounts to identify them
-		key.ExtraInitialBalance = beacon.Gwei(index+1) + ts.ExtraGwei
+		// All validators have idiosyncratic balance amounts to identify them.
+		// Also include a high amount in order to guarantee withdrawals.
+		key.ExtraInitialBalance = beacon.Gwei((index+1)*1000000) + ts.ExtraGwei
 
 		if ts.GenesisExecutionWithdrawalCredentialsShares > 0 &&
 			(index%ts.GenesisExecutionWithdrawalCredentialsShares) == 0 {
