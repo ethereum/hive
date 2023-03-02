@@ -126,6 +126,26 @@ func (c ExecutionPreChain) SecondsPerBlock() uint64 {
 	return 1
 }
 
+// A pre-existing chain is imported by the client, and it is not
+// expected that the client mines or produces any blocks.
+type ExecutionPostMergeGenesis struct{}
+
+func (c ExecutionPostMergeGenesis) Configure(*ExecutionGenesis) error {
+	return nil
+}
+
+func (c ExecutionPostMergeGenesis) HiveParams(node int) hivesim.Params {
+	return hivesim.Params{}
+}
+
+func (c ExecutionPostMergeGenesis) DifficultyPerBlock() *big.Int {
+	return big.NewInt(0)
+}
+
+func (c ExecutionPostMergeGenesis) SecondsPerBlock() uint64 {
+	return 12
+}
+
 type ExecutionCliqueConsensus struct {
 	CliquePeriod uint64
 	PrivateKey   string

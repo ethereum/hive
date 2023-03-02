@@ -38,9 +38,7 @@ const (
 	PortValidatorAPI = 5000
 )
 
-var (
-	EMPTY_TREE_ROOT = tree.Root{}
-)
+var EMPTY_TREE_ROOT = tree.Root{}
 
 type BeaconClient struct {
 	T                     *hivesim.T
@@ -98,6 +96,11 @@ func (bn *BeaconClient) Start(extraOptions ...hivesim.StartOption) error {
 		Cli:   &http.Client{},
 		Codec: eth2api.JSONCodec{},
 	}
+	bn.T.Logf(
+		"Started client %s, container: %s",
+		bn.ClientType,
+		bn.HiveClient.Container,
+	)
 	return nil
 }
 
@@ -221,6 +224,14 @@ func (versionedBlock *VersionedSignedBeaconBlock) ExecutionPayload() (api.Execut
 		)
 	}
 	return result, nil
+}
+
+func (versionedBlock *VersionedSignedBeaconBlock) Withdrawals() (common.Withdrawals, error) {
+	switch v := versionedBlock.Data.(type) {
+	case *capella.SignedBeaconBlock:
+		return v.Message.Body.ExecutionPayload.Withdrawals, nil
+	}
+	return nil, nil
 }
 
 func (b *VersionedSignedBeaconBlock) StateRoot() tree.Root {
@@ -445,6 +456,20 @@ type VersionedBeaconStateResponse struct {
 	spec *common.Spec
 }
 
+func (vbs *VersionedBeaconStateResponse) Root() tree.Root {
+	switch state := vbs.Data.(type) {
+	case *phase0.BeaconState:
+		return state.HashTreeRoot(vbs.spec, tree.GetHashFn())
+	case *altair.BeaconState:
+		return state.HashTreeRoot(vbs.spec, tree.GetHashFn())
+	case *bellatrix.BeaconState:
+		return state.HashTreeRoot(vbs.spec, tree.GetHashFn())
+	case *capella.BeaconState:
+		return state.HashTreeRoot(vbs.spec, tree.GetHashFn())
+	}
+	panic("badly formatted beacon state")
+}
+
 func (vbs *VersionedBeaconStateResponse) CurrentVersion() common.Version {
 	switch state := vbs.Data.(type) {
 	case *phase0.BeaconState:
@@ -563,6 +588,24 @@ func (vbs *VersionedBeaconStateResponse) LatestExecutionPayloadHeaderHash() tree
 		return state.LatestExecutionPayloadHeader.BlockHash
 	}
 	panic("badly formatted beacon state")
+}
+
+func (vbs *VersionedBeaconStateResponse) NextWithdrawalIndex() (common.WithdrawalIndex, error) {
+	var wIndex common.WithdrawalIndex
+	switch state := vbs.Data.(type) {
+	case *capella.BeaconState:
+		wIndex = state.NextWithdrawalIndex
+	}
+	return wIndex, nil
+}
+
+func (vbs *VersionedBeaconStateResponse) NextWithdrawalValidatorIndex() (common.ValidatorIndex, error) {
+	var wIndex common.ValidatorIndex
+	switch state := vbs.Data.(type) {
+	case *capella.BeaconState:
+		wIndex = state.NextWithdrawalValidatorIndex
+	}
+	return wIndex, nil
 }
 
 func (vbs *VersionedBeaconStateResponse) NextWithdrawals(

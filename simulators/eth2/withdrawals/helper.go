@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -76,6 +78,20 @@ type BeaconBlockState struct {
 
 type BeaconCache map[tree.Root]BeaconBlockState
 
+// Clear the cache for when there was a known/expected re-org to query everything again
+func (c BeaconCache) Clear() error {
+	roots := make([]tree.Root, len(c))
+	i := 0
+	for s := range c {
+		roots[i] = s
+		i++
+	}
+	for _, s := range roots {
+		delete(c, s)
+	}
+	return nil
+}
+
 func (c BeaconCache) GetBlockStateByRoot(
 	ctx context.Context,
 	bc *clients.BeaconClient,
@@ -88,9 +104,16 @@ func (c BeaconCache) GetBlockStateByRoot(
 	if err != nil {
 		return BeaconBlockState{}, err
 	}
-	s, err := bc.BeaconStateV2(ctx, eth2api.StateIdRoot(b.StateRoot()))
+	s, err := bc.BeaconStateV2(ctx, eth2api.StateIdSlot(b.Slot()))
 	if err != nil {
 		return BeaconBlockState{}, err
+	}
+	blockStateRoot := b.StateRoot()
+	stateRoot := s.Root()
+	if !bytes.Equal(blockStateRoot[:], stateRoot[:]) {
+		return BeaconBlockState{}, fmt.Errorf(
+			"state root missmatch while fetching state",
+		)
 	}
 	both := BeaconBlockState{
 		VersionedBeaconStateResponse: s,
@@ -126,6 +149,42 @@ func (c BeaconCache) GetBlockStateBySlotFromHeadRoot(
 			return nil, err
 		}
 	}
+}
+
+func PrintWithdrawalHistory(c BeaconCache) error {
+	slotMap := make(map[beacon.Slot]tree.Root)
+	slots := make([]beacon.Slot, 0)
+	for r, s := range c {
+		slot := s.StateSlot()
+		slotMap[slot] = r
+		slots = append(slots, slot)
+	}
+
+	sort.Slice(slots, func(i, j int) bool { return slots[j] > slots[i] })
+
+	for _, slot := range slots {
+		root := slotMap[slot]
+		s := c[root]
+		nextWithdrawalIndex, _ := s.NextWithdrawalIndex()
+		nextWithdrawalValidatorIndex, _ := s.NextWithdrawalValidatorIndex()
+		fmt.Printf(
+			"Slot=%d, NextWithdrawalIndex=%d, NextWithdrawalValidatorIndex=%d\n",
+			slot,
+			nextWithdrawalIndex,
+			nextWithdrawalValidatorIndex,
+		)
+		fmt.Printf("Withdrawals:\n")
+		ws, _ := s.Withdrawals()
+		for i, w := range ws {
+			fmt.Printf(
+				"%d: Validator Index: %s, Amount: %d\n",
+				i,
+				w.ValidatorIndex,
+				w.Amount,
+			)
+		}
+	}
+	return nil
 }
 
 // Helper struct to keep track of current status of a validator withdrawal state
