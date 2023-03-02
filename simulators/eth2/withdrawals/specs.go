@@ -59,7 +59,7 @@ var (
 		AltairForkEpoch:         common.Big0,
 		BellatrixForkEpoch:      common.Big0,
 		CapellaForkEpoch:        common.Big1,
-		Eth1Consensus:           &el.ExecutionCliqueConsensus{},
+		Eth1Consensus:           &el.ExecutionPostMergeGenesis{},
 	}
 
 	MINIMAL_SLOT_TIME_CLIENTS = []string{
