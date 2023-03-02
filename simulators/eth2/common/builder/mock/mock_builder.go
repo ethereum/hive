@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -132,6 +133,67 @@ func NewMockBuilder(
 	router.HandleFunc("/eth/v1/builder/blinded_blocks", m.HandleSubmitBlindedBlock).
 		Methods("POST")
 	router.HandleFunc("/eth/v1/builder/status", m.HandleStatus).Methods("GET")
+
+	// Mock customization
+	// Error on payload request
+	router.HandleFunc("/mock/errors/payload_request", m.HandleMockDisableErrorOnHeaderRequest).
+		Methods("DELETE")
+	router.HandleFunc("/mock/errors/payload_request", m.HandleMockEnableErrorOnHeaderRequest).
+		Methods("POST")
+	router.HandleFunc(
+		"/mock/errors/payload_request/slot/{slot:[0-9]+}",
+		m.HandleMockEnableErrorOnHeaderRequest,
+	).Methods("POST")
+	router.HandleFunc(
+		"/mock/errors/payload_request/epoch/{epoch:[0-9]+}",
+		m.HandleMockEnableErrorOnHeaderRequest,
+	).Methods("POST")
+
+	// Error on block submission
+	router.HandleFunc("/mock/errors/payload_reveal", m.HandleMockDisableErrorOnPayloadReveal).
+		Methods("DELETE")
+	router.HandleFunc("/mock/errors/payload_reveal", m.HandleMockEnableErrorOnPayloadReveal).
+		Methods("POST")
+	router.HandleFunc(
+		"/mock/errors/payload_reveal/slot/{slot:[0-9]+}",
+		m.HandleMockEnableErrorOnPayloadReveal,
+	).Methods("POST")
+	router.HandleFunc(
+		"/mock/errors/payload_reveal/epoch/{epoch:[0-9]+}",
+		m.HandleMockEnableErrorOnPayloadReveal,
+	).Methods("POST")
+
+	// Invalidate payload attributes
+	router.HandleFunc("/mock/invalid/payload_attributes", m.HandleMockDisableInvalidatePayloadAttributes).
+		Methods("DELETE")
+	router.HandleFunc(
+		"/mock/invalid/payload_attributes/{type}",
+		m.HandleMockEnableInvalidatePayloadAttributes,
+	).Methods("POST")
+	router.HandleFunc(
+		"/mock/invalid/payload_attributes/{type}/slot/{slot:[0-9]+}",
+		m.HandleMockEnableInvalidatePayloadAttributes,
+	).Methods("POST")
+	router.HandleFunc(
+		"/mock/invalid/payload_attributes/{type}/epoch/{epoch:[0-9]+}",
+		m.HandleMockEnableInvalidatePayloadAttributes,
+	).Methods("POST")
+
+	// Invalidate payload
+	router.HandleFunc("/mock/invalid/payload", m.HandleMockDisableInvalidatePayload).
+		Methods("DELETE")
+	router.HandleFunc(
+		"/mock/invalid/payload/{type}",
+		m.HandleMockEnableInvalidatePayload,
+	).Methods("POST")
+	router.HandleFunc(
+		"/mock/invalid/payload/{type}/slot/{slot:[0-9]+}",
+		m.HandleMockEnableInvalidatePayload,
+	).Methods("POST")
+	router.HandleFunc(
+		"/mock/invalid/payload/{type}/epoch/{epoch:[0-9]+}",
+		m.HandleMockEnableInvalidatePayload,
+	).Methods("POST")
 
 	m.srv = &http.Server{
 		Handler: router,
@@ -973,6 +1035,331 @@ func (m *MockBuilder) HandleStatus(
 	)
 	w.WriteHeader(http.StatusOK)
 }
+
+// mock builder options handlers
+func (m *MockBuilder) parseSlotEpochRequest(
+	vars map[string]string,
+) (slot beacon.Slot, errcode int, err error) {
+	if slotStr, ok := vars["slot"]; ok {
+		var slotInt uint64
+		if slotInt, err = strconv.ParseUint(slotStr, 10, 64); err != nil {
+			errcode = http.StatusBadRequest
+			return
+		} else {
+			slot = beacon.Slot(slotInt)
+		}
+	} else if epochStr, ok := vars["epoch"]; ok {
+		var epoch uint64
+		if epoch, err = strconv.ParseUint(epochStr, 10, 64); err != nil {
+			errcode = http.StatusBadRequest
+			return
+		} else {
+			if m.cfg.spec == nil {
+				err = fmt.Errorf("unable to respond: spec not ready")
+				errcode = http.StatusInternalServerError
+				return
+			}
+			slot, err = m.cfg.spec.EpochStartSlot(beacon.Epoch(epoch))
+			if err != nil {
+				errcode = http.StatusInternalServerError
+				return
+			}
+		}
+	}
+	return
+}
+
+func (m *MockBuilder) HandleMockDisableErrorOnHeaderRequest(
+	w http.ResponseWriter, req *http.Request,
+) {
+	logrus.WithFields(logrus.Fields{
+		"builder_id": m.cfg.id,
+	}).Info(
+		"Received request to disable error on payload request",
+	)
+
+	m.cfg.mutex.Lock()
+	defer m.cfg.mutex.Unlock()
+	m.cfg.errorOnHeaderRequest = nil
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (m *MockBuilder) HandleMockEnableErrorOnHeaderRequest(
+	w http.ResponseWriter, req *http.Request,
+) {
+	var (
+		vars = mux.Vars(req)
+	)
+
+	slot, code, err := m.parseSlotEpochRequest(vars)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"err":        err,
+		}).Error("Unable to parse slot/epoch in request")
+		http.Error(
+			w,
+			fmt.Sprintf("Unable to respond request: %v", err),
+			code,
+		)
+		return
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"builder_id": m.cfg.id,
+		"slot":       slot,
+	}).Info(
+		"Received request to enable error on payload request",
+	)
+
+	if err = WithErrorOnHeaderRequestAtSlot(slot)(m); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"err":        err,
+		}).Error("Unable to respond request")
+		http.Error(
+			w,
+			fmt.Sprintf("Unable to respond request: %v", err),
+			code,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (m *MockBuilder) HandleMockDisableErrorOnPayloadReveal(
+	w http.ResponseWriter, req *http.Request,
+) {
+	logrus.WithFields(logrus.Fields{
+		"builder_id": m.cfg.id,
+	}).Info(
+		"Received request to disable error on payload reveal",
+	)
+
+	m.cfg.mutex.Lock()
+	defer m.cfg.mutex.Unlock()
+	m.cfg.errorOnPayloadReveal = nil
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (m *MockBuilder) HandleMockEnableErrorOnPayloadReveal(
+	w http.ResponseWriter, req *http.Request,
+) {
+	var (
+		vars = mux.Vars(req)
+	)
+
+	slot, code, err := m.parseSlotEpochRequest(vars)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"err":        err,
+		}).Error("Unable to parse slot/epoch in request")
+		http.Error(
+			w,
+			fmt.Sprintf("Unable to respond request: %v", err),
+			code,
+		)
+		return
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"builder_id": m.cfg.id,
+		"slot":       slot,
+	}).Info(
+		"Received request to enable error on payload reveal",
+	)
+
+	if err = WithErrorOnPayloadRevealAtSlot(slot)(m); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"err":        err,
+		}).Error("Unable to respond request")
+		http.Error(
+			w,
+			fmt.Sprintf("Unable to respond request: %v", err),
+			code,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (m *MockBuilder) HandleMockDisableInvalidatePayloadAttributes(
+	w http.ResponseWriter, req *http.Request,
+) {
+	logrus.WithFields(logrus.Fields{
+		"builder_id": m.cfg.id,
+	}).Info(
+		"Received request to disable invalidation of payload attributes",
+	)
+
+	m.cfg.mutex.Lock()
+	defer m.cfg.mutex.Unlock()
+	m.cfg.payloadAttrModifier = nil
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (m *MockBuilder) HandleMockEnableInvalidatePayloadAttributes(
+	w http.ResponseWriter, req *http.Request,
+) {
+	var (
+		vars   = mux.Vars(req)
+		invTyp PayloadAttributesInvalidation
+	)
+
+	slot, code, err := m.parseSlotEpochRequest(vars)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"err":        err,
+		}).Error("Unable to parse slot/epoch in request")
+		http.Error(
+			w,
+			fmt.Sprintf("Unable to respond request: %v", err),
+			code,
+		)
+		return
+	}
+
+	if typeStr, ok := vars["type"]; !ok {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+		}).Error("Unable to parse request url: missing type var")
+		http.Error(
+			w,
+			"Unable to parse request url: missing type var",
+			http.StatusBadRequest,
+		)
+		return
+	} else if invTyp, ok = PayloadAttrInvalidationTypes[typeStr]; !ok {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"type":       typeStr,
+		}).Error("Unable to parse request url: unknown invalidity type")
+		http.Error(
+			w,
+			fmt.Sprintf("Unable to parse request url: unknown invalidity type: %s", typeStr),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"builder_id": m.cfg.id,
+		"type":       invTyp,
+		"slot":       slot,
+	}).Info(
+		"Received request to enable payload attributes invalidation",
+	)
+
+	if err = WithPayloadAttributesInvalidatorAtSlot(slot, invTyp)(m); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"err":        err,
+		}).Error("Unable to enable payload attr invalidation")
+		http.Error(
+			w,
+			"Unable to enable payload attr invalidation",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (m *MockBuilder) HandleMockDisableInvalidatePayload(
+	w http.ResponseWriter, req *http.Request,
+) {
+	logrus.WithFields(logrus.Fields{
+		"builder_id": m.cfg.id,
+	}).Info(
+		"Received request to disable invalidation of payload",
+	)
+
+	m.cfg.mutex.Lock()
+	defer m.cfg.mutex.Unlock()
+	m.cfg.payloadModifier = nil
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (m *MockBuilder) HandleMockEnableInvalidatePayload(
+	w http.ResponseWriter, req *http.Request,
+) {
+	var (
+		vars   = mux.Vars(req)
+		invTyp PayloadInvalidation
+	)
+
+	slot, code, err := m.parseSlotEpochRequest(vars)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"err":        err,
+		}).Error("Unable to parse slot/epoch in request")
+		http.Error(
+			w,
+			fmt.Sprintf("Unable to respond request: %v", err),
+			code,
+		)
+		return
+	}
+
+	if typeStr, ok := vars["type"]; !ok {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+		}).Error("Unable to parse request url: missing type var")
+		http.Error(
+			w,
+			"Unable to parse request url: missing type var",
+			http.StatusBadRequest,
+		)
+		return
+	} else if invTyp, ok = PayloadInvalidationTypes[typeStr]; !ok {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"type":       typeStr,
+		}).Error("Unable to parse request url: unknown invalidity type")
+		http.Error(
+			w,
+			fmt.Sprintf("Unable to parse request url: unknown invalidity type: %s", typeStr),
+			http.StatusBadRequest,
+		)
+		return
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"builder_id": m.cfg.id,
+		"type":       invTyp,
+		"slot":       slot,
+	}).Info(
+		"Received request to enable payload attributes invalidation",
+	)
+
+	if err = WithPayloadInvalidatorAtSlot(slot, invTyp)(m); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"err":        err,
+		}).Error("Unable to enable payload attr invalidation")
+		http.Error(
+			w,
+			"Unable to enable payload attr invalidation",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// helpers
 
 func serveJSON(w http.ResponseWriter, value interface{}) error {
 	resp, err := json.Marshal(value)

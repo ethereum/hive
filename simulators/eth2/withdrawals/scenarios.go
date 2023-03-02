@@ -3,14 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
-	"fmt"
 	"math/big"
 	"time"
 
-	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
@@ -236,7 +232,7 @@ loop:
 			t.Fatalf("FAIL: Timeout waiting on all accounts to withdraw")
 		case <-time.After(time.Duration(testnet.Spec().SECONDS_PER_SLOT) * time.Second):
 			// Print all info
-			testnet.BeaconClients().Running().PrintStatus(slotCtx, t)
+			testnet.BeaconClients().Running().PrintStatus(slotCtx)
 
 			// Check all accounts
 			for _, n := range testnet.Nodes.Running() {
@@ -296,10 +292,6 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 	config := ts.GetTestnetConfig(n)
 	ctx := context.Background()
 
-	capellaSlot := beacon.Slot(
-		config.CapellaForkEpoch.Uint64() * slotsPerEpoch,
-	)
-
 	// Configure the builder according to the error
 	config.BuilderOptions = make([]mock_builder.Option, 0)
 
@@ -307,126 +299,38 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 	config.BuilderOptions = append(
 		config.BuilderOptions,
 		mock_builder.WithPayloadWeiValueBump(big.NewInt(10000)),
+		mock_builder.WithExtraDataWatermark("builder payload tst"),
 	)
 
 	// Inject test error
-	switch ts.BuilderTestError {
-	case INVALID_WITHDRAWALS:
+	capellaEpoch := beacon.Epoch(config.CapellaForkEpoch.Uint64())
+	if ts.ErrorOnHeaderRequest {
 		config.BuilderOptions = append(
 			config.BuilderOptions,
-			mock_builder.WithPayloadAttributesModifier(
-				func(pa *api.PayloadAttributes, s beacon.Slot) (bool, error) {
-					// Only modify once we reached capella
-					if s >= capellaSlot {
-						// Create a list of invalid (random) withdrawals within the length limit
-						pa.Withdrawals = make(
-							[]*types.Withdrawal,
-							withdrawalsPerInvalidList,
-						)
-						for i := uint64(0); i < withdrawalsPerInvalidList; i++ {
-							w := types.Withdrawal{}
-							w.Index = i + (uint64(s-capellaSlot) * withdrawalsPerInvalidList)
-							w.Validator = i + 1
-							w.Amount = i + 1
-							rand.Read(w.Address[:])
-							pa.Withdrawals[i] = &w
-						}
-						return true, nil
-					}
-					return false, nil
-				},
+			mock_builder.WithErrorOnHeaderRequestAtEpoch(capellaEpoch),
+		)
+	}
+	if ts.ErrorOnPayloadReveal {
+		config.BuilderOptions = append(
+			config.BuilderOptions,
+			mock_builder.WithErrorOnPayloadRevealAtEpoch(capellaEpoch),
+		)
+	}
+	if ts.InvalidatePayload != "" {
+		config.BuilderOptions = append(
+			config.BuilderOptions,
+			mock_builder.WithPayloadInvalidatorAtEpoch(
+				capellaEpoch,
+				ts.InvalidatePayload,
 			),
 		)
-	case INVALIDATE_SINGLE_WITHDRAWAL_ADDRESS,
-		INVALIDATE_SINGLE_WITHDRAWAL_AMOUNT,
-		INVALIDATE_SINGLE_WITHDRAWAL_VALIDATOR_INDEX,
-		INVALIDATE_SINGLE_WITHDRAWAL_INDEX:
+	}
+	if ts.InvalidatePayloadAttributes != "" {
 		config.BuilderOptions = append(
 			config.BuilderOptions,
-			mock_builder.WithPayloadAttributesModifier(
-				func(pa *api.PayloadAttributes, s beacon.Slot) (bool, error) {
-					// Only modify once we reached capella
-					if s >= capellaSlot {
-						// We need to invalidate a single withdrawal
-						if len(pa.Withdrawals) > 0 {
-							switch ts.BuilderTestError {
-							case INVALIDATE_SINGLE_WITHDRAWAL_ADDRESS:
-								pa.Withdrawals[0].Address[0]++
-							case INVALIDATE_SINGLE_WITHDRAWAL_AMOUNT:
-								pa.Withdrawals[0].Amount++
-							case INVALIDATE_SINGLE_WITHDRAWAL_VALIDATOR_INDEX:
-								pa.Withdrawals[0].Validator++
-							case INVALIDATE_SINGLE_WITHDRAWAL_INDEX:
-								pa.Withdrawals[0].Index++
-							}
-							return true, nil
-						}
-					}
-					return false, nil
-				},
-			),
-		)
-	case VALID_WITHDRAWALS_INVALID_STATE_ROOT:
-		config.BuilderOptions = append(
-			config.BuilderOptions,
-			mock_builder.WithPayloadModifier(
-				func(ed *api.ExecutableData, s beacon.Slot) (bool, error) {
-					// Only modify once we reached capella
-					if s >= capellaSlot {
-						var (
-							originalHash      = ed.BlockHash
-							originalStateRoot = ed.StateRoot
-							modifiedStateRoot = common.Hash{}
-						)
-						// We need to simulate the builder producing an invalid
-						// execution payload by modifying its state root
-						rand.Read(modifiedStateRoot[:])
-						if b, err := api.ExecutableDataToBlock(*ed); err != nil {
-							return false, err
-						} else {
-							header := b.Header()
-							header.Root = modifiedStateRoot
-							modifiedHash := header.Hash()
-							copy(ed.BlockHash[:], modifiedHash[:])
-							copy(ed.StateRoot[:], modifiedStateRoot[:])
-						}
-						t.Logf(
-							"INFO: Modified payload %d: hash:%s->%s, stateRoot:%s->%s, parentHash:%s",
-							ed.Number,
-							originalHash,
-							ed.BlockHash,
-							originalStateRoot,
-							ed.StateRoot,
-							ed.ParentHash,
-						)
-						return true, nil
-					}
-					return false, nil
-				},
-			),
-		)
-	case ERROR_ON_HEADER_REQUEST:
-		config.BuilderOptions = append(
-			config.BuilderOptions,
-			mock_builder.WithErrorOnHeaderRequest(
-				func(s beacon.Slot) error {
-					if s >= capellaSlot {
-						return fmt.Errorf("error produced by test")
-					}
-					return nil
-				},
-			),
-		)
-	case ERROR_ON_UNBLINDED_PAYLOAD_REQUEST:
-		config.BuilderOptions = append(
-			config.BuilderOptions,
-			mock_builder.WithErrorOnPayloadReveal(
-				func(s beacon.Slot) error {
-					if s >= capellaSlot {
-						return fmt.Errorf("error produced by test")
-					}
-					return nil
-				},
+			mock_builder.WithPayloadAttributesInvalidatorAtEpoch(
+				capellaEpoch,
+				ts.InvalidatePayloadAttributes,
 			),
 		)
 	}
@@ -498,8 +402,9 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 
 	// Verify any modified payloads did not make it into the
 	// canonical chain
-	switch ts.BuilderTestError {
-	case NO_ERROR:
+	if !ts.ErrorOnHeaderRequest && !ts.ErrorOnPayloadReveal &&
+		ts.InvalidatePayload == "" &&
+		ts.InvalidatePayloadAttributes == "" {
 		// Simply verify that builder's capella payloads were included in the
 		// canonical chain
 		for i, n := range testnet.Nodes.Running() {
@@ -529,11 +434,7 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 				)
 			}
 		}
-	case INVALID_WITHDRAWALS,
-		INVALIDATE_SINGLE_WITHDRAWAL_ADDRESS,
-		INVALIDATE_SINGLE_WITHDRAWAL_AMOUNT,
-		INVALIDATE_SINGLE_WITHDRAWAL_VALIDATOR_INDEX,
-		INVALIDATE_SINGLE_WITHDRAWAL_INDEX:
+	} else if ts.InvalidatePayloadAttributes != "" {
 		for i, n := range testnet.VerificationNodes().Running() {
 			modifiedPayloads := n.BeaconClient.Builder.GetModifiedPayloads()
 			if len(modifiedPayloads) == 0 {
