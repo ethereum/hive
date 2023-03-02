@@ -1834,18 +1834,13 @@ func SyncingWithChainHavingValidTransitionBlock(
 		)
 	}
 
-	var headOptStatus clients.BlockV2OptimisticResponse
-	ctxTimeout, cancel = context.WithTimeout(ctx, time.Second*5)
-	defer cancel()
-	if exists, err := eth2api.SimpleRequest(ctxTimeout, importer.API, eth2api.FmtGET("/eth/v2/beacon/blocks/%s", eth2api.BlockHead.BlockId()), &headOptStatus); err != nil {
+	optimistic, err := importer.BlockIsOptimistic(ctx, eth2api.BlockHead)
+	if err != nil {
 		t.Fatalf("FAIL: Failed to poll head importer head: %v", err)
-	} else if !exists {
-		t.Fatalf("FAIL: Failed to poll head importer head: !exists")
-	}
-	if headOptStatus.ExecutionOptimistic {
+	} else if optimistic {
 		t.Fatalf(
 			"FAIL: importer still optimistic: execution_optimistic==%t",
-			headOptStatus.ExecutionOptimistic,
+			optimistic,
 		)
 	}
 }
@@ -1988,26 +1983,9 @@ func SyncingWithChainHavingInvalidTransitionBlock(
 	}
 
 	if headInfo.Header.Message.Slot != (builderExecutionBlock.Slot() - 1) {
-		ctxTimeout, cancel := context.WithTimeout(ctx, time.Second*5)
-		defer cancel()
-		var headOptStatus clients.BlockV2OptimisticResponse
-		if exists, err := eth2api.SimpleRequest(
-			ctxTimeout, importer.API,
-			eth2api.FmtGET(
-				"/eth/v2/beacon/blocks/%s",
-				eth2api.BlockHead.BlockId(),
-			),
-			&headOptStatus,
-		); err != nil {
-			// Block still not synced
-			fmt.Printf(
-				"DEBUG: Queried block %s: %v\n",
-				eth2api.BlockHead.BlockId(),
-				err,
-			)
-		} else if !exists {
-			// Block still not synced
-			fmt.Printf("DEBUG: Queried block %s: %v\n", eth2api.BlockHead.BlockId(), err)
+		optimistic, err := importer.BlockIsOptimistic(ctx, eth2api.BlockHead)
+		if err != nil {
+			t.Fatalf("FAIL: Failed to poll head importer head: %v", err)
 		}
 
 		t.Fatalf(
@@ -2016,7 +1994,7 @@ func SyncingWithChainHavingInvalidTransitionBlock(
 			headInfo.Header.Message.Slot,
 			builderExecutionBlock.StateRoot(),
 			builderExecutionBlock.Slot(),
-			headOptStatus.ExecutionOptimistic,
+			optimistic,
 		)
 	}
 }
