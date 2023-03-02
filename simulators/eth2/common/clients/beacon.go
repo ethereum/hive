@@ -226,6 +226,14 @@ func (versionedBlock *VersionedSignedBeaconBlock) ExecutionPayload() (api.Execut
 	return result, nil
 }
 
+func (versionedBlock *VersionedSignedBeaconBlock) Withdrawals() (common.Withdrawals, error) {
+	switch v := versionedBlock.Data.(type) {
+	case *capella.SignedBeaconBlock:
+		return v.Message.Body.ExecutionPayload.Withdrawals, nil
+	}
+	return nil, nil
+}
+
 func (b *VersionedSignedBeaconBlock) StateRoot() tree.Root {
 	switch v := b.Data.(type) {
 	case *phase0.SignedBeaconBlock:
