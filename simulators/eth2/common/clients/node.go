@@ -9,8 +9,8 @@ import (
 	"golang.org/x/exp/slices"
 
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/hive/hivesim"
 	cg "github.com/ethereum/hive/simulators/eth2/common/chain_generators"
+	"github.com/ethereum/hive/simulators/eth2/common/utils"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 )
@@ -20,17 +20,30 @@ import (
 // - Beacon Client
 // - Validator Client
 type NodeDefinition struct {
-	ExecutionClient      string
-	ConsensusClient      string
-	ValidatorClient      string
-	ValidatorShares      uint64
-	ExecutionClientTTD   *big.Int
-	BeaconNodeTTD        *big.Int
+	// Client Types
+	ExecutionClient string
+	ConsensusClient string
+	ValidatorClient string
+
+	// Execution Config
+	ExecutionClientTTD *big.Int
+	ChainGenerator     cg.ChainGenerator
+	Chain              []*types.Block
+
+	// Beacon Config
+	BeaconNodeTTD *big.Int
+
+	// Validator Config
+	ValidatorShares uint64
+
+	// Node Config
 	TestVerificationNode bool
 	DisableStartup       bool
-	ChainGenerator       cg.ChainGenerator
-	Chain                []*types.Block
-	ExecutionSubnet      string
+
+	// Subnet Configuration
+	ExecutionSubnet string
+	ConsensusSubnet string
+	Subnet          string
 }
 
 func (n *NodeDefinition) String() string {
@@ -42,14 +55,34 @@ func (n *NodeDefinition) ExecutionClientName() string {
 }
 
 func (n *NodeDefinition) ConsensusClientName() string {
-	return fmt.Sprintf("%s", n.ConsensusClient)
+	return n.ConsensusClient
 }
 
 func (n *NodeDefinition) ValidatorClientName() string {
 	if n.ValidatorClient == "" {
 		return beaconNodeToValidator(n.ConsensusClient)
 	}
-	return fmt.Sprintf("%s", n.ValidatorClient)
+	return n.ValidatorClient
+}
+
+func (n *NodeDefinition) GetExecutionSubnet() string {
+	if n.ExecutionSubnet != "" {
+		return n.ExecutionSubnet
+	}
+	if n.Subnet != "" {
+		return n.Subnet
+	}
+	return ""
+}
+
+func (n *NodeDefinition) GetConsensusSubnet() string {
+	if n.ConsensusSubnet != "" {
+		return n.ConsensusSubnet
+	}
+	if n.Subnet != "" {
+		return n.Subnet
+	}
+	return ""
 }
 
 func beaconNodeToValidator(name string) string {
@@ -118,7 +151,7 @@ func (all NodeDefinitions) FilterByEL(filters []string) NodeDefinitions {
 // Contains a flag that marks a node that can be used to query
 // test verification information.
 type Node struct {
-	T               *hivesim.T
+	Logging         utils.Logging
 	Index           int
 	ExecutionClient *ExecutionClient
 	BeaconClient    *BeaconClient
@@ -126,29 +159,35 @@ type Node struct {
 	Verification    bool
 }
 
+func (n *Node) Logf(format string, values ...interface{}) {
+	if l := n.Logging; l != nil {
+		l.Logf(format, values...)
+	}
+}
+
 // Starts all clients included in the bundle
-func (n *Node) Start(extraOptions ...hivesim.StartOption) error {
-	n.T.Logf("Starting validator client bundle %d", n.Index)
+func (n *Node) Start() error {
+	n.Logf("Starting validator client bundle %d", n.Index)
 	if n.ExecutionClient != nil {
-		if err := n.ExecutionClient.Start(extraOptions...); err != nil {
+		if err := n.ExecutionClient.Start(); err != nil {
 			return err
 		}
 	} else {
-		n.T.Logf("No execution client started")
+		n.Logf("No execution client started")
 	}
 	if n.BeaconClient != nil {
-		if err := n.BeaconClient.Start(extraOptions...); err != nil {
+		if err := n.BeaconClient.Start(); err != nil {
 			return err
 		}
 	} else {
-		n.T.Logf("No beacon client started")
+		n.Logf("No beacon client started")
 	}
 	if n.ValidatorClient != nil {
-		if err := n.ValidatorClient.Start(extraOptions...); err != nil {
+		if err := n.ValidatorClient.Start(); err != nil {
 			return err
 		}
 	} else {
-		n.T.Logf("No validator client started")
+		n.Logf("No validator client started")
 	}
 	return nil
 }
@@ -169,7 +208,7 @@ func (n *Node) Shutdown() error {
 func (n *Node) ClientNames() string {
 	var name string
 	if n.ExecutionClient != nil {
-		name = n.ExecutionClient.ClientType
+		name = n.ExecutionClient.ClientType()
 	}
 	if n.BeaconClient != nil {
 		name = fmt.Sprintf("%s/%s", name, n.BeaconClient.ClientName())
@@ -196,7 +235,7 @@ func (n *Node) SignBLSToExecutionChange(
 	if domain, err := bn.ComputeDomain(
 		ctx,
 		common.DOMAIN_BLS_TO_EXECUTION_CHANGE,
-		&bn.spec.GENESIS_FORK_VERSION,
+		&bn.Config.Spec.GENESIS_FORK_VERSION,
 	); err != nil {
 		return nil, err
 	} else {
@@ -277,7 +316,7 @@ func (all Nodes) Proxies() Proxies {
 	ps := make(Proxies, 0)
 	for _, n := range all {
 		if n.ExecutionClient != nil {
-			ps = append(ps, n.ExecutionClient.proxy)
+			ps = append(ps, n.ExecutionClient)
 		}
 	}
 	return ps
@@ -356,7 +395,7 @@ func (all Nodes) FilterByEL(filters []string) Nodes {
 	ret := make(Nodes, 0)
 	for _, n := range all {
 		for _, filter := range filters {
-			if strings.Contains(n.ExecutionClient.ClientType, filter) {
+			if strings.Contains(n.ExecutionClient.ClientType(), filter) {
 				ret = append(ret, n)
 				break
 			}

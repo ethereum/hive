@@ -30,6 +30,7 @@ import (
 var (
 	depositAddress                              common.Eth1Address
 	DEFAULT_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY = big.NewInt(128)
+	DEFAULT_MAX_CONSECUTIVE_ERRORS_ON_WAITS     = 3
 )
 
 func init() {
@@ -305,6 +306,9 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 		spec:                  p.spec,
 		eth1Genesis:           p.eth1Genesis,
 		eth2GenesisState:      p.eth2Genesis,
+
+		// Testing
+		maxConsecutiveErrorsOnWaits: DEFAULT_MAX_CONSECUTIVE_ERRORS_ON_WAITS,
 	}
 }
 
@@ -315,11 +319,8 @@ func (p *PreparedTestnet) prepareExecutionNode(
 	testnet *Testnet,
 	eth1Def *hivesim.ClientDefinition,
 	consensus el.ExecutionConsensus,
-	ttd *big.Int,
-	executionIndex int,
 	chain []*types.Block,
-	subnet string,
-	logEngineCalls bool,
+	config clients.ExecutionClientConfig,
 ) *clients.ExecutionClient {
 	testnet.Logf(
 		"Preparing execution node: %s (%s)",
@@ -327,16 +328,21 @@ func (p *PreparedTestnet) prepareExecutionNode(
 		eth1Def.Version,
 	)
 
+	cm := &clients.HiveManagedClient{
+		T:                    testnet.T,
+		HiveClientDefinition: eth1Def,
+	}
+
 	// This method will return the options used to run the client.
 	// Requires a method that returns the rest of the currently running
 	// execution clients on the network at startup.
-	optionsGenerator := func() ([]hivesim.StartOption, error) {
+	cm.OptionsGenerator = func() ([]hivesim.StartOption, error) {
 		opts := []hivesim.StartOption{p.executionOpts}
-		opts = append(opts, consensus.HiveParams(executionIndex))
+		opts = append(opts, consensus.HiveParams(config.ClientIndex))
 
 		currentlyRunningEcs := testnet.ExecutionClients().
 			Running().
-			Subnet(subnet)
+			Subnet(config.Subnet)
 		if len(currentlyRunningEcs) > 0 {
 			bootnode, err := currentlyRunningEcs.Enodes()
 			if err != nil {
@@ -346,39 +352,35 @@ func (p *PreparedTestnet) prepareExecutionNode(
 			// Make the client connect to the first eth1 node, as a bootnode for the eth1 net
 			opts = append(opts, hivesim.Params{"HIVE_BOOTNODE": bootnode})
 		}
-		if ttd != nil {
+		opts = append(
+			opts,
+			hivesim.Params{
+				"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf(
+					"%d",
+					config.TerminalTotalDifficulty,
+				),
+			},
+		)
+		genesis := testnet.ExecutionGenesis().ToBlock()
+		if config.TerminalTotalDifficulty <= genesis.Difficulty().Int64() {
 			opts = append(
 				opts,
 				hivesim.Params{
-					"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf(
-						"%d",
-						ttd.Int64(),
+					"HIVE_TERMINAL_BLOCK_HASH": fmt.Sprintf(
+						"%s",
+						genesis.Hash(),
 					),
 				},
 			)
-		} else {
-			genesis := testnet.ExecutionGenesis()
-			genesisBlock := genesis.ToBlock()
-			if genesis.Config.TerminalTotalDifficulty.Cmp(genesisBlock.Difficulty()) <= 0 {
-				opts = append(
-					opts,
-					hivesim.Params{
-						"HIVE_TERMINAL_BLOCK_HASH": fmt.Sprintf(
-							"%s",
-							genesisBlock.Hash(),
-						),
-					},
-				)
-				opts = append(
-					opts,
-					hivesim.Params{
-						"HIVE_TERMINAL_BLOCK_NUMBER": fmt.Sprintf(
-							"%d",
-							genesisBlock.NumberU64(),
-						),
-					},
-				)
-			}
+			opts = append(
+				opts,
+				hivesim.Params{
+					"HIVE_TERMINAL_BLOCK_NUMBER": fmt.Sprintf(
+						"%d",
+						genesis.NumberU64(),
+					),
+				},
+			)
 		}
 
 		if len(chain) > 0 {
@@ -391,17 +393,12 @@ func (p *PreparedTestnet) prepareExecutionNode(
 		}
 		return opts, nil
 	}
-	return clients.NewExecutionClient(
-		testnet.T,
-		eth1Def,
-		optionsGenerator,
-		executionIndex,
-		clients.PortEngineRPC+executionIndex,
-		subnet,
-		ttd,
-		true,
-		logEngineCalls,
-	)
+
+	return &clients.ExecutionClient{
+		Client: cm,
+		Logger: testnet.T,
+		Config: config,
+	}
 }
 
 // Prepares a beacon client object with all the necessary information
@@ -410,10 +407,9 @@ func (p *PreparedTestnet) prepareBeaconNode(
 	parentCtx context.Context,
 	testnet *Testnet,
 	beaconDef *hivesim.ClientDefinition,
-	ttd *big.Int,
-	beaconIndex int,
 	enableBuilders bool,
 	builderOptions []mock_builder.Option,
+	config clients.BeaconClientConfig,
 	eth1Endpoints ...*clients.ExecutionClient,
 ) *clients.BeaconClient {
 	testnet.Logf(
@@ -422,10 +418,60 @@ func (p *PreparedTestnet) prepareBeaconNode(
 		beaconDef.Version,
 	)
 
+	if len(eth1Endpoints) == 0 {
+		panic(fmt.Errorf("at least 1 execution endpoint is required"))
+	}
+
+	cm := &clients.HiveManagedClient{
+		T:                    testnet.T,
+		HiveClientDefinition: beaconDef,
+	}
+
+	cl := &clients.BeaconClient{
+		Client: cm,
+		Logger: testnet.T,
+		Config: config,
+	}
+
+	if enableBuilders {
+		simIP, err := testnet.T.Sim.ContainerNetworkIP(
+			testnet.T.SuiteID,
+			"bridge",
+			"simulation",
+		)
+		if err != nil {
+			panic(err)
+		}
+
+		options := []mock_builder.Option{
+			mock_builder.WithExternalIP(net.ParseIP(simIP)),
+			mock_builder.WithPort(
+				mock_builder.DEFAULT_BUILDER_PORT + config.ClientIndex,
+			),
+			mock_builder.WithID(config.ClientIndex),
+			mock_builder.WithBeaconGenesisTime(testnet.genesisTime),
+			mock_builder.WithSpec(p.spec),
+		}
+
+		if builderOptions != nil {
+			options = append(options, builderOptions...)
+		}
+
+		cl.Builder, err = mock_builder.NewMockBuilder(
+			context.Background(),
+			eth1Endpoints[0],
+			cl,
+			options...,
+		)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	// This method will return the options used to run the client.
 	// Requires a method that returns the rest of the currently running
 	// beacon clients on the network at startup.
-	optionsGenerator := func() ([]hivesim.StartOption, error) {
+	cm.OptionsGenerator = func() ([]hivesim.StartOption, error) {
 		opts := []hivesim.StartOption{p.beaconOpts}
 
 		// Hook up beacon node to (maybe multiple) eth1 nodes
@@ -458,85 +504,57 @@ func (p *PreparedTestnet) prepareBeaconNode(
 		opts = append(opts, hivesim.Params{
 			"HIVE_ETH2_ETH1_RPC_ADDRS":        strings.Join(addrs, ","),
 			"HIVE_ETH2_ETH1_ENGINE_RPC_ADDRS": strings.Join(engineAddrs, ","),
-			"HIVE_ETH2_BEACON_NODE_INDEX":     fmt.Sprintf("%d", beaconIndex),
+			"HIVE_ETH2_BEACON_NODE_INDEX": fmt.Sprintf(
+				"%d",
+				config.ClientIndex,
+			),
 		})
 
-		if bootnodeENRs, err := testnet.BeaconClients().Running().ENRs(parentCtx); err != nil {
-			return nil, fmt.Errorf(
-				"failed to get ENR as bootnode for every beacon node: %v",
-				err,
-			)
-		} else if bootnodeENRs != "" {
-			opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENRs})
+		currentlyRunningBcs := testnet.BeaconClients().
+			Running().
+			Subnet(config.Subnet)
+		if len(currentlyRunningBcs) > 0 {
+			if bootnodeENRs, err := currentlyRunningBcs.ENRs(parentCtx); err != nil {
+				return nil, fmt.Errorf(
+					"failed to get ENR as bootnode for every beacon node: %v",
+					err,
+				)
+			} else if bootnodeENRs != "" {
+				opts = append(opts, hivesim.Params{"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENRs})
+			}
+
+			if staticPeers, err := currentlyRunningBcs.P2PAddrs(parentCtx); err != nil {
+				return nil, fmt.Errorf(
+					"failed to get p2paddr for every beacon node: %v",
+					err,
+				)
+			} else if staticPeers != "" {
+				opts = append(opts, hivesim.Params{"HIVE_ETH2_STATIC_PEERS": staticPeers})
+			}
 		}
 
-		if staticPeers, err := testnet.BeaconClients().Running().P2PAddrs(parentCtx); err != nil {
-			return nil, fmt.Errorf(
-				"failed to get p2paddr for every beacon node: %v",
-				err,
-			)
-		} else if staticPeers != "" {
-			opts = append(opts, hivesim.Params{"HIVE_ETH2_STATIC_PEERS": staticPeers})
+		opts = append(
+			opts,
+			hivesim.Params{
+				"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf(
+					"%d",
+					config.TerminalTotalDifficulty,
+				),
+			},
+		)
+
+		if cl.Builder != nil {
+			opts = append(opts, hivesim.Params{
+				"HIVE_ETH2_BUILDER_ENDPOINT": cl.Builder.Address(),
+			})
 		}
 
-		if ttd != nil {
-			opts = append(
-				opts,
-				hivesim.Params{
-					"HIVE_TERMINAL_TOTAL_DIFFICULTY": fmt.Sprintf("%d", ttd),
-				},
-			)
-		}
+		// TODO
+		//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
+		//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
+		//}
+
 		return opts, nil
-	}
-
-	// TODO
-	//if p.configName != "mainnet" && hasBuildTarget(beaconDef, p.configName) {
-	//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
-	//}
-	cl := clients.NewBeaconClient(
-		testnet.T,
-		beaconDef,
-		optionsGenerator,
-		testnet.genesisTime,
-		testnet.spec,
-		beaconIndex,
-		testnet.genesisValidatorsRoot,
-	)
-
-	if enableBuilders {
-		simIP, err := testnet.T.Sim.ContainerNetworkIP(
-			testnet.T.SuiteID,
-			"bridge",
-			"simulation",
-		)
-		if err != nil {
-			panic(err)
-		}
-
-		options := []mock_builder.Option{
-			mock_builder.WithExternalIP(net.ParseIP(simIP)),
-			mock_builder.WithPort(
-				mock_builder.DEFAULT_BUILDER_PORT + beaconIndex,
-			),
-			mock_builder.WithID(beaconIndex),
-			mock_builder.WithBeaconGenesisTime(testnet.genesisTime),
-		}
-
-		if builderOptions != nil {
-			options = append(options, builderOptions...)
-		}
-
-		mockBuilder, err := mock_builder.NewMockBuilder(
-			eth1Endpoints[0],
-			cl,
-			p.spec,
-			options...,
-		)
-		if err != nil {
-			panic(err)
-		}
-		cl.Builder = mockBuilder
 	}
 
 	return cl
@@ -563,9 +581,16 @@ func (p *PreparedTestnet) prepareValidatorClient(
 			keyIndex,
 		)
 	}
+	keys := p.keyTranches[keyIndex]
+
+	cm := &clients.HiveManagedClient{
+		T:                    testnet.T,
+		HiveClientDefinition: validatorDef,
+	}
+
 	// This method will return the options used to run the client.
 	// Requires the beacon client object to which to connect.
-	optionsGenerator := func(validatorKeys map[common.ValidatorIndex]*cl.KeyDetails) ([]hivesim.StartOption, error) {
+	cm.OptionsGenerator = func() ([]hivesim.StartOption, error) {
 		if !bn.IsRunning() {
 			return nil, fmt.Errorf(
 				"attempted to start a validator when the beacon node is not running",
@@ -573,21 +598,29 @@ func (p *PreparedTestnet) prepareValidatorClient(
 		}
 		// Hook up validator to beacon node
 		bnAPIOpt := hivesim.Params{
-			"HIVE_ETH2_BN_API_IP": bn.HiveClient.IP.String(),
+			"HIVE_ETH2_BN_API_IP": bn.GetIP().String(),
 		}
-		keysOpt := cl.KeysBundle(validatorKeys)
+		keysOpt := cl.KeysBundle(keys)
 		opts := []hivesim.StartOption{p.validatorOpts, keysOpt, bnAPIOpt}
+
+		if bn.Builder != nil {
+			opts = append(opts, hivesim.Params{
+				"HIVE_ETH2_BUILDER_ENDPOINT": bn.Builder.Address(),
+			})
+		}
+
 		// TODO
 		//if p.configName != "mainnet" && hasBuildTarget(validatorDef, p.configName) {
 		//	opts = append(opts, hivesim.WithBuildTarget(p.configName))
 		//}
 		return opts, nil
 	}
-	return clients.NewValidatorClient(
-		testnet.T,
-		validatorDef,
-		optionsGenerator,
-		p.keyTranches[keyIndex],
-		bn,
-	)
+
+	return &clients.ValidatorClient{
+		Client:       cm,
+		Logger:       testnet.T,
+		ClientIndex:  keyIndex,
+		Keys:         keys,
+		BeaconClient: bn,
+	}
 }

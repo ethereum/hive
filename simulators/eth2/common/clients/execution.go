@@ -2,13 +2,13 @@ package clients
 
 import (
 	"context"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -17,7 +17,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/spoofing/proxy"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
 	"github.com/golang-jwt/jwt/v4"
@@ -43,204 +42,269 @@ var AllEngineCallsLog = []string{
 	"engine_newPayloadV2",
 }
 
+type ExecutionProxyConfig struct {
+	Host                   net.IP
+	Port                   int
+	LogEngineCalls         bool
+	TrackForkchoiceUpdated bool
+}
+
+type ExecutionClientConfig struct {
+	ClientIndex             int
+	ProxyConfig             *ExecutionProxyConfig
+	TerminalTotalDifficulty int64
+	EngineAPIPort           int
+	RPCPort                 int
+	Subnet                  string
+	JWTSecret               []byte
+}
+
 type ExecutionClient struct {
-	T                *hivesim.T
-	HiveClient       *hivesim.Client
-	ClientType       string
-	OptionsGenerator func() ([]hivesim.StartOption, error)
-	LatestForkchoice *api.ForkchoiceStateV1
-	trackFcU         bool
-	proxy            **proxy.Proxy
-	proxyPort        int
-	subnet           string
-	ttd              *big.Int
-	clientIndex      int
-	logEngineCalls   bool
+	Client
+	Logger utils.Logging
+	Config ExecutionClientConfig
+
+	proxy     *proxy.Proxy
+	latestfcu *api.ForkchoiceStateV1
 
 	engineRpcClient *rpc.Client
 	ethRpcClient    *rpc.Client
 	eth             *ethclient.Client
+
+	startupComplete bool
 }
 
-func NewExecutionClient(
-	t *hivesim.T,
-	eth1Def *hivesim.ClientDefinition,
-	optionsGenerator func() ([]hivesim.StartOption, error),
-	clientIndex int,
-	proxyPort int,
-	subnet string,
-	ttd *big.Int,
-	trackFcu bool,
-	logEngineCalls bool,
-) *ExecutionClient {
-	return &ExecutionClient{
-		T:                t,
-		ClientType:       eth1Def.Name,
-		OptionsGenerator: optionsGenerator,
-		trackFcU:         trackFcu,
-		proxyPort:        proxyPort,
-		proxy:            new(*proxy.Proxy),
-		subnet:           subnet,
-		ttd:              ttd,
-		clientIndex:      clientIndex,
-		logEngineCalls:   logEngineCalls,
+func (en *ExecutionClient) Logf(format string, values ...interface{}) {
+	if l := en.Logger; l != nil {
+		l.Logf(format, values...)
 	}
 }
 
 func (en *ExecutionClient) UserRPCAddress() (string, error) {
-	if en.HiveClient == nil {
-		return "", fmt.Errorf("el hive client not yet launched")
+	if !en.Client.IsRunning() {
+		return "", fmt.Errorf("execution client not yet launched")
 	}
-	return fmt.Sprintf("http://%v:%d", en.HiveClient.IP, PortUserRPC), nil
+	var port = PortUserRPC
+	if en.Config.RPCPort != 0 {
+		port = en.Config.RPCPort
+	}
+	return fmt.Sprintf(
+		"http://%v:%d",
+		en.Client.GetIP(),
+		port,
+	), nil
 }
 
 func (en *ExecutionClient) EngineRPCAddress() (string, error) {
-	// TODO what will the default port be?
-	return fmt.Sprintf("http://%v:%d", en.HiveClient.IP, PortEngineRPC), nil
+	var port = PortEngineRPC
+	if en.Config.EngineAPIPort != 0 {
+		port = en.Config.EngineAPIPort
+	}
+	return fmt.Sprintf(
+		"http://%v:%d",
+		en.Client.GetIP(),
+		port,
+	), nil
 }
 
 func (en *ExecutionClient) MustGetEnode() string {
-	addr, err := en.HiveClient.EnodeURL()
-	if err != nil {
+	if enodeClient, ok := en.Client.(EnodeClient); ok {
+		addr, err := enodeClient.GetEnodeURL()
+		if err == nil {
+			return addr
+		}
 		panic(err)
 	}
-	return addr
+	panic(fmt.Errorf("invalid client type"))
 }
 
 func (en *ExecutionClient) ConfiguredTTD() *big.Int {
-	return en.ttd
+	return big.NewInt(en.Config.TerminalTotalDifficulty)
 }
 
-func (en *ExecutionClient) Start(extraOptions ...hivesim.StartOption) error {
-	if en.HiveClient != nil {
-		return fmt.Errorf("client already started")
-	}
-	en.T.Logf("Starting client %s", en.ClientType)
-	opts, err := en.OptionsGenerator()
-	if err != nil {
-		return fmt.Errorf("unable to get start options: %v", err)
-	}
-	opts = append(opts, extraOptions...)
-
-	en.HiveClient = en.T.StartClient(en.ClientType, opts...)
-	en.T.Logf(
-		"Started client %s, container: %s",
-		en.ClientType,
-		en.HiveClient.Container,
-	)
-
-	// Prepare Eth/Engine RPCs
-	engineRPCAddress, err := en.EngineRPCAddress()
-	if err != nil {
-		return err
-	}
-	client := &http.Client{}
-	// Prepare HTTP Client
-	en.engineRpcClient, err = rpc.DialHTTPWithClient(engineRPCAddress, client)
-	if err != nil {
-		return err
-	}
-
-	// Prepare ETH Client
-	client = &http.Client{}
-
-	userRPCAddress, err := en.UserRPCAddress()
-	if err != nil {
-		return err
-	}
-	en.ethRpcClient, err = rpc.DialHTTPWithClient(userRPCAddress, client)
-	if err != nil {
-		return err
-	}
-	en.eth = ethclient.NewClient(en.ethRpcClient)
-
-	// Prepare proxy
-	dest, err := en.EngineRPCAddress()
-	if err != nil {
-		return err
-	}
-
-	secret, err := hex.DecodeString(
-		"7365637265747365637265747365637265747365637265747365637265747365",
-	)
-	if err != nil {
-		panic(err)
-	}
-	simIP, err := en.T.Sim.ContainerNetworkIP(
-		en.T.SuiteID,
-		"bridge",
-		"simulation",
-	)
-	if err != nil {
-		panic(err)
-	}
-
-	p := proxy.NewProxy(
-		net.ParseIP(simIP),
-		en.proxyPort,
-		dest,
-		secret,
-	)
-
-	if en.trackFcU {
-		logCallback := func(req []byte) *spoof.Spoof {
-			var (
-				fcState api.ForkchoiceStateV1
-				pAttr   api.PayloadAttributes
-				err     error
-			)
-			err = proxy.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
-			if err == nil {
-				en.LatestForkchoice = &fcState
+func (en *ExecutionClient) Start() error {
+	if !en.Client.IsRunning() {
+		if managedClient, ok := en.Client.(ManagedClient); !ok {
+			return fmt.Errorf("attempted to start an unmanaged client")
+		} else {
+			if err := managedClient.Start(); err != nil {
+				return err
 			}
-			return nil
-		}
-		for _, c := range AllForkchoiceUpdatedCalls {
-			p.AddRequestCallback(c, logCallback)
 		}
 	}
 
-	if en.logEngineCalls {
-		logCallback := func(res []byte, req []byte) *spoof.Spoof {
-			en.T.Logf(
-				"DEBUG: execution client %d, request: %s",
-				en.clientIndex,
-				req,
-			)
-			en.T.Logf(
-				"DEBUG: execution client %d, response: %s",
-				en.clientIndex,
-				res,
-			)
-			return nil
+	return en.Init(context.Background())
+}
+
+func (en *ExecutionClient) Init(ctx context.Context) error {
+	if !en.startupComplete {
+		defer func() {
+			en.startupComplete = true
+		}()
+
+		// Prepare Eth/Engine RPCs
+		engineRPCAddress, err := en.EngineRPCAddress()
+		if err != nil {
+			return err
 		}
-		for _, c := range AllEngineCallsLog {
-			p.AddResponseCallback(c, logCallback)
+		client := &http.Client{}
+		// Prepare HTTP Client
+		en.engineRpcClient, err = rpc.DialHTTPWithClient(
+			engineRPCAddress,
+			client,
+		)
+		if err != nil {
+			return err
 		}
+
+		// Prepare ETH Client
+		client = &http.Client{}
+
+		userRPCAddress, err := en.UserRPCAddress()
+		if err != nil {
+			return err
+		}
+		en.ethRpcClient, err = rpc.DialHTTPWithClient(userRPCAddress, client)
+		if err != nil {
+			return err
+		}
+		en.eth = ethclient.NewClient(en.ethRpcClient)
+
+		// Prepare proxy
+		dest, err := en.EngineRPCAddress()
+		if err != nil {
+			return err
+		}
+
+		if en.Config.ProxyConfig != nil {
+			p := proxy.NewProxy(
+				en.Config.ProxyConfig.Host,
+				en.Config.ProxyConfig.Port,
+				dest,
+				en.Config.JWTSecret,
+			)
+
+			if en.Config.ProxyConfig.TrackForkchoiceUpdated {
+				logCallback := func(req []byte) *spoof.Spoof {
+					var (
+						fcState api.ForkchoiceStateV1
+						pAttr   api.PayloadAttributes
+						err     error
+					)
+					err = proxy.UnmarshalFromJsonRPCRequest(
+						req,
+						&fcState,
+						&pAttr,
+					)
+					if err == nil {
+						en.latestfcu = &fcState
+					}
+					return nil
+				}
+				for _, c := range AllForkchoiceUpdatedCalls {
+					p.AddRequestCallback(c, logCallback)
+				}
+			}
+
+			if en.Config.ProxyConfig.LogEngineCalls {
+				logCallback := func(res []byte, req []byte) *spoof.Spoof {
+					en.Logf(
+						"DEBUG: execution client %d, request: %s",
+						en.Config.ClientIndex,
+						req,
+					)
+					en.Logf(
+						"DEBUG: execution client %d, response: %s",
+						en.Config.ClientIndex,
+						res,
+					)
+					return nil
+				}
+				for _, c := range AllEngineCallsLog {
+					p.AddResponseCallback(c, logCallback)
+				}
+			}
+
+			en.proxy = p
+		}
+
 	}
-
-	*en.proxy = p
-
 	return nil
 }
 
 func (en *ExecutionClient) Shutdown() error {
-	if err := en.T.Sim.StopClient(en.T.SuiteID, en.T.TestID, en.HiveClient.Container); err != nil {
-		return err
+	if managedClient, ok := en.Client.(ManagedClient); !ok {
+		return fmt.Errorf("attempted to shutdown an unmanaged client")
+	} else {
+		return managedClient.Shutdown()
 	}
-	en.HiveClient = nil
-	return nil
 }
 
 func (en *ExecutionClient) IsRunning() bool {
-	return en.HiveClient != nil
+	return en.Client.IsRunning()
 }
 
 func (en *ExecutionClient) Proxy() *proxy.Proxy {
-	if en.proxy != nil && *en.proxy != nil {
-		return *en.proxy
+	return en.proxy
+}
+
+func (en *ExecutionClient) GetLatestForkchoiceUpdated(
+	ctx context.Context,
+) (*api.ForkchoiceStateV1, error) {
+	if en.latestfcu != nil {
+		return en.latestfcu, nil
 	}
-	return nil
+	// Try to reconstruct by querying it from the client
+	forkchoiceState := &api.ForkchoiceStateV1{}
+	errs := make(chan error, 3)
+	var wg sync.WaitGroup
+
+	type labelBlockHashTask struct {
+		label string
+		dest  *common.Hash
+	}
+
+	for _, t := range []*labelBlockHashTask{
+		{
+			label: "latest",
+			dest:  &forkchoiceState.HeadBlockHash,
+		},
+		{
+			label: "safe",
+			dest:  &forkchoiceState.SafeBlockHash,
+		},
+		{
+			label: "finalized",
+			dest:  &forkchoiceState.FinalizedBlockHash,
+		},
+	} {
+		wg.Add(1)
+		t := t
+		go func(t *labelBlockHashTask) {
+			defer wg.Done()
+			if res, err := en.HeaderByLabel(
+				ctx,
+				t.label,
+			); err != nil {
+				en.Logf(
+					"Error trying to fetch label %s from client: %v",
+					t.label,
+					err,
+				)
+			} else if err == nil && res != nil && res.Number != nil {
+				*t.dest = res.Hash()
+			}
+		}(t)
+	}
+	wg.Wait()
+
+	select {
+	case err := <-errs:
+		return nil, err
+	default:
+	}
+
+	return forkchoiceState, nil
 }
 
 // Engine API
@@ -273,10 +337,7 @@ func (en *ExecutionClient) PrepareAuthCallToken(
 }
 
 func (en *ExecutionClient) PrepareDefaultAuthCallToken() error {
-	secret, _ := hex.DecodeString(
-		"7365637265747365637265747365637265747365637265747365637265747365",
-	)
-	en.PrepareAuthCallToken(secret, time.Now())
+	en.PrepareAuthCallToken(en.Config.JWTSecret, time.Now())
 	return nil
 }
 
@@ -414,7 +475,7 @@ func (ec *ExecutionClient) CheckTTD(parentCtx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if td.Cmp(ec.ttd) >= 0 {
+	if td.Cmp(big.NewInt(ec.Config.TerminalTotalDifficulty)) >= 0 {
 		return true, nil
 	}
 	return false, nil
@@ -531,7 +592,7 @@ func (all ExecutionClients) Subnet(subnet string) ExecutionClients {
 	}
 	res := make(ExecutionClients, 0)
 	for _, ec := range all {
-		if ec.subnet == subnet {
+		if ec.Config.Subnet == subnet {
 			res = append(res, ec)
 		}
 	}
@@ -546,11 +607,15 @@ func (all ExecutionClients) Enodes() (string, error) {
 	enodes := make([]string, 0)
 	for _, en := range all {
 		if en.IsRunning() {
-			enode, err := en.HiveClient.EnodeURL()
-			if err != nil {
-				return "", err
+			if enodeClient, ok := en.Client.(EnodeClient); ok {
+				enode, err := enodeClient.GetEnodeURL()
+				if err != nil {
+					return "", err
+				}
+				enodes = append(enodes, enode)
+			} else {
+				return "", fmt.Errorf("invalid client type")
 			}
-			enodes = append(enodes, enode)
 		}
 	}
 	return strings.Join(enodes, ","), nil
@@ -591,13 +656,16 @@ func (all ExecutionClients) CheckHeads(
 	return true, nil
 }
 
-type Proxies []**proxy.Proxy
+type ProxyProvider interface {
+	Proxy() *proxy.Proxy
+}
+type Proxies []ProxyProvider
 
 func (all Proxies) Running() []*proxy.Proxy {
 	res := make([]*proxy.Proxy, 0)
-	for _, p := range all {
-		if p != nil && *p != nil {
-			res = append(res, *p)
+	for _, pp := range all {
+		if p := pp.Proxy(); p != nil {
+			res = append(res, p)
 		}
 	}
 	return res
