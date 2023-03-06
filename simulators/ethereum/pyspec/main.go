@@ -66,6 +66,9 @@ func fixtureRunner(t *hivesim.T) {
 	fileRoot := fmt.Sprintf("%s/", testPath)
 	t.Log("file root directory:", fileRoot)
 
+	// to log all failing tests at the end of sim
+	failedTests := make(map[string]error)
+
 	// spawn `parallelism` workers to run fixtures against clients
 	var wg sync.WaitGroup
 	var testCh = make(chan *testcase)
@@ -81,6 +84,9 @@ func fixtureRunner(t *hivesim.T) {
 					Run:       test.run,
 					AlwaysRun: false,
 				})
+				if test.failedErr != nil {
+					failedTests[test.clientType+"/"+test.name] = test.failedErr
+				}
 			}
 		}()
 	}
@@ -100,6 +106,14 @@ func fixtureRunner(t *hivesim.T) {
 
 	// wait for all workers to finish
 	wg.Wait()
+
+	// log all failed tests
+	if len(failedTests) > 0 {
+		t.Log("failing tests:")
+		for name, err := range failedTests {
+			t.Logf("%v: %v", name, err)
+		}
+	}
 }
 
 // coverts a pyspec test path into its respective repo link.

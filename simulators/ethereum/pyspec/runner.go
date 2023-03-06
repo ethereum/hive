@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,7 +51,7 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 			// define testcase (tc) struct with initial fields
 			tc := testcase{
 				fixture:  fixture,
-				name:     strings.ReplaceAll(path[10:len(path)-5]+"_", "/", "_") + name,
+				name:     path[10:len(path)-5] + "/" + name,
 				filepath: path,
 			}
 			// extract genesis, payloads & post allocation field to tc
@@ -89,6 +90,7 @@ func (tc *testcase) run(t *hivesim.T) {
 	t.Log("starting client with Engine API.")
 	engineClient, err := engineStarter.StartClient(t, ctx, tc.genesis, env, nil)
 	if err != nil {
+		tc.failedErr = err
 		t.Fatalf("can't start client with Engine API: %v", err)
 	}
 	t1 := time.Now()
@@ -104,7 +106,8 @@ func (tc *testcase) run(t *hivesim.T) {
 		// execute fixture block payload
 		plStatus, plErr := engineClient.NewPayloadV2(context.Background(), payload)
 		if plErr != nil {
-			t.Fatalf("unable to send payload %v in test %s: %v ", blockNumber, tc.name, plErr)
+			tc.failedErr = plErr
+			t.Fatalf("unable to send block %v in test %s: %v ", blockNumber+1, tc.name, plErr)
 		}
 		// update latest valid block hash
 		if plStatus.Status == "VALID" {
@@ -112,9 +115,10 @@ func (tc *testcase) run(t *hivesim.T) {
 		}
 		// check payload status is expected from fixture
 		if expectedStatus != plStatus.Status {
+			tc.failedErr = errors.New("payload status mismatch")
 			t.Fatalf(`payload status mismatch for block %v in test %s.
 				expected from fixture: %s
-				got from payload: %s`, blockNumber, tc.name, expectedStatus, plStatus.Status)
+				got from payload: %s`, blockNumber+1, tc.name, expectedStatus, plStatus.Status)
 		}
 	}
 	t2 := time.Now()
@@ -123,8 +127,8 @@ func (tc *testcase) run(t *hivesim.T) {
 	if latestValidHash != (common.Hash{}) {
 		// update with latest valid response
 		fcState := &api.ForkchoiceStateV1{HeadBlockHash: latestValidHash}
-		_, fcErr := engineClient.ForkchoiceUpdatedV2(ctx, fcState, nil)
-		if fcErr != nil {
+		if _, fcErr := engineClient.ForkchoiceUpdatedV2(ctx, fcState, nil); fcErr != nil {
+			tc.failedErr = fcErr
 			t.Fatalf("unable to update head of beacon chain in test %s: %v ", tc.name, fcErr)
 		}
 	}
@@ -136,17 +140,21 @@ func (tc *testcase) run(t *hivesim.T) {
 		gotNonce, errN := engineClient.NonceAt(ctx, account, nil)
 		gotBalance, errB := engineClient.BalanceAt(ctx, account, nil)
 		if errN != nil {
+			tc.failedErr = errN
 			t.Errorf("unable to call nonce from account: %v, in test %s: %v", account, tc.name, errN)
 		} else if errB != nil {
+			tc.failedErr = errB
 			t.Errorf("unable to call balance from account: %v, in test %s: %v", account, tc.name, errB)
 		}
 		// check final nonce & balance matches expected in fixture
 		if genesisAccount.Nonce != gotNonce {
+			tc.failedErr = errors.New("nonce recieved doesn't match expected from fixture")
 			t.Errorf(`nonce recieved from account %v doesn't match expected from fixture in test %s:
 			recieved from block: %v
 			expected in fixture: %v`, account, tc.name, gotNonce, genesisAccount.Nonce)
 		}
 		if genesisAccount.Balance.Cmp(gotBalance) != 0 {
+			tc.failedErr = errors.New("balance recieved doesn't match expected from fixture")
 			t.Errorf(`balance recieved from account %v doesn't match expected from fixture in test %s:
 			recieved from block: %v
 			expected in fixture: %v`, account, tc.name, gotBalance, genesisAccount.Balance)
@@ -161,11 +169,13 @@ func (tc *testcase) run(t *hivesim.T) {
 			// get storage values for account with keys: keys
 			gotStorage, errS := engineClient.StorageAtKeys(ctx, account, keys, nil)
 			if errS != nil {
-				t.Errorf("unable to get storage values from account: %v, in test %s: %v", account, tc.name, errN)
+				tc.failedErr = errS
+				t.Errorf("unable to get storage values from account: %v, in test %s: %v", account, tc.name, errS)
 			}
 			// check values in storage match with fixture
 			for _, key := range keys {
 				if genesisAccount.Storage[key] != *gotStorage[key] {
+					tc.failedErr = errors.New("storage recieved doesn't match expected from fixture")
 					t.Errorf(`storage recieved from account %v doesn't match expected from fixture in test %s:
 						from storage address: %v
 						recieved from block:  %v
@@ -176,13 +186,16 @@ func (tc *testcase) run(t *hivesim.T) {
 	}
 	end := time.Now()
 
-	t.Logf(`test timing:
+	if tc.failedErr == nil {
+		t.Logf(`test timing:
 			setupClientEnv %v
  			startClient %v
  			sendAllPayloads %v
  			setNewHeadOfChain %v
 			checkStorageValues %v
 			totalTestTime %v`, t0.Sub(start), t1.Sub(t0), t2.Sub(t1), t3.Sub(t2), end.Sub(t3), end.Sub(start))
+
+	}
 }
 
 // updates the environment variables against the fork rules

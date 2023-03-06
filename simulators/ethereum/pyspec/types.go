@@ -14,13 +14,16 @@ import (
 )
 
 type testcase struct {
+	// test meta data
 	name       string
 	filepath   string
 	clientType string
-	fixture    fixtureTest
-	genesis    *core.Genesis
-	payloads   []*api.ExecutableData
-	postAlloc  *core.GenesisAlloc
+	failedErr  error
+	// test fixture data
+	fixture   fixtureTest
+	genesis   *core.Genesis
+	payloads  []*api.ExecutableData
+	postAlloc *core.GenesisAlloc
 }
 
 type fixtureTest struct {
