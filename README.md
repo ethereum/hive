@@ -5,8 +5,8 @@ Hive is a system for running integration tests against Ethereum clients.
 Ethereum Foundation maintains two public Hive instances to check for consensus, p2p and
 blockchain compatibility:
 
-- eth1 consensus, rpc, p2p tests are on <https://hivetests.ethdevops.io>
-- Engine API integration tests are on <https://hivetests2.ethdevops.io>
+- eth1 consensus, graphql and p2p tests are on <https://hivetests.ethdevops.io>
+- Engine API integration and rpc tests are on <https://hivetests2.ethdevops.io>
 
 **To read more about hive, please check [the documentation][doc].**
 
