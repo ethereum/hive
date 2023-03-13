@@ -170,6 +170,16 @@ func (c *Client) Exec(command ...string) (*ExecInfo, error) {
 	return c.test.Sim.ClientExec(c.test.SuiteID, c.test.TestID, c.Container, command)
 }
 
+// Pauses the client container.
+func (c *Client) Pause() error {
+	return c.test.Sim.PauseClient(c.test.SuiteID, c.test.TestID, c.Container)
+}
+
+// Unpauses the client container.
+func (c *Client) Unpause() error {
+	return c.test.Sim.UnpauseClient(c.test.SuiteID, c.test.TestID, c.Container)
+}
+
 // T is a running test. This is a lot like testing.T, but has some additional methods for
 // launching clients.
 //
