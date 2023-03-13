@@ -177,7 +177,8 @@ func generateTx(txType int, key *ecdsa.PrivateKey, genesis *core.Genesis, gen *c
 func createTxGasLimit(gen *core.BlockGen, genesis *core.Genesis, data []byte) uint64 {
 	isHomestead := genesis.Config.IsHomestead(gen.Number())
 	isEIP2028 := genesis.Config.IsIstanbul(gen.Number())
-	igas, err := core.IntrinsicGas(data, nil, true, isHomestead, isEIP2028)
+	isEIP3860 := genesis.Config.IsShanghai(gen.Timestamp())
+	igas, err := core.IntrinsicGas(data, nil, true, isHomestead, isEIP2028, isEIP3860)
 	if err != nil {
 		panic(err)
 	}
@@ -217,7 +218,7 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 	}
 
 	// Import the chain. This runs all block validation rules.
-	blockchain, err := core.NewBlockChain(db, nil, config, engine, vm.Config{}, nil, nil)
+	blockchain, err := core.NewBlockChain(db, nil, &cfg.genesis, nil, engine, vm.Config{}, nil, nil)
 	if err != nil {
 		return fmt.Errorf("can't create blockchain: %v", err)
 	}
@@ -261,7 +262,8 @@ func writeChain(chain *core.BlockChain, filename string, start uint64, modifyBlo
 		return err
 	}
 	defer out.Close()
-	return exportN(chain, out, start, chain.CurrentBlock().NumberU64(), modifyBlock)
+	lastBlock := chain.CurrentBlock().Number.Uint64()
+	return exportN(chain, out, start, lastBlock, modifyBlock)
 }
 
 // instaSeal wraps a consensus engine with instant block sealing. When a block is produced
@@ -270,8 +272,8 @@ type instaSeal struct{ consensus.Engine }
 
 // FinalizeAndAssemble implements consensus.Engine, accumulating the block and uncle rewards,
 // setting the final state and assembling the block.
-func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt) (*types.Block, error) {
-	block, err := e.Engine.FinalizeAndAssemble(chain, header, state, txs, uncles, receipts)
+func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, error) {
+	block, err := e.Engine.FinalizeAndAssemble(chain, header, state, txs, uncles, receipts, withdrawals)
 	if err != nil {
 		return nil, err
 	}
