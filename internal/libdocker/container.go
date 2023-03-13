@@ -202,6 +202,26 @@ func (b *ContainerBackend) DeleteContainer(containerID string) error {
 	return err
 }
 
+// PauseContainer pauses the given container.
+func (b *ContainerBackend) PauseContainer(containerID string) error {
+	b.logger.Debug("pausing container", "container", containerID[:8])
+	err := b.client.PauseContainer(containerID)
+	if err != nil {
+		b.logger.Error("can't pause container", "container", containerID[:8], "err", err)
+	}
+	return err
+}
+
+// UnpauseContainer unpauses the given container.
+func (b *ContainerBackend) UnpauseContainer(containerID string) error {
+	b.logger.Debug("unpausing container", "container", containerID[:8])
+	err := b.client.UnpauseContainer(containerID)
+	if err != nil {
+		b.logger.Error("can't unpause container", "container", containerID[:8], "err", err)
+	}
+	return err
+}
+
 // CreateNetwork creates a docker network.
 func (b *ContainerBackend) CreateNetwork(name string) (string, error) {
 	network, err := b.client.CreateNetwork(docker.CreateNetworkOptions{
