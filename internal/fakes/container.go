@@ -14,10 +14,12 @@ import (
 
 // BackendHooks can be used to override the behavior of the fake backend.
 type BackendHooks struct {
-	CreateContainer func(image string, opt libhive.ContainerOptions) (string, error)
-	StartContainer  func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
-	DeleteContainer func(containerID string) error
-	RunProgram      func(containerID string, cmd []string) (*libhive.ExecInfo, error)
+	CreateContainer  func(image string, opt libhive.ContainerOptions) (string, error)
+	StartContainer   func(image, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error)
+	DeleteContainer  func(containerID string) error
+	PauseContainer   func(containerID string) error
+	UnpauseContainer func(containerID string) error
+	RunProgram       func(containerID string, cmd []string) (*libhive.ExecInfo, error)
 
 	NetworkNameToID     func(string) (string, error)
 	CreateNetwork       func(string) (string, error)
@@ -143,6 +145,20 @@ func (b *fakeBackend) DeleteContainer(containerID string) error {
 	delete(b.cimg, containerID)
 	b.mutex.Unlock()
 	return err
+}
+
+func (b *fakeBackend) PauseContainer(containerID string) error {
+	if b.hooks.PauseContainer != nil {
+		return b.hooks.PauseContainer(containerID)
+	}
+	return nil
+}
+
+func (b *fakeBackend) UnpauseContainer(containerID string) error {
+	if b.hooks.UnpauseContainer != nil {
+		return b.hooks.UnpauseContainer(containerID)
+	}
+	return nil
 }
 
 func (b *fakeBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
