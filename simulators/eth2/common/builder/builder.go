@@ -1,7 +1,7 @@
 package builder
 
 import (
-	api "github.com/ethereum/go-ethereum/core/beacon"
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
 

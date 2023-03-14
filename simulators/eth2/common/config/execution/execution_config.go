@@ -279,11 +279,10 @@ func (conf *ExecutionGenesis) ToParams(
 	depositAddress [20]byte,
 ) hivesim.Params {
 	params := hivesim.Params{
-		"HIVE_DEPOSIT_CONTRACT_ADDRESS": common.Address(depositAddress).
-			String(),
-		"HIVE_NETWORK_ID":     fmt.Sprintf("%d", conf.NetworkID),
-		"HIVE_CHAIN_ID":       conf.Genesis.Config.ChainID.String(),
-		"HIVE_FORK_HOMESTEAD": conf.Genesis.Config.HomesteadBlock.String(),
+		"HIVE_DEPOSIT_CONTRACT_ADDRESS": common.Address(depositAddress).String(),
+		"HIVE_NETWORK_ID":               fmt.Sprintf("%d", conf.NetworkID),
+		"HIVE_CHAIN_ID":                 conf.Genesis.Config.ChainID.String(),
+		"HIVE_FORK_HOMESTEAD":           conf.Genesis.Config.HomesteadBlock.String(),
 		//"HIVE_FORK_DAO_BLOCK":           conf.Genesis.Config.DAOForkBlock.String(),  // nil error, not used anyway
 		"HIVE_FORK_TANGERINE":            conf.Genesis.Config.EIP150Block.String(),
 		"HIVE_FORK_SPURIOUS":             conf.Genesis.Config.EIP155Block.String(), // also eip558
@@ -299,15 +298,10 @@ func (conf *ExecutionGenesis) ToParams(
 		"HIVE_TERMINAL_TOTAL_DIFFICULTY": conf.Genesis.Config.TerminalTotalDifficulty.String(),
 	}
 	if conf.Genesis.Config.ShanghaiTime != nil {
-		params = params.Set(
-			"HIVE_SHANGHAI_TIMESTAMP",
-			conf.Genesis.Config.ShanghaiTime.String(),
-		)
+		params["HIVE_SHANGHAI_TIMESTAMP"] = fmt.Sprint(*conf.Genesis.Config.ShanghaiTime)
 	}
 	if conf.Genesis.Config.Clique != nil {
-		params["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(
-			conf.Genesis.Config.Clique.Period,
-		)
+		params["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(conf.Genesis.Config.Clique.Period)
 	}
 	return params
 }

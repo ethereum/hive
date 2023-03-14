@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	api "github.com/ethereum/go-ethereum/core/beacon"
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/chain_generators/pow"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
