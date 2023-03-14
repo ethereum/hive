@@ -499,12 +499,8 @@ func (manager *TestManager) PauseNode(testID TestID, nodeID string) error {
 		return ErrNoSuchNode
 	}
 	// Pause the container.
-	if nodeInfo.wait != nil {
-		if err := manager.backend.PauseContainer(nodeInfo.ID); err != nil {
-			return fmt.Errorf("unable to pause client: %v", err)
-		}
-		nodeInfo.wait()
-		nodeInfo.wait = nil
+	if err := manager.backend.PauseContainer(nodeInfo.ID); err != nil {
+		return fmt.Errorf("unable to pause client: %v", err)
 	}
 	return nil
 }
@@ -523,12 +519,8 @@ func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
 		return ErrNoSuchNode
 	}
 	// Unpause the container.
-	if nodeInfo.wait != nil {
-		if err := manager.backend.UnpauseContainer(nodeInfo.ID); err != nil {
-			return fmt.Errorf("unable to unpause client: %v", err)
-		}
-		nodeInfo.wait()
-		nodeInfo.wait = nil
+	if err := manager.backend.UnpauseContainer(nodeInfo.ID); err != nil {
+		return fmt.Errorf("unable to unpause client: %v", err)
 	}
 	return nil
 }
