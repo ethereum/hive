@@ -62,17 +62,14 @@ type PreparedTestnet struct {
 
 // Prepares the fork timestamps of post-merge forks based on the
 // consensus layer genesis time and the fork epochs
-func prepareExecutionForkConfig(
-	eth2GenesisTime common.Timestamp,
-	config *Config,
-) *params.ChainConfig {
+func prepareExecutionForkConfig(eth2GenesisTime common.Timestamp, config *Config) *params.ChainConfig {
 	chainConfig := params.ChainConfig{}
 	if config.CapellaForkEpoch != nil {
-		if config.CapellaForkEpoch.Uint64() == 0 {
-			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime))
-		} else {
-			chainConfig.ShanghaiTime = big.NewInt(int64(eth2GenesisTime) + config.CapellaForkEpoch.Int64()*config.SlotTime.Int64()*32)
+		shanghai := uint64(eth2GenesisTime)
+		if config.CapellaForkEpoch.Uint64() != 0 {
+			shanghai += uint64(config.CapellaForkEpoch.Int64() * config.SlotTime.Int64() * 32)
 		}
+		chainConfig.ShanghaiTime = &shanghai
 	}
 	return &chainConfig
 }

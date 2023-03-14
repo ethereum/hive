@@ -13,7 +13,7 @@ import (
 	"time"
 
 	el_common "github.com/ethereum/go-ethereum/common"
-	api "github.com/ethereum/go-ethereum/core/beacon"
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/eth2/common/builder/types/bellatrix"
 	"github.com/ethereum/hive/simulators/eth2/common/builder/types/capella"

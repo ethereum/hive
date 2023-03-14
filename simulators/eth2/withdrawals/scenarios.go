@@ -8,8 +8,8 @@ import (
 	"math/big"
 	"time"
 
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	api "github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
@@ -41,17 +41,18 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 
 	// Add verification of Beacon->Execution Engine API calls to the proxies
 
+	chainconfig := testnet.ExecutionGenesis().Config
 	// NewPayloadV1 expires at ShanghaiTime
 	newPayloadV1ExpireVerifier := beacon_verification.NewEngineMaxTimestampVerifier(
 		t,
 		beacon_verification.EngineNewPayloadV1,
-		testnet.ExecutionGenesis().Config.ShanghaiTime.Uint64(),
+		*chainconfig.ShanghaiTime,
 	)
 	// ForkchoiceUpdatedV1 expires at ShanghaiTime
 	forkchoiceUpdatedV1ExpireVerifier := beacon_verification.NewEngineMaxTimestampVerifier(
 		t,
 		beacon_verification.EngineForkchoiceUpdatedV1,
-		testnet.ExecutionGenesis().Config.ShanghaiTime.Uint64(),
+		*chainconfig.ShanghaiTime,
 	)
 	for _, e := range testnet.ExecutionClients() {
 		newPayloadV1ExpireVerifier.AddToProxy(e.Proxy())
