@@ -6,7 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	api "github.com/ethereum/go-ethereum/core/beacon"
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )

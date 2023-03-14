@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/ethereum/go-ethereum/core/beacon"
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"

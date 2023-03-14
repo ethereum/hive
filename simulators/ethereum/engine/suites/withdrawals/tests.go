@@ -9,9 +9,9 @@ import (
 	"math/rand"
 	"time"
 
+	beacon "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"

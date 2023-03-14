@@ -11,12 +11,12 @@ import (
 	"sync"
 	"time"
 
+	beacon "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/txpool"
@@ -180,7 +180,7 @@ type GethNode struct {
 	ethashEngine    *ethash.Ethash
 	ethashWaitGroup sync.WaitGroup
 
-	mustHeadBlock *types.Block
+	mustHeadBlock *types.Header
 
 	datadir    string
 	genesis    *core.Genesis
@@ -318,14 +318,14 @@ func (n *GethNode) AddPeer(ec client.EngineClient) error {
 	return nil
 }
 
-func (n *GethNode) isBlockTerminal(b *types.Block) (bool, *big.Int, error) {
+func (n *GethNode) isBlockTerminal(b *types.Header) (bool, *big.Int, error) {
 	ctx, cancel := context.WithTimeout(n.running, globals.RPCTimeout)
 	defer cancel()
-	parentTD, err := n.GetBlockTotalDifficulty(ctx, b.ParentHash())
+	parentTD, err := n.GetBlockTotalDifficulty(ctx, b.ParentHash)
 	if err != nil {
 		return false, nil, err
 	}
-	blockTD := new(big.Int).Add(parentTD, b.Difficulty())
+	blockTD := new(big.Int).Add(parentTD, b.Difficulty)
 	return blockTD.Cmp(n.ttd) >= 0 && parentTD.Cmp(n.ttd) < 0, blockTD, nil
 }
 
@@ -345,7 +345,7 @@ func (n *GethNode) EnablePoWMining() {
 	go n.PoWMiningLoop()
 }
 
-func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, *types.Block, error) {
+func (n *GethNode) PrepareNextBlock(currentBlock *types.Header) (*state.StateDB, *types.Block, error) {
 	if t, _, err := n.isBlockTerminal(currentBlock); err == nil {
 		if t {
 			if n.config.TerminalBlockSiblingCount != nil && n.config.TerminalBlockSiblingCount.Cmp(n.terminalBlocksMined) > 0 {
@@ -361,14 +361,14 @@ func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, 
 	}
 
 	timestamp := uint64(time.Now().Unix())
-	if currentBlock.Time() >= timestamp {
-		timestamp = currentBlock.Time() + 1
+	if currentBlock.Time >= timestamp {
+		timestamp = currentBlock.Time + 1
 	}
-	num := currentBlock.Number()
+	num := new(big.Int).Set(currentBlock.Number)
 	nextHeader := &types.Header{
 		ParentHash: currentBlock.Hash(),
 		Number:     num.Add(num, common.Big1),
-		GasLimit:   currentBlock.GasLimit(),
+		GasLimit:   currentBlock.GasLimit,
 		Time:       timestamp,
 		Coinbase:   n.config.PoWMinerEtherBase,
 	}
@@ -383,9 +383,9 @@ func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, 
 
 	// Set baseFee and GasLimit if we are on an EIP-1559 chain
 	if n.eth.BlockChain().Config().IsLondon(nextHeader.Number) {
-		nextHeader.BaseFee = misc.CalcBaseFee(n.eth.BlockChain().Config(), currentBlock.Header())
-		if !n.eth.BlockChain().Config().IsLondon(currentBlock.Number()) {
-			parentGasLimit := currentBlock.GasLimit() * n.eth.BlockChain().Config().ElasticityMultiplier()
+		nextHeader.BaseFee = misc.CalcBaseFee(n.eth.BlockChain().Config(), currentBlock)
+		if !n.eth.BlockChain().Config().IsLondon(currentBlock.Number) {
+			parentGasLimit := currentBlock.GasLimit * n.eth.BlockChain().Config().ElasticityMultiplier()
 			nextHeader.GasLimit = parentGasLimit
 		}
 	}
@@ -395,7 +395,7 @@ func (n *GethNode) PrepareNextBlock(currentBlock *types.Block) (*state.StateDB, 
 		return nil, nil, err
 	}
 
-	state, err := n.eth.BlockChain().StateAt(currentBlock.Root())
+	state, err := n.eth.BlockChain().StateAt(currentBlock.Root)
 	if err != nil {
 		panic(err)
 	}
@@ -407,6 +407,7 @@ func (n *GethNode) PoWMiningLoop() {
 	n.ethashWaitGroup.Add(1)
 	defer n.ethashWaitGroup.Done()
 	currentBlock := n.eth.BlockChain().CurrentBlock()
+
 	// During the Pow mining, the node must respond with the latest mined block, not what the blockchain actually states
 	n.mustHeadBlock = currentBlock
 
@@ -470,7 +471,8 @@ func (n *GethNode) PoWMiningLoop() {
 			}
 
 			// Check whether the block was a terminal block
-			if t, td, err := n.isBlockTerminal(b); err == nil {
+			header := b.Header()
+			if t, td, err := n.isBlockTerminal(header); err == nil {
 				if t {
 					n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
 					fmt.Printf("DEBUG (%s) [%v]: Mined a New Terminal Block: hash=%v, parent=%v, number=%d, td=%d, ttd=%d\n", n.config.Name, time.Now(), b.Hash(), b.ParentHash(), b.Number(), td, n.ttd)
@@ -488,8 +490,8 @@ func (n *GethNode) PoWMiningLoop() {
 			}
 
 			// Update the block on top of which to proceed with mining
-			currentBlock = b
-			n.mustHeadBlock = b
+			currentBlock = header
+			n.mustHeadBlock = header
 		case <-n.running.Done():
 			close(stopChan)
 			return
@@ -529,17 +531,20 @@ func (n *GethNode) SealBlock(ctx context.Context, block *types.Block) (*types.Bl
 
 // Sets the canonical block to an ancestor of the provided block.
 // `N==1` means to re-org to the parent of the provided block.
-func (n *GethNode) ReOrgBackBlockChain(N uint64, currentBlock *types.Block) (*types.Block, error) {
+func (n *GethNode) ReOrgBackBlockChain(N uint64, currentBlock *types.Header) (*types.Header, error) {
 	if N == 0 {
 		return currentBlock, nil
 	}
 	for ; N > 0; N-- {
-		currentBlock = n.eth.BlockChain().GetBlockByHash(currentBlock.ParentHash())
+		currentBlock = n.eth.BlockChain().GetHeaderByHash(currentBlock.ParentHash)
 		if currentBlock == nil {
 			return nil, fmt.Errorf("Unable to re-org back")
 		}
 	}
-	_, err := n.eth.BlockChain().SetCanonical(currentBlock)
+
+	block := n.eth.BlockChain().GetBlock(currentBlock.Hash(), currentBlock.Number.Uint64())
+
+	_, err := n.eth.BlockChain().SetCanonical(block)
 	n.mustHeadBlock = currentBlock
 	if err != nil {
 		return nil, err
@@ -659,13 +664,12 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 	if err != nil {
 		return err
 	}
-	_ = root
+
 	triedb := bc.StateCache().TrieDB()
-	if err := triedb.Commit(block.Root(), true, nil); err != nil {
+	if err := triedb.Commit(block.Root(), true); err != nil {
 		return err
 	}
-
-	if err := triedb.Commit(root, true, nil); err != nil {
+	if err := triedb.Commit(root, true); err != nil {
 		return err
 	}
 
@@ -769,16 +773,18 @@ func parseBlockNumber(number *big.Int) rpc.BlockNumber {
 
 func (n *GethNode) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
 	if number == nil && n.mustHeadBlock != nil {
-		return n.mustHeadBlock, nil
+		mustHeadHash := n.mustHeadBlock.Hash()
+		block := n.eth.BlockChain().GetBlock(mustHeadHash, n.mustHeadBlock.Number.Uint64())
+		return block, nil
 	}
 	return n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 }
 
 func (n *GethNode) BlockNumber(ctx context.Context) (uint64, error) {
 	if n.mustHeadBlock != nil {
-		return n.mustHeadBlock.NumberU64(), nil
+		return n.mustHeadBlock.Number.Uint64(), nil
 	}
-	return n.eth.APIBackend.CurrentBlock().NumberU64(), nil
+	return n.eth.APIBackend.CurrentBlock().Number.Uint64(), nil
 }
 
 func (n *GethNode) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
@@ -787,7 +793,7 @@ func (n *GethNode) BlockByHash(ctx context.Context, hash common.Hash) (*types.Bl
 
 func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
 	if number == nil && n.mustHeadBlock != nil {
-		return n.mustHeadBlock.Header(), nil
+		return n.mustHeadBlock, nil
 	}
 	b, err := n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 	if err != nil {

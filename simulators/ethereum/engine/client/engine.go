@@ -5,7 +5,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/core"
-	api "github.com/ethereum/go-ethereum/core/beacon"
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/hive/hivesim"
 
 	"github.com/ethereum/go-ethereum/common"
