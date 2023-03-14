@@ -86,5 +86,3 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )
-
-replace github.com/ethereum/go-ethereum v1.10.26 => github.com/ethereum/go-ethereum v1.10.24-0.20230127123926-a63875bf4d7f
