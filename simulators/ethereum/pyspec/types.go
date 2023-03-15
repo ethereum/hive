@@ -50,7 +50,7 @@ type fixtureJSON struct {
 type block struct {
 	Rlp          string        `json:"rlp"`
 	BlockHeader  *blockHeader  `json:"blockHeader"`
-	transaction  []transaction `json:"transaction"`
+	Transactions []transaction `json:"transactions"`
 	UncleHeaders []byte        `json:"uncleHeaders"`
 	Withdrawals  []withdrawals `json:"withdrawals"`
 	Exception    string        `json:"expectException"`
