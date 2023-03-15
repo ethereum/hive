@@ -95,33 +95,34 @@ type blockHeaderUnmarshaling struct {
 
 //go:generate go run github.com/fjl/gencodec -type transaction -field-override transactionUnmarshaling -out gen_txs.go
 type transaction struct {
-	Type                 []byte           `json:"type"`
-	ChainId              *big.Int         `json:"chainId"`
-	Nonce                uint64           `json:"nonce"`
-	GasPrice             *big.Int         `json:"gasPrice"`
-	MaxPriorityFeePerGas *big.Int         `json:"maxPriorityFeePerGas"`
-	MaxFeePerGas         *big.Int         `json:"maxFeePerGas"`
-	Gas                  uint64           `json:"gas"`
-	Value                *big.Int         `json:"value"`
-	Input                []byte           `json:"data"`
-	To                   common.Address   `json:"to,omitempty"`
-	Protected            bool             `json:"protected"`
-	AccessList           types.AccessList `json:"accessList"`
-	SecretKey            common.Hash      `json:"secretKey"`
-	V                    *big.Int         `json:"v"`
-	R                    *big.Int         `json:"r"`
-	S                    *big.Int         `json:"s"`
+	Type                 *uint64           `json:"type"`
+	ChainId              *big.Int          `json:"chainId"`
+	Nonce                uint64            `json:"nonce"`
+	GasPrice             *big.Int          `json:"gasPrice"`
+	MaxPriorityFeePerGas *big.Int          `json:"maxPriorityFeePerGas"`
+	MaxFeePerGas         *big.Int          `json:"maxFeePerGas"`
+	Gas                  uint64            `json:"gasLimit"`
+	Value                *big.Int          `json:"value"`
+	Input                []byte            `json:"data"`
+	To                   string            `json:"to"`
+	Protected            bool              `json:"protected"`
+	AccessList           *types.AccessList `json:"accessList"`
+	SecretKey            *common.Hash      `json:"secretKey"`
+	V                    *big.Int          `json:"v"`
+	R                    *big.Int          `json:"r"`
+	S                    *big.Int          `json:"s"`
 }
 
 type transactionUnmarshaling struct {
-	Type                 hexutil.Bytes         `json:"type"`
+	Type                 *math.HexOrDecimal64  `json:"type"`
 	ChainId              *math.HexOrDecimal256 `json:"chainId"`
 	Nonce                math.HexOrDecimal64   `json:"nonce"`
 	GasPrice             *math.HexOrDecimal256 `json:"gasPrice"`
 	MaxPriorityFeePerGas *math.HexOrDecimal256 `json:"maxPriorityFeePerGas"`
 	MaxFeePerGas         *math.HexOrDecimal256 `json:"maxFeePerGas"`
-	Gas                  math.HexOrDecimal64   `json:"gas"`
+	Gas                  math.HexOrDecimal64   `json:"gasLimit"`
 	Value                *math.HexOrDecimal256 `json:"value"`
+	Input                hexutil.Bytes         `json:"data"`
 	V                    *math.HexOrDecimal256 `json:"v"`
 	R                    *math.HexOrDecimal256 `json:"r"`
 	S                    *math.HexOrDecimal256 `json:"s"`
