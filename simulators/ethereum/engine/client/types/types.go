@@ -3,9 +3,9 @@ package types
 import (
 	"math/big"
 
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core/beacon"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -52,8 +52,8 @@ type executableDataV1Marshaling struct {
 	Transactions  []hexutil.Bytes
 }
 
-func (edv1 *ExecutableDataV1) ToExecutableData() beacon.ExecutableData {
-	return beacon.ExecutableData{
+func (edv1 *ExecutableDataV1) ToExecutableData() api.ExecutableData {
+	return api.ExecutableData{
 		ParentHash:    edv1.ParentHash,
 		FeeRecipient:  edv1.FeeRecipient,
 		StateRoot:     edv1.StateRoot,
@@ -71,7 +71,7 @@ func (edv1 *ExecutableDataV1) ToExecutableData() beacon.ExecutableData {
 	}
 }
 
-func (edv1 *ExecutableDataV1) FromExecutableData(ed *beacon.ExecutableData) {
+func (edv1 *ExecutableDataV1) FromExecutableData(ed *api.ExecutableData) {
 	if ed.Withdrawals != nil {
 		panic("source executable data contains withdrawals, not supported by V1")
 	}
