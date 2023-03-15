@@ -17,29 +17,27 @@ var _ = (*blockHeaderUnmarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (b blockHeader) MarshalJSON() ([]byte, error) {
 	type blockHeader struct {
-		ParentHash          common.Hash           `json:"parentHash"`
-		UncleHash           common.Hash           `json:"sha3Uncles"`
-		UncleHashAlt        common.Hash           `json:"uncleHash"`
-		Coinbase            common.Address        `json:"coinbase"`
-		CoinbaseAlt         common.Address        `json:"author"`
-		CoinbaseAlt2        common.Address        `json:"miner"`
-		StateRoot           common.Hash           `json:"stateRoot"`
-		TransactionsTrie    common.Hash           `json:"transactionsRoot"`
-		TransactionsTrieAlt common.Hash           `json:"transactionsTrie"`
-		ReceiptTrie         common.Hash           `json:"receiptsRoot"`
-		ReceiptTrieAlt      common.Hash           `json:"receiptTrie"`
-		Bloom               types.Bloom           `json:"bloom"`
-		Difficulty          *math.HexOrDecimal256 `json:"difficulty"`
-		Number              *math.HexOrDecimal256 `json:"number"`
-		GasLimit            math.HexOrDecimal64   `json:"gasLimit"`
-		GasUsed             math.HexOrDecimal64   `json:"gasUsed"`
-		Timestamp           *math.HexOrDecimal256 `json:"timestamp"`
-		ExtraData           hexutil.Bytes         `json:"extraData"`
-		MixHash             common.Hash           `json:"mixHash"`
-		Nonce               types.BlockNonce      `json:"nonce"`
-		BaseFee             *math.HexOrDecimal256 `json:"baseFeePerGas"`
-		Hash                common.Hash           `json:"hash"`
-		WithdrawalsRoot     common.Hash           `json:"withdrawalsRoot"`
+		ParentHash      common.Hash           `json:"parentHash"`
+		UncleHash       common.Hash           `json:"sha3Uncles"`
+		UncleHashAlt    common.Hash           `json:"uncleHash"`
+		Coinbase        common.Address        `json:"coinbase"`
+		CoinbaseAlt     common.Address        `json:"author"`
+		CoinbaseAlt2    common.Address        `json:"miner"`
+		StateRoot       common.Hash           `json:"stateRoot"`
+		ReceiptTrie     common.Hash           `json:"receiptsRoot"`
+		ReceiptTrieAlt  common.Hash           `json:"receiptTrie"`
+		Bloom           types.Bloom           `json:"bloom"`
+		Difficulty      *math.HexOrDecimal256 `json:"difficulty"`
+		Number          *math.HexOrDecimal256 `json:"number"`
+		GasLimit        math.HexOrDecimal64   `json:"gasLimit"`
+		GasUsed         math.HexOrDecimal64   `json:"gasUsed"`
+		Timestamp       *math.HexOrDecimal256 `json:"timestamp"`
+		ExtraData       hexutil.Bytes         `json:"extraData"`
+		MixHash         common.Hash           `json:"mixHash"`
+		Nonce           types.BlockNonce      `json:"nonce"`
+		BaseFee         *math.HexOrDecimal256 `json:"baseFeePerGas"`
+		Hash            common.Hash           `json:"hash"`
+		WithdrawalsRoot common.Hash           `json:"withdrawalsRoot"`
 	}
 	var enc blockHeader
 	enc.ParentHash = b.ParentHash
@@ -49,8 +47,6 @@ func (b blockHeader) MarshalJSON() ([]byte, error) {
 	enc.CoinbaseAlt = b.CoinbaseAlt
 	enc.CoinbaseAlt2 = b.CoinbaseAlt2
 	enc.StateRoot = b.StateRoot
-	enc.TransactionsTrie = b.TransactionsTrie
-	enc.TransactionsTrieAlt = b.TransactionsTrieAlt
 	enc.ReceiptTrie = b.ReceiptTrie
 	enc.ReceiptTrieAlt = b.ReceiptTrieAlt
 	enc.Bloom = b.Bloom
@@ -71,29 +67,27 @@ func (b blockHeader) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON unmarshals from JSON.
 func (b *blockHeader) UnmarshalJSON(input []byte) error {
 	type blockHeader struct {
-		ParentHash          *common.Hash          `json:"parentHash"`
-		UncleHash           *common.Hash          `json:"sha3Uncles"`
-		UncleHashAlt        *common.Hash          `json:"uncleHash"`
-		Coinbase            *common.Address       `json:"coinbase"`
-		CoinbaseAlt         *common.Address       `json:"author"`
-		CoinbaseAlt2        *common.Address       `json:"miner"`
-		StateRoot           *common.Hash          `json:"stateRoot"`
-		TransactionsTrie    *common.Hash          `json:"transactionsRoot"`
-		TransactionsTrieAlt *common.Hash          `json:"transactionsTrie"`
-		ReceiptTrie         *common.Hash          `json:"receiptsRoot"`
-		ReceiptTrieAlt      *common.Hash          `json:"receiptTrie"`
-		Bloom               *types.Bloom          `json:"bloom"`
-		Difficulty          *math.HexOrDecimal256 `json:"difficulty"`
-		Number              *math.HexOrDecimal256 `json:"number"`
-		GasLimit            *math.HexOrDecimal64  `json:"gasLimit"`
-		GasUsed             *math.HexOrDecimal64  `json:"gasUsed"`
-		Timestamp           *math.HexOrDecimal256 `json:"timestamp"`
-		ExtraData           *hexutil.Bytes        `json:"extraData"`
-		MixHash             *common.Hash          `json:"mixHash"`
-		Nonce               *types.BlockNonce     `json:"nonce"`
-		BaseFee             *math.HexOrDecimal256 `json:"baseFeePerGas"`
-		Hash                *common.Hash          `json:"hash"`
-		WithdrawalsRoot     *common.Hash          `json:"withdrawalsRoot"`
+		ParentHash      *common.Hash          `json:"parentHash"`
+		UncleHash       *common.Hash          `json:"sha3Uncles"`
+		UncleHashAlt    *common.Hash          `json:"uncleHash"`
+		Coinbase        *common.Address       `json:"coinbase"`
+		CoinbaseAlt     *common.Address       `json:"author"`
+		CoinbaseAlt2    *common.Address       `json:"miner"`
+		StateRoot       *common.Hash          `json:"stateRoot"`
+		ReceiptTrie     *common.Hash          `json:"receiptsRoot"`
+		ReceiptTrieAlt  *common.Hash          `json:"receiptTrie"`
+		Bloom           *types.Bloom          `json:"bloom"`
+		Difficulty      *math.HexOrDecimal256 `json:"difficulty"`
+		Number          *math.HexOrDecimal256 `json:"number"`
+		GasLimit        *math.HexOrDecimal64  `json:"gasLimit"`
+		GasUsed         *math.HexOrDecimal64  `json:"gasUsed"`
+		Timestamp       *math.HexOrDecimal256 `json:"timestamp"`
+		ExtraData       *hexutil.Bytes        `json:"extraData"`
+		MixHash         *common.Hash          `json:"mixHash"`
+		Nonce           *types.BlockNonce     `json:"nonce"`
+		BaseFee         *math.HexOrDecimal256 `json:"baseFeePerGas"`
+		Hash            *common.Hash          `json:"hash"`
+		WithdrawalsRoot *common.Hash          `json:"withdrawalsRoot"`
 	}
 	var dec blockHeader
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -119,12 +113,6 @@ func (b *blockHeader) UnmarshalJSON(input []byte) error {
 	}
 	if dec.StateRoot != nil {
 		b.StateRoot = *dec.StateRoot
-	}
-	if dec.TransactionsTrie != nil {
-		b.TransactionsTrie = *dec.TransactionsTrie
-	}
-	if dec.TransactionsTrieAlt != nil {
-		b.TransactionsTrieAlt = *dec.TransactionsTrieAlt
 	}
 	if dec.ReceiptTrie != nil {
 		b.ReceiptTrie = *dec.ReceiptTrie

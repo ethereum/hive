@@ -9,67 +9,122 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/common/math"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
-var _ = (*transactionsUnmarshaling)(nil)
+var _ = (*transactionUnmarshaling)(nil)
 
 // MarshalJSON marshals as JSON.
-func (t transactions) MarshalJSON() ([]byte, error) {
-	type transactions struct {
-		Nonce     math.HexOrDecimal64   `json:"nonce"`
-		To        common.Address        `json:"to.omitempty"`
-		Value     *math.HexOrDecimal256 `json:"value"`
-		Data      hexutil.Bytes         `json:"data"`
-		GasLimit  math.HexOrDecimal64   `json:"gasLimit"`
-		GasUsed   math.HexOrDecimal64   `json:"gasUsed"`
-		SecretKey common.Hash           `json:"secretKey"`
+func (t transaction) MarshalJSON() ([]byte, error) {
+	type transaction struct {
+		Type                 hexutil.Bytes         `json:"type"`
+		ChainId              *math.HexOrDecimal256 `json:"chainId"`
+		Nonce                math.HexOrDecimal64   `json:"nonce"`
+		GasPrice             *math.HexOrDecimal256 `json:"gasPrice"`
+		MaxPriorityFeePerGas *math.HexOrDecimal256 `json:"maxPriorityFeePerGas"`
+		MaxFeePerGas         *math.HexOrDecimal256 `json:"maxFeePerGas"`
+		Gas                  math.HexOrDecimal64   `json:"gas"`
+		Value                *math.HexOrDecimal256 `json:"value"`
+		Input                []byte                `json:"data"`
+		To                   common.Address        `json:"to,omitempty"`
+		Protected            bool                  `json:"protected"`
+		AccessList           types.AccessList      `json:"accessList"`
+		SecretKey            common.Hash           `json:"secretKey"`
+		V                    *math.HexOrDecimal256 `json:"v"`
+		R                    *math.HexOrDecimal256 `json:"r"`
+		S                    *math.HexOrDecimal256 `json:"s"`
 	}
-	var enc transactions
+	var enc transaction
+	enc.Type = t.Type
+	enc.ChainId = (*math.HexOrDecimal256)(t.ChainId)
 	enc.Nonce = math.HexOrDecimal64(t.Nonce)
-	enc.To = t.To
+	enc.GasPrice = (*math.HexOrDecimal256)(t.GasPrice)
+	enc.MaxPriorityFeePerGas = (*math.HexOrDecimal256)(t.MaxPriorityFeePerGas)
+	enc.MaxFeePerGas = (*math.HexOrDecimal256)(t.MaxFeePerGas)
+	enc.Gas = math.HexOrDecimal64(t.Gas)
 	enc.Value = (*math.HexOrDecimal256)(t.Value)
-	enc.Data = t.Data
-	enc.GasLimit = math.HexOrDecimal64(t.GasLimit)
-	enc.GasUsed = math.HexOrDecimal64(t.GasUsed)
+	enc.Input = t.Input
+	enc.To = t.To
+	enc.Protected = t.Protected
+	enc.AccessList = t.AccessList
 	enc.SecretKey = t.SecretKey
+	enc.V = (*math.HexOrDecimal256)(t.V)
+	enc.R = (*math.HexOrDecimal256)(t.R)
+	enc.S = (*math.HexOrDecimal256)(t.S)
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
-func (t *transactions) UnmarshalJSON(input []byte) error {
-	type transactions struct {
-		Nonce     *math.HexOrDecimal64  `json:"nonce"`
-		To        *common.Address       `json:"to.omitempty"`
-		Value     *math.HexOrDecimal256 `json:"value"`
-		Data      *hexutil.Bytes        `json:"data"`
-		GasLimit  *math.HexOrDecimal64  `json:"gasLimit"`
-		GasUsed   *math.HexOrDecimal64  `json:"gasUsed"`
-		SecretKey *common.Hash          `json:"secretKey"`
+func (t *transaction) UnmarshalJSON(input []byte) error {
+	type transaction struct {
+		Type                 *hexutil.Bytes        `json:"type"`
+		ChainId              *math.HexOrDecimal256 `json:"chainId"`
+		Nonce                *math.HexOrDecimal64  `json:"nonce"`
+		GasPrice             *math.HexOrDecimal256 `json:"gasPrice"`
+		MaxPriorityFeePerGas *math.HexOrDecimal256 `json:"maxPriorityFeePerGas"`
+		MaxFeePerGas         *math.HexOrDecimal256 `json:"maxFeePerGas"`
+		Gas                  *math.HexOrDecimal64  `json:"gas"`
+		Value                *math.HexOrDecimal256 `json:"value"`
+		Input                []byte                `json:"data"`
+		To                   *common.Address       `json:"to,omitempty"`
+		Protected            *bool                 `json:"protected"`
+		AccessList           *types.AccessList     `json:"accessList"`
+		SecretKey            *common.Hash          `json:"secretKey"`
+		V                    *math.HexOrDecimal256 `json:"v"`
+		R                    *math.HexOrDecimal256 `json:"r"`
+		S                    *math.HexOrDecimal256 `json:"s"`
 	}
-	var dec transactions
+	var dec transaction
 	if err := json.Unmarshal(input, &dec); err != nil {
 		return err
+	}
+	if dec.Type != nil {
+		t.Type = *dec.Type
+	}
+	if dec.ChainId != nil {
+		t.ChainId = (*big.Int)(dec.ChainId)
 	}
 	if dec.Nonce != nil {
 		t.Nonce = uint64(*dec.Nonce)
 	}
-	if dec.To != nil {
-		t.To = *dec.To
+	if dec.GasPrice != nil {
+		t.GasPrice = (*big.Int)(dec.GasPrice)
+	}
+	if dec.MaxPriorityFeePerGas != nil {
+		t.MaxPriorityFeePerGas = (*big.Int)(dec.MaxPriorityFeePerGas)
+	}
+	if dec.MaxFeePerGas != nil {
+		t.MaxFeePerGas = (*big.Int)(dec.MaxFeePerGas)
+	}
+	if dec.Gas != nil {
+		t.Gas = uint64(*dec.Gas)
 	}
 	if dec.Value != nil {
 		t.Value = (*big.Int)(dec.Value)
 	}
-	if dec.Data != nil {
-		t.Data = *dec.Data
+	if dec.Input != nil {
+		t.Input = dec.Input
 	}
-	if dec.GasLimit != nil {
-		t.GasLimit = uint64(*dec.GasLimit)
+	if dec.To != nil {
+		t.To = *dec.To
 	}
-	if dec.GasUsed != nil {
-		t.GasUsed = uint64(*dec.GasUsed)
+	if dec.Protected != nil {
+		t.Protected = *dec.Protected
+	}
+	if dec.AccessList != nil {
+		t.AccessList = *dec.AccessList
 	}
 	if dec.SecretKey != nil {
 		t.SecretKey = *dec.SecretKey
+	}
+	if dec.V != nil {
+		t.V = (*big.Int)(dec.V)
+	}
+	if dec.R != nil {
+		t.R = (*big.Int)(dec.R)
+	}
+	if dec.S != nil {
+		t.S = (*big.Int)(dec.S)
 	}
 	return nil
 }
