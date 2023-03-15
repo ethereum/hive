@@ -17,13 +17,11 @@ RUN apk add --update bash curl jq
 # WORKDIR /go-ethereum
 # RUN apk add --update bash curl jq git make
 # RUN make geth
-# RUN echo "{}"                                                      \
-#   | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-#   | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}"  \
-#   | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}"               \
-#   > /version.json
+
 # FROM alpine:latest
+# RUN apk add --update bash jq
 # COPY --from=builder /go-ethereum/build/bin/geth /usr/local/bin/geth
+
 
 RUN /usr/local/bin/geth console --exec 'console.log(admin.nodeInfo.name)' --maxpeers=0 --nodiscover --dev 2>/dev/null | head -1 > /version.txt
 
