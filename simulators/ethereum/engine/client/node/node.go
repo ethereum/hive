@@ -843,6 +843,10 @@ func (n *GethNode) StorageAt(ctx context.Context, account common.Address, key co
 	return stateDB.GetState(account, key).Bytes(), nil
 }
 
+func (n *GethNode) StorageAtKeys(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) (map[common.Hash]*common.Hash, error) {
+	return nil, fmt.Errorf("StorageAtKeys not implemented")
+}
+
 func (n *GethNode) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
 	return nil, fmt.Errorf("TransactionReceipt not implemented")
 }

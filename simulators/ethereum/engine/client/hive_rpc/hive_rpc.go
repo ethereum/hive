@@ -24,6 +24,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/pkg/errors"
 )
 
 type HiveRPCEngineStarter struct {
@@ -226,6 +227,40 @@ func toBlockNumArg(number *big.Int) string {
 		return "safe"
 	}
 	return hexutil.EncodeBig(number)
+}
+
+func (ec *HiveRPCEngineClient) StorageAtKeys(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) (map[common.Hash]*common.Hash, error) {
+	reqs := make([]rpc.BatchElem, 0, len(keys))
+	results := make(map[common.Hash]*common.Hash, len(keys))
+	var blockNumberString string
+	if blockNumber == nil {
+		blockNumberString = "latest"
+	} else {
+		blockNumberString = hexutil.EncodeBig(blockNumber)
+	}
+	for _, key := range keys {
+		valueResult := &common.Hash{}
+		reqs = append(reqs, rpc.BatchElem{
+			Method: "eth_getStorageAt",
+			Args:   []interface{}{account, key, blockNumberString},
+			Result: valueResult,
+		})
+		results[key] = valueResult
+	}
+
+	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
+		return nil, err
+	}
+	if err := ec.c.BatchCallContext(ctx, reqs); err != nil {
+		return nil, err
+	}
+	for i, req := range reqs {
+		if req.Error != nil {
+			return nil, errors.Wrap(req.Error, fmt.Sprintf("request for storage at index %d failed", i))
+		}
+	}
+
+	return results, nil
 }
 
 func (ec *HiveRPCEngineClient) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {

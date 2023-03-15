@@ -1,0 +1,11 @@
+go 1.19
+
+use (
+	./consensus
+	./engine
+	./graphql
+	./pyspec
+	./rpc
+	./rpc-compat
+	./sync
+)
