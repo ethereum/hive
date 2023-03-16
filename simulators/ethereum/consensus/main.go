@@ -297,6 +297,12 @@ var ruleset = map[string]envvars{
 	},
 }
 
+// This list contains directory names that will not be entered by the loadTests walk.
+var ignoredDirectories = []string{
+	"EIPTests",
+	"EOFTests",
+}
+
 func main() {
 	suite := hivesim.Suite{
 		Name: "consensus",
@@ -401,15 +407,24 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) 
 			return err
 		}
 		if info.IsDir() {
+			// Handle ignored directories.
+			dirname := strings.TrimPrefix(path, root)
+			for _, skipped := range ignoredDirectories {
+				if dirname == skipped {
+					return filepath.SkipDir
+				}
+			}
 			return nil
 		}
+
 		if fname := info.Name(); !strings.HasSuffix(fname, ".json") {
 			return nil
 		}
 		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".json")
+		// Handle --sim.limit regular expression.
 		if !re.MatchString(pathname) {
 			fmt.Println("skip", pathname)
-			return nil // skip
+			return nil
 		}
 
 		var tests map[string]BlockTest
