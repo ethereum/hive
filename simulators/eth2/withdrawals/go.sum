@@ -69,8 +69,8 @@ github.com/ethereum/go-ethereum v1.11.4 h1:KG81SnUHXWk8LJB3mBcHg/E2yLvXoiPmRMCIR
 github.com/ethereum/go-ethereum v1.11.4/go.mod h1:it7x0DWnTDMfVFdXcU6Ti4KEFQynLHVRarcSlPr0HBo=
 github.com/ethereum/hive v0.0.0-20230313141339-8e3200bfc09e h1:3g9cqRqpbZ92tSlGL4PfFoq435axKw6HiZ1Gz3fOkfk=
 github.com/ethereum/hive v0.0.0-20230313141339-8e3200bfc09e/go.mod h1:PlpDuxHg6q1jU0K8Ouf+RXlHguignJ7k8Eyukc9RCPQ=
-github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316215042-b3093b2c9870 h1:ArT6zLEnH9X5QeJaWlG3r+3k8xQ3JNAIFjturPHoKpo=
-github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316215042-b3093b2c9870/go.mod h1:MMc0Yhzet/146K0C2i5Tv3q7SWF4KGmciE0wNqjJ3iI=
+github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6 h1:LcSUNGwQuJyR/gdPcsif57yKX+3MyhpoAuChzR8k6Yk=
+github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6/go.mod h1:FX4oxNyTNw/P+TUWrb7vva7o/rFI0pHO7OYdtG6EtN4=
 github.com/fasthttp-contrib/websocket v0.0.0-20160511215533-1f3b11f56072/go.mod h1:duJ4Jxv5lDcvg4QuQr0oowTf7dz4/CR8NtyCooz9HL8=
 github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
 github.com/ferranbt/fastssz v0.1.2 h1:Dky6dXlngF6Qjc+EfDipAkE83N5I5DE68bY6O0VLNPk=
@@ -209,8 +209,6 @@ github.com/kylelemons/godebug v1.1.0 h1:RPNrshWIDI6G2gRW9EHilWtl7Z6Sb1BR0xunSBf0
 github.com/labstack/echo/v4 v4.5.0/go.mod h1:czIriw4a0C1dFun+ObrXp7ok03xON0N1awStJ6ArI7Y=
 github.com/labstack/gommon v0.3.0/go.mod h1:MULnywXg0yavhxWKc+lOruYdAhDwPK9wf0OL7NoOu+k=
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
-github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea h1:9ahHMPkNvYf9Nn3+U072ZKMDm05gaXfRESAmwP07Q+M=
-github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea/go.mod h1:9OVXfWYnIV+wj1/SqfdREmE5mzN/OANAgdOJRtFtvpo=
 github.com/mattn/go-colorable v0.1.2/go.mod h1:U0ppj6V5qS13XJ6of8GYAs25YV2eR4EVcfRqFIhoBtE=
 github.com/mattn/go-colorable v0.1.8/go.mod h1:u6P/XSegPjTcexA+o6vUJrdnUu04hMope9wVRipJSqc=
 github.com/mattn/go-colorable v0.1.11/go.mod h1:u5H1YNBxpqRaxsYJYSkiCWKzEfiAb1Gb520KVy5xxl4=
@@ -296,6 +294,8 @@ github.com/protolambda/zrnt v0.30.0/go.mod h1:qcdX9CXFeVNCQK/q0nswpzhd+31RHMk2Ax
 github.com/protolambda/ztyp v0.2.2 h1:rVcL3vBu9W/aV646zF6caLS/dyn9BN8NYiuJzicLNyY=
 github.com/protolambda/ztyp v0.2.2/go.mod h1:9bYgKGqg3wJqT9ac1gI2hnVb0STQq7p/1lapqrqY1dU=
 github.com/prysmaticlabs/gohashtree v0.0.1-alpha.0.20220714111606-acbb2962fb48 h1:cSo6/vk8YpvkLbk9v3FO97cakNmUoxwi2KMP8hd5WIw=
+github.com/rauljordan/engine-proxy v0.0.0-20230316220057-4c80c36c4c3a h1:ZIfMLprHVdo2vs3WcSqSDEyz2ZsSzDhGeOyxh8VQThA=
+github.com/rauljordan/engine-proxy v0.0.0-20230316220057-4c80c36c4c3a/go.mod h1:9OVXfWYnIV+wj1/SqfdREmE5mzN/OANAgdOJRtFtvpo=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.3 h1:utMvzDsuh3suAEnhH0RdHmoPbU648o6CvXxTx4SBMOw=
 github.com/rivo/uniseg v0.4.3/go.mod h1:FN3SvrM+Zdj16jyLfmOkMNblXMcoc8DfTHruCPUcx88=
