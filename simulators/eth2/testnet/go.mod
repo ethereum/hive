@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/ethereum/hive v0.0.0-20230313141339-8e3200bfc09e
-	github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316215042-b3093b2c9870
+	github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6
 )
 
 require (
@@ -63,7 +63,7 @@ require (
 	github.com/protolambda/go-keystorev4 v0.0.0-20211007151826-f20444f6d564 // indirect
 	github.com/protolambda/zrnt v0.30.0 // indirect
 	github.com/protolambda/ztyp v0.2.2 // indirect
-	github.com/rauljordan/engine-proxy v0.0.0-20220517190449-e62b2e2f6e27 // indirect
+	github.com/rauljordan/engine-proxy v0.0.0-20230316220057-4c80c36c4c3a // indirect
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect
