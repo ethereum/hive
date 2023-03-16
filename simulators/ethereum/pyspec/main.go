@@ -16,7 +16,6 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
-// starts the pyspec test suite in hive and runs the fixture runner.
 func main() {
 	suite := hivesim.Suite{
 		Name: "pyspec",
@@ -38,7 +37,7 @@ func main() {
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
-// loads the pyspec test files and spawns the client tests.
+// fixtureRunner loads the pyspec test files and spawns the client tests.
 func fixtureRunner(t *hivesim.T) {
 
 	// retrieve clients available for testing
@@ -116,7 +115,7 @@ func fixtureRunner(t *hivesim.T) {
 	}
 }
 
-// coverts a pyspec test path into its respective repo link.
+// repoLink coverts a pyspec test path into a github repository link.
 func repoLink(testPath string) string {
 	// Example for withdrawals_zero_amout.json:
 	// Converts '/fixtures/withdrawals/withdrawals/withdrawals_zero_amount.json'

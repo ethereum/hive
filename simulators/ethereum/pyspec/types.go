@@ -142,10 +142,8 @@ type withdrawalsUnmarshaling struct {
 	Amount         math.HexOrDecimal64 `json:"amount"`
 }
 
-// -------------------------------------------------------------------------- //
-// extractFixtureFields() extracts the genesis, payloads and post allocation  //
-// fields from the given fixture test and stores them in the testcase struct. //
-// -------------------------------------------------------------------------- //
+// extractFixtureFields extracts the genesis, payloads and post allocation
+// fields from the given fixture test and stores them in the testcase struct.
 func (tc *testcase) extractFixtureFields(fixture fixtureJSON) {
 	// extract genesis fields from fixture test
 	tc.genesis = extractGenesis(fixture)
@@ -163,10 +161,8 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) {
 	tc.postAlloc = &fixture.Post
 }
 
-// ------------------------------------------------------------------------------ //
-// extractGenesis() extracts the genesis block information from the given fixture //
-// and returns a core.Genesis struct containing the extracted information.        //
-// ------------------------------------------------------------------------------ //
+// extractGenesis extracts the genesis block information from the given fixture
+// and returns a core.Genesis struct containing the extracted information.
 func extractGenesis(fixture fixtureJSON) *core.Genesis {
 	genesis := &core.Genesis{
 		Coinbase:   fixture.Genesis.Coinbase,
@@ -183,10 +179,8 @@ func extractGenesis(fixture fixtureJSON) *core.Genesis {
 	return genesis
 }
 
-// ------------------------------------------------------------------------- //
-// decodeBlock() decodes the RLP-encoded block data in the block struct and  //
-// returns a types.Block struct containing the decoded information.          //
-// ------------------------------------------------------------------------- //
+// decodeBlock decodes the RLP-encoded block data in the block struct and
+// returns a types.Block struct containing the decoded information.
 func (bl *block) decodeBlock() (*types.Block, error) {
 	data, err := hexutil.Decode(bl.Rlp)
 	if err != nil {

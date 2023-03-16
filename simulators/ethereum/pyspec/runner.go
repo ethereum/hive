@@ -16,9 +16,8 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 )
 
-// extracts tests from fixture.json files in a given directory,
-// creates a testcase struct for each test, and passes the testcase struct to a
-// func() parameter `fn`, which is used within fixtureRunner to run the tests.
+// loadFixtureTests extracts tests from fixture.json files in a given directory,
+// creates a testcase for each test, and passes the testcase struct to fn.
 func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// check file is actually a fixture
@@ -63,9 +62,10 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 	})
 }
 
-// executes a testcase against the client, called within a test channel from fixtureRunner,
-// all testcase payloads are sent and executed using the EngineAPI. for verification all fixture
-// nonce, balance and storage values are checked against the response recieved from the lastest block.
+// run executes a testcase against the client, called within a test channel from
+// fixtureRunner, all testcase payloads are sent and executed using the EngineAPI. for
+// verification all fixture nonce, balance and storage values are checked against the
+// response recieved from the lastest block.
 func (tc *testcase) run(t *hivesim.T) {
 	start := time.Now()
 
@@ -198,7 +198,7 @@ func (tc *testcase) run(t *hivesim.T) {
 	}
 }
 
-// updates the environment variables against the fork rules
+// updateEnv updates the environment variables against the fork rules
 // defined in envForks, for the network specified in the testcase fixture.
 func (tc *testcase) updateEnv(env hivesim.Params) {
 	forkRules := envForks[tc.fixture.json.Network]
