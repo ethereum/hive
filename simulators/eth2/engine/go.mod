@@ -5,10 +5,10 @@ go 1.18
 require (
 	github.com/ethereum/go-ethereum v1.11.4
 	github.com/ethereum/hive v0.0.0-20230313141339-8e3200bfc09e
-	github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316215042-b3093b2c9870
+	github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6
 	github.com/protolambda/eth2api v0.0.0-20230316214135-5f8afbd6d05d
 	github.com/protolambda/zrnt v0.30.0
-	github.com/rauljordan/engine-proxy v0.0.0-20220517190449-e62b2e2f6e27
+	github.com/rauljordan/engine-proxy v0.0.0-20230316220057-4c80c36c4c3a
 )
 
 require (
@@ -87,5 +87,3 @@ require (
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
 )
-
-replace github.com/rauljordan/engine-proxy => github.com/marioevz/engine-proxy v0.0.0-20220617181151-e8661eb39eea
