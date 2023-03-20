@@ -105,8 +105,6 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 fi
 
-set -ex
-
 # Configure any mining operation
 # TODO
 #if [ "$HIVE_MINER" != "" ]; then
@@ -134,10 +132,14 @@ FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net"
 #FLAGS="$FLAGS --ws"
 
 # Enable continuous sync if mining is disabled
-# TODO
-# if [ "$HIVE_MINER" == "" ]; then
-#     FLAGS="$FLAGS --debug.continuous"
-# fi
+if [ "$HIVE_MINER" == "" ]; then
+    # if there is no chain file then we need to sync with the continuous
+    # download mode
+    if [ ! -f /chain.rlp ]; then
+        FLAGS="$FLAGS --debug.continuous"
+    fi
+fi
+
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="7365637265747365637265747365637265747365637265747365637265747365"
