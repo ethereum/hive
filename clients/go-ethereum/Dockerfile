@@ -18,7 +18,7 @@ FROM ethereum/client-go:$branch as builder
 ## ----
 
 FROM alpine:latest
-RUN apk add --update bash jq
+RUN apk add --update bash curl jq
 COPY --from=builder /usr/local/bin/geth /usr/local/bin/geth
 
 # Generate the version.txt file.
