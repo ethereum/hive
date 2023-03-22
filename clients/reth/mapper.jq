@@ -50,7 +50,10 @@ def to_bool:
     "muirGlacierBlock": env.HIVE_FORK_MUIR_GLACIER|to_int,
     "berlinBlock": env.HIVE_FORK_BERLIN|to_int,
     "londonBlock": env.HIVE_FORK_LONDON|to_int,
+    "arrowGlacierBlock": env.HIVE_FORK_ARROW_GLACIER|to_int,
+    "grayGlacierBlock": env.HIVE_FORK_GRAY_GLACIER|to_int,
     "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
+    "terminalTotalDifficultyPassed": env.HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED|to_bool,
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
   }|remove_empty
 }

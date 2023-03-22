@@ -82,7 +82,7 @@ set +ex
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
     echo "Loading initial blockchain..."
-    $reth import $FLAGS /chain.rlp
+    RUST_LOG=info $reth import $FLAGS /chain.rlp
 else
     echo "Warning: chain.rlp not found."
 fi
@@ -152,4 +152,4 @@ FLAGS="$FLAGS --nat none"
 
 # Launch the main client.
 echo "Running reth with flags: $FLAGS"
-$reth node $FLAGS
+RUST_LOG=info $reth node $FLAGS
