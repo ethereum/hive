@@ -152,4 +152,5 @@ FLAGS="$FLAGS --nat none"
 
 # Launch the main client.
 echo "Running reth with flags: $FLAGS"
+export RUST_LOG_STYLE=never
 RUST_LOG=info $reth node $FLAGS
