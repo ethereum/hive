@@ -128,8 +128,8 @@ fi
 #fi
 
 # Configure RPC.
-FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net"
-#FLAGS="$FLAGS --ws"
+FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,web3"
+FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,net,web3"
 
 # Enable continuous sync if mining is disabled
 if [ "$HIVE_MINER" == "" ]; then
