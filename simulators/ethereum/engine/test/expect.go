@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
@@ -483,7 +483,8 @@ type GetPayloadBodiesResponseExpectObject struct {
 }
 
 func (tec *TestEngineClient) TestEngineGetPayloadBodiesByRangeV1(start uint64, count uint64) *GetPayloadBodiesResponseExpectObject {
-	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	// Get Payload Bodies can take a long time to respond
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout*6)
 	defer cancel()
 	payloadBodies, err := tec.Engine.GetPayloadBodiesByRangeV1(ctx, start, count)
 	ret := &GetPayloadBodiesResponseExpectObject{
@@ -500,7 +501,7 @@ func (tec *TestEngineClient) TestEngineGetPayloadBodiesByRangeV1(start uint64, c
 }
 
 func (tec *TestEngineClient) TestEngineGetPayloadBodiesByHashV1(hashes []common.Hash) *GetPayloadBodiesResponseExpectObject {
-	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout*6)
 	defer cancel()
 	payloadBodies, err := tec.Engine.GetPayloadBodiesByHashV1(ctx, hashes)
 	ret := &GetPayloadBodiesResponseExpectObject{

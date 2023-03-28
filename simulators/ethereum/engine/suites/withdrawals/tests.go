@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"sync"
 	"time"
 
 	beacon "github.com/ethereum/go-ethereum/beacon/engine"
@@ -776,6 +777,37 @@ var Tests = []test.SpecInterface{
 			GetPayloadBodyRequestByHashIndex{
 				Start: 16,
 				End:   17,
+			},
+		},
+	},
+
+	&GetPayloadBodiesSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "GetPayloadBodies Parallel",
+				About: `
+				Make multiple withdrawals to 16 accounts each payload.
+				Retrieve many of the payloads' bodies by number range and hash in parallel, multiple times.
+				`,
+				TimeoutSeconds:   240,
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+			},
+			WithdrawalsForkHeight:    17,
+			WithdrawalsBlockCount:    32,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1024,
+		},
+		Parallel:       true,
+		RequestsRepeat: 55,
+		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
+			GetPayloadBodyRequestByRange{
+				Start: 17,
+				Count: 32,
+			},
+			GetPayloadBodyRequestByHashIndex{
+				Start: 17,
+				End:   17 + 32,
 			},
 		},
 	},
@@ -1900,12 +1932,14 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 type GetPayloadBodiesSpec struct {
 	*WithdrawalsBaseSpec
 	GetPayloadBodiesRequests []GetPayloadBodyRequest
+	RequestsRepeat           int
 	GenerateSidechain        bool
 	AfterSync                bool
+	Parallel                 bool
 }
 
 type GetPayloadBodyRequest interface {
-	Verify(*test.TestEngineClient, clmock.ExecutableDataHistory)
+	Verify(int, *test.TestEngineClient, clmock.ExecutableDataHistory)
 }
 
 type GetPayloadBodyRequestByRange struct {
@@ -1913,7 +1947,12 @@ type GetPayloadBodyRequestByRange struct {
 	Count uint64
 }
 
-func (req GetPayloadBodyRequestByRange) Verify(testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
+func (req GetPayloadBodyRequestByRange) Verify(reqIndex int, testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
+	testEngine.Logf("INFO: Starting GetPayloadBodyByRange request %d", reqIndex)
+	startTime := time.Now()
+	defer func() {
+		testEngine.Logf("INFO: Ended GetPayloadBodyByRange request %d, %s", reqIndex, time.Since(startTime))
+	}()
 	r := testEngine.TestEngineGetPayloadBodiesByRangeV1(req.Start, req.Count)
 	if req.Start < 1 || req.Count < 1 {
 		r.ExpectationDescription = fmt.Sprintf(`
@@ -1953,7 +1992,12 @@ type GetPayloadBodyRequestByHashIndex struct {
 	End          uint64
 }
 
-func (req GetPayloadBodyRequestByHashIndex) Verify(testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
+func (req GetPayloadBodyRequestByHashIndex) Verify(reqIndex int, testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
+	testEngine.Logf("INFO: Starting GetPayloadBodyByHash request %d", reqIndex)
+	startTime := time.Now()
+	defer func() {
+		testEngine.Logf("INFO: Ended GetPayloadBodyByHash request %d, %s", reqIndex, time.Since(startTime))
+	}()
 	payloads := make([]*beacon.ExecutableData, 0)
 	hashes := make([]common.Hash, 0)
 	if len(req.BlockNumbers) > 0 {
@@ -2095,9 +2139,44 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 	}
 
 	// Now send the range request, which should ignore any sidechain
-	for _, req := range ws.GetPayloadBodiesRequests {
-		req.Verify(testEngine, payloadHistory)
+	if ws.Parallel {
+		wg := new(sync.WaitGroup)
+		type RequestIndex struct {
+			Request GetPayloadBodyRequest
+			Index   int
+		}
+		workChan := make(chan *RequestIndex)
+		workers := 16
+		wg.Add(workers)
+		for w := 0; w < workers; w++ {
+			go func() {
+				defer wg.Done()
+				for req := range workChan {
+					req.Request.Verify(req.Index, testEngine, payloadHistory)
+				}
+			}()
+		}
+		repeat := 1
+		if ws.RequestsRepeat > 0 {
+			repeat = ws.RequestsRepeat
+		}
+		for j := 0; j < repeat; j++ {
+			for i, req := range ws.GetPayloadBodiesRequests {
+				workChan <- &RequestIndex{
+					Request: req,
+					Index:   i + (j * repeat),
+				}
+			}
+		}
+
+		close(workChan)
+		wg.Wait()
+	} else {
+		for i, req := range ws.GetPayloadBodiesRequests {
+			req.Verify(i, testEngine, payloadHistory)
+		}
 	}
+
 }
 
 type BlockValueSpec struct {
