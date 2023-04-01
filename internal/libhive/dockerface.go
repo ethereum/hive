@@ -23,6 +23,8 @@ type ContainerBackend interface {
 	CreateContainer(ctx context.Context, image string, opt ContainerOptions) (string, error)
 	StartContainer(ctx context.Context, containerID string, opt ContainerOptions) (*ContainerInfo, error)
 	DeleteContainer(containerID string) error
+	PauseContainer(containerID string) error
+	UnpauseContainer(containerID string) error
 
 	// RunProgram runs a command in the given container and returns its outputs and exit code.
 	RunProgram(ctx context.Context, containerID string, cmdline []string) (*ExecInfo, error)

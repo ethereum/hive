@@ -173,6 +173,26 @@ func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string)
 	return err
 }
 
+// PauseClient signals to the host that the node needs to be paused.
+func (sim *Simulation) PauseClient(testSuite SuiteID, test TestID, nodeid string) error {
+	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid), nil)
+	if err != nil {
+		return err
+	}
+	_, err = http.DefaultClient.Do(req)
+	return err
+}
+
+// UnpauseClient signals to the host that the node needs to be unpaused.
+func (sim *Simulation) UnpauseClient(testSuite SuiteID, test TestID, nodeid string) error {
+	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid), nil)
+	if err != nil {
+		return err
+	}
+	_, err = http.DefaultClient.Do(req)
+	return err
+}
+
 // ClientEnodeURL returns the enode URL of a running client.
 func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
 	return sim.ClientEnodeURLNetwork(testSuite, test, node, "bridge")

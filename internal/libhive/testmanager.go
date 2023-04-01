@@ -485,6 +485,46 @@ func (manager *TestManager) StopNode(testID TestID, nodeID string) error {
 	return nil
 }
 
+// PauseNode pauses a client container.
+func (manager *TestManager) PauseNode(testID TestID, nodeID string) error {
+	manager.testCaseMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
+
+	testCase, ok := manager.runningTestCases[testID]
+	if !ok {
+		return ErrNoSuchNode
+	}
+	nodeInfo, ok := testCase.ClientInfo[nodeID]
+	if !ok {
+		return ErrNoSuchNode
+	}
+	// Pause the container.
+	if err := manager.backend.PauseContainer(nodeInfo.ID); err != nil {
+		return fmt.Errorf("unable to pause client: %v", err)
+	}
+	return nil
+}
+
+// UnpauseNode unpauses a client container.
+func (manager *TestManager) UnpauseNode(testID TestID, nodeID string) error {
+	manager.testCaseMutex.Lock()
+	defer manager.testCaseMutex.Unlock()
+
+	testCase, ok := manager.runningTestCases[testID]
+	if !ok {
+		return ErrNoSuchNode
+	}
+	nodeInfo, ok := testCase.ClientInfo[nodeID]
+	if !ok {
+		return ErrNoSuchNode
+	}
+	// Unpause the container.
+	if err := manager.backend.UnpauseContainer(nodeInfo.ID); err != nil {
+		return fmt.Errorf("unable to unpause client: %v", err)
+	}
+	return nil
+}
+
 // writeSuiteFile writes the simulation result to the log directory.
 func writeSuiteFile(s *TestSuite, logdir string) error {
 	suiteData, err := json.Marshal(s)

@@ -38,6 +38,8 @@ func newSimulationAPI(b ContainerBackend, env SimEnv, tm *TestManager) http.Hand
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.getNodeStatus).Methods("GET")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node", api.startClient).Methods("POST")
 	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}", api.stopClient).Methods("DELETE")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.pauseClient).Methods("POST")
+	router.HandleFunc("/testsuite/{suite}/test/{test}/node/{node}/pause", api.unpauseClient).Methods("DELETE")
 	router.HandleFunc("/testsuite/{suite}/test", api.startTest).Methods("POST")
 	// post because the delete http verb does not always support a message body
 	router.HandleFunc("/testsuite/{suite}/test/{test}", api.endTest).Methods("POST")
@@ -357,6 +359,46 @@ func (api *simAPI) stopClient(w http.ResponseWriter, r *http.Request) {
 	node := mux.Vars(r)["node"]
 
 	err = api.tm.StopNode(testID, node)
+	switch {
+	case err == ErrNoSuchNode:
+		serveError(w, err, http.StatusNotFound)
+	case err != nil:
+		serveError(w, err, http.StatusInternalServerError)
+	default:
+		serveOK(w)
+	}
+}
+
+// pauseClient pauses a client container.
+func (api *simAPI) pauseClient(w http.ResponseWriter, r *http.Request) {
+	_, testID, err := api.requestSuiteAndTest(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	node := mux.Vars(r)["node"]
+
+	err = api.tm.PauseNode(testID, node)
+	switch {
+	case err == ErrNoSuchNode:
+		serveError(w, err, http.StatusNotFound)
+	case err != nil:
+		serveError(w, err, http.StatusInternalServerError)
+	default:
+		serveOK(w)
+	}
+}
+
+// unpauseClient unpauses a client container.
+func (api *simAPI) unpauseClient(w http.ResponseWriter, r *http.Request) {
+	_, testID, err := api.requestSuiteAndTest(r)
+	if err != nil {
+		serveError(w, err, http.StatusBadRequest)
+		return
+	}
+	node := mux.Vars(r)["node"]
+
+	err = api.tm.UnpauseNode(testID, node)
 	switch {
 	case err == ErrNoSuchNode:
 		serveError(w, err, http.StatusNotFound)
