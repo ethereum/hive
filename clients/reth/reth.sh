@@ -127,6 +127,11 @@ fi
 #    fi
 #fi
 
+# If clique is expected enable auto-mine
+if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+  FLAGS="$FLAGS --auto-mine"
+fi
+
 # Configure RPC.
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,web3"
 FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,net,web3"
