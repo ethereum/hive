@@ -409,6 +409,7 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 	// Verify any modified payloads did not make it into the
 	// canonical chain
 	if !ts.ErrorOnHeaderRequest && !ts.ErrorOnPayloadReveal &&
+		!ts.InvalidPayloadVersion &&
 		ts.InvalidatePayload == "" &&
 		ts.InvalidatePayloadAttributes == "" {
 		// Simply verify that builder's capella payloads were included in the
