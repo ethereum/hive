@@ -334,6 +334,12 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 			),
 		)
 	}
+	if ts.InvalidPayloadVersion {
+		config.BuilderOptions = append(
+			config.BuilderOptions,
+			mock_builder.WithInvalidBuilderBidVersionAtEpoch(capellaEpoch),
+		)
+	}
 
 	testnet := tn.StartTestnet(ctx, t, env, config)
 	defer testnet.Stop()

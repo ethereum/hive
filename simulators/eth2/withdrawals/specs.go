@@ -243,6 +243,7 @@ type BuilderWithdrawalsTestSpec struct {
 	BaseWithdrawalsTestSpec
 	ErrorOnHeaderRequest        bool
 	ErrorOnPayloadReveal        bool
+	InvalidPayloadVersion       bool
 	InvalidatePayload           mock_builder.PayloadInvalidation
 	InvalidatePayloadAttributes mock_builder.PayloadAttributesInvalidation
 }

@@ -130,6 +130,18 @@ var builderTests = []TestSpec{
 	},
 	BuilderWithdrawalsTestSpec{
 		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-builders-capella-invalid-payload-version",
+			Description: `
+			Test consensus clients correctly reject a built payload if the
+			version is outdated (bellatrix instead of capella).
+			`,
+			// All validators can withdraw from the start
+			GenesisExecutionWithdrawalCredentialsShares: 1,
+		},
+		InvalidPayloadVersion: true,
+	},
+	BuilderWithdrawalsTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
 			Name: "test-builders-capella-invalid-payload",
 			Description: `
 			Test consensus clients correctly circuit break builder after a
