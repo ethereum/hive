@@ -9,6 +9,8 @@ import (
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/hive/simulators/eth2/common/builder/types/bellatrix"
+	"github.com/ethereum/hive/simulators/eth2/common/builder/types/common"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
@@ -16,6 +18,7 @@ type PayloadAttributesModifier func(*api.PayloadAttributes, beacon.Slot) (bool, 
 type PayloadModifier func(*api.ExecutableData, beacon.Slot) (bool, error)
 type ErrorProducer func(beacon.Slot) error
 type PayloadWeiBidModifier func(*big.Int) (*big.Int, error)
+type GetBuilderBidVersion func(beacon.Slot) (common.BuilderBid, string, error)
 
 type config struct {
 	id                      int
@@ -31,6 +34,8 @@ type config struct {
 	payloadModifier      PayloadModifier
 	errorOnHeaderRequest ErrorProducer
 	errorOnPayloadReveal ErrorProducer
+
+	builderBidVersionResolver GetBuilderBidVersion
 
 	mutex sync.Mutex
 }
@@ -476,6 +481,52 @@ func WithPayloadAttributesInvalidatorAtSlot(
 
 		pm := genPayloadAttributesInvalidator(slot, invType, m.cfg.spec)
 		m.cfg.payloadAttrModifier = pm
+		return nil
+	}
+}
+
+func WithInvalidBuilderBidVersionAtSlot(
+	activationSlot beacon.Slot,
+) Option {
+	return func(m *MockBuilder) error {
+		m.cfg.mutex.Lock()
+		defer m.cfg.mutex.Unlock()
+		m.cfg.builderBidVersionResolver = func(slot beacon.Slot) (common.BuilderBid, string, error) {
+			if slot >= activationSlot {
+				// Always return Bellatrix, until theres a new fork that can override capella
+				return &bellatrix.BuilderBid{}, "bellatrix", nil
+			}
+			return m.DefaultBuilderBidVersionResolver(slot)
+		}
+
+		return nil
+	}
+}
+
+func WithInvalidBuilderBidVersionAtEpoch(
+	activationEpoch beacon.Epoch,
+) Option {
+	return func(m *MockBuilder) error {
+		m.cfg.mutex.Lock()
+		defer m.cfg.mutex.Unlock()
+
+		var spec = m.cfg.spec
+		if spec == nil {
+			return fmt.Errorf("unknown spec")
+		}
+		activationSlot, err := spec.EpochStartSlot(activationEpoch)
+		if err != nil {
+			return err
+		}
+
+		m.cfg.builderBidVersionResolver = func(slot beacon.Slot) (common.BuilderBid, string, error) {
+			if slot >= activationSlot {
+				// Always return Bellatrix, until theres a new fork that can override capella
+				return &bellatrix.BuilderBid{}, "bellatrix", nil
+			}
+			return m.DefaultBuilderBidVersionResolver(slot)
+		}
+
 		return nil
 	}
 }

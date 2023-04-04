@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	el_common "github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	el_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/eth2/common/builder/types/bellatrix"
 	"github.com/ethereum/hive/simulators/eth2/common/builder/types/capella"
@@ -216,6 +216,17 @@ func (m *MockBuilder) Cancel() error {
 		m.cancel()
 	}
 	return nil
+}
+
+func (m *MockBuilder) DefaultBuilderBidVersionResolver(
+	slot beacon.Slot,
+) (builderBid common.BuilderBid, version string, err error) {
+	if m.cfg.spec.SlotToEpoch(slot) >= m.cfg.spec.CAPELLA_FORK_EPOCH {
+		return &capella.BuilderBid{}, "capella", nil
+	} else if m.cfg.spec.SlotToEpoch(slot) >= m.cfg.spec.BELLATRIX_FORK_EPOCH {
+		return &bellatrix.BuilderBid{}, "bellatrix", nil
+	}
+	return nil, "", fmt.Errorf("payload requested from improper fork")
 }
 
 // Start a proxy server.
@@ -765,21 +776,23 @@ func (m *MockBuilder) HandleGetExecutionPayloadHeader(
 		version    string
 	)
 
-	if m.cfg.spec.SlotToEpoch(slot) >= m.cfg.spec.CAPELLA_FORK_EPOCH {
-		builderBid = &capella.BuilderBid{}
-		version = "capella"
-	} else if m.cfg.spec.SlotToEpoch(slot) >= m.cfg.spec.BELLATRIX_FORK_EPOCH {
-		builderBid = &bellatrix.BuilderBid{}
-		version = "bellatrix"
-	} else {
+	m.cfg.mutex.Lock()
+	builderBidVersionResolver := m.cfg.builderBidVersionResolver
+	m.cfg.mutex.Unlock()
+	if builderBidVersionResolver == nil {
+		builderBidVersionResolver = m.DefaultBuilderBidVersionResolver
+	}
+
+	builderBid, version, err = builderBidVersionResolver(slot)
+	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"builder_id": m.cfg.id,
-			"err":        fmt.Errorf("payload requested from improper fork"),
-		}).Error("Invalid slot requested")
+			"err":        err,
+		}).Error("Error getting builder bid version")
 		http.Error(
 			w,
 			"Unable to respond to header request",
-			http.StatusBadRequest,
+			http.StatusInternalServerError,
 		)
 		return
 	}
