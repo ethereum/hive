@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	el_common "github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	el_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/eth2/common/builder/types/common"
 	blsu "github.com/protolambda/bls12-381-util"
 	"github.com/protolambda/zrnt/eth2/beacon/bellatrix"
@@ -74,9 +74,6 @@ func (b *BuilderBid) FromExecutableData(
 ) error {
 	if ed == nil {
 		return fmt.Errorf("nil execution payload")
-	}
-	if ed.Withdrawals != nil {
-		return fmt.Errorf("execution data contains withdrawals")
 	}
 	copy(b.Header.ParentHash[:], ed.ParentHash[:])
 	copy(b.Header.FeeRecipient[:], ed.FeeRecipient[:])
