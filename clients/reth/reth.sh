@@ -36,6 +36,9 @@
 # Immediately abort the script on any error encountered
 set -ex
 
+# no ansi colors
+export RUST_LOG_STYLE=never
+
 reth=/usr/local/bin/reth
 
 case "$HIVE_LOGLEVEL" in
@@ -157,5 +160,4 @@ FLAGS="$FLAGS --nat none"
 
 # Launch the main client.
 echo "Running reth with flags: $FLAGS"
-export RUST_LOG_STYLE=never
 RUST_LOG=info $reth node $FLAGS
