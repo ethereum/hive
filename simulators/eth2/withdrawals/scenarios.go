@@ -484,5 +484,20 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 		for ep, slots := range count {
 			t.Logf("INFO: Epoch %d, filled slots=%d", ep, slots)
 		}
+
+		// These errors should be caught by the CL client when the built blinded
+		// payload is received. Hence, a low number of missed slots is expected.
+		if ts.ErrorOnHeaderRequest || ts.InvalidPayloadVersion || ts.InvalidatePayloadAttributes != "" {
+			max_missed_slots := uint64(1)
+			if count[capellaEpoch] < uint64(testnet.Spec().SLOTS_PER_EPOCH)-max_missed_slots {
+				t.Fatalf(
+					"FAIL: Epoch %d should have at least %d filled slots, but has %d",
+					capellaEpoch,
+					uint64(testnet.Spec().SLOTS_PER_EPOCH)-max_missed_slots,
+					count[capellaEpoch],
+				)
+			}
+		}
+
 	}
 }
