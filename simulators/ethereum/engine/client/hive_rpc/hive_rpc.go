@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
-	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -248,10 +248,7 @@ func (ec *HiveRPCEngineClient) StorageAtKeys(ctx context.Context, account common
 		results[key] = valueResult
 	}
 
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return nil, err
-	}
-	if err := ec.c.BatchCallContext(ctx, reqs); err != nil {
+	if err := ec.cEth.BatchCallContext(ctx, reqs); err != nil {
 		return nil, err
 	}
 	for i, req := range reqs {
@@ -513,10 +510,7 @@ func (ec *HiveRPCEngineClient) SendTransactions(ctx context.Context, txs []*type
 			Result: &hashes[i],
 		}
 	}
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return []error{err}
-	}
-	if err := ec.c.BatchCallContext(ctx, reqs); err != nil {
+	if err := ec.cEth.BatchCallContext(ctx, reqs); err != nil {
 		return []error{err}
 	}
 
