@@ -428,6 +428,7 @@ func genPayloadAttributesInvalidator(
 					pa.Withdrawals = make([]*types.Withdrawal, 0)
 				}
 				pa.Withdrawals = append(pa.Withdrawals, &types.Withdrawal{})
+				return true, nil
 			case INVALIDATE_ATTR_TIMESTAMP:
 				pa.Timestamp = pa.Timestamp - uint64(
 					spec.SECONDS_PER_SLOT*2,
