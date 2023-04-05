@@ -16,8 +16,8 @@ RUN go install github.com/go-delve/delve/cmd/dlv@latest
 # Build the runner container.
 FROM golang:1-alpine
 ADD . /
-COPY --from=builder /source/withdrawals/sim /
+COPY --from=builder /source/sim /
 COPY --from=builder /go/bin/dlv /
 
-ENTRYPOINT ["/go/bin/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "./sim"]
+ENTRYPOINT ["./dlv", "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "./sim"]
 
