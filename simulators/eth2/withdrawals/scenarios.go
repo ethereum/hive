@@ -477,7 +477,7 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 		}
 	}
 
-	// Count and print missed slots
+	// Count, print and verify missed slots
 	if count, err := testnet.BeaconClients().Running()[0].GetFilledSlotsCountPerEpoch(ctx); err != nil {
 		t.Fatalf("FAIL: unable to obtain slot count per epoch: %v", err)
 	} else {
@@ -485,18 +485,26 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 			t.Logf("INFO: Epoch %d, filled slots=%d", ep, slots)
 		}
 
-		// These errors should be caught by the CL client when the built blinded
-		// payload is received. Hence, a low number of missed slots is expected.
+		var max_missed_slots uint64 = 0
 		if ts.ErrorOnHeaderRequest || ts.InvalidPayloadVersion || ts.InvalidatePayloadAttributes != "" {
-			max_missed_slots := uint64(1)
-			if count[capellaEpoch] < uint64(testnet.Spec().SLOTS_PER_EPOCH)-max_missed_slots {
-				t.Fatalf(
-					"FAIL: Epoch %d should have at least %d filled slots, but has %d",
-					capellaEpoch,
-					uint64(testnet.Spec().SLOTS_PER_EPOCH)-max_missed_slots,
-					count[capellaEpoch],
-				)
-			}
+			// These errors should be caught by the CL client when the built blinded
+			// payload is received. Hence, a low number of missed slots is expected.
+			max_missed_slots = 1
+		} else {
+			// All other errors cannot be caught by the CL client until the
+			// payload is revealed, and the beacon block had been signed.
+			// Hence, a high number of missed slots is expected because the
+			// circuit breaker is a mechanism that only kicks in after many
+			// missed slots.
+			max_missed_slots = 10
+		}
+		if count[capellaEpoch] < uint64(testnet.Spec().SLOTS_PER_EPOCH)-max_missed_slots {
+			t.Fatalf(
+				"FAIL: Epoch %d should have at least %d filled slots, but has %d",
+				capellaEpoch,
+				uint64(testnet.Spec().SLOTS_PER_EPOCH)-max_missed_slots,
+				count[capellaEpoch],
+			)
 		}
 
 	}
