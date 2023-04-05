@@ -64,7 +64,7 @@ cat /genesis.json
 if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
     # Create password file.
     echo "Importing clique key..."
-    echo "$HIVE_CLIQUE_PRIVATEKEY" > ./private_key.txt
+    echo -n "$HIVE_CLIQUE_PRIVATEKEY" > ./private_key.txt
     # Ensure password file is used when running ethereumjs in mining mode.
     if [ "$HIVE_MINER" != "" ]; then
         FLAGS="$FLAGS --mine --unlock ./private_key.txt --minerCoinbase $HIVE_MINER"
@@ -84,6 +84,8 @@ if [ -f /chain.rlp ]; then
   echo "Warning: chain.rlp not found."
 fi
 
-FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+if [ "$HIVE_BOOTNODE" != "" ]; then
+    FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+fi
 echo "Running ethereumjs with flags $FLAGS"
 $ethereumjs $FLAGS
