@@ -1,6 +1,6 @@
 FROM node:16-alpine as build
 RUN apk update && apk add --no-cache bash git jq curl python3 gcc make g++ && rm -rf /var/cache/apk/*
-RUN git clone --depth 1 https://github.com/ethereumjs/ethereumjs-monorepo.git && \
+RUN git clone --depth 1 -b develop-v7 https://github.com/ethereumjs/ethereumjs-monorepo.git && \
     (cd ethereumjs-monorepo && npm i)
 
 RUN cd ethereumjs-monorepo/packages/client && npm ethereumjs --version > /version.txt
