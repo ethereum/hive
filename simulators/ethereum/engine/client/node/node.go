@@ -92,11 +92,11 @@ var (
 	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
 )
 
-func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
-	return s.StartGethNode(T, testContext, genesis, ClientParams, ClientFiles, bootClients...)
+func (s GethNodeEngineStarter) StartClient(_ client.ClientStarter, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+	return s.StartGethNode(testContext, genesis, ClientParams, ClientFiles, bootClients...)
 }
 
-func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
+func (s GethNodeEngineStarter) StartGethNode(testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
 	var (
 		ttd = s.TerminalTotalDifficulty
 		err error

@@ -51,6 +51,11 @@ func main() {
 			Description: `
 	Test Engine API withdrawals, pre/post Shanghai.`[1:],
 		}
+		withdrawalsSync = hivesim.Suite{
+			Name: "engine-withdrawals-sync",
+			Description: `
+	Test Engine API withdrawals sync, pre/post Shanghai.`[1:],
+		}
 	)
 
 	simulator := hivesim.New()
@@ -61,6 +66,7 @@ func main() {
 	addTestsToSuite(simulator, &excap, specToInterface(suite_ex_cap.Tests), "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
+	addTestsToSuite(simulator, &withdrawalsSync, suite_withdrawals.SyncTests, "full")
 
 	// Mark suites for execution
 	hivesim.MustRunSuite(simulator, engine)
@@ -69,6 +75,7 @@ func main() {
 	hivesim.MustRunSuite(simulator, excap)
 	hivesim.MustRunSuite(simulator, sync)
 	hivesim.MustRunSuite(simulator, withdrawals)
+	hivesim.MustRunSuite(simulator, withdrawalsSync)
 }
 
 func specToInterface(src []test.Spec) []test.SpecInterface {
@@ -129,22 +136,27 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 			newParams = newParams.Set("HIVE_POST_MERGE_GENESIS", "true")
 		}
 
-		if clientTypes, err := sim.ClientTypes(); err == nil {
-			for _, clientType := range clientTypes {
+		if allClientTypes, err := sim.ClientTypes(); err == nil {
+			for _, combination := range helper.ClientTypeCombinator(allClientTypes).Combinations() {
+				clientTypes := combination
+				if len(clientTypes) == 0 {
+					panic(fmt.Errorf("client types length zero"))
+				}
+				clientTypesNames := helper.ClientTypesNames(clientTypes)
 				suite.Add(hivesim.TestSpec{
-					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), clientType.Name),
+					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), clientTypesNames),
 					Description: currentTest.GetAbout(),
 					Run: func(t *hivesim.T) {
 						// Start the client with given options
 						c := t.StartClient(
-							clientType.Name,
+							clientTypes[0].Name,
 							newParams,
 							genesisStartOption,
 							hivesim.WithStaticFiles(testFiles),
 						)
-						t.Logf("Start test (%s): %s", c.Type, currentTest.GetName())
+						t.Logf("Start test: %s (%s)", currentTest.GetName(), clientTypesNames)
 						defer func() {
-							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
+							t.Logf("End test: %s (%s)", currentTest.GetName(), clientTypesNames)
 						}()
 						timeout := globals.DefaultTestCaseTimeout
 						// If a test.Spec specifies a timeout, use that instead
@@ -158,6 +170,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 							timeout,
 							t,
 							c,
+							clientTypes,
 							genesis,
 							newParams,
 							testFiles,
