@@ -947,10 +947,10 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 		for i, secondaryClientSpec := range mergeTestSpec.SecondaryClientSpecs {
 			// Start the secondary client with the alternative chain
 			secondaryClient, err := secondaryClientSpec.ClientStarter.StartClient(t.T, t.CLMock.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
-			t.Logf("INFO (%s): Started secondary client: %v", t.TestName, secondaryClient.ID())
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to start secondary client: %v", t.TestName, err)
 			}
+			t.Logf("INFO (%s): Started secondary client: %v", t.TestName, secondaryClient.ID())
 			defer t.HandleClientPostRunVerification(secondaryClient)
 			secondaryClients[i] = ClientSpec{
 				Client: secondaryClient,
@@ -961,6 +961,15 @@ func GenerateMergeTestSpec(mergeTestSpec MergeTestSpec) test.Spec {
 		// Start a secondary clients with alternative PoW chains
 		for _, cs := range secondaryClients {
 			if cs.Spec.SkipAddingToCLMocker {
+				// This client is not added to the CLMocker, so we don't need to
+				// wait for it to reach TTD, but we still need to close it
+				defer func(c client.EngineClient) {
+					t.Logf("INFO (%s): Closing secondary engine client: %v", t.TestName, c.ID())
+					if err := c.Close(); err != nil {
+						t.Logf("WARN (%s): Error while closing engine client: %v", t.TestName, err)
+					}
+					t.Logf("INFO (%s): Closed secondary engine client: %v", t.TestName, c.ID())
+				}(cs.Client)
 				continue
 			}
 
