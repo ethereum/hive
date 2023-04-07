@@ -554,7 +554,7 @@ func (n *GethNode) ReOrgBackBlockChain(N uint64, currentBlock *types.Header) (*t
 
 func (n *GethNode) SubscribeP2PEvents() {
 	eventChan := make(chan *p2p.PeerEvent)
-	n.node.Server().SubscribeEvents(eventChan)
+	subscription := n.node.Server().SubscribeEvents(eventChan)
 	for {
 		select {
 		case event := <-eventChan:
@@ -573,6 +573,7 @@ func (n *GethNode) SubscribeP2PEvents() {
 			}
 
 		case <-n.running.Done():
+			subscription.Unsubscribe()
 			return
 		}
 	}
