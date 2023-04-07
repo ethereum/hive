@@ -156,6 +156,7 @@ func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportO
 func (cl *CLMocker) AddEngineClient(ec client.EngineClient) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
+	cl.Logf("CLMocker: Adding engine client %v", ec.ID())
 	cl.EngineClients = append(cl.EngineClients, ec)
 }
 
@@ -164,6 +165,7 @@ func (cl *CLMocker) RemoveEngineClient(ec client.EngineClient) {
 	cl.EngineClientsLock.Lock()
 	defer cl.EngineClientsLock.Unlock()
 
+	cl.Logf("CLMocker: Removing engine client %v", ec.ID())
 	for i, engine := range cl.EngineClients {
 		if engine.ID() == ec.ID() {
 			cl.EngineClients = append(cl.EngineClients[:i], cl.EngineClients[i+1:]...)
@@ -176,9 +178,11 @@ func (cl *CLMocker) RemoveEngineClient(ec client.EngineClient) {
 // Close all the engine clients
 func (cl *CLMocker) CloseClients() {
 	for _, engine := range cl.EngineClients {
+		cl.Logf("CLMocker: Closing engine client %v", engine.ID())
 		if err := engine.Close(); err != nil {
 			panic(err)
 		}
+		cl.Logf("CLMocker: Closed engine client %v", engine.ID())
 	}
 }
 
