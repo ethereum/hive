@@ -7,17 +7,12 @@ RUN apk --no-cache add gcc musl-dev linux-headers cmake make clang build-base cl
 ADD . /source
 
 # Build within simulator folder
-WORKDIR /source
-RUN go get ./...
+WORKDIR /source/withdrawals
 RUN go build -gcflags="all=-N -l" -o ./sim .
 
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
-# Build the runner container.
-FROM golang:1-alpine
-ADD . /
-COPY --from=builder /source/sim /
-COPY --from=builder /go/bin/dlv /
+EXPOSE 40000
 
-ENTRYPOINT ["./dlv", "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "./sim"]
+ENTRYPOINT ["/go/bin/dlv", "--listen=:40000", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "./sim", "--", "serve"]
 
