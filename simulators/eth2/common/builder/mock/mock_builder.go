@@ -49,14 +49,18 @@ type MockBuilder struct {
 	cancel  context.CancelFunc
 
 	// Payload/Blocks history maps
-	suggestedFeeRecipients      map[beacon.BLSPubkey]el_common.Address
-	suggestedFeeRecipientsMutex sync.Mutex
-	builtPayloads               map[beacon.Slot]*api.ExecutableData
-	builtPayloadsMutex          sync.Mutex
-	modifiedPayloads            map[beacon.Slot]*api.ExecutableData
-	modifiedPayloadsMutex       sync.Mutex
-	signedBeaconBlock           map[tree.Root]bool
-	signedBeaconBlockMutex      sync.Mutex
+	suggestedFeeRecipients          map[beacon.BLSPubkey]el_common.Address
+	suggestedFeeRecipientsMutex     sync.Mutex
+	builtPayloads                   map[beacon.Slot]*api.ExecutableData
+	builtPayloadsMutex              sync.Mutex
+	modifiedPayloads                map[beacon.Slot]*api.ExecutableData
+	modifiedPayloadsMutex           sync.Mutex
+	validatorPublicKeys             map[beacon.Slot]*beacon.BLSPubkey
+	validatorPublicKeysMutex        sync.Mutex
+	receivedSignedBeaconBlocks      map[beacon.Slot]common.SignedBeaconBlock
+	receivedSignedBeaconBlocksMutex sync.Mutex
+	signedBeaconBlock               map[tree.Root]bool
+	signedBeaconBlockMutex          sync.Mutex
 
 	// Configuration object
 	cfg *config
@@ -84,10 +88,16 @@ func NewMockBuilder(
 		el: el,
 		cl: cl,
 
-		suggestedFeeRecipients: make(map[beacon.BLSPubkey]el_common.Address),
-		builtPayloads:          make(map[beacon.Slot]*api.ExecutableData),
-		modifiedPayloads:       make(map[beacon.Slot]*api.ExecutableData),
-		signedBeaconBlock:      make(map[tree.Root]bool),
+		suggestedFeeRecipients: make(
+			map[beacon.BLSPubkey]el_common.Address,
+		),
+		builtPayloads:       make(map[beacon.Slot]*api.ExecutableData),
+		modifiedPayloads:    make(map[beacon.Slot]*api.ExecutableData),
+		validatorPublicKeys: make(map[beacon.Slot]*beacon.BLSPubkey),
+		receivedSignedBeaconBlocks: make(
+			map[beacon.Slot]common.SignedBeaconBlock,
+		),
+		signedBeaconBlock: make(map[tree.Root]bool),
 
 		cfg: &config{
 			host: DEFAULT_BUILDER_HOST,
@@ -303,6 +313,16 @@ func (m *MockBuilder) GetModifiedPayloads() map[beacon.Slot]*api.ExecutableData 
 	return mapCopy
 }
 
+func (m *MockBuilder) GetSignedBeaconBlocks() map[beacon.Slot]common.SignedBeaconBlock {
+	m.receivedSignedBeaconBlocksMutex.Lock()
+	defer m.receivedSignedBeaconBlocksMutex.Unlock()
+	mapCopy := make(map[beacon.Slot]common.SignedBeaconBlock)
+	for k, v := range m.receivedSignedBeaconBlocks {
+		mapCopy[k] = v
+	}
+	return mapCopy
+}
+
 func (m *MockBuilder) HandleValidators(
 	w http.ResponseWriter,
 	req *http.Request,
@@ -489,6 +509,10 @@ func (m *MockBuilder) HandleGetExecutionPayloadHeader(
 	}).Info(
 		"Received request for header",
 	)
+	// Save the validator public key
+	m.validatorPublicKeysMutex.Lock()
+	m.validatorPublicKeys[slot] = &pubkey
+	m.validatorPublicKeysMutex.Unlock()
 	// Request head state from the CL
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -991,12 +1015,78 @@ func (m *MockBuilder) HandleSubmitBlindedBlock(
 	m.signedBeaconBlockMutex.Lock()
 	m.signedBeaconBlock[signedBeaconBlockRoot] = true
 	m.signedBeaconBlockMutex.Unlock()
+	m.receivedSignedBeaconBlocksMutex.Lock()
+	m.receivedSignedBeaconBlocks[signedBeaconBlock.Slot()] = signedBeaconBlock
+	m.receivedSignedBeaconBlocksMutex.Unlock()
+
+	// Verify signature
+	pubkey := m.validatorPublicKeys[signedBeaconBlock.Slot()]
+	if pubkey == nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"slot":       messageSlotEnvelope.SlotEnvelope.Slot,
+		}).Error("Could not find public key in history")
+		http.Error(
+			w,
+			"Unable to validate signature",
+			http.StatusInternalServerError,
+		)
+		return
+	}
+	if pk, err := pubkey.Pubkey(); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"builder_id": m.cfg.id,
+			"slot":       messageSlotEnvelope.SlotEnvelope.Slot,
+		}).Error("Could not convert public key")
+		http.Error(
+			w,
+			"Unable to validate signature",
+			http.StatusInternalServerError,
+		)
+		return
+	} else {
+		root := signedBeaconBlock.Root(m.cfg.spec)
+		sig := signedBeaconBlock.BlockSignature()
+		s, err := sig.Signature()
+		if err != nil {
+			logrus.WithFields(logrus.Fields{
+				"builder_id": m.cfg.id,
+				"slot":       messageSlotEnvelope.SlotEnvelope.Slot,
+				"signature":  signedBeaconBlock.BlockSignature().String(),
+			}).Error("Unable to validate signature")
+			http.Error(
+				w,
+				"Unable to validate signature",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+
+		dom := beacon.ComputeDomain(beacon.DOMAIN_BEACON_PROPOSER, m.cfg.spec.ForkVersion(signedBeaconBlock.Slot()), *m.cl.Config.GenesisValidatorsRoot)
+		signingRoot := beacon.ComputeSigningRoot(root, dom)
+		if !blsu.Verify(pk, signingRoot[:], s) {
+			logrus.WithFields(logrus.Fields{
+				"builder_id": m.cfg.id,
+				"slot":       messageSlotEnvelope.SlotEnvelope.Slot,
+				"pubkey":     pubkey.String(),
+				"signature":  signedBeaconBlock.BlockSignature().String(),
+			}).Error("invalid signature")
+			http.Error(
+				w,
+				"Invalid signature",
+				http.StatusInternalServerError,
+			)
+			return
+		}
+	}
 
 	logrus.WithFields(logrus.Fields{
 		"builder_id": m.cfg.id,
 		"root":       signedBeaconBlock.Root(m.cfg.spec).String(),
 		"stateRoot":  signedBeaconBlock.StateRoot().String(),
 		"slot":       signedBeaconBlock.Slot().String(),
+		"publicKey":  pubkey.String(),
+		"signature":  signedBeaconBlock.BlockSignature().String(),
 	}).Info("Received signed beacon block")
 
 	logrus.WithFields(logrus.Fields{
