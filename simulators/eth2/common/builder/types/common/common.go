@@ -3,8 +3,8 @@ package common
 import (
 	"math/big"
 
-	el_common "github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	el_common "github.com/ethereum/go-ethereum/common"
 	blsu "github.com/protolambda/bls12-381-util"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
@@ -61,12 +61,14 @@ type VersionedSignedBuilderBid struct {
 	Data    *SignedBuilderBid `json:"data"    yaml:"data"`
 }
 
-type SignedBlindedBeacon interface {
+type SignedBeaconBlock interface {
 	ExecutionPayloadHash() el_common.Hash
 	Root(*beacon.Spec) tree.Root
 	StateRoot() tree.Root
 	SetExecutionPayload(ExecutionPayload) error
 	Slot() beacon.Slot
+	ProposerIndex() beacon.ValidatorIndex
+	BlockSignature() *common.BLSSignature
 }
 
 type ExecutionPayload interface {

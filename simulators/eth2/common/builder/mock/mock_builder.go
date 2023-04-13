@@ -932,7 +932,7 @@ func (m *MockBuilder) HandleSubmitBlindedBlock(
 	}
 
 	var (
-		signedBeaconBlock    common.SignedBlindedBeacon
+		signedBeaconBlock    common.SignedBeaconBlock
 		executionPayloadResp common.ExecutionPayloadResponse
 	)
 	if m.cfg.spec.SlotToEpoch(
