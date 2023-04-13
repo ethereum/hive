@@ -163,7 +163,7 @@ var builderTests = []TestSpec{
 			Test canonical chain includes capella payloads built by the builder api.
 			`,
 			// All validators can withdraw from the start
-			GenesisExecutionWithdrawalCredentialsShares: 1,
+			GenesisExecutionWithdrawalCredentialsShares: 0,
 		},
 	},
 }

@@ -344,6 +344,19 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 	testnet := tn.StartTestnet(ctx, t, env, config)
 	defer testnet.Stop()
 
+	blsDomain := ComputeBLSToExecutionDomain(testnet)
+
+	// Get all validators info
+	allValidators, err := ValidatorsFromBeaconState(
+		testnet.GenesisBeaconState(),
+		*testnet.Spec().Spec,
+		env.Keys,
+		&blsDomain,
+	)
+	if err != nil {
+		t.Fatalf("FAIL: Error parsing validators from beacon state")
+	}
+
 	go func() {
 		lastNonce := uint64(0)
 		txPerIteration := 5
@@ -396,6 +409,32 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 				i,
 			)
 		}
+	}
+
+	// If there are any remaining validators that cannot withdraw yet, send
+	// BLS-to-execution-changes now.
+	nonWithdrawableValidators := allValidators.NonWithdrawable()
+	if len(nonWithdrawableValidators) > 0 {
+		beaconClients := testnet.BeaconClients()
+		for i := 0; i < len(nonWithdrawableValidators); i++ {
+			b := beaconClients[i%len(beaconClients)]
+			v := nonWithdrawableValidators[i]
+			if err := v.SignSendBLSToExecutionChange(
+				ctx,
+				b,
+				common.Address{byte(v.Index + 0x100)},
+			); err != nil {
+				t.Fatalf(
+					"FAIL: Unable to submit bls-to-execution changes: %v",
+					err,
+				)
+			} else {
+				t.Logf("INFO: Sent validator %d BLS-To-Exec-Change on Capella (%s)", v.Index, b.ClientName())
+			}
+		}
+
+	} else {
+		t.Logf("INFO: no validators left on BLS credentials")
 	}
 
 	// Wait for finalization, to verify that builder modifications
@@ -508,4 +547,60 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 		}
 
 	}
+
+	// Verify all submited blinded beacon blocks have correct signatures
+	spec := testnet.Spec().Spec
+	genesisValsRoot := testnet.GenesisValidatorsRoot()
+	for i, n := range testnet.Nodes.Running() {
+		b := n.BeaconClient.Builder
+		for slot, b := range b.GetSignedBeaconBlocks() {
+			if slot != b.Slot() {
+				t.Fatalf(
+					"FAIL: Beacon block slot %d does not match slot %d",
+					b.Slot(),
+					slot,
+				)
+			}
+			proposerIndex := b.ProposerIndex()
+			v := allValidators.GetValidatorByIndex(proposerIndex)
+			if v == nil {
+				t.Fatalf(
+					"FAIL: Unable to find validator with index %d",
+					proposerIndex,
+				)
+			}
+			blockProposerDomain := beacon.ComputeDomain(
+				beacon.DOMAIN_BEACON_PROPOSER,
+				spec.ForkVersion(slot),
+				genesisValsRoot,
+			)
+			signature := b.BlockSignature()
+			blockRoot := b.Root(spec)
+			if valid, err := v.VerifySignature(
+				signature,
+				blockRoot,
+				blockProposerDomain,
+			); err != nil {
+				t.Fatalf(
+					"FAIL: Error verifying signature for slot %d on node %d: err",
+					slot,
+					i,
+					err,
+				)
+			} else if !valid {
+				t.Fatalf(
+					"FAIL: Invalid signature for slot %d on node %d, root=%s, signature=%s, public key=%s",
+					slot,
+					i,
+					blockRoot.String(),
+					b.BlockSignature().String(),
+					v.PubKey.String(),
+				)
+			}
+
+		}
+	}
+	t.Logf(
+		"INFO: Validated all signatures of beacon blocks received by builders",
+	)
 }

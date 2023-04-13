@@ -190,6 +190,7 @@ func PrintWithdrawalHistory(c BeaconCache) error {
 // Helper struct to keep track of current status of a validator withdrawal state
 type Validator struct {
 	Index                      beacon.ValidatorIndex
+	PubKey                     *beacon.BLSPubkey
 	WithdrawAddress            *common.Address
 	Exited                     bool
 	ExitCondition              string
@@ -329,6 +330,29 @@ func (v *Validator) VerifyWithdrawnBalance(
 	return false, nil
 }
 
+func (v *Validator) VerifySignature(
+	signature *beacon.BLSSignature,
+	root tree.Root,
+	domain beacon.BLSDomain,
+) (bool, error) {
+	if signature == nil {
+		return false, fmt.Errorf("no signature to verify")
+	}
+	// Convert to blsu pubkey
+	pk, err := v.PubKey.Pubkey()
+	if err != nil {
+		return false, err
+	}
+	// Convert signature to blsu
+	s, err := signature.Signature()
+	if err != nil {
+		return false, nil
+	}
+	// Compute signing root
+	signingRoot := beacon.ComputeSigningRoot(root, domain)
+	return blsu.Verify(pk, signingRoot[:], s), nil
+}
+
 // Signs the BLS-to-execution-change for the given address
 func (v *Validator) SignBLSToExecutionChange(
 	executionAddress common.Address,
@@ -386,6 +410,15 @@ func (v *Validator) SignSendBLSToExecutionChange(
 }
 
 type Validators []*Validator
+
+func (vs Validators) GetValidatorByIndex(i beacon.ValidatorIndex) *Validator {
+	for _, v := range vs {
+		if v.Index == i {
+			return v
+		}
+	}
+	return nil
+}
 
 // Verify all validators have withdrawn
 func (vs Validators) VerifyWithdrawnBalance(
@@ -480,6 +513,12 @@ func ValidatorFromBeaconValidator(
 	v.Keys = keys
 	v.BLSToExecutionChangeDomain = domain
 	v.BlockStateCache = beaconCache
+
+	pk, err := source.Pubkey()
+	if err != nil {
+		return nil, err
+	}
+	v.PubKey = &pk
 
 	wc, err := source.WithdrawalCredentials()
 	if err != nil {
