@@ -1540,39 +1540,44 @@ func uniquePayloadID(t *test.Env) {
 
 	r := t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
 	r.ExpectUpdatedPayloadID(previousPayloadID)
-	previousPayloadID = r.Response.PayloadID
 
 	// Modify timestamp
+	previousPayloadID = r.Response.PayloadID
 	payloadAttributes.Timestamp += 1
 	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
 	r.ExpectUpdatedPayloadID(previousPayloadID)
-	previousPayloadID = r.Response.PayloadID
 
 	// Modify random
+	previousPayloadID = r.Response.PayloadID
 	payloadAttributes.Random = common.Hash{1}
 	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
 	r.ExpectUpdatedPayloadID(previousPayloadID)
-	previousPayloadID = r.Response.PayloadID
 
 	// Modify fee recipient
-
+	previousPayloadID = r.Response.PayloadID
 	payloadAttributes.SuggestedFeeRecipient = common.Address{1}
 	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
 	r.ExpectUpdatedPayloadID(previousPayloadID)
-	previousPayloadID = r.Response.PayloadID
 
 	// Add withdrawal
+	previousPayloadID = r.Response.PayloadID
 	newWithdrawal := &types.Withdrawal{}
 	payloadAttributes.Withdrawals = append(payloadAttributes.Withdrawals, newWithdrawal)
 	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
 	r.ExpectUpdatedPayloadID(previousPayloadID)
-	previousPayloadID = r.Response.PayloadID
 
 	// Modify withdrawal
+	previousPayloadID = r.Response.PayloadID
 	newWithdrawal.Amount = 1
 	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
 	r.ExpectUpdatedPayloadID(previousPayloadID)
+
+	// Add another withdrawal
 	previousPayloadID = r.Response.PayloadID
+	newWithdrawal = &types.Withdrawal{Index: 1}
+	payloadAttributes.Withdrawals = append(payloadAttributes.Withdrawals, newWithdrawal)
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
 
 	// Add test here for future attributes!
 }
