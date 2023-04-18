@@ -60,12 +60,12 @@ case "$HIVE_LOGLEVEL" in
     4)   LOG=DEBUG ;;
     5)   LOG=TRACE ;;
 esac
-FLAGS="--logging=$LOG"
+FLAGS="--logging=$LOG --data-storage-format=BONSAI"
 
 # Configure the chain.
 jq -f /mapper.jq /genesis.json > /besugenesis.json
 echo -n "Genesis: "; cat /besugenesis.json
-FLAGS="$FLAGS --genesis-file=/besugenesis.json"
+FLAGS="$FLAGS --genesis-file=/besugenesis.json "
 
 # Enable experimental 'berlin' hard-fork features if configured.
 #if [ -n "$HIVE_FORK_BERLIN" ]; then
