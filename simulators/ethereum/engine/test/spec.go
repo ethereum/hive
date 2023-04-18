@@ -135,3 +135,7 @@ func (s Spec) GetTTD() int64 {
 func (s Spec) IsMiningDisabled() bool {
 	return s.DisableMining
 }
+
+var LatestFork = ForkConfig{
+	ShanghaiTimestamp: big.NewInt(0),
+}

@@ -88,6 +88,11 @@ var Tests = []test.Spec{
 		Run:  preTTDFinalizedBlockHash,
 		TTD:  2,
 	},
+	{
+		Name:       "Unique Payload ID",
+		Run:        uniquePayloadID,
+		ForkConfig: test.LatestFork,
+	},
 	// Invalid Payload Tests
 	{
 		Name: "Bad Hash on NewPayload",
@@ -1511,6 +1516,65 @@ func preTTDFinalizedBlockHash(t *test.Env) {
 	r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
 	r.ExpectPayloadStatus(test.Valid)
 
+}
+
+// Check that the payload id returned on a forkchoiceUpdated call is different
+// when the attributes change
+func uniquePayloadID(t *test.Env) {
+	// Wait until TTD is reached by this client
+	t.CLMock.WaitForTTD()
+
+	parentHash := t.CLMock.LatestHeader.Hash()
+
+	fcState := &api.ForkchoiceStateV1{
+		HeadBlockHash: parentHash,
+	}
+	payloadAttributes := &api.PayloadAttributes{
+		Timestamp:             t.CLMock.LatestHeader.Time + 1,
+		Random:                common.Hash{},
+		SuggestedFeeRecipient: common.Address{},
+		Withdrawals:           []*types.Withdrawal{},
+	}
+
+	previousPayloadID := &api.PayloadID{}
+
+	r := t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+	previousPayloadID = r.Response.PayloadID
+
+	// Modify timestamp
+	payloadAttributes.Timestamp += 1
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+	previousPayloadID = r.Response.PayloadID
+
+	// Modify random
+	payloadAttributes.Random = common.Hash{1}
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+	previousPayloadID = r.Response.PayloadID
+
+	// Modify fee recipient
+
+	payloadAttributes.SuggestedFeeRecipient = common.Address{1}
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+	previousPayloadID = r.Response.PayloadID
+
+	// Add withdrawal
+	newWithdrawal := &types.Withdrawal{}
+	payloadAttributes.Withdrawals = append(payloadAttributes.Withdrawals, newWithdrawal)
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+	previousPayloadID = r.Response.PayloadID
+
+	// Modify withdrawal
+	newWithdrawal.Amount = 1
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+	previousPayloadID = r.Response.PayloadID
+
+	// Add test here for future attributes!
 }
 
 // Corrupt the hash of a valid payload, client should reject the payload.
