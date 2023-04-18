@@ -4,8 +4,8 @@ import (
 	"context"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/core"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -32,10 +32,12 @@ type Eth interface {
 type Engine interface {
 	ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
 	ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
+	ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
 
 	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error)
 	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error)
 
+	NewPayload(ctx context.Context, version int, payload interface{}) (api.PayloadStatusV1, error)
 	NewPayloadV1(ctx context.Context, payload *client_types.ExecutableDataV1) (api.PayloadStatusV1, error)
 	NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
 
@@ -76,8 +78,10 @@ type EngineStarter interface {
 }
 
 var (
-	Head      *big.Int // Nil
-	Pending   = big.NewInt(-2)
-	Finalized = big.NewInt(-3)
-	Safe      = big.NewInt(-4)
+	Head                           *big.Int // Nil
+	Pending                        = big.NewInt(-2)
+	Finalized                      = big.NewInt(-3)
+	Safe                           = big.NewInt(-4)
+	LatestForkchoiceUpdatedVersion = 2
+	LatestNewPayloadVersion        = 2
 )
