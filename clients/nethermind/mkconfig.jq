@@ -72,11 +72,10 @@ def sync_config:
 def base_config:
   {
     "Init": {
-      "PubSubEnabled": true,
       "WebSocketsEnabled": true,
       "IsMining": (env.HIVE_MINER != null),
       "UseMemDb": true,
-      "ChainSpecPath": "/chainspec/test.json",
+      "ChainSpecPath": "/chainspec.json",
       "BaseDbPath": "nethermind_db/hive",
       "LogFileName": "/hive.logs.txt"
     },
@@ -90,12 +89,6 @@ def base_config:
       "DiscoveryPort": 30303,
       "P2PPort": 30303,
       "ExternalIp": "127.0.0.1",
-    },
-    "Hive": {
-      "ChainFile": "/chain.rlp",
-      "GenesisFilePath": "/genesis.json",
-      "BlocksDir": "/blocks",
-      "KeysDir": "/keys"
     },
   }
 ;

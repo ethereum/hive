@@ -55,11 +55,6 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo -n $JWT_SECRET > /jwt.secret
 fi
 
-# Generate the genesis and chainspec file.
-mkdir -p /chainspec
-jq -f /mapper.jq /genesis.json > /chainspec/test.json
-jq . /chainspec/test.json
-
 # Generate the config file.
 mkdir /configs
 jq -n -f /mkconfig.jq > /configs/test.cfg
@@ -86,6 +81,7 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     esac
     LOG_FLAG="--log $LOG"
 fi
+cat /chainspec.json
 echo "Running Nethermind..."
 # The output is tee:d, via /log.txt, because the enode script uses that logfile to parse out the enode id
 dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg $LOG_FLAG 2>&1 | tee /log.txt

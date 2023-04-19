@@ -15,7 +15,7 @@ ADD nethermind.sh /nethermind.sh
 RUN chmod +x /nethermind.sh
 
 # Add the enode script.
-RUN mkdir /hive-bin
+RUN mkdir -p /hive-bin
 ADD enode.sh /hive-bin/enode.sh
 RUN chmod +x /hive-bin/enode.sh
 
