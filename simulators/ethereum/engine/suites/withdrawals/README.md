@@ -205,6 +205,13 @@ All test cases contain the following verifications:
     - All transactions and withdrawals are in the correct format and order.
     - Requested payload bodies of unknown hashes are returned as null in the returned list
 
+- Payload Bodies By Range/Hash Parallel - Shanghai Fork on Block 17 - 32 Withdrawal Blocks
+  - Launch client `A` and create a canonical chain consisting of 48 blocks, where the first shanghai block is number 17
+  - Make requests to obtain the full withdrawals payload bodies from the canonical chain by hash or range, in parallel, and repeatedly.
+  - Verify that:
+    - All transactions and withdrawals are in the correct format and order.
+    - There are no locking issues in the client due to parallel requests.
+
 ## Block Value Tests
 - Block Value on GetPayloadV2 Post-Shanghai
   - Create a Shanghai chain where the fork transition happens at block 1
