@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="docker" type="GoRemoteDebugConfigurationType" factoryName="Go Remote" port="40000">
+    <option name="disconnectOption" value="STOP" />
+    <disconnect value="STOP" />
+    <method v="2" />
+  </configuration>
+</component>

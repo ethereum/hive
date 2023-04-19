@@ -11,10 +11,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/core"
-	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -37,7 +36,7 @@ type HiveRPCEngineStarter struct {
 	JWTSecret               []byte
 }
 
-func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis helper.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
 	var (
 		clientType = s.ClientType
 		enginePort = s.EnginePort

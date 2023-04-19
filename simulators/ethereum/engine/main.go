@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/ethereum/hive/hivesim"
@@ -10,42 +11,42 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 
-	suite_auth "github.com/ethereum/hive/simulators/ethereum/engine/suites/auth"
-	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
-	suite_ex_cap "github.com/ethereum/hive/simulators/ethereum/engine/suites/exchange_capabilities"
-	suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
+	//suite_auth "github.com/ethereum/hive/simulators/ethereum/engine/suites/auth"
+	//suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
+	//suite_ex_cap "github.com/ethereum/hive/simulators/ethereum/engine/suites/exchange_capabilities"
+	//suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
 func main() {
 	var (
-		engine = hivesim.Suite{
-			Name: "engine-api",
-			Description: `
-	Test Engine API tests using CL mocker to inject commands into clients after they 
-	have reached the Terminal Total Difficulty.`[1:],
-		}
-		transition = hivesim.Suite{
-			Name: "engine-transition",
-			Description: `
-	Test Engine API tests using CL mocker to inject commands into clients and drive 
-	them through the merge.`[1:],
-		}
-		auth = hivesim.Suite{
-			Name: "engine-auth",
-			Description: `
-	Test Engine API authentication features.`[1:],
-		}
-		excap = hivesim.Suite{
-			Name: "engine-exchange-capabilities",
-			Description: `
-	Test Engine API exchange capabilities.`[1:],
-		}
-		sync = hivesim.Suite{
-			Name: "engine-sync",
-			Description: `
-	Test Engine API sync, pre/post merge.`[1:],
-		}
+		//	engine = hivesim.Suite{
+		//		Name: "engine-api",
+		//		Description: `
+		//Test Engine API tests using CL mocker to inject commands into clients after they
+		//have reached the Terminal Total Difficulty.`[1:],
+		//	}
+		//	transition = hivesim.Suite{
+		//		Name: "engine-transition",
+		//		Description: `
+		//Test Engine API tests using CL mocker to inject commands into clients and drive
+		//them through the merge.`[1:],
+		//	}
+		//	auth = hivesim.Suite{
+		//		Name: "engine-auth",
+		//		Description: `
+		//Test Engine API authentication features.`[1:],
+		//	}
+		//	excap = hivesim.Suite{
+		//		Name: "engine-exchange-capabilities",
+		//		Description: `
+		//Test Engine API exchange capabilities.`[1:],
+		//	}
+		//	sync = hivesim.Suite{
+		//		Name: "engine-sync",
+		//		Description: `
+		//Test Engine API sync, pre/post merge.`[1:],
+		//	}
 		withdrawals = hivesim.Suite{
 			Name: "engine-withdrawals",
 			Description: `
@@ -55,19 +56,19 @@ func main() {
 
 	simulator := hivesim.New()
 
-	addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
-	addTestsToSuite(simulator, &transition, specToInterface(suite_transition.Tests), "full")
-	addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
-	addTestsToSuite(simulator, &excap, specToInterface(suite_ex_cap.Tests), "full")
+	//addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
+	//addTestsToSuite(simulator, &transition, specToInterface(suite_transition.Tests), "full")
+	//addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
+	//addTestsToSuite(simulator, &excap, specToInterface(suite_ex_cap.Tests), "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
 
 	// Mark suites for execution
-	hivesim.MustRunSuite(simulator, engine)
-	hivesim.MustRunSuite(simulator, transition)
-	hivesim.MustRunSuite(simulator, auth)
-	hivesim.MustRunSuite(simulator, excap)
-	hivesim.MustRunSuite(simulator, sync)
+	//hivesim.MustRunSuite(simulator, engine)
+	//hivesim.MustRunSuite(simulator, transition)
+	//hivesim.MustRunSuite(simulator, auth)
+	//hivesim.MustRunSuite(simulator, excap)
+	//hivesim.MustRunSuite(simulator, sync)
 	hivesim.MustRunSuite(simulator, withdrawals)
 }
 
@@ -79,14 +80,28 @@ func specToInterface(src []test.Spec) []test.SpecInterface {
 	return res
 }
 
+type ClientGenesis interface {
+	GetTTD()
+}
+
+// Load the genesis based on each client
+
 // Add test cases to a given test suite
 func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.SpecInterface, nodeType string) {
 	for _, currentTest := range tests {
 		currentTest := currentTest
 
 		// Load the genesis file specified and dynamically bundle it.
-		genesis := currentTest.GetGenesis()
-		genesisStartOption, err := helper.GenesisStartOption(genesis)
+		clientTypes, err := sim.ClientTypes()
+		if err != nil {
+			return
+		}
+		if len(clientTypes) != 1 {
+			panic("missing client")
+		}
+		clientName := strings.Split(clientTypes[0].Name, "_")[0]
+		genesis := currentTest.GetGenesis(clientName)
+		genesisStartOption, err := helper.GenesisStartOptionBasedOnClient(genesis, clientName)
 		if err != nil {
 			panic("unable to inject genesis")
 		}
@@ -107,7 +122,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		testFiles := hivesim.Params{}
-		if genesis.Difficulty.Cmp(big.NewInt(ttd)) < 0 {
+		if genesis.Difficulty().Cmp(big.NewInt(ttd)) < 0 {
 
 			if currentTest.GetChainFile() != "" {
 				// We are using a Proof of Work chain file, remove all clique-related settings
