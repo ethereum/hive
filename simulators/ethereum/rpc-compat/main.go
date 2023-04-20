@@ -143,6 +143,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 					respError := respMap["error"].(map[string]interface{})
 					wantError := wantMap["error"].(map[string]interface{})
 					respError["message"] = wantError["message"]
+					respError["code"] = wantError["code"]
 					// cast back into the any type
 					respMap["error"] = respError
 				}
