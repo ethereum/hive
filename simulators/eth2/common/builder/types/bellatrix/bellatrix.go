@@ -34,6 +34,14 @@ func (s *SignedBeaconBlock) Slot() beacon.Slot {
 	return s.Message.Slot
 }
 
+func (s *SignedBeaconBlock) ProposerIndex() beacon.ValidatorIndex {
+	return s.Message.ProposerIndex
+}
+
+func (s *SignedBeaconBlock) BlockSignature() *beacon.BLSSignature {
+	return &s.Signature
+}
+
 func (s *SignedBeaconBlock) SetExecutionPayload(
 	ep common.ExecutionPayload,
 ) error {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"math/big"
 
-	el_common "github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	el_common "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/eth2/common/builder/types/common"
 	blsu "github.com/protolambda/bls12-381-util"
 	"github.com/protolambda/zrnt/eth2/beacon/capella"
@@ -32,6 +32,14 @@ func (s *SignedBeaconBlock) StateRoot() tree.Root {
 
 func (s *SignedBeaconBlock) Slot() beacon.Slot {
 	return s.Message.Slot
+}
+
+func (s *SignedBeaconBlock) ProposerIndex() beacon.ValidatorIndex {
+	return s.Message.ProposerIndex
+}
+
+func (s *SignedBeaconBlock) BlockSignature() *beacon.BLSSignature {
+	return &s.Signature
 }
 
 func (s *SignedBeaconBlock) SetExecutionPayload(

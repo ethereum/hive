@@ -164,6 +164,21 @@ document.
 
 ### Builder API Fallback for Withdrawals
 
+* [x] Builder API Constructs Payloads with Valid Withdrawals List
+  <details>
+  <summary>Click for details</summary>
+  
+  - Start two validating nodes on Bellatrix/Paris genesis
+  - Total of 128 Validators, 64 for each validating node
+  - All genesis validators have BLS withdrawal credentials
+  - Both validating nodes are connected to a builder API mock server
+  - Builder API server is configured to return payloads with the correct withdrawals list, starting from capella
+  - Wait for capella and verify that the payloads are correctly included in the canonical chain
+  - Wait for finalization, and verify at least one block was built by the builder API on each node
+  - Verify that all signed beacon blocks delivered to the builder were correctly constructed and signed
+
+  </details>
+
 * [x] Builder API Constructs Payloads with Invalid Withdrawals List
   <details>
   <summary>Click for details</summary>
