@@ -12,4 +12,5 @@ FROM alpine:latest
 ADD . /source
 WORKDIR /source
 COPY --from=builder /source/engine .
+# COPY --from=geth    /ethash /ethash
 ENTRYPOINT ["./engine"]

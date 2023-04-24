@@ -2,9 +2,7 @@ package node
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
@@ -14,8 +12,6 @@ import (
 	beacon "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
@@ -37,32 +33,12 @@ import (
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
-	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
 
 type GethNodeTestConfiguration struct {
 	// Node name
 	Name string
-
-	// The node mines proof of work blocks
-	PoWMiner              bool
-	PoWMinerEtherBase     common.Address
-	PoWRandomTransactions bool
-	// Prepare the Ethash instance even if we don't mine (to seal blocks)
-	Ethash bool
-	// Disable gossiping of newly mined blocks (peers need to sync to obtain the blocks)
-	DisableGossiping bool
-
-	// Block Modifier
-	BlockModifier helper.BlockModifier
-
-	// In PoW production mode, produce many terminal blocks which shall be gossiped
-	TerminalBlockSiblingCount *big.Int
-	TerminalBlockSiblingDepth *big.Int
-
-	// Of all terminal blocks produced, the index of the one to send as terminal block when queried
-	NthTerminalBlockToReturnAsHead *big.Int
 
 	// To allow testing terminal block gossiping on the other clients, restrict this client
 	// to only connect to the boot node
@@ -73,9 +49,6 @@ type GethNodeTestConfiguration struct {
 
 	// Chain to import
 	ChainFile string
-
-	// How many seconds to delay PoW mining start
-	MiningStartDelaySeconds *big.Int
 }
 type GethNodeEngineStarter struct {
 	// Client parameters used to launch the default client
@@ -87,9 +60,7 @@ type GethNodeEngineStarter struct {
 }
 
 var (
-	DefaultMaxPeers                  = big.NewInt(25)
-	DefaultMiningStartDelaySeconds   = big.NewInt(10)
-	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
+	DefaultMaxPeers = big.NewInt(25)
 )
 
 func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
@@ -144,14 +115,6 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		}
 	}
 
-	if s.Config.MiningStartDelaySeconds == nil {
-		s.Config.MiningStartDelaySeconds = DefaultMiningStartDelaySeconds
-	}
-
-	if s.Config.TerminalBlockSiblingDepth == nil {
-		s.Config.TerminalBlockSiblingDepth = DefaultTerminalBlockSiblingDepth
-	}
-
 	g, err := newNode(s.Config, enodes, &genesisCopy)
 	if err != nil {
 		return nil, err
@@ -175,10 +138,8 @@ type AccountTransactionInfo struct {
 	PreviousNonce uint64
 }
 type GethNode struct {
-	node            *node.Node
-	eth             *eth.Ethereum
-	ethashEngine    *ethash.Ethash
-	ethashWaitGroup sync.WaitGroup
+	node *node.Node
+	eth  *eth.Ethereum
 
 	mustHeadBlock *types.Header
 
@@ -201,7 +162,6 @@ type GethNode struct {
 	// Test specific configuration
 	accTxInfoMap                      map[common.Address]*AccountTransactionInfo
 	totalReceivedOrAnnouncedNewBlocks *big.Int
-	terminalBlocksMined               *big.Int
 
 	config GethNodeTestConfiguration
 }
@@ -241,7 +201,6 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		DatabaseHandles:  256,
 		TxPool:           txpool.DefaultConfig,
 		GPO:              ethconfig.Defaults.GPO,
-		Ethash:           ethconfig.Defaults.Ethash,
 		Miner:            ethconfig.Defaults.Miner,
 		LightServ:        100,
 		LightPeers:       int(startConfig.MaxPeers.Int64()) - 1,
@@ -283,23 +242,10 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		accTxInfoMap: make(map[common.Address]*AccountTransactionInfo),
 		// Test related configuration
 		totalReceivedOrAnnouncedNewBlocks: big.NewInt(0),
-		terminalBlocksMined:               big.NewInt(0),
 		config:                            startConfig,
 	}
 
 	g.running, g.closing = context.WithCancel(context.Background())
-	if startConfig.PoWMiner || startConfig.Ethash {
-		// Create the ethash consensus module
-		ethashConfig := ethconfig.Defaults.Ethash
-		ethashConfig.PowMode = ethash.ModeNormal
-		ethashConfig.CacheDir = "/ethash"
-		ethashConfig.DatasetDir = ethashConfig.CacheDir
-		g.ethashEngine = ethash.New(ethashConfig, nil, false)
-	}
-	if startConfig.PoWMiner {
-		// Enable mining
-		go g.EnablePoWMining()
-	}
 
 	// Start thread to monitor the amount of gossiped blocks this node receives
 	go g.SubscribeP2PEvents()
@@ -316,217 +262,6 @@ func (n *GethNode) AddPeer(ec client.EngineClient) error {
 	n.node.Server().AddTrustedPeer(node)
 	n.node.Server().AddPeer(node)
 	return nil
-}
-
-func (n *GethNode) isBlockTerminal(b *types.Header) (bool, *big.Int, error) {
-	ctx, cancel := context.WithTimeout(n.running, globals.RPCTimeout)
-	defer cancel()
-	parentTD, err := n.GetBlockTotalDifficulty(ctx, b.ParentHash)
-	if err != nil {
-		return false, nil, err
-	}
-	blockTD := new(big.Int).Add(parentTD, b.Difficulty)
-	return blockTD.Cmp(n.ttd) >= 0 && parentTD.Cmp(n.ttd) < 0, blockTD, nil
-}
-
-func (n *GethNode) EnablePoWMining() {
-	// Delay mining start:
-	// This is useful in some cases where we try to test gossip blocks,
-	// because subsequent client docker container might take a while to
-	// start, and miss some of the gossipped blocks, thus failing the
-	// test.
-	select {
-	case <-time.After(time.Second * time.Duration(n.config.MiningStartDelaySeconds.Int64())):
-	case <-n.running.Done():
-		return
-	}
-
-	// Start PoW Mining Loop
-	go n.PoWMiningLoop()
-}
-
-func (n *GethNode) PrepareNextBlock(currentBlock *types.Header) (*state.StateDB, *types.Block, error) {
-	if t, _, err := n.isBlockTerminal(currentBlock); err == nil {
-		if t {
-			if n.config.TerminalBlockSiblingCount != nil && n.config.TerminalBlockSiblingCount.Cmp(n.terminalBlocksMined) > 0 {
-				// Reset the canonical chain to the parent of the terminal block to keep the miner mining.
-				if currentBlock, err = n.ReOrgBackBlockChain(n.config.TerminalBlockSiblingDepth.Uint64(), currentBlock); err != nil {
-					panic(err)
-				}
-			} else {
-				// PoW has finished
-				return nil, nil, nil
-			}
-		}
-	}
-
-	timestamp := uint64(time.Now().Unix())
-	if currentBlock.Time >= timestamp {
-		timestamp = currentBlock.Time + 1
-	}
-	num := new(big.Int).Set(currentBlock.Number)
-	nextHeader := &types.Header{
-		ParentHash: currentBlock.Hash(),
-		Number:     num.Add(num, common.Big1),
-		GasLimit:   currentBlock.GasLimit,
-		Time:       timestamp,
-		Coinbase:   n.config.PoWMinerEtherBase,
-	}
-
-	if nextHeader.Coinbase == (common.Address{}) {
-		// Coinbase was not specified, use a random address here to have a different stateRoot each mined block
-		rand.Read(nextHeader.Coinbase[:])
-	}
-
-	// Always randomize extra to try to generate different seal hash
-	rand.Read(nextHeader.Extra)
-
-	// Set baseFee and GasLimit if we are on an EIP-1559 chain
-	if n.eth.BlockChain().Config().IsLondon(nextHeader.Number) {
-		nextHeader.BaseFee = misc.CalcBaseFee(n.eth.BlockChain().Config(), currentBlock)
-		if !n.eth.BlockChain().Config().IsLondon(currentBlock.Number) {
-			parentGasLimit := currentBlock.GasLimit * n.eth.BlockChain().Config().ElasticityMultiplier()
-			nextHeader.GasLimit = parentGasLimit
-		}
-	}
-
-	if err := n.ethashEngine.Prepare(n.eth.BlockChain(), nextHeader); err != nil {
-		log.Error("Failed to prepare header for sealing", "err", err)
-		return nil, nil, err
-	}
-
-	state, err := n.eth.BlockChain().StateAt(currentBlock.Root)
-	if err != nil {
-		panic(err)
-	}
-	b, err := n.ethashEngine.FinalizeAndAssemble(n.eth.BlockChain(), nextHeader, state, nil, nil, nil, nil)
-	return state, b, err
-}
-
-func (n *GethNode) PoWMiningLoop() {
-	n.ethashWaitGroup.Add(1)
-	defer n.ethashWaitGroup.Done()
-	currentBlock := n.eth.BlockChain().CurrentBlock()
-
-	// During the Pow mining, the node must respond with the latest mined block, not what the blockchain actually states
-	n.mustHeadBlock = currentBlock
-
-	// When the node stops mining, the head must now point to the actual head
-	defer func() {
-		n.mustHeadBlock = nil
-	}()
-
-	for {
-		select {
-		case <-n.running.Done():
-			return
-		default:
-		}
-		s, b, err := n.PrepareNextBlock(currentBlock)
-		if err != nil {
-			panic(err)
-		}
-		if b == nil {
-			// Nothing left to mine
-			return
-		}
-
-		// Wait until the previous block is succesfully propagated
-		<-time.After(time.Millisecond * 200)
-
-		// Modify the block before sealing
-		if n.config.BlockModifier != nil {
-			b, err = n.config.BlockModifier.ModifyUnsealedBlock(n.eth.BlockChain(), s, b)
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		// Seal the next block to broadcast
-		rChan := make(chan *types.Block, 0)
-		stopChan := make(chan struct{})
-		n.ethashEngine.Seal(n.eth.BlockChain(), b, rChan, stopChan)
-		select {
-		case b := <-rChan:
-			if b == nil {
-				panic(fmt.Errorf("no block got sealed"))
-			}
-			jsH, _ := json.MarshalIndent(b.Header(), "", " ")
-			fmt.Printf("INFO (%s): Mined block:\n%s\n", n.config.Name, jsH)
-
-			// Modify the sealed block if necessary
-			if n.config.BlockModifier != nil {
-				sealVerifier := func(h *types.Header) bool {
-					return n.ethashEngine.VerifyHeader(n.eth.BlockChain(), h, true) == nil
-				}
-				b, err = n.config.BlockModifier.ModifySealedBlock(sealVerifier, b)
-				if err != nil {
-					panic(err)
-				}
-			}
-
-			// Broadcast
-			if !n.config.DisableGossiping {
-				n.eth.EventMux().Post(core.NewMinedBlockEvent{Block: b})
-			}
-
-			// Check whether the block was a terminal block
-			header := b.Header()
-			if t, td, err := n.isBlockTerminal(header); err == nil {
-				if t {
-					n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
-					fmt.Printf("DEBUG (%s) [%v]: Mined a New Terminal Block: hash=%v, parent=%v, number=%d, td=%d, ttd=%d\n", n.config.Name, time.Now(), b.Hash(), b.ParentHash(), b.Number(), td, n.ttd)
-				} else {
-					fmt.Printf("DEBUG (%s) [%v]: Mined a New Block: hash=%v, parent=%v, number=%d, td=%d, ttd=%d\n", n.config.Name, time.Now(), b.Hash(), b.ParentHash(), b.Number(), td, n.ttd)
-				}
-			} else {
-				panic(err)
-			}
-
-			// Write to the chain
-			_, err = n.eth.BlockChain().WriteBlockAndSetHead(b, nil, nil, s, false)
-			if err != nil {
-				panic(err)
-			}
-
-			// Update the block on top of which to proceed with mining
-			currentBlock = header
-			n.mustHeadBlock = header
-		case <-n.running.Done():
-			close(stopChan)
-			return
-		}
-	}
-}
-
-// Seal a block for testing purposes
-func (n *GethNode) SealBlock(ctx context.Context, block *types.Block) (*types.Block, error) {
-	if n.ethashEngine == nil {
-		return nil, fmt.Errorf("Node was not configured with an ethash instance")
-	}
-	n.ethashWaitGroup.Add(1)
-	defer n.ethashWaitGroup.Done()
-	newHeader := types.CopyHeader(block.Header())
-	// Reset nonce and mixHash
-	newHeader.Nonce = types.BlockNonce{}
-	newHeader.MixDigest = common.Hash{}
-
-	rChan := make(chan *types.Block, 0)
-	stopChan := make(chan struct{})
-	blockToSeal := types.NewBlockWithHeader(newHeader).WithBody(block.Transactions(), block.Uncles())
-
-	n.ethashEngine.Seal(n.eth.BlockChain(), blockToSeal, rChan, stopChan)
-
-	select {
-	case b := <-rChan:
-		if b == nil {
-			panic(fmt.Errorf("no block got sealed"))
-		}
-		return b, nil
-	case <-ctx.Done():
-		close(stopChan)
-		return nil, ctx.Err()
-	}
 }
 
 // Sets the canonical block to an ancestor of the provided block.
@@ -589,12 +324,6 @@ func (n *GethNode) Close() error {
 	default:
 	}
 	n.closing()
-	if n.ethashEngine != nil {
-		n.ethashWaitGroup.Wait()
-		if err := n.ethashEngine.Close(); err != nil {
-			panic(err)
-		}
-	}
 	err := n.node.Close()
 	if err != nil {
 		return err
@@ -964,12 +693,6 @@ func (n *GethNode) PostRunVerifications() error {
 	if n.config.ExpectedGossipNewBlocksCount != nil {
 		if n.config.ExpectedGossipNewBlocksCount.Cmp(n.totalReceivedOrAnnouncedNewBlocks) != 0 {
 			return fmt.Errorf("Node received gossiped blocks count different than expected: %d != %d", n.totalReceivedOrAnnouncedNewBlocks, n.config.ExpectedGossipNewBlocksCount)
-		}
-	}
-	if n.config.PoWMiner && n.config.TerminalBlockSiblingCount != nil {
-		if n.terminalBlocksMined.Cmp(n.config.TerminalBlockSiblingCount) != 0 {
-			return fmt.Errorf("PoW Miner node could not mine expected amount of terminal blocks: %d != %d", n.terminalBlocksMined, n.config.TerminalBlockSiblingCount)
-
 		}
 	}
 	return nil
