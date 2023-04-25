@@ -1,7 +1,6 @@
 ## Build geth from source from a local directory called go-ethereum.
 
 FROM golang:1-alpine as builder
-ARG branch=master
 ADD go-ethereum /go-ethereum
 WORKDIR /go-ethereum
 RUN apk add --update bash curl jq git make
