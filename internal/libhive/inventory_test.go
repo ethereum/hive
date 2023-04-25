@@ -9,17 +9,25 @@ import (
 
 func TestSplitClientName(t *testing.T) {
 	tests := []struct {
-		name                   string
-		wantClient, wantBranch string
+		name                                                       string
+		wantClient, wantDockerFile, wantUser, wantRepo, wantBranch string
 	}{
-		{"client", "client", ""},
-		{"client_b", "client", "b"},
-		{"the_client_b", "the_client", "b"},
+		{"client", "client", "", "", "", ""},
+		{"client_b", "client", "", "", "", "b"},
+		{"the_client_b", "the_client", "", "", "", "b"},
+		{"the_client_u:user", "the_client", "", "user", "", ""},
+		{"the_client_u:user_b", "the_client", "", "user", "", "b"},
+		{"the_client_u:user_b:branch", "the_client", "", "user", "", "branch"},
+		{"the_client_b:branch_u:user", "the_client", "", "user", "", "branch"},
+		{"the_client_r:repo_b:branch_u:user", "the_client", "", "user", "repo", "branch"},
+		{"client_r:repo_b:branch_u:user", "client", "", "user", "repo", "branch"},
+		{"client_b:branch_u:user_r:repo", "client", "", "user", "repo", "branch"},
+		{"client_b:branch_f:git_r:repo", "client", "git", "", "repo", "branch"},
 	}
 	for _, test := range tests {
-		c, b := libhive.SplitClientName(test.name)
-		if c != test.wantClient || b != test.wantBranch {
-			t.Errorf("SpnlitClientName(%q) -> (%q, %q), want (%q, %q)", test.name, c, b, test.wantClient, test.wantBranch)
+		cInfo := libhive.SplitClientName(test.name)
+		if cInfo.Name != test.wantClient || cInfo.TagBranch != test.wantBranch || cInfo.User != test.wantUser || cInfo.Repo != test.wantRepo {
+			t.Errorf("SpnlitClientName(%q) -> (%q, %q, %q, %q), want (%q, %q, %q, %q)", test.name, cInfo.Name, cInfo.TagBranch, cInfo.User, cInfo.Repo, test.wantClient, test.wantBranch, test.wantUser, test.wantRepo)
 		}
 	}
 }

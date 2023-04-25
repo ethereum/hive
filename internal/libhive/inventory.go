@@ -8,15 +8,78 @@ import (
 	"strings"
 )
 
-// branchDelimiter is what separates the client name from the branch, eg: besu_nightly, go-ethereum_master.
-const branchDelimiter = "_"
+// argDelimiter is what separates the client name from its arguments.
+//
+// All arguments start with a letter followed by a colon.
+// The last argument, when no prefix is specified, is the branch or tag name.
+// Supported prefixes are:
+//
+//	f: - docker file name (used to build the client image)
+//	u: - user name (owner of git repository)
+//	r: - repository name
+//	b: - branch or tag name
+//
+// Examples:
+//
+//	besu_nightly -> client: besu, branch: nightly
+//	besu_u:hyperledger_b:master -> client: besu, user: hyperledger, branch: master
+//	go-ethereum_f:git -> client: go-ethereum, dockerfile: Dockerfile.git
+const argDelimiter = "_"
+
+type ClientBuildInfo struct {
+	Name       string
+	DockerFile string
+	User       string
+	Repo       string
+	TagBranch  string
+}
+
+func (c ClientBuildInfo) String() string {
+	s := c.Name
+	if c.DockerFile != "" {
+		s = s + "_" + c.DockerFile
+	}
+	if c.User != "" {
+		s = s + "_" + c.User
+	}
+	if c.Repo != "" {
+		s = s + "_" + c.Repo
+	}
+	if c.TagBranch != "" {
+		s = s + "_" + c.TagBranch
+	}
+	return s
+}
+
+func (c *ClientBuildInfo) ParseSubstring(s string, isLast bool) {
+	if strings.HasPrefix(s, "u:") {
+		c.User = s[2:]
+	} else if strings.HasPrefix(s, "r:") {
+		c.Repo = s[2:]
+	} else if strings.HasPrefix(s, "f:") {
+		c.DockerFile = s[2:]
+	} else if isLast || strings.HasPrefix(s, "b:") {
+		// Last substring is the branch if it doesn't have a prefix.
+		c.TagBranch = strings.TrimPrefix(s, "b:")
+	} else {
+		c.Name = c.Name + argDelimiter + s
+	}
+}
 
 // SplitClientName returns the name and branch components of 'name'.
-func SplitClientName(name string) (string, string) {
-	if ix := strings.LastIndex(name, branchDelimiter); ix > 0 {
-		return name[:ix], name[ix+1:]
+func SplitClientName(name string) ClientBuildInfo {
+	res := &ClientBuildInfo{}
+	if strings.Count(name, argDelimiter) > 0 {
+		substrings := strings.Split(name, argDelimiter)
+		res.Name = substrings[0]
+		for i := len(substrings) - 1; i > 0; i-- {
+			res.ParseSubstring(substrings[i], i == (len(substrings)-1))
+		}
+	} else {
+		res.Name = name
+
 	}
-	return name, ""
+	return *res
 }
 
 // Inventory keeps names of clients and simulators.
@@ -29,7 +92,7 @@ type Inventory struct {
 // HasClient returns true if the inventory contains the given client.
 // The client name may contain a branch specifier.
 func (inv Inventory) HasClient(name string) bool {
-	name, _ = SplitClientName(name)
+	name = SplitClientName(name).Name
 	_, ok := inv.Clients[name]
 	return ok
 }
@@ -37,7 +100,7 @@ func (inv Inventory) HasClient(name string) bool {
 // ClientDirectory returns the directory containing the given client's Dockerfile.
 // The client name may contain a branch specifier.
 func (inv Inventory) ClientDirectory(name string) string {
-	name, _ = SplitClientName(name)
+	name = SplitClientName(name).Name
 	return filepath.Join(inv.BaseDir, "clients", filepath.FromSlash(name))
 }
 

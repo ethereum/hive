@@ -20,6 +20,22 @@ name like:
 
     ./hive --sim my-simulation --client go-ethereum_v1.9.23,go_ethereum_v1.9.22
 
+Other arguments to the docker image building process of the client can be specified by
+using a single letter and colon prefix.
+
+Supported prefixes are:
+
+	f: - docker file name (used to build the client image)
+	u: - user name (owner of git repository)
+	r: - repository name
+	b: - branch or tag name
+
+Examples:
+
+	besu_nightly -> client: besu, branch: nightly
+	besu_u:hyperledger_b:master -> client: besu, user: hyperledger, branch: master
+	go-ethereum_f:git -> client: go-ethereum, dockerfile: Dockerfile.git
+
 See the [go-ethereum client definition][geth-docker] for an example of a client
 Dockerfile.
 
