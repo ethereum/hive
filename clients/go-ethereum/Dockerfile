@@ -22,13 +22,14 @@ FROM ethereum/client-go:$branch as builder
 ## go-ethereum from a git branch.
 
 # FROM alpine:latest as builder
+# ARG user=ethereum
+# ARG repo=go-ethereum
 # ARG branch=master
-# ARG repo=ethereum
 # RUN \
 #   apk add --update bash curl jq go git make gcc musl-dev         \
 #         ca-certificates linux-headers                         && \
 #   git clone --depth 1 --branch $branch                           \
-#       https://github.com/$repo/go-ethereum                    && \
+#       https://github.com/$user/$repo                          && \
 #   (cd go-ethereum && make geth)                               && \
 #   (cd go-ethereum                                             && \
 #   echo "{}"                                                      \
