@@ -139,8 +139,8 @@ fi
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,web3"
 FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,net,web3"
 
-# Enable continuous sync if mining is disabled
-if [ "$HIVE_MINER" == "" ]; then
+# Enable continuous sync if there is no CL (ttd == "") and mining is disabled
+if [ -z "${HIVE_MINER}" ] && [ -z "${HIVE_CLIQUE_PRIVATEKEY}" ] && [ -z "${HIVE_TERMINAL_TOTAL_DIFFICULTY}" ]; then
     # if there is no chain file then we need to sync with the continuous
     # download mode
     if [ ! -f /chain.rlp ]; then
