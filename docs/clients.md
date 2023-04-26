@@ -36,6 +36,38 @@ Examples:
 	besu_u:hyperledger_b:master -> client: besu, user: hyperledger, branch: master
 	go-ethereum_f:git -> client: go-ethereum, dockerfile: Dockerfile.git
 
+Client configuration can also be specified as a YAML or JSON file.
+
+    ./hive --sim my-simulation --client clients.yaml
+
+```yaml
+- name: go-ethereum
+  dockerfile: git
+- name: nethermind
+  user: nethermindeth
+  repo: hive
+  branch: latest
+```
+
+    ./hive --sim my-simulation --client clients.json
+
+```json
+[
+	{
+		"name": "go-ethereum",
+		"dockerfile": "git"
+	},
+	{
+		"name": "nethermind",
+		"user": "nethermindeth",
+		"repo": "hive",
+		"branch": "latest",
+	}
+]
+```
+
+The client name is required, but all other fields are optional.
+
 See the [go-ethereum client definition][geth-docker] for an example of a client
 Dockerfile.
 
@@ -51,7 +83,7 @@ list:
 
 The role list is available to simulators and can be used to differentiate between clients
 based on features. Declaring a client role also signals that the client supports certain
-role-specific environment variables and files. If `hive.yml` is missing or doesn't declare
+role-specific environment variables and files. If `hive.yaml` is missing or doesn't declare
 roles, the `eth1` role is assumed.
 
 ### /version.txt

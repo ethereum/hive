@@ -40,8 +40,8 @@ func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder
 }
 
 // ReadClientMetadata reads metadata of the given client.
-func (b *Builder) ReadClientMetadata(name string) (*libhive.ClientMetadata, error) {
-	dir := b.config.Inventory.ClientDirectory(name)
+func (b *Builder) ReadClientMetadata(client libhive.ClientBuildInfo) (*libhive.ClientMetadata, error) {
+	dir := b.config.Inventory.ClientDirectory(client)
 	f, err := os.Open(filepath.Join(dir, "hive.yaml"))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -60,16 +60,25 @@ func (b *Builder) ReadClientMetadata(name string) (*libhive.ClientMetadata, erro
 }
 
 // BuildClientImage builds a docker image of the given client.
-func (b *Builder) BuildClientImage(ctx context.Context, name string) (string, error) {
-	dir := b.config.Inventory.ClientDirectory(name)
-	cInfo := libhive.SplitClientName(name)
-	tag := fmt.Sprintf("hive/clients/%s:latest", cInfo.String())
+func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientBuildInfo) (string, error) {
+	dir := b.config.Inventory.ClientDirectory(client)
+	tag := fmt.Sprintf("hive/clients/%s:latest", client.String())
 	dockerFile := "Dockerfile"
-	if cInfo.DockerFile != "" {
+	if client.DockerFile != "" {
 		// Custom Dockerfile.
-		dockerFile += "." + cInfo.DockerFile
+		dockerFile += "." + client.DockerFile
 	}
-	err := b.buildImage(ctx, dir, dockerFile, cInfo.User, cInfo.Repo, cInfo.TagBranch, tag)
+	buildArgs := make([]docker.BuildArg, 0)
+	if client.User != "" {
+		buildArgs = append(buildArgs, docker.BuildArg{Name: "user", Value: client.User})
+	}
+	if client.Repo != "" {
+		buildArgs = append(buildArgs, docker.BuildArg{Name: "repo", Value: client.Repo})
+	}
+	if client.TagBranch != "" {
+		buildArgs = append(buildArgs, docker.BuildArg{Name: "branch", Value: client.TagBranch})
+	}
+	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs...)
 	return tag, err
 }
 
@@ -91,7 +100,7 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 		}
 	}
 	tag := fmt.Sprintf("hive/simulators/%s:latest", name)
-	err := b.buildImage(ctx, buildContextPath, buildDockerfile, "", "", "", tag)
+	err := b.buildImage(ctx, buildContextPath, buildDockerfile, tag)
 	return tag, err
 }
 
@@ -235,7 +244,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch.
-func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, user, repo, branch, imageTag string) error {
+func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs ...docker.BuildArg) error {
 	logger := b.logger.New("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
@@ -246,21 +255,11 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, user, 
 	opts := b.buildConfig(ctx, imageTag)
 	opts.ContextDir = context
 	opts.Dockerfile = dockerFile
-	buildArgs := make([]docker.BuildArg, 0)
 	logctx := []interface{}{"dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull}
-	if user != "" {
-		logctx = append(logctx, "user", user)
-		buildArgs = append(buildArgs, docker.BuildArg{Name: "user", Value: user})
-	}
-	if repo != "" {
-		logctx = append(logctx, "repo", repo)
-		buildArgs = append(buildArgs, docker.BuildArg{Name: "repo", Value: repo})
-	}
-	if branch != "" {
-		logctx = append(logctx, "branch", branch)
-		buildArgs = append(buildArgs, docker.BuildArg{Name: "branch", Value: branch})
-	}
 	if len(buildArgs) > 0 {
+		for _, arg := range buildArgs {
+			logctx = append(logctx, "buildarg", fmt.Sprintf("%s=%s", arg.Name, arg.Value))
+		}
 		opts.BuildArgs = buildArgs
 	}
 

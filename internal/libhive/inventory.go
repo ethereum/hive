@@ -1,14 +1,20 @@
 package libhive
 
 import (
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
-// argDelimiter is what separates the client name from its arguments.
+// argDelimiter is what separates the client name from its build arguments.
 //
 // All arguments start with a letter followed by a colon.
 // The last argument, when no prefix is specified, is the branch or tag name.
@@ -24,14 +30,15 @@ import (
 //	besu_nightly -> client: besu, branch: nightly
 //	besu_u:hyperledger_b:master -> client: besu, user: hyperledger, branch: master
 //	go-ethereum_f:git -> client: go-ethereum, dockerfile: Dockerfile.git
+const clientDelimiter = ","
 const argDelimiter = "_"
 
 type ClientBuildInfo struct {
-	Name       string
-	DockerFile string
-	User       string
-	Repo       string
-	TagBranch  string
+	Name       string `json:"name"       yaml:"name"`
+	DockerFile string `json:"dockerfile" yaml:"dockerfile"`
+	User       string `json:"user"       yaml:"user"`
+	Repo       string `json:"repo"       yaml:"repo"`
+	TagBranch  string `json:"branch"     yaml:"branch"`
 }
 
 func (c ClientBuildInfo) String() string {
@@ -66,20 +73,61 @@ func (c *ClientBuildInfo) ParseSubstring(s string, isLast bool) {
 	}
 }
 
-// SplitClientName returns the name and branch components of 'name'.
-func SplitClientName(name string) ClientBuildInfo {
+// Parses client build info from a string.
+func ParseClientBuildInfoString(fullString string) ClientBuildInfo {
 	res := &ClientBuildInfo{}
-	if strings.Count(name, argDelimiter) > 0 {
-		substrings := strings.Split(name, argDelimiter)
+	if strings.Count(fullString, argDelimiter) > 0 {
+		substrings := strings.Split(fullString, argDelimiter)
 		res.Name = substrings[0]
 		for i := len(substrings) - 1; i > 0; i-- {
 			res.ParseSubstring(substrings[i], i == (len(substrings)-1))
 		}
 	} else {
-		res.Name = name
+		res.Name = fullString
 
 	}
 	return *res
+}
+
+type ClientsBuildInfo []ClientBuildInfo
+
+func (c ClientsBuildInfo) Names() []string {
+	names := make([]string, len(c))
+	for i, client := range c {
+		names[i] = client.Name
+	}
+	return names
+}
+
+func ClientsBuildInfoFromString(arg string) (ClientsBuildInfo, error) {
+	var res ClientsBuildInfo
+	for _, name := range strings.Split(arg, clientDelimiter) {
+		res = append(res, ParseClientBuildInfoString(name))
+	}
+	return res, nil
+}
+
+func ClientsBuildInfoFromFile(file io.Reader) (ClientsBuildInfo, error) {
+	// Read the YAML file
+	data, err := ioutil.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+	var res ClientsBuildInfo
+	// First try to unmarshal as yaml
+	errYaml := yaml.Unmarshal(data, &res)
+	if errYaml == nil {
+		return res, nil
+	}
+
+	// If that fails, try to unmarshal as a json
+	errJson := json.Unmarshal(data, &res)
+	if errJson == nil {
+		return res, nil
+	}
+
+	// Combine the errors
+	return nil, fmt.Errorf("unable to parse clients file: %s, json: %s", errYaml.Error(), errJson.Error())
 }
 
 // Inventory keeps names of clients and simulators.
@@ -91,17 +139,15 @@ type Inventory struct {
 
 // HasClient returns true if the inventory contains the given client.
 // The client name may contain a branch specifier.
-func (inv Inventory) HasClient(name string) bool {
-	name = SplitClientName(name).Name
-	_, ok := inv.Clients[name]
+func (inv Inventory) HasClient(client ClientBuildInfo) bool {
+	_, ok := inv.Clients[client.Name]
 	return ok
 }
 
 // ClientDirectory returns the directory containing the given client's Dockerfile.
 // The client name may contain a branch specifier.
-func (inv Inventory) ClientDirectory(name string) string {
-	name = SplitClientName(name).Name
-	return filepath.Join(inv.BaseDir, "clients", filepath.FromSlash(name))
+func (inv Inventory) ClientDirectory(client ClientBuildInfo) string {
+	return filepath.Join(inv.BaseDir, "clients", filepath.FromSlash(client.Name))
 }
 
 // HasSimulator returns true if the inventory contains the given simulator.

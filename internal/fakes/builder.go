@@ -9,10 +9,10 @@ import (
 
 // BuilderHooks can be used to override the behavior of the fake builder.
 type BuilderHooks struct {
-	BuildClientImage    func(context.Context, string) (string, error)
+	BuildClientImage    func(context.Context, libhive.ClientBuildInfo) (string, error)
 	BuildSimulatorImage func(context.Context, string) (string, error)
 	ReadFile            func(ctx context.Context, image string, file string) ([]byte, error)
-	ReadClientMetadata  func(name string) (*libhive.ClientMetadata, error)
+	ReadClientMetadata  func(client libhive.ClientBuildInfo) (*libhive.ClientMetadata, error)
 }
 
 // fakeBuilder implements Backend without docker.
@@ -29,11 +29,11 @@ func NewBuilder(hooks *BuilderHooks) libhive.Builder {
 	return b
 }
 
-func (b *fakeBuilder) BuildClientImage(ctx context.Context, client string) (string, error) {
+func (b *fakeBuilder) BuildClientImage(ctx context.Context, client libhive.ClientBuildInfo) (string, error) {
 	if b.hooks.BuildClientImage != nil {
 		return b.hooks.BuildClientImage(ctx, client)
 	}
-	return "fakebuild/client/" + client + ":latest", nil
+	return "fakebuild/client/" + client.Name + ":latest", nil
 }
 
 func (b *fakeBuilder) BuildSimulatorImage(ctx context.Context, sim string) (string, error) {
@@ -47,9 +47,9 @@ func (b *fakeBuilder) BuildImage(ctx context.Context, name string, fsys fs.FS) e
 	return nil
 }
 
-func (b *fakeBuilder) ReadClientMetadata(name string) (*libhive.ClientMetadata, error) {
+func (b *fakeBuilder) ReadClientMetadata(client libhive.ClientBuildInfo) (*libhive.ClientMetadata, error) {
 	if b.hooks.ReadClientMetadata != nil {
-		return b.hooks.ReadClientMetadata(name)
+		return b.hooks.ReadClientMetadata(client)
 	}
 	m := libhive.ClientMetadata{Roles: []string{"eth1"}}
 	return &m, nil

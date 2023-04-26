@@ -16,7 +16,7 @@ import (
 
 func TestRunner(t *testing.T) {
 	var (
-		allClients = []string{"client-1", "client-2", "client-3"}
+		allClients = libhive.ClientsBuildInfo{{Name: "client-1"}, {Name: "client-2"}, {Name: "client-3"}}
 		simClients = allClients[1:]
 	)
 
@@ -34,7 +34,7 @@ func TestRunner(t *testing.T) {
 				if err != nil {
 					t.Fatal("error getting client types:", err)
 				}
-				if names := clientNames(defs); !reflect.DeepEqual(names, simClients) {
+				if names := clientNames(defs); !reflect.DeepEqual(names, simClients.Names()) {
 					t.Fatal("wrong client names:", names)
 				}
 			}
