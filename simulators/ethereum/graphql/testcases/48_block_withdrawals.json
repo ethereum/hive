@@ -1,6 +1,6 @@
 {
   "request":
-  "{ block (number: 33) { number withdrawalsRoot withdrawals { index amount validator address } } }",
+  "{ block (number: 33) { number withdrawalsRoot withdrawals { index amount validator address block { hash } } } }",
 
   "responses": [{
     "data" : {
@@ -11,7 +11,10 @@
           "index": "0x0",
           "amount": "0x2540be400",
           "validator": "0xa",
-          "address": "0x0000000000000000000000000000000000000dad"
+          "address": "0x0000000000000000000000000000000000000dad",
+          "block": {
+            "hash": "0x30e688f50392780a71899dcb4c35997f5c1d168cf90306d8e6919ea805097810"
+          }
         }]
       }
     }
