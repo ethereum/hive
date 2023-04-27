@@ -20,6 +20,45 @@ name like:
 
     ./hive --sim my-simulation --client go-ethereum_v1.9.23,go_ethereum_v1.9.22
 
+Other arguments to the docker image building process of the client can be specified by
+using YAML or JSON file as argument.
+
+    ./hive --sim my-simulation --client clients.yaml
+
+```yaml
+- name: go-ethereum
+  dockerfile: git
+- name: nethermind
+  user: nethermindeth
+  repo: hive
+  branch: latest
+```
+
+    ./hive --sim my-simulation --client clients.json
+
+```json
+[
+	{
+		"name": "go-ethereum",
+		"dockerfile": "git"
+	},
+	{
+		"name": "nethermind",
+		"user": "nethermindeth",
+		"repo": "hive",
+		"branch": "latest",
+	}
+]
+```
+
+Supported client build arguments are:
+
+	- name: Name of the client, eg: besu, go-ethereum, etc
+	- dockerfile: Dockerfile to use. E.g. using `dockerfile==git` will build using `Dockerfile.git` instead of the default `Dockerfile`
+	- user: GitHub/DockerHub user or organization name that owns the repository
+	- repo: Repository name
+	- branch: Git branch or docker tag name to use during build process
+
 See the [go-ethereum client definition][geth-docker] for an example of a client
 Dockerfile.
 
@@ -35,7 +74,7 @@ list:
 
 The role list is available to simulators and can be used to differentiate between clients
 based on features. Declaring a client role also signals that the client supports certain
-role-specific environment variables and files. If `hive.yml` is missing or doesn't declare
+role-specific environment variables and files. If `hive.yaml` is missing or doesn't declare
 roles, the `eth1` role is assumed.
 
 ### /version.txt

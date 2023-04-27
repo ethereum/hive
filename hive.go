@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
-	"strings"
 	"time"
 
 	"github.com/ethereum/hive/internal/libdocker"
@@ -38,7 +37,8 @@ func main() {
 			"just the client name, or a client_branch specifier. If a branch name is supplied,\n"+
 			"the client image will use the given git branch or docker tag. Multiple instances of\n"+
 			"a single client type may be requested with different branches.\n"+
-			"Example: \"besu_latest,besu_20.10.2\"")
+			"Example: \"besu_latest,besu_20.10.2\"\n"+
+			"If a valid file is specified instead, the client configuration will be parsed from this file as YALM or JSON.\n")
 		clientTimeout = flag.Duration("client.checktimelimit", 3*time.Minute, "The `timeout` of waiting for clients to open up the RPC port.\n"+
 			"If a very long chain is imported, this timeout may need to be quite large.\n"+
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
@@ -111,7 +111,10 @@ func main() {
 		ClientStartTimeout: *clientTimeout,
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
-	clientList := splitAndTrim(*clients, ",")
+	clientList, err := parseClients(*clients)
+	if err != nil {
+		fatal(err)
+	}
 
 	if err := runner.Build(ctx, clientList, simList); err != nil {
 		fatal(err)
@@ -146,10 +149,18 @@ func fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
-func splitAndTrim(input, sep string) []string {
-	list := strings.Split(input, sep)
-	for i := range list {
-		list[i] = strings.TrimSpace(list[i])
+func parseClients(input string) ([]libhive.ClientBuildInfo, error) {
+	// First check if the input is a path to a file.
+	if _, err := os.Stat(input); err == nil {
+		// Read the file as yaml/json and try to parse the list of client info.
+		f, err := os.Open(input)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+		return libhive.ClientsBuildInfoFromFile(f)
+	} else {
+		// Otherwise, parse the input as a comma-separated list of client info.
+		return libhive.ClientsBuildInfoFromString(input)
 	}
-	return list
 }
