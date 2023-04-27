@@ -1,21 +1,9 @@
-## By default, the geth is pulled from Docker Hub.
+## By default, geth is pulled from Docker Hub.
 
+ARG user=ethereum
+ARG repo=client-go
 ARG branch=latest
-FROM ethereum/client-go:$branch as builder
-
-## ----
-## Uncomment the steps below (and comment out the steps above!) to build go-ethereum
-## from local sources in the ./go-ethereum directory.
-
-# FROM golang:1-alpine as builder
-# ARG branch=master
-# ADD go-ethereum /go-ethereum
-# WORKDIR /go-ethereum
-# RUN apk add --update bash curl jq git make
-# RUN make geth
-# RUN mv ./build/bin/geth /usr/local/bin/geth
-
-## ----
+FROM $user/$repo:$branch as builder
 
 ## ----
 ## Uncomment the steps below (and comment out the steps above!) to build
