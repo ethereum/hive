@@ -258,7 +258,7 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageT
 	logctx := []interface{}{"dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull}
 	if len(buildArgs) > 0 {
 		for _, arg := range buildArgs {
-			logctx = append(logctx, "buildarg", fmt.Sprintf("%s=%s", arg.Name, arg.Value))
+			logctx = append(logctx, arg.Name, arg.Value)
 		}
 		opts.BuildArgs = buildArgs
 	}
