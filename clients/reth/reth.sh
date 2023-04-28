@@ -131,7 +131,7 @@ fi
 #fi
 
 # If clique is expected enable auto-mine
-if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
+if [ -n "${HIVE_CLIQUE_PRIVATEKEY}" ] || [ -n "${HIVE_MINER}" ]; then
   FLAGS="$FLAGS --auto-mine"
 fi
 
