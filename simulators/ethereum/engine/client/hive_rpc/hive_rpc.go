@@ -247,10 +247,7 @@ func (ec *HiveRPCEngineClient) StorageAtKeys(ctx context.Context, account common
 		results[key] = valueResult
 	}
 
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return nil, err
-	}
-	if err := ec.c.BatchCallContext(ctx, reqs); err != nil {
+	if err := ec.cEth.BatchCallContext(ctx, reqs); err != nil {
 		return nil, err
 	}
 	for i, req := range reqs {
@@ -417,7 +414,7 @@ func (ec *HiveRPCEngineClient) GetPayloadBodiesByHashV1(ctx context.Context, has
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) newPayload(ctx context.Context, version int, payload interface{}) (api.PayloadStatusV1, error) {
+func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload interface{}) (api.PayloadStatusV1, error) {
 	var result api.PayloadStatusV1
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
@@ -430,12 +427,12 @@ func (ec *HiveRPCEngineClient) newPayload(ctx context.Context, version int, payl
 func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *client_types.ExecutableDataV1) (api.PayloadStatusV1, error) {
 	ed := payload.ToExecutableData()
 	ec.latestPayloadSent = &ed
-	return ec.newPayload(ctx, 1, payload)
+	return ec.NewPayload(ctx, 1, payload)
 }
 
 func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
 	ec.latestPayloadSent = payload
-	return ec.newPayload(ctx, 2, payload)
+	return ec.NewPayload(ctx, 2, payload)
 }
 
 func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Context, tConf *api.TransitionConfigurationV1) (api.TransitionConfigurationV1, error) {
@@ -512,10 +509,7 @@ func (ec *HiveRPCEngineClient) SendTransactions(ctx context.Context, txs []*type
 			Result: &hashes[i],
 		}
 	}
-	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
-		return []error{err}
-	}
-	if err := ec.c.BatchCallContext(ctx, reqs); err != nil {
+	if err := ec.cEth.BatchCallContext(ctx, reqs); err != nil {
 		return []error{err}
 	}
 

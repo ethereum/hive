@@ -52,14 +52,9 @@ set -e
 # Generate JWT file if necessary
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
-    echo -n $JWT_SECRET > /jwt.secret
+    echo -n $JWT_SECRET > /nethermind/keystore/jwt-secret
 fi
 
-# Generate the config file.
-mkdir /configs
-jq -n -f /mkconfig.jq > /configs/test.cfg
-
-echo "test.cfg"
 cat /configs/test.cfg
 
 # Set bootnode.
@@ -81,7 +76,6 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
     esac
     LOG_FLAG="--log $LOG"
 fi
-cat /chainspec.json
 echo "Running Nethermind..."
 # The output is tee:d, via /log.txt, because the enode script uses that logfile to parse out the enode id
 dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg $LOG_FLAG 2>&1 | tee /log.txt

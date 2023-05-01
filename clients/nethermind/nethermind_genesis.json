@@ -1,5 +1,5 @@
 {
-  "name": "gnosis",
+  "name": "gnosis_withdrawals_devnet",
   "engine": {
     "authorityRound": {
       "params": {
@@ -11,7 +11,7 @@
           "multi": {
             "0": {
               "list": [
-                "0x14747a698Ec1227e6753026C08B29b4d5D3bC484"
+                "0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875"
               ]
             }
           }
@@ -55,10 +55,10 @@
     "eip3529Transition": "0x0",
     "eip3541Transition": "0x0",
     "eip1559Transition": "0x0",
-    "eip4895TransitionTimestamp": "0x64147a94",
-    "eip3855TransitionTimestamp": "0x64147a94",
-    "eip3651TransitionTimestamp": "0x64147a94",
-    "eip3860TransitionTimestamp": "0x64147a94",
+    "eip4895TransitionTimestamp": "0x64147a940",
+    "eip3855TransitionTimestamp": "0x64147a940",
+    "eip3651TransitionTimestamp": "0x64147a940",
+    "eip3860TransitionTimestamp": "0x64147a940",
     "eip1559BaseFeeMaxChangeDenominator": "0x8",
     "eip1559ElasticityMultiplier": "0x2",
     "eip1559FeeCollector": "0x1559000000000000000000000000000000000000",
@@ -66,7 +66,7 @@
     "registrar": "0x6000000000000000000000000000000000000000",
     "transactionPermissionContract": "0x4000000000000000000000000000000000000001",
     "transactionPermissionContractTransition": "0x0",
-    "terminalTotalDifficulty": "54445178707350154154139937189082913832640"
+    "terminalTotalDifficulty": "131073"
   },
   "genesis": {
     "seal": {
@@ -80,6 +80,9 @@
     "gasLimit": "0x989680"
   },
   "accounts": {
+    "0xcf49fda3be353c69b41ed96333cd24302da4556f": {
+      "balance": "0xc9f2c9cd04674edea40000000"
+    },
     "0xB03a86b3126157C039b55E21D378587CcFc04d45": {
       "balance": "0xc9f2c9cd04674edea40000000"
     },

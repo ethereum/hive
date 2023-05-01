@@ -3,8 +3,10 @@ package testnet
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
+	"net"
 	"sync"
 	"time"
 
@@ -32,6 +34,9 @@ const (
 var (
 	EMPTY_EXEC_HASH = ethcommon.Hash{}
 	EMPTY_TREE_ROOT = tree.Root{}
+	JWT_SECRET, _   = hex.DecodeString(
+		"7365637265747365637265747365637265747365637265747365637265747365",
+	)
 )
 
 type Testnet struct {
@@ -134,15 +139,27 @@ func StartTestnet(
 	env *Environment,
 	config *Config,
 ) *Testnet {
-	prep := prepareTestnet(t, env, config)
-	testnet := prep.createTestnet(t)
-	genesisTime := testnet.GenesisTimeUnix()
-	countdown := time.Until(genesisTime)
+	var (
+		prep        = prepareTestnet(t, env, config)
+		testnet     = prep.createTestnet(t)
+		genesisTime = testnet.GenesisTimeUnix()
+	)
 	t.Logf(
 		"Created new testnet, genesis at %s (%s from now)",
 		genesisTime,
-		countdown,
+		time.Until(genesisTime),
 	)
+
+	var simulatorIP net.IP
+	if simIPStr, err := t.Sim.ContainerNetworkIP(
+		testnet.T.SuiteID,
+		"bridge",
+		"simulation",
+	); err != nil {
+		panic(err)
+	} else {
+		simulatorIP = net.ParseIP(simIPStr)
+	}
 
 	testnet.Nodes = make(clients.Nodes, len(config.NodeDefinitions))
 
@@ -172,10 +189,18 @@ func StartTestnet(
 				node.ValidatorClientName(),
 				"validator",
 			)
+			executionTTD = int64(0)
+			beaconTTD    = int64(0)
 		)
 
 		if executionDef == nil || beaconDef == nil || validatorDef == nil {
 			t.Fatalf("FAIL: Unable to get client")
+		}
+		if node.ExecutionClientTTD != nil {
+			executionTTD = node.ExecutionClientTTD.Int64()
+		}
+		if node.BeaconNodeTTD != nil {
+			beaconTTD = node.BeaconNodeTTD.Int64()
 		}
 
 		// Prepare the client objects with all the information necessary to
@@ -185,11 +210,19 @@ func StartTestnet(
 			testnet,
 			executionDef,
 			config.Eth1Consensus,
-			node.ExecutionClientTTD,
-			nodeIndex,
 			node.Chain,
-			node.ExecutionSubnet,
-			env.LogEngineCalls,
+			clients.ExecutionClientConfig{
+				ClientIndex:             nodeIndex,
+				TerminalTotalDifficulty: executionTTD,
+				Subnet:                  node.GetExecutionSubnet(),
+				JWTSecret:               JWT_SECRET,
+				ProxyConfig: &clients.ExecutionProxyConfig{
+					Host:                   simulatorIP,
+					Port:                   clients.PortEngineRPC + nodeIndex,
+					TrackForkchoiceUpdated: true,
+					LogEngineCalls:         env.LogEngineCalls,
+				},
+			},
 		)
 
 		if node.ConsensusClient != "" {
@@ -197,10 +230,16 @@ func StartTestnet(
 				parentCtx,
 				testnet,
 				beaconDef,
-				node.BeaconNodeTTD,
-				nodeIndex,
 				config.EnableBuilders,
 				config.BuilderOptions,
+				clients.BeaconClientConfig{
+					ClientIndex:             nodeIndex,
+					TerminalTotalDifficulty: beaconTTD,
+					Spec:                    testnet.spec,
+					GenesisValidatorsRoot:   &testnet.genesisValidatorsRoot,
+					GenesisTime:             &testnet.genesisTime,
+					Subnet:                  node.GetConsensusSubnet(),
+				},
 				nodeClient.ExecutionClient,
 			)
 
@@ -214,18 +253,16 @@ func StartTestnet(
 		}
 
 		// Add rest of properties
-		nodeClient.T = t
+		nodeClient.Logging = t
 		nodeClient.Index = nodeIndex
 		nodeClient.Verification = node.TestVerificationNode
-
 		// Start the node clients if specified so
 		if !node.DisableStartup {
-			nodeClient.Start()
+			if err := nodeClient.Start(); err != nil {
+				t.Fatalf("FAIL: Unable to start node %d: %v", nodeIndex, err)
+			}
 		}
 	}
-
-	// Default config
-	testnet.maxConsecutiveErrorsOnWaits = 3
 
 	return testnet
 }
@@ -262,7 +299,7 @@ func (t *Testnet) WaitForGenesis(ctx context.Context) {
 // Wait a certain amount of slots while printing the current status.
 func (t *Testnet) WaitSlots(ctx context.Context, slots common.Slot) error {
 	for s := common.Slot(0); s < slots; s++ {
-		t.BeaconClients().Running().PrintStatus(ctx, t)
+		t.BeaconClients().Running().PrintStatus(ctx)
 		select {
 		case <-time.After(time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second):
 		case <-ctx.Done():

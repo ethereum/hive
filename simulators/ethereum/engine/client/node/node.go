@@ -554,7 +554,7 @@ func (n *GethNode) ReOrgBackBlockChain(N uint64, currentBlock *types.Header) (*t
 
 func (n *GethNode) SubscribeP2PEvents() {
 	eventChan := make(chan *p2p.PeerEvent)
-	n.node.Server().SubscribeEvents(eventChan)
+	subscription := n.node.Server().SubscribeEvents(eventChan)
 	for {
 		select {
 		case event := <-eventChan:
@@ -573,6 +573,7 @@ func (n *GethNode) SubscribeP2PEvents() {
 			}
 
 		case <-n.running.Done():
+			subscription.Unsubscribe()
 			return
 		}
 	}
@@ -694,6 +695,23 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 }
 
 // Engine API
+func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}) (beacon.PayloadStatusV1, error) {
+	switch version {
+	case 1:
+		if c, ok := pl.(*client_types.ExecutableDataV1); ok {
+			return n.NewPayloadV1(ctx, c)
+		} else {
+			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
+		}
+	case 2:
+		if c, ok := pl.(*beacon.ExecutableData); ok {
+			return n.NewPayloadV2(ctx, c)
+		} else {
+			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
+		}
+	}
+	return beacon.PayloadStatusV1{}, fmt.Errorf("unknown version %d", version)
+}
 func (n *GethNode) NewPayloadV1(ctx context.Context, pl *client_types.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
 	ed := pl.ToExecutableData()
 	n.latestPayloadSent = &ed
@@ -707,7 +725,16 @@ func (n *GethNode) NewPayloadV2(ctx context.Context, pl *beacon.ExecutableData) 
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
-
+func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+	switch version {
+	case 1:
+		return n.ForkchoiceUpdatedV1(ctx, fcs, payload)
+	case 2:
+		return n.ForkchoiceUpdatedV2(ctx, fcs, payload)
+	default:
+		return beacon.ForkChoiceResponse{}, fmt.Errorf("unknown version %d", version)
+	}
+}
 func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload

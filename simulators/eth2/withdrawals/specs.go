@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
@@ -233,21 +234,6 @@ func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 	return keys
 }
 
-type BuilderTestError int
-
-const (
-	NO_ERROR BuilderTestError = iota
-	ERROR_ON_HEADER_REQUEST
-	ERROR_ON_UNBLINDED_PAYLOAD_REQUEST
-	INVALID_WITHDRAWALS
-	INVALIDATE_SINGLE_WITHDRAWAL_ADDRESS
-	INVALIDATE_SINGLE_WITHDRAWAL_AMOUNT
-	INVALIDATE_SINGLE_WITHDRAWAL_VALIDATOR_INDEX
-	INVALIDATE_SINGLE_WITHDRAWAL_INDEX
-	VALID_WITHDRAWALS_INVALID_STATE_ROOT
-	TIMEOUT
-)
-
 var REQUIRES_FINALIZATION_TO_ACTIVATE_BUILDER = []string{
 	"lighthouse",
 	"teku",
@@ -255,7 +241,11 @@ var REQUIRES_FINALIZATION_TO_ACTIVATE_BUILDER = []string{
 
 type BuilderWithdrawalsTestSpec struct {
 	BaseWithdrawalsTestSpec
-	BuilderTestError BuilderTestError
+	ErrorOnHeaderRequest        bool
+	ErrorOnPayloadReveal        bool
+	InvalidPayloadVersion       bool
+	InvalidatePayload           mock_builder.PayloadInvalidation
+	InvalidatePayloadAttributes mock_builder.PayloadAttributesInvalidation
 }
 
 func (ts BuilderWithdrawalsTestSpec) GetTestnetConfig(

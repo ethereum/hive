@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/hive/hivesim"
+	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	consensus_config "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
@@ -101,7 +102,7 @@ var builderTests = []TestSpec{
 			// All validators can withdraw from the start
 			GenesisExecutionWithdrawalCredentialsShares: 1,
 		},
-		BuilderTestError: INVALID_WITHDRAWALS,
+		InvalidatePayloadAttributes: mock_builder.INVALIDATE_ATTR_EXTRA_WITHDRAWAL,
 	},
 	BuilderWithdrawalsTestSpec{
 		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
@@ -113,7 +114,7 @@ var builderTests = []TestSpec{
 			// All validators can withdraw from the start
 			GenesisExecutionWithdrawalCredentialsShares: 1,
 		},
-		BuilderTestError: ERROR_ON_HEADER_REQUEST,
+		ErrorOnHeaderRequest: true,
 	},
 	BuilderWithdrawalsTestSpec{
 		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
@@ -125,7 +126,19 @@ var builderTests = []TestSpec{
 			// All validators can withdraw from the start
 			GenesisExecutionWithdrawalCredentialsShares: 1,
 		},
-		BuilderTestError: ERROR_ON_UNBLINDED_PAYLOAD_REQUEST,
+		ErrorOnPayloadReveal: true,
+	},
+	BuilderWithdrawalsTestSpec{
+		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
+			Name: "test-builders-capella-invalid-payload-version",
+			Description: `
+			Test consensus clients correctly reject a built payload if the
+			version is outdated (bellatrix instead of capella).
+			`,
+			// All validators can withdraw from the start
+			GenesisExecutionWithdrawalCredentialsShares: 1,
+		},
+		InvalidPayloadVersion: true,
 	},
 	BuilderWithdrawalsTestSpec{
 		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
@@ -141,7 +154,7 @@ var builderTests = []TestSpec{
 			// All validators can withdraw from the start
 			GenesisExecutionWithdrawalCredentialsShares: 1,
 		},
-		BuilderTestError: VALID_WITHDRAWALS_INVALID_STATE_ROOT,
+		InvalidatePayload: mock_builder.INVALIDATE_PAYLOAD_STATE_ROOT,
 	},
 	BuilderWithdrawalsTestSpec{
 		BaseWithdrawalsTestSpec: BaseWithdrawalsTestSpec{
@@ -152,7 +165,6 @@ var builderTests = []TestSpec{
 			// All validators can withdraw from the start
 			GenesisExecutionWithdrawalCredentialsShares: 1,
 		},
-		BuilderTestError: NO_ERROR,
 	},
 }
 

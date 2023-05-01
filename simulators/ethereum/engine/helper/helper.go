@@ -408,6 +408,7 @@ type BaseTransactionCreator struct {
 	Payload    []byte
 	TxType     TestTransactionType
 	PrivateKey *ecdsa.PrivateKey
+	ChainID    *big.Int
 }
 
 func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transaction, error) {
@@ -460,7 +461,7 @@ func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transact
 	if key == nil {
 		key = globals.VaultKey
 	}
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(globals.ChainID), key)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(tc.ChainID), key)
 	if err != nil {
 		return nil, err
 	}

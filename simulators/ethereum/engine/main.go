@@ -86,6 +86,20 @@ type ClientGenesis interface {
 
 // Load the genesis based on each client
 
+// getTimestamp of the next 2 minutes
+func getTimestamp() string {
+	now := time.Now()
+
+	// Calculate the start of the next 2 minutes
+	nextMinute := now.Truncate(time.Minute).Add(2 * time.Minute)
+
+	// Get the Unix timestamp of the next 2 minutes
+	timestamp := nextMinute.Unix()
+
+	// Convert the timestamp to a hexadecimal representation
+	return "0x" + fmt.Sprintf("%x", timestamp)
+}
+
 // Add test cases to a given test suite
 func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.SpecInterface, nodeType string) {
 	for _, currentTest := range tests {
@@ -101,6 +115,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 		clientName := strings.Split(clientTypes[0].Name, "_")[0]
 		genesis := currentTest.GetGenesis(clientName)
+		//genesis.UpdateTimestamp(getTimestamp())
 		genesisStartOption, err := helper.GenesisStartOptionBasedOnClient(genesis, clientName)
 		if err != nil {
 			panic("unable to inject genesis")

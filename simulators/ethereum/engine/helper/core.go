@@ -42,6 +42,7 @@ type Genesis interface {
 	SetCoinbase(address common.Address)
 	Alloc() GenesisAlloc
 	AllocGenesis(address common.Address, account GenesisAccount)
+	UpdateTimestamp(timestamp string)
 
 	// Used for testing
 
@@ -159,9 +160,16 @@ type NethermindChainSpec struct {
 	Accounts map[string]Account `json:"accounts,omitempty"`
 }
 
+func (n *NethermindChainSpec) UpdateTimestamp(timestamp string) {
+	n.Params.Eip3651TransitionTimestamp = timestamp
+	n.Params.Eip3855TransitionTimestamp = timestamp
+	n.Params.Eip3860TransitionTimestamp = timestamp
+	n.Params.Eip4895TransitionTimestamp = timestamp
+}
+
 func (n *NethermindChainSpec) Config() *params.ChainConfig {
-	//TODO implement me
-	panic("implement me")
+	chainID := big.NewInt(int64(n.Params.NetworkID))
+	return &params.ChainConfig{ChainID: chainID}
 }
 
 func (n *NethermindChainSpec) SetConfig(config *params.ChainConfig) {
@@ -200,8 +208,7 @@ func (n *NethermindChainSpec) SetExtraData(data []byte) {
 }
 
 func (n *NethermindChainSpec) GasLimit() uint64 {
-	//TODO implement me
-	panic("implement me")
+	return common.HexToHash(n.Genesis.GasLimit).Big().Uint64()
 }
 
 func (n *NethermindChainSpec) SetGasLimit(limit uint64) {

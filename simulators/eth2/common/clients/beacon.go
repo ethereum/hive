@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/hive/hivesim"
 
 	"github.com/ethereum/hive/simulators/eth2/common/builder"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
@@ -26,6 +26,7 @@ import (
 	"github.com/protolambda/zrnt/eth2/beacon/capella"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/beacon/phase0"
+	"github.com/protolambda/zrnt/eth2/configs"
 	"github.com/protolambda/ztyp/tree"
 )
 
@@ -40,92 +41,138 @@ const (
 
 var EMPTY_TREE_ROOT = tree.Root{}
 
+type BeaconClientConfig struct {
+	ClientIndex             int
+	TerminalTotalDifficulty int64
+	BeaconAPIPort           int
+	Spec                    *common.Spec
+	GenesisValidatorsRoot   *tree.Root
+	GenesisTime             *common.Timestamp
+	Subnet                  string
+}
+
 type BeaconClient struct {
-	T                     *hivesim.T
-	HiveClient            *hivesim.Client
-	ClientType            string
-	OptionsGenerator      func() ([]hivesim.StartOption, error)
-	API                   *eth2api.Eth2HttpClient
-	genesisTime           common.Timestamp
-	spec                  *common.Spec
-	index                 int
-	genesisValidatorsRoot tree.Root
-	Builder               builder.Builder
+	Client
+	Logger  utils.Logging
+	Config  BeaconClientConfig
+	Builder builder.Builder
+
+	api *eth2api.Eth2HttpClient
 }
 
-func NewBeaconClient(
-	t *hivesim.T,
-	beaconDef *hivesim.ClientDefinition,
-	optionsGenerator func() ([]hivesim.StartOption, error),
-	genesisTime common.Timestamp,
-	spec *common.Spec,
-	index int,
-	genesisValidatorsRoot tree.Root,
-) *BeaconClient {
-	return &BeaconClient{
-		T:                     t,
-		ClientType:            beaconDef.Name,
-		OptionsGenerator:      optionsGenerator,
-		genesisTime:           genesisTime,
-		spec:                  spec,
-		index:                 index,
-		genesisValidatorsRoot: genesisValidatorsRoot,
+func (bn *BeaconClient) Logf(format string, values ...interface{}) {
+	if l := bn.Logger; l != nil {
+		l.Logf(format, values...)
 	}
 }
 
-func (bn *BeaconClient) Start(extraOptions ...hivesim.StartOption) error {
-	if bn.HiveClient != nil {
-		return fmt.Errorf("client already started")
-	}
-	bn.T.Logf("Starting client %s", bn.ClientType)
-	opts, err := bn.OptionsGenerator()
-	if err != nil {
-		return fmt.Errorf("unable to get start options: %v", err)
-	}
-	opts = append(opts, extraOptions...)
+func (bn *BeaconClient) Start() error {
+	if !bn.IsRunning() {
+		if managedClient, ok := bn.Client.(ManagedClient); !ok {
+			return fmt.Errorf("attempted to start an unmanaged client")
+		} else {
+			if err := managedClient.Start(); err != nil {
+				return err
+			}
+		}
 
-	if bn.Builder != nil {
-		opts = append(opts, hivesim.Params{
-			"HIVE_ETH2_BUILDER_ENDPOINT": bn.Builder.Address(),
-		})
 	}
 
-	bn.HiveClient = bn.T.StartClient(bn.ClientType, opts...)
-	bn.API = &eth2api.Eth2HttpClient{
-		Addr:  fmt.Sprintf("http://%s:%d", bn.HiveClient.IP, PortBeaconAPI),
-		Cli:   &http.Client{},
-		Codec: eth2api.JSONCodec{},
+	return bn.Init(context.Background())
+}
+
+func (bn *BeaconClient) Init(ctx context.Context) error {
+	if bn.api == nil {
+		port := bn.Config.BeaconAPIPort
+		if port == 0 {
+			port = PortBeaconAPI
+		}
+		bn.api = &eth2api.Eth2HttpClient{
+			Addr: fmt.Sprintf(
+				"http://%s:%d",
+				bn.GetIP(),
+				port,
+			),
+			Cli:   &http.Client{},
+			Codec: eth2api.JSONCodec{},
+		}
 	}
-	bn.T.Logf(
-		"Started client %s, container: %s",
-		bn.ClientType,
-		bn.HiveClient.Container,
-	)
-	return nil
+
+	var wg sync.WaitGroup
+	var errs = make(chan error, 2)
+	if bn.Config.Spec == nil {
+		// Try to fetch config directly from the client
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				if cfg, err := bn.BeaconConfig(ctx); err == nil && cfg != nil {
+					if spec, err := SpecFromConfig(cfg); err != nil {
+						errs <- err
+						return
+					} else {
+						bn.Config.Spec = spec
+						return
+					}
+				}
+				select {
+				case <-ctx.Done():
+					errs <- ctx.Err()
+					return
+				case <-time.After(time.Second):
+				}
+			}
+		}()
+	}
+
+	if bn.Config.GenesisTime == nil || bn.Config.GenesisValidatorsRoot == nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				if gen, err := bn.GenesisConfig(ctx); err == nil &&
+					gen != nil {
+					bn.Config.GenesisTime = &gen.GenesisTime
+					bn.Config.GenesisValidatorsRoot = &gen.GenesisValidatorsRoot
+					return
+				}
+				select {
+				case <-ctx.Done():
+					errs <- ctx.Err()
+					return
+				case <-time.After(time.Second):
+				}
+			}
+		}()
+	}
+	wg.Wait()
+
+	select {
+	case err := <-errs:
+		return err
+	default:
+		return nil
+	}
 }
 
 func (bn *BeaconClient) Shutdown() error {
-	if err := bn.T.Sim.StopClient(bn.T.SuiteID, bn.T.TestID, bn.HiveClient.Container); err != nil {
-		return err
+	if managedClient, ok := bn.Client.(ManagedClient); !ok {
+		return fmt.Errorf("attempted to shutdown an unmanaged client")
+	} else {
+		return managedClient.Shutdown()
 	}
-	bn.HiveClient = nil
-	return nil
-}
-
-func (bn *BeaconClient) IsRunning() bool {
-	return bn.HiveClient != nil
 }
 
 func (bn *BeaconClient) ENR(parentCtx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(parentCtx, time.Second*10)
 	defer cancel()
 	var out eth2api.NetworkIdentity
-	if err := nodeapi.Identity(ctx, bn.API, &out); err != nil {
+	if err := nodeapi.Identity(ctx, bn.api, &out); err != nil {
 		return "", err
 	}
-	fmt.Printf("p2p addrs: %v\n", out.P2PAddresses)
-	fmt.Printf("peer id: %s\n", out.PeerID)
-	fmt.Printf("enr: %s\n", out.ENR)
+	bn.Logf("p2p addrs: %v\n", out.P2PAddresses)
+	bn.Logf("peer id: %s\n", out.PeerID)
+	bn.Logf("enr: %s\n", out.ENR)
 	return out.ENR, nil
 }
 
@@ -133,15 +180,22 @@ func (bn *BeaconClient) P2PAddr(parentCtx context.Context) (string, error) {
 	ctx, cancel := context.WithTimeout(parentCtx, time.Second*10)
 	defer cancel()
 	var out eth2api.NetworkIdentity
-	if err := nodeapi.Identity(ctx, bn.API, &out); err != nil {
+	if err := nodeapi.Identity(ctx, bn.api, &out); err != nil {
 		return "", err
 	}
 	return fmt.Sprintf(
 		"/ip4/%s/tcp/%d/p2p/%s",
-		bn.HiveClient.IP.String(),
+		bn.GetIP().String(),
 		PortBeaconTCP,
 		out.PeerID,
 	), nil
+}
+
+func (bn *BeaconClient) BeaconAPIURL() (string, error) {
+	if bn.api == nil {
+		return "", fmt.Errorf("api not initialized")
+	}
+	return bn.api.Addr, nil
 }
 
 func (bn *BeaconClient) EnodeURL() (string, error) {
@@ -151,14 +205,78 @@ func (bn *BeaconClient) EnodeURL() (string, error) {
 }
 
 func (bn *BeaconClient) ClientName() string {
-	name := bn.ClientType
+	name := bn.ClientType()
 	if len(name) > 3 && name[len(name)-3:] == "-bn" {
 		name = name[:len(name)-3]
 	}
 	return name
 }
 
+func (bn *BeaconClient) API() *eth2api.Eth2HttpClient {
+	return bn.api
+}
+
+func SpecFromConfig(cfg *common.Config) (*common.Spec, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("empty cfg")
+	}
+	var spec *common.Spec
+	if cfg.PRESET_BASE == "mainnet" {
+		specCpy := *configs.Mainnet
+		spec = &specCpy
+	} else if cfg.PRESET_BASE == "minimal" {
+		specCpy := *configs.Minimal
+		spec = &specCpy
+	} else {
+		return nil, fmt.Errorf("invalid preset base: %s", cfg.PRESET_BASE)
+	}
+	spec.Config = *cfg
+	return spec, nil
+}
+
 // Beacon API wrappers
+func (bn *BeaconClient) BeaconConfig(
+	parentCtx context.Context,
+) (*common.Config, error) {
+	var (
+		cfg    = new(common.Config)
+		exists bool
+		err    error
+	)
+	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
+	defer cancel()
+	exists, err = eth2api.SimpleRequest(
+		ctx,
+		bn.api,
+		eth2api.FmtGET("/eth/v1/config/spec"),
+		eth2api.Wrap(cfg),
+	)
+
+	if !exists {
+		return nil, fmt.Errorf("endpoint not found on beacon client")
+	}
+	return cfg, err
+}
+
+func (bn *BeaconClient) GenesisConfig(
+	parentCtx context.Context,
+) (*eth2api.GenesisResponse, error) {
+	var (
+		dest   = new(eth2api.GenesisResponse)
+		exists bool
+		err    error
+	)
+	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
+	defer cancel()
+
+	exists, err = beaconapi.Genesis(ctx, bn.api, dest)
+
+	if !exists {
+		return nil, fmt.Errorf("endpoint not found on beacon client")
+	}
+	return dest, err
+}
+
 type VersionedSignedBeaconBlock struct {
 	*eth2api.VersionedSignedBeaconBlock
 }
@@ -301,7 +419,7 @@ func (bn *BeaconClient) BlockV2Root(
 	)
 	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
 	defer cancel()
-	root, exists, err = beaconapi.BlockRoot(ctx, bn.API, blockId)
+	root, exists, err = beaconapi.BlockRoot(ctx, bn.api, blockId)
 	if !exists {
 		return root, fmt.Errorf(
 			"endpoint not found on beacon client",
@@ -321,7 +439,7 @@ func (bn *BeaconClient) BlockV2(
 	)
 	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
 	defer cancel()
-	exists, err = beaconapi.BlockV2(ctx, bn.API, blockId, versionedBlock)
+	exists, err = beaconapi.BlockV2(ctx, bn.api, blockId, versionedBlock)
 	if !exists {
 		return nil, fmt.Errorf("endpoint not found on beacon client")
 	}
@@ -348,7 +466,7 @@ func (bn *BeaconClient) BlockIsOptimistic(
 	defer cancel()
 	exists, err = eth2api.SimpleRequest(
 		ctx,
-		bn.API,
+		bn.api,
 		eth2api.FmtGET("/eth/v2/beacon/blocks/%s", blockId.BlockId()),
 		blockOptResp,
 	)
@@ -369,7 +487,7 @@ func (bn *BeaconClient) BlockHeader(
 	)
 	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
 	defer cancel()
-	exists, err = beaconapi.BlockHeader(ctx, bn.API, blockId, headInfo)
+	exists, err = beaconapi.BlockHeader(ctx, bn.api, blockId, headInfo)
 	if !exists {
 		return nil, fmt.Errorf("endpoint not found on beacon client")
 	}
@@ -390,7 +508,7 @@ func (bn *BeaconClient) StateValidator(
 	defer cancel()
 	exists, err = beaconapi.StateValidator(
 		ctx,
-		bn.API,
+		bn.api,
 		stateId,
 		validatorId,
 		stateValidatorResponse,
@@ -414,7 +532,7 @@ func (bn *BeaconClient) StateFinalityCheckpoints(
 	defer cancel()
 	exists, err = beaconapi.FinalityCheckpoints(
 		ctx,
-		bn.API,
+		bn.api,
 		stateId,
 		finalityCheckpointsResponse,
 	)
@@ -726,7 +844,7 @@ func (bn *BeaconClient) BeaconStateV2(
 	defer cancel()
 	exists, err = debugapi.BeaconStateV2(
 		ctx,
-		bn.API,
+		bn.api,
 		stateId,
 		versionedBeaconStateResponse,
 	)
@@ -735,7 +853,7 @@ func (bn *BeaconClient) BeaconStateV2(
 	}
 	return &VersionedBeaconStateResponse{
 		VersionedBeaconState: versionedBeaconStateResponse,
-		spec:                 bn.spec,
+		spec:                 bn.Config.Spec,
 	}, err
 }
 
@@ -775,7 +893,7 @@ func (bn *BeaconClient) StateValidators(
 	defer cancel()
 	exists, err = beaconapi.StateValidators(
 		ctx,
-		bn.API,
+		bn.api,
 		stateId,
 		validatorIds,
 		statusFilter,
@@ -804,7 +922,7 @@ func (bn *BeaconClient) StateValidatorBalances(
 	defer cancel()
 	exists, err = beaconapi.StateValidatorBalances(
 		ctx,
-		bn.API,
+		bn.api,
 		stateId,
 		validatorIds,
 		&stateValidatorBalanceResponse,
@@ -820,11 +938,14 @@ func (bn *BeaconClient) ComputeDomain(
 	typ common.BLSDomainType,
 	version *common.Version,
 ) (common.BLSDomain, error) {
+	if bn.Config.GenesisTime == nil {
+		panic(fmt.Errorf("init not called yet"))
+	}
 	if version != nil {
 		return common.ComputeDomain(
 			typ,
 			*version,
-			bn.genesisValidatorsRoot,
+			*bn.Config.GenesisValidatorsRoot,
 		), nil
 	}
 	// We need to request for head state to know current active version
@@ -835,7 +956,7 @@ func (bn *BeaconClient) ComputeDomain(
 	return common.ComputeDomain(
 		typ,
 		state.CurrentVersion(),
-		bn.genesisValidatorsRoot,
+		*bn.Config.GenesisValidatorsRoot,
 	), nil
 }
 
@@ -845,7 +966,7 @@ func (bn *BeaconClient) SubmitPoolBLSToExecutionChange(
 ) error {
 	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
 	defer cancel()
-	return beaconapi.SubmitBLSToExecutionChanges(ctx, bn.API, l)
+	return beaconapi.SubmitBLSToExecutionChanges(ctx, bn.api, l)
 }
 
 func (bn *BeaconClient) SubmitVoluntaryExit(
@@ -854,18 +975,21 @@ func (bn *BeaconClient) SubmitVoluntaryExit(
 ) error {
 	ctx, cancel := utils.ContextTimeoutRPC(parentCtx)
 	defer cancel()
-	return beaconapi.SubmitVoluntaryExit(ctx, bn.API, exit)
+	return beaconapi.SubmitVoluntaryExit(ctx, bn.api, exit)
 }
 
 func (b *BeaconClient) WaitForExecutionPayload(
 	ctx context.Context,
 ) (ethcommon.Hash, error) {
-	fmt.Printf(
+	if b.Config.GenesisTime == nil {
+		panic(fmt.Errorf("init not called yet"))
+	}
+	b.Logf(
 		"Waiting for execution payload on beacon %d (%s)\n",
-		b.index,
+		b.Config.ClientIndex,
 		b.ClientName(),
 	)
-	slotDuration := time.Duration(b.spec.SECONDS_PER_SLOT) * time.Second
+	slotDuration := time.Duration(b.Config.Spec.SECONDS_PER_SLOT) * time.Second
 	timer := time.NewTicker(slotDuration)
 
 	for {
@@ -873,9 +997,9 @@ func (b *BeaconClient) WaitForExecutionPayload(
 		case <-ctx.Done():
 			return ethcommon.Hash{}, ctx.Err()
 		case <-timer.C:
-			realTimeSlot := b.spec.TimeToSlot(
+			realTimeSlot := b.Config.Spec.TimeToSlot(
 				common.Timestamp(time.Now().Unix()),
-				b.genesisTime,
+				*b.Config.GenesisTime,
 			)
 			var (
 				headInfo  *eth2api.BeaconBlockHeaderAndInfo
@@ -898,9 +1022,9 @@ func (b *BeaconClient) WaitForExecutionPayload(
 				)
 			}
 			zero := ethcommon.Hash{}
-			fmt.Printf(
+			b.Logf(
 				"WaitForExecutionPayload: beacon %d (%s): slot=%d, realTimeSlot=%d, head=%s, exec=%s\n",
-				b.index,
+				b.Config.ClientIndex,
 				b.ClientName(),
 				headInfo.Header.Message.Slot,
 				realTimeSlot,
@@ -919,11 +1043,12 @@ func (b *BeaconClient) WaitForOptimisticState(
 	blockID eth2api.BlockId,
 	optimistic bool,
 ) (*eth2api.BeaconBlockHeaderAndInfo, error) {
-	fmt.Printf("Waiting for optimistic sync on beacon %d (%s)\n",
-		b.index,
+	b.Logf("Waiting for optimistic sync on beacon %d (%s)\n",
+		b.Config.ClientIndex,
 		b.ClientName(),
 	)
-	slotDuration := time.Duration(b.spec.SECONDS_PER_SLOT) * time.Second
+
+	slotDuration := time.Duration(b.Config.Spec.SECONDS_PER_SLOT) * time.Second
 	timer := time.NewTicker(slotDuration)
 
 	for {
@@ -932,7 +1057,7 @@ func (b *BeaconClient) WaitForOptimisticState(
 			return nil, ctx.Err()
 		case <-timer.C:
 			var headOptStatus BlockV2OptimisticResponse
-			if exists, err := eth2api.SimpleRequest(ctx, b.API, eth2api.FmtGET("/eth/v2/beacon/blocks/%s", blockID.BlockId()), &headOptStatus); err != nil {
+			if exists, err := eth2api.SimpleRequest(ctx, b.api, eth2api.FmtGET("/eth/v2/beacon/blocks/%s", blockID.BlockId()), &headOptStatus); err != nil {
 				// Block still not synced
 				continue
 			} else if !exists {
@@ -944,7 +1069,7 @@ func (b *BeaconClient) WaitForOptimisticState(
 			}
 			// Return the block
 			var blockInfo eth2api.BeaconBlockHeaderAndInfo
-			if exists, err := beaconapi.BlockHeader(ctx, b.API, blockID, &blockInfo); err != nil {
+			if exists, err := beaconapi.BlockHeader(ctx, b.api, blockID, &blockInfo); err != nil {
 				return nil, fmt.Errorf(
 					"WaitForExecutionPayload: failed to poll block: %v",
 					err,
@@ -984,9 +1109,12 @@ func (bn *BeaconClient) GetLatestExecutionBeaconBlock(
 func (bn *BeaconClient) GetFirstExecutionBeaconBlock(
 	parentCtx context.Context,
 ) (*VersionedSignedBeaconBlock, error) {
-	lastSlot := bn.spec.TimeToSlot(
+	if bn.Config.GenesisTime == nil {
+		panic(fmt.Errorf("init not called yet"))
+	}
+	lastSlot := bn.Config.Spec.TimeToSlot(
 		common.Timestamp(time.Now().Unix()),
-		bn.genesisTime,
+		*bn.Config.GenesisTime,
 	)
 	for slot := common.Slot(0); slot <= lastSlot; slot++ {
 		versionedBlock, err := bn.BlockV2(parentCtx, eth2api.BlockIdSlot(slot))
@@ -1037,7 +1165,7 @@ func (bn *BeaconClient) GetFilledSlotsCountPerEpoch(
 			return nil, fmt.Errorf("failed to poll head: %v", err)
 		}
 		epoch := common.Epoch(
-			headInfo.Header.Message.Slot / bn.spec.SLOTS_PER_EPOCH,
+			headInfo.Header.Message.Slot / bn.Config.Spec.SLOTS_PER_EPOCH,
 		)
 		if prev, ok := epochMap[epoch]; ok {
 			epochMap[epoch] = prev + 1
@@ -1067,6 +1195,20 @@ func (all BeaconClients) Running() BeaconClients {
 	for _, bc := range all {
 		if bc.IsRunning() {
 			res = append(res, bc)
+		}
+	}
+	return res
+}
+
+// Return subset of clients that are part of an specific subnet
+func (all BeaconClients) Subnet(subnet string) BeaconClients {
+	if subnet == "" {
+		return all
+	}
+	res := make(BeaconClients, 0)
+	for _, bn := range all {
+		if bn.Config.Subnet == subnet {
+			res = append(res, bn)
 		}
 	}
 	return res
@@ -1125,7 +1267,6 @@ func (b BeaconClients) GetBeaconBlockByExecutionHash(
 
 func (runningBeacons BeaconClients) PrintStatus(
 	ctx context.Context,
-	l utils.Logging,
 ) {
 	for i, b := range runningBeacons {
 		var (
@@ -1160,7 +1301,7 @@ func (runningBeacons BeaconClients) PrintStatus(
 			}
 		}
 
-		l.Logf(
+		b.Logf(
 			"beacon %d (%s): fork=%s, slot=%d, head=%s, exec_payload=%s, justified=%s, finalized=%s",
 			i,
 			b.ClientName(),

@@ -32,7 +32,7 @@ func init() {
 }
 
 type KeyDetails struct {
-	// ValidatorKeystoreJSON encodes an EIP-2335 keystore, serialized in JSON
+	// ValidatorKeystoreJSON encodes an EIP-2335 miner-0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875.json, serialized in JSON
 	// https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2335.md
 	ValidatorKeystoreJSON []byte
 	// ValidatorKeystorePass holds the secret used for ValidatorKeystoreJSON
@@ -152,7 +152,7 @@ func marshalWeakKeystoreJSON(
 ) ([]byte, error) {
 	store, err := weakKeystore(priv, pub, normedPass, path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to encrypt keystore: %v", err)
+		return nil, fmt.Errorf("failed to encrypt miner-0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875.json: %v", err)
 	}
 	return json.MarshalIndent(store, "", "  ")
 }
@@ -203,7 +203,7 @@ func (k *MnemonicsKeySource) Keys() ([]*KeyDetails, error) {
 		_, err = rand.Read(passRandomness[:])
 		if err != nil {
 			return nil, fmt.Errorf(
-				"failed to generate keystore password: %w",
+				"failed to generate miner-0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875.json password: %w",
 				err,
 			)
 		}
@@ -318,7 +318,7 @@ func KeysBundle(
 	opts := make([]hivesim.StartOption, 0, len(keys)*2)
 	for _, k := range keys {
 		p := fmt.Sprintf(
-			"/hive/input/keystores/0x%x/keystore.json",
+			"/hive/input/keystores/0x%x/miner-0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875.json.json",
 			k.ValidatorPubkey[:],
 		)
 		opts = append(

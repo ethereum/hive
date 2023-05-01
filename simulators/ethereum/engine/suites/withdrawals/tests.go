@@ -31,10 +31,14 @@ var (
 
 	WARM_COINBASE_ADDRESS = common.HexToAddress("0x0101010101010101010101010101010101010101")
 	PUSH0_ADDRESS         = common.HexToAddress("0x0202020202020202020202020202020202020202")
+	CONTRACT_1            = common.HexToAddress("0xB03a86b3126157C039b55E21D378587CcFc04d45")
+	CONTRACT_2            = common.HexToAddress("0xcC4e00A72d871D6c328BcFE9025AD93d0a26dF51")
 
 	TX_CONTRACT_ADDRESSES = []common.Address{
-		WARM_COINBASE_ADDRESS,
-		PUSH0_ADDRESS,
+		//WARM_COINBASE_ADDRESS,
+		//PUSH0_ADDRESS,
+		CONTRACT_1,
+		CONTRACT_2,
 	}
 )
 
@@ -43,30 +47,30 @@ var (
 
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork On Genesis",
-	//		About: `
-	//		Tests the withdrawals fork happening since genesis (e.g. on a
-	//		testnet).
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 0,
-	//	WithdrawalsBlockCount: 2, // Genesis is a withdrawals block
-	//	WithdrawalsPerBlock:   16,
-	//},
-
 	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
-			Name: "Withdrawals Fork on Block 1",
+			Name: "Withdrawals Fork On Genesis",
 			About: `
-			Tests the withdrawals fork happening directly after genesis.
+			Tests the withdrawals fork happening since genesis (e.g. on a
+			testnet).
 			`,
 		},
-		WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
-		WithdrawalsBlockCount: 1,
+		WithdrawalsForkHeight: 2,
+		WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
 		WithdrawalsPerBlock:   16,
 	},
+
+	//&WithdrawalsBaseSpec{
+	//	Spec: test.Spec{
+	//		Name: "Withdrawals Fork on Block 1",
+	//		About: `
+	//		Tests the withdrawals fork happening directly after genesis.
+	//		`,
+	//	},
+	//	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
+	//	WithdrawalsBlockCount: 1,
+	//	WithdrawalsPerBlock:   16,
+	//},
 
 	//&WithdrawalsBaseSpec{
 	//	Spec: test.Spec{
@@ -1099,7 +1103,9 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	t.CLMock.WaitForTTD()
 
 	// Check if we have pre-Shanghai blocks
-	if ws.GetWithdrawalsForkTime() > uint64(globals.GenesisTimestamp) {
+	withdrawalForkTime := ws.GetWithdrawalsForkTime()
+	globalTimestamp := uint64(globals.GenesisTimestamp)
+	if withdrawalForkTime > globalTimestamp {
 		// Check `latest` during all pre-shanghai blocks, none should
 		// contain `withdrawalsRoot`, including genesis.
 
@@ -1137,7 +1143,8 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						Amount:    common.Big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
+						GasLimit:  t.Genesis.GasLimit(),
+						ChainID:   t.Genesis.Config().ChainID,
 					},
 				)
 
@@ -1149,12 +1156,13 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			if !ws.SkipBaseVerifications {
 				// Try to send a ForkchoiceUpdatedV2 with non-null
 				// withdrawals before Shanghai
+				blockIncrement := ws.GetBlockTimeIncrements()
 				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
 					&beacon.PayloadAttributes{
-						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
+						Timestamp:             t.CLMock.LatestHeader.Time + blockIncrement,
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
 						Withdrawals:           make(types.Withdrawals, 0),

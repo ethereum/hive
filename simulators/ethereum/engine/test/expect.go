@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
@@ -122,6 +122,9 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.Forkchoi
 }
 
 func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
+	//if version == -1 {
+	//	version = client.LatestForkchoiceUpdatedVersion
+	//}
 	if version == 2 {
 		return tec.TestEngineForkchoiceUpdatedV2(fcState, pAttributes)
 	}
@@ -183,6 +186,21 @@ func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *api.PayloadID) {
 	if ((exp.Response.PayloadID == nil || pid == nil) && exp.Response.PayloadID != pid) ||
 		(exp.Response.PayloadID != nil && pid != nil && *exp.Response.PayloadID != *pid) {
 		exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadID, pid)
+	}
+}
+
+func (exp *ForkchoiceResponseExpectObject) ExpectUpdatedPayloadID(previousID *api.PayloadID) {
+	exp.ExpectNoError()
+	if exp.Response.PayloadID == nil || previousID == nil {
+		if exp.Response.PayloadID == previousID {
+			// Both are null
+			exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV%d: Expected change from %v", exp.TestName, exp.Version, previousID)
+		}
+	} else {
+		// Both are different from null
+		if *exp.Response.PayloadID == *previousID {
+			exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV%d: Expected change from %s", exp.TestName, exp.Version, previousID.String())
+		}
 	}
 }
 

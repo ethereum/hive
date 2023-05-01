@@ -1,11 +1,11 @@
 package globals
 
 import (
+	"github.com/ethereum/go-ethereum/crypto"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
 )
