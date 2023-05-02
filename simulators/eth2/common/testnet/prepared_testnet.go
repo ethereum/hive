@@ -62,7 +62,7 @@ type PreparedTestnet struct {
 	beaconOpts    hivesim.StartOption
 
 	// A tranche is a group of validator keys to run on 1 node
-	keyTranches []map[common.ValidatorIndex]*cl.KeyDetails
+	keyTranches []cl.ValidatorDetailsMap
 }
 
 // Prepares the fork timestamps of post-merge forks based on the
@@ -633,7 +633,7 @@ func (p *PreparedTestnet) prepareValidatorClient(
 		Client:       cm,
 		Logger:       testnet.T,
 		ClientIndex:  keyIndex,
-		Keys:         keys,
+		Keys:         keys.Keys(),
 		BeaconClient: bn,
 	}
 }
