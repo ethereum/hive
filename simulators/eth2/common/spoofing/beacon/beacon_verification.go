@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
-	"github.com/ethereum/hive/simulators/eth2/common/spoofing/proxy"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
 	spoof "github.com/rauljordan/engine-proxy/proxy"
 	"golang.org/x/exp/slices"
 )
@@ -36,7 +36,7 @@ func GetTimestampFromNewPayload(
 	req []byte,
 ) (*uint64, error) {
 	var payload api.ExecutableData
-	if err := proxy.UnmarshalFromJsonRPCRequest(req, &payload); err != nil {
+	if err := exec_client.UnmarshalFromJsonRPCRequest(req, &payload); err != nil {
 		return nil, err
 	}
 	return &payload.Timestamp, nil
@@ -49,7 +49,7 @@ func GetTimestampFromFcU(
 		fcS api.ForkchoiceStateV1
 		pA  *api.PayloadAttributes
 	)
-	if err := proxy.UnmarshalFromJsonRPCRequest(req, &fcS, &pA); err != nil {
+	if err := exec_client.UnmarshalFromJsonRPCRequest(req, &fcS, &pA); err != nil {
 		return nil, err
 	}
 	if pA == nil {
@@ -90,7 +90,9 @@ func (v *EngineEndpointMaxTimestampVerify) Verify(
 	return nil
 }
 
-func (v *EngineEndpointMaxTimestampVerify) AddToProxy(p *proxy.Proxy) error {
+func (v *EngineEndpointMaxTimestampVerify) AddToProxy(
+	p *exec_client.Proxy,
+) error {
 	if p == nil {
 		return fmt.Errorf("attempted to add to nil proxy")
 	}

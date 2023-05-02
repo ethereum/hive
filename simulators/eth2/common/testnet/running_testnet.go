@@ -22,9 +22,12 @@ import (
 	"github.com/protolambda/ztyp/tree"
 
 	"github.com/ethereum/hive/hivesim"
-	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	execution_config "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
+	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
+	node "github.com/marioevz/eth-clients/clients/node"
+	builder_types "github.com/marioevz/mock-builder/types"
 )
 
 const (
@@ -41,7 +44,7 @@ var (
 
 type Testnet struct {
 	*hivesim.T
-	clients.Nodes
+	node.Nodes
 
 	genesisTime           common.Timestamp
 	genesisValidatorsRoot common.Root
@@ -161,11 +164,11 @@ func StartTestnet(
 		simulatorIP = net.ParseIP(simIPStr)
 	}
 
-	testnet.Nodes = make(clients.Nodes, len(config.NodeDefinitions))
+	testnet.Nodes = make(node.Nodes, len(config.NodeDefinitions))
 
 	// Init all client bundles
 	for nodeIndex := range testnet.Nodes {
-		testnet.Nodes[nodeIndex] = new(clients.Node)
+		testnet.Nodes[nodeIndex] = new(node.Node)
 	}
 
 	// For each key partition, we start a client bundle that consists of:
@@ -211,14 +214,14 @@ func StartTestnet(
 			executionDef,
 			config.Eth1Consensus,
 			node.Chain,
-			clients.ExecutionClientConfig{
+			exec_client.ExecutionClientConfig{
 				ClientIndex:             nodeIndex,
 				TerminalTotalDifficulty: executionTTD,
 				Subnet:                  node.GetExecutionSubnet(),
 				JWTSecret:               JWT_SECRET,
-				ProxyConfig: &clients.ExecutionProxyConfig{
+				ProxyConfig: &exec_client.ExecutionProxyConfig{
 					Host:                   simulatorIP,
-					Port:                   clients.PortEngineRPC + nodeIndex,
+					Port:                   exec_client.PortEngineRPC + nodeIndex,
 					TrackForkchoiceUpdated: true,
 					LogEngineCalls:         env.LogEngineCalls,
 				},
@@ -232,7 +235,7 @@ func StartTestnet(
 				beaconDef,
 				config.EnableBuilders,
 				config.BuilderOptions,
-				clients.BeaconClientConfig{
+				beacon_client.BeaconClientConfig{
 					ClientIndex:             nodeIndex,
 					TerminalTotalDifficulty: beaconTTD,
 					Spec:                    testnet.spec,
@@ -273,7 +276,9 @@ func (t *Testnet) Stop() {
 	}
 	for _, b := range t.BeaconClients() {
 		if b.Builder != nil {
-			b.Builder.Cancel()
+			if builder, ok := b.Builder.(builder_types.Builder); ok {
+				builder.Cancel()
+			}
 		}
 	}
 }
@@ -345,7 +350,7 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 				wg.Add(1)
 				go func(
 					ctx context.Context,
-					n *clients.Node,
+					n *node.Node,
 					r *result,
 				) {
 					defer wg.Done()
@@ -460,7 +465,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(ctx context.Context, n *clients.Node, r *result) {
+				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 
 					b := n.BeaconClient
@@ -581,7 +586,7 @@ func (t *Testnet) WaitForExecutionFinality(
 
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(ctx context.Context, n *clients.Node, r *result) {
+				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 					var (
 						b       = n.BeaconClient
@@ -717,7 +722,7 @@ func (t *Testnet) WaitForCurrentEpochFinalization(
 			for i, n := range runningNodes {
 				i := i
 				wg.Add(1)
-				go func(ctx context.Context, n *clients.Node, r *result) {
+				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 
 					b := n.BeaconClient
@@ -842,7 +847,7 @@ func (t *Testnet) WaitForExecutionPayload(
 
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(ctx context.Context, n *clients.Node, r *result) {
+				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 
 					b := n.BeaconClient
@@ -915,7 +920,7 @@ func (t *Testnet) WaitForExecutionPayload(
 
 func GetHealth(
 	parentCtx context.Context,
-	bn *clients.BeaconClient,
+	bn *beacon_client.BeaconClient,
 	spec *common.Spec,
 	slot common.Slot,
 ) (float64, error) {

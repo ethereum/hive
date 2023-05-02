@@ -8,8 +8,8 @@ import (
 	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
+	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/tree"
@@ -20,7 +20,7 @@ type VerificationSlot interface {
 	Slot(
 		ctx context.Context,
 		t *Testnet,
-		bn *clients.BeaconClient,
+		bn *beacon_client.BeaconClient,
 	) (common.Slot, error)
 }
 
@@ -32,7 +32,7 @@ type FirstSlotAfterCheckpoint struct {
 func (c FirstSlotAfterCheckpoint) Slot(
 	ctx context.Context,
 	t *Testnet,
-	_ *clients.BeaconClient,
+	_ *beacon_client.BeaconClient,
 ) (common.Slot, error) {
 	return t.Spec().EpochStartSlot(c.Checkpoint.Epoch + 1)
 }
@@ -45,7 +45,7 @@ type LastSlotAtCheckpoint struct {
 func (c LastSlotAtCheckpoint) Slot(
 	ctx context.Context,
 	t *Testnet,
-	_ *clients.BeaconClient,
+	_ *beacon_client.BeaconClient,
 ) (common.Slot, error) {
 	return t.Spec().SLOTS_PER_EPOCH * common.Slot(c.Checkpoint.Epoch), nil
 }
@@ -56,7 +56,7 @@ type LastestSlotByTime struct{}
 func (l LastestSlotByTime) Slot(
 	ctx context.Context,
 	t *Testnet,
-	_ *clients.BeaconClient,
+	_ *beacon_client.BeaconClient,
 ) (common.Slot, error) {
 	return t.Spec().
 			TimeToSlot(common.Timestamp(time.Now().Unix()), t.GenesisTime()),
@@ -69,7 +69,7 @@ type LastestSlotByHead struct{}
 func (l LastestSlotByHead) Slot(
 	ctx context.Context,
 	t *Testnet,
-	bn *clients.BeaconClient,
+	bn *beacon_client.BeaconClient,
 ) (common.Slot, error) {
 	headInfo, err := bn.BlockHeader(ctx, eth2api.BlockHead)
 	if err != nil {
@@ -186,7 +186,7 @@ func (t *Testnet) VerifyExecutionPayloadHashInclusion(
 	parentCtx context.Context,
 	vs VerificationSlot,
 	hash ethcommon.Hash,
-) (*clients.VersionedSignedBeaconBlock, error) {
+) (*beacon_client.VersionedSignedBeaconBlock, error) {
 	for _, bn := range t.VerificationNodes().BeaconClients().Running() {
 		b, err := t.VerifyExecutionPayloadHashInclusionNode(
 			parentCtx,
@@ -204,9 +204,9 @@ func (t *Testnet) VerifyExecutionPayloadHashInclusion(
 func (t *Testnet) VerifyExecutionPayloadHashInclusionNode(
 	parentCtx context.Context,
 	vs VerificationSlot,
-	bn *clients.BeaconClient,
+	bn *beacon_client.BeaconClient,
 	hash ethcommon.Hash,
-) (*clients.VersionedSignedBeaconBlock, error) {
+) (*beacon_client.VersionedSignedBeaconBlock, error) {
 	lastSlot, err := vs.Slot(parentCtx, t, bn)
 	if err != nil {
 		return nil, err

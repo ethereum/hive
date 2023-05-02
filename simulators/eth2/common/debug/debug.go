@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
+	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
 	"github.com/protolambda/eth2api"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/ztyp/tree"
@@ -17,7 +17,7 @@ import (
 func PrintAllBeaconBlocks(
 	parentCtx context.Context,
 	l utils.Logging,
-	b *clients.BeaconClient,
+	b *beacon_client.BeaconClient,
 ) error {
 	headInfo, err := b.BlockHeader(parentCtx, eth2api.BlockHead)
 
@@ -154,7 +154,7 @@ func (bm BeaconBlockMap) Print(l utils.Logging) error {
 func PrintAllTestnetBeaconBlocks(
 	parentCtx context.Context,
 	l utils.Logging,
-	runningBeacons clients.BeaconClients,
+	runningBeacons beacon_client.BeaconClients,
 ) error {
 	beaconTree := make(BeaconBlockMap)
 
