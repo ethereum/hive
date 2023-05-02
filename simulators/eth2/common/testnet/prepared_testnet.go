@@ -93,6 +93,11 @@ func prepareTestnet(
 	eth1GenesisTime := common.Timestamp(time.Now().Unix())
 	eth2GenesisTime := eth1GenesisTime + 30
 
+	// Sanitize configuration according to the clients used
+	if err := config.fillDefaults(); err != nil {
+		t.Fatal(fmt.Errorf("FAIL: error filling defaults: %v", err))
+	}
+
 	// Generate genesis for execution clients
 	eth1Genesis := el.BuildExecutionGenesis(
 		config.TerminalTotalDifficulty,

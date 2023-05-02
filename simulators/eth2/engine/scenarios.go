@@ -28,7 +28,7 @@ import (
 
 var (
 	DEFAULT_VALIDATOR_COUNT           uint64 = 60
-	DEFAULT_SLOT_TIME                 uint64 = 6
+	MAINNET_SLOT_TIME                 uint64 = 12
 	DEFAULT_TERMINAL_TOTAL_DIFFICULTY uint64 = 100
 
 	EPOCHS_TO_FINALITY beacon.Epoch = 4
@@ -36,7 +36,6 @@ var (
 	// Default config used for all tests unless a client specific config exists
 	DEFAULT_CONFIG = &tn.Config{
 		ValidatorCount: big.NewInt(int64(DEFAULT_VALIDATOR_COUNT)),
-		SlotTime:       big.NewInt(int64(DEFAULT_SLOT_TIME)),
 		TerminalTotalDifficulty: big.NewInt(
 			int64(DEFAULT_TERMINAL_TOTAL_DIFFICULTY),
 		),
@@ -694,7 +693,7 @@ func Timeouts(t *hivesim.T, env *tn.Environment, n clients.NodeDefinition) {
 			n,
 		},
 		// Use the default mainnet slot time to allow the timeout value to make sense
-		SlotTime: big.NewInt(int64(12)),
+		SlotTime: big.NewInt(int64(MAINNET_SLOT_TIME)),
 	})
 
 	testnet := tn.StartTestnet(ctx, t, env, config)

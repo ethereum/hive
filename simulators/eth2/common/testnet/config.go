@@ -1,6 +1,7 @@
 package testnet
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +14,17 @@ import (
 var (
 	Big0 = big.NewInt(0)
 	Big1 = big.NewInt(1)
+
+	MAINNET_SLOT_TIME int64 = 12
+	MINIMAL_SLOT_TIME int64 = 6
+
+	// Clients that support the minimal slot time in hive
+	MINIMAL_SLOT_TIME_CLIENTS = []string{
+		"lighthouse",
+		"teku",
+		"prysm",
+		"lodestar",
+	}
 )
 
 type Config struct {
@@ -112,4 +124,24 @@ func (c *Config) activeFork() string {
 	} else {
 		return "phase0"
 	}
+}
+
+// Check the configuration and its support by the multiple client definitions
+func (c *Config) fillDefaults() error {
+	if c.SlotTime == nil {
+		allNodeDefinitions := c.NodeDefinitions
+		if len(
+			allNodeDefinitions.FilterByCL(MINIMAL_SLOT_TIME_CLIENTS),
+		) == len(
+			allNodeDefinitions,
+		) {
+			// If all clients support using minimal 6 second slot time, use it
+			c.SlotTime = big.NewInt(MINIMAL_SLOT_TIME)
+		} else {
+			// Otherwise, use the mainnet 12 second slot time
+			c.SlotTime = big.NewInt(MAINNET_SLOT_TIME)
+		}
+		fmt.Printf("INFO: using %d second slot time\n", c.SlotTime)
+	}
+	return nil
 }
