@@ -62,6 +62,7 @@ jq . /chainspec/test.json
 
 # Generate the config file.
 mkdir /configs
+echo "Supplied genesis state:" 
 jq -n -f /mkconfig.jq > /configs/test.cfg
 
 echo "test.cfg"
