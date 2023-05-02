@@ -44,29 +44,12 @@ var (
 		Eth1Consensus:      &el.ExecutionCliqueConsensus{},
 	}
 
-	// Clients that do not support starting on epoch 0 with all forks enabled.
-	// Tests take longer for these clients.
-	INCREMENTAL_FORKS_CONFIG = &tn.Config{
-		TerminalTotalDifficulty: big.NewInt(
-			int64(DEFAULT_TERMINAL_TOTAL_DIFFICULTY) * 5,
-		),
-		AltairForkEpoch:    common.Big1,
-		BellatrixForkEpoch: common.Big2,
-	}
-	INCREMENTAL_FORKS_CLIENTS = map[string]bool{
-		"nimbus": true,
-		"prysm":  true,
-	}
-
 	SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE = map[string]*big.Int{}
 )
 
 func getClientConfig(n clients.NodeDefinition) *tn.Config {
-	config := DEFAULT_CONFIG
-	if INCREMENTAL_FORKS_CLIENTS[n.ConsensusClient] {
-		config = config.Join(INCREMENTAL_FORKS_CONFIG)
-	}
-	return config
+	config := *DEFAULT_CONFIG
+	return &config
 }
 
 func TransitionTestnet(t *hivesim.T, env *tn.Environment,
