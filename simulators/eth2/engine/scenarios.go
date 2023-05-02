@@ -10,16 +10,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/chain_generators/pow"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/debug"
 	payload_spoof "github.com/ethereum/hive/simulators/eth2/common/spoofing/payload"
-	"github.com/ethereum/hive/simulators/eth2/common/spoofing/proxy"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
+	"github.com/marioevz/eth-clients/clients/node"
 	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 	spoof "github.com/rauljordan/engine-proxy/proxy"
@@ -268,7 +269,7 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 					spoof   *spoof.Spoof
 					err     error
 				)
-				err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+				err = exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
 				if err != nil {
 					panic(err)
 				}
@@ -306,7 +307,7 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 				spoof   *spoof.Spoof
 				err     error
 			)
-			err = proxy.UnmarshalFromJsonRPCRequest(req, &payload)
+			err = exec_client.UnmarshalFromJsonRPCRequest(req, &payload)
 			if err != nil {
 				panic(err)
 			}
@@ -346,7 +347,11 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 				spoof   *spoof.Spoof
 				err     error
 			)
-			err = proxy.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+			err = exec_client.UnmarshalFromJsonRPCRequest(
+				req,
+				&fcState,
+				&pAttr,
+			)
 			if err != nil {
 				panic(err)
 			}
@@ -474,7 +479,10 @@ func InvalidPayloadGen(
 					var (
 						payload api.ExecutableData
 					)
-					err := proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+					err := exec_client.UnmarshalFromJsonRPCResponse(
+						res,
+						&payload,
+					)
 					if err != nil {
 						panic(err)
 					}
@@ -496,7 +504,7 @@ func InvalidPayloadGen(
 					spoof   *spoof.Spoof
 					err     error
 				)
-				err = proxy.UnmarshalFromJsonRPCRequest(req, &payload)
+				err = exec_client.UnmarshalFromJsonRPCRequest(req, &payload)
 				if err != nil {
 					panic(err)
 				}
@@ -616,7 +624,7 @@ func IncorrectHeaderPrevRandaoPayload(
 				spoof   *spoof.Spoof
 				err     error
 			)
-			err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+			err = exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
 			if err != nil {
 				panic(err)
 			}
@@ -771,11 +779,11 @@ func InvalidTimestampPayload(
 			spoof     *spoof.Spoof
 			err       error
 		)
-		err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+		err = exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
 		if err != nil {
 			panic(err)
 		}
-		err = proxy.UnmarshalFromJsonRPCRequest(req, &payloadID)
+		err = exec_client.UnmarshalFromJsonRPCRequest(req, &payloadID)
 		if err != nil {
 			panic(err)
 		}
@@ -1103,7 +1111,7 @@ func SyncingWithInvalidChain(
 			spoof   *spoof.Spoof
 			err     error
 		)
-		err = proxy.UnmarshalFromJsonRPCRequest(req, &payload)
+		err = exec_client.UnmarshalFromJsonRPCRequest(req, &payload)
 		if err != nil {
 			panic(err)
 		}
@@ -1160,7 +1168,7 @@ func SyncingWithInvalidChain(
 			spoof   *spoof.Spoof
 			err     error
 		)
-		err = proxy.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+		err = exec_client.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
 		if err != nil {
 			panic(err)
 		}
@@ -1484,7 +1492,7 @@ func InvalidQuantityPayloadFields(
 
 	invalidateQuantityType := func(id int, method string, response []byte, q QuantityType, invType InvalidationType) *spoof.Spoof {
 		responseFields := make(map[string]json.RawMessage)
-		if err := proxy.UnmarshalFromJsonRPCResponse(response, &responseFields); err != nil {
+		if err := exec_client.UnmarshalFromJsonRPCResponse(response, &responseFields); err != nil {
 			panic(
 				fmt.Errorf("unable to unmarshal: %v. json: %s", err, response),
 			)
@@ -1580,7 +1588,7 @@ func InvalidQuantityPayloadFields(
 				getPayloadCount++
 			}()
 			var payload api.ExecutableData
-			err := proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+			err := exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
 			if err != nil {
 				panic(err)
 			}
@@ -1613,7 +1621,7 @@ func InvalidQuantityPayloadFields(
 				},
 			)
 			invalidPayloadHashes = append(invalidPayloadHashes, newHash)
-			return proxy.Combine(
+			return exec_client.Combine(
 				spoof,
 				invalidateQuantityType(
 					id,
@@ -2224,8 +2232,8 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(
 	// because they are not interconnected.
 	// Therefore only one client pair will end up in optimistic sync mode.
 	type BuilderImporterInfo struct {
-		Builder        *clients.Node
-		Importer       *clients.Node
+		Builder        *node.Node
+		Importer       *node.Node
 		ChainGenerator *pow.ChainGenerator
 	}
 	builderImporterPairs := []BuilderImporterInfo{
@@ -2345,7 +2353,7 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(
 	}
 
 	// Verify the heads match
-	optimisticClients := clients.ExecutionClients{
+	optimisticClients := exec_client.ExecutionClients{
 		optimisticPair.Builder.ExecutionClient,
 		optimisticPair.Importer.ExecutionClient,
 	}
@@ -2360,7 +2368,7 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(
 	}
 
 	// Verify heads of the two client pairs are different
-	forkedClients := clients.ExecutionClients{
+	forkedClients := exec_client.ExecutionClients{
 		testnet.ExecutionClients().Running()[0],
 		testnet.ExecutionClients().Running()[2],
 	}
@@ -2438,7 +2446,7 @@ func NoViableHeadDueToOptimisticSync(
 		importerProxy = testnet.Proxies().Running()[1]
 		// Not yet started
 		builder2      = testnet.BeaconClients()[2]
-		builder2Proxy *proxy.Proxy
+		builder2Proxy *exec_client.Proxy
 	)
 
 	importerNewPayloadResponseMocker := payload_spoof.NewEngineResponseMocker(
@@ -2466,7 +2474,7 @@ func NoViableHeadDueToOptimisticSync(
 			payload api.ExecutableData
 			err     error
 		)
-		err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+		err = exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
 		if err != nil {
 			panic(err)
 		}

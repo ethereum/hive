@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
@@ -133,7 +134,7 @@ func SlotsUntilBellatrix(
 
 func TimeUntilTerminalBlock(
 	parentCtx context.Context,
-	e *clients.ExecutionClient,
+	e *exec_client.ExecutionClient,
 	c el.ExecutionConsensus,
 	defaultTTD *big.Int,
 ) uint64 {
