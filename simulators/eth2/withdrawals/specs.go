@@ -8,11 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
+	mock_builder "github.com/marioevz/mock-builder/mock"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
@@ -192,7 +192,7 @@ func (ts BaseWithdrawalsTestSpec) GetValidatorCount() uint64 {
 
 func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 	mnemonic string,
-) []*cl.KeyDetails {
+) []*cl.ValidatorDetails {
 	keySrc := &cl.MnemonicsKeySource{
 		From:       0,
 		To:         ts.GetValidatorCount(),

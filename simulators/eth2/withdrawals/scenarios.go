@@ -8,11 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
-	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
+	mock_builder "github.com/marioevz/mock-builder/mock"
 
 	beacon_verification "github.com/ethereum/hive/simulators/eth2/common/spoofing/beacon"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
+	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
 	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
@@ -160,7 +161,7 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 	}
 
 	// Get the beacon state and verify the credentials were updated
-	var versionedBeaconState *clients.VersionedBeaconStateResponse
+	var versionedBeaconState *beacon_client.VersionedBeaconStateResponse
 	for _, bn := range testnet.BeaconClients().Running() {
 		versionedBeaconState, err = bn.BeaconStateV2(
 			ctx,
@@ -399,7 +400,14 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 
 	// Check that the builder was working properly until now
 	for i, b := range testnet.BeaconClients().Running() {
-		builder := b.Builder
+		builder, ok := b.Builder.(*mock_builder.MockBuilder)
+		if !ok {
+			t.Fatalf(
+				"FAIL: client %d (%s) is not a mock builder",
+				i,
+				b.ClientName(),
+			)
+		}
 		if builder.GetBuiltPayloadsCount() == 0 {
 			t.Fatalf("FAIL: builder %d did not build any payloads", i)
 		}
@@ -454,7 +462,14 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 		// Simply verify that builder's capella payloads were included in the
 		// canonical chain
 		for i, n := range testnet.Nodes.Running() {
-			b := n.BeaconClient.Builder
+			b, ok := n.BeaconClient.Builder.(*mock_builder.MockBuilder)
+			if !ok {
+				t.Fatalf(
+					"FAIL: client %d (%s) is not a mock builder",
+					i,
+					n.BeaconClient.ClientName(),
+				)
+			}
 			ec := n.ExecutionClient
 			includedPayloads := 0
 			for _, p := range b.GetBuiltPayloads() {
@@ -482,7 +497,15 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 		}
 	} else if ts.InvalidatePayloadAttributes != "" {
 		for i, n := range testnet.VerificationNodes().Running() {
-			modifiedPayloads := n.BeaconClient.Builder.GetModifiedPayloads()
+			b, ok := n.BeaconClient.Builder.(*mock_builder.MockBuilder)
+			if !ok {
+				t.Fatalf(
+					"FAIL: client %d (%s) is not a mock builder",
+					i,
+					n.BeaconClient.ClientName(),
+				)
+			}
+			modifiedPayloads := b.GetModifiedPayloads()
 			if len(modifiedPayloads) == 0 {
 				t.Fatalf("FAIL: No payloads were modified by builder %d", i)
 			}
@@ -552,7 +575,14 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 	spec := testnet.Spec().Spec
 	genesisValsRoot := testnet.GenesisValidatorsRoot()
 	for i, n := range testnet.Nodes.Running() {
-		b := n.BeaconClient.Builder
+		b, ok := n.BeaconClient.Builder.(*mock_builder.MockBuilder)
+		if !ok {
+			t.Fatalf(
+				"FAIL: client %d (%s) is not a mock builder",
+				i,
+				n.BeaconClient.ClientName(),
+			)
+		}
 		for slot, b := range b.GetSignedBeaconBlocks() {
 			if slot != b.Slot() {
 				t.Fatalf(
