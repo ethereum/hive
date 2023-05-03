@@ -155,12 +155,11 @@ func TestRPCError(t *hivesim.T, env *tn.Environment,
 
 	fields := make(map[string]interface{})
 	fields["headBlockHash"] = "weird error"
-	spoof := &spoof.Spoof{
-		Method: EngineForkchoiceUpdatedV1,
-		Fields: fields,
-	}
 
-	testnet.Proxies().Running()[0].AddRequest(spoof)
+	testnet.Proxies().Running()[0].AddRequests(
+		exec_client.MakeSpoofs(
+			fields,
+			exec_client.AllForkchoiceUpdatedCalls...)...)
 
 	time.Sleep(24 * time.Second)
 
@@ -365,9 +364,15 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 		}
 	}
 	for n, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(n))
-		p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(n))
-		p.AddResponseCallback(EngineForkchoiceUpdatedV1, fcUCallbackGen(n))
+		p.AddResponseCallbacks(
+			getPayloadCallbackGen(n),
+			exec_client.AllGetPayloadCalls...)
+		p.AddResponseCallbacks(
+			newPayloadCallbackGen(n),
+			exec_client.AllNewPayloadCalls...)
+		p.AddResponseCallbacks(
+			fcUCallbackGen(n),
+			exec_client.AllForkchoiceUpdatedCalls...)
 	}
 
 	// Network should recover from this
@@ -532,8 +537,12 @@ func InvalidPayloadGen(
 		callback
 		*/
 		for i, p := range testnet.Proxies().Running() {
-			p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
-			p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(i))
+			p.AddResponseCallbacks(
+				getPayloadCallbackGen(i),
+				exec_client.AllGetPayloadCalls...)
+			p.AddResponseCallbacks(
+				newPayloadCallbackGen(i),
+				exec_client.AllNewPayloadCalls...)
 		}
 
 		execPayloadCtx, cancel := testnet.Spec().SlotTimeoutContext(
@@ -630,7 +639,7 @@ func IncorrectHeaderPrevRandaoPayload(
 		return nil
 	}
 	for _, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(EngineGetPayloadV1, c)
+		p.AddResponseCallbacks(c, exec_client.AllGetPayloadCalls...)
 	}
 
 	execPayloadCtx, cancel := testnet.Spec().SlotTimeoutContext(
@@ -700,13 +709,13 @@ func Timeouts(t *hivesim.T, env *tn.Environment, n clients.NodeDefinition) {
 		p0 = testnet.Proxies().Running()[0]
 		p1 = testnet.Proxies().Running()[1]
 	)
-	p0.AddResponseCallback(
-		EngineNewPayloadV1,
+	p0.AddResponseCallbacks(
 		gen(NewPayloadTimeoutSeconds-ToleranceSeconds),
+		exec_client.AllNewPayloadCalls...,
 	)
-	p1.AddResponseCallback(
-		EngineForkchoiceUpdatedV1,
+	p1.AddResponseCallbacks(
 		gen(ForkchoiceUpdatedTimeoutSeconds-ToleranceSeconds),
+		exec_client.AllForkchoiceUpdatedCalls...,
 	)
 
 	// Finality should be reached anyway because the time limit is not reached on the engine calls
@@ -817,15 +826,15 @@ func InvalidTimestampPayload(
 	)
 
 	for _, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(EngineGetPayloadV1, c)
-		p.AddResponseCallback(
-			EngineForkchoiceUpdatedV1,
+		p.AddResponseCallbacks(c, exec_client.AllGetPayloadCalls...)
+		p.AddResponseCallbacks(
 			payload_spoof.CheckErrorOnForkchoiceUpdatedPayloadAttributes(
 				&fcuLock,
 				fcUCountLimit,
 				&fcUAttrCount,
 				fcudone,
 			),
+			exec_client.AllForkchoiceUpdatedCalls...,
 		)
 	}
 
@@ -1207,10 +1216,12 @@ func SyncingWithInvalidChain(
 	importerProxy := testnet.Proxies().Running()[2]
 
 	// Add the callback to the last proxy which will not produce blocks
-	importerProxy.AddResponseCallback(EngineNewPayloadV1, newPayloadCallback)
-	importerProxy.AddResponseCallback(
-		EngineForkchoiceUpdatedV1,
+	importerProxy.AddResponseCallbacks(
+		newPayloadCallback,
+		exec_client.AllNewPayloadCalls...)
+	importerProxy.AddResponseCallbacks(
 		forkchoiceUpdatedCallback,
+		exec_client.AllForkchoiceUpdatedCalls...,
 	)
 
 	<-done
@@ -1365,14 +1376,14 @@ func EqualTimestampTerminalTransitionBlock(
 	)
 
 	for _, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(
-			EngineForkchoiceUpdatedV1,
+		p.AddResponseCallbacks(
 			payload_spoof.CheckErrorOnForkchoiceUpdatedPayloadAttributes(
 				&fcuLock,
 				fcUCountLimit,
 				&fcUAttrCount,
 				fcudone,
 			),
+			exec_client.AllForkchoiceUpdatedCalls...,
 		)
 	}
 
@@ -1618,7 +1629,9 @@ func InvalidQuantityPayloadFields(
 
 	// We pass the id of the proxy to identify which one it is within the callback
 	for i, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
+		p.AddResponseCallbacks(
+			getPayloadCallbackGen(i),
+			exec_client.AllGetPayloadCalls...)
 	}
 
 	// Wait until we are done
@@ -2522,7 +2535,9 @@ func NoViableHeadDueToOptimisticSync(
 		}
 		return nil
 	}
-	builder1Proxy.AddResponseCallback(EngineGetPayloadV1, getPayloadCallback)
+	builder1Proxy.AddResponseCallbacks(
+		getPayloadCallback,
+		exec_client.AllGetPayloadCalls...)
 
 	execPayloadCtx, cancel := testnet.Spec().SlotTimeoutContext(
 		ctx,

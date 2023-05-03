@@ -629,8 +629,7 @@ func (e *EngineResponseMocker) SetDefaultResponse(r *api.PayloadStatusV1) {
 func (e *EngineResponseMocker) AddGetPayloadPassthroughToProxy(
 	p *exec_client.Proxy,
 ) {
-	p.AddResponseCallback(
-		EngineGetPayloadV1,
+	p.AddResponseCallbacks(
 		func(res []byte, req []byte) *spoof.Spoof {
 			// Hash of the payload built is being added to the passthrough list
 			var (
@@ -643,14 +642,14 @@ func (e *EngineResponseMocker) AddGetPayloadPassthroughToProxy(
 			e.AddPassthrough(payload.BlockHash, true)
 			return nil
 		},
+		exec_client.AllGetPayloadCalls...,
 	)
 }
 
 func (e *EngineResponseMocker) AddNewPayloadCallbackToProxy(
 	p *exec_client.Proxy,
 ) {
-	p.AddResponseCallback(
-		EngineNewPayloadV1,
+	p.AddResponseCallbacks(
 		func(res []byte, req []byte) *spoof.Spoof {
 			var (
 				payload api.ExecutableData
@@ -700,14 +699,14 @@ func (e *EngineResponseMocker) AddNewPayloadCallbackToProxy(
 			}
 			return nil
 		},
+		exec_client.AllNewPayloadCalls...,
 	)
 }
 
 func (e *EngineResponseMocker) AddForkchoiceUpdatedCallbackToProxy(
 	p *exec_client.Proxy,
 ) {
-	p.AddResponseCallback(
-		EngineForkchoiceUpdatedV1,
+	p.AddResponseCallbacks(
 		func(res []byte, req []byte) *spoof.Spoof {
 			var (
 				fcState api.ForkchoiceStateV1
@@ -766,6 +765,7 @@ func (e *EngineResponseMocker) AddForkchoiceUpdatedCallbackToProxy(
 			}
 			return nil
 		},
+		exec_client.AllForkchoiceUpdatedCalls...,
 	)
 }
 

@@ -99,7 +99,7 @@ func (v *EngineEndpointMaxTimestampVerify) AddToProxy(
 	if v.Endpoint == "" {
 		return fmt.Errorf("attempted to add to proxy with empty endpoint")
 	}
-	p.AddRequestCallback(v.Endpoint, v.Verify)
+	p.AddRequestCallbacks(v.Verify, v.Endpoint)
 	return nil
 }
 
