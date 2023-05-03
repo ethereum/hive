@@ -245,12 +245,8 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 			getPayloadCount++
 			// Invalidate the transition payload
 			if getPayloadCount == 1 {
-				var (
-					payload api.ExecutableData
-					spoof   *spoof.Spoof
-					err     error
-				)
-				err = exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
+				var spoof *spoof.Spoof
+				payload, err := PayloadFromResponse(res)
 				if err != nil {
 					panic(err)
 				}
@@ -261,7 +257,7 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 				)
 				invalidPayloadHash, spoof, err = payload_spoof.GenerateInvalidPayloadSpoof(
 					EngineGetPayloadV1,
-					&payload,
+					payload,
 					payload_spoof.InvalidParentHash,
 					VaultSigner,
 				)
@@ -463,13 +459,7 @@ func InvalidPayloadGen(
 				if getPayloadCount == invalidPayloadNumber {
 					// We are not going to spoof anything here, we just need to save the transition payload hash and the id of the validator that generated it
 					// to invalidate it in other clients.
-					var (
-						payload api.ExecutableData
-					)
-					err := exec_client.UnmarshalFromJsonRPCResponse(
-						res,
-						&payload,
-					)
+					payload, err := PayloadFromResponse(res)
 					if err != nil {
 						panic(err)
 					}
@@ -610,19 +600,15 @@ func IncorrectHeaderPrevRandaoPayload(
 		getPayloadCount++
 		// Invalidate a payload after the transition payload
 		if getPayloadCount == 2 {
-			var (
-				payload api.ExecutableData
-				spoof   *spoof.Spoof
-				err     error
-			)
-			err = exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
+			var spoof *spoof.Spoof
+			payload, err := PayloadFromResponse(res)
 			if err != nil {
 				panic(err)
 			}
 			t.Logf("INFO (%v): Invalidating payload: %s", t.TestID, res)
 			invalidPayloadHash, spoof, err = payload_spoof.GenerateInvalidPayloadSpoof(
 				EngineGetPayloadV1,
-				&payload,
+				payload,
 				payload_spoof.InvalidPrevRandao,
 				VaultSigner,
 			)
@@ -765,16 +751,14 @@ func InvalidTimestampPayload(
 		defer getPayloadLock.Unlock()
 		getPayloadCount++
 		var (
-			payload   api.ExecutableData
-			payloadID api.PayloadID
+			payloadID = new(api.PayloadID)
 			spoof     *spoof.Spoof
-			err       error
 		)
-		err = exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
+		payload, err := PayloadFromResponse(res)
 		if err != nil {
 			panic(err)
 		}
-		err = exec_client.UnmarshalFromJsonRPCRequest(req, &payloadID)
+		err = exec_client.UnmarshalFromJsonRPCRequest(req, payloadID)
 		if err != nil {
 			panic(err)
 		}
@@ -794,7 +778,7 @@ func InvalidTimestampPayload(
 			extraData := []byte("alt")
 			invalidPayloadHash, spoof, err = payload_spoof.CustomizePayloadSpoof(
 				EngineGetPayloadV1,
-				&payload,
+				payload,
 				&payload_spoof.CustomPayloadData{
 					Timestamp: &newTimestamp,
 					ExtraData: &extraData,
@@ -1580,8 +1564,7 @@ func InvalidQuantityPayloadFields(
 			defer func() {
 				getPayloadCount++
 			}()
-			var payload api.ExecutableData
-			err := exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
+			payload, err := PayloadFromResponse(res)
 			if err != nil {
 				panic(err)
 			}
@@ -1608,7 +1591,7 @@ func InvalidQuantityPayloadFields(
 			)
 			newHash, spoof, _ := payload_spoof.CustomizePayloadSpoof(
 				EngineGetPayloadV1,
-				&payload,
+				payload,
 				&payload_spoof.CustomPayloadData{
 					ExtraData: &customExtraData,
 				},
@@ -2465,11 +2448,7 @@ func NoViableHeadDueToOptimisticSync(
 	)
 	getPayloadCallback := func(res []byte, req []byte) *spoof.Spoof {
 		getPayloadCount++
-		var (
-			payload api.ExecutableData
-			err     error
-		)
-		err = exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
+		payload, err := PayloadFromResponse(res)
 		if err != nil {
 			panic(err)
 		}

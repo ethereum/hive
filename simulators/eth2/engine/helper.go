@@ -7,6 +7,7 @@ import (
 	"math/big"
 	"time"
 
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
@@ -151,4 +152,18 @@ func TimeUntilTerminalBlock(
 		td.Sub(ttd, td).Div(td, c.DifficultyPerBlock()).Mul(td, big.NewInt(int64(c.SecondsPerBlock())))
 		return td.Uint64()
 	}
+}
+
+func PayloadFromResponse(res []byte) (*api.ExecutableData, error) {
+	// First try unmarshalling to the envelope
+	env := new(api.ExecutionPayloadEnvelope)
+	if err := exec_client.UnmarshalFromJsonRPCResponse(res, env); err == nil {
+		return env.ExecutionPayload, nil
+	}
+	// If that fails, try unmarshalling directly to the payload
+	payload := new(api.ExecutableData)
+	if err := exec_client.UnmarshalFromJsonRPCResponse(res, payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
 }
