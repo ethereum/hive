@@ -208,6 +208,8 @@ github.com/labstack/gommon v0.3.0/go.mod h1:MULnywXg0yavhxWKc+lOruYdAhDwPK9wf0OL
 github.com/magiconair/properties v1.8.0/go.mod h1:PppfXfuXeibc/6YijjN8zIbojt8czPbwD3XqdrwzmxQ=
 github.com/marioevz/eth-clients v0.0.0-20230501225027-135b7d52b617 h1:sk4stg95D93cfiIIYI+XPRhXZQ91QGIPOHNDZjmpXms=
 github.com/marioevz/eth-clients v0.0.0-20230501225027-135b7d52b617/go.mod h1:LnzXFKyMw3wF/3eaTfPhKiwkWkZJXokOWcUI02Ioi4s=
+github.com/marioevz/eth-clients v0.0.0-20230503000902-6ba8d15dfe6a h1:EbX/rlcGlMXhwlTibd+TWuN2G2mQKiahwH4xBFpzXo0=
+github.com/marioevz/eth-clients v0.0.0-20230503000902-6ba8d15dfe6a/go.mod h1:LnzXFKyMw3wF/3eaTfPhKiwkWkZJXokOWcUI02Ioi4s=
 github.com/marioevz/mock-builder v0.0.0-20230501225822-df434a88e375 h1:44F0CrAc81Nzsr/4BhkeKebbrHERHdCjO6jXS9VAE/0=
 github.com/marioevz/mock-builder v0.0.0-20230501225822-df434a88e375/go.mod h1:FQIXEFViaQkOqKrqLC91JgqG+6YEvqMVh9D7g6PmFUg=
 github.com/mattn/go-colorable v0.1.2/go.mod h1:U0ppj6V5qS13XJ6of8GYAs25YV2eR4EVcfRqFIhoBtE=

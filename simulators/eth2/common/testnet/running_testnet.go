@@ -64,6 +64,8 @@ type ActiveSpec struct {
 	*common.Spec
 }
 
+const slotsTolerance common.Slot = 2
+
 func (spec *ActiveSpec) EpochTimeoutContext(
 	parent context.Context,
 	epochs common.Epoch,
@@ -71,7 +73,7 @@ func (spec *ActiveSpec) EpochTimeoutContext(
 	return context.WithTimeout(
 		parent,
 		time.Duration(
-			uint64(spec.SLOTS_PER_EPOCH*common.Slot(epochs))*
+			uint64((spec.SLOTS_PER_EPOCH*common.Slot(epochs))+slotsTolerance)*
 				uint64(spec.SECONDS_PER_SLOT),
 		)*time.Second,
 	)
@@ -84,7 +86,7 @@ func (spec *ActiveSpec) SlotTimeoutContext(
 	return context.WithTimeout(
 		parent,
 		time.Duration(
-			uint64(slots)*
+			uint64(slots+slotsTolerance)*
 				uint64(spec.SECONDS_PER_SLOT))*time.Second,
 	)
 }
@@ -357,12 +359,6 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 
 					b := n.BeaconClient
 
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
-					if err != nil {
-						r.err = errors.Wrap(err, "failed to poll head")
-						return
-					}
-
 					checkpoints, err := b.BlockFinalityCheckpoints(
 						ctx,
 						eth2api.BlockHead,
@@ -377,7 +373,7 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 
 					versionedBlock, err := b.BlockV2(
 						ctx,
-						eth2api.BlockIdRoot(headInfo.Root),
+						eth2api.BlockHead,
 					)
 					if err != nil {
 						r.err = errors.Wrap(err, "failed to retrieve block")
@@ -389,7 +385,7 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 						execution = executionPayload.BlockHash
 					}
 
-					slot := headInfo.Header.Message.Slot
+					slot := versionedBlock.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -405,7 +401,7 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 						versionedBlock.Version,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(versionedBlock.Root().String()),
 						utils.Shorten(execution.String()),
 						utils.Shorten(checkpoints.CurrentJustified.String()),
 						utils.Shorten(checkpoints.Finalized.String()),
@@ -470,12 +466,6 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 
 					b := n.BeaconClient
 
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
-					if err != nil {
-						r.err = errors.Wrap(err, "failed to poll head")
-						return
-					}
-
 					checkpoints, err := b.BlockFinalityCheckpoints(
 						ctx,
 						eth2api.BlockHead,
@@ -490,7 +480,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 
 					versionedBlock, err := b.BlockV2(
 						ctx,
-						eth2api.BlockIdRoot(headInfo.Root),
+						eth2api.BlockHead,
 					)
 					if err != nil {
 						r.err = errors.Wrap(err, "failed to retrieve block")
@@ -501,7 +491,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 						execution = executionPayload.BlockHash
 					}
 
-					slot := headInfo.Header.Message.Slot
+					slot := versionedBlock.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -521,7 +511,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 						versionedBlock.Version,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(versionedBlock.Root().String()),
 						health,
 						utils.Shorten(execution.String()),
 						utils.Shorten(checkpoints.CurrentJustified.String()),
@@ -589,16 +579,16 @@ func (t *Testnet) WaitForExecutionFinality(
 				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 					var (
-						b       = n.BeaconClient
-						version string
+						b             = n.BeaconClient
+						finalizedFork string
 					)
 
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
+					headBlock, err := b.BlockV2(ctx, eth2api.BlockHead)
 					if err != nil {
 						r.err = errors.Wrap(err, "failed to poll head")
 						return
 					}
-					slot := headInfo.Header.Message.Slot
+					slot := headBlock.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -621,9 +611,9 @@ func (t *Testnet) WaitForExecutionFinality(
 						return
 					}
 
-					execution := ethcommon.Hash{}
+					finalizedExecution := ethcommon.Hash{}
 					if (checkpoints.Finalized != common.Checkpoint{}) {
-						if versionedBlock, err := b.BlockV2(
+						if finalizedBlock, err := b.BlockV2(
 							ctx,
 							eth2api.BlockIdRoot(checkpoints.Finalized.Root),
 						); err != nil {
@@ -633,26 +623,30 @@ func (t *Testnet) WaitForExecutionFinality(
 							)
 							return
 						} else {
-							version = versionedBlock.Version
-							if exeuctionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
-								execution = exeuctionPayload.BlockHash
+							finalizedFork = finalizedBlock.Version
+							if exeuctionPayload, err := finalizedBlock.ExecutionPayload(); err == nil {
+								finalizedExecution = exeuctionPayload.BlockHash
 							}
 						}
 					}
 
 					r.msg = fmt.Sprintf(
-						"fork=%s, clock_slot=%s, slot=%d, head=%s, "+
-							"exec_payload=%s, justified=%s, finalized=%s",
-						version,
+						"fork=%s, finalized_fork=%s, clock_slot=%s, slot=%d, head=%s, "+
+							"finalized_exec_payload=%s, justified=%s, finalized=%s",
+						headBlock.Version,
+						finalizedFork,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
-						utils.Shorten(execution.Hex()),
+						utils.Shorten(headBlock.Root().String()),
+						utils.Shorten(finalizedExecution.Hex()),
 						utils.Shorten(checkpoints.CurrentJustified.String()),
 						utils.Shorten(checkpoints.Finalized.String()),
 					)
 
-					if !bytes.Equal(execution[:], EMPTY_EXEC_HASH[:]) {
+					if !bytes.Equal(
+						finalizedExecution[:],
+						EMPTY_EXEC_HASH[:],
+					) {
 						r.done = true
 						r.result = checkpoints.Finalized
 					}
@@ -852,13 +846,16 @@ func (t *Testnet) WaitForExecutionPayload(
 
 					b := n.BeaconClient
 
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
+					versionedBlock, err := b.BlockV2(
+						ctx,
+						eth2api.BlockHead,
+					)
 					if err != nil {
-						r.err = errors.Wrap(err, "failed to poll head")
+						r.err = errors.Wrap(err, "failed to retrieve block")
 						return
 					}
 
-					slot := headInfo.Header.Message.Slot
+					slot := versionedBlock.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -866,15 +863,6 @@ func (t *Testnet) WaitForExecutionPayload(
 							clockSlot,
 							slot,
 						)
-						return
-					}
-
-					versionedBlock, err := b.BlockV2(
-						ctx,
-						eth2api.BlockIdRoot(headInfo.Root),
-					)
-					if err != nil {
-						r.err = errors.Wrap(err, "failed to retrieve block")
 						return
 					}
 
@@ -891,7 +879,7 @@ func (t *Testnet) WaitForExecutionPayload(
 						versionedBlock.Version,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(versionedBlock.Root().String()),
 						health,
 						utils.Shorten(executionHash.Hex()),
 					)
