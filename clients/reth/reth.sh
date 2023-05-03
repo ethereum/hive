@@ -50,8 +50,8 @@ case "$HIVE_LOGLEVEL" in
 esac
 
 # Create the data directory.
-mkdir /reth-hive-db
-FLAGS="$FLAGS --db /reth-hive-db"
+mkdir /reth-hive-datadir
+FLAGS="$FLAGS --datadir /reth-hive-datadir"
 
 # TODO If a specific network ID is requested, use that
 #if [ "$HIVE_NETWORK_ID" != "" ]; then
