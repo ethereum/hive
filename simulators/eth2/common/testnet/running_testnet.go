@@ -203,9 +203,13 @@ func StartTestnet(
 		}
 		if node.ExecutionClientTTD != nil {
 			executionTTD = node.ExecutionClientTTD.Int64()
+		} else if testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty != nil {
+			executionTTD = testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty.Int64()
 		}
 		if node.BeaconNodeTTD != nil {
 			beaconTTD = node.BeaconNodeTTD.Int64()
+		} else if testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty != nil {
+			beaconTTD = testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty.Int64()
 		}
 
 		// Prepare the client objects with all the information necessary to
@@ -611,6 +615,11 @@ func (t *Testnet) WaitForExecutionFinality(
 						return
 					}
 
+					execution := ethcommon.Hash{}
+					if exeuctionPayload, err := headBlock.ExecutionPayload(); err == nil {
+						execution = exeuctionPayload.BlockHash
+					}
+
 					finalizedExecution := ethcommon.Hash{}
 					if (checkpoints.Finalized != common.Checkpoint{}) {
 						if finalizedBlock, err := b.BlockV2(
@@ -632,12 +641,13 @@ func (t *Testnet) WaitForExecutionFinality(
 
 					r.msg = fmt.Sprintf(
 						"fork=%s, finalized_fork=%s, clock_slot=%s, slot=%d, head=%s, "+
-							"finalized_exec_payload=%s, justified=%s, finalized=%s",
+							"exec_payload=%s, finalized_exec_payload=%s, justified=%s, finalized=%s",
 						headBlock.Version,
 						finalizedFork,
 						clockSlot,
 						slot,
 						utils.Shorten(headBlock.Root().String()),
+						utils.Shorten(execution.Hex()),
 						utils.Shorten(finalizedExecution.Hex()),
 						utils.Shorten(checkpoints.CurrentJustified.String()),
 						utils.Shorten(checkpoints.Finalized.String()),

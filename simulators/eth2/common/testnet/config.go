@@ -28,28 +28,28 @@ var (
 )
 
 type Config struct {
-	AltairForkEpoch                 *big.Int
-	BellatrixForkEpoch              *big.Int
-	CapellaForkEpoch                *big.Int
-	ValidatorCount                  *big.Int
-	KeyTranches                     *big.Int
-	SlotTime                        *big.Int
-	TerminalTotalDifficulty         *big.Int
-	SafeSlotsToImportOptimistically *big.Int
-	ExtraShares                     *big.Int
+	AltairForkEpoch                 *big.Int `json:"altair_fork_epoch,omitempty"`
+	BellatrixForkEpoch              *big.Int `json:"bellatrix_fork_epoch,omitempty"`
+	CapellaForkEpoch                *big.Int `json:"capella_fork_epoch,omitempty"`
+	ValidatorCount                  *big.Int `json:"validator_count,omitempty"`
+	KeyTranches                     *big.Int `json:"key_tranches,omitempty"`
+	SlotTime                        *big.Int `json:"slot_time,omitempty"`
+	TerminalTotalDifficulty         *big.Int `json:"terminal_total_difficulty,omitempty"`
+	SafeSlotsToImportOptimistically *big.Int `json:"safe_slots_to_import_optimistically,omitempty"`
+	ExtraShares                     *big.Int `json:"extra_shares,omitempty"`
 
 	// Node configurations to launch. Each node as a proportional share of
 	// validators.
-	NodeDefinitions clients.NodeDefinitions
-	Eth1Consensus   execution_config.ExecutionConsensus
+	NodeDefinitions clients.NodeDefinitions             `json:"node_definitions,omitempty"`
+	Eth1Consensus   execution_config.ExecutionConsensus `json:"eth1_consensus,omitempty"`
 
 	// Execution Layer specific config
-	InitialBaseFeePerGas     *big.Int
-	GenesisExecutionAccounts map[common.Address]core.GenesisAccount
+	InitialBaseFeePerGas     *big.Int                               `json:"initial_base_fee_per_gas,omitempty"`
+	GenesisExecutionAccounts map[common.Address]core.GenesisAccount `json:"genesis_execution_accounts,omitempty"`
 
 	// Builders
-	EnableBuilders bool
-	BuilderOptions []mock_builder.Option
+	EnableBuilders bool                  `json:"enable_builders,omitempty"`
+	BuilderOptions []mock_builder.Option `json:"builder_options,omitempty"`
 }
 
 // Choose a configuration value. `b` takes precedence

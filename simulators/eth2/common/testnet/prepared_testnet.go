@@ -98,6 +98,12 @@ func prepareTestnet(
 		t.Fatal(fmt.Errorf("FAIL: error filling defaults: %v", err))
 	}
 
+	if configJson, err := json.MarshalIndent(config, "", "  "); err != nil {
+		panic(err)
+	} else {
+		t.Logf("Testnet config: %s", configJson)
+	}
+
 	// Generate genesis for execution clients
 	eth1Genesis := el.BuildExecutionGenesis(
 		config.TerminalTotalDifficulty,

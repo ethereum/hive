@@ -17,29 +17,29 @@ import (
 // - Validator Client
 type NodeDefinition struct {
 	// Client Types
-	ExecutionClient string
-	ConsensusClient string
-	ValidatorClient string
+	ExecutionClient string `json:"execution_client"`
+	ConsensusClient string `json:"consensus_client"`
+	ValidatorClient string `json:"validator_client"`
 
 	// Execution Config
-	ExecutionClientTTD *big.Int
+	ExecutionClientTTD *big.Int `json:"execution_client_ttd,omitempty"`
 	ChainGenerator     cg.ChainGenerator
 	Chain              []*types.Block
 
 	// Beacon Config
-	BeaconNodeTTD *big.Int
+	BeaconNodeTTD *big.Int `json:"beacon_node_ttd,omitempty"`
 
 	// Validator Config
-	ValidatorShares uint64
+	ValidatorShares uint64 `json:"validator_shares"`
 
 	// Node Config
-	TestVerificationNode bool
-	DisableStartup       bool
+	TestVerificationNode bool `json:"test_verification_node"`
+	DisableStartup       bool `json:"disable_startup"`
 
 	// Subnet Configuration
-	ExecutionSubnet string
-	ConsensusSubnet string
-	Subnet          string
+	ExecutionSubnet string `json:"execution_subnet"`
+	ConsensusSubnet string `json:"consensus_subnet"`
+	Subnet          string `json:"subnet"`
 }
 
 func (n *NodeDefinition) String() string {
