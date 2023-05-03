@@ -58,10 +58,6 @@ fi
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 
-if [ "$HIVE_SKIP_POW" != "" ]; then
-    FLAGS="$FLAGS --fakepow"
-fi
-
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
     FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
