@@ -1,13 +1,13 @@
 # Build nethermind from a local source:
-# Copy your local client within this directory
+# Copy your local client within this directory.
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 ADD nethermind /nethermind
-WORKDIR /nethermind
-RUN cd src/Nethermind/Nethermind.Runner && dotnet build -c release
+RUN cd /nethermind/src/Nethermind/Nethermind.Runner && dotnet build -c release
 
 FROM mcr.microsoft.com/dotnet/aspnet:7.0
 COPY --from=build /nethermind/src/Nethermind/Nethermind.Runner/bin/release/net7.0 /nethermind
+WORKDIR /nethermind
 
 RUN apt-get update && apt-get install -y wget
 RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /usr/local/bin/jq && \
