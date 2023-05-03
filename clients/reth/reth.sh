@@ -84,7 +84,6 @@ set +ex
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-    echo "Loading initial blockchain..."
     RUST_LOG=info $reth import $FLAGS /chain.rlp
 else
     echo "Warning: chain.rlp not found."
