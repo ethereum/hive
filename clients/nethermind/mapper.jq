@@ -163,6 +163,7 @@ def clique_engine:
     "extraData": .extraData,
     "gasLimit": .gasLimit,
     "baseFeePerGas": .baseFeePerGas,
+    "excessDataGas": .excessDataGas,
   },
   "accounts": ((.alloc|with_entries(.key|="0x"+.)) * {
     "0x0000000000000000000000000000000000000001": {
