@@ -1,7 +1,3 @@
-# Generate the ethash verification caches.
-# Use a static version because this will never need to be updated.
-FROM ethereum/client-go:v1.10.20 AS geth
-
 # This simulation runs Engine API tests.
 FROM golang:1-alpine as builder
 RUN apk add --update gcc musl-dev linux-headers
@@ -16,5 +12,4 @@ FROM alpine:latest
 ADD . /source
 WORKDIR /source
 COPY --from=builder /source/engine .
-COPY --from=geth    /ethash /ethash
 ENTRYPOINT ["./engine"]
