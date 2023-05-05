@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 
 	"github.com/ethereum/hive/hivesim"
-	"regexp"
 )
 
 func main() {
@@ -93,6 +93,7 @@ func fixtureRunner(t *hivesim.T) {
 
 	_, testPattern := t.Sim.TestPattern()
 	re := regexp.MustCompile(testPattern)
+	//[01bc7755] test invalid_blob_txs.json / 000/type_3_tx_pre_fork/shanghai: unable to extract fixture fields: failed to decode block: transaction type not supported
 
 	// deliver and run test cases against each client
 	loadFixtureTests(t, fileRoot, re, func(tc testcase) {
