@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -144,14 +145,17 @@ type withdrawalsUnmarshaling struct {
 
 // extractFixtureFields extracts the genesis, payloads and post allocation
 // fields from the given fixture test and stores them in the testcase struct.
-func (tc *testcase) extractFixtureFields(fixture fixtureJSON) {
+func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
 	// extract genesis fields from fixture test
 	tc.genesis = extractGenesis(fixture)
 
 	// extract payloads from each block
 	payloads := []*api.ExecutableData{}
-	for _, block := range fixture.Blocks {
-		block, _ := block.decodeBlock()
+	for _, bl := range fixture.Blocks {
+		block, err := bl.decodeBlock()
+		if err != nil {
+			return fmt.Errorf("failed to decode block: %v", err)
+		}
 		payload := api.BlockToExecutableData(block, common.Big0).ExecutionPayload
 		payloads = append(payloads, payload)
 	}
@@ -159,6 +163,7 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) {
 
 	// extract post account information
 	tc.postAlloc = &fixture.Post
+	return nil
 }
 
 // extractGenesis extracts the genesis block information from the given fixture
