@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -14,18 +13,19 @@ import (
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"io/fs"
 )
 
 // loadFixtureTests extracts tests from fixture.json files in a given directory,
 // creates a testcase for each test, and passes the testcase struct to fn.
 func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		// check file is actually a fixture
 		if err != nil {
 			t.Logf("unable to walk path: %s", err)
 			return err
 		}
-		if info.IsDir() || !strings.HasSuffix(info.Name(), ".json") {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
 			return nil
 		}
 		excludePaths := []string{"example/"} // modify for tests to exclude
@@ -54,7 +54,9 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 				filepath: path,
 			}
 			// extract genesis, payloads & post allocation field to tc
-			tc.extractFixtureFields(fixture.json)
+			if err := tc.extractFixtureFields(fixture.json); err != nil {
+				tc.failedErr = fmt.Errorf("unable to extract fixture fields: %v", err)
+			}
 			// feed tc to single worker within fixtureRunner()
 			fn(tc)
 		}
@@ -85,7 +87,10 @@ func (tc *testcase) run(t *hivesim.T) {
 	}
 	tc.updateEnv(env)
 	t0 := time.Now()
-
+	// If test is already failed, don't bother spinning up a client
+	if tc.failedErr != nil {
+		return
+	}
 	// start client (also creates an engine RPC client internally)
 	t.Log("starting client with Engine API.")
 	engineClient, err := engineStarter.StartClient(t, ctx, tc.genesis, env, nil)
