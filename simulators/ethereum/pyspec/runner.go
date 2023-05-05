@@ -18,7 +18,7 @@ import (
 
 // loadFixtureTests extracts tests from fixture.json files in a given directory,
 // creates a testcase for each test, and passes the testcase struct to fn.
-func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
+func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) {
 	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		// check file is actually a fixture
 		if err != nil {
@@ -27,6 +27,11 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 		}
 		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
 			return nil
+		}
+		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".json")
+		if !re.MatchString(pathname) {
+			fmt.Println("skip", pathname)
+			return nil // skip
 		}
 		excludePaths := []string{"example/"} // modify for tests to exclude
 		if strings.Contains(path, strings.Join(excludePaths, "")) {
@@ -55,6 +60,7 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 			}
 			// extract genesis, payloads & post allocation field to tc
 			if err := tc.extractFixtureFields(fixture.json); err != nil {
+				t.Logf("test %v / %v: unable to extract fixture fields: %v", d.Name(), name, err)
 				tc.failedErr = fmt.Errorf("unable to extract fixture fields: %v", err)
 			}
 			// feed tc to single worker within fixtureRunner()
