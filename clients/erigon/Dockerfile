@@ -8,10 +8,7 @@ FROM $user/$repo:$branch
 # to install additional commands, so switch back to root.
 USER root
 
-RUN apk add --no-cache \
-    bash \
-    curl \
-    jq
+RUN apk add --no-cache bash curl jq
 
 # Create version.txt
 RUN erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt
