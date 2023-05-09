@@ -302,7 +302,7 @@ func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBloc
 
 // TTD is the value specified in the test.Spec + Genesis.Difficulty
 func CalculateRealTTD(g Genesis, ttdValue int64) int64 {
-	return g.Difficulty().Int64() + ttdValue
+	return g.Config().TerminalTotalDifficulty.Int64() + ttdValue
 }
 
 var (

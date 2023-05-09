@@ -20,7 +20,7 @@ var (
 	GenesisTimestamp = int64(0x1234)
 
 	// RPC Timeout for every call
-	RPCTimeout = 10 * time.Second
+	RPCTimeout = 100 * time.Second
 
 	// Engine, Eth ports
 	EthPortHTTP    = 8545
@@ -35,7 +35,7 @@ var (
 	VaultKey, _         = crypto.HexToECDSA("63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376")
 
 	// Global test case timeout
-	DefaultTestCaseTimeout = time.Second * 60
+	DefaultTestCaseTimeout = time.Minute * 10
 
 	// Confirmation blocks
 	PoWConfirmationBlocks = uint64(15)

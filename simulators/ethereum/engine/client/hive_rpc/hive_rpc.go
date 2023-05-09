@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -165,6 +164,67 @@ type HiveRPCEngineClient struct {
 	accTxInfoMap map[common.Address]*AccountTransactionInfo
 }
 
+func (ec *HiveRPCEngineClient) BlockByNumber(ctx context.Context, number *big.Int) (*client.Block, error) {
+	url, _ := ec.Url()
+	var requestBody string
+	if number == nil {
+
+		requestBody = fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["%v",true],"id":1}`, "latest")
+	} else {
+
+		requestBody = fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["%v",true],"id":1}`, number.Int64())
+	}
+
+	blockHash, err := getBlockHash(url, requestBody)
+	if err != nil {
+		return nil, err
+	}
+	byNumber, err := ec.Client.BlockByNumber(ctx, number)
+	if err != nil {
+		return nil, err
+	}
+	header := client.NewBlockHeader(byNumber.Header(), common.HexToHash(blockHash))
+	return client.NewBlock(byNumber, header), nil
+}
+
+func getBlockHash(url string, requestBody string) (string, error) {
+	response, err := http.Post(url, "application/json", strings.NewReader(requestBody))
+	if err != nil {
+		fmt.Println("Failed to send request:", err)
+		return "", err
+	}
+	defer response.Body.Close()
+
+	// Parse the response JSON into a Go map
+	var responseData map[string]interface{}
+	err = json.NewDecoder(response.Body).Decode(&responseData)
+	if err != nil {
+		fmt.Println("Failed to parse response:", err)
+		return "", err
+	}
+
+	// Extract the block hash from the response data
+	blockData := responseData["result"].(map[string]interface{})
+	blockHash := blockData["hash"].(string)
+	return blockHash, nil
+}
+
+func (ec *HiveRPCEngineClient) BlockByHash(ctx context.Context, hash common.Hash) (*client.Block, error) {
+	url, _ := ec.Url()
+	requestBody := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByHash","params":["%s",true],"id":1}`, hash.Hex())
+
+	blockHash, err := getBlockHash(url, requestBody)
+	if err != nil {
+		return nil, err
+	}
+	byHash, err := ec.Client.BlockByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	header := client.NewBlockHeader(byHash.Header(), common.HexToHash(blockHash))
+	return client.NewBlock(byHash, header), nil
+}
+
 // NewClient creates a engine client that uses the given RPC client.
 func NewHiveRPCEngineClient(h *hivesim.Client, enginePort int, ethPort int, jwtSecretBytes []byte, ttd *big.Int, transport http.RoundTripper) *HiveRPCEngineClient {
 	// Prepare HTTP Client
@@ -198,6 +258,10 @@ func (ec *HiveRPCEngineClient) ID() string {
 
 func (ec *HiveRPCEngineClient) EnodeURL() (string, error) {
 	return ec.h.EnodeURL()
+}
+
+func (ec *HiveRPCEngineClient) Url() (string, error) {
+	return fmt.Sprintf("http://%v:8545", ec.h.IP), nil
 }
 
 func (ec *HiveRPCEngineClient) TerminalTotalDifficulty() *big.Int {
@@ -259,13 +323,28 @@ func (ec *HiveRPCEngineClient) StorageAtKeys(ctx context.Context, account common
 	return results, nil
 }
 
-func (ec *HiveRPCEngineClient) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
-	var header *types.Header
-	err := ec.cEth.CallContext(ctx, &header, "eth_getBlockByNumber", toBlockNumArg(number), false)
-	if err == nil && header == nil {
-		err = ethereum.NotFound
+func (ec *HiveRPCEngineClient) HeaderByNumber(ctx context.Context, number *big.Int) (*client.BlockHeader, error) {
+
+	url, _ := ec.Url()
+	var requestBody string
+	if number == nil {
+
+		requestBody = fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["%v",true],"id":1}`, "latest")
+	} else {
+
+		requestBody = fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["%v",true],"id":1}`, number.Int64())
 	}
-	return header, err
+
+	blockHash, err := getBlockHash(url, requestBody)
+	if err != nil {
+		return nil, err
+	}
+	byNumber, err := ec.Client.BlockByNumber(ctx, number)
+	if err != nil {
+		return nil, err
+	}
+	header := client.NewBlockHeader(byNumber.Header(), common.HexToHash(blockHash))
+	return header, nil
 }
 
 // Helper structs to fetch the TotalDifficulty

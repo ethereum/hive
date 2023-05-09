@@ -14,12 +14,46 @@ import (
 	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 )
 
+type BlockHeader struct {
+	types.Header
+
+	hash common.Hash
+}
+
+func (h *BlockHeader) Hash() common.Hash {
+	return h.hash
+}
+
+func NewBlockHeader(header *types.Header, hash common.Hash) *BlockHeader {
+	h := &BlockHeader{}
+	h.hash = hash
+	h.Header = *header
+	return h
+}
+
+type Block struct {
+	types.Block
+	Header BlockHeader
+	//Hash common.Hash
+}
+
+func NewBlock(block *types.Block, header *BlockHeader) *Block {
+	b := &Block{}
+	b.Header = *header
+	b.Block = *block
+	return b
+}
+
+func (b *Block) Hash() common.Hash {
+	return b.Header.Hash()
+}
+
 type Eth interface {
 	BalanceAt(ctx context.Context, account common.Address, blockNumber *big.Int) (*big.Int, error)
-	BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error)
+	BlockByNumber(ctx context.Context, number *big.Int) (*Block, error)
 	BlockNumber(ctx context.Context) (uint64, error)
-	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
-	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
+	BlockByHash(ctx context.Context, hash common.Hash) (*Block, error)
+	HeaderByNumber(ctx context.Context, number *big.Int) (*BlockHeader, error)
 	SendTransaction(ctx context.Context, tx *types.Transaction) error
 	SendTransactions(ctx context.Context, txs []*types.Transaction) []error
 	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
@@ -56,6 +90,7 @@ type EngineClient interface {
 	ID() string
 	Close() error
 	EnodeURL() (string, error)
+	Url() (string, error)
 
 	// Local Test Account Management
 	GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error)

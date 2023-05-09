@@ -2,10 +2,12 @@ package helper
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 	"math/big"
+	"strconv"
 )
 
 type GenesisAlloc interface {
@@ -29,7 +31,7 @@ type Genesis interface {
 	Nonce() uint64
 	SetNonce(nonce uint64)
 	Timestamp() uint64
-	SetTimestamp(timestamp uint64)
+	SetTimestamp(timestamp int64)
 	ExtraData() []byte
 	SetExtraData(data []byte)
 	GasLimit() uint64
@@ -169,7 +171,14 @@ func (n *NethermindChainSpec) UpdateTimestamp(timestamp string) {
 
 func (n *NethermindChainSpec) Config() *params.ChainConfig {
 	chainID := big.NewInt(int64(n.Params.NetworkID))
-	return &params.ChainConfig{ChainID: chainID}
+	ttd, err := strconv.ParseInt(n.Params.TerminalTotalDifficulty, 10, 64)
+	if err != nil {
+		panic(err)
+	}
+	return &params.ChainConfig{
+		ChainID:                 chainID,
+		TerminalTotalDifficulty: big.NewInt(ttd),
+	}
 }
 
 func (n *NethermindChainSpec) SetConfig(config *params.ChainConfig) {
@@ -192,9 +201,13 @@ func (n *NethermindChainSpec) Timestamp() uint64 {
 	panic("implement me")
 }
 
-func (n *NethermindChainSpec) SetTimestamp(timestamp uint64) {
-	//TODO implement me
-	panic("implement me")
+func (n *NethermindChainSpec) SetTimestamp(timestamp int64) {
+	n.Params.TerminalTotalDifficulty = fmt.Sprintf("%v", timestamp)
+	n.Params.Eip3651TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip4895TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip3855TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip3651TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip3860TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 }
 
 func (n *NethermindChainSpec) ExtraData() []byte {

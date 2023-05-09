@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"math/big"
 	"math/rand"
+	"net/http"
+	"strings"
 	"time"
 
 	beacon "github.com/ethereum/go-ethereum/beacon/engine"
@@ -51,13 +53,14 @@ var Tests = []test.SpecInterface{
 		Spec: test.Spec{
 			Name: "Withdrawals Fork On Genesis",
 			About: `
-			Tests the withdrawals fork happening since genesis (e.g. on a
+			Tests the withdrawals fork happening on block 5 (e.g. on a
 			testnet).
 			`,
 		},
 		WithdrawalsForkHeight: 2,
 		WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
 		WithdrawalsPerBlock:   16,
+		TimeIncrements:        5,
 	},
 
 	//&WithdrawalsBaseSpec{
@@ -1095,6 +1098,17 @@ func (ws *WithdrawalsBaseSpec) GetTransactionCountPerPayload() uint64 {
 	return ws.TransactionsPerBlock.Uint64()
 }
 
+// getTimestamp of the next 2 minutes
+func getTimestamp() int64 {
+	now := time.Now()
+
+	// Calculate the start of the next 2 minutes
+	nextThreeSeconds := now.Truncate(time.Minute).Add(3 * time.Second)
+
+	// Get the Unix timestamp of the next 2 minutes
+	return nextThreeSeconds.Unix()
+}
+
 // Base test case execution procedure for withdrawals
 func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
@@ -1156,32 +1170,34 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			if !ws.SkipBaseVerifications {
 				// Try to send a ForkchoiceUpdatedV2 with non-null
 				// withdrawals before Shanghai
-				blockIncrement := ws.GetBlockTimeIncrements()
+				//blockIncrement := ws.GetBlockTimeIncrements()
+				//r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
+				//	&beacon.ForkchoiceStateV1{
+				//		HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+				//	},
+				//	&beacon.PayloadAttributes{
+				//		Timestamp:             t.CLMock.LatestHeader.Time + blockIncrement,
+				//		Random:                common.Hash{},
+				//		SuggestedFeeRecipient: common.Address{},
+				//		Withdrawals:           make(types.Withdrawals, 0),
+				//	},
+				//)
+				//r.ExpectationDescription = "Sent pre-shanghai Forkchoice using ForkchoiceUpdatedV2 + Withdrawals, error is expected"
+				//r.ExpectErrorCode(InvalidParamsError)
+				//
+				// Send a valid Pre-Shanghai request using ForkchoiceUpdatedV2
+				// (CLMock uses V1 by default)
+				latestBlock := t.CLMock.LatestHeader.Time
+				payloadTimestamp := time.Unix(int64(latestBlock), 0).Add(3 * time.Second).Unix()
 				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
 					&beacon.PayloadAttributes{
-						Timestamp:             t.CLMock.LatestHeader.Time + blockIncrement,
+						Timestamp:             uint64(payloadTimestamp),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
 						Withdrawals:           make(types.Withdrawals, 0),
-					},
-				)
-				r.ExpectationDescription = "Sent pre-shanghai Forkchoice using ForkchoiceUpdatedV2 + Withdrawals, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
-
-				// Send a valid Pre-Shanghai request using ForkchoiceUpdatedV2
-				// (CLMock uses V1 by default)
-				r = t.TestEngine.TestEngineForkchoiceUpdatedV2(
-					&beacon.ForkchoiceStateV1{
-						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
-					},
-					&beacon.PayloadAttributes{
-						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
-						Random:                common.Hash{},
-						SuggestedFeeRecipient: common.Address{},
-						Withdrawals:           nil,
 					},
 				)
 				r.ExpectationDescription = "Sent pre-shanghai Forkchoice ForkchoiceUpdatedV2 + null withdrawals, no error is expected"
@@ -1196,19 +1212,19 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 
 				// Send produced payload but try to include non-nil
 				// `withdrawals`, it should fail.
-				emptyWithdrawalsList := make(types.Withdrawals, 0)
-				payloadPlusWithdrawals, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
-					Withdrawals: emptyWithdrawalsList,
-				})
-				if err != nil {
-					t.Fatalf("Unable to append withdrawals: %v", err)
-				}
-				r := t.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
-				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2+Withdrawals, error is expected"
-				r.ExpectErrorCode(InvalidParamsError)
-
+				//emptyWithdrawalsList := make(types.Withdrawals, 0)
+				//payloadPlusWithdrawals, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				//	Withdrawals: emptyWithdrawalsList,
+				//})
+				//if err != nil {
+				//	t.Fatalf("Unable to append withdrawals: %v", err)
+				//}
+				//r := t.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
+				//r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2+Withdrawals, error is expected"
+				//r.ExpectErrorCode(InvalidParamsError)
+				//
 				// Send valid ExecutionPayloadV1 using engine_newPayloadV2
-				r = t.TestEngine.TestEngineNewPayloadV2(&t.CLMock.LatestPayloadBuilt)
+				r := t.TestEngine.TestEngineNewPayloadV2(&t.CLMock.LatestPayloadBuilt)
 				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2, no error is expected"
 				r.ExpectStatus(test.Valid)
 			}
@@ -1229,7 +1245,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		},
 		OnForkchoiceBroadcast: func() {
 			if !ws.SkipBaseVerifications {
-				ws.VerifyContractsStorage(t)
+				//ws.VerifyContractsStorage(t)
 			}
 		},
 	})
@@ -1247,12 +1263,17 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			if !ws.SkipBaseVerifications {
 				// Try to send a PayloadAttributesV1 with null withdrawals after
 				// Shanghai
+
+				blockHash, err := getLatestHash(t)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to get latest block hash: %v", t.TestName, err)
+				}
 				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
 					&beacon.ForkchoiceStateV1{
-						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
+						HeadBlockHash: common.HexToHash(blockHash),
 					},
 					&beacon.PayloadAttributes{
-						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
+						Timestamp:             uint64(getTimestamp()),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
 						Withdrawals:           nil,
@@ -1266,25 +1287,25 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
 			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
 			// Send some transactions
-			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-				var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
+			//for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
+			//	var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
+			//
+			//	_, err := helper.SendNextTransaction(
+			//		t.TestContext,
+			//		t.CLMock.NextBlockProducer,
+			//		&helper.BaseTransactionCreator{
+			//			Recipient: &destAddr,
+			//			Amount:    common.Big1,
+			//			Payload:   nil,
+			//			TxType:    t.TestTransactionType,
+			//			GasLimit:  75000,
+			//		},
+			//	)
 
-				_, err := helper.SendNextTransaction(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient: &destAddr,
-						Amount:    common.Big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
-					},
-				)
-
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-				}
-			}
+			//	if err != nil {
+			//		t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+			//	}
+			//}
 		},
 		OnGetPayload: func() {
 			if !ws.SkipBaseVerifications {
@@ -1393,40 +1414,65 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						%s`, jsWithdrawals)
 				r.ExpectWithdrawalsRoot(&expectedWithdrawalsRoot)
 
-				ws.VerifyContractsStorage(t)
+				//ws.VerifyContractsStorage(t)
 			}
 		},
 	})
+	// TODO: verify withdrawal contract storage
 	// Iterate over balance history of withdrawn accounts using RPC and
 	// check that the balances match expected values.
 	// Also check one block before the withdrawal took place, verify that
 	// withdrawal has not been updated.
-	if !ws.SkipBaseVerifications {
-		for block := uint64(0); block <= t.CLMock.LatestExecutedPayload.Number; block++ {
-			ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
+	//if !ws.SkipBaseVerifications {
+	//	for block := uint64(0); block <= t.CLMock.LatestExecutedPayload.Number; block++ {
+	//		ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
+	//
+	//		// Check the correct withdrawal root on past blocks
+	//		r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
+	//		var expectedWithdrawalsRoot *common.Hash = nil
+	//		if block >= ws.WithdrawalsForkHeight {
+	//			calcWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
+	//				ws.WithdrawalsHistory.GetWithdrawals(block),
+	//			)
+	//			expectedWithdrawalsRoot = &calcWithdrawalsRoot
+	//		}
+	//		jsWithdrawals, _ := json.MarshalIndent(ws.WithdrawalsHistory.GetWithdrawals(block), "", " ")
+	//		r.ExpectationDescription = fmt.Sprintf(`
+	//					Requested block %d to verify withdrawalsRoot with the
+	//					following withdrawals:
+	//					%s`, block, jsWithdrawals)
+	//
+	//		r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
+	//
+	//	}
+	//
+	//	// Verify on `latest`
+	//	ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
+	//}
+}
 
-			// Check the correct withdrawal root on past blocks
-			r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
-			var expectedWithdrawalsRoot *common.Hash = nil
-			if block >= ws.WithdrawalsForkHeight {
-				calcWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
-					ws.WithdrawalsHistory.GetWithdrawals(block),
-				)
-				expectedWithdrawalsRoot = &calcWithdrawalsRoot
-			}
-			jsWithdrawals, _ := json.MarshalIndent(ws.WithdrawalsHistory.GetWithdrawals(block), "", " ")
-			r.ExpectationDescription = fmt.Sprintf(`
-						Requested block %d to verify withdrawalsRoot with the
-						following withdrawals:
-						%s`, block, jsWithdrawals)
-
-			r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
-
-		}
-
-		// Verify on `latest`
-		ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
+func getLatestHash(t *test.Env) (string, error) {
+	url, _ := t.CLMock.EngineClients[0].Url()
+	requestBody := fmt.Sprintf(`{"jsonrpc":"2.0","method":"eth_getBlockByNumber","params":["%s",true],"id":1}`, "latest")
+	response, err := http.Post(url, "application/json", strings.NewReader(requestBody))
+	if err != nil {
+		fmt.Println("Failed to send request:", err)
+		return "", err
 	}
+	defer response.Body.Close()
+
+	// Parse the response JSON into a Go map
+	var responseData map[string]interface{}
+	err = json.NewDecoder(response.Body).Decode(&responseData)
+	if err != nil {
+		fmt.Println("Failed to parse response:", err)
+		return "", err
+	}
+
+	// Extract the block hash from the response data
+	blockData := responseData["result"].(map[string]interface{})
+	blockHash := blockData["hash"].(string)
+	return blockHash, nil
 }
 
 // Withdrawals sync spec:

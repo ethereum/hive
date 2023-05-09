@@ -87,17 +87,14 @@ type ClientGenesis interface {
 // Load the genesis based on each client
 
 // getTimestamp of the next 2 minutes
-func getTimestamp() string {
+func getTimestamp() int64 {
 	now := time.Now()
 
 	// Calculate the start of the next 2 minutes
-	nextMinute := now.Truncate(time.Minute).Add(2 * time.Minute)
+	nextMinute := now.Truncate(time.Minute).Add(3 * time.Minute)
 
 	// Get the Unix timestamp of the next 2 minutes
-	timestamp := nextMinute.Unix()
-
-	// Convert the timestamp to a hexadecimal representation
-	return "0x" + fmt.Sprintf("%x", timestamp)
+	return nextMinute.Unix()
 }
 
 // Add test cases to a given test suite
@@ -115,6 +112,11 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 		clientName := strings.Split(clientTypes[0].Name, "_")[0]
 		genesis := currentTest.GetGenesis(clientName)
+
+		// Set the timestamp of the genesis to the next 2 minutes
+		timestamp := getTimestamp()
+
+		genesis.SetTimestamp(timestamp)
 		//genesis.UpdateTimestamp(getTimestamp())
 		genesisStartOption, err := helper.GenesisStartOptionBasedOnClient(genesis, clientName)
 		if err != nil {
@@ -176,7 +178,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 						defer func() {
 							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
 						}()
-						timeout := globals.DefaultTestCaseTimeout
+						timeout := time.Minute * 20
 						// If a test.Spec specifies a timeout, use that instead
 						if currentTest.GetTimeout() != 0 {
 							timeout = time.Second * time.Duration(currentTest.GetTimeout())

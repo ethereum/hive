@@ -2206,7 +2206,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Error while getting latest block: %v", t.TestName, err)
 			}
-			cA = b
+			cA = &b.Block
 		} else {
 			t.CLMock.ProduceBlocks(int(cAHeight.Int64()), clmock.BlockProcessCallbacks{})
 			cA, err = api.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt)

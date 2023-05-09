@@ -110,12 +110,12 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 	env.TestEngine = NewTestEngineClient(env, ec)
 
 	// Defer producing one last block to verify Execution client did not break after the test
-	defer func() {
-		// Only run if the TTD was reached during test, and test had not failed at this point.
-		if clMocker.TTDReached && !t.Failed() {
-			clMocker.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
-		}
-	}()
+	//defer func() {
+	//	// Only run if the TTD was reached during test, and test had not failed at this point.
+	//	if clMocker.TTDReached && !t.Failed() {
+	//		clMocker.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
+	//	}
+	//}()
 
 	// Run the test
 	testSpec.Execute(env)

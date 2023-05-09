@@ -720,7 +720,7 @@ func (tec *TestEngineClient) TestHeaderByNumber(number *big.Int) *HeaderResponse
 	ret := &HeaderResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "HeaderByNumber",
-		Header:    header,
+		Header:    &header.Header,
 		Error:     err,
 	}
 	if err, ok := err.(rpc.Error); ok {
@@ -772,7 +772,7 @@ func (tec *TestEngineClient) TestBlockByNumber(number *big.Int) *BlockResponseEx
 	ret := &BlockResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "BlockByNumber",
-		Block:     block,
+		Block:     &block.Block,
 		Error:     err,
 	}
 	if err, ok := err.(rpc.Error); ok {
@@ -788,7 +788,7 @@ func (tec *TestEngineClient) TestBlockByHash(hash common.Hash) *BlockResponseExp
 	ret := &BlockResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "BlockByHash",
-		Block:     block,
+		Block:     &block.Block,
 		Error:     err,
 	}
 	if err, ok := err.(rpc.Error); ok {
