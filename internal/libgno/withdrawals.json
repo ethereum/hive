@@ -1,0 +1,125 @@
+[
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "_failedWithdrawalId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_processedAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "FailedWithdrawalProcessed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "WithdrawalExecuted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "_failedWithdrawalId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "_amount",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "_address",
+        "type": "address"
+      }
+    ],
+    "name": "WithdrawalFailed",
+    "type": "event"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_maxNumberOfFailedWithdrawalsToProcess",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint64[]",
+        "name": "_amounts",
+        "type": "uint64[]"
+      },
+      {
+        "internalType": "address[]",
+        "name": "_addresses",
+        "type": "address[]"
+      }
+    ],
+    "name": "executeSystemWithdrawals",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_maxNumberOfFailedWithdrawalsToProcess",
+        "type": "uint256"
+      }
+    ],
+    "name": "processFailedWithdrawalsFromPointer",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_failedWithdrawalId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "_amountToProceed",
+        "type": "uint256"
+      }
+    ],
+    "name": "processFailedWithdrawal",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  }
+]
