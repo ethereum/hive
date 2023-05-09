@@ -17,10 +17,18 @@ func main() {
 		Description: "This suite runs Discovery v4 protocol tests.",
 		Tests: []hivesim.AnyTest{
 			hivesim.ClientTestSpec{
-				Role:       "eth1",
-				Parameters: hivesim.Params{"HIVE_LOGLEVEL": "5"},
-				AlwaysRun:  true,
-				Run:        runDiscoveryTest,
+				Role: "eth1",
+				Parameters: hivesim.Params{
+					"HIVE_NETWORK_ID":     "19763",
+					"HIVE_CHAIN_ID":       "19763",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_LOGLEVEL":       "5",
+				},
+				AlwaysRun: true,
+				Run:       runDiscoveryTest,
 			},
 		},
 	}
