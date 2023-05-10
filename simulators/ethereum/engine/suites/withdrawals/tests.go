@@ -77,7 +77,7 @@ var Tests = []test.SpecInterface{
 
 	//&WithdrawalsBaseSpec{
 	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 2",
+	//		Name: "Withdrawals Fork on Block 5",
 	//		About: `
 	//		Tests the transition to the withdrawals fork after a single block
 	//		has happened.
@@ -85,9 +85,10 @@ var Tests = []test.SpecInterface{
 	//		client is expected to respond with the appropriate error.
 	//		`,
 	//	},
-	//	WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+	//	WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
 	//	WithdrawalsBlockCount: 1,
 	//	WithdrawalsPerBlock:   16,
+	//	TimeIncrements:        5,
 	//},
 	//
 	//&WithdrawalsBaseSpec{
@@ -1187,14 +1188,14 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				//
 				// Send a valid Pre-Shanghai request using ForkchoiceUpdatedV2
 				// (CLMock uses V1 by default)
-				latestBlock := t.CLMock.LatestHeader.Time
-				payloadTimestamp := time.Unix(int64(latestBlock), 0).Add(3 * time.Second).Unix()
+				//latestBlock := t.CLMock.LatestHeader.Time
+				//payloadTimestamp := time.Unix(int64(latestBlock), 0).Add(3 * time.Second).Unix()
 				r := t.TestEngine.TestEngineForkchoiceUpdatedV2(
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
 					&beacon.PayloadAttributes{
-						Timestamp:             uint64(payloadTimestamp),
+						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
 						Withdrawals:           make(types.Withdrawals, 0),

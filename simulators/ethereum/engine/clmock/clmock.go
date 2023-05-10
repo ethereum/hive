@@ -495,7 +495,6 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 
 	cl.CurrentPayloadNumber = cl.LatestHeader.Number.Uint64() + 1
 
-	time.Sleep(10 * time.Second)
 	cl.pickNextPayloadProducer()
 
 	// Check if next withdrawals necessary, test can override this value on
