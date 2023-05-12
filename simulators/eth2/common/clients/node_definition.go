@@ -22,9 +22,9 @@ type NodeDefinition struct {
 	ValidatorClient string `json:"validator_client"`
 
 	// Execution Config
-	ExecutionClientTTD *big.Int `json:"execution_client_ttd,omitempty"`
-	ChainGenerator     cg.ChainGenerator
-	Chain              []*types.Block
+	ExecutionClientTTD *big.Int          `json:"execution_client_ttd,omitempty"`
+	ChainGenerator     cg.ChainGenerator `json:"-"`
+	Chain              []*types.Block    `json:"chain,omitempty"`
 
 	// Beacon Config
 	BeaconNodeTTD *big.Int `json:"beacon_node_ttd,omitempty"`
