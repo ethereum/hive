@@ -69,14 +69,8 @@ func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientBui
 		dockerFile += "." + client.DockerFile
 	}
 	buildArgs := make([]docker.BuildArg, 0)
-	if client.User != "" {
-		buildArgs = append(buildArgs, docker.BuildArg{Name: "user", Value: client.User})
-	}
-	if client.Repo != "" {
-		buildArgs = append(buildArgs, docker.BuildArg{Name: "repo", Value: client.Repo})
-	}
-	if client.TagBranch != "" {
-		buildArgs = append(buildArgs, docker.BuildArg{Name: "branch", Value: client.TagBranch})
+	for key, value := range client.BuildArguments {
+		buildArgs = append(buildArgs, docker.BuildArg{Name: key, Value: value})
 	}
 	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs...)
 	return tag, err

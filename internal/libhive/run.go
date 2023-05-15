@@ -77,10 +77,10 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientBuildInfo)
 		anyBuilt = true
 		version, err := r.builder.ReadFile(ctx, image, "/version.txt")
 		if err != nil {
-			log15.Warn("can't read version info of "+client.Name, "image", image, "err", err)
+			log15.Warn("can't read version info of "+client.Client, "image", image, "err", err)
 		}
-		r.clientDefs[client.Name] = &ClientDefinition{
-			Name:    client.Name,
+		r.clientDefs[client.Client] = &ClientDefinition{
+			Name:    client.Client,
 			Version: strings.TrimSpace(string(version)),
 			Image:   image,
 			Meta:    *meta,
@@ -174,11 +174,11 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 		}
 	} else {
 		for _, client := range env.ClientList {
-			def, ok := r.clientDefs[client.Name]
+			def, ok := r.clientDefs[client.Client]
 			if !ok {
-				return SimResult{}, fmt.Errorf("unknown client %q in simulation client list", client.Name)
+				return SimResult{}, fmt.Errorf("unknown client %q in simulation client list", client.Client)
 			}
-			clientDefs[client.Name] = def
+			clientDefs[client.Client] = def
 		}
 	}
 

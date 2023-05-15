@@ -26,12 +26,13 @@ using YAML or JSON file as argument.
     ./hive --sim my-simulation --client clients.yaml
 
 ```yaml
-- name: go-ethereum
+- client: go-ethereum
   dockerfile: git
-- name: nethermind
-  user: nethermindeth
-  repo: hive
-  branch: latest
+- client: nethermind
+  build_args:
+    user: nethermindeth
+    repo: hive
+    branch: latest
 ```
 
     ./hive --sim my-simulation --client clients.json
@@ -39,25 +40,29 @@ using YAML or JSON file as argument.
 ```json
 [
 	{
-		"name": "go-ethereum",
+		"client": "go-ethereum",
 		"dockerfile": "git"
 	},
 	{
-		"name": "nethermind",
-		"user": "nethermindeth",
-		"repo": "hive",
-		"branch": "latest",
+		"client": "nethermind",
+		"build_args": {
+			"user": "nethermindeth",
+			"repo": "hive",
+			"branch": "latest"
+		}
 	}
 ]
 ```
 
-Supported client build arguments are:
+Parameters supported for each client described in this file are:
+ - client: Name of the client to use to build the image
+ - dockerfile: Dockerfile to use. E.g. using `dockerfile==git` will build using `Dockerfile.git` instead of the default `Dockerfile`
+ - build_args: Build arguments passed to the docker build engine to use when building the image
 
-	- name: Name of the client, eg: besu, go-ethereum, etc
-	- dockerfile: Dockerfile to use. E.g. using `dockerfile==git` will build using `Dockerfile.git` instead of the default `Dockerfile`
-	- user: GitHub/DockerHub user or organization name that owns the repository
-	- repo: Repository name
-	- branch: Git branch or docker tag name to use during build process
+Supported docker image build arguments depend on the client and the docker image being used, but common client build arguments are:
+ - user: GitHub/DockerHub user or organization name that owns the repository
+ - repo: Repository name
+ - branch: Git branch or docker tag name to use during build process
 
 See the [go-ethereum client definition][geth-docker] for an example of a client
 Dockerfile.

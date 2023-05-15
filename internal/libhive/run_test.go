@@ -16,7 +16,7 @@ import (
 
 func TestRunner(t *testing.T) {
 	var (
-		allClients = libhive.ClientsBuildInfo{{Name: "client-1"}, {Name: "client-2"}, {Name: "client-3"}}
+		allClients = libhive.ClientsBuildInfo{{Client: "client-1"}, {Client: "client-2"}, {Client: "client-3"}}
 		simClients = allClients[1:]
 	)
 

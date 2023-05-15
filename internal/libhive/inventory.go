@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -20,30 +19,23 @@ const branchDelimiter = "_"
 
 // All other build arguments for a client must be passed by using a YAML/JSON file
 type ClientBuildInfo struct {
-	// Name is the name of the client, eg: besu, go-ethereum, etc.
-	Name string `json:"name"       yaml:"name"`
+	// Client is the name of the client, eg: besu, go-ethereum, etc.
+	Client string `json:"client"       yaml:"client"`
 	// DockerFile is the name of the Dockerfile to use for building the client.
 	// E.g. using `Dockerfile==git` will build using `Dockerfile.git`.
 	DockerFile string `json:"dockerfile" yaml:"dockerfile"`
-	// User is the GitHub/DockerHub user or organization name that owns the
-	// repository.
-	User string `json:"user"       yaml:"user"`
-	// Repo is the name of the repository.
-	Repo string `json:"repo"       yaml:"repo"`
-	// TagBranch is the name of the github branch or docker tag to use to
-	// build the client. If not specified, the default branch will be used.
-	TagBranch string `json:"branch"     yaml:"branch"`
+	// Build parameters used to build the docker image for the client.
+	BuildArguments map[string]string `json:"build_args" yaml:"build_args"`
 }
 
 func (c ClientBuildInfo) String() string {
-	// Append all struct fields to a string separated by underscores using reflection.
-	v := reflect.ValueOf(c)
 	var values []string
-	for i := 0; i < v.NumField(); i++ {
-		fieldVal := v.Field(i).String()
-		if fieldVal != "" {
-			values = append(values, v.Field(i).String())
-		}
+	values = append(values, c.Client)
+	if c.DockerFile != "" {
+		values = append(values, c.DockerFile)
+	}
+	for k, v := range c.BuildArguments {
+		values = append(values, k, v)
 	}
 	return strings.Join(values, "_")
 }
@@ -53,15 +45,16 @@ func ParseClientBuildInfoString(fullString string) (ClientBuildInfo, error) {
 	res := ClientBuildInfo{}
 	if strings.Count(fullString, branchDelimiter) > 0 {
 		substrings := strings.Split(fullString, branchDelimiter)
-		res.Name = strings.Join(substrings[0:len(substrings)-1], "_")
-		res.TagBranch = substrings[len(substrings)-1]
-		if res.TagBranch == "" {
-			return res, fmt.Errorf("invalid branch: %s", res.TagBranch)
+		res.Client = strings.Join(substrings[0:len(substrings)-1], "_")
+		tag := substrings[len(substrings)-1]
+		if tag == "" {
+			return res, fmt.Errorf("invalid branch: %s", tag)
 		}
+		res.BuildArguments = map[string]string{"branch": tag}
 	} else {
-		res.Name = fullString
+		res.Client = fullString
 	}
-	if res.Name == "" {
+	if res.Client == "" {
 		return res, fmt.Errorf("invalid client name: %s", fullString)
 	}
 	return res, nil
@@ -72,7 +65,7 @@ type ClientsBuildInfo []ClientBuildInfo
 func (c ClientsBuildInfo) Names() []string {
 	names := make([]string, len(c))
 	for i, client := range c {
-		names[i] = client.Name
+		names[i] = client.Client
 	}
 	return names
 }
@@ -125,14 +118,14 @@ type Inventory struct {
 // HasClient returns true if the inventory contains the given client.
 // The client name may contain a branch specifier.
 func (inv Inventory) HasClient(client ClientBuildInfo) bool {
-	_, ok := inv.Clients[client.Name]
+	_, ok := inv.Clients[client.Client]
 	return ok
 }
 
 // ClientDirectory returns the directory containing the given client's Dockerfile.
 // The client name may contain a branch specifier.
 func (inv Inventory) ClientDirectory(client ClientBuildInfo) string {
-	return filepath.Join(inv.BaseDir, "clients", filepath.FromSlash(client.Name))
+	return filepath.Join(inv.BaseDir, "clients", filepath.FromSlash(client.Client))
 }
 
 // HasSimulator returns true if the inventory contains the given simulator.

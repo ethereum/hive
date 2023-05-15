@@ -9,20 +9,21 @@ import (
 	"github.com/ethereum/hive/internal/libhive"
 )
 
-func TestSplitClientName(t *testing.T) {
+func TestParseClientBuildInfoString(t *testing.T) {
 	tests := []struct {
-		name                                                       string
-		wantClient, wantDockerFile, wantUser, wantRepo, wantBranch string
+		name            string
+		wantClient      string
+		wantBuildParams map[string]string
 	}{
-		{"client", "client", "", "", "", ""},
-		{"client_b", "client", "", "", "", "b"},
-		{"the_client_b", "the_client", "", "", "", "b"},
-		{"the_client_name_has_many_underscores_b", "the_client_name_has_many_underscores", "", "", "", "b"},
+		{"client", "client", nil},
+		{"client_b", "client", map[string]string{"branch": "b"}},
+		{"the_client_b", "the_client", map[string]string{"branch": "b"}},
+		{"the_client_name_has_many_underscores_b", "the_client_name_has_many_underscores", map[string]string{"branch": "b"}},
 	}
 	for _, test := range tests {
 		cInfo, _ := libhive.ParseClientBuildInfoString(test.name)
-		if cInfo.Name != test.wantClient || cInfo.TagBranch != test.wantBranch || cInfo.User != test.wantUser || cInfo.Repo != test.wantRepo {
-			t.Errorf("SpnlitClientName(%q) -> (%q, %q, %q, %q), want (%q, %q, %q, %q)", test.name, cInfo.Name, cInfo.TagBranch, cInfo.User, cInfo.Repo, test.wantClient, test.wantBranch, test.wantUser, test.wantRepo)
+		if cInfo.Client != test.wantClient || !reflect.DeepEqual(test.wantBuildParams, cInfo.BuildArguments) {
+			t.Errorf("ParseClientBuildInfoString(%q) -> (%q, %q), want (%q, %q)", test.name, cInfo.Client, cInfo.BuildArguments, test.wantClient, test.wantBuildParams)
 		}
 	}
 }
@@ -37,7 +38,7 @@ func TestInvalidSplitClientName(t *testing.T) {
 	for _, test := range tests {
 		cInfo, err := libhive.ParseClientBuildInfoString(test)
 		if err == nil {
-			t.Errorf("SplitClientName(%q) -> (%q, %q, %q, %q), want error", test, cInfo.Name, cInfo.TagBranch, cInfo.User, cInfo.Repo)
+			t.Errorf("SplitClientName(%q) -> (%q, %q), want error", test, cInfo.Client, cInfo.BuildArguments)
 		}
 	}
 }
@@ -47,9 +48,9 @@ func TestClientBuildInfoString(t *testing.T) {
 		buildInfo libhive.ClientBuildInfo
 		want      string
 	}{
-		{libhive.ClientBuildInfo{Name: "client"}, "client"},
-		{libhive.ClientBuildInfo{Name: "client", Repo: "myrepo", TagBranch: "mytag"}, "client_myrepo_mytag"},
-		{libhive.ClientBuildInfo{Name: "client", DockerFile: "mydockerfile", User: "myuser"}, "client_mydockerfile_myuser"},
+		{libhive.ClientBuildInfo{Client: "client"}, "client"},
+		{libhive.ClientBuildInfo{Client: "client", BuildArguments: map[string]string{"repo": "myrepo", "branch": "mybranch"}}, "client_repo_myrepo_branch_mybranch"},
+		{libhive.ClientBuildInfo{Client: "client", DockerFile: "mydockerfile", BuildArguments: map[string]string{"user": "myuser"}}, "client_mydockerfile_user_myuser"},
 	}
 	for _, test := range tests {
 		if test.buildInfo.String() != test.want {
@@ -66,22 +67,23 @@ func TestClientBuildInfoFromFile(t *testing.T) {
 	}{
 		{
 			`[
-				{"name": "go-ethereum", "dockerfile": "git"},
-				{"name": "go-ethereum", "branch": "latest", "dockerfile": "local"},
-				{"name": "supereth3000"}
+				{"client": "go-ethereum", "dockerfile": "git"},
+				{"client": "go-ethereum", "dockerfile": "local", "build_args": {"branch": "latest"}},
+				{"client": "supereth3000"}
 			]`,
 			`
-- name: go-ethereum
+- client: go-ethereum
   dockerfile: git
-- name: go-ethereum
-  branch: latest
+- client: go-ethereum
   dockerfile: local
-- name: supereth3000
+  build_args:
+    branch: latest
+- client: supereth3000
 `,
 			libhive.ClientsBuildInfo{
-				{Name: "go-ethereum", DockerFile: "git"},
-				{Name: "go-ethereum", TagBranch: "latest", DockerFile: "local"},
-				{Name: "supereth3000"}},
+				{Client: "go-ethereum", DockerFile: "git"},
+				{Client: "go-ethereum", DockerFile: "local", BuildArguments: map[string]string{"branch": "latest"}},
+				{Client: "supereth3000"}},
 		},
 	}
 

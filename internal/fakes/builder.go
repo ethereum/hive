@@ -33,7 +33,7 @@ func (b *fakeBuilder) BuildClientImage(ctx context.Context, client libhive.Clien
 	if b.hooks.BuildClientImage != nil {
 		return b.hooks.BuildClientImage(ctx, client)
 	}
-	return "fakebuild/client/" + client.Name + ":latest", nil
+	return "fakebuild/client/" + client.Client + ":latest", nil
 }
 
 func (b *fakeBuilder) BuildSimulatorImage(ctx context.Context, sim string) (string, error) {
