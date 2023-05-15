@@ -9,7 +9,7 @@ require (
 	github.com/herumi/bls-eth-go-binary v1.29.1
 	github.com/holiman/uint256 v1.2.2
 	github.com/marioevz/eth-clients v0.0.0-20230503173323-98293c926363
-	github.com/marioevz/mock-builder v0.0.0-20230501225822-df434a88e375
+	github.com/marioevz/mock-builder v0.0.0-20230515180219-3b0b5c3eefe3
 	github.com/pkg/errors v0.9.1
 	github.com/protolambda/bls12-381-util v0.0.0-20220416220906-d8552aa452c7
 	github.com/protolambda/eth2api v0.0.0-20230316214135-5f8afbd6d05d
