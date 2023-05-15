@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
 	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
 	exec_client "github.com/marioevz/eth-clients/clients/execution"
+	"github.com/pkg/errors"
 	blsu "github.com/protolambda/bls12-381-util"
 	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
@@ -229,7 +230,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 		headBlockRoot,
 	)
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "failed to get head block state")
 	}
 	fmt.Printf(
 		"INFO: Verifying balance validator %d on slot %d\n",
@@ -240,7 +241,10 @@ func (v *Validator) VerifyWithdrawnBalance(
 	// Then get the balance
 	execPayload, err := headBlockState.ExecutionPayload()
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(
+			err,
+			"failed to get execution payload from head",
+		)
 	}
 	balance, err := ec.BalanceAt(
 		ctx,
@@ -248,7 +252,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 		big.NewInt(int64(execPayload.Number)),
 	)
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "failed to get balance")
 	}
 
 	fmt.Printf(
@@ -286,7 +290,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 		for slot := beacon.Slot(0); slot <= headBlockState.Slot(); slot++ {
 			blockState, err := v.BlockStateCache.GetBlockStateBySlotFromHeadRoot(ctx, bc, headBlockRoot, slot)
 			if err != nil {
-				return false, err
+				return false, errors.Wrapf(err, "failed to get block state, slot %d", slot)
 			}
 			if blockState == nil {
 				// Probably a skipped slot
@@ -295,7 +299,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 
 			execPayload, err := blockState.ExecutionPayload()
 			if err != nil {
-				return false, err
+				return false, errors.Wrapf(err, "failed to get execution payload, slot %d", slot)
 			}
 
 			if WithdrawalsContainValidator(execPayload.Withdrawals, v.Index) {
