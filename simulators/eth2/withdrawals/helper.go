@@ -10,9 +10,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
+	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
+	"github.com/pkg/errors"
 	blsu "github.com/protolambda/bls12-381-util"
 	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
@@ -72,8 +74,8 @@ func WithdrawalsContainValidator(
 }
 
 type BeaconBlockState struct {
-	*clients.VersionedBeaconStateResponse
-	*clients.VersionedSignedBeaconBlock
+	*beacon_client.VersionedBeaconStateResponse
+	*beacon_client.VersionedSignedBeaconBlock
 }
 
 type BeaconCache map[tree.Root]BeaconBlockState
@@ -94,7 +96,7 @@ func (c BeaconCache) Clear() error {
 
 func (c BeaconCache) GetBlockStateByRoot(
 	ctx context.Context,
-	bc *clients.BeaconClient,
+	bc *beacon_client.BeaconClient,
 	blockroot tree.Root,
 ) (BeaconBlockState, error) {
 	if s, ok := c[blockroot]; ok {
@@ -125,7 +127,7 @@ func (c BeaconCache) GetBlockStateByRoot(
 
 func (c BeaconCache) GetBlockStateBySlotFromHeadRoot(
 	ctx context.Context,
-	bc *clients.BeaconClient,
+	bc *beacon_client.BeaconClient,
 	headblockroot tree.Root,
 	slot beacon.Slot,
 ) (*BeaconBlockState, error) {
@@ -195,7 +197,7 @@ type Validator struct {
 	Exited                     bool
 	ExitCondition              string
 	ExactWithdrawableBalance   *big.Int
-	Keys                       *cl.KeyDetails
+	Keys                       *cl.ValidatorDetails
 	BLSToExecutionChangeDomain *beacon.BLSDomain
 	Verified                   bool
 	InitialBalance             beacon.Gwei
@@ -205,8 +207,8 @@ type Validator struct {
 
 func (v *Validator) VerifyWithdrawnBalance(
 	ctx context.Context,
-	bc *clients.BeaconClient,
-	ec *clients.ExecutionClient,
+	bc *beacon_client.BeaconClient,
+	ec *exec_client.ExecutionClient,
 	headBlockRoot tree.Root,
 ) (bool, error) {
 	if v.Verified {
@@ -228,7 +230,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 		headBlockRoot,
 	)
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "failed to get head block state")
 	}
 	fmt.Printf(
 		"INFO: Verifying balance validator %d on slot %d\n",
@@ -239,7 +241,10 @@ func (v *Validator) VerifyWithdrawnBalance(
 	// Then get the balance
 	execPayload, err := headBlockState.ExecutionPayload()
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(
+			err,
+			"failed to get execution payload from head",
+		)
 	}
 	balance, err := ec.BalanceAt(
 		ctx,
@@ -247,7 +252,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 		big.NewInt(int64(execPayload.Number)),
 	)
 	if err != nil {
-		return false, err
+		return false, errors.Wrap(err, "failed to get balance")
 	}
 
 	fmt.Printf(
@@ -285,7 +290,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 		for slot := beacon.Slot(0); slot <= headBlockState.Slot(); slot++ {
 			blockState, err := v.BlockStateCache.GetBlockStateBySlotFromHeadRoot(ctx, bc, headBlockRoot, slot)
 			if err != nil {
-				return false, err
+				return false, errors.Wrapf(err, "failed to get block state, slot %d", slot)
 			}
 			if blockState == nil {
 				// Probably a skipped slot
@@ -294,7 +299,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 
 			execPayload, err := blockState.ExecutionPayload()
 			if err != nil {
-				return false, err
+				return false, errors.Wrapf(err, "failed to get execution payload, slot %d", slot)
 			}
 
 			if WithdrawalsContainValidator(execPayload.Withdrawals, v.Index) {
@@ -392,7 +397,7 @@ func (v *Validator) SignBLSToExecutionChange(
 // Also internally update the withdraw address.
 func (v *Validator) SignSendBLSToExecutionChange(
 	ctx context.Context,
-	bc *clients.BeaconClient,
+	bc *beacon_client.BeaconClient,
 	executionAddress common.Address,
 ) error {
 	signedBLS, err := v.SignBLSToExecutionChange(executionAddress)
@@ -423,8 +428,8 @@ func (vs Validators) GetValidatorByIndex(i beacon.ValidatorIndex) *Validator {
 // Verify all validators have withdrawn
 func (vs Validators) VerifyWithdrawnBalance(
 	ctx context.Context,
-	bc *clients.BeaconClient,
-	ec *clients.ExecutionClient,
+	bc *beacon_client.BeaconClient,
+	ec *exec_client.ExecutionClient,
 	headBlockRoot tree.Root,
 ) (bool, error) {
 	for i, v := range vs {
@@ -499,7 +504,7 @@ func ValidatorFromBeaconValidator(
 	index beacon.ValidatorIndex,
 	source beacon.Validator,
 	balance beacon.Gwei,
-	keys *cl.KeyDetails,
+	keys *cl.ValidatorDetails,
 	domain *beacon.BLSDomain,
 	beaconCache BeaconCache,
 ) (*Validator, error) {
@@ -562,7 +567,7 @@ func ValidatorFromBeaconState(
 	spec beacon.Spec,
 	state beacon.BeaconState,
 	index beacon.ValidatorIndex,
-	keys *cl.KeyDetails,
+	keys *cl.ValidatorDetails,
 	domain *beacon.BLSDomain,
 	beaconCache BeaconCache,
 ) (*Validator, error) {
@@ -596,7 +601,7 @@ func ValidatorFromBeaconState(
 func ValidatorsFromBeaconState(
 	state beacon.BeaconState,
 	spec beacon.Spec,
-	keys []*cl.KeyDetails,
+	keys []*cl.ValidatorDetails,
 	domain *beacon.BLSDomain,
 ) (Validators, error) {
 	stateVals, err := state.Validators()
