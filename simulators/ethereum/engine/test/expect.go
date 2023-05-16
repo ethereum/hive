@@ -900,7 +900,7 @@ func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) 
 	exp.ExpectNoError()
 	if ((expBalance == nil || exp.Balance == nil) && expBalance != exp.Balance) ||
 		(expBalance != nil && exp.Balance != nil && expBalance.Cmp(exp.Balance) != 0) {
-		exp.Fatalf("FAIL (%s): Unexpected balance on %s, for account %s at block %v: %v, expected=%v", exp.TestName, exp.Call, exp.Account, exp.Block, exp.Balance, expBalance)
+		exp.Fatalf("FAIL (%s): Unexpected balance on %s, for account %s at block %v: %v, expected=%v", exp.TestName, exp.Call, exp.Account, exp.Block.Int64(), exp.Balance, expBalance)
 	}
 }
 

@@ -9,6 +9,14 @@ import (
 	"strings"
 )
 
+// MAX_FAILED_WITHDRAWALS_TO_PROCESS represents the maximum number of failed withdrawals to process.
+const MAX_FAILED_WITHDRAWALS_TO_PROCESS = 4
+
+const GAS_LIMIT = 1000000
+
+// SYSTEM_SENDER represents the address of the system sender.
+var SYSTEM_SENDER = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
+
 // GNOWithdrawalContractABI represents the path to the GNO withdrawal contract ABI.
 //
 //go:embed withdrawals.json

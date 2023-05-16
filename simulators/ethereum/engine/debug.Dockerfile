@@ -12,12 +12,11 @@ FROM golang:1-alpine as builder
 RUN apk add --update gcc musl-dev linux-headers
 
 # Build the simulator executable.
-ADD . /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
-RUN echo $GOPATH
 ENV GOPATH /Users/maceo/go
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+ADD . /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
 WORKDIR /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
 RUN go build -gcflags="all=-N -l" -v .
-RUN go install github.com/go-delve/delve/cmd/dlv@latest
 
 # Build the simulator run container.
 FROM alpine:latest
@@ -26,7 +25,6 @@ WORKDIR /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engi
 COPY --from=builder /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine .
 COPY --from=geth    /ethash /ethash
 COPY --from=builder /Users/maceo/go/bin/dlv /go/bin/dlv
-RUN ls
 
 EXPOSE 40000
 

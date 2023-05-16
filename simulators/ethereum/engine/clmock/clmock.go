@@ -450,7 +450,14 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 	if isShanghai(cl.LatestExecutedPayload.Timestamp, cl.ShanghaiTimestamp) {
 		version = 2
 	}
-	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, version) {
+	var payload *api.PayloadAttributes
+	payload = &api.PayloadAttributes{
+		Timestamp:             cl.LatestPayloadBuilt.Timestamp,
+		Random:                cl.LatestPayloadBuilt.Random,
+		SuggestedFeeRecipient: cl.LatestPayloadBuilt.FeeRecipient,
+		Withdrawals:           cl.LatestPayloadBuilt.Withdrawals,
+	}
+	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, payload, version) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
 		} else if resp.ForkchoiceResponse.PayloadStatus.Status == api.VALID {
@@ -532,77 +539,77 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 		callbacks.OnNewPayloadBroadcast()
 	}
 
-	//// Broadcast forkchoice updated with new HeadBlock to all clients
-	//previousForkchoice := cl.LatestForkchoice
-	//cl.HeadHashHistory = append(cl.HeadHashHistory, cl.LatestPayloadBuilt.BlockHash)
-	//
-	//cl.LatestForkchoice = api.ForkchoiceStateV1{}
-	//cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
-	//if len(cl.HeadHashHistory) > int(cl.SlotsToSafe.Int64()) {
-	//	cl.LatestForkchoice.SafeBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToSafe.Int64())-1]
-	//}
-	//if len(cl.HeadHashHistory) > int(cl.SlotsToFinalized.Int64()) {
-	//	cl.LatestForkchoice.FinalizedBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToFinalized.Int64())-1]
-	//}
-	//cl.broadcastLatestForkchoice()
-	//if callbacks.OnForkchoiceBroadcast != nil {
-	//	callbacks.OnForkchoiceBroadcast()
-	//}
-	//
-	//// Broadcast forkchoice updated with new SafeBlock to all clients
-	//if callbacks.OnSafeBlockChange != nil && previousForkchoice.SafeBlockHash != cl.LatestForkchoice.SafeBlockHash {
-	//	callbacks.OnSafeBlockChange()
-	//}
-	//// Broadcast forkchoice updated with new FinalizedBlock to all clients
-	//if callbacks.OnFinalizedBlockChange != nil && previousForkchoice.FinalizedBlockHash != cl.LatestForkchoice.FinalizedBlockHash {
-	//	callbacks.OnFinalizedBlockChange()
-	//}
-	//
-	//// Save the number of the first PoS block
-	//if cl.FirstPoSBlockNumber == nil {
-	//	cl.FirstPoSBlockNumber = big.NewInt(int64(cl.LatestHeader.Number.Uint64() + 1))
-	//}
-	//
-	//// Save the header of the latest block in the PoS chain
-	//cl.LatestHeadNumber = cl.LatestHeadNumber.Add(cl.LatestHeadNumber, common.Big1)
-	//
-	//// Check if any of the clients accepted the new payload
-	//cl.LatestHeader = nil
-	//for _, ec := range cl.EngineClients {
-	//	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
-	//	defer cancel()
-	//	newHeader, err := ec.HeaderByNumber(ctx, cl.LatestHeadNumber)
-	//	if err != nil {
-	//		continue
-	//	}
-	//	if newHeader.Hash() != cl.LatestPayloadBuilt.BlockHash {
-	//		continue
-	//	}
-	//	// Check that the new finalized header has the correct properties
-	//	// ommersHash == 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347
-	//	if newHeader.UncleHash != types.EmptyUncleHash {
-	//		cl.Fatalf("CLMocker: Client %v produced a new header with incorrect ommersHash: %v", ec.ID(), newHeader.UncleHash)
-	//	}
-	//	// difficulty == 0
-	//	if newHeader.Difficulty.Cmp(common.Big0) != 0 {
-	//		cl.Fatalf("CLMocker: Client %v produced a new header with incorrect difficulty: %v", ec.ID(), newHeader.Difficulty)
-	//	}
-	//	// mixHash == prevRandao
-	//	if newHeader.MixDigest != cl.PrevRandaoHistory[cl.LatestHeadNumber.Uint64()] {
-	//		cl.Fatalf("CLMocker: Client %v produced a new header with incorrect mixHash: %v != %v", ec.ID(), newHeader.MixDigest, cl.PrevRandaoHistory[cl.LatestHeadNumber.Uint64()])
-	//	}
-	//	// nonce == 0x0000000000000000
-	//	if newHeader.Nonce != (types.BlockNonce{}) {
-	//		cl.Fatalf("CLMocker: Client %v produced a new header with incorrect nonce: %v", ec.ID(), newHeader.Nonce)
-	//	}
-	//	if len(newHeader.Extra) > 32 {
-	//		cl.Fatalf("CLMocker: Client %v produced a new header with incorrect extraData (len > 32): %v", ec.ID(), newHeader.Extra)
-	//	}
-	//	cl.LatestHeader = newHeader
-	//}
-	//if cl.LatestHeader == nil {
-	//	cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
-	//}
+	// Broadcast forkchoice updated with new HeadBlock to all clients
+	previousForkchoice := cl.LatestForkchoice
+	cl.HeadHashHistory = append(cl.HeadHashHistory, cl.LatestPayloadBuilt.BlockHash)
+
+	cl.LatestForkchoice = api.ForkchoiceStateV1{}
+	cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
+	if len(cl.HeadHashHistory) > int(cl.SlotsToSafe.Int64()) {
+		cl.LatestForkchoice.SafeBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToSafe.Int64())-1]
+	}
+	if len(cl.HeadHashHistory) > int(cl.SlotsToFinalized.Int64()) {
+		cl.LatestForkchoice.FinalizedBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToFinalized.Int64())-1]
+	}
+	cl.broadcastLatestForkchoice()
+	if callbacks.OnForkchoiceBroadcast != nil {
+		callbacks.OnForkchoiceBroadcast()
+	}
+
+	// Broadcast forkchoice updated with new SafeBlock to all clients
+	if callbacks.OnSafeBlockChange != nil && previousForkchoice.SafeBlockHash != cl.LatestForkchoice.SafeBlockHash {
+		callbacks.OnSafeBlockChange()
+	}
+	// Broadcast forkchoice updated with new FinalizedBlock to all clients
+	if callbacks.OnFinalizedBlockChange != nil && previousForkchoice.FinalizedBlockHash != cl.LatestForkchoice.FinalizedBlockHash {
+		callbacks.OnFinalizedBlockChange()
+	}
+
+	// Save the number of the first PoS block
+	if cl.FirstPoSBlockNumber == nil {
+		cl.FirstPoSBlockNumber = big.NewInt(int64(cl.LatestHeader.Number.Uint64() + 1))
+	}
+
+	// Save the header of the latest block in the PoS chain
+	cl.LatestHeadNumber = cl.LatestHeadNumber.Add(cl.LatestHeadNumber, common.Big1)
+
+	// Check if any of the clients accepted the new payload
+	cl.LatestHeader = nil
+	for _, ec := range cl.EngineClients {
+		ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
+		defer cancel()
+		newHeader, err := ec.HeaderByNumber(ctx, cl.LatestHeadNumber)
+		if err != nil {
+			continue
+		}
+		if newHeader.Hash() != cl.LatestPayloadBuilt.BlockHash {
+			continue
+		}
+		// Check that the new finalized header has the correct properties
+		// ommersHash == 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347
+		if newHeader.UncleHash != types.EmptyUncleHash {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect ommersHash: %v", ec.ID(), newHeader.UncleHash)
+		}
+		// difficulty == 0
+		if newHeader.Difficulty.Cmp(common.Big0) != 0 {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect difficulty: %v", ec.ID(), newHeader.Difficulty)
+		}
+		// mixHash == prevRandao
+		if newHeader.MixDigest != cl.PrevRandaoHistory[cl.LatestHeadNumber.Uint64()] {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect mixHash: %v != %v", ec.ID(), newHeader.MixDigest, cl.PrevRandaoHistory[cl.LatestHeadNumber.Uint64()])
+		}
+		// nonce == 0x0000000000000000
+		if newHeader.Nonce != (types.BlockNonce{}) {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect nonce: %v", ec.ID(), newHeader.Nonce)
+		}
+		if len(newHeader.Extra) > 32 {
+			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect extraData (len > 32): %v", ec.ID(), newHeader.Extra)
+		}
+		cl.LatestHeader = newHeader
+	}
+	if cl.LatestHeader == nil {
+		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
+	}
 
 }
 
