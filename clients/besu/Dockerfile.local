@@ -3,7 +3,9 @@
 ## Builder stage: Compiles besu from a local directory
 FROM openjdk:17-jdk-slim as builder
 
-COPY besu besu
+# Default local client path: clients/besu/<besu>
+ARG local_path=besu
+COPY $local_path besu
 
 RUN apt-get update && apt-get install -y git libsodium-dev libnss3-dev \
     && cd besu && ./gradlew installDist
