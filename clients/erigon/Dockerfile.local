@@ -4,7 +4,9 @@
 ## Builder stage: Compiles erigon from a local directory
 FROM golang:1-alpine as builder
 
-COPY erigon erigon
+# Default local client path: clients/erigon/<erigon>
+ARG local_path=erigon
+COPY $local_path erigon
 
 RUN apk add bash build-base ca-certificates git \
     && cd erigon && make erigon \
