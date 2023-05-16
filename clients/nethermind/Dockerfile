@@ -1,5 +1,7 @@
+ARG user=nethermindeth
+ARG repo=hive
 ARG branch=latest
-FROM nethermindeth/hive:$branch
+FROM $user/$repo:$branch
 
 RUN apt-get update && apt-get install -y wget
 RUN wget https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -O /usr/local/bin/jq && \

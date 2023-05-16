@@ -142,6 +142,9 @@ def clique_engine:
     "eip3860TransitionTimestamp": env.HIVE_SHANGHAI_TIMESTAMP|to_hex,
     "eip4895TransitionTimestamp": env.HIVE_SHANGHAI_TIMESTAMP|to_hex,
 
+    # Cancun
+    "eip4844TransitionTimestamp": env.HIVE_CANCUN_TIMESTAMP|to_hex,
+
     # Other chain parameters
     "networkID": env.HIVE_NETWORK_ID|to_hex,
     "chainID": env.HIVE_CHAIN_ID|to_hex,
@@ -160,6 +163,7 @@ def clique_engine:
     "extraData": .extraData,
     "gasLimit": .gasLimit,
     "baseFeePerGas": .baseFeePerGas,
+    "excessDataGas": .excessDataGas,
   },
   "accounts": ((.alloc|with_entries(.key|="0x"+.)) * {
     "0x0000000000000000000000000000000000000001": {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/ethereum/hive/simulators/eth2/common/clients"
+	"github.com/marioevz/eth-clients/clients/node"
 )
 
 // result object used to get a result/error from each node
@@ -78,7 +78,7 @@ func (rs resultsArr) AllDone() bool {
 	return true
 }
 
-func makeResults(nodes clients.Nodes, maxErr int) resultsArr {
+func makeResults(nodes node.Nodes, maxErr int) resultsArr {
 	res := make(resultsArr, len(nodes))
 	for i, n := range nodes {
 		r := result{

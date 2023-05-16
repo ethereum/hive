@@ -4,8 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -18,15 +19,20 @@ import (
 
 // loadFixtureTests extracts tests from fixture.json files in a given directory,
 // creates a testcase for each test, and passes the testcase struct to fn.
-func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) {
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		// check file is actually a fixture
 		if err != nil {
 			t.Logf("unable to walk path: %s", err)
 			return err
 		}
-		if info.IsDir() || !strings.HasSuffix(info.Name(), ".json") {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
 			return nil
+		}
+		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".json")
+		if !re.MatchString(pathname) {
+			fmt.Println("skip", pathname)
+			return nil // skip
 		}
 		excludePaths := []string{"example/"} // modify for tests to exclude
 		if strings.Contains(path, strings.Join(excludePaths, "")) {
@@ -54,7 +60,10 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 				filepath: path,
 			}
 			// extract genesis, payloads & post allocation field to tc
-			tc.extractFixtureFields(fixture.json)
+			if err := tc.extractFixtureFields(fixture.json); err != nil {
+				t.Logf("test %v / %v: unable to extract fixture fields: %v", d.Name(), name, err)
+				tc.failedErr = fmt.Errorf("unable to extract fixture fields: %v", err)
+			}
 			// feed tc to single worker within fixtureRunner()
 			fn(tc)
 		}
@@ -85,7 +94,11 @@ func (tc *testcase) run(t *hivesim.T) {
 	}
 	tc.updateEnv(env)
 	t0 := time.Now()
-
+	// If test is already failed, don't bother spinning up a client
+	if tc.failedErr != nil {
+		t.Errorf("test failed early: %v", tc.failedErr)
+		return
+	}
 	// start client (also creates an engine RPC client internally)
 	t.Log("starting client with Engine API.")
 	engineClient, err := engineStarter.StartClient(t, ctx, tc.genesis, env, nil)

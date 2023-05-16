@@ -58,10 +58,6 @@ fi
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 
-if [ "$HIVE_SKIP_POW" != "" ]; then
-    FLAGS="$FLAGS --fakepow"
-fi
-
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
     FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
@@ -131,7 +127,7 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
     # Create password file.
     echo "Importing clique key..."
     echo "secret" > /geth-password-file.txt
-    $geth --nousb account import --password /geth-password-file.txt <(echo "$HIVE_CLIQUE_PRIVATEKEY")
+    $geth account import --password /geth-password-file.txt <(echo "$HIVE_CLIQUE_PRIVATEKEY")
 
     # Ensure password file is used when running geth in mining mode.
     if [ "$HIVE_MINER" != "" ]; then
@@ -141,7 +137,7 @@ fi
 
 # Configure any mining operation
 if [ "$HIVE_MINER" != "" ] && [ "$HIVE_NODETYPE" != "light" ]; then
-    FLAGS="$FLAGS --mine --miner.threads 1 --miner.etherbase $HIVE_MINER"
+    FLAGS="$FLAGS --mine --miner.etherbase $HIVE_MINER"
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"

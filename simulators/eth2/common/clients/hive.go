@@ -3,30 +3,12 @@ package clients
 import (
 	"fmt"
 	"net"
-	"strconv"
 
 	"github.com/ethereum/hive/hivesim"
+	"github.com/marioevz/eth-clients/clients"
 )
 
-type Client interface {
-	IsRunning() bool
-	GetIP() net.IP
-	ClientType() string
-}
-
-type EnodeClient interface {
-	Client
-	GetEnodeURL() (string, error)
-}
-
-type ManagedClient interface {
-	Client
-	AddStartOption(...interface{})
-	Start() error
-	Shutdown() error
-}
-
-var _ ManagedClient = &HiveManagedClient{}
+var _ clients.ManagedClient = &HiveManagedClient{}
 
 type HiveOptionsGenerator func() ([]hivesim.StartOption, error)
 
@@ -102,50 +84,4 @@ func (h *HiveManagedClient) GetEnodeURL() (string, error) {
 
 func (h *HiveManagedClient) ClientType() string {
 	return h.HiveClientDefinition.Name
-}
-
-var _ Client = &ExternalClient{}
-
-type ExternalClient struct {
-	Type     string
-	IP       net.IP
-	Port     int
-	EnodeURL string
-}
-
-func ExternalClientFromURL(url string, typ string) (*ExternalClient, error) {
-	ip, portStr, err := net.SplitHostPort(url)
-	if err != nil {
-		return nil, err
-	}
-	port, err := strconv.ParseInt(portStr, 10, 64)
-	if err != nil {
-		return nil, err
-	}
-	return &ExternalClient{
-		Type: typ,
-		IP:   net.ParseIP(ip),
-		Port: int(port),
-	}, nil
-}
-
-func (m *ExternalClient) IsRunning() bool {
-	// We can try pinging a certain port for status
-	return true
-}
-
-func (m *ExternalClient) GetIP() net.IP {
-	return m.IP
-}
-
-func (m *ExternalClient) GetPort() int {
-	return m.Port
-}
-
-func (m *ExternalClient) ClientType() string {
-	return m.Type
-}
-
-func (m *ExternalClient) GetEnodeURL() (string, error) {
-	return m.EnodeURL, nil
 }

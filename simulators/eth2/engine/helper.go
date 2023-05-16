@@ -7,11 +7,13 @@ import (
 	"math/big"
 	"time"
 
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
@@ -133,7 +135,7 @@ func SlotsUntilBellatrix(
 
 func TimeUntilTerminalBlock(
 	parentCtx context.Context,
-	e *clients.ExecutionClient,
+	e *exec_client.ExecutionClient,
 	c el.ExecutionConsensus,
 	defaultTTD *big.Int,
 ) uint64 {
@@ -150,4 +152,18 @@ func TimeUntilTerminalBlock(
 		td.Sub(ttd, td).Div(td, c.DifficultyPerBlock()).Mul(td, big.NewInt(int64(c.SecondsPerBlock())))
 		return td.Uint64()
 	}
+}
+
+func PayloadFromResponse(res []byte) (*api.ExecutableData, error) {
+	// First try unmarshalling to the envelope
+	env := new(api.ExecutionPayloadEnvelope)
+	if err := exec_client.UnmarshalFromJsonRPCResponse(res, env); err == nil {
+		return env.ExecutionPayload, nil
+	}
+	// If that fails, try unmarshalling directly to the payload
+	payload := new(api.ExecutableData)
+	if err := exec_client.UnmarshalFromJsonRPCResponse(res, payload); err != nil {
+		return nil, err
+	}
+	return payload, nil
 }
