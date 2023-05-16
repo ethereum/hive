@@ -55,6 +55,7 @@ def to_bool:
     "mergeForkBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
     "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
+    "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
     "terminalTotalDifficultyPassed": true,
   }|remove_empty
 }
