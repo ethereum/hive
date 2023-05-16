@@ -69,7 +69,7 @@ func TestClientBuildInfoFromFile(t *testing.T) {
 			`[
 				{"client": "go-ethereum", "dockerfile": "git"},
 				{"client": "go-ethereum", "dockerfile": "local", "build_args": {"branch": "latest"}},
-				{"client": "supereth3000"}
+				{"client": "supereth3000", "build_args": {"some_other_arg": "some_other_value"}}
 			]`,
 			`
 - client: go-ethereum
@@ -79,11 +79,13 @@ func TestClientBuildInfoFromFile(t *testing.T) {
   build_args:
     branch: latest
 - client: supereth3000
+  build_args:
+    some_other_arg: some_other_value
 `,
 			libhive.ClientsBuildInfo{
 				{Client: "go-ethereum", DockerFile: "git"},
 				{Client: "go-ethereum", DockerFile: "local", BuildArguments: map[string]string{"branch": "latest"}},
-				{Client: "supereth3000"}},
+				{Client: "supereth3000", BuildArguments: map[string]string{"some_other_arg": "some_other_value"}}},
 		},
 	}
 
