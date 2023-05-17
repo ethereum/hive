@@ -16,7 +16,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:7.0
 # Copy compiled binary from builder
 COPY --from=build /nethermind/src/Nethermind/Nethermind.Runner/bin/release/net7.0 /nethermind
 
-RUN apt-get update && apt-get install -y jq wget && \
+RUN apt-get update && apt-get install -y jq && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
