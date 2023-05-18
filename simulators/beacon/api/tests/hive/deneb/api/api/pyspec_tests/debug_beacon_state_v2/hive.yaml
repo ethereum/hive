@@ -1,0 +1,8 @@
+- !VerifyBeaconStateV2
+  method: BeaconStateV2
+  id: head
+  fields: {state_root: 2d1c4b009796faa2f953cb5d67b1373d31479303845871669016e715c0d347eb}
+- !VerifyBeaconStateV2
+  method: BeaconStateV2
+  id: slot:3
+  fields: {state_root: 2d1c4b009796faa2f953cb5d67b1373d31479303845871669016e715c0d347eb}
