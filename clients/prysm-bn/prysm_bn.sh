@@ -3,7 +3,7 @@
 # Immediately abort the script on any error encountered
 set -e
 
-if [ ! -f "/hive/input/genesis.ssz" ]; then
+if [ ! -f "/hive/input/genesis.ssz" ] && [ ! -f "/hive/input/checkpoint_state.ssz" ]; then
     if [ -z "$HIVE_ETH2_ETH1_RPC_ADDRS" ]; then
       echo "genesis.ssz file is missing, and no Eth1 RPC addr was provided for building genesis from scratch."
       # TODO: alternative to start from weak-subjectivity-state
@@ -26,22 +26,40 @@ esac
 
 echo "bootnodes: ${HIVE_ETH2_BOOTNODE_ENRS}"
 
-# znrt encodes the values of these items between double quotes (""), which is against the spec:
-# https://github.com/ethereum/consensus-specs/blob/v1.1.10/configs/mainnet.yaml
-sed -i 's/"\([[:digit:]]\+\)"/\1/' /hive/input/config.yaml
-sed -i 's/"\(0x[[:xdigit:]]\+\)"/\1/' /hive/input/config.yaml
+if [ -f "/hive/input/config.yaml" ]; then
+    # znrt encodes the values of these items between double quotes (""), which is against the spec:
+    # https://github.com/ethereum/consensus-specs/blob/v1.1.10/configs/mainnet.yaml
+    sed -i 's/"\([[:digit:]]\+\)"/\1/' /hive/input/config.yaml
+    sed -i 's/"\(0x[[:xdigit:]]\+\)"/\1/' /hive/input/config.yaml
 
-if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
-    sed -i '/TERMINAL_TOTAL_DIFFICULTY/d' /hive/input/config.yaml
-    echo "TERMINAL_TOTAL_DIFFICULTY: $HIVE_TERMINAL_TOTAL_DIFFICULTY" >> /hive/input/config.yaml
+    if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
+        sed -i '/TERMINAL_TOTAL_DIFFICULTY/d' /hive/input/config.yaml
+        echo "TERMINAL_TOTAL_DIFFICULTY: $HIVE_TERMINAL_TOTAL_DIFFICULTY" >> /hive/input/config.yaml
+    fi
+
+    if [[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" != "" ]]; then
+        echo "SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY: $HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" >> /hive/input/config.yaml
+    fi
+
+    echo config.yaml:
+    cat /hive/input/config.yaml
+    config_option="--chain-config-file=/hive/input/config.yaml"
 fi
 
-if [[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" != "" ]]; then
-    echo "SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY: $HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" >> /hive/input/config.yaml
+if [ -f "/hive/input/genesis.ssz" ]; then
+    genesis_option="--genesis-state=/hive/input/genesis.ssz"
 fi
 
-echo config.yaml:
-cat /hive/input/config.yaml
+if [ -f "/hive/input/checkpoint_state.ssz" ]; then
+    if [ ! -f "/hive/input/checkpoint_block.ssz" ]; then
+        echo "checkpoint_block.ssz file is missing"
+        exit 1
+    fi
+    checkpoint_option="--checkpoint-state=/hive/input/checkpoint_state.ssz --checkpoint-block=/hive/input/checkpoint_block.ssz"
+fi
+if [[ "$HIVE_ETH2_ETH1_RPC_ADDRS" != "" ]]; then
+    execution_option="--execution-endpoint=$HIVE_ETH2_ETH1_RPC_ADDRS --jwt-secret=/jwtsecret --deposit-contract=${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111} --contract-deployment-block=${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}"
+fi
 
 CONTAINER_IP=`hostname -i | awk '{print $1;}'`
 metrics_option=$([[ "$HIVE_ETH2_METRICS_PORT" == "" ]] && echo "--disable-monitoring=true" || echo "--disable-monitoring=false --monitoring-host=0.0.0.0 --monitoring-port=$HIVE_ETH2_METRICS_PORT")
@@ -65,22 +83,20 @@ echo Starting Prysm Beacon Node
     --verbosity="$LOG" \
     --accept-terms-of-use=true \
     --datadir=/data/beacon \
-    --chain-config-file=/hive/input/config.yaml \
-    --genesis-state=/hive/input/genesis.ssz \
+    $config_option \
+    $genesis_option \
     $bootnode_option \
+    $checkpoint_option \
     --p2p-tcp-port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --p2p-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --p2p-host-ip="${CONTAINER_IP}" \
     --p2p-local-ip="${CONTAINER_IP}" \
-    --execution-endpoint="$HIVE_ETH2_ETH1_RPC_ADDRS" \
-    --jwt-secret=/jwtsecret \
+    $execution_option \
     --min-sync-peers=1 \
     --subscribe-all-subnets=true \
     --enable-debug-rpc-endpoints=true \
     $metrics_option \
     $builder_option \
-    --deposit-contract="${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" \
-    --contract-deployment-block="${HIVE_ETH2_DEPOSIT_DEPLOY_BLOCK_NUMBER:-0}" \
     --rpc-host=0.0.0.0 --rpc-port="${HIVE_ETH2_BN_GRPC_PORT:-3500}" \
     --grpc-gateway-host=0.0.0.0 --grpc-gateway-port="${HIVE_ETH2_BN_API_PORT:-4000}" --grpc-gateway-corsdomain="*" \
     --suggested-fee-recipient="0xa94f5374Fce5edBC8E2a8697C15331677e6EbF0B"
