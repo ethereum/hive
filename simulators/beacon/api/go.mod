@@ -8,7 +8,7 @@ require (
 	github.com/holiman/uint256 v1.2.2
 	github.com/marioevz/eth-clients v0.0.0-20230503173323-98293c926363
 	github.com/pkg/errors v0.9.1
-	github.com/protolambda/zrnt v0.30.0
+	github.com/protolambda/zrnt v0.30.1-0.20230514200506-8154369c6d3e
 	github.com/protolambda/ztyp v0.2.2
 	gopkg.in/yaml.v3 v3.0.1
 )

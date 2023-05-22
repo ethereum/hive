@@ -263,6 +263,8 @@ github.com/protolambda/eth2api v0.0.0-20230316214135-5f8afbd6d05d/go.mod h1:4WbG
 github.com/protolambda/messagediff v1.4.0/go.mod h1:LboJp0EwIbJsePYpzh5Op/9G1/4mIztMRYzzwR0dR2M=
 github.com/protolambda/zrnt v0.30.0 h1:pHEn69ZgaDFGpLGGYG1oD7DvYI7RDirbMBPfbC+8p4g=
 github.com/protolambda/zrnt v0.30.0/go.mod h1:qcdX9CXFeVNCQK/q0nswpzhd+31RHMk2Ax/2lMsJ4Jw=
+github.com/protolambda/zrnt v0.30.1-0.20230514200506-8154369c6d3e h1:TzbOmtwCquaqGgiGcb5NyX9ltLrJ/QjxOiEpHSLAFUA=
+github.com/protolambda/zrnt v0.30.1-0.20230514200506-8154369c6d3e/go.mod h1:qcdX9CXFeVNCQK/q0nswpzhd+31RHMk2Ax/2lMsJ4Jw=
 github.com/protolambda/ztyp v0.2.2 h1:rVcL3vBu9W/aV646zF6caLS/dyn9BN8NYiuJzicLNyY=
 github.com/protolambda/ztyp v0.2.2/go.mod h1:9bYgKGqg3wJqT9ac1gI2hnVb0STQq7p/1lapqrqY1dU=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
