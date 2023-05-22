@@ -7,12 +7,13 @@ RUN apk --no-cache add gcc musl-dev linux-headers cmake make clang build-base cl
 ADD . /source
 
 # Build within simulator folder
-WORKDIR /source
+WORKDIR /source/api
 RUN go build -o ./sim .
 
 # Build the runner container.
 FROM alpine:latest
 ADD . /
-COPY --from=builder /source/sim /
+COPY --from=builder /source/api/sim /
+ADD ./api/tests /tests
 
 ENTRYPOINT ["./sim"]
