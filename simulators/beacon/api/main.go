@@ -140,22 +140,25 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(BeaconAPITe
 			return nil // skip
 		}
 		if !re.MatchString(info.Name()) {
-			fmt.Println("skip", info.Name())
+			fmt.Println("skip (regex string)", info.Name())
 			return nil // skip
 		}
+		testName := walkpath
+		testName = strings.TrimPrefix(testName, filepath.FromSlash(root+"/"))
+		testName = strings.TrimPrefix(testName, filepath.FromSlash("hive/"))
 		test := BeaconAPITest{
-			Name: info.Name(),
+			Name: testName,
 			Path: walkpath,
 		}
 		if err := test.LoadFromDirectory(walkpath); err != nil {
-			fmt.Println(walkpath)
+			fmt.Println("skip (load from dir)", walkpath, err)
 			return nil
 		}
 		if preset_str, _, err := test.PresetFork(); err != nil {
-			fmt.Println("skip", info.Name())
+			fmt.Println("skip (preset fork)", info.Name(), err)
 			return nil
 		} else if preset_str != "hive" {
-			fmt.Println("skip", info.Name())
+			fmt.Println("skip", info.Name(), preset_str)
 			return nil
 		}
 		fn(test)

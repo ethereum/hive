@@ -9,10 +9,9 @@ import (
 
 // Test verifications yaml file unmarshaller
 func TestBeaconAPIVerifications_UnmarshalYAML(t *testing.T) {
-	yamlString := `- method: BeaconStateV2
+	yamlString := `- !EthV2DebugBeaconStates
   id: head
-  fields:
-    state_root: a100000000000000000000000000000000000000000000000000000000000000
+  fields: {state_root: a100000000000000000000000000000000000000000000000000000000000000}
 `
 
 	var verifications BeaconAPIVerifications
@@ -23,11 +22,11 @@ func TestBeaconAPIVerifications_UnmarshalYAML(t *testing.T) {
 		t.Fatal("expected 1 verification")
 	}
 	// Verify type is correct
-	if v, ok := verifications.Verifications[0].(*BeaconStateV2Verification); !ok {
-		t.Fatal("expected BeaconStateV2Verification")
+	if v, ok := verifications.Verifications[0].(*EthV2DebugBeaconStates); !ok {
+		t.Fatal("expected EthV2DebugBeaconStates")
 	} else {
 		if *v.Fields.StateRoot != (tree.Root{0xa1}) {
-			t.Fatal("expected state root to be 0x01")
+			t.Fatal("expected state root to be 0xa1")
 		}
 	}
 
