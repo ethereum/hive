@@ -8,13 +8,13 @@ import (
 )
 
 // Test verifications yaml file unmarshaller
-func TestBeaconAPIVerifications_UnmarshalYAML(t *testing.T) {
+func TestBeaconAPITestSteps_UnmarshalYAML(t *testing.T) {
 	yamlString := `- !EthV2DebugBeaconStates
   id: head
   fields: {state_root: a100000000000000000000000000000000000000000000000000000000000000}
 `
 
-	var verifications BeaconAPIVerifications
+	var verifications BeaconAPITestSteps
 	if err := yaml.Unmarshal([]byte(yamlString), &verifications); err != nil {
 		t.Fatal(err)
 	}

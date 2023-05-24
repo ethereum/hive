@@ -1,8 +1,13 @@
-- !VerifyBeaconStateV2
-  method: BeaconStateV2
+- !EthV1BeaconStatesFinalityCheckpoints
   id: head
-  fields: {state_root: 2d1c4b009796faa2f953cb5d67b1373d31479303845871669016e715c0d347eb}
-- !VerifyBeaconStateV2
-  method: BeaconStateV2
-  id: slot:3
-  fields: {state_root: 2d1c4b009796faa2f953cb5d67b1373d31479303845871669016e715c0d347eb}
+  finalized: false
+  execution_optimistic: null
+  data:
+    previous_justified: {epoch: 0, root: '0000000000000000000000000000000000000000000000000000000000000000'}
+    current_justified: {epoch: 0, root: '0000000000000000000000000000000000000000000000000000000000000000'}
+    finalized: {epoch: 0, root: '0000000000000000000000000000000000000000000000000000000000000000'}
+- !EthV1BeaconStatesFork
+  id: head
+  finalized: false
+  execution_optimistic: null
+  data: {previous_version: 0300000a, current_version: 0400000a, epoch: 0}

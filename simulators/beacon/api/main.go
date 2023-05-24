@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"path"
 	"path/filepath"
@@ -13,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -23,6 +25,7 @@ import (
 	"github.com/protolambda/zrnt/eth2/beacon/common"
 	"github.com/protolambda/zrnt/eth2/configs"
 	"github.com/protolambda/ztyp/view"
+	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
@@ -36,16 +39,23 @@ const (
 	FarFutureEpoch   = common.Epoch(0xffffffffffffffff)
 )
 
+var log = logrus.New()
+
 func main() {
+	// Create the test suite
 	suite := hivesim.Suite{
 		Name: "beacon-api",
 	}
+	// Add the tests to the suite
 	suite.Add(hivesim.TestSpec{
 		Name:        "test file loader",
 		Description: "This is a meta-test. It loads the tests for the beacon api.",
 		Run:         loaderTest,
 		AlwaysRun:   true,
 	})
+	// Init logrus
+
+	// Run the test suite
 	hivesim.MustRunSuite(hivesim.New(), suite)
 }
 
@@ -166,6 +176,11 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(BeaconAPITe
 	})
 }
 
+type BeaconAPIConfig struct {
+	GenesisTime int `yaml:"genesis_time"`
+	Time        int `yaml:"time"`
+}
+
 type BeaconAPITest struct {
 	// The name of the test
 	Name string
@@ -180,9 +195,12 @@ type BeaconAPITest struct {
 	// The blocks to process
 	Blocks [][]byte
 	// The checks to perform
-	Verifications BeaconAPIVerifications
+	Verifications BeaconAPITestSteps
+	// Config
+	Config BeaconAPIConfig
 
 	ClientType *hivesim.ClientDefinition
+	TestP2P    *TestP2P
 }
 
 func (b *BeaconAPITest) LoadFromDirectory(dirPath string) error {
@@ -245,11 +263,34 @@ func (b *BeaconAPITest) LoadFromDirectory(dirPath string) error {
 }
 
 func (b *BeaconAPITest) Run(t *hivesim.T) {
-	configBundle, err := b.ConfigBundle()
+	// Get the simulator IP
+	simIP, err := t.Sim.ContainerNetworkIP(
+		t.SuiteID,
+		"bridge",
+		"simulation",
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	// Init P2P
+	testP2P, err := NewTestP2P(net.ParseIP(simIP), 9000)
+	if err != nil {
+		t.Fatalf("failed to create p2p object: %v", err)
+	}
+	b.TestP2P = testP2P
+	defer testP2P.Close()
+	if err := testP2P.SetupStreams(); err != nil {
+		t.Fatalf("failed to setup streams: %v", err)
+	}
+
+	t.Logf("P2P Host ID: %s", testP2P.Host.ID().Pretty())
+	t.Logf("LocalNode: %s", testP2P.LocalNode.Node().String())
+
+	configBundle, err := b.ConfigBundle(testP2P.LocalNode.Node().String())
 	if err != nil {
 		t.Fatalf("failed to create config bundle: %v", err)
 	}
-	b.ConsensusConfig()
 	cm := &HiveManagedClient{
 		T:                    t,
 		HiveClientDefinition: b.ClientType,
@@ -261,6 +302,7 @@ func (b *BeaconAPITest) Run(t *hivesim.T) {
 	if err != nil {
 		t.Fatalf("failed to create consensus config: %v", err)
 	}
+
 	cl := &beacon_client.BeaconClient{
 		Client: cm,
 		Logger: t,
@@ -276,6 +318,7 @@ func (b *BeaconAPITest) Run(t *hivesim.T) {
 		t.Fatalf("failed to start client: %v", err)
 	}
 	b.Verifications.DoVerifications(t, context.Background(), cl)
+	time.Sleep(5 * time.Second)
 }
 
 func BytesSource(data []byte) func() (io.ReadCloser, error) {
@@ -351,7 +394,7 @@ func (b *BeaconAPITest) ConsensusConfig() (*common.Spec, error) {
 	return spec, nil
 }
 
-func (b *BeaconAPITest) ConfigBundle() (hivesim.StartOption, error) {
+func (b *BeaconAPITest) ConfigBundle(bootnodeENR string) (hivesim.StartOption, error) {
 	// Get the config
 	spec, err := b.ConsensusConfig()
 	if err != nil {
@@ -362,11 +405,14 @@ func (b *BeaconAPITest) ConfigBundle() (hivesim.StartOption, error) {
 		return nil, err
 	}
 	return hivesim.Bundle(
+
 		hivesim.Params{
 			"HIVE_CHECK_LIVE_PORT": fmt.Sprintf(
 				"%d",
 				PortBeaconAPI,
 			),
+			"HIVE_CLIENT_CLOCK":       fmt.Sprintf("%d", b.Config.Time),
+			"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENR,
 		},
 		hivesim.WithDynamicFile(
 			"/hive/input/config.yaml",

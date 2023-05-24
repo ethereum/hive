@@ -16,17 +16,17 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type BeaconAPIVerification interface {
-	Check(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient)
+type BeaconAPITestStep interface {
+	Execute(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient)
 }
 
 // Verifications Interface
-type BeaconAPIVerifications struct {
-	Verifications []BeaconAPIVerification
+type BeaconAPITestSteps struct {
+	Verifications []BeaconAPITestStep
 }
 
 // Beacon API Verifications will be parsed from yaml by identified the first field "method"
-func (l *BeaconAPIVerifications) UnmarshalYAML(unmarshal func(interface{}) error) error {
+func (l *BeaconAPITestSteps) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	// Unmarshal the YAML list into YAML nodes in order to read their tags
 	var rawNodes []yaml.Node
 	if err := unmarshal(&rawNodes); err != nil {
@@ -35,7 +35,7 @@ func (l *BeaconAPIVerifications) UnmarshalYAML(unmarshal func(interface{}) error
 
 	// Iterate over the raw list and create the appropriate object based on the "method" field
 	for _, node := range rawNodes {
-		var object BeaconAPIVerification
+		var object BeaconAPITestStep
 		objectType := strings.TrimPrefix(node.Tag, "!")
 		switch objectType {
 		case "EthV2DebugBeaconStates":
@@ -45,7 +45,7 @@ func (l *BeaconAPIVerifications) UnmarshalYAML(unmarshal func(interface{}) error
 		case "EthV1BeaconStatesFinalityCheckpoints":
 			object = &EthV1BeaconStatesFinalityCheckpoints{}
 		default:
-			fmt.Printf("INFO: unknown type parsing hive.yaml: %s\n", objectType)
+			log.WithField("type", objectType).Warn("unknown type parsing hive.yaml")
 			continue
 		}
 
@@ -61,9 +61,9 @@ func (l *BeaconAPIVerifications) UnmarshalYAML(unmarshal func(interface{}) error
 	return nil
 }
 
-func (l *BeaconAPIVerifications) DoVerifications(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient) {
+func (l *BeaconAPITestSteps) DoVerifications(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient) {
 	for _, v := range l.Verifications {
-		v.Check(t, parentCtx, cl)
+		v.Execute(t, parentCtx, cl)
 	}
 }
 
@@ -146,7 +146,7 @@ type EthV2DebugBeaconStates struct {
 	Error  bool                         `yaml:"error"`
 }
 
-func (v EthV2DebugBeaconStates) Check(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient) {
+func (v EthV2DebugBeaconStates) Execute(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient) {
 	t.Logf("verifying beacon state v2")
 	stateId, err := StringToStateID(v.Id)
 	if err != nil {
@@ -525,7 +525,7 @@ type EthV1BeaconStatesFork struct {
 	Error               bool        `yaml:"error"`
 }
 
-func (v EthV1BeaconStatesFork) Check(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient) {
+func (v EthV1BeaconStatesFork) Execute(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient) {
 	t.Logf("verifying finality checkpoints v1")
 	stateId, err := StringToStateID(v.Id)
 	if err != nil {
@@ -569,7 +569,7 @@ type EthV1BeaconStatesFinalityCheckpoints struct {
 	Error               bool                        `yaml:"error"`
 }
 
-func (v EthV1BeaconStatesFinalityCheckpoints) Check(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient) {
+func (v EthV1BeaconStatesFinalityCheckpoints) Execute(t *hivesim.T, parentCtx context.Context, cl *beacon_client.BeaconClient) {
 	t.Logf("verifying finality checkpoints v1")
 	stateId, err := StringToStateID(v.Id)
 	if err != nil {
