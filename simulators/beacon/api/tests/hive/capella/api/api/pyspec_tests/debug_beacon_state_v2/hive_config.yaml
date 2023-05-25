@@ -1,1 +1,8 @@
-{genesis_time: 1606824000, time: 1606824048, fork_digest: eca0d369}
+genesis_time: 1606824000
+genesis_validators_root: 32251a5a748672e3acb1e574ec27caf3b6be68d581c44c402eb166d71a89808e
+time: 1606824048
+fork_version: 0300000a
+fork_digest: 72faae6e
+finalized_checkpoint: {epoch: 0, root: '0000000000000000000000000000000000000000000000000000000000000000'}
+head: {epoch: 0, root: a29214f2cb71d8b1c9e5e24aa7eb5552e392803b892fb05b3594713a2fabbf3b}
+head_slot: 3

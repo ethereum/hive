@@ -177,8 +177,37 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(BeaconAPITe
 }
 
 type BeaconAPIConfig struct {
-	GenesisTime int `yaml:"genesis_time"`
-	Time        int `yaml:"time"`
+	GenesisTime           int               `yaml:"genesis_time"`
+	GenesisValidatorsRoot common.Root       `yaml:"genesis_validators_root"`
+	Time                  int               `yaml:"time"`
+	ForkVersion           common.Version    `yaml:"fork_version"`
+	ForkDigest            common.ForkDigest `yaml:"fork_digest"`
+	FinalizedCheckpoint   common.Checkpoint `yaml:"finalized_checkpoint"`
+	Head                  common.Checkpoint `yaml:"head"`
+	HeadSlot              common.Slot       `yaml:"head_slot"`
+}
+
+func (c BeaconAPIConfig) BeginState() *BeaconAPITestState {
+	return &BeaconAPITestState{
+		CurrentForkVersion:  c.ForkVersion,
+		CurrentForkDigest:   c.ForkDigest,
+		FinalizedCheckpoint: c.FinalizedCheckpoint,
+		CurrentHead:         c.Head,
+		CurrentSlot:         c.HeadSlot,
+		MetaData: MetaData{
+			SeqNumber: 0,
+			AttNets:   make([]byte, 8),
+		},
+	}
+}
+
+type BeaconAPITestState struct {
+	CurrentForkVersion  common.Version
+	CurrentForkDigest   common.ForkDigest
+	FinalizedCheckpoint common.Checkpoint
+	CurrentHead         common.Checkpoint
+	CurrentSlot         common.Slot
+	MetaData            MetaData
 }
 
 type BeaconAPITest struct {
@@ -197,7 +226,12 @@ type BeaconAPITest struct {
 	// The checks to perform
 	Verifications BeaconAPITestSteps
 	// Config
-	Config BeaconAPIConfig
+	Config          common.Config
+	BeaconAPIConfig BeaconAPIConfig
+	ForkDecoder     *ForkDecoder
+
+	// State
+	State *BeaconAPITestState
 
 	ClientType *hivesim.ClientDefinition
 	TestP2P    *TestP2P
@@ -259,10 +293,40 @@ func (b *BeaconAPITest) LoadFromDirectory(dirPath string) error {
 		panic(err)
 	}
 
+	// Read config checks
+	hiveConfigPath := path.Join(dirPath, "hive_config.yaml")
+	if _, err := os.Stat(checksPath); os.IsNotExist(err) {
+		return err
+	}
+	hiveConfigFile, err := os.ReadFile(hiveConfigPath)
+	if err != nil {
+		return err
+	}
+	if err := yaml.Unmarshal(hiveConfigFile, &b.BeaconAPIConfig); err != nil {
+		panic(err)
+	}
+
+	// Read config
+	configPath := path.Join(dirPath, "config.yaml")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return err
+	}
+	configFile, err := os.ReadFile(configPath)
+	if err != nil {
+		return err
+	}
+	if err := yaml.Unmarshal(configFile, &b.Config); err != nil {
+		panic(err)
+	}
+	b.ForkDecoder = NewForkDecoder(&b.Config, b.BeaconAPIConfig.GenesisValidatorsRoot)
+
 	return nil
 }
 
 func (b *BeaconAPITest) Run(t *hivesim.T) {
+	// Set the starting test state
+	b.State = b.BeaconAPIConfig.BeginState()
+
 	// Get the simulator IP
 	simIP, err := t.Sim.ContainerNetworkIP(
 		t.SuiteID,
@@ -274,7 +338,7 @@ func (b *BeaconAPITest) Run(t *hivesim.T) {
 	}
 
 	// Init P2P
-	testP2P, err := NewTestP2P(net.ParseIP(simIP), 9000)
+	testP2P, err := NewTestP2P(b, net.ParseIP(simIP), 9000)
 	if err != nil {
 		t.Fatalf("failed to create p2p object: %v", err)
 	}
@@ -317,8 +381,45 @@ func (b *BeaconAPITest) Run(t *hivesim.T) {
 	if err := cl.Start(); err != nil {
 		t.Fatalf("failed to start client: %v", err)
 	}
-	b.Verifications.DoVerifications(t, context.Background(), cl)
 	time.Sleep(5 * time.Second)
+	b.Verifications.DoVerifications(t, context.Background(), b, cl)
+}
+
+type ForkDecoder struct {
+	Genesis   common.ForkDigest
+	Altair    common.ForkDigest
+	Bellatrix common.ForkDigest
+	Capella   common.ForkDigest
+	Deneb     common.ForkDigest
+}
+
+func NewForkDecoder(config *common.Config, genesisValRoot common.Root) *ForkDecoder {
+	return &ForkDecoder{
+		Genesis:   common.ComputeForkDigest(config.GENESIS_FORK_VERSION, genesisValRoot),
+		Altair:    common.ComputeForkDigest(config.ALTAIR_FORK_VERSION, genesisValRoot),
+		Bellatrix: common.ComputeForkDigest(config.BELLATRIX_FORK_VERSION, genesisValRoot),
+		Capella:   common.ComputeForkDigest(config.CAPELLA_FORK_VERSION, genesisValRoot),
+		Deneb:     common.ComputeForkDigest(config.DENEB_FORK_VERSION, genesisValRoot),
+	}
+}
+
+func (f *ForkDecoder) ForkFromDigest(digest []byte) string {
+	if bytes.Equal(digest, f.Genesis[:]) {
+		return "genesis"
+	}
+	if bytes.Equal(digest, f.Altair[:]) {
+		return "altair"
+	}
+	if bytes.Equal(digest, f.Bellatrix[:]) {
+		return "bellatrix"
+	}
+	if bytes.Equal(digest, f.Capella[:]) {
+		return "capella"
+	}
+	if bytes.Equal(digest, f.Deneb[:]) {
+		return "deneb"
+	}
+	return ""
 }
 
 func BytesSource(data []byte) func() (io.ReadCloser, error) {
@@ -411,7 +512,7 @@ func (b *BeaconAPITest) ConfigBundle(bootnodeENR string) (hivesim.StartOption, e
 				"%d",
 				PortBeaconAPI,
 			),
-			"HIVE_CLIENT_CLOCK":       fmt.Sprintf("%d", b.Config.Time),
+			"HIVE_CLIENT_CLOCK":       fmt.Sprintf("%d", b.BeaconAPIConfig.Time),
 			"HIVE_ETH2_BOOTNODE_ENRS": bootnodeENR,
 		},
 		hivesim.WithDynamicFile(

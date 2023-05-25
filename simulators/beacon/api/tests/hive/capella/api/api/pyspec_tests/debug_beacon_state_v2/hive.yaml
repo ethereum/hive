@@ -11,3 +11,16 @@
   finalized: false
   execution_optimistic: null
   data: {previous_version: 0200000a, current_version: 0300000a, epoch: 0}
+- !Eth2BeaconChainRequestBeaconBlocksByRange
+  start_slot: 1
+  count: 2
+  expected_roots: [cb69ee12a0c88fa299e14bbcfd5627f5df19df4d5a8332da71ae614dc783c3db]
+  step: 1
+  version: 2
+- !Eth2BeaconChainRequestBeaconBlocksByRange
+  start_slot: 1
+  count: 3
+  expected_roots: [cb69ee12a0c88fa299e14bbcfd5627f5df19df4d5a8332da71ae614dc783c3db,
+    2ae06b5ce48668637d8591f07853a9a2a23cecabeca017c2a85dfbe447635d15]
+  step: 1
+  version: 2
