@@ -24,11 +24,13 @@ import (
 
 var (
 	Head               *big.Int // Nil
-	Pending            = big.NewInt(-2)
-	Finalized          = big.NewInt(-3)
-	Safe               = big.NewInt(-4)
-	InvalidParamsError = -32602
-	MAX_INITCODE_SIZE  = 49152
+	Pending                     = big.NewInt(-2)
+	Finalized                   = big.NewInt(-3)
+	Safe                        = big.NewInt(-4)
+	InvalidParamsError          = -32602
+	MAX_INITCODE_SIZE           = 49152
+
+	MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK uint64 = 16
 
 	WARM_COINBASE_ADDRESS = common.HexToAddress("0x0101010101010101010101010101010101010101")
 	PUSH0_ADDRESS         = common.HexToAddress("0x0202020202020202020202020202020202020202")
@@ -54,7 +56,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight: 0,
 		WithdrawalsBlockCount: 2, // Genesis is a withdrawals block
-		WithdrawalsPerBlock:   16,
+		WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 	},
 
 	&WithdrawalsBaseSpec{
@@ -66,7 +68,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
-		WithdrawalsPerBlock:   16,
+		WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 	},
 
 	&WithdrawalsBaseSpec{
@@ -81,7 +83,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
-		WithdrawalsPerBlock:   16,
+		WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 	},
 
 	&WithdrawalsBaseSpec{
@@ -96,7 +98,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight: 3, // Genesis, Block 1 and 2 are Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
-		WithdrawalsPerBlock:   16,
+		WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 	},
 
 	&WithdrawalsBaseSpec{
@@ -108,7 +110,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
+		WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		WithdrawableAccountCount: 1,
 	},
 
@@ -125,7 +127,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
+		WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		WithdrawableAccountCount: 2,
 	},
 
@@ -133,14 +135,14 @@ var Tests = []test.SpecInterface{
 		Spec: test.Spec{
 			Name: "Withdraw many accounts",
 			About: `
-			Make multiple withdrawals to 1024 different accounts.
+			Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK * 5 different accounts.
 			Execute many blocks this way.
 			`,
 			TimeoutSeconds: 240,
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    4,
-		WithdrawalsPerBlock:      1024,
+		WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK * 5,
 		WithdrawableAccountCount: 1024,
 	},
 
@@ -153,7 +155,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
+		WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		WithdrawableAccountCount: 2,
 		WithdrawAmounts: []uint64{
 			0,
@@ -207,7 +209,7 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 1
-			- Withdraw to a single account 16 times each block for 2 blocks
+			- Withdraw to a single account MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK times each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync and verify withdrawn account's balance
 			`,
@@ -215,7 +217,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight:    1,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1,
 			TransactionsPerBlock:     common.Big0,
 		},
@@ -228,14 +230,14 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 1
-			- Withdraw to a single account 16 times each block for 2 blocks
+			- Withdraw to a single account MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK times each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync and verify withdrawn account's balance
 			`,
 			},
 			WithdrawalsForkHeight:    1,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1,
 		},
 		SyncSteps: 1,
@@ -246,14 +248,14 @@ var Tests = []test.SpecInterface{
 				Name: "Sync after 2 blocks - Withdrawals on Genesis - Single Withdrawal Account",
 				About: `
 			- Spawn a first client, with Withdrawals since genesis
-			- Withdraw to a single account 16 times each block for 2 blocks
+			- Withdraw to a single account MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK times each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync and verify withdrawn account's balance
 			`,
 			},
 			WithdrawalsForkHeight:    0,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1,
 		},
 		SyncSteps: 1,
@@ -265,15 +267,15 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 2
-			- Withdraw to 16 accounts each block for 2 blocks
+			- Withdraw to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
 			`,
 			},
 			WithdrawalsForkHeight:    2,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 16,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawableAccountCount: MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			TransactionsPerBlock:     common.Big0,
 		},
 		SyncSteps: 1,
@@ -285,15 +287,15 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 2
-			- Withdraw to 16 accounts each block for 2 blocks
+			- Withdraw to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
 			`,
 			},
 			WithdrawalsForkHeight:    2,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 16,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawableAccountCount: MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		SyncSteps: 1,
 	},
@@ -304,7 +306,7 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 2
-			- Withdraw to many accounts 16 times each block for 128 blocks
+			- Withdraw to many accounts MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK times each block for 128 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
 			`,
@@ -312,7 +314,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight:    2,
 			WithdrawalsBlockCount:    128,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1024,
 		},
 		SyncSteps: 1,
@@ -331,8 +333,8 @@ var Tests = []test.SpecInterface{
 				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
+			WithdrawalsBlockCount: MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 1,
 		ReOrgViaSync:    false,
@@ -350,8 +352,8 @@ var Tests = []test.SpecInterface{
 				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
+			WithdrawalsBlockCount: MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 8,
 		ReOrgViaSync:    false,
@@ -369,8 +371,8 @@ var Tests = []test.SpecInterface{
 				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
+			WithdrawalsBlockCount: MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 8,
 		ReOrgViaSync:    true,
@@ -390,7 +392,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 10,
 		ReOrgViaSync:    false,
@@ -410,7 +412,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 10,
 		ReOrgViaSync:    true,
@@ -430,7 +432,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount:         10,
 		ReOrgViaSync:            false,
@@ -451,7 +453,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount:         10,
 		ReOrgViaSync:            true,
@@ -472,7 +474,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			TimeIncrements:        2,
 		},
 		ReOrgBlockCount:         10,
@@ -494,7 +496,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			TimeIncrements:        2,
 		},
 		ReOrgBlockCount:         10,
@@ -522,7 +524,7 @@ var Tests = []test.SpecInterface{
 			Spec: test.Spec{
 				Name: "GetPayloadBodiesByRange",
 				About: `
-				Make multiple withdrawals to 16 accounts each payload.
+				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
 				Retrieve many of the payloads' bodies by number range.
 				`,
 				TimeoutSeconds:   240,
@@ -531,7 +533,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight:    17,
 			WithdrawalsBlockCount:    16,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1024,
 		},
 		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
@@ -595,7 +597,7 @@ var Tests = []test.SpecInterface{
 			Spec: test.Spec{
 				Name: "GetPayloadBodies After Sync",
 				About: `
-				Make multiple withdrawals to 16 accounts each payload.
+				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
 				Spawn a secondary client which must sync the canonical chain
 				from the first client.
 				Retrieve many of the payloads' bodies by number range from
@@ -606,8 +608,8 @@ var Tests = []test.SpecInterface{
 				SlotsToFinalized: big.NewInt(64),
 			},
 			WithdrawalsForkHeight:    17,
-			WithdrawalsBlockCount:    16,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsBlockCount:    MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1024,
 		},
 		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
@@ -645,7 +647,7 @@ var Tests = []test.SpecInterface{
 			Spec: test.Spec{
 				Name: "GetPayloadBodiesByRange (Sidechain)",
 				About: `
-				Make multiple withdrawals to 16 accounts each payload.
+				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
 				Retrieve many of the payloads' bodies by number range.
 				Create a sidechain extending beyond the canonical chain block number.
 				`,
@@ -654,8 +656,8 @@ var Tests = []test.SpecInterface{
 				SlotsToFinalized: big.NewInt(64),
 			},
 			WithdrawalsForkHeight:    17,
-			WithdrawalsBlockCount:    16,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsBlockCount:    MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1024,
 		},
 		GenerateSidechain: true,
@@ -708,7 +710,7 @@ var Tests = []test.SpecInterface{
 			Spec: test.Spec{
 				Name: "GetPayloadBodiesByHash",
 				About: `
-				Make multiple withdrawals to 16 accounts each payload.
+				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
 				Retrieve many of the payloads' bodies by hash.
 				`,
 				TimeoutSeconds:   240,
@@ -716,8 +718,8 @@ var Tests = []test.SpecInterface{
 				SlotsToFinalized: big.NewInt(64),
 			},
 			WithdrawalsForkHeight:    17,
-			WithdrawalsBlockCount:    16,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsBlockCount:    MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1024,
 		},
 		GetPayloadBodiesRequests: []GetPayloadBodyRequest{
@@ -786,7 +788,7 @@ var Tests = []test.SpecInterface{
 			Spec: test.Spec{
 				Name: "GetPayloadBodies Parallel",
 				About: `
-				Make multiple withdrawals to 16 accounts each payload.
+				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
 				Retrieve many of the payloads' bodies by number range and hash in parallel, multiple times.
 				`,
 				TimeoutSeconds:   240,
@@ -795,7 +797,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight:    17,
 			WithdrawalsBlockCount:    32,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			WithdrawableAccountCount: 1024,
 		},
 		Parallel:       true,
@@ -1075,8 +1077,8 @@ func (ws *WithdrawalsBaseSpec) GetTotalPayloadCount() uint64 {
 
 func (ws *WithdrawalsBaseSpec) GetWithdrawableAccountCount() uint64 {
 	if ws.WithdrawableAccountCount == 0 {
-		// Withdraw to 16 accounts by default
-		return 16
+		// Withdraw to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts by default
+		return MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK
 	}
 	return ws.WithdrawableAccountCount
 }
