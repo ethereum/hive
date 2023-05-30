@@ -20,8 +20,8 @@ func TestParseClientBuildInfoString(t *testing.T) {
 	}
 	for _, test := range tests {
 		cInfo, _ := parseClientDesignator(test.name)
-		if cInfo.Client != test.wantClient || !reflect.DeepEqual(test.wantBuildParams, cInfo.BuildEnv) {
-			t.Errorf("ParseClientBuildInfoString(%q) -> (%q, %q), want (%q, %q)", test.name, cInfo.Client, cInfo.BuildEnv, test.wantClient, test.wantBuildParams)
+		if cInfo.Client != test.wantClient || !reflect.DeepEqual(test.wantBuildParams, cInfo.BuildArgs) {
+			t.Errorf("ParseClientBuildInfoString(%q) -> (%q, %q), want (%q, %q)", test.name, cInfo.Client, cInfo.BuildArgs, test.wantClient, test.wantBuildParams)
 		}
 	}
 }
@@ -36,7 +36,7 @@ func TestInvalidSplitClientName(t *testing.T) {
 	for _, test := range tests {
 		cInfo, err := parseClientDesignator(test)
 		if err == nil {
-			t.Errorf("SplitClientName(%q) -> (%q, %q), want error", test, cInfo.Client, cInfo.BuildEnv)
+			t.Errorf("SplitClientName(%q) -> (%q, %q), want error", test, cInfo.Client, cInfo.BuildArgs)
 		}
 	}
 }
@@ -51,11 +51,11 @@ func TestClientDesignatorString(t *testing.T) {
 			string: "client",
 		},
 		{
-			client: ClientDesignator{Client: "client", BuildEnv: map[string]string{"repo": "myrepo", "branch": "mybranch"}},
+			client: ClientDesignator{Client: "client", BuildArgs: map[string]string{"repo": "myrepo", "branch": "mybranch"}},
 			string: "client_branch_mybranch_repo_myrepo",
 		},
 		{
-			client: ClientDesignator{Client: "client", DockerfileExt: "mydockerfile", BuildEnv: map[string]string{"user": "myuser"}},
+			client: ClientDesignator{Client: "client", DockerfileExt: "mydockerfile", BuildArgs: map[string]string{"user": "myuser"}},
 			string: "client_mydockerfile_user_myuser",
 		},
 	}
@@ -81,8 +81,8 @@ func TestClientBuildInfoFromFile(t *testing.T) {
 
 	expectedOutput := []ClientDesignator{
 		{Client: "go-ethereum", DockerfileExt: "git"},
-		{Client: "go-ethereum", DockerfileExt: "local", BuildEnv: map[string]string{"branch": "latest"}},
-		{Client: "supereth3000", BuildEnv: map[string]string{"some_other_arg": "some_other_value"}},
+		{Client: "go-ethereum", DockerfileExt: "local", BuildArgs: map[string]string{"branch": "latest"}},
+		{Client: "supereth3000", BuildArgs: map[string]string{"some_other_arg": "some_other_value"}},
 	}
 
 	r := strings.NewReader(yamlInput)

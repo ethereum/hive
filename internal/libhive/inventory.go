@@ -12,12 +12,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// branchDelimiter is what separates the client name from the branch, eg: besu_nightly, go-ethereum_master.
-const branchDelimiter = "_"
-
-// clientDelimiter separates multiple clients in the parameter string.
-const clientDelimiter = ","
-
 // ClientDesignator specifies a client and build parameters for it.
 type ClientDesignator struct {
 	Client string `yaml:"client"`
@@ -26,8 +20,8 @@ type ClientDesignator struct {
 	// client. Example: setting this to "git" will build using "Dockerfile.git".
 	DockerfileExt string `yaml:"dockerfile"`
 
-	// Parameters passed as environment to the docker build.
-	BuildEnv map[string]string `yaml:"build_args"`
+	// Arguments passed to the docker build.
+	BuildArgs map[string]string `yaml:"build_args"`
 }
 
 // String returns a unique string representation of the client build configuration.
@@ -40,7 +34,7 @@ func (c ClientDesignator) String() string {
 	}
 
 	var keys []string
-	for k := range c.BuildEnv {
+	for k := range c.BuildArgs {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -48,7 +42,7 @@ func (c ClientDesignator) String() string {
 		b.WriteString("_")
 		b.WriteString(k)
 		b.WriteString("_")
-		b.WriteString(c.BuildEnv[k])
+		b.WriteString(c.BuildArgs[k])
 	}
 	return b.String()
 }
@@ -61,6 +55,11 @@ func (c ClientDesignator) Dockerfile() string {
 	return "Dockerfile." + c.DockerfileExt
 }
 
+const (
+	branchDelimiter = "_" // separates the client name and branch, eg: besu_nightly
+	clientDelimiter = "," // separates client names in a list
+)
+
 // parseClientDesignator parses a client name string.
 func parseClientDesignator(fullString string) (ClientDesignator, error) {
 	var res ClientDesignator
@@ -71,7 +70,7 @@ func parseClientDesignator(fullString string) (ClientDesignator, error) {
 		if tag == "" {
 			return res, fmt.Errorf("invalid branch: %s", tag)
 		}
-		res.BuildEnv = map[string]string{"branch": tag}
+		res.BuildArgs = map[string]string{"branch": tag}
 	} else {
 		res.Client = fullString
 	}

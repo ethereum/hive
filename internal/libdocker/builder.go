@@ -65,7 +65,7 @@ func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDes
 	tag := fmt.Sprintf("hive/clients/%s:latest", client.String())
 	dockerFile := client.Dockerfile()
 	buildArgs := make([]docker.BuildArg, 0)
-	for key, value := range client.BuildEnv {
+	for key, value := range client.BuildArgs {
 		buildArgs = append(buildArgs, docker.BuildArg{Name: key, Value: value})
 	}
 	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs...)
