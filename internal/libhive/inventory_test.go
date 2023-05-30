@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestParseClientBuildInfoString(t *testing.T) {
+func TestParseClientDesignator(t *testing.T) {
 	tests := []struct {
 		name            string
 		wantClient      string
@@ -21,7 +21,7 @@ func TestParseClientBuildInfoString(t *testing.T) {
 	for _, test := range tests {
 		cInfo, _ := parseClientDesignator(test.name)
 		if cInfo.Client != test.wantClient || !reflect.DeepEqual(test.wantBuildParams, cInfo.BuildArgs) {
-			t.Errorf("ParseClientBuildInfoString(%q) -> (%q, %q), want (%q, %q)", test.name, cInfo.Client, cInfo.BuildArgs, test.wantClient, test.wantBuildParams)
+			t.Errorf("parseClientDesignator(%q) -> (%q, %q), want (%q, %q)", test.name, cInfo.Client, cInfo.BuildArgs, test.wantClient, test.wantBuildParams)
 		}
 	}
 }
@@ -36,7 +36,7 @@ func TestInvalidSplitClientName(t *testing.T) {
 	for _, test := range tests {
 		cInfo, err := parseClientDesignator(test)
 		if err == nil {
-			t.Errorf("SplitClientName(%q) -> (%q, %q), want error", test, cInfo.Client, cInfo.BuildArgs)
+			t.Errorf("parseClientDesignator(%q) -> (%q, %q), want error", test, cInfo.Client, cInfo.BuildArgs)
 		}
 	}
 }
@@ -66,7 +66,7 @@ func TestClientDesignatorString(t *testing.T) {
 	}
 }
 
-func TestClientBuildInfoFromFile(t *testing.T) {
+func TestParseClientListYAML(t *testing.T) {
 	yamlInput := `
 - client: go-ethereum
   dockerfile: git
@@ -91,7 +91,7 @@ func TestClientBuildInfoFromFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(&clientInfo, &expectedOutput) {
-		t.Errorf("ClientBuildInfoFromYaml -> %q, want %q", clientInfo, expectedOutput)
+		t.Errorf("ParseClientListYAML -> %v, want %v", clientInfo, expectedOutput)
 	}
 }
 
