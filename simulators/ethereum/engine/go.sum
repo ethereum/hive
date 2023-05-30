@@ -26,7 +26,6 @@ github.com/btcsuite/btcd/btcec/v2 v2.3.2/go.mod h1:zYzJ8etWJQIv1Ogk7OzpWjowwOdXY
 github.com/btcsuite/btcd/chaincfg/chainhash v1.0.1 h1:q0rUy8C/TYNBQS1+CGKw68tLOFYSNEs0TFnxxnS9+4U=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
 github.com/cespare/cp v1.1.1 h1:nCb6ZLdB7NRaqsm91JtQTAme2SKJzXVsdPIPkyJr1MU=
-github.com/cespare/cp v1.1.1/go.mod h1:SOGHArjBr4JWaSDEVpWpo/hNg6RoKrls6Oh40hiwW+s=
 github.com/cespare/xxhash/v2 v2.1.2/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
 github.com/cespare/xxhash/v2 v2.2.0 h1:DC2CZ1Ep5Y4k3ZQ899DldepgrayRUGE6BBZ/cd9Cj44=
 github.com/cespare/xxhash/v2 v2.2.0/go.mod h1:VGX0DQ3Q6kWi7AoAeZDth3/j3BFtOZR5XLFGgcrjCOs=
@@ -80,6 +79,8 @@ github.com/ethereum/go-ethereum v1.11.6 h1:2VF8Mf7XiSUfmoNOy3D+ocfl9Qu8baQBrCNbo
 github.com/ethereum/go-ethereum v1.11.6/go.mod h1:+a8pUj1tOyJ2RinsNQD4326YS+leSoKGiG/uVVb0x6Y=
 github.com/ethereum/hive v0.0.0-20230313141339-8e3200bfc09e h1:3g9cqRqpbZ92tSlGL4PfFoq435axKw6HiZ1Gz3fOkfk=
 github.com/ethereum/hive v0.0.0-20230313141339-8e3200bfc09e/go.mod h1:PlpDuxHg6q1jU0K8Ouf+RXlHguignJ7k8Eyukc9RCPQ=
+github.com/ethereum/hive/simulators/ethereum/rpc v0.0.0-20230526161643-a5c0542ee4ac h1:vXJyOdY/KftXDrg6f0TFtOJkP/LaTPMOGsbngYm0KK0=
+github.com/ethereum/hive/simulators/ethereum/rpc v0.0.0-20230526161643-a5c0542ee4ac/go.mod h1:DyRd29AtsFbT/tBEB7/cE87X029pmEmNbhFfb/+9A/E=
 github.com/fasthttp-contrib/websocket v0.0.0-20160511215533-1f3b11f56072/go.mod h1:duJ4Jxv5lDcvg4QuQr0oowTf7dz4/CR8NtyCooz9HL8=
 github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=
 github.com/fjl/memsize v0.0.1 h1:+zhkb+dhUgx0/e+M8sF0QqiouvMQUiKR+QYvdxIOKcQ=

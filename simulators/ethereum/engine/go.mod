@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/ethereum/go-ethereum v1.11.6
 	github.com/ethereum/hive v0.0.0-20230313141339-8e3200bfc09e
+	github.com/ethereum/hive/simulators/ethereum/rpc v0.0.0-20230526161643-a5c0542ee4ac
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/mailru/easyjson v0.7.7
 	github.com/pkg/errors v0.9.1
@@ -17,7 +18,6 @@ require (
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.2 // indirect
-	github.com/cespare/cp v1.1.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/cockroachdb/errors v1.9.1 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
