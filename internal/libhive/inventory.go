@@ -56,7 +56,7 @@ func (c ClientDesignator) String() string {
 // Dockerfile gives the name of the Dockerfile to use when building the client.
 func (c ClientDesignator) Dockerfile() string {
 	if c.DockerfileExt == "" {
-		return c.Client
+		return "Dockerfile"
 	}
 	return "Dockerfile." + c.DockerfileExt
 }
