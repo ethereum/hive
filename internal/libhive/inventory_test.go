@@ -50,7 +50,7 @@ func TestClientBuildInfoString(t *testing.T) {
 	}{
 		{libhive.ClientBuildInfo{Client: "client"}, "client"},
 		{libhive.ClientBuildInfo{Client: "client", BuildArguments: map[string]string{"repo": "myrepo", "branch": "mybranch"}}, "client_repo_myrepo_branch_mybranch"},
-		{libhive.ClientBuildInfo{Client: "client", DockerFile: "mydockerfile", BuildArguments: map[string]string{"user": "myuser"}}, "client_mydockerfile_user_myuser"},
+		{libhive.ClientBuildInfo{Client: "client", Dockerfile: "mydockerfile", BuildArguments: map[string]string{"user": "myuser"}}, "client_mydockerfile_user_myuser"},
 	}
 	for _, test := range tests {
 		if test.buildInfo.String() != test.want {
@@ -83,8 +83,8 @@ func TestClientBuildInfoFromFile(t *testing.T) {
     some_other_arg: some_other_value
 `,
 			libhive.ClientsBuildInfo{
-				{Client: "go-ethereum", DockerFile: "git"},
-				{Client: "go-ethereum", DockerFile: "local", BuildArguments: map[string]string{"branch": "latest"}},
+				{Client: "go-ethereum", Dockerfile: "git"},
+				{Client: "go-ethereum", Dockerfile: "local", BuildArguments: map[string]string{"branch": "latest"}},
 				{Client: "supereth3000", BuildArguments: map[string]string{"some_other_arg": "some_other_value"}}},
 		},
 	}

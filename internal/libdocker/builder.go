@@ -64,9 +64,9 @@ func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientBui
 	dir := b.config.Inventory.ClientDirectory(client)
 	tag := fmt.Sprintf("hive/clients/%s:latest", client.String())
 	dockerFile := "Dockerfile"
-	if client.DockerFile != "" {
+	if client.Dockerfile != "" {
 		// Custom Dockerfile.
-		dockerFile += "." + client.DockerFile
+		dockerFile += "." + client.Dockerfile
 	}
 	buildArgs := make([]docker.BuildArg, 0)
 	for key, value := range client.BuildArguments {

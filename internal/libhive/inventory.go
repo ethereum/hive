@@ -21,9 +21,11 @@ const branchDelimiter = "_"
 type ClientBuildInfo struct {
 	// Client is the name of the client, eg: besu, go-ethereum, etc.
 	Client string `json:"client"       yaml:"client"`
-	// DockerFile is the name of the Dockerfile to use for building the client.
+
+	// Dockerfile is the name of the Dockerfile to use for building the client.
 	// E.g. using `Dockerfile==git` will build using `Dockerfile.git`.
-	DockerFile string `json:"dockerfile" yaml:"dockerfile"`
+	Dockerfile string `json:"dockerfile" yaml:"dockerfile"`
+
 	// Build parameters used to build the docker image for the client.
 	BuildArguments map[string]string `json:"build_args" yaml:"build_args"`
 }
@@ -31,8 +33,8 @@ type ClientBuildInfo struct {
 func (c ClientBuildInfo) String() string {
 	var values []string
 	values = append(values, c.Client)
-	if c.DockerFile != "" {
-		values = append(values, c.DockerFile)
+	if c.Dockerfile != "" {
+		values = append(values, c.Dockerfile)
 	}
 	for k, v := range c.BuildArguments {
 		values = append(values, k, v)
