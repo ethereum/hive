@@ -68,7 +68,7 @@ func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDes
 	for key, value := range client.BuildArgs {
 		buildArgs = append(buildArgs, docker.BuildArg{Name: key, Value: value})
 	}
-	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs...)
+	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs)
 	return tag, err
 }
 
@@ -90,7 +90,7 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 		}
 	}
 	tag := fmt.Sprintf("hive/simulators/%s:latest", name)
-	err := b.buildImage(ctx, buildContextPath, buildDockerfile, tag)
+	err := b.buildImage(ctx, buildContextPath, buildDockerfile, tag, nil)
 	return tag, err
 }
 
@@ -234,7 +234,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch.
-func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs ...docker.BuildArg) error {
+func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs []docker.BuildArg) error {
 	logger := b.logger.New("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
