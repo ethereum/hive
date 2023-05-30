@@ -39,13 +39,39 @@ version by appending it to the client name with `_`, for example:
 
     ./hive --sim devp2p --client go-ethereum_v1.9.22,go-ethereum_v1.9.23
 
-Simulation runs can be customized in many ways. Here's an overview of the available
-command-line options.
+### Client Build Parameters
 
-`--client.checktimelimit <timeout>`: The timeout of waiting for clients to open up TCP
-port 8545. If a very long chain is imported, this timeout may need to be quite long. A
-lower value means that hive won't wait as long in case the node crashes and never opens
-the RPC port. Defaults to 3 minutes.
+The client list for a run can also be given in a YAML file. This also allows further
+customization of the build arguments of the client. To enable the YAML file, use the
+`--client-file` option:
+
+    ./hive --sim my-simulation --client-file clients.yaml
+
+Here is an example clients.yaml file:
+
+    - client: go-ethereum
+      dockerfile: git
+    - client: nethermind
+      build_args:
+        user: nethermindeth
+        repo: hive
+        branch: latest
+
+For each client in the list, the following options can be given:
+
+ - `client`: name of the client to use to build the image
+ - `dockerfile`: the Dockerfile extension to use. For example, specifying `git` here will
+   build the client using `Dockerfile.git` instead of the default `Dockerfile`
+ - `build_args`: build arguments passed to the Dockerfile
+
+Supported build arguments depend on the client and the docker image being used, but common
+client build arguments are:
+
+ - `user`: GitHub/DockerHub user or organization name that owns the repository
+ - `repo`: repository name
+ - `branch`: git branch or docker tag name to use
+
+### Docker Options
 
 `--docker.pull`: Setting this option makes hive re-pull the base images of all built
 docker containers.
@@ -56,16 +82,7 @@ docker containers.
 rebuild. You can use this option during simulator development to ensure a new image is
 built even when there are no changes to the simulator code.
 
-`--sim.timelimit <timeout>`: Simulation timeout. Hive aborts the simulator if it exceeds
-this time. There is no default timeout.
-
-`--sim.loglevel <level>`: Selects log level of client instances. Supports values 0-5,
-defaults to 3. Note that this value may be overridden by simulators for specific clients.
-This sets the default value of `HIVE_LOGLEVEL` in client containers.
-
-`--sim.parallelism <number>`: Sets max number of parallel clients/containers. This is
-interpreted by simulators. It sets the `HIVE_PARALLELISM` environment variable. Defaults
-to 1.
+### Simulation Options
 
 `--sim.limit <pattern>`: Specifies a regular expression to selectively enable suites and
 test cases. This is interpreted by simulators. It sets the `HIVE_TEST_PATTERN` environment
@@ -85,6 +102,22 @@ This command runs the `consensus` simulator and runs only tests from the `stBugs
 directory (note the first `/`, matching any suite name):
 
     ./hive --sim ethereum/consensus --sim.limit /stBugs/
+
+`--sim.timelimit <timeout>`: Simulation timeout. Hive aborts the simulator if it exceeds
+this time. There is no default timeout.
+
+`--client.checktimelimit <timeout>`: The timeout of waiting for clients to open up TCP
+port 8545. If a very long chain is imported, this timeout may need to be quite long. A
+lower value means that hive won't wait as long in case the node crashes and never opens
+the RPC port. Defaults to 3 minutes.
+
+`--sim.loglevel <level>`: Selects log level of client instances. Supports values 0-5,
+defaults to 3. Note that this value may be overridden by simulators for specific clients.
+This sets the default value of `HIVE_LOGLEVEL` in client containers.
+
+`--sim.parallelism <number>`: Sets max number of parallel clients/containers. This is
+interpreted by simulators. It sets the `HIVE_PARALLELISM` environment variable. Defaults
+to 1.
 
 ## Viewing simulation results (hiveview)
 
