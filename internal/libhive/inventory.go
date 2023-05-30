@@ -60,21 +60,11 @@ func ParseClientBuildInfoString(fullString string) (ClientBuildInfo, error) {
 	return res, nil
 }
 
-type ClientsBuildInfo []ClientBuildInfo
-
-func (c ClientsBuildInfo) Names() []string {
-	names := make([]string, len(c))
-	for i, client := range c {
-		names[i] = client.Client
-	}
-	return names
-}
-
 // clientDelimiter separates multiple clients in the parameter string.
 const clientDelimiter = ","
 
-func ClientsBuildInfoFromString(arg string) (ClientsBuildInfo, error) {
-	var res ClientsBuildInfo
+func ClientsBuildInfoFromString(arg string) ([]ClientBuildInfo, error) {
+	var res []ClientBuildInfo
 	for _, name := range strings.Split(arg, clientDelimiter) {
 		if clientBuildInfo, err := ParseClientBuildInfoString(name); err != nil {
 			return nil, err
@@ -85,8 +75,8 @@ func ClientsBuildInfoFromString(arg string) (ClientsBuildInfo, error) {
 	return res, nil
 }
 
-func ClientsBuildInfoFromFile(file io.Reader) (ClientsBuildInfo, error) {
-	var res ClientsBuildInfo
+func ClientsBuildInfoFromFile(file io.Reader) ([]ClientBuildInfo, error) {
+	var res []ClientBuildInfo
 	err := yaml.NewDecoder(file).Decode(&res)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse clients file: %w", err)

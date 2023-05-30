@@ -81,7 +81,7 @@ func TestClientBuildInfoFromFile(t *testing.T) {
     some_other_arg: some_other_value
 `
 
-	expectedOutput := libhive.ClientsBuildInfo{
+	expectedOutput := []libhive.ClientBuildInfo{
 		{Client: "go-ethereum", Dockerfile: "git"},
 		{Client: "go-ethereum", Dockerfile: "local", BuildArguments: map[string]string{"branch": "latest"}},
 		{Client: "supereth3000", BuildArguments: map[string]string{"some_other_arg": "some_other_value"}},

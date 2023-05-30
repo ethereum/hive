@@ -16,7 +16,7 @@ import (
 
 func TestRunner(t *testing.T) {
 	var (
-		allClients = libhive.ClientsBuildInfo{{Client: "client-1"}, {Client: "client-2"}, {Client: "client-3"}}
+		allClients = []libhive.ClientBuildInfo{{Client: "client-1"}, {Client: "client-2"}, {Client: "client-3"}}
 		simClients = allClients[1:]
 	)
 
@@ -34,7 +34,7 @@ func TestRunner(t *testing.T) {
 				if err != nil {
 					t.Fatal("error getting client types:", err)
 				}
-				if names := clientNames(defs); !reflect.DeepEqual(names, simClients.Names()) {
+				if names := clientNames(defs); !reflect.DeepEqual(names, buildInfoNames(simClients)) {
 					t.Fatal("wrong client names:", names)
 				}
 			}
@@ -74,5 +74,13 @@ func clientNames(defs []*hivesim.ClientDefinition) []string {
 		names = append(names, def.Name)
 	}
 	sort.Strings(names)
+	return names
+}
+
+func buildInfoNames(clients []libhive.ClientBuildInfo) []string {
+	names := make([]string, len(clients))
+	for i, c := range clients {
+		names[i] = c.Client
+	}
 	return names
 }
