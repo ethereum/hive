@@ -29,15 +29,25 @@ type ClientBuildInfo struct {
 }
 
 func (c ClientBuildInfo) String() string {
-	var values []string
-	values = append(values, c.Client)
+	var b strings.Builder
+	b.WriteString(c.Client)
 	if c.Dockerfile != "" {
-		values = append(values, c.Dockerfile)
+		b.WriteString("_")
+		b.WriteString(c.Dockerfile)
 	}
-	for k, v := range c.BuildArguments {
-		values = append(values, k, v)
+
+	var keys []string
+	for k := range c.BuildArguments {
+		keys = append(keys, k)
 	}
-	return strings.Join(values, "_")
+	sort.Strings(keys)
+	for _, k := range keys {
+		b.WriteString("_")
+		b.WriteString(k)
+		b.WriteString("_")
+		b.WriteString(c.BuildArguments[k])
+	}
+	return b.String()
 }
 
 // Parses client build info from a string.

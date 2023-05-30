@@ -54,7 +54,7 @@ func TestClientBuildInfoString(t *testing.T) {
 		},
 		{
 			buildInfo: libhive.ClientBuildInfo{Client: "client", BuildArguments: map[string]string{"repo": "myrepo", "branch": "mybranch"}},
-			want:      "client_repo_myrepo_branch_mybranch",
+			want:      "client_branch_mybranch_repo_myrepo",
 		},
 		{
 			buildInfo: libhive.ClientBuildInfo{Client: "client", Dockerfile: "mydockerfile", BuildArguments: map[string]string{"user": "myuser"}},
