@@ -175,9 +175,11 @@ func (n *NethermindChainSpec) Config() *params.ChainConfig {
 	if err != nil {
 		panic(err)
 	}
+	shangai := big.NewInt(0).SetBytes(common.Hex2Bytes(n.Params.Eip4895TransitionTimestamp)).Uint64()
 	return &params.ChainConfig{
 		ChainID:                 chainID,
 		TerminalTotalDifficulty: big.NewInt(ttd),
+		ShanghaiTime:            &shangai,
 	}
 }
 
@@ -202,7 +204,7 @@ func (n *NethermindChainSpec) Timestamp() uint64 {
 }
 
 func (n *NethermindChainSpec) SetTimestamp(timestamp int64) {
-	n.Params.TerminalTotalDifficulty = fmt.Sprintf("%v", timestamp)
+	//n.Params.TerminalTotalDifficulty = fmt.Sprintf("%v", timestamp)
 	n.Params.Eip3651TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip4895TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip3855TransitionTimestamp = fmt.Sprintf("%#x", timestamp)

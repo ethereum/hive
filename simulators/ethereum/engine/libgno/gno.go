@@ -16,6 +16,7 @@ const GAS_LIMIT = 1000000
 
 // SYSTEM_SENDER represents the address of the system sender.
 var SYSTEM_SENDER = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
+var GNOTokenAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000001")
 
 // GNOWithdrawalContractABI represents the path to the GNO withdrawal contract ABI.
 //
@@ -29,6 +30,7 @@ var GNOTokenContractABI string
 
 var ErrorAmountAndAddressDifferentLength = fmt.Errorf("amount and addresses must be the same length")
 var ErrorLoadingWithdrawalContract = fmt.Errorf("error loading withdrawal contract")
+var ErrorLoadingGNOTokenContract = fmt.Errorf("error loading gno token contract")
 var ErrorPackingArguments = fmt.Errorf("error packing arguments")
 
 // ExecuteSystemWithdrawal gets the byte code to execute a system withdrawal.
@@ -46,4 +48,26 @@ func ExecuteSystemWithdrawal(maxNumberOfFailedWithdrawalsToProcess uint64, amoun
 	}
 	// if at some point we want to convert it to hex, use something like this: hex.EncodeToString(dataBytes)
 	return dataBytes, nil
+}
+
+// BalanceOfAddressData return contract method to get the balance of a GNO token.
+func BalanceOfAddressData(account common.Address) ([]byte, error) {
+	gnoTokenABI, err := abi.JSON(strings.NewReader(GNOTokenContractABI))
+	if err != nil {
+		return []byte{}, ErrorLoadingGNOTokenContract
+	}
+	dataBytes, err := gnoTokenABI.Pack("balanceOf", account)
+	if err != nil {
+		return []byte{}, fmt.Errorf("%w: %w", ErrorPackingArguments, err)
+	}
+	return dataBytes, nil
+}
+
+// GetGNOTokenABI return the GNO token ABI.
+func GetGNOTokenABI() (*abi.ABI, error) {
+	gnoTokenABI, err := abi.JSON(strings.NewReader(GNOTokenContractABI))
+	if err != nil {
+		return nil, ErrorLoadingGNOTokenContract
+	}
+	return &gnoTokenABI, nil
 }

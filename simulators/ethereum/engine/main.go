@@ -91,7 +91,7 @@ func getTimestamp() int64 {
 	now := time.Now()
 
 	// Calculate the start of the next 2 minutes
-	nextMinute := now.Truncate(time.Minute).Add(3 * time.Minute)
+	nextMinute := now.Truncate(time.Minute).Add(1 * time.Minute)
 
 	// Get the Unix timestamp of the next 2 minutes
 	return nextMinute.Unix()
@@ -115,8 +115,8 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 
 		// Set the timestamp of the genesis to the next 2 minutes
 		timestamp := getTimestamp()
-
 		genesis.SetTimestamp(timestamp)
+		genesis.SetDifficulty(big.NewInt(100))
 		//genesis.UpdateTimestamp(getTimestamp())
 		genesisStartOption, err := helper.GenesisStartOptionBasedOnClient(genesis, clientName)
 		if err != nil {
@@ -124,10 +124,10 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		// Calculate and set the TTD for this test
-		ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
+		//ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
 
 		// Configure Forks
-		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", genesis.Difficulty()))
 		if currentTest.GetForkConfig().ShanghaiTimestamp != nil {
 			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", currentTest.GetForkConfig().ShanghaiTimestamp))
 			// Ensure the merge transition is activated before shanghai.
@@ -139,27 +139,27 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		testFiles := hivesim.Params{}
-		if genesis.Difficulty().Cmp(big.NewInt(ttd)) < 0 {
-
-			if currentTest.GetChainFile() != "" {
-				// We are using a Proof of Work chain file, remove all clique-related settings
-				// TODO: Nethermind still requires HIVE_MINER for the Engine API
-				// delete(newParams, "HIVE_MINER")
-				delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
-				delete(newParams, "HIVE_CLIQUE_PERIOD")
-				// Add the new file to be loaded as chain.rlp
-				testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.GetChainFile())
-			}
-			if currentTest.IsMiningDisabled() {
-				delete(newParams, "HIVE_MINER")
-			}
-		} else {
-			// This is a post-merge test
-			delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
-			delete(newParams, "HIVE_CLIQUE_PERIOD")
-			delete(newParams, "HIVE_MINER")
-			newParams = newParams.Set("HIVE_POST_MERGE_GENESIS", "true")
-		}
+		//if genesis.Difficulty().Cmp(big.NewInt(ttd)) < 0 {
+		//
+		//	if currentTest.GetChainFile() != "" {
+		//		// We are using a Proof of Work chain file, remove all clique-related settings
+		//		// TODO: Nethermind still requires HIVE_MINER for the Engine API
+		//		// delete(newParams, "HIVE_MINER")
+		//		delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
+		//		delete(newParams, "HIVE_CLIQUE_PERIOD")
+		//		// Add the new file to be loaded as chain.rlp
+		//		testFiles = testFiles.Set("/chain.rlp", "./chains/"+currentTest.GetChainFile())
+		//	}
+		//	if currentTest.IsMiningDisabled() {
+		//		delete(newParams, "HIVE_MINER")
+		//	}
+		//} else {
+		// This is a post-merge test
+		delete(newParams, "HIVE_CLIQUE_PRIVATEKEY")
+		delete(newParams, "HIVE_CLIQUE_PERIOD")
+		delete(newParams, "HIVE_MINER")
+		newParams = newParams.Set("HIVE_POST_MERGE_GENESIS", "false")
+		//}
 
 		if clientTypes, err := sim.ClientTypes(); err == nil {
 			for _, clientType := range clientTypes {
@@ -187,7 +187,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 						// Run the test case
 						test.Run(
 							currentTest,
-							big.NewInt(ttd),
+							genesis.Difficulty(),
 							timeout,
 							t,
 							c,

@@ -66,7 +66,7 @@
     "registrar": "0x6000000000000000000000000000000000000000",
     "transactionPermissionContract": "0x4000000000000000000000000000000000000001",
     "transactionPermissionContractTransition": "0x0",
-    "terminalTotalDifficulty": "131073"
+    "terminalTotalDifficulty": "100"
   },
   "genesis": {
     "seal": {
@@ -76,11 +76,11 @@
       }
     },
     "baseFeePerGas": "0x3b9aca00",
-    "difficulty": "0x20000",
+    "difficulty": "0xd10",
     "gasLimit": "0x989680"
   },
   "accounts": {
-    "0xcf49fda3be353c69b41ed96333cd24302da4556f": {
+    "0x59f80ed315477f9f0059D862713A7b082A599217": {
       "balance": "0xc9f2c9cd04674edea40000000"
     },
     "0xB03a86b3126157C039b55E21D378587CcFc04d45": {

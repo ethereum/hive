@@ -206,17 +206,18 @@ func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 	cl.LatestHeader, err = ec.HeaderByNumber(ctx, nil)
 	if err != nil {
 		cl.Fatalf("CLMocker: Unable to get latest header: %v", err)
+		panic(err)
 	}
-	// Print cl.LatestHeader.Hash
-	cl.Logf("Hash of LatestHeader %s", cl.LatestHeader.Hash())
 
 	ctx, cancel = context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
 
 	if ttd, err := ec.GetTotalDifficulty(ctx); err != nil {
 		cl.Fatalf("CLMocker: Error getting total difficulty from engine client: %v", err)
+		panic(err)
 	} else if ttd.Cmp(ec.TerminalTotalDifficulty()) < 0 {
 		cl.Fatalf("CLMocker: Attempted to set TTD Block when TTD had not been reached: %d > %d", ec.TerminalTotalDifficulty(), ttd)
+		panic(err)
 	} else {
 		cl.Logf("CLMocker: TTD has been reached at block %d (%d>=%d)\n", cl.LatestHeader.Number, ttd, ec.TerminalTotalDifficulty())
 		jsH, _ := json.MarshalIndent(cl.LatestHeader, "", " ")
@@ -242,6 +243,7 @@ func (cl *CLMocker) WaitForTTD() {
 	ec, err := helper.WaitAnyClientForTTD(cl.EngineClients, cl.TestContext)
 	if ec == nil || err != nil {
 		cl.Fatalf("CLMocker: Error while waiting for TTD: %v", err)
+		panic(err)
 	}
 	// One of the clients has reached TTD, send the initial fcU with this client as head
 	cl.SetTTDBlockClient(ec)
@@ -263,14 +265,21 @@ func (cl *CLMocker) GetTimestampIncrement() uint64 {
 	return cl.BlockTimestampIncrement.Uint64()
 }
 
+var counter = 0
+
 // Returns the timestamp value to be included in the next payload attributes
 func (cl *CLMocker) GetNextBlockTimestamp() uint64 {
-	if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
-		// We are producing the transition payload and there's a value specified
-		// for this specific payload
-		return cl.TransitionPayloadTimestamp.Uint64()
-	}
-	return cl.LatestHeader.Time + cl.GetTimestampIncrement()
+
+	now := time.Now()
+	ret := uint64(now.Truncate(time.Minute).Add(5 * time.Second).Add(time.Duration(counter) * time.Second).Unix())
+	counter += 1
+	return ret
+	//if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
+	//	// We are producing the transition payload and there's a value specified
+	//	// for this specific payload
+	//	return cl.TransitionPayloadTimestamp.Uint64()
+	//}
+	//return cl.LatestHeader.Time + cl.GetTimestampIncrement()
 }
 
 // Picks the next payload producer from the set of clients registered
@@ -450,14 +459,7 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 	if isShanghai(cl.LatestExecutedPayload.Timestamp, cl.ShanghaiTimestamp) {
 		version = 2
 	}
-	var payload *api.PayloadAttributes
-	payload = &api.PayloadAttributes{
-		Timestamp:             cl.LatestPayloadBuilt.Timestamp,
-		Random:                cl.LatestPayloadBuilt.Random,
-		SuggestedFeeRecipient: cl.LatestPayloadBuilt.FeeRecipient,
-		Withdrawals:           cl.LatestPayloadBuilt.Withdrawals,
-	}
-	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, payload, version) {
+	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, version) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
 		} else if resp.ForkchoiceResponse.PayloadStatus.Status == api.VALID {
@@ -491,7 +493,6 @@ type BlockProcessCallbacks struct {
 
 func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 
-	time.Sleep(20 * time.Second)
 	if !cl.TTDReached {
 		cl.Fatalf("CLMocker: Attempted to create a block when the TTD had not yet been reached")
 	}
@@ -526,7 +527,6 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 	// Give the client a delay between getting the payload ID and actually retrieving the payload
 	time.Sleep(cl.PayloadProductionClientDelay)
 
-	time.Sleep(10 * time.Second)
 	cl.GetNextPayload()
 
 	if callbacks.OnGetPayload != nil {
@@ -589,26 +589,32 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 		// ommersHash == 0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347
 		if newHeader.UncleHash != types.EmptyUncleHash {
 			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect ommersHash: %v", ec.ID(), newHeader.UncleHash)
+			panic(err)
 		}
 		// difficulty == 0
 		if newHeader.Difficulty.Cmp(common.Big0) != 0 {
 			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect difficulty: %v", ec.ID(), newHeader.Difficulty)
+			panic(err)
 		}
 		// mixHash == prevRandao
 		if newHeader.MixDigest != cl.PrevRandaoHistory[cl.LatestHeadNumber.Uint64()] {
 			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect mixHash: %v != %v", ec.ID(), newHeader.MixDigest, cl.PrevRandaoHistory[cl.LatestHeadNumber.Uint64()])
+			panic(err)
 		}
 		// nonce == 0x0000000000000000
 		if newHeader.Nonce != (types.BlockNonce{}) {
 			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect nonce: %v", ec.ID(), newHeader.Nonce)
+			panic(err)
 		}
 		if len(newHeader.Extra) > 32 {
 			cl.Fatalf("CLMocker: Client %v produced a new header with incorrect extraData (len > 32): %v", ec.ID(), newHeader.Extra)
+			panic(err)
 		}
 		cl.LatestHeader = newHeader
 	}
 	if cl.LatestHeader == nil {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
+		panic("None of the clients accepted the newly constructed payload")
 	}
 
 }

@@ -31,8 +31,8 @@ var (
 	MaxTimeDriftSeconds        = int64(60)
 
 	// This is the account that sends vault funding transactions.
-	VaultAccountAddress = common.HexToAddress("0xcf49fda3be353c69b41ed96333cd24302da4556f")
-	VaultKey, _         = crypto.HexToECDSA("63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376")
+	VaultAccountAddress = common.HexToAddress("0x59f80ed315477f9f0059D862713A7b082A599217")
+	VaultKey, _         = crypto.HexToECDSA("ff804d09c833619af673fa99c92ae506d30ff60f37ad41a3d098dcf714db1e4a")
 
 	// Global test case timeout
 	DefaultTestCaseTimeout = time.Minute * 10

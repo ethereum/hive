@@ -16,7 +16,7 @@ ENV GOPATH /Users/maceo/go
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
 ADD . /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
 WORKDIR /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
-RUN go build -gcflags="all=-N -l" -v .
+RUN go build -mod=vendor -gcflags="all=-N -l" -v .
 
 # Build the simulator run container.
 FROM alpine:latest
