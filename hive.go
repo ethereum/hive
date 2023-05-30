@@ -33,12 +33,14 @@ func main() {
 		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
 		useCredHelper         = flag.Bool("docker.cred-helper", false, "configure docker authentication using locally-configured credential helper")
 
+		clientsFile = flag.String("client-file", "", `YAML `+"`file`"+` containing client configurations.`)
+
 		clients = flag.String("client", "go-ethereum", "Comma separated `list` of clients to use. Client names in the list may be given as\n"+
 			"just the client name, or a client_branch specifier. If a branch name is supplied,\n"+
 			"the client image will use the given git branch or docker tag. Multiple instances of\n"+
 			"a single client type may be requested with different branches.\n"+
-			"Example: \"besu_latest,besu_20.10.2\"\n"+
-			"If a valid file is specified instead, the client configuration will be parsed from this file as YAML or JSON.\n")
+			"Example: \"besu_latest,besu_20.10.2\"\n")
+
 		clientTimeout = flag.Duration("client.checktimelimit", 3*time.Minute, "The `timeout` of waiting for clients to open up the RPC port.\n"+
 			"If a very long chain is imported, this timeout may need to be quite large.\n"+
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
@@ -111,11 +113,28 @@ func main() {
 		ClientStartTimeout: *clientTimeout,
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
-	clientList, err := parseClients(*clients)
-	if err != nil {
-		fatal(err)
+
+	// Parse the client list.
+	// It can be supplied as a comma-separated list, or as a YAML file.
+	clientFlag := flag.Lookup("client")
+	clientFileFlag := flag.Lookup("client-file")
+	if clientFlag.Value.String() != "" && clientFileFlag.Value.String() != "" {
+		fatal("cannot use -client and -client-file at the same time")
+	}
+	var clientList []libhive.ClientDesignator
+	if *clientsFile != "" {
+		clientList, err = parseClientsFile(*clientsFile)
+		if err != nil {
+			fatal("-client-file:", err)
+		}
+	} else {
+		clientList, err = libhive.ParseClientList(*clients)
+		if err != nil {
+			fatal("-client:", err)
+		}
 	}
 
+	// Build clients and simulators.
 	if err := runner.Build(ctx, clientList, simList); err != nil {
 		fatal(err)
 	}
@@ -125,6 +144,7 @@ func main() {
 		return
 	}
 
+	// Run simulators.
 	var failCount int
 	for _, sim := range simList {
 		result, err := runner.Run(ctx, sim, env)
@@ -149,18 +169,11 @@ func fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
-func parseClients(input string) ([]libhive.ClientDesignator, error) {
-	// First check if the input is a path to a file.
-	if _, err := os.Stat(input); err == nil {
-		// Read the file as yaml/json and try to parse the list of client info.
-		f, err := os.Open(input)
-		if err != nil {
-			return nil, err
-		}
-		defer f.Close()
-		return libhive.ParseClientListYAML(f)
-	} else {
-		// Otherwise, parse the input as a comma-separated list of client info.
-		return libhive.ParseClientList(input)
+func parseClientsFile(file string) ([]libhive.ClientDesignator, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
 	}
+	defer f.Close()
+	return libhive.ParseClientListYAML(f)
 }
