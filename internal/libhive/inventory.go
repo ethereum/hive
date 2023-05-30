@@ -1,10 +1,8 @@
 package libhive
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -20,14 +18,14 @@ const branchDelimiter = "_"
 // All other build arguments for a client must be passed by using a YAML/JSON file
 type ClientBuildInfo struct {
 	// Client is the name of the client, eg: besu, go-ethereum, etc.
-	Client string `json:"client"       yaml:"client"`
+	Client string `yaml:"client"`
 
 	// Dockerfile is the name of the Dockerfile to use for building the client.
 	// E.g. using `Dockerfile==git` will build using `Dockerfile.git`.
-	Dockerfile string `json:"dockerfile" yaml:"dockerfile"`
+	Dockerfile string `yaml:"dockerfile"`
 
 	// Build parameters used to build the docker image for the client.
-	BuildArguments map[string]string `json:"build_args" yaml:"build_args"`
+	BuildArguments map[string]string `yaml:"build_args"`
 }
 
 func (c ClientBuildInfo) String() string {
@@ -88,26 +86,12 @@ func ClientsBuildInfoFromString(arg string) (ClientsBuildInfo, error) {
 }
 
 func ClientsBuildInfoFromFile(file io.Reader) (ClientsBuildInfo, error) {
-	// Read the file
-	data, err := ioutil.ReadAll(file)
-	if err != nil {
-		return nil, err
-	}
 	var res ClientsBuildInfo
-	// First try to unmarshal as yaml
-	errYaml := yaml.Unmarshal(data, &res)
-	if errYaml == nil {
-		return res, nil
+	err := yaml.NewDecoder(file).Decode(&res)
+	if err != nil {
+		return nil, fmt.Errorf("unable to parse clients file: %w", err)
 	}
-
-	// If that fails, try to unmarshal as a json
-	errJson := json.Unmarshal(data, &res)
-	if errJson == nil {
-		return res, nil
-	}
-
-	// Combine the errors
-	return nil, fmt.Errorf("unable to parse clients file: %s, json: %s", errYaml.Error(), errJson.Error())
+	return res, nil
 }
 
 // Inventory keeps names of clients and simulators.

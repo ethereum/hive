@@ -48,9 +48,18 @@ func TestClientBuildInfoString(t *testing.T) {
 		buildInfo libhive.ClientBuildInfo
 		want      string
 	}{
-		{libhive.ClientBuildInfo{Client: "client"}, "client"},
-		{libhive.ClientBuildInfo{Client: "client", BuildArguments: map[string]string{"repo": "myrepo", "branch": "mybranch"}}, "client_repo_myrepo_branch_mybranch"},
-		{libhive.ClientBuildInfo{Client: "client", Dockerfile: "mydockerfile", BuildArguments: map[string]string{"user": "myuser"}}, "client_mydockerfile_user_myuser"},
+		{
+			buildInfo: libhive.ClientBuildInfo{Client: "client"},
+			want:      "client",
+		},
+		{
+			buildInfo: libhive.ClientBuildInfo{Client: "client", BuildArguments: map[string]string{"repo": "myrepo", "branch": "mybranch"}},
+			want:      "client_repo_myrepo_branch_mybranch",
+		},
+		{
+			buildInfo: libhive.ClientBuildInfo{Client: "client", Dockerfile: "mydockerfile", BuildArguments: map[string]string{"user": "myuser"}},
+			want:      "client_mydockerfile_user_myuser",
+		},
 	}
 	for _, test := range tests {
 		if test.buildInfo.String() != test.want {
@@ -60,18 +69,7 @@ func TestClientBuildInfoString(t *testing.T) {
 }
 
 func TestClientBuildInfoFromFile(t *testing.T) {
-	jsonYamlTests := []struct {
-		json string
-		yaml string
-		want libhive.ClientsBuildInfo
-	}{
-		{
-			`[
-				{"client": "go-ethereum", "dockerfile": "git"},
-				{"client": "go-ethereum", "dockerfile": "local", "build_args": {"branch": "latest"}},
-				{"client": "supereth3000", "build_args": {"some_other_arg": "some_other_value"}}
-			]`,
-			`
+	yamlInput := `
 - client: go-ethereum
   dockerfile: git
 - client: go-ethereum
@@ -81,38 +79,22 @@ func TestClientBuildInfoFromFile(t *testing.T) {
 - client: supereth3000
   build_args:
     some_other_arg: some_other_value
-`,
-			libhive.ClientsBuildInfo{
-				{Client: "go-ethereum", Dockerfile: "git"},
-				{Client: "go-ethereum", Dockerfile: "local", BuildArguments: map[string]string{"branch": "latest"}},
-				{Client: "supereth3000", BuildArguments: map[string]string{"some_other_arg": "some_other_value"}}},
-		},
+`
+
+	expectedOutput := libhive.ClientsBuildInfo{
+		{Client: "go-ethereum", Dockerfile: "git"},
+		{Client: "go-ethereum", Dockerfile: "local", BuildArguments: map[string]string{"branch": "latest"}},
+		{Client: "supereth3000", BuildArguments: map[string]string{"some_other_arg": "some_other_value"}},
 	}
 
-	t.Run("ClientBuildInfoFromYaml", func(t *testing.T) {
-		for _, test := range jsonYamlTests {
-			r := strings.NewReader(test.yaml)
-			clientInfo, err := libhive.ClientsBuildInfoFromFile(r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(&clientInfo, &test.want) {
-				t.Errorf("ClientBuildInfoFromYaml -> %q, want %q", clientInfo, test.want)
-			}
-		}
-	})
-	t.Run("ClientBuildInfoFromJson", func(t *testing.T) {
-		for _, test := range jsonYamlTests {
-			r := strings.NewReader(test.json)
-			clientInfo, err := libhive.ClientsBuildInfoFromFile(r)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !reflect.DeepEqual(&clientInfo, &test.want) {
-				t.Errorf("ClientBuildInfoFromYaml -> %q, want %q", clientInfo, test.want)
-			}
-		}
-	})
+	r := strings.NewReader(yamlInput)
+	clientInfo, err := libhive.ClientsBuildInfoFromFile(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(&clientInfo, &expectedOutput) {
+		t.Errorf("ClientBuildInfoFromYaml -> %q, want %q", clientInfo, expectedOutput)
+	}
 }
 
 func TestInventory(t *testing.T) {
