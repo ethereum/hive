@@ -15,16 +15,16 @@ import (
 // branchDelimiter is what separates the client name from the branch, eg: besu_nightly, go-ethereum_master.
 const branchDelimiter = "_"
 
-// All other build arguments for a client must be passed by using a YAML/JSON file
+// ClientBuildInfo represents the build configuration of a client.
+// The parameters set here are used when building the client docker image.
 type ClientBuildInfo struct {
-	// Client is the name of the client, eg: besu, go-ethereum, etc.
 	Client string `yaml:"client"`
 
 	// Dockerfile is the name of the Dockerfile to use for building the client.
-	// E.g. using `Dockerfile==git` will build using `Dockerfile.git`.
+	// E.g. using Dockerfile == 'git' will build using Dockerfile.git.
 	Dockerfile string `yaml:"dockerfile"`
 
-	// Build parameters used to build the docker image for the client.
+	// Parameters passed as environment to the docker build.
 	BuildArguments map[string]string `yaml:"build_args"`
 }
 
