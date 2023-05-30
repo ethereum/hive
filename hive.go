@@ -149,7 +149,7 @@ func fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
-func parseClients(input string) ([]libhive.ClientBuildInfo, error) {
+func parseClients(input string) ([]libhive.ClientDesignator, error) {
 	// First check if the input is a path to a file.
 	if _, err := os.Stat(input); err == nil {
 		// Read the file as yaml/json and try to parse the list of client info.
@@ -158,9 +158,9 @@ func parseClients(input string) ([]libhive.ClientBuildInfo, error) {
 			return nil, err
 		}
 		defer f.Close()
-		return libhive.ClientsBuildInfoFromFile(f)
+		return libhive.ParseClientListYAML(f)
 	} else {
 		// Otherwise, parse the input as a comma-separated list of client info.
-		return libhive.ClientsBuildInfoFromString(input)
+		return libhive.ParseClientList(input)
 	}
 }

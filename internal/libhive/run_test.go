@@ -16,7 +16,7 @@ import (
 
 func TestRunner(t *testing.T) {
 	var (
-		allClients = []libhive.ClientBuildInfo{{Client: "client-1"}, {Client: "client-2"}, {Client: "client-3"}}
+		allClients = []libhive.ClientDesignator{{Client: "client-1"}, {Client: "client-2"}, {Client: "client-3"}}
 		simClients = allClients[1:]
 	)
 
@@ -77,7 +77,7 @@ func clientNames(defs []*hivesim.ClientDefinition) []string {
 	return names
 }
 
-func buildInfoNames(clients []libhive.ClientBuildInfo) []string {
+func buildInfoNames(clients []libhive.ClientDesignator) []string {
 	names := make([]string, len(clients))
 	for i, c := range clients {
 		names[i] = c.Client

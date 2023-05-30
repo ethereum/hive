@@ -40,7 +40,7 @@ func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder
 }
 
 // ReadClientMetadata reads metadata of the given client.
-func (b *Builder) ReadClientMetadata(client libhive.ClientBuildInfo) (*libhive.ClientMetadata, error) {
+func (b *Builder) ReadClientMetadata(client libhive.ClientDesignator) (*libhive.ClientMetadata, error) {
 	dir := b.config.Inventory.ClientDirectory(client)
 	f, err := os.Open(filepath.Join(dir, "hive.yaml"))
 	if err != nil {
@@ -60,16 +60,12 @@ func (b *Builder) ReadClientMetadata(client libhive.ClientBuildInfo) (*libhive.C
 }
 
 // BuildClientImage builds a docker image of the given client.
-func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientBuildInfo) (string, error) {
+func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDesignator) (string, error) {
 	dir := b.config.Inventory.ClientDirectory(client)
 	tag := fmt.Sprintf("hive/clients/%s:latest", client.String())
-	dockerFile := "Dockerfile"
-	if client.Dockerfile != "" {
-		// Custom Dockerfile.
-		dockerFile += "." + client.Dockerfile
-	}
+	dockerFile := client.Dockerfile()
 	buildArgs := make([]docker.BuildArg, 0)
-	for key, value := range client.BuildArguments {
+	for key, value := range client.BuildEnv {
 		buildArgs = append(buildArgs, docker.BuildArg{Name: key, Value: value})
 	}
 	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs...)

@@ -15,29 +15,32 @@ import (
 // branchDelimiter is what separates the client name from the branch, eg: besu_nightly, go-ethereum_master.
 const branchDelimiter = "_"
 
-// ClientBuildInfo represents the build configuration of a client.
-// The parameters set here are used when building the client docker image.
-type ClientBuildInfo struct {
+// clientDelimiter separates multiple clients in the parameter string.
+const clientDelimiter = ","
+
+// ClientDesignator specifies a client and build parameters for it.
+type ClientDesignator struct {
 	Client string `yaml:"client"`
 
-	// Dockerfile is the name of the Dockerfile to use for building the client.
-	// E.g. using Dockerfile == 'git' will build using Dockerfile.git.
-	Dockerfile string `yaml:"dockerfile"`
+	// DockerfileExt is the extension of the Docker that should be used to build the
+	// client. Example: setting this to "git" will build using "Dockerfile.git".
+	DockerfileExt string `yaml:"dockerfile"`
 
 	// Parameters passed as environment to the docker build.
-	BuildArguments map[string]string `yaml:"build_args"`
+	BuildEnv map[string]string `yaml:"build_args"`
 }
 
-func (c ClientBuildInfo) String() string {
+// String returns a unique string representation of the client build configuration.
+func (c ClientDesignator) String() string {
 	var b strings.Builder
 	b.WriteString(c.Client)
-	if c.Dockerfile != "" {
+	if c.DockerfileExt != "" {
 		b.WriteString("_")
-		b.WriteString(c.Dockerfile)
+		b.WriteString(c.DockerfileExt)
 	}
 
 	var keys []string
-	for k := range c.BuildArguments {
+	for k := range c.BuildEnv {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
@@ -45,14 +48,22 @@ func (c ClientBuildInfo) String() string {
 		b.WriteString("_")
 		b.WriteString(k)
 		b.WriteString("_")
-		b.WriteString(c.BuildArguments[k])
+		b.WriteString(c.BuildEnv[k])
 	}
 	return b.String()
 }
 
-// Parses client build info from a string.
-func ParseClientBuildInfoString(fullString string) (ClientBuildInfo, error) {
-	res := ClientBuildInfo{}
+// Dockerfile gives the name of the Dockerfile to use when building the client.
+func (c ClientDesignator) Dockerfile() string {
+	if c.DockerfileExt == "" {
+		return c.Client
+	}
+	return "Dockerfile." + c.DockerfileExt
+}
+
+// parseClientDesignator parses a client name string.
+func parseClientDesignator(fullString string) (ClientDesignator, error) {
+	var res ClientDesignator
 	if strings.Count(fullString, branchDelimiter) > 0 {
 		substrings := strings.Split(fullString, branchDelimiter)
 		res.Client = strings.Join(substrings[0:len(substrings)-1], "_")
@@ -60,7 +71,7 @@ func ParseClientBuildInfoString(fullString string) (ClientBuildInfo, error) {
 		if tag == "" {
 			return res, fmt.Errorf("invalid branch: %s", tag)
 		}
-		res.BuildArguments = map[string]string{"branch": tag}
+		res.BuildEnv = map[string]string{"branch": tag}
 	} else {
 		res.Client = fullString
 	}
@@ -70,23 +81,24 @@ func ParseClientBuildInfoString(fullString string) (ClientBuildInfo, error) {
 	return res, nil
 }
 
-// clientDelimiter separates multiple clients in the parameter string.
-const clientDelimiter = ","
-
-func ClientsBuildInfoFromString(arg string) ([]ClientBuildInfo, error) {
-	var res []ClientBuildInfo
+// ParseClientList reads a comma-separated list of client names. Each client name may
+// optionally contain a branch specifier separated from the name by underscore, e.g.
+// "besu_nightly".
+func ParseClientList(arg string) ([]ClientDesignator, error) {
+	var res []ClientDesignator
 	for _, name := range strings.Split(arg, clientDelimiter) {
-		if clientBuildInfo, err := ParseClientBuildInfoString(name); err != nil {
+		c, err := parseClientDesignator(name)
+		if err != nil {
 			return nil, err
-		} else {
-			res = append(res, clientBuildInfo)
 		}
+		res = append(res, c)
 	}
 	return res, nil
 }
 
-func ClientsBuildInfoFromFile(file io.Reader) ([]ClientBuildInfo, error) {
-	var res []ClientBuildInfo
+// ParseClientListYAML reads a YAML document containing a list of clients.
+func ParseClientListYAML(file io.Reader) ([]ClientDesignator, error) {
+	var res []ClientDesignator
 	err := yaml.NewDecoder(file).Decode(&res)
 	if err != nil {
 		return nil, fmt.Errorf("unable to parse clients file: %w", err)
@@ -103,14 +115,14 @@ type Inventory struct {
 
 // HasClient returns true if the inventory contains the given client.
 // The client name may contain a branch specifier.
-func (inv Inventory) HasClient(client ClientBuildInfo) bool {
+func (inv Inventory) HasClient(client ClientDesignator) bool {
 	_, ok := inv.Clients[client.Client]
 	return ok
 }
 
 // ClientDirectory returns the directory containing the given client's Dockerfile.
 // The client name may contain a branch specifier.
-func (inv Inventory) ClientDirectory(client ClientBuildInfo) string {
+func (inv Inventory) ClientDirectory(client ClientDesignator) string {
 	return filepath.Join(inv.BaseDir, "clients", filepath.FromSlash(client.Client))
 }
 

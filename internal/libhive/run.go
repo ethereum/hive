@@ -42,7 +42,7 @@ func NewRunner(inv Inventory, b Builder, cb ContainerBackend) *Runner {
 }
 
 // Build builds client and simulator images.
-func (r *Runner) Build(ctx context.Context, clientList []ClientBuildInfo, simList []string) error {
+func (r *Runner) Build(ctx context.Context, clientList []ClientDesignator, simList []string) error {
 	if err := r.container.Build(ctx, r.builder); err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (r *Runner) Build(ctx context.Context, clientList []ClientBuildInfo, simLis
 }
 
 // buildClients builds client images.
-func (r *Runner) buildClients(ctx context.Context, clientList []ClientBuildInfo) error {
+func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator) error {
 	if len(clientList) == 0 {
 		return errors.New("client list is empty, cannot simulate")
 	}

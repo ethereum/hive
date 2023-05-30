@@ -1,12 +1,10 @@
-package libhive_test
+package libhive
 
 import (
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
-
-	"github.com/ethereum/hive/internal/libhive"
 )
 
 func TestParseClientBuildInfoString(t *testing.T) {
@@ -21,9 +19,9 @@ func TestParseClientBuildInfoString(t *testing.T) {
 		{"the_client_name_has_many_underscores_b", "the_client_name_has_many_underscores", map[string]string{"branch": "b"}},
 	}
 	for _, test := range tests {
-		cInfo, _ := libhive.ParseClientBuildInfoString(test.name)
-		if cInfo.Client != test.wantClient || !reflect.DeepEqual(test.wantBuildParams, cInfo.BuildArguments) {
-			t.Errorf("ParseClientBuildInfoString(%q) -> (%q, %q), want (%q, %q)", test.name, cInfo.Client, cInfo.BuildArguments, test.wantClient, test.wantBuildParams)
+		cInfo, _ := parseClientDesignator(test.name)
+		if cInfo.Client != test.wantClient || !reflect.DeepEqual(test.wantBuildParams, cInfo.BuildEnv) {
+			t.Errorf("ParseClientBuildInfoString(%q) -> (%q, %q), want (%q, %q)", test.name, cInfo.Client, cInfo.BuildEnv, test.wantClient, test.wantBuildParams)
 		}
 	}
 }
@@ -36,34 +34,34 @@ func TestInvalidSplitClientName(t *testing.T) {
 		"client_",
 	}
 	for _, test := range tests {
-		cInfo, err := libhive.ParseClientBuildInfoString(test)
+		cInfo, err := parseClientDesignator(test)
 		if err == nil {
-			t.Errorf("SplitClientName(%q) -> (%q, %q), want error", test, cInfo.Client, cInfo.BuildArguments)
+			t.Errorf("SplitClientName(%q) -> (%q, %q), want error", test, cInfo.Client, cInfo.BuildEnv)
 		}
 	}
 }
 
-func TestClientBuildInfoString(t *testing.T) {
+func TestClientDesignatorString(t *testing.T) {
 	tests := []struct {
-		buildInfo libhive.ClientBuildInfo
-		want      string
+		client ClientDesignator
+		string string
 	}{
 		{
-			buildInfo: libhive.ClientBuildInfo{Client: "client"},
-			want:      "client",
+			client: ClientDesignator{Client: "client"},
+			string: "client",
 		},
 		{
-			buildInfo: libhive.ClientBuildInfo{Client: "client", BuildArguments: map[string]string{"repo": "myrepo", "branch": "mybranch"}},
-			want:      "client_branch_mybranch_repo_myrepo",
+			client: ClientDesignator{Client: "client", BuildEnv: map[string]string{"repo": "myrepo", "branch": "mybranch"}},
+			string: "client_branch_mybranch_repo_myrepo",
 		},
 		{
-			buildInfo: libhive.ClientBuildInfo{Client: "client", Dockerfile: "mydockerfile", BuildArguments: map[string]string{"user": "myuser"}},
-			want:      "client_mydockerfile_user_myuser",
+			client: ClientDesignator{Client: "client", DockerfileExt: "mydockerfile", BuildEnv: map[string]string{"user": "myuser"}},
+			string: "client_mydockerfile_user_myuser",
 		},
 	}
 	for _, test := range tests {
-		if test.buildInfo.String() != test.want {
-			t.Errorf("ClientBuildInfoString -> %q, want %q", test.buildInfo.String(), test.want)
+		if test.client.String() != test.string {
+			t.Errorf("wrong name %q, want %q", test.client.String(), test.string)
 		}
 	}
 }
@@ -81,14 +79,14 @@ func TestClientBuildInfoFromFile(t *testing.T) {
     some_other_arg: some_other_value
 `
 
-	expectedOutput := []libhive.ClientBuildInfo{
-		{Client: "go-ethereum", Dockerfile: "git"},
-		{Client: "go-ethereum", Dockerfile: "local", BuildArguments: map[string]string{"branch": "latest"}},
-		{Client: "supereth3000", BuildArguments: map[string]string{"some_other_arg": "some_other_value"}},
+	expectedOutput := []ClientDesignator{
+		{Client: "go-ethereum", DockerfileExt: "git"},
+		{Client: "go-ethereum", DockerfileExt: "local", BuildEnv: map[string]string{"branch": "latest"}},
+		{Client: "supereth3000", BuildEnv: map[string]string{"some_other_arg": "some_other_value"}},
 	}
 
 	r := strings.NewReader(yamlInput)
-	clientInfo, err := libhive.ClientsBuildInfoFromFile(r)
+	clientInfo, err := ParseClientListYAML(r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,13 +97,13 @@ func TestClientBuildInfoFromFile(t *testing.T) {
 
 func TestInventory(t *testing.T) {
 	basedir := filepath.FromSlash("../..")
-	inv, err := libhive.LoadInventory(basedir)
+	inv, err := LoadInventory(basedir)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	t.Run("HasClient", func(t *testing.T) {
-		clientInfo, err := libhive.ClientsBuildInfoFromString("go-ethereum_f:git,go-ethereum_latest,supereth3000")
+		clientInfo, err := ParseClientList("go-ethereum_f:git,go-ethereum_latest,supereth3000")
 		if err != nil {
 			t.Fatal(err)
 		}
