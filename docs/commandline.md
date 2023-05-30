@@ -42,8 +42,8 @@ version by appending it to the client name with `_`, for example:
 ### Client Build Parameters
 
 The client list for a run can also be given in a YAML file. This also allows further
-customization of the build arguments of the client. To enable the YAML file, use the
-`--client-file` option:
+customization of the build arguments of the client. Specify the `--client-file` option to
+use a client list file.
 
     ./hive --sim my-simulation --client-file clients.yaml
 
