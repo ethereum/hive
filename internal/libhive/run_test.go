@@ -34,7 +34,7 @@ func TestRunner(t *testing.T) {
 				if err != nil {
 					t.Fatal("error getting client types:", err)
 				}
-				if names := clientNames(defs); !reflect.DeepEqual(names, buildInfoNames(simClients)) {
+				if names := clientDefinitionNames(defs); !reflect.DeepEqual(names, clientDesignatorNames(simClients)) {
 					t.Fatal("wrong client names:", names)
 				}
 			}
@@ -68,7 +68,7 @@ func makeTestInventory() libhive.Inventory {
 	return inv
 }
 
-func clientNames(defs []*hivesim.ClientDefinition) []string {
+func clientDefinitionNames(defs []*hivesim.ClientDefinition) []string {
 	names := make([]string, 0, len(defs))
 	for _, def := range defs {
 		names = append(names, def.Name)
@@ -77,7 +77,7 @@ func clientNames(defs []*hivesim.ClientDefinition) []string {
 	return names
 }
 
-func buildInfoNames(clients []libhive.ClientDesignator) []string {
+func clientDesignatorNames(clients []libhive.ClientDesignator) []string {
 	names := make([]string, len(clients))
 	for i, c := range clients {
 		names[i] = c.Client
