@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/ethereum/hive/internal/libdocker"
@@ -116,11 +117,7 @@ func main() {
 
 	// Parse the client list.
 	// It can be supplied as a comma-separated list, or as a YAML file.
-	clientFlag := flag.Lookup("client")
-	clientFileFlag := flag.Lookup("client-file")
-	if clientFlag.Value.String() != "" && clientFileFlag.Value.String() != "" {
-		fatal("cannot use -client and -client-file at the same time")
-	}
+	checkFlagsExclusive("client", "client-file")
 	var clientList []libhive.ClientDesignator
 	if *clientsFile != "" {
 		clientList, err = parseClientsFile(*clientsFile)
@@ -176,4 +173,29 @@ func parseClientsFile(file string) ([]libhive.ClientDesignator, error) {
 	}
 	defer f.Close()
 	return libhive.ParseClientListYAML(f)
+}
+
+func checkFlagsExclusive(flagNames ...string) {
+	set := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) {
+		set[f.Name] = true
+	})
+	var found bool
+	for _, name := range flagNames {
+		if set[name] {
+			if found {
+				fatal("flags", flagListString(flagNames), "cannot be used together")
+			}
+			found = true
+			set[name] = false
+		}
+	}
+}
+
+func flagListString(names []string) string {
+	flags := make([]string, len(names))
+	for i := range flags {
+		flags[i] = "-" + names[i]
+	}
+	return strings.Join(flags, ", ")
 }
