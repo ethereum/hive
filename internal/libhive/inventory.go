@@ -98,8 +98,9 @@ func ParseClientList(arg string) ([]ClientDesignator, error) {
 // ParseClientListYAML reads a YAML document containing a list of clients.
 func ParseClientListYAML(file io.Reader) ([]ClientDesignator, error) {
 	var res []ClientDesignator
-	err := yaml.NewDecoder(file).Decode(&res)
-	if err != nil {
+	dec := yaml.NewDecoder(file)
+	dec.KnownFields(true)
+	if err := dec.Decode(&res); err != nil {
 		return nil, fmt.Errorf("unable to parse clients file: %w", err)
 	}
 	return res, nil
