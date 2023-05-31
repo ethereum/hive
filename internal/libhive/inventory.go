@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"gopkg.in/inconshreveable/log15.v2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -95,6 +96,12 @@ func ParseClientList(arg string) ([]ClientDesignator, error) {
 	return res, nil
 }
 
+var knownBuildArgs = map[string]struct{}{
+	"branch": {},
+	"user":   {},
+	"repo":   {},
+}
+
 // ParseClientListYAML reads a YAML document containing a list of clients.
 func ParseClientListYAML(file io.Reader) ([]ClientDesignator, error) {
 	var res []ClientDesignator
@@ -102,6 +109,14 @@ func ParseClientListYAML(file io.Reader) ([]ClientDesignator, error) {
 	dec.KnownFields(true)
 	if err := dec.Decode(&res); err != nil {
 		return nil, fmt.Errorf("unable to parse clients file: %w", err)
+	}
+	// Validate build arguments.
+	for _, c := range res {
+		for key := range c.BuildArgs {
+			if _, ok := knownBuildArgs[key]; !ok {
+				log15.Warn(fmt.Sprintf("unknown build arg %q in clients.yaml file", key))
+			}
+		}
 	}
 	return res, nil
 }
