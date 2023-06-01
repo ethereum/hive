@@ -17,14 +17,16 @@ import (
 
 // ClientDesignator specifies a client and build parameters for it.
 type ClientDesignator struct {
+	// Client is the client name.
+	// This must refer to a subdirectory of clients/
 	Client string `yaml:"client"`
 
 	// DockerfileExt is the extension of the Docker that should be used to build the
 	// client. Example: setting this to "git" will build using "Dockerfile.git".
-	DockerfileExt string `yaml:"dockerfile"`
+	DockerfileExt string `yaml:"dockerfile,omitempty"`
 
 	// Arguments passed to the docker build.
-	BuildArgs map[string]string `yaml:"build_args"`
+	BuildArgs map[string]string `yaml:"build_args,omitempty"`
 }
 
 // String returns a unique string representation of the client build configuration.
@@ -54,6 +56,24 @@ func (c ClientDesignator) Dockerfile() string {
 	return "Dockerfile." + c.DockerfileExt
 }
 
+// ParseClientList reads a comma-separated list of client names. Each client name may
+// optionally contain a branch specifier separated from the name by underscore, e.g.
+// "besu_nightly".
+func ParseClientList(inv *Inventory, arg string) ([]ClientDesignator, error) {
+	var res []ClientDesignator
+	for _, name := range strings.Split(arg, clientDelimiter) {
+		c, err := parseClientDesignator(name)
+		if err != nil {
+			return nil, err
+		}
+		res = append(res, c)
+	}
+	if err := validateClients(inv, res); err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
 const (
 	branchDelimiter = "_" // separates the client name and branch, eg: besu_nightly
 	clientDelimiter = "," // separates client names in a list
@@ -79,17 +99,16 @@ func parseClientDesignator(fullString string) (ClientDesignator, error) {
 	return res, nil
 }
 
-// ParseClientList reads a comma-separated list of client names. Each client name may
-// optionally contain a branch specifier separated from the name by underscore, e.g.
-// "besu_nightly".
-func ParseClientList(arg string) ([]ClientDesignator, error) {
+// ParseClientListYAML reads a YAML document containing a list of clients.
+func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, error) {
 	var res []ClientDesignator
-	for _, name := range strings.Split(arg, clientDelimiter) {
-		c, err := parseClientDesignator(name)
-		if err != nil {
-			return nil, err
-		}
-		res = append(res, c)
+	dec := yaml.NewDecoder(file)
+	dec.KnownFields(true)
+	if err := dec.Decode(&res); err != nil {
+		return nil, fmt.Errorf("unable to parse clients file: %w", err)
+	}
+	if err := validateClients(inv, res); err != nil {
+		return nil, err
 	}
 	return res, nil
 }
@@ -100,25 +119,17 @@ var knownBuildArgs = map[string]struct{}{
 	"repo":   {},
 }
 
-// ParseClientListYAML reads a YAML document containing a list of clients.
-func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, error) {
-	var res []ClientDesignator
-	dec := yaml.NewDecoder(file)
-	dec.KnownFields(true)
-	if err := dec.Decode(&res); err != nil {
-		return nil, fmt.Errorf("unable to parse clients file: %w", err)
-	}
-
-	for _, c := range res {
+func validateClients(inv *Inventory, list []ClientDesignator) error {
+	for _, c := range list {
 		// Validate client exists.
 		ic, ok := inv.Clients[c.Client]
 		if !ok {
-			return nil, fmt.Errorf("unknown client %q", c.Client)
+			return fmt.Errorf("unknown client %q", c.Client)
 		}
 		// Validate DockerfileExt.
 		if c.DockerfileExt != "" {
 			if !slices.Contains(ic.Dockerfiles, c.DockerfileExt) {
-				return nil, fmt.Errorf("client %s doesn't have Dockerfile.%s", c.Client, c.DockerfileExt)
+				return fmt.Errorf("client %s doesn't have Dockerfile.%s", c.Client, c.DockerfileExt)
 			}
 		}
 		// Check build arguments.
@@ -128,8 +139,7 @@ func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, er
 			}
 		}
 	}
-
-	return res, nil
+	return nil
 }
 
 // Inventory keeps names of clients and simulators.
@@ -144,9 +154,14 @@ type InventoryClient struct {
 }
 
 // HasClient returns true if the inventory contains the given client.
-// The client name may contain a branch specifier.
 func (inv Inventory) HasClient(client ClientDesignator) bool {
-	_, ok := inv.Clients[client.Client]
+	ic, ok := inv.Clients[client.Client]
+	if !ok {
+		return false
+	}
+	if client.DockerfileExt != "" {
+		return slices.Contains(ic.Dockerfiles, client.DockerfileExt)
+	}
 	return ok
 }
 

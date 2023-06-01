@@ -125,7 +125,7 @@ func main() {
 			fatal("-client-file:", err)
 		}
 	} else {
-		clientList, err = libhive.ParseClientList(*clients)
+		clientList, err = libhive.ParseClientList(&inv, *clients)
 		if err != nil {
 			fatal("-client:", err)
 		}

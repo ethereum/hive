@@ -110,7 +110,7 @@ func TestInventory(t *testing.T) {
 	spew.Dump(inv)
 
 	t.Run("HasClient", func(t *testing.T) {
-		clientInfo, err := ParseClientList("go-ethereum_f:git,go-ethereum_latest,supereth3000")
+		clientInfo, err := ParseClientList(&inv, "go-ethereum,go-ethereum_latest,lighthouse-vc")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -123,7 +123,7 @@ func TestInventory(t *testing.T) {
 		if !inv.HasClient(clientInfo[1]) {
 			t.Error("can't find go-ethereum_latest client")
 		}
-		if inv.HasClient(clientInfo[2]) {
+		if inv.HasClient(ClientDesignator{Client: "supereth3000"}) {
 			t.Error("returned true for unknown client")
 		}
 	})
