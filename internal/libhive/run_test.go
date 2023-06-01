@@ -61,9 +61,9 @@ func TestRunner(t *testing.T) {
 
 func makeTestInventory() libhive.Inventory {
 	var inv libhive.Inventory
-	inv.AddClient("client-1")
-	inv.AddClient("client-2")
-	inv.AddClient("client-3")
+	inv.AddClient("client-1", nil)
+	inv.AddClient("client-2", nil)
+	inv.AddClient("client-3", nil)
 	inv.AddSimulator("sim-1")
 	return inv
 }

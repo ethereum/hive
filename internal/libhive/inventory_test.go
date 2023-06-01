@@ -5,6 +5,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/davecgh/go-spew/spew"
 )
 
 func TestParseClientDesignator(t *testing.T) {
@@ -85,8 +87,12 @@ func TestParseClientListYAML(t *testing.T) {
 		{Client: "supereth3000", BuildArgs: map[string]string{"some_other_arg": "some_other_value"}},
 	}
 
+	var inv Inventory
+	inv.AddClient("go-ethereum", &InventoryClient{Dockerfiles: []string{"git", "local"}})
+	inv.AddClient("supereth3000", nil)
+
 	r := strings.NewReader(yamlInput)
-	clientInfo, err := ParseClientListYAML(r)
+	clientInfo, err := ParseClientListYAML(&inv, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,6 +107,7 @@ func TestInventory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	spew.Dump(inv)
 
 	t.Run("HasClient", func(t *testing.T) {
 		clientInfo, err := ParseClientList("go-ethereum_f:git,go-ethereum_latest,supereth3000")

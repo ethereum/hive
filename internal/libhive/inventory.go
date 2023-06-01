@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/exp/slices"
 	"gopkg.in/inconshreveable/log15.v2"
 	"gopkg.in/yaml.v3"
 )
@@ -103,29 +104,46 @@ var knownBuildArgs = map[string]struct{}{
 }
 
 // ParseClientListYAML reads a YAML document containing a list of clients.
-func ParseClientListYAML(file io.Reader) ([]ClientDesignator, error) {
+func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, error) {
 	var res []ClientDesignator
 	dec := yaml.NewDecoder(file)
 	dec.KnownFields(true)
 	if err := dec.Decode(&res); err != nil {
 		return nil, fmt.Errorf("unable to parse clients file: %w", err)
 	}
-	// Validate build arguments.
+
 	for _, c := range res {
+		// Validate client exists.
+		ic, ok := inv.Clients[c.Client]
+		if !ok {
+			return nil, fmt.Errorf("unknown client %q", c.Client)
+		}
+		// Validate DockerfileExt.
+		if c.DockerfileExt != "" {
+			if !slices.Contains(ic.Dockerfiles, c.DockerfileExt) {
+				return nil, fmt.Errorf("client %s doesn't have Dockerfile.%s", c.Client, c.DockerfileExt)
+			}
+		}
+		// Check build arguments.
 		for key := range c.BuildArgs {
 			if _, ok := knownBuildArgs[key]; !ok {
 				log15.Warn(fmt.Sprintf("unknown build arg %q in clients.yaml file", key))
 			}
 		}
 	}
+
 	return res, nil
 }
 
 // Inventory keeps names of clients and simulators.
 type Inventory struct {
 	BaseDir    string
-	Clients    map[string]struct{}
+	Clients    map[string]InventoryClient
 	Simulators map[string]struct{}
+}
+
+type InventoryClient struct {
+	Dockerfiles []string
 }
 
 // HasClient returns true if the inventory contains the given client.
@@ -154,11 +172,15 @@ func (inv Inventory) SimulatorDirectory(name string) string {
 
 // AddClient ensures the given client name is known to the inventory.
 // This method exists for unit testing purposes only.
-func (inv *Inventory) AddClient(name string) {
+func (inv *Inventory) AddClient(name string, ic *InventoryClient) {
 	if inv.Clients == nil {
-		inv.Clients = make(map[string]struct{})
+		inv.Clients = make(map[string]InventoryClient)
 	}
-	inv.Clients[name] = struct{}{}
+	var icv InventoryClient
+	if ic != nil {
+		icv = *ic
+	}
+	inv.Clients[name] = icv
 }
 
 // AddSimulator ensures the given simulator name is known to the inventory.
@@ -194,22 +216,57 @@ func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
 func LoadInventory(basedir string) (Inventory, error) {
 	var err error
 	inv := Inventory{BaseDir: basedir}
-	inv.Clients, err = findDockerfiles(filepath.Join(basedir, "clients"))
+	inv.Clients, err = findClients(filepath.Join(basedir, "clients"))
 	if err != nil {
 		return inv, err
 	}
-	inv.Simulators, err = findDockerfiles(filepath.Join(basedir, "simulators"))
+	inv.Simulators, err = findSimulators(filepath.Join(basedir, "simulators"))
 	return inv, err
 }
 
-func findDockerfiles(dir string) (map[string]struct{}, error) {
+func findClients(dir string) (map[string]InventoryClient, error) {
+	clients := make(map[string]InventoryClient)
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || path == dir {
+			return err
+		}
+		rel, err := filepath.Rel(dir, filepath.Dir(path))
+		if err != nil {
+			return err
+		}
+		clientName := filepath.ToSlash(rel)
+
+		// Skip client sub-directories.
+		if info.IsDir() && path != dir {
+			if _, ok := clients[clientName]; ok {
+				return filepath.SkipDir
+			}
+		}
+		// Add Dockerfiles.
+		file := info.Name()
+		if file == "Dockerfile" || strings.HasPrefix(file, "Dockerfile.") {
+			if file == "Dockerfile" {
+				clients[clientName] = InventoryClient{}
+			} else {
+				client := clients[clientName]
+				client.Dockerfiles = append(client.Dockerfiles, strings.TrimPrefix(file, "Dockerfile."))
+				clients[clientName] = client
+			}
+		}
+		return nil
+	})
+	return clients, err
+}
+
+func findSimulators(dir string) (map[string]struct{}, error) {
 	names := make(map[string]struct{})
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
+		name := info.Name()
 		// If we hit a dockerfile, add the parent and stop looking in this directory.
-		if strings.HasSuffix(path, "Dockerfile") {
+		if name == "Dockerfile" {
 			rel, _ := filepath.Rel(dir, filepath.Dir(path))
 			name := filepath.ToSlash(rel)
 			names[name] = struct{}{}

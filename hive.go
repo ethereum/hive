@@ -120,7 +120,7 @@ func main() {
 	checkFlagsExclusive("client", "client-file")
 	var clientList []libhive.ClientDesignator
 	if *clientsFile != "" {
-		clientList, err = parseClientsFile(*clientsFile)
+		clientList, err = parseClientsFile(&inv, *clientsFile)
 		if err != nil {
 			fatal("-client-file:", err)
 		}
@@ -166,13 +166,13 @@ func fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
-func parseClientsFile(file string) ([]libhive.ClientDesignator, error) {
+func parseClientsFile(inv *libhive.Inventory, file string) ([]libhive.ClientDesignator, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	return libhive.ParseClientListYAML(f)
+	return libhive.ParseClientListYAML(inv, f)
 }
 
 func checkFlagsExclusive(flagNames ...string) {
