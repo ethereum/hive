@@ -21,6 +21,11 @@ type ClientDesignator struct {
 	// This must refer to a subdirectory of clients/
 	Client string `yaml:"client"`
 
+	// Nametag is used in the name of the client image.
+	// This is for assigning meaningful names to different builds of the same client.
+	// If unspecified, a default value is chosen to make client names unique.
+	Nametag string `yaml:"nametag,omitempty"`
+
 	// DockerfileExt is the extension of the Docker that should be used to build the
 	// client. Example: setting this to "git" will build using "Dockerfile.git".
 	DockerfileExt string `yaml:"dockerfile,omitempty"`
@@ -29,23 +34,17 @@ type ClientDesignator struct {
 	BuildArgs map[string]string `yaml:"build_args,omitempty"`
 }
 
-// String returns a unique string representation of the client build configuration.
-func (c ClientDesignator) String() string {
-	var b strings.Builder
-	b.WriteString(c.Client)
+func (c ClientDesignator) buildString() string {
+	var values []string
 	if c.DockerfileExt != "" {
-		b.WriteString("_")
-		b.WriteString(c.DockerfileExt)
+		values = append(values, c.DockerfileExt)
 	}
 	keys := maps.Keys(c.BuildArgs)
 	sort.Strings(keys)
 	for _, k := range keys {
-		b.WriteString("_")
-		b.WriteString(k)
-		b.WriteString("_")
-		b.WriteString(c.BuildArgs[k])
+		values = append(values, k, c.BuildArgs[k])
 	}
-	return b.String()
+	return strings.Join(values, "_")
 }
 
 // Dockerfile gives the name of the Dockerfile to use when building the client.
@@ -54,6 +53,14 @@ func (c ClientDesignator) Dockerfile() string {
 		return "Dockerfile"
 	}
 	return "Dockerfile." + c.DockerfileExt
+}
+
+// Name returns the full client name including nametag.
+func (c ClientDesignator) Name() string {
+	if c.Nametag == "" {
+		return c.Client
+	}
+	return c.Client + "_" + c.Nametag
 }
 
 // ParseClientList reads a comma-separated list of client names. Each client name may
@@ -120,7 +127,12 @@ var knownBuildArgs = map[string]struct{}{
 }
 
 func validateClients(inv *Inventory, list []ClientDesignator) error {
+	occurrences := make(map[string]int)
+	clientBranches := make(map[string]set[string])
+
 	for _, c := range list {
+		occurrences[c.Client]++
+
 		// Validate client exists.
 		ic, ok := inv.Clients[c.Client]
 		if !ok {
@@ -138,7 +150,32 @@ func validateClients(inv *Inventory, list []ClientDesignator) error {
 				log15.Warn(fmt.Sprintf("unknown build arg %q in clients.yaml file", key))
 			}
 		}
+		clientBranches[c.Client] = clientBranches[c.Client].add(c.BuildArgs["branch"])
 	}
+
+	// Assign nametags.
+	usednames := make(set[string], len(list))
+	for i := range list {
+		c := &list[i]
+		if occurrences[c.Client] == 1 {
+			continue
+		}
+		if c.Nametag == "" {
+			// Try assigning nametag based on branch name.
+			if len(clientBranches[c.Client]) == occurrences[c.Client] {
+				c.Nametag = c.BuildArgs["branch"]
+			} else {
+				// Fall back to using all build arguments as nametag.
+				c.Nametag = c.buildString()
+			}
+		}
+		name := c.Name()
+		if usednames.contains(name) {
+			return fmt.Errorf("duplicate client name %q", name)
+		}
+		usednames.add(c.Name())
+	}
+
 	return nil
 }
 
@@ -287,4 +324,19 @@ func findSimulators(dir string) (map[string]struct{}, error) {
 		return nil
 	})
 	return names, err
+}
+
+type set[X comparable] map[X]struct{}
+
+func (s set[X]) add(x X) set[X] {
+	if s == nil {
+		s = make(map[X]struct{})
+	}
+	s[x] = struct{}{}
+	return s
+}
+
+func (s set[X]) contains(x X) bool {
+	_, ok := s[x]
+	return ok
 }

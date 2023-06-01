@@ -62,7 +62,7 @@ func (b *Builder) ReadClientMetadata(client libhive.ClientDesignator) (*libhive.
 // BuildClientImage builds a docker image of the given client.
 func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDesignator) (string, error) {
 	dir := b.config.Inventory.ClientDirectory(client)
-	tag := fmt.Sprintf("hive/clients/%s:latest", client.String())
+	tag := fmt.Sprintf("hive/clients/%s:latest", client.Name())
 	dockerFile := client.Dockerfile()
 	buildArgs := make([]docker.BuildArg, 0)
 	for key, value := range client.BuildArgs {

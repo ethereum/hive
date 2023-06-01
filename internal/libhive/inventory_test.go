@@ -1,6 +1,7 @@
 package libhive
 
 import (
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -43,28 +44,91 @@ func TestInvalidSplitClientName(t *testing.T) {
 	}
 }
 
-func TestClientDesignatorString(t *testing.T) {
+func TestClientNaming(t *testing.T) {
+	var inv Inventory
+	inv.AddClient("c1", &InventoryClient{Dockerfiles: []string{"git", "local"}})
+	inv.AddClient("c2", nil)
+
 	tests := []struct {
-		client ClientDesignator
-		string string
+		clients []ClientDesignator
+		names   []string
+		wantErr error
 	}{
 		{
-			client: ClientDesignator{Client: "client"},
-			string: "client",
+			clients: []ClientDesignator{{Client: "c1"}, {Client: "c2"}},
+			names:   []string{"c1", "c2"},
 		},
 		{
-			client: ClientDesignator{Client: "client", BuildArgs: map[string]string{"repo": "myrepo", "branch": "mybranch"}},
-			string: "client_branch_mybranch_repo_myrepo",
+			clients: []ClientDesignator{{Client: "c2", Nametag: "foo"}},
+			names:   []string{"c2_foo"},
 		},
 		{
-			client: ClientDesignator{Client: "client", DockerfileExt: "mydockerfile", BuildArgs: map[string]string{"user": "myuser"}},
-			string: "client_mydockerfile_user_myuser",
+			clients: []ClientDesignator{{Client: "c1"}, {Client: "c2"}, {Client: "c2", Nametag: "foo"}},
+			names:   []string{"c1", "c2", "c2_foo"},
+		},
+		{
+			clients: []ClientDesignator{
+				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
+				{Client: "c1", BuildArgs: map[string]string{"branch": "unstable"}},
+			},
+			names: []string{"c1_latest", "c1_unstable"},
+		},
+		{
+			clients: []ClientDesignator{
+				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
+				{Client: "c1", BuildArgs: map[string]string{"branch": "latest", "other": "1"}},
+			},
+			names: []string{"c1_branch_latest", "c1_branch_latest_other_1"},
+		},
+		{
+			clients: []ClientDesignator{
+				{Client: "c1", DockerfileExt: "git"},
+				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
+			},
+			names: []string{"c1", "c1_latest"},
+		},
+		{
+			clients: []ClientDesignator{
+				{Client: "c1", DockerfileExt: "git"},
+				{Client: "c1", DockerfileExt: "local"},
+			},
+			names: []string{"c1_git", "c1_local"},
+		},
+		// Errors:
+		{
+			clients: []ClientDesignator{
+				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
+				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
+			},
+			wantErr: fmt.Errorf("duplicate client name \"c1_branch_latest\""),
 		},
 	}
-	for _, test := range tests {
-		if test.client.String() != test.string {
-			t.Errorf("wrong name %q, want %q", test.client.String(), test.string)
-		}
+
+	for i := range tests {
+		test := tests[i]
+		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			err := validateClients(&inv, test.clients)
+			if err != nil {
+				if test.wantErr == nil {
+					t.Fatal("unexpected error:", err)
+				}
+				if err.Error() != test.wantErr.Error() {
+					t.Fatalf("wrong error: %v, want %v", err, test.wantErr)
+				}
+				return
+			} else if test.wantErr != nil {
+				t.Fatal("expected error")
+			}
+
+			names := make([]string, len(test.clients))
+			for i, c := range test.clients {
+				names[i] = c.Name()
+			}
+			if !reflect.DeepEqual(names, test.names) {
+				t.Log("want:", test.names)
+				t.Fatal("names:", names)
+			}
+		})
 	}
 }
 
@@ -72,19 +136,22 @@ func TestParseClientListYAML(t *testing.T) {
 	yamlInput := `
 - client: go-ethereum
   dockerfile: git
+  build_args:
+    branch: custom
 - client: go-ethereum
   dockerfile: local
-  build_args:
-    branch: latest
 - client: supereth3000
   build_args:
     some_other_arg: some_other_value
+- client: supereth3000
+  nametag: thebest
 `
 
 	expectedOutput := []ClientDesignator{
-		{Client: "go-ethereum", DockerfileExt: "git"},
-		{Client: "go-ethereum", DockerfileExt: "local", BuildArgs: map[string]string{"branch": "latest"}},
-		{Client: "supereth3000", BuildArgs: map[string]string{"some_other_arg": "some_other_value"}},
+		{Client: "go-ethereum", Nametag: "custom", DockerfileExt: "git", BuildArgs: map[string]string{"branch": "custom"}},
+		{Client: "go-ethereum", DockerfileExt: "local"},
+		{Client: "supereth3000", Nametag: "some_other_arg_some_other_value", BuildArgs: map[string]string{"some_other_arg": "some_other_value"}},
+		{Client: "supereth3000", Nametag: "thebest"},
 	}
 
 	var inv Inventory
@@ -97,7 +164,11 @@ func TestParseClientListYAML(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(&clientInfo, &expectedOutput) {
-		t.Errorf("ParseClientListYAML -> %v, want %v", clientInfo, expectedOutput)
+		t.Logf("want: %+v", expectedOutput)
+		t.Errorf(" got: %+v", clientInfo)
+	}
+	for _, c := range clientInfo {
+		t.Logf("name: %v", c.Name())
 	}
 }
 

@@ -79,8 +79,8 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 		if err != nil {
 			log15.Warn("can't read version info of "+client.Client, "image", image, "err", err)
 		}
-		r.clientDefs[client.Client] = &ClientDefinition{
-			Name:    client.Client,
+		r.clientDefs[client.Name()] = &ClientDefinition{
+			Name:    client.Name(),
 			Version: strings.TrimSpace(string(version)),
 			Image:   image,
 			Meta:    *meta,
