@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
 	"gopkg.in/inconshreveable/log15.v2"
 	"gopkg.in/yaml.v3"
@@ -34,11 +35,7 @@ func (c ClientDesignator) String() string {
 		b.WriteString("_")
 		b.WriteString(c.DockerfileExt)
 	}
-
-	var keys []string
-	for k := range c.BuildArgs {
-		keys = append(keys, k)
-	}
+	keys := maps.Keys(c.BuildArgs)
 	sort.Strings(keys)
 	for _, k := range keys {
 		b.WriteString("_")
