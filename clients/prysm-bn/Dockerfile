@@ -1,5 +1,7 @@
-ARG branch=latest-debug
-FROM gcr.io/prysmaticlabs/prysm/beacon-chain:$branch as upstream
+ARG baseimage=gcr.io/prysmaticlabs/prysm/beacon-chain
+ARG tag=latest-debug
+
+FROM $baseimage:$tag as upstream
 
 FROM debian:buster-slim
 COPY --from=upstream /app/cmd/beacon-chain/beacon-chain beacon-chain

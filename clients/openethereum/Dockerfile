@@ -1,12 +1,13 @@
 # This dockerfile builds OpenEthereum for Hive.
-ARG branch=latest
+ARG tag=latest
+ARG baseimage=openethereum/openethereum
 
 # The runner script needs a tool to convert raw private keys
 # to keystore files. We use the ethkey tool from geth for this.
 FROM ethereum/client-go:alltools-latest AS keytool-builder
 
 # Now pull OpenEthereum.
-FROM openethereum/openethereum:$branch
+FROM $baseimage:$tag
 USER root
 
 # Copy keystore tool.

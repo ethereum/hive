@@ -1,7 +1,8 @@
-ARG branch=latest
+ARG tag=latest
+ARG baseimage=sigp/lighthouse_minimal
 
 # TODO: either special upstream build, or clone + build minimal version here in dockerfile.
-FROM sigp/lighthouse_minimal:$branch
+FROM $baseimage:$tag
 
 ADD lighthouse_bn.sh /lighthouse_bn.sh
 RUN chmod +x /lighthouse_bn.sh

@@ -1,6 +1,7 @@
-ARG branch=latest-unstable
+ARG tag=latest-unstable
+ARG baseimage=sigp/lighthouse
 
-FROM sigp/lighthouse:$branch
+FROM $baseimage:$tag
 
 ADD lighthouse_vc.sh /lighthouse_vc.sh
 RUN chmod +x /lighthouse_vc.sh

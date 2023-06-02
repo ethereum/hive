@@ -1,6 +1,7 @@
-ARG branch=develop
+ARG tag=develop
+ARG baseimage=consensys/teku
 
-FROM consensys/teku:$branch
+FROM $baseimage:$tag
 
 USER root
 
