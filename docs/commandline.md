@@ -53,23 +53,26 @@ Here is an example clients.yaml file:
       dockerfile: git
     - client: nethermind
       build_args:
-        user: nethermindeth
-        repo: hive
-        branch: latest
+        baseimage: nethermindeth/hive
+        tag: latest
 
 For each client in the list, the following options can be given:
 
- - `client`: name of the client to use to build the image
- - `dockerfile`: the Dockerfile extension to use. For example, specifying `git` here will
-   build the client using `Dockerfile.git` instead of the default `Dockerfile`
- - `build_args`: build arguments passed to the Dockerfile
+ - `client`: Name of the client. This must refer to a known client in the clients/ directory.
+ - `dockerfile`: The Dockerfile extension to use. For example, specifying `git` here will
+   build the client using `Dockerfile.git` instead of the default `Dockerfile`.
+ - `nametag`: this can be used to assign a more descriptive name to the client. If unset,
+   a unique nametag will be chosen based on the version tag and/or build arguments.
+ - `build_args`: Build arguments passed to the Dockerfile, see below.
 
-Supported build arguments depend on the client and the docker image being used, but common
-client build arguments are:
+Supported build arguments depend on the client and the docker image being used. Common build
+arguments are:
 
- - `user`: GitHub/DockerHub user or organization name that owns the repository
- - `repo`: repository name
- - `branch`: git branch or docker tag name to use
+ - `tag`: The git commit/tag/branch or docker tag name to use.
+ - `baseimage`: For clients pulled from DockerHub, this can be used to override the organization
+   and image name. Example `ethereum/client-go`.
+ - `github`: For client Dockerfiles building from git, this setting can be used to change
+   the source code repository (fork) on GitHub. Example: `ethereum/go-ethereum`.
 
 ### Docker Options
 
