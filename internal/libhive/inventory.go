@@ -127,9 +127,10 @@ func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, er
 }
 
 var knownBuildArgs = map[string]struct{}{
-	"tag":       {}, // this is the branch/version specifier when pulling the git repo or docker base image
-	"github":    {}, // (for git pull) github repo to clone
-	"baseimage": {}, // (for dockerhub-based clients) name of the client image
+	"tag":        {}, // this is the branch/version specifier when pulling the git repo or docker base image
+	"github":     {}, // (for git pull) github repo to clone
+	"baseimage":  {}, // (for dockerhub-based clients) name of the client image
+	"local_path": {}, // (for builds from local source) path to the source directory
 }
 
 func validateClients(inv *Inventory, list []ClientDesignator) error {
