@@ -3,12 +3,11 @@
 ## Builder stage: Compiles nethermind from a git repository
 FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 
-ARG user=nethermindeth
-ARG repo=nethermind
-ARG branch=master
+ARG github=nethermindeth/nethermind
+ARG tag=master
 
 RUN echo "Cloning: $user/$repo - $branch" && \
-    git clone -b $branch https://github.com/$user/$repo && \
+    git clone -b $tag https://github.com/$github && \
     cd /nethermind/src/Nethermind/Nethermind.Runner && \
     dotnet build -c release
 
@@ -41,4 +40,3 @@ EXPOSE 8545 30303 30303/udp
 
 ENV NETHERMIND_HIVE_ENABLED true
 ENTRYPOINT ["/nethermind.sh"]
-

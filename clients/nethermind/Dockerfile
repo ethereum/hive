@@ -1,8 +1,7 @@
 ## Build Nethermind Via Pre-Built Image:
-ARG user=nethermindeth
-ARG repo=hive
-ARG branch=latest
-FROM $user/$repo:$branch
+ARG baseimage=nethermindeth/hive
+ARG tag=latest
+FROM $baseimage:$tag
 
 RUN apt-get update && apt-get install -y jq && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
@@ -25,4 +24,3 @@ EXPOSE 8545 30303 30303/udp
 
 ENV NETHERMIND_HIVE_ENABLED true
 ENTRYPOINT ["/nethermind.sh"]
-
