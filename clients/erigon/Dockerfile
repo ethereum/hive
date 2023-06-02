@@ -1,8 +1,7 @@
 ## Build Erigon Via Pre-Built Image:
-ARG user=thorax
-ARG repo=erigon
-ARG branch=devel
-FROM $user/$repo:$branch
+ARG baseimage=thorax/erigon
+ARG tag=devel
+FROM $baseimage:$tag
 
 # The upstream erigon container uses a non-root user, but we need
 # to install additional commands, so switch back to root.

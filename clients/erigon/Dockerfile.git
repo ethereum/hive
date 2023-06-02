@@ -3,18 +3,13 @@
 ## Builder stage: Compiles erigon from a git repository
 FROM golang:1-alpine as builder
 
-ARG user=ledgerwatch
-ARG repo=erigon
-ARG branch=devel
+ARG github=ledgerwatch/erigon
+ARG tag=devel
 
-RUN echo "Cloning: $user/$repo - $branch" \
+RUN echo "Cloning: $github - $tag" \
     && apk add bash build-base ca-certificates git jq \
-    && git clone --depth 1 --branch $branch https://github.com/$user/$repo \
-    && cd erigon && make erigon && echo "{}" \
-    | jq ".+ {\"repo\":\"$(git config --get remote.origin.url)\"}" \
-    | jq ".+ {\"branch\":\"$(git rev-parse --abbrev-ref HEAD)\"}" \
-    | jq ".+ {\"commit\":\"$(git rev-parse HEAD)\"}" > /version.json \
-    && cp build/bin/erigon /usr/local/bin/erigon 
+    && git clone --depth 1 --branch $tag https://github.com/$tag \
+    && cp build/bin/erigon /usr/local/bin/erigon
 
 ## Final stage: Sets up the environment for running erigon
 FROM alpine:latest
