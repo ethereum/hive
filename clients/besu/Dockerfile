@@ -1,8 +1,7 @@
 ## Build Besu Via Pre-Built Image:
-ARG user=hyperledger
-ARG repo=besu
-ARG branch=develop
-FROM $user/$repo:$branch
+ARG baseimage=hyperledger/besu
+ARG tag=develop
+FROM $baseimage:$tag
 
 USER root
 

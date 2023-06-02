@@ -3,13 +3,12 @@
 ## Builder stage: Compiles besu from a git repository
 FROM openjdk:17-jdk-slim as builder
 
-ARG branch=main
-ARG user=hyperledger
-ARG repo=besu
+ARG tag=main
+ARG github=hyperledger/besu
 
-RUN echo "Cloning: $user/$repo - $branch" && \
+RUN echo "Cloning: $github - $tag" && \
     apt-get update && apt-get install -y git libsodium-dev libnss3-dev \
-    && git clone --depth 1 --branch $branch https://github.com/$user/$repo \
+    && git clone --depth 1 --branch $tag https://github.com/$github \
     && cd besu && ./gradlew installDist
 
 ## Final stage: Sets up the environment for running besu
