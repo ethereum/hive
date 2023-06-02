@@ -17,9 +17,9 @@ func TestParseClientDesignator(t *testing.T) {
 		wantBuildParams map[string]string
 	}{
 		{"client", "client", nil},
-		{"client_b", "client", map[string]string{"branch": "b"}},
-		{"the_client_b", "the_client", map[string]string{"branch": "b"}},
-		{"the_client_name_has_many_underscores_b", "the_client_name_has_many_underscores", map[string]string{"branch": "b"}},
+		{"client_b", "client", map[string]string{"tag": "b"}},
+		{"the_client_b", "the_client", map[string]string{"tag": "b"}},
+		{"the_client_name_has_many_underscores_b", "the_client_name_has_many_underscores", map[string]string{"tag": "b"}},
 	}
 	for _, test := range tests {
 		cInfo, _ := parseClientDesignator(test.name)
@@ -29,7 +29,7 @@ func TestParseClientDesignator(t *testing.T) {
 	}
 }
 
-func TestInvalidSplitClientName(t *testing.T) {
+func TestParseClientDesignatorUnderscore(t *testing.T) {
 	tests := []string{
 		"",
 		"__",
@@ -68,22 +68,22 @@ func TestClientNaming(t *testing.T) {
 		},
 		{
 			clients: []ClientDesignator{
-				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
-				{Client: "c1", BuildArgs: map[string]string{"branch": "unstable"}},
+				{Client: "c1", BuildArgs: map[string]string{"tag": "latest"}},
+				{Client: "c1", BuildArgs: map[string]string{"tag": "unstable"}},
 			},
 			names: []string{"c1_latest", "c1_unstable"},
 		},
 		{
 			clients: []ClientDesignator{
-				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
-				{Client: "c1", BuildArgs: map[string]string{"branch": "latest", "other": "1"}},
+				{Client: "c1", BuildArgs: map[string]string{"tag": "latest"}},
+				{Client: "c1", BuildArgs: map[string]string{"tag": "latest", "other": "1"}},
 			},
-			names: []string{"c1_branch_latest", "c1_branch_latest_other_1"},
+			names: []string{"c1_latest", "c1_latest_other_1"},
 		},
 		{
 			clients: []ClientDesignator{
 				{Client: "c1", DockerfileExt: "git"},
-				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
+				{Client: "c1", BuildArgs: map[string]string{"tag": "latest"}},
 			},
 			names: []string{"c1", "c1_latest"},
 		},
@@ -97,10 +97,10 @@ func TestClientNaming(t *testing.T) {
 		// Errors:
 		{
 			clients: []ClientDesignator{
-				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
-				{Client: "c1", BuildArgs: map[string]string{"branch": "latest"}},
+				{Client: "c1", BuildArgs: map[string]string{"tag": "latest"}},
+				{Client: "c1", BuildArgs: map[string]string{"tag": "latest"}},
 			},
-			wantErr: fmt.Errorf("duplicate client name \"c1_branch_latest\""),
+			wantErr: fmt.Errorf("duplicate client name \"c1_latest\""),
 		},
 	}
 
@@ -137,20 +137,20 @@ func TestParseClientListYAML(t *testing.T) {
 - client: go-ethereum
   dockerfile: git
   build_args:
-    branch: custom
+    tag: custom
 - client: go-ethereum
   dockerfile: local
 - client: supereth3000
   build_args:
-    some_other_arg: some_other_value
+    github: org/repository
 - client: supereth3000
   nametag: thebest
 `
 
 	expectedOutput := []ClientDesignator{
-		{Client: "go-ethereum", Nametag: "custom", DockerfileExt: "git", BuildArgs: map[string]string{"branch": "custom"}},
+		{Client: "go-ethereum", Nametag: "custom", DockerfileExt: "git", BuildArgs: map[string]string{"tag": "custom"}},
 		{Client: "go-ethereum", DockerfileExt: "local"},
-		{Client: "supereth3000", Nametag: "some_other_arg_some_other_value", BuildArgs: map[string]string{"some_other_arg": "some_other_value"}},
+		{Client: "supereth3000", Nametag: "github_org/repository", BuildArgs: map[string]string{"github": "org/repository"}},
 		{Client: "supereth3000", Nametag: "thebest"},
 	}
 

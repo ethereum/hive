@@ -39,9 +39,15 @@ func (c ClientDesignator) buildString() string {
 	if c.DockerfileExt != "" {
 		values = append(values, c.DockerfileExt)
 	}
+	if c.BuildArgs["tag"] != "" {
+		values = append(values, c.BuildArgs["tag"])
+	}
 	keys := maps.Keys(c.BuildArgs)
 	sort.Strings(keys)
 	for _, k := range keys {
+		if k == "tag" {
+			continue
+		}
 		values = append(values, k, c.BuildArgs[k])
 	}
 	return strings.Join(values, "_")
@@ -64,7 +70,7 @@ func (c ClientDesignator) Name() string {
 }
 
 // ParseClientList reads a comma-separated list of client names. Each client name may
-// optionally contain a branch specifier separated from the name by underscore, e.g.
+// optionally contain a branch/tag specifier separated from the name by underscore, e.g.
 // "besu_nightly".
 func ParseClientList(inv *Inventory, arg string) ([]ClientDesignator, error) {
 	var res []ClientDesignator
@@ -94,9 +100,9 @@ func parseClientDesignator(fullString string) (ClientDesignator, error) {
 		res.Client = strings.Join(substrings[0:len(substrings)-1], "_")
 		tag := substrings[len(substrings)-1]
 		if tag == "" {
-			return res, fmt.Errorf("invalid branch: %s", tag)
+			return res, fmt.Errorf("invalid branch/tag: %s", tag)
 		}
-		res.BuildArgs = map[string]string{"branch": tag}
+		res.BuildArgs = map[string]string{"tag": tag}
 	} else {
 		res.Client = fullString
 	}
@@ -121,14 +127,14 @@ func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, er
 }
 
 var knownBuildArgs = map[string]struct{}{
-	"branch": {},
-	"user":   {},
-	"repo":   {},
+	"tag":       {}, // this is the branch/version specifier when pulling the git repo or docker base image
+	"github":    {}, // (for git pull) github repo to clone
+	"baseimage": {}, // (for dockerhub-based clients) name of the client image
 }
 
 func validateClients(inv *Inventory, list []ClientDesignator) error {
 	occurrences := make(map[string]int)
-	clientBranches := make(map[string]set[string])
+	clientTags := make(map[string]set[string])
 
 	for _, c := range list {
 		occurrences[c.Client]++
@@ -150,7 +156,7 @@ func validateClients(inv *Inventory, list []ClientDesignator) error {
 				log15.Warn(fmt.Sprintf("unknown build arg %q in clients.yaml file", key))
 			}
 		}
-		clientBranches[c.Client] = clientBranches[c.Client].add(c.BuildArgs["branch"])
+		clientTags[c.Client] = clientTags[c.Client].add(c.BuildArgs["tag"])
 	}
 
 	// Assign nametags.
@@ -161,9 +167,9 @@ func validateClients(inv *Inventory, list []ClientDesignator) error {
 			continue
 		}
 		if c.Nametag == "" {
-			// Try assigning nametag based on branch name.
-			if len(clientBranches[c.Client]) == occurrences[c.Client] {
-				c.Nametag = c.BuildArgs["branch"]
+			// Try assigning nametag based on "tag" argument.
+			if len(clientTags[c.Client]) == occurrences[c.Client] {
+				c.Nametag = c.BuildArgs["tag"]
 			} else {
 				// Fall back to using all build arguments as nametag.
 				c.Nametag = c.buildString()
