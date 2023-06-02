@@ -1,9 +1,9 @@
 ### Build EthereumJS From Git:
 
-FROM node:16-alpine as build
+FROM node:18-alpine as build
 
 ARG github=ethereumjs/ethereumjs-monorepo
-ARG tag=develop-v7
+ARG tag=master
 
 RUN echo "Cloning: $github - $tag" \
     && apk update && apk add --no-cache bash git jq curl python3 gcc make g++ \

@@ -1,7 +1,7 @@
 ### Build Ethereumjs Locally:
 ### Requires a copy of ethereumjs-monorepo/ -> hive/clients/ethereumjs/
 
-FROM node:16-alpine
+FROM node:18-alpine
 
 # Default local client path: clients/ethereumjs/<ethereumjs-monorepo>
 ARG local_path=ethereumjs-monorepo
