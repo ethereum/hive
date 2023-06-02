@@ -34,11 +34,14 @@ func main() {
 		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
 		useCredHelper         = flag.Bool("docker.cred-helper", false, "configure docker authentication using locally-configured credential helper")
 
+		clientsFile = flag.String("client-file", "", `YAML `+"`file`"+` containing client configurations.`)
+
 		clients = flag.String("client", "go-ethereum", "Comma separated `list` of clients to use. Client names in the list may be given as\n"+
 			"just the client name, or a client_branch specifier. If a branch name is supplied,\n"+
 			"the client image will use the given git branch or docker tag. Multiple instances of\n"+
 			"a single client type may be requested with different branches.\n"+
-			"Example: \"besu_latest,besu_20.10.2\"")
+			"Example: \"besu_latest,besu_20.10.2\"\n")
+
 		clientTimeout = flag.Duration("client.checktimelimit", 3*time.Minute, "The `timeout` of waiting for clients to open up the RPC port.\n"+
 			"If a very long chain is imported, this timeout may need to be quite large.\n"+
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
@@ -111,8 +114,24 @@ func main() {
 		ClientStartTimeout: *clientTimeout,
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
-	clientList := splitAndTrim(*clients, ",")
 
+	// Parse the client list.
+	// It can be supplied as a comma-separated list, or as a YAML file.
+	checkFlagsExclusive("client", "client-file")
+	var clientList []libhive.ClientDesignator
+	if *clientsFile != "" {
+		clientList, err = parseClientsFile(&inv, *clientsFile)
+		if err != nil {
+			fatal("-client-file:", err)
+		}
+	} else {
+		clientList, err = libhive.ParseClientList(&inv, *clients)
+		if err != nil {
+			fatal("-client:", err)
+		}
+	}
+
+	// Build clients and simulators.
 	if err := runner.Build(ctx, clientList, simList); err != nil {
 		fatal(err)
 	}
@@ -122,6 +141,7 @@ func main() {
 		return
 	}
 
+	// Run simulators.
 	var failCount int
 	for _, sim := range simList {
 		result, err := runner.Run(ctx, sim, env)
@@ -146,10 +166,36 @@ func fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
-func splitAndTrim(input, sep string) []string {
-	list := strings.Split(input, sep)
-	for i := range list {
-		list[i] = strings.TrimSpace(list[i])
+func parseClientsFile(inv *libhive.Inventory, file string) ([]libhive.ClientDesignator, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
 	}
-	return list
+	defer f.Close()
+	return libhive.ParseClientListYAML(inv, f)
+}
+
+func checkFlagsExclusive(flagNames ...string) {
+	set := make(map[string]bool)
+	flag.Visit(func(f *flag.Flag) {
+		set[f.Name] = true
+	})
+	var found bool
+	for _, name := range flagNames {
+		if set[name] {
+			if found {
+				fatal("flags", flagListString(flagNames), "cannot be used together")
+			}
+			found = true
+			set[name] = false
+		}
+	}
+}
+
+func flagListString(names []string) string {
+	flags := make([]string, len(names))
+	for i := range flags {
+		flags[i] = "-" + names[i]
+	}
+	return strings.Join(flags, ", ")
 }

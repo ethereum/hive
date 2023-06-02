@@ -8,20 +8,29 @@ Clients are docker images which can be instantiated by a simulation. A client de
 consists of a Dockerfile and associated resources. Client definitions live in
 subdirectories of `clients/` in the hive repository.
 
+See the [go-ethereum client definition][geth-docker] for an example of a client
+Dockerfile.
+
 When hive runs a simulation, it first builds all client docker images using their
 Dockerfile, i.e. it basically runs `docker build .` in the client directory. Since most
 client definitions wrap an existing Ethereum client, and building the client from source
 may take a long time, it is usually best to base the hive client wrapper on a pre-built
 docker image from Docker Hub.
 
-Client Dockerfiles should support an optional argument named `branch`, which specifies the
-requested client version. This argument can be set by users by appending it to the client
-name like:
+The client Dockerfile should support an optional argument named `branch`, which specifies
+the requested client version. This argument can be set by users by appending it to the
+client name like:
 
     ./hive --sim my-simulation --client go-ethereum_v1.9.23,go_ethereum_v1.9.22
 
-See the [go-ethereum client definition][geth-docker] for an example of a client
-Dockerfile.
+Other build arguments can also be set using a YAML file, see the [hive command
+documentation][hive-client-yaml] for more information.
+
+### Alternative Dockerfiles
+
+There can be other Dockerfiles besides the main one. Typically, a client should also
+provide a `Dockerfile.git` that builds the client from source code. Alternative
+Dockerfiles can be selected through hive's `-client-file` YAML configuration.
 
 ### hive.yaml
 
@@ -35,7 +44,7 @@ list:
 
 The role list is available to simulators and can be used to differentiate between clients
 based on features. Declaring a client role also signals that the client supports certain
-role-specific environment variables and files. If `hive.yml` is missing or doesn't declare
+role-specific environment variables and files. If `hive.yaml` is missing or doesn't declare
 roles, the `eth1` role is assumed.
 
 ### /version.txt
@@ -155,6 +164,7 @@ For the server role, the following additional variables should be supported:
 
 [LES]: https://github.com/ethereum/devp2p/blob/master/caps/les.md
 [geth-docker]: ../clients/go-ethereum/Dockerfile
+[hive-client-yaml]: ./commandline.md#client-build-parameters
 [oe-genesis-jq]: ../clients/openethereum/mapper.jq
 [EIP-155]: https://eips.ethereum.org/EIPS/eip-155
 [EIP-606]: https://eips.ethereum.org/EIPS/eip-606

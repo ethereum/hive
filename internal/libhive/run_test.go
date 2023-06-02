@@ -16,7 +16,7 @@ import (
 
 func TestRunner(t *testing.T) {
 	var (
-		allClients = []string{"client-1", "client-2", "client-3"}
+		allClients = []libhive.ClientDesignator{{Client: "client-1"}, {Client: "client-2"}, {Client: "client-3"}}
 		simClients = allClients[1:]
 	)
 
@@ -34,7 +34,7 @@ func TestRunner(t *testing.T) {
 				if err != nil {
 					t.Fatal("error getting client types:", err)
 				}
-				if names := clientNames(defs); !reflect.DeepEqual(names, simClients) {
+				if names := clientDefinitionNames(defs); !reflect.DeepEqual(names, clientDesignatorNames(simClients)) {
 					t.Fatal("wrong client names:", names)
 				}
 			}
@@ -61,18 +61,26 @@ func TestRunner(t *testing.T) {
 
 func makeTestInventory() libhive.Inventory {
 	var inv libhive.Inventory
-	inv.AddClient("client-1")
-	inv.AddClient("client-2")
-	inv.AddClient("client-3")
+	inv.AddClient("client-1", nil)
+	inv.AddClient("client-2", nil)
+	inv.AddClient("client-3", nil)
 	inv.AddSimulator("sim-1")
 	return inv
 }
 
-func clientNames(defs []*hivesim.ClientDefinition) []string {
+func clientDefinitionNames(defs []*hivesim.ClientDefinition) []string {
 	names := make([]string, 0, len(defs))
 	for _, def := range defs {
 		names = append(names, def.Name)
 	}
 	sort.Strings(names)
+	return names
+}
+
+func clientDesignatorNames(clients []libhive.ClientDesignator) []string {
+	names := make([]string, len(clients))
+	for i, c := range clients {
+		names[i] = c.Client
+	}
 	return names
 }

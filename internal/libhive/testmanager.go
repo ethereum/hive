@@ -43,7 +43,7 @@ type SimEnv struct {
 
 	// These are the clients which are made available to the simulator.
 	// If unset (i.e. nil), all built clients are used.
-	ClientList []string
+	ClientList []ClientDesignator
 
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
