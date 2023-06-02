@@ -1,9 +1,7 @@
-## By default, geth is pulled from Docker Hub.
+ARG baseimage=ethereum/client-go
+ARG tag=latest
 
-ARG user=ethereum
-ARG repo=client-go
-ARG branch=latest
-FROM $user/$repo:$branch as builder
+FROM $baseimage:$tag as builder
 
 FROM alpine:latest
 RUN apk add --update bash curl jq
