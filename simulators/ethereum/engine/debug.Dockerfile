@@ -11,20 +11,25 @@ RUN \
 FROM golang:1-alpine as builder
 RUN apk add --update gcc musl-dev linux-headers
 
+# Set the GOPATH and enable Go modules
+ENV GOPATH=/go
+ENV GO111MODULE=on
+
 # Build the simulator executable.
-ENV GOPATH /Users/maceo/go
 RUN go install github.com/go-delve/delve/cmd/dlv@latest
-ADD . /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
-WORKDIR /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
+ADD . $GOPATH/src/github.com/gnosischain/hive/simulators/ethereum/engine
+WORKDIR $GOPATH/src/github.com/gnosischain/hive/simulators/ethereum/engine
 RUN go build -mod=vendor -gcflags="all=-N -l" -v .
 
 # Build the simulator run container.
 FROM alpine:latest
-#ADD . /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
-WORKDIR /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine
-COPY --from=builder /Users/maceo/go/src/github.com/gnosischain/hive/simulators/ethereum/engine .
+# Set the GOPATH and enable Go modules
+ENV GOPATH=/go
+ENV GO111MODULE=on
+WORKDIR /app
+COPY --from=builder $GOPATH/src/github.com/gnosischain/hive/simulators/ethereum/engine .
 COPY --from=geth    /ethash /ethash
-COPY --from=builder /Users/maceo/go/bin/dlv /go/bin/dlv
+COPY --from=builder /go/bin/dlv /go/bin/dlv
 
 EXPOSE 40000
 
