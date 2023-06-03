@@ -88,7 +88,6 @@ func LoadInventory(basedir string) (Inventory, error) {
 	if err != nil {
 		return inv, err
 	}
-
 	inv.Simulators, err = findSimulators(filepath.Join(basedir, "simulators"))
 	return inv, err
 }
@@ -134,7 +133,11 @@ func findClients(dir string) (map[string]InventoryClient, error) {
 		file := info.Name()
 		switch {
 		case file == "Dockerfile":
-			clients[clientName] = InventoryClient{}
+			clients[clientName] = InventoryClient{
+				Meta: ClientMetadata{
+					Roles: []string{"eth1"}, // default role
+				},
+			}
 		case strings.HasPrefix(file, "Dockerfile."):
 			client, ok := clients[clientName]
 			if !ok {
