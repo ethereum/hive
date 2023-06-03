@@ -12,7 +12,6 @@ type BuilderHooks struct {
 	BuildClientImage    func(context.Context, libhive.ClientDesignator) (string, error)
 	BuildSimulatorImage func(context.Context, string) (string, error)
 	ReadFile            func(ctx context.Context, image string, file string) ([]byte, error)
-	ReadClientMetadata  func(client libhive.ClientDesignator) (*libhive.ClientMetadata, error)
 }
 
 // fakeBuilder implements Backend without docker.
@@ -45,14 +44,6 @@ func (b *fakeBuilder) BuildSimulatorImage(ctx context.Context, sim string) (stri
 
 func (b *fakeBuilder) BuildImage(ctx context.Context, name string, fsys fs.FS) error {
 	return nil
-}
-
-func (b *fakeBuilder) ReadClientMetadata(client libhive.ClientDesignator) (*libhive.ClientMetadata, error) {
-	if b.hooks.ReadClientMetadata != nil {
-		return b.hooks.ReadClientMetadata(client)
-	}
-	m := libhive.ClientMetadata{Roles: []string{"eth1"}}
-	return &m, nil
 }
 
 func (b *fakeBuilder) ReadFile(ctx context.Context, image, file string) ([]byte, error) {

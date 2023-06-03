@@ -172,38 +172,14 @@ func TestParseClientListYAML(t *testing.T) {
 	}
 }
 
-func TestInventory(t *testing.T) {
+// This test ensures the real hive client definitions can be loaded.
+func TestLoadInventory(t *testing.T) {
 	basedir := filepath.FromSlash("../..")
 	inv, err := LoadInventory(basedir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	spew.Dump(inv)
 
-	t.Run("HasClient", func(t *testing.T) {
-		clientInfo, err := ParseClientList(&inv, "go-ethereum,go-ethereum_latest,lighthouse-vc")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(clientInfo) != 3 {
-			t.Fatal("wrong number of clients")
-		}
-		if !inv.HasClient(clientInfo[0]) {
-			t.Error("can't find go-ethereum client")
-		}
-		if !inv.HasClient(clientInfo[1]) {
-			t.Error("can't find go-ethereum_latest client")
-		}
-		if inv.HasClient(ClientDesignator{Client: "supereth3000"}) {
-			t.Error("returned true for unknown client")
-		}
-	})
-	t.Run("HasSimulator", func(t *testing.T) {
-		if !inv.HasSimulator("smoke/genesis") {
-			t.Error("can't find smoke/genesis simulator")
-		}
-		if inv.HasSimulator("unknown simulator name") {
-			t.Error("returned true for unknown simulator name")
-		}
-	})
+	t.Log("clients:", spew.Sdump(inv.Clients))
+	t.Log("simulators:", inv.Simulators)
 }

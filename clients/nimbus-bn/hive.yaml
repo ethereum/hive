@@ -1,4 +1,2 @@
 roles:
   - beacon
-build_targets:
-  - mainnet

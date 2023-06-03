@@ -15,6 +15,170 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Inventory keeps names of clients and simulators.
+type Inventory struct {
+	BaseDir    string
+	Clients    map[string]InventoryClient
+	Simulators map[string]struct{}
+}
+
+type InventoryClient struct {
+	Dockerfiles []string
+	Meta        ClientMetadata
+}
+
+// ClientDirectory returns the directory containing the given client's Dockerfile.
+// The client name may contain a branch specifier.
+func (inv Inventory) ClientDirectory(client ClientDesignator) string {
+	return filepath.Join(inv.BaseDir, "clients", filepath.FromSlash(client.Client))
+}
+
+// SimulatorDirectory returns the directory of containing the given simulator's Dockerfile.
+func (inv Inventory) SimulatorDirectory(name string) string {
+	return filepath.Join(inv.BaseDir, "simulators", filepath.FromSlash(name))
+}
+
+// AddClient ensures the given client name is known to the inventory.
+// This method exists for unit testing purposes only.
+func (inv *Inventory) AddClient(name string, ic *InventoryClient) {
+	if inv.Clients == nil {
+		inv.Clients = make(map[string]InventoryClient)
+	}
+	var icv InventoryClient
+	if ic != nil {
+		icv = *ic
+	}
+	inv.Clients[name] = icv
+}
+
+// AddSimulator ensures the given simulator name is known to the inventory.
+// This method exists for unit testing purposes only.
+func (inv *Inventory) AddSimulator(name string) {
+	if inv.Simulators == nil {
+		inv.Simulators = make(map[string]struct{})
+	}
+	inv.Simulators[name] = struct{}{}
+}
+
+// MatchSimulators returns matching simulator names.
+func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return nil, nil
+	}
+	re, err := regexp.Compile(expr)
+	if err != nil {
+		return nil, err
+	}
+	var result []string
+	for sim := range inv.Simulators {
+		if re.MatchString(sim) {
+			result = append(result, sim)
+		}
+	}
+	sort.Strings(result)
+	return result, nil
+}
+
+// LoadInventory finds all clients and simulators in basedir.
+func LoadInventory(basedir string) (Inventory, error) {
+	var err error
+	inv := Inventory{BaseDir: basedir}
+	inv.Clients, err = findClients(filepath.Join(basedir, "clients"))
+	if err != nil {
+		return inv, err
+	}
+	inv.Simulators, err = findSimulators(filepath.Join(basedir, "simulators"))
+	return inv, err
+}
+
+func findSimulators(dir string) (map[string]struct{}, error) {
+	names := make(map[string]struct{})
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		name := info.Name()
+		// If we hit a dockerfile, add the parent and stop looking in this directory.
+		if name == "Dockerfile" {
+			rel, _ := filepath.Rel(dir, filepath.Dir(path))
+			name := filepath.ToSlash(rel)
+			names[name] = struct{}{}
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	return names, err
+}
+
+func findClients(dir string) (map[string]InventoryClient, error) {
+	clients := make(map[string]InventoryClient)
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || path == dir {
+			return err
+		}
+		rel, err := filepath.Rel(dir, filepath.Dir(path))
+		if err != nil {
+			return err
+		}
+		clientName := filepath.ToSlash(rel)
+
+		// Skip client sub-directories.
+		if info.IsDir() && path != dir {
+			if _, ok := clients[clientName]; ok {
+				return filepath.SkipDir
+			}
+		}
+		// Add Dockerfiles.
+		file := info.Name()
+		switch {
+		case file == "Dockerfile":
+			clients[clientName] = InventoryClient{
+				Meta: ClientMetadata{
+					Roles: []string{"eth1"}, // default role
+				},
+			}
+		case strings.HasPrefix(file, "Dockerfile."):
+			client, ok := clients[clientName]
+			if !ok {
+				log15.Warn(fmt.Sprintf("found %s in directory without Dockerfile", file), "path", filepath.Dir(path))
+				return nil
+			}
+			client.Dockerfiles = append(client.Dockerfiles, strings.TrimPrefix(file, "Dockerfile."))
+			clients[clientName] = client
+		case file == "hive.yaml":
+			client, ok := clients[clientName]
+			if !ok {
+				log15.Warn("found hive.yaml in directory without Dockerfile", "path", filepath.Dir(path))
+				return nil
+			}
+			md, err := loadClientMetadata(path)
+			if err != nil {
+				return err
+			}
+			client.Meta = md
+			clients[clientName] = client
+		}
+		return nil
+	})
+	return clients, err
+}
+
+func loadClientMetadata(path string) (m ClientMetadata, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return m, err
+	}
+	defer f.Close()
+
+	dec := yaml.NewDecoder(f)
+	dec.KnownFields(true)
+	if err := dec.Decode(&m); err != nil {
+		return m, fmt.Errorf("error in %s: %v", path, err)
+	}
+	return m, nil
+}
+
 // ClientDesignator specifies a client and build parameters for it.
 type ClientDesignator struct {
 	// Client is the client name.
@@ -184,153 +348,6 @@ func validateClients(inv *Inventory, list []ClientDesignator) error {
 	}
 
 	return nil
-}
-
-// Inventory keeps names of clients and simulators.
-type Inventory struct {
-	BaseDir    string
-	Clients    map[string]InventoryClient
-	Simulators map[string]struct{}
-}
-
-type InventoryClient struct {
-	Dockerfiles []string
-}
-
-// HasClient returns true if the inventory contains the given client.
-func (inv Inventory) HasClient(client ClientDesignator) bool {
-	ic, ok := inv.Clients[client.Client]
-	if !ok {
-		return false
-	}
-	if client.DockerfileExt != "" {
-		return slices.Contains(ic.Dockerfiles, client.DockerfileExt)
-	}
-	return ok
-}
-
-// ClientDirectory returns the directory containing the given client's Dockerfile.
-// The client name may contain a branch specifier.
-func (inv Inventory) ClientDirectory(client ClientDesignator) string {
-	return filepath.Join(inv.BaseDir, "clients", filepath.FromSlash(client.Client))
-}
-
-// HasSimulator returns true if the inventory contains the given simulator.
-func (inv Inventory) HasSimulator(name string) bool {
-	_, ok := inv.Simulators[name]
-	return ok
-}
-
-// SimulatorDirectory returns the directory of containing the given simulator's Dockerfile.
-func (inv Inventory) SimulatorDirectory(name string) string {
-	return filepath.Join(inv.BaseDir, "simulators", filepath.FromSlash(name))
-}
-
-// AddClient ensures the given client name is known to the inventory.
-// This method exists for unit testing purposes only.
-func (inv *Inventory) AddClient(name string, ic *InventoryClient) {
-	if inv.Clients == nil {
-		inv.Clients = make(map[string]InventoryClient)
-	}
-	var icv InventoryClient
-	if ic != nil {
-		icv = *ic
-	}
-	inv.Clients[name] = icv
-}
-
-// AddSimulator ensures the given simulator name is known to the inventory.
-// This method exists for unit testing purposes only.
-func (inv *Inventory) AddSimulator(name string) {
-	if inv.Simulators == nil {
-		inv.Simulators = make(map[string]struct{})
-	}
-	inv.Simulators[name] = struct{}{}
-}
-
-// MatchSimulators returns matching simulator names.
-func (inv *Inventory) MatchSimulators(expr string) ([]string, error) {
-	expr = strings.TrimSpace(expr)
-	if expr == "" {
-		return nil, nil
-	}
-	re, err := regexp.Compile(expr)
-	if err != nil {
-		return nil, err
-	}
-	var result []string
-	for sim := range inv.Simulators {
-		if re.MatchString(sim) {
-			result = append(result, sim)
-		}
-	}
-	sort.Strings(result)
-	return result, nil
-}
-
-// LoadInventory finds all clients and simulators in basedir.
-func LoadInventory(basedir string) (Inventory, error) {
-	var err error
-	inv := Inventory{BaseDir: basedir}
-	inv.Clients, err = findClients(filepath.Join(basedir, "clients"))
-	if err != nil {
-		return inv, err
-	}
-	inv.Simulators, err = findSimulators(filepath.Join(basedir, "simulators"))
-	return inv, err
-}
-
-func findClients(dir string) (map[string]InventoryClient, error) {
-	clients := make(map[string]InventoryClient)
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil || path == dir {
-			return err
-		}
-		rel, err := filepath.Rel(dir, filepath.Dir(path))
-		if err != nil {
-			return err
-		}
-		clientName := filepath.ToSlash(rel)
-
-		// Skip client sub-directories.
-		if info.IsDir() && path != dir {
-			if _, ok := clients[clientName]; ok {
-				return filepath.SkipDir
-			}
-		}
-		// Add Dockerfiles.
-		file := info.Name()
-		if file == "Dockerfile" || strings.HasPrefix(file, "Dockerfile.") {
-			if file == "Dockerfile" {
-				clients[clientName] = InventoryClient{}
-			} else {
-				client := clients[clientName]
-				client.Dockerfiles = append(client.Dockerfiles, strings.TrimPrefix(file, "Dockerfile."))
-				clients[clientName] = client
-			}
-		}
-		return nil
-	})
-	return clients, err
-}
-
-func findSimulators(dir string) (map[string]struct{}, error) {
-	names := make(map[string]struct{})
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		name := info.Name()
-		// If we hit a dockerfile, add the parent and stop looking in this directory.
-		if name == "Dockerfile" {
-			rel, _ := filepath.Rel(dir, filepath.Dir(path))
-			name := filepath.ToSlash(rel)
-			names[name] = struct{}{}
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	return names, err
 }
 
 type set[X comparable] map[X]struct{}
