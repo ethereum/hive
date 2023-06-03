@@ -195,6 +195,7 @@ type Inventory struct {
 
 type InventoryClient struct {
 	Dockerfiles []string
+	Meta        ClientMetadata
 }
 
 // HasClient returns true if the inventory contains the given client.
@@ -276,8 +277,28 @@ func LoadInventory(basedir string) (Inventory, error) {
 	if err != nil {
 		return inv, err
 	}
+
 	inv.Simulators, err = findSimulators(filepath.Join(basedir, "simulators"))
 	return inv, err
+}
+
+func findSimulators(dir string) (map[string]struct{}, error) {
+	names := make(map[string]struct{})
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		name := info.Name()
+		// If we hit a dockerfile, add the parent and stop looking in this directory.
+		if name == "Dockerfile" {
+			rel, _ := filepath.Rel(dir, filepath.Dir(path))
+			name := filepath.ToSlash(rel)
+			names[name] = struct{}{}
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	return names, err
 }
 
 func findClients(dir string) (map[string]InventoryClient, error) {
@@ -300,37 +321,48 @@ func findClients(dir string) (map[string]InventoryClient, error) {
 		}
 		// Add Dockerfiles.
 		file := info.Name()
-		if file == "Dockerfile" || strings.HasPrefix(file, "Dockerfile.") {
-			if file == "Dockerfile" {
-				clients[clientName] = InventoryClient{}
-			} else {
-				client := clients[clientName]
-				client.Dockerfiles = append(client.Dockerfiles, strings.TrimPrefix(file, "Dockerfile."))
-				clients[clientName] = client
+		switch {
+		case file == "Dockerfile":
+			clients[clientName] = InventoryClient{}
+		case strings.HasPrefix(file, "Dockerfile."):
+			client, ok := clients[clientName]
+			if !ok {
+				log15.Warn(fmt.Sprintf("found %s in directory without Dockerfile", file), "path", filepath.Dir(path))
+				return nil
 			}
+			client.Dockerfiles = append(client.Dockerfiles, strings.TrimPrefix(file, "Dockerfile."))
+			clients[clientName] = client
+		case file == "hive.yaml":
+			client, ok := clients[clientName]
+			if !ok {
+				log15.Warn("found hive.yaml in directory without Dockerfile", "path", filepath.Dir(path))
+				return nil
+			}
+			md, err := loadClientMetadata(path)
+			if err != nil {
+				return err
+			}
+			client.Meta = md
+			clients[clientName] = client
 		}
 		return nil
 	})
 	return clients, err
 }
 
-func findSimulators(dir string) (map[string]struct{}, error) {
-	names := make(map[string]struct{})
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		name := info.Name()
-		// If we hit a dockerfile, add the parent and stop looking in this directory.
-		if name == "Dockerfile" {
-			rel, _ := filepath.Rel(dir, filepath.Dir(path))
-			name := filepath.ToSlash(rel)
-			names[name] = struct{}{}
-			return filepath.SkipDir
-		}
-		return nil
-	})
-	return names, err
+func loadClientMetadata(path string) (m ClientMetadata, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return m, err
+	}
+	defer f.Close()
+
+	dec := yaml.NewDecoder(f)
+	dec.KnownFields(true)
+	if err := dec.Decode(&m); err != nil {
+		return m, fmt.Errorf("error in %s: %v", path, err)
+	}
+	return m, nil
 }
 
 type set[X comparable] map[X]struct{}

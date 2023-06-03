@@ -63,13 +63,6 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 	var anyBuilt bool
 	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
 	for _, client := range clientList {
-		if !r.inv.HasClient(client) {
-			return fmt.Errorf("unknown client %q", client)
-		}
-		meta, err := r.builder.ReadClientMetadata(client)
-		if err != nil {
-			return err
-		}
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
 			continue
@@ -83,7 +76,7 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 			Name:    client.Name(),
 			Version: strings.TrimSpace(string(version)),
 			Image:   image,
-			Meta:    *meta,
+			Meta:    r.inv.Clients[client.Client].Meta,
 		}
 	}
 	if !anyBuilt {
