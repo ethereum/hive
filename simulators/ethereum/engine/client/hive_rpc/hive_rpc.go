@@ -43,8 +43,8 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		jwtSecret  = s.JWTSecret
 		ttd        = s.TerminalTotalDifficulty
 	)
+	cs, err := T.Sim.ClientTypes()
 	if clientType == "" {
-		cs, err := T.Sim.ClientTypes()
 		if err != nil {
 			return nil, fmt.Errorf("client type was not supplied and simulator returned error on trying to get all client types: %v", err)
 		}
@@ -75,9 +75,9 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		}
 	} else {
 		// Real TTD must be calculated adding the genesis difficulty
-		ttdInt := helper.CalculateRealTTD(genesis, ttd.Int64())
-		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttdInt))
-		ttd = big.NewInt(ttdInt)
+		//ttdInt := helper.CalculateRealTTD(genesis, ttd.Int64())
+		//ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttdInt))
+		ttd = genesis.Difficulty()
 	}
 	if len(bootClients) > 0 {
 		var (
@@ -95,7 +95,8 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 	}
 
 	// Start the client and create the engine client object
-	genesisStart, err := helper.GenesisStartOption(genesis)
+	clientName := strings.Split(cs[0].Name, "_")[0]
+	genesisStart, err := helper.GenesisStartOptionBasedOnClient(genesis, clientName)
 	if err != nil {
 		return nil, err
 	}
@@ -109,6 +110,14 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 		Inner:  http.DefaultTransport,
 	})
 	return ec, nil
+}
+
+// getEnodeForClient prepare the enode return string to be in the form [ enode1, enode2, ... ]
+func getEnodeForClient(enodeString string) string {
+	if enodeString[len(enodeString)-1] == ',' {
+		enodeString = enodeString[:len(enodeString)-1]
+	}
+	return "[" + enodeString + "]"
 }
 
 func CheckEthEngineLive(c *hivesim.Client) error {

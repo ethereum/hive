@@ -13,6 +13,7 @@ ADD test.cfg /configs/test.cfg
 ADD nethermind.sh /nethermind.sh
 
 RUN chmod +x /nethermind.sh
+RUN mkdir -p /nethermind/Data
 
 # Add the enode script.
 RUN mkdir -p /hive-bin
