@@ -1368,15 +1368,15 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 	t.CLMock.AddEngineClient(secondaryEngine)
 
 	ctx := context.Background()
-	block, err := t.CLMock.EngineClients[0].BlockByNumber(ctx, t.CLMock.LatestHeadNumber)
+	block1, err := t.CLMock.EngineClients[0].BlockByNumber(ctx, nil)
 	if err != nil {
 		panic("failed to get block by number")
 		return
 	}
 
-	t.CLMock.LatestForkchoice.HeadBlockHash = block.Hash()
-	// Spawn a secondary client which will need to sync to the primary client
+	t.CLMock.LatestForkchoice.HeadBlockHash = block1.Hash()
 
+	//Spawn a secondary client which will need to sync to the primary client
 	t.CLMock.AddEngineClient(secondaryEngine)
 
 	if ws.SyncSteps > 1 {
@@ -1389,9 +1389,9 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 			case <-t.TimeoutContext.Done():
 				t.Fatalf("FAIL (%s): Timeout while waiting for secondary client to sync", t.TestName)
 			case <-time.After(time.Second):
-				//secondaryEngineTest.TestEngineNewPayloadV2(
-				//	&t.CLMock.LatestExecutedPayload,
-				//)
+				secondaryEngineTest.TestEngineNewPayloadV2(
+					&t.CLMock.LatestExecutedPayload,
+				)
 				r := secondaryEngineTest.TestEngineForkchoiceUpdatedV2(
 					&t.CLMock.LatestForkchoice,
 					nil,
@@ -1407,6 +1407,21 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 		}
 	}
 	ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestHeader.Number.Uint64(), nil, secondaryEngineTest)
+	ctx = context.Background()
+	block1, err = t.CLMock.EngineClients[0].BlockByNumber(ctx, nil)
+	if err != nil {
+		panic("failed to get block by number")
+		return
+	}
+	block2, err := secondaryEngine.BlockByNumber(ctx, nil)
+	if err != nil {
+		panic("failed to get block by number")
+		return
+	}
+	// Latest block in both EngineClients should be the same
+	if block1.Number().Uint64() != block2.Number().Uint64() {
+		t.Fatalf("FAIL (%s): Secondary client is not synced to the same block as the primary client", t.TestName
+	}
 }
 
 // Withdrawals re-org spec:
