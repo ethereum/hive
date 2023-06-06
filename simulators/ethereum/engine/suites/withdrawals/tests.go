@@ -45,19 +45,19 @@ var (
 
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork On Genesis",
-	//		About: `
-	//		Tests the withdrawals fork happening on block 5 (e.g. on a
-	//		testnet).
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1,
-	//	WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
-	//	WithdrawalsPerBlock:   16,
-	//	TimeIncrements:        5,
-	//},
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdrawals Fork On Genesis",
+			About: `
+			Tests the withdrawals fork happening on block 5 (e.g. on a
+			testnet).
+			`,
+		},
+		WithdrawalsForkHeight: 1,
+		WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
+		WithdrawalsPerBlock:   16,
+		TimeIncrements:        5,
+	},
 
 	//&WithdrawalsBaseSpec{
 	//	Spec: test.Spec{
@@ -203,27 +203,27 @@ var Tests = []test.SpecInterface{
 	//},
 	//
 	// Sync Tests
-	//&WithdrawalsSyncSpec{
-	//	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	//		Spec: test.Spec{
-	//			Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
-	//			About: `
-	//		- Spawn a first client
-	//		- Go through withdrawals fork on Block 1
-	//		- Withdraw to a single account 16 times each block for 2 blocks
-	//		- Spawn a secondary client and send FCUV2(head)
-	//		- Wait for sync and verify withdrawn account's balance
-	//		`,
-	//			//TimeoutSeconds: 6000,
-	//		},
-	//		WithdrawalsForkHeight:    1,
-	//		WithdrawalsBlockCount:    2,
-	//		WithdrawalsPerBlock:      16,
-	//		WithdrawableAccountCount: 1,
-	//		//TransactionsPerBlock:     common.Big0,
-	//	},
-	//	SyncSteps: 1,
-	//},
+	&WithdrawalsSyncSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
+				About: `
+			- Spawn a first client
+			- Go through withdrawals fork on Block 1
+			- Withdraw to a single account 16 times each block for 2 blocks
+			- Spawn a secondary client and send FCUV2(head)
+			- Wait for sync and verify withdrawn account's balance
+			`,
+				//TimeoutSeconds: 6000,
+			},
+			WithdrawalsForkHeight:    1,
+			WithdrawalsBlockCount:    2,
+			WithdrawalsPerBlock:      16,
+			WithdrawableAccountCount: 1,
+			//TransactionsPerBlock:     common.Big0,
+		},
+		SyncSteps: 1,
+	},
 	//&WithdrawalsSyncSpec{
 	//	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 	//		Spec: test.Spec{
