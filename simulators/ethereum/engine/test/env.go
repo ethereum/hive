@@ -127,7 +127,7 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 	}()
 
 	// Run the test
-	time.Sleep(3 * time.Minute)
+	time.Sleep(49 * time.Second)
 	testSpec.Execute(env)
 }
 
