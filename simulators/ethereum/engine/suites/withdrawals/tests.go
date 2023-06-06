@@ -1420,7 +1420,7 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 	}
 	// Latest block in both EngineClients should be the same
 	if block1.Number().Uint64() != block2.Number().Uint64() {
-		t.Fatalf("FAIL (%s): Secondary client is not synced to the same block as the primary client", t.TestName
+		t.Fatalf("FAIL (%s): Secondary client is not synced to the same block as the primary client", t.TestName)
 	}
 }
 
