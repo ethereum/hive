@@ -47,10 +47,9 @@ var (
 var Tests = []test.SpecInterface{
 	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
-			Name: "Withdrawals Fork On Genesis",
+			Name: "Withdawals Fork on Block 1",
 			About: `
-			Tests the withdrawals fork happening on block 5 (e.g. on a
-			testnet).
+			Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
 			`,
 		},
 		WithdrawalsForkHeight: 1,
@@ -59,136 +58,136 @@ var Tests = []test.SpecInterface{
 		TimeIncrements:        5,
 	},
 
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 1",
-	//		About: `
-	//		Tests the withdrawals fork happening directly after genesis.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   16,
-	//},
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdrawals Fork on Block 1",
+			About: `
+			Tests the withdrawals fork happening directly after genesis.
+			`,
+		},
+		WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
+		WithdrawalsBlockCount: 1,
+		WithdrawalsPerBlock:   16,
+	},
 
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 5",
-	//		About: `
-	//		Tests the transition to the withdrawals fork after a single block
-	//		has happened.
-	//		Block 1 is sent with invalid non-null withdrawals payload and
-	//		client is expected to respond with the appropriate error.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   16,
-	//	TimeIncrements:        5,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 3",
-	//		About: `
-	//		Tests the transition to the withdrawals fork after two blocks
-	//		have happened.
-	//		Block 2 is sent with invalid non-null withdrawals payload and
-	//		client is expected to respond with the appropriate error.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 3, // Genesis, Block 1 and 2 are Pre-Withdrawals
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   16,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdraw to a single account",
-	//		About: `
-	//		Make multiple withdrawals to a single account.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    1,
-	//	WithdrawalsPerBlock:      64,
-	//	WithdrawableAccountCount: 1,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdraw to two accounts",
-	//		About: `
-	//		Make multiple withdrawals to two different accounts, repeated in
-	//		round-robin.
-	//		Reasoning: There might be a difference in implementation when an
-	//		account appears multiple times in the withdrawals list but the list
-	//		is not in ordered sequence.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    1,
-	//	WithdrawalsPerBlock:      64,
-	//	WithdrawableAccountCount: 2,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdraw many accounts",
-	//		About: `
-	//		Make multiple withdrawals to 1024 different accounts.
-	//		Execute many blocks this way.
-	//		`,
-	//		TimeoutSeconds: 240,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    4,
-	//	WithdrawalsPerBlock:      1024,
-	//	WithdrawableAccountCount: 1024,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdraw zero amount",
-	//		About: `
-	//		Make multiple withdrawals where the amount withdrawn is 0.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    1,
-	//	WithdrawalsPerBlock:      64,
-	//	WithdrawableAccountCount: 2,
-	//	WithdrawAmounts: []uint64{
-	//		0,
-	//		1,
-	//	},
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Empty Withdrawals",
-	//		About: `
-	//		Produce withdrawals block with zero withdrawals.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1,
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   0,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Corrupted Block Hash Payload (INVALID)",
-	//		About: `
-	//		Send a valid payload with a corrupted hash using engine_newPayloadV2.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    1,
-	//	TestCorrupedHashPayloads: true,
-	//},
-	//
-	//// Block value tests
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdrawals Fork on Block 5",
+			About: `
+			Tests the transition to the withdrawals fork after a single block
+			has happened.
+			Block 1 is sent with invalid non-null withdrawals payload and
+			client is expected to respond with the appropriate error.
+			`,
+		},
+		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
+		WithdrawalsBlockCount: 1,
+		WithdrawalsPerBlock:   16,
+		TimeIncrements:        5,
+	},
+
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdrawals Fork on Block 3",
+			About: `
+			Tests the transition to the withdrawals fork after two blocks
+			have happened.
+			Block 2 is sent with invalid non-null withdrawals payload and
+			client is expected to respond with the appropriate error.
+			`,
+		},
+		WithdrawalsForkHeight: 3, // Genesis, Block 1 and 2 are Pre-Withdrawals
+		WithdrawalsBlockCount: 1,
+		WithdrawalsPerBlock:   16,
+	},
+
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdraw to a single account",
+			About: `
+			Make multiple withdrawals to a single account.
+			`,
+		},
+		WithdrawalsForkHeight:    1,
+		WithdrawalsBlockCount:    1,
+		WithdrawalsPerBlock:      64,
+		WithdrawableAccountCount: 1,
+	},
+
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdraw to two accounts",
+			About: `
+			Make multiple withdrawals to two different accounts, repeated in
+			round-robin.
+			Reasoning: There might be a difference in implementation when an
+			account appears multiple times in the withdrawals list but the list
+			is not in ordered sequence.
+			`,
+		},
+		WithdrawalsForkHeight:    1,
+		WithdrawalsBlockCount:    1,
+		WithdrawalsPerBlock:      64,
+		WithdrawableAccountCount: 2,
+	},
+
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdraw many accounts",
+			About: `
+			Make multiple withdrawals to 1024 different accounts.
+			Execute many blocks this way.
+			`,
+			TimeoutSeconds: 240,
+		},
+		WithdrawalsForkHeight:    1,
+		WithdrawalsBlockCount:    4,
+		WithdrawalsPerBlock:      1024,
+		WithdrawableAccountCount: 1024,
+	},
+
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdraw zero amount",
+			About: `
+			Make multiple withdrawals where the amount withdrawn is 0.
+			`,
+		},
+		WithdrawalsForkHeight:    1,
+		WithdrawalsBlockCount:    1,
+		WithdrawalsPerBlock:      64,
+		WithdrawableAccountCount: 2,
+		WithdrawAmounts: []uint64{
+			0,
+			1,
+		},
+	},
+
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Empty Withdrawals",
+			About: `
+			Produce withdrawals block with zero withdrawals.
+			`,
+		},
+		WithdrawalsForkHeight: 1,
+		WithdrawalsBlockCount: 1,
+		WithdrawalsPerBlock:   0,
+	},
+
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Corrupted Block Hash Payload (INVALID)",
+			About: `
+			Send a valid payload with a corrupted hash using engine_newPayloadV2.
+			`,
+		},
+		WithdrawalsForkHeight:    1,
+		WithdrawalsBlockCount:    1,
+		TestCorrupedHashPayloads: true,
+	},
+
+	// Block value tests
 	//&BlockValueSpec{
 	//	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 	//		Spec: test.Spec{
@@ -201,7 +200,7 @@ var Tests = []test.SpecInterface{
 	//		WithdrawalsBlockCount: 1,
 	//	},
 	//},
-	//
+
 	// Sync Tests
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
@@ -220,7 +219,6 @@ var Tests = []test.SpecInterface{
 			WithdrawalsBlockCount:    2,
 			WithdrawalsPerBlock:      16,
 			WithdrawableAccountCount: 1,
-			//TransactionsPerBlock:     common.Big0,
 		},
 		SyncSteps: 1,
 	},
