@@ -38,6 +38,8 @@ func (b blockHeader) MarshalJSON() ([]byte, error) {
 		BaseFee         *math.HexOrDecimal256 `json:"baseFeePerGas"`
 		Hash            common.Hash           `json:"hash"`
 		WithdrawalsRoot common.Hash           `json:"withdrawalsRoot"`
+		DataGasUsed     *math.HexOrDecimal64  `json:"dataGasUsed"`
+		ExcessDataGas   *math.HexOrDecimal64  `json:"excessDataGas"`
 	}
 	var enc blockHeader
 	enc.ParentHash = b.ParentHash
@@ -61,6 +63,8 @@ func (b blockHeader) MarshalJSON() ([]byte, error) {
 	enc.BaseFee = (*math.HexOrDecimal256)(b.BaseFee)
 	enc.Hash = b.Hash
 	enc.WithdrawalsRoot = b.WithdrawalsRoot
+	enc.DataGasUsed = (*math.HexOrDecimal64)(b.DataGasUsed)
+	enc.ExcessDataGas = (*math.HexOrDecimal64)(b.ExcessDataGas)
 	return json.Marshal(&enc)
 }
 
@@ -88,6 +92,8 @@ func (b *blockHeader) UnmarshalJSON(input []byte) error {
 		BaseFee         *math.HexOrDecimal256 `json:"baseFeePerGas"`
 		Hash            *common.Hash          `json:"hash"`
 		WithdrawalsRoot *common.Hash          `json:"withdrawalsRoot"`
+		DataGasUsed     *math.HexOrDecimal64  `json:"dataGasUsed"`
+		ExcessDataGas   *math.HexOrDecimal64  `json:"excessDataGas"`
 	}
 	var dec blockHeader
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -155,6 +161,12 @@ func (b *blockHeader) UnmarshalJSON(input []byte) error {
 	}
 	if dec.WithdrawalsRoot != nil {
 		b.WithdrawalsRoot = *dec.WithdrawalsRoot
+	}
+	if dec.DataGasUsed != nil {
+		b.DataGasUsed = (*uint64)(dec.DataGasUsed)
+	}
+	if dec.ExcessDataGas != nil {
+		b.ExcessDataGas = (*uint64)(dec.ExcessDataGas)
 	}
 	return nil
 }

@@ -89,7 +89,6 @@ func (tc *testcase) run(t *hivesim.T) {
 	env := hivesim.Params{
 		"HIVE_FORK_DAO_VOTE": "1",
 		"HIVE_CHAIN_ID":      "1",
-		"HIVE_SKIP_POW":      "1",
 		"HIVE_NODETYPE":      "full",
 	}
 	tc.updateEnv(env)
@@ -111,16 +110,28 @@ func (tc *testcase) run(t *hivesim.T) {
 	// send payloads and check response
 	latestValidHash := common.Hash{}
 	for blockNumber, payload := range tc.payloads {
+		// set expected payload return status
 		plException := tc.fixture.json.Blocks[blockNumber].Exception
 		expectedStatus := "VALID"
 		if plException != "" {
 			expectedStatus = "INVALID"
 		}
+		// set NewPayload version
+		plVersion := 3
+		t.Logf("VersiondHashes %v:", tc.versionedHashes)
+		if tc.versionedHashes == nil {
+			plVersion = 2
+		}
 		// execute fixture block payload
-		plStatus, plErr := engineClient.NewPayloadV2(context.Background(), payload)
+		plStatus, plErr := engineClient.NewPayload(context.Background(), plVersion, payload, tc.versionedHashes)
 		if plErr != nil {
-			tc.failedErr = plErr
-			t.Fatalf("unable to send block %v in test %s: %v ", blockNumber+1, tc.name, plErr)
+			if plException == plErr.Error() {
+				t.Logf("expected error caught by client: %v", plErr)
+				continue
+			} else {
+				tc.failedErr = plErr
+				t.Fatalf("unexpected error: %v, unable to send block %v in test %s", plErr, blockNumber+1, tc.name)
+			}
 		}
 		// update latest valid block hash
 		if plStatus.Status == "VALID" {
