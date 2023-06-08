@@ -1,0 +1,10 @@
+## -- Git Build --
+- client: ethereumjs
+  nametag: 4844-git
+  build_args:
+      baseimage: ethereumjs/ethereumjs-monorepo
+      tag: master
+## -- Local Build --
+# - client: ethereumjs
+# nametag: 4844-local
+# dockerfile: local
