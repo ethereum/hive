@@ -10,7 +10,7 @@
   dockerfile: git
   build_args:
       github: nethermindeth/nethermind
-      tag: feature/eip-4844-v6.1
+      tag: feature/eip-4844-v6
 ## -- Local Build --
 # - client: nethermind
 # nametag: 4844-local
