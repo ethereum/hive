@@ -107,15 +107,27 @@ func (s Spec) GetForkConfig() ForkConfig {
 	return s.ForkConfig
 }
 
+func GenesisFactory(clientName string) helper.Genesis {
+	switch clientName {
+	case "erigon_":
+		return &helper.ErigonGenesis{}
+	case "nethermind_":
+		return &helper.NethermindChainSpec{}
+	default:
+		return nil
+	}
+}
+
 func (s Spec) GetGenesis(base string) helper.Genesis {
 	if len(base) != 0 {
 		base += "_"
 	}
+	gen := GenesisFactory(base)
 	genesisPath := "./init/" + base + "genesis.json"
 	if s.GenesisFile != "" {
 		genesisPath = fmt.Sprintf("./init/%s", s.GenesisFile)
 	}
-	genesis := helper.LoadGenesis(genesisPath)
+	genesis := helper.LoadGenesis(genesisPath, gen)
 	return genesis
 }
 func (s Spec) GetGenesisTest(base string) string {
