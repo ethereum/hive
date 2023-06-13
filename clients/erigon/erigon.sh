@@ -63,8 +63,8 @@ else
 fi
 
 # Configure the chain.
-mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
+#mv /genesis.json /genesis-input.json
+#jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis
 echo "Supplied genesis state:"
