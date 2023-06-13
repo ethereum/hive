@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"time"
 
@@ -159,6 +160,9 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		delete(newParams, "HIVE_CLIQUE_PERIOD")
 		delete(newParams, "HIVE_MINER")
 		newParams = newParams.Set("HIVE_POST_MERGE_GENESIS", "false")
+		newParams = newParams.Set("HIVE_NETWORK_ID", strconv.FormatInt(genesis.Config().ChainID.Int64(), 10))
+		t := strconv.FormatUint(genesis.Difficulty().Uint64(), 10)
+		newParams = newParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", t)
 		//}
 
 		if clientTypes, err := sim.ClientTypes(); err == nil {

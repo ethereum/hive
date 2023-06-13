@@ -290,14 +290,173 @@ func (n *NethermindChainSpec) ToBlock() *types.Block {
 	panic("implement me")
 }
 
-//func (n *NethermindChainSpec) UnmarshalJSON(bytes []byte) error {
-//	return json.Unmarshal(bytes, &n)
-//}
-//
-//func (n *NethermindChainSpec) MarshalJSON() ([]byte, error) {
-//	bytes, err := json.Marshal(n)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return bytes, nil
-//}
+type ErigonAura struct {
+	StepDuration                int `json:"stepDuration"`
+	BlockReward                 int `json:"blockReward"`
+	MaximumUncleCountTransition int `json:"maximumUncleCountTransition"`
+	MaximumUncleCount           int `json:"maximumUncleCount"`
+	Validators                  struct {
+		Multi map[string]map[string][]string `json:"multi,omitempty"`
+	} `json:"validators"`
+	BlockRewardContractAddress       string            `json:"blockRewardContractAddress"`
+	BlockRewardContractTransition    int               `json:"blockRewardContractTransition"`
+	RandomnessContractAddress        map[string]string `json:"randomnessContractAddress"`
+	PosdaoTransition                 int               `json:"posdaoTransition"`
+	BlockGasLimitContractTransitions map[string]string `json:"blockGasLimitContractTransitions"`
+	Registrar                        string            `json:"registrar"`
+}
+
+type ErigonConfig struct {
+	ChainName                     string     `json:"ChainName"`
+	ChainID                       int        `json:"chainId"`
+	Consensus                     string     `json:"consensus"`
+	HomesteadBlock                int        `json:"homesteadBlock"`
+	Eip150Block                   int        `json:"eip150Block"`
+	Eip155Block                   int        `json:"eip155Block"`
+	ByzantiumBlock                int        `json:"byzantiumBlock"`
+	ConstantinopleBlock           int        `json:"constantinopleBlock"`
+	PetersburgBlock               int        `json:"petersburgBlock"`
+	IstanbulBlock                 int        `json:"istanbulBlock"`
+	BerlinBlock                   int        `json:"berlinBlock"`
+	LondonBlock                   int        `json:"londonBlock"`
+	Eip1559FeeCollectorTransition int        `json:"eip1559FeeCollectorTransition"`
+	Eip1559FeeCollector           string     `json:"eip1559FeeCollector"`
+	TerminalTotalDifficulty       *big.Int   `json:"terminalTotalDifficulty"`
+	TerminalTotalDifficultyPassed bool       `json:"terminalTotalDifficultyPassed"`
+	Aura                          ErigonAura `json:"aura"`
+}
+
+type ErigonAccount struct {
+	Balance     string `json:"balance"`
+	Constructor string `json:"constructor,omitempty"`
+}
+
+type ErigonGenesis struct {
+	ErigonConfig     ErigonConfig             `json:"config"`
+	ErigonTimestamp  string                   `json:"timestamp"`
+	AuRaSeal         string                   `json:"auRaSeal"`
+	ErigonGasLimit   string                   `json:"gasLimit"`
+	ErigonDifficulty string                   `json:"difficulty"`
+	ErigonAlloc      map[string]ErigonAccount `json:"alloc"`
+}
+
+func (v ErigonGenesis) Config() *params.ChainConfig {
+	chainID := big.NewInt(int64(v.ErigonConfig.ChainID))
+	ttd := big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonDifficulty))
+	shangai := big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonTimestamp)).Uint64()
+	return &params.ChainConfig{
+		ChainID:                 chainID,
+		TerminalTotalDifficulty: ttd,
+		ShanghaiTime:            &shangai,
+	}
+}
+
+func (v ErigonGenesis) SetConfig(config *params.ChainConfig) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) Nonce() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) SetNonce(nonce uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) Timestamp() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) SetTimestamp(timestamp int64) {
+	v.ErigonTimestamp = fmt.Sprintf("%#x", timestamp)
+}
+
+func (v ErigonGenesis) ExtraData() []byte {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) SetExtraData(data []byte) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) GasLimit() uint64 {
+	return big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonGasLimit)).Uint64()
+}
+
+func (v ErigonGenesis) SetGasLimit(limit uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) Difficulty() *big.Int {
+	return big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonDifficulty))
+}
+
+func (v ErigonGenesis) SetDifficulty(difficulty *big.Int) {
+	v.ErigonDifficulty = common.BigToHash(difficulty).Hex()
+}
+
+func (v ErigonGenesis) MixHash() common.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) SetMixHash(hash common.Hash) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) Coinbase() common.Address {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) SetCoinbase(address common.Address) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) Alloc() GenesisAlloc {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) AllocGenesis(address common.Address, account GenesisAccount) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) UpdateTimestamp(timestamp string) {
+	v.ErigonTimestamp = timestamp
+}
+
+func (v ErigonGenesis) Number() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) GasUsed() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) ParentHash() common.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) BaseFee() *big.Int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (v ErigonGenesis) ToBlock() *types.Block {
+	//TODO implement me
+	panic("implement me")
+}

@@ -7,6 +7,7 @@ import (
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
+	big "math/big"
 )
 
 // suppress unused package warning
@@ -1028,7 +1029,7 @@ func (v *NethermindChainSpec) UnmarshalJSON(data []byte) error {
 func (v *NethermindChainSpec) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper3(l, v)
 }
-func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(in *jlexer.Lexer, out *Builtin) {
+func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(in *jlexer.Lexer, out *ErigonGenesis) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1047,30 +1048,28 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(
 			continue
 		}
 		switch key {
-		case "name":
-			out.Name = string(in.String())
-		case "pricing":
+		case "config":
+			(out.ErigonConfig).UnmarshalEasyJSON(in)
+		case "timestamp":
+			out.ErigonTimestamp = string(in.String())
+		case "auRaSeal":
+			out.AuRaSeal = string(in.String())
+		case "gasLimit":
+			out.ErigonGasLimit = string(in.String())
+		case "difficulty":
+			out.ErigonDifficulty = string(in.String())
+		case "alloc":
 			if in.IsNull() {
 				in.Skip()
 			} else {
 				in.Delim('{')
-				if !in.IsDelim('}') {
-					out.Pricing = make(map[string]interface{})
-				} else {
-					out.Pricing = nil
-				}
+				out.ErigonAlloc = make(map[string]ErigonAccount)
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
-					var v5 interface{}
-					if m, ok := v5.(easyjson.Unmarshaler); ok {
-						m.UnmarshalEasyJSON(in)
-					} else if m, ok := v5.(json.Unmarshaler); ok {
-						_ = m.UnmarshalJSON(in.Raw())
-					} else {
-						v5 = in.Interface()
-					}
-					(out.Pricing)[key] = v5
+					var v5 ErigonAccount
+					(v5).UnmarshalEasyJSON(in)
+					(out.ErigonAlloc)[key] = v5
 					in.WantComma()
 				}
 				in.Delim('}')
@@ -1085,28 +1084,44 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(
 		in.Consumed()
 	}
 }
-func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(out *jwriter.Writer, in Builtin) {
+func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(out *jwriter.Writer, in ErigonGenesis) {
 	out.RawByte('{')
 	first := true
 	_ = first
-	if in.Name != "" {
-		const prefix string = ",\"name\":"
-		first = false
+	{
+		const prefix string = ",\"config\":"
 		out.RawString(prefix[1:])
-		out.String(string(in.Name))
+		(in.ErigonConfig).MarshalEasyJSON(out)
 	}
-	if len(in.Pricing) != 0 {
-		const prefix string = ",\"pricing\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
+	{
+		const prefix string = ",\"timestamp\":"
+		out.RawString(prefix)
+		out.String(string(in.ErigonTimestamp))
+	}
+	{
+		const prefix string = ",\"auRaSeal\":"
+		out.RawString(prefix)
+		out.String(string(in.AuRaSeal))
+	}
+	{
+		const prefix string = ",\"gasLimit\":"
+		out.RawString(prefix)
+		out.String(string(in.ErigonGasLimit))
+	}
+	{
+		const prefix string = ",\"difficulty\":"
+		out.RawString(prefix)
+		out.String(string(in.ErigonDifficulty))
+	}
+	{
+		const prefix string = ",\"alloc\":"
+		out.RawString(prefix)
+		if in.ErigonAlloc == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
+			out.RawString(`null`)
 		} else {
-			out.RawString(prefix)
-		}
-		{
 			out.RawByte('{')
 			v6First := true
-			for v6Name, v6Value := range in.Pricing {
+			for v6Name, v6Value := range in.ErigonAlloc {
 				if v6First {
 					v6First = false
 				} else {
@@ -1114,13 +1129,7 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(
 				}
 				out.String(string(v6Name))
 				out.RawByte(':')
-				if m, ok := v6Value.(easyjson.Marshaler); ok {
-					m.MarshalEasyJSON(out)
-				} else if m, ok := v6Value.(json.Marshaler); ok {
-					out.Raw(m.MarshalJSON())
-				} else {
-					out.Raw(json.Marshal(v6Value))
-				}
+				(v6Value).MarshalEasyJSON(out)
 			}
 			out.RawByte('}')
 		}
@@ -1129,29 +1138,221 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(
 }
 
 // MarshalJSON supports json.Marshaler interface
-func (v Builtin) MarshalJSON() ([]byte, error) {
+func (v ErigonGenesis) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
 	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
-func (v Builtin) MarshalEasyJSON(w *jwriter.Writer) {
+func (v ErigonGenesis) MarshalEasyJSON(w *jwriter.Writer) {
 	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
-func (v *Builtin) UnmarshalJSON(data []byte) error {
+func (v *ErigonGenesis) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
 	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *Builtin) UnmarshalEasyJSON(l *jlexer.Lexer) {
+func (v *ErigonGenesis) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(l, v)
 }
-func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(in *jlexer.Lexer, out *AuthorityParams) {
+func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(in *jlexer.Lexer, out *ErigonConfig) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "ChainName":
+			out.ChainName = string(in.String())
+		case "chainId":
+			out.ChainID = int(in.Int())
+		case "consensus":
+			out.Consensus = string(in.String())
+		case "homesteadBlock":
+			out.HomesteadBlock = int(in.Int())
+		case "eip150Block":
+			out.Eip150Block = int(in.Int())
+		case "eip155Block":
+			out.Eip155Block = int(in.Int())
+		case "byzantiumBlock":
+			out.ByzantiumBlock = int(in.Int())
+		case "constantinopleBlock":
+			out.ConstantinopleBlock = int(in.Int())
+		case "petersburgBlock":
+			out.PetersburgBlock = int(in.Int())
+		case "istanbulBlock":
+			out.IstanbulBlock = int(in.Int())
+		case "berlinBlock":
+			out.BerlinBlock = int(in.Int())
+		case "londonBlock":
+			out.LondonBlock = int(in.Int())
+		case "eip1559FeeCollectorTransition":
+			out.Eip1559FeeCollectorTransition = int(in.Int())
+		case "eip1559FeeCollector":
+			out.Eip1559FeeCollector = string(in.String())
+		case "terminalTotalDifficulty":
+			if in.IsNull() {
+				in.Skip()
+				out.TerminalTotalDifficulty = nil
+			} else {
+				if out.TerminalTotalDifficulty == nil {
+					out.TerminalTotalDifficulty = new(big.Int)
+				}
+				if data := in.Raw(); in.Ok() {
+					in.AddError((*out.TerminalTotalDifficulty).UnmarshalJSON(data))
+				}
+			}
+		case "terminalTotalDifficultyPassed":
+			out.TerminalTotalDifficultyPassed = bool(in.Bool())
+		case "aura":
+			(out.Aura).UnmarshalEasyJSON(in)
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(out *jwriter.Writer, in ErigonConfig) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"ChainName\":"
+		out.RawString(prefix[1:])
+		out.String(string(in.ChainName))
+	}
+	{
+		const prefix string = ",\"chainId\":"
+		out.RawString(prefix)
+		out.Int(int(in.ChainID))
+	}
+	{
+		const prefix string = ",\"consensus\":"
+		out.RawString(prefix)
+		out.String(string(in.Consensus))
+	}
+	{
+		const prefix string = ",\"homesteadBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.HomesteadBlock))
+	}
+	{
+		const prefix string = ",\"eip150Block\":"
+		out.RawString(prefix)
+		out.Int(int(in.Eip150Block))
+	}
+	{
+		const prefix string = ",\"eip155Block\":"
+		out.RawString(prefix)
+		out.Int(int(in.Eip155Block))
+	}
+	{
+		const prefix string = ",\"byzantiumBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.ByzantiumBlock))
+	}
+	{
+		const prefix string = ",\"constantinopleBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.ConstantinopleBlock))
+	}
+	{
+		const prefix string = ",\"petersburgBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.PetersburgBlock))
+	}
+	{
+		const prefix string = ",\"istanbulBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.IstanbulBlock))
+	}
+	{
+		const prefix string = ",\"berlinBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.BerlinBlock))
+	}
+	{
+		const prefix string = ",\"londonBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.LondonBlock))
+	}
+	{
+		const prefix string = ",\"eip1559FeeCollectorTransition\":"
+		out.RawString(prefix)
+		out.Int(int(in.Eip1559FeeCollectorTransition))
+	}
+	{
+		const prefix string = ",\"eip1559FeeCollector\":"
+		out.RawString(prefix)
+		out.String(string(in.Eip1559FeeCollector))
+	}
+	{
+		const prefix string = ",\"terminalTotalDifficulty\":"
+		out.RawString(prefix)
+		if in.TerminalTotalDifficulty == nil {
+			out.RawString("null")
+		} else {
+			out.Raw((*in.TerminalTotalDifficulty).MarshalJSON())
+		}
+	}
+	{
+		const prefix string = ",\"terminalTotalDifficultyPassed\":"
+		out.RawString(prefix)
+		out.Bool(bool(in.TerminalTotalDifficultyPassed))
+	}
+	{
+		const prefix string = ",\"aura\":"
+		out.RawString(prefix)
+		(in.Aura).MarshalEasyJSON(out)
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v ErigonConfig) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v ErigonConfig) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *ErigonConfig) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *ErigonConfig) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(l, v)
+}
+func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper6(in *jlexer.Lexer, out *ErigonAura) {
 	isTopLevel := in.IsStart()
 	if in.IsNull() {
 		if isTopLevel {
@@ -1173,7 +1374,7 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 		case "stepDuration":
 			out.StepDuration = int(in.Int())
 		case "blockReward":
-			out.BlockReward = string(in.String())
+			out.BlockReward = int(in.Int())
 		case "maximumUncleCountTransition":
 			out.MaximumUncleCountTransition = int(in.Int())
 		case "maximumUncleCount":
@@ -1189,11 +1390,7 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 				in.Skip()
 			} else {
 				in.Delim('{')
-				if !in.IsDelim('}') {
-					out.RandomnessContractAddress = make(map[string]string)
-				} else {
-					out.RandomnessContractAddress = nil
-				}
+				out.RandomnessContractAddress = make(map[string]string)
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
@@ -1204,10 +1401,6 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 				}
 				in.Delim('}')
 			}
-		case "withdrawalContractAddress":
-			out.WithdrawalContractAddress = string(in.String())
-		case "twoThirdsMajorityTransition":
-			out.TwoThirdsMajorityTransition = int(in.Int())
 		case "posdaoTransition":
 			out.PosdaoTransition = int(in.Int())
 		case "blockGasLimitContractTransitions":
@@ -1215,11 +1408,7 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 				in.Skip()
 			} else {
 				in.Delim('{')
-				if !in.IsDelim('}') {
-					out.BlockGasLimitContractTransitions = make(map[string]string)
-				} else {
-					out.BlockGasLimitContractTransitions = nil
-				}
+				out.BlockGasLimitContractTransitions = make(map[string]string)
 				for !in.IsDelim('}') {
 					key := string(in.String())
 					in.WantColon()
@@ -1230,6 +1419,8 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 				}
 				in.Delim('}')
 			}
+		case "registrar":
+			out.Registrar = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -1240,85 +1431,51 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 		in.Consumed()
 	}
 }
-func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(out *jwriter.Writer, in AuthorityParams) {
+func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper6(out *jwriter.Writer, in ErigonAura) {
 	out.RawByte('{')
 	first := true
 	_ = first
-	if in.StepDuration != 0 {
+	{
 		const prefix string = ",\"stepDuration\":"
-		first = false
 		out.RawString(prefix[1:])
 		out.Int(int(in.StepDuration))
 	}
-	if in.BlockReward != "" {
+	{
 		const prefix string = ",\"blockReward\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.String(string(in.BlockReward))
+		out.RawString(prefix)
+		out.Int(int(in.BlockReward))
 	}
-	if in.MaximumUncleCountTransition != 0 {
+	{
 		const prefix string = ",\"maximumUncleCountTransition\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Int(int(in.MaximumUncleCountTransition))
 	}
-	if in.MaximumUncleCount != 0 {
+	{
 		const prefix string = ",\"maximumUncleCount\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Int(int(in.MaximumUncleCount))
 	}
-	if true {
+	{
 		const prefix string = ",\"validators\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		easyjson3d34c335Encode3(out, in.Validators)
 	}
-	if in.BlockRewardContractAddress != "" {
+	{
 		const prefix string = ",\"blockRewardContractAddress\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.BlockRewardContractAddress))
 	}
-	if in.BlockRewardContractTransition != 0 {
+	{
 		const prefix string = ",\"blockRewardContractTransition\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Int(int(in.BlockRewardContractTransition))
 	}
-	if len(in.RandomnessContractAddress) != 0 {
+	{
 		const prefix string = ",\"randomnessContractAddress\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
+		out.RawString(prefix)
+		if in.RandomnessContractAddress == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
+			out.RawString(`null`)
 		} else {
-			out.RawString(prefix)
-		}
-		{
 			out.RawByte('{')
 			v9First := true
 			for v9Name, v9Value := range in.RandomnessContractAddress {
@@ -1334,45 +1491,17 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 			out.RawByte('}')
 		}
 	}
-	if in.WithdrawalContractAddress != "" {
-		const prefix string = ",\"withdrawalContractAddress\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.String(string(in.WithdrawalContractAddress))
-	}
-	if in.TwoThirdsMajorityTransition != 0 {
-		const prefix string = ",\"twoThirdsMajorityTransition\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
-		out.Int(int(in.TwoThirdsMajorityTransition))
-	}
-	if in.PosdaoTransition != 0 {
+	{
 		const prefix string = ",\"posdaoTransition\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Int(int(in.PosdaoTransition))
 	}
-	if len(in.BlockGasLimitContractTransitions) != 0 {
+	{
 		const prefix string = ",\"blockGasLimitContractTransitions\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
+		out.RawString(prefix)
+		if in.BlockGasLimitContractTransitions == nil && (out.Flags&jwriter.NilMapAsEmpty) == 0 {
+			out.RawString(`null`)
 		} else {
-			out.RawString(prefix)
-		}
-		{
 			out.RawByte('{')
 			v10First := true
 			for v10Name, v10Value := range in.BlockGasLimitContractTransitions {
@@ -1388,31 +1517,36 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 			out.RawByte('}')
 		}
 	}
+	{
+		const prefix string = ",\"registrar\":"
+		out.RawString(prefix)
+		out.String(string(in.Registrar))
+	}
 	out.RawByte('}')
 }
 
 // MarshalJSON supports json.Marshaler interface
-func (v AuthorityParams) MarshalJSON() ([]byte, error) {
+func (v ErigonAura) MarshalJSON() ([]byte, error) {
 	w := jwriter.Writer{}
-	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(&w, v)
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper6(&w, v)
 	return w.Buffer.BuildBytes(), w.Error
 }
 
 // MarshalEasyJSON supports easyjson.Marshaler interface
-func (v AuthorityParams) MarshalEasyJSON(w *jwriter.Writer) {
-	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(w, v)
+func (v ErigonAura) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper6(w, v)
 }
 
 // UnmarshalJSON supports json.Unmarshaler interface
-func (v *AuthorityParams) UnmarshalJSON(data []byte) error {
+func (v *ErigonAura) UnmarshalJSON(data []byte) error {
 	r := jlexer.Lexer{Data: data}
-	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(&r, v)
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper6(&r, v)
 	return r.Error()
 }
 
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
-func (v *AuthorityParams) UnmarshalEasyJSON(l *jlexer.Lexer) {
-	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(l, v)
+func (v *ErigonAura) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper6(l, v)
 }
 func easyjson3d34c335Decode3(in *jlexer.Lexer, out *struct {
 	Multi map[string]map[string][]string `json:"multi,omitempty"`
@@ -1558,4 +1692,463 @@ func easyjson3d34c335Encode3(out *jwriter.Writer, in struct {
 		}
 	}
 	out.RawByte('}')
+}
+func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(in *jlexer.Lexer, out *ErigonAccount) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "balance":
+			out.Balance = string(in.String())
+		case "constructor":
+			out.Constructor = string(in.String())
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(out *jwriter.Writer, in ErigonAccount) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	{
+		const prefix string = ",\"balance\":"
+		out.RawString(prefix[1:])
+		out.String(string(in.Balance))
+	}
+	if in.Constructor != "" {
+		const prefix string = ",\"constructor\":"
+		out.RawString(prefix)
+		out.String(string(in.Constructor))
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v ErigonAccount) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v ErigonAccount) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *ErigonAccount) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *ErigonAccount) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(l, v)
+}
+func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper8(in *jlexer.Lexer, out *Builtin) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "name":
+			out.Name = string(in.String())
+		case "pricing":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				in.Delim('{')
+				if !in.IsDelim('}') {
+					out.Pricing = make(map[string]interface{})
+				} else {
+					out.Pricing = nil
+				}
+				for !in.IsDelim('}') {
+					key := string(in.String())
+					in.WantColon()
+					var v18 interface{}
+					if m, ok := v18.(easyjson.Unmarshaler); ok {
+						m.UnmarshalEasyJSON(in)
+					} else if m, ok := v18.(json.Unmarshaler); ok {
+						_ = m.UnmarshalJSON(in.Raw())
+					} else {
+						v18 = in.Interface()
+					}
+					(out.Pricing)[key] = v18
+					in.WantComma()
+				}
+				in.Delim('}')
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper8(out *jwriter.Writer, in Builtin) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	if in.Name != "" {
+		const prefix string = ",\"name\":"
+		first = false
+		out.RawString(prefix[1:])
+		out.String(string(in.Name))
+	}
+	if len(in.Pricing) != 0 {
+		const prefix string = ",\"pricing\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('{')
+			v19First := true
+			for v19Name, v19Value := range in.Pricing {
+				if v19First {
+					v19First = false
+				} else {
+					out.RawByte(',')
+				}
+				out.String(string(v19Name))
+				out.RawByte(':')
+				if m, ok := v19Value.(easyjson.Marshaler); ok {
+					m.MarshalEasyJSON(out)
+				} else if m, ok := v19Value.(json.Marshaler); ok {
+					out.Raw(m.MarshalJSON())
+				} else {
+					out.Raw(json.Marshal(v19Value))
+				}
+			}
+			out.RawByte('}')
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v Builtin) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper8(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v Builtin) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper8(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *Builtin) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper8(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *Builtin) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper8(l, v)
+}
+func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper9(in *jlexer.Lexer, out *AuthorityParams) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "stepDuration":
+			out.StepDuration = int(in.Int())
+		case "blockReward":
+			out.BlockReward = string(in.String())
+		case "maximumUncleCountTransition":
+			out.MaximumUncleCountTransition = int(in.Int())
+		case "maximumUncleCount":
+			out.MaximumUncleCount = int(in.Int())
+		case "validators":
+			easyjson3d34c335Decode3(in, &out.Validators)
+		case "blockRewardContractAddress":
+			out.BlockRewardContractAddress = string(in.String())
+		case "blockRewardContractTransition":
+			out.BlockRewardContractTransition = int(in.Int())
+		case "randomnessContractAddress":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				in.Delim('{')
+				if !in.IsDelim('}') {
+					out.RandomnessContractAddress = make(map[string]string)
+				} else {
+					out.RandomnessContractAddress = nil
+				}
+				for !in.IsDelim('}') {
+					key := string(in.String())
+					in.WantColon()
+					var v20 string
+					v20 = string(in.String())
+					(out.RandomnessContractAddress)[key] = v20
+					in.WantComma()
+				}
+				in.Delim('}')
+			}
+		case "withdrawalContractAddress":
+			out.WithdrawalContractAddress = string(in.String())
+		case "twoThirdsMajorityTransition":
+			out.TwoThirdsMajorityTransition = int(in.Int())
+		case "posdaoTransition":
+			out.PosdaoTransition = int(in.Int())
+		case "blockGasLimitContractTransitions":
+			if in.IsNull() {
+				in.Skip()
+			} else {
+				in.Delim('{')
+				if !in.IsDelim('}') {
+					out.BlockGasLimitContractTransitions = make(map[string]string)
+				} else {
+					out.BlockGasLimitContractTransitions = nil
+				}
+				for !in.IsDelim('}') {
+					key := string(in.String())
+					in.WantColon()
+					var v21 string
+					v21 = string(in.String())
+					(out.BlockGasLimitContractTransitions)[key] = v21
+					in.WantComma()
+				}
+				in.Delim('}')
+			}
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper9(out *jwriter.Writer, in AuthorityParams) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	if in.StepDuration != 0 {
+		const prefix string = ",\"stepDuration\":"
+		first = false
+		out.RawString(prefix[1:])
+		out.Int(int(in.StepDuration))
+	}
+	if in.BlockReward != "" {
+		const prefix string = ",\"blockReward\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.BlockReward))
+	}
+	if in.MaximumUncleCountTransition != 0 {
+		const prefix string = ",\"maximumUncleCountTransition\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(in.MaximumUncleCountTransition))
+	}
+	if in.MaximumUncleCount != 0 {
+		const prefix string = ",\"maximumUncleCount\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(in.MaximumUncleCount))
+	}
+	if true {
+		const prefix string = ",\"validators\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		easyjson3d34c335Encode3(out, in.Validators)
+	}
+	if in.BlockRewardContractAddress != "" {
+		const prefix string = ",\"blockRewardContractAddress\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.BlockRewardContractAddress))
+	}
+	if in.BlockRewardContractTransition != 0 {
+		const prefix string = ",\"blockRewardContractTransition\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(in.BlockRewardContractTransition))
+	}
+	if len(in.RandomnessContractAddress) != 0 {
+		const prefix string = ",\"randomnessContractAddress\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('{')
+			v22First := true
+			for v22Name, v22Value := range in.RandomnessContractAddress {
+				if v22First {
+					v22First = false
+				} else {
+					out.RawByte(',')
+				}
+				out.String(string(v22Name))
+				out.RawByte(':')
+				out.String(string(v22Value))
+			}
+			out.RawByte('}')
+		}
+	}
+	if in.WithdrawalContractAddress != "" {
+		const prefix string = ",\"withdrawalContractAddress\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.WithdrawalContractAddress))
+	}
+	if in.TwoThirdsMajorityTransition != 0 {
+		const prefix string = ",\"twoThirdsMajorityTransition\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(in.TwoThirdsMajorityTransition))
+	}
+	if in.PosdaoTransition != 0 {
+		const prefix string = ",\"posdaoTransition\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.Int(int(in.PosdaoTransition))
+	}
+	if len(in.BlockGasLimitContractTransitions) != 0 {
+		const prefix string = ",\"blockGasLimitContractTransitions\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		{
+			out.RawByte('{')
+			v23First := true
+			for v23Name, v23Value := range in.BlockGasLimitContractTransitions {
+				if v23First {
+					v23First = false
+				} else {
+					out.RawByte(',')
+				}
+				out.String(string(v23Name))
+				out.RawByte(':')
+				out.String(string(v23Value))
+			}
+			out.RawByte('}')
+		}
+	}
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v AuthorityParams) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper9(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v AuthorityParams) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper9(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *AuthorityParams) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper9(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *AuthorityParams) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper9(l, v)
 }
