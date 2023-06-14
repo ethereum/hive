@@ -1,11 +1,11 @@
 ## Pulls geth from a git repository and builds it from source.
 
-FROM alpine:latest as builder
+FROM golang:1.20-alpine as builder
 ARG github=ethereum/go-ethereum
 ARG tag=master
 
 RUN \
-  apk add --update bash curl jq go git make gcc musl-dev              \
+  apk add --update bash curl jq git make gcc musl-dev              \
         ca-certificates linux-headers                              && \
   git clone --depth 1 --branch $tag https://github.com/$github     && \
   cd go-ethereum                                                   && \
