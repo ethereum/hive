@@ -16,7 +16,7 @@ WORKDIR /nimbus-eth1
 
 RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" V=1 update
 
-RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" nimbus && \
+RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC} -d:chronicles_colors=none" nimbus && \
     mv build/nimbus /usr/bin/
 
 # --------------------------------- #

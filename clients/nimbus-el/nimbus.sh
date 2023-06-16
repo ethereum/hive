@@ -51,9 +51,15 @@ set -e
 nimbus=/usr/bin/nimbus
 FLAGS="--prune-mode:archive --nat:extip:0.0.0.0"
 
-if [ "$HIVE_LOGLEVEL" != "" ]; then
-  FLAGS="$FLAGS --log-level:DEBUG"
-fi
+loglevel=DEBUG
+case "$HIVE_LOGLEVEL" in
+    0|1) loglevel=ERROR ;;
+    2)   loglevel=WARN  ;;
+    3)   loglevel=INFO  ;;
+    4)   loglevel=DEBUG ;;
+    5)   loglevel=TRACE ;;
+esac
+FLAGS="$FLAGS --log-level:$loglevel"
 
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 if [ "$HIVE_BOOTNODE" != "" ]; then
