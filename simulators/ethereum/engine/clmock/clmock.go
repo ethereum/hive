@@ -314,9 +314,8 @@ func (cl *CLMocker) pickNextPayloadProducer() {
 			// Selected client latest block hash does not match canonical chain, try again
 			cl.NextBlockProducer = nil
 			continue
-		} else {
-			break
 		}
+		break
 
 	}
 
@@ -543,8 +542,9 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 	previousForkchoice := cl.LatestForkchoice
 	cl.HeadHashHistory = append(cl.HeadHashHistory, cl.LatestPayloadBuilt.BlockHash)
 
-	cl.LatestForkchoice = api.ForkchoiceStateV1{}
-	cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
+	cl.LatestForkchoice = api.ForkchoiceStateV1{
+		HeadBlockHash: cl.LatestPayloadBuilt.BlockHash,
+	}
 	if len(cl.HeadHashHistory) > int(cl.SlotsToSafe.Int64()) {
 		cl.LatestForkchoice.SafeBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToSafe.Int64())-1]
 	}

@@ -87,11 +87,11 @@ type ClientGenesis interface {
 // Load the genesis based on each client
 
 // getTimestamp of the next 2 minutes
-func getTimestamp() int64 {
+func getTimestamp(spec test.SpecInterface) int64 {
 	now := time.Now()
 
 	// Calculate the start of the next 2 minutes
-	nextMinute := now.Truncate(time.Minute).Add(1 * time.Minute)
+	nextMinute := now.Truncate(time.Minute).Add(1 * time.Minute).Add(time.Duration(spec.GetPreShapellaBlockCount()*30) * time.Second)
 
 	// Get the Unix timestamp of the next 2 minutes
 	return nextMinute.Unix()
@@ -114,7 +114,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		genesis := currentTest.GetGenesis(clientName)
 
 		// Set the timestamp of the genesis to the next 2 minutes
-		timestamp := getTimestamp()
+		timestamp := getTimestamp(currentTest)
 		genesis.SetTimestamp(timestamp)
 		genesis.SetDifficulty(big.NewInt(100))
 		//genesis.UpdateTimestamp(getTimestamp())
@@ -124,7 +124,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		// Calculate and set the TTD for this test
-		//ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
+		// ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
 
 		// Configure Forks
 		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", genesis.Difficulty()))
