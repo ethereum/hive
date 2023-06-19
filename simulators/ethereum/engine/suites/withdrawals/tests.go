@@ -63,63 +63,63 @@ type WithdrawalsBaseSpec struct {
 //
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	// &WithdrawalsBaseSpec{
-	// 	Spec: test.Spec{
-	// 		Name: "Withdrawals Fork On Genesis",
-	// 		About: `
-	// 		Tests the withdrawals fork happening on block 5 (e.g. on a
-	// 		testnet).
-	// 		`,
-	// 	},
-	// 	WithdrawalsForkHeight: 1, //TODO
-	// 	WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
-	// 	WithdrawalsPerBlock:   16,
-	// 	TimeIncrements:        5,
-	// },
-
-	// &WithdrawalsBaseSpec{
-	// 	Spec: test.Spec{
-	// 		Name: "Withdrawals Fork on Block 1",
-	// 		About: `
-	// 		Tests the withdrawals fork happening directly after genesis.
-	// 		`,
-	// 	},
-	// 	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
-	// 	WithdrawalsBlockCount: 1,
-	// 	WithdrawalsPerBlock:   16,
-	// },
-	// // TODO
-	// &WithdrawalsBaseSpec{
-	// 	Spec: test.Spec{
-	// 		Name: "Withdrawals Fork on Block 5",
-	// 		About: `
-	// 		Tests the transition to the withdrawals fork after a single block
-	// 		has happened.
-	// 		Block 1 is sent with invalid non-null withdrawals payload and
-	// 		client is expected to respond with the appropriate error.
-	// 		`,
-	// 	},
-	// 	WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
-	// 	WithdrawalsBlockCount: 1,
-	// 	WithdrawalsPerBlock:   16,
-	// 	TimeIncrements:        5,
-	// },
-	// TODO
+	//&WithdrawalsBaseSpec{
+	//	Spec: test.Spec{
+	//		Name: "Withdrawals Fork On Genesis",
+	//		About: `
+	//		Tests the withdrawals fork happening on block 5 (e.g. on a
+	//		testnet).
+	//		`,
+	//	},
+	//	WithdrawalsForkHeight: 1, //TODO
+	//	WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
+	//	WithdrawalsPerBlock:   16,
+	//	TimeIncrements:        5,
+	//},
+	//
+	//&WithdrawalsBaseSpec{
+	//	Spec: test.Spec{
+	//		Name: "Withdrawals Fork on Block 1",
+	//		About: `
+	//		Tests the withdrawals fork happening directly after genesis.
+	//		`,
+	//	},
+	//	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
+	//	WithdrawalsBlockCount: 1,
+	//	WithdrawalsPerBlock:   16,
+	//},
+	//// TODO
 	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
-			Name: "Withdrawals Fork on Block 3",
+			Name: "Withdrawals Fork on Block 5",
 			About: `
-			Tests the transition to the withdrawals fork after two blocks
-			have happened.
-			Block 2 is sent with invalid non-null withdrawals payload and
+			Tests the transition to the withdrawals fork after a single block
+			has happened.
+			Block 1 is sent with invalid non-null withdrawals payload and
 			client is expected to respond with the appropriate error.
 			`,
 		},
-		WithdrawalsForkHeight: 3, // Genesis, Block 1 and 2 are Pre-Withdrawals
+		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
 		WithdrawalsPerBlock:   16,
 		TimeIncrements:        5,
 	},
+	// TODO
+	//&WithdrawalsBaseSpec{
+	//	Spec: test.Spec{
+	//		Name: "Withdrawals Fork on Block 3",
+	//		About: `
+	//		Tests the transition to the withdrawals fork after two blocks
+	//		have happened.
+	//		Block 2 is sent with invalid non-null withdrawals payload and
+	//		client is expected to respond with the appropriate error.
+	//		`,
+	//	},
+	//	WithdrawalsForkHeight: 3, // Genesis, Block 1 and 2 are Pre-Withdrawals
+	//	WithdrawalsBlockCount: 1,
+	//	WithdrawalsPerBlock:   16,
+	//	TimeIncrements:        5,
+	//},
 
 	// &WithdrawalsBaseSpec{
 	// 	Spec: test.Spec{
@@ -1090,7 +1090,15 @@ func getTimestamp() int64 {
 func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
 	ws.WithdrawalsHistory = make(WithdrawalsHistory)
+	shangaiTime := *t.Genesis.Config().ShanghaiTime
+	t.CLMock.ShanghaiTimestamp = big.NewInt(0).SetUint64(shangaiTime)
+	// Create a time.Time value from the int64 timestamp
+	tUnix := time.Unix(t.CLMock.ShanghaiTimestamp.Int64(), 0)
 
+	// Format the time in a human-readable way
+	formattedTime := tUnix.Format("2006-01-02 15:04:05")
+	// Print shangai timestamp
+	t.Logf("Shanghai timestamp: %v", formattedTime)
 	t.CLMock.WaitForTTD()
 
 	r := t.TestEngine.TestBlockByNumber(nil)
@@ -1180,7 +1188,11 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	})
 
 	if time.Now().Unix() < int64(*t.Genesis.Config().ShanghaiTime) {
-		time.Sleep(time.Duration((int64(*t.Genesis.Config().ShanghaiTime) - time.Now().Unix())))
+		tUnix = time.Unix(t.CLMock.ShanghaiTimestamp.Int64(), 0)
+		durationUntilFuture := time.Until(tUnix)
+		if durationUntilFuture > 0 {
+			time.Sleep(durationUntilFuture)
+		}
 	}
 
 	// Produce requested post-shanghai blocks
@@ -1432,7 +1444,7 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 	}
 	// Latest block in both EngineClients should be the same
 	if block1.Number().Uint64() != block2.Number().Uint64() {
-		t.Fatalf("FAIL (%s): Secondary client is not synced to the same block as the primary client", t.TestName
+		t.Fatalf("FAIL (%s): Secondary client is not synced to the same block as the primary client", t.TestName)
 	}
 }
 

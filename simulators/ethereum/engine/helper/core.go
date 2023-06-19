@@ -175,11 +175,17 @@ func (n *NethermindChainSpec) Config() *params.ChainConfig {
 	if err != nil {
 		panic(err)
 	}
-	shangai := big.NewInt(0).SetBytes(common.Hex2Bytes(n.Params.Eip4895TransitionTimestamp)).Uint64()
+	unixTimestampUint64, err := strconv.ParseUint(n.Params.Eip4895TransitionTimestamp[2:], 16, 64)
+	if err != nil {
+		fmt.Println("Error parsing hexadecimal timestamp:", err)
+		return nil
+	}
+
+	//shangai := big.NewInt(0).SetBytes(common.Hex2Bytes(n.Params.Eip4895TransitionTimestamp)).Uint64()
 	return &params.ChainConfig{
 		ChainID:                 chainID,
 		TerminalTotalDifficulty: big.NewInt(ttd),
-		ShanghaiTime:            &shangai,
+		ShanghaiTime:            &unixTimestampUint64,
 	}
 }
 

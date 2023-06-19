@@ -90,8 +90,19 @@ type ClientGenesis interface {
 func getTimestamp(spec test.SpecInterface) int64 {
 	now := time.Now()
 
+	preShapellaBlock := spec.GetPreShapellaBlockCount()
+	if preShapellaBlock == 0 {
+		preShapellaBlock = 1
+	}
+
 	// Calculate the start of the next 2 minutes
-	nextMinute := now.Truncate(time.Minute).Add(1 * time.Minute).Add(time.Duration(spec.GetPreShapellaBlockCount()*30) * time.Second)
+	nextMinute := now.Truncate(time.Minute).Add(time.Duration(preShapellaBlock) * 3 * time.Minute).Add(time.Minute)
+	// Create a time.Time value from the int64 timestamp
+	//tUnix := time.Unix(nex, 0)
+
+	// Format the time in a human-readable way
+	formattedTime := nextMinute.Format("2006-01-02 15:04:05")
+	fmt.Sprintf("Formatted timestamp: %v\n", formattedTime)
 
 	// Get the Unix timestamp of the next 2 minutes
 	return nextMinute.Unix()

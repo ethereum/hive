@@ -108,6 +108,14 @@ type CLMocker struct {
 }
 
 func isShanghai(blockTimestamp uint64, shanghaiTimestamp *big.Int) bool {
+	tUnix := time.Unix(int64(blockTimestamp), 0)
+	formattedTime := tUnix.Format("2006-01-02 15:04:05")
+	fmt.Sprintf("Block timestamp: %v", formattedTime)
+
+	tUnix = time.Unix(shanghaiTimestamp.Int64(), 0)
+	shangai := tUnix.Format("2006-01-02 15:04:05")
+	fmt.Sprintf("Shangai Timestamp: %v", shangai)
+
 	return shanghaiTimestamp != nil && big.NewInt(int64(blockTimestamp)).Cmp(shanghaiTimestamp) >= 0
 }
 
