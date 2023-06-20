@@ -44,7 +44,7 @@ fi
 
 if [ "$HIVE_BOOTNODE" != "" ]; then
     # Somehow the bootnodes flag is not working for erigon, only staticpeers is working for sync tests
-    FLAGS="$FLAGS --staticpeers $HIVE_BOOTNODE --nodiscover"
+    FLAGS="$FLAGS --staticpeers $HIVE_BOOTNODE"
 fi
 
 if [ "$HIVE_SKIP_POW" != "" ]; then
@@ -53,7 +53,7 @@ fi
 
 # Create the data directory.
 mkdir /erigon-hive-datadir
-FLAGS="$FLAGS --datadir /erigon-hive-datadir"
+FLAGS="$FLAGS --datadir /erigon-hive-datadir  --nodiscover"
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
@@ -67,8 +67,8 @@ fi
 #jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis
-echo "Supplied genesis state:"
-cat /genesis.json
+#echo "Supplied genesis state:"
+#cat /genesis.json
 
 echo "Command flags till now:"
 echo $FLAGS
@@ -135,6 +135,6 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
 fi
 
 # Launch the main client.
-FLAGS="$FLAGS --nat=none --externalcl"
+FLAGS="$FLAGS --nat=none"
 echo "Running erigon with flags $FLAGS"
 $erigon $FLAGS

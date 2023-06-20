@@ -323,6 +323,7 @@ type ErigonConfig struct {
 	Eip1559FeeCollector           string     `json:"eip1559FeeCollector"`
 	TerminalTotalDifficulty       *big.Int   `json:"terminalTotalDifficulty"`
 	TerminalTotalDifficultyPassed bool       `json:"terminalTotalDifficultyPassed"`
+	ShanghaiTimestamp             *big.Int   `json:"shanghaiTime"`
 	Aura                          ErigonAura `json:"aura"`
 }
 
@@ -333,14 +334,14 @@ type ErigonAccount struct {
 
 type ErigonGenesis struct {
 	ErigonConfig     ErigonConfig             `json:"config"`
-	ErigonTimestamp  string                   `json:"timestamp"`
+	ErigonTimestamp  *big.Int                 `json:"timestamp"`
 	AuRaSeal         string                   `json:"auRaSeal"`
 	ErigonGasLimit   string                   `json:"gasLimit"`
 	ErigonDifficulty string                   `json:"difficulty"`
 	ErigonAlloc      map[string]ErigonAccount `json:"alloc"`
 }
 
-func (v ErigonGenesis) Config() *params.ChainConfig {
+func (v *ErigonGenesis) Config() *params.ChainConfig {
 	chainID := big.NewInt(int64(v.ErigonConfig.ChainID))
 	ttd := big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonDifficulty))
 	shangai := big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonTimestamp)).Uint64()
@@ -351,112 +352,112 @@ func (v ErigonGenesis) Config() *params.ChainConfig {
 	}
 }
 
-func (v ErigonGenesis) SetConfig(config *params.ChainConfig) {
+func (v *ErigonGenesis) SetConfig(config *params.ChainConfig) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) Nonce() uint64 {
+func (v *ErigonGenesis) Nonce() uint64 {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) SetNonce(nonce uint64) {
+func (v *ErigonGenesis) SetNonce(nonce uint64) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) Timestamp() uint64 {
+func (v *ErigonGenesis) Timestamp() uint64 {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) SetTimestamp(timestamp int64) {
-	v.ErigonTimestamp = fmt.Sprintf("%#x", timestamp)
+func (v *ErigonGenesis) SetTimestamp(timestamp int64) {
+	v.ErigonConfig.ShanghaiTimestamp = big.NewInt(timestamp)
 }
 
-func (v ErigonGenesis) ExtraData() []byte {
+func (v *ErigonGenesis) ExtraData() []byte {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) SetExtraData(data []byte) {
+func (v *ErigonGenesis) SetExtraData(data []byte) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) GasLimit() uint64 {
+func (v *ErigonGenesis) GasLimit() uint64 {
 	return big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonGasLimit)).Uint64()
 }
 
-func (v ErigonGenesis) SetGasLimit(limit uint64) {
+func (v *ErigonGenesis) SetGasLimit(limit uint64) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) Difficulty() *big.Int {
+func (v *ErigonGenesis) Difficulty() *big.Int {
 	return big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonDifficulty))
 }
 
-func (v ErigonGenesis) SetDifficulty(difficulty *big.Int) {
+func (v *ErigonGenesis) SetDifficulty(difficulty *big.Int) {
 	v.ErigonDifficulty = common.BigToHash(difficulty).Hex()
 }
 
-func (v ErigonGenesis) MixHash() common.Hash {
+func (v *ErigonGenesis) MixHash() common.Hash {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) SetMixHash(hash common.Hash) {
+func (v *ErigonGenesis) SetMixHash(hash common.Hash) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) Coinbase() common.Address {
+func (v *ErigonGenesis) Coinbase() common.Address {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) SetCoinbase(address common.Address) {
+func (v *ErigonGenesis) SetCoinbase(address common.Address) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) Alloc() GenesisAlloc {
+func (v *ErigonGenesis) Alloc() GenesisAlloc {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) AllocGenesis(address common.Address, account GenesisAccount) {
+func (v *ErigonGenesis) AllocGenesis(address common.Address, account GenesisAccount) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) UpdateTimestamp(timestamp string) {
+func (v *ErigonGenesis) UpdateTimestamp(timestamp string) {
 	v.ErigonTimestamp = timestamp
 }
 
-func (v ErigonGenesis) Number() uint64 {
+func (v *ErigonGenesis) Number() uint64 {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) GasUsed() uint64 {
+func (v *ErigonGenesis) GasUsed() uint64 {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) ParentHash() common.Hash {
+func (v *ErigonGenesis) ParentHash() common.Hash {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) BaseFee() *big.Int {
+func (v *ErigonGenesis) BaseFee() *big.Int {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (v ErigonGenesis) ToBlock() *types.Block {
+func (v *ErigonGenesis) ToBlock() *types.Block {
 	//TODO implement me
 	panic("implement me")
 }
