@@ -58,7 +58,7 @@ func main() {
 	addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
 	addTestsToSuite(simulator, &transition, specToInterface(suite_transition.Tests), "full")
 	addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
-	addTestsToSuite(simulator, &excap, specToInterface(suite_ex_cap.Tests), "full")
+	addTestsToSuite(simulator, &excap, suite_ex_cap.Tests, "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
 
