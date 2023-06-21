@@ -21,11 +21,11 @@ COPY --from=builder /source/pyspec/pyspec .
 # To run locally generated fixtures, comment the following RUN lines and
 # uncomment the ADD line.
 # Download the latest fixture release.
-RUN wget https://github.com/spencer-tb/execution-spec-tests/releases/latest/download/fixtures.tar.gz
-RUN tar -xzvf fixtures.tar.gz
-RUN mv fixtures /fixtures
+# RUN wget https://github.com/spencer-tb/execution-spec-tests/releases/latest/download/fixtures.tar.gz
+# RUN tar -xzvf fixtures.tar.gz
+# RUN mv fixtures /fixtures
 
-# ADD ./pyspec/fixtures /fixtures
+ADD ./pyspec/fixtures /fixtures
 
 # Point to executable and test fixtures.
 ENV TESTPATH /fixtures

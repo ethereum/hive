@@ -24,7 +24,7 @@ type testcase struct {
 	fixture         fixtureTest
 	genesis         *core.Genesis
 	payloads        []*api.ExecutableData
-	versionedHashes []common.Hash
+	versionedHashes [][]common.Hash
 	postAlloc       *core.GenesisAlloc
 }
 
@@ -158,8 +158,7 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
 	tc.genesis = extractGenesis(fixture)
 
 	// extract payload & versionedHashes
-	var blobs []common.Hash
-	blockContainsBlobTxs := false
+	var blobs [][]common.Hash
 	payloads := []*api.ExecutableData{}
 	for _, bl := range fixture.Blocks {
 		// decode block rlp
@@ -171,22 +170,18 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
 		payload := api.BlockToExecutableData(block, common.Big0).ExecutionPayload
 		payloads = append(payloads, payload)
 		// extract blobs from block
+		block_blobs := []common.Hash{}
 		for _, tx := range block.Transactions() {
 			if tx.Type() >= 3 {
-				blockContainsBlobTxs = true
 				for _, blob := range tx.DataHashes() {
-					blobs = append(blobs, blob)
+					block_blobs = append(block_blobs, blob)
 				}
 			}
 		}
+		blobs = append(blobs, block_blobs)
 	}
 	tc.payloads = payloads
-	tc.versionedHashes = nil
-	if blockContainsBlobTxs {
-		tc.versionedHashes = blobs
-	} else {
-		tc.versionedHashes = nil
-	}
+	tc.versionedHashes = blobs
 
 	// extract post account information
 	tc.postAlloc = &fixture.Post
@@ -206,6 +201,7 @@ func extractGenesis(fixture fixtureJSON) *core.Genesis {
 		Nonce:         fixture.Genesis.Nonce.Uint64(),
 		BaseFee:       fixture.Genesis.BaseFee,
 		ExcessDataGas: fixture.Genesis.ExcessDataGas,
+		DataGasUsed:   fixture.Genesis.DataGasUsed,
 		Alloc:         fixture.Pre,
 	}
 	return genesis
