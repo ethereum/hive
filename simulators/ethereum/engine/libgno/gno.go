@@ -15,8 +15,9 @@ const MAX_FAILED_WITHDRAWALS_TO_PROCESS = 4
 const GAS_LIMIT = 1000000
 
 // SYSTEM_SENDER represents the address of the system sender.
-var SYSTEM_SENDER = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
-var GNOTokenAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000001")
+// var SYSTEM_SENDER = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
+var GNOTokenAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000002")
+var WithdrawalsContractAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000003")
 
 // GNOWithdrawalContractABI represents the path to the GNO withdrawal contract ABI.
 //
@@ -50,6 +51,20 @@ func ExecuteSystemWithdrawal(maxNumberOfFailedWithdrawalsToProcess uint64, amoun
 	return dataBytes, nil
 }
 
+// ExecuteWithdrawalsClaims gets the byte code to execute a withdrawals claims.
+func ExecuteWithdrawalsClaims(addresses []common.Address) ([]byte, error) {
+	withdrawalABI, err := abi.JSON(strings.NewReader(GNOWithdrawalContractABI))
+	if err != nil {
+		return []byte{}, ErrorLoadingWithdrawalContract
+	}
+	dataBytes, err := withdrawalABI.Pack("claimWithdrawals", addresses)
+	if err != nil {
+		return []byte{}, fmt.Errorf("%w: %w", ErrorPackingArguments, err)
+	}
+	// if at some point we want to convert it to hex, use something like this: hex.EncodeToString(dataBytes)
+	return dataBytes, nil
+}
+
 // BalanceOfAddressData return contract method to get the balance of a GNO token.
 func BalanceOfAddressData(account common.Address) ([]byte, error) {
 	gnoTokenABI, err := abi.JSON(strings.NewReader(GNOTokenContractABI))
@@ -70,4 +85,13 @@ func GetGNOTokenABI() (*abi.ABI, error) {
 		return nil, ErrorLoadingGNOTokenContract
 	}
 	return &gnoTokenABI, nil
+}
+
+// GetWithdrawalsABI return the Withdrawals contract ABI.
+func GetWithdrawalsABI() (*abi.ABI, error) {
+	withdrawalsABI, err := abi.JSON(strings.NewReader(GNOWithdrawalContractABI))
+	if err != nil {
+		return nil, ErrorLoadingWithdrawalContract
+	}
+	return &withdrawalsABI, nil
 }
