@@ -16,7 +16,7 @@ const GAS_LIMIT = 1000000
 
 // SYSTEM_SENDER represents the address of the system sender.
 // var SYSTEM_SENDER = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
-var GNOTokenAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000001")
+var GNOTokenAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000002")
 var WithdrawalsContractAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000003")
 
 // GNOWithdrawalContractABI represents the path to the GNO withdrawal contract ABI.
