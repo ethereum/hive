@@ -83,7 +83,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		// Calculate and set the TTD for this test
-		ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
+		ttd := genesis.Config.TerminalTotalDifficulty
 
 		// Configure Forks
 		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
@@ -98,7 +98,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		testFiles := hivesim.Params{}
-		if genesis.Difficulty.Cmp(big.NewInt(ttd)) < 0 {
+		if genesis.Difficulty.Cmp(ttd) <= 0 {
 
 			if currentTest.GetChainFile() != "" {
 				// We are using a Proof of Work chain file, remove all clique-related settings
@@ -145,7 +145,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 						// Run the test case
 						test.Run(
 							currentTest,
-							big.NewInt(ttd),
+							new(big.Int).Set(ttd),
 							timeout,
 							t,
 							c,

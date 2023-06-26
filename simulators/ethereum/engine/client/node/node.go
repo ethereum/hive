@@ -193,6 +193,12 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 	if err != nil {
 		return nil, err
 	}
+	if genesis == nil || genesis.Config == nil {
+		return nil, fmt.Errorf("genesis configuration is nil")
+	}
+	if genesis.Config.TerminalTotalDifficultyPassed == false {
+		return nil, fmt.Errorf("genesis configuration is has not passed terminal total difficulty")
+	}
 	econfig := &ethconfig.Config{
 		Genesis:          genesis,
 		NetworkId:        genesis.Config.ChainID.Uint64(),
@@ -505,24 +511,10 @@ func (n *GethNode) GetPayloadBodiesByHashV1(ctx context.Context, hashes []common
 }
 
 // Eth JSON RPC
-const (
-	SafeBlockNumber      = rpc.BlockNumber(-4) // This is not yet true
-	FinalizedBlockNumber = rpc.BlockNumber(-3)
-	PendingBlockNumber   = rpc.BlockNumber(-2)
-	LatestBlockNumber    = rpc.BlockNumber(-1)
-	EarliestBlockNumber  = rpc.BlockNumber(0)
-)
-
-var (
-	Head      *big.Int // Nil
-	Pending   = big.NewInt(-2)
-	Finalized = big.NewInt(-3)
-	Safe      = big.NewInt(-4)
-)
 
 func parseBlockNumber(number *big.Int) rpc.BlockNumber {
 	if number == nil {
-		return LatestBlockNumber
+		return rpc.LatestBlockNumber
 	}
 	return rpc.BlockNumber(number.Int64())
 }
@@ -651,7 +643,7 @@ func (n *GethNode) ID() string {
 
 func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
 	// First get the current head of the client where we will send the tx
-	head, err := n.eth.APIBackend.BlockByNumber(testCtx, LatestBlockNumber)
+	head, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
 	if err != nil {
 		return 0, err
 	}
@@ -677,7 +669,7 @@ func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.A
 
 func (n *GethNode) UpdateNonce(testCtx context.Context, account common.Address, newNonce uint64) error {
 	// First get the current head of the client where we will send the tx
-	head, err := n.eth.APIBackend.BlockByNumber(testCtx, LatestBlockNumber)
+	head, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
 	if err != nil {
 		return err
 	}
