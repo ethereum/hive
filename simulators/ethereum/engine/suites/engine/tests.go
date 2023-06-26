@@ -37,21 +37,6 @@ var (
 var Tests = []test.Spec{
 	// Engine API Negative Test Cases
 	{
-		Name: "Invalid Terminal Block in ForkchoiceUpdated",
-		Run:  invalidTerminalBlockForkchoiceUpdated,
-		TTD:  1000000,
-	},
-	{
-		Name: "Invalid GetPayload Under PoW",
-		Run:  invalidGetPayloadUnderPoW,
-		TTD:  1000000,
-	},
-	{
-		Name: "Invalid Terminal Block in NewPayload",
-		Run:  invalidTerminalBlockNewPayload,
-		TTD:  1000000,
-	},
-	{
 		Name: "Inconsistent Head in ForkchoiceState",
 		Run:  inconsistentForkchoiceStateGen("Head"),
 	},
@@ -82,11 +67,6 @@ var Tests = []test.Spec{
 	{
 		Name: "ForkchoiceUpdated Invalid Payload Attributes (Syncing)",
 		Run:  invalidPayloadAttributesGen(true),
-	},
-	{
-		Name: "Pre-TTD ForkchoiceUpdated After PoS Switch",
-		Run:  preTTDFinalizedBlockHash,
-		TTD:  2,
 	},
 	{
 		Name:       "Unique Payload ID",
@@ -634,12 +614,10 @@ var Tests = []test.Spec{
 	{
 		Name: "safe Block after New SafeBlockHash",
 		Run:  blockStatusSafeBlock,
-		TTD:  5,
 	},
 	{
 		Name: "finalized Block after New FinalizedBlockHash",
 		Run:  blockStatusFinalizedBlock,
-		TTD:  5,
 	},
 	{
 		Name:             "safe, finalized on Canonical Chain",
@@ -670,10 +648,8 @@ var Tests = []test.Spec{
 		Run:  validPayloadFcUSyncingClient,
 	},
 	{
-		Name:      "NewPayload with Missing ForkchoiceUpdated",
-		Run:       missingFcu,
-		TTD:       393120,
-		ChainFile: "blocks_2_td_393504.rlp",
+		Name: "NewPayload with Missing ForkchoiceUpdated",
+		Run:  missingFcu,
 	},
 	{
 		Name: "Payload Build after New Invalid Payload",
@@ -744,86 +720,13 @@ var Tests = []test.Spec{
 	{
 		Name:                "PrevRandao Opcode Transactions",
 		Run:                 prevRandaoOpcodeTx,
-		TTD:                 10,
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "PrevRandao Opcode Transactions (EIP-1559 Transactions)",
 		Run:                 prevRandaoOpcodeTx,
-		TTD:                 10,
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
-}
-
-// Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
-func invalidTerminalBlockForkchoiceUpdated(t *test.Env) {
-	gblock := t.Genesis.ToBlock()
-
-	forkchoiceState := api.ForkchoiceStateV1{
-		HeadBlockHash:      gblock.Hash(),
-		SafeBlockHash:      gblock.Hash(),
-		FinalizedBlockHash: gblock.Hash(),
-	}
-
-	// Execution specification:
-	// {payloadStatus: {status: INVALID, latestValidHash=0x00..00}, payloadId: null}
-	// either obtained from the Payload validation process or as a result of validating a PoW block referenced by forkchoiceState.headBlockHash
-	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceState, nil)
-	r.ExpectPayloadStatus(test.Invalid)
-	r.ExpectLatestValidHash(&(common.Hash{}))
-	// ValidationError is not validated since it can be either null or a string message
-
-	// Check that PoW chain progresses
-	t.VerifyPoWProgress(gblock.Hash())
-}
-
-// Invalid GetPayload Under PoW: Client must reject GetPayload directives under PoW.
-func invalidGetPayloadUnderPoW(t *test.Env) {
-	gblock := t.Genesis.ToBlock()
-	// We start in PoW and try to get an invalid Payload, which should produce an error but nothing should be disrupted.
-	r := t.TestEngine.TestEngineGetPayloadV1(&api.PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
-	r.ExpectError()
-
-	// Check that PoW chain progresses
-	t.VerifyPoWProgress(gblock.Hash())
-}
-
-// Invalid Terminal Block in NewPayload: Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
-func invalidTerminalBlockNewPayload(t *test.Env) {
-	gblock := t.Genesis.ToBlock()
-
-	// Create a dummy payload to send in the NewPayload call
-	payload := api.ExecutableData{
-		ParentHash:    gblock.Hash(),
-		FeeRecipient:  common.Address{},
-		StateRoot:     gblock.Root(),
-		ReceiptsRoot:  types.EmptyUncleHash,
-		LogsBloom:     types.CreateBloom(types.Receipts{}).Bytes(),
-		Random:        common.Hash{},
-		Number:        1,
-		GasLimit:      gblock.GasLimit(),
-		GasUsed:       0,
-		Timestamp:     gblock.Time() + 1,
-		ExtraData:     []byte{},
-		BaseFeePerGas: gblock.BaseFee(),
-		BlockHash:     common.Hash{},
-		Transactions:  [][]byte{},
-	}
-	hashedPayload, err := helper.CustomizePayload(&payload, &helper.CustomPayloadData{})
-	if err != nil {
-		t.Fatalf("FAIL (%s): Error while constructing PoW payload: %v", t.TestName, err)
-	}
-
-	// Execution specification:
-	// {status: INVALID, latestValidHash=0x00..00}
-	// if terminal block conditions are not satisfied
-	r := t.TestEngine.TestEngineNewPayloadV1(hashedPayload)
-	r.ExpectStatus(test.Invalid)
-	r.ExpectLatestValidHash(&(common.Hash{}))
-	// ValidationError is not validated since it can be either null or a string message
-
-	// Check that PoW chain progresses
-	t.VerifyPoWProgress(gblock.Hash())
 }
 
 // Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using NewPayload) and unknown SafeBlock
@@ -1045,30 +948,6 @@ func invalidPayloadAttributesGen(syncing bool) func(*test.Env) {
 			},
 		})
 	}
-
-}
-
-// Verify that a forkchoiceUpdated fails on hash being set to a pre-TTD block after PoS change
-func preTTDFinalizedBlockHash(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
-	// Produce blocks before starting the test
-	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
-
-	// Send the Genesis block as forkchoice
-	gblock := t.Genesis.ToBlock()
-
-	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
-		HeadBlockHash:      gblock.Hash(),
-		SafeBlockHash:      gblock.Hash(),
-		FinalizedBlockHash: gblock.Hash(),
-	}, nil)
-	r.ExpectPayloadStatus(test.Invalid)
-	r.ExpectLatestValidHash(&(common.Hash{}))
-
-	r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
-	r.ExpectPayloadStatus(test.Valid)
 
 }
 
@@ -2042,10 +1921,6 @@ func blockStatusHeadBlock(t *test.Env) {
 
 // Test to verify Block information available at the Eth RPC after new SafeBlock ForkchoiceUpdated
 func blockStatusSafeBlock(t *test.Env) {
-	// On PoW mode, `safe` tag shall return error.
-	r := t.TestEngine.TestHeaderByNumber(Safe)
-	r.ExpectErrorCode(-39001)
-
 	// Wait until this client catches up with latest PoS Block
 	t.CLMock.WaitForTTD()
 
@@ -2064,10 +1939,6 @@ func blockStatusSafeBlock(t *test.Env) {
 
 // Test to verify Block information available at the Eth RPC after new FinalizedBlock ForkchoiceUpdated
 func blockStatusFinalizedBlock(t *test.Env) {
-	// On PoW mode, `finalized` tag shall return error.
-	r := t.TestEngine.TestHeaderByNumber(Finalized)
-	r.ExpectErrorCode(-39001)
-
 	// Wait until this client catches up with latest PoS Block
 	t.CLMock.WaitForTTD()
 
@@ -2944,7 +2815,7 @@ func missingFcu(t *test.Env) {
 	// Wait until TTD is reached by this client
 	t.CLMock.WaitForTTD()
 
-	// Get last PoW block hash
+	// Get last PoW block hash (genesis)
 	lastPoWBlockHash := t.TestEngine.TestBlockByNumber(Head).Block.Hash()
 
 	// Produce blocks on the main client, these payloads will be replayed on the secondary client.
@@ -3183,58 +3054,9 @@ func checkPrevRandaoValue(t *test.Env, expectedPrevRandao common.Hash, blockNumb
 
 // PrevRandao Opcode tests
 func prevRandaoOpcodeTx(t *test.Env) {
-	// We need to send PREVRANDAO opcode transactions in PoW and particularly in the block where the TTD is reached.
-	ttdReached := make(chan interface{})
-
-	// Try to send many transactions before PoW transition to guarantee at least one enters in the block
-	go func(t *test.Env) {
-		for {
-			_, err := helper.SendNextTransaction(
-				t.TestContext,
-				t.Engine,
-				&helper.BaseTransactionCreator{
-					Recipient: &globals.PrevRandaoContractAddr,
-					Amount:    big0,
-					Payload:   nil,
-					TxType:    t.TestTransactionType,
-					GasLimit:  75000,
-				},
-			)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-			}
-
-			select {
-			case <-t.TimeoutContext.Done():
-				t.Fatalf("FAIL (%s): Timeout while sending PREVRANDAO opcode transactions: %v")
-			case <-ttdReached:
-				return
-			case <-time.After(time.Second / 10):
-			}
-		}
-	}(t)
 	t.CLMock.WaitForTTD()
-	close(ttdReached)
 
-	// Ideally all blocks up until TTD must have a DIFFICULTY opcode tx in it
-	r := t.TestEngine.TestBlockNumber()
-	r.ExpectNoError()
-	ttdBlockNumber := r.Number
-
-	// Start
-	for i := uint64(ttdBlockNumber); i <= ttdBlockNumber; i++ {
-		// First check that the block actually contained the transaction
-		r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(i)))
-		r.ExpectTransactionCountGreaterThan(0)
-
-		storageKey := common.Hash{}
-		storageKey[31] = byte(i)
-		s := t.TestEngine.TestStorageAt(globals.PrevRandaoContractAddr, storageKey, nil)
-		s.ExpectBigIntStorageEqual(big.NewInt(2))
-
-	}
-
-	// Send transactions now past TTD, the value of the storage in these blocks must match the prevRandao value
+	// Send transactions in PoS, the value of the storage in these blocks must match the prevRandao value
 	var (
 		txCount        = 10
 		currentTxIndex = 0
@@ -3277,7 +3099,7 @@ func prevRandaoOpcodeTx(t *test.Env) {
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to get latest block number: %v", t.TestName, err)
 	}
-	for i := ttdBlockNumber + 1; i <= lastBlockNumber; i++ {
+	for i := uint64(1); i <= lastBlockNumber; i++ {
 		checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[i], i)
 	}
 

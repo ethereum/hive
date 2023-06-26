@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
 )
@@ -129,37 +128,5 @@ func (t *Env) MainTTD() *big.Int {
 func (t *Env) HandleClientPostRunVerification(ec client.EngineClient) {
 	if err := ec.PostRunVerifications(); err != nil {
 		t.Fatalf("FAIL (%s): Client failed post-run verification: %v", t.TestName, err)
-	}
-}
-
-// Verify that the client progresses after a certain PoW block still in PoW mode
-func (t *Env) VerifyPoWProgress(lastBlockHash common.Hash) {
-	// Get the block number first
-	ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-	defer cancel()
-	lb, err := t.Eth.BlockByHash(ctx, lastBlockHash)
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to fetch block: %v", t.TestName, err)
-	}
-	nextNum := lb.Number().Int64() + 1
-	for {
-		ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
-		defer cancel()
-		nh, err := t.Eth.HeaderByNumber(ctx, big.NewInt(nextNum))
-		if err == nil && nh != nil {
-			// Chain has progressed, check that the next block is also PoW
-			// Difficulty must NOT be zero
-			if nh.Difficulty.Cmp(common.Big0) == 0 {
-				t.Fatalf("FAIL (%s): Expected PoW chain to progress in PoW mode, but following block difficulty==%v", t.TestName, nh.Difficulty)
-			}
-			// Chain is still PoW/Clique
-			return
-		}
-		t.Logf("INFO (%s): Error getting block, will try again: %v", t.TestName, err)
-		select {
-		case <-t.TimeoutContext.Done():
-			t.Fatalf("FAIL (%s): Timeout while waiting for PoW chain to progress", t.TestName)
-		case <-time.After(time.Second):
-		}
 	}
 }
