@@ -98,7 +98,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		testFiles := hivesim.Params{}
-		if genesis.Difficulty.Cmp(ttd) <= 0 {
+		if genesis.Difficulty.Cmp(ttd) < 0 {
 
 			if currentTest.GetChainFile() != "" {
 				// We are using a Proof of Work chain file, remove all clique-related settings
