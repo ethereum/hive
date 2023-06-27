@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/ethereum/go-ethereum/tests"
 )
 
 type testcase struct {
@@ -24,6 +25,7 @@ type testcase struct {
 	fixture         fixtureTest
 	genesis         *core.Genesis
 	payloads        []*api.ExecutableData
+	payloadVersions []int
 	versionedHashes [][]common.Hash
 	postAlloc       *core.GenesisAlloc
 }
@@ -157,9 +159,10 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
 	// extract genesis fields from fixture test
 	tc.genesis = extractGenesis(fixture)
 
-	// extract payload & versionedHashes
-	var blobs [][]common.Hash
+	// extract payload, plVersion & versionedHashes
 	payloads := []*api.ExecutableData{}
+	payloadVersions := []int{}
+	var blobs [][]common.Hash
 	for _, bl := range fixture.Blocks {
 		// decode block rlp
 		block, err := bl.decodeBlock()
@@ -167,20 +170,30 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
 			return fmt.Errorf("failed to decode block: %v", err)
 		}
 		// extract payloads from block
-		payload := api.BlockToExecutableData(block, common.Big0).ExecutionPayload
+		payload := api.BlockToExecutableData(block, common.Big0, nil, nil, nil).ExecutionPayload
 		payloads = append(payloads, payload)
+
+		// assess payload version
+		payloadVersion := tc.getPayloadVersion(payload)
+		payloadVersions = append(payloadVersions, payloadVersion)
+
 		// extract blobs from block
 		block_blobs := []common.Hash{}
 		for _, tx := range block.Transactions() {
 			if tx.Type() >= 3 {
-				for _, blob := range tx.DataHashes() {
+				for _, blob := range tx.BlobHashes() {
 					block_blobs = append(block_blobs, blob)
 				}
 			}
 		}
-		blobs = append(blobs, block_blobs)
+		if payloadVersion >= 3 {
+			blobs = append(blobs, block_blobs)
+		} else {
+			blobs = append(blobs, nil)
+		}
 	}
 	tc.payloads = payloads
+	tc.payloadVersions = payloadVersions
 	tc.versionedHashes = blobs
 
 	// extract post account information
@@ -188,10 +201,28 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
 	return nil
 }
 
+// getPayloadVersion returns the payload version based on the network and timestamp
+func (tc *testcase) getPayloadVersion(payload *api.ExecutableData) (int) {
+    switch tc.fixture.json.Network {
+    case "Cancun":
+        return 3
+    case "Shanghai":
+        return 2
+    case "ShanghaiToCancunAtTime15k":
+        if payload.Timestamp >= 15000 {
+            return 3
+        }
+        return 2
+    default:
+        return 1
+    }
+}
+
 // extractGenesis extracts the genesis block information from the given fixture
 // and returns a core.Genesis struct containing the extracted information.
 func extractGenesis(fixture fixtureJSON) *core.Genesis {
 	genesis := &core.Genesis{
+		Config:        tests.Forks[fixture.Network],
 		Coinbase:      fixture.Genesis.Coinbase,
 		Difficulty:    fixture.Genesis.Difficulty,
 		GasLimit:      fixture.Genesis.GasLimit,
@@ -200,8 +231,8 @@ func extractGenesis(fixture fixtureJSON) *core.Genesis {
 		Mixhash:       fixture.Genesis.MixHash,
 		Nonce:         fixture.Genesis.Nonce.Uint64(),
 		BaseFee:       fixture.Genesis.BaseFee,
-		ExcessDataGas: fixture.Genesis.ExcessDataGas,
 		DataGasUsed:   fixture.Genesis.DataGasUsed,
+		ExcessDataGas: fixture.Genesis.ExcessDataGas,
 		Alloc:         fixture.Pre,
 	}
 	return genesis
@@ -214,7 +245,6 @@ func (bl *block) decodeBlock() (*types.Block, error) {
 	if err != nil {
 		return nil, err
 	}
-	print(data)
 	var b types.Block
 	err = rlp.DecodeBytes(data, &b)
 	return &b, err

@@ -110,30 +110,26 @@ func (tc *testcase) run(t *hivesim.T) {
 	// send payloads and check response
 	latestValidHash := common.Hash{}
 	for blockNumber, payload := range tc.payloads {
-		t.Logf("blockNumber: %v", blockNumber)
-		t.Logf("blobHashes: %v", tc.versionedHashes[blockNumber])
 		// set expected payload return status
 		plException := tc.fixture.json.Blocks[blockNumber].Exception
 		expectedStatus := "VALID"
 		if plException != "" {
 			expectedStatus = "INVALID"
 		}
-		// set NewPayload version TODO
-		plVersion := 1
-		if tc.fixture.json.Network == "Cancun" {
-			plVersion = 3
-		} else if tc.fixture.json.Network == "Shanghai" {
-			plVersion = 2
-		}
 		// execute fixture block payload
-		plStatus, plErr := engineClient.NewPayload(context.Background(), plVersion, payload, tc.versionedHashes[blockNumber])
+		plStatus, plErr := engineClient.NewPayload(
+			context.Background(),
+			tc.payloadVersions[blockNumber],
+			payload,
+			tc.versionedHashes[blockNumber],
+		)
 		if plErr != nil {
 			if plException == plErr.Error() {
 				t.Logf("expected error caught by client: %v", plErr)
 				continue
 			} else {
 				tc.failedErr = plErr
-				t.Fatalf("unexpected error: %v, unable to send block %v in test %s", plErr, blockNumber+1, tc.name)
+				t.Fatalf("unexpected error: %v, unable to send block %v, in test %s", plErr, blockNumber+1, tc.name)
 			}
 		}
 		// update latest valid block hash

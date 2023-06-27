@@ -1,11 +1,11 @@
 module github.com/ethereum/hive/simulators/ethereum/pyspec
 
-go 1.19
+go 1.20
 
 require (
-	github.com/ethereum/go-ethereum v1.12.0
-	github.com/ethereum/hive v0.0.0-20230313141339-8e3200bfc09e
-	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20230315233552-7d35d478f4a5
+	github.com/ethereum/go-ethereum v1.11.4
+	github.com/ethereum/hive v0.0.0-20230616141546-33068992107d
+	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20230616141546-33068992107d
 )
 
 require (
@@ -21,9 +21,10 @@ require (
 	github.com/cockroachdb/redact v1.1.3 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.11.0 // indirect
-	github.com/crate-crypto/go-kzg-4844 v0.2.0 // indirect
+	github.com/crate-crypto/go-kzg-4844 v0.3.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
+	github.com/ethereum/c-kzg-4844 v0.2.0 // indirect
 	github.com/getsentry/sentry-go v0.18.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
@@ -50,13 +51,13 @@ require (
 	github.com/rivo/uniseg v0.4.3 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
-	github.com/stretchr/testify v1.8.1 // indirect
+	github.com/supranational/blst v0.3.11-0.20230406105308-e9dfc5ee724b // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
 	github.com/tklauser/go-sysconf v0.3.11 // indirect
 	github.com/tklauser/numcpus v0.6.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	golang.org/x/crypto v0.9.0 // indirect
-	golang.org/x/exp v0.0.0-20230515195305-f3d0a9c9a5cc // indirect
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/sync v0.2.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
@@ -65,4 +66,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/ethereum/go-ethereum v1.12.0 => github.com/marioevz/go-ethereum v1.10.14-0.20230607235252-075f62d72ccc
+replace github.com/ethereum/go-ethereum v1.11.4 => github.com/marioevz/go-ethereum v1.10.14-0.20230621172608-37143248dd79
