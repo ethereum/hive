@@ -13,7 +13,6 @@ import (
 	suite_auth "github.com/ethereum/hive/simulators/ethereum/engine/suites/auth"
 	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	suite_ex_cap "github.com/ethereum/hive/simulators/ethereum/engine/suites/exchange_capabilities"
-	suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
@@ -24,12 +23,6 @@ func main() {
 			Description: `
 	Test Engine API tests using CL mocker to inject commands into clients after they 
 	have reached the Terminal Total Difficulty.`[1:],
-		}
-		transition = hivesim.Suite{
-			Name: "engine-transition",
-			Description: `
-	Test Engine API tests using CL mocker to inject commands into clients and drive 
-	them through the merge.`[1:],
 		}
 		auth = hivesim.Suite{
 			Name: "engine-auth",
@@ -56,7 +49,6 @@ func main() {
 	simulator := hivesim.New()
 
 	addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
-	addTestsToSuite(simulator, &transition, specToInterface(suite_transition.Tests), "full")
 	addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
 	addTestsToSuite(simulator, &excap, suite_ex_cap.Tests, "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
@@ -64,7 +56,6 @@ func main() {
 
 	// Mark suites for execution
 	hivesim.MustRunSuite(simulator, engine)
-	hivesim.MustRunSuite(simulator, transition)
 	hivesim.MustRunSuite(simulator, auth)
 	hivesim.MustRunSuite(simulator, excap)
 	hivesim.MustRunSuite(simulator, sync)
@@ -92,7 +83,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		// Calculate and set the TTD for this test
-		ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
+		ttd := genesis.Config.TerminalTotalDifficulty
 
 		// Configure Forks
 		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
@@ -107,7 +98,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		}
 
 		testFiles := hivesim.Params{}
-		if genesis.Difficulty.Cmp(big.NewInt(ttd)) < 0 {
+		if genesis.Difficulty.Cmp(ttd) <= 0 {
 
 			if currentTest.GetChainFile() != "" {
 				// We are using a Proof of Work chain file, remove all clique-related settings
@@ -154,7 +145,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 						// Run the test case
 						test.Run(
 							currentTest,
-							big.NewInt(ttd),
+							new(big.Int).Set(ttd),
 							timeout,
 							t,
 							c,

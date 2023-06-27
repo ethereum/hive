@@ -37,21 +37,6 @@ var (
 var Tests = []test.Spec{
 	// Engine API Negative Test Cases
 	{
-		Name: "Invalid Terminal Block in ForkchoiceUpdated",
-		Run:  invalidTerminalBlockForkchoiceUpdated,
-		TTD:  1000000,
-	},
-	{
-		Name: "Invalid GetPayload Under PoW",
-		Run:  invalidGetPayloadUnderPoW,
-		TTD:  1000000,
-	},
-	{
-		Name: "Invalid Terminal Block in NewPayload",
-		Run:  invalidTerminalBlockNewPayload,
-		TTD:  1000000,
-	},
-	{
 		Name: "Inconsistent Head in ForkchoiceState",
 		Run:  inconsistentForkchoiceStateGen("Head"),
 	},
@@ -84,11 +69,6 @@ var Tests = []test.Spec{
 		Run:  invalidPayloadAttributesGen(true),
 	},
 	{
-		Name: "Pre-TTD ForkchoiceUpdated After PoS Switch",
-		Run:  preTTDFinalizedBlockHash,
-		TTD:  2,
-	},
-	{
 		Name:       "Unique Payload ID",
 		Run:        uniquePayloadID,
 		ForkConfig: test.LatestFork,
@@ -113,12 +93,6 @@ var Tests = []test.Spec{
 	{
 		Name: "ParentHash==BlockHash on NewPayload",
 		Run:  parentHashOnExecPayload,
-	},
-	{
-		Name:      "Invalid Transition Payload",
-		Run:       invalidTransitionPayload,
-		TTD:       393504,
-		ChainFile: "blocks_2_td_393504.rlp",
 	},
 	{
 		Name: "Invalid ParentHash NewPayload",
@@ -628,464 +602,22 @@ var Tests = []test.Spec{
 		}.GenerateSync(),
 	},
 
-	// Invalid Transition Payload Re-Org/Sync Tests (Reveal via sync through secondary client)
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid StateRoot, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidStateRoot,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid StateRoot",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidStateRoot,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid StateRoot, Empty Txs, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidStateRoot,
-			EmptyTransactions:     true,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid StateRoot, Empty Txs",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidStateRoot,
-			EmptyTransactions:     true,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid ReceiptsRoot, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(3),
-			PayloadField:          helper.InvalidReceiptsRoot,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid ReceiptsRoot",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(3),
-			PayloadField:          helper.InvalidReceiptsRoot,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	/*
-		TODO, RE-ENABLE: Test is causing a panic on the secondary node, disabling for now.
-		{
-			Name:             "Invalid Transition Payload Re-Org, Invalid Number, Reveal using sync",
-			TimeoutSeconds:   30,
-			TTD:              393504,
-			ChainFile:        "blocks_2_td_393504.rlp",
-			SlotsToFinalized: big.NewInt(20),
-			Run: InvalidMissingAncestorReOrgSpec{
-				PayloadInvalidIndex:     1, // Transition payload
-				CommonAncestorHeight:  big.NewInt(0),
-				DeviatingPayloadCount: big.NewInt(2),
-				PayloadField:          helper.InvalidNumber,
-				ReOrgFromCanonical:    true,
-			}.GenerateSync(),
-		},
-		{
-			Name:             "Invalid Transition Payload Sync, Invalid Number",
-			TimeoutSeconds:   30,
-			TTD:              393504,
-			ChainFile:        "blocks_2_td_393504.rlp",
-			SlotsToFinalized: big.NewInt(20),
-			Run: InvalidMissingAncestorReOrgSpec{
-				PayloadInvalidIndex:     1, // Transition payload
-				CommonAncestorHeight:  big.NewInt(0),
-				DeviatingPayloadCount: big.NewInt(2),
-				PayloadField:          helper.InvalidNumber,
-				ReOrgFromCanonical:    false,
-			}.GenerateSync(),
-		},
-	*/
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid GasLimit, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(3),
-			PayloadField:          helper.InvalidGasLimit,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid GasLimit",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(3),
-			PayloadField:          helper.InvalidGasLimit,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid GasUsed, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(3),
-			PayloadField:          helper.InvalidGasUsed,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid GasUsed",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(3),
-			PayloadField:          helper.InvalidGasUsed,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid Timestamp, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(3),
-			PayloadField:          helper.InvalidTimestamp,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid Timestamp",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(3),
-			PayloadField:          helper.InvalidTimestamp,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	/*
-		TODO, RE-ENABLE: Test consistently fails with Failed to set invalid block: missing trie node.
-		{
-			Name:             "Invalid Transition Payload Re-Org, Invalid PrevRandao, Reveal using sync",
-			TimeoutSeconds:   30,
-			TTD:              393504,
-			ChainFile:        "blocks_2_td_393504.rlp",
-			SlotsToFinalized: big.NewInt(20),
-			Run: InvalidMissingAncestorReOrgSpec{
-				PayloadInvalidIndex:     1, // Transition payload
-				CommonAncestorHeight:  big.NewInt(0),
-				DeviatingPayloadCount: big.NewInt(3),
-				PayloadField:          helper.InvalidPrevRandao,
-				ReOrgFromCanonical:    true,
-			}.GenerateSync(),
-		},
-		{
-			Name:             "Invalid Transition Payload Sync, Invalid PrevRandao",
-			TimeoutSeconds:   30,
-			TTD:              393504,
-			ChainFile:        "blocks_2_td_393504.rlp",
-			SlotsToFinalized: big.NewInt(20),
-			Run: InvalidMissingAncestorReOrgSpec{
-				PayloadInvalidIndex:     1, // Transition payload
-				CommonAncestorHeight:  big.NewInt(0),
-				DeviatingPayloadCount: big.NewInt(3),
-				PayloadField:          helper.InvalidPrevRandao,
-				ReOrgFromCanonical:    false,
-			}.GenerateSync(),
-		},
-	*/
-	{
-		Name:             "Invalid Transition Payload Re-Org, Incomplete Transactions, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.RemoveTransaction,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Incomplete Transactions",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.RemoveTransaction,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Signature, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionSignature,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid Transaction Signature",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionSignature,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Nonce, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionNonce,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid Transaction Nonce",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionNonce,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Gas, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionGas,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid Transaction Gas",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionGas,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction GasPrice, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionGasPrice,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid Transaction GasPrice",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionGasPrice,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid Transaction Value, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionValue,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid Transaction Value",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidTransactionValue,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Re-Org, Invalid Ommers, Reveal using sync",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidOmmers,
-			ReOrgFromCanonical:    true,
-		}.GenerateSync(),
-	},
-	{
-		Name:             "Invalid Transition Payload Sync, Invalid Ommers",
-		TimeoutSeconds:   30,
-		TTD:              393504,
-		ChainFile:        "blocks_2_td_393504.rlp",
-		SlotsToFinalized: big.NewInt(20),
-		Run: InvalidMissingAncestorReOrgSpec{
-			PayloadInvalidIndex:   1, // Transition payload
-			CommonAncestorHeight:  big.NewInt(0),
-			DeviatingPayloadCount: big.NewInt(2),
-			PayloadField:          helper.InvalidOmmers,
-			ReOrgFromCanonical:    false,
-		}.GenerateSync(),
-	},
-
 	// Eth RPC Status on ForkchoiceUpdated Events
 	{
 		Name: "latest Block after NewPayload",
-		Run:  blockStatusExecPayloadGen(false),
-	},
-	{
-		Name: "latest Block after NewPayload (Transition Block)",
-		Run:  blockStatusExecPayloadGen(true),
-		TTD:  5,
+		Run:  blockStatusExecPayload,
 	},
 	{
 		Name: "latest Block after New HeadBlockHash",
-		Run:  blockStatusHeadBlockGen(false),
-	},
-	{
-		Name: "latest Block after New HeadBlockHash (Transition Block)",
-		Run:  blockStatusHeadBlockGen(true),
-		TTD:  5,
+		Run:  blockStatusHeadBlock,
 	},
 	{
 		Name: "safe Block after New SafeBlockHash",
 		Run:  blockStatusSafeBlock,
-		TTD:  5,
 	},
 	{
 		Name: "finalized Block after New FinalizedBlockHash",
 		Run:  blockStatusFinalizedBlock,
-		TTD:  5,
 	},
 	{
 		Name:             "safe, finalized on Canonical Chain",
@@ -1116,10 +648,8 @@ var Tests = []test.Spec{
 		Run:  validPayloadFcUSyncingClient,
 	},
 	{
-		Name:      "NewPayload with Missing ForkchoiceUpdated",
-		Run:       missingFcu,
-		TTD:       393120,
-		ChainFile: "blocks_2_td_393504.rlp",
+		Name: "NewPayload with Missing ForkchoiceUpdated",
+		Run:  missingFcu,
 	},
 	{
 		Name: "Payload Build after New Invalid Payload",
@@ -1190,86 +720,13 @@ var Tests = []test.Spec{
 	{
 		Name:                "PrevRandao Opcode Transactions",
 		Run:                 prevRandaoOpcodeTx,
-		TTD:                 10,
 		TestTransactionType: helper.LegacyTxOnly,
 	},
 	{
 		Name:                "PrevRandao Opcode Transactions (EIP-1559 Transactions)",
 		Run:                 prevRandaoOpcodeTx,
-		TTD:                 10,
 		TestTransactionType: helper.DynamicFeeTxOnly,
 	},
-}
-
-// Invalid Terminal Block in ForkchoiceUpdated: Client must reject ForkchoiceUpdated directives if the referenced HeadBlockHash does not meet the TTD requirement.
-func invalidTerminalBlockForkchoiceUpdated(t *test.Env) {
-	gblock := t.Genesis.ToBlock()
-
-	forkchoiceState := api.ForkchoiceStateV1{
-		HeadBlockHash:      gblock.Hash(),
-		SafeBlockHash:      gblock.Hash(),
-		FinalizedBlockHash: gblock.Hash(),
-	}
-
-	// Execution specification:
-	// {payloadStatus: {status: INVALID, latestValidHash=0x00..00}, payloadId: null}
-	// either obtained from the Payload validation process or as a result of validating a PoW block referenced by forkchoiceState.headBlockHash
-	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceState, nil)
-	r.ExpectPayloadStatus(test.Invalid)
-	r.ExpectLatestValidHash(&(common.Hash{}))
-	// ValidationError is not validated since it can be either null or a string message
-
-	// Check that PoW chain progresses
-	t.VerifyPoWProgress(gblock.Hash())
-}
-
-// Invalid GetPayload Under PoW: Client must reject GetPayload directives under PoW.
-func invalidGetPayloadUnderPoW(t *test.Env) {
-	gblock := t.Genesis.ToBlock()
-	// We start in PoW and try to get an invalid Payload, which should produce an error but nothing should be disrupted.
-	r := t.TestEngine.TestEngineGetPayloadV1(&api.PayloadID{1, 2, 3, 4, 5, 6, 7, 8})
-	r.ExpectError()
-
-	// Check that PoW chain progresses
-	t.VerifyPoWProgress(gblock.Hash())
-}
-
-// Invalid Terminal Block in NewPayload: Client must reject NewPayload directives if the referenced ParentHash does not meet the TTD requirement.
-func invalidTerminalBlockNewPayload(t *test.Env) {
-	gblock := t.Genesis.ToBlock()
-
-	// Create a dummy payload to send in the NewPayload call
-	payload := api.ExecutableData{
-		ParentHash:    gblock.Hash(),
-		FeeRecipient:  common.Address{},
-		StateRoot:     gblock.Root(),
-		ReceiptsRoot:  types.EmptyUncleHash,
-		LogsBloom:     types.CreateBloom(types.Receipts{}).Bytes(),
-		Random:        common.Hash{},
-		Number:        1,
-		GasLimit:      gblock.GasLimit(),
-		GasUsed:       0,
-		Timestamp:     gblock.Time() + 1,
-		ExtraData:     []byte{},
-		BaseFeePerGas: gblock.BaseFee(),
-		BlockHash:     common.Hash{},
-		Transactions:  [][]byte{},
-	}
-	hashedPayload, err := helper.CustomizePayload(&payload, &helper.CustomPayloadData{})
-	if err != nil {
-		t.Fatalf("FAIL (%s): Error while constructing PoW payload: %v", t.TestName, err)
-	}
-
-	// Execution specification:
-	// {status: INVALID, latestValidHash=0x00..00}
-	// if terminal block conditions are not satisfied
-	r := t.TestEngine.TestEngineNewPayloadV1(hashedPayload)
-	r.ExpectStatus(test.Invalid)
-	r.ExpectLatestValidHash(&(common.Hash{}))
-	// ValidationError is not validated since it can be either null or a string message
-
-	// Check that PoW chain progresses
-	t.VerifyPoWProgress(gblock.Hash())
 }
 
 // Verify that a forkchoiceUpdated with a valid HeadBlock (previously sent using NewPayload) and unknown SafeBlock
@@ -1494,30 +951,6 @@ func invalidPayloadAttributesGen(syncing bool) func(*test.Env) {
 
 }
 
-// Verify that a forkchoiceUpdated fails on hash being set to a pre-TTD block after PoS change
-func preTTDFinalizedBlockHash(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
-	// Produce blocks before starting the test
-	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
-
-	// Send the Genesis block as forkchoice
-	gblock := t.Genesis.ToBlock()
-
-	r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
-		HeadBlockHash:      gblock.Hash(),
-		SafeBlockHash:      gblock.Hash(),
-		FinalizedBlockHash: gblock.Hash(),
-	}, nil)
-	r.ExpectPayloadStatus(test.Invalid)
-	r.ExpectLatestValidHash(&(common.Hash{}))
-
-	r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, nil)
-	r.ExpectPayloadStatus(test.Valid)
-
-}
-
 // Check that the payload id returned on a forkchoiceUpdated call is different
 // when the attributes change
 func uniquePayloadID(t *test.Env) {
@@ -1716,62 +1149,6 @@ func parentHashOnExecPayload(t *test.Env) {
 		},
 	})
 
-}
-
-// Attempt to re-org to a chain containing an invalid transition payload
-func invalidTransitionPayload(t *test.Env) {
-	// Wait until TTD is reached by main client
-	t.CLMock.WaitForTTD()
-
-	// Produce two blocks before trying to re-org
-	t.CLMock.ProduceBlocks(2, clmock.BlockProcessCallbacks{
-		OnPayloadProducerSelected: func() {
-			_, err := helper.SendNextTransaction(
-				t.TestContext,
-				t.CLMock.NextBlockProducer,
-				&helper.BaseTransactionCreator{
-					Recipient: &globals.PrevRandaoContractAddr,
-					Amount:    big1,
-					Payload:   nil,
-					TxType:    t.TestTransactionType,
-					GasLimit:  75000,
-				},
-			)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-			}
-		},
-	})
-
-	// Introduce the invalid transition payload
-	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-		// This is being done in the middle of the block building
-		// process simply to be able to re-org back.
-		OnGetPayload: func() {
-			basePayload := t.CLMock.ExecutedPayloadHistory[t.CLMock.FirstPoSBlockNumber.Uint64()]
-			alteredPayload, err := helper.GenerateInvalidPayload(basePayload, helper.InvalidStateRoot)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
-			}
-			p := t.TestEngine.TestEngineNewPayloadV1(alteredPayload)
-			p.ExpectStatusEither(test.Invalid, test.Accepted)
-			if p.Status.Status == test.Invalid {
-				p.ExpectLatestValidHash(&(common.Hash{}))
-			} else if p.Status.Status == test.Accepted {
-				p.ExpectLatestValidHash(nil)
-			}
-			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
-				HeadBlockHash:      alteredPayload.BlockHash,
-				SafeBlockHash:      common.Hash{},
-				FinalizedBlockHash: common.Hash{},
-			}, nil)
-			r.ExpectPayloadStatus(test.Invalid)
-			r.ExpectLatestValidHash(&(common.Hash{}))
-
-			s := t.TestEngine.TestBlockByNumber(Head)
-			s.ExpectHash(t.CLMock.LatestExecutedPayload.BlockHash)
-		},
-	})
 }
 
 // Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
@@ -2160,13 +1537,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 		)
 		// To allow having the invalid payload delivered via P2P, we need a second client to serve the payload
 		starter := node.GethNodeEngineStarter{
-			Config: node.GethNodeTestConfiguration{
-				// Ethash engine is only needed in a single test case
-				Ethash: spec.PayloadField == helper.InvalidOmmers &&
-					spec.CommonAncestorHeight != nil &&
-					spec.CommonAncestorHeight.Cmp(big0) == 0 &&
-					spec.PayloadInvalidIndex == 1,
-			},
+			Config: node.GethNodeTestConfiguration{},
 		}
 		if spec.ReOrgFromCanonical {
 			// If we are doing a re-org from canonical, we can add both nodes as peers from the start
@@ -2290,17 +1661,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 								t.Fatalf("FAIL (%s): Unable to get uncle block: %v", t.TestName, err)
 							}
 						} else {
-							// Uncle is a PoW block, we need to mine an alternative PoW block
-							ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-							defer cancel()
-							parentPoW, err := secondaryClient.BlockByNumber(ctx, new(big.Int).Sub(sideBlock.Number(), big1))
-							if err != nil || parentPoW == nil {
-								t.Fatalf("FAIL (%s): Unable to get parent base block to generate uncle: %v", t.TestName, err)
-							}
-							uncle, err = secondaryClient.SealBlock(t.TimeoutContext, parentPoW)
-							if err != nil {
-								t.Fatalf("FAIL (%s): Unable generate uncle: %v", t.TestName, err)
-							}
+							panic("FAIL: Unable to get uncle block")
 						}
 					}
 					// Invalidate fields not available in the ExecutableData
@@ -2477,101 +1838,89 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 }
 
 // Test to verify Block information available at the Eth RPC after NewPayload
-func blockStatusExecPayloadGen(transitionBlock bool) func(t *test.Env) {
-	return func(t *test.Env) {
-		// Wait until this client catches up with latest PoS Block
-		t.CLMock.WaitForTTD()
+func blockStatusExecPayload(t *test.Env) {
+	// Wait until this client catches up with latest PoS Block
+	t.CLMock.WaitForTTD()
 
-		// Produce blocks before starting the test, only if we are not testing the transition block
-		if !transitionBlock {
-			t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
-		}
+	// Produce blocks before starting the test
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-		var tx *types.Transaction
-		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-			OnPayloadProducerSelected: func() {
-				var err error
-				tx, err = helper.SendNextTransaction(
-					t.TestContext,
-					t.Engine, &helper.BaseTransactionCreator{
-						Recipient: &ZeroAddr,
-						Amount:    big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
-					},
-				)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", err)
-				}
-			},
-			// Run test after the new payload has been broadcasted
-			OnNewPayloadBroadcast: func() {
-				r := t.TestEngine.TestHeaderByNumber(Head)
-				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+	var tx *types.Transaction
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			var err error
+			tx, err = helper.SendNextTransaction(
+				t.TestContext,
+				t.Engine, &helper.BaseTransactionCreator{
+					Recipient: &ZeroAddr,
+					Amount:    big1,
+					Payload:   nil,
+					TxType:    t.TestTransactionType,
+					GasLimit:  75000,
+				},
+			)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", err)
+			}
+		},
+		// Run test after the new payload has been broadcasted
+		OnNewPayloadBroadcast: func() {
+			r := t.TestEngine.TestHeaderByNumber(Head)
+			r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-				s := t.TestEngine.TestBlockNumber()
-				s.ExpectNumber(t.CLMock.LatestHeadNumber.Uint64())
+			s := t.TestEngine.TestBlockNumber()
+			s.ExpectNumber(t.CLMock.LatestHeadNumber.Uint64())
 
-				p := t.TestEngine.TestBlockByNumber(Head)
-				p.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+			p := t.TestEngine.TestBlockByNumber(Head)
+			p.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-				// Check that the receipt for the transaction we just sent is still not available
-				q := t.TestEngine.TestTransactionReceipt(tx.Hash())
-				q.ExpectError()
-			},
-		})
-	}
+			// Check that the receipt for the transaction we just sent is still not available
+			q := t.TestEngine.TestTransactionReceipt(tx.Hash())
+			q.ExpectError()
+		},
+	})
 }
 
 // Test to verify Block information available at the Eth RPC after new HeadBlock ForkchoiceUpdated
-func blockStatusHeadBlockGen(transitionBlock bool) func(t *test.Env) {
-	return func(t *test.Env) {
-		// Wait until this client catches up with latest PoS Block
-		t.CLMock.WaitForTTD()
+func blockStatusHeadBlock(t *test.Env) {
+	// Wait until this client catches up with latest PoS Block
+	t.CLMock.WaitForTTD()
 
-		// Produce blocks before starting the test, only if we are not testing the transition block
-		if !transitionBlock {
-			t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
-		}
+	// Produce blocks before starting the test
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-		var tx *types.Transaction
-		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-			OnPayloadProducerSelected: func() {
-				var err error
-				tx, err = helper.SendNextTransaction(
-					t.TestContext,
-					t.Engine,
-					&helper.BaseTransactionCreator{
-						Recipient: &ZeroAddr,
-						Amount:    big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
-					},
-				)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-				}
-			},
-			// Run test after a forkchoice with new HeadBlockHash has been broadcasted
-			OnForkchoiceBroadcast: func() {
-				r := t.TestEngine.TestHeaderByNumber(Head)
-				r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+	var tx *types.Transaction
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			var err error
+			tx, err = helper.SendNextTransaction(
+				t.TestContext,
+				t.Engine,
+				&helper.BaseTransactionCreator{
+					Recipient: &ZeroAddr,
+					Amount:    big1,
+					Payload:   nil,
+					TxType:    t.TestTransactionType,
+					GasLimit:  75000,
+				},
+			)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+			}
+		},
+		// Run test after a forkchoice with new HeadBlockHash has been broadcasted
+		OnForkchoiceBroadcast: func() {
+			r := t.TestEngine.TestHeaderByNumber(Head)
+			r.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
-				s := t.TestEngine.TestTransactionReceipt(tx.Hash())
-				s.ExpectTransactionHash(tx.Hash())
-			},
-		})
-	}
+			s := t.TestEngine.TestTransactionReceipt(tx.Hash())
+			s.ExpectTransactionHash(tx.Hash())
+		},
+	})
 }
 
 // Test to verify Block information available at the Eth RPC after new SafeBlock ForkchoiceUpdated
 func blockStatusSafeBlock(t *test.Env) {
-	// On PoW mode, `safe` tag shall return error.
-	r := t.TestEngine.TestHeaderByNumber(Safe)
-	r.ExpectErrorCode(-39001)
-
 	// Wait until this client catches up with latest PoS Block
 	t.CLMock.WaitForTTD()
 
@@ -2590,10 +1939,6 @@ func blockStatusSafeBlock(t *test.Env) {
 
 // Test to verify Block information available at the Eth RPC after new FinalizedBlock ForkchoiceUpdated
 func blockStatusFinalizedBlock(t *test.Env) {
-	// On PoW mode, `finalized` tag shall return error.
-	r := t.TestEngine.TestHeaderByNumber(Finalized)
-	r.ExpectErrorCode(-39001)
-
 	// Wait until this client catches up with latest PoS Block
 	t.CLMock.WaitForTTD()
 
@@ -3470,7 +2815,7 @@ func missingFcu(t *test.Env) {
 	// Wait until TTD is reached by this client
 	t.CLMock.WaitForTTD()
 
-	// Get last PoW block hash
+	// Get last PoW block hash (genesis)
 	lastPoWBlockHash := t.TestEngine.TestBlockByNumber(Head).Block.Hash()
 
 	// Produce blocks on the main client, these payloads will be replayed on the secondary client.
@@ -3709,58 +3054,9 @@ func checkPrevRandaoValue(t *test.Env, expectedPrevRandao common.Hash, blockNumb
 
 // PrevRandao Opcode tests
 func prevRandaoOpcodeTx(t *test.Env) {
-	// We need to send PREVRANDAO opcode transactions in PoW and particularly in the block where the TTD is reached.
-	ttdReached := make(chan interface{})
-
-	// Try to send many transactions before PoW transition to guarantee at least one enters in the block
-	go func(t *test.Env) {
-		for {
-			_, err := helper.SendNextTransaction(
-				t.TestContext,
-				t.Engine,
-				&helper.BaseTransactionCreator{
-					Recipient: &globals.PrevRandaoContractAddr,
-					Amount:    big0,
-					Payload:   nil,
-					TxType:    t.TestTransactionType,
-					GasLimit:  75000,
-				},
-			)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-			}
-
-			select {
-			case <-t.TimeoutContext.Done():
-				t.Fatalf("FAIL (%s): Timeout while sending PREVRANDAO opcode transactions: %v")
-			case <-ttdReached:
-				return
-			case <-time.After(time.Second / 10):
-			}
-		}
-	}(t)
 	t.CLMock.WaitForTTD()
-	close(ttdReached)
 
-	// Ideally all blocks up until TTD must have a DIFFICULTY opcode tx in it
-	r := t.TestEngine.TestBlockNumber()
-	r.ExpectNoError()
-	ttdBlockNumber := r.Number
-
-	// Start
-	for i := uint64(ttdBlockNumber); i <= ttdBlockNumber; i++ {
-		// First check that the block actually contained the transaction
-		r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(i)))
-		r.ExpectTransactionCountGreaterThan(0)
-
-		storageKey := common.Hash{}
-		storageKey[31] = byte(i)
-		s := t.TestEngine.TestStorageAt(globals.PrevRandaoContractAddr, storageKey, nil)
-		s.ExpectBigIntStorageEqual(big.NewInt(2))
-
-	}
-
-	// Send transactions now past TTD, the value of the storage in these blocks must match the prevRandao value
+	// Send transactions in PoS, the value of the storage in these blocks must match the prevRandao value
 	var (
 		txCount        = 10
 		currentTxIndex = 0
@@ -3803,7 +3099,7 @@ func prevRandaoOpcodeTx(t *test.Env) {
 	if err != nil {
 		t.Fatalf("FAIL (%s): Unable to get latest block number: %v", t.TestName, err)
 	}
-	for i := ttdBlockNumber + 1; i <= lastBlockNumber; i++ {
+	for i := uint64(1); i <= lastBlockNumber; i++ {
 		checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[i], i)
 	}
 

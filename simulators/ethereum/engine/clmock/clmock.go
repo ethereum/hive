@@ -218,7 +218,7 @@ func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 	} else {
 		cl.Logf("CLMocker: TTD has been reached at block %d (%d>=%d)\n", cl.LatestHeader.Number, ttd, ec.TerminalTotalDifficulty())
 		jsH, _ := json.MarshalIndent(cl.LatestHeader, "", " ")
-		cl.Logf("CLMocker: Block %d: %s\n", cl.LatestHeader.Number, jsH)
+		cl.Logf("CLMocker: Client: %s, Block %d: %s\n", ec.ID(), cl.LatestHeader.Number, jsH)
 	}
 
 	cl.TTDReached = true

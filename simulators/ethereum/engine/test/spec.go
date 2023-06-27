@@ -31,7 +31,6 @@ type SpecInterface interface {
 	GetName() string
 	GetTestTransactionType() helper.TestTransactionType
 	GetTimeout() int
-	GetTTD() int64
 	IsMiningDisabled() bool
 }
 
@@ -113,6 +112,10 @@ func (s Spec) GetGenesis() *core.Genesis {
 		genesisPath = fmt.Sprintf("./init/%s", s.GenesisFile)
 	}
 	genesis := helper.LoadGenesis(genesisPath)
+	genesis.Config.TerminalTotalDifficulty = big.NewInt(genesis.Difficulty.Int64() + s.TTD)
+	if genesis.Difficulty.Cmp(genesis.Config.TerminalTotalDifficulty) <= 0 {
+		genesis.Config.TerminalTotalDifficultyPassed = true
+	}
 	return &genesis
 }
 
@@ -126,10 +129,6 @@ func (s Spec) GetTestTransactionType() helper.TestTransactionType {
 
 func (s Spec) GetTimeout() int {
 	return s.TimeoutSeconds
-}
-
-func (s Spec) GetTTD() int64 {
-	return s.TTD
 }
 
 func (s Spec) IsMiningDisabled() bool {
