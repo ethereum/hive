@@ -1,9 +1,3 @@
-## -- Image Build --
-# - client: nethermind
-# nametag: 4844-image
-# build_args:
-# baseimage: nethermindeth/nethermind
-# tag: eip-4844-v6
 ## -- Git Build --
 - client: nethermind
   nametag: 4844-git
@@ -11,7 +5,3 @@
   build_args:
       github: nethermindeth/nethermind
       tag: feature/eip-4844-v6
-## -- Local Build --
-# - client: nethermind
-# nametag: 4844-local
-# dockerfile: local

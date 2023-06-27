@@ -4,7 +4,3 @@
   build_args:
       baseimage: ethereumjs/ethereumjs-monorepo
       tag: master
-## -- Local Build --
-# - client: ethereumjs
-# nametag: 4844-local
-# dockerfile: local

@@ -5,7 +5,3 @@
   build_args:
       github: mariusvanderwijden/go-ethereum
       tag: 4844-devnet-6
-## -- Local Build --
-# - client: go-ethereum
-# nametag: 4844-local
-# dockerfile: local

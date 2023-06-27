@@ -6,7 +6,3 @@
   build_args:
       github: roberto-bayardo/erigon
       tag: eip-4844
-## -- Local Build --
-# - client: erigon
-# nametag: 4844-local
-# dockerfile: local
