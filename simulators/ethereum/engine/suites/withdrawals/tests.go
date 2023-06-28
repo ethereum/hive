@@ -959,7 +959,50 @@ func (ws *WithdrawalsBaseSpec) GetGenesisTest(base string) string {
 func (ws *WithdrawalsBaseSpec) GetGenesis(base string) helper.Genesis {
 
 	genesis := ws.Spec.GetGenesis(base)
+	// // Add accounts that use the coinbase (EIP-3651)
+	// warmCoinbaseCode := []byte{
+	// 	0x5A, // GAS
+	// 	0x60, // PUSH1(0x00)
+	// 	0x00,
+	// 	0x60, // PUSH1(0x00)
+	// 	0x00,
+	// 	0x60, // PUSH1(0x00)
+	// 	0x00,
+	// 	0x60, // PUSH1(0x00)
+	// 	0x00,
+	// 	0x60, // PUSH1(0x00)
+	// 	0x00,
+	// 	0x41, // COINBASE
+	// 	0x60, // PUSH1(0xFF)
+	// 	0xFF,
+	// 	0xF1, // CALL
+	// 	0x5A, // GAS
+	// 	0x90, // SWAP1
+	// 	0x50, // POP - Call result
+	// 	0x90, // SWAP1
+	// 	0x03, // SUB
+	// 	0x60, // PUSH1(0x16) - GAS + PUSH * 6 + COINBASE
+	// 	0x16,
+	// 	0x90, // SWAP1
+	// 	0x03, // SUB
+	// 	0x43, // NUMBER
+	// 	0x55, // SSTORE
+	// }
+	// genesis.Alloc()[WARM_COINBASE_ADDRESS] = core.GenesisAccount{
+	// 	Code:    warmCoinbaseCode,
+	// 	Balance: common.Big0,
+	// }
 
+	// // Add accounts that use the PUSH0 (EIP-3855)
+	// push0Code := []byte{
+	// 	0x43, // NUMBER
+	// 	0x5F, // PUSH0
+	// 	0x55, // SSTORE
+	// }
+	// genesis.Alloc()[PUSH0_ADDRESS] = core.GenesisAccount{
+	// 	Code:    push0Code,
+	// 	Balance: common.Big0,
+	// }
 	return genesis
 }
 
@@ -970,8 +1013,9 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 	// Assume that forkchoice updated has been already sent
 	latestPayloadNumber := t.CLMock.LatestExecutedPayload.Number
 	latestPayloadNumberBig := big.NewInt(int64(latestPayloadNumber))
+	s := big.NewInt(0)
 
-	r := t.TestEngine.TestStorageAt(WARM_COINBASE_ADDRESS, common.BigToHash(latestPayloadNumberBig), latestPayloadNumberBig)
+	r := t.TestEngine.TestStorageAt(WARM_COINBASE_ADDRESS, common.BigToHash(s), latestPayloadNumberBig)
 	p := t.TestEngine.TestStorageAt(PUSH0_ADDRESS, common.Hash{}, latestPayloadNumberBig)
 	if latestPayloadNumber >= ws.WithdrawalsForkHeight {
 		// Shanghai
@@ -1125,7 +1169,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						Amount:    common.Big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
-						GasLimit:  t.Genesis.GasLimit(),
+						GasLimit:  75000,
 						ChainID:   t.Genesis.Config().ChainID,
 					},
 				)
@@ -1194,7 +1238,6 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			time.Sleep(durationUntilFuture)
 		}
 	}
-
 	// Produce requested post-shanghai blocks
 	// (At least 1 block will be produced after this procedure ends).
 	var (
@@ -1273,6 +1316,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			//		r.ExpectBalanceEqual(expectedAccountBalance)
 			//	}
 			//}
+			ws.VerifyContractsStorage(t)
 		},
 		OnForkchoiceBroadcast: func() {
 			if !ws.SkipBaseVerifications {
