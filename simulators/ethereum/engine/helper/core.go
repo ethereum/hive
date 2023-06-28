@@ -20,12 +20,13 @@ type GenesisAlloc interface {
 type GenesisAccount interface {
 	// Balance holds the balance of the account
 	Balance() *big.Int
-	SetBalance()
+	SetBalance(balance *big.Int)
 	Code() []byte
 	SetCode(code []byte)
 	SetConstructor(constructor []byte)
 	Constructor() []byte
 }
+
 type Genesis interface {
 	Config() *params.ChainConfig
 	SetConfig(config *params.ChainConfig)
@@ -44,7 +45,7 @@ type Genesis interface {
 	Coinbase() common.Address
 	SetCoinbase(address common.Address)
 	Alloc() GenesisAlloc
-	AllocGenesis(address common.Address, account GenesisAccount)
+	AllocGenesis(address common.Address, account Account)
 	UpdateTimestamp(timestamp string)
 
 	// Used for testing
@@ -75,11 +76,26 @@ type Builtin struct {
 
 type Account map[string]interface{}
 
-//struct {
-//	Balance     string  `json:"balance,omitempty"`
-//	Constructor string  `json:"constructor,omitempty"`
-//	Builtin     Builtin `json:"builtin,omitempty"`
-//}
+//	struct {
+//		Balance     string  `json:"balance,omitempty"`
+//		Constructor string  `json:"constructor,omitempty"`
+//		Builtin     Builtin `json:"builtin,omitempty"`
+//	}
+func NewAccount() Account {
+	return make(Account, 0)
+}
+
+func (a Account) SetBalance(balance *big.Int) {
+	a["balance"] = common.BigToHash(balance)
+}
+
+func (a Account) SetCode(code []byte) {
+	a["code"] = common.Bytes2Hex(code)
+}
+
+func (a Account) SetConstructor(constructor []byte) {
+	a["constructor"] = common.Bytes2Hex(constructor)
+}
 
 type NethermindGenesis struct {
 	Seal struct {
@@ -267,9 +283,8 @@ func (n *NethermindChainSpec) Alloc() GenesisAlloc {
 	panic("implement me")
 }
 
-func (n *NethermindChainSpec) AllocGenesis(address common.Address, account GenesisAccount) {
-	//TODO implement me
-	panic("implement me")
+func (n *NethermindChainSpec) AllocGenesis(address common.Address, account Account) {
+	n.Accounts[address.Hex()] = account
 }
 
 func (n *NethermindChainSpec) Number() uint64 {

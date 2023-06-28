@@ -959,50 +959,55 @@ func (ws *WithdrawalsBaseSpec) GetGenesisTest(base string) string {
 func (ws *WithdrawalsBaseSpec) GetGenesis(base string) helper.Genesis {
 
 	genesis := ws.Spec.GetGenesis(base)
-	// // Add accounts that use the coinbase (EIP-3651)
-	// warmCoinbaseCode := []byte{
-	// 	0x5A, // GAS
-	// 	0x60, // PUSH1(0x00)
-	// 	0x00,
-	// 	0x60, // PUSH1(0x00)
-	// 	0x00,
-	// 	0x60, // PUSH1(0x00)
-	// 	0x00,
-	// 	0x60, // PUSH1(0x00)
-	// 	0x00,
-	// 	0x60, // PUSH1(0x00)
-	// 	0x00,
-	// 	0x41, // COINBASE
-	// 	0x60, // PUSH1(0xFF)
-	// 	0xFF,
-	// 	0xF1, // CALL
-	// 	0x5A, // GAS
-	// 	0x90, // SWAP1
-	// 	0x50, // POP - Call result
-	// 	0x90, // SWAP1
-	// 	0x03, // SUB
-	// 	0x60, // PUSH1(0x16) - GAS + PUSH * 6 + COINBASE
-	// 	0x16,
-	// 	0x90, // SWAP1
-	// 	0x03, // SUB
-	// 	0x43, // NUMBER
-	// 	0x55, // SSTORE
-	// }
-	// genesis.Alloc()[WARM_COINBASE_ADDRESS] = core.GenesisAccount{
-	// 	Code:    warmCoinbaseCode,
-	// 	Balance: common.Big0,
-	// }
+	// Add accounts that use the coinbase (EIP-3651)
+	warmCoinbaseCode := []byte{
+		0x5A, // GAS
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x41, // COINBASE
+		0x60, // PUSH1(0xFF)
+		0xFF,
+		0xF1, // CALL
+		0x5A, // GAS
+		0x90, // SWAP1
+		0x50, // POP - Call result
+		0x90, // SWAP1
+		0x03, // SUB
+		0x60, // PUSH1(0x16) - GAS + PUSH * 6 + COINBASE
+		0x16,
+		0x90, // SWAP1
+		0x03, // SUB
+		// TODO:
+		0x60, // PUSH1(0x00)
+		0x00,
+		// 0x43, // NUMBER
+		0x55, // SSTORE
+	}
+	warmCoinbaseAcc := helper.NewAccount()
+	push0Acc := helper.NewAccount()
 
-	// // Add accounts that use the PUSH0 (EIP-3855)
-	// push0Code := []byte{
-	// 	0x43, // NUMBER
-	// 	0x5F, // PUSH0
-	// 	0x55, // SSTORE
-	// }
-	// genesis.Alloc()[PUSH0_ADDRESS] = core.GenesisAccount{
-	// 	Code:    push0Code,
-	// 	Balance: common.Big0,
-	// }
+	warmCoinbaseAcc.SetBalance(common.Big0)
+	warmCoinbaseAcc.SetCode(warmCoinbaseCode)
+
+	genesis.AllocGenesis(WARM_COINBASE_ADDRESS, warmCoinbaseAcc)
+	// Add accounts that use the PUSH0 (EIP-3855)
+	push0Code := []byte{
+		0x43, // NUMBER
+		0x5F, // PUSH0
+		0x55, // SSTORE
+	}
+	push0Acc.SetBalance(common.Big0)
+	push0Acc.SetCode(push0Code)
+
+	genesis.AllocGenesis(PUSH0_ADDRESS, push0Acc)
 	return genesis
 }
 
@@ -1022,9 +1027,9 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 		r.ExpectBigIntStorageEqual(big.NewInt(100))        // WARM_STORAGE_READ_COST
 		p.ExpectBigIntStorageEqual(latestPayloadNumberBig) // tx succeeded
 	} else {
-		// // Pre-Shanghai
-		// r.ExpectBigIntStorageEqual(big.NewInt(2600)) // COLD_ACCOUNT_ACCESS_COST
-		// p.ExpectBigIntStorageEqual(big.NewInt(0))    // tx must've failed
+		// Pre-Shanghai
+		r.ExpectBigIntStorageEqual(big.NewInt(2600)) // COLD_ACCOUNT_ACCESS_COST
+		p.ExpectBigIntStorageEqual(big.NewInt(0))    // tx must've failed
 	}
 }
 
