@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"math/big"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -28,11 +29,6 @@ func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(test
 		}
 		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
 			return nil
-		}
-		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".json")
-		if !re.MatchString(pathname) {
-			fmt.Println("skip", pathname)
-			return nil // skip
 		}
 		excludePaths := []string{"example/"} // modify for tests to exclude
 		if strings.Contains(path, strings.Join(excludePaths, "")) {
@@ -58,6 +54,10 @@ func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(test
 				fixture:  fixture,
 				name:     path[10:len(path)-5] + "/" + name,
 				filepath: path,
+			}
+			// match test case name against regex if provided
+			if !re.MatchString(tc.name) {
+				continue
 			}
 			// extract genesis, payloads & post allocation field to tc
 			if err := tc.extractFixtureFields(fixture.json); err != nil {
@@ -105,6 +105,13 @@ func (tc *testcase) run(t *hivesim.T) {
 		tc.failedErr = err
 		t.Fatalf("can't start client with Engine API: %v", err)
 	}
+	// verify genesis hash matches that of the fixture
+	genesisBlock, err := engineClient.BlockByNumber(ctx, big.NewInt(0))
+	if genesisBlock.Hash() != tc.fixture.json.Genesis.Hash {
+		tc.failedErr = errors.New("genesis hash mismatch")
+		t.Fatalf("genesis hash mismatch")
+	}
+	t.Logf("genesis hash of client and fixture match \n %v \n %v", genesisBlock.Hash(), tc.fixture.json.Genesis.Hash)
 	t1 := time.Now()
 
 	// send payloads and check response
