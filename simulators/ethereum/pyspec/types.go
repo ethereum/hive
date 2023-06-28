@@ -170,7 +170,7 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
 			return fmt.Errorf("failed to decode block: %v", err)
 		}
 		// extract payloads from block
-		payload := api.BlockToExecutableData(block, common.Big0, nil, nil, nil).ExecutionPayload
+		payload := api.BlockToExecutableData(block, common.Big0).ExecutionPayload
 		payloads = append(payloads, payload)
 
 		// assess payload version
