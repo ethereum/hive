@@ -3,7 +3,7 @@ module github.com/ethereum/hive/simulators/ethereum/pyspec
 go 1.20
 
 require (
-	github.com/ethereum/go-ethereum v1.11.4
+	github.com/ethereum/go-ethereum v1.12.0
 	github.com/ethereum/hive v0.0.0-20230616141546-33068992107d
 	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20230616141546-33068992107d
 )
@@ -66,4 +66,4 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/ethereum/go-ethereum v1.11.4 => github.com/marioevz/go-ethereum v1.10.14-0.20230621172608-37143248dd79
+replace github.com/ethereum/go-ethereum => github.com/marioevz/go-ethereum v1.10.14-0.20230614003945-ca2054da1293
