@@ -1107,6 +1107,15 @@ func getTimestamp() int64 {
 	return nextThreeSeconds.Unix()
 }
 
+// sendPayloadTransactions spreads and sends TransactionCountPerPayload equaly between TX_CONTRACT_ADDRESSES
+//
+// Tx params:
+//
+//	Amount:    common.Big1
+//	Payload:   nil
+//	TxType:    t.TestTransactionType
+//	GasLimit:  t.Genesis.GasLimit()
+//	ChainID:   t.Genesis.Config().ChainID,
 func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
 	for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
 		var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
