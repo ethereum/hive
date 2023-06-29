@@ -566,6 +566,32 @@ func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCr
 	}
 }
 
+func SendNextTransactionWithAccount(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, sender common.Address) (*types.Transaction, error) {
+	nonce, err := node.GetNextAccountNonce(testCtx, sender)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := txCreator.MakeTransaction(nonce)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+		defer cancel()
+		err := node.SendTransaction(ctx, tx)
+		if err == nil {
+			return tx, nil
+		} else if SentTxAlreadyKnown(err) {
+			return tx, nil
+		}
+		select {
+		case <-time.After(time.Second):
+		case <-testCtx.Done():
+			return nil, testCtx.Err()
+		}
+	}
+}
+
 func SendNextTransactions(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, txCount uint64) ([]*types.Transaction, error) {
 	var err error
 	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)

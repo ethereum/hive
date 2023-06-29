@@ -78,6 +78,19 @@ func BalanceOfAddressData(account common.Address) ([]byte, error) {
 	return dataBytes, nil
 }
 
+// BalanceOfAddressData return contract method to get the balance of a GNO token.
+func TransferData(recipient common.Address, amount *big.Int) ([]byte, error) {
+	gnoTokenABI, err := abi.JSON(strings.NewReader(GNOTokenContractABI))
+	if err != nil {
+		return []byte{}, ErrorLoadingGNOTokenContract
+	}
+	dataBytes, err := gnoTokenABI.Pack("transfer", recipient, amount)
+	if err != nil {
+		return []byte{}, fmt.Errorf("%w: %w", ErrorPackingArguments, err)
+	}
+	return dataBytes, nil
+}
+
 // GetGNOTokenABI return the GNO token ABI.
 func GetGNOTokenABI() (*abi.ABI, error) {
 	gnoTokenABI, err := abi.JSON(strings.NewReader(GNOTokenContractABI))

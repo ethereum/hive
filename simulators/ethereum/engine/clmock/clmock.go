@@ -108,14 +108,6 @@ type CLMocker struct {
 }
 
 func isShanghai(blockTimestamp uint64, shanghaiTimestamp *big.Int) bool {
-	tUnix := time.Unix(int64(blockTimestamp), 0)
-	formattedTime := tUnix.Format("2006-01-02 15:04:05")
-	fmt.Sprintf("Block timestamp: %v", formattedTime)
-
-	tUnix = time.Unix(shanghaiTimestamp.Int64(), 0)
-	shangai := tUnix.Format("2006-01-02 15:04:05")
-	fmt.Sprintf("Shangai Timestamp: %v", shangai)
-
 	return shanghaiTimestamp != nil && big.NewInt(int64(blockTimestamp)).Cmp(shanghaiTimestamp) >= 0
 }
 
@@ -322,8 +314,9 @@ func (cl *CLMocker) pickNextPayloadProducer() {
 			// Selected client latest block hash does not match canonical chain, try again
 			cl.NextBlockProducer = nil
 			continue
+		} else {
+			break
 		}
-		break
 
 	}
 
@@ -550,9 +543,8 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 	previousForkchoice := cl.LatestForkchoice
 	cl.HeadHashHistory = append(cl.HeadHashHistory, cl.LatestPayloadBuilt.BlockHash)
 
-	cl.LatestForkchoice = api.ForkchoiceStateV1{
-		HeadBlockHash: cl.LatestPayloadBuilt.BlockHash,
-	}
+	cl.LatestForkchoice = api.ForkchoiceStateV1{}
+	cl.LatestForkchoice.HeadBlockHash = cl.LatestPayloadBuilt.BlockHash
 	if len(cl.HeadHashHistory) > int(cl.SlotsToSafe.Int64()) {
 		cl.LatestForkchoice.SafeBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToSafe.Int64())-1]
 	}
