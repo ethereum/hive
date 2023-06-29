@@ -13,6 +13,8 @@ import (
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/tests"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -59,24 +61,6 @@ func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(test
 			if !re.MatchString(tc.name) {
 				continue
 			}
-
-			// TODO: remove once fixed tests
-			exclude := []string{
-				"001-fork=ShanghaiToCancunAtTime15k-excess_data_gas_missing=False-data_gas_used_missing=True",
-				"invalid_blob_tx_contract_creation",
-			} // modify for tests to exclude
-			shouldSkip := false
-			for _, ex := range exclude {
-			    if strings.Contains(tc.name, ex) {
-			        shouldSkip = true
-			        break
-			    }
-			}
-			if shouldSkip {
-				t.Logf("skipping test %s, needs to be fixed", tc.name)
-				continue // assuming this code is in a loop
-			}
-
 			// extract genesis, payloads & post allocation field to tc
 			if err := tc.extractFixtureFields(fixture.json); err != nil {
 				t.Logf("test %v / %v: unable to extract fixture fields: %v", d.Name(), name, err)
@@ -125,18 +109,21 @@ func (tc *testcase) run(t *hivesim.T) {
 	}
 	// verify genesis hash matches that of the fixture
 	genesisBlock, err := engineClient.BlockByNumber(ctx, big.NewInt(0))
+	if err != nil {
+		tc.failedErr = err
+		t.Fatalf("unable to get genesis block: %v", err)
+	}
 	if genesisBlock.Hash() != tc.fixture.json.Genesis.Hash {
 		tc.failedErr = errors.New("genesis hash mismatch")
 		t.Fatalf("genesis hash mismatch")
 	}
-	t.Logf("genesis hash of client and fixture match \n %v \n %v", genesisBlock.Hash(), tc.fixture.json.Genesis.Hash)
 	t1 := time.Now()
 
 	// send payloads and check response
 	latestValidHash := common.Hash{}
-	for blockNumber, payload := range tc.payloads {
+	for i, engineNewPayload := range tc.payloads {
 		// set expected payload return status
-		plException := tc.fixture.json.Blocks[blockNumber].Exception
+		plException := tc.fixture.json.Blocks[i].Exception
 		expectedStatus := "VALID"
 		if plException != "" {
 			expectedStatus = "INVALID"
@@ -144,9 +131,9 @@ func (tc *testcase) run(t *hivesim.T) {
 		// execute fixture block payload
 		plStatus, plErr := engineClient.NewPayload(
 			context.Background(),
-			tc.payloadVersions[blockNumber],
-			payload,
-			tc.versionedHashes[blockNumber],
+			int(engineNewPayload.Version),
+			engineNewPayload.Payload,
+			engineNewPayload.BlobVersionedHashes,
 		)
 		if plErr != nil {
 			if plException == plErr.Error() {
@@ -154,7 +141,7 @@ func (tc *testcase) run(t *hivesim.T) {
 				continue
 			} else {
 				tc.failedErr = plErr
-				t.Fatalf("unexpected error: %v, unable to send block %v, in test %s", plErr, blockNumber+1, tc.name)
+				t.Fatalf("unexpected error: %v, unable to send block %v, in test %s", plErr, i+1, tc.name)
 			}
 		}
 		// update latest valid block hash
@@ -164,10 +151,7 @@ func (tc *testcase) run(t *hivesim.T) {
 		// check payload status is expected from fixture
 		if expectedStatus != plStatus.Status {
 			tc.failedErr = errors.New("payload status mismatch")
-			t.Logf(`payload status mismatch for payload: %v
-				expected from fixture: %s
-				got from payload: %s`, *payload.DataGasUsed, expectedStatus, plStatus.Status)
-			t.Fatalf("payload status mismatch for block %v in test %s.", blockNumber+1, tc.name)
+			t.Fatalf("payload status mismatch for block %v in test %s.", i+1, tc.name)
 		}
 	}
 	t2 := time.Now()
@@ -254,4 +238,40 @@ func (tc *testcase) updateEnv(env hivesim.Params) {
 	for k, v := range forkRules {
 		env[k] = fmt.Sprintf("%d", v)
 	}
+}
+
+// extractFixtureFields extracts the genesis, post allocation and payload
+// fields from the given fixture test and stores them in the testcase struct.
+func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
+	tc.genesis = extractGenesis(fixture)
+	tc.postAlloc = &fixture.Post
+	var engineNewPayloads []*engineNewPayload
+	for _, bl := range fixture.Blocks {
+		if bl.EngineNewPayload == nil {
+			return errors.New("engineNewPayload is nil")
+		}
+		engineNewPayloads = append(engineNewPayloads, bl.EngineNewPayload)
+	}
+	tc.payloads = engineNewPayloads
+	return nil
+}
+
+// extractGenesis extracts the genesis block information from the given fixture
+// and returns a core.Genesis struct containing the extracted information.
+func extractGenesis(fixture fixtureJSON) *core.Genesis {
+	genesis := &core.Genesis{
+		Config:        tests.Forks[fixture.Network],
+		Coinbase:      fixture.Genesis.Coinbase,
+		Difficulty:    fixture.Genesis.Difficulty,
+		GasLimit:      fixture.Genesis.GasLimit,
+		Timestamp:     fixture.Genesis.Timestamp.Uint64(),
+		ExtraData:     fixture.Genesis.ExtraData,
+		Mixhash:       fixture.Genesis.MixHash,
+		Nonce:         fixture.Genesis.Nonce.Uint64(),
+		BaseFee:       fixture.Genesis.BaseFee,
+		DataGasUsed:   fixture.Genesis.DataGasUsed,
+		ExcessDataGas: fixture.Genesis.ExcessDataGas,
+		Alloc:         fixture.Pre,
+	}
+	return genesis
 }

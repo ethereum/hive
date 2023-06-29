@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"math/big"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -11,8 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/rlp"
-	"github.com/ethereum/go-ethereum/tests"
 )
 
 type testcase struct {
@@ -22,12 +19,10 @@ type testcase struct {
 	clientType string
 	failedErr  error
 	// test fixture data
-	fixture         fixtureTest
-	genesis         *core.Genesis
-	payloads        []*api.ExecutableData
-	payloadVersions []int
-	versionedHashes [][]common.Hash
-	postAlloc       *core.GenesisAlloc
+	fixture   fixtureTest
+	genesis   *core.Genesis
+	postAlloc *core.GenesisAlloc
+	payloads  []*engineNewPayload
 }
 
 type fixtureTest struct {
@@ -52,15 +47,19 @@ type fixtureJSON struct {
 }
 
 type block struct {
-	Rlp          string        `json:"rlp"`
-	BlockHeader  *blockHeader  `json:"blockHeader"`
-	Transactions []transaction `json:"transactions"`
-	UncleHeaders []byte        `json:"uncleHeaders"`
-	Withdrawals  []withdrawals `json:"withdrawals"`
-	Exception    string        `json:"expectException"`
+	Rlp              string            `json:"rlp"`
+	BlockHeader      *blockHeader      `json:"blockHeader"`
+	Transactions     []transaction     `json:"transactions"`
+	UncleHeaders     []byte            `json:"uncleHeaders"`
+	Withdrawals      []withdrawals     `json:"withdrawals"`
+	Exception        string            `json:"expectException"`
+	EngineNewPayload *engineNewPayload `json:"engineNewPayload"`
 }
 
 //go:generate go run github.com/fjl/gencodec -type blockHeader -field-override blockHeaderUnmarshaling -out gen_bh.go
+//go:generate go run github.com/fjl/gencodec -type transaction -field-override transactionUnmarshaling -out gen_txs.go
+//go:generate go run github.com/fjl/gencodec -type withdrawals -field-override withdrawalsUnmarshaling -out gen_wds.go
+//go:generate go run github.com/fjl/gencodec -type engineNewPayload -field-override engineNewPayloadUnmarshaling -out gen_enp.go
 type blockHeader struct {
 	ParentHash         common.Hash      `json:"parentHash"`
 	UncleHash          common.Hash      `json:"sha3Uncles"`
@@ -101,7 +100,6 @@ type blockHeaderUnmarshaling struct {
 	ExcessDataGas *math.HexOrDecimal64  `json:"excessDataGas"`
 }
 
-//go:generate go run github.com/fjl/gencodec -type transaction -field-override transactionUnmarshaling -out gen_txs.go
 type transaction struct {
 	Type                 *uint64           `json:"type"`
 	ChainId              *big.Int          `json:"chainId"`
@@ -139,7 +137,6 @@ type transactionUnmarshaling struct {
 	MaxFeePerDataGas     *math.HexOrDecimal256 `json:"maxFeePerDataGas"`
 }
 
-//go:generate go run github.com/fjl/gencodec -type withdrawals -field-override withdrawalsUnmarshaling -out gen_wds.go
 type withdrawals struct {
 	Index          uint64         `json:"index"`
 	ValidatorIndex uint64         `json:"validatorIndex"`
@@ -153,99 +150,12 @@ type withdrawalsUnmarshaling struct {
 	Amount         math.HexOrDecimal64 `json:"amount"`
 }
 
-// extractFixtureFields extracts the genesis, payloads, blobs and post allocation
-// fields from the given fixture test and stores them in the testcase struct.
-func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
-	// extract genesis fields from fixture test
-	tc.genesis = extractGenesis(fixture)
-
-	// extract payload, plVersion & versionedHashes
-	payloads := []*api.ExecutableData{}
-	payloadVersions := []int{}
-	var blobs [][]common.Hash
-	for _, bl := range fixture.Blocks {
-		// decode block rlp
-		block, err := bl.decodeBlock()
-		if err != nil {
-			return fmt.Errorf("failed to decode block: %v", err)
-		}
-		// extract payloads from block
-		payload := api.BlockToExecutableData(block, common.Big0).ExecutionPayload
-		payloads = append(payloads, payload)
-
-		// assess payload version
-		payloadVersion := tc.getPayloadVersion(payload)
-		payloadVersions = append(payloadVersions, payloadVersion)
-
-		// extract blobs from block
-		block_blobs := []common.Hash{}
-		for _, tx := range block.Transactions() {
-			if tx.Type() >= 3 {
-				for _, blob := range tx.BlobHashes() {
-					block_blobs = append(block_blobs, blob)
-				}
-			}
-		}
-		if payloadVersion >= 3 {
-			blobs = append(blobs, block_blobs)
-		} else {
-			blobs = append(blobs, nil)
-		}
-	}
-	tc.payloads = payloads
-	tc.payloadVersions = payloadVersions
-	tc.versionedHashes = blobs
-
-	// extract post account information
-	tc.postAlloc = &fixture.Post
-	return nil
+type engineNewPayload struct {
+	Payload             *api.ExecutableData `json:"payload"`
+	Version             uint64              `json:"version"`
+	BlobVersionedHashes []common.Hash       `json:"blobVersionedHashes"`
 }
 
-// getPayloadVersion returns the payload version based on the network and timestamp
-func (tc *testcase) getPayloadVersion(payload *api.ExecutableData) (int) {
-    switch tc.fixture.json.Network {
-    case "Cancun":
-        return 3
-    case "Shanghai":
-        return 2
-    case "ShanghaiToCancunAtTime15k":
-        if payload.Timestamp >= 15000 {
-            return 3
-        }
-        return 2
-    default:
-        return 1
-    }
-}
-
-// extractGenesis extracts the genesis block information from the given fixture
-// and returns a core.Genesis struct containing the extracted information.
-func extractGenesis(fixture fixtureJSON) *core.Genesis {
-	genesis := &core.Genesis{
-		Config:        tests.Forks[fixture.Network],
-		Coinbase:      fixture.Genesis.Coinbase,
-		Difficulty:    fixture.Genesis.Difficulty,
-		GasLimit:      fixture.Genesis.GasLimit,
-		Timestamp:     fixture.Genesis.Timestamp.Uint64(),
-		ExtraData:     fixture.Genesis.ExtraData,
-		Mixhash:       fixture.Genesis.MixHash,
-		Nonce:         fixture.Genesis.Nonce.Uint64(),
-		BaseFee:       fixture.Genesis.BaseFee,
-		DataGasUsed:   fixture.Genesis.DataGasUsed,
-		ExcessDataGas: fixture.Genesis.ExcessDataGas,
-		Alloc:         fixture.Pre,
-	}
-	return genesis
-}
-
-// decodeBlock decodes the RLP-encoded block data in the block struct and
-// returns a types.Block struct containing the decoded information.
-func (bl *block) decodeBlock() (*types.Block, error) {
-	data, err := hexutil.Decode(bl.Rlp)
-	if err != nil {
-		return nil, err
-	}
-	var b types.Block
-	err = rlp.DecodeBytes(data, &b)
-	return &b, err
+type engineNewPayloadUnmarshaling struct {
+	Version math.HexOrDecimal64 `json:"version"`
 }
