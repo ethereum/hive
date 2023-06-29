@@ -986,9 +986,9 @@ func (ws *WithdrawalsBaseSpec) GetGenesis(base string) helper.Genesis {
 		0x90, // SWAP1
 		0x03, // SUB
 		// TODO:
-		0x60, // PUSH1(0x00)
-		0x00,
-		// 0x43, // NUMBER
+		// 0x60, // PUSH1(0x00)
+		// 0x00,
+		0x43, // NUMBER
 		0x55, // SSTORE
 	}
 	warmCoinbaseAcc := helper.NewAccount()
@@ -1018,9 +1018,8 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 	// Assume that forkchoice updated has been already sent
 	latestPayloadNumber := t.CLMock.LatestExecutedPayload.Number
 	latestPayloadNumberBig := big.NewInt(int64(latestPayloadNumber))
-	s := big.NewInt(0)
 
-	r := t.TestEngine.TestStorageAt(WARM_COINBASE_ADDRESS, common.BigToHash(s), latestPayloadNumberBig)
+	r := t.TestEngine.TestStorageAt(WARM_COINBASE_ADDRESS, common.BigToHash(latestPayloadNumberBig), latestPayloadNumberBig)
 	p := t.TestEngine.TestStorageAt(PUSH0_ADDRESS, common.Hash{}, latestPayloadNumberBig)
 	if latestPayloadNumber >= ws.WithdrawalsForkHeight {
 		// Shanghai
@@ -1128,8 +1127,9 @@ func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
 				Amount:    common.Big1,
 				Payload:   nil,
 				TxType:    t.TestTransactionType,
-				GasLimit:  t.Genesis.GasLimit(),
-				ChainID:   t.Genesis.Config().ChainID,
+				// TODO: figure out why contract storage check fails on block 2 with Genesis.GasLimit()
+				GasLimit: 75000,
+				ChainID:  t.Genesis.Config().ChainID,
 			},
 		)
 

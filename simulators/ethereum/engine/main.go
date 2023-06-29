@@ -94,7 +94,7 @@ func getTimestamp(spec test.SpecInterface) int64 {
 		preShapellaBlock = 1
 	}
 
-	nextMinute := now.Truncate(time.Minute).Add(time.Duration(preShapellaBlock) * 1 * time.Minute).Add(time.Minute)
+	nextMinute := now.Truncate(time.Minute).Add(time.Duration(preShapellaBlock) * 3 * time.Minute).Add(time.Minute)
 	// Create a time.Time value from the int64 timestamp
 	//tUnix := time.Unix(nex, 0)
 
