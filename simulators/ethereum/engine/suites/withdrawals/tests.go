@@ -1026,6 +1026,7 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 		// Shanghai
 		r.ExpectBigIntStorageEqual(big.NewInt(100))        // WARM_STORAGE_READ_COST
 		p.ExpectBigIntStorageEqual(latestPayloadNumberBig) // tx succeeded
+
 	} else {
 		// Pre-Shanghai
 		r.ExpectBigIntStorageEqual(big.NewInt(2600)) // COLD_ACCOUNT_ACCESS_COST
@@ -1106,6 +1107,29 @@ func getTimestamp() int64 {
 	return nextThreeSeconds.Unix()
 }
 
+func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
+	for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
+		var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
+
+		_, err := helper.SendNextTransaction(
+			t.TestContext,
+			t.CLMock.NextBlockProducer,
+			&helper.BaseTransactionCreator{
+				Recipient: &destAddr,
+				Amount:    common.Big1,
+				Payload:   nil,
+				TxType:    t.TestTransactionType,
+				GasLimit:  t.Genesis.GasLimit(),
+				ChainID:   t.Genesis.Config().ChainID,
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+		}
+	}
+}
+
 // type balancer map[common.Address]uint64
 // type blockBalancer map[uint64]balancer
 //
@@ -1161,28 +1185,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	t.CLMock.ProduceBlocks(int(ws.GetPreWithdrawalsBlockCount()), clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 
-			// Send some transactions
-			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-
-				var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
-
-				_, err := helper.SendNextTransaction(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient: &destAddr,
-						Amount:    common.Big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
-						ChainID:   t.Genesis.Config().ChainID,
-					},
-				)
-
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-				}
-			}
+			ws.sendPayloadTransactions(t)
 
 			if !ws.SkipBaseVerifications {
 
@@ -1256,27 +1259,8 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			// Send some withdrawals
 			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
 			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
-			// Send some transactions
-			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-				var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
 
-				_, err := helper.SendNextTransaction(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient: &destAddr,
-						Amount:    common.Big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  t.Genesis.GasLimit(),
-						ChainID:   t.Genesis.Config().ChainID,
-					},
-				)
-
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-				}
-			}
+			ws.sendPayloadTransactions(t)
 
 		},
 		OnGetPayload: func() {
@@ -1321,7 +1305,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			//		r.ExpectBalanceEqual(expectedAccountBalance)
 			//	}
 			//}
-			ws.VerifyContractsStorage(t)
+
 		},
 		OnForkchoiceBroadcast: func() {
 			if !ws.SkipBaseVerifications {
@@ -1339,7 +1323,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						t.Fatalf("FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d", t.TestName, addr, expectBalanceEqual, latestBalance)
 					}
 				}
-
+				ws.VerifyContractsStorage(t)
 			}
 		},
 	})
