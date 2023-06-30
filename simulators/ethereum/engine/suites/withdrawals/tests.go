@@ -99,8 +99,8 @@ var Tests = []test.SpecInterface{
 			Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
 			`,
 		},
-		WithdrawalsForkHeight: 1, //TODO
-		WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
+		WithdrawalsForkHeight: 1,  //TODO
+		WithdrawalsBlockCount: 10, // Genesis is not a withdrawals block
 		WithdrawalsPerBlock:   16,
 		TimeIncrements:        5,
 	},
