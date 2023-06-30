@@ -117,17 +117,21 @@ func main() {
 
 	// Parse the client list.
 	// It can be supplied as a comma-separated list, or as a YAML file.
-	checkFlagsExclusive("client", "client-file")
 	var clientList []libhive.ClientDesignator
-	if *clientsFile != "" {
+	if *clientsFile == "" {
+		clientList, err = libhive.ParseClientList(&inv, *clients)
+		if err != nil {
+			fatal("-client:", err)
+		}
+	} else {
 		clientList, err = parseClientsFile(&inv, *clientsFile)
 		if err != nil {
 			fatal("-client-file:", err)
 		}
-	} else {
-		clientList, err = libhive.ParseClientList(&inv, *clients)
-		if err != nil {
-			fatal("-client:", err)
+		// If YAML file is used, the list can be filtered by the -client flag.
+		if flagIsSet("client") {
+			filter := strings.Split(*clients, ",")
+			clientList = libhive.FilterClients(clientList, filter)
 		}
 	}
 
@@ -135,7 +139,6 @@ func main() {
 	if err := runner.Build(ctx, clientList, simList); err != nil {
 		fatal(err)
 	}
-
 	if *simDevMode {
 		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint)
 		return
@@ -175,27 +178,12 @@ func parseClientsFile(inv *libhive.Inventory, file string) ([]libhive.ClientDesi
 	return libhive.ParseClientListYAML(inv, f)
 }
 
-func checkFlagsExclusive(flagNames ...string) {
-	set := make(map[string]bool)
-	flag.Visit(func(f *flag.Flag) {
-		set[f.Name] = true
-	})
+func flagIsSet(name string) bool {
 	var found bool
-	for _, name := range flagNames {
-		if set[name] {
-			if found {
-				fatal("flags", flagListString(flagNames), "cannot be used together")
-			}
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
 			found = true
-			set[name] = false
 		}
-	}
-}
-
-func flagListString(names []string) string {
-	flags := make([]string, len(names))
-	for i := range flags {
-		flags[i] = "-" + names[i]
-	}
-	return strings.Join(flags, ", ")
+	})
+	return found
 }
