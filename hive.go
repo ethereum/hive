@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/ethereum/hive/internal/libdocker"
@@ -116,20 +117,21 @@ func main() {
 
 	// Parse the client list.
 	// It can be supplied as a comma-separated list, or as a YAML file.
-	clientList, err := libhive.ParseClientList(&inv, *clients)
-	if err != nil {
-		fatal("-client:", err)
-	}
-	if *clientsFile != "" {
-		clientListFromFile, err := parseClientsFile(&inv, *clientsFile)
+	var clientList []libhive.ClientDesignator
+	if *clientsFile == "" {
+		clientList, err = libhive.ParseClientList(&inv, *clients)
+		if err != nil {
+			fatal("-client:", err)
+		}
+	} else {
+		clientList, err = parseClientsFile(&inv, *clientsFile)
 		if err != nil {
 			fatal("-client-file:", err)
 		}
-		// If YAML file is used, the list is filtered by the -client flag.
+		// If YAML file is used, the list can be filtered by the -client flag.
 		if flagIsSet("client") {
-			clientList = libhive.FilterClients(clientListFromFile, clientList)
-		} else {
-			clientList = clientListFromFile
+			filter := strings.Split(*clients, ",")
+			clientList = libhive.FilterClients(clientList, filter)
 		}
 	}
 
@@ -137,7 +139,6 @@ func main() {
 	if err := runner.Build(ctx, clientList, simList); err != nil {
 		fatal(err)
 	}
-
 	if *simDevMode {
 		runner.RunDevMode(ctx, env, *simDevModeAPIEndpoint)
 		return

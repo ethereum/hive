@@ -291,10 +291,10 @@ func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, er
 }
 
 // FilterClients trims the given list to only include clients matching the 'filter list'.
-func FilterClients(list []ClientDesignator, filter []ClientDesignator) []ClientDesignator {
+func FilterClients(list []ClientDesignator, filter []string) []ClientDesignator {
 	accept := make(set[string])
 	for _, f := range filter {
-		accept.add(f.Name())
+		accept.add(strings.TrimSpace(f))
 	}
 	var res []ClientDesignator
 	for _, c := range list {
