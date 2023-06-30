@@ -47,29 +47,6 @@ $(document).ready(function () {
     showText(document.getElementById('exampletext').innerHTML);
 });
 
-// setHL sets the highlight on a line number.
-function setHL(num, scroll) {
-    // out with the old
-    $('.highlighted').removeClass('highlighted');
-    if (!num) {
-        return;
-    }
-
-    let contentArea = document.getElementById('file-content');
-    let gutter = document.getElementById('gutter');
-    let numElem = gutter.children[num - 1];
-    if (!numElem) {
-        console.error('invalid line number:', num);
-        return;
-    }
-    // in with the new
-    let lineElem = contentArea.children[num - 1];
-    $(numElem).addClass('highlighted');
-    $(lineElem).addClass('highlighted');
-    if (scroll) {
-        numElem.scrollIntoView();
-    }
-}
 
 // showLinkBack displays the link to the test viewer.
 function showLinkBack(suiteID, suiteName, testID) {
@@ -114,18 +91,65 @@ function showText(text) {
 
 class TextViewer {
     number = 1;
-    
-    constructor() {
-        this.contentArea = document.getElementById('file-content');
-        this.gutter = document.getElementById('gutter');
+
+    constructor(container) {
+        this.header = $('#viewer-header');
+        this.container = $('#viewer');
+        this.contentArea = $('.file-content', this.container);
+        this.gutter = $('gutter', this.container);
     }
 
+    // clear removes all text from the view.
     clear() {
         this.contentArea.innerHTML = '';
         this.gutter.innerHTML = '';
         this.number = 1;
     }
 
+    // show ensures the viewer is visible.
+    show() {
+        this.header.show();
+        this.container.show();
+    }
+
+    // setText displays the given text.
+    setText(text) {
+        this.clear();
+        let lines = text.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            this.appendLine(lines[i]);
+        }
+        let meta = $('#meta');
+        meta.text(lines.length + ' Lines, ' + formatBytes(text.length));
+    }
+
+    // highlight sets the highlight on a line number.
+    highlight(lineNumber, scroll) {
+        // out with the old
+        $('.highlighted', this.container).removeClass('highlighted');
+        if (!num) {
+            return;
+        }
+
+        let numElem = this.gutter.children[num - 1];
+        if (!numElem) {
+            console.error('invalid line number:', num);
+            return;
+        }
+        // in with the new
+        let lineElem = this.contentArea.children[num - 1];
+        $(numElem).addClass('highlighted');
+        $(lineElem).addClass('highlighted');
+        if (scroll) {
+            numElem.scrollIntoView();
+        }
+    }
+
+    lineNumberClicked() {
+        setHL($(this).attr('line'), false);
+        history.replaceState(null, null, '#' + $(this).attr('id'));
+    }
+    
     appendLine(text) {
         let num = document.createElement('span');
         num.setAttribute('id', 'L' + this.number);
@@ -139,31 +163,6 @@ class TextViewer {
         line.innerText = text + '\n';
         this.contentArea.appendChild(line);
     }
-
-    // show ensures the viewer is visible.
-    show() {
-        $('#viewer-header').show();
-        $('#viewer').show();
-    }
-    
-    setText(text) {
-        this.clear();
-        let lines = text.split('\n');        
-        for (let i = 0; i < lines.length; i++) {
-            this.appendLine(lines[i]);
-        }
-        
-        let meta = $('#meta');
-        meta.text(lines.length + ' Lines, ' + formatBytes(text.length));
-
-        this.show();
-    }
-}
-
-
-function lineNumberClicked() {
-    setHL($(this).attr('line'), false);
-    history.replaceState(null, null, '#' + $(this).attr('id'));
 }
 
 // fetchFile loads up a new file to view
