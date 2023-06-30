@@ -86,7 +86,6 @@ type ClientGenesis interface {
 
 // Load the genesis based on each client
 
-// getTimestamp of the next 2 minutes
 func getTimestamp(spec test.SpecInterface) int64 {
 	now := time.Now()
 
@@ -95,7 +94,6 @@ func getTimestamp(spec test.SpecInterface) int64 {
 		preShapellaBlock = 1
 	}
 
-	// Calculate the start of the next 2 minutes
 	nextMinute := now.Truncate(time.Minute).Add(time.Duration(preShapellaBlock) * 3 * time.Minute).Add(time.Minute)
 	return nextMinute.Unix()
 }
