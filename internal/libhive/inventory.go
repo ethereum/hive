@@ -290,6 +290,21 @@ func ParseClientListYAML(inv *Inventory, file io.Reader) ([]ClientDesignator, er
 	return res, nil
 }
 
+// FilterClients trims the given list to only include clients matching the 'filter list'.
+func FilterClients(list []ClientDesignator, filter []ClientDesignator) []ClientDesignator {
+	accept := make(set[string])
+	for _, f := range filter {
+		accept.add(f.Name())
+	}
+	var res []ClientDesignator
+	for _, c := range list {
+		if accept.contains(c.Client) || accept.contains(c.Name()) {
+			res = append(res, c)
+		}
+	}
+	return res
+}
+
 var knownBuildArgs = map[string]struct{}{
 	"tag":        {}, // this is the branch/version specifier when pulling the git repo or docker base image
 	"github":     {}, // (for git pull) github repo to clone
