@@ -85,12 +85,45 @@ func NewAccount() Account {
 	return make(Account, 0)
 }
 
+// GetCode returns theaccount balance if it was set,
+// otherwise returns common.Big0
+func (a Account) GetBalance() *big.Int {
+	hexBalance, ok := a["balance"]
+	if !ok {
+		return common.Big0
+	}
+	hexStr := hexBalance.(string)
+	balance := common.Big0
+	_ = balance.FillBytes(common.Hex2Bytes(hexStr))
+	return balance
+}
+
 func (a Account) SetBalance(balance *big.Int) {
 	a["balance"] = common.BigToHash(balance)
 }
 
+// GetCode returns the hex representation of code if it was set,
+// otherwise returns ""
+func (a Account) GetCode() string {
+	code, ok := a["code"]
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%x", code.(string))
+}
+
 func (a Account) SetCode(code []byte) {
 	a["code"] = common.Bytes2Hex(code)
+}
+
+// GetConstructor returns the hex representation of constructor if it was set,
+// otherwise returns ""
+func (a Account) GetConstructor() string {
+	constructor, ok := a["constructor"]
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%x", constructor.(string))
 }
 
 func (a Account) SetConstructor(constructor []byte) {
