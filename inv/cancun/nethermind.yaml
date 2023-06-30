@@ -1,7 +1,0 @@
-## -- Git Build --
-- client: nethermind
-  nametag: 4844-git
-  dockerfile: git
-  build_args:
-      github: nethermindeth/nethermind
-      tag: feature/eip-4844-v6
