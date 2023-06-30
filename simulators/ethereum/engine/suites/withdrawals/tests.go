@@ -31,8 +31,55 @@ var (
 	InvalidParamsError = -32602
 	MAX_INITCODE_SIZE  = 49152
 
+	/*
+		Warm coinbase contract needs to check if EIP-3651 applied after shapella
+		https://eips.ethereum.org/EIPS/eip-3651
+
+		Contract bytecode saves coinbase access cost to the slot number of current block
+		i.e. if current block number is 5 ==> coinbase access cost saved to slot 5 etc
+	*/
 	WARM_COINBASE_ADDRESS = common.HexToAddress("0x0101010101010101010101010101010101010101")
-	PUSH0_ADDRESS         = common.HexToAddress("0x0202020202020202020202020202020202020202")
+	warmCoinbaseCode      = []byte{
+		0x5A, // GAS
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x41, // COINBASE
+		0x60, // PUSH1(0xFF)
+		0xFF,
+		0xF1, // CALL
+		0x5A, // GAS
+		0x90, // SWAP1
+		0x50, // POP - Call result
+		0x90, // SWAP1
+		0x03, // SUB
+		0x60, // PUSH1(0x16) - GAS + PUSH * 6 + COINBASE
+		0x16,
+		0x90, // SWAP1
+		0x03, // SUB
+		0x43, // NUMBER
+		0x55, // SSTORE
+	}
+	/*
+		Warm coinbase contract needs to check if EIP-3855 applied after shapella
+		https://eips.ethereum.org/EIPS/eip-3855
+
+		Contract bytecode reverts tx before the shapells (because PUSH0 opcode does not exists)
+		After shapella hardfork it saves current block number to 0 slot
+	*/
+	PUSH0_ADDRESS = common.HexToAddress("0x0202020202020202020202020202020202020202")
+	push0Code     = []byte{
+		0x43, // NUMBER
+		0x5F, // PUSH0
+		0x55, // SSTORE
+	}
 
 	TX_CONTRACT_ADDRESSES = []common.Address{
 		WARM_COINBASE_ADDRESS,
@@ -959,38 +1006,7 @@ func (ws *WithdrawalsBaseSpec) GetGenesisTest(base string) string {
 func (ws *WithdrawalsBaseSpec) GetGenesis(base string) helper.Genesis {
 
 	genesis := ws.Spec.GetGenesis(base)
-	// Add accounts that use the coinbase (EIP-3651)
-	warmCoinbaseCode := []byte{
-		0x5A, // GAS
-		0x60, // PUSH1(0x00)
-		0x00,
-		0x60, // PUSH1(0x00)
-		0x00,
-		0x60, // PUSH1(0x00)
-		0x00,
-		0x60, // PUSH1(0x00)
-		0x00,
-		0x60, // PUSH1(0x00)
-		0x00,
-		0x41, // COINBASE
-		0x60, // PUSH1(0xFF)
-		0xFF,
-		0xF1, // CALL
-		0x5A, // GAS
-		0x90, // SWAP1
-		0x50, // POP - Call result
-		0x90, // SWAP1
-		0x03, // SUB
-		0x60, // PUSH1(0x16) - GAS + PUSH * 6 + COINBASE
-		0x16,
-		0x90, // SWAP1
-		0x03, // SUB
-		// TODO:
-		// 0x60, // PUSH1(0x00)
-		// 0x00,
-		0x43, // NUMBER
-		0x55, // SSTORE
-	}
+
 	warmCoinbaseAcc := helper.NewAccount()
 	push0Acc := helper.NewAccount()
 
@@ -998,12 +1014,7 @@ func (ws *WithdrawalsBaseSpec) GetGenesis(base string) helper.Genesis {
 	warmCoinbaseAcc.SetCode(warmCoinbaseCode)
 
 	genesis.AllocGenesis(WARM_COINBASE_ADDRESS, warmCoinbaseAcc)
-	// Add accounts that use the PUSH0 (EIP-3855)
-	push0Code := []byte{
-		0x43, // NUMBER
-		0x5F, // PUSH0
-		0x55, // SSTORE
-	}
+
 	push0Acc.SetBalance(common.Big0)
 	push0Acc.SetCode(push0Code)
 
