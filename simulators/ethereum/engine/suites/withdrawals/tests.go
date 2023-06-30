@@ -68,7 +68,7 @@ var (
 		0x55, // SSTORE
 	}
 	/*
-		Warm coinbase contract needs to check if EIP-3855 applied after shapella
+		PUSH0 contract needs to check if EIP-3855 applied after shapella
 		https://eips.ethereum.org/EIPS/eip-3855
 
 		Contract bytecode reverts tx before the shapells (because PUSH0 opcode does not exists)
@@ -110,32 +110,31 @@ type WithdrawalsBaseSpec struct {
 //
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork On Genesis",
-	//		About: `
-	//		Tests the withdrawals fork happening on block 5 (e.g. on a
-	//		testnet).
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1, //TODO
-	//	WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
-	//	WithdrawalsPerBlock:   16,
-	//	TimeIncrements:        5,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 1",
-	//		About: `
-	//		Tests the withdrawals fork happening directly after genesis.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   16,
-	//},
-	//// TODO
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 1",
+	// 		About: `
+	// 		Tests the withdrawals fork happening directly after genesis.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
+	// 	WithdrawalsBlockCount: 1,
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork On Genesis",
+	// 		About: `
+	// 		Tests the withdrawals fork happening directly after genesis.
+	// 		Produce 2 blocks with withdrawals after the fork.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1,
+	// 	WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
 	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdrawals Fork on Block 5",
@@ -1305,26 +1304,26 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			}
 		},
 		OnNewPayloadBroadcast: func() {
-			//if !ws.SkipBaseVerifications {
-			//	for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
-			//		// Test balance at `latest`, which should not yet have the
-			//		// withdrawal applied.
-			//		expectedAccountBalance := ws.WithdrawalsHistory.GetExpectedAccountBalance(
-			//			addr,
-			//			t.CLMock.LatestExecutedPayload.Number-1)
-			//		r := t.TestEngine.TestBalanceAt(addr, nil)
-			//		r.ExpectationDescription = fmt.Sprintf(`
-			//			Requested balance for account %s on "latest" block
-			//			after engine_newPayloadV2, expecting balance to be equal
-			//			to value on previous block (%d), since the new payload
-			//			has not yet been applied.
-			//			`,
-			//			addr,
-			//			t.CLMock.LatestExecutedPayload.Number-1,
-			//		)
-			//		r.ExpectBalanceEqual(expectedAccountBalance)
-			//	}
-			//}
+			if !ws.SkipBaseVerifications {
+				for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
+					// Test balance at `latest`, which should not yet have the
+					// withdrawal applied.
+					expectedAccountBalance := ws.WithdrawalsHistory.GetExpectedAccountBalance(
+						addr,
+						t.CLMock.LatestExecutedPayload.Number-1)
+					r := t.TestEngine.TestBalanceAt(addr, nil)
+					r.ExpectationDescription = fmt.Sprintf(`
+						Requested balance for account %s on "latest" block
+						after engine_newPayloadV2, expecting balance to be equal
+						to value on previous block (%d), since the new payload
+						has not yet been applied.
+						`,
+						addr,
+						t.CLMock.LatestExecutedPayload.Number-1,
+					)
+					r.ExpectBalanceEqual(expectedAccountBalance)
+				}
+			}
 
 		},
 		OnForkchoiceBroadcast: func() {
