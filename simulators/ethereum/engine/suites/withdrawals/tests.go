@@ -3,6 +3,7 @@ package suite_withdrawals
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"time"
@@ -99,8 +100,8 @@ var Tests = []test.SpecInterface{
 			Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
 			`,
 		},
-		WithdrawalsForkHeight: 1,  //TODO
-		WithdrawalsBlockCount: 10, // Genesis is not a withdrawals block
+		WithdrawalsForkHeight: 1, //TODO
+		WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
 		WithdrawalsPerBlock:   16,
 		TimeIncrements:        5,
 	},
@@ -1267,9 +1268,9 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	}
 
 	var (
-	//startAccount = ws.GetWithdrawalsStartAccount()
-	//nextIndex    = uint64(0)
-	//addressToSend = common.HexToAddress("0x0000000000000000000000babe0babe000000000")
+		startAccount = ws.GetWithdrawalsStartAccount()
+		nextIndex    = uint64(0)
+		//addressToSend = common.HexToAddress("0x0000000000000000000000babe0babe000000000")
 	)
 
 	// start client
@@ -1280,156 +1281,147 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	}
 	defer client.Close()
 
-	// Check balance of address before send any amount of tokens
-	//latestBalance, err := getBalanceOfToken(client, globals.GnoVaultAccountAddress, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-	//if err != nil {
-	//	t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, globals.GnoVaultAccountAddress.Hex())
-	//}
-	//t.Logf("First Balance %v", latestBalance.Uint64())
-	//
 	// Produce requested post-shanghai blocks
-	// (At least 1 block will be produced after this procedure ends).
-	//n := ws.WithdrawalsBlockCount
-	//for n > 0 {
+	// (At least 3 block will be produced after this procedure ends).
+	// Since we implemented a pull strategy for withdrawals, we needed to
+	// process 3 blocks:
+	// 1. Send some withdrawals and transactions
+	// 2. Check withdrawable amount, claim tokens and check balance is as expected
+	// 3.
 	for i := 0; i < int(ws.WithdrawalsBlockCount); i++ {
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-			//OnPayloadProducerSelected: func() {
-			//
-			//	// Send some withdrawals
-			//	t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
-			//	ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
-			//	// Send some transactions
-			//	for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-			//		var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
-			//
-			//		_, err := helper.SendNextTransaction(
-			//			t.TestContext,
-			//			t.CLMock.NextBlockProducer,
-			//			&helper.BaseTransactionCreator{
-			//				Recipient: &destAddr,
-			//				Amount:    common.Big1,
-			//				Payload:   nil,
-			//				TxType:    t.TestTransactionType,
-			//				GasLimit:  t.Genesis.GasLimit(),
-			//				ChainID:   t.Genesis.Config().ChainID,
-			//			},
-			//		)
-			//		if err != nil {
-			//			t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-			//		}
-			//	}
-			//},
-			//OnGetPayload: func() {
-			//	if !ws.SkipBaseVerifications {
-			//
-			//		// Verify the list of withdrawals returned on the payload built
-			//		// completely matches the list provided in the
-			//		// engine_forkchoiceUpdatedV2 method call
-			//		if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
-			//			panic("withdrawals sent list was not saved")
-			//		} else {
-			//			if len(sentList) != len(t.CLMock.LatestPayloadBuilt.Withdrawals) {
-			//				t.Fatalf("FAIL (%s): Incorrect list of withdrawals on built payload: want=%d, got=%d", t.TestName, len(sentList), len(t.CLMock.LatestPayloadBuilt.Withdrawals))
-			//			}
-			//			for i := 0; i < len(sentList); i++ {
-			//				if err := test.CompareWithdrawal(sentList[i], t.CLMock.LatestPayloadBuilt.Withdrawals[i]); err != nil {
-			//					t.Fatalf("FAIL (%s): Incorrect withdrawal on index %d: %v", t.TestName, i, err)
-			//				}
-			//			}
-			//
-			//		}
-			//	}
-			//},
+			OnPayloadProducerSelected: func() {
+				println("processed block 1")
+				// Send some withdrawals
+				t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
+				ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+
+				ws.sendPayloadTransactions(t)
+			},
+			OnGetPayload: func() {
+				if !ws.SkipBaseVerifications {
+
+					// Verify the list of withdrawals returned on the payload built
+					// completely matches the list provided in the
+					// engine_forkchoiceUpdatedV2 method call
+					if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
+						panic("withdrawals sent list was not saved")
+					} else {
+						if len(sentList) != len(t.CLMock.LatestPayloadBuilt.Withdrawals) {
+							t.Fatalf("FAIL (%s): Incorrect list of withdrawals on built payload: want=%d, got=%d", t.TestName, len(sentList), len(t.CLMock.LatestPayloadBuilt.Withdrawals))
+						}
+						for i := 0; i < len(sentList); i++ {
+							if err := test.CompareWithdrawal(sentList[i], t.CLMock.LatestPayloadBuilt.Withdrawals[i]); err != nil {
+								t.Fatalf("FAIL (%s): Incorrect withdrawal on index %d: %v", t.TestName, i, err)
+							}
+						}
+
+					}
+				}
+			},
+			OnForkchoiceBroadcast: func() {
+				if !ws.SkipBaseVerifications {
+					for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
+						//Test balance at `latest`, which should have the
+						//withdrawal applied.
+						latestBalance, err := getWithdrawableAmount(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
+						if err != nil {
+							t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
+						}
+						newLatestBalance := latestBalance.Mul(latestBalance, big.NewInt(32))
+						expectBalanceEqual := ws.WithdrawalsHistory.GetExpectedAccountBalance(addr, t.CLMock.LatestExecutedPayload.Number)
+
+						if newLatestBalance.Cmp(expectBalanceEqual) != 0 {
+							t.Fatalf("FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d", t.TestName, addr, expectBalanceEqual, latestBalance)
+						}
+					}
+				}
+			},
 		})
-		println("processed block 1")
 
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-			//OnPayloadProducerSelected: func() {
-			//	// Get ExecuteWithdrawalsClaims
-			//	addresses := make([]common.Address, 0)
-			//	for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
-			//		addresses = append(addresses, w.Address)
-			//	}
-			//	// Send claim transaction
-			//	claims, err := libgno.ExecuteWithdrawalsClaims(addresses)
-			//	if err != nil {
-			//		t.Fatalf("Couldn't claim tokens")
-			//	}
-			//	_, err = helper.SendNextTransactionWithAccount(
-			//		t.TestContext,
-			//		t.CLMock.NextBlockProducer,
-			//		&helper.BaseTransactionCreator{
-			//			Recipient:  &libgno.WithdrawalsContractAddress,
-			//			Amount:     common.Big0,
-			//			Payload:    claims,
-			//			PrivateKey: globals.GnoVaultVaultKey,
-			//			TxType:     t.TestTransactionType,
-			//			GasLimit:   t.Genesis.GasLimit(),
-			//			ChainID:    t.Genesis.Config().ChainID,
-			//		},
-			//		globals.GnoVaultAccountAddress,
-			//	)
-			//	if err != nil {
-			//		t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-			//	}
-			//},
+			OnPayloadProducerSelected: func() {
+				// Get ExecuteWithdrawalsClaims
+				addresses := make([]common.Address, 0)
+				for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
+					addresses = append(addresses, w.Address)
+				}
+				// Send claim transaction
+				claims, err := libgno.ExecuteWithdrawalsClaims(addresses)
+				if err != nil {
+					t.Fatalf("Couldn't claim tokens")
+				}
+				_, err = helper.SendNextTransactionWithAccount(
+					t.TestContext,
+					t.CLMock.NextBlockProducer,
+					&helper.BaseTransactionCreator{
+						Recipient:  &libgno.WithdrawalsContractAddress,
+						Amount:     common.Big0,
+						Payload:    claims,
+						PrivateKey: globals.GnoVaultVaultKey,
+						TxType:     t.TestTransactionType,
+						GasLimit:   t.Genesis.GasLimit(),
+						ChainID:    t.Genesis.Config().ChainID,
+					},
+					globals.GnoVaultAccountAddress,
+				)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				}
+			},
+			//})
+			//t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+			OnForkchoiceBroadcast: func() {
+				if !ws.SkipBaseVerifications {
+					for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number - 1) {
+						//Test balance at `latest`, which should have the
+						//withdrawal applied.
+						latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
+						if err != nil {
+							t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
+						}
+						newLatestBalance := latestBalance.Mul(latestBalance, big.NewInt(32))
+						expectBalanceEqual := ws.WithdrawalsHistory.GetExpectedAccountBalance(addr, t.CLMock.LatestExecutedPayload.Number-1)
+
+						if newLatestBalance.Cmp(expectBalanceEqual) != 0 {
+							t.Fatalf("FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d", t.TestName, addr, expectBalanceEqual, latestBalance)
+						}
+					}
+				}
+			},
 		})
-		println("processed block 2")
-		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-			//OnForkchoiceBroadcast: func() {
-			//	if !ws.SkipBaseVerifications {
-			//		for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number - 2) {
-			//			//Test balance at `latest`, which should have the
-			//			//withdrawal applied.
-			//			latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-			//			if err != nil {
-			//				t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
-			//			}
-			//			newLatestBalance := latestBalance.Mul(latestBalance, big.NewInt(32))
-			//			expectBalanceEqual := ws.WithdrawalsHistory.GetExpectedAccountBalance(addr, t.CLMock.LatestExecutedPayload.Number-2)
-			//
-			//			if newLatestBalance.Cmp(expectBalanceEqual) != 0 {
-			//				t.Fatalf("FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d", t.TestName, addr, expectBalanceEqual, latestBalance)
-			//			}
-			//		}
-			//
-			//	}
-			//},
-		})
-		println("processed block 3")
-		//n--
 	}
 
 	// Iterate over balance history of withdrawn accounts using RPC and
 	// check that the balances match expected values.
 	// Also check one block before the withdrawal took place, verify that
 	// withdrawal has not been updated.
-	//if !ws.SkipBaseVerifications {
-	//	for block := uint64(0); block <= t.CLMock.LatestExecutedPayload.Number; block++ {
-	//		ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
-	//
-	//		// Check the correct withdrawal root on past blocks
-	//		r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
-	//		var expectedWithdrawalsRoot *common.Hash = nil
-	//		if block >= ws.WithdrawalsForkHeight {
-	//			calcWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
-	//				ws.WithdrawalsHistory.GetWithdrawals(block),
-	//			)
-	//			expectedWithdrawalsRoot = &calcWithdrawalsRoot
-	//		}
-	//		jsWithdrawals, _ := json.MarshalIndent(ws.WithdrawalsHistory.GetWithdrawals(block), "", " ")
-	//		r.ExpectationDescription = fmt.Sprintf(`
-	//					Requested block %d to verify withdrawalsRoot with the
-	//					following withdrawals:
-	//					%s`, block, jsWithdrawals)
-	//
-	//		r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
-	//
-	//	}
-	//
-	//	// Verify on `latest`
-	//	ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
-	//}
+	if !ws.SkipBaseVerifications {
+		for block := uint64(0); block <= t.CLMock.LatestExecutedPayload.Number; block++ {
+			ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
+
+			// Check the correct withdrawal root on past blocks
+			r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
+			var expectedWithdrawalsRoot *common.Hash = nil
+			if block >= ws.WithdrawalsForkHeight {
+				calcWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
+					ws.WithdrawalsHistory.GetWithdrawals(block),
+				)
+				expectedWithdrawalsRoot = &calcWithdrawalsRoot
+			}
+			jsWithdrawals, _ := json.MarshalIndent(ws.WithdrawalsHistory.GetWithdrawals(block), "", " ")
+			r.ExpectationDescription = fmt.Sprintf(`
+						Requested block %d to verify withdrawalsRoot with the
+						following withdrawals:
+						%s`, block, jsWithdrawals)
+
+			r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
+
+		}
+
+		// Verify on `latest`
+		ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
+	}
 }
 
 func claimTokens(client *ethclient.Client, addresses []common.Address, chainID *big.Int) error {
@@ -1536,27 +1528,34 @@ func getClient(t *test.Env) *ethclient.Client {
 }
 
 func getBalanceOfToken(client *ethclient.Client, account common.Address, block *big.Int) (*big.Int, error) {
-
 	// get GnoTokenABI
 	tokenABI, err := libgno.GetGNOTokenABI()
 	if err != nil {
 		return nil, err
 	}
-	//withdrawalsABI, err := libgno.GetWithdrawalsABI()
-	//if err != nil {
-	//	return nil, err
-	//}
 	var result []interface{}
-	//withdrawalsContract := bind.NewBoundContract(libgno.WithdrawalsContractAddress, *withdrawalsABI, client, client, client)
 	opts := &bind.CallOpts{Pending: false, BlockNumber: block}
-	//err = withdrawalsContract.Call(opts, &result, "withdrawableAmount", account)
-	//if err != nil {
-	//	return nil, err
-	//}
 
 	//Call the balanceOf function
 	contract := bind.NewBoundContract(libgno.GNOTokenAddress, *tokenABI, client, client, client)
 	err = contract.Call(opts, &result, "balanceOf", account)
+	if err != nil {
+		return nil, err
+	}
+	if len(result) != 1 {
+		return nil, fmt.Errorf("unexpected result length: %d", len(result))
+	}
+	return result[0].(*big.Int), nil
+}
+func getWithdrawableAmount(client *ethclient.Client, account common.Address, block *big.Int) (*big.Int, error) {
+	withdrawalsABI, err := libgno.GetWithdrawalsABI()
+	if err != nil {
+		return nil, err
+	}
+	var result []interface{}
+	withdrawalsContract := bind.NewBoundContract(libgno.WithdrawalsContractAddress, *withdrawalsABI, client, client, client)
+	opts := &bind.CallOpts{Pending: false, BlockNumber: block}
+	err = withdrawalsContract.Call(opts, &result, "withdrawableAmount", account)
 	if err != nil {
 		return nil, err
 	}
