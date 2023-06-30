@@ -7,6 +7,7 @@ import $ from 'jquery';
 import * as common from './app-common.js';
 import * as routes from './routes.js';
 import * as html from './html.js';
+import * as testlog from './testlog.js';
 import { formatDuration, queryParam } from './utils.js';
 
 $(document).ready(function () {
@@ -368,8 +369,12 @@ function formatTestDetails(suiteData, row) {
         let p = document.createElement('p');
         p.innerHTML = '<b>Details:</b>';
         container.appendChild(p);
-        let detailsOutput = formatTestLog(suiteData, d);
-        container.appendChild(detailsOutput);
+        formatTestLog(suiteData, d, container);
+    } else if (d.summaryResult.logOffsets) {
+        let p = document.createElement('p');
+        p.innerHTML = '<b>Details:</b>';
+        container.appendChild(p);
+        formatTestLog2(suiteData, d, container);
     }
 
     return container;
@@ -390,7 +395,7 @@ function countLines(text) {
 
 // formatTestLog processes the test output. Log output from the test is shortened
 // to avoid freezing the browser.
-function formatTestLog(suiteData, test) {
+function formatTestLog(suiteData, test, container) {
     const maxLines = 25;
 
     let text = test.summaryResult.details;
@@ -461,7 +466,46 @@ function formatTestLog(suiteData, test) {
         output.appendChild(el);
     }
 
-    return output;
+    container.appendChild(output);
+}
+
+async function formatTestLog2(suiteData, test, container) {
+    let logFile = suiteData.suiteID.replace(/\.json$/, "-testlog.txt");
+    let loader = new testlog.LogLoader(logFile, test.logOffsets);
+
+    let {head, tail} = await loader.headAndTailLines(25);
+
+    // Create the output sections.
+    let output = document.createElement('div');
+    output.classList.add('test-output');
+
+    if (head.length > 0) {
+        // Add the beginning of text.
+        let el = document.createElement('code');
+        el.innerText = head.join('\n');
+        el.classList.add('output-prefix');
+        if (tail.length == 0) {
+            el.classList.add('output-suffix');
+        }
+        output.appendChild(el);
+    }
+
+    if (tail.length > 0) {
+        // Create the truncation marker.
+        let linkText = '... click for full output...';
+        let linkURL = routes.testLog(suiteData.suiteID, suiteData.name, test.testIndex);
+        let trunc = html.makeLink(linkURL, linkText);
+        trunc.classList.add('output-trunc');
+        output.appendChild(trunc);
+
+        // Add the remaining text.
+        let el = document.createElement('code');
+        el.innerText = tail.join('\n');
+        el.classList.add('output-suffix');
+        output.appendChild(el);
+    }
+
+    container.appendChild(output);
 }
 
 function highlightErrorsInTestOutput(content) {

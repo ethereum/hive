@@ -2,6 +2,7 @@ import $ from 'jquery';
 
 import * as common from './app-common.js';
 import * as routes from './routes.js';
+import * as testlog from './testlog.js';
 import { makeLink } from './html.js';
 import { formatBytes, queryParam } from './utils.js';
 
@@ -107,40 +108,58 @@ function showFileContent(text, filename) {
 
 // showText sets the content of the viewer.
 function showText(text) {
-    let contentArea = document.getElementById('file-content');
-    let gutter = document.getElementById('gutter');
+    let viewer = new TextViewer();
+    viewer.setText(text);
+}
 
-    // Clear content.
-    contentArea.innerHTML = '';
-    gutter.innerHTML = '';
-
-    // Add the lines.
-    let lines = text.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-        appendLine(contentArea, gutter, i + 1, lines[i]);
+class TextViewer {
+    number = 1;
+    
+    constructor() {
+        this.contentArea = document.getElementById('file-content');
+        this.gutter = document.getElementById('gutter');
     }
 
-    // Set meta-info.
-    let meta = $('#meta');
-    meta.text(lines.length + ' Lines, ' + formatBytes(text.length));
+    clear() {
+        this.contentArea.innerHTML = '';
+        this.gutter.innerHTML = '';
+        this.number = 1;
+    }
 
-    // Ensure viewer is visible.
-    $('#viewer-header').show();
-    $('#viewer').show();
+    appendLine(text) {
+        let num = document.createElement('span');
+        num.setAttribute('id', 'L' + this.number);
+        num.setAttribute('class', 'num');
+        num.setAttribute('line', this.number.toString());
+        num.addEventListener('click', lineNumberClicked);
+        this.gutter.appendChild(num);
+        this.number += 1;
+
+        let line = document.createElement('pre');
+        line.innerText = text + '\n';
+        this.contentArea.appendChild(line);
+    }
+
+    // show ensures the viewer is visible.
+    show() {
+        $('#viewer-header').show();
+        $('#viewer').show();
+    }
+    
+    setText(text) {
+        this.clear();
+        let lines = text.split('\n');        
+        for (let i = 0; i < lines.length; i++) {
+            this.appendLine(lines[i]);
+        }
+        
+        let meta = $('#meta');
+        meta.text(lines.length + ' Lines, ' + formatBytes(text.length));
+
+        this.show();
+    }
 }
 
-function appendLine(contentArea, gutter, number, text) {
-    let num = document.createElement('span');
-    num.setAttribute('id', 'L' + number);
-    num.setAttribute('class', 'num');
-    num.setAttribute('line', number.toString());
-    num.addEventListener('click', lineNumberClicked);
-    gutter.appendChild(num);
-
-    let line = document.createElement('pre');
-    line.innerText = text + '\n';
-    contentArea.appendChild(line);
-}
 
 function lineNumberClicked() {
     setHL($(this).attr('line'), false);
@@ -167,7 +186,7 @@ function fetchFile(url, line /* optional jump to line */ ) {
 }
 
 // fetchTestLog loads the suite file and displays the output of a test.
-function fetchTestLog(suiteFile, testIndex, line) {
+function fetchTestLog(suiteFile, testIndex, lineHighlight) {
     $.ajax({
         xhr: common.newXhrWithProgressBar,
         url: suiteFile,
@@ -178,16 +197,34 @@ function fetchTestLog(suiteFile, testIndex, line) {
                 showError(errtext);
                 return;
             }
-
             let test = data.testCases[testIndex];
-            let name = test.name;
-            let logtext = test.summaryResult.details;
-            showTitle('Test:', name);
-            showText(logtext);
-            setHL(line, true);
+            streamTestLogLines(suiteFile, test, lineHighlight);
         },
         error: function(jq, status, error) {
             alert('Failed to load ' + suiteFile + '\nstatus:' + status + '\nerror:' + error);
         },
+    });
+}
+
+function streamTestLogLines(suiteFile, testCase, lineToHighlight) {
+    let name = testCase.name;
+    showTitle('Test:', name);
+
+    if (!testCase.logOffsets) {
+        let logtext = testCase.summaryResult.details;
+        showText(logtext);
+        setHL(lineToHighlight, true);
+        return;
+    }
+
+    // Log is stored in a separate file.
+    let logFile = suiteFile += "-testlog.txt";
+    let loader = new testlog.LogLoader(logFile, testCase.logOffsets);
+    let viewer = new TextViewer();
+    viewer.clear();
+    viewer.show();
+    loader.iterLines(function (line, offsets) {
+        viewer.appendLine(line);
+        return true;
     });
 }
