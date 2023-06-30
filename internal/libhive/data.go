@@ -26,8 +26,10 @@ type TestSuite struct {
 	Description    string               `json:"description"`
 	ClientVersions map[string]string    `json:"clientVersions"`
 	TestCases      map[TestID]*TestCase `json:"testCases"`
-	// the log-file pertaining to the simulator. (may encompass more than just one TestSuite)
+	// Path to the log-file pertaining to the simulator. (may encompass more than just one TestSuite)
 	SimulatorLog string `json:"simLog"`
+	// Path to the log file containing test output.
+	TestLog string `json:"testLog"`
 }
 
 // TestCase represents a single test case in a test suite.
@@ -37,7 +39,14 @@ type TestCase struct {
 	Start         time.Time              `json:"start"`
 	End           time.Time              `json:"end"`
 	SummaryResult TestResult             `json:"summaryResult"` // The result of the whole test case.
-	ClientInfo    map[string]*ClientInfo `json:"clientInfo"`    // Info about each client.
+	LogOffsets    TestLogOffsets         `json:"logOffsets"`
+	ClientInfo    map[string]*ClientInfo `json:"clientInfo"` // Info about each client.
+}
+
+// TestLogOffsets holds file offsets into the test log file.
+type TestLogOffsets struct {
+	Begin int64 `json:"begin"`
+	End   int64 `json:"end"`
 }
 
 // TestResult is the payload submitted to the EndTest endpoint.
