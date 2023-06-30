@@ -31,8 +31,55 @@ var (
 	InvalidParamsError = -32602
 	MAX_INITCODE_SIZE  = 49152
 
+	/*
+		Warm coinbase contract needs to check if EIP-3651 applied after shapella
+		https://eips.ethereum.org/EIPS/eip-3651
+
+		Contract bytecode saves coinbase access cost to the slot number of current block
+		i.e. if current block number is 5 ==> coinbase access cost saved to slot 5 etc
+	*/
 	WARM_COINBASE_ADDRESS = common.HexToAddress("0x0101010101010101010101010101010101010101")
-	PUSH0_ADDRESS         = common.HexToAddress("0x0202020202020202020202020202020202020202")
+	warmCoinbaseCode      = []byte{
+		0x5A, // GAS
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x60, // PUSH1(0x00)
+		0x00,
+		0x41, // COINBASE
+		0x60, // PUSH1(0xFF)
+		0xFF,
+		0xF1, // CALL
+		0x5A, // GAS
+		0x90, // SWAP1
+		0x50, // POP - Call result
+		0x90, // SWAP1
+		0x03, // SUB
+		0x60, // PUSH1(0x16) - GAS + PUSH * 6 + COINBASE
+		0x16,
+		0x90, // SWAP1
+		0x03, // SUB
+		0x43, // NUMBER
+		0x55, // SSTORE
+	}
+	/*
+		PUSH0 contract needs to check if EIP-3855 applied after shapella
+		https://eips.ethereum.org/EIPS/eip-3855
+
+		Contract bytecode reverts tx before the shapells (because PUSH0 opcode does not exists)
+		After shapella hardfork it saves current block number to 0 slot
+	*/
+	PUSH0_ADDRESS = common.HexToAddress("0x0202020202020202020202020202020202020202")
+	push0Code     = []byte{
+		0x43, // NUMBER
+		0x5F, // PUSH0
+		0x55, // SSTORE
+	}
 
 	TX_CONTRACT_ADDRESSES = []common.Address{
 		WARM_COINBASE_ADDRESS,
@@ -63,32 +110,31 @@ type WithdrawalsBaseSpec struct {
 //
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork On Genesis",
-	//		About: `
-	//		Tests the withdrawals fork happening on block 5 (e.g. on a
-	//		testnet).
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1, //TODO
-	//	WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
-	//	WithdrawalsPerBlock:   16,
-	//	TimeIncrements:        5,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 1",
-	//		About: `
-	//		Tests the withdrawals fork happening directly after genesis.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   16,
-	//},
-	//// TODO
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 1",
+	// 		About: `
+	// 		Tests the withdrawals fork happening directly after genesis.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
+	// 	WithdrawalsBlockCount: 1,
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork On Genesis",
+	// 		About: `
+	// 		Tests the withdrawals fork happening directly after genesis.
+	// 		Produce 2 blocks with withdrawals after the fork.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1,
+	// 	WithdrawalsBlockCount: 2, // Genesis is not a withdrawals block
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
 	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdrawals Fork on Block 5",
@@ -960,6 +1006,18 @@ func (ws *WithdrawalsBaseSpec) GetGenesis(base string) helper.Genesis {
 
 	genesis := ws.Spec.GetGenesis(base)
 
+	warmCoinbaseAcc := helper.NewAccount()
+	push0Acc := helper.NewAccount()
+
+	warmCoinbaseAcc.SetBalance(common.Big0)
+	warmCoinbaseAcc.SetCode(warmCoinbaseCode)
+
+	genesis.AllocGenesis(WARM_COINBASE_ADDRESS, warmCoinbaseAcc)
+
+	push0Acc.SetBalance(common.Big0)
+	push0Acc.SetCode(push0Code)
+
+	genesis.AllocGenesis(PUSH0_ADDRESS, push0Acc)
 	return genesis
 }
 
@@ -977,10 +1035,11 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 		// Shanghai
 		r.ExpectBigIntStorageEqual(big.NewInt(100))        // WARM_STORAGE_READ_COST
 		p.ExpectBigIntStorageEqual(latestPayloadNumberBig) // tx succeeded
+
 	} else {
-		// // Pre-Shanghai
-		// r.ExpectBigIntStorageEqual(big.NewInt(2600)) // COLD_ACCOUNT_ACCESS_COST
-		// p.ExpectBigIntStorageEqual(big.NewInt(0))    // tx must've failed
+		// Pre-Shanghai
+		r.ExpectBigIntStorageEqual(big.NewInt(2600)) // COLD_ACCOUNT_ACCESS_COST
+		p.ExpectBigIntStorageEqual(big.NewInt(0))    // tx must've failed
 	}
 }
 
@@ -1057,6 +1116,39 @@ func getTimestamp() int64 {
 	return nextThreeSeconds.Unix()
 }
 
+// sendPayloadTransactions spreads and sends TransactionCountPerPayload equaly between TX_CONTRACT_ADDRESSES
+//
+// Tx params:
+//
+//	Amount:    common.Big1
+//	Payload:   nil
+//	TxType:    t.TestTransactionType
+//	GasLimit:  t.Genesis.GasLimit()
+//	ChainID:   t.Genesis.Config().ChainID,
+func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
+	for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
+		var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
+
+		_, err := helper.SendNextTransaction(
+			t.TestContext,
+			t.CLMock.NextBlockProducer,
+			&helper.BaseTransactionCreator{
+				Recipient: &destAddr,
+				Amount:    common.Big1,
+				Payload:   nil,
+				TxType:    t.TestTransactionType,
+				// TODO: figure out why contract storage check fails on block 2 with Genesis.GasLimit()
+				GasLimit: 75000,
+				ChainID:  t.Genesis.Config().ChainID,
+			},
+		)
+
+		if err != nil {
+			t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+		}
+	}
+}
+
 // type balancer map[common.Address]uint64
 // type blockBalancer map[uint64]balancer
 //
@@ -1112,28 +1204,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	t.CLMock.ProduceBlocks(int(ws.GetPreWithdrawalsBlockCount()), clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 
-			// Send some transactions
-			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-
-				var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
-
-				_, err := helper.SendNextTransaction(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient: &destAddr,
-						Amount:    common.Big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  t.Genesis.GasLimit(),
-						ChainID:   t.Genesis.Config().ChainID,
-					},
-				)
-
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-				}
-			}
+			ws.sendPayloadTransactions(t)
 
 			if !ws.SkipBaseVerifications {
 
@@ -1194,7 +1265,6 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			time.Sleep(durationUntilFuture)
 		}
 	}
-
 	// Produce requested post-shanghai blocks
 	// (At least 1 block will be produced after this procedure ends).
 	var (
@@ -1208,27 +1278,8 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			// Send some withdrawals
 			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
 			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
-			// Send some transactions
-			for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
-				var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
 
-				_, err := helper.SendNextTransaction(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient: &destAddr,
-						Amount:    common.Big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  t.Genesis.GasLimit(),
-						ChainID:   t.Genesis.Config().ChainID,
-					},
-				)
-
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-				}
-			}
+			ws.sendPayloadTransactions(t)
 
 		},
 		OnGetPayload: func() {
@@ -1253,26 +1304,27 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			}
 		},
 		OnNewPayloadBroadcast: func() {
-			//if !ws.SkipBaseVerifications {
-			//	for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
-			//		// Test balance at `latest`, which should not yet have the
-			//		// withdrawal applied.
-			//		expectedAccountBalance := ws.WithdrawalsHistory.GetExpectedAccountBalance(
-			//			addr,
-			//			t.CLMock.LatestExecutedPayload.Number-1)
-			//		r := t.TestEngine.TestBalanceAt(addr, nil)
-			//		r.ExpectationDescription = fmt.Sprintf(`
-			//			Requested balance for account %s on "latest" block
-			//			after engine_newPayloadV2, expecting balance to be equal
-			//			to value on previous block (%d), since the new payload
-			//			has not yet been applied.
-			//			`,
-			//			addr,
-			//			t.CLMock.LatestExecutedPayload.Number-1,
-			//		)
-			//		r.ExpectBalanceEqual(expectedAccountBalance)
-			//	}
-			//}
+			if !ws.SkipBaseVerifications {
+				for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
+					// Test balance at `latest`, which should not yet have the
+					// withdrawal applied.
+					expectedAccountBalance := ws.WithdrawalsHistory.GetExpectedAccountBalance(
+						addr,
+						t.CLMock.LatestExecutedPayload.Number-1)
+					r := t.TestEngine.TestBalanceAt(addr, nil)
+					r.ExpectationDescription = fmt.Sprintf(`
+						Requested balance for account %s on "latest" block
+						after engine_newPayloadV2, expecting balance to be equal
+						to value on previous block (%d), since the new payload
+						has not yet been applied.
+						`,
+						addr,
+						t.CLMock.LatestExecutedPayload.Number-1,
+					)
+					r.ExpectBalanceEqual(expectedAccountBalance)
+				}
+			}
+
 		},
 		OnForkchoiceBroadcast: func() {
 			if !ws.SkipBaseVerifications {
@@ -1290,7 +1342,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						t.Fatalf("FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d", t.TestName, addr, expectBalanceEqual, latestBalance)
 					}
 				}
-
+				ws.VerifyContractsStorage(t)
 			}
 		},
 	})
