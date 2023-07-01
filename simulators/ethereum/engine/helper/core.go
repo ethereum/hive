@@ -13,7 +13,7 @@ import (
 
 var (
 	_ GenesisAccount = (Account)(nil)
-	_ Genesis        = (*NethermindChainSpec)(nil)
+	// _ Genesis        = (*NethermindChainSpec)(nil)
 )
 
 type GenesisAlloc interface {
@@ -350,14 +350,14 @@ func (n *NethermindChainSpec) ToBlock() *types.Block {
 	panic("implement me")
 }
 
-func (n *NethermindChainSpec) UnmarshalJSON(bytes []byte) error {
-	return json.Unmarshal(bytes, &n)
-}
+// func (n *NethermindChainSpec) UnmarshalJSON(bytes []byte) error {
+// 	return json.Unmarshal(bytes, &n)
+// }
 
-func (n *NethermindChainSpec) MarshalJSON() ([]byte, error) {
-	bytes, err := json.Marshal(n)
-	if err != nil {
-		return nil, err
-	}
-	return bytes, nil
-}
+// func (n *NethermindChainSpec) MarshalJSON() ([]byte, error) {
+// 	bytes, err := json.Marshal(n)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	return bytes, nil
+// }
