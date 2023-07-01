@@ -3,10 +3,11 @@ package libgno
 import (
 	_ "embed"
 	"fmt"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
 	"math/big"
 	"strings"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 // MAX_FAILED_WITHDRAWALS_TO_PROCESS represents the maximum number of failed withdrawals to process.
@@ -51,6 +52,7 @@ func ExecuteSystemWithdrawal(maxNumberOfFailedWithdrawalsToProcess uint64, amoun
 	return dataBytes, nil
 }
 
+// TODO: rename
 // ExecuteWithdrawalsClaims gets the byte code to execute a withdrawals claims.
 func ExecuteWithdrawalsClaims(addresses []common.Address) ([]byte, error) {
 	withdrawalABI, err := abi.JSON(strings.NewReader(GNOWithdrawalContractABI))
