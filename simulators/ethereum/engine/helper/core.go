@@ -11,6 +11,11 @@ import (
 	"github.com/ethereum/go-ethereum/params"
 )
 
+var (
+	_ GenesisAccount = (Account)(nil)
+	_ Genesis        = (*NethermindChainSpec)(nil)
+)
+
 type GenesisAlloc interface {
 
 	// representation of a map of address to GenesisAccount, is different from each client.
@@ -21,10 +26,10 @@ type GenesisAccount interface {
 	// Balance holds the balance of the account
 	Balance() *big.Int
 	SetBalance(balance *big.Int)
-	Code() []byte
+	Code() string
 	SetCode(code []byte)
 	SetConstructor(constructor []byte)
-	Constructor() []byte
+	Constructor() string
 }
 
 type Genesis interface {
@@ -87,7 +92,7 @@ func NewAccount() Account {
 
 // GetCode returns theaccount balance if it was set,
 // otherwise returns common.Big0
-func (a Account) GetBalance() *big.Int {
+func (a Account) Balance() *big.Int {
 	hexBalance, ok := a["balance"]
 	if !ok {
 		return common.Big0
@@ -104,7 +109,7 @@ func (a Account) SetBalance(balance *big.Int) {
 
 // GetCode returns the hex representation of code if it was set,
 // otherwise returns ""
-func (a Account) GetCode() string {
+func (a Account) Code() string {
 	code, ok := a["code"]
 	if !ok {
 		return ""
@@ -118,7 +123,7 @@ func (a Account) SetCode(code []byte) {
 
 // GetConstructor returns the hex representation of constructor if it was set,
 // otherwise returns ""
-func (a Account) GetConstructor() string {
+func (a Account) Constructor() string {
 	constructor, ok := a["constructor"]
 	if !ok {
 		return ""
@@ -345,14 +350,14 @@ func (n *NethermindChainSpec) ToBlock() *types.Block {
 	panic("implement me")
 }
 
-//func (n *NethermindChainSpec) UnmarshalJSON(bytes []byte) error {
-//	return json.Unmarshal(bytes, &n)
-//}
-//
-//func (n *NethermindChainSpec) MarshalJSON() ([]byte, error) {
-//	bytes, err := json.Marshal(n)
-//	if err != nil {
-//		return nil, err
-//	}
-//	return bytes, nil
-//}
+func (n *NethermindChainSpec) UnmarshalJSON(bytes []byte) error {
+	return json.Unmarshal(bytes, &n)
+}
+
+func (n *NethermindChainSpec) MarshalJSON() ([]byte, error) {
+	bytes, err := json.Marshal(n)
+	if err != nil {
+		return nil, err
+	}
+	return bytes, nil
+}
