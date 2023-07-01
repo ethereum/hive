@@ -11,7 +11,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	beacon "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 
@@ -704,26 +703,6 @@ func (ws *WithdrawalsBaseSpec) GetWithdrawalsStartAccount() *big.Int {
 	return big.NewInt(0x1000)
 }
 
-// Adds bytecode that unconditionally sets an storage key to specified account range
-func AddUnconditionalBytecode(g *core.Genesis, start *big.Int, end *big.Int) {
-	for ; start.Cmp(end) <= 0; start.Add(start, common.Big1) {
-		accountAddress := common.BigToAddress(start)
-		// Bytecode to unconditionally set a storage key
-		g.Alloc[accountAddress] = core.GenesisAccount{
-			Code: []byte{
-				0x60, // PUSH1(0x01)
-				0x01,
-				0x60, // PUSH1(0x00)
-				0x00,
-				0x55, // SSTORE
-				0x00, // STOP
-			}, // sstore(0, 1)
-			Nonce:   0,
-			Balance: common.Big0,
-		}
-	}
-}
-
 // Append the accounts we are going to withdraw to, which should also include
 // bytecode for testing purposes.
 func (ws *WithdrawalsBaseSpec) GetGenesisTest(base string) string {
@@ -1044,9 +1023,9 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					addresses = append(addresses, w.Address)
 				}
 				// Send claim transaction
-				claims, err := libgno.ExecuteWithdrawalsClaims(addresses)
+				claims, err := libgno.CreateClaimWithdrawalsPayload(addresses)
 				if err != nil {
-					t.Fatalf("Couldn't claim tokens")
+					t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
 				}
 				_, err = helper.SendNextTransactionWithAccount(
 					t.TestContext,
@@ -1079,7 +1058,10 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						expectBalanceEqual := ws.WithdrawalsHistory.GetExpectedAccountBalance(addr, t.CLMock.LatestExecutedPayload.Number-1)
 
 						if newLatestBalance.Cmp(expectBalanceEqual) != 0 {
-							t.Fatalf("FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d", t.TestName, addr, expectBalanceEqual, latestBalance)
+							t.Fatalf(
+								"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
+								t.TestName, addr, expectBalanceEqual, latestBalance,
+							)
 						}
 					}
 				}
@@ -1321,7 +1303,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 	// t.CLMock.AddEngineClient(secondaryEngine)
 
 	var (
-		canonicalStartAccount       = big.NewInt(0x1000)
+		canonicalStartAccount       = ws.GetWithdrawalsStartAccount()
 		canonicalNextIndex          = uint64(0)
 		sidechainStartAccount       = new(big.Int).SetBit(common.Big0, 160, 1)
 		sidechainNextIndex          = uint64(0)

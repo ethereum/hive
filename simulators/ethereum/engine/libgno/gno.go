@@ -52,9 +52,8 @@ func ExecuteSystemWithdrawal(maxNumberOfFailedWithdrawalsToProcess uint64, amoun
 	return dataBytes, nil
 }
 
-// TODO: rename
-// ExecuteWithdrawalsClaims gets the byte code to execute a withdrawals claims.
-func ExecuteWithdrawalsClaims(addresses []common.Address) ([]byte, error) {
+// CreateClaimWithdrawalsPayload creates the Tx payload for claimWithdrawals call.
+func CreateClaimWithdrawalsPayload(addresses []common.Address) ([]byte, error) {
 	withdrawalABI, err := abi.JSON(strings.NewReader(GNOWithdrawalContractABI))
 	if err != nil {
 		return []byte{}, ErrorLoadingWithdrawalContract
