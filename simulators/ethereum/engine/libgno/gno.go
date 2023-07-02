@@ -10,30 +10,32 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// MAX_FAILED_WITHDRAWALS_TO_PROCESS represents the maximum number of failed withdrawals to process.
-const MAX_FAILED_WITHDRAWALS_TO_PROCESS = 4
+const (
+	// MAX_FAILED_WITHDRAWALS_TO_PROCESS represents the maximum number of failed withdrawals to process.
+	MAX_FAILED_WITHDRAWALS_TO_PROCESS = 4
+	GAS_LIMIT                         = 1000000
+)
 
-const GAS_LIMIT = 1000000
+var (
+	// SYSTEM_SENDER represents the address of the system sender.
+	// var SYSTEM_SENDER = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
+	GNOTokenAddress            = common.HexToAddress("0xbabe2bed00000000000000000000000000000002")
+	WithdrawalsContractAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000003")
 
-// SYSTEM_SENDER represents the address of the system sender.
-// var SYSTEM_SENDER = common.HexToAddress("0xfffffffffffffffffffffffffffffffffffffffe")
-var GNOTokenAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000002")
-var WithdrawalsContractAddress = common.HexToAddress("0xbabe2bed00000000000000000000000000000003")
+	// GNOWithdrawalContractABI represents the path to the GNO withdrawal contract ABI.
+	//
+	//go:embed withdrawals.json
+	GNOWithdrawalContractABI string
 
-// GNOWithdrawalContractABI represents the path to the GNO withdrawal contract ABI.
-//
-//go:embed withdrawals.json
-var GNOWithdrawalContractABI string
+	// GNOTokenContractABI represents the path to the GNO token contract ABI.
+	//
+	//go:embed sbctoken.json
+	GNOTokenContractABI string
 
-// GNOTokenContractABI represents the path to the GNO token contract ABI.
-//
-//go:embed sbctoken.json
-var GNOTokenContractABI string
-
-var ErrorAmountAndAddressDifferentLength = fmt.Errorf("amount and addresses must be the same length")
-var ErrorLoadingWithdrawalContract = fmt.Errorf("error loading withdrawal contract")
-var ErrorLoadingGNOTokenContract = fmt.Errorf("error loading gno token contract")
-var ErrorPackingArguments = fmt.Errorf("error packing arguments")
+	ErrorAmountAndAddressDifferentLength = fmt.Errorf("amount and addresses must be the same length")
+	ErrorLoadingWithdrawalContract       = fmt.Errorf("error loading withdrawal contract")
+	ErrorLoadingGNOTokenContract         = fmt.Errorf("error loading gno token contract")
+)
 
 // ExecuteSystemWithdrawal gets the byte code to execute a system withdrawal.
 func ExecuteSystemWithdrawal(maxNumberOfFailedWithdrawalsToProcess uint64, amount []uint64, addresses []common.Address) ([]byte, error) {
