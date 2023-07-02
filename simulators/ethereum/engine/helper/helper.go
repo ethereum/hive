@@ -235,16 +235,6 @@ func LoadGenesisTest(path string) string {
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}
-
-	//var genesis NethermindChainSpec
-	//err = genesis.UnmarshalJSON(contents)
-	//if err != nil {
-	//	return nil
-	//}
-	//if err := json.Unmarshal(contents, &genesis); err != nil {
-	//	panic(fmt.Errorf("can't parse genesis JSON: %v", err))
-	//}
-	//return Genesis(&genesis)
 	return string(contents)
 }
 

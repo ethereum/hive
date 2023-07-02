@@ -54,7 +54,6 @@ type Genesis interface {
 	UpdateTimestamp(timestamp string)
 
 	// Used for testing
-
 	Number() uint64
 	GasUsed() uint64
 	ParentHash() common.Hash
@@ -63,16 +62,9 @@ type Genesis interface {
 	ToBlock() *types.Block
 
 	// Marshalling and Unmarshalling interfaces
-
 	json.Unmarshaler
 	json.Marshaler
 }
-
-//type PricingStruct struct {
-//	Price map[string]map[string]uint64 `json:"price,omitempty"`
-//}
-
-//type Pricing map[string]PricingStruct
 
 type Builtin struct {
 	Name    string                 `json:"name,omitempty"`
@@ -81,11 +73,6 @@ type Builtin struct {
 
 type Account map[string]interface{}
 
-//	struct {
-//		Balance     string  `json:"balance,omitempty"`
-//		Constructor string  `json:"constructor,omitempty"`
-//		Builtin     Builtin `json:"builtin,omitempty"`
-//	}
 func NewAccount() Account {
 	return make(Account, 0)
 }
@@ -236,7 +223,6 @@ func (n *NethermindChainSpec) Config() *params.ChainConfig {
 		return nil
 	}
 
-	//shangai := big.NewInt(0).SetBytes(common.Hex2Bytes(n.Params.Eip4895TransitionTimestamp)).Uint64()
 	return &params.ChainConfig{
 		ChainID:                 chainID,
 		TerminalTotalDifficulty: big.NewInt(ttd),
@@ -349,15 +335,3 @@ func (n *NethermindChainSpec) ToBlock() *types.Block {
 	//TODO implement me
 	panic("implement me")
 }
-
-// func (n *NethermindChainSpec) UnmarshalJSON(bytes []byte) error {
-// 	return json.Unmarshal(bytes, &n)
-// }
-
-// func (n *NethermindChainSpec) MarshalJSON() ([]byte, error) {
-// 	bytes, err := json.Marshal(n)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return bytes, nil
-// }
