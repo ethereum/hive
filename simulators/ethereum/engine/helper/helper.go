@@ -387,6 +387,8 @@ const (
 	DynamicFeeTxOnly
 )
 
+var _ TransactionCreator = (*BaseTransactionCreator)(nil)
+
 type TransactionCreator interface {
 	MakeTransaction(nonce uint64) (*types.Transaction, error)
 }
