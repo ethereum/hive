@@ -35,6 +35,7 @@ var (
 	ErrorAmountAndAddressDifferentLength = fmt.Errorf("amount and addresses must be the same length")
 	ErrorLoadingWithdrawalContract       = fmt.Errorf("error loading withdrawal contract")
 	ErrorLoadingGNOTokenContract         = fmt.Errorf("error loading gno token contract")
+	ErrorPackingArguments                = fmt.Errorf("error packing arguments")
 )
 
 // ExecuteSystemWithdrawal gets the byte code to execute a system withdrawal.
