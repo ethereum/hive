@@ -1023,7 +1023,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					addresses = append(addresses, w.Address)
 				}
 				// Send claim transaction
-				claims, err := libgno.CreateClaimWithdrawalsPayload(addresses)
+				claims, err := libgno.ClaimWithdrawalsData(addresses)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
 				}

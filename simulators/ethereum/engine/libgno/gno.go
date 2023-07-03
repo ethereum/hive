@@ -43,9 +43,9 @@ func ExecuteSystemWithdrawal(maxNumberOfFailedWithdrawalsToProcess uint64, amoun
 	if len(amount) != len(addresses) {
 		return []byte{}, ErrorAmountAndAddressDifferentLength
 	}
-	withdrawalABI, err := abi.JSON(strings.NewReader(GNOWithdrawalContractABI))
+	withdrawalABI, err := GetWithdrawalsABI()
 	if err != nil {
-		return []byte{}, ErrorLoadingWithdrawalContract
+		return []byte{}, err
 	}
 	dataBytes, err := withdrawalABI.Pack("executeSystemWithdrawals", big.NewInt(int64(maxNumberOfFailedWithdrawalsToProcess)), amount, addresses)
 	if err != nil {
@@ -55,11 +55,11 @@ func ExecuteSystemWithdrawal(maxNumberOfFailedWithdrawalsToProcess uint64, amoun
 	return dataBytes, nil
 }
 
-// CreateClaimWithdrawalsPayload creates the Tx payload for claimWithdrawals call.
-func CreateClaimWithdrawalsPayload(addresses []common.Address) ([]byte, error) {
-	withdrawalABI, err := abi.JSON(strings.NewReader(GNOWithdrawalContractABI))
+// ClaimWithdrawalsData return the Tx calldata for "claimWithdrawals" call.
+func ClaimWithdrawalsData(addresses []common.Address) ([]byte, error) {
+	withdrawalABI, err := GetWithdrawalsABI()
 	if err != nil {
-		return []byte{}, ErrorLoadingWithdrawalContract
+		return []byte{}, err
 	}
 	dataBytes, err := withdrawalABI.Pack("claimWithdrawals", addresses)
 	if err != nil {
@@ -69,11 +69,11 @@ func CreateClaimWithdrawalsPayload(addresses []common.Address) ([]byte, error) {
 	return dataBytes, nil
 }
 
-// BalanceOfAddressData return contract method to get the balance of a GNO token.
+// BalanceOfAddressData return the Tx calldata for "balanceOf" call.
 func BalanceOfAddressData(account common.Address) ([]byte, error) {
-	gnoTokenABI, err := abi.JSON(strings.NewReader(GNOTokenContractABI))
+	gnoTokenABI, err := GetGNOTokenABI()
 	if err != nil {
-		return []byte{}, ErrorLoadingGNOTokenContract
+		return []byte{}, err
 	}
 	dataBytes, err := gnoTokenABI.Pack("balanceOf", account)
 	if err != nil {
@@ -82,11 +82,11 @@ func BalanceOfAddressData(account common.Address) ([]byte, error) {
 	return dataBytes, nil
 }
 
-// BalanceOfAddressData return contract method to get the balance of a GNO token.
+// TransferData return the Tx calldata for "Transfer" call.
 func TransferData(recipient common.Address, amount *big.Int) ([]byte, error) {
-	gnoTokenABI, err := abi.JSON(strings.NewReader(GNOTokenContractABI))
+	gnoTokenABI, err := GetGNOTokenABI()
 	if err != nil {
-		return []byte{}, ErrorLoadingGNOTokenContract
+		return []byte{}, err
 	}
 	dataBytes, err := gnoTokenABI.Pack("transfer", recipient, amount)
 	if err != nil {
@@ -108,7 +108,7 @@ func GetGNOTokenABI() (*abi.ABI, error) {
 func GetWithdrawalsABI() (*abi.ABI, error) {
 	withdrawalsABI, err := abi.JSON(strings.NewReader(GNOWithdrawalContractABI))
 	if err != nil {
-		return nil, ErrorLoadingWithdrawalContract
+		return nil, fmt.Errorf("%w: %w", ErrorLoadingWithdrawalContract, err)
 	}
 	return &withdrawalsABI, nil
 }
