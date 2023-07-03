@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"time"
@@ -122,35 +121,22 @@ func convertSuiteFile(dir string, file string) {
 	sort.Slice(testIDs, func(i, j int) bool { return testIDs[i] < testIDs[j] })
 
 	// Write test log file.
-	testlogPath := path.Base(file) + "-testlog.txt"
-	testlog, err := os.OpenFile(filepath.Join(dir, testlogPath), os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
-	if err != nil {
-		panic(err)
-	}
-	var offset int64
 	for _, id := range testIDs {
 		test := suite.TestCases[id]
-
-		// write heading
-		n, err := fmt.Fprintln(testlog, "---\n"+test.Name)
-		if err != nil {
-			panic(err)
+		if len(test.SummaryResult.Details) > 1024 {
+			// write to file
+			dir := filepath.Join(dir, "details")
+			name := fmt.Sprintf("%d-%s.txt", time.Now().Unix()0, id)
+			path := filepath.Join(dir, name)
+			os.MkdirAll(dir, 0755)
+			err := os.WriteFile(path, []byte(test.SummaryResult.Details), 0644)
+			if err != nil {
+				panic(err)
+			}
+			test.SummaryResult.DetailsFile = name
+			test.SummaryResult.DetailsFileSize = int64(len(test.SummaryResult.Details))
+			test.SummaryResult.Details = ""
 		}
-		offset += int64(n)
-		// write log
-		test.LogOffsets.Begin = offset
-		n, err = testlog.WriteString(test.SummaryResult.Details)
-		if err != nil {
-			panic(err)
-		}
-		offset += int64(n)
-		test.LogOffsets.End = offset
-
-		// delete output in main file
-		test.SummaryResult.Details = ""
-	}
-	if err := testlog.Close(); err != nil {
-		panic(err)
 	}
 
 	// Rewrite suite file.
