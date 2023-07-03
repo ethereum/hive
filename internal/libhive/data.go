@@ -39,21 +39,20 @@ type TestCase struct {
 	Start         time.Time              `json:"start"`
 	End           time.Time              `json:"end"`
 	SummaryResult TestResult             `json:"summaryResult"` // The result of the whole test case.
-	LogOffsets    TestLogOffsets         `json:"logOffsets"`
-	ClientInfo    map[string]*ClientInfo `json:"clientInfo"` // Info about each client.
+	ClientInfo    map[string]*ClientInfo `json:"clientInfo"`    // Info about each client.
 }
 
-// TestLogOffsets holds file offsets into the test log file.
-type TestLogOffsets struct {
-	Begin int64 `json:"begin"`
-	End   int64 `json:"end"`
-}
-
-// TestResult is the payload submitted to the EndTest endpoint.
+// TestResult represents the result of a test case.
 type TestResult struct {
-	Pass    bool   `json:"pass"`
-	Timeout bool   `json:"timeout,omitempty"`
-	Details string `json:"details"`
+	Pass    bool `json:"pass"`
+	Timeout bool `json:"timeout,omitempty"`
+
+	// The test log can be stored inline.
+	Details string `json:"details,omitempty"`
+
+	// If the log is large, it will be stored in a separate file.
+	DetailsFile     string `json:"detailsFile,omitempty"`
+	DetailsFileSize int64  `json:"detailsFileSize,omitempty"`
 }
 
 // ClientInfo describes a client that participated in a test case.

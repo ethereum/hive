@@ -28,6 +28,8 @@ var (
 	ErrTestSuiteLimited         = errors.New("testsuite test count is limited")
 )
 
+const detailsFileThreshold = 512 * 1024
+
 // SimEnv contains the simulation parameters.
 type SimEnv struct {
 	LogDir string
@@ -412,7 +414,7 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 }
 
 // EndTest finishes the test case
-func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, summaryResult *TestResult) error {
+func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, result *TestResult) error {
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()
 
@@ -422,13 +424,32 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 		return ErrNoSuchTestCase
 	}
 	// Make sure there is at least a result summary
-	if summaryResult == nil {
+	if result == nil {
 		return ErrNoSummaryResult
+	}
+	if result.DetailsFile != "" {
+		log15.Error("submitted test result has detailsFile", "file", result.DetailsFile)
+		result.DetailsFile = ""
+		result.DetailsFileSize = 0
 	}
 
 	// Add the results to the test case
 	testCase.End = time.Now()
-	testCase.SummaryResult = *summaryResult
+	if manager.config.LogDir != "" && len(result.Details) > detailsFileThreshold {
+		// Details are large, write them to a file.
+		name := fmt.Sprintf("%d-%s-%d.txt", testCase.End.Unix(), manager.simContainerID, testID)
+		dir := filepath.Join(manager.config.LogDir, "details")
+		os.MkdirAll(dir, 0755)
+		err := os.WriteFile(filepath.Join(dir, name), []byte(result.Details), 0644)
+		if err != nil {
+			log15.Error("could not write details file", "test", testID, "err", err)
+		} else {
+			result.DetailsFile = name
+			result.DetailsFileSize = int64(len(result.Details))
+			result.Details = ""
+		}
+	}
+	testCase.SummaryResult = *result
 
 	// Stop running clients.
 	for _, v := range testCase.ClientInfo {

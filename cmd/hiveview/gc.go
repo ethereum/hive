@@ -36,6 +36,9 @@ func logdirGC(dir string, cutoff time.Time, keepMin int) error {
 		for _, test := range suite.TestCases {
 			for _, client := range test.ClientInfo {
 				usedFiles[client.LogFile] = struct{}{}
+				if test.SummaryResult.DetailsFile != "" {
+					usedFiles[test.SummaryResult.DetailsFile] = struct{}{}
+				}
 			}
 		}
 		return nil
