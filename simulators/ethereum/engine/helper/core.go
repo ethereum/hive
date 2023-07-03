@@ -333,8 +333,8 @@ type ErigonAccount struct {
 }
 
 type ErigonGenesis struct {
-	ErigonConfig     ErigonConfig             `json:"config"`
-	ErigonTimestamp  *big.Int                 `json:"timestamp"`
+	ErigonConfig ErigonConfig `json:"config"`
+	//ErigonTimestamp  uint64                   `json:"timestamp"`
 	AuRaSeal         string                   `json:"auRaSeal"`
 	ErigonGasLimit   string                   `json:"gasLimit"`
 	ErigonDifficulty string                   `json:"difficulty"`
@@ -344,7 +344,7 @@ type ErigonGenesis struct {
 func (v *ErigonGenesis) Config() *params.ChainConfig {
 	chainID := big.NewInt(int64(v.ErigonConfig.ChainID))
 	ttd := big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonDifficulty))
-	shangai := big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonTimestamp)).Uint64()
+	shangai := v.ErigonConfig.ShanghaiTimestamp.Uint64() //big.NewInt(v.ErigonConfig.ShanghaiTimestamp
 	return &params.ChainConfig{
 		ChainID:                 chainID,
 		TerminalTotalDifficulty: ttd,
@@ -434,7 +434,7 @@ func (v *ErigonGenesis) AllocGenesis(address common.Address, account GenesisAcco
 }
 
 func (v *ErigonGenesis) UpdateTimestamp(timestamp string) {
-	v.ErigonTimestamp = timestamp
+	//v.ErigonConfig.ShanghaiTimestamp =
 }
 
 func (v *ErigonGenesis) Number() uint64 {

@@ -1113,7 +1113,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						Amount:    common.Big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
-						GasLimit:  t.Genesis.GasLimit(),
+						GasLimit:  t.Genesis.GasLimit() + 1000,
 						ChainID:   t.Genesis.Config().ChainID,
 					},
 				)
@@ -1200,7 +1200,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 						Amount:    common.Big1,
 						Payload:   nil,
 						TxType:    t.TestTransactionType,
-						GasLimit:  t.Genesis.GasLimit(),
+						GasLimit:  t.Genesis.GasLimit() + 1000,
 						ChainID:   t.Genesis.Config().ChainID,
 					},
 				)
@@ -1215,8 +1215,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			if !ws.SkipBaseVerifications {
 
 				// Verify the list of withdrawals returned on the payload built
-				// completely matches the list provided in the
-				// engine_forkchoiceUpdatedV2 method call
+:wq				// engine_forkchoiceUpdatedV2 method call
 				if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
 					panic("withdrawals sent list was not saved")
 				} else {

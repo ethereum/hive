@@ -51,6 +51,8 @@ if [ "$HIVE_SKIP_POW" != "" ]; then
     FLAGS="$FLAGS --fakepow"
 fi
 
+cat /genesis.json
+
 # Create the data directory.
 mkdir /erigon-hive-datadir
 FLAGS="$FLAGS --datadir /erigon-hive-datadir  --nodiscover"

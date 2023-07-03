@@ -1050,8 +1050,6 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(
 		switch key {
 		case "config":
 			(out.ErigonConfig).UnmarshalEasyJSON(in)
-		case "timestamp":
-			out.ErigonTimestamp = string(in.String())
 		case "auRaSeal":
 			out.AuRaSeal = string(in.String())
 		case "gasLimit":
@@ -1092,11 +1090,6 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper4(
 		const prefix string = ",\"config\":"
 		out.RawString(prefix[1:])
 		(in.ErigonConfig).MarshalEasyJSON(out)
-	}
-	{
-		const prefix string = ",\"timestamp\":"
-		out.RawString(prefix)
-		out.String(string(in.ErigonTimestamp))
 	}
 	{
 		const prefix string = ",\"auRaSeal\":"
@@ -1221,6 +1214,18 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 			}
 		case "terminalTotalDifficultyPassed":
 			out.TerminalTotalDifficultyPassed = bool(in.Bool())
+		case "shanghaiTime":
+			if in.IsNull() {
+				in.Skip()
+				out.ShanghaiTimestamp = nil
+			} else {
+				if out.ShanghaiTimestamp == nil {
+					out.ShanghaiTimestamp = new(big.Int)
+				}
+				if data := in.Raw(); in.Ok() {
+					in.AddError((*out.ShanghaiTimestamp).UnmarshalJSON(data))
+				}
+			}
 		case "aura":
 			(out.Aura).UnmarshalEasyJSON(in)
 		default:
@@ -1320,6 +1325,15 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 		const prefix string = ",\"terminalTotalDifficultyPassed\":"
 		out.RawString(prefix)
 		out.Bool(bool(in.TerminalTotalDifficultyPassed))
+	}
+	{
+		const prefix string = ",\"shanghaiTime\":"
+		out.RawString(prefix)
+		if in.ShanghaiTimestamp == nil {
+			out.RawString("null")
+		} else {
+			out.Raw((*in.ShanghaiTimestamp).MarshalJSON())
+		}
 	}
 	{
 		const prefix string = ",\"aura\":"
