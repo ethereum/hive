@@ -91,18 +91,18 @@ var (
 
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	// &WithdrawalsBaseSpec{
-	// 	Spec: test.Spec{
-	// 		Name: "Withdawals Fork on Block 1",
-	// 		About: `
-	// 		Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
-	// 		`,
-	// 	},
-	// 	WithdrawalsForkHeight: 1, //TODO
-	// 	WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
-	// 	WithdrawalsPerBlock:   16,
-	// 	TimeIncrements:        5,
-	// },
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdawals Fork on Block 1",
+			About: `
+			Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
+			`,
+		},
+		WithdrawalsForkHeight: 1, //TODO
+		WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
+		WithdrawalsPerBlock:   16,
+		TimeIncrements:        5,
+	},
 	//
 	//&WithdrawalsBaseSpec{
 	//	Spec: test.Spec{
@@ -116,21 +116,21 @@ var Tests = []test.SpecInterface{
 	//	WithdrawalsPerBlock:   16,
 	//},
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdrawals Fork on Block 5",
-			About: `
-			Tests the transition to the withdrawals fork after a single block
-			has happened.
-			Block 1 is sent with invalid non-null withdrawals payload and
-			client is expected to respond with the appropriate error.
-			`,
-		},
-		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
-		WithdrawalsBlockCount: 2,
-		WithdrawalsPerBlock:   16,
-		TimeIncrements:        5,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 5",
+	// 		About: `
+	// 		Tests the transition to the withdrawals fork after a single block
+	// 		has happened.
+	// 		Block 1 is sent with invalid non-null withdrawals payload and
+	// 		client is expected to respond with the appropriate error.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
+	// 	WithdrawalsBlockCount: 2,
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
 
 	// TODO: Fix this test. It's reverting the block, which is the expected behavior.
 	//&WithdrawalsBaseSpec{
