@@ -1049,10 +1049,6 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				if !ws.SkipBaseVerifications {
 					block := t.CLMock.LatestExecutedPayload.Number - 1
 					addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block)
-					transfersMap, err := getWithdrawalsTransferEvents(client, addresses, block, block)
-					if err != nil {
-						t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
-					}
 					for _, addr := range addresses {
 						//Test balance at `latest`, which should have the withdrawal applied.
 						latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
@@ -1066,13 +1062,6 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 							t.Fatalf(
 								"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
 								t.TestName, addr, expectBalanceEqual, latestBalance,
-							)
-						}
-						// check value from event equal balance
-						if latestBalance.Cmp(transfersMap[addr.Hex()]) != 0 {
-							t.Fatalf(
-								"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
-								t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
 							)
 						}
 					}
@@ -1111,6 +1100,34 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 
 		// Verify on `latest`
 		ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
+		block := t.CLMock.LatestExecutedPayload.Number
+		addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
+		transfersMap, err := getWithdrawalsTransferEvents(client, addresses, block, block)
+		if err != nil {
+			t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
+		}
+
+		for _, addr := range addresses {
+			//Test balance at `latest`, which should have the withdrawal applied.
+			latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
+			}
+			eventValue := transfersMap[addr.Hex()]
+			if eventValue == nil {
+				t.Fatalf(
+					"FAIL (%s): No value withdrawal transfer value presented in events list for address: %v",
+					t.TestName, addr.Hex(),
+				)
+			}
+			// check value from event equal balance
+			if latestBalance.Cmp(eventValue) != 0 {
+				t.Fatalf(
+					"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
+					t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
+				)
+			}
+		}
 	}
 }
 
