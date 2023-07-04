@@ -91,18 +91,18 @@ var (
 
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdawals Fork on Block 1",
-			About: `
-			Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
-			`,
-		},
-		WithdrawalsForkHeight: 1, //TODO
-		WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
-		WithdrawalsPerBlock:   16,
-		TimeIncrements:        5,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdawals Fork on Block 1",
+	// 		About: `
+	// 		Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1, //TODO
+	// 	WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
 	//
 	//&WithdrawalsBaseSpec{
 	//	Spec: test.Spec{
@@ -116,22 +116,21 @@ var Tests = []test.SpecInterface{
 	//	WithdrawalsPerBlock:   16,
 	//},
 
-	// TODO: Fix this test
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 5",
-	//		About: `
-	//		Tests the transition to the withdrawals fork after a single block
-	//		has happened.
-	//		Block 1 is sent with invalid non-null withdrawals payload and
-	//		client is expected to respond with the appropriate error.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   16,
-	//	TimeIncrements:        5,
-	//},
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdrawals Fork on Block 5",
+			About: `
+			Tests the transition to the withdrawals fork after a single block
+			has happened.
+			Block 1 is sent with invalid non-null withdrawals payload and
+			client is expected to respond with the appropriate error.
+			`,
+		},
+		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
+		WithdrawalsBlockCount: 2,
+		WithdrawalsPerBlock:   16,
+		TimeIncrements:        5,
+	},
 
 	// TODO: Fix this test. It's reverting the block, which is the expected behavior.
 	//&WithdrawalsBaseSpec{
@@ -1048,7 +1047,13 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 
 			OnForkchoiceBroadcast: func() {
 				if !ws.SkipBaseVerifications {
-					for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number - 1) {
+					block := t.CLMock.LatestExecutedPayload.Number - 1
+					addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block)
+					transfersMap, err := getWithdrawalsTransferEvents(client, addresses, block, block)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
+					}
+					for _, addr := range addresses {
 						//Test balance at `latest`, which should have the withdrawal applied.
 						latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
 						if err != nil {
@@ -1063,7 +1068,15 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 								t.TestName, addr, expectBalanceEqual, latestBalance,
 							)
 						}
+						// check value from event equal balance
+						if latestBalance.Cmp(transfersMap[addr.Hex()]) != 0 {
+							t.Fatalf(
+								"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
+								t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
+							)
+						}
 					}
+
 				}
 			},
 		})
@@ -1148,6 +1161,33 @@ func getWithdrawableAmount(client *ethclient.Client, account common.Address, blo
 		return nil, fmt.Errorf("unexpected result length: %d", len(result))
 	}
 	return result[0].(*big.Int), nil
+}
+
+func getWithdrawalsTransferEvents(client *ethclient.Client, addresses []common.Address, fromBlock, toBlock uint64) (map[string]*big.Int, error) {
+	transfersList := make(map[string]*big.Int, 0)
+	token, err := libgno.NewGnoToken(libgno.GNOTokenAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("can't bind token contract: %w", err)
+	}
+	eventsIterator, err := token.FilterTransfer(
+		&bind.FilterOpts{
+			Start: fromBlock,
+			End:   &toBlock,
+		},
+		[]common.Address{libgno.WithdrawalsContractAddress},
+		addresses,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("can't filter transfers: %w", err)
+	}
+
+	for eventsIterator.Next() {
+		addr := eventsIterator.Event.To.Hex()
+		amount := eventsIterator.Event.Value
+
+		transfersList[addr] = amount
+	}
+	return transfersList, nil
 }
 
 // Withdrawals sync spec:
