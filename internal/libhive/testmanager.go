@@ -381,9 +381,13 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 		testLogFile *os.File
 	)
 	if manager.config.LogDir != "" {
-		testLogPath = fmt.Sprintf("details/%x-%d.log", manager.simContainerID, newSuiteID)
+		testLogPath = fmt.Sprintf("details/%s-%d.log", manager.simContainerID, newSuiteID)
 		fp := filepath.Join(manager.config.LogDir, filepath.FromSlash(testLogPath))
-		file, err := os.OpenFile(fp, os.O_CREATE, 0644)
+
+		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
+			return 0, err
+		}
+		file, err := os.OpenFile(fp, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			return 0, err
 		}
@@ -476,7 +480,7 @@ func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *
 func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCase, text string) *TestLogOffsets {
 	var (
 		begin   = suite.testLogOffset
-		header  = "--" + testCase.Name + "\n"
+		header  = "-- " + testCase.Name + "\n"
 		footer  = "\n\n"
 		offsets TestLogOffsets
 	)
@@ -492,7 +496,7 @@ func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCas
 		// Otherwise, exclude the header and footer in offsets.
 		// They are just written to make the file more readable.
 		offsets.Begin = begin + int64(len(header))
-		offsets.End = suite.testLogOffset - int64(len(footer))
+		offsets.End = offsets.Begin + int64(len(text))
 	}
 	return &offsets
 }

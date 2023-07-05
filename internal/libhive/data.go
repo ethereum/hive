@@ -28,8 +28,8 @@ type TestSuite struct {
 	ClientVersions map[string]string    `json:"clientVersions"`
 	TestCases      map[TestID]*TestCase `json:"testCases"`
 
-	SimulatorLog   string `json:"simLog"`  // path to simulator log-file simulator. (this may be shared with multiple suites)
-	TestDetailsLog string `json:"testLog"` // the test details output file
+	SimulatorLog   string `json:"simLog"`         // path to simulator log-file simulator. (may be shared with multiple suites)
+	TestDetailsLog string `json:"testDetailsLog"` // the test details output file
 
 	testDetailsFile *os.File
 	testLogOffset   int64
@@ -56,8 +56,8 @@ type TestResult struct {
 }
 
 type TestLogOffsets struct {
-	Begin int64 "json:begin"
-	End   int64 "json:end"
+	Begin int64 `json:"begin"`
+	End   int64 `json:"end"`
 }
 
 // ClientInfo describes a client that participated in a test case.
