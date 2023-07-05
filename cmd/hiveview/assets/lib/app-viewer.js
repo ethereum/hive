@@ -94,7 +94,7 @@ function showTitle(type, title) {
 
 function showError(text) {
     $('#file-title').text('Error');
-    showText('Error:\n\n' + text);
+    showText('Error!\n\n' + text);
 }
 
 // showFileContent shows a file + fileinfo.
@@ -185,14 +185,19 @@ async function fetchTestLog(suiteFile, testIndex, line) {
     if (test.summaryResult.details) {
         logtext = test.summaryResult.details;
     } else if (test.summaryResult.logOffsets) {
-        let url = routes.resultsRoot + data.testDetailsLog;
         try {
+            let url = routes.resultsRoot + data.testDetailsLog;
             let loader = new testlog.Loader(url, test.summaryResult.logOffsets);
-            logtext = await loader.text();
+            logtext = await loader.text(function (received, length) {
+                common.showLoadProgress(received/length);
+            });
+            common.showLoadProgress(false);
         } catch(err) {
-            showError('Failed to load ' + url + '\nerror: ' + err);
+            showError(err);
             return;
         }
+    } else {
+        showError("test has no details/log")
     }
     showTitle('Test:', name);
     showText(logtext);

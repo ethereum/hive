@@ -52,10 +52,16 @@ export function newXhrWithProgressBar() {
     return xhr;
 }
 
-function showLoadProgress(loadState) {
+export function showLoadProgress(loadState, element) {
+    if (!element) {
+        element = $('#load-progress-bar-container');
+    } else {
+        element = $(element);
+    }
+
     if (!loadState) {
         console.log('load finished');
-        $('#load-progress-bar-container').hide();
+        element.hide();
         return;
     }
 
@@ -67,8 +73,8 @@ function showLoadProgress(loadState) {
     let percent = Math.floor(loadState * 100);
     console.log('loading: ' + percent);
 
-    $('#load-progress-bar-container').show();
-    let bar = $('#load-progress-bar');
+    element.show();
+    let bar = $('.progress-bar', element);
     bar.toggleClass('progress-bar-animated', animated);
     bar.toggleClass('progress-bar-striped', animated);
     bar.attr('aria-valuenow', '' + percent);

@@ -1,3 +1,5 @@
+import $ from 'jquery';
+
 // splitHeadTail splits the given text, getting n lines from both the beginning and the
 // end of the text.
 export function splitHeadTail(text, maxLines) {
@@ -60,6 +62,8 @@ const LOADER_CHUNK_SIZE = 8192;
 
 // Loader provides incremental access to log files.
 export class Loader {
+    onProgress = undefined;
+
     constructor(logFileName, offsets) {
         // Ensure file offsets are valid.
         if (offsets.begin > offsets.end) {
@@ -101,9 +105,30 @@ export class Loader {
     }
 
     // text fetches the entire log.
-    async text() {
+    async text(progressCallback) {
         let response = await this._fetchRange(0, this.length);
-        return await response.text();
+        let reader = response.body.getReader();
+        if (progressCallback) {
+            progressCallback(0, this.length);
+        }
+
+        let received = 0;
+        let decoder = new TextDecoder();
+        let text = "";
+        while(true) {
+            const {done, value} = await reader.read();
+            if (value) {
+                received += value.length;
+                text += decoder.decode(value, {stream: !done});
+                if (progressCallback) {
+                    progressCallback(received, this.length);
+                }
+            }
+            if (done) {
+                break;
+            }
+        }
+        return text;
     }
 
     // iterLines reads text lines starting at the head of the file and calls fn
