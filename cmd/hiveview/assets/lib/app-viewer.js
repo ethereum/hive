@@ -197,7 +197,7 @@ async function fetchTestLog(suiteFile, testIndex, line) {
             return;
         }
     } else {
-        showError("test has no details/log")
+        showError('test has no details/log');
     }
     showTitle('Test:', name);
     showText(logtext);
@@ -205,5 +205,5 @@ async function fetchTestLog(suiteFile, testIndex, line) {
 }
 
 async function load(url, dataType) {
-    return $.ajax({url, dataType, xhr: common.newXhrWithProgressBar})
+    return $.ajax({url, dataType, xhr: common.newXhrWithProgressBar});
 }

@@ -1,5 +1,3 @@
-import $ from 'jquery';
-
 // splitHeadTail splits the given text, getting n lines from both the beginning and the
 // end of the text.
 export function splitHeadTail(text, maxLines) {
@@ -65,7 +63,7 @@ export class Loader {
     constructor(logFileName, offsets) {
         // Ensure file offsets are valid.
         if (offsets.begin > offsets.end) {
-            throw new Error(`invalid offsets: ${begin} > ${end}`);
+            throw new Error(`invalid offsets: ${offsets.begin} > ${offsets.end}`);
         }
         this.logFileName = logFileName;
         this.length = offsets.end - offsets.begin;
@@ -82,8 +80,8 @@ export class Loader {
 
         let received = 0;
         let decoder = new TextDecoder();
-        let text = "";
-        while(true) {
+        let text = '';
+        for(;;) {
             const {done, value} = await reader.read();
             if (value) {
                 received += value.length;
@@ -153,8 +151,8 @@ export class Loader {
             // One or more lines were decoded.
             let outputPos = dec.outputPosition - text.length;
             let pos = 0;
-            while (true) {
-                let nl = text.indexOf("\n", pos);
+            for (;;) {
+                let nl = text.indexOf('\n', pos);
                 if (nl === -1) {
                     continue outer;
                 }
@@ -179,7 +177,7 @@ export class Loader {
                 await this._fetchRangeIntoBuffer(start, end, dec);
                 continue;
             }
-            if (first && line == "\n") {
+            if (first && line === '\n') {
                 first = false;
                 continue;
             }
@@ -325,9 +323,9 @@ class ReverseBuffer {
         }
         let lineLength = this._offset - pos;
         let lineBytes = this._data.slice(pos+1, this._offset+1);
-        let line = new TextDecoder("utf-8").decode(lineBytes);
+        let line = new TextDecoder('utf-8').decode(lineBytes);
         this._offset = pos - 1;
         this._outputPosition -= lineLength;
-        return line + "\n";
+        return line + '\n';
     }
 }
