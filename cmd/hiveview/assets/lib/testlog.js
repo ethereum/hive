@@ -102,7 +102,7 @@ export class Loader {
 
     // text fetches the entire log.
     async text() {
-        let response = this._fetchRange(0, this.length);
+        let response = await this._fetchRange(0, this.length);
         return await response.text();
     }
 

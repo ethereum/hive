@@ -2,6 +2,7 @@ import $ from 'jquery';
 
 import * as common from './app-common.js';
 import * as routes from './routes.js';
+import * as testlog from './testlog.js';
 import { makeLink } from './html.js';
 import { formatBytes, queryParam } from './utils.js';
 
@@ -153,8 +154,8 @@ async function fetchFile(url, line /* optional jump to line */ ) {
     let data;
     try {
         data = await load(url, 'text');
-    } catch (e) {
-        showError('Failed to load ' + url + '\nerror: ' + error);
+    } catch (err) {
+        showError('Failed to load ' + url + '\nerror: ' + err);
         return;
     }
     let title = url.replace(resultsRE, '');
@@ -168,8 +169,8 @@ async function fetchTestLog(suiteFile, testIndex, line) {
     let data;
     try {
         data = await load(suiteFile, 'json');
-    } catch(e) {
-        showError('Failed to load ' + suiteFile + '\nerror: ' + error);
+    } catch(err) {
+        showError('Failed to load ' + suiteFile + '\nerror: ' + err);
         return;
     }
     if (!data['testCases'] || !data['testCases'][testIndex]) {
@@ -183,12 +184,13 @@ async function fetchTestLog(suiteFile, testIndex, line) {
     let logtext;
     if (test.summaryResult.details) {
         logtext = test.summaryResult.details;
-    } else {
+    } else if (test.summaryResult.logOffsets) {
+        let url = routes.resultsRoot + data.testDetailsLog;
         try {
-            let url = 'results/details/' + test.summaryResult.detailsFile;
-            logtext = await load(url, 'text');
-        } catch(e) {
-            showError('Failed to load ' + url + '\nerror: ' + error);
+            let loader = new testlog.Loader(url, test.summaryResult.logOffsets);
+            logtext = await loader.text();
+        } catch(err) {
+            showError('Failed to load ' + url + '\nerror: ' + err);
             return;
         }
     }
