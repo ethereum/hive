@@ -91,18 +91,18 @@ var (
 
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdawals Fork on Block 1",
-			About: `
-			Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
-			`,
-		},
-		WithdrawalsForkHeight: 1, //TODO
-		WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
-		WithdrawalsPerBlock:   16,
-		TimeIncrements:        5,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdawals Fork on Block 1",
+	// 		About: `
+	// 		Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1, //TODO
+	// 	WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
 	//
 	//&WithdrawalsBaseSpec{
 	//	Spec: test.Spec{
@@ -116,21 +116,21 @@ var Tests = []test.SpecInterface{
 	//	WithdrawalsPerBlock:   16,
 	//},
 
-	// &WithdrawalsBaseSpec{
-	// 	Spec: test.Spec{
-	// 		Name: "Withdrawals Fork on Block 5",
-	// 		About: `
-	// 		Tests the transition to the withdrawals fork after a single block
-	// 		has happened.
-	// 		Block 1 is sent with invalid non-null withdrawals payload and
-	// 		client is expected to respond with the appropriate error.
-	// 		`,
-	// 	},
-	// 	WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
-	// 	WithdrawalsBlockCount: 2,
-	// 	WithdrawalsPerBlock:   16,
-	// 	TimeIncrements:        5,
-	// },
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdrawals Fork on Block 5",
+			About: `
+			Tests the transition to the withdrawals fork after a single block
+			has happened.
+			Block 1 is sent with invalid non-null withdrawals payload and
+			client is expected to respond with the appropriate error.
+			`,
+		},
+		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
+		WithdrawalsBlockCount: 1,
+		WithdrawalsPerBlock:   16,
+		TimeIncrements:        5,
+	},
 
 	// TODO: Fix this test. It's reverting the block, which is the expected behavior.
 	//&WithdrawalsBaseSpec{
@@ -552,6 +552,7 @@ var Tests = []test.SpecInterface{
 	//	ReOrgViaSync:            true,
 	//	SidechainTimeIncrements: 1,
 	//},
+
 	//// TODO: REORG SYNC WHERE SYNCED BLOCKS HAVE WITHDRAWALS BEFORE TIME
 	//
 	//// EVM Tests (EIP-3651, EIP-3855, EIP-3860)
@@ -848,14 +849,22 @@ func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
 	}
 }
 
+func (ws *WithdrawalsBaseSpec) waitForShaghai(t *test.Env) {
+	if time.Now().Unix() < int64(*t.Genesis.Config().ShanghaiTime) {
+		tUnix := time.Unix(t.CLMock.ShanghaiTimestamp.Int64(), 0)
+		durationUntilFuture := time.Until(tUnix)
+		if durationUntilFuture > 0 {
+			time.Sleep(durationUntilFuture)
+		}
+	}
+}
+
 // Base test case execution procedure for withdrawals
 func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
 	ws.WithdrawalsHistory = make(WithdrawalsHistory)
 	shangaiTime := *t.Genesis.Config().ShanghaiTime
 	t.CLMock.ShanghaiTimestamp = big.NewInt(0).SetUint64(shangaiTime)
-	// Create a time.Time value from the int64 timestamp
-	tUnix := time.Unix(t.CLMock.ShanghaiTimestamp.Int64(), 0)
 
 	// Wait ttd
 	t.CLMock.WaitForTTD()
@@ -925,14 +934,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		},
 	})
 
-	// Wait for shangai
-	if time.Now().Unix() < int64(*t.Genesis.Config().ShanghaiTime) {
-		tUnix = time.Unix(t.CLMock.ShanghaiTimestamp.Int64(), 0)
-		durationUntilFuture := time.Until(tUnix)
-		if durationUntilFuture > 0 {
-			time.Sleep(durationUntilFuture)
-		}
-	}
+	ws.waitForShaghai(t)
 
 	var (
 		startAccount = ws.GetWithdrawalsStartAccount()
@@ -1044,7 +1046,38 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
 				}
 			},
+			OnGetPayload: func() {
+				if !ws.SkipBaseVerifications {
+					block := t.CLMock.LatestExecutedPayload.Number
+					addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
+					transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, block, block)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
+					}
 
+					for _, addr := range addresses {
+						//Test balance at `latest`, which should have the withdrawal applied.
+						latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
+						if err != nil {
+							t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
+						}
+						eventValue := transfersMap[addr.Hex()]
+						if eventValue == nil {
+							t.Fatalf(
+								"FAIL (%s): No value withdrawal transfer value presented in events list for address: %v",
+								t.TestName, addr.Hex(),
+							)
+						}
+						// check value from event equal balance
+						if latestBalance.Cmp(eventValue) != 0 {
+							t.Fatalf(
+								"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
+								t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
+							)
+						}
+					}
+				}
+			},
 			OnForkchoiceBroadcast: func() {
 				if !ws.SkipBaseVerifications {
 					block := t.CLMock.LatestExecutedPayload.Number - 1
@@ -1100,34 +1133,6 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 
 		// Verify on `latest`
 		ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
-		block := t.CLMock.LatestExecutedPayload.Number
-		addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
-		transfersMap, err := getWithdrawalsTransferEvents(client, addresses, block, block)
-		if err != nil {
-			t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
-		}
-
-		for _, addr := range addresses {
-			//Test balance at `latest`, which should have the withdrawal applied.
-			latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
-			}
-			eventValue := transfersMap[addr.Hex()]
-			if eventValue == nil {
-				t.Fatalf(
-					"FAIL (%s): No value withdrawal transfer value presented in events list for address: %v",
-					t.TestName, addr.Hex(),
-				)
-			}
-			// check value from event equal balance
-			if latestBalance.Cmp(eventValue) != 0 {
-				t.Fatalf(
-					"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
-					t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
-				)
-			}
-		}
 	}
 }
 
@@ -1178,33 +1183,6 @@ func getWithdrawableAmount(client *ethclient.Client, account common.Address, blo
 		return nil, fmt.Errorf("unexpected result length: %d", len(result))
 	}
 	return result[0].(*big.Int), nil
-}
-
-func getWithdrawalsTransferEvents(client *ethclient.Client, addresses []common.Address, fromBlock, toBlock uint64) (map[string]*big.Int, error) {
-	transfersList := make(map[string]*big.Int, 0)
-	token, err := libgno.NewGnoToken(libgno.GNOTokenAddress, client)
-	if err != nil {
-		return nil, fmt.Errorf("can't bind token contract: %w", err)
-	}
-	eventsIterator, err := token.FilterTransfer(
-		&bind.FilterOpts{
-			Start: fromBlock,
-			End:   &toBlock,
-		},
-		[]common.Address{libgno.WithdrawalsContractAddress},
-		addresses,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("can't filter transfers: %w", err)
-	}
-
-	for eventsIterator.Next() {
-		addr := eventsIterator.Event.To.Hex()
-		amount := eventsIterator.Event.Value
-
-		transfersList[addr] = amount
-	}
-	return transfersList, nil
 }
 
 // Withdrawals sync spec:
