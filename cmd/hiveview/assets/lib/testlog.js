@@ -58,7 +58,7 @@ function countLines(text) {
 }
 
 const NEWLINE = 10;
-const LOADER_CHUNK_SIZE = 8192;
+const LOADER_CHUNK_SIZE = 32768;
 
 // Loader provides incremental access to log files.
 export class Loader {
