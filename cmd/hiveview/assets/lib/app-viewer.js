@@ -2,7 +2,6 @@ import $ from 'jquery';
 
 import * as common from './app-common.js';
 import * as routes from './routes.js';
-import * as testlog from './testlog.js';
 import { makeLink } from './html.js';
 import { formatBytes, queryParam } from './utils.js';
 
@@ -47,6 +46,29 @@ $(document).ready(function () {
     showText(document.getElementById('exampletext').innerHTML);
 });
 
+// setHL sets the highlight on a line number.
+function setHL(num, scroll) {
+    // out with the old
+    $('.highlighted').removeClass('highlighted');
+    if (!num) {
+        return;
+    }
+
+    let contentArea = document.getElementById('file-content');
+    let gutter = document.getElementById('gutter');
+    let numElem = gutter.children[num - 1];
+    if (!numElem) {
+        console.error('invalid line number:', num);
+        return;
+    }
+    // in with the new
+    let lineElem = contentArea.children[num - 1];
+    $(numElem).addClass('highlighted');
+    $(lineElem).addClass('highlighted');
+    if (scroll) {
+        numElem.scrollIntoView();
+    }
+}
 
 // showLinkBack displays the link to the test viewer.
 function showLinkBack(suiteID, suiteName, testID) {
@@ -85,145 +107,96 @@ function showFileContent(text, filename) {
 
 // showText sets the content of the viewer.
 function showText(text) {
-    let viewer = new TextViewer();
-    viewer.setText(text);
+    let contentArea = document.getElementById('file-content');
+    let gutter = document.getElementById('gutter');
+
+    // Clear content.
+    contentArea.innerHTML = '';
+    gutter.innerHTML = '';
+
+    // Add the lines.
+    let lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        appendLine(contentArea, gutter, i + 1, lines[i]);
+    }
+
+    // Set meta-info.
+    let meta = $('#meta');
+    meta.text(lines.length + ' Lines, ' + formatBytes(text.length));
+
+    // Ensure viewer is visible.
+    $('#viewer-header').show();
+    $('#viewer').show();
 }
 
-class TextViewer {
-    number = 1;
+function appendLine(contentArea, gutter, number, text) {
+    let num = document.createElement('span');
+    num.setAttribute('id', 'L' + number);
+    num.setAttribute('class', 'num');
+    num.setAttribute('line', number.toString());
+    num.addEventListener('click', lineNumberClicked);
+    gutter.appendChild(num);
 
-    constructor(container) {
-        this.header = $('#viewer-header');
-        this.container = $('#viewer');
-        this.contentArea = $('.file-content', this.container);
-        this.gutter = $('gutter', this.container);
-    }
+    let line = document.createElement('pre');
+    line.innerText = text + '\n';
+    contentArea.appendChild(line);
+}
 
-    // clear removes all text from the view.
-    clear() {
-        this.contentArea.innerHTML = '';
-        this.gutter.innerHTML = '';
-        this.number = 1;
-    }
-
-    // show ensures the viewer is visible.
-    show() {
-        this.header.show();
-        this.container.show();
-    }
-
-    // setText displays the given text.
-    setText(text) {
-        this.clear();
-        let lines = text.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-            this.appendLine(lines[i]);
-        }
-        let meta = $('#meta');
-        meta.text(lines.length + ' Lines, ' + formatBytes(text.length));
-    }
-
-    // highlight sets the highlight on a line number.
-    highlight(lineNumber, scroll) {
-        // out with the old
-        $('.highlighted', this.container).removeClass('highlighted');
-        if (!num) {
-            return;
-        }
-
-        let numElem = this.gutter.children[num - 1];
-        if (!numElem) {
-            console.error('invalid line number:', num);
-            return;
-        }
-        // in with the new
-        let lineElem = this.contentArea.children[num - 1];
-        $(numElem).addClass('highlighted');
-        $(lineElem).addClass('highlighted');
-        if (scroll) {
-            numElem.scrollIntoView();
-        }
-    }
-
-    lineNumberClicked() {
-        setHL($(this).attr('line'), false);
-        history.replaceState(null, null, '#' + $(this).attr('id'));
-    }
-    
-    appendLine(text) {
-        let num = document.createElement('span');
-        num.setAttribute('id', 'L' + this.number);
-        num.setAttribute('class', 'num');
-        num.setAttribute('line', this.number.toString());
-        num.addEventListener('click', lineNumberClicked);
-        this.gutter.appendChild(num);
-        this.number += 1;
-
-        let line = document.createElement('pre');
-        line.innerText = text + '\n';
-        this.contentArea.appendChild(line);
-    }
+function lineNumberClicked() {
+    setHL($(this).attr('line'), false);
+    history.replaceState(null, null, '#' + $(this).attr('id'));
 }
 
 // fetchFile loads up a new file to view
-function fetchFile(url, line /* optional jump to line */ ) {
+async function fetchFile(url, line /* optional jump to line */ ) {
     let resultsRE = new RegExp('^' + routes.resultsRoot);
-    $.ajax({
-        xhr: common.newXhrWithProgressBar,
-        url: url,
-        dataType: 'text',
-        success: function(data) {
-            let title = url.replace(resultsRE, '');
-            showTitle(null, title);
-            showFileContent(data, url);
-            setHL(line, true);
-        },
-        error: function(jq, status, error) {
-            alert('Failed to load ' + url + '\nstatus:' + status + '\nerror:' + error);
-        },
-    });
+    let data;
+    try {
+        data = await load(url, 'text');
+    } catch (e) {
+        showError('Failed to load ' + url + '\nerror: ' + error);
+        return;
+    }
+    let title = url.replace(resultsRE, '');
+    showTitle(null, title);
+    showFileContent(data, url);
+    setHL(line, true);
 }
 
 // fetchTestLog loads the suite file and displays the output of a test.
-function fetchTestLog(suiteFile, testIndex, lineHighlight) {
-    $.ajax({
-        xhr: common.newXhrWithProgressBar,
-        url: suiteFile,
-        dataType: 'json',
-        success: function(data) {
-            if (!data['testCases'] || !data['testCases'][testIndex]) {
-                let errtext = 'Invalid test data returned by server: ' + JSON.stringify(data, null, 2);
-                showError(errtext);
-                return;
-            }
-            let test = data.testCases[testIndex];
-            streamTestLogLines(suiteFile, test, lineHighlight);
-        },
-        error: function(jq, status, error) {
-            alert('Failed to load ' + suiteFile + '\nstatus:' + status + '\nerror:' + error);
-        },
-    });
-}
-
-function streamTestLogLines(suiteFile, testCase, lineToHighlight) {
-    let name = testCase.name;
-    showTitle('Test:', name);
-
-    if (!testCase.logOffsets) {
-        let logtext = testCase.summaryResult.details;
-        showText(logtext);
-        setHL(lineToHighlight, true);
+async function fetchTestLog(suiteFile, testIndex, line) {
+    let data;
+    try {
+        data = await load(suiteFile, 'json');
+    } catch(e) {
+        showError('Failed to load ' + suiteFile + '\nerror: ' + error);
+        return;
+    }
+    if (!data['testCases'] || !data['testCases'][testIndex]) {
+        let errtext = 'Invalid test data returned by server: ' + JSON.stringify(data, null, 2);
+        showError(errtext);
         return;
     }
 
-    // Log is stored in a separate file.
-    let logFile = suiteFile += "-testlog.txt";
-    let loader = new testlog.LogLoader(logFile, testCase.logOffsets);
-    let viewer = new TextViewer();
-    viewer.clear();
-    viewer.show();
-    loader.iterLines(function (line, offsets) {
-        viewer.appendLine(line);
-        return true;
-    });
+    let test = data.testCases[testIndex];
+    let name = test.name;
+    let logtext;
+    if (test.summaryResult.details) {
+        logtext = test.summaryResult.details;
+    } else {
+        try {
+            let url = 'results/details/' + test.summaryResult.detailsFile;
+            logtext = await load(url, 'text');
+        } catch(e) {
+            showError('Failed to load ' + url + '\nerror: ' + error);
+            return;
+        }
+    }
+    showTitle('Test:', name);
+    showText(logtext);
+    setHL(line, true);
+}
+
+async function load(url, dataType) {
+    return $.ajax({url, dataType, xhr: common.newXhrWithProgressBar})
 }

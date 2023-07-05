@@ -126,7 +126,7 @@ func convertSuiteFile(dir string, file string) {
 		if len(test.SummaryResult.Details) > 1024 {
 			// write to file
 			dir := filepath.Join(dir, "details")
-			name := fmt.Sprintf("%d-%s.txt", time.Now().Unix()0, id)
+			name := fmt.Sprintf("%d-%s.txt", time.Now().Unix(), id)
 			path := filepath.Join(dir, name)
 			os.MkdirAll(dir, 0755)
 			err := os.WriteFile(path, []byte(test.SummaryResult.Details), 0644)
