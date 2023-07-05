@@ -385,9 +385,11 @@ function formatTestDetails(suiteData, row) {
             console.error(error);
             spinner.remove();
             let p = document.createElement('p');
-            p.innerHTML = '<b>' + html.encode(error.toString()) + '</b>';
+            p.innerHTML = highlightErrorsInTestOutput(error.toString());
             container.appendChild(p);
         });
+    } else {
+        $(container).append('<b>Details:</b> Test has no log output.');
     }
 
     return container;
