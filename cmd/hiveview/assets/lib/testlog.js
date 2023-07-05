@@ -60,9 +60,14 @@ const LOADER_CHUNK_SIZE = 8192;
 
 // Loader provides incremental access to log files.
 export class Loader {
-    constructor(logFileName, length) {
+    constructor(logFileName, offsets) {
+        // Ensure file offsets are valid.
+        if (offsets.begin > offsets.end) {
+            throw new Error(`invalid offsets: ${begin} > ${end}`);
+        }
         this.logFileName = logFileName;
-        this.length = length;
+        this.length = offsets.end - offsets.begin;
+        this.offsets = offsets;
     }
 
     // headAndTailLines returns up to n lines from the beginning and
@@ -97,8 +102,7 @@ export class Loader {
 
     // text fetches the entire log.
     async text() {
-        let request = new Request(this.logFileName, {method: 'GET'});
-        let response = await fetch();
+        let response = this._fetchRange(0, this.length);
         return await response.text();
     }
 
@@ -115,7 +119,7 @@ export class Loader {
                 // Decoder wants more input.
                 let start = dec.inputPosition;
                 let end = Math.min(start+LOADER_CHUNK_SIZE, this.length);
-                await this._fetchRange(start, end, dec);
+                await this._fetchRangeIntoBuffer(start, end, dec);
                 continue;
             }
             // A line was decoded.
@@ -134,7 +138,7 @@ export class Loader {
                 // Decoder wants more input.
                 let end = dec.inputPosition;
                 let start = Math.max(0, end-LOADER_CHUNK_SIZE);
-                await this._fetchRange(start, end, dec);
+                await this._fetchRangeIntoBuffer(start, end, dec);
                 continue;
             }
             if (first && line == "\n") {
@@ -148,16 +152,8 @@ export class Loader {
         }
     }
 
-    async _fetchRange(begin, end, buffer) {
-        let range = 'bytes=' + begin + '-' + end;
-        console.log('fetching:', this.logFileName, 'range:', range);
-        let options = {method: 'GET', headers: {'Range': range}};
-
-        let response = await fetch(this.logFileName, options);
-        if (!response.ok) {
-            let status = `${response.status} ${response.statusText}`;
-            throw new Error(`load ${this.logFileName} (range ${begin}-${end}) failed: ${status}`);
-        }
+    async _fetchRangeIntoBuffer(begin, end, buffer) {
+        let response = await this._fetchRange(begin, end);
         let reader = response.body.getReader();
         for (;;) {
             let { done, value } = await reader.read();
@@ -166,6 +162,20 @@ export class Loader {
             }
             buffer.pushBytes(value);
         }
+    }
+
+    async _fetchRange(begin, end) {
+        let rangeBegin = this.offsets.begin + begin;
+        let rangeEnd = this.offsets.begin + end;
+        let range = 'bytes=' + rangeBegin + '-' + rangeEnd;
+        console.log('fetching:', this.logFileName, 'range:', range);
+        let options = {method: 'GET', headers: {'Range': range}};
+        let response = await fetch(this.logFileName, options);
+        if (!response.ok) {
+            let status = `${response.status} ${response.statusText}`;
+            throw new Error(`load ${this.logFileName} (range ${rangeBegin}-${rangeEnd}) failed: ${status}`);
+        }
+        return response;
     }
 }
 
@@ -191,7 +201,7 @@ class LineDecoder {
     get outputPosition() { return this._length - this._remaining; }
 
     // atEOF returns true when the end of input was reached.
-    atEOF() { this._remaining <= 0; }
+    atEOF() { return this._remaining <= 0; }
 
     // pushBytes adds input data to the decoder.
     pushBytes(bytes) {

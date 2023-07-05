@@ -371,21 +371,21 @@ function formatTestDetails(suiteData, row) {
         // at most 25 lines from the head and tail.
         let log = testlog.splitHeadTail(d.summaryResult.details, 25);
         formatTestLog(suiteData, d.testIndex, log, container);
-    } else if (d.summaryResult.detailsFile) {
+    } else if (d.summaryResult.logOffsets) {
         // Test output is stored in a separate file, so we need to load that here.
         let spinner = $('<div><div class="spinner-grow text-secondary" role="status"></div>');
         $(container).append(spinner);
 
-        let url = 'results/details/' + d.summaryResult.detailsFile;
-        let size = d.summaryResult.detailsFileSize;
-        let loader = new testlog.Loader(url, size);
+        let url = routes.resultsRoot + suiteData.testDetailsLog;
+        let loader = new testlog.Loader(url, d.summaryResult.logOffsets);
         loader.headAndTailLines(25).then(function (log) {
             spinner.remove();
             formatTestLog(suiteData, d.testIndex, log, container);
         }).catch(function (error) {
+            console.error(error);
             spinner.remove();
             let p = document.createElement('p');
-            p.innerHTML = '<b>Error loading details:</b>' + html.encode(error.toString());
+            p.innerHTML = '<b>' + html.encode(error.toString()) + '</b>';
             container.appendChild(p);
         });
     }
