@@ -62,8 +62,6 @@ const LOADER_CHUNK_SIZE = 32768;
 
 // Loader provides incremental access to log files.
 export class Loader {
-    onProgress = undefined;
-
     constructor(logFileName, offsets) {
         // Ensure file offsets are valid.
         if (offsets.begin > offsets.end) {
@@ -72,36 +70,6 @@ export class Loader {
         this.logFileName = logFileName;
         this.length = offsets.end - offsets.begin;
         this.offsets = offsets;
-    }
-
-    // headAndTailLines returns up to n lines from the beginning and
-    // end of the log.
-    async headAndTailLines(n) {
-        var head = [];
-        var headEndPosition = 0;
-        var tail = [];
-
-        // Read head lines first.
-        let eofReached = await this.iterLines(function (line, offset) {
-            headEndPosition = offset;
-            head.push(line);
-            return head.length < n;
-        });
-        if (eofReached || head.length < n) {
-            return {head, tail};
-        }
-
-        // Now read from tail. This stops when the read enters the
-        // region already covered by the head.
-        await this._iterTailLines(function (line, offset) {
-            if (offset < headEndPosition) {
-                return false;
-            }
-            tail.unshift(line);
-            return tail.length < n;
-        });
-
-        return {head, tail};
     }
 
     // text fetches the entire log.
@@ -131,25 +99,70 @@ export class Loader {
         return text;
     }
 
+    // headAndTailLines returns up to n lines from the beginning and
+    // end of the log.
+    async headAndTailLines(n) {
+        var head = [];
+        var headEndPosition = 0;
+        var tail = [];
+
+        // Read head lines first.
+        let eofReached = await this.iterLines(function (line, offset) {
+            headEndPosition = offset;
+            head.push(line);
+            return head.length < n;
+        });
+        if (eofReached || head.length < n) {
+            return {head, tail};
+        }
+
+        // Now read from tail. This stops when the read enters the
+        // region already covered by the head.
+        let linkWithHead = false;
+        await this._iterTailLines(function (line, offset) {
+            if (offset < headEndPosition) {
+                linkWithHead = true;
+                return false;
+            }
+            tail.unshift(line);
+            return tail.length < n;
+        });
+        if (linkWithHead) {
+            head = head.concat(tail);
+            tail = [];
+        }
+        return {head, tail};
+    }
+
     // iterLines reads text lines starting at the head of the file and calls fn
-    // for each line. The second argument to fn is absolute read position at the start
+    // for each line. The second argument to fn is absolute read position at the end
     // of the line.
     //
     // When the callback function returns false, iteration is aborted.
     async iterLines(func) {
         let dec = new LineDecoder(this.length);
-        while (!dec.atEOF()) {
-            let line = dec.decodeLine();
-            if (!line) {
+        outer: while (!dec.atEOF()) {
+            let text = dec.decode();
+            if (!text) {
                 // Decoder wants more input.
                 let start = dec.inputPosition;
                 let end = Math.min(start+LOADER_CHUNK_SIZE, this.length);
                 await this._fetchRangeIntoBuffer(start, end, dec);
                 continue;
             }
-            // A line was decoded.
-            if (!func(line, dec.outputPosition)) {
-                return;
+            // One or more lines were decoded.
+            let outputPos = dec.outputPosition - text.length;
+            let pos = 0;
+            while (true) {
+                let nl = text.indexOf("\n", pos);
+                if (nl === -1) {
+                    continue outer;
+                }
+                let line = text.substring(pos, nl+1);
+                pos = nl + 1;
+                if (!func(line, outputPos + pos)) {
+                    return;
+                }
             }
         }
     }
@@ -158,7 +171,7 @@ export class Loader {
         let dec = new ReverseBuffer(this.length);
         let first = true;
         while (dec.outputPosition > 0) {
-            let line = dec.decodeLine();
+            let line = dec.decode();
             if (!line) {
                 // Decoder wants more input.
                 let end = dec.inputPosition;
@@ -235,9 +248,10 @@ class LineDecoder {
         return this;
     }
 
-    // decodeLine returns the next line as a string. When there isn't enough buffered
-    // input data for a complete line, or all input was decoded, it returns false.
-    decodeLine() {
+    // decode returns one or more decoded lines as a string. When there isn't enough
+    // buffered input data for a complete line, or all input was decoded, it returns
+    // false.
+    decode() {
         while (this._queue.length > 0 && !this.atEOF()) {
             var buf = this._queue[0];
 
@@ -300,8 +314,8 @@ class ReverseBuffer {
         return this;
     }
 
-    // decodeLine removes the one line from the buffer and returns it.
-    decodeLine() {
+    // decode removes the one line from the buffer and returns it.
+    decode() {
         if (this._offset <= 0) {
             return null;
         }
