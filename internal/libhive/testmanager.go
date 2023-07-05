@@ -381,7 +381,7 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 		testLogFile *os.File
 	)
 	if manager.config.LogDir != "" {
-		testLogPath = fmt.Sprintf("details/%s-%d.log", manager.simContainerID, newSuiteID)
+		testLogPath = fmt.Sprintf("details/%d-%s-%d.log", time.Now().Unix(), manager.simContainerID, newSuiteID)
 		fp := filepath.Join(manager.config.LogDir, filepath.FromSlash(testLogPath))
 
 		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
