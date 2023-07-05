@@ -28,8 +28,6 @@ var (
 	ErrTestSuiteLimited         = errors.New("testsuite test count is limited")
 )
 
-const detailsFileThreshold = 512 * 1024
-
 // SimEnv contains the simulation parameters.
 type SimEnv struct {
 	LogDir string
@@ -349,6 +347,9 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 			return ErrTestSuiteRunning
 		}
 	}
+	if suite.testDetailsFile != nil {
+		suite.testDetailsFile.Close()
+	}
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
@@ -373,14 +374,31 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
 
-	var newSuiteID = TestSuiteID(manager.testSuiteCounter)
+	newSuiteID := TestSuiteID(manager.testSuiteCounter)
+
+	var (
+		testLogPath string
+		testLogFile *os.File
+	)
+	if manager.config.LogDir != "" {
+		testLogPath = fmt.Sprintf("details/%x-%d.log", manager.simContainerID, newSuiteID)
+		fp := filepath.Join(manager.config.LogDir, filepath.FromSlash(testLogPath))
+		file, err := os.OpenFile(fp, os.O_CREATE, 0644)
+		if err != nil {
+			return 0, err
+		}
+		testLogFile = file
+	}
+
 	manager.runningTestSuites[newSuiteID] = &TestSuite{
-		ID:             newSuiteID,
-		Name:           name,
-		Description:    description,
-		ClientVersions: make(map[string]string),
-		TestCases:      make(map[TestID]*TestCase),
-		SimulatorLog:   manager.simLogFile,
+		ID:              newSuiteID,
+		Name:            name,
+		Description:     description,
+		ClientVersions:  make(map[string]string),
+		TestCases:       make(map[TestID]*TestCase),
+		SimulatorLog:    manager.simLogFile,
+		TestDetailsLog:  testLogPath,
+		testDetailsFile: testLogFile,
 	}
 	manager.testSuiteCounter++
 	return newSuiteID, nil
@@ -414,11 +432,15 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 }
 
 // EndTest finishes the test case
-func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, result *TestResult) error {
+func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *TestResult) error {
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()
 
 	// Check if the test case is running
+	testSuite, ok := manager.runningTestSuites[suiteID]
+	if !ok {
+		return ErrNoSuchTestCase
+	}
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
 		return ErrNoSuchTestCase
@@ -427,27 +449,13 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, res
 	if result == nil {
 		return ErrNoSummaryResult
 	}
-	if result.DetailsFile != "" {
-		log15.Error("submitted test result has detailsFile", "file", result.DetailsFile)
-		result.DetailsFile = ""
-		result.DetailsFileSize = 0
-	}
 
 	// Add the results to the test case
 	testCase.End = time.Now()
-	if manager.config.LogDir != "" && len(result.Details) > detailsFileThreshold {
-		// Details are large, write them to a file.
-		name := fmt.Sprintf("%d-%s-%d.txt", testCase.End.Unix(), manager.simContainerID, testID)
-		dir := filepath.Join(manager.config.LogDir, "details")
-		os.MkdirAll(dir, 0755)
-		err := os.WriteFile(filepath.Join(dir, name), []byte(result.Details), 0644)
-		if err != nil {
-			log15.Error("could not write details file", "test", testID, "err", err)
-		} else {
-			result.DetailsFile = name
-			result.DetailsFileSize = int64(len(result.Details))
-			result.Details = ""
-		}
+	if result.Details != "" && testSuite.testDetailsFile != nil {
+		offsets := manager.writeTestDetails(testSuite, testCase, result.Details)
+		result.Details = ""
+		result.LogOffsets = offsets
 	}
 	testCase.SummaryResult = *result
 
@@ -463,6 +471,30 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, res
 	// Delete from running, if it's still there.
 	delete(manager.runningTestCases, testID)
 	return nil
+}
+
+func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCase, text string) *TestLogOffsets {
+	var (
+		begin   = suite.testLogOffset
+		header  = "--" + testCase.Name + "\n"
+		footer  = "\n\n"
+		offsets TestLogOffsets
+	)
+	n, err := fmt.Fprint(suite.testDetailsFile, header, text, footer)
+	suite.testLogOffset += int64(n)
+
+	if err != nil {
+		log15.Error("could not write details file", "err", err)
+		// Write was incomplete, so play it safe with the offsets.
+		offsets.Begin = begin
+		offsets.End = begin + int64(n)
+	} else {
+		// Otherwise, exclude the header and footer in offsets.
+		// They are just written to make the file more readable.
+		offsets.Begin = begin + int64(len(header))
+		offsets.End = suite.testLogOffset - int64(len(footer))
+	}
+	return &offsets
 }
 
 // RegisterNode is used by test suite hosts to register the creation of a node in the context of a test

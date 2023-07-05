@@ -1,6 +1,7 @@
 package libhive
 
 import (
+	"os"
 	"strconv"
 	"time"
 )
@@ -26,10 +27,12 @@ type TestSuite struct {
 	Description    string               `json:"description"`
 	ClientVersions map[string]string    `json:"clientVersions"`
 	TestCases      map[TestID]*TestCase `json:"testCases"`
-	// Path to the log-file pertaining to the simulator. (may encompass more than just one TestSuite)
-	SimulatorLog string `json:"simLog"`
-	// Path to the log file containing test output.
-	TestLog string `json:"testLog"`
+
+	SimulatorLog   string `json:"simLog"`  // path to simulator log-file simulator. (this may be shared with multiple suites)
+	TestDetailsLog string `json:"testLog"` // the test details output file
+
+	testDetailsFile *os.File
+	testLogOffset   int64
 }
 
 // TestCase represents a single test case in a test suite.
@@ -47,12 +50,14 @@ type TestResult struct {
 	Pass    bool `json:"pass"`
 	Timeout bool `json:"timeout,omitempty"`
 
-	// The test log can be stored inline.
-	Details string `json:"details,omitempty"`
+	// The test log can be stored inline, or as offsets into the suite's TestLog file.
+	Details    string          `json:"details,omitempty"`
+	LogOffsets *TestLogOffsets `json:"logOffsets,omitempty"`
+}
 
-	// If the log is large, it will be stored in a separate file.
-	DetailsFile     string `json:"detailsFile,omitempty"`
-	DetailsFileSize int64  `json:"detailsFileSize,omitempty"`
+type TestLogOffsets struct {
+	Begin int64 "json:begin"
+	End   int64 "json:end"
 }
 
 // ClientInfo describes a client that participated in a test case.
