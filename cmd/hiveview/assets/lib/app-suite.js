@@ -411,9 +411,7 @@ function formatTestLog(suiteData, testIndex, logData, container) {
         if (logData.tail.length == 0) {
             el.classList.add('output-suffix');
         }
-        el.innerHTML = logData.head.reduce(function (o, line) {
-            return o + highlightErrorsInTestOutput(html.encode(line));
-        }, '');
+        el.innerHTML = formatTestDetailLines(logData.head);
         output.appendChild(el);
     }
 
@@ -433,13 +431,17 @@ function formatTestLog(suiteData, testIndex, logData, container) {
         // Add the remaining text.
         let el = document.createElement('code');
         el.classList.add('output-suffix');
-        el.innerHTML = logData.tail.reduce(function (o, line) {
-            return o + highlightErrorsInTestOutput(html.encode(line));
-        }, '');
+        el.innerHTML = formatTestDetailLines(logData.tail);
         output.appendChild(el);
     }
 
     container.appendChild(output);
+}
+
+function formatTestDetailLines(lines) {
+    return lines.reduce(function (o, line) {
+        return o + highlightErrorsInTestOutput(html.encode(line));
+    }, '');
 }
 
 function highlightErrorsInTestOutput(content) {
