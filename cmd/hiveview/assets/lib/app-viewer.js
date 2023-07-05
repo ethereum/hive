@@ -184,10 +184,10 @@ async function fetchTestLog(suiteFile, testIndex, line) {
     let logtext;
     if (test.summaryResult.details) {
         logtext = test.summaryResult.details;
-    } else if (test.summaryResult.logOffsets) {
+    } else if (test.summaryResult.log) {
         try {
             let url = routes.resultsRoot + data.testDetailsLog;
-            let loader = new testlog.Loader(url, test.summaryResult.logOffsets);
+            let loader = new testlog.Loader(url, test.summaryResult.log);
             logtext = await loader.text(function (received, length) {
                 common.showLoadProgress(received/length);
             });

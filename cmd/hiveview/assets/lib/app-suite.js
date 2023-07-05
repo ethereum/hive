@@ -371,13 +371,15 @@ function formatTestDetails(suiteData, row) {
         // at most 25 lines from the head and tail.
         let log = testlog.splitHeadTail(d.summaryResult.details, 25);
         formatTestLog(suiteData, d.testIndex, log, container);
-    } else if (d.summaryResult.logOffsets) {
+    } else if (d.summaryResult.log) {
         // Test output is stored in a separate file, so we need to load that here.
+        // The .log field contains the offsets into that file, it's an object
+        // like {begin: 732, end: 812}.
         let spinner = $('<div><div class="spinner-grow text-secondary" role="status"></div>');
         $(container).append(spinner);
 
         let url = routes.resultsRoot + suiteData.testDetailsLog;
-        let loader = new testlog.Loader(url, d.summaryResult.logOffsets);
+        let loader = new testlog.Loader(url, d.summaryResult.log);
         loader.headAndTailLines(25).then(function (log) {
             spinner.remove();
             formatTestLog(suiteData, d.testIndex, log, container);

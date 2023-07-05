@@ -50,9 +50,10 @@ type TestResult struct {
 	Pass    bool `json:"pass"`
 	Timeout bool `json:"timeout,omitempty"`
 
-	// The test log can be stored inline, or as offsets into the suite's TestLog file.
+	// The test log can be stored inline ("details"), or as offsets into the
+	// suite's TestDetailsLog file ("log").
 	Details    string          `json:"details,omitempty"`
-	LogOffsets *TestLogOffsets `json:"logOffsets,omitempty"`
+	LogOffsets *TestLogOffsets `json:"log,omitempty"`
 }
 
 type TestLogOffsets struct {
