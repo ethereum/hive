@@ -154,7 +154,7 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
 fi
 
 # Enable KZG trusted setup if cancun timestamp is set, needed for custom genesis on Besu wtih Cancun
-if [ "$HIVE_CANCUN_TIMESTAMP " != "" ]; then
+if [ "$HIVE_CANCUN_TIMESTAMP" != "" ]; then
     FLAGS="$FLAGS --kzg-trusted-setup=/trusted_setup.txt"
 fi
 
