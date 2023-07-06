@@ -139,7 +139,7 @@ export class Loader {
     // When the callback function returns false, iteration is aborted.
     async iterLines(func) {
         let dec = new LineDecoder(this.length);
-        outer: while (!dec.atEOF()) {
+        while (!dec.atEOF()) {
             let text = dec.decode();
             if (!text) {
                 // Decoder wants more input.
@@ -151,13 +151,11 @@ export class Loader {
             // One or more lines were decoded.
             let outputPos = dec.outputPosition - text.length;
             let pos = 0;
-            for (;;) {
+            while (pos < text.length) {
                 let nl = text.indexOf('\n', pos);
-                if (nl === -1) {
-                    continue outer;
-                }
-                let line = text.substring(pos, nl+1);
-                pos = nl + 1;
+                let end = (nl < 0) ? text.length : nl+1;
+                let line = text.substring(pos, end);
+                pos = end;
                 if (!func(line, outputPos + pos)) {
                     return;
                 }
