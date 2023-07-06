@@ -188,14 +188,8 @@ export class Loader {
 
     async _fetchRangeIntoBuffer(begin, end, buffer) {
         let response = await this._fetchRange(begin, end);
-        let reader = response.body.getReader();
-        for (;;) {
-            let { done, value } = await reader.read();
-            if (done) {
-                break;
-            }
-            buffer.pushBytes(value);
-        }
+        let blob = new Uint8Array(await response.arrayBuffer());
+        buffer.pushBytes(blob);
     }
 
     async _fetchRange(begin, end) {
