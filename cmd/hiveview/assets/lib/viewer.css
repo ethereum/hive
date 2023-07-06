@@ -25,6 +25,10 @@ h3 {
     font-size: 80%;
 }
 
+#raw-url {
+    float: right;
+}
+
 #file-content-container {
     overflow-x: auto;
     flex: 99 0 auto;
@@ -97,7 +101,7 @@ pre.highlighted {
     min-width: 2em;
 }
 
-.num.highlighted::after {
+p.num.highlighted::after {
     content: '';
     box-sizing: border-box;
     display: block;

@@ -97,12 +97,12 @@ function showError(text) {
     showText('Error!\n\n' + text);
 }
 
-// showFileContent shows a file + fileinfo.
-// This is called by the loader, after a successful fetch.
-function showFileContent(text, filename) {
-    showText(text);
+function showRawLink(url, text) {
     let raw = $('#raw-url');
-    raw.attr('href', filename);
+    raw.attr('href', url);
+    if (text) {
+        raw.text(text);
+    }
     raw.show();
 }
 
@@ -151,16 +151,17 @@ function lineNumberClicked() {
 // fetchFile loads up a new file to view
 async function fetchFile(url, line /* optional jump to line */ ) {
     let resultsRE = new RegExp('^' + routes.resultsRoot);
-    let data;
+    let text;
     try {
-        data = await load(url, 'text');
+        showRawLink(url);
+        text = await load(url, 'text');
     } catch (err) {
         showError('Failed to load ' + url + '\nerror: ' + err);
         return;
     }
     let title = url.replace(resultsRE, '');
     showTitle(null, title);
-    showFileContent(data, url);
+    showText(text);
     setHL(line, true);
 }
 
@@ -187,6 +188,7 @@ async function fetchTestLog(suiteFile, testIndex, line) {
         try {
             let url = routes.resultsRoot + data.testDetailsLog;
             let loader = new testlog.Loader(url, test.summaryResult.log);
+            showRawLink(url, 'raw suite output');
             logtext = await loader.text(function (received, length) {
                 common.showLoadProgress(received/length);
             });
