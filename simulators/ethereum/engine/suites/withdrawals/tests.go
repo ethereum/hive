@@ -1620,14 +1620,6 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 // Withdrawals execution layer spec:
 type WithdrawalsExecutionLayerSpec struct {
 	*WithdrawalsBaseSpec
-	NumberOfClaims int
-}
-
-func (ws *WithdrawalsExecutionLayerSpec) numberOfClaims() int {
-	if ws.NumberOfClaims == 0 {
-		return 1
-	}
-	return ws.NumberOfClaims
 }
 
 func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
@@ -1699,91 +1691,80 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 		})
 	}
 
-	for i := 0; i < ws.numberOfClaims(); i++ {
-		// claim accumulated withdrawals on that block
-		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+	// for i := 0; i < ws.numberOfClaims(); i++ {
+	// claim accumulated withdrawals on that block
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 
-			OnPayloadProducerSelected: func() {
-				// Get ExecuteWithdrawalsClaims
-				addresses := make([]common.Address, 0)
-				for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
-					addresses = append(addresses, w.Address)
-				}
-				// Send claim transaction
-				claims, err := libgno.ClaimWithdrawalsData(addresses)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
-				}
-				_, err = helper.SendNextTransactionWithAccount(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient:  &libgno.WithdrawalsContractAddress,
-						Amount:     common.Big0,
-						Payload:    claims,
-						PrivateKey: globals.GnoVaultVaultKey,
-						TxType:     t.TestTransactionType,
-						GasLimit:   t.Genesis.GasLimit(),
-						ChainID:    t.Genesis.Config().ChainID,
-					},
-					globals.GnoVaultAccountAddress,
-				)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
-				}
-			}})
-
-		if !ws.SkipBaseVerifications {
-			block := t.CLMock.LatestExecutedPayload.Number
-			addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
-			transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, block, block)
+		OnPayloadProducerSelected: func() {
+			// Get ExecuteWithdrawalsClaims
+			addresses := make([]common.Address, 0)
+			for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
+				addresses = append(addresses, w.Address)
+			}
+			// Send claim transaction
+			claims, err := libgno.ClaimWithdrawalsData(addresses)
 			if err != nil {
-				t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
+				t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
 			}
-			if len(addresses) == 0 {
-				t.Fatalf("FAIL (%s): No withdrawal addresses found: %w", t.TestName)
-			}
-			for _, addr := range addresses {
-				//Test balance at `latest`, which should have the withdrawal applied.
-				latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
-				}
-
-				withdrawalsAccumulated := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(addr, t.CLMock.LatestExecutedPayload.Number-1)
-				withdrawalsAccumulated.Div(withdrawalsAccumulated, big.NewInt(32))
-				// check that account balance == expected balance from withdrawals history
-				if latestBalance.Cmp(withdrawalsAccumulated) != 0 {
-					t.Fatalf(
-						"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
-						t.TestName, addr, withdrawalsAccumulated, latestBalance,
-					)
-				}
-				eventValue := transfersMap[addr.Hex()]
-				if eventValue == nil {
-					t.Fatalf(
-						"FAIL (%s): No withdrawal transfer value presented in events list for address: %v",
-						t.TestName, addr.Hex(),
-					)
-				}
-				// check that account balance == value from transfer event
-				if latestBalance.Cmp(eventValue) != 0 {
-					t.Fatalf(
-						"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
-						t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
-					)
-				}
-			}
-		}
-		if i+1 != ws.numberOfClaims() {
-			ws.WithdrawalsHistory = make(WithdrawalsHistory, 0)
-			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-				OnPayloadProducerSelected: func() {
-					// Send some withdrawals
-					t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
-					ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+			_, err = helper.SendNextTransactionWithAccount(
+				t.TestContext,
+				t.CLMock.NextBlockProducer,
+				&helper.BaseTransactionCreator{
+					Recipient:  &libgno.WithdrawalsContractAddress,
+					Amount:     common.Big0,
+					Payload:    claims,
+					PrivateKey: globals.GnoVaultVaultKey,
+					TxType:     t.TestTransactionType,
+					GasLimit:   t.Genesis.GasLimit(),
+					ChainID:    t.Genesis.Config().ChainID,
 				},
-			})
+				globals.GnoVaultAccountAddress,
+			)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
+			}
+		}})
+
+	if !ws.SkipBaseVerifications {
+		block := t.CLMock.LatestExecutedPayload.Number
+		addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
+		transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, block, block)
+		if err != nil {
+			t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
+		}
+		if len(addresses) == 0 {
+			t.Fatalf("FAIL (%s): No withdrawal addresses found: %w", t.TestName)
+		}
+		for _, addr := range addresses {
+			//Test balance at `latest`, which should have the withdrawal applied.
+			latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
+			}
+
+			withdrawalsAccumulated := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(addr, t.CLMock.LatestExecutedPayload.Number-1)
+			withdrawalsAccumulated.Div(withdrawalsAccumulated, big.NewInt(32))
+			// check that account balance == expected balance from withdrawals history
+			if latestBalance.Cmp(withdrawalsAccumulated) != 0 {
+				t.Fatalf(
+					"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
+					t.TestName, addr, latestBalance, withdrawalsAccumulated,
+				)
+			}
+			eventValue := transfersMap[addr.Hex()]
+			if eventValue == nil {
+				t.Fatalf(
+					"FAIL (%s): No withdrawal transfer value presented in events list for address: %v",
+					t.TestName, addr.Hex(),
+				)
+			}
+			// check that account balance == value from transfer event
+			if latestBalance.Cmp(eventValue) != 0 {
+				t.Fatalf(
+					"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
+					t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
+				)
+			}
 		}
 	}
 }
