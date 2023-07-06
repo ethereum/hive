@@ -101,7 +101,7 @@ pre.highlighted {
     min-width: 2em;
 }
 
-p.num.highlighted::after {
+.num.highlighted::after {
     content: '';
     box-sizing: border-box;
     display: block;
