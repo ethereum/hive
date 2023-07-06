@@ -425,7 +425,7 @@ function formatTestLog(suiteData, testIndex, logData, container) {
         if (logData.hiddenLines) {
             linkText = '' + logData.hiddenLines + ' lines hidden. Click here to see full log.';
         } else {
-            linkText = 'Output truncated due to size, click here to see full log.';
+            linkText = 'Output truncated. Click here to see full log.';
         }
         let linkURL = routes.testLog(suiteData.suiteID, suiteData.name, testIndex);
         let trunc = html.makeLink(linkURL, linkText);

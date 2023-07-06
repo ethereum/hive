@@ -170,12 +170,11 @@ async function fetchTestLog(suiteFile, testIndex, line) {
     try {
         data = await load(suiteFile, 'json');
     } catch(err) {
-        showError('Failed to load ' + suiteFile + '\nerror: ' + err);
+        showError(`Failed to load ${suiteFile}: ${err}`);
         return;
     }
     if (!data['testCases'] || !data['testCases'][testIndex]) {
-        let errtext = 'Invalid test data returned by server: ' + JSON.stringify(data, null, 2);
-        showError(errtext);
+        showError('Invalid test data returned by server: ' + JSON.stringify(data, null, 2));
         return;
     }
 
