@@ -72,7 +72,7 @@ export class Loader {
 
     // text fetches the entire log.
     async text(progressCallback) {
-        let response = await this._fetchRange(0, this.length);
+        let response = await this._fetchRange(0, this.length-1);
         let reader = response.body.getReader();
         if (progressCallback) {
             progressCallback(0, this.length);

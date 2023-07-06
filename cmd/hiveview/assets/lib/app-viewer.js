@@ -118,6 +118,10 @@ function showText(text) {
     // Add the lines.
     let lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
+        // Avoid showing empty last line when there is a newline at the end.
+        if (i === lines.length-1 && lines[i] == "") {
+            break;
+        }
         appendLine(contentArea, gutter, i + 1, lines[i]);
     }
 
