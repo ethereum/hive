@@ -347,6 +347,9 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 			return ErrTestSuiteRunning
 		}
 	}
+	if suite.testDetailsFile != nil {
+		suite.testDetailsFile.Close()
+	}
 	// Write the result.
 	if manager.config.LogDir != "" {
 		err := writeSuiteFile(suite, manager.config.LogDir)
@@ -371,14 +374,35 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
 
-	var newSuiteID = TestSuiteID(manager.testSuiteCounter)
+	newSuiteID := TestSuiteID(manager.testSuiteCounter)
+
+	var (
+		testLogPath string
+		testLogFile *os.File
+	)
+	if manager.config.LogDir != "" {
+		testLogPath = fmt.Sprintf("details/%d-%s-%d.log", time.Now().Unix(), manager.simContainerID, newSuiteID)
+		fp := filepath.Join(manager.config.LogDir, filepath.FromSlash(testLogPath))
+
+		if err := os.MkdirAll(filepath.Dir(fp), 0755); err != nil {
+			return 0, err
+		}
+		file, err := os.OpenFile(fp, os.O_CREATE|os.O_WRONLY, 0644)
+		if err != nil {
+			return 0, err
+		}
+		testLogFile = file
+	}
+
 	manager.runningTestSuites[newSuiteID] = &TestSuite{
-		ID:             newSuiteID,
-		Name:           name,
-		Description:    description,
-		ClientVersions: make(map[string]string),
-		TestCases:      make(map[TestID]*TestCase),
-		SimulatorLog:   manager.simLogFile,
+		ID:              newSuiteID,
+		Name:            name,
+		Description:     description,
+		ClientVersions:  make(map[string]string),
+		TestCases:       make(map[TestID]*TestCase),
+		SimulatorLog:    manager.simLogFile,
+		TestDetailsLog:  testLogPath,
+		testDetailsFile: testLogFile,
 	}
 	manager.testSuiteCounter++
 	return newSuiteID, nil
@@ -412,23 +436,32 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 }
 
 // EndTest finishes the test case
-func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, summaryResult *TestResult) error {
+func (manager *TestManager) EndTest(suiteID TestSuiteID, testID TestID, result *TestResult) error {
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()
 
 	// Check if the test case is running
+	testSuite, ok := manager.runningTestSuites[suiteID]
+	if !ok {
+		return ErrNoSuchTestCase
+	}
 	testCase, ok := manager.runningTestCases[testID]
 	if !ok {
 		return ErrNoSuchTestCase
 	}
 	// Make sure there is at least a result summary
-	if summaryResult == nil {
+	if result == nil {
 		return ErrNoSummaryResult
 	}
 
 	// Add the results to the test case
 	testCase.End = time.Now()
-	testCase.SummaryResult = *summaryResult
+	if result.Details != "" && testSuite.testDetailsFile != nil {
+		offsets := manager.writeTestDetails(testSuite, testCase, result.Details)
+		result.Details = ""
+		result.LogOffsets = offsets
+	}
+	testCase.SummaryResult = *result
 
 	// Stop running clients.
 	for _, v := range testCase.ClientInfo {
@@ -442,6 +475,30 @@ func (manager *TestManager) EndTest(testSuiteRun TestSuiteID, testID TestID, sum
 	// Delete from running, if it's still there.
 	delete(manager.runningTestCases, testID)
 	return nil
+}
+
+func (manager *TestManager) writeTestDetails(suite *TestSuite, testCase *TestCase, text string) *TestLogOffsets {
+	var (
+		begin   = suite.testLogOffset
+		header  = "-- " + testCase.Name + "\n"
+		footer  = "\n\n"
+		offsets TestLogOffsets
+	)
+	n, err := fmt.Fprint(suite.testDetailsFile, header, text, footer)
+	suite.testLogOffset += int64(n)
+
+	if err != nil {
+		log15.Error("could not write details file", "err", err)
+		// Write was incomplete, so play it safe with the offsets.
+		offsets.Begin = begin
+		offsets.End = begin + int64(n)
+	} else {
+		// Otherwise, exclude the header and footer in offsets.
+		// They are just written to make the file more readable.
+		offsets.Begin = begin + int64(len(header))
+		offsets.End = offsets.Begin + int64(len(text))
+	}
+	return &offsets
 }
 
 // RegisterNode is used by test suite hosts to register the creation of a node in the context of a test
