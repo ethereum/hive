@@ -235,16 +235,6 @@ func LoadGenesisTest(path string) string {
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}
-
-	//var genesis NethermindChainSpec
-	//err = genesis.UnmarshalJSON(contents)
-	//if err != nil {
-	//	return nil
-	//}
-	//if err := json.Unmarshal(contents, &genesis); err != nil {
-	//	panic(fmt.Errorf("can't parse genesis JSON: %v", err))
-	//}
-	//return Genesis(&genesis)
 	return string(contents)
 }
 
@@ -397,6 +387,8 @@ const (
 	DynamicFeeTxOnly
 )
 
+var _ TransactionCreator = (*BaseTransactionCreator)(nil)
+
 type TransactionCreator interface {
 	MakeTransaction(nonce uint64) (*types.Transaction, error)
 }
@@ -542,6 +534,32 @@ func SentTxAlreadyKnown(err error) bool {
 
 func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (*types.Transaction, error) {
 	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := txCreator.MakeTransaction(nonce)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+		defer cancel()
+		err := node.SendTransaction(ctx, tx)
+		if err == nil {
+			return tx, nil
+		} else if SentTxAlreadyKnown(err) {
+			return tx, nil
+		}
+		select {
+		case <-time.After(time.Second):
+		case <-testCtx.Done():
+			return nil, testCtx.Err()
+		}
+	}
+}
+
+func SendNextTransactionWithAccount(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, sender common.Address) (*types.Transaction, error) {
+	nonce, err := node.GetNextAccountNonce(testCtx, sender)
 	if err != nil {
 		return nil, err
 	}
