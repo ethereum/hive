@@ -7,7 +7,9 @@ import (
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 const (
@@ -93,6 +95,39 @@ func TransferData(recipient common.Address, amount *big.Int) ([]byte, error) {
 		return []byte{}, fmt.Errorf("%w: %w", ErrorPackingArguments, err)
 	}
 	return dataBytes, nil
+}
+
+// GetWithdrawalsTransferEvents get all transfer events where:
+//
+// `From` = deposit contract address
+// `To` = all addresses from addresses argument
+//
+// for specific block range and returns map { withdrawalAddress: transferAmount }
+func GetWithdrawalsTransferEvents(client *ethclient.Client, addresses []common.Address, fromBlock, toBlock uint64) (map[string]*big.Int, error) {
+	transfersList := make(map[string]*big.Int, 0)
+	token, err := NewGnoToken(GNOTokenAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("can't bind token contract: %w", err)
+	}
+	eventsIterator, err := token.FilterTransfer(
+		&bind.FilterOpts{
+			Start: fromBlock,
+			End:   &toBlock,
+		},
+		[]common.Address{WithdrawalsContractAddress},
+		addresses,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("can't filter transfers: %w", err)
+	}
+
+	for eventsIterator.Next() {
+		addr := eventsIterator.Event.To.Hex()
+		amount := eventsIterator.Event.Value
+
+		transfersList[addr] = amount
+	}
+	return transfersList, nil
 }
 
 // GetGNOTokenABI return the GNO token ABI.
