@@ -1215,7 +1215,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			if !ws.SkipBaseVerifications {
 
 				// Verify the list of withdrawals returned on the payload built
-:wq				// engine_forkchoiceUpdatedV2 method call
+				// engine_forkchoiceUpdatedV2 method call
 				if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
 					panic("withdrawals sent list was not saved")
 				} else {
