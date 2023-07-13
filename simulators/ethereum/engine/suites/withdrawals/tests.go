@@ -103,18 +103,18 @@ var Tests = []test.SpecInterface{
 	// 	WithdrawalsPerBlock:   16,
 	// 	TimeIncrements:        5,
 	// },
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 1",
-	//		About: `
-	//		Tests the withdrawals fork happening directly after genesis.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   16,
-	//},
+
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 1",
+	// 		About: `
+	// 		Tests the withdrawals fork happening directly after genesis.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
+	// 	WithdrawalsBlockCount: 1,
+	// 	WithdrawalsPerBlock:   16,
+	// },
 
 	// &WithdrawalsBaseSpec{
 	// 	Spec: test.Spec{
@@ -132,109 +132,109 @@ var Tests = []test.SpecInterface{
 	// 	TimeIncrements:        5,
 	// },
 
-	// TODO: Fix this test. It's reverting the block, which is the expected behavior.
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdrawals Fork on Block 3",
-	//		About: `
-	//		Tests the transition to the withdrawals fork after two blocks
-	//		have happened.
-	//		Block 2 is sent with invalid non-null withdrawals payload and
-	//		client is expected to respond with the appropriate error.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 3, // Genesis, Block 1 and 2 are Pre-Withdrawals
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   16,
-	//	TimeIncrements:        5,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdraw to a single account",
-	//		About: `
-	//		Make multiple withdrawals to a single account.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    1,
-	//	WithdrawalsPerBlock:      64,
-	//	WithdrawableAccountCount: 1,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdraw to two accounts",
-	//		About: `
-	//		Make multiple withdrawals to two different accounts, repeated in
-	//		round-robin.
-	//		Reasoning: There might be a difference in implementation when an
-	//		account appears multiple times in the withdrawals list but the list
-	//		is not in ordered sequence.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    1,
-	//	WithdrawalsPerBlock:      64,
-	//	WithdrawableAccountCount: 2,
-	//},
+	// // TODO: Fix this test. It's reverting the block, which is the expected behavior.
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 3",
+	// 		About: `
+	// 		Tests the transition to the withdrawals fork after two blocks
+	// 		have happened.
+	// 		Block 2 is sent with invalid non-null withdrawals payload and
+	// 		client is expected to respond with the appropriate error.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 3, // Genesis, Block 1 and 2 are Pre-Withdrawals
+	// 	WithdrawalsBlockCount: 1,
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
 
-	// TODO: Fix this test, it's reverting the block, which is the expected behavior.
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdraw many accounts",
-	//		About: `
-	//		Make multiple withdrawals to 1024 different accounts.
-	//		Execute many blocks this way.
-	//		`,
-	//		TimeoutSeconds: 240,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    4,
-	//	WithdrawalsPerBlock:      1024,
-	//	WithdrawableAccountCount: 1024,
-	//},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdraw to a single account",
+	// 		About: `
+	// 		Make multiple withdrawals to a single account.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    1,
+	// 	WithdrawalsPerBlock:      64,
+	// 	WithdrawableAccountCount: 1,
+	// },
 
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Withdraw zero amount",
-	//		About: `
-	//		Make multiple withdrawals where the amount withdrawn is 0.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    1,
-	//	WithdrawalsPerBlock:      64,
-	//	WithdrawableAccountCount: 2,
-	//	WithdrawAmounts: []uint64{
-	//		0,
-	//		1,
-	//	},
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Empty Withdrawals",
-	//		About: `
-	//		Produce withdrawals block with zero withdrawals.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight: 1,
-	//	WithdrawalsBlockCount: 1,
-	//	WithdrawalsPerBlock:   0,
-	//},
-	//
-	//&WithdrawalsBaseSpec{
-	//	Spec: test.Spec{
-	//		Name: "Corrupted Block Hash Payload (INVALID)",
-	//		About: `
-	//		Send a valid payload with a corrupted hash using engine_newPayloadV2.
-	//		`,
-	//	},
-	//	WithdrawalsForkHeight:    1,
-	//	WithdrawalsBlockCount:    1,
-	//	TestCorrupedHashPayloads: true,
-	//},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdraw to two accounts",
+	// 		About: `
+	// 		Make multiple withdrawals to two different accounts, repeated in
+	// 		round-robin.
+	// 		Reasoning: There might be a difference in implementation when an
+	// 		account appears multiple times in the withdrawals list but the list
+	// 		is not in ordered sequence.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    1,
+	// 	WithdrawalsPerBlock:      64,
+	// 	WithdrawableAccountCount: 2,
+	// },
+
+	// // TODO: Fix this test, it's reverting the block, which is the expected behavior.
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdraw many accounts",
+	// 		About: `
+	// 		Make multiple withdrawals to 1024 different accounts.
+	// 		Execute many blocks this way.
+	// 		`,
+	// 		TimeoutSeconds: 240,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    4,
+	// 	WithdrawalsPerBlock:      1024,
+	// 	WithdrawableAccountCount: 1024,
+	// },
+
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdraw zero amount",
+	// 		About: `
+	// 		Make multiple withdrawals where the amount withdrawn is 0.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    1,
+	// 	WithdrawalsPerBlock:      64,
+	// 	WithdrawableAccountCount: 2,
+	// 	WithdrawAmounts: []uint64{
+	// 		0,
+	// 		1,
+	// 	},
+	// },
+
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Empty Withdrawals",
+	// 		About: `
+	// 		Produce withdrawals block with zero withdrawals.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1,
+	// 	WithdrawalsBlockCount: 1,
+	// 	WithdrawalsPerBlock:   0,
+	// },
+
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Corrupted Block Hash Payload (INVALID)",
+	// 		About: `
+	// 		Send a valid payload with a corrupted hash using engine_newPayloadV2.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    1,
+	// 	TestCorrupedHashPayloads: true,
+	// },
 
 	// Block value tests
 	//&BlockValueSpec{
@@ -571,16 +571,87 @@ var Tests = []test.SpecInterface{
 	&WithdrawalsExecutionLayerSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
+				Name: "Withdrawals Fork on Block 2",
 				About: `
 				`,
 			},
-			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
 			WithdrawalsBlockCount: 2,
 			WithdrawalsPerBlock:   16,
 			TimeIncrements:        5,
 		},
+		ClaimBlocksCount: 2,
 	},
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 5",
+	// 			About: `
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 2,
+	// 		WithdrawalsPerBlock:   16,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 5",
+	// 			About: `
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 2,
+	// 		WithdrawalsPerBlock:   16,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 3,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 5",
+	// 			About: `
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 2,
+	// 		WithdrawalsPerBlock:   16,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 5",
+	// 			About: `
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 1,
+	// 		WithdrawalsPerBlock:   32,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 5",
+	// 			About: `
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 10,
+	// 		WithdrawalsPerBlock:   256,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
 }
 
 // Helper types to convert gwei into wei more easily
@@ -595,6 +666,21 @@ type WithdrawalsHistory map[uint64]types.Withdrawals
 func (wh WithdrawalsHistory) GetExpectedAccumulatedBalance(account common.Address, block uint64) *big.Int {
 	balance := big.NewInt(0)
 	for b := uint64(0); b <= block; b++ {
+		if withdrawals, ok := wh[b]; ok && withdrawals != nil {
+			for _, withdrawal := range withdrawals {
+				if withdrawal.Address == account {
+					balance.Add(balance, WeiAmount(withdrawal))
+				}
+			}
+		}
+	}
+	return balance
+}
+
+// Gets an accumulated account balance to a range fromBlock --> toBlock
+func (wh WithdrawalsHistory) GetExpectedAccumulatedBalanceDelta(account common.Address, fromBlock, toBlock uint64) *big.Int {
+	balance := big.NewInt(0)
+	for b := fromBlock; b <= toBlock; b++ {
 		if withdrawals, ok := wh[b]; ok && withdrawals != nil {
 			for _, withdrawal := range withdrawals {
 				if withdrawal.Address == account {
@@ -778,9 +864,9 @@ func (ws *WithdrawalsBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
 func (ws *WithdrawalsBaseSpec) GetPreWithdrawalsBlockCount() uint64 {
 	if ws.WithdrawalsForkHeight == 0 {
 		return 0
-	} else {
-		return ws.WithdrawalsForkHeight - 1
 	}
+	return ws.WithdrawalsForkHeight - 1
+
 }
 
 // Number of payloads to be produced (pre and post withdrawals) during the entire test
@@ -1060,38 +1146,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
 				}
 			},
-			OnGetPayload: func() {
-				if !ws.SkipBaseVerifications {
-					block := t.CLMock.LatestExecutedPayload.Number
-					addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
-					transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, block, block)
-					if err != nil {
-						t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
-					}
 
-					for _, addr := range addresses {
-						//Test balance at `latest`, which should have the withdrawal applied.
-						latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-						if err != nil {
-							t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
-						}
-						eventValue := transfersMap[addr.Hex()]
-						if eventValue == nil {
-							t.Fatalf(
-								"FAIL (%s): No value withdrawal transfer value presented in events list for address: %v",
-								t.TestName, addr.Hex(),
-							)
-						}
-						// check value from event equal balance
-						if latestBalance.Cmp(eventValue) != 0 {
-							t.Fatalf(
-								"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
-								t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
-							)
-						}
-					}
-				}
-			},
 			OnForkchoiceBroadcast: func() {
 				if !ws.SkipBaseVerifications {
 					block := t.CLMock.LatestExecutedPayload.Number - 1
@@ -1180,6 +1235,28 @@ func getBalanceOfToken(client *ethclient.Client, account common.Address, block *
 		return nil, fmt.Errorf("unexpected result length: %d", len(result))
 	}
 	return result[0].(*big.Int), nil
+}
+
+func getBalanceChangeDelta(client *ethclient.Client, account common.Address, fromBlock, toBlock *big.Int) (*big.Int, error) {
+	fromBalance, err := getBalanceOfToken(client, account, fromBlock)
+	if err != nil {
+		return nil, err
+	}
+	toBalance, err := getBalanceOfToken(client, account, toBlock)
+	if err != nil {
+		return nil, err
+	}
+
+	switch fromBalance.Cmp(toBalance) {
+	case -1:
+		return common.Big0.Sub(toBalance, fromBalance), nil
+	case 0:
+		return big.NewInt(0), nil
+	case 1:
+		return common.Big0.Sub(fromBalance, toBalance), nil
+	default:
+		panic("unexpected bigint Cmp() behaviour")
+	}
 }
 
 // getWithdrawableAmount returns withdrawableAmount for specific address from deposit contract
@@ -1619,6 +1696,14 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 // Withdrawals execution layer spec:
 type WithdrawalsExecutionLayerSpec struct {
 	*WithdrawalsBaseSpec
+	ClaimBlocksCount int
+}
+
+func (ws *WithdrawalsExecutionLayerSpec) claimBlocksCount() int {
+	if ws.ClaimBlocksCount == 0 {
+		return 1
+	}
+	return ws.ClaimBlocksCount
 }
 
 func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
@@ -1690,80 +1775,111 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 		})
 	}
 
-	// for i := 0; i < ws.numberOfClaims(); i++ {
-	// claim accumulated withdrawals on that block
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-
 		OnPayloadProducerSelected: func() {
-			// Get ExecuteWithdrawalsClaims
-			addresses := make([]common.Address, 0)
-			for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
-				addresses = append(addresses, w.Address)
+			ws.ClaimWithdrawals(t)
+		},
+		OnForkchoiceBroadcast: func() {
+			if !ws.SkipBaseVerifications {
+				ws.VerifyClaimsExecution(t, client, 0, t.CLMock.LatestExecutedPayload.Number)
 			}
-			// Send claim transaction
-			claims, err := libgno.ClaimWithdrawalsData(addresses)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
-			}
-			_, err = helper.SendNextTransactionWithAccount(
-				t.TestContext,
-				t.CLMock.NextBlockProducer,
-				&helper.BaseTransactionCreator{
-					Recipient:  &libgno.WithdrawalsContractAddress,
-					Amount:     common.Big0,
-					Payload:    claims,
-					PrivateKey: globals.GnoVaultVaultKey,
-					TxType:     t.TestTransactionType,
-					GasLimit:   t.Genesis.GasLimit(),
-					ChainID:    t.Genesis.Config().ChainID,
+		},
+	})
+
+	if !ws.SkipBaseVerifications && ws.claimBlocksCount() > 1 {
+		for i := 1; i <= ws.claimBlocksCount(); i++ {
+			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+				OnPayloadProducerSelected: func() {
+					// Send some withdrawals
+					t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
+					ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+
+					ws.sendPayloadTransactions(t)
 				},
-				globals.GnoVaultAccountAddress,
-			)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
-			}
-		}})
+			})
+			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+				OnPayloadProducerSelected: func() {
+					ws.ClaimWithdrawals(t)
+				},
 
-	if !ws.SkipBaseVerifications {
-		block := t.CLMock.LatestExecutedPayload.Number
-		addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
-		transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, block, block)
+				OnForkchoiceBroadcast: func() {
+					ws.VerifyClaimsExecution(t, client, t.CLMock.LatestExecutedPayload.Number-2, t.CLMock.LatestExecutedPayload.Number)
+				},
+			})
+		}
+	}
+}
+
+func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
+	// Get ExecuteWithdrawalsClaims
+	addresses := make([]common.Address, 0)
+	for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
+		addresses = append(addresses, w.Address)
+	}
+	// Send claim transaction
+	claims, err := libgno.ClaimWithdrawalsData(addresses)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
+	}
+	_, err = helper.SendNextTransactionWithAccount(
+		t.TestContext,
+		t.CLMock.NextBlockProducer,
+		&helper.BaseTransactionCreator{
+			Recipient:  &libgno.WithdrawalsContractAddress,
+			Amount:     common.Big0,
+			Payload:    claims,
+			PrivateKey: globals.GnoVaultVaultKey,
+			TxType:     t.TestTransactionType,
+			GasLimit:   t.Genesis.GasLimit(),
+			ChainID:    t.Genesis.Config().ChainID,
+		},
+		globals.GnoVaultAccountAddress,
+	)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
+	}
+}
+
+func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
+	t *test.Env, client *ethclient.Client, fromBlock, toBlock uint64,
+) {
+	block := t.CLMock.LatestExecutedPayload.Number
+	addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
+	transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, block, block)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
+	}
+	if len(addresses) == 0 {
+		t.Fatalf("FAIL (%s): No withdrawal addresses found: %w", t.TestName)
+	}
+	for _, addr := range addresses {
+		balanceDelta, err := getBalanceChangeDelta(client, addr, big.NewInt(int64(fromBlock)), big.NewInt(int64(toBlock)))
 		if err != nil {
-			t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
+			t.Fatalf("FAIL (%s): Error trying to get balance delta of token: %v, address: %v, from block %d to block %d", t.TestName, err, addr.Hex(), fromBlock, toBlock)
 		}
-		if len(addresses) == 0 {
-			t.Fatalf("FAIL (%s): No withdrawal addresses found: %w", t.TestName)
-		}
-		for _, addr := range addresses {
-			//Test balance at `latest`, which should have the withdrawal applied.
-			latestBalance, err := getBalanceOfToken(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
-			}
 
-			withdrawalsAccumulated := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(addr, t.CLMock.LatestExecutedPayload.Number-1)
-			withdrawalsAccumulated.Div(withdrawalsAccumulated, big.NewInt(32))
-			// check that account balance == expected balance from withdrawals history
-			if latestBalance.Cmp(withdrawalsAccumulated) != 0 {
-				t.Fatalf(
-					"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
-					t.TestName, addr, latestBalance, withdrawalsAccumulated,
-				)
-			}
-			eventValue := transfersMap[addr.Hex()]
-			if eventValue == nil {
-				t.Fatalf(
-					"FAIL (%s): No withdrawal transfer value presented in events list for address: %v",
-					t.TestName, addr.Hex(),
-				)
-			}
-			// check that account balance == value from transfer event
-			if latestBalance.Cmp(eventValue) != 0 {
-				t.Fatalf(
-					"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
-					t.TestName, addr.Hex(), latestBalance, transfersMap[addr.Hex()],
-				)
-			}
+		withdrawalsAccumulatedDelta := ws.WithdrawalsHistory.GetExpectedAccumulatedBalanceDelta(addr, fromBlock, toBlock)
+		withdrawalsAccumulatedDelta.Div(withdrawalsAccumulatedDelta, big.NewInt(32))
+		// check that account balance == expected balance from withdrawals history
+		if balanceDelta.Cmp(withdrawalsAccumulatedDelta) != 0 {
+			t.Fatalf(
+				"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
+				t.TestName, addr, balanceDelta, withdrawalsAccumulatedDelta,
+			)
+		}
+		eventValue := transfersMap[addr.Hex()]
+		if eventValue == nil {
+			t.Fatalf(
+				"FAIL (%s): No withdrawal transfer value presented in events list for address: %v",
+				t.TestName, addr.Hex(),
+			)
+		}
+		// check that account balance == value from transfer event
+		if balanceDelta.Cmp(eventValue) != 0 {
+			t.Fatalf(
+				"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
+				t.TestName, addr.Hex(), balanceDelta, transfersMap[addr.Hex()],
+			)
 		}
 	}
 }
