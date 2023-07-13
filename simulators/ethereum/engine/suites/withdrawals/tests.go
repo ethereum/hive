@@ -580,7 +580,6 @@ var Tests = []test.SpecInterface{
 			WithdrawalsPerBlock:   16,
 			TimeIncrements:        5,
 		},
-		NumberOfClaims: 2,
 	},
 }
 
