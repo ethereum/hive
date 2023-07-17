@@ -14,6 +14,8 @@ github.com/beorn7/perks/quantile
 ## explicit; go 1.17
 github.com/btcsuite/btcd/btcec/v2
 github.com/btcsuite/btcd/btcec/v2/ecdsa
+# github.com/cespare/cp v1.1.1
+## explicit
 # github.com/cespare/xxhash/v2 v2.2.0
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
@@ -217,8 +219,6 @@ github.com/ethereum/go-ethereum/trie
 ## explicit; go 1.18
 github.com/ethereum/hive/hivesim
 github.com/ethereum/hive/internal/simapi
-# github.com/ethereum/hive/simulators/ethereum/rpc v0.0.0-20230526161643-a5c0542ee4ac
-## explicit; go 1.18
 # github.com/fjl/memsize v0.0.1
 ## explicit
 github.com/fjl/memsize
@@ -253,7 +253,7 @@ github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/types
-# github.com/golang-jwt/jwt/v4 v4.4.3
+# github.com/golang-jwt/jwt/v4 v4.5.0
 ## explicit; go 1.16
 github.com/golang-jwt/jwt/v4
 # github.com/golang/protobuf v1.5.2

@@ -3,11 +3,17 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"strconv"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
-	"math/big"
-	"strconv"
+)
+
+var (
+	_ GenesisAccount = (Account)(nil)
+	// _ Genesis        = (*NethermindChainSpec)(nil)
 )
 
 type GenesisAlloc interface {
@@ -19,12 +25,13 @@ type GenesisAlloc interface {
 type GenesisAccount interface {
 	// Balance holds the balance of the account
 	Balance() *big.Int
-	SetBalance()
-	Code() []byte
+	SetBalance(balance *big.Int)
+	Code() string
 	SetCode(code []byte)
 	SetConstructor(constructor []byte)
-	Constructor() []byte
+	Constructor() string
 }
+
 type Genesis interface {
 	Config() *params.ChainConfig
 	SetConfig(config *params.ChainConfig)
@@ -43,11 +50,10 @@ type Genesis interface {
 	Coinbase() common.Address
 	SetCoinbase(address common.Address)
 	Alloc() GenesisAlloc
-	AllocGenesis(address common.Address, account GenesisAccount)
+	AllocGenesis(address common.Address, account Account)
 	UpdateTimestamp(timestamp string)
 
 	// Used for testing
-
 	Number() uint64
 	GasUsed() uint64
 	ParentHash() common.Hash
@@ -56,16 +62,9 @@ type Genesis interface {
 	ToBlock() *types.Block
 
 	// Marshalling and Unmarshalling interfaces
-
 	json.Unmarshaler
 	json.Marshaler
 }
-
-//type PricingStruct struct {
-//	Price map[string]map[string]uint64 `json:"price,omitempty"`
-//}
-
-//type Pricing map[string]PricingStruct
 
 type Builtin struct {
 	Name    string                 `json:"name,omitempty"`
@@ -74,11 +73,54 @@ type Builtin struct {
 
 type Account map[string]interface{}
 
-//struct {
-//	Balance     string  `json:"balance,omitempty"`
-//	Constructor string  `json:"constructor,omitempty"`
-//	Builtin     Builtin `json:"builtin,omitempty"`
-//}
+func NewAccount() Account {
+	return make(Account, 0)
+}
+
+// GetCode returns theaccount balance if it was set,
+// otherwise returns common.Big0
+func (a Account) Balance() *big.Int {
+	hexBalance, ok := a["balance"]
+	if !ok {
+		return common.Big0
+	}
+	hexStr := hexBalance.(common.Hash)
+	balance := common.Big0
+	_ = balance.FillBytes(common.Hex2Bytes(hexStr.String()))
+	return balance
+}
+
+func (a Account) SetBalance(balance *big.Int) {
+	a["balance"] = common.BigToHash(balance)
+}
+
+// GetCode returns the hex representation of code if it was set,
+// otherwise returns ""
+func (a Account) Code() string {
+	code, ok := a["code"]
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%x", code.(string))
+}
+
+func (a Account) SetCode(code []byte) {
+	a["code"] = common.Bytes2Hex(code)
+}
+
+// GetConstructor returns the hex representation of constructor if it was set,
+// otherwise returns ""
+func (a Account) Constructor() string {
+	constructor, ok := a["constructor"]
+	if !ok {
+		return ""
+	}
+	return fmt.Sprintf("%x", constructor.(string))
+}
+
+func (a Account) SetConstructor(constructor []byte) {
+	a["constructor"] = common.Bytes2Hex(constructor)
+}
 
 type NethermindGenesis struct {
 	Seal struct {
@@ -175,11 +217,16 @@ func (n *NethermindChainSpec) Config() *params.ChainConfig {
 	if err != nil {
 		panic(err)
 	}
-	shangai := big.NewInt(0).SetBytes(common.Hex2Bytes(n.Params.Eip4895TransitionTimestamp)).Uint64()
+	unixTimestampUint64, err := strconv.ParseUint(n.Params.Eip4895TransitionTimestamp[2:], 16, 64)
+	if err != nil {
+		fmt.Println("Error parsing hexadecimal timestamp:", err)
+		return nil
+	}
+
 	return &params.ChainConfig{
 		ChainID:                 chainID,
 		TerminalTotalDifficulty: big.NewInt(ttd),
-		ShanghaiTime:            &shangai,
+		ShanghaiTime:            &unixTimestampUint64,
 	}
 }
 
@@ -260,9 +307,8 @@ func (n *NethermindChainSpec) Alloc() GenesisAlloc {
 	panic("implement me")
 }
 
-func (n *NethermindChainSpec) AllocGenesis(address common.Address, account GenesisAccount) {
-	//TODO implement me
-	panic("implement me")
+func (n *NethermindChainSpec) AllocGenesis(address common.Address, account Account) {
+	n.Accounts[address.Hex()] = account
 }
 
 func (n *NethermindChainSpec) Number() uint64 {
@@ -428,9 +474,11 @@ func (v *ErigonGenesis) Alloc() GenesisAlloc {
 	panic("implement me")
 }
 
-func (v *ErigonGenesis) AllocGenesis(address common.Address, account GenesisAccount) {
-	//TODO implement me
-	panic("implement me")
+func (v *ErigonGenesis) AllocGenesis(address common.Address, account Account) {
+	v.ErigonAlloc[address.Hex()] = ErigonAccount{
+		Balance:     account.Balance().String(),
+		Constructor: account.Constructor(),
+	}
 }
 
 func (v *ErigonGenesis) UpdateTimestamp(timestamp string) {

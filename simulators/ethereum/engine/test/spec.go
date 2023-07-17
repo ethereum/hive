@@ -32,6 +32,7 @@ type SpecInterface interface {
 	GetTestTransactionType() helper.TestTransactionType
 	GetTimeout() int
 	GetTTD() int64
+	GetPreShapellaBlockCount() int
 	IsMiningDisabled() bool
 }
 
@@ -160,4 +161,8 @@ func (s Spec) GetTTD() int64 {
 
 func (s Spec) IsMiningDisabled() bool {
 	return s.DisableMining
+}
+
+func (s Spec) GetPreShapellaBlockCount() int {
+	return 0
 }
