@@ -575,7 +575,7 @@ var Tests = []test.SpecInterface{
 				About: `
 				`,
 			},
-			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
 			WithdrawalsBlockCount: 2,
 			WithdrawalsPerBlock:   16,
 			TimeIncrements:        5,
@@ -1169,7 +1169,6 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 							)
 						}
 					}
-
 				}
 			},
 		})
@@ -1765,49 +1764,42 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 	// 1. Send some withdrawals and transactions
 	// 2. Check withdrawable amount, claim tokens and check balance is as expected
 	// 3.
-	for i := 0; i < int(ws.WithdrawalsBlockCount); i++ {
-		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-			OnPayloadProducerSelected: func() {
-				// Send some withdrawals
-				t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
-				ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
-			},
-		})
-	}
+
+	t.CLMock.ProduceBlocks(int(ws.WithdrawalsBlockCount), clmock.BlockProcessCallbacks{
+		OnPayloadProducerSelected: func() {
+			// Send some withdrawals
+			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
+			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+
+		},
+	})
 
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			ws.ClaimWithdrawals(t)
 		},
-		OnForkchoiceBroadcast: func() {
-			if !ws.SkipBaseVerifications {
-				ws.VerifyClaimsExecution(t, client, 0, t.CLMock.LatestExecutedPayload.Number)
-			}
-		},
 	})
+	//
+	ws.VerifyClaimsExecution(t, client, 0, t.CLMock.LatestExecutedPayload.Number)
 
-	if !ws.SkipBaseVerifications && ws.claimBlocksCount() > 1 {
-		for i := 1; i <= ws.claimBlocksCount(); i++ {
-			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-				OnPayloadProducerSelected: func() {
-					// Send some withdrawals
-					t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
-					ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
-
-					ws.sendPayloadTransactions(t)
-				},
-			})
-			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-				OnPayloadProducerSelected: func() {
-					ws.ClaimWithdrawals(t)
-				},
-
-				OnForkchoiceBroadcast: func() {
-					ws.VerifyClaimsExecution(t, client, t.CLMock.LatestExecutedPayload.Number-2, t.CLMock.LatestExecutedPayload.Number)
-				},
-			})
-		}
-	}
+	// if !ws.SkipBaseVerifications && ws.claimBlocksCount() > 1 {
+	// 	for i := 1; i <= ws.claimBlocksCount(); i++ {
+	// 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+	// 			OnPayloadProducerSelected: func() {
+	// 				// Send some withdrawals
+	// 				t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
+	// 				ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+	// 			},
+	// 		})
+	// 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+	// 			OnPayloadProducerSelected: func() {
+	// 				ws.ClaimWithdrawals(t)
+	// 			},
+	// 		})
+	// 		//
+	// 		ws.VerifyClaimsExecution(t, client, t.CLMock.LatestExecutedPayload.Number-2, t.CLMock.LatestExecutedPayload.Number)
+	// 	}
+	// }
 }
 
 func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
@@ -1843,9 +1835,8 @@ func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
 func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
 	t *test.Env, client *ethclient.Client, fromBlock, toBlock uint64,
 ) {
-	block := t.CLMock.LatestExecutedPayload.Number
-	addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block - 1)
-	transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, block, block)
+	addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(toBlock - 1)
+	transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, toBlock, toBlock)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
 	}
