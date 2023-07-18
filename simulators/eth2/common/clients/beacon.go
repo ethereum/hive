@@ -110,10 +110,9 @@ func (bn *BeaconClient) Init(ctx context.Context) error {
 					if spec, err := SpecFromConfig(cfg); err != nil {
 						errs <- err
 						return
-					} else {
-						bn.Config.Spec = spec
-						return
 					}
+					bn.Config.Spec = spec
+					return
 				}
 				select {
 				case <-ctx.Done():
