@@ -15,7 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
@@ -205,7 +204,7 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		SyncMode:         downloader.FullSync,
 		DatabaseCache:    256,
 		DatabaseHandles:  256,
-		TxPool:           txpool.DefaultConfig,
+		TxPool:           ethconfig.Defaults.TxPool,
 		GPO:              ethconfig.Defaults.GPO,
 		Miner:            ethconfig.Defaults.Miner,
 		LightServ:        100,
@@ -430,7 +429,8 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 }
 
 // Engine API
-func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}) (beacon.PayloadStatusV1, error) {
+
+func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}, versionedHashes []common.Hash) (beacon.PayloadStatusV1, error) {
 	switch version {
 	case 1:
 		if c, ok := pl.(*client_types.ExecutableDataV1); ok {
@@ -447,6 +447,7 @@ func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}) 
 	}
 	return beacon.PayloadStatusV1{}, fmt.Errorf("unknown version %d", version)
 }
+
 func (n *GethNode) NewPayloadV1(ctx context.Context, pl *client_types.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
 	ed := pl.ToExecutableData()
 	n.latestPayloadSent = &ed
@@ -454,12 +455,21 @@ func (n *GethNode) NewPayloadV1(ctx context.Context, pl *client_types.Executable
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
+
 func (n *GethNode) NewPayloadV2(ctx context.Context, pl *beacon.ExecutableData) (beacon.PayloadStatusV1, error) {
 	n.latestPayloadSent = pl
 	resp, err := n.api.NewPayloadV2(*pl)
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
+
+func (n *GethNode) NewPayloadV3(ctx context.Context, pl *beacon.ExecutableData, versionedHashes []common.Hash) (beacon.PayloadStatusV1, error) {
+	n.latestPayloadSent = pl
+	resp, err := n.api.NewPayloadV3(*pl, &versionedHashes)
+	n.latestPayloadStatusReponse = &resp
+	return resp, err
+}
+
 func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	switch version {
 	case 1:
@@ -470,6 +480,7 @@ func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beac
 		return beacon.ForkChoiceResponse{}, fmt.Errorf("unknown version %d", version)
 	}
 }
+
 func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload

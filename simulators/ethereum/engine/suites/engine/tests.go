@@ -1580,7 +1580,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			cA = b
 		} else {
 			t.CLMock.ProduceBlocks(int(cAHeight.Int64()), clmock.BlockProcessCallbacks{})
-			cA, err = api.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt)
+			cA, err = api.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt, nil)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
 			}
@@ -1647,7 +1647,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					}
 				}
 
-				sideBlock, err := api.ExecutableDataToBlock(*sidePayload)
+				sideBlock, err := api.ExecutableDataToBlock(*sidePayload, nil)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
 				}
@@ -1656,7 +1656,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					if spec.PayloadField == helper.InvalidOmmers {
 						if unclePayload, ok := t.CLMock.ExecutedPayloadHistory[sideBlock.NumberU64()-1]; ok && unclePayload != nil {
 							// Uncle is a PoS payload
-							uncle, err = api.ExecutableDataToBlock(*unclePayload)
+							uncle, err = api.ExecutableDataToBlock(*unclePayload, nil)
 							if err != nil {
 								t.Fatalf("FAIL (%s): Unable to get uncle block: %v", t.TestName, err)
 							}
@@ -1695,7 +1695,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 						defer cancel()
 
-						p := api.BlockToExecutableData(altChainPayloads[i], common.Big0).ExecutionPayload
+						p := api.BlockToExecutableData(altChainPayloads[i], common.Big0, nil, nil, nil).ExecutionPayload
 						pv1 := &client_types.ExecutableDataV1{}
 						pv1.FromExecutableData(p)
 						status, err := secondaryClient.NewPayloadV1(ctx, pv1)
@@ -1760,7 +1760,8 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 				}
 				// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
 				for {
-					r := t.TestEngine.TestEngineNewPayloadV1(api.BlockToExecutableData(altChainPayloads[n], common.Big0).ExecutionPayload)
+					ed := api.BlockToExecutableData(altChainPayloads[n], common.Big0, nil, nil, nil)
+					r := t.TestEngine.TestEngineNewPayloadV1(ed.ExecutionPayload)
 					t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
 					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 						HeadBlockHash:      altChainPayloads[n].Hash(),
