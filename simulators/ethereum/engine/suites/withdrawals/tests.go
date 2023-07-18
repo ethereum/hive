@@ -91,18 +91,18 @@ var (
 
 // List of all withdrawals tests
 var Tests = []test.SpecInterface{
-	// &WithdrawalsBaseSpec{
-	// 	Spec: test.Spec{
-	// 		Name: "Withdawals Fork on Block 1",
-	// 		About: `
-	// 		Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
-	// 		`,
-	// 	},
-	// 	WithdrawalsForkHeight: 1, //TODO
-	// 	WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
-	// 	WithdrawalsPerBlock:   16,
-	// 	TimeIncrements:        5,
-	// },
+	&WithdrawalsBaseSpec{
+		Spec: test.Spec{
+			Name: "Withdawals Fork on Block 1",
+			About: `
+			Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
+			`,
+		},
+		WithdrawalsForkHeight: 1, //TODO
+		WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
+		WithdrawalsPerBlock:   16,
+		TimeIncrements:        5,
+	},
 	//
 	//&WithdrawalsBaseSpec{
 	//	Spec: test.Spec{
@@ -573,19 +573,19 @@ var Tests = []test.SpecInterface{
 	//	OverflowMaxInitcodeTxCountAfterFork:  1,
 	//},
 
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
-				About: `
-				`,
-			},
-			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
-			WithdrawalsBlockCount: 2,
-			WithdrawalsPerBlock:   16,
-			TimeIncrements:        5,
-		},
-	},
+	//&WithdrawalsExecutionLayerSpec{
+	//	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	//		Spec: test.Spec{
+	//			Name: "Withdrawals Fork on Block 5",
+	//			About: `
+	//			`,
+	//		},
+	//		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+	//		WithdrawalsBlockCount: 2,
+	//		WithdrawalsPerBlock:   16,
+	//		TimeIncrements:        5,
+	//	},
+	//},
 }
 
 // Helper types to convert gwei into wei more easily
@@ -867,7 +867,7 @@ func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
 	}
 }
 
-func (ws *WithdrawalsBaseSpec) waitForShaghai(t *test.Env) {
+func (ws *WithdrawalsBaseSpec) waitForShanghai(t *test.Env) {
 	if time.Now().Unix() < int64(*t.Genesis.Config().ShanghaiTime) {
 		tUnix := time.Unix(t.CLMock.ShanghaiTimestamp.Int64(), 0)
 		durationUntilFuture := time.Until(tUnix)
@@ -952,7 +952,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		},
 	})
 
-	ws.waitForShaghai(t)
+	ws.waitForShanghai(t)
 
 	var (
 		startAccount = ws.GetWithdrawalsStartAccount()
@@ -988,8 +988,8 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 
 					// Verify the list of withdrawals returned on the payload built
 					// engine_forkchoiceUpdatedV2 method call
-				if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
-					t.Fatalf("FAIL (%s): Withdrawals sent list was not saved", t.TestName)
+					if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
+						t.Fatalf("FAIL (%s): Withdrawals sent list was not saved", t.TestName)
 					} else {
 						if len(sentList) != len(t.CLMock.LatestPayloadBuilt.Withdrawals) {
 							t.Fatalf(
@@ -1662,7 +1662,7 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 		},
 	})
 
-	ws.waitForShaghai(t)
+	ws.waitForShanghai(t)
 
 	var (
 		startAccount = ws.GetWithdrawalsStartAccount()
