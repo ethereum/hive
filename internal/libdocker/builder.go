@@ -73,7 +73,7 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 	dir := b.config.Inventory.SimulatorDirectory(name)
 	buildContextPath := dir
 	buildDockerfile := "Dockerfile"
-	if len(b.config.OverrideDockerfile) > 0 {
+	if b.config.OverrideDockerfile != "" {
 		buildDockerfile = b.config.OverrideDockerfile
 	}
 	// build context dir of simulator can be overridden with "hive_context.txt" file containing the desired build path
