@@ -1101,9 +1101,7 @@ func (m *MockBuilder) HandleMockDisableErrorOnHeaderRequest(
 func (m *MockBuilder) HandleMockEnableErrorOnHeaderRequest(
 	w http.ResponseWriter, req *http.Request,
 ) {
-	var (
-		vars = mux.Vars(req)
-	)
+	vars := mux.Vars(req)
 
 	slot, code, err := m.parseSlotEpochRequest(vars)
 	if err != nil {
