@@ -317,8 +317,6 @@ github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7
 github.com/etcd-io/bbolt v1.3.3/go.mod h1:ZF2nL25h33cCyBtcyWeZ2/I3HQOfTP+0PIEvHjkjCrw=
 github.com/ethereum/go-ethereum v1.11.4 h1:KG81SnUHXWk8LJB3mBcHg/E2yLvXoiPmRMCIRxgx3cE=
 github.com/ethereum/go-ethereum v1.11.4/go.mod h1:it7x0DWnTDMfVFdXcU6Ti4KEFQynLHVRarcSlPr0HBo=
-github.com/ethereum/hive/hiveproxy v0.0.0-20230313101845-c7dfe88c8138 h1:Y74Ksk90DLCMWnpOfOEWRLxVjsf/67vY+hX5kWu9UY0=
-github.com/ethereum/hive/hiveproxy v0.0.0-20230313101845-c7dfe88c8138/go.mod h1:1LWNU6/EYsIOXZGa2KdklD1ET77gLTeEyhq+WTZ+37o=
 github.com/evanphx/json-patch v4.9.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanw/esbuild v0.17.6 h1:4TFYbndxF6+KQwLTyZ4PGIal5Pc6g6AK6jp0IU4Elf0=
 github.com/evanw/esbuild v0.17.6/go.mod h1:iINY06rn799hi48UqEnaQvVfZWe6W9bET78LbvN8VWk=
