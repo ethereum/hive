@@ -1159,9 +1159,7 @@ func (m *MockBuilder) HandleMockDisableErrorOnPayloadReveal(
 func (m *MockBuilder) HandleMockEnableErrorOnPayloadReveal(
 	w http.ResponseWriter, req *http.Request,
 ) {
-	var (
-		vars = mux.Vars(req)
-	)
+	vars := mux.Vars(req)
 
 	slot, code, err := m.parseSlotEpochRequest(vars)
 	if err != nil {
