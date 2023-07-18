@@ -110,10 +110,9 @@ func (bn *BeaconClient) Init(ctx context.Context) error {
 					if spec, err := SpecFromConfig(cfg); err != nil {
 						errs <- err
 						return
-					} else {
-						bn.Config.Spec = spec
-						return
 					}
+					bn.Config.Spec = spec
+					return
 				}
 				select {
 				case <-ctx.Done():
@@ -158,9 +157,9 @@ func (bn *BeaconClient) Init(ctx context.Context) error {
 func (bn *BeaconClient) Shutdown() error {
 	if managedClient, ok := bn.Client.(ManagedClient); !ok {
 		return fmt.Errorf("attempted to shutdown an unmanaged client")
-	} else {
-		return managedClient.Shutdown()
-	}
+	} 
+	return managedClient.Shutdown()
+	
 }
 
 func (bn *BeaconClient) ENR(parentCtx context.Context) (string, error) {

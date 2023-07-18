@@ -420,9 +420,8 @@ func genPayloadAttributesInvalidator(
 						pa.Withdrawals = pa.Withdrawals[1:]
 					}
 					return true, nil
-				} else {
-					return false, fmt.Errorf("unable to invalidate: no withdrawals")
 				}
+				return false, fmt.Errorf("unable to invalidate: no withdrawals")
 			case INVALIDATE_ATTR_EXTRA_WITHDRAWAL:
 				if pa.Withdrawals == nil {
 					pa.Withdrawals = make([]*types.Withdrawal, 0)
