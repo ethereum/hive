@@ -1,6 +1,6 @@
 module github.com/ethereum/hive
 
-go 1.18
+go 1.20
 
 require (
 	github.com/davecgh/go-spew v1.1.1
@@ -9,6 +9,7 @@ require (
 	github.com/evanw/esbuild v0.18.11
 	github.com/fsouza/go-dockerclient v1.8.1
 	github.com/gorilla/mux v1.8.0
+	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	golang.org/x/net v0.7.0
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1
 	gopkg.in/yaml.v3 v3.0.1
@@ -78,7 +79,6 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	golang.org/x/crypto v0.4.0 // indirect
-	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1 // indirect
 	golang.org/x/sys v0.5.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect

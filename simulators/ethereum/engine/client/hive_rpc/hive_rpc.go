@@ -415,12 +415,16 @@ func (ec *HiveRPCEngineClient) GetPayloadBodiesByHashV1(ctx context.Context, has
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload interface{}) (api.PayloadStatusV1, error) {
-	var result api.PayloadStatusV1
+func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes []common.Hash) (result api.PayloadStatusV1, err error) {
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
-	err := ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload)
+
+	if versionedHashes != nil {
+		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload, versionedHashes)
+	} else {
+		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload)
+	}
 	ec.latestPayloadStatusReponse = &result
 	return result, err
 }
@@ -428,14 +432,18 @@ func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payl
 func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *client_types.ExecutableDataV1) (api.PayloadStatusV1, error) {
 	ed := payload.ToExecutableData()
 	ec.latestPayloadSent = &ed
-	return ec.NewPayload(ctx, 1, payload)
+	return ec.NewPayload(ctx, 1, payload, nil)
 }
 
 func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error) {
 	ec.latestPayloadSent = payload
-	return ec.NewPayload(ctx, 2, payload)
+	return ec.NewPayload(ctx, 2, payload, nil)
 }
 
+func (ec *HiveRPCEngineClient) NewPayloadV3(ctx context.Context, payload *api.ExecutableData, versionedHashes []common.Hash) (api.PayloadStatusV1, error) {
+	ec.latestPayloadSent = payload
+	return ec.NewPayload(ctx, 3, payload, versionedHashes)
+}
 func (ec *HiveRPCEngineClient) ExchangeTransitionConfigurationV1(ctx context.Context, tConf *api.TransitionConfigurationV1) (api.TransitionConfigurationV1, error) {
 	var result api.TransitionConfigurationV1
 	err := ec.c.CallContext(ctx, &result, "engine_exchangeTransitionConfigurationV1", tConf)
