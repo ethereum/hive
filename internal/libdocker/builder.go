@@ -110,10 +110,10 @@ func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error
 }
 
 func (b *Builder) buildConfig(ctx context.Context, name string) docker.BuildImageOptions {
-	fmt.Println("buildConfig")
+	b.logger.Info("buildConfig")
 	nocache := false
 	if b.config.NoCachePattern != nil {
-		fmt.Println(b.config.NoCachePattern)
+		b.logger.Info("NoCachePattern: ", b.config.NoCachePattern.String())
 		nocache = b.config.NoCachePattern.MatchString(name)
 	}
 	opts := docker.BuildImageOptions{
