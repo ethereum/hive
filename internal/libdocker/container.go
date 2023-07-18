@@ -98,6 +98,7 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 		// but it's probably best to give Docker the info as early as possible.
 		createOpts.Config.AttachStdout = true
 	}
+
 	fmt.Println("[max] CREATING CONTAINER")
 
 	// TODO: [max] - tidy up - this sets up the port bindings for debug on the simulator onlyi
