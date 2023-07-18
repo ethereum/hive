@@ -88,6 +88,11 @@ var Tests = []test.Spec{
 		Run:  preTTDFinalizedBlockHash,
 		TTD:  2,
 	},
+	{
+		Name:       "Unique Payload ID",
+		Run:        uniquePayloadID,
+		ForkConfig: test.LatestFork,
+	},
 	// Invalid Payload Tests
 	{
 		Name: "Bad Hash on NewPayload",
@@ -1513,6 +1518,70 @@ func preTTDFinalizedBlockHash(t *test.Env) {
 
 }
 
+// Check that the payload id returned on a forkchoiceUpdated call is different
+// when the attributes change
+func uniquePayloadID(t *test.Env) {
+	// Wait until TTD is reached by this client
+	t.CLMock.WaitForTTD()
+
+	parentHash := t.CLMock.LatestHeader.Hash()
+
+	fcState := &api.ForkchoiceStateV1{
+		HeadBlockHash: parentHash,
+	}
+	payloadAttributes := &api.PayloadAttributes{
+		Timestamp:             t.CLMock.LatestHeader.Time + 1,
+		Random:                common.Hash{},
+		SuggestedFeeRecipient: common.Address{},
+		Withdrawals:           []*types.Withdrawal{},
+	}
+
+	previousPayloadID := &api.PayloadID{}
+
+	r := t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+
+	// Modify timestamp
+	previousPayloadID = r.Response.PayloadID
+	payloadAttributes.Timestamp += 1
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+
+	// Modify random
+	previousPayloadID = r.Response.PayloadID
+	payloadAttributes.Random = common.Hash{1}
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+
+	// Modify fee recipient
+	previousPayloadID = r.Response.PayloadID
+	payloadAttributes.SuggestedFeeRecipient = common.Address{1}
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+
+	// Add withdrawal
+	previousPayloadID = r.Response.PayloadID
+	newWithdrawal := &types.Withdrawal{}
+	payloadAttributes.Withdrawals = append(payloadAttributes.Withdrawals, newWithdrawal)
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+
+	// Modify withdrawal
+	previousPayloadID = r.Response.PayloadID
+	newWithdrawal.Amount = 1
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+
+	// Add another withdrawal
+	previousPayloadID = r.Response.PayloadID
+	newWithdrawal = &types.Withdrawal{Index: 1}
+	payloadAttributes.Withdrawals = append(payloadAttributes.Withdrawals, newWithdrawal)
+	r = t.TestEngine.TestEngineForkchoiceUpdated(fcState, payloadAttributes, -1)
+	r.ExpectUpdatedPayloadID(previousPayloadID)
+
+	// Add test here for future attributes!
+}
+
 // Corrupt the hash of a valid payload, client should reject the payload.
 // All possible scenarios:
 //    (fcU)
@@ -2137,7 +2206,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			if err != nil {
 				t.Fatalf("FAIL (%s): Error while getting latest block: %v", t.TestName, err)
 			}
-			cA = b
+			cA = &b.Block
 		} else {
 			t.CLMock.ProduceBlocks(int(cAHeight.Int64()), clmock.BlockProcessCallbacks{})
 			cA, err = api.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt)

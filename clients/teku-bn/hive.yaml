@@ -1,2 +1,4 @@
 roles:
   - beacon
+build_targets:
+  - gnosis

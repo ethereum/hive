@@ -72,16 +72,35 @@ def sync_config:
 def base_config:
   {
     "Init": {
-      "PubSubEnabled": true,
       "WebSocketsEnabled": true,
-      "IsMining": (env.HIVE_MINER != null),
+      "IsMining": true,
       "UseMemDb": true,
-      "ChainSpecPath": "/chainspec/test.json",
+      "ChainSpecPath": "/chainspec.json",
       "BaseDbPath": "nethermind_db/hive",
-      "LogFileName": "/hive.logs.txt"
+      "LogFileName": "/hive.logs.txt",
+      "DiscoveryEnabled": false
+    },
+    "Sync": {
+      "FastSync": false,
+      "SnapSync": false
+    },
+    "Mining": {
+      "Enabled": true,
+      "MinGasPrice": 1
+    },
+    "KeyStore": {
+      "BlockAuthorAccount": "0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875",
+      "UnlockAccounts": "0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875",
+      "PasswordFiles": ["/networkdata/keystore_password_filename"],
+      "KeyStoreDirectory": "/networkdata/miner_keystores"
+    },
+    "Aura": {
+      "AllowAuRaPrivateChains": true,
     },
     "JsonRpc": {
       "Enabled": true,
+      "EnginePort":8551,
+      "EngineHost":"0.0.0.0",
       "Host": "0.0.0.0",
       "Port": 8545,
       "WebSocketsPort": 8546,
@@ -90,12 +109,6 @@ def base_config:
       "DiscoveryPort": 30303,
       "P2PPort": 30303,
       "ExternalIp": "127.0.0.1",
-    },
-    "Hive": {
-      "ChainFile": "/chain.rlp",
-      "GenesisFilePath": "/genesis.json",
-      "BlocksDir": "/blocks",
-      "KeysDir": "/keys"
     },
   }
 ;

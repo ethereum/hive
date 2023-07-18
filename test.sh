@@ -49,7 +49,7 @@ function testsync {
 
 function testdevp2p {
   echo "$(date) Starting p2p simulation [$1]"
-  run "./hive --sim devp2p --client $1 $FLAGS"
+  run "./hive --sim devp2p --client $1 $FLAGS --docker.output"
 }
 
 mkdir $RESULTS
@@ -58,40 +58,20 @@ mkdir $RESULTS
 #
 
 # These three can succsessfully sync with themselves
-#testsync openethereum_latest
-#testsync go-ethereum_latest
-testsync openethereum_latest,go-ethereum_latest
 
 # These two are failing - even against themselves
-testsync besu_latest       # fails
-testsync nethermind_latest # fails
+#testsync nethermind_latest # fails
 
 #testsync besu_latest,nethermind_latest
 
-#testsync go-ethereum_latest go-ethereum_stable
-#testsync go-ethereum_latest openethereum_latest
 #testsync go-ethereum_latest nethermind_latest
-#testsync go-ethereum_latest besu_latest
-
-# GraphQL implemented only in besu and geth
-#
-
-testgraphql go-ethereum_latest
-testgraphql besu_latest
-
 
 # The devp2p tests are pretty quick -- a few minutes
-#testdevp2p go-ethereum_latest
-#testdevp2p nethermind_latest
-#testdevp2p besu_latest
-#testdevp2p openethereum_latest
+testdevp2p nethermind_local
 
 
 # These take an extremely long time to run
-#testconsensus go-ethereum_latest
-#testconsensus openethereum_latest
 #testconsensus nethermind_latest
-#testconsensus besu_latest
 
 
 

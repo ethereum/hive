@@ -9,8 +9,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
@@ -122,6 +122,9 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.Forkchoi
 }
 
 func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
+	//if version == -1 {
+	//	version = client.LatestForkchoiceUpdatedVersion
+	//}
 	if version == 2 {
 		return tec.TestEngineForkchoiceUpdatedV2(fcState, pAttributes)
 	}
@@ -183,6 +186,21 @@ func (exp *ForkchoiceResponseExpectObject) ExpectPayloadID(pid *api.PayloadID) {
 	if ((exp.Response.PayloadID == nil || pid == nil) && exp.Response.PayloadID != pid) ||
 		(exp.Response.PayloadID != nil && pid != nil && *exp.Response.PayloadID != *pid) {
 		exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV%d: %v, expected=%v", exp.TestName, exp.Version, exp.Response.PayloadID, pid)
+	}
+}
+
+func (exp *ForkchoiceResponseExpectObject) ExpectUpdatedPayloadID(previousID *api.PayloadID) {
+	exp.ExpectNoError()
+	if exp.Response.PayloadID == nil || previousID == nil {
+		if exp.Response.PayloadID == previousID {
+			// Both are null
+			exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV%d: Expected change from %v", exp.TestName, exp.Version, previousID)
+		}
+	} else {
+		// Both are different from null
+		if *exp.Response.PayloadID == *previousID {
+			exp.Fatalf("FAIL (%v): Unexpected PayloadID on EngineForkchoiceUpdatedV%d: Expected change from %s", exp.TestName, exp.Version, previousID.String())
+		}
 	}
 }
 
@@ -702,7 +720,7 @@ func (tec *TestEngineClient) TestHeaderByNumber(number *big.Int) *HeaderResponse
 	ret := &HeaderResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "HeaderByNumber",
-		Header:    header,
+		Header:    &header.Header,
 		Error:     err,
 	}
 	if err, ok := err.(rpc.Error); ok {
@@ -754,7 +772,7 @@ func (tec *TestEngineClient) TestBlockByNumber(number *big.Int) *BlockResponseEx
 	ret := &BlockResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "BlockByNumber",
-		Block:     block,
+		Block:     &block.Block,
 		Error:     err,
 	}
 	if err, ok := err.(rpc.Error); ok {
@@ -770,7 +788,7 @@ func (tec *TestEngineClient) TestBlockByHash(hash common.Hash) *BlockResponseExp
 	ret := &BlockResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Call:      "BlockByHash",
-		Block:     block,
+		Block:     &block.Block,
 		Error:     err,
 	}
 	if err, ok := err.(rpc.Error); ok {
@@ -882,7 +900,7 @@ func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) 
 	exp.ExpectNoError()
 	if ((expBalance == nil || exp.Balance == nil) && expBalance != exp.Balance) ||
 		(expBalance != nil && exp.Balance != nil && expBalance.Cmp(exp.Balance) != 0) {
-		exp.Fatalf("FAIL (%s): Unexpected balance on %s, for account %s at block %v: %v, expected=%v", exp.TestName, exp.Call, exp.Account, exp.Block, exp.Balance, expBalance)
+		exp.Fatalf("FAIL (%s): Unexpected balance on %s, for account %s at block %v: %v, expected=%v", exp.TestName, exp.Call, exp.Account, exp.Block.Int64(), exp.Balance, expBalance)
 	}
 }
 

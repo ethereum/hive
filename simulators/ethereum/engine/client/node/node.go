@@ -554,7 +554,7 @@ func (n *GethNode) ReOrgBackBlockChain(N uint64, currentBlock *types.Header) (*t
 
 func (n *GethNode) SubscribeP2PEvents() {
 	eventChan := make(chan *p2p.PeerEvent)
-	n.node.Server().SubscribeEvents(eventChan)
+	subscription := n.node.Server().SubscribeEvents(eventChan)
 	for {
 		select {
 		case event := <-eventChan:
@@ -573,6 +573,7 @@ func (n *GethNode) SubscribeP2PEvents() {
 			}
 
 		case <-n.running.Done():
+			subscription.Unsubscribe()
 			return
 		}
 	}
@@ -694,6 +695,23 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 }
 
 // Engine API
+func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}) (beacon.PayloadStatusV1, error) {
+	switch version {
+	case 1:
+		if c, ok := pl.(*client_types.ExecutableDataV1); ok {
+			return n.NewPayloadV1(ctx, c)
+		} else {
+			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
+		}
+	case 2:
+		if c, ok := pl.(*beacon.ExecutableData); ok {
+			return n.NewPayloadV2(ctx, c)
+		} else {
+			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
+		}
+	}
+	return beacon.PayloadStatusV1{}, fmt.Errorf("unknown version %d", version)
+}
 func (n *GethNode) NewPayloadV1(ctx context.Context, pl *client_types.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
 	ed := pl.ToExecutableData()
 	n.latestPayloadSent = &ed
@@ -707,7 +725,16 @@ func (n *GethNode) NewPayloadV2(ctx context.Context, pl *beacon.ExecutableData) 
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
-
+func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+	switch version {
+	case 1:
+		return n.ForkchoiceUpdatedV1(ctx, fcs, payload)
+	case 2:
+		return n.ForkchoiceUpdatedV2(ctx, fcs, payload)
+	default:
+		return beacon.ForkChoiceResponse{}, fmt.Errorf("unknown version %d", version)
+	}
+}
 func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
@@ -771,7 +798,7 @@ func parseBlockNumber(number *big.Int) rpc.BlockNumber {
 	return rpc.BlockNumber(number.Int64())
 }
 
-func (n *GethNode) BlockByNumber(ctx context.Context, number *big.Int) (*types.Block, error) {
+func (n *GethNode) BlockByNumber(ctx context.Context, number *big.Int) (*client.Block, error) {
 	if number == nil && n.mustHeadBlock != nil {
 		mustHeadHash := n.mustHeadBlock.Hash()
 		block := n.eth.BlockChain().GetBlock(mustHeadHash, n.mustHeadBlock.Number.Uint64())
@@ -780,6 +807,52 @@ func (n *GethNode) BlockByNumber(ctx context.Context, number *big.Int) (*types.B
 	return n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 }
 
+//	type LocalBlock struct {
+//		header       *LocalHeader
+//		uncles       []*types.Header
+//		transactions types.Transactions
+//		withdrawals  types.Withdrawals
+//
+//		hash common.Hash `json:"hash"`
+//	}
+//
+//	type LocalHeader struct {
+//		*types.Header
+//		hash common.Hash `json:"hash"`
+//	}
+//
+//	func (n *LocalBlock) Hash() common.Hash {
+//		return n.hash
+//	}
+//func BlockByNumber(b *eth.EthAPIBackend, n *GethNode, ctx context.Context, number rpc.BlockNumber) (*types.Block, error) {
+//// Pending block is only known by the miner
+//if number == rpc.PendingBlockNumber {
+//	block := b.eth.miner.PendingBlock()
+//	return block, nil
+//}
+//n.
+//// Otherwise resolve and return the block
+//if number == rpc.LatestBlockNumber {
+//	header := n.eth.APIBackend.CurrentBlock()
+//	return b.eth.blockchain.GetBlock(header.Hash(), header.Number.Uint64()), nil
+//}
+//if number == rpc.FinalizedBlockNumber {
+//	if !b.eth.Merger().TDDReached() {
+//		return nil, errors.New("'finalized' tag not supported on pre-merge network")
+//	}
+//	header := b.eth.blockchain.CurrentFinalBlock()
+//	return b.eth.blockchain.GetBlock(header.Hash(), header.Number.Uint64()), nil
+//}
+//if number == rpc.SafeBlockNumber {
+//	if !b.eth.Merger().TDDReached() {
+//		return nil, errors.New("'safe' tag not supported on pre-merge network")
+//	}
+//	header := b.eth.blockchain.CurrentSafeBlock()
+//	return b.eth.blockchain.GetBlock(header.Hash(), header.Number.Uint64()), nil
+//}
+//return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
+//}
+
 func (n *GethNode) BlockNumber(ctx context.Context) (uint64, error) {
 	if n.mustHeadBlock != nil {
 		return n.mustHeadBlock.Number.Uint64(), nil
@@ -787,11 +860,15 @@ func (n *GethNode) BlockNumber(ctx context.Context) (uint64, error) {
 	return n.eth.APIBackend.CurrentBlock().Number.Uint64(), nil
 }
 
-func (n *GethNode) BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error) {
-	return n.eth.APIBackend.BlockByHash(ctx, hash)
+func (n *GethNode) BlockByHash(ctx context.Context, hash common.Hash) (*client.Block, error) {
+	block, err := n.eth.APIBackend.BlockByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+
 }
 
-func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error) {
+func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*client.BlockHeader, error) {
 	if number == nil && n.mustHeadBlock != nil {
 		return n.mustHeadBlock, nil
 	}
@@ -887,6 +964,10 @@ func (n *GethNode) TerminalTotalDifficulty() *big.Int {
 
 func (n *GethNode) EnodeURL() (string, error) {
 	return n.node.Server().NodeInfo().Enode, nil
+}
+
+func (n *GethNode) Url() (string, error) {
+	return fmt.Sprintf("http://%v:%v", n.node.Server().NodeInfo().IP, n.node.Server().NodeInfo().Ports.Listener), nil
 }
 
 func (n *GethNode) ID() string {

@@ -13,7 +13,6 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -39,7 +38,7 @@ type Env struct {
 	CLMock *clmock.CLMocker
 
 	// Client parameters used to launch the default client
-	Genesis      *core.Genesis
+	Genesis      helper.Genesis
 	ClientParams hivesim.Params
 	ClientFiles  hivesim.Params
 
@@ -47,7 +46,7 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis helper.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	consensusConfig := testSpec.GetConsensusConfig()
 	clMocker := clmock.NewCLMocker(
@@ -115,10 +114,20 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 		// Only run if the TTD was reached during test, and test had not failed at this point.
 		if clMocker.TTDReached && !t.Failed() {
 			clMocker.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
+			ctx := context.Background()
+			number, err := env.Eth.BlockByNumber(ctx, nil)
+			if err != nil {
+				return
+			}
+			if number.Number().Int64() != clMocker.LatestHeader.Number.Int64() {
+				t.Fatalf("FAIL (%s): Client did not reached ttd ", env.TestName)
+			}
+
 		}
 	}()
 
 	// Run the test
+	time.Sleep(49 * time.Second)
 	testSpec.Execute(env)
 }
 

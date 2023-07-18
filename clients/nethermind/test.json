@@ -1,0 +1,137 @@
+{
+  "version": "1",
+  "engine": {
+    "Ethash": {
+      "params": {
+        "minimumDifficulty": "0x20000",
+        "difficultyBoundDivisor": "0x800",
+        "durationLimit": "0x0d",
+        "daoHardforkBeneficiary": "0xbf4ed7b27f1d666546e30d74d50d173d20bca754",
+        "blockReward": {
+          "0x0": "0x4563918244F40000"
+        },
+        "difficultyBombDelays": {}
+      }
+    }
+  },
+  "params": {
+    "maxCodeSize": 24576,
+    "maximumExtraDataSize": "0x400"
+  },
+  "genesis": {
+    "seal": {
+      "ethereum": {
+        "nonce": "0x78cc16f7b4f65485",
+        "mixHash": "0x2c85bcbce56429100b2108254bb56906257582aeafcbd682bc9af67a9f5aee46"
+      }
+    },
+    "difficulty": "0x020000",
+    "author": "0x8888f1f195afa192cfee860698584c030f4c9db1",
+    "timestamp": "0x54c98c81",
+    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "extraData": "0x42",
+    "gasLimit": "0x2fefd8"
+  },
+  "accounts": {
+    "0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b": {
+      "balance": "0x09184e72a000"
+    },
+    "0x0000000000000000000000000000000000000001": {
+      "builtin": {
+        "name": "ecrecover",
+        "pricing": {
+          "linear": {
+            "base": 3000,
+            "word": 0
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000002": {
+      "builtin": {
+        "name": "sha256",
+        "pricing": {
+          "linear": {
+            "base": 60,
+            "word": 12
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000003": {
+      "builtin": {
+        "name": "ripemd160",
+        "pricing": {
+          "linear": {
+            "base": 600,
+            "word": 120
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000004": {
+      "builtin": {
+        "name": "identity",
+        "pricing": {
+          "linear": {
+            "base": 15,
+            "word": 3
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000005": {
+      "builtin": {
+        "name": "modexp",
+        "pricing": {
+          "modexp": {
+            "divisor": 20
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000006": {
+      "builtin": {
+        "name": "alt_bn128_add",
+        "pricing": {
+          "linear": {
+            "base": 500,
+            "word": 0
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000007": {
+      "builtin": {
+        "name": "alt_bn128_mul",
+        "pricing": {
+          "linear": {
+            "base": 40000,
+            "word": 0
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000008": {
+      "builtin": {
+        "name": "alt_bn128_pairing",
+        "pricing": {
+          "alt_bn128_pairing": {
+            "base": 100000,
+            "pair": 80000
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000009": {
+      "builtin": {
+        "name": "blake2_f",
+        "pricing": {
+          "blake2_f": {
+            "gas_per_round": 1
+          }
+        }
+      }
+    }
+  }
+}

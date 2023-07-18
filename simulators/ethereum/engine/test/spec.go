@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
@@ -27,11 +26,13 @@ type SpecInterface interface {
 	GetConsensusConfig() ConsensusConfig
 	GetChainFile() string
 	GetForkConfig() ForkConfig
-	GetGenesis() *core.Genesis
+	GetGenesis(string) helper.Genesis
+	GetGenesisTest(string) string
 	GetName() string
 	GetTestTransactionType() helper.TestTransactionType
 	GetTimeout() int
 	GetTTD() int64
+	GetPreShapellaBlockCount() int
 	IsMiningDisabled() bool
 }
 
@@ -107,13 +108,27 @@ func (s Spec) GetForkConfig() ForkConfig {
 	return s.ForkConfig
 }
 
-func (s Spec) GetGenesis() *core.Genesis {
-	genesisPath := "./init/genesis.json"
+func (s Spec) GetGenesis(base string) helper.Genesis {
+	if len(base) != 0 {
+		base += "_"
+	}
+	genesisPath := "./init/" + base + "genesis.json"
 	if s.GenesisFile != "" {
 		genesisPath = fmt.Sprintf("./init/%s", s.GenesisFile)
 	}
 	genesis := helper.LoadGenesis(genesisPath)
-	return &genesis
+	return genesis
+}
+func (s Spec) GetGenesisTest(base string) string {
+	if len(base) != 0 {
+		base += "_"
+	}
+	genesisPath := "./init/" + base + "genesis.json"
+	if s.GenesisFile != "" {
+		genesisPath = fmt.Sprintf("./init/%s", s.GenesisFile)
+	}
+	genesis := helper.LoadGenesisTest(genesisPath)
+	return genesis
 }
 
 func (s Spec) GetName() string {
@@ -134,4 +149,8 @@ func (s Spec) GetTTD() int64 {
 
 func (s Spec) IsMiningDisabled() bool {
 	return s.DisableMining
+}
+
+func (s Spec) GetPreShapellaBlockCount() int {
+	return 0
 }

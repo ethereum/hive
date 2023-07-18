@@ -26,7 +26,7 @@ func PrintAllBeaconBlocks(
 	}
 	l.Logf(
 		"PrintAllBeaconBlocks: Printing beacon chain from %s\n",
-		b.HiveClient.Container,
+		b.ClientType(),
 	)
 	l.Logf(
 		"PrintAllBeaconBlocks: Head, slot %d, root %v\n",

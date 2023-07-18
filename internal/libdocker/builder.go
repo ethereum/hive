@@ -73,13 +73,16 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 	dir := b.config.Inventory.SimulatorDirectory(name)
 	buildContextPath := dir
 	buildDockerfile := "Dockerfile"
+	if b.config.OverrideDockerfile != "" {
+		buildDockerfile = b.config.OverrideDockerfile
+	}
 	// build context dir of simulator can be overridden with "hive_context.txt" file containing the desired build path
 	if contextPathBytes, err := os.ReadFile(filepath.Join(filepath.FromSlash(dir), "hive_context.txt")); err == nil {
 		buildContextPath = filepath.Join(dir, strings.TrimSpace(string(contextPathBytes)))
 		if strings.HasPrefix(buildContextPath, "../") {
 			return "", fmt.Errorf("cannot access build directory outside of Hive root: %q", buildContextPath)
 		}
-		if p, err := filepath.Rel(buildContextPath, filepath.Join(filepath.FromSlash(dir), "Dockerfile")); err != nil {
+		if p, err := filepath.Rel(buildContextPath, filepath.Join(filepath.FromSlash(dir), buildDockerfile)); err != nil {
 			return "", fmt.Errorf("failed to derive relative simulator Dockerfile path: %v", err)
 		} else {
 			buildDockerfile = p
@@ -107,8 +110,10 @@ func (b *Builder) BuildImage(ctx context.Context, name string, fsys fs.FS) error
 }
 
 func (b *Builder) buildConfig(ctx context.Context, name string) docker.BuildImageOptions {
+	b.logger.Info("Building Config")
 	nocache := false
 	if b.config.NoCachePattern != nil {
+		b.logger.Info(b.config.NoCachePattern.String())
 		nocache = b.config.NoCachePattern.MatchString(name)
 	}
 	opts := docker.BuildImageOptions{

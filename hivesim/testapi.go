@@ -82,13 +82,12 @@ func MustRunSuite(host *Simulation, suite Suite) {
 // Using this test type doesn't launch any clients by default. To interact with clients,
 // you can launch them using the t.Client method:
 //
-//    c := t.Client()
-//    c.RPC().Call(...)
+//	c := t.Client()
+//	c.RPC().Call(...)
 //
 // or run a subtest using t.RunClientTest():
 //
-//    t.RunClientTest(hivesim.ClientTestSpec{...})
-//
+//	t.RunClientTest(hivesim.ClientTestSpec{...})
 type TestSpec struct {
 	// These fields are displayed in the UI. Be sure to add
 	// a meaningful description here.

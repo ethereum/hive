@@ -1,0 +1,311 @@
+{
+  "name": "gnosis",
+  "engine": {
+    "authorityRound": {
+      "params": {
+        "stepDuration": 5,
+        "blockReward": "0x0",
+        "maximumUncleCountTransition": 0,
+        "maximumUncleCount": 0,
+        "validators": {
+          "multi": {
+            "0": {
+              "list": [
+                "0x14747a698Ec1227e6753026C08B29b4d5D3bC484"
+              ]
+            }
+          }
+        },
+        "blockRewardContractAddress": "0x2000000000000000000000000000000000000001",
+        "blockRewardContractTransition": 0,
+        "randomnessContractAddress": {
+          "0": "0x3000000000000000000000000000000000000001"
+        },
+        "withdrawalContractAddress": "0xbabe2bed00000000000000000000000000000003",
+        "twoThirdsMajorityTransition": 0,
+        "posdaoTransition": 0,
+        "blockGasLimitContractTransitions": {
+          "0": "0x4000000000000000000000000000000000000001"
+        }
+      }
+    }
+  },
+  "params": {
+    "networkID": 10202,
+    "gasLimitBoundDivisor": "0x400",
+    "maximumExtraDataSize": "0x20",
+    "maxCodeSize": "0x6000",
+    "maxCodeSizeTransition": "0x0",
+    "minGasLimit": "0x1388",
+    "eip140Transition": "0x0",
+    "eip211Transition": "0x0",
+    "eip214Transition": "0x0",
+    "eip658Transition": "0x0",
+    "eip145Transition": "0x0",
+    "eip1014Transition": "0x0",
+    "eip1052Transition": "0x0",
+    "eip1283Transition": "0x0",
+    "eip1344Transition": "0x0",
+    "eip1706Transition": "0x0",
+    "eip1884Transition": "0x0",
+    "eip2028Transition": "0x0",
+    "eip2929Transition": "0x0",
+    "eip2930Transition": "0x0",
+    "eip3198Transition": "0x0",
+    "eip3529Transition": "0x0",
+    "eip3541Transition": "0x0",
+    "eip1559Transition": "0x0",
+    "eip4895TransitionTimestamp": "0x64147a94",
+    "eip3855TransitionTimestamp": "0x64147a94",
+    "eip3651TransitionTimestamp": "0x64147a94",
+    "eip3860TransitionTimestamp": "0x64147a94",
+    "eip1559BaseFeeMaxChangeDenominator": "0x8",
+    "eip1559ElasticityMultiplier": "0x2",
+    "eip1559FeeCollector": "0x1559000000000000000000000000000000000000",
+    "eip1559FeeCollectorTransition": 0,
+    "registrar": "0x6000000000000000000000000000000000000000",
+    "transactionPermissionContract": "0x4000000000000000000000000000000000000001",
+    "transactionPermissionContractTransition": "0x0",
+    "terminalTotalDifficulty": "54445178707350154154139937189082913832640"
+  },
+  "genesis": {
+    "seal": {
+      "authorityRound": {
+        "step": "0x0",
+        "signature": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    "baseFeePerGas": "0x3b9aca00",
+    "difficulty": "0x20000",
+    "gasLimit": "0x989680"
+  },
+  "accounts": {
+    "0xB03a86b3126157C039b55E21D378587CcFc04d45": {
+      "balance": "0xc9f2c9cd04674edea40000000"
+    },
+    "0xcC4e00A72d871D6c328BcFE9025AD93d0a26dF51": {
+      "balance": "0xc9f2c9cd04674edea40000000"
+    },
+    "0x0000000000000000000000000000000000000005": {
+      "builtin": {
+        "name": "modexp",
+        "pricing": {
+          "0": {
+            "price": {
+              "modexp2565": {}
+            }
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000006": {
+      "builtin": {
+        "name": "alt_bn128_add",
+        "pricing": {
+          "0": {
+            "price": {
+              "alt_bn128_const_operations": {
+                "price": 150
+              }
+            }
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000007": {
+      "builtin": {
+        "name": "alt_bn128_mul",
+        "pricing": {
+          "0": {
+            "price": {
+              "alt_bn128_const_operations": {
+                "price": 6000
+              }
+            }
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000008": {
+      "builtin": {
+        "name": "alt_bn128_pairing",
+        "pricing": {
+          "0": {
+            "price": {
+              "alt_bn128_pairing": {
+                "base": 45000,
+                "pair": 34000
+              }
+            }
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000009": {
+      "builtin": {
+        "name": "blake2_f",
+        "pricing": {
+          "0": {
+            "price": {
+              "blake2_f": {
+                "gas_per_round": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000001": {
+      "balance": "1",
+      "builtin": {
+        "name": "ecrecover",
+        "pricing": {
+          "0": {
+            "price": {
+              "linear": {
+                "base": 3000,
+                "word": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000002": {
+      "balance": "1",
+      "builtin": {
+        "name": "sha256",
+        "pricing": {
+          "0": {
+            "price": {
+              "linear": {
+                "base": 60,
+                "word": 12
+              }
+            }
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000003": {
+      "balance": "1",
+      "builtin": {
+        "name": "ripemd160",
+        "pricing": {
+          "0": {
+            "price": {
+              "linear": {
+                "base": 600,
+                "word": 120
+              }
+            }
+          }
+        }
+      }
+    },
+    "0x0000000000000000000000000000000000000004": {
+      "balance": "1",
+      "builtin": {
+        "name": "identity",
+        "pricing": {
+          "0": {
+            "price": {
+              "linear": {
+                "base": 15,
+                "word": 3
+              }
+            }
+          }
+        }
+      }
+    },
+    "0x1000000000000000000000000000000000000001": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x1000000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x1100000000000000000000000000000000000001": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x1100000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x2000000000000000000000000000000000000001": {
+      "balance": "0",
+      "constructor": "0x"
+    },
+    "0x2000000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x3000000000000000000000000000000000000001": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x3000000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x4000000000000000000000000000000000000001": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x4000000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x4100000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x5000000000000000000000000000000000000001": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x5000000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x6100000000000000000000000000000000000001": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x6100000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x6000000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0x7000000000000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x60"
+    },
+    "0xbabe2bed00000000000000000000000000000001": {
+      "balance": "0",
+      "constructor": "0x6"
+    },
+    "0xbabe2bed00000000000000000000000000000002": {
+      "balance": "0",
+      "constructor": "0x"
+    },
+    "0xbabe2bed00000000000000000000000000000003": {
+      "balance": "0",
+      "constructor": "0x"
+    },
+    "0xbabe2bed00000000000000000000000000000004": {
+      "balance": "0",
+      "constructor": "0x"
+    },
+    "0xface2face0000000000000000000000000000000": {
+      "balance": "0",
+      "constructor": "0x6"
+    }
+  }
+}

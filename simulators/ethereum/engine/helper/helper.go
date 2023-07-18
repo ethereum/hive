@@ -205,16 +205,37 @@ func LoadChain(path string) types.Blocks {
 	return blocks
 }
 
-func LoadGenesis(path string) core.Genesis {
-	contents, err := ioutil.ReadFile(path)
+func LoadGenesis(path string) Genesis {
+	reader, err := os.Open(path)
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}
-	var genesis core.Genesis
+	contents, err := io.ReadAll(reader)
+	if err != nil {
+		panic(fmt.Errorf("can't to read genesis file: %v", err))
+	}
+
+	var genesis NethermindChainSpec
+	err = genesis.UnmarshalJSON(contents)
+	if err != nil {
+		return nil
+	}
 	if err := json.Unmarshal(contents, &genesis); err != nil {
 		panic(fmt.Errorf("can't parse genesis JSON: %v", err))
 	}
-	return genesis
+	return Genesis(&genesis)
+}
+
+func LoadGenesisTest(path string) string {
+	reader, err := os.Open(path)
+	if err != nil {
+		panic(fmt.Errorf("can't to read genesis file: %v", err))
+	}
+	contents, err := io.ReadAll(reader)
+	if err != nil {
+		panic(fmt.Errorf("can't to read genesis file: %v", err))
+	}
+	return string(contents)
 }
 
 func LoadGenesisBlock(path string) *types.Block {
@@ -222,14 +243,42 @@ func LoadGenesisBlock(path string) *types.Block {
 	return genesis.ToBlock()
 }
 
-func GenesisStartOption(genesis *core.Genesis) (hivesim.StartOption, error) {
-	out, err := json.Marshal(genesis)
+func GenesisStartOption(genesis Genesis) (hivesim.StartOption, error) {
+	out, err := genesis.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
 	}
 	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
 }
 
+func GenesisStartOptionBasedOnClient(genesis Genesis, clientName string) (hivesim.StartOption, error) {
+	out, err := genesis.MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
+	}
+	// We don't need mappers
+	switch clientName {
+	case "erigon":
+		return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
+	case "nethermind":
+		return hivesim.WithDynamicFile("/chainspec.json", bytesSource(out)), nil
+	}
+	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
+}
+func GenesisStartOptionBasedOnClientTest(genesis string, clientName string) (hivesim.StartOption, error) {
+	//out, err := genesis.MarshalJSON()
+	//if err != nil {
+	//	return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
+	//}
+	// We don't need mappers
+	//switch clientName {
+	//case "erigon":
+	//return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
+	//case "nethermind":
+	return hivesim.WithDynamicFile("/chainspec.json", bytesSource([]byte(genesis))), nil
+	//}
+	//return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
+}
 func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
 	result := new(big.Int).Set(genesis.Difficulty)
 	for _, b := range chain {
@@ -242,8 +291,8 @@ func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBloc
 }
 
 // TTD is the value specified in the test.Spec + Genesis.Difficulty
-func CalculateRealTTD(g *core.Genesis, ttdValue int64) int64 {
-	return g.Difficulty.Int64() + ttdValue
+func CalculateRealTTD(g Genesis, ttdValue int64) int64 {
+	return g.Config().TerminalTotalDifficulty.Int64() + ttdValue
 }
 
 var (
@@ -338,6 +387,8 @@ const (
 	DynamicFeeTxOnly
 )
 
+var _ TransactionCreator = (*BaseTransactionCreator)(nil)
+
 type TransactionCreator interface {
 	MakeTransaction(nonce uint64) (*types.Transaction, error)
 }
@@ -349,6 +400,7 @@ type BaseTransactionCreator struct {
 	Payload    []byte
 	TxType     TestTransactionType
 	PrivateKey *ecdsa.PrivateKey
+	ChainID    *big.Int
 }
 
 func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transaction, error) {
@@ -401,7 +453,7 @@ func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64) (*types.Transact
 	if key == nil {
 		key = globals.VaultKey
 	}
-	signedTx, err := types.SignTx(tx, types.NewLondonSigner(globals.ChainID), key)
+	signedTx, err := types.SignTx(tx, types.NewLondonSigner(tc.ChainID), key)
 	if err != nil {
 		return nil, err
 	}
@@ -482,6 +534,32 @@ func SentTxAlreadyKnown(err error) bool {
 
 func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (*types.Transaction, error) {
 	nonce, err := node.GetNextAccountNonce(testCtx, globals.VaultAccountAddress)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := txCreator.MakeTransaction(nonce)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+		defer cancel()
+		err := node.SendTransaction(ctx, tx)
+		if err == nil {
+			return tx, nil
+		} else if SentTxAlreadyKnown(err) {
+			return tx, nil
+		}
+		select {
+		case <-time.After(time.Second):
+		case <-testCtx.Done():
+			return nil, testCtx.Err()
+		}
+	}
+}
+
+func SendNextTransactionWithAccount(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, sender common.Address) (*types.Transaction, error) {
+	nonce, err := node.GetNextAccountNonce(testCtx, sender)
 	if err != nil {
 		return nil, err
 	}
