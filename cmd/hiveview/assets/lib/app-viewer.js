@@ -92,9 +92,20 @@ function showTitle(type, title) {
     $('#file-title').text(title);
 }
 
-function showError(text) {
+function showError(text, err) {
+    let errtext = text;
+    if (err instanceof Error) {
+        errtext += `\n${err.name}: ${err.message}`;
+    } else if (err) {
+        if (err.status) {
+            errtext += `\nstatus ${err.status}`;
+        } else {
+            errtext += `\n${err}`;
+        }
+    }
+
     $('#file-title').text('Error');
-    showText('Error!\n\n' + text);
+    showText('Error!\n' + errtext);
 }
 
 function showRawLink(url, text) {
@@ -160,7 +171,7 @@ async function fetchFile(url, line /* optional jump to line */ ) {
         showRawLink(url);
         text = await load(url, 'text');
     } catch (err) {
-        showError('Failed to load ' + url + '\nerror: ' + err);
+        showError(`Failed to load ${url}`, err);
         return;
     }
     let title = url.replace(resultsRE, '');
@@ -175,7 +186,7 @@ async function fetchTestLog(suiteFile, testIndex, line) {
     try {
         data = await load(suiteFile, 'json');
     } catch(err) {
-        showError(`Failed to load ${suiteFile}: ${err}`);
+        showError(`Can't load suite file: ${suiteFile}`, err);
         return;
     }
     if (!data['testCases'] || !data['testCases'][testIndex]) {
@@ -198,7 +209,7 @@ async function fetchTestLog(suiteFile, testIndex, line) {
             });
             common.showLoadProgress(false);
         } catch(err) {
-            showError(err);
+            showError('Loading test log failed.', err);
             return;
         }
     } else {

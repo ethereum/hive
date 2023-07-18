@@ -40,7 +40,7 @@ $(document).ready(function () {
             }
         },
         error: function(xhr, status, error) {
-            showError('error fetching ' + filename + ' : ' + error);
+            showError('error fetching ' + filename + ': ' + error);
         },
     });
 });
