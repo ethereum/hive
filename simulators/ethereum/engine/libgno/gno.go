@@ -130,6 +130,37 @@ func GetWithdrawalsTransferEvents(client *ethclient.Client, addresses []common.A
 	return transfersList, nil
 }
 
+// func GetBalanceOf(client *ethclient.Client, account common.Address, block *big.Int) (*big.Int, error) {
+// 	opts := &bind.CallOpts{Pending: false, BlockNumber: block}
+// 	token, err := NewGnoToken(GNOTokenAddress, client)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("can't bind token contract: %w", err)
+// 	}
+// 	return token.BalanceOf(opts, account)
+// }
+
+// https://github.com/ethereum/go-ethereum/issues/26254
+func GetBalanceOf(client *ethclient.Client, account common.Address, block *big.Int) (*big.Int, error) {
+	// get GnoTokenABI
+	tokenABI, err := GetGNOTokenABI()
+	if err != nil {
+		return nil, err
+	}
+	var result []interface{}
+	opts := &bind.CallOpts{Pending: false, BlockNumber: block}
+
+	//Call the balanceOf function
+	contract := bind.NewBoundContract(GNOTokenAddress, *tokenABI, client, client, client)
+	err = contract.Call(opts, &result, "balanceOf", account)
+	if err != nil {
+		return nil, err
+	}
+	if len(result) != 1 {
+		return nil, fmt.Errorf("unexpected result length: %d", len(result))
+	}
+	return result[0].(*big.Int), nil
+}
+
 // GetGNOTokenABI return the GNO token ABI.
 func GetGNOTokenABI() (*abi.ABI, error) {
 	gnoTokenABI, err := abi.JSON(strings.NewReader(GNOTokenContractABI))
