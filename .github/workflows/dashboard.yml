@@ -1,0 +1,47 @@
+name: Daily Command
+
+on:
+  schedule:
+    - cron:  '0 0 * * *'  # Run every day at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  run-command:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Install Linux packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install libsnappy-dev libc6-dev libc6 build-essential
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Build hive
+        run: |
+          go build -o hive hive.go
+
+      - name: Run Nethermind tests
+        run: |
+          ./hive --sim ethereum/engine --sim.limit="withdrawals" --client nethermind --results-root=${{ github.workspace }}/runs --loglevel=5 --client.checktimelimit=10m --docker.override-dockerfile="debug.Dockerfile" --docker.output 
+
+      - name: Send file over SSH
+        uses: appleboy/scp-action@master
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT }}
+          source: ${{ github.workspace }}/runs/*
+          target: ${{ secrets.DIR }}/dashboard_info
