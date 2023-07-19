@@ -44,4 +44,4 @@ jobs:
           password: ${{ secrets.SSH_PASSWORD }}
           port: ${{ secrets.SSH_PORT }}
           source: ${{ github.workspace }}/runs/*
-          target: ${{ secrets.DIR }}/dashboard_info
+          target: ${{ secrets.DIR }}/
