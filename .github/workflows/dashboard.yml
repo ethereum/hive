@@ -35,6 +35,8 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Build hive
+        env:
+          GOPATH: $HOME/go
         run: |
           go get ./...
           go build -o hive hive.go
