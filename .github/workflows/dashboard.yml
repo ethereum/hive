@@ -4,6 +4,10 @@ on:
   schedule:
     - cron:  '0 0 * * *'  # Run every day at midnight UTC
   workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    types: [closed]
 
 jobs:
   run-command:
