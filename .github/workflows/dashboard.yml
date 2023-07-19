@@ -2,12 +2,12 @@ name: Daily Command
 
 on:
   schedule:
-    - cron:  '0 0 * * *'  # Run every day at midnight UTC
+    - cron: '0 0 * * *'  # Run every day at midnight UTC
   workflow_dispatch:
   pull_request:
     branches:
       - master
-    types: [closed]
+    types: [ closed ]
 
 jobs:
   run-command:
@@ -17,6 +17,11 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: 1.20
+        env:
+          GOPATH: $HOME/go
+          
+      - name: Set up Go modules
+        run: go env -w GO111MODULE=on
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
