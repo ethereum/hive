@@ -235,9 +235,8 @@ func (en *ExecutionClient) Init(ctx context.Context) error {
 func (en *ExecutionClient) Shutdown() error {
 	if managedClient, ok := en.Client.(ManagedClient); !ok {
 		return fmt.Errorf("attempted to shutdown an unmanaged client")
-	} else {
-		return managedClient.Shutdown()
 	}
+	return managedClient.Shutdown()
 }
 
 func (en *ExecutionClient) IsRunning() bool {
