@@ -1224,17 +1224,11 @@ func getBalanceChangeDelta(client *ethclient.Client, account common.Address, fro
 	if err != nil {
 		return nil, err
 	}
-
-	switch fromBalance.Cmp(toBalance) {
-	case -1:
-		return common.Big0.Sub(toBalance, fromBalance), nil
-	case 0:
-		return big.NewInt(0), nil
-	case 1:
-		return common.Big0.Sub(fromBalance, toBalance), nil
-	default:
-		panic("unexpected bigint Cmp() behaviour")
+	diff := big.NewInt(0).Sub(toBalance, fromBalance)
+	if toBalance.Cmp(fromBalance) == 1 {
+		return diff, nil
 	}
+	return diff.Neg(diff), nil
 }
 
 // getWithdrawableAmount returns withdrawableAmount for specific address from deposit contract
@@ -1759,44 +1753,10 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 		},
 		// ws.VerifyClaimsExecution(t, client, ws.WithdrawalsForkHeight, t.CLMock.LatestExecutedPayload.Number)
 		OnForkchoiceBroadcast: func() {
-			addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number - 1)
-			for _, addr := range addresses {
-				fromBalance, err := libgno.GetBalanceOf(client, addr, big.NewInt(int64(ws.WithdrawalsForkHeight)))
-				if err != nil {
-					t.Fatal(err)
-				}
-				toBalance, err := libgno.GetBalanceOf(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-				if err != nil {
-					t.Fatal(err)
-				}
-				_ = fromBalance
-				_ = toBalance
-				var delta *big.Int
-
-				// switch fromBalance.Cmp(toBalance) {
-				// case -1:
-				// 	delta = common.Big0.Sub(toBalance, fromBalance)
-				// case 0:
-				// 	delta = big.NewInt(0)
-				// case 1:
-				// 	delta = common.Big0.Sub(fromBalance, toBalance)
-				// default:
-				// 	panic("unexpected bigint Cmp() behaviour")
-				// }
-
-				fmt.Println(delta)
-			}
-			// ws.VerifyClaimsExecution(t, client, ws.WithdrawalsForkHeight, t.CLMock.LatestExecutedPayload.Number)
+			ws.VerifyClaimsExecution(t, client, ws.WithdrawalsForkHeight, t.CLMock.LatestExecutedPayload.Number)
 		},
 	})
-	// addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number - 1)
-	// for _, addr := range addresses {
-	// 	latestBalance, err := libgno.GetBalanceOf(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-	// 	if err != nil {
-	// 		t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
-	// 	}
-	// 	fmt.Println(latestBalance)
-	// }
+
 	if !ws.SkipBaseVerifications && ws.claimBlocksCount() > 1 {
 		for i := 1; i <= ws.claimBlocksCount(); i++ {
 			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
@@ -1810,13 +1770,16 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 				OnPayloadProducerSelected: func() {
 					ws.ClaimWithdrawals(t)
 				},
+				OnForkchoiceBroadcast: func() {
+					ws.VerifyClaimsExecution(t, client, t.CLMock.LatestExecutedPayload.Number-1, t.CLMock.LatestExecutedPayload.Number)
+				},
 			})
+
 		}
 	}
-	// 		//
-	// 		ws.VerifyClaimsExecution(t, client, t.CLMock.LatestExecutedPayload.Number-2, t.CLMock.LatestExecutedPayload.Number)
-	// 	}
-	// }
+	if !ws.SkipBaseVerifications {
+		ws.VerifyClaimsExecution(t, client, ws.WithdrawalsForkHeight, t.CLMock.LatestExecutedPayload.Number)
+	}
 }
 
 func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
@@ -1853,7 +1816,7 @@ func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
 	t *test.Env, client *ethclient.Client, fromBlock, toBlock uint64,
 ) {
 	addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(toBlock - 1)
-	transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, toBlock, toBlock)
+	transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, fromBlock, toBlock)
 	if err != nil {
 		t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
 	}
@@ -1861,20 +1824,21 @@ func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
 		t.Fatalf("FAIL (%s): No withdrawal addresses found: %w", t.TestName)
 	}
 	for _, addr := range addresses {
-		_, err := getBalanceChangeDelta(client, addr, big.NewInt(int64(fromBlock)), big.NewInt(int64(toBlock)))
+		balanceDelta, err := getBalanceChangeDelta(client, addr, big.NewInt(int64(fromBlock)), big.NewInt(int64(toBlock)))
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error trying to get balance delta of token: %v, address: %v, from block %d to block %d", t.TestName, err, addr.Hex(), fromBlock, toBlock)
 		}
 
 		withdrawalsAccumulatedDelta := ws.WithdrawalsHistory.GetExpectedAccumulatedBalanceDelta(addr, fromBlock, toBlock)
 		withdrawalsAccumulatedDelta.Div(withdrawalsAccumulatedDelta, big.NewInt(32))
+
 		// check that account balance == expected balance from withdrawals history
-		// if balanceDelta.Cmp(withdrawalsAccumulatedDelta) != 0 {
-		// 	t.Fatalf(
-		// 		"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
-		// 		t.TestName, addr, balanceDelta, withdrawalsAccumulatedDelta,
-		// 	)
-		// }
+		if balanceDelta.Cmp(withdrawalsAccumulatedDelta) != 0 {
+			t.Fatalf(
+				"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
+				t.TestName, addr, balanceDelta, withdrawalsAccumulatedDelta,
+			)
+		}
 
 		eventValue := transfersMap[addr.Hex()]
 		if eventValue == nil {
@@ -1883,19 +1847,12 @@ func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
 				t.TestName, addr.Hex(),
 			)
 		}
-		// TODO: remove
-		if eventValue.Cmp(withdrawalsAccumulatedDelta) != 0 {
+		// check that account balance == value from transfer event
+		if balanceDelta.Cmp(eventValue) != 0 {
 			t.Fatalf(
-				"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
-				t.TestName, addr, eventValue, withdrawalsAccumulatedDelta,
+				"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
+				t.TestName, addr.Hex(), balanceDelta, transfersMap[addr.Hex()],
 			)
 		}
-		// check that account balance == value from transfer event
-		// if balanceDelta.Cmp(eventValue) != 0 {
-		// 	t.Fatalf(
-		// 		"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
-		// 		t.TestName, addr.Hex(), balanceDelta, transfersMap[addr.Hex()],
-		// 	)
-		// }
 	}
 }

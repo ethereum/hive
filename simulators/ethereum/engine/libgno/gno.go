@@ -102,7 +102,7 @@ func TransferData(recipient common.Address, amount *big.Int) ([]byte, error) {
 // `From` = deposit contract address
 // `To` = all addresses from addresses argument
 //
-// for specific block range and returns map { withdrawalAddress: transferAmount }
+// for specific block range and returns accumulated map { withdrawalAddress: Sum(transferAmounts) }
 func GetWithdrawalsTransferEvents(client *ethclient.Client, addresses []common.Address, fromBlock, toBlock uint64) (map[string]*big.Int, error) {
 	transfersList := make(map[string]*big.Int, 0)
 	token, err := NewGnoToken(GNOTokenAddress, client)
@@ -122,43 +122,25 @@ func GetWithdrawalsTransferEvents(client *ethclient.Client, addresses []common.A
 	}
 
 	for eventsIterator.Next() {
+
 		addr := eventsIterator.Event.To.Hex()
 		amount := eventsIterator.Event.Value
-
-		transfersList[addr] = amount
+		if _, ok := transfersList[addr]; ok {
+			transfersList[addr].Add(transfersList[addr], amount)
+		} else {
+			transfersList[addr] = amount
+		}
 	}
 	return transfersList, nil
 }
 
-// func GetBalanceOf(client *ethclient.Client, account common.Address, block *big.Int) (*big.Int, error) {
-// 	opts := &bind.CallOpts{Pending: false, BlockNumber: block}
-// 	token, err := NewGnoToken(GNOTokenAddress, client)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("can't bind token contract: %w", err)
-// 	}
-// 	return token.BalanceOf(opts, account)
-// }
-
-// https://github.com/ethereum/go-ethereum/issues/26254
 func GetBalanceOf(client *ethclient.Client, account common.Address, block *big.Int) (*big.Int, error) {
-	// get GnoTokenABI
-	tokenABI, err := GetGNOTokenABI()
-	if err != nil {
-		return nil, err
-	}
-	var result []interface{}
 	opts := &bind.CallOpts{Pending: false, BlockNumber: block}
-
-	//Call the balanceOf function
-	contract := bind.NewBoundContract(GNOTokenAddress, *tokenABI, client, client, client)
-	err = contract.Call(opts, &result, "balanceOf", account)
+	token, err := NewGnoToken(GNOTokenAddress, client)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("can't bind token contract: %w", err)
 	}
-	if len(result) != 1 {
-		return nil, fmt.Errorf("unexpected result length: %d", len(result))
-	}
-	return result[0].(*big.Int), nil
+	return token.BalanceOf(opts, account)
 }
 
 // GetGNOTokenABI return the GNO token ABI.
