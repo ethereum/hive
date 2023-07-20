@@ -568,20 +568,36 @@ var Tests = []test.SpecInterface{
 	//	OverflowMaxInitcodeTxCountAfterFork:  1,
 	//},
 
+	//// Execution layer withdrawals spec
 	&WithdrawalsExecutionLayerSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 2",
+				Name: "Withdrawals Fork on Block 5",
 				About: `
 				`,
 			},
 			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
-			WithdrawalsBlockCount: 2,
+			WithdrawalsBlockCount: 1,
 			WithdrawalsPerBlock:   16,
 			TimeIncrements:        5,
 		},
-		ClaimBlocksCount: 2,
+		ClaimBlocksCount: 1,
 	},
+
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 2",
+	// 			About: `
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 2,
+	// 		WithdrawalsPerBlock:   16,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
 	// &WithdrawalsExecutionLayerSpec{
 	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 	// 		Spec: test.Spec{
@@ -608,7 +624,7 @@ var Tests = []test.SpecInterface{
 	// 		WithdrawalsPerBlock:   16,
 	// 		TimeIncrements:        5,
 	// 	},
-	// 	ClaimBlocksCount: 3,
+	// 	ClaimBlocksCount: 5,
 	// },
 	// &WithdrawalsExecutionLayerSpec{
 	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
@@ -624,6 +640,7 @@ var Tests = []test.SpecInterface{
 	// 	},
 	// 	ClaimBlocksCount: 2,
 	// },
+
 	// &WithdrawalsExecutionLayerSpec{
 	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 	// 		Spec: test.Spec{
@@ -651,6 +668,20 @@ var Tests = []test.SpecInterface{
 	// 		TimeIncrements:        5,
 	// 	},
 	// 	ClaimBlocksCount: 2,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 5",
+	// 			About: `
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 3,
+	// 		WithdrawalsPerBlock:   1024,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 4,
 	// },
 }
 
