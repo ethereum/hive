@@ -34,10 +34,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Download dependencies
+        run: go get ./...
+
       - name: Build hive
-        run: |
-          go get -mod=mod ./...
-          go build -o hive hive.go
+        run: go build -o hive hive.go
 
       - name: Run Nethermind tests
         run: |
