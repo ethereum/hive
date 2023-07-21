@@ -160,3 +160,9 @@ func GetWithdrawalsABI() (*abi.ABI, error) {
 	}
 	return &withdrawalsABI, nil
 }
+
+// UnwrapToGNO takes mGNO wrapped token amount and returns GNO (32 mGNO == 1 GNO) amount
+// see https://docs.gnosischain.com/node/faq/#what-is-mgno for rationale
+func UnwrapToGNO(amount *big.Int) *big.Int {
+	return amount.Div(amount, big.NewInt(32))
+}

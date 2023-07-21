@@ -1870,7 +1870,8 @@ func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
 				t.TestName, addr, balanceDelta, withdrawalsAccumulatedDelta,
 			)
 		}
-
+		// if block range is >1 there will be the trasfered sum from all transfer events
+		// for specific address in block range
 		eventValue := transfersMap[addr.Hex()]
 		if eventValue == nil {
 			t.Fatalf(
