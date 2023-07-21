@@ -1079,13 +1079,9 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 	}
 	defer client.Close()
 
-	// Produce requested post-shanghai blocks
-	// (At least 3 block will be produced after this procedure ends).
-	// Since we implemented a pull strategy for withdrawals, we needed to
-	// process 3 blocks:
+	// Produce requested post-shanghai blocks:
 	// 1. Send some withdrawals and transactions
-	// 2. Check withdrawable amount, claim tokens and check balance is as expected
-	// 3.
+	// 2. Check that contract withdrawable amount matches the expectations
 	for i := 0; i < int(ws.WithdrawalsBlockCount); i++ {
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnPayloadProducerSelected: func() {
@@ -1123,80 +1119,22 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			OnForkchoiceBroadcast: func() {
 				if !ws.SkipBaseVerifications {
 					for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
-						//Test balance at `latest`, which should have the withdrawal applied.
-						latestBalance, err := getWithdrawableAmount(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
+						// Test balance at `latest`, which should have the withdrawal applied.
+						withdrawableAmount, err := getWithdrawableAmount(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
 						if err != nil {
 							t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
 						}
-						// TODO:
-						newLatestBalance := latestBalance.Mul(latestBalance, big.NewInt(32))
-						expectBalanceEqual := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(addr, t.CLMock.LatestExecutedPayload.Number)
 
-						if newLatestBalance.Cmp(expectBalanceEqual) != 0 {
+						expectBalanceMGNO := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(addr, t.CLMock.LatestExecutedPayload.Number)
+						expectBalance := libgno.UnwrapToGNO(expectBalanceMGNO)
+
+						if withdrawableAmount.Cmp(expectBalance) != 0 {
 							t.Fatalf(
 								"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
 								t.TestName,
 								addr,
-								expectBalanceEqual,
-								latestBalance,
-							)
-						}
-					}
-				}
-			},
-		})
-
-		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-
-			OnPayloadProducerSelected: func() {
-				// Get ExecuteWithdrawalsClaims
-				addresses := make([]common.Address, 0)
-				for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
-					addresses = append(addresses, w.Address)
-				}
-				// Send claim transaction
-				claims, err := libgno.ClaimWithdrawalsData(addresses)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
-				}
-				_, err = helper.SendNextTransactionWithAccount(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient:  &libgno.WithdrawalsContractAddress,
-						Amount:     common.Big0,
-						Payload:    claims,
-						PrivateKey: globals.GnoVaultVaultKey,
-						TxType:     t.TestTransactionType,
-						GasLimit:   t.Genesis.GasLimit(),
-						ChainID:    t.Genesis.Config().ChainID,
-					},
-					globals.GnoVaultAccountAddress,
-				)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
-				}
-			},
-
-			OnForkchoiceBroadcast: func() {
-				if !ws.SkipBaseVerifications {
-					block := t.CLMock.LatestExecutedPayload.Number - 1
-					addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(block)
-					for _, addr := range addresses {
-						//Test balance at `latest`, which should have the withdrawal applied.
-						latestBalance, err := libgno.GetBalanceOf(client, addr, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-						if err != nil {
-							t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
-						}
-
-						// TODO:
-						newLatestBalance := latestBalance.Mul(latestBalance, big.NewInt(32))
-						expectBalanceEqual := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(addr, t.CLMock.LatestExecutedPayload.Number-1)
-
-						if newLatestBalance.Cmp(expectBalanceEqual) != 0 {
-							t.Fatalf(
-								"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
-								t.TestName, addr, expectBalanceEqual, latestBalance,
+								expectBalance,
+								withdrawableAmount,
 							)
 						}
 					}
@@ -1712,6 +1650,89 @@ func (ws *WithdrawalsExecutionLayerSpec) claimBlocksCount() int {
 	return ws.ClaimBlocksCount
 }
 
+// ClaimWithdrawals sends claimWithdrawals() call to deposit contract with list of addresses
+// from withdrawals history
+func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
+	// Get ExecuteWithdrawalsClaims
+	addresses := make([]common.Address, 0)
+	for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
+		addresses = append(addresses, w.Address)
+	}
+	// Send claim transaction
+	claims, err := libgno.ClaimWithdrawalsData(addresses)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
+	}
+	_, err = helper.SendNextTransactionWithAccount(
+		t.TestContext,
+		t.CLMock.NextBlockProducer,
+		&helper.BaseTransactionCreator{
+			Recipient:  &libgno.WithdrawalsContractAddress,
+			Amount:     common.Big0,
+			Payload:    claims,
+			PrivateKey: globals.GnoVaultVaultKey,
+			TxType:     t.TestTransactionType,
+			GasLimit:   t.Genesis.GasLimit(),
+			ChainID:    t.Genesis.Config().ChainID,
+		},
+		globals.GnoVaultAccountAddress,
+	)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
+	}
+}
+
+// VerifyClaimsExecution verifies that:
+//
+// sum(withdrawals) == ERC20 balance delta == sum(transfer events values)
+//
+// for provided block range
+func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
+	t *test.Env, client *ethclient.Client, fromBlock, toBlock uint64,
+) {
+	addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(toBlock - 1)
+	transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, fromBlock, toBlock)
+	if err != nil {
+		t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
+	}
+	if len(addresses) == 0 {
+		t.Fatalf("FAIL (%s): No withdrawal addresses found: %w", t.TestName)
+	}
+	for _, addr := range addresses {
+		balanceDelta, err := getBalanceChangeDelta(client, addr, big.NewInt(int64(fromBlock)), big.NewInt(int64(toBlock)))
+		if err != nil {
+			t.Fatalf("FAIL (%s): Error trying to get balance delta of token: %v, address: %v, from block %d to block %d", t.TestName, err, addr.Hex(), fromBlock, toBlock)
+		}
+
+		withdrawalsAccumulatedDeltaMGNO := ws.WithdrawalsHistory.GetExpectedAccumulatedBalanceDelta(addr, fromBlock, toBlock)
+		withdrawalsDeltaGNO := libgno.UnwrapToGNO(withdrawalsAccumulatedDeltaMGNO)
+
+		// check that account balance == expected balance from withdrawals history
+		if balanceDelta.Cmp(withdrawalsDeltaGNO) != 0 {
+			t.Fatalf(
+				"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
+				t.TestName, addr, balanceDelta, withdrawalsDeltaGNO,
+			)
+		}
+		// if block range is >1 there will be the trasfered sum from all transfer events
+		// for specific address in block range
+		eventValue := transfersMap[addr.Hex()]
+		if eventValue == nil {
+			t.Fatalf(
+				"FAIL (%s): No withdrawal transfer value presented in events list for address: %v",
+				t.TestName, addr.Hex(),
+			)
+		}
+		// check that account balance == value from transfer event
+		if balanceDelta.Cmp(eventValue) != 0 {
+			t.Fatalf(
+				"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
+				t.TestName, addr.Hex(), balanceDelta, transfersMap[addr.Hex()],
+			)
+		}
+	}
+}
+
 func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 	// Create the withdrawals history object
 	ws.WithdrawalsHistory = make(WithdrawalsHistory)
@@ -1811,88 +1832,5 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 	}
 	if !ws.SkipBaseVerifications {
 		ws.VerifyClaimsExecution(t, client, ws.WithdrawalsForkHeight, t.CLMock.LatestExecutedPayload.Number)
-	}
-}
-
-// ClaimWithdrawals sends claimWithdrawals() call to deposit contract with list of addresses
-// from withdrawals history
-func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
-	// Get ExecuteWithdrawalsClaims
-	addresses := make([]common.Address, 0)
-	for _, w := range ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber-1] {
-		addresses = append(addresses, w.Address)
-	}
-	// Send claim transaction
-	claims, err := libgno.ClaimWithdrawalsData(addresses)
-	if err != nil {
-		t.Fatalf("FAIL (%s): Cant create claimWithdrawals transaction payload: %v", t.TestName, err)
-	}
-	_, err = helper.SendNextTransactionWithAccount(
-		t.TestContext,
-		t.CLMock.NextBlockProducer,
-		&helper.BaseTransactionCreator{
-			Recipient:  &libgno.WithdrawalsContractAddress,
-			Amount:     common.Big0,
-			Payload:    claims,
-			PrivateKey: globals.GnoVaultVaultKey,
-			TxType:     t.TestTransactionType,
-			GasLimit:   t.Genesis.GasLimit(),
-			ChainID:    t.Genesis.Config().ChainID,
-		},
-		globals.GnoVaultAccountAddress,
-	)
-	if err != nil {
-		t.Fatalf("FAIL (%s): Error trying to send claim transaction: %v", t.TestName, err)
-	}
-}
-
-// VerifyClaimsExecution verifies that:
-//
-// sum(withdrawals) == ERC20 balance delta == sum(transfer events values)
-//
-// for provided block range
-func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
-	t *test.Env, client *ethclient.Client, fromBlock, toBlock uint64,
-) {
-	addresses := ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(toBlock - 1)
-	transfersMap, err := libgno.GetWithdrawalsTransferEvents(client, addresses, fromBlock, toBlock)
-	if err != nil {
-		t.Fatalf("FAIL (%s): Error trying to get claims transfer events: %w", t.TestName, err)
-	}
-	if len(addresses) == 0 {
-		t.Fatalf("FAIL (%s): No withdrawal addresses found: %w", t.TestName)
-	}
-	for _, addr := range addresses {
-		balanceDelta, err := getBalanceChangeDelta(client, addr, big.NewInt(int64(fromBlock)), big.NewInt(int64(toBlock)))
-		if err != nil {
-			t.Fatalf("FAIL (%s): Error trying to get balance delta of token: %v, address: %v, from block %d to block %d", t.TestName, err, addr.Hex(), fromBlock, toBlock)
-		}
-
-		withdrawalsAccumulatedDeltaMGNO := ws.WithdrawalsHistory.GetExpectedAccumulatedBalanceDelta(addr, fromBlock, toBlock)
-		withdrawalsDeltaGNO := libgno.UnwrapToGNO(withdrawalsAccumulatedDeltaMGNO)
-
-		// check that account balance == expected balance from withdrawals history
-		if balanceDelta.Cmp(withdrawalsDeltaGNO) != 0 {
-			t.Fatalf(
-				"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
-				t.TestName, addr, balanceDelta, withdrawalsDeltaGNO,
-			)
-		}
-		// if block range is >1 there will be the trasfered sum from all transfer events
-		// for specific address in block range
-		eventValue := transfersMap[addr.Hex()]
-		if eventValue == nil {
-			t.Fatalf(
-				"FAIL (%s): No withdrawal transfer value presented in events list for address: %v",
-				t.TestName, addr.Hex(),
-			)
-		}
-		// check that account balance == value from transfer event
-		if balanceDelta.Cmp(eventValue) != 0 {
-			t.Fatalf(
-				"FAIL (%s): Transfer event value is not equal latest balance for address %s: want=%d (actual), got=%d (from event)",
-				t.TestName, addr.Hex(), balanceDelta, transfersMap[addr.Hex()],
-			)
-		}
 	}
 }
