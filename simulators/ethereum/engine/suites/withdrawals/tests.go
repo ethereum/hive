@@ -1246,6 +1246,8 @@ func getClient(t *test.Env) *ethclient.Client {
 	return client
 }
 
+// getBalanceChangeDelta calls balanceOf for fromBlock and toBlock heights and returns balance delta
+// i.e. how much balance changed from block X to block Y
 func getBalanceChangeDelta(client *ethclient.Client, account common.Address, fromBlock, toBlock *big.Int) (*big.Int, error) {
 	fromBalance, err := libgno.GetBalanceOf(client, account, fromBlock)
 	if err != nil {
@@ -1256,6 +1258,7 @@ func getBalanceChangeDelta(client *ethclient.Client, account common.Address, fro
 		return nil, err
 	}
 	diff := big.NewInt(0).Sub(toBalance, fromBalance)
+	// if diff is positive return it, othervise return -(diff)
 	if toBalance.Cmp(fromBalance) == 1 {
 		return diff, nil
 	}
@@ -1761,33 +1764,31 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 	}
 	defer client.Close()
 
-	// Produce requested post-shanghai blocks
-	// (At least 3 block will be produced after this procedure ends).
-	// Since we implemented a pull strategy for withdrawals, we needed to
-	// process 3 blocks:
-	// 1. Send some withdrawals and transactions
-	// 2. Check withdrawable amount, claim tokens and check balance is as expected
-	// 3.
-
-	t.CLMock.ProduceBlocks(int(ws.WithdrawalsBlockCount), clmock.BlockProcessCallbacks{
-		OnPayloadProducerSelected: func() {
-			// Send some withdrawals
-			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
-			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
-
-		},
-	})
+	// Produce requested post-shanghai blocks:
+	// 1. Produce WithdrawalsBlockCount number of blocks with withdrawals
+	// 2. Claim accumulated withdrawals and verify claims execution and balances
+	// 3. Iteratively produce block pairs (first with withdrawals and second with claim Tx)
+	//    and verify every claim execution
+	for i := 0; i < int(ws.WithdrawalsBlockCount); i++ {
+		t.CLMock.ProduceBlocks(int(ws.WithdrawalsBlockCount), clmock.BlockProcessCallbacks{
+			OnPayloadProducerSelected: func() {
+				// Send some withdrawals
+				t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
+				ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+			},
+		})
+	}
 
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			ws.ClaimWithdrawals(t)
 		},
-		// ws.VerifyClaimsExecution(t, client, ws.WithdrawalsForkHeight, t.CLMock.LatestExecutedPayload.Number)
 		OnForkchoiceBroadcast: func() {
 			ws.VerifyClaimsExecution(t, client, ws.WithdrawalsForkHeight, t.CLMock.LatestExecutedPayload.Number)
 		},
 	})
 
+	// performs multiple iterations of withdrawals generation and claiming
 	if !ws.SkipBaseVerifications && ws.claimBlocksCount() > 1 {
 		for i := 1; i <= ws.claimBlocksCount(); i++ {
 			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
@@ -1813,6 +1814,8 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 	}
 }
 
+// ClaimWithdrawals sends claimWithdrawals() call to deposit contract with list of addresses
+// from withdrawals history
 func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
 	// Get ExecuteWithdrawalsClaims
 	addresses := make([]common.Address, 0)
@@ -1843,6 +1846,11 @@ func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
 	}
 }
 
+// VerifyClaimsExecution verifies that:
+//
+// sum(withdrawals) == ERC20 balance delta == sum(transfer events values)
+//
+// for provided block range
 func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
 	t *test.Env, client *ethclient.Client, fromBlock, toBlock uint64,
 ) {
@@ -1860,14 +1868,14 @@ func (ws *WithdrawalsExecutionLayerSpec) VerifyClaimsExecution(
 			t.Fatalf("FAIL (%s): Error trying to get balance delta of token: %v, address: %v, from block %d to block %d", t.TestName, err, addr.Hex(), fromBlock, toBlock)
 		}
 
-		withdrawalsAccumulatedDelta := ws.WithdrawalsHistory.GetExpectedAccumulatedBalanceDelta(addr, fromBlock, toBlock)
-		withdrawalsAccumulatedDelta.Div(withdrawalsAccumulatedDelta, big.NewInt(32))
+		withdrawalsAccumulatedDeltaMGNO := ws.WithdrawalsHistory.GetExpectedAccumulatedBalanceDelta(addr, fromBlock, toBlock)
+		withdrawalsDeltaGNO := libgno.UnwrapToGNO(withdrawalsAccumulatedDeltaMGNO)
 
 		// check that account balance == expected balance from withdrawals history
-		if balanceDelta.Cmp(withdrawalsAccumulatedDelta) != 0 {
+		if balanceDelta.Cmp(withdrawalsDeltaGNO) != 0 {
 			t.Fatalf(
 				"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
-				t.TestName, addr, balanceDelta, withdrawalsAccumulatedDelta,
+				t.TestName, addr, balanceDelta, withdrawalsDeltaGNO,
 			)
 		}
 		// if block range is >1 there will be the trasfered sum from all transfer events
