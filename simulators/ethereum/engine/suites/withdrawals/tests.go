@@ -583,106 +583,105 @@ var Tests = []test.SpecInterface{
 		},
 		ClaimBlocksCount: 1,
 	},
+	&WithdrawalsExecutionLayerSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 2",
+				About: `
+				`,
+			},
+			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsBlockCount: 2,
+			WithdrawalsPerBlock:   16,
+			TimeIncrements:        5,
+		},
+		ClaimBlocksCount: 2,
+	},
+	&WithdrawalsExecutionLayerSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 5",
+				About: `
+				`,
+			},
+			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsBlockCount: 2,
+			WithdrawalsPerBlock:   16,
+			TimeIncrements:        5,
+		},
+		ClaimBlocksCount: 2,
+	},
+	&WithdrawalsExecutionLayerSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 5",
+				About: `
+				`,
+			},
+			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsBlockCount: 2,
+			WithdrawalsPerBlock:   16,
+			TimeIncrements:        5,
+		},
+		ClaimBlocksCount: 5,
+	},
+	&WithdrawalsExecutionLayerSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 5",
+				About: `
+				`,
+			},
+			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsBlockCount: 2,
+			WithdrawalsPerBlock:   16,
+			TimeIncrements:        5,
+		},
+		ClaimBlocksCount: 2,
+	},
 
-	// &WithdrawalsExecutionLayerSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Withdrawals Fork on Block 2",
-	// 			About: `
-	// 			`,
-	// 		},
-	// 		WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 2,
-	// 		WithdrawalsPerBlock:   16,
-	// 		TimeIncrements:        5,
-	// 	},
-	// 	ClaimBlocksCount: 2,
-	// },
-	// &WithdrawalsExecutionLayerSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Withdrawals Fork on Block 5",
-	// 			About: `
-	// 			`,
-	// 		},
-	// 		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 2,
-	// 		WithdrawalsPerBlock:   16,
-	// 		TimeIncrements:        5,
-	// 	},
-	// 	ClaimBlocksCount: 2,
-	// },
-	// &WithdrawalsExecutionLayerSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Withdrawals Fork on Block 5",
-	// 			About: `
-	// 			`,
-	// 		},
-	// 		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 2,
-	// 		WithdrawalsPerBlock:   16,
-	// 		TimeIncrements:        5,
-	// 	},
-	// 	ClaimBlocksCount: 5,
-	// },
-	// &WithdrawalsExecutionLayerSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Withdrawals Fork on Block 5",
-	// 			About: `
-	// 			`,
-	// 		},
-	// 		WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 2,
-	// 		WithdrawalsPerBlock:   16,
-	// 		TimeIncrements:        5,
-	// 	},
-	// 	ClaimBlocksCount: 2,
-	// },
-
-	// &WithdrawalsExecutionLayerSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Withdrawals Fork on Block 5",
-	// 			About: `
-	// 			`,
-	// 		},
-	// 		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 1,
-	// 		WithdrawalsPerBlock:   32,
-	// 		TimeIncrements:        5,
-	// 	},
-	// 	ClaimBlocksCount: 2,
-	// },
-	// &WithdrawalsExecutionLayerSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Withdrawals Fork on Block 5",
-	// 			About: `
-	// 			`,
-	// 		},
-	// 		WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 10,
-	// 		WithdrawalsPerBlock:   256,
-	// 		TimeIncrements:        5,
-	// 	},
-	// 	ClaimBlocksCount: 2,
-	// },
-	// &WithdrawalsExecutionLayerSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Withdrawals Fork on Block 5",
-	// 			About: `
-	// 			`,
-	// 		},
-	// 		WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 3,
-	// 		WithdrawalsPerBlock:   1024,
-	// 		TimeIncrements:        5,
-	// 	},
-	// 	ClaimBlocksCount: 4,
-	// },
+	&WithdrawalsExecutionLayerSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 5",
+				About: `
+				`,
+			},
+			WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsBlockCount: 1,
+			WithdrawalsPerBlock:   32,
+			TimeIncrements:        5,
+		},
+		ClaimBlocksCount: 2,
+	},
+	&WithdrawalsExecutionLayerSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 5",
+				About: `
+				`,
+			},
+			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsBlockCount: 10,
+			WithdrawalsPerBlock:   256,
+			TimeIncrements:        5,
+		},
+		ClaimBlocksCount: 2,
+	},
+	&WithdrawalsExecutionLayerSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Block 5",
+				About: `
+				`,
+			},
+			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsBlockCount: 3,
+			WithdrawalsPerBlock:   1024,
+			TimeIncrements:        5,
+		},
+		ClaimBlocksCount: 4,
+	},
 }
 
 // Helper types to convert gwei into wei more easily
