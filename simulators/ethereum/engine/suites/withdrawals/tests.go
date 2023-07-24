@@ -588,8 +588,12 @@ var Tests = []test.SpecInterface{
 	&WithdrawalsExecutionLayerSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
+				Name: "Withdrawals Fork on Block 1 - 1 blocks withdrawals - 1 mass-claim",
 				About: `
+				- Shapella on block 1
+				- 1 block with withdrawals
+				- Claim accumulated withdrawals
+				- Compares balances and events values with withdrawals from CL
 				`,
 			},
 			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
@@ -602,8 +606,15 @@ var Tests = []test.SpecInterface{
 	&WithdrawalsExecutionLayerSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 2",
+				Name: "Withdrawals Fork on Block 1 - 2 blocks withdrawals - 2 mass-claims",
 				About: `
+				- Shapella on block 1
+				- 2 blocks with withdrawals
+				- Claim accumulated withdrawals
+				- Produce 1 additional pair (A, B) of blocks:
+				  A: block with withdrawals
+				  B: block with claim Tx
+				- Compares balances and events values with withdrawals from CL
 				`,
 			},
 			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
@@ -616,11 +627,18 @@ var Tests = []test.SpecInterface{
 	&WithdrawalsExecutionLayerSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
+				Name: "Withdrawals Fork on Block 2 - 2 blocks withdrawals - 2 mass-claims",
 				About: `
+				- Shapella on block 2
+				- 2 blocks with withdrawals
+				- Claim accumulated withdrawals
+				- Produce 1 additional pair (A, B) of blocks:
+				  A: block with withdrawals
+				  B: block with claim Tx
+				- Compares balances and events values with withdrawals from CL
 				`,
 			},
-			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsForkHeight: 2,
 			WithdrawalsBlockCount: 2,
 			WithdrawalsPerBlock:   16,
 			TimeIncrements:        5,
@@ -630,30 +648,23 @@ var Tests = []test.SpecInterface{
 	&WithdrawalsExecutionLayerSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
+				Name: "Withdrawals Fork on Block 4 - 4 blocks withdrawals - 5 mass-claims - 64 withdrawals per block",
 				About: `
+				- Shapella on block 4
+				- 4 blocks with withdrawals
+				- Claim accumulated withdrawals
+				- Produce 4 additional pairs (A, B) of blocks:
+				  A: block with withdrawals
+				  B: block with claim Tx
+				- Compares balances and events values with withdrawals from CL
 				`,
 			},
-			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
-			WithdrawalsBlockCount: 2,
-			WithdrawalsPerBlock:   16,
+			WithdrawalsForkHeight: 4,
+			WithdrawalsBlockCount: 4,
+			WithdrawalsPerBlock:   64,
 			TimeIncrements:        5,
 		},
 		ClaimBlocksCount: 5,
-	},
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
-				About: `
-				`,
-			},
-			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
-			WithdrawalsBlockCount: 2,
-			WithdrawalsPerBlock:   16,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 2,
 	},
 
 	// &WithdrawalsExecutionLayerSpec{
@@ -663,7 +674,7 @@ var Tests = []test.SpecInterface{
 	// 			About: `
 	// 			`,
 	// 		},
-	// 		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsForkHeight: 5,
 	// 		WithdrawalsBlockCount: 1,
 	// 		WithdrawalsPerBlock:   32,
 	// 		TimeIncrements:        5,
@@ -673,11 +684,18 @@ var Tests = []test.SpecInterface{
 	&WithdrawalsExecutionLayerSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
+				Name: "Withdrawals Fork on Block 2 - 8 blocks withdrawals - 2 mass-claims - 256 withdrawals per block",
 				About: `
+				- Shapella on block 2
+				- 8 blocks with withdrawals
+				- Claim accumulated withdrawals
+				- Produce 1 additional pair (A, B) of blocks:
+				  A: block with withdrawals
+				  B: block with claim Tx
+				- Compares balances and events values with withdrawals from CL
 				`,
 			},
-			WithdrawalsForkHeight: 2, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsForkHeight: 2,
 			WithdrawalsBlockCount: 8,
 			WithdrawalsPerBlock:   256,
 			TimeIncrements:        5,
@@ -687,11 +705,18 @@ var Tests = []test.SpecInterface{
 	&WithdrawalsExecutionLayerSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
+				Name: "Withdrawals Fork on Block 1 - 3 blocks withdrawals - 4 mass-claims - 1024 withdrawals per block",
 				About: `
+				- Shapella on block 1
+				- 3 blocks with withdrawals
+				- Claim accumulated withdrawals
+				- Produce 3 additional pairs (A, B) of blocks:
+				  A: block with withdrawals
+				  B: block with claim Tx
+				- Compares balances and events values with withdrawals from CL
 				`,
 			},
-			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+			WithdrawalsForkHeight: 1,
 			WithdrawalsBlockCount: 3,
 			WithdrawalsPerBlock:   1024,
 			TimeIncrements:        5,
