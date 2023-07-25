@@ -102,7 +102,7 @@ func TransferData(recipient common.Address, amount *big.Int) ([]byte, error) {
 // `From` = deposit contract address
 // `To` = all addresses from addresses argument
 //
-// for specific block range and returns map { withdrawalAddress: transferAmount }
+// for specific block range and returns accumulated map { withdrawalAddress: Sum(transferAmounts) }
 func GetWithdrawalsTransferEvents(client *ethclient.Client, addresses []common.Address, fromBlock, toBlock uint64) (map[string]*big.Int, error) {
 	transfersList := make(map[string]*big.Int, 0)
 	token, err := NewGnoToken(GNOTokenAddress, client)
@@ -122,12 +122,25 @@ func GetWithdrawalsTransferEvents(client *ethclient.Client, addresses []common.A
 	}
 
 	for eventsIterator.Next() {
+
 		addr := eventsIterator.Event.To.Hex()
 		amount := eventsIterator.Event.Value
-
-		transfersList[addr] = amount
+		if _, ok := transfersList[addr]; ok {
+			transfersList[addr].Add(transfersList[addr], amount)
+		} else {
+			transfersList[addr] = amount
+		}
 	}
 	return transfersList, nil
+}
+
+func GetBalanceOf(client *ethclient.Client, account common.Address, block *big.Int) (*big.Int, error) {
+	opts := &bind.CallOpts{Pending: false, BlockNumber: block}
+	token, err := NewGnoToken(GNOTokenAddress, client)
+	if err != nil {
+		return nil, fmt.Errorf("can't bind token contract: %w", err)
+	}
+	return token.BalanceOf(opts, account)
 }
 
 // GetGNOTokenABI return the GNO token ABI.
@@ -146,4 +159,10 @@ func GetWithdrawalsABI() (*abi.ABI, error) {
 		return nil, fmt.Errorf("%w: %w", ErrorLoadingWithdrawalContract, err)
 	}
 	return &withdrawalsABI, nil
+}
+
+// UnwrapToGNO takes mGNO wrapped token amount and returns GNO (32 mGNO == 1 GNO) amount
+// see https://docs.gnosischain.com/node/faq/#what-is-mgno for rationale
+func UnwrapToGNO(amount *big.Int) *big.Int {
+	return amount.Div(amount, big.NewInt(32))
 }
