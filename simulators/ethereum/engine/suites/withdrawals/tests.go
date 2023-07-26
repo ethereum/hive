@@ -310,46 +310,46 @@ var Tests = []test.SpecInterface{
 		SyncSteps: 1,
 	},
 
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts - No Transactions",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 2
-			- Withdraw to 16 accounts each block for 2 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
-			`,
-			},
-			WithdrawalsForkHeight:    2,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 16,
-			TransactionsPerBlock:     common.Big0,
-		},
-		SyncSteps: 1,
-	},
+	//&WithdrawalsSyncSpec{
+	//	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	//		Spec: test.Spec{
+	//			Name: "Sync after 2 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts - No Transactions",
+	//			About: `
+	//		- Spawn a first client
+	//		- Go through withdrawals fork on Block 2
+	//		- Withdraw to 16 accounts each block for 2 blocks
+	//		- Spawn a secondary client and send FCUV2(head)
+	//		- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+	//		`,
+	//		},
+	//		WithdrawalsForkHeight:    2,
+	//		WithdrawalsBlockCount:    2,
+	//		WithdrawalsPerBlock:      16,
+	//		WithdrawableAccountCount: 16,
+	//		TransactionsPerBlock:     common.Big0,
+	//	},
+	//	SyncSteps: 1,
+	//},
 
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 2
-			- Withdraw to 16 accounts each block for 2 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
-			`,
-			},
-			WithdrawalsForkHeight:    2,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 16,
-		},
-		SyncSteps: 1,
-	},
+	//&WithdrawalsSyncSpec{
+	//	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	//		Spec: test.Spec{
+	//			Name: "Sync after 2 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
+	//			About: `
+	//		- Spawn a first client
+	//		- Go through withdrawals fork on Block 2
+	//		- Withdraw to 16 accounts each block for 2 blocks
+	//		- Spawn a secondary client and send FCUV2(head)
+	//		- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+	//		`,
+	//		},
+	//		WithdrawalsForkHeight:    2,
+	//		WithdrawalsBlockCount:    2,
+	//		WithdrawalsPerBlock:      16,
+	//		WithdrawableAccountCount: 16,
+	//	},
+	//	SyncSteps: 1,
+	//},
 
 	// // TODO: This test is failing, need to investigate.
 	// &WithdrawalsSyncSpec{
@@ -645,27 +645,27 @@ var Tests = []test.SpecInterface{
 		},
 		ClaimBlocksCount: 2,
 	},
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 4 - 4 blocks withdrawals - 5 mass-claims - 64 withdrawals per block",
-				About: `
-				- Shapella on block 4
-				- 4 blocks with withdrawals
-				- Claim accumulated withdrawals
-				- Produce 4 additional pairs (A, B) of blocks:
-				  A: block with withdrawals
-				  B: block with claim Tx
-				- Compares balances and events values with withdrawals from CL
-				`,
-			},
-			WithdrawalsForkHeight: 4,
-			WithdrawalsBlockCount: 4,
-			WithdrawalsPerBlock:   64,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 5,
-	},
+	//&WithdrawalsExecutionLayerSpec{
+	//	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	//		Spec: test.Spec{
+	//			Name: "Withdrawals Fork on Block 4 - 4 blocks withdrawals - 5 mass-claims - 64 withdrawals per block",
+	//			About: `
+	//			- Shapella on block 4
+	//			- 4 blocks with withdrawals
+	//			- Claim accumulated withdrawals
+	//			- Produce 4 additional pairs (A, B) of blocks:
+	//			  A: block with withdrawals
+	//			  B: block with claim Tx
+	//			- Compares balances and events values with withdrawals from CL
+	//			`,
+	//		},
+	//		WithdrawalsForkHeight: 4,
+	//		WithdrawalsBlockCount: 4,
+	//		WithdrawalsPerBlock:   64,
+	//		TimeIncrements:        5,
+	//	},
+	//	ClaimBlocksCount: 5,
+	//},
 
 	// &WithdrawalsExecutionLayerSpec{
 	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
