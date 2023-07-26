@@ -89,4 +89,4 @@ if [ "$HIVE_LOGLEVEL" != "" ]; then
 fi
 echo "Running Nethermind..."
 # The output is tee:d, via /log.txt, because the enode script uses that logfile to parse out the enode id
-dotnet /nethermind/Nethermind.Runner.dll --config /configs/test.cfg $LOG_FLAG 2>&1 | tee /log.txt
+dotnet /nethermind/nethermind.dll --config /configs/test.cfg $LOG_FLAG 2>&1 | tee /log.txt

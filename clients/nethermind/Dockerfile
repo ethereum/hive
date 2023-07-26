@@ -1,13 +1,13 @@
 ## Build Nethermind Via Pre-Built Image:
-ARG baseimage=nethermindeth/hive
-ARG tag=latest
+ARG baseimage=nethermindeth/nethermind
+ARG tag=master
 FROM $baseimage:$tag
 
 RUN apt-get update && apt-get install -y jq && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
-RUN dotnet /nethermind/Nethermind.Runner.dll --version > /raw_version.txt && tail -n 1 /raw_version.txt > /version.txt
+RUN dotnet /nethermind/nethermind.dll --version > /raw_version.txt && tail -n 1 /raw_version.txt > /version.txt
 
 # Add genesis mapper script, startup script, and enode URL retriever script
 ADD genesis.json /genesis.json
