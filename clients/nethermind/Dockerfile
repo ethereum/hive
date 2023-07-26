@@ -1,6 +1,6 @@
 ## Build Nethermind Via Pre-Built Image:
-ARG baseimage=nethermindeth/hive
-ARG tag=latest
+ARG baseimage=nethermindeth/nethermind
+ARG tag=master
 FROM $baseimage:$tag
 
 RUN apt-get update && apt-get install -y jq && \
