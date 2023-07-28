@@ -3,6 +3,7 @@ package clmock
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -10,10 +11,12 @@ import (
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
-	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -27,9 +30,12 @@ var (
 	// Time delay between ForkchoiceUpdated and GetPayload to allow the clients
 	// to produce a new Payload
 	DefaultPayloadProductionClientDelay = time.Second
+
+	// Fork specific constants
+	BLOB_COMMITMENT_VERSION_KZG = byte(0x01)
 )
 
-type ExecutableDataHistory map[uint64]*api.ExecutableData
+type ExecutableDataHistory map[uint64]*typ.ExecutableData
 
 func (h ExecutableDataHistory) LatestPayloadNumber() uint64 {
 	latest := uint64(0)
@@ -78,6 +84,9 @@ type CLMocker struct {
 	NextPayloadID        *api.PayloadID
 	CurrentPayloadNumber uint64
 
+	// Chain History
+	HeaderHistory map[uint64]*types.Header
+
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
 	ExecutedPayloadHistory ExecutableDataHistory
@@ -86,10 +95,11 @@ type CLMocker struct {
 	// Latest broadcasted data using the PoS Engine API
 	LatestHeadNumber        *big.Int
 	LatestHeader            *types.Header
-	LatestPayloadBuilt      api.ExecutableData
+	LatestPayloadBuilt      typ.ExecutableData
 	LatestBlockValue        *big.Int
+	LatestBlobBundle        *typ.BlobsBundle
 	LatestPayloadAttributes api.PayloadAttributes
-	LatestExecutedPayload   api.ExecutableData
+	LatestExecutedPayload   typ.ExecutableData
 	LatestForkchoice        api.ForkchoiceStateV1
 
 	// Merge related
@@ -97,21 +107,20 @@ type CLMocker struct {
 	TTDReached                      bool
 	TransitionPayloadTimestamp      *big.Int
 	SafeSlotsToImportOptimistically *big.Int
+	ChainTotalDifficulty            *big.Int
 
-	// Shanghai Related
-	ShanghaiTimestamp *big.Int
-	NextWithdrawals   types.Withdrawals
+	// Fork configuration
+	*globals.ForkConfig
+	Genesis *core.Genesis
+
+	NextWithdrawals types.Withdrawals
 
 	// Global context which all procedures shall stop
 	TestContext    context.Context
 	TimeoutContext context.Context
 }
 
-func isShanghai(blockTimestamp uint64, shanghaiTimestamp *big.Int) bool {
-	return shanghaiTimestamp != nil && big.NewInt(int64(blockTimestamp)).Cmp(shanghaiTimestamp) >= 0
-}
-
-func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int, shanghaiTime *big.Int) *CLMocker {
+func NewCLMocker(t *hivesim.T, genesis *core.Genesis, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int, forkConfig globals.ForkConfig) *CLMocker {
 	// Init random seed for different purposes
 	seed := time.Now().Unix()
 	t.Logf("Randomness seed: %v\n", seed)
@@ -145,11 +154,24 @@ func NewCLMocker(t *hivesim.T, slotsToSafe, slotsToFinalized, safeSlotsToImportO
 			SafeBlockHash:      common.Hash{},
 			FinalizedBlockHash: common.Hash{},
 		},
-		ShanghaiTimestamp: shanghaiTime,
-		TestContext:       context.Background(),
+		ChainTotalDifficulty: genesis.Difficulty,
+		ForkConfig:           &forkConfig,
+		Genesis:              genesis,
+		TestContext:          context.Background(),
 	}
 
+	// Create header history
+	newCLMocker.HeaderHistory = make(map[uint64]*types.Header)
+
+	// Add genesis to the header history
+	newCLMocker.HeaderHistory[0] = genesis.ToBlock().Header()
+
 	return newCLMocker
+}
+
+// Return genesis block of the canonical chain
+func (cl *CLMocker) GenesisBlock() *types.Block {
+	return cl.Genesis.ToBlock()
 }
 
 // Add a Client to be kept in sync with the latest payloads
@@ -197,6 +219,45 @@ func (cl *CLMocker) IsOptimisticallySyncing() bool {
 	return diff.Cmp(cl.SafeSlotsToImportOptimistically) >= 0
 }
 
+func (cl *CLMocker) ForkID() forkid.ID {
+	return forkid.NewID(cl.Genesis.Config, cl.GenesisBlock().Hash(), cl.LatestHeader.Number.Uint64(), cl.Genesis.Timestamp)
+}
+
+func (cl *CLMocker) GetHeaders(amount uint64, originHash common.Hash, originNumber uint64, reverse bool, skip uint64) ([]*types.Header, error) {
+	if amount < 1 {
+		return nil, errors.New("no block headers requested")
+	}
+
+	headers := make([]*types.Header, amount)
+	var blockNumber uint64
+
+	// range over blocks to check if our chain has the requested header
+	for _, h := range cl.HeaderHistory {
+		if h.Hash() == originHash || h.Number.Uint64() == originNumber {
+			headers[0] = h
+			blockNumber = h.Number.Uint64()
+		}
+	}
+	if headers[0] == nil {
+		return nil, fmt.Errorf("no headers found for given origin number %v, hash %v", originNumber, originHash)
+	}
+
+	if reverse {
+		for i := 1; i < int(amount); i++ {
+			blockNumber -= (1 - skip)
+			headers[i] = cl.HeaderHistory[blockNumber]
+		}
+		return headers, nil
+	}
+
+	for i := 1; i < int(amount); i++ {
+		blockNumber += (1 + skip)
+		headers[i] = cl.HeaderHistory[blockNumber]
+	}
+
+	return headers, nil
+}
+
 // Sets the specified client's chain head as Terminal PoW block by sending the initial forkchoiceUpdated.
 func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 	var err error
@@ -207,18 +268,20 @@ func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 	if err != nil {
 		cl.Fatalf("CLMocker: Unable to get latest header: %v", err)
 	}
+	cl.HeaderHistory[cl.LatestHeader.Number.Uint64()] = cl.LatestHeader
 
 	ctx, cancel = context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
 
-	if ttd, err := ec.GetTotalDifficulty(ctx); err != nil {
+	if td, err := ec.GetTotalDifficulty(ctx); err != nil {
 		cl.Fatalf("CLMocker: Error getting total difficulty from engine client: %v", err)
-	} else if ttd.Cmp(ec.TerminalTotalDifficulty()) < 0 {
-		cl.Fatalf("CLMocker: Attempted to set TTD Block when TTD had not been reached: %d > %d", ec.TerminalTotalDifficulty(), ttd)
+	} else if td.Cmp(ec.TerminalTotalDifficulty()) < 0 {
+		cl.Fatalf("CLMocker: Attempted to set TTD Block when TTD had not been reached: %d > %d", ec.TerminalTotalDifficulty(), td)
 	} else {
-		cl.Logf("CLMocker: TTD has been reached at block %d (%d>=%d)\n", cl.LatestHeader.Number, ttd, ec.TerminalTotalDifficulty())
+		cl.Logf("CLMocker: TTD has been reached at block %d (%d>=%d)\n", cl.LatestHeader.Number, td, ec.TerminalTotalDifficulty())
 		jsH, _ := json.MarshalIndent(cl.LatestHeader, "", " ")
 		cl.Logf("CLMocker: Client: %s, Block %d: %s\n", ec.ID(), cl.LatestHeader.Number, jsH)
+		cl.ChainTotalDifficulty = td
 	}
 
 	cl.TTDReached = true
@@ -325,7 +388,7 @@ func (cl *CLMocker) RequestNextPayload() {
 		Timestamp:             cl.GetNextBlockTimestamp(),
 	}
 
-	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) && cl.NextWithdrawals != nil {
+	if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) && cl.NextWithdrawals != nil {
 		cl.LatestPayloadAttributes.Withdrawals = cl.NextWithdrawals
 	}
 
@@ -339,7 +402,7 @@ func (cl *CLMocker) RequestNextPayload() {
 		fcUVersion int
 		err        error
 	)
-	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
+	if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
 		fcUVersion = 2
 		resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV2(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 
@@ -363,12 +426,15 @@ func (cl *CLMocker) GetNextPayload() {
 	var err error
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
-	if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
+	if cl.IsCancun(cl.LatestPayloadAttributes.Timestamp) {
+		cl.LatestPayloadBuilt, cl.LatestBlockValue, cl.LatestBlobBundle, err = cl.NextBlockProducer.GetPayloadV3(ctx, cl.NextPayloadID)
+	} else if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
 		cl.LatestPayloadBuilt, cl.LatestBlockValue, err = cl.NextBlockProducer.GetPayloadV2(ctx, cl.NextPayloadID)
-
+		cl.LatestBlobBundle = nil
 	} else {
 		cl.LatestPayloadBuilt, err = cl.NextBlockProducer.GetPayloadV1(ctx, cl.NextPayloadID)
 		cl.LatestBlockValue = nil
+		cl.LatestBlobBundle = nil
 	}
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.ID(), cl.NextPayloadID, err)
@@ -391,8 +457,19 @@ func (cl *CLMocker) GetNextPayload() {
 }
 
 func (cl *CLMocker) broadcastNextNewPayload() {
+	// Check if we have blobs to include in the broadcast
+	var versionedHashes *[]common.Hash
+	if cl.LatestBlobBundle != nil {
+		// Broadcast the blob bundle to all clients
+		var err error
+		versionedHashes, err = cl.LatestBlobBundle.VersionedHashes(BLOB_COMMITMENT_VERSION_KZG)
+		if err != nil {
+			cl.Fatalf("CLMocker: Could not get versioned hashes from blob bundle: %v", err)
+		}
+	}
 	// Broadcast the executePayload to all clients
-	responses := cl.BroadcastNewPayload(&cl.LatestPayloadBuilt)
+	responses := cl.BroadcastNewPayload(&cl.LatestPayloadBuilt, versionedHashes)
+	validations := 0
 	for _, resp := range responses {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastNewPayload Error (%v): %v\n", resp.Container, resp.Error)
@@ -407,6 +484,7 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 				if *resp.ExecutePayloadResponse.LatestValidHash != cl.LatestPayloadBuilt.BlockHash {
 					cl.Fatalf("CLMocker: NewPayload returned VALID status with incorrect LatestValidHash==%v, expected %v", resp.ExecutePayloadResponse.LatestValidHash, cl.LatestPayloadBuilt.BlockHash)
 				}
+				validations += 1
 			} else if resp.ExecutePayloadResponse.Status == api.ACCEPTED {
 				// The client is not synced but the payload was accepted
 				// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md:
@@ -422,6 +500,9 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 			}
 		}
 	}
+	if validations == 0 {
+		cl.Fatalf("CLMocker: No clients validated the payload")
+	}
 	cl.LatestExecutedPayload = cl.LatestPayloadBuilt
 	payload := cl.LatestPayloadBuilt
 	cl.ExecutedPayloadHistory[cl.LatestPayloadBuilt.Number] = &payload
@@ -429,7 +510,7 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 
 func (cl *CLMocker) broadcastLatestForkchoice() {
 	version := 1
-	if isShanghai(cl.LatestExecutedPayload.Timestamp, cl.ShanghaiTimestamp) {
+	if cl.IsShanghai(cl.LatestExecutedPayload.Timestamp) {
 		version = 2
 	}
 	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, version) {
@@ -583,7 +664,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 	if cl.LatestHeader == nil {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
 	}
-
+	cl.HeaderHistory[cl.LatestHeadNumber.Uint64()] = cl.LatestHeader
 }
 
 // Loop produce PoS blocks by using the Engine API
@@ -600,7 +681,7 @@ type ExecutePayloadOutcome struct {
 	Error                  error
 }
 
-func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableData) []ExecutePayloadOutcome {
+func (cl *CLMocker) BroadcastNewPayload(payload *typ.ExecutableData, versionedHashes *[]common.Hash) []ExecutePayloadOutcome {
 	responses := make([]ExecutePayloadOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.ID()
@@ -610,10 +691,12 @@ func (cl *CLMocker) BroadcastNewPayload(payload *api.ExecutableData) []ExecutePa
 			execPayloadResp api.PayloadStatusV1
 			err             error
 		)
-		if isShanghai(payload.Timestamp, cl.ShanghaiTimestamp) {
+		if cl.IsCancun(payload.Timestamp) {
+			execPayloadResp, err = ec.NewPayloadV3(ctx, payload, versionedHashes)
+		} else if cl.IsShanghai(payload.Timestamp) {
 			execPayloadResp, err = ec.NewPayloadV2(ctx, payload)
 		} else {
-			edv1 := &client_types.ExecutableDataV1{}
+			edv1 := &typ.ExecutableDataV1{}
 			edv1.FromExecutableData(payload)
 			execPayloadResp, err = ec.NewPayloadV1(ctx, edv1)
 		}

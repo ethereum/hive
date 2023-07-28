@@ -15,11 +15,11 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
-	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
 var (
@@ -939,8 +939,8 @@ func (ws *WithdrawalsBaseSpec) GetWithdrawalsForkTime() uint64 {
 }
 
 // Generates the fork config, including withdrawals fork timestamp.
-func (ws *WithdrawalsBaseSpec) GetForkConfig() test.ForkConfig {
-	return test.ForkConfig{
+func (ws *WithdrawalsBaseSpec) GetForkConfig() globals.ForkConfig {
+	return globals.ForkConfig{
 		ShanghaiTimestamp: big.NewInt(int64(ws.GetWithdrawalsForkTime())),
 	}
 }
@@ -1214,9 +1214,10 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				// Send produced payload but try to include non-nil
 				// `withdrawals`, it should fail.
 				emptyWithdrawalsList := make(types.Withdrawals, 0)
-				payloadPlusWithdrawals, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				customizer := &helper.CustomPayloadData{
 					Withdrawals: emptyWithdrawalsList,
-				})
+				}
+				payloadPlusWithdrawals, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
@@ -1309,9 +1310,10 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				// with null, and client must respond with `InvalidParamsError`.
 				// Note that StateRoot is also incorrect but null withdrawals should
 				// be checked first instead of responding `INVALID`
-				nilWithdrawalsPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				customizer := &helper.CustomPayloadData{
 					RemoveWithdrawals: true,
-				})
+				}
+				nilWithdrawalsPayload, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
@@ -1564,7 +1566,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		sidechainStartAccount       = new(big.Int).SetBit(common.Big0, 160, 1)
 		sidechainNextIndex          = uint64(0)
 		sidechainWithdrawalsHistory = make(WithdrawalsHistory)
-		sidechain                   = make(map[uint64]*beacon.ExecutableData)
+		sidechain                   = make(map[uint64]*typ.ExecutableData)
 		sidechainPayloadId          *beacon.PayloadID
 	)
 
@@ -1613,7 +1615,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 			}
 
 			// Error will be ignored here since the tx could have been already relayed
-			secondaryEngine.SendTransactions(t.TestContext, txs)
+			secondaryEngine.SendTransactions(t.TestContext, txs...)
 
 			if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainSplitHeight() {
 				// Also request a payload from the sidechain
@@ -1664,7 +1666,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		OnGetPayload: func() {
 			var (
 				version int
-				payload *beacon.ExecutableData
+				payload *typ.ExecutableData
 			)
 			if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainWithdrawalsForkHeight() {
 				version = 2
@@ -1916,14 +1918,19 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 				t.Fatalf("FAIL: Client did not include valid tx with MAX_INITCODE_SIZE")
 			}
 			// Customize the payload to include a tx with an invalid initcode
-			customPayload, err := helper.CustomizePayloadTransactions(&t.CLMock.LatestPayloadBuilt, types.Transactions{invalidTx})
-			if err != nil {
-				t.Fatalf("FAIL: Unable to customize payload: %v", err)
-			}
+			if invTx, ok := invalidTx.(*types.Transaction); ok {
 
-			r := t.TestEngine.TestEngineNewPayloadV2(customPayload)
-			r.ExpectStatus(test.Invalid)
-			r.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.ParentHash)
+				customPayload, err := helper.CustomizePayloadTransactions(&t.CLMock.LatestPayloadBuilt, types.Transactions{invTx})
+				if err != nil {
+					t.Fatalf("FAIL: Unable to customize payload: %v", err)
+				}
+
+				r := t.TestEngine.TestEngineNewPayloadV2(customPayload)
+				r.ExpectStatus(test.Invalid)
+				r.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.ParentHash)
+			} else {
+				t.Fatalf("FAIL: Unable to cast invalid tx to types.Transaction")
+			}
 		},
 	})
 }
@@ -1980,7 +1987,7 @@ func (req GetPayloadBodyRequestByRange) Verify(reqIndex int, testEngine *test.Te
 		for i := req.Start; i < req.Start+count; i++ {
 			p := payloadHistory[i]
 
-			r.ExpectPayloadBody(i-req.Start, &client_types.ExecutionPayloadBodyV1{
+			r.ExpectPayloadBody(i-req.Start, &typ.ExecutionPayloadBodyV1{
 				Transactions: p.Transactions,
 				Withdrawals:  p.Withdrawals,
 			})
@@ -2000,7 +2007,7 @@ func (req GetPayloadBodyRequestByHashIndex) Verify(reqIndex int, testEngine *tes
 	defer func() {
 		testEngine.Logf("INFO: Ended GetPayloadBodyByHash request %d, %s", reqIndex, time.Since(startTime))
 	}()
-	payloads := make([]*beacon.ExecutableData, 0)
+	payloads := make([]*typ.ExecutableData, 0)
 	hashes := make([]common.Hash, 0)
 	if len(req.BlockNumbers) > 0 {
 		for _, n := range req.BlockNumbers {
@@ -2037,9 +2044,9 @@ func (req GetPayloadBodyRequestByHashIndex) Verify(reqIndex int, testEngine *tes
 	r := testEngine.TestEngineGetPayloadBodiesByHashV1(hashes)
 	r.ExpectPayloadBodiesCount(uint64(len(payloads)))
 	for i, p := range payloads {
-		var expectedPayloadBody *client_types.ExecutionPayloadBodyV1
+		var expectedPayloadBody *typ.ExecutionPayloadBodyV1
 		if p != nil {
-			expectedPayloadBody = &client_types.ExecutionPayloadBodyV1{
+			expectedPayloadBody = &typ.ExecutionPayloadBodyV1{
 				Transactions: p.Transactions,
 				Withdrawals:  p.Withdrawals,
 			}
@@ -2085,17 +2092,18 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 
 		// Now we have an extra payload that follows the canonical chain,
 		// but we need a side chain for the test.
-		sidechainCurrent, err := helper.CustomizePayload(&t.CLMock.LatestExecutedPayload, &helper.CustomPayloadData{
+		customizer := &helper.CustomPayloadData{
 			Withdrawals: helper.RandomizeWithdrawalsOrder(t.CLMock.LatestExecutedPayload.Withdrawals),
-		})
+		}
+		sidechainCurrent, err := customizer.CustomizePayload(&t.CLMock.LatestExecutedPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
 		}
-
-		sidechainHead, err := helper.CustomizePayload(nextCanonicalPayload, &helper.CustomPayloadData{
+		customizer = &helper.CustomPayloadData{
 			ParentHash:  &sidechainCurrent.BlockHash,
 			Withdrawals: helper.RandomizeWithdrawalsOrder(nextCanonicalPayload.Withdrawals),
-		})
+		}
+		sidechainHead, err := customizer.CustomizePayload(nextCanonicalPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
 		}

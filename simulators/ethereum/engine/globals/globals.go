@@ -1,14 +1,42 @@
 package globals
 
 import (
+	"crypto/ecdsa"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
 )
+
+type TestAccount struct {
+	KeyHex  string
+	Address *common.Address
+	Key     *ecdsa.PrivateKey
+}
+
+func (a *TestAccount) GetKey() *ecdsa.PrivateKey {
+	if a.Key == nil {
+		key, err := crypto.HexToECDSA(a.KeyHex)
+		if err != nil {
+			panic(err)
+		}
+		a.Key = key
+	}
+	return a.Key
+}
+
+func (a *TestAccount) GetAddress() common.Address {
+	if a.Address == nil {
+		key := a.GetKey()
+		addr := crypto.PubkeyToAddress(key.PublicKey)
+		a.Address = &addr
+	}
+	return *a.Address
+}
 
 var (
 
@@ -33,6 +61,40 @@ var (
 	// This is the account that sends vault funding transactions.
 	VaultAccountAddress = common.HexToAddress("0xcf49fda3be353c69b41ed96333cd24302da4556f")
 	VaultKey, _         = crypto.HexToECDSA("63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376")
+
+	// Accounts used for testing, including the vault account
+	TestAccounts = []*TestAccount{
+		{
+			KeyHex: "63b508a03c3b5937ceb903af8b1b0c191012ef6eb7e9c3fb7afa94e5d214d376",
+		},
+		{
+			KeyHex: "073786d6a43474fda30a10eb7b5c3a47a81dd1e2bf72cfb7f66d868ff4f9827c",
+		},
+		{
+			KeyHex: "c99aa79d5b71da1ddbb020d9ca8c98fffb83b8317f4e06d9960e1ed102eaae73",
+		},
+		{
+			KeyHex: "fcb29daf153be371a3cbaaf58ecd0c675b0ae83ca3ea61c33f71be795b007df1",
+		},
+		{
+			KeyHex: "eac70caf07cca9ad271c9d80523b7e320013bd1d6bc941ef2b6eb51979323e62",
+		},
+		{
+			KeyHex: "06ce09a48d7034b06b1c290ff88f26351d3d21001e82df46aaae9d2f6338b50d",
+		},
+		{
+			KeyHex: "03f9ae8a83bbcbbbdc979ea4f22b040d82c5a32785488df63ec3066c8d89078a",
+		},
+		{
+			KeyHex: "39731ae349b81dd5e7ad9f1e97e63883f4e469e46c5ce6aa6a1b6229a68a2c23",
+		},
+		{
+			KeyHex: "f298d89779b49d5431162a40492b641f9c09d319fb0bdeffd94ad4b8919d9ccf",
+		},
+		{
+			KeyHex: "c2a53ab2068f63f2fad05fa6b3b23ae997ceb68a4b7acac17c2354aeffb624a8",
+		},
+	}
 
 	// Global test case timeout
 	DefaultTestCaseTimeout = time.Second * 60
@@ -69,3 +131,29 @@ var (
 		"HIVE_MERGE_BLOCK_ID": "100",
 	}
 )
+
+// Global types
+type ForkConfig struct {
+	ShanghaiTimestamp *big.Int
+	CancunTimestamp   *big.Int
+}
+
+func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
+	if f.ShanghaiTimestamp != nil {
+		shanghaiTime := f.ShanghaiTimestamp.Uint64()
+		genesis.Config.ShanghaiTime = &shanghaiTime
+	}
+	if f.CancunTimestamp != nil {
+		cancunTime := f.CancunTimestamp.Uint64()
+		genesis.Config.CancunTime = &cancunTime
+	}
+	return nil
+}
+
+func (f *ForkConfig) IsShanghai(blockTimestamp uint64) bool {
+	return f.ShanghaiTimestamp != nil && new(big.Int).SetUint64(blockTimestamp).Cmp(f.ShanghaiTimestamp) >= 0
+}
+
+func (f *ForkConfig) IsCancun(blockTimestamp uint64) bool {
+	return f.CancunTimestamp != nil && new(big.Int).SetUint64(blockTimestamp).Cmp(f.CancunTimestamp) >= 0
+}

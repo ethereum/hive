@@ -10,8 +10,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-
-	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
 type Eth interface {
@@ -20,8 +19,8 @@ type Eth interface {
 	BlockNumber(ctx context.Context) (uint64, error)
 	BlockByHash(ctx context.Context, hash common.Hash) (*types.Block, error)
 	HeaderByNumber(ctx context.Context, number *big.Int) (*types.Header, error)
-	SendTransaction(ctx context.Context, tx *types.Transaction) error
-	SendTransactions(ctx context.Context, txs []*types.Transaction) []error
+	SendTransaction(ctx context.Context, tx typ.Transaction) error
+	SendTransactions(ctx context.Context, txs ...typ.Transaction) []error
 	StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error)
 	StorageAtKeys(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) (map[common.Hash]*common.Hash, error)
 	TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error)
@@ -34,19 +33,20 @@ type Engine interface {
 	ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
 	ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
 
-	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, error)
-	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (api.ExecutableData, *big.Int, error)
+	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, error)
+	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, error)
+	GetPayloadV3(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, error)
 
-	NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes []common.Hash) (api.PayloadStatusV1, error)
-	NewPayloadV1(ctx context.Context, payload *client_types.ExecutableDataV1) (api.PayloadStatusV1, error)
-	NewPayloadV2(ctx context.Context, payload *api.ExecutableData) (api.PayloadStatusV1, error)
-	NewPayloadV3(ctx context.Context, payload *api.ExecutableData, versionedHashes []common.Hash) (api.PayloadStatusV1, error)
+	NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes *[]common.Hash) (api.PayloadStatusV1, error)
+	NewPayloadV1(ctx context.Context, payload *typ.ExecutableDataV1) (api.PayloadStatusV1, error)
+	NewPayloadV2(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error)
+	NewPayloadV3(ctx context.Context, payload *typ.ExecutableData, versionedHashes *[]common.Hash) (api.PayloadStatusV1, error)
 
-	GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*client_types.ExecutionPayloadBodyV1, error)
-	GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*client_types.ExecutionPayloadBodyV1, error)
+	GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error)
+	GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*typ.ExecutionPayloadBodyV1, error)
 
 	LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes)
-	LatestNewPayloadSent() (payload *api.ExecutableData)
+	LatestNewPayloadSent() (payload *typ.ExecutableData)
 
 	LatestForkchoiceResponse() (fcuResponse *api.ForkChoiceResponse)
 	LatestNewPayloadResponse() (payloadResponse *api.PayloadStatusV1)
@@ -59,6 +59,7 @@ type EngineClient interface {
 	EnodeURL() (string, error)
 
 	// Local Test Account Management
+	GetLastAccountNonce(testCtx context.Context, account common.Address) (uint64, error)
 	GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error)
 	UpdateNonce(testCtx context.Context, account common.Address, newNonce uint64) error
 
