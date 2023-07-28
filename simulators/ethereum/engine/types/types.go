@@ -105,7 +105,7 @@ type PayloadAttributes struct {
 	Random                common.Hash         `json:"prevRandao"            gencodec:"required"`
 	SuggestedFeeRecipient common.Address      `json:"suggestedFeeRecipient" gencodec:"required"`
 	Withdrawals           []*types.Withdrawal `json:"withdrawals"`
-	ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot"`
+	BeaconRoot            *common.Hash        `json:"parentBeaconBlockRoot"`
 }
 
 // JSON type overrides for PayloadAttributes.
@@ -214,7 +214,7 @@ func ExecutableDataToBlock(ed ExecutableData, versionedHashes []common.Hash, bea
 	if err != nil {
 		return nil, err
 	}
-	return geth_beacon.ExecutableDataToBlock(geth_ed, versionedHashes)
+	return geth_beacon.ExecutableDataToBlock(geth_ed, versionedHashes, beaconRoot)
 }
 
 func BlockToExecutableData(block *types.Block, fees *big.Int) ExecutableData {

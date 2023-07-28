@@ -20,14 +20,14 @@ func (p PayloadAttributes) MarshalJSON() ([]byte, error) {
 		Random                common.Hash         `json:"prevRandao"            gencodec:"required"`
 		SuggestedFeeRecipient common.Address      `json:"suggestedFeeRecipient" gencodec:"required"`
 		Withdrawals           []*types.Withdrawal `json:"withdrawals"`
-		ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot"`
+		BeaconRoot *common.Hash        `json:"parentBeaconBlockRoot"`
 	}
 	var enc PayloadAttributes
 	enc.Timestamp = hexutil.Uint64(p.Timestamp)
 	enc.Random = p.Random
 	enc.SuggestedFeeRecipient = p.SuggestedFeeRecipient
 	enc.Withdrawals = p.Withdrawals
-	enc.ParentBeaconBlockRoot = p.ParentBeaconBlockRoot
+	enc.BeaconRoot = p.BeaconRoot
 	return json.Marshal(&enc)
 }
 
@@ -38,7 +38,7 @@ func (p *PayloadAttributes) UnmarshalJSON(input []byte) error {
 		Random                *common.Hash        `json:"prevRandao"            gencodec:"required"`
 		SuggestedFeeRecipient *common.Address     `json:"suggestedFeeRecipient" gencodec:"required"`
 		Withdrawals           []*types.Withdrawal `json:"withdrawals"`
-		ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot"`
+		BeaconRoot *common.Hash        `json:"parentBeaconBlockRoot"`
 	}
 	var dec PayloadAttributes
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -59,8 +59,8 @@ func (p *PayloadAttributes) UnmarshalJSON(input []byte) error {
 	if dec.Withdrawals != nil {
 		p.Withdrawals = dec.Withdrawals
 	}
-	if dec.ParentBeaconBlockRoot != nil {
-		p.ParentBeaconBlockRoot = dec.ParentBeaconBlockRoot
+	if dec.BeaconRoot != nil {
+		p.BeaconRoot = dec.BeaconRoot
 	}
 	return nil
 }

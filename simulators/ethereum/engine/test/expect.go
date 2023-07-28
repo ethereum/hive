@@ -251,10 +251,10 @@ func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *typ.ExecutableData)
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineNewPayloadV3(payload *typ.ExecutableData, versionedHashes *[]common.Hash) *NewPayloadResponseExpectObject {
+func (tec *TestEngineClient) TestEngineNewPayloadV3(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	status, err := tec.Engine.NewPayloadV3(ctx, payload, versionedHashes)
+	status, err := tec.Engine.NewPayloadV3(ctx, payload, versionedHashes, beaconRoot)
 	ret := &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Payload:   payload,

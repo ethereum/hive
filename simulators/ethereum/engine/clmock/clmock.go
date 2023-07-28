@@ -381,14 +381,14 @@ func (cl *CLMocker) SetNextWithdrawals(nextWithdrawals types.Withdrawals) {
 
 func TimestampToBeaconRoot(timestamp uint64) common.Hash {
 	// Generates a deterministic hash from the timestamp
-	beaconBlockRoot := common.Hash{}
+	beaconRoot := common.Hash{}
 	timestampBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(timestampBytes[:], timestamp)
 	md := sha256.New()
 	md.Write(timestampBytes)
 	timestampHash := md.Sum(nil)
-	copy(beaconBlockRoot[:], timestampHash)
-	return beaconBlockRoot
+	copy(beaconRoot[:], timestampHash)
+	return beaconRoot
 }
 
 func (cl *CLMocker) RequestNextPayload() {
@@ -408,8 +408,8 @@ func (cl *CLMocker) RequestNextPayload() {
 
 	if cl.IsCancun(cl.LatestPayloadAttributes.Timestamp) {
 		// Write a deterministic hash based on the block number
-		beaconBlockRoot := TimestampToBeaconRoot(cl.LatestPayloadAttributes.Timestamp)
-		cl.LatestPayloadAttributes.ParentBeaconBlockRoot = &beaconBlockRoot
+		beaconRoot := TimestampToBeaconRoot(cl.LatestPayloadAttributes.Timestamp)
+		cl.LatestPayloadAttributes.BeaconRoot = &beaconRoot
 	}
 
 	// Save random value
@@ -488,7 +488,7 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 		}
 	}
 	// Broadcast the executePayload to all clients
-	responses := cl.BroadcastNewPayload(&cl.LatestPayloadBuilt, versionedHashes)
+	responses := cl.BroadcastNewPayload(&cl.LatestPayloadBuilt, versionedHashes, cl.LatestPayloadAttributes.BeaconRoot)
 	validations := 0
 	for _, resp := range responses {
 		if resp.Error != nil {
@@ -701,7 +701,7 @@ type ExecutePayloadOutcome struct {
 	Error                  error
 }
 
-func (cl *CLMocker) BroadcastNewPayload(payload *typ.ExecutableData, versionedHashes *[]common.Hash) []ExecutePayloadOutcome {
+func (cl *CLMocker) BroadcastNewPayload(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) []ExecutePayloadOutcome {
 	responses := make([]ExecutePayloadOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.ID()
@@ -712,7 +712,7 @@ func (cl *CLMocker) BroadcastNewPayload(payload *typ.ExecutableData, versionedHa
 			err             error
 		)
 		if cl.IsCancun(payload.Timestamp) {
-			execPayloadResp, err = ec.NewPayloadV3(ctx, payload, versionedHashes)
+			execPayloadResp, err = ec.NewPayloadV3(ctx, payload, versionedHashes, beaconRoot)
 		} else if cl.IsShanghai(payload.Timestamp) {
 			execPayloadResp, err = ec.NewPayloadV2(ctx, payload)
 		} else {

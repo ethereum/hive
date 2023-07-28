@@ -1217,7 +1217,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				customizer := &helper.CustomPayloadData{
 					Withdrawals: emptyWithdrawalsList,
 				}
-				payloadPlusWithdrawals, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+				payloadPlusWithdrawals, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
@@ -1313,7 +1313,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				customizer := &helper.CustomPayloadData{
 					RemoveWithdrawals: true,
 				}
-				nilWithdrawalsPayload, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+				nilWithdrawalsPayload, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
@@ -1920,7 +1920,7 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 			// Customize the payload to include a tx with an invalid initcode
 			if invTx, ok := invalidTx.(*types.Transaction); ok {
 
-				customPayload, err := helper.CustomizePayloadTransactions(&t.CLMock.LatestPayloadBuilt, types.Transactions{invTx})
+				customPayload, _, err := helper.CustomizePayloadTransactions(&t.CLMock.LatestPayloadBuilt, types.Transactions{invTx})
 				if err != nil {
 					t.Fatalf("FAIL: Unable to customize payload: %v", err)
 				}
@@ -2095,7 +2095,7 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 		customizer := &helper.CustomPayloadData{
 			Withdrawals: helper.RandomizeWithdrawalsOrder(t.CLMock.LatestExecutedPayload.Withdrawals),
 		}
-		sidechainCurrent, err := customizer.CustomizePayload(&t.CLMock.LatestExecutedPayload)
+		sidechainCurrent, _, err := customizer.CustomizePayload(&t.CLMock.LatestExecutedPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
 		}
@@ -2103,7 +2103,7 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 			ParentHash:  &sidechainCurrent.BlockHash,
 			Withdrawals: helper.RandomizeWithdrawalsOrder(nextCanonicalPayload.Withdrawals),
 		}
-		sidechainHead, err := customizer.CustomizePayload(nextCanonicalPayload)
+		sidechainHead, _, err := customizer.CustomizePayload(nextCanonicalPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
 		}

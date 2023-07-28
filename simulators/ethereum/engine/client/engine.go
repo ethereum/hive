@@ -38,10 +38,10 @@ type Engine interface {
 	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, error)
 	GetPayloadV3(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, error)
 
-	NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes *[]common.Hash) (api.PayloadStatusV1, error)
+	NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (api.PayloadStatusV1, error)
 	NewPayloadV1(ctx context.Context, payload *typ.ExecutableDataV1) (api.PayloadStatusV1, error)
 	NewPayloadV2(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error)
-	NewPayloadV3(ctx context.Context, payload *typ.ExecutableData, versionedHashes *[]common.Hash) (api.PayloadStatusV1, error)
+	NewPayloadV3(ctx context.Context, payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (api.PayloadStatusV1, error)
 
 	GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error)
 	GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*typ.ExecutionPayloadBodyV1, error)

@@ -452,13 +452,13 @@ func (ec *HiveRPCEngineClient) GetBlobsBundleV1(ctx context.Context, payloadId *
 }
 
 // New Payload API Call Methods
-func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes *[]common.Hash) (result api.PayloadStatusV1, err error) {
+func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (result api.PayloadStatusV1, err error) {
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 
 	if version >= 3 {
-		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload, versionedHashes)
+		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload, versionedHashes, beaconRoot)
 	} else {
 		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload)
 	}
@@ -469,17 +469,17 @@ func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payl
 func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *typ.ExecutableDataV1) (api.PayloadStatusV1, error) {
 	ed := payload.ToExecutableData()
 	ec.latestPayloadSent = &ed
-	return ec.NewPayload(ctx, 1, payload, nil)
+	return ec.NewPayload(ctx, 1, payload, nil, nil)
 }
 
 func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error) {
 	ec.latestPayloadSent = payload
-	return ec.NewPayload(ctx, 2, payload, nil)
+	return ec.NewPayload(ctx, 2, payload, nil, nil)
 }
 
-func (ec *HiveRPCEngineClient) NewPayloadV3(ctx context.Context, payload *typ.ExecutableData, versionedHashes *[]common.Hash) (api.PayloadStatusV1, error) {
+func (ec *HiveRPCEngineClient) NewPayloadV3(ctx context.Context, payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (api.PayloadStatusV1, error) {
 	ec.latestPayloadSent = payload
-	return ec.NewPayload(ctx, 3, payload, versionedHashes)
+	return ec.NewPayload(ctx, 3, payload, versionedHashes, beaconRoot)
 }
 
 // Exchange Transition Configuration API Call Methods
