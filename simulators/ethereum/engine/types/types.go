@@ -132,9 +132,9 @@ type ExecutableData struct {
 	BlockHash             common.Hash         `json:"blockHash"     gencodec:"required"`
 	Transactions          [][]byte            `json:"transactions"  gencodec:"required"`
 	Withdrawals           []*types.Withdrawal `json:"withdrawals"`
-	BlobGasUsed           *uint64             `json:"blobGasUsed"`
-	ExcessBlobGas         *uint64             `json:"excessBlobGas"`
-	ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot"`
+	BlobGasUsed           *uint64             `json:"blobGasUsed,omitempty"`
+	ExcessBlobGas         *uint64             `json:"excessBlobGas,omitempty"`
+	ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot,omitempty"`
 }
 
 // JSON type overrides for executableData.
