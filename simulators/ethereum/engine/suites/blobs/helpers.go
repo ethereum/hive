@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"reflect"
 	"sync"
 
@@ -126,4 +127,12 @@ func VerifyTransactionFromNode(ctx context.Context, eth client.Eth, tx typ.Trans
 	}
 
 	return nil
+}
+
+func BeaconRootStorageIndexes(timestamp uint64) (common.Hash, common.Hash) {
+	// Calculate keys
+	timestampReduced := timestamp % HISTORICAL_ROOTS_MODULUS
+	timestampExtended := timestampReduced + HISTORICAL_ROOTS_MODULUS
+
+	return common.BigToHash(new(big.Int).SetUint64(timestampReduced)), common.BigToHash(new(big.Int).SetUint64(timestampExtended))
 }

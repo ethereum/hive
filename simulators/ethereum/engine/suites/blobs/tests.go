@@ -15,7 +15,7 @@ var (
 	DATAHASH_START_ADDRESS = big.NewInt(0x100)
 	DATAHASH_ADDRESS_COUNT = 1000
 
-	// Fork specific constants
+	// EIP 4844 specific constants
 	GAS_PER_BLOB = uint64(0x20000)
 
 	MIN_DATA_GASPRICE         = uint64(1)
@@ -28,6 +28,10 @@ var (
 	BLOB_GASPRICE_UPDATE_FRACTION = uint64(3338477)
 
 	BLOB_COMMITMENT_VERSION_KZG = byte(0x01)
+
+	// EIP 4788 specific constants
+	HISTORY_STORAGE_ADDRESS  = uint8(0x0B)
+	HISTORICAL_ROOTS_MODULUS = uint64(98304)
 
 	// Engine API errors
 	INVALID_PARAMS_ERROR   = pInt(-32602)

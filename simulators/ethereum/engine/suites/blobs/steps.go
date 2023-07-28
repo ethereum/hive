@@ -253,6 +253,25 @@ func GetBlobDataInPayload(pool *TestBlobTxPool, payload *typ.ExecutableData) ([]
 	return blobTxsInPayload, blobDataInPayload, nil
 }
 
+func VerifyBeaconRootStorage(ctx context.Context, testEngine *test.TestEngineClient, payload *typ.ExecutableData) error {
+	// Read the storage keys from the stateful precompile that stores the beacon roots and verify
+	// that the beacon root is the same as the one in the payload
+	blockNumber := new(big.Int).SetUint64(payload.Number)
+	precompileAddress := common.BytesToAddress([]byte{HISTORY_STORAGE_ADDRESS})
+
+	timestampKey, beaconRootKey := BeaconRootStorageIndexes(payload.Timestamp)
+
+	// Verify the timestamp key
+	r := testEngine.TestStorageAt(precompileAddress, timestampKey, blockNumber)
+	r.ExpectBigIntStorageEqual(new(big.Int).SetUint64(payload.Timestamp))
+
+	// Verify the beacon root key
+	r = testEngine.TestStorageAt(precompileAddress, beaconRootKey, blockNumber)
+	parentBeaconBlockRoot := clmock.TimestampToBeaconRoot(payload.Timestamp)
+	r.ExpectStorageEqual(parentBeaconBlockRoot)
+	return nil
+}
+
 func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.ForkConfig, testEngine *test.TestEngineClient, blobTxsInPayload []*typ.TransactionWithBlobData, payload *typ.ExecutableData, previousPayload *typ.ExecutableData) error {
 	var (
 		parentExcessBlobGas = uint64(0)
@@ -295,6 +314,10 @@ func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.F
 
 		if totalBlobCount != step.ExpectedIncludedBlobCount {
 			return fmt.Errorf("expected %d blobs in transactions, got %d", step.ExpectedIncludedBlobCount, totalBlobCount)
+		}
+
+		if err := VerifyBeaconRootStorage(ctx, testEngine, payload); err != nil {
+			return err
 		}
 
 	} else {
