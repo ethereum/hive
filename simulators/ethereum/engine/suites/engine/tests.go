@@ -790,7 +790,7 @@ func unknownFinalizedBlockHash(t *test.Env) {
 
 			// Test again using PayloadAttributes, should also return INVALID and no PayloadID
 			r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceStateUnknownFinalizedHash,
-				&api.PayloadAttributes{
+				&typ.PayloadAttributes{
 					Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
 					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
@@ -831,7 +831,7 @@ func unknownHeadBlockHash(t *test.Env) {
 
 	// Test again using PayloadAttributes, should also return SYNCING and no PayloadID
 	r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceStateUnknownHeadHash,
-		&api.PayloadAttributes{
+		&typ.PayloadAttributes{
 			Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
 			Random:                common.Hash{},
 			SuggestedFeeRecipient: common.Address{},
@@ -922,7 +922,7 @@ func invalidPayloadAttributesGen(syncing bool) func(*test.Env) {
 					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				}
-				attr := api.PayloadAttributes{
+				attr := typ.PayloadAttributes{
 					Timestamp:             0,
 					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
@@ -962,7 +962,7 @@ func uniquePayloadID(t *test.Env) {
 	fcState := &api.ForkchoiceStateV1{
 		HeadBlockHash: parentHash,
 	}
-	payloadAttributes := &api.PayloadAttributes{
+	payloadAttributes := &typ.PayloadAttributes{
 		Timestamp:             t.CLMock.LatestHeader.Time + 1,
 		Random:                common.Hash{},
 		SuggestedFeeRecipient: common.Address{},
@@ -1254,7 +1254,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 					SafeBlockHash:      alteredPayload.BlockHash,
 					FinalizedBlockHash: alteredPayload.BlockHash,
 				}
-				payloadAttrbutes := api.PayloadAttributes{
+				payloadAttrbutes := typ.PayloadAttributes{
 					Timestamp:             alteredPayload.Timestamp + 1,
 					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
@@ -1583,7 +1583,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			cA = b
 		} else {
 			t.CLMock.ProduceBlocks(int(cAHeight.Int64()), clmock.BlockProcessCallbacks{})
-			cA, err = typ.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt, nil)
+			cA, err = typ.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt, nil, nil)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
 			}
@@ -1651,7 +1651,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					}
 				}
 
-				sideBlock, err := typ.ExecutableDataToBlock(*sidePayload, nil)
+				sideBlock, err := typ.ExecutableDataToBlock(*sidePayload, nil, nil)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
 				}
@@ -1660,7 +1660,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					if spec.PayloadField == helper.InvalidOmmers {
 						if unclePayload, ok := t.CLMock.ExecutedPayloadHistory[sideBlock.NumberU64()-1]; ok && unclePayload != nil {
 							// Uncle is a PoS payload
-							uncle, err = typ.ExecutableDataToBlock(*unclePayload, nil)
+							uncle, err = typ.ExecutableDataToBlock(*unclePayload, nil, nil)
 							if err != nil {
 								t.Fatalf("FAIL (%s): Unable to get uncle block: %v", t.TestName, err)
 							}
@@ -2126,7 +2126,7 @@ func reorgPrevValidatedPayloadOnSideChain(t *test.Env) {
 				HeadBlockHash:      sidechainPayloads[len(sidechainPayloads)-2].BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-			}, &api.PayloadAttributes{
+			}, &typ.PayloadAttributes{
 				Timestamp:             t.CLMock.LatestHeader.Time,
 				Random:                prevRandao,
 				SuggestedFeeRecipient: common.Address{},
@@ -2540,7 +2540,7 @@ func sidechainReorg(t *test.Env) {
 			rand.Read(alternativePrevRandao[:])
 
 			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice,
-				&api.PayloadAttributes{
+				&typ.PayloadAttributes{
 					Timestamp:             t.CLMock.LatestHeader.Time + 1,
 					Random:                alternativePrevRandao,
 					SuggestedFeeRecipient: t.CLMock.NextFeeRecipient,
@@ -2784,7 +2784,7 @@ func validPayloadFcUSyncingClient(t *test.Env) {
 				HeadBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
 				FinalizedBlockHash: t.CLMock.LatestPayloadBuilt.BlockHash,
-			}, &api.PayloadAttributes{
+			}, &typ.PayloadAttributes{
 				Timestamp:             t.CLMock.LatestPayloadBuilt.Timestamp + 1,
 				Random:                common.Hash{},
 				SuggestedFeeRecipient: common.Address{},
@@ -2899,7 +2899,7 @@ func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 
 			{
 				// Get a payload from the invalid payload producer and invalidate it
-				r := invalidPayloadProducer.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, &api.PayloadAttributes{
+				r := invalidPayloadProducer.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, &typ.PayloadAttributes{
 					Timestamp:             t.CLMock.LatestHeader.Time + 1,
 					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},

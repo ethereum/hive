@@ -89,7 +89,7 @@ type ForkchoiceResponseExpectObject struct {
 	ErrorCode int
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) *ForkchoiceResponseExpectObject {
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) *ForkchoiceResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	resp, err := tec.Engine.ForkchoiceUpdatedV1(ctx, fcState, pAttributes)
@@ -105,7 +105,7 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.Forkchoi
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) *ForkchoiceResponseExpectObject {
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) *ForkchoiceResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	resp, err := tec.Engine.ForkchoiceUpdatedV2(ctx, fcState, pAttributes)
@@ -121,7 +121,7 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.Forkchoi
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
+func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
 	if version == -1 {
 		version = client.LatestForkchoiceUpdatedVersion
 	}

@@ -152,7 +152,7 @@ type GethNode struct {
 
 	// Engine updates info
 	latestFcUStateSent *beacon.ForkchoiceStateV1
-	latestPAttrSent    *beacon.PayloadAttributes
+	latestPAttrSent    *typ.PayloadAttributes
 	latestFcUResponse  *beacon.ForkChoiceResponse
 
 	latestPayloadSent          *typ.ExecutableData
@@ -490,7 +490,7 @@ func (n *GethNode) NewPayloadV3(ctx context.Context, pl *typ.ExecutableData, ver
 	return resp, err
 }
 
-func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	switch version {
 	case 1:
 		return n.ForkchoiceUpdatedV1(ctx, fcs, payload)
@@ -501,20 +501,33 @@ func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beac
 	}
 }
 
-func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
-	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, payload)
+	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, &beacon.PayloadAttributes{
+		Timestamp:             payload.Timestamp,
+		Random:                payload.Random,
+		SuggestedFeeRecipient: payload.SuggestedFeeRecipient,
+	})
 	n.latestFcUResponse = &fcr
 	return fcr, err
 }
 
-func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
-	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, payload)
+	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, &beacon.PayloadAttributes{
+		Timestamp:             payload.Timestamp,
+		Random:                payload.Random,
+		SuggestedFeeRecipient: payload.SuggestedFeeRecipient,
+		Withdrawals:           payload.Withdrawals,
+	})
 	n.latestFcUResponse = &fcr
 	return fcr, err
+}
+
+func (n *GethNode) ForkchoiceUpdatedV3(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+	panic("not supported yet")
 }
 
 func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
@@ -767,7 +780,7 @@ func (n *GethNode) PostRunVerifications() error {
 	return nil
 }
 
-func (n *GethNode) LatestForkchoiceSent() (fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributes) {
+func (n *GethNode) LatestForkchoiceSent() (fcState *beacon.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) {
 	return n.latestFcUStateSent, n.latestPAttrSent
 }
 

@@ -1178,7 +1178,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
-					&beacon.PayloadAttributes{
+					&typ.PayloadAttributes{
 						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
@@ -1194,7 +1194,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
-					&beacon.PayloadAttributes{
+					&typ.PayloadAttributes{
 						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
@@ -1269,7 +1269,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
-					&beacon.PayloadAttributes{
+					&typ.PayloadAttributes{
 						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
@@ -1632,7 +1632,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 				}
 
 				var version int
-				pAttributes := beacon.PayloadAttributes{
+				pAttributes := typ.PayloadAttributes{
 					Random:                t.CLMock.LatestPayloadAttributes.Random,
 					SuggestedFeeRecipient: t.CLMock.LatestPayloadAttributes.SuggestedFeeRecipient,
 				}
@@ -1705,7 +1705,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		// the sidechain.
 		for i := uint64(0); i < ws.GetSidechainWithdrawalsForkHeight()-ws.WithdrawalsForkHeight; i++ {
 			sidechainWithdrawalsHistory[sidechainHeight+1], sidechainNextIndex = ws.GenerateWithdrawalsForBlock(sidechainNextIndex, sidechainStartAccount)
-			pAttributes := beacon.PayloadAttributes{
+			pAttributes := typ.PayloadAttributes{
 				Timestamp:             sidechain[sidechainHeight].Timestamp + ws.GetSidechainBlockTimeIncrements(),
 				Random:                t.CLMock.LatestPayloadAttributes.Random,
 				SuggestedFeeRecipient: t.CLMock.LatestPayloadAttributes.SuggestedFeeRecipient,
@@ -2075,7 +2075,7 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 			&beacon.ForkchoiceStateV1{
 				HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 			},
-			&beacon.PayloadAttributes{
+			&typ.PayloadAttributes{
 				Timestamp:   t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 				Withdrawals: nextWithdrawals,
 			},

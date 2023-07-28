@@ -159,7 +159,7 @@ type HiveRPCEngineClient struct {
 
 	// Engine updates info
 	latestFcUStateSent *api.ForkchoiceStateV1
-	latestPAttrSent    *api.PayloadAttributes
+	latestPAttrSent    *typ.PayloadAttributes
 	latestFcUResponse  *api.ForkChoiceResponse
 
 	latestPayloadSent          *typ.ExecutableData
@@ -338,7 +338,7 @@ func (ec *HiveRPCEngineClient) PrepareDefaultAuthCallToken() error {
 // Engine API Call Methods
 
 // Forkchoice Updated API Calls
-func (ec *HiveRPCEngineClient) ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
+func (ec *HiveRPCEngineClient) ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error) {
 	var result api.ForkChoiceResponse
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
@@ -354,12 +354,16 @@ func (ec *HiveRPCEngineClient) ForkchoiceUpdated(ctx context.Context, version in
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
+func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error) {
 	return ec.ForkchoiceUpdated(ctx, 1, fcState, pAttributes)
 }
 
-func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error) {
+func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error) {
 	return ec.ForkchoiceUpdated(ctx, 2, fcState, pAttributes)
+}
+
+func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV3(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error) {
+	return ec.ForkchoiceUpdated(ctx, 3, fcState, pAttributes)
 }
 
 // Get Payload API Calls
@@ -599,7 +603,7 @@ func (ec *HiveRPCEngineClient) PostRunVerifications() error {
 	return nil
 }
 
-func (ec *HiveRPCEngineClient) LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) {
+func (ec *HiveRPCEngineClient) LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) {
 	return ec.latestFcUStateSent, ec.latestPAttrSent
 }
 

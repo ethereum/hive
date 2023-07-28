@@ -117,24 +117,23 @@ type payloadAttributesMarshaling struct {
 
 // ExecutableData is the data necessary to execute an EL payload.
 type ExecutableData struct {
-	ParentHash            common.Hash         `json:"parentHash"    gencodec:"required"`
-	FeeRecipient          common.Address      `json:"feeRecipient"  gencodec:"required"`
-	StateRoot             common.Hash         `json:"stateRoot"     gencodec:"required"`
-	ReceiptsRoot          common.Hash         `json:"receiptsRoot"  gencodec:"required"`
-	LogsBloom             []byte              `json:"logsBloom"     gencodec:"required"`
-	Random                common.Hash         `json:"prevRandao"    gencodec:"required"`
-	Number                uint64              `json:"blockNumber"   gencodec:"required"`
-	GasLimit              uint64              `json:"gasLimit"      gencodec:"required"`
-	GasUsed               uint64              `json:"gasUsed"       gencodec:"required"`
-	Timestamp             uint64              `json:"timestamp"     gencodec:"required"`
-	ExtraData             []byte              `json:"extraData"     gencodec:"required"`
-	BaseFeePerGas         *big.Int            `json:"baseFeePerGas" gencodec:"required"`
-	BlockHash             common.Hash         `json:"blockHash"     gencodec:"required"`
-	Transactions          [][]byte            `json:"transactions"  gencodec:"required"`
-	Withdrawals           []*types.Withdrawal `json:"withdrawals"`
-	BlobGasUsed           *uint64             `json:"blobGasUsed,omitempty"`
-	ExcessBlobGas         *uint64             `json:"excessBlobGas,omitempty"`
-	ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot,omitempty"`
+	ParentHash    common.Hash         `json:"parentHash"    gencodec:"required"`
+	FeeRecipient  common.Address      `json:"feeRecipient"  gencodec:"required"`
+	StateRoot     common.Hash         `json:"stateRoot"     gencodec:"required"`
+	ReceiptsRoot  common.Hash         `json:"receiptsRoot"  gencodec:"required"`
+	LogsBloom     []byte              `json:"logsBloom"     gencodec:"required"`
+	Random        common.Hash         `json:"prevRandao"    gencodec:"required"`
+	Number        uint64              `json:"blockNumber"   gencodec:"required"`
+	GasLimit      uint64              `json:"gasLimit"      gencodec:"required"`
+	GasUsed       uint64              `json:"gasUsed"       gencodec:"required"`
+	Timestamp     uint64              `json:"timestamp"     gencodec:"required"`
+	ExtraData     []byte              `json:"extraData"     gencodec:"required"`
+	BaseFeePerGas *big.Int            `json:"baseFeePerGas" gencodec:"required"`
+	BlockHash     common.Hash         `json:"blockHash"     gencodec:"required"`
+	Transactions  [][]byte            `json:"transactions"  gencodec:"required"`
+	Withdrawals   []*types.Withdrawal `json:"withdrawals"`
+	BlobGasUsed   *uint64             `json:"blobGasUsed,omitempty"`
+	ExcessBlobGas *uint64             `json:"excessBlobGas,omitempty"`
 }
 
 // JSON type overrides for executableData.
@@ -165,9 +164,6 @@ type executionPayloadEnvelopeMarshaling struct {
 
 // Convert Execution Payload Types
 func ToBeaconExecutableData(pl *ExecutableData) (geth_beacon.ExecutableData, error) {
-	if pl.ParentBeaconBlockRoot != nil {
-		return geth_beacon.ExecutableData{}, fmt.Errorf("parent geth_beacon block root is not nil is unsupported")
-	}
 	return geth_beacon.ExecutableData{
 		ParentHash:    pl.ParentHash,
 		FeeRecipient:  pl.FeeRecipient,
@@ -210,8 +206,8 @@ func FromBeaconExecutableData(ed *geth_beacon.ExecutableData) (ExecutableData, e
 	}, nil
 }
 
-func ExecutableDataToBlock(ed ExecutableData, versionedHashes []common.Hash) (*types.Block, error) {
-	if ed.ParentBeaconBlockRoot != nil {
+func ExecutableDataToBlock(ed ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash) (*types.Block, error) {
+	if beaconRoot != nil {
 		return nil, fmt.Errorf("parent geth_beacon block root is not nil is unsupported")
 	}
 	geth_ed, err := ToBeaconExecutableData(&ed)

@@ -29,9 +29,10 @@ type Eth interface {
 }
 
 type Engine interface {
-	ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
-	ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
-	ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) (api.ForkChoiceResponse, error)
+	ForkchoiceUpdatedV1(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error)
+	ForkchoiceUpdatedV2(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error)
+	ForkchoiceUpdatedV3(ctx context.Context, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error)
+	ForkchoiceUpdated(ctx context.Context, version int, fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) (api.ForkChoiceResponse, error)
 
 	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, error)
 	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, error)
@@ -45,7 +46,7 @@ type Engine interface {
 	GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error)
 	GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*typ.ExecutionPayloadBodyV1, error)
 
-	LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes)
+	LatestForkchoiceSent() (fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes)
 	LatestNewPayloadSent() (payload *typ.ExecutableData)
 
 	LatestForkchoiceResponse() (fcuResponse *api.ForkChoiceResponse)

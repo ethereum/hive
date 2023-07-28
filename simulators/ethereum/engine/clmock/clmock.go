@@ -2,6 +2,8 @@ package clmock
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,7 +100,7 @@ type CLMocker struct {
 	LatestPayloadBuilt      typ.ExecutableData
 	LatestBlockValue        *big.Int
 	LatestBlobBundle        *typ.BlobsBundle
-	LatestPayloadAttributes api.PayloadAttributes
+	LatestPayloadAttributes typ.PayloadAttributes
 	LatestExecutedPayload   typ.ExecutableData
 	LatestForkchoice        api.ForkchoiceStateV1
 
@@ -377,12 +379,24 @@ func (cl *CLMocker) SetNextWithdrawals(nextWithdrawals types.Withdrawals) {
 	cl.NextWithdrawals = nextWithdrawals
 }
 
+func TimestampToBeaconRoot(timestamp uint64) common.Hash {
+	// Generates a deterministic hash from the timestamp
+	beaconBlockRoot := common.Hash{}
+	timestampBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(timestampBytes[:], timestamp)
+	md := sha256.New()
+	md.Write(timestampBytes)
+	timestampHash := md.Sum(nil)
+	copy(beaconBlockRoot[:], timestampHash)
+	return beaconBlockRoot
+}
+
 func (cl *CLMocker) RequestNextPayload() {
 	// Generate a random value for the PrevRandao field
 	nextPrevRandao := common.Hash{}
 	rand.Read(nextPrevRandao[:])
 
-	cl.LatestPayloadAttributes = api.PayloadAttributes{
+	cl.LatestPayloadAttributes = typ.PayloadAttributes{
 		Random:                nextPrevRandao,
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
 		Timestamp:             cl.GetNextBlockTimestamp(),
@@ -390,6 +404,12 @@ func (cl *CLMocker) RequestNextPayload() {
 
 	if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) && cl.NextWithdrawals != nil {
 		cl.LatestPayloadAttributes.Withdrawals = cl.NextWithdrawals
+	}
+
+	if cl.IsCancun(cl.LatestPayloadAttributes.Timestamp) {
+		// Write a deterministic hash based on the block number
+		beaconBlockRoot := TimestampToBeaconRoot(cl.LatestPayloadAttributes.Timestamp)
+		cl.LatestPayloadAttributes.ParentBeaconBlockRoot = &beaconBlockRoot
 	}
 
 	// Save random value
@@ -402,14 +422,14 @@ func (cl *CLMocker) RequestNextPayload() {
 		fcUVersion int
 		err        error
 	)
-	if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
+	if cl.IsCancun(cl.LatestPayloadAttributes.Timestamp) {
+		fcUVersion = 3
+	} else if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
 		fcUVersion = 2
-		resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV2(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
-
 	} else {
 		fcUVersion = 1
-		resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV1(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	}
+	resp, err = cl.NextBlockProducer.ForkchoiceUpdated(ctx, fcUVersion, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV%d (%v): %v", fcUVersion, cl.NextBlockProducer.ID(), err)
 	}
@@ -717,7 +737,7 @@ type ForkChoiceOutcome struct {
 	Error              error
 }
 
-func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, payloadAttr *api.PayloadAttributes, version int) []ForkChoiceOutcome {
+func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, payloadAttr *typ.PayloadAttributes, version int) []ForkChoiceOutcome {
 	responses := make([]ForkChoiceOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.ID()
