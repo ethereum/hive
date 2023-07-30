@@ -68,7 +68,7 @@ fi
 
 # Dump genesis
 #echo "Supplied genesis state:"
-#cat /genesis.json
+cat /genesis.json
 
 echo "Command flags till now:"
 echo $FLAGS

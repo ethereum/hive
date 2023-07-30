@@ -350,6 +350,7 @@ type ErigonAura struct {
 	PosdaoTransition                 int               `json:"posdaoTransition"`
 	BlockGasLimitContractTransitions map[string]string `json:"blockGasLimitContractTransitions"`
 	Registrar                        string            `json:"registrar"`
+	WithdrawalContractAddress        string            `json:"withdrawalContractAddress"`
 }
 
 type ErigonConfig struct {
@@ -379,8 +380,7 @@ type ErigonAccount struct {
 }
 
 type ErigonGenesis struct {
-	ErigonConfig ErigonConfig `json:"config"`
-	//ErigonTimestamp  uint64                   `json:"timestamp"`
+	ErigonConfig     ErigonConfig             `json:"config"`
 	AuRaSeal         string                   `json:"auRaSeal"`
 	ErigonGasLimit   string                   `json:"gasLimit"`
 	ErigonDifficulty string                   `json:"difficulty"`

@@ -1435,6 +1435,8 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper6(
 			}
 		case "registrar":
 			out.Registrar = string(in.String())
+		case "withdrawalContractAddress":
+			out.WithdrawalContractAddress = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -1535,6 +1537,11 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper6(
 		const prefix string = ",\"registrar\":"
 		out.RawString(prefix)
 		out.String(string(in.Registrar))
+	}
+	{
+		const prefix string = ",\"withdrawalContractAddress\":"
+		out.RawString(prefix)
+		out.String(string(in.WithdrawalContractAddress))
 	}
 	out.RawByte('}')
 }
