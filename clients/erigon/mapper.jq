@@ -52,5 +52,6 @@ def to_bool:
     "londonBlock": env.HIVE_FORK_LONDON|to_int,
     "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
+    "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
   }|remove_empty
 }
