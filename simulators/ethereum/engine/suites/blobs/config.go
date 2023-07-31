@@ -92,6 +92,12 @@ func (bs *BlobsBaseSpec) GetGenesis() *core.Genesis {
 		}
 	}
 
+	// Add 1 wei to the 4788 stateful precompile so its account is not deleted at the end of
+	// block execution.
+	genesis.Alloc[common.BigToAddress(new(big.Int).SetUint64(uint64(HISTORY_STORAGE_ADDRESS)))] = core.GenesisAccount{
+		Balance: big.NewInt(1),
+	}
+
 	return genesis
 }
 
