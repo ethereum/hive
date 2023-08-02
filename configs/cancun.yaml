@@ -9,7 +9,7 @@
   nametag: cancun-git
   build_args:
       github: ethereumjs/ethereumjs-monorepo
-      tag: master # TODO: add branch
+      tag: master
 
 - client: go-ethereum
   nametag: cancun-git
