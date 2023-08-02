@@ -129,7 +129,7 @@ type NewPayloads struct {
 	// Extra modifications on NewPayload to potentially generate an invalid payload
 	PayloadCustomizer helper.PayloadCustomizer
 	// Version to use to call NewPayload
-	Version uint64
+	Version int
 	// Expected responses on the NewPayload call
 	ExpectedError  *int
 	ExpectedStatus test.PayloadStatus
@@ -457,20 +457,9 @@ func (step NewPayloads) Execute(t *BlobTestContext) error {
 
 				version := step.Version
 				if version == 0 {
-					if t.Env.ForkConfig.IsCancun(payload.Timestamp) {
-						version = 3
-					} else {
-						version = 2
-					}
+					version = t.Env.ForkConfig.NewPayloadVersion(payload.Timestamp)
 				}
-
-				if version == 3 {
-					r = t.TestEngine.TestEngineNewPayloadV3(payload, versionedHashes, beaconRoot)
-				} else if version == 2 {
-					r = t.TestEngine.TestEngineNewPayloadV2(payload)
-				} else {
-					t.Fatalf("FAIL: Unknown version %d", step.Version)
-				}
+				r = t.TestEngine.TestEngineNewPayload(payload, versionedHashes, beaconRoot, version)
 				if step.ExpectedError != nil {
 					r.ExpectErrorCode(*step.ExpectedError)
 				} else {

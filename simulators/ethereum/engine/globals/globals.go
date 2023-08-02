@@ -157,3 +157,30 @@ func (f *ForkConfig) IsShanghai(blockTimestamp uint64) bool {
 func (f *ForkConfig) IsCancun(blockTimestamp uint64) bool {
 	return f.CancunTimestamp != nil && new(big.Int).SetUint64(blockTimestamp).Cmp(f.CancunTimestamp) >= 0
 }
+
+func (f *ForkConfig) ForkchoiceUpdatedVersion(timestamp uint64) int {
+	if f.IsCancun(timestamp) {
+		return 3
+	} else if f.IsShanghai(timestamp) {
+		return 2
+	}
+	return 1
+}
+
+func (f *ForkConfig) NewPayloadVersion(timestamp uint64) int {
+	if f.IsCancun(timestamp) {
+		return 3
+	} else if f.IsShanghai(timestamp) {
+		return 2
+	}
+	return 1
+}
+
+func (f *ForkConfig) GetPayloadVersion(timestamp uint64) int {
+	if f.IsCancun(timestamp) {
+		return 3
+	} else if f.IsShanghai(timestamp) {
+		return 2
+	}
+	return 1
+}

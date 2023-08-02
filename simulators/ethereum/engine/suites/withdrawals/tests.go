@@ -1683,7 +1683,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 				// This block is part of both chains, simply forward it to the secondary client
 				payload = &t.CLMock.LatestPayloadBuilt
 			}
-			r := secondaryEngineTest.TestEngineNewPayload(payload, version)
+			r := secondaryEngineTest.TestEngineNewPayload(payload, nil, nil, version)
 			r.ExpectStatus(test.Valid)
 			p := secondaryEngineTest.TestEngineForkchoiceUpdated(
 				&beacon.ForkchoiceStateV1{
@@ -1780,7 +1780,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 				version = 1
 			}
 			t.Logf("INFO (%s): Sending sidechain payload %d, hash=%s, parent=%s", t.TestName, payloadNumber, payload.BlockHash, payload.ParentHash)
-			r := t.TestEngine.TestEngineNewPayload(payload, version)
+			r := t.TestEngine.TestEngineNewPayload(payload, nil, nil, version)
 			r.ExpectStatusEither(test.Valid, test.Accepted)
 			p := t.TestEngine.TestEngineForkchoiceUpdated(
 				&beacon.ForkchoiceStateV1{

@@ -268,11 +268,15 @@ func (tec *TestEngineClient) TestEngineNewPayloadV3(payload *typ.ExecutableData,
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineNewPayload(payload *typ.ExecutableData, version int) *NewPayloadResponseExpectObject {
-	if version == 2 {
+func (tec *TestEngineClient) TestEngineNewPayload(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash, version int) *NewPayloadResponseExpectObject {
+	if version == 3 {
+		return tec.TestEngineNewPayloadV3(payload, versionedHashes, beaconRoot)
+	} else if version == 2 {
 		return tec.TestEngineNewPayloadV2(payload)
+	} else if version == 1 {
+		return tec.TestEngineNewPayloadV1(payload)
 	}
-	return tec.TestEngineNewPayloadV1(payload)
+	panic(fmt.Sprintf("Unsupported version: %d", version))
 }
 
 func (exp *NewPayloadResponseExpectObject) PayloadJson() string {

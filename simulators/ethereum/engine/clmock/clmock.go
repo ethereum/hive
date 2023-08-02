@@ -391,24 +391,6 @@ func TimestampToBeaconRoot(timestamp uint64) common.Hash {
 	return beaconRoot
 }
 
-func (cl *CLMocker) ForkchoiceUpdatedVersion(timestamp uint64) int {
-	if cl.IsCancun(timestamp) {
-		return 3
-	} else if cl.IsShanghai(timestamp) {
-		return 2
-	}
-	return 1
-}
-
-func (cl *CLMocker) NewPayloadVersion(timestamp uint64) int {
-	if cl.IsCancun(timestamp) {
-		return 3
-	} else if cl.IsShanghai(timestamp) {
-		return 2
-	}
-	return 1
-}
-
 func (cl *CLMocker) RequestNextPayload() {
 	// Generate a random value for the PrevRandao field
 	nextPrevRandao := common.Hash{}
