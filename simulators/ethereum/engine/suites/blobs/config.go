@@ -56,9 +56,9 @@ func (bs *BlobsBaseSpec) GetGenesis() *core.Genesis {
 	genesis.ExtraData = []byte{}
 
 	if bs.CancunForkHeight == 0 {
-		genesis.BlobGasUsed = pUint64(0)
-		genesis.ExcessBlobGas = pUint64(0)
-		// TODO (DEVNET 8): Add parent beacon block
+		genesis.BlobGasUsed = new(uint64)
+		genesis.ExcessBlobGas = new(uint64)
+		genesis.BeaconRoot = new(common.Hash)
 	}
 
 	// Add accounts that use the DATAHASH opcode
