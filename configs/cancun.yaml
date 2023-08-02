@@ -3,12 +3,12 @@
   dockerfile: git
   build_args:
       github: hyperledger/besu
-      tag: master # TODO: add branch
+      tag: main
 
 - client: ethereumjs
   nametag: cancun-git
   build_args:
-      baseimage: ethereumjs/ethereumjs-monorepo
+      github: ethereumjs/ethereumjs-monorepo
       tag: master # TODO: add branch
 
 - client: go-ethereum
