@@ -391,6 +391,24 @@ func TimestampToBeaconRoot(timestamp uint64) common.Hash {
 	return beaconRoot
 }
 
+func (cl *CLMocker) ForkchoiceUpdatedVersion(timestamp uint64) int {
+	if cl.IsCancun(timestamp) {
+		return 3
+	} else if cl.IsShanghai(timestamp) {
+		return 2
+	}
+	return 1
+}
+
+func (cl *CLMocker) NewPayloadVersion(timestamp uint64) int {
+	if cl.IsCancun(timestamp) {
+		return 3
+	} else if cl.IsShanghai(timestamp) {
+		return 2
+	}
+	return 1
+}
+
 func (cl *CLMocker) RequestNextPayload() {
 	// Generate a random value for the PrevRandao field
 	nextPrevRandao := common.Hash{}
@@ -417,19 +435,8 @@ func (cl *CLMocker) RequestNextPayload() {
 
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
-	var (
-		resp       api.ForkChoiceResponse
-		fcUVersion int
-		err        error
-	)
-	if cl.IsCancun(cl.LatestPayloadAttributes.Timestamp) {
-		fcUVersion = 3
-	} else if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
-		fcUVersion = 2
-	} else {
-		fcUVersion = 1
-	}
-	resp, err = cl.NextBlockProducer.ForkchoiceUpdated(ctx, fcUVersion, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
+	fcUVersion := cl.ForkchoiceUpdatedVersion(cl.LatestPayloadAttributes.Timestamp)
+	resp, err := cl.NextBlockProducer.ForkchoiceUpdated(ctx, fcUVersion, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV%d (%v): %v", fcUVersion, cl.NextBlockProducer.ID(), err)
 	}
@@ -488,9 +495,9 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 		}
 	}
 	// Broadcast the executePayload to all clients
-	responses := cl.BroadcastNewPayload(&cl.LatestPayloadBuilt, versionedHashes, cl.LatestPayloadAttributes.BeaconRoot)
+	version := cl.NewPayloadVersion(cl.LatestPayloadBuilt.Timestamp)
 	validations := 0
-	for _, resp := range responses {
+	for _, resp := range cl.BroadcastNewPayload(&cl.LatestPayloadBuilt, versionedHashes, cl.LatestPayloadAttributes.BeaconRoot, version) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastNewPayload Error (%v): %v\n", resp.Container, resp.Error)
 		} else {
@@ -529,10 +536,7 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 }
 
 func (cl *CLMocker) broadcastLatestForkchoice() {
-	version := 1
-	if cl.IsShanghai(cl.LatestExecutedPayload.Timestamp) {
-		version = 2
-	}
+	version := cl.ForkchoiceUpdatedVersion(cl.LatestExecutedPayload.Timestamp)
 	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, version) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
@@ -701,25 +705,13 @@ type ExecutePayloadOutcome struct {
 	Error                  error
 }
 
-func (cl *CLMocker) BroadcastNewPayload(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) []ExecutePayloadOutcome {
+func (cl *CLMocker) BroadcastNewPayload(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash, version int) []ExecutePayloadOutcome {
 	responses := make([]ExecutePayloadOutcome, len(cl.EngineClients))
 	for i, ec := range cl.EngineClients {
 		responses[i].Container = ec.ID()
 		ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 		defer cancel()
-		var (
-			execPayloadResp api.PayloadStatusV1
-			err             error
-		)
-		if cl.IsCancun(payload.Timestamp) {
-			execPayloadResp, err = ec.NewPayloadV3(ctx, payload, versionedHashes, beaconRoot)
-		} else if cl.IsShanghai(payload.Timestamp) {
-			execPayloadResp, err = ec.NewPayloadV2(ctx, payload)
-		} else {
-			edv1 := &typ.ExecutableDataV1{}
-			edv1.FromExecutableData(payload)
-			execPayloadResp, err = ec.NewPayloadV1(ctx, edv1)
-		}
+		execPayloadResp, err := ec.NewPayload(ctx, version, payload, versionedHashes, beaconRoot)
 		if err != nil {
 			cl.Errorf("CLMocker: Could not ExecutePayloadV1: %v", err)
 			responses[i].Error = err
@@ -745,15 +737,7 @@ func (cl *CLMocker) BroadcastForkchoiceUpdated(fcstate *api.ForkchoiceStateV1, p
 		if cl.IsOptimisticallySyncing() || newPayloadStatus.Status == "VALID" {
 			ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 			defer cancel()
-			var (
-				fcUpdatedResp api.ForkChoiceResponse
-				err           error
-			)
-			if version == 2 {
-				fcUpdatedResp, err = ec.ForkchoiceUpdatedV2(ctx, fcstate, payloadAttr)
-			} else if version == 1 {
-				fcUpdatedResp, err = ec.ForkchoiceUpdatedV1(ctx, fcstate, payloadAttr)
-			}
+			fcUpdatedResp, err := ec.ForkchoiceUpdated(ctx, version, fcstate, payloadAttr)
 			if err != nil {
 				cl.Errorf("CLMocker: Could not ForkchoiceUpdatedV1: %v", err)
 				responses[i].Error = err
