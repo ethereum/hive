@@ -449,7 +449,7 @@ func (step NewPayloads) Execute(t *BlobTestContext) error {
 
 				if step.PayloadCustomizer != nil {
 					// Send a custom new payload
-					payload, beaconRoot, err = step.PayloadCustomizer.CustomizePayload(payload)
+					payload, beaconRoot, err = step.PayloadCustomizer.CustomizePayload(payload, beaconRoot)
 					if err != nil {
 						t.Fatalf("FAIL: Error customizing payload (payload %d/%d): %v", p+1, payloadCount, err)
 					}
@@ -620,7 +620,7 @@ func (step SendModifiedLatestPayload) Execute(t *BlobTestContext) error {
 	}
 	// Modify the payload
 	if step.PayloadCustomizer != nil {
-		payload, beaconRoot, err = step.PayloadCustomizer.CustomizePayload(payload)
+		payload, beaconRoot, err = step.PayloadCustomizer.CustomizePayload(payload, beaconRoot)
 		if err != nil {
 			return fmt.Errorf("error modifying payload: %v", err)
 		}

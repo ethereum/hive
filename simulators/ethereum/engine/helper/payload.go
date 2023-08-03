@@ -15,7 +15,7 @@ import (
 )
 
 type PayloadCustomizer interface {
-	CustomizePayload(basePayload *typ.ExecutableData) (modifiedPayload *typ.ExecutableData, beaconRoot *common.Hash, err error)
+	CustomizePayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash) (modifiedPayload *typ.ExecutableData, modifiedBeaconRoot *common.Hash, err error)
 }
 
 type CustomPayloadData struct {
@@ -47,7 +47,7 @@ var _ PayloadCustomizer = (*CustomPayloadData)(nil)
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
 // BlockHash is calculated automatically.
-func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.ExecutableData) (*typ.ExecutableData, *common.Hash, error) {
+func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash) (*typ.ExecutableData, *common.Hash, error) {
 	txs := basePayload.Transactions
 	if customData.Transactions != nil {
 		txs = *customData.Transactions
@@ -140,6 +140,8 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 		customPayloadHeader.BeaconRoot = nil
 	} else if customData.BeaconRoot != nil {
 		customPayloadHeader.BeaconRoot = customData.BeaconRoot
+	} else if baseBeaconRoot != nil {
+		customPayloadHeader.BeaconRoot = baseBeaconRoot
 	}
 
 	// Return the new payload
@@ -171,7 +173,7 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 	return result, customPayloadHeader.BeaconRoot, nil
 }
 
-func CustomizePayloadTransactions(basePayload *typ.ExecutableData, customTransactions types.Transactions) (*typ.ExecutableData, *common.Hash, error) {
+func CustomizePayloadTransactions(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash, customTransactions types.Transactions) (*typ.ExecutableData, *common.Hash, error) {
 	byteTxs := make([][]byte, 0)
 	for _, tx := range customTransactions {
 		bytes, err := tx.MarshalBinary()
@@ -182,7 +184,7 @@ func CustomizePayloadTransactions(basePayload *typ.ExecutableData, customTransac
 	}
 	return (&CustomPayloadData{
 		Transactions: &byteTxs,
-	}).CustomizePayload(basePayload)
+	}).CustomizePayload(basePayload, baseBeaconRoot)
 }
 
 func (customData *CustomPayloadData) String() string {
@@ -234,7 +236,7 @@ func (customData *CustomPayloadData) String() string {
 
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
 // One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
-func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField InvalidPayloadBlockField) (*typ.ExecutableData, *common.Hash, error) {
+func GenerateInvalidPayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash, payloadField InvalidPayloadBlockField) (*typ.ExecutableData, *common.Hash, error) {
 
 	var customPayloadMod *CustomPayloadData
 	switch payloadField {
@@ -353,7 +355,7 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 		return &copyPayload, nil, nil
 	}
 
-	return customPayloadMod.CustomizePayload(basePayload)
+	return customPayloadMod.CustomizePayload(basePayload, baseBeaconRoot)
 }
 
 /*
