@@ -1042,16 +1042,16 @@ func (tr *TransactionReceiptExpectObject) ExpectBlockHash(expectedHash common.Ha
 func (tr *TransactionReceiptExpectObject) ExpectBlobGasUsed(expectedBlobGasUsed uint64) {
 	tr.ExpectNoError()
 
-	if expectedBlobGasUsed == tr.Receipt.BlobGasUsed {
-		tr.Fatalf("FAIL (%s): Unexpected transaction data gas used on %s: %v, dataGasUsed=%d, expected=%d", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlobGasUsed, expectedBlobGasUsed)
+	if expectedBlobGasUsed != tr.Receipt.BlobGasUsed {
+		tr.Fatalf("FAIL (%s): Unexpected transaction blob gas used on %s: %v, blobGasUsed=%d, expected=%d", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlobGasUsed, expectedBlobGasUsed)
 	}
 }
 
 func (tr *TransactionReceiptExpectObject) ExpectBlobGasPrice(expectedBlobGasPrice *big.Int) {
 	tr.ExpectNoError()
 	if (expectedBlobGasPrice == nil || tr.Receipt.BlobGasPrice == nil) && expectedBlobGasPrice != tr.Receipt.BlobGasPrice {
-		tr.Fatalf("FAIL (%s): Unexpected transaction data gas price on %s: %v, BlobGasPrice=%v, expected=%v", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlobGasPrice, expectedBlobGasPrice)
+		tr.Fatalf("FAIL (%s): Unexpected transaction blob gas price on %s: %v, BlobGasPrice=%v, expected=%v", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlobGasPrice, expectedBlobGasPrice)
 	} else if expectedBlobGasPrice != nil && tr.Receipt.BlobGasPrice != nil && expectedBlobGasPrice.Cmp(tr.Receipt.BlobGasPrice) != 0 {
-		tr.Fatalf("FAIL (%s): Unexpected transaction data gas price on %s: %v, BlobGasPrice=0x%x, expected=0x%x", tr.TestName, tr.Call, tr.Receipt.TxHash, *tr.Receipt.BlobGasPrice, *expectedBlobGasPrice)
+		tr.Fatalf("FAIL (%s): Unexpected transaction blob gas price on %s: %v, BlobGasPrice=0x%x, expected=0x%x", tr.TestName, tr.Call, tr.Receipt.TxHash, *tr.Receipt.BlobGasPrice, *expectedBlobGasPrice)
 	}
 }
