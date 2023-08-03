@@ -504,7 +504,7 @@ func (step NewPayloads) Description() string {
 // A step that sends multiple new blobs to the client
 type SendBlobTransactions struct {
 	// Number of blob transactions to send before this block's GetPayload request
-	BlobTransactionSendCount uint64
+	TransactionCount uint64
 	// Blobs per transaction
 	BlobsPerTransaction uint64
 	// Max Data Gas Cost for every blob transaction
@@ -541,7 +541,7 @@ func (step SendBlobTransactions) Execute(t *BlobTestContext) error {
 	}
 	engine = t.Engines[step.ClientIndex]
 	//  Send the blob transactions
-	for bTx := uint64(0); bTx < step.BlobTransactionSendCount; bTx++ {
+	for bTx := uint64(0); bTx < step.TransactionCount; bTx++ {
 		blobTxCreator := &helper.BlobTransactionCreator{
 			To:         &addr,
 			GasLimit:   100000,
@@ -589,7 +589,7 @@ func (step SendBlobTransactions) Execute(t *BlobTestContext) error {
 }
 
 func (step SendBlobTransactions) Description() string {
-	return fmt.Sprintf("SendBlobTransactions: %d Transactions, %d blobs each, %d max data gas fee", step.BlobTransactionSendCount, step.GetBlobsPerTransaction(), step.BlobTransactionMaxBlobGasCost.Uint64())
+	return fmt.Sprintf("SendBlobTransactions: %d Transactions, %d blobs each, %d max data gas fee", step.TransactionCount, step.GetBlobsPerTransaction(), step.BlobTransactionMaxBlobGasCost.Uint64())
 }
 
 // Send a modified version of the latest payload produced using NewPayloadV3

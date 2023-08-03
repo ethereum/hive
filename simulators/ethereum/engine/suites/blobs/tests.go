@@ -2,6 +2,7 @@
 package suite_blobs
 
 import (
+	"fmt"
 	"math/big"
 	"time"
 
@@ -62,6 +63,18 @@ var Tests = []test.SpecInterface{
 			Name: "Blob Transactions On Block 1, Shanghai Genesis",
 			About: `
 			Tests the Cancun fork since Block 1.
+
+			Verifications performed:
+			- Correct implementation of Engine API changes for Cancun:
+			  - engine_newPayloadV3, engine_forkchoiceUpdatedV3, engine_getPayloadV3
+			- Correct implementation of EIP-4844:
+			  - Blob transaction ordering and inclusion
+			  - Blob transaction blob gas cost checks
+			  - Verify Blob bundle on built payload
+			- Eth RPC changes for Cancun:
+			  - Blob fields in eth_getBlockByNumber
+			  - Beacon root in eth_getBlockByNumber
+			  - Blob fields in transaction receipts from eth_getTransactionReceipt
 			`,
 		},
 
@@ -75,7 +88,7 @@ var Tests = []test.SpecInterface{
 			// First, we send a couple of blob transactions on genesis,
 			// with enough data gas cost to make sure they are included in the first block.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 
@@ -90,7 +103,7 @@ var Tests = []test.SpecInterface{
 			// Try to increase the data gas cost of the blob transactions
 			// by maxing out the number of blobs for the next payloads.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(MAX_BLOBS_PER_BLOCK-TARGET_BLOBS_PER_BLOCK) + 1,
+				TransactionCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(MAX_BLOBS_PER_BLOCK-TARGET_BLOBS_PER_BLOCK) + 1,
 				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
@@ -120,6 +133,9 @@ var Tests = []test.SpecInterface{
 			Name: "Blob Transactions On Block 1, Cancun Genesis",
 			About: `
 			Tests the Cancun fork since genesis.
+
+			Verifications performed:
+			* See Blob Transactions On Block 1, Shanghai Genesis
 			`,
 		},
 
@@ -131,7 +147,7 @@ var Tests = []test.SpecInterface{
 			// First, we send a couple of blob transactions on genesis,
 			// with enough data gas cost to make sure they are included in the first block.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 
@@ -146,7 +162,7 @@ var Tests = []test.SpecInterface{
 			// Try to increase the data gas cost of the blob transactions
 			// by maxing out the number of blobs for the next payloads.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(MAX_BLOBS_PER_BLOCK-TARGET_BLOBS_PER_BLOCK) + 1,
+				TransactionCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(MAX_BLOBS_PER_BLOCK-TARGET_BLOBS_PER_BLOCK) + 1,
 				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
@@ -179,8 +195,8 @@ var Tests = []test.SpecInterface{
 			Using same account, and an increased nonce from the previously sent
 			transactions, send N blob transactions with 1 blob each.
 			Verify that the payloads are created with the correct ordering:
-			 - The first payloads must include the first N blob transactions.
-			 - The last payloads must include the last single-blob transactions.
+			 - The first payloads must include the first N blob transactions
+			 - The last payloads must include the last single-blob transactions
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
@@ -192,13 +208,13 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			// First send the MAX_BLOBS_PER_BLOCK-1 blob transactions.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      5,
+				TransactionCount:              5,
 				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 			// Then send the single-blob transactions
 			SendBlobTransactions{
-				BlobTransactionSendCount:      MAX_BLOBS_PER_BLOCK + 1,
+				TransactionCount:              MAX_BLOBS_PER_BLOCK + 1,
 				BlobsPerTransaction:           1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
@@ -227,8 +243,8 @@ var Tests = []test.SpecInterface{
 			transactions, send a single 2-blob transaction, and send N blob
 			transactions with 1 blob each.
 			Verify that the payloads are created with the correct ordering:
-			 - The first payloads must include the first N blob transactions.
-			 - The last payloads must include the rest of the transactions.
+			 - The first payloads must include the first N blob transactions
+			 - The last payloads must include the rest of the transactions
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
@@ -240,21 +256,21 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			// First send the MAX_BLOBS_PER_BLOCK-1 blob transactions.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      5,
+				TransactionCount:              5,
 				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 
 			// Then send the dual-blob transaction
 			SendBlobTransactions{
-				BlobTransactionSendCount:      1,
+				TransactionCount:              1,
 				BlobsPerTransaction:           2,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 
 			// Then send the single-blob transactions
 			SendBlobTransactions{
-				BlobTransactionSendCount:      MAX_BLOBS_PER_BLOCK - 2,
+				TransactionCount:              MAX_BLOBS_PER_BLOCK - 2,
 				BlobsPerTransaction:           1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
@@ -295,14 +311,14 @@ var Tests = []test.SpecInterface{
 			// First send the MAX_BLOBS_PER_BLOCK-1 blob transactions from
 			// account A.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      5,
+				TransactionCount:              5,
 				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 				AccountIndex:                  0,
 			},
 			// Then send the single-blob transactions from account B
 			SendBlobTransactions{
-				BlobTransactionSendCount:      5,
+				TransactionCount:              5,
 				BlobsPerTransaction:           1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 				AccountIndex:                  1,
@@ -355,7 +371,7 @@ var Tests = []test.SpecInterface{
 			// First send the MAX_BLOBS_PER_BLOCK-1 blob transactions from
 			// account A, to client A.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      5,
+				TransactionCount:              5,
 				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(120),
 				AccountIndex:                  0,
@@ -364,7 +380,7 @@ var Tests = []test.SpecInterface{
 			// Then send the single-blob transactions from account B, to client
 			// B.
 			SendBlobTransactions{
-				BlobTransactionSendCount:      5,
+				TransactionCount:              5,
 				BlobsPerTransaction:           1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 				AccountIndex:                  1,
@@ -397,27 +413,27 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			// Send multiple blob transactions with the same nonce.
 			SendBlobTransactions{ // Blob ID 0
-				BlobTransactionSendCount:      1,
+				TransactionCount:              1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 				BlobTransactionGasFeeCap:      big.NewInt(1e9),
 				BlobTransactionGasTipCap:      big.NewInt(1e9),
 			},
 			SendBlobTransactions{ // Blob ID 1
-				BlobTransactionSendCount:      1,
+				TransactionCount:              1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1e2),
 				BlobTransactionGasFeeCap:      big.NewInt(1e10),
 				BlobTransactionGasTipCap:      big.NewInt(1e10),
 				ReplaceTransactions:           true,
 			},
 			SendBlobTransactions{ // Blob ID 2
-				BlobTransactionSendCount:      1,
+				TransactionCount:              1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1e3),
 				BlobTransactionGasFeeCap:      big.NewInt(1e11),
 				BlobTransactionGasTipCap:      big.NewInt(1e11),
 				ReplaceTransactions:           true,
 			},
 			SendBlobTransactions{ // Blob ID 3
-				BlobTransactionSendCount:      1,
+				TransactionCount:              1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1e4),
 				BlobTransactionGasFeeCap:      big.NewInt(1e12),
 				BlobTransactionGasTipCap:      big.NewInt(1e12),
@@ -439,6 +455,8 @@ var Tests = []test.SpecInterface{
 			Name: "Parallel Blob Transactions",
 			About: `
 			Test sending multiple blob transactions in parallel from different accounts.
+
+			Verify that a payload is created with the maximum number of blobs.
 			`,
 		},
 
@@ -450,61 +468,61 @@ var Tests = []test.SpecInterface{
 			ParallelSteps{
 				Steps: []TestStep{
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  0,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  1,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  2,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  3,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  4,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  5,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  6,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  7,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  8,
 					},
 					SendBlobTransactions{
-						BlobTransactionSendCount:      5,
+						TransactionCount:              5,
 						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  9,
@@ -530,6 +548,8 @@ var Tests = []test.SpecInterface{
 			- nil BlobGasUsed
 			- nil Versioned Hashes Array
 			- nil Beacon Root
+
+			Verify that client returns INVALID_PARAMS_ERROR
 			`,
 		},
 
@@ -543,9 +563,9 @@ var Tests = []test.SpecInterface{
 					Blobs: nil,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
+				`, INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -571,9 +591,9 @@ var Tests = []test.SpecInterface{
 					BlobGasUsed: pUint64(0),
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
+				`, INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -599,9 +619,9 @@ var Tests = []test.SpecInterface{
 					ExcessBlobGas: pUint64(0),
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
+				`, INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -627,9 +647,9 @@ var Tests = []test.SpecInterface{
 					Blobs: []helper.BlobID{},
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
+				`, INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -655,9 +675,9 @@ var Tests = []test.SpecInterface{
 					BeaconRoot: &(common.Hash{}),
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
+				`, INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -688,9 +708,9 @@ var Tests = []test.SpecInterface{
 					BeaconRoot:    &(common.Hash{}),
 				},
 				ExpectedError: UNSUPPORTED_FORK_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 before Cancun with no nil fields must return UNSUPPORTED_FORK_ERROR (code -38005)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 before Cancun with no nil fields must return UNSUPPORTED_FORK_ERROR (code %d)
+				`, UNSUPPORTED_FORK_ERROR),
 			},
 		},
 	},
@@ -718,9 +738,9 @@ var Tests = []test.SpecInterface{
 					RemoveExcessBlobGas: true,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 after Cancun with nil ExcessBlobGas must return INVALID_PARAMS_ERROR (code -32602)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 after Cancun with nil ExcessBlobGas must return INVALID_PARAMS_ERROR (code %d)
+				`, INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -745,9 +765,9 @@ var Tests = []test.SpecInterface{
 					RemoveBlobGasUsed: true,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 after Cancun with nil BlobGasUsed must return INVALID_PARAMS_ERROR (code -32602)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 after Cancun with nil BlobGasUsed must return INVALID_PARAMS_ERROR (code %d)
+				`, INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -772,9 +792,9 @@ var Tests = []test.SpecInterface{
 					RemoveBeaconRoot: true,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
-				ExpectationDescription: `
-				NewPayloadV3 after Cancun with nil parentBeaconBlockRoot must return INVALID_PARAMS_ERROR (code -32602)
-				`,
+				ExpectationDescription: fmt.Sprintf(`
+				NewPayloadV3 after Cancun with nil parentBeaconBlockRoot must return INVALID_PARAMS_ERROR (code %d)
+				`, INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -791,7 +811,7 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -820,7 +840,7 @@ var Tests = []test.SpecInterface{
 		// mempool but was not included in the payload.
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -847,7 +867,7 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -874,7 +894,7 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -901,7 +921,7 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -927,7 +947,7 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -955,7 +975,7 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -982,7 +1002,7 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1035,7 +1055,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1071,7 +1091,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1105,7 +1125,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1138,7 +1158,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1172,7 +1192,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1205,7 +1225,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1240,7 +1260,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1274,7 +1294,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				BlobTransactionSendCount:      TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
@@ -1328,7 +1348,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	// BlobGasUsed, ExcessBlobGas Negative Tests
-	// Most cases are contained in https://github.com/ethereum/execution-spec-tests/tree/main/tests/eips/eip4844
+	// Most cases are contained in https://github.com/ethereum/execution-spec-tests/tree/main/tests/cancun/eip4844_blobs
 	// and can be executed using `pyspec` simulator.
 	&BlobsBaseSpec{
 
@@ -1370,7 +1390,7 @@ var Tests = []test.SpecInterface{
 		Spec: test.Spec{
 			Name: "Request Blob Pooled Transactions",
 			About: `
-			Requests blob pooled transactions and verify correct coding.
+			Requests blob pooled transactions and verify correct encoding.
 			`,
 		},
 		TestSequence: TestSequence{
@@ -1380,7 +1400,7 @@ var Tests = []test.SpecInterface{
 			},
 			// Send multiple transactions with multiple blobs each
 			SendBlobTransactions{
-				BlobTransactionSendCount:      1,
+				TransactionCount:              1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			DevP2PRequestPooledTransactionHash{
