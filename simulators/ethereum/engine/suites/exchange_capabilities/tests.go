@@ -3,6 +3,7 @@ package suite_exchange_capabilities
 import (
 	"math/big"
 
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	"golang.org/x/exp/slices"
 )
@@ -29,10 +30,12 @@ var (
 )
 
 var Tests = []test.SpecInterface{
+
+	// Shanghai
 	ExchangeCapabilitiesSpec{
 		Spec: test.Spec{
 			Name: "Exchange Capabilities - Shanghai",
-			ForkConfig: test.ForkConfig{
+			ForkConfig: globals.ForkConfig{
 				ShanghaiTimestamp: big.NewInt(0),
 			},
 		},
@@ -41,11 +44,33 @@ var Tests = []test.SpecInterface{
 	ExchangeCapabilitiesSpec{
 		Spec: test.Spec{
 			Name: "Exchange Capabilities - Shanghai (Not active)",
-			ForkConfig: test.ForkConfig{
+			ForkConfig: globals.ForkConfig{
 				ShanghaiTimestamp: big.NewInt(1000),
 			},
 		},
 		MinimalExpectedCapabilitiesSet: ShanghaiCapabilities,
+	},
+
+	// Cancun
+	ExchangeCapabilitiesSpec{
+		Spec: test.Spec{
+			Name: "Exchange Capabilities - Cancun",
+			ForkConfig: globals.ForkConfig{
+				ShanghaiTimestamp: big.NewInt(0),
+				CancunTimestamp:   big.NewInt(0),
+			},
+		},
+		MinimalExpectedCapabilitiesSet: CancunCapabilities,
+	},
+	ExchangeCapabilitiesSpec{
+		Spec: test.Spec{
+			Name: "Exchange Capabilities - Cancun (Not active)",
+			ForkConfig: globals.ForkConfig{
+				ShanghaiTimestamp: big.NewInt(0),
+				CancunTimestamp:   big.NewInt(1000),
+			},
+		},
+		MinimalExpectedCapabilitiesSet: CancunCapabilities,
 	},
 }
 

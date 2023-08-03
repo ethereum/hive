@@ -29,16 +29,19 @@ type Env struct {
 	TestContext context.Context
 
 	// RPC Clients
-	Engine     client.EngineClient
-	Eth        client.Eth
-	TestEngine *TestEngineClient
-	HiveEngine *hive_rpc.HiveRPCEngineClient
+	Engine      client.EngineClient
+	Eth         client.Eth
+	TestEngine  *TestEngineClient
+	HiveEngine  *hive_rpc.HiveRPCEngineClient
+	Engines     []client.EngineClient
+	TestEngines []*TestEngineClient
 
 	// Consensus Layer Mocker Instance
 	CLMock *clmock.CLMocker
 
 	// Client parameters used to launch the default client
 	Genesis      *core.Genesis
+	ForkConfig   *globals.ForkConfig
 	ClientParams hivesim.Params
 	ClientFiles  hivesim.Params
 
@@ -46,15 +49,16 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, forkConfig *globals.ForkConfig, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	consensusConfig := testSpec.GetConsensusConfig()
 	clMocker := clmock.NewCLMocker(
 		t,
+		genesis,
 		consensusConfig.SlotsToSafe,
 		consensusConfig.SlotsToFinalized,
 		big.NewInt(consensusConfig.SafeSlotsToImportOptimistically),
-		testSpec.GetForkConfig().ShanghaiTimestamp)
+		testSpec.GetForkConfig())
 
 	// Send the CLMocker for configuration by the spec, if any.
 	testSpec.ConfigureCLMock(clMocker)
@@ -80,14 +84,18 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 		TestName:            testSpec.GetName(),
 		Client:              c,
 		Engine:              ec,
+		Engines:             make([]client.EngineClient, 0),
 		Eth:                 ec,
 		HiveEngine:          ec,
 		CLMock:              clMocker,
 		Genesis:             genesis,
+		ForkConfig:          forkConfig,
 		ClientParams:        cParams,
 		ClientFiles:         cFiles,
 		TestTransactionType: testSpec.GetTestTransactionType(),
 	}
+	env.Engines = append(env.Engines, ec)
+	env.TestEngines = append(env.TestEngines, env.TestEngine)
 
 	// Before running the test, make sure Eth and Engine ports are open for the client
 	if err := hive_rpc.CheckEthEngineLive(c); err != nil {

@@ -1,18 +1,15 @@
 package test
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
-
-type ForkConfig struct {
-	// Shanghai Fork Timestamp
-	ShanghaiTimestamp *big.Int
-}
 
 type ConsensusConfig struct {
 	SlotsToSafe                     *big.Int
@@ -26,7 +23,7 @@ type SpecInterface interface {
 	GetAbout() string
 	GetConsensusConfig() ConsensusConfig
 	GetChainFile() string
-	GetForkConfig() ForkConfig
+	GetForkConfig() globals.ForkConfig
 	GetGenesis() *core.Genesis
 	GetName() string
 	GetTestTransactionType() helper.TestTransactionType
@@ -76,7 +73,7 @@ type Spec struct {
 	TestTransactionType helper.TestTransactionType
 
 	// Fork Config
-	ForkConfig
+	globals.ForkConfig
 }
 
 func (s Spec) Execute(env *Env) {
@@ -102,7 +99,7 @@ func (s Spec) GetChainFile() string {
 	return s.ChainFile
 }
 
-func (s Spec) GetForkConfig() ForkConfig {
+func (s Spec) GetForkConfig() globals.ForkConfig {
 	return s.ForkConfig
 }
 
@@ -116,6 +113,18 @@ func (s Spec) GetGenesis() *core.Genesis {
 	if genesis.Difficulty.Cmp(genesis.Config.TerminalTotalDifficulty) <= 0 {
 		genesis.Config.TerminalTotalDifficultyPassed = true
 	}
+
+	// Add balance to all the test accounts
+	for _, testAcc := range globals.TestAccounts {
+		balance, ok := new(big.Int).SetString("123450000000000000000", 16)
+		if !ok {
+			panic(errors.New("failed to parse balance"))
+		}
+		genesis.Alloc[testAcc.GetAddress()] = core.GenesisAccount{
+			Balance: balance,
+		}
+	}
+
 	return &genesis
 }
 
@@ -135,6 +144,6 @@ func (s Spec) IsMiningDisabled() bool {
 	return s.DisableMining
 }
 
-var LatestFork = ForkConfig{
+var LatestFork = globals.ForkConfig{
 	ShanghaiTimestamp: big.NewInt(0),
 }

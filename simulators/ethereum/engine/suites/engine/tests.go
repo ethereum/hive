@@ -11,11 +11,11 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/node"
-	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -790,7 +790,7 @@ func unknownFinalizedBlockHash(t *test.Env) {
 
 			// Test again using PayloadAttributes, should also return INVALID and no PayloadID
 			r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceStateUnknownFinalizedHash,
-				&api.PayloadAttributes{
+				&typ.PayloadAttributes{
 					Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
 					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
@@ -831,7 +831,7 @@ func unknownHeadBlockHash(t *test.Env) {
 
 	// Test again using PayloadAttributes, should also return SYNCING and no PayloadID
 	r = t.TestEngine.TestEngineForkchoiceUpdatedV1(&forkchoiceStateUnknownHeadHash,
-		&api.PayloadAttributes{
+		&typ.PayloadAttributes{
 			Timestamp:             t.CLMock.LatestExecutedPayload.Timestamp + 1,
 			Random:                common.Hash{},
 			SuggestedFeeRecipient: common.Address{},
@@ -847,8 +847,8 @@ func inconsistentForkchoiceStateGen(inconsistency string) func(t *test.Env) {
 		// Wait until TTD is reached by this client
 		t.CLMock.WaitForTTD()
 
-		canonicalPayloads := make([]*api.ExecutableData, 0)
-		alternativePayloads := make([]*api.ExecutableData, 0)
+		canonicalPayloads := make([]*typ.ExecutableData, 0)
+		alternativePayloads := make([]*typ.ExecutableData, 0)
 		// Produce blocks before starting the test
 		t.CLMock.ProduceBlocks(3, clmock.BlockProcessCallbacks{
 			OnGetPayload: func() {
@@ -858,7 +858,7 @@ func inconsistentForkchoiceStateGen(inconsistency string) func(t *test.Env) {
 				if len(alternativePayloads) > 0 {
 					customData.ParentHash = &alternativePayloads[len(alternativePayloads)-1].BlockHash
 				}
-				alternativePayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &customData)
+				alternativePayload, _, err := customData.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to construct alternative payload: %v", t.TestName, err)
 				}
@@ -922,7 +922,7 @@ func invalidPayloadAttributesGen(syncing bool) func(*test.Env) {
 					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				}
-				attr := api.PayloadAttributes{
+				attr := typ.PayloadAttributes{
 					Timestamp:             0,
 					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
@@ -962,7 +962,7 @@ func uniquePayloadID(t *test.Env) {
 	fcState := &api.ForkchoiceStateV1{
 		HeadBlockHash: parentHash,
 	}
-	payloadAttributes := &api.PayloadAttributes{
+	payloadAttributes := &typ.PayloadAttributes{
 		Timestamp:             t.CLMock.LatestHeader.Time + 1,
 		Random:                common.Hash{},
 		SuggestedFeeRecipient: common.Address{},
@@ -1051,7 +1051,7 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*test.Env) {
 		t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 		var (
-			alteredPayload     api.ExecutableData
+			alteredPayload     typ.ExecutableData
 			invalidPayloadHash common.Hash
 		)
 
@@ -1106,9 +1106,10 @@ func badHashOnNewPayloadGen(syncing bool, sidechain bool) func(*test.Env) {
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			// Run test after the new payload has been obtained
 			OnGetPayload: func() {
-				alteredPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
-					ParentHash: &invalidPayloadHash,
-				})
+				customizer := &helper.CustomPayloadData{
+					ParentHash: &alteredPayload.BlockHash,
+				}
+				alteredPayload, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
 				}
@@ -1207,7 +1208,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 		}
 
 		var (
-			alteredPayload *api.ExecutableData
+			alteredPayload *typ.ExecutableData
 			err            error
 		)
 
@@ -1224,7 +1225,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 					t.Fatalf("FAIL (%s): No transactions in the base payload", t.TestName)
 				}
 
-				alteredPayload, err = helper.GenerateInvalidPayload(&t.CLMock.LatestPayloadBuilt, payloadField)
+				alteredPayload, _, err = helper.GenerateInvalidPayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot, payloadField)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to modify payload (%v): %v", t.TestName, payloadField, err)
 				}
@@ -1253,7 +1254,7 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 					SafeBlockHash:      alteredPayload.BlockHash,
 					FinalizedBlockHash: alteredPayload.BlockHash,
 				}
-				payloadAttrbutes := api.PayloadAttributes{
+				payloadAttrbutes := typ.PayloadAttributes{
 					Timestamp:             alteredPayload.Timestamp + 1,
 					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
@@ -1344,9 +1345,10 @@ func invalidPayloadTestCaseGen(payloadField helper.InvalidPayloadBlockField, syn
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			// Run test after the new payload has been obtained
 			OnGetPayload: func() {
-				followUpAlteredPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				customizer := &helper.CustomPayloadData{
 					ParentHash: &alteredPayload.BlockHash,
-				})
+				}
+				followUpAlteredPayload, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
 				}
@@ -1388,7 +1390,7 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 		n := 10
 
 		// Slice to save the side B chain
-		altChainPayloads := make([]*api.ExecutableData, 0)
+		altChainPayloads := make([]*typ.ExecutableData, 0)
 
 		// Append the common ancestor
 		altChainPayloads = append(altChainPayloads, &cA)
@@ -1422,19 +1424,20 @@ func invalidMissingAncestorReOrgGen(invalid_index int, payloadField helper.Inval
 			},
 			OnGetPayload: func() {
 				var (
-					sidePayload *api.ExecutableData
+					sidePayload *typ.ExecutableData
 					err         error
 				)
 				// Insert extraData to ensure we deviate from the main payload, which contains empty extradata
-				sidePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				customizer := &helper.CustomPayloadData{
 					ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
 					ExtraData:  &([]byte{0x01}),
-				})
+				}
+				sidePayload, _, err = customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
 				if len(altChainPayloads) == invalid_index {
-					sidePayload, err = helper.GenerateInvalidPayload(sidePayload, payloadField)
+					sidePayload, _, err = helper.GenerateInvalidPayload(sidePayload, t.CLMock.LatestPayloadAttributes.BeaconRoot, payloadField)
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 					}
@@ -1580,7 +1583,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			cA = b
 		} else {
 			t.CLMock.ProduceBlocks(int(cAHeight.Int64()), clmock.BlockProcessCallbacks{})
-			cA, err = api.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt, nil)
+			cA, err = typ.ExecutableDataToBlock(t.CLMock.LatestPayloadBuilt, nil, nil)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
 			}
@@ -1628,26 +1631,27 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			},
 			OnGetPayload: func() {
 				var (
-					sidePayload *api.ExecutableData
+					sidePayload *typ.ExecutableData
 					err         error
 				)
 				// Insert extraData to ensure we deviate from the main payload, which contains empty extradata
 				pHash := altChainPayloads[len(altChainPayloads)-1].Hash()
-				sidePayload, err = helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+				customizer := &helper.CustomPayloadData{
 					ParentHash: &pHash,
 					ExtraData:  &([]byte{0x01}),
-				})
+				}
+				sidePayload, _, err = customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
 				if len(altChainPayloads) == invalidIndex {
-					sidePayload, err = helper.GenerateInvalidPayload(sidePayload, spec.PayloadField)
+					sidePayload, _, err = helper.GenerateInvalidPayload(sidePayload, t.CLMock.LatestPayloadAttributes.BeaconRoot, spec.PayloadField)
 					if err != nil {
 						t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 					}
 				}
 
-				sideBlock, err := api.ExecutableDataToBlock(*sidePayload, nil)
+				sideBlock, err := typ.ExecutableDataToBlock(*sidePayload, nil, nil)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)
 				}
@@ -1656,7 +1660,7 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 					if spec.PayloadField == helper.InvalidOmmers {
 						if unclePayload, ok := t.CLMock.ExecutedPayloadHistory[sideBlock.NumberU64()-1]; ok && unclePayload != nil {
 							// Uncle is a PoS payload
-							uncle, err = api.ExecutableDataToBlock(*unclePayload, nil)
+							uncle, err = typ.ExecutableDataToBlock(*unclePayload, nil, nil)
 							if err != nil {
 								t.Fatalf("FAIL (%s): Unable to get uncle block: %v", t.TestName, err)
 							}
@@ -1695,9 +1699,9 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 						ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 						defer cancel()
 
-						p := api.BlockToExecutableData(altChainPayloads[i], common.Big0, nil, nil, nil).ExecutionPayload
-						pv1 := &client_types.ExecutableDataV1{}
-						pv1.FromExecutableData(p)
+						p := typ.BlockToExecutableData(altChainPayloads[i], common.Big0)
+						pv1 := &typ.ExecutableDataV1{}
+						pv1.FromExecutableData(&p)
 						status, err := secondaryClient.NewPayloadV1(ctx, pv1)
 						if err != nil {
 							t.Fatalf("FAIL (%s): TEST ISSUE - Unable to send new payload: %v", t.TestName, err)
@@ -1760,8 +1764,8 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 				}
 				// If we are syncing through p2p, we need to keep polling until the client syncs the missing payloads
 				for {
-					ed := api.BlockToExecutableData(altChainPayloads[n], common.Big0, nil, nil, nil)
-					r := t.TestEngine.TestEngineNewPayloadV1(ed.ExecutionPayload)
+					ed := typ.BlockToExecutableData(altChainPayloads[n], common.Big0)
+					r := t.TestEngine.TestEngineNewPayloadV1(&ed)
 					t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
 					s := t.TestEngine.TestEngineForkchoiceUpdatedV1(&api.ForkchoiceStateV1{
 						HeadBlockHash:      altChainPayloads[n].Hash(),
@@ -1846,7 +1850,7 @@ func blockStatusExecPayload(t *test.Env) {
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-	var tx *types.Transaction
+	var tx typ.Transaction
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			var err error
@@ -1890,7 +1894,7 @@ func blockStatusHeadBlock(t *test.Env) {
 	// Produce blocks before starting the test
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
-	var tx *types.Transaction
+	var tx typ.Transaction
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			var err error
@@ -2011,15 +2015,16 @@ func blockStatusReorg(t *test.Env) {
 			// Run using an alternative Payload, verify that the latest info is updated after re-org
 			customRandom := common.Hash{}
 			rand.Read(customRandom[:])
-			customizedPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &helper.CustomPayloadData{
+			customizer := &helper.CustomPayloadData{
 				PrevRandao: &customRandom,
-			})
+			}
+			customizedPayload, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
 
 			// Send custom payload and fcU to it
-			t.CLMock.BroadcastNewPayload(customizedPayload)
+			t.CLMock.BroadcastNewPayload(customizedPayload, nil, nil, t.CLMock.NewPayloadVersion(customizedPayload.Timestamp))
 			t.CLMock.BroadcastForkchoiceUpdated(&api.ForkchoiceStateV1{
 				HeadBlockHash:      customizedPayload.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
@@ -2084,7 +2089,7 @@ func reorgPrevValidatedPayloadOnSideChain(t *test.Env) {
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
 
 	var (
-		sidechainPayloads     = make([]*api.ExecutableData, 0)
+		sidechainPayloads     = make([]*typ.ExecutableData, 0)
 		sidechainPayloadCount = 5
 	)
 
@@ -2099,7 +2104,7 @@ func reorgPrevValidatedPayloadOnSideChain(t *test.Env) {
 			if len(sidechainPayloads) > 0 {
 				customData.ParentHash = &sidechainPayloads[len(sidechainPayloads)-1].BlockHash
 			}
-			altPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt, &customData)
+			altPayload, _, err := customData.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
@@ -2121,7 +2126,7 @@ func reorgPrevValidatedPayloadOnSideChain(t *test.Env) {
 				HeadBlockHash:      sidechainPayloads[len(sidechainPayloads)-2].BlockHash,
 				SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
 				FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-			}, &api.PayloadAttributes{
+			}, &typ.PayloadAttributes{
 				Timestamp:             t.CLMock.LatestHeader.Time,
 				Random:                prevRandao,
 				SuggestedFeeRecipient: common.Address{},
@@ -2148,7 +2153,7 @@ func safeReorgToSideChain(t *test.Env) {
 	t.CLMock.WaitForTTD()
 
 	// Produce an alternative chain
-	sidechainPayloads := make([]*api.ExecutableData, 0)
+	sidechainPayloads := make([]*typ.ExecutableData, 0)
 
 	// Produce three payloads `P1`, `P2`, `P3`, along with the side chain payloads `P2'`, `P3'`
 	// First payload is finalized so no alternative payload
@@ -2160,11 +2165,11 @@ func safeReorgToSideChain(t *test.Env) {
 			if len(sidechainPayloads) > 0 {
 				altParentHash = sidechainPayloads[len(sidechainPayloads)-1].BlockHash
 			}
-			altPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt,
-				&helper.CustomPayloadData{
-					ParentHash: &altParentHash,
-					ExtraData:  &([]byte{0x01}),
-				})
+			customizer := &helper.CustomPayloadData{
+				ParentHash: &altParentHash,
+				ExtraData:  &([]byte{0x01}),
+			}
+			altPayload, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
@@ -2215,7 +2220,7 @@ func reorgBackFromSyncing(t *test.Env) {
 	t.CLMock.WaitForTTD()
 
 	// Produce an alternative chain
-	sidechainPayloads := make([]*api.ExecutableData, 0)
+	sidechainPayloads := make([]*typ.ExecutableData, 0)
 	t.CLMock.ProduceBlocks(10, clmock.BlockProcessCallbacks{
 		OnGetPayload: func() {
 			// Generate an alternative payload by simply adding extraData to the block
@@ -2223,11 +2228,11 @@ func reorgBackFromSyncing(t *test.Env) {
 			if len(sidechainPayloads) > 0 {
 				altParentHash = sidechainPayloads[len(sidechainPayloads)-1].BlockHash
 			}
-			altPayload, err := helper.CustomizePayload(&t.CLMock.LatestPayloadBuilt,
-				&helper.CustomPayloadData{
-					ParentHash: &altParentHash,
-					ExtraData:  &([]byte{0x01}),
-				})
+			customizer := &helper.CustomPayloadData{
+				ParentHash: &altParentHash,
+				ExtraData:  &([]byte{0x01}),
+			}
+			altPayload, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
@@ -2275,8 +2280,8 @@ func transactionReorg(t *test.Env) {
 
 	for i := 0; i < txCount; i++ {
 		var (
-			noTxnPayload api.ExecutableData
-			tx           *types.Transaction
+			noTxnPayload typ.ExecutableData
+			tx           typ.Transaction
 		)
 		// Generate two payloads, one with the transaction and the other one without it
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
@@ -2388,9 +2393,9 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
 
 		for i := 0; i < txCount; i++ {
 			var (
-				mainPayload *api.ExecutableData
-				sidePayload *api.ExecutableData
-				tx          *types.Transaction
+				mainPayload *typ.ExecutableData
+				sidePayload *typ.ExecutableData
+				tx          typ.Transaction
 			)
 
 			t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
@@ -2437,9 +2442,10 @@ func transactionReorgBlockhash(newNPOnRevert bool) func(t *test.Env) {
 
 					// Create side payload with different hash
 					var err error
-					sidePayload, err = helper.CustomizePayload(mainPayload, &helper.CustomPayloadData{
+					customizer := &helper.CustomPayloadData{
 						ExtraData: &([]byte{0x01}),
-					})
+					}
+					sidePayload, _, err = customizer.CustomizePayload(mainPayload, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 					if err != nil {
 						t.Fatalf("Error creating reorg payload %v", err)
 					}
@@ -2534,7 +2540,7 @@ func sidechainReorg(t *test.Env) {
 			rand.Read(alternativePrevRandao[:])
 
 			r := t.TestEngine.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice,
-				&api.PayloadAttributes{
+				&typ.PayloadAttributes{
 					Timestamp:             t.CLMock.LatestHeader.Time + 1,
 					Random:                alternativePrevRandao,
 					SuggestedFeeRecipient: t.CLMock.NextFeeRecipient,
@@ -2623,9 +2629,10 @@ func multipleNewCanonicalPayloads(t *test.Env) {
 			for i := 0; i < payloadCount; i++ {
 				newPrevRandao := common.Hash{}
 				rand.Read(newPrevRandao[:])
-				newPayload, err := helper.CustomizePayload(&basePayload, &helper.CustomPayloadData{
+				customizer := &helper.CustomPayloadData{
 					PrevRandao: &newPrevRandao,
-				})
+				}
+				newPayload, _, err := customizer.CustomizePayload(&basePayload, t.CLMock.LatestPayloadAttributes.BeaconRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload %v: %v", t.TestName, i, err)
 				}
@@ -2735,7 +2742,7 @@ func inOrderPayloads(t *test.Env) {
 func validPayloadFcUSyncingClient(t *test.Env) {
 	var (
 		secondaryClient client.EngineClient
-		previousPayload api.ExecutableData
+		previousPayload typ.ExecutableData
 	)
 	{
 		// To allow sending the primary engine client into SYNCING state, we need a secondary client to guide the payload creation
@@ -2777,7 +2784,7 @@ func validPayloadFcUSyncingClient(t *test.Env) {
 				HeadBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
 				SafeBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
 				FinalizedBlockHash: t.CLMock.LatestPayloadBuilt.BlockHash,
-			}, &api.PayloadAttributes{
+			}, &typ.PayloadAttributes{
 				Timestamp:             t.CLMock.LatestPayloadBuilt.Timestamp + 1,
 				Random:                common.Hash{},
 				SuggestedFeeRecipient: common.Address{},
@@ -2888,11 +2895,11 @@ func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 			if t.CLMock.NextBlockProducer == invalidPayloadProducer.Engine {
 				invalidPayloadProducer = secondaryEngineTest
 			}
-			var inv_p *api.ExecutableData
+			var inv_p *typ.ExecutableData
 
 			{
 				// Get a payload from the invalid payload producer and invalidate it
-				r := invalidPayloadProducer.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, &api.PayloadAttributes{
+				r := invalidPayloadProducer.TestEngineForkchoiceUpdatedV1(&t.CLMock.LatestForkchoice, &typ.PayloadAttributes{
 					Timestamp:             t.CLMock.LatestHeader.Time + 1,
 					Random:                common.Hash{},
 					SuggestedFeeRecipient: common.Address{},
@@ -2904,7 +2911,7 @@ func payloadBuildAfterNewInvalidPayload(t *test.Env) {
 				s := invalidPayloadProducer.TestEngineGetPayloadV1(r.Response.PayloadID)
 				s.ExpectNoError()
 
-				inv_p, err = helper.GenerateInvalidPayload(&s.Payload, helper.InvalidStateRoot)
+				inv_p, _, err = helper.GenerateInvalidPayload(&s.Payload, t.CLMock.LatestPayloadAttributes.BeaconRoot, helper.InvalidStateRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to invalidate payload: %v", t.TestName, err)
 				}
@@ -3061,7 +3068,7 @@ func prevRandaoOpcodeTx(t *test.Env) {
 	var (
 		txCount        = 10
 		currentTxIndex = 0
-		txs            = make([]*types.Transaction, 0)
+		txs            = make([]typ.Transaction, 0)
 	)
 	t.CLMock.ProduceBlocks(txCount, clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {

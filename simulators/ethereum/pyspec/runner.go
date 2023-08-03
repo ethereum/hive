@@ -133,7 +133,8 @@ func (tc *testcase) run(t *hivesim.T) {
 			context.Background(),
 			int(engineNewPayload.Version),
 			engineNewPayload.Payload,
-			engineNewPayload.BlobVersionedHashes,
+			&engineNewPayload.BlobVersionedHashes,
+			nil, // TODO: Fix in pyspec PR
 		)
 		if plErr != nil {
 			if plException == plErr.Error() {
@@ -269,8 +270,8 @@ func extractGenesis(fixture fixtureJSON) *core.Genesis {
 		Mixhash:       fixture.Genesis.MixHash,
 		Nonce:         fixture.Genesis.Nonce.Uint64(),
 		BaseFee:       fixture.Genesis.BaseFee,
-		DataGasUsed:   fixture.Genesis.DataGasUsed,
-		ExcessDataGas: fixture.Genesis.ExcessDataGas,
+		BlobGasUsed:   fixture.Genesis.BlobGasUsed,
+		ExcessBlobGas: fixture.Genesis.ExcessBlobGas,
 		Alloc:         fixture.Pre,
 	}
 	return genesis
