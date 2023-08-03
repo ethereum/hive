@@ -1,4 +1,4 @@
-package suite_blobs
+package suite_cancun
 
 import (
 	"bytes"

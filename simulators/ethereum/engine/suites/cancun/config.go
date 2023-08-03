@@ -1,4 +1,4 @@
-package suite_blobs
+package suite_cancun
 
 import (
 	"math/big"
@@ -10,18 +10,18 @@ import (
 )
 
 // Timestamp delta between genesis and the withdrawals fork
-func (bs *BlobsBaseSpec) GetCancunGenesisTimeDelta() uint64 {
+func (bs *CancunBaseSpec) GetCancunGenesisTimeDelta() uint64 {
 	return bs.CancunForkHeight * bs.GetBlockTimeIncrements()
 }
 
 // Calculates Shanghai fork timestamp given the amount of blocks that need to be
 // produced beforehand.
-func (bs *BlobsBaseSpec) GetCancunForkTime() uint64 {
+func (bs *CancunBaseSpec) GetCancunForkTime() uint64 {
 	return uint64(globals.GenesisTimestamp) + bs.GetCancunGenesisTimeDelta()
 }
 
 // Generates the fork config, including cancun fork timestamp.
-func (bs *BlobsBaseSpec) GetForkConfig() globals.ForkConfig {
+func (bs *CancunBaseSpec) GetForkConfig() globals.ForkConfig {
 	return globals.ForkConfig{
 		ShanghaiTimestamp: big.NewInt(0), // No test starts before Shanghai
 		CancunTimestamp:   new(big.Int).SetUint64(bs.GetCancunForkTime()),
@@ -29,24 +29,24 @@ func (bs *BlobsBaseSpec) GetForkConfig() globals.ForkConfig {
 }
 
 // Get the per-block timestamp increments configured for this test
-func (bs *BlobsBaseSpec) GetBlockTimeIncrements() uint64 {
+func (bs *CancunBaseSpec) GetBlockTimeIncrements() uint64 {
 	return 1
 }
 
 // Timestamp delta between genesis and the withdrawals fork
-func (bs *BlobsBaseSpec) GetBlobsGenesisTimeDelta() uint64 {
+func (bs *CancunBaseSpec) GetBlobsGenesisTimeDelta() uint64 {
 	return bs.CancunForkHeight * bs.GetBlockTimeIncrements()
 }
 
 // Calculates Shanghai fork timestamp given the amount of blocks that need to be
 // produced beforehand.
-func (bs *BlobsBaseSpec) GetBlobsForkTime() uint64 {
+func (bs *CancunBaseSpec) GetBlobsForkTime() uint64 {
 	return uint64(globals.GenesisTimestamp) + bs.GetBlobsGenesisTimeDelta()
 }
 
 // Append the accounts we are going to withdraw to, which should also include
 // bytecode for testing purposes.
-func (bs *BlobsBaseSpec) GetGenesis() *core.Genesis {
+func (bs *CancunBaseSpec) GetGenesis() *core.Genesis {
 	genesis := bs.Spec.GetGenesis()
 
 	// Remove PoW altogether
@@ -103,6 +103,6 @@ func (bs *BlobsBaseSpec) GetGenesis() *core.Genesis {
 
 // Changes the CL Mocker default time increments of 1 to the value specified
 // in the test spec.
-func (bs *BlobsBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
+func (bs *CancunBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
 	cl.BlockTimestampIncrement = big.NewInt(int64(bs.GetBlockTimeIncrements()))
 }

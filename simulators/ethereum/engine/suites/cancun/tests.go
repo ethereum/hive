@@ -1,5 +1,5 @@
-// # Test suite for blob tests
-package suite_blobs
+// # Test suite for cancun tests
+package suite_cancun
 
 import (
 	"fmt"
@@ -53,11 +53,11 @@ func pInt(v int) *int {
 }
 
 // Execution specification reference:
-// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+// https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md
 
 // List of all blob tests
 var Tests = []test.SpecInterface{
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Blob Transactions On Block 1, Shanghai Genesis",
@@ -127,7 +127,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Blob Transactions On Block 1, Cancun Genesis",
@@ -185,7 +185,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Blob Transaction Ordering, Single Account",
@@ -232,7 +232,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Blob Transaction Ordering, Single Account 2",
@@ -289,7 +289,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Blob Transaction Ordering, Multiple Accounts",
@@ -332,7 +332,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Blob Transaction Ordering, Multiple Clients",
@@ -397,7 +397,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Replace Blob Transactions",
@@ -449,7 +449,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Parallel Blob Transactions",
@@ -539,7 +539,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	// NewPayloadV3 Before Cancun, Negative Tests
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
@@ -569,7 +569,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Before Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
@@ -597,7 +597,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Before Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
@@ -625,7 +625,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Empty Array Versioned Hashes, Nil Beacon Root",
 			About: `
@@ -653,7 +653,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Zero Beacon Root",
 			About: `
@@ -681,7 +681,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Before Cancun, 0x00 Data Fields, Empty Array Versioned Hashes, Zero Beacon Root",
 			About: `
@@ -716,7 +716,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	// NewPayloadV3 After Cancun, Negative Tests
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 After Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Empty Array Versioned Hashes, Zero Beacon Root",
 			About: `
@@ -744,7 +744,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 After Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Empty Array Versioned Hashes",
 			About: `
@@ -771,7 +771,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 After Cancun, 0x00 Blob Fields, Empty Array Versioned Hashes, Nil Beacon Root",
 			About: `
@@ -800,7 +800,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	// Test versioned hashes in Engine API NewPayloadV3
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Missing Hash",
@@ -827,7 +827,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Extra Hash",
@@ -857,7 +857,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Out of Order",
 			About: `
@@ -884,7 +884,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash",
 			About: `
@@ -911,7 +911,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash",
 			About: `
@@ -937,7 +937,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version",
 			About: `
@@ -965,7 +965,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes",
 			About: `
@@ -992,7 +992,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes",
 			About: `
@@ -1019,7 +1019,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes",
 			About: `
@@ -1043,7 +1043,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	// Test versioned hashes in Engine API NewPayloadV3 on syncing clients
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Missing Hash (Syncing)",
@@ -1077,7 +1077,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Extra Hash (Syncing)",
@@ -1114,7 +1114,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Out of Order (Syncing)",
 			About: `
@@ -1147,7 +1147,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash (Syncing)",
 			About: `
@@ -1181,7 +1181,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash (Syncing)",
 			About: `
@@ -1214,7 +1214,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version (Syncing)",
 			About: `
@@ -1249,7 +1249,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes (Syncing)",
 			About: `
@@ -1283,7 +1283,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes (Syncing)",
 			About: `
@@ -1317,7 +1317,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes (Syncing)",
 			About: `
@@ -1350,7 +1350,7 @@ var Tests = []test.SpecInterface{
 	// BlobGasUsed, ExcessBlobGas Negative Tests
 	// Most cases are contained in https://github.com/ethereum/execution-spec-tests/tree/main/tests/cancun/eip4844_blobs
 	// and can be executed using `pyspec` simulator.
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Incorrect BlobGasUsed: Non-Zero on Zero Blobs",
@@ -1367,7 +1367,7 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 
 		Spec: test.Spec{
 			Name: "Incorrect BlobGasUsed: GAS_PER_BLOB on Zero Blobs",
@@ -1386,7 +1386,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	// DevP2P tests
-	&BlobsBaseSpec{
+	&CancunBaseSpec{
 		Spec: test.Spec{
 			Name: "Request Blob Pooled Transactions",
 			About: `
@@ -1412,11 +1412,8 @@ var Tests = []test.SpecInterface{
 	},
 }
 
-// Blobs base spec
-// This struct contains the base spec for all blob tests. It contains the
-// timestamp increments per block, the withdrawals fork height, and the list of
-// payloads to produce during the test.
-type BlobsBaseSpec struct {
+// Contains the base spec for all cancun tests.
+type CancunBaseSpec struct {
 	test.Spec
 	TimeIncrements   uint64 // Timestamp increments per block throughout the test
 	GetPayloadDelay  uint64 // Delay between FcU and GetPayload calls
@@ -1425,11 +1422,11 @@ type BlobsBaseSpec struct {
 }
 
 // Base test case execution procedure for blobs tests.
-func (bs *BlobsBaseSpec) Execute(t *test.Env) {
+func (bs *CancunBaseSpec) Execute(t *test.Env) {
 
 	t.CLMock.WaitForTTD()
 
-	blobTestCtx := &BlobTestContext{
+	blobTestCtx := &CancunTestContext{
 		Env:            t,
 		TestBlobTxPool: new(TestBlobTxPool),
 	}

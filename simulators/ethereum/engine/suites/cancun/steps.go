@@ -1,4 +1,4 @@
-package suite_blobs
+package suite_cancun
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type BlobTestContext struct {
+type CancunTestContext struct {
 	*test.Env
 	*TestBlobTxPool
 }
@@ -28,7 +28,7 @@ type BlobTestContext struct {
 // Interface to represent a single step in a test vector
 type TestStep interface {
 	// Executes the step
-	Execute(testCtx *BlobTestContext) error
+	Execute(testCtx *CancunTestContext) error
 	Description() string
 }
 
@@ -39,7 +39,7 @@ type ParallelSteps struct {
 	Steps []TestStep
 }
 
-func (step ParallelSteps) Execute(t *BlobTestContext) error {
+func (step ParallelSteps) Execute(t *CancunTestContext) error {
 	// Run the steps in parallel
 	wg := sync.WaitGroup{}
 	errs := make(chan error, len(step.Steps))
@@ -85,7 +85,7 @@ func (step LaunchClients) GetClientCount() uint64 {
 	return clientCount
 }
 
-func (step LaunchClients) Execute(t *BlobTestContext) error {
+func (step LaunchClients) Execute(t *CancunTestContext) error {
 	// Launch a new client
 	var (
 		client client.EngineClient
@@ -384,7 +384,7 @@ func (step NewPayloads) VerifyBlobBundle(blobDataInPayload []*BlobWrapData, payl
 	return nil
 }
 
-func (step NewPayloads) Execute(t *BlobTestContext) error {
+func (step NewPayloads) Execute(t *CancunTestContext) error {
 	// Create a new payload
 	// Produce the payload
 	payloadCount := step.GetPayloadCount()
@@ -531,7 +531,7 @@ func (step SendBlobTransactions) GetBlobsPerTransaction() uint64 {
 	return blobCountPerTx
 }
 
-func (step SendBlobTransactions) Execute(t *BlobTestContext) error {
+func (step SendBlobTransactions) Execute(t *CancunTestContext) error {
 	// Send a blob transaction
 	addr := common.BigToAddress(DATAHASH_START_ADDRESS)
 	blobCountPerTx := step.GetBlobsPerTransaction()
@@ -604,7 +604,7 @@ type SendModifiedLatestPayload struct {
 	ExpectedStatus test.PayloadStatus
 }
 
-func (step SendModifiedLatestPayload) Execute(t *BlobTestContext) error {
+func (step SendModifiedLatestPayload) Execute(t *CancunTestContext) error {
 	// Get the latest payload
 	var (
 		payload    = &t.CLMock.LatestPayloadBuilt
@@ -658,7 +658,7 @@ type DevP2PRequestPooledTransactionHash struct {
 	WaitForNewPooledTransaction bool
 }
 
-func (step DevP2PRequestPooledTransactionHash) Execute(t *BlobTestContext) error {
+func (step DevP2PRequestPooledTransactionHash) Execute(t *CancunTestContext) error {
 	// Get client index's enode
 	if step.ClientIndex >= uint64(len(t.TestEngines)) {
 		return fmt.Errorf("invalid client index %d", step.ClientIndex)
