@@ -84,8 +84,8 @@ type blockHeader struct {
 	BaseFee            *big.Int         `json:"baseFeePerGas"`
 	Hash               common.Hash      `json:"hash"`
 	WithdrawalsRoot    common.Hash      `json:"withdrawalsRoot"`
-	DataGasUsed        *uint64          `json:"dataGasUsed"`
-	ExcessDataGas      *uint64          `json:"excessDataGas"`
+	BlobGasUsed        *uint64          `json:"dataGasUsed"`
+	ExcessBlobGas      *uint64          `json:"excessDataGas"`
 }
 
 type blockHeaderUnmarshaling struct {
@@ -96,8 +96,8 @@ type blockHeaderUnmarshaling struct {
 	Timestamp     *math.HexOrDecimal256 `json:"timestamp"`
 	ExtraData     hexutil.Bytes         `json:"extraData"`
 	BaseFee       *math.HexOrDecimal256 `json:"baseFeePerGas"`
-	DataGasUsed   *math.HexOrDecimal64  `json:"dataGasUsed"`
-	ExcessDataGas *math.HexOrDecimal64  `json:"excessDataGas"`
+	BlobGasUsed   *math.HexOrDecimal64  `json:"dataGasUsed"`
+	ExcessBlobGas *math.HexOrDecimal64  `json:"excessDataGas"`
 }
 
 type transaction struct {
