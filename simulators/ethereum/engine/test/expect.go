@@ -1006,59 +1006,52 @@ func (tec *TestEngineClient) TestTransactionReceipt(txHash common.Hash) *Transac
 	return ret
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectError() {
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Receipt)
+func (tr *TransactionReceiptExpectObject) ExpectError() {
+	if tr.Error == nil {
+		tr.Fatalf("FAIL (%s): Expected error on %s: block=%v", tr.TestName, tr.Call, tr.Receipt)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectErrorCode(code int) {
-	exp.ExpectError()
-	if exp.ErrorCode != code {
-		exp.Fatalf("FAIL (%s): Expected error code on %s: want=%d, got=%d", exp.TestName, exp.Call, code, exp.ErrorCode)
+func (tr *TransactionReceiptExpectObject) ExpectErrorCode(code int) {
+	tr.ExpectError()
+	if tr.ErrorCode != code {
+		tr.Fatalf("FAIL (%s): Expected error code on %s: want=%d, got=%d", tr.TestName, tr.Call, code, tr.ErrorCode)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectNoError() {
-	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Unexpected error on %s: %v, expected=<None>", exp.TestName, exp.Call, exp.Error)
+func (tr *TransactionReceiptExpectObject) ExpectNoError() {
+	if tr.Error != nil {
+		tr.Fatalf("FAIL (%s): Unexpected error on %s: %v, expected=<None>", tr.TestName, tr.Call, tr.Error)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectTransactionHash(expectedHash common.Hash) {
-	exp.ExpectNoError()
-	if exp.Receipt.TxHash != expectedHash {
-		exp.Fatalf("FAIL (%s): Unexpected transaction hash on %s: %v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, expectedHash)
+func (tr *TransactionReceiptExpectObject) ExpectTransactionHash(expectedHash common.Hash) {
+	tr.ExpectNoError()
+	if tr.Receipt.TxHash != expectedHash {
+		tr.Fatalf("FAIL (%s): Unexpected transaction hash on %s: %v, expected=%v", tr.TestName, tr.Call, tr.Receipt.TxHash, expectedHash)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectBlockHash(expectedHash common.Hash) {
-	exp.ExpectNoError()
-	if exp.Receipt.BlockHash != expectedHash {
-		exp.Fatalf("FAIL (%s): Unexpected transaction block hash on %s: %v, blockhash=%v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, exp.Receipt.BlockHash, expectedHash)
+func (tr *TransactionReceiptExpectObject) ExpectBlockHash(expectedHash common.Hash) {
+	tr.ExpectNoError()
+	if tr.Receipt.BlockHash != expectedHash {
+		tr.Fatalf("FAIL (%s): Unexpected transaction block hash on %s: %v, blockhash=%v, expected=%v", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlockHash, expectedHash)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectBlobGasUsed(expectedBlobGasUsed *uint64) {
-	exp.ExpectNoError()
-	/*
-		TODO: ENABLE!
-			if (expectedBlobGasUsed == nil || exp.Receipt.BlobGasUsed == nil) && expectedBlobGasUsed != exp.Receipt.BlobGasUsed {
-				exp.Fatalf("FAIL (%s): Unexpected transaction data gas used on %s: %v, dataGasUsed=%v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, exp.Receipt.BlobGasUsed, expectedBlobGasUsed)
-			} else if expectedBlobGasUsed != nil && exp.Receipt.BlobGasUsed != nil && *expectedBlobGasUsed != *exp.Receipt.BlobGasUsed {
-				exp.Fatalf("FAIL (%s): Unexpected transaction data gas used on %s: %v, dataGasUsed=0x%x, expected=0x%x", exp.TestName, exp.Call, exp.Receipt.TxHash, *exp.Receipt.BlobGasUsed, *expectedBlobGasUsed)
-			}
-	*/
+func (tr *TransactionReceiptExpectObject) ExpectBlobGasUsed(expectedBlobGasUsed uint64) {
+	tr.ExpectNoError()
+
+	if expectedBlobGasUsed == tr.Receipt.BlobGasUsed {
+		tr.Fatalf("FAIL (%s): Unexpected transaction data gas used on %s: %v, dataGasUsed=%d, expected=%d", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlobGasUsed, expectedBlobGasUsed)
+	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectBlobGasPrice(expectedBlobGasPrice *uint64) {
-	exp.ExpectNoError()
-	/*
-		TODO: ENABLE!
-			if (expectedBlobGasPrice == nil || exp.Receipt.BlobGasPrice == nil) && expectedBlobGasPrice != exp.Receipt.BlobGasPrice {
-				exp.Fatalf("FAIL (%s): Unexpected transaction data gas price on %s: %v, BlobGasPrice=%v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, exp.Receipt.BlobGasPrice, expectedBlobGasPrice)
-			} else if expectedBlobGasPrice != nil && exp.Receipt.BlobGasPrice != nil && *expectedBlobGasPrice != *exp.Receipt.BlobGasPrice {
-				exp.Fatalf("FAIL (%s): Unexpected transaction data gas price on %s: %v, BlobGasPrice=0x%x, expected=0x%x", exp.TestName, exp.Call, exp.Receipt.TxHash, *exp.Receipt.BlobGasPrice, *expectedBlobGasPrice)
-			}
-	*/
+func (tr *TransactionReceiptExpectObject) ExpectBlobGasPrice(expectedBlobGasPrice *big.Int) {
+	tr.ExpectNoError()
+	if (expectedBlobGasPrice == nil || tr.Receipt.BlobGasPrice == nil) && expectedBlobGasPrice != tr.Receipt.BlobGasPrice {
+		tr.Fatalf("FAIL (%s): Unexpected transaction data gas price on %s: %v, BlobGasPrice=%v, expected=%v", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlobGasPrice, expectedBlobGasPrice)
+	} else if expectedBlobGasPrice != nil && tr.Receipt.BlobGasPrice != nil && expectedBlobGasPrice.Cmp(tr.Receipt.BlobGasPrice) != 0 {
+		tr.Fatalf("FAIL (%s): Unexpected transaction data gas price on %s: %v, BlobGasPrice=0x%x, expected=0x%x", tr.TestName, tr.Call, tr.Receipt.TxHash, *tr.Receipt.BlobGasPrice, *expectedBlobGasPrice)
+	}
 }

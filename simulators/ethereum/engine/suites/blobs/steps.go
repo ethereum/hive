@@ -300,7 +300,7 @@ func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.F
 		}
 
 		totalBlobCount := uint64(0)
-		expectedBlobGasPrice := GetBlobGasPrice(expectedExcessBlobGas)
+		expectedBlobGasPrice := new(big.Int).SetUint64(GetBlobGasPrice(expectedExcessBlobGas))
 
 		for _, tx := range blobTxsInPayload {
 			blobCount := uint64(len(tx.BlobHashes()))
@@ -309,8 +309,8 @@ func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.F
 			// Retrieve receipt from client
 			r := testEngine.TestTransactionReceipt(tx.Hash())
 			expectedBlobGasUsed := blobCount * GAS_PER_BLOB
-			r.ExpectBlobGasUsed(&expectedBlobGasUsed)
-			r.ExpectBlobGasPrice(&expectedBlobGasPrice)
+			r.ExpectBlobGasUsed(expectedBlobGasUsed)
+			r.ExpectBlobGasPrice(expectedBlobGasPrice)
 		}
 
 		if totalBlobCount != step.ExpectedIncludedBlobCount {
