@@ -131,8 +131,9 @@ type NewPayloads struct {
 	// Version to use to call NewPayload
 	Version int
 	// Expected responses on the NewPayload call
-	ExpectedError  *int
-	ExpectedStatus test.PayloadStatus
+	ExpectedError          *int
+	ExpectationDescription string
+	ExpectedStatus         test.PayloadStatus
 }
 
 type VersionedHashes struct {
@@ -460,6 +461,7 @@ func (step NewPayloads) Execute(t *BlobTestContext) error {
 					version = t.Env.ForkConfig.NewPayloadVersion(payload.Timestamp)
 				}
 				r = t.TestEngine.TestEngineNewPayload(payload, versionedHashes, beaconRoot, version)
+				r.ExpectationDescription = step.ExpectationDescription
 				if step.ExpectedError != nil {
 					r.ExpectErrorCode(*step.ExpectedError)
 				} else {

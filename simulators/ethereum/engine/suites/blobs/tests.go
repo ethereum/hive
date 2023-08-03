@@ -523,12 +523,13 @@ var Tests = []test.SpecInterface{
 	// NewPayloadV3 Before Cancun, Negative Tests
 	&BlobsBaseSpec{
 		Spec: test.Spec{
-			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes",
+			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- nil ExcessBlobGas
 			- nil BlobGasUsed
 			- nil Versioned Hashes Array
+			- nil Beacon Root
 			`,
 		},
 
@@ -542,17 +543,21 @@ var Tests = []test.SpecInterface{
 					Blobs: nil,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
+				`,
 			},
 		},
 	},
 	&BlobsBaseSpec{
 		Spec: test.Spec{
-			Name: "NewPayloadV3 Before Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Nil Versioned Hashes",
+			Name: "NewPayloadV3 Before Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- nil ExcessBlobGas
 			- 0x00 BlobGasUsed
 			- nil Versioned Hashes Array
+			- nil Beacon Root
 			`,
 		},
 
@@ -566,17 +571,21 @@ var Tests = []test.SpecInterface{
 					BlobGasUsed: pUint64(0),
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
+				`,
 			},
 		},
 	},
 	&BlobsBaseSpec{
 		Spec: test.Spec{
-			Name: "NewPayloadV3 Before Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Nil Versioned Hashes",
+			Name: "NewPayloadV3 Before Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- 0x00 ExcessBlobGas
 			- nil BlobGasUsed
 			- nil Versioned Hashes Array
+			- nil Beacon Root
 			`,
 		},
 
@@ -590,18 +599,22 @@ var Tests = []test.SpecInterface{
 					ExcessBlobGas: pUint64(0),
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
+				`,
 			},
 		},
 	},
 	&BlobsBaseSpec{
 		Spec: test.Spec{
-			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Empty Array Versioned Hashes",
+			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Empty Array Versioned Hashes, Nil Beacon Root",
 			About: `
 				Test sending NewPayloadV3 Before Cancun with:
 				- nil ExcessBlobGas
 				- nil BlobGasUsed
 				- Empty Versioned Hashes Array
-				`,
+				- nil Beacon Root
+			`,
 		},
 
 		CancunForkHeight: 2,
@@ -614,17 +627,49 @@ var Tests = []test.SpecInterface{
 					Blobs: []helper.BlobID{},
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
+				`,
 			},
 		},
 	},
 	&BlobsBaseSpec{
 		Spec: test.Spec{
-			Name: "NewPayloadV3 Before Cancun, 0x00 Data Fields, Empty Array Versioned Hashes",
+			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Zero Beacon Root",
+			About: `
+			Test sending NewPayloadV3 Before Cancun with:
+			- nil ExcessBlobGas
+			- nil BlobGasUsed
+			- nil Versioned Hashes Array
+			- Zero Beacon Root
+			`,
+		},
+
+		CancunForkHeight: 2,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				ExpectedIncludedBlobCount: 0,
+				Version:                   3,
+				PayloadCustomizer: &helper.CustomPayloadData{
+					BeaconRoot: &(common.Hash{}),
+				},
+				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code -32602)
+				`,
+			},
+		},
+	},
+	&BlobsBaseSpec{
+		Spec: test.Spec{
+			Name: "NewPayloadV3 Before Cancun, 0x00 Data Fields, Empty Array Versioned Hashes, Zero Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- 0x00 ExcessBlobGas
 			- 0x00 BlobGasUsed
 			- Empty Versioned Hashes Array
+			- Zero Beacon Root
 			`,
 		},
 
@@ -640,8 +685,12 @@ var Tests = []test.SpecInterface{
 				PayloadCustomizer: &helper.CustomPayloadData{
 					ExcessBlobGas: pUint64(0),
 					BlobGasUsed:   pUint64(0),
+					BeaconRoot:    &(common.Hash{}),
 				},
 				ExpectedError: UNSUPPORTED_FORK_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 before Cancun with no nil fields must return UNSUPPORTED_FORK_ERROR (code -38005)
+				`,
 			},
 		},
 	},
@@ -649,12 +698,13 @@ var Tests = []test.SpecInterface{
 	// NewPayloadV3 After Cancun, Negative Tests
 	&BlobsBaseSpec{
 		Spec: test.Spec{
-			Name: "NewPayloadV3 After Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Empty Array Versioned Hashes",
+			Name: "NewPayloadV3 After Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Empty Array Versioned Hashes, Zero Beacon Root",
 			About: `
 			Test sending NewPayloadV3 After Cancun with:
 			- nil ExcessBlobGas
 			- 0x00 BlobGasUsed
 			- Empty Versioned Hashes Array
+			- Zero Beacon Root
 			`,
 		},
 
@@ -668,6 +718,9 @@ var Tests = []test.SpecInterface{
 					RemoveExcessBlobGas: true,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 after Cancun with nil ExcessBlobGas must return INVALID_PARAMS_ERROR (code -32602)
+				`,
 			},
 		},
 	},
@@ -692,6 +745,36 @@ var Tests = []test.SpecInterface{
 					RemoveBlobGasUsed: true,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 after Cancun with nil BlobGasUsed must return INVALID_PARAMS_ERROR (code -32602)
+				`,
+			},
+		},
+	},
+	&BlobsBaseSpec{
+		Spec: test.Spec{
+			Name: "NewPayloadV3 After Cancun, 0x00 Blob Fields, Empty Array Versioned Hashes, Nil Beacon Root",
+			About: `
+			Test sending NewPayloadV3 After Cancun with:
+			- 0x00 ExcessBlobGas
+			- nil BlobGasUsed
+			- Empty Versioned Hashes Array
+			`,
+		},
+
+		CancunForkHeight: 1,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				ExpectedIncludedBlobCount: 0,
+				Version:                   3,
+				PayloadCustomizer: &helper.CustomPayloadData{
+					RemoveBeaconRoot: true,
+				},
+				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 after Cancun with nil parentBeaconBlockRoot must return INVALID_PARAMS_ERROR (code -32602)
+				`,
 			},
 		},
 	},
@@ -718,6 +801,9 @@ var Tests = []test.SpecInterface{
 					Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1),
 				},
 				ExpectedStatus: test.Invalid,
+				ExpectationDescription: `
+				NewPayloadV3 with incorrect list of versioned hashes must return INVALID status
+				`,
 			},
 		},
 	},
@@ -744,6 +830,9 @@ var Tests = []test.SpecInterface{
 					Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK+1),
 				},
 				ExpectedStatus: test.Invalid,
+				ExpectationDescription: `
+				NewPayloadV3 with incorrect list of versioned hashes must return INVALID status
+				`,
 			},
 		},
 	},
@@ -768,6 +857,9 @@ var Tests = []test.SpecInterface{
 					Blobs: helper.GetBlobListByIndex(helper.BlobID(TARGET_BLOBS_PER_BLOCK-1), 0),
 				},
 				ExpectedStatus: test.Invalid,
+				ExpectationDescription: `
+				NewPayloadV3 with incorrect list of versioned hashes must return INVALID status
+				`,
 			},
 		},
 	},
@@ -792,6 +884,9 @@ var Tests = []test.SpecInterface{
 					Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK), helper.BlobID(TARGET_BLOBS_PER_BLOCK-1)),
 				},
 				ExpectedStatus: test.Invalid,
+				ExpectationDescription: `
+				NewPayloadV3 with incorrect list of versioned hashes must return INVALID status
+				`,
 			},
 		},
 	},
@@ -816,6 +911,9 @@ var Tests = []test.SpecInterface{
 					Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(TARGET_BLOBS_PER_BLOCK)),
 				},
 				ExpectedStatus: test.Invalid,
+				ExpectationDescription: `
+				NewPayloadV3 with incorrect hash in list of versioned hashes must return INVALID status
+				`,
 			},
 		},
 	},
@@ -840,6 +938,9 @@ var Tests = []test.SpecInterface{
 					HashVersions: []byte{BLOB_COMMITMENT_VERSION_KZG, BLOB_COMMITMENT_VERSION_KZG + 1},
 				},
 				ExpectedStatus: test.Invalid,
+				ExpectationDescription: `
+				NewPayloadV3 with incorrect version in list of versioned hashes must return INVALID status
+				`,
 			},
 		},
 	},
@@ -864,6 +965,9 @@ var Tests = []test.SpecInterface{
 					Blobs: nil,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
+				ExpectationDescription: `
+				NewPayloadV3 after Cancun with nil VersionedHashes must return INVALID_PARAMS_ERROR (code -32602)
+				`,
 			},
 		},
 	},
@@ -888,6 +992,9 @@ var Tests = []test.SpecInterface{
 					Blobs: []helper.BlobID{},
 				},
 				ExpectedStatus: test.Invalid,
+				ExpectationDescription: `
+				NewPayloadV3 with incorrect list of versioned hashes must return INVALID status
+				`,
 			},
 		},
 	},
@@ -908,6 +1015,9 @@ var Tests = []test.SpecInterface{
 					Blobs: []helper.BlobID{0},
 				},
 				ExpectedStatus: test.Invalid,
+				ExpectationDescription: `
+				NewPayloadV3 with incorrect list of versioned hashes must return INVALID status
+				`,
 			},
 		},
 	},
