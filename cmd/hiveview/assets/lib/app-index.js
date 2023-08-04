@@ -181,7 +181,6 @@ function selectWithOptions(api, colIdx) {
                 select.append( $('<option value="'+d+'">'+d+'</option>') );
             }
         } );
-    
 }
 
 function statusSelect(api, colIdx) {
