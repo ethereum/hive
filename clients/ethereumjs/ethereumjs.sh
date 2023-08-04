@@ -49,7 +49,7 @@
 set -e
 
 ethereumjs="node /ethereumjs-monorepo/packages/client/dist/bin/cli.js"
-FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcEnginePort 8551 --ws --logLevel debug --rpcDebug --transports rlpx --isSingleNode"
+FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcAddr 0.0.0.0 --rpcEngineAddr 0.0.0.0 --rpcEnginePort 8551 --ws false --logLevel debug --rpcDebug --transports rlpx --isSingleNode"
 
 
 # Configure the chain.
