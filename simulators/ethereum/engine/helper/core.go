@@ -433,7 +433,7 @@ func (v *ErigonGenesis) SetExtraData(data []byte) {
 }
 
 func (v *ErigonGenesis) GasLimit() uint64 {
-	return big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonGasLimit)).Uint64()
+	return common.HexToHash(v.ErigonGasLimit).Big().Uint64()
 }
 
 func (v *ErigonGenesis) SetGasLimit(limit uint64) {
