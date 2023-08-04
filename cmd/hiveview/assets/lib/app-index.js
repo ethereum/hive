@@ -59,7 +59,9 @@ function showFileListing(data) {
         suites.push(suite);
     });
 
-    $('#filetable').DataTable({
+    // "const table" makes the table already render here so that column filtering
+    // can then be added as a second row
+    const table = $('#filetable').DataTable({
         data: suites,
         pageLength: 50,
         autoWidth: false,
@@ -134,4 +136,6 @@ function showFileListing(data) {
             },
         ],
     });
+    
+    $('<tr><th></th><th></th><th></th><th></th><th></th></tr>').appendTo($('#filetable thead'))
 }
