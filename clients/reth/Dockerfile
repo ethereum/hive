@@ -1,5 +1,7 @@
-ARG branch=main
-FROM paradigmxyz/reth:$branch
+ARG baseimage=paradigmxyz/reth
+ARG tag=main
+
+FROM $baseimage:$tag as builder
 
 # Install script tools.
 RUN apt-get update -y
