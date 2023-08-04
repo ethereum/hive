@@ -137,6 +137,7 @@ function showFileListing(data) {
             const api = this.api();
             $('<tr class="filters"><th></th><th></th><th></th><th></th><th></th></tr>')
                 .appendTo($('#filetable thead'));
+            dateSelect(api, 0);
             selectWithOptions(api, 1);
             selectWithOptions(api, 2);
             statusSelect(api, 3);
@@ -188,4 +189,22 @@ function statusSelect(api, colIdx) {
     select.append( $('<option value="✓">SUCCESS</option>') );
     select.append( $('<option value="FAIL">FAIL</option>') );
     select.append( $('<option value="TIMEOUT">TIMEOUT</option>') );
+}
+
+function minusXDaysDate(x) {
+    const date = new Date(new Date().setDate(new Date().getDate() - x))
+    return date.toLocaleDateString()
+}
+
+function dateSelect(api, colIdx) {
+    const select = genericSelect(api, colIdx);
+    const today = new Date().toLocaleDateString();
+    select.append( $('<option value="' + today + '">Today</option>') );
+    select.append( $('<option value="' + minusXDaysDate(1) + '">Yesterday</option>') );
+    select.append( $('<option value="' + minusXDaysDate(2) + '">2 days ago</option>') );
+    select.append( $('<option value="' + minusXDaysDate(3) + '">3 days ago</option>') );
+    select.append( $('<option value="' + minusXDaysDate(4) + '">4 days ago</option>') );
+    select.append( $('<option value="' + minusXDaysDate(5) + '">5 days ago</option>') );
+    select.append( $('<option value="' + minusXDaysDate(6) + '">6 days ago</option>') );
+    select.append( $('<option value="' + minusXDaysDate(7) + '">7 days ago</option>') );
 }
