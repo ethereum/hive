@@ -139,11 +139,12 @@ function showFileListing(data) {
                 .appendTo($('#filetable thead'));
             selectWithOptions(api, 1);
             selectWithOptions(api, 2);
+            statusSelect(api, 3);
         }
     });
 }
 
-function selectWithOptions(api, colIdx) {
+function genericSelect(api, colIdx) {
     const table = $('#filetable').DataTable();
 
     const cell = $('.filters th').eq(
@@ -161,6 +162,12 @@ function selectWithOptions(api, colIdx) {
         } );
     
     select.append( $('<option value="">Show all</option>') );
+    return select;
+}
+
+function selectWithOptions(api, colIdx) {
+    const table = $('#filetable').DataTable();
+    const select = genericSelect(api, colIdx);
 
     // Get the search data for the first column and add to the select list
     table
@@ -174,4 +181,11 @@ function selectWithOptions(api, colIdx) {
             }
         } );
     
+}
+
+function statusSelect(api, colIdx) {
+    const select = genericSelect(api, colIdx);
+    select.append( $('<option value="✓">SUCCESS</option>') );
+    select.append( $('<option value="FAIL">FAIL</option>') );
+    select.append( $('<option value="TIMEOUT">TIMEOUT</option>') );
 }
