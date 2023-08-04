@@ -59,9 +59,7 @@ function showFileListing(data) {
         suites.push(suite);
     });
 
-    // "const table" makes the table already render here so that column filtering
-    // can then be added as a second row
-    const table = $('#filetable').DataTable({
+    $('#filetable').DataTable({
         data: suites,
         pageLength: 50,
         autoWidth: false,
@@ -135,7 +133,45 @@ function showFileListing(data) {
                 },
             },
         ],
+        initComplete: function () {
+            const api = this.api();
+            $('<tr class="filters"><th></th><th></th><th></th><th></th><th></th></tr>')
+                .appendTo($('#filetable thead'));
+            selectWithOptions(api, 1);
+            selectWithOptions(api, 2);
+        }
     });
+}
+
+function selectWithOptions(api, colIdx) {
+    const table = $('#filetable').DataTable();
+
+    const cell = $('.filters th').eq(
+        $(api.column(colIdx).header()).index()
+    );
+
+    // Create the select list and search operation
+    const select = $('<select />')
+        .appendTo(cell)
+        .on( 'change', function () {
+            table
+                .column( colIdx )
+                .search( $(this).val() )
+                .draw();
+        } );
     
-    $('<tr><th></th><th></th><th></th><th></th><th></th></tr>').appendTo($('#filetable thead'))
+    select.append( $('<option value="">Show all</option>') );
+
+    // Get the search data for the first column and add to the select list
+    table
+        .column( colIdx )
+        .cache( 'search' )
+        .sort()
+        .unique()
+        .each( function ( d ) {
+            if (!d.includes(',')) {
+                select.append( $('<option value="'+d+'">'+d+'</option>') );
+            }
+        } );
+    
 }
