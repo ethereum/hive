@@ -3,13 +3,13 @@
 
 FROM node:18-alpine
 
+RUN apk update && apk add --no-cache bash git jq curl python3 gcc make g++ \
+    && rm -rf /var/cache/apk/*
+
 # Default local client path: clients/ethereumjs/<ethereumjs-monorepo>
 ARG local_path=ethereumjs-monorepo
 COPY $local_path ethereumjs-monorepo
-
-RUN apk update && apk add --no-cache bash git jq curl python3 gcc make g++ && \
-    && rm -rf /var/cache/apk/* \
-    && cd ethereumjs-monorepo && npm i
+RUN cd ethereumjs-monorepo && npm i
 
 # Create version.txt
 RUN cd ethereumjs-monorepo/packages/client && npm ethereumjs --version > /version.txt
