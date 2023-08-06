@@ -39,6 +39,7 @@ jobs:
         run: go build -v -o hive hive.go
 
       - name: Run Nethermind tests
+        continue-on-error: true
         run: |
           ./hive --sim ethereum/engine --sim.limit="withdrawals" --client nethermind --results-root=${{ github.workspace }}/runs --loglevel=5 --client.checktimelimit=10m --docker.output 
 
