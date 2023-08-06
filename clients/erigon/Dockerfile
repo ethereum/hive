@@ -8,10 +8,6 @@ USER root
 # Install script tools.
 RUN apk add --update bash curl
 
-# Add genesis mapper script.
-#ADD genesis.json /genesis.json
-#ADD mapper.jq /mapper.jq
-
 # Add the startup script.
 ADD erigon.sh /erigon.sh
 RUN chmod +x /erigon.sh

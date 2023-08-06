@@ -238,19 +238,6 @@ func LoadGenesisTest(path string) string {
 	return string(contents)
 }
 
-//
-//func LoadGenesisBlock(path string) *types.Block {
-//	genesis := LoadGenesis(path)
-//	return genesis.ToBlock()
-//}
-
-//	func GenesisStartOption(genesis Genesis) (hivesim.StartOption, error) {
-//		out, err := genesis.MarshalJSON()
-//		if err != nil {
-//			return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
-//		}
-//		return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
-//	}
 func GenesisStartOptionBasedOnClient(genesis Genesis, clientName string) (hivesim.StartOption, error) {
 	out, err := genesis.MarshalJSON()
 	if err != nil {
@@ -265,20 +252,7 @@ func GenesisStartOptionBasedOnClient(genesis Genesis, clientName string) (hivesi
 	}
 	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
 }
-func GenesisStartOptionBasedOnClientTest(genesis string, clientName string) (hivesim.StartOption, error) {
-	//out, err := genesis.MarshalJSON()
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
-	//}
-	// We don't need mappers
-	//switch clientName {
-	//case "erigon":
-	//return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
-	//case "nethermind":
-	return hivesim.WithDynamicFile("/chainspec.json", bytesSource([]byte(genesis))), nil
-	//}
-	//return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
-}
+
 func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
 	result := new(big.Int).Set(genesis.Difficulty)
 	for _, b := range chain {
