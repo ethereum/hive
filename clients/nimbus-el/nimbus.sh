@@ -31,6 +31,7 @@
 #  - [x] HIVE_FORK_MUIRGLACIER        block number for Muir Glacier transition
 #  - [x] HIVE_FORK_BERLIN             block number for Berlin transition
 #  - [x] HIVE_FORK_LONDON             block number for London transition
+#  - [x] HIVE_FORK_MERGE              block number for Merge transition
 #
 # Clique PoA:
 #
@@ -101,7 +102,7 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-  (cd /blocks && cat `ls | sort -n` > blocks.rlp && $nimbus import blocks.rlp $FLAGS)
+  (cd /blocks && $nimbus import `ls | sort -n` $FLAGS)
 else
   echo "Warning: blocks folder not found."
 fi
