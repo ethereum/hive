@@ -57,12 +57,12 @@ fi
 
 # Generate the genesis and chainspec file.
 mkdir -p /chainspec
+echo "Supplied genesis state:" 
 jq -f /mapper.jq /genesis.json > /chainspec/test.json
 jq . /chainspec/test.json
 
 # Generate the config file.
 mkdir /configs
-echo "Supplied genesis state:" 
 jq -n -f /mkconfig.jq > /configs/test.cfg
 
 echo "test.cfg"
