@@ -134,7 +134,7 @@ func (tc *testcase) run(t *hivesim.T) {
 			int(engineNewPayload.Version),
 			engineNewPayload.Payload,
 			&engineNewPayload.BlobVersionedHashes,
-			nil, // TODO: Fix in pyspec PR
+			engineNewPayload.ParentBeaconBlockRoot,
 		)
 		if plErr != nil {
 			if plException == plErr.Error() {
@@ -149,6 +149,7 @@ func (tc *testcase) run(t *hivesim.T) {
 		if plStatus.Status == "VALID" {
 			latestValidHash = *plStatus.LatestValidHash
 		}
+
 		// check payload status is expected from fixture
 		if expectedStatus != plStatus.Status {
 			tc.failedErr = errors.New("payload status mismatch")
@@ -272,6 +273,7 @@ func extractGenesis(fixture fixtureJSON) *core.Genesis {
 		BaseFee:       fixture.Genesis.BaseFee,
 		BlobGasUsed:   fixture.Genesis.BlobGasUsed,
 		ExcessBlobGas: fixture.Genesis.ExcessBlobGas,
+		BeaconRoot:    fixture.Genesis.BeaconRoot,
 		Alloc:         fixture.Pre,
 	}
 	return genesis

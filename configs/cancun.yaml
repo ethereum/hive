@@ -5,6 +5,13 @@
       github: hyperledger/besu
       tag: main
 
+- client: erigon
+  nametag: cancun-git
+  dockerfile: git
+  build_args:
+      github: ledgerwatch/erigon
+      tag: devel
+
 - client: ethereumjs
   nametag: cancun-git
   build_args:
@@ -24,10 +31,3 @@
   build_args:
       github: NethermindEth/nethermind
       tag: cancun
-
-- client: erigon
-  nametag: cancun-git
-  dockerfile: git
-  build_args:
-      github: ledgerwatch/erigon
-      tag: devel
