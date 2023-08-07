@@ -169,6 +169,7 @@ def clique_engine:
     "baseFeePerGas": .baseFeePerGas,
     "blobGasUsed": .blobGasUsed,
     "excessBlobGas": .excessBlobGas,
+    "parentBeaconBlockRoot": .parentBeaconBlockRoot,
   },
   "accounts": ((.alloc|with_entries(.key|="0x"+.)) * {
     "0x0000000000000000000000000000000000000001": {
