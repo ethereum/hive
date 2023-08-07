@@ -68,8 +68,8 @@ type blockHeader struct {
 	CoinbaseAlt        common.Address   `json:"author"` // nethermind name
 	CoinbaseAlt2       common.Address   `json:"miner"`  // geth/besu name
 	StateRoot          common.Hash      `json:"stateRoot"`
-	transactionTrie    common.Hash      `json:"transactionRoot"`
-	transactionTrieAlt common.Hash      `json:"transactionTrie"` // name in fixtures
+	TransactionTrie    common.Hash      `json:"transactionRoot"`
+	TransactionTrieAlt common.Hash      `json:"transactionTrie"` // name in fixtures
 	ReceiptTrie        common.Hash      `json:"receiptsRoot"`
 	ReceiptTrieAlt     common.Hash      `json:"receiptTrie"` // name in fixtures
 	Bloom              types.Bloom      `json:"bloom"`
@@ -84,8 +84,9 @@ type blockHeader struct {
 	BaseFee            *big.Int         `json:"baseFeePerGas"`
 	Hash               common.Hash      `json:"hash"`
 	WithdrawalsRoot    common.Hash      `json:"withdrawalsRoot"`
-	BlobGasUsed        *uint64          `json:"dataGasUsed"`
-	ExcessBlobGas      *uint64          `json:"excessDataGas"`
+	BlobGasUsed        *uint64          `json:"blobGasUsed"`
+	ExcessBlobGas      *uint64          `json:"excessBlobGas"`
+	BeaconRoot         *common.Hash     `json:"parentBeaconBlockRoot"`
 }
 
 type blockHeaderUnmarshaling struct {
@@ -151,9 +152,10 @@ type withdrawalsUnmarshaling struct {
 }
 
 type engineNewPayload struct {
-	Payload             *api.ExecutableData `json:"payload"`
-	Version             uint64              `json:"version"`
-	BlobVersionedHashes []common.Hash       `json:"blobVersionedHashes"`
+	Payload               *api.ExecutableData `json:"executionPayload"`
+	BlobVersionedHashes   []common.Hash       `json:"expectedBlobVersionedHashes"`
+	ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot"`
+	Version               uint64              `json:"version"`
 }
 
 type engineNewPayloadUnmarshaling struct {
