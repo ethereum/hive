@@ -3,7 +3,6 @@ package hivesim
 import (
 	"errors"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http/httptest"
 	"os"
@@ -174,7 +173,7 @@ func TestStartClientStartOptions(t *testing.T) {
 	})
 
 	t.Run("files_options", func(t *testing.T) {
-		file1, err := ioutil.TempFile("", "hivesim_test")
+		file1, err := os.CreateTemp("", "hivesim_test")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -183,7 +182,7 @@ func TestStartClientStartOptions(t *testing.T) {
 		}
 		defer os.Remove(file1.Name())
 
-		file2, err := ioutil.TempFile("", "hivesim_test")
+		file2, err := os.CreateTemp("", "hivesim_test")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -217,7 +216,7 @@ func TestStartClientStartOptions(t *testing.T) {
 		})
 
 		mockSrc := func(content string) func() (io.ReadCloser, error) {
-			return func() (io.ReadCloser, error) { return ioutil.NopCloser(strings.NewReader(content)), nil }
+			return func() (io.ReadCloser, error) { return io.NopCloser(strings.NewReader(content)), nil }
 		}
 
 		t.Run("dynamic", func(t *testing.T) {
