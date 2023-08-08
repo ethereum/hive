@@ -16,7 +16,7 @@
   nametag: cancun-git
   build_args:
       github: ethereumjs/ethereumjs-monorepo
-      tag: master
+      tag: hive-branch
 
 - client: go-ethereum
   nametag: cancun-git
