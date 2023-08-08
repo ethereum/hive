@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net/http"
 	"os"
@@ -46,14 +45,14 @@ type LoggingRoundTrip struct {
 
 func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Read and log the request body.
-	reqBytes, err := ioutil.ReadAll(req.Body)
+	reqBytes, err := io.ReadAll(req.Body)
 	req.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 	rt.Logger.Logf(">> (%s) %s", rt.ID, bytes.TrimSpace(reqBytes))
 	reqCopy := *req
-	reqCopy.Body = ioutil.NopCloser(bytes.NewReader(reqBytes))
+	reqCopy.Body = io.NopCloser(bytes.NewReader(reqBytes))
 
 	// Do the round trip.
 	resp, err := rt.Inner.RoundTrip(&reqCopy)
@@ -63,12 +62,12 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	defer resp.Body.Close()
 
 	// Read and log the response bytes.
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	respCopy := *resp
-	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
+	respCopy.Body = io.NopCloser(bytes.NewReader(respBytes))
 	rt.Logger.Logf("<< (%s) %s", rt.ID, bytes.TrimSpace(respBytes))
 	return &respCopy, nil
 }
@@ -180,7 +179,7 @@ func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx
 
 func bytesSource(data []byte) func() (io.ReadCloser, error) {
 	return func() (io.ReadCloser, error) {
-		return ioutil.NopCloser(bytes.NewReader(data)), nil
+		return io.NopCloser(bytes.NewReader(data)), nil
 	}
 }
 
@@ -207,7 +206,7 @@ func LoadChain(path string) types.Blocks {
 }
 
 func LoadGenesis(path string) core.Genesis {
-	contents, err := ioutil.ReadFile(path)
+	contents, err := io.ReadFile(path)
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}

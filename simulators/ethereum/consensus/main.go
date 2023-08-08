@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -549,7 +548,7 @@ func (tc *testcase) artefacts() (string, string, []string, error) {
 	genesis := toGethGenesis(&tc.blockTest.json)
 	genBytes, _ := json.Marshal(genesis)
 	genesisFile := filepath.Join(rootDir, "genesis.json")
-	if err := ioutil.WriteFile(genesisFile, genBytes, 0777); err != nil {
+	if err := os.WriteFile(genesisFile, genBytes, 0777); err != nil {
 		return rootDir, "", nil, fmt.Errorf("failed writing genesis: %v", err)
 	}
 
@@ -557,7 +556,7 @@ func (tc *testcase) artefacts() (string, string, []string, error) {
 	for i, block := range tc.blockTest.json.Blocks {
 		rlpdata := common.FromHex(block.Rlp)
 		fname := fmt.Sprintf("%s/%04d.rlp", blockDir, i+1)
-		if err := ioutil.WriteFile(fname, rlpdata, 0777); err != nil {
+		if err := os.WriteFile(fname, rlpdata, 0777); err != nil {
 			return rootDir, genesisFile, blocks, fmt.Errorf("failed writing block %d: %v", i, err)
 		}
 		blocks = append(blocks, fname)

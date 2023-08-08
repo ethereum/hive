@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path"
@@ -104,7 +103,7 @@ func deliverTests(t *hivesim.T, wg *sync.WaitGroup, limit int) <-chan *testCase 
 			if fname := info.Name(); !strings.HasSuffix(fname, ".json") {
 				return nil
 			}
-			data, err := ioutil.ReadFile(filepath)
+			data, err := io.ReadFile(filepath)
 			if err != nil {
 				t.Logf("Warning: can't read test file %s: %v", filepath, err)
 				return nil
@@ -157,7 +156,7 @@ func (tc *testCase) run(t *hivesim.T, c *hivesim.Client) {
 	if err != nil {
 		t.Fatal("HTTP post failed:", err)
 	}
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal("can't read HTTP response:", err)
 	}
