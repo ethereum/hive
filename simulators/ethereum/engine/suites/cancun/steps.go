@@ -258,7 +258,7 @@ func VerifyBeaconRootStorage(ctx context.Context, testEngine *test.TestEngineCli
 	// Read the storage keys from the stateful precompile that stores the beacon roots and verify
 	// that the beacon root is the same as the one in the payload
 	blockNumber := new(big.Int).SetUint64(payload.Number)
-	precompileAddress := common.BytesToAddress([]byte{HISTORY_STORAGE_ADDRESS})
+	precompileAddress := HISTORY_STORAGE_ADDRESS
 
 	timestampKey, beaconRootKey := BeaconRootStorageIndexes(payload.Timestamp)
 

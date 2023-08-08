@@ -92,10 +92,11 @@ func (bs *CancunBaseSpec) GetGenesis() *core.Genesis {
 		}
 	}
 
-	// Add 1 wei to the 4788 stateful precompile so its account is not deleted at the end of
-	// block execution.
-	genesis.Alloc[common.BigToAddress(new(big.Int).SetUint64(uint64(HISTORY_STORAGE_ADDRESS)))] = core.GenesisAccount{
-		Balance: big.NewInt(1),
+	// Add bytecode pre deploy to the EIP-4788 address.
+	genesis.Alloc[HISTORY_STORAGE_ADDRESS] = core.GenesisAccount{
+		Balance: common.Big0,
+		Nonce:   1,
+		Code:    common.Hex2Bytes("0x3373fffffffffffffffffffffffffffffffffffffffe14604457602036146024575f5ffd5b620180005f350680545f35146037575f5ffd5b6201800001545f5260205ff35b42620180004206555f3562018000420662018000015500"),
 	}
 
 	return genesis
