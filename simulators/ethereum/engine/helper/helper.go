@@ -206,7 +206,7 @@ func LoadChain(path string) types.Blocks {
 }
 
 func LoadGenesis(path string) core.Genesis {
-	contents, err := io.ReadFile(path)
+	contents, err := os.ReadFile(path)
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}

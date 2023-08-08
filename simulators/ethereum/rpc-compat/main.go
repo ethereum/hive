@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -221,7 +220,7 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
 			fmt.Println("skip", pathname)
 			return nil // skip
 		}
-		data, err := io.ReadFile(path)
+		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}

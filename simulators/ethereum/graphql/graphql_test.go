@@ -24,7 +24,7 @@ func Test_responseMatch(t *testing.T) {
 	hivesimT := &hivesim.T{}
 	// unmarshal JSON test file
 	fp := "./testcases/07_eth_gasPrice.json"
-	data, err := io.ReadFile(fp)
+	data, err := os.ReadFile(fp)
 	if err != nil {
 		t.Fatalf("Warning: can't read test file %s: %v", fp, err)
 	}

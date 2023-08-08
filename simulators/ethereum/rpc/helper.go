@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -215,7 +217,7 @@ func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 func loadGenesis() *types.Block {
-	contents, err := io.ReadFile("init/genesis.json")
+	contents, err := os.ReadFile("init/genesis.json")
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}
