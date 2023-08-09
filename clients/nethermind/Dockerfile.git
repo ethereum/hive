@@ -6,7 +6,7 @@ FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
 ARG github=nethermindeth/nethermind
 ARG tag=master
 
-RUN echo "Cloning: $user/$repo - $branch" && \
+RUN echo "Cloning: $github - $tag" && \
     git clone -b $tag https://github.com/$github && \
     cd /nethermind/src/Nethermind/Nethermind.Runner && \
     dotnet build -c release

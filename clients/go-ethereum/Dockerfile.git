@@ -5,8 +5,9 @@ ARG github=ethereum/go-ethereum
 ARG tag=master
 
 RUN \
-  apk add --update bash curl jq git make gcc musl-dev              \
-        ca-certificates linux-headers                              && \
+  apk add --update bash curl jq git make gcc musl-dev                 \
+  ca-certificates linux-headers                                    && \
+  echo "Cloning: $github - $tag"                                   && \
   git clone --depth 1 --branch $tag https://github.com/$github     && \
   cd go-ethereum                                                   && \
   make geth                                                        && \
