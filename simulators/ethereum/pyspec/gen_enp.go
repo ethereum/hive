@@ -19,7 +19,7 @@ func (e engineNewPayload) MarshalJSON() ([]byte, error) {
 		BlobVersionedHashes   []common.Hash          `json:"expectedBlobVersionedHashes"`
 		ParentBeaconBlockRoot *common.Hash           `json:"parentBeaconBlockRoot"`
 		Version               math.HexOrDecimal64    `json:"version"`
-		ErrorCode             string                 `json:"errorCode"`
+		ErrorCode             int64                  `json:"errorCode,string"`
 	}
 	var enc engineNewPayload
 	enc.Payload = e.Payload
@@ -37,7 +37,7 @@ func (e *engineNewPayload) UnmarshalJSON(input []byte) error {
 		BlobVersionedHashes   []common.Hash          `json:"expectedBlobVersionedHashes"`
 		ParentBeaconBlockRoot *common.Hash           `json:"parentBeaconBlockRoot"`
 		Version               *math.HexOrDecimal64   `json:"version"`
-		ErrorCode             *string                `json:"errorCode"`
+		ErrorCode             *int64                 `json:"errorCode,string"`
 	}
 	var dec engineNewPayload
 	if err := json.Unmarshal(input, &dec); err != nil {

@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"path/filepath"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -133,8 +132,8 @@ func (tc *testcase) run(t *hivesim.T) {
 			engineNewPayload.ParentBeaconBlockRoot,
 		)
 		// check for rpc errors and compare error codes
-		fxErrCode := tc.fixture.json.Blocks[i].EngineNewPayload.ErrorCode
-		if fxErrCode != "" {
+		fxErrCode := int(tc.fixture.json.Blocks[i].EngineNewPayload.ErrorCode)
+		if fxErrCode != 0 {
 			checkRPCErrors(plErr, fxErrCode, t, tc)
 			continue
 		}
@@ -277,10 +276,10 @@ func extractGenesis(fixture fixtureJSON) *core.Genesis {
 }
 
 // checkRPCErrors checks for RPC errors and compares error codes if expected.
-func checkRPCErrors(plErr error, fxErrCode string, t *hivesim.T, tc *testcase) {
+func checkRPCErrors(plErr error, fxErrCode int, t *hivesim.T, tc *testcase) {
 	rpcErr, isRpcErr := plErr.(rpc.Error)
 	if isRpcErr {
-		plErrCode := strconv.Itoa(rpcErr.ErrorCode())
+		plErrCode := rpcErr.ErrorCode()
 		if plErrCode != fxErrCode {
 			tc.failedErr = fmt.Errorf("error code mismatch: client returned %v and fixture expected %v", plErrCode, fxErrCode)
 			t.Fatalf("error code mismatch\n client returned: %v\n fixture expected: %v\n in test %s", plErrCode, fxErrCode, tc.name)
