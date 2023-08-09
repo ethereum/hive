@@ -156,6 +156,7 @@ type engineNewPayload struct {
 	BlobVersionedHashes   []common.Hash       `json:"expectedBlobVersionedHashes"`
 	ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot"`
 	Version               uint64              `json:"version"`
+	ErrorCode             string              `json:"errorCode"`
 }
 
 type engineNewPayloadUnmarshaling struct {

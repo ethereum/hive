@@ -8,12 +8,14 @@ import (
 	"math/big"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/go-ethereum/tests"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
@@ -122,10 +124,12 @@ func (tc *testcase) run(t *hivesim.T) {
 	// send payloads and check response
 	latestValidHash := common.Hash{}
 	for i, engineNewPayload := range tc.payloads {
-		// set expected payload return status
-		plException := tc.fixture.json.Blocks[i].Exception
+		// parse potential expected fixture exception and error code
+		fxException := tc.fixture.json.Blocks[i].Exception
+		fxErrCode := tc.fixture.json.Blocks[i].EngineNewPayload.ErrorCode
+		// set expected payload return status based on exception
 		expectedStatus := "VALID"
-		if plException != "" {
+		if fxException != "" {
 			expectedStatus = "INVALID"
 		}
 		// execute fixture block payload
@@ -136,24 +140,17 @@ func (tc *testcase) run(t *hivesim.T) {
 			&engineNewPayload.BlobVersionedHashes,
 			engineNewPayload.ParentBeaconBlockRoot,
 		)
-		if plErr != nil {
-			if plException == plErr.Error() {
-				t.Logf("expected error caught by client: %v", plErr)
-				continue
-			} else {
-				tc.failedErr = plErr
-				t.Fatalf("unexpected error: %v, unable to send block %v, in test %s", plErr, i+1, tc.name)
+		// check for rpc errors and compare error codes
+		if checkRPCErrors(plErr, fxErrCode, t, tc) {
+			// check payload status matches expected
+			if plStatus.Status != expectedStatus {
+				tc.failedErr = fmt.Errorf("payload status mismatch: client returned %v and fixture expected %v", plStatus.Status, expectedStatus)
+				t.Fatalf("payload status mismatch: client returned %v\n fixture expected %v\n", plStatus.Status, expectedStatus, tc.name)
 			}
-		}
-		// update latest valid block hash
-		if plStatus.Status == "VALID" {
-			latestValidHash = *plStatus.LatestValidHash
-		}
-
-		// check payload status is expected from fixture
-		if expectedStatus != plStatus.Status {
-			tc.failedErr = errors.New("payload status mismatch")
-			t.Fatalf("payload status mismatch for block %v in test %s.", i+1, tc.name)
+			// update latest valid block hash if payload status is VALID
+			if plStatus.Status == "VALID" {
+				latestValidHash = *plStatus.LatestValidHash
+			}
 		}
 	}
 	t2 := time.Now()
@@ -277,4 +274,32 @@ func extractGenesis(fixture fixtureJSON) *core.Genesis {
 		Alloc:         fixture.Pre,
 	}
 	return genesis
+}
+
+// checkRPCErrors checks for RPC errors and compares error codes if expected.
+func checkRPCErrors(plErr error, fxErrCode string, t *hivesim.T, tc *testcase) bool {
+	rpcErr, isRpcErr := plErr.(rpc.Error)
+	// get an RPC error but fixture did not expect one
+	if isRpcErr && fxErrCode == "" {
+		tc.failedErr = errors.New("unexpected rpc error received")
+		t.Fatalf("unexpected rpc error received in test %s", tc.name)
+		return false
+	}
+	// fixture expects an RPC error but didn't get one
+	if !isRpcErr && fxErrCode != "" {
+		tc.failedErr = errors.New("fixture expected a rpc error")
+		t.Fatalf("fixture expected a rpc error in test %s", tc.name)
+		return false
+	}
+	// expected an RPC error, compare error codes
+	if isRpcErr && fxErrCode != "" {
+		plErrCode := strconv.Itoa(rpcErr.ErrorCode())
+		if plErrCode != fxErrCode {
+			tc.failedErr = fmt.Errorf("error code mismatch: client returned %v and fixture expected %v", plErrCode, fxErrCode)
+			t.Fatalf("error code mismatch\n client returned: %v\n fixture expected: %v\n in test %s", plErrCode, fxErrCode, tc.name)
+			return false
+		}
+		t.Logf("expected error code caught by client: %v", plErrCode)
+	}
+	return true
 }
