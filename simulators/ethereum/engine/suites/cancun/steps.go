@@ -273,7 +273,7 @@ func VerifyBeaconRootStorage(ctx context.Context, testEngine *test.TestEngineCli
 	return nil
 }
 
-func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.ForkConfig, testEngine *test.TestEngineClient, blobTxsInPayload []*typ.TransactionWithBlobData, payload *typ.ExecutableData, previousPayload *typ.ExecutableData) error {
+func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.ForkConfig, testEngine *test.TestEngineClient, blobTxsInPayload []*typ.TransactionWithBlobData, shouldOverrideBuilder *bool, payload *typ.ExecutableData, previousPayload *typ.ExecutableData) error {
 	var (
 		parentExcessBlobGas = uint64(0)
 		parentBlobGasUsed   = uint64(0)
@@ -297,6 +297,10 @@ func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.F
 		}
 		if *payload.ExcessBlobGas != expectedExcessBlobGas {
 			return fmt.Errorf("payload contains incorrect excessDataGas: want 0x%x, have 0x%x", expectedExcessBlobGas, *payload.ExcessBlobGas)
+		}
+
+		if shouldOverrideBuilder == nil {
+			return fmt.Errorf("shouldOverrideBuilder was not included in the getPayload response")
 		}
 
 		totalBlobCount := uint64(0)
@@ -479,7 +483,7 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 				if err != nil {
 					t.Fatalf("FAIL: Error retrieving blob bundle (payload %d/%d): %v", p+1, payloadCount, err)
 				}
-				if err := step.VerifyPayload(t.TimeoutContext, t.Env.ForkConfig, t.TestEngine, blobTxsInPayload, payload, &previousPayload); err != nil {
+				if err := step.VerifyPayload(t.TimeoutContext, t.Env.ForkConfig, t.TestEngine, blobTxsInPayload, t.CLMock.LatestShouldOverrideBuilder, payload, &previousPayload); err != nil {
 					t.Fatalf("FAIL: Error verifying payload (payload %d/%d): %v", p+1, payloadCount, err)
 				}
 				previousPayload = t.CLMock.LatestPayloadBuilt
