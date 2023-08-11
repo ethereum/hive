@@ -437,6 +437,10 @@ func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}, 
 	case 1:
 		if c, ok := pl.(*typ.ExecutableDataV1); ok {
 			return n.NewPayloadV1(ctx, c)
+		} else if c, ok := pl.(*typ.ExecutableData); ok {
+			edv1 := new(typ.ExecutableDataV1)
+			edv1.FromExecutableData(c)
+			return n.NewPayloadV1(ctx, edv1)
 		} else {
 			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
 		}
