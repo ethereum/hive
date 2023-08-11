@@ -368,17 +368,18 @@ func (ec *HiveRPCEngineClient) ForkchoiceUpdatedV3(ctx context.Context, fcState 
 
 // Get Payload API Calls
 
-func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, error) {
+func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
 	var (
-		executableData typ.ExecutableData
-		blockValue     *big.Int
-		blobsBundle    *typ.BlobsBundle
-		err            error
-		rpcString      = fmt.Sprintf("engine_getPayloadV%d", version)
+		executableData        typ.ExecutableData
+		blockValue            *big.Int
+		blobsBundle           *typ.BlobsBundle
+		shouldOverrideBuilder *bool
+		err                   error
+		rpcString             = fmt.Sprintf("engine_getPayloadV%d", version)
 	)
 
 	if err = ec.PrepareDefaultAuthCallToken(); err != nil {
-		return executableData, nil, nil, err
+		return executableData, nil, nil, nil, err
 	}
 
 	if version >= 2 {
@@ -389,24 +390,25 @@ func (ec *HiveRPCEngineClient) GetPayload(ctx context.Context, version int, payl
 		}
 		blockValue = response.BlockValue
 		blobsBundle = response.BlobsBundle
+		shouldOverrideBuilder = response.ShouldOverrideBuilder
 	} else {
 		err = ec.c.CallContext(ctx, &executableData, rpcString, payloadId)
 	}
 
-	return executableData, blockValue, blobsBundle, err
+	return executableData, blockValue, blobsBundle, shouldOverrideBuilder, err
 }
 
 func (ec *HiveRPCEngineClient) GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, error) {
-	ed, _, _, err := ec.GetPayload(ctx, 1, payloadId)
+	ed, _, _, _, err := ec.GetPayload(ctx, 1, payloadId)
 	return ed, err
 }
 
 func (ec *HiveRPCEngineClient) GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, error) {
-	ed, bv, _, err := ec.GetPayload(ctx, 2, payloadId)
+	ed, bv, _, _, err := ec.GetPayload(ctx, 2, payloadId)
 	return ed, bv, err
 }
 
-func (ec *HiveRPCEngineClient) GetPayloadV3(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, error) {
+func (ec *HiveRPCEngineClient) GetPayloadV3(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
 	return ec.GetPayload(ctx, 3, payloadId)
 }
 

@@ -437,6 +437,10 @@ func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}, 
 	case 1:
 		if c, ok := pl.(*typ.ExecutableDataV1); ok {
 			return n.NewPayloadV1(ctx, c)
+		} else if c, ok := pl.(*typ.ExecutableData); ok {
+			edv1 := new(typ.ExecutableDataV1)
+			edv1.FromExecutableData(c)
+			return n.NewPayloadV1(ctx, edv1)
 		} else {
 			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
 		}
@@ -485,7 +489,7 @@ func (n *GethNode) NewPayloadV3(ctx context.Context, pl *typ.ExecutableData, ver
 	if err != nil {
 		return beacon.PayloadStatusV1{}, err
 	}
-	resp, err := n.api.NewPayloadV3(ed, versionedHashes, beaconRoot)
+	resp, err := n.api.NewPayloadV3(ed, *versionedHashes, beaconRoot)
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
@@ -501,14 +505,23 @@ func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beac
 	}
 }
 
-func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
-	n.latestFcUStateSent = fcs
-	n.latestPAttrSent = payload
-	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, &beacon.PayloadAttributes{
+func GethPayloadAttributes(payload *typ.PayloadAttributes) *beacon.PayloadAttributes {
+	if payload == nil {
+		return nil
+	}
+	return &beacon.PayloadAttributes{
 		Timestamp:             payload.Timestamp,
 		Random:                payload.Random,
 		SuggestedFeeRecipient: payload.SuggestedFeeRecipient,
-	})
+		Withdrawals:           payload.Withdrawals,
+		BeaconRoot:            payload.BeaconRoot,
+	}
+}
+
+func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+	n.latestFcUStateSent = fcs
+	n.latestPAttrSent = payload
+	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, GethPayloadAttributes(payload))
 	n.latestFcUResponse = &fcr
 	return fcr, err
 }
@@ -516,18 +529,17 @@ func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.Forkchoi
 func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
-	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, &beacon.PayloadAttributes{
-		Timestamp:             payload.Timestamp,
-		Random:                payload.Random,
-		SuggestedFeeRecipient: payload.SuggestedFeeRecipient,
-		Withdrawals:           payload.Withdrawals,
-	})
+	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, GethPayloadAttributes(payload))
 	n.latestFcUResponse = &fcr
 	return fcr, err
 }
 
 func (n *GethNode) ForkchoiceUpdatedV3(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
-	panic("not supported yet")
+	n.latestFcUStateSent = fcs
+	n.latestPAttrSent = payload
+	fcr, err := n.api.ForkchoiceUpdatedV3(*fcs, GethPayloadAttributes(payload))
+	n.latestFcUResponse = &fcr
+	return fcr, err
 }
 
 func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
@@ -547,14 +559,14 @@ func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID
 	return ed, p.BlockValue, err
 }
 
-func (n *GethNode) GetPayloadV3(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, error) {
+func (n *GethNode) GetPayloadV3(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
 	p, err := n.api.GetPayloadV3(*payloadId)
 	if p == nil || err != nil {
-		return typ.ExecutableData{}, nil, nil, err
+		return typ.ExecutableData{}, nil, nil, nil, err
 	}
 	ed, err := typ.FromBeaconExecutableData(p.ExecutionPayload)
 	// TODO: Convert and return the blobs bundle
-	return ed, p.BlockValue, nil, err
+	return ed, p.BlockValue, nil, &p.Override, err
 }
 
 func (n *GethNode) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error) {

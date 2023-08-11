@@ -95,14 +95,15 @@ type CLMocker struct {
 	HeadHashHistory        []common.Hash
 
 	// Latest broadcasted data using the PoS Engine API
-	LatestHeadNumber        *big.Int
-	LatestHeader            *types.Header
-	LatestPayloadBuilt      typ.ExecutableData
-	LatestBlockValue        *big.Int
-	LatestBlobBundle        *typ.BlobsBundle
-	LatestPayloadAttributes typ.PayloadAttributes
-	LatestExecutedPayload   typ.ExecutableData
-	LatestForkchoice        api.ForkchoiceStateV1
+	LatestHeadNumber            *big.Int
+	LatestHeader                *types.Header
+	LatestPayloadBuilt          typ.ExecutableData
+	LatestBlockValue            *big.Int
+	LatestBlobBundle            *typ.BlobsBundle
+	LatestShouldOverrideBuilder *bool
+	LatestPayloadAttributes     typ.PayloadAttributes
+	LatestExecutedPayload       typ.ExecutableData
+	LatestForkchoice            api.ForkchoiceStateV1
 
 	// Merge related
 	FirstPoSBlockNumber             *big.Int
@@ -222,7 +223,7 @@ func (cl *CLMocker) IsOptimisticallySyncing() bool {
 }
 
 func (cl *CLMocker) ForkID() forkid.ID {
-	return forkid.NewID(cl.Genesis.Config, cl.GenesisBlock().Hash(), cl.LatestHeader.Number.Uint64(), cl.Genesis.Timestamp)
+	return forkid.NewID(cl.Genesis.Config, cl.GenesisBlock(), cl.LatestHeader.Number.Uint64(), cl.Genesis.Timestamp)
 }
 
 func (cl *CLMocker) GetHeaders(amount uint64, originHash common.Hash, originNumber uint64, reverse bool, skip uint64) ([]*types.Header, error) {
@@ -436,7 +437,7 @@ func (cl *CLMocker) GetNextPayload() {
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
 	if cl.IsCancun(cl.LatestPayloadAttributes.Timestamp) {
-		cl.LatestPayloadBuilt, cl.LatestBlockValue, cl.LatestBlobBundle, err = cl.NextBlockProducer.GetPayloadV3(ctx, cl.NextPayloadID)
+		cl.LatestPayloadBuilt, cl.LatestBlockValue, cl.LatestBlobBundle, cl.LatestShouldOverrideBuilder, err = cl.NextBlockProducer.GetPayloadV3(ctx, cl.NextPayloadID)
 	} else if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
 		cl.LatestPayloadBuilt, cl.LatestBlockValue, err = cl.NextBlockProducer.GetPayloadV2(ctx, cl.NextPayloadID)
 		cl.LatestBlobBundle = nil

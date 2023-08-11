@@ -20,7 +20,7 @@ func (p PayloadAttributes) MarshalJSON() ([]byte, error) {
 		Random                common.Hash         `json:"prevRandao"            gencodec:"required"`
 		SuggestedFeeRecipient common.Address      `json:"suggestedFeeRecipient" gencodec:"required"`
 		Withdrawals           []*types.Withdrawal `json:"withdrawals"`
-		BeaconRoot *common.Hash        `json:"parentBeaconBlockRoot"`
+		BeaconRoot            *common.Hash        `json:"parentBeaconBlockRoot"`
 	}
 	var enc PayloadAttributes
 	enc.Timestamp = hexutil.Uint64(p.Timestamp)
@@ -38,7 +38,7 @@ func (p *PayloadAttributes) UnmarshalJSON(input []byte) error {
 		Random                *common.Hash        `json:"prevRandao"            gencodec:"required"`
 		SuggestedFeeRecipient *common.Address     `json:"suggestedFeeRecipient" gencodec:"required"`
 		Withdrawals           []*types.Withdrawal `json:"withdrawals"`
-		BeaconRoot *common.Hash        `json:"parentBeaconBlockRoot"`
+		BeaconRoot            *common.Hash        `json:"parentBeaconBlockRoot"`
 	}
 	var dec PayloadAttributes
 	if err := json.Unmarshal(input, &dec); err != nil {
