@@ -485,7 +485,7 @@ func (n *GethNode) NewPayloadV3(ctx context.Context, pl *typ.ExecutableData, ver
 	if err != nil {
 		return beacon.PayloadStatusV1{}, err
 	}
-	resp, err := n.api.NewPayloadV3(ed, versionedHashes, beaconRoot)
+	resp, err := n.api.NewPayloadV3(ed, *versionedHashes, beaconRoot)
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
