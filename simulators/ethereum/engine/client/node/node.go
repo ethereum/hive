@@ -559,14 +559,14 @@ func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID
 	return ed, p.BlockValue, err
 }
 
-func (n *GethNode) GetPayloadV3(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, error) {
+func (n *GethNode) GetPayloadV3(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
 	p, err := n.api.GetPayloadV3(*payloadId)
 	if p == nil || err != nil {
-		return typ.ExecutableData{}, nil, nil, err
+		return typ.ExecutableData{}, nil, nil, nil, err
 	}
 	ed, err := typ.FromBeaconExecutableData(p.ExecutionPayload)
 	// TODO: Convert and return the blobs bundle
-	return ed, p.BlockValue, nil, err
+	return ed, p.BlockValue, nil, &p.Override, err
 }
 
 func (n *GethNode) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error) {

@@ -15,23 +15,26 @@ var _ = (*executionPayloadEnvelopeMarshaling)(nil)
 // MarshalJSON marshals as JSON.
 func (e ExecutionPayloadEnvelope) MarshalJSON() ([]byte, error) {
 	type ExecutionPayloadEnvelope struct {
-		ExecutionPayload *ExecutableData `json:"executionPayload" gencodec:"required"`
-		BlockValue       *hexutil.Big    `json:"blockValue"       gencodec:"required"`
-		BlobsBundle      *BlobsBundle    `json:"blobsBundle"      gencodec:"omitempty"`
+		ExecutionPayload      *ExecutableData `json:"executionPayload"       gencodec:"required"`
+		BlockValue            *hexutil.Big    `json:"blockValue"             gencodec:"required"`
+		BlobsBundle           *BlobsBundle    `json:"blobsBundle,omitempty"`
+		ShouldOverrideBuilder *bool           `json:"shouldOverrideBuilder,omitempty"`
 	}
 	var enc ExecutionPayloadEnvelope
 	enc.ExecutionPayload = e.ExecutionPayload
 	enc.BlockValue = (*hexutil.Big)(e.BlockValue)
 	enc.BlobsBundle = e.BlobsBundle
+	enc.ShouldOverrideBuilder = e.ShouldOverrideBuilder
 	return json.Marshal(&enc)
 }
 
 // UnmarshalJSON unmarshals from JSON.
 func (e *ExecutionPayloadEnvelope) UnmarshalJSON(input []byte) error {
 	type ExecutionPayloadEnvelope struct {
-		ExecutionPayload *ExecutableData `json:"executionPayload" gencodec:"required"`
-		BlockValue       *hexutil.Big    `json:"blockValue"       gencodec:"required"`
-		BlobsBundle      *BlobsBundle    `json:"blobsBundle"      gencodec:"omitempty"`
+		ExecutionPayload      *ExecutableData `json:"executionPayload"       gencodec:"required"`
+		BlockValue            *hexutil.Big    `json:"blockValue"             gencodec:"required"`
+		BlobsBundle           *BlobsBundle    `json:"blobsBundle,omitempty"`
+		ShouldOverrideBuilder *bool           `json:"shouldOverrideBuilder,omitempty"`
 	}
 	var dec ExecutionPayloadEnvelope
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -47,6 +50,9 @@ func (e *ExecutionPayloadEnvelope) UnmarshalJSON(input []byte) error {
 	e.BlockValue = (*big.Int)(dec.BlockValue)
 	if dec.BlobsBundle != nil {
 		e.BlobsBundle = dec.BlobsBundle
+	}
+	if dec.ShouldOverrideBuilder != nil {
+		e.ShouldOverrideBuilder = dec.ShouldOverrideBuilder
 	}
 	return nil
 }

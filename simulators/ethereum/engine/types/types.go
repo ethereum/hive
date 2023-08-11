@@ -153,9 +153,10 @@ type executableDataMarshaling struct {
 //go:generate go run github.com/fjl/gencodec -type ExecutionPayloadEnvelope -field-override executionPayloadEnvelopeMarshaling -out gen_epe.go
 
 type ExecutionPayloadEnvelope struct {
-	ExecutionPayload *ExecutableData `json:"executionPayload" gencodec:"required"`
-	BlockValue       *big.Int        `json:"blockValue"       gencodec:"required"`
-	BlobsBundle      *BlobsBundle    `json:"blobsBundle"      gencodec:"omitempty"`
+	ExecutionPayload      *ExecutableData `json:"executionPayload"       gencodec:"required"`
+	BlockValue            *big.Int        `json:"blockValue"             gencodec:"required"`
+	BlobsBundle           *BlobsBundle    `json:"blobsBundle,omitempty"`
+	ShouldOverrideBuilder *bool           `json:"shouldOverrideBuilder,omitempty"`
 }
 
 type executionPayloadEnvelopeMarshaling struct {
