@@ -501,14 +501,23 @@ func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beac
 	}
 }
 
-func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
-	n.latestFcUStateSent = fcs
-	n.latestPAttrSent = payload
-	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, &beacon.PayloadAttributes{
+func GethPayloadAttributes(payload *typ.PayloadAttributes) *beacon.PayloadAttributes {
+	if payload == nil {
+		return nil
+	}
+	return &beacon.PayloadAttributes{
 		Timestamp:             payload.Timestamp,
 		Random:                payload.Random,
 		SuggestedFeeRecipient: payload.SuggestedFeeRecipient,
-	})
+		Withdrawals:           payload.Withdrawals,
+		BeaconRoot:            payload.BeaconRoot,
+	}
+}
+
+func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+	n.latestFcUStateSent = fcs
+	n.latestPAttrSent = payload
+	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, GethPayloadAttributes(payload))
 	n.latestFcUResponse = &fcr
 	return fcr, err
 }
@@ -516,18 +525,17 @@ func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.Forkchoi
 func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
-	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, &beacon.PayloadAttributes{
-		Timestamp:             payload.Timestamp,
-		Random:                payload.Random,
-		SuggestedFeeRecipient: payload.SuggestedFeeRecipient,
-		Withdrawals:           payload.Withdrawals,
-	})
+	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, GethPayloadAttributes(payload))
 	n.latestFcUResponse = &fcr
 	return fcr, err
 }
 
 func (n *GethNode) ForkchoiceUpdatedV3(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
-	panic("not supported yet")
+	n.latestFcUStateSent = fcs
+	n.latestPAttrSent = payload
+	fcr, err := n.api.ForkchoiceUpdatedV3(*fcs, GethPayloadAttributes(payload))
+	n.latestFcUResponse = &fcr
+	return fcr, err
 }
 
 func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
