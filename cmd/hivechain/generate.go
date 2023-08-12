@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/big"
 	"os"
@@ -240,7 +239,7 @@ func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int
 	if err := writeChain(blockchain, filepath.Join(path, "chain_genesis.rlp"), 0, cfg.modifyBlock); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(filepath.Join(path, "chain_poststate.json"), dump, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(path, "chain_poststate.json"), dump, 0644); err != nil {
 		return err
 	}
 	return nil

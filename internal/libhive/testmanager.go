@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -594,5 +593,5 @@ func writeSuiteFile(s *TestSuite, logdir string) error {
 	suiteFileName := fmt.Sprintf("%v-%x.json", time.Now().Unix(), b)
 	suiteFile := filepath.Join(logdir, suiteFileName)
 	// Write it.
-	return ioutil.WriteFile(suiteFile, suiteData, 0644)
+	return os.WriteFile(suiteFile, suiteData, 0644)
 }
