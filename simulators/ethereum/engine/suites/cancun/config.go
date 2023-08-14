@@ -2,52 +2,71 @@ package suite_cancun
 
 import (
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
 
-// Timestamp delta between genesis and the withdrawals fork
-func (bs *CancunBaseSpec) GetCancunGenesisTimeDelta() uint64 {
-	return bs.CancunForkHeight * bs.GetBlockTimeIncrements()
+// Contains the base spec for all cancun tests.
+type CancunBaseSpec struct {
+	test.Spec
+	TimeIncrements   uint64 // Timestamp increments per block throughout the test
+	GetPayloadDelay  uint64 // Delay between FcU and GetPayload calls
+	CancunForkHeight uint64 // Withdrawals activation fork height
+	GenesisTimestamp *uint64
+	TestSequence
 }
 
-// Calculates Shanghai fork timestamp given the amount of blocks that need to be
+// Timestamp delta between genesis and the withdrawals fork
+func (cs *CancunBaseSpec) GetCancunGenesisTimeDelta() uint64 {
+	return cs.CancunForkHeight * cs.GetBlockTimeIncrements()
+}
+
+func (cs *CancunBaseSpec) GetGenesisTimestamp() uint64 {
+	if cs.GenesisTimestamp != nil {
+		return *cs.GenesisTimestamp
+	}
+	return uint64(globals.GenesisTimestamp)
+}
+
+// Calculates Cancun fork timestamp given the amount of blocks that need to be
 // produced beforehand.
-func (bs *CancunBaseSpec) GetCancunForkTime() uint64 {
-	return uint64(globals.GenesisTimestamp) + bs.GetCancunGenesisTimeDelta()
+func (cs *CancunBaseSpec) GetCancunForkTime() uint64 {
+	return cs.GetGenesisTimestamp() + cs.GetCancunGenesisTimeDelta()
 }
 
 // Generates the fork config, including cancun fork timestamp.
-func (bs *CancunBaseSpec) GetForkConfig() globals.ForkConfig {
+func (cs *CancunBaseSpec) GetForkConfig() globals.ForkConfig {
 	return globals.ForkConfig{
 		ShanghaiTimestamp: big.NewInt(0), // No test starts before Shanghai
-		CancunTimestamp:   new(big.Int).SetUint64(bs.GetCancunForkTime()),
+		CancunTimestamp:   new(big.Int).SetUint64(cs.GetCancunForkTime()),
 	}
 }
 
 // Get the per-block timestamp increments configured for this test
-func (bs *CancunBaseSpec) GetBlockTimeIncrements() uint64 {
+func (cs *CancunBaseSpec) GetBlockTimeIncrements() uint64 {
 	return 1
 }
 
 // Timestamp delta between genesis and the withdrawals fork
-func (bs *CancunBaseSpec) GetBlobsGenesisTimeDelta() uint64 {
-	return bs.CancunForkHeight * bs.GetBlockTimeIncrements()
+func (cs *CancunBaseSpec) GetBlobsGenesisTimeDelta() uint64 {
+	return cs.CancunForkHeight * cs.GetBlockTimeIncrements()
 }
 
-// Calculates Shanghai fork timestamp given the amount of blocks that need to be
+// Calculates Cancun fork timestamp given the amount of blocks that need to be
 // produced beforehand.
-func (bs *CancunBaseSpec) GetBlobsForkTime() uint64 {
-	return uint64(globals.GenesisTimestamp) + bs.GetBlobsGenesisTimeDelta()
+func (cs *CancunBaseSpec) GetBlobsForkTime() uint64 {
+	return cs.GetGenesisTimestamp() + cs.GetBlobsGenesisTimeDelta()
 }
 
 // Append the accounts we are going to withdraw to, which should also include
 // bytecode for testing purposes.
-func (bs *CancunBaseSpec) GetGenesis() *core.Genesis {
-	genesis := bs.Spec.GetGenesis()
+func (cs *CancunBaseSpec) GetGenesis() *core.Genesis {
+	genesis := cs.Spec.GetGenesis()
 
 	// Remove PoW altogether
 	genesis.Difficulty = common.Big0
@@ -55,7 +74,7 @@ func (bs *CancunBaseSpec) GetGenesis() *core.Genesis {
 	genesis.Config.Clique = nil
 	genesis.ExtraData = []byte{}
 
-	if bs.CancunForkHeight == 0 {
+	if cs.CancunForkHeight == 0 {
 		genesis.BlobGasUsed = new(uint64)
 		genesis.ExcessBlobGas = new(uint64)
 		genesis.BeaconRoot = new(common.Hash)
@@ -104,6 +123,80 @@ func (bs *CancunBaseSpec) GetGenesis() *core.Genesis {
 
 // Changes the CL Mocker default time increments of 1 to the value specified
 // in the test spec.
-func (bs *CancunBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
-	cl.BlockTimestampIncrement = big.NewInt(int64(bs.GetBlockTimeIncrements()))
+func (cs *CancunBaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
+	cl.BlockTimestampIncrement = big.NewInt(int64(cs.GetBlockTimeIncrements()))
+}
+
+// Base test case execution procedure for blobs tests.
+func (cs *CancunBaseSpec) Execute(t *test.Env) {
+
+	t.CLMock.WaitForTTD()
+
+	blobTestCtx := &CancunTestContext{
+		Env:            t,
+		TestBlobTxPool: new(TestBlobTxPool),
+	}
+
+	blobTestCtx.TestBlobTxPool.HashesByIndex = make(map[uint64]common.Hash)
+
+	if cs.GetPayloadDelay != 0 {
+		t.CLMock.PayloadProductionClientDelay = time.Duration(cs.GetPayloadDelay) * time.Second
+	}
+
+	for stepId, step := range cs.TestSequence {
+		t.Logf("INFO: Executing step %d: %s", stepId+1, step.Description())
+		if err := step.Execute(blobTestCtx); err != nil {
+			t.Fatalf("FAIL: Error executing step %d: %v", stepId+1, err)
+		}
+	}
+
+}
+
+type CancunForkSpec struct {
+	CancunBaseSpec
+	GenesisTimestamp  uint64
+	ShanghaiTimestamp uint64
+	CancunTimestamp   uint64
+
+	ProduceBlocksBeforePeering uint64
+}
+
+func (cs *CancunForkSpec) GetGenesisTimestamp() uint64 {
+	return cs.GenesisTimestamp
+}
+
+// Get Cancun fork timestamp.
+func (cs *CancunForkSpec) GetCancunForkTime() uint64 {
+	return cs.CancunTimestamp
+}
+
+// Generates the fork config, including cancun fork timestamp.
+func (cs *CancunForkSpec) GetForkConfig() globals.ForkConfig {
+	return globals.ForkConfig{
+		ShanghaiTimestamp: new(big.Int).SetUint64(cs.ShanghaiTimestamp),
+		CancunTimestamp:   new(big.Int).SetUint64(cs.CancunTimestamp),
+	}
+}
+
+// Genesis generation.
+func (cs *CancunForkSpec) GetGenesis() *core.Genesis {
+	// Calculate the cancun fork height
+	cs.CancunForkHeight = (cs.CancunTimestamp - cs.GenesisTimestamp) / cs.GetBlockTimeIncrements()
+	genesis := cs.CancunBaseSpec.GetGenesis()
+	genesis.Timestamp = cs.GenesisTimestamp
+	return genesis
+}
+
+func (cs *CancunForkSpec) Execute(t *test.Env) {
+	// Add steps to check the sequence
+	cs.TestSequence = TestSequence{
+		NewPayloads{
+			PayloadCount: cs.ProduceBlocksBeforePeering,
+		},
+		DevP2PClientPeering{
+			ClientIndex: 0,
+		},
+	}
+
+	cs.CancunBaseSpec.Execute(t)
 }
