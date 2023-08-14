@@ -223,7 +223,7 @@ func (cl *CLMocker) IsOptimisticallySyncing() bool {
 }
 
 func (cl *CLMocker) ForkID() forkid.ID {
-	return forkid.NewID(cl.Genesis.Config, cl.GenesisBlock(), cl.LatestHeader.Number.Uint64(), cl.Genesis.Timestamp)
+	return forkid.NewID(cl.Genesis.Config, cl.GenesisBlock(), cl.LatestHeader.Number.Uint64(), cl.LatestHeader.Time)
 }
 
 func (cl *CLMocker) GetHeaders(amount uint64, originHash common.Hash, originNumber uint64, reverse bool, skip uint64) ([]*types.Header, error) {
