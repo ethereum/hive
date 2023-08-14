@@ -4,6 +4,9 @@ on:
   schedule:
     - cron: '0 0 * * *'  # Run every day at midnight UTC
   workflow_dispatch:
+  push:
+    branches:
+      - master
   pull_request:
     branches:
       - master

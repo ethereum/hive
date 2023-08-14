@@ -482,7 +482,8 @@ func (v *ErigonGenesis) AllocGenesis(address common.Address, account Account) {
 }
 
 func (v *ErigonGenesis) UpdateTimestamp(timestamp string) {
-	//v.ErigonConfig.ShanghaiTimestamp =
+	//TODO implement me
+	panic("implement me")
 }
 
 func (v *ErigonGenesis) Number() uint64 {
