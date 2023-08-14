@@ -6,8 +6,8 @@ FROM golang:1-alpine as builder
 ARG local_path=go-ethereum
 COPY $local_path go-ethereum
 
-WORKDIR /go-ethereum
-RUN apk add --update bash curl jq git make
+WORKDIR go-ethereum
+RUN apk add --update bash curl jq git make gcc libc-dev linux-headers
 RUN make geth
 RUN mv ./build/bin/geth /usr/local/bin/geth
 
