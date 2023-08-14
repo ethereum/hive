@@ -4,7 +4,6 @@ package suite_cancun
 import (
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
@@ -1385,6 +1384,114 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
+	// ForkID tests
+	&CancunForkSpec{
+		GenesisTimestamp:  0,
+		ShanghaiTimestamp: 0,
+		CancunTimestamp:   0,
+
+		CancunBaseSpec: CancunBaseSpec{
+			Spec: test.Spec{
+				Name: "ForkID, genesis at 0, shanghai at 0, cancun at 0",
+				About: `
+			Attemp to peer client with the following configuration at height 0:
+			- genesis timestamp 0
+			- shanghai fork at timestamp 0
+			- cancun fork at timestamp 0
+			`,
+			},
+		},
+	},
+	&CancunForkSpec{
+		GenesisTimestamp:  0,
+		ShanghaiTimestamp: 0,
+		CancunTimestamp:   1,
+
+		CancunBaseSpec: CancunBaseSpec{
+			Spec: test.Spec{
+				Name: "ForkID, genesis at 0, shanghai at 0, cancun at 1",
+				About: `
+			Attemp to peer client with the following configuration at height 0:
+			- genesis timestamp 0
+			- shanghai fork at timestamp 0
+			- cancun fork at timestamp 1
+			`,
+			},
+		},
+	},
+
+	&CancunForkSpec{
+		GenesisTimestamp:           0,
+		ShanghaiTimestamp:          0,
+		CancunTimestamp:            1,
+		ProduceBlocksBeforePeering: 1,
+
+		CancunBaseSpec: CancunBaseSpec{
+			Spec: test.Spec{
+				Name: "ForkID, genesis at 0, shanghai at 0, cancun at 1, transition",
+				About: `
+			Attemp to peer client with the following configuration at height 1:
+			- genesis timestamp 0
+			- shanghai fork at timestamp 0
+			- cancun fork at timestamp 1
+			`,
+			},
+		},
+	},
+
+	&CancunForkSpec{
+		GenesisTimestamp:  1,
+		ShanghaiTimestamp: 1,
+		CancunTimestamp:   1,
+
+		CancunBaseSpec: CancunBaseSpec{
+			Spec: test.Spec{
+				Name: "ForkID, genesis at 1, shanghai at 1, cancun at 1",
+				About: `
+			Attemp to peer client with the following configuration at height 0:
+			- genesis timestamp 1
+			- shanghai fork at timestamp 1
+			- cancun fork at timestamp 1
+			`,
+			},
+		},
+	},
+	&CancunForkSpec{
+		GenesisTimestamp:  1,
+		ShanghaiTimestamp: 1,
+		CancunTimestamp:   2,
+
+		CancunBaseSpec: CancunBaseSpec{
+			Spec: test.Spec{
+				Name: "ForkID, genesis at 1, shanghai at 1, cancun at 2",
+				About: `
+			Attemp to peer client with the following configuration at height 0:
+			- genesis timestamp 1
+			- shanghai fork at timestamp 1
+			- cancun fork at timestamp 2
+			`,
+			},
+		},
+	},
+	&CancunForkSpec{
+		GenesisTimestamp:           1,
+		ShanghaiTimestamp:          1,
+		CancunTimestamp:            2,
+		ProduceBlocksBeforePeering: 1,
+
+		CancunBaseSpec: CancunBaseSpec{
+			Spec: test.Spec{
+				Name: "ForkID, genesis at 1, shanghai at 1, cancun at 2, transition",
+				About: `
+			Attemp to peer client with the following configuration at height 1:
+			- genesis timestamp 1
+			- shanghai fork at timestamp 1
+			- cancun fork at timestamp 2
+			`,
+			},
+		},
+	},
+
 	// DevP2P tests
 	&CancunBaseSpec{
 		Spec: test.Spec{
@@ -1410,38 +1517,4 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
-}
-
-// Contains the base spec for all cancun tests.
-type CancunBaseSpec struct {
-	test.Spec
-	TimeIncrements   uint64 // Timestamp increments per block throughout the test
-	GetPayloadDelay  uint64 // Delay between FcU and GetPayload calls
-	CancunForkHeight uint64 // Withdrawals activation fork height
-	TestSequence
-}
-
-// Base test case execution procedure for blobs tests.
-func (bs *CancunBaseSpec) Execute(t *test.Env) {
-
-	t.CLMock.WaitForTTD()
-
-	blobTestCtx := &CancunTestContext{
-		Env:            t,
-		TestBlobTxPool: new(TestBlobTxPool),
-	}
-
-	blobTestCtx.TestBlobTxPool.HashesByIndex = make(map[uint64]common.Hash)
-
-	if bs.GetPayloadDelay != 0 {
-		t.CLMock.PayloadProductionClientDelay = time.Duration(bs.GetPayloadDelay) * time.Second
-	}
-
-	for stepId, step := range bs.TestSequence {
-		t.Logf("INFO: Executing step %d: %s", stepId+1, step.Description())
-		if err := step.Execute(blobTestCtx); err != nil {
-			t.Fatalf("FAIL: Error executing step %d: %v", stepId+1, err)
-		}
-	}
-
 }

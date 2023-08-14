@@ -652,6 +652,31 @@ func (step SendModifiedLatestPayload) Description() string {
 	return desc
 }
 
+// A step that attempts to peer to the client using devp2p, and checks the forkid of the client
+type DevP2PClientPeering struct {
+	// Client index to peer to
+	ClientIndex uint64
+}
+
+func (step DevP2PClientPeering) Execute(t *CancunTestContext) error {
+	// Get client index's enode
+	if step.ClientIndex >= uint64(len(t.TestEngines)) {
+		return fmt.Errorf("invalid client index %d", step.ClientIndex)
+	}
+	engine := t.Engines[step.ClientIndex]
+	conn, err := devp2p.PeerEngineClient(engine, t.CLMock)
+	if err != nil {
+		return fmt.Errorf("error peering engine client: %v", err)
+	}
+	defer conn.Close()
+	t.Logf("INFO: Connected to client %d, remote public key: %s", step.ClientIndex, conn.RemoteKey())
+	return nil
+}
+
+func (step DevP2PClientPeering) Description() string {
+	return fmt.Sprintf("DevP2PClientPeering: client %d", step.ClientIndex)
+}
+
 // A step that requests a Transaction hash via P2P and expects the correct full blob tx
 type DevP2PRequestPooledTransactionHash struct {
 	// Client index to request the transaction hash from
