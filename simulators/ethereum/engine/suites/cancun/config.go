@@ -115,7 +115,7 @@ func (cs *CancunBaseSpec) GetGenesis() *core.Genesis {
 	genesis.Alloc[HISTORY_STORAGE_ADDRESS] = core.GenesisAccount{
 		Balance: common.Big0,
 		Nonce:   1,
-		Code:    common.Hex2Bytes("0x3373fffffffffffffffffffffffffffffffffffffffe14604457602036146024575f5ffd5b620180005f350680545f35146037575f5ffd5b6201800001545f5260205ff35b42620180004206555f3562018000420662018000015500"),
+		Code:    common.Hex2Bytes("3373fffffffffffffffffffffffffffffffffffffffe14604457602036146024575f5ffd5b620180005f350680545f35146037575f5ffd5b6201800001545f5260205ff35b42620180004206555f3562018000420662018000015500"),
 	}
 
 	return genesis
