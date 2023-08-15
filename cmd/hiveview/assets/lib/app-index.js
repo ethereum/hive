@@ -179,6 +179,7 @@ function genericSelect(api, colIdx, anchoredMatch) {
 function selectWithOptions(api, colIdx, anchoredMatch) {
     const table = $('#filetable').DataTable();
     const select = genericSelect(api, colIdx, anchoredMatch);
+    let added = {};
 
     // Get the search data for the first column and add to the select list
     table
@@ -187,9 +188,14 @@ function selectWithOptions(api, colIdx, anchoredMatch) {
         .sort()
         .unique()
         .each(function (d) {
-            if (!d.includes(',')) {
+            d.split(',').forEach(function (d) {
+                d = d.trim();
+                if (added[d]) {
+                    return;
+                }
+                added[d] = true;
                 select.append($('<option value="'+d+'">'+d+'</option>'));
-            }
+            });
         });
 }
 
