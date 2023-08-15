@@ -157,13 +157,18 @@ function genericSelect(api, colIdx, anchoredMatch) {
         .appendTo(cell)
         .on('change', function () {
             let re = escapeRegExp($(this).val());
-            if (anchoredMatch) {
-                re = '^' + re + '$';
+            if (re !== '') {
+                if (anchoredMatch) {
+                    re = '^' + re + '$';
+                } else {
+                    re = '\\b' + re + '\\b';
+                }
+                console.log(`searching column ${colIdx} with regexp ${re}`);
+                table.column(colIdx).search(re, true, false);
             } else {
-                re = '\\b' + re + '\\b';
+                // Empty query clears search.
+                table.column(colIdx).search('');
             }
-            console.log(`searching column ${colIdx} with regexp ${re}`);
-            table.column(colIdx).search(re, true, false);
             table.draw();
         });
 
