@@ -122,6 +122,7 @@ func (tc *testcase) run(t *hivesim.T) {
 
 	// send payloads and check response
 	latestValidHash := common.Hash{}
+	latestVersion := uint64(1)
 	for i, engineNewPayload := range tc.payloads {
 		// execute fixture block payload
 		plStatus, plErr := engineClient.NewPayload(
@@ -131,6 +132,7 @@ func (tc *testcase) run(t *hivesim.T) {
 			&engineNewPayload.BlobVersionedHashes,
 			engineNewPayload.ParentBeaconBlockRoot,
 		)
+		latestVersion = engineNewPayload.Version
 		// check for rpc errors and compare error codes
 		fxErrCode := int(tc.fixture.json.Blocks[i].EngineNewPayload.ErrorCode)
 		if fxErrCode != 0 {
@@ -158,7 +160,9 @@ func (tc *testcase) run(t *hivesim.T) {
 	if latestValidHash != (common.Hash{}) {
 		// update with latest valid response
 		fcState := &api.ForkchoiceStateV1{HeadBlockHash: latestValidHash}
-		if _, fcErr := engineClient.ForkchoiceUpdatedV2(ctx, fcState, nil); fcErr != nil {
+		// TODO: This is incorrect, up to this point, the `engine_forkchoiceUpdated` and `engine_newPayload` versions for each
+		// fork match, but it could change in the future. Ideally we should embed the version in the fixture.
+		if _, fcErr := engineClient.ForkchoiceUpdated(ctx, int(latestVersion), fcState, nil); fcErr != nil {
 			tc.failedErr = fcErr
 			t.Fatalf("unable to update head of beacon chain in test %s: %v ", tc.name, fcErr)
 		}
