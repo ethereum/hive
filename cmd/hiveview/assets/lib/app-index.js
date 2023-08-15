@@ -179,23 +179,21 @@ function genericSelect(api, colIdx, anchoredMatch) {
 function selectWithOptions(api, colIdx, anchoredMatch) {
     const table = $('#filetable').DataTable();
     const select = genericSelect(api, colIdx, anchoredMatch);
-    let added = {};
+    let options = new Set();
 
     // Get the search data for the first column and add to the select list
     table
         .column(colIdx)
         .cache('search')
-        .sort()
         .unique()
         .each(function (d) {
             d.split(',').forEach(function (d) {
-                d = d.trim();
-                if (!added[d]) {
-                    added[d] = true;
-                    select.append($('<option value="'+d+'">'+d+'</option>'));
-                }
+                options.add(d.trim());
             });
         });
+    Array.from(options.values()).sort().forEach(function (d) {
+        select.append($('<option value="'+d+'">'+d+'</option>'));
+    });
 }
 
 function statusSelect(api, colIdx) {
