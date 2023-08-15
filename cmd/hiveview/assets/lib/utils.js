@@ -37,3 +37,8 @@ export function formatBytes(loc) {
 export function queryParam(key) {
     return new URLSearchParams(document.location.search).get(key);
 }
+
+// escapeRegExp escapes all regexp special characters in str.
+export function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}

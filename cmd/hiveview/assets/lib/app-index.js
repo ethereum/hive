@@ -7,7 +7,7 @@ import $ from 'jquery';
 import * as common from './app-common.js';
 import * as routes from './routes.js';
 import { makeButton } from './html.js';
-import { formatBytes } from './utils.js';
+import { formatBytes, escapeRegExp } from './utils.js';
 
 $(document).ready(function () {
     common.updateHeader();
@@ -156,7 +156,7 @@ function genericSelect(api, colIdx, anchoredMatch) {
     const select = $('<select />')
         .appendTo(cell)
         .on('change', function () {
-            let re = $(this).val();
+            let re = escapeRegExp($(this).val());
             if (anchoredMatch) {
                 re = '^' + re + '$';
             } else {
