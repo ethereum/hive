@@ -138,14 +138,14 @@ function showFileListing(data) {
             $('<tr class="filters"><th></th><th></th><th></th><th></th><th></th></tr>')
                 .appendTo($('#filetable thead'));
             dateSelect(api, 0);
-            selectWithOptions(api, 1);
-            selectWithOptions(api, 2);
+            selectWithOptions(api, 1, true);
+            selectWithOptions(api, 2, false);
             statusSelect(api, 3);
         }
     });
 }
 
-function genericSelect(api, colIdx) {
+function genericSelect(api, colIdx, anchoredMatch) {
     const table = $('#filetable').DataTable();
 
     const cell = $('.filters th').eq(
@@ -156,19 +156,24 @@ function genericSelect(api, colIdx) {
     const select = $('<select />')
         .appendTo(cell)
         .on('change', function () {
-            table
-                .column(colIdx)
-                .search($(this).val())
-                .draw();
+            let re = $(this).val();
+            if (anchoredMatch) {
+                re = '^' + re + '$';
+            } else {
+                re = '\\b' + re + '\\b';
+            }
+            console.log(`searching column ${colIdx} with regexp ${re}`);
+            table.column(colIdx).search(re, true, false);
+            table.draw();
         });
-    
+
     select.append($('<option value="">Show all</option>'));
     return select;
 }
 
-function selectWithOptions(api, colIdx) {
+function selectWithOptions(api, colIdx, anchoredMatch) {
     const table = $('#filetable').DataTable();
-    const select = genericSelect(api, colIdx);
+    const select = genericSelect(api, colIdx, anchoredMatch);
 
     // Get the search data for the first column and add to the select list
     table
