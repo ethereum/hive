@@ -138,16 +138,23 @@ function showFileListing(data) {
             $('<tr class="filters"><th></th><th></th><th></th><th></th><th></th></tr>')
                 .appendTo($('#filetable thead'));
             dateSelect(api, 0);
-            selectWithOptions(api, 1, true);
-            selectWithOptions(api, 2, false);
+            selectWithOptions(api, 1, anchorStartEnd);
+            selectWithOptions(api, 2, anchorWord);
             statusSelect(api, 3);
         }
     });
 }
 
-function genericSelect(api, colIdx, anchoredMatch) {
-    const table = $('#filetable').DataTable();
+function anchorWord(re) {
+    return '\\b' + re + '\\b';
+}
 
+function anchorStartEnd(re) {
+    return '^' + re + '$';
+}
+
+function genericSelect(api, colIdx, modifyRE) {
+    const table = $('#filetable').DataTable();
     const cell = $('.filters th').eq(
         $(api.column(colIdx).header()).index()
     );
@@ -158,10 +165,8 @@ function genericSelect(api, colIdx, anchoredMatch) {
         .on('change', function () {
             let re = escapeRegExp($(this).val());
             if (re !== '') {
-                if (anchoredMatch) {
-                    re = '^' + re + '$';
-                } else {
-                    re = '\\b' + re + '\\b';
+                if (modifyRE) {
+                    re = modifyRE(re);
                 }
                 console.log(`searching column ${colIdx} with regexp ${re}`);
                 table.column(colIdx).search(re, true, false);
@@ -176,9 +181,9 @@ function genericSelect(api, colIdx, anchoredMatch) {
     return select;
 }
 
-function selectWithOptions(api, colIdx, anchoredMatch) {
+function selectWithOptions(api, colIdx, modifyRE) {
     const table = $('#filetable').DataTable();
-    const select = genericSelect(api, colIdx, anchoredMatch);
+    const select = genericSelect(api, colIdx, modifyRE);
     let options = new Set();
 
     // Get the search data for the first column and add to the select list
