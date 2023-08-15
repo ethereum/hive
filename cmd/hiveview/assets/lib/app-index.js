@@ -155,14 +155,14 @@ function genericSelect(api, colIdx) {
     // Create the select list and search operation
     const select = $('<select />')
         .appendTo(cell)
-        .on( 'change', function () {
+        .on('change', function () {
             table
-                .column( colIdx )
-                .search( $(this).val() )
+                .column(colIdx)
+                .search($(this).val())
                 .draw();
-        } );
+        });
     
-    select.append( $('<option value="">Show all</option>') );
+    select.append($('<option value="">Show all</option>'));
     return select;
 }
 
@@ -172,22 +172,22 @@ function selectWithOptions(api, colIdx) {
 
     // Get the search data for the first column and add to the select list
     table
-        .column( colIdx )
-        .cache( 'search' )
+        .column(colIdx)
+        .cache('search')
         .sort()
         .unique()
-        .each( function ( d ) {
+        .each(function (d) {
             if (!d.includes(',')) {
-                select.append( $('<option value="'+d+'">'+d+'</option>') );
+                select.append($('<option value="'+d+'">'+d+'</option>'));
             }
-        } );
+        });
 }
 
 function statusSelect(api, colIdx) {
     const select = genericSelect(api, colIdx);
-    select.append( $('<option value="✓">SUCCESS</option>') );
-    select.append( $('<option value="FAIL">FAIL</option>') );
-    select.append( $('<option value="TIMEOUT">TIMEOUT</option>') );
+    select.append($('<option value="✓">SUCCESS</option>'));
+    select.append($('<option value="FAIL">FAIL</option>'));
+    select.append($('<option value="TIMEOUT">TIMEOUT</option>'));
 }
 
 function minusXDaysDate(x) {
@@ -198,12 +198,12 @@ function minusXDaysDate(x) {
 function dateSelect(api, colIdx) {
     const select = genericSelect(api, colIdx);
     const today = new Date().toLocaleDateString();
-    select.append( $('<option value="' + today + '">Today</option>') );
-    select.append( $('<option value="' + minusXDaysDate(1) + '">Yesterday</option>') );
-    select.append( $('<option value="' + minusXDaysDate(2) + '">2 days ago</option>') );
-    select.append( $('<option value="' + minusXDaysDate(3) + '">3 days ago</option>') );
-    select.append( $('<option value="' + minusXDaysDate(4) + '">4 days ago</option>') );
-    select.append( $('<option value="' + minusXDaysDate(5) + '">5 days ago</option>') );
-    select.append( $('<option value="' + minusXDaysDate(6) + '">6 days ago</option>') );
-    select.append( $('<option value="' + minusXDaysDate(7) + '">7 days ago</option>') );
+    select.append($('<option value="' + today + '">Today</option>'));
+    select.append($('<option value="' + minusXDaysDate(1) + '">Yesterday</option>'));
+    select.append($('<option value="' + minusXDaysDate(2) + '">2 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(3) + '">3 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(4) + '">4 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(5) + '">5 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(6) + '">6 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(7) + '">7 days ago</option>'));
 }
