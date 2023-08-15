@@ -190,11 +190,10 @@ function selectWithOptions(api, colIdx, anchoredMatch) {
         .each(function (d) {
             d.split(',').forEach(function (d) {
                 d = d.trim();
-                if (added[d]) {
-                    return;
+                if (!added[d]) {
+                    added[d] = true;
+                    select.append($('<option value="'+d+'">'+d+'</option>'));
                 }
-                added[d] = true;
-                select.append($('<option value="'+d+'">'+d+'</option>'));
             });
         });
 }
