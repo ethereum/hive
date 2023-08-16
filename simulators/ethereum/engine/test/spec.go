@@ -115,7 +115,7 @@ func GenesisFactory(clientName string) helper.Genesis {
 	case "nethermind_":
 		return &helper.NethermindChainSpec{}
 	default:
-		return nil
+		panic("unsupported client provided")
 	}
 }
 
