@@ -95,7 +95,7 @@ func getTimestamp(spec test.SpecInterface) int64 {
 		preShapellaBlock = 1
 	}
 
-	nextMinute := now.Truncate(time.Minute).Add(time.Duration(preShapellaBlock) * 3 * time.Minute).Add(time.Minute)
+	nextMinute := now.Truncate(time.Minute).Add(time.Duration(preShapellaBlock) * 1 * time.Minute).Add(time.Minute)
 	return nextMinute.Unix()
 }
 
@@ -183,7 +183,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 						defer func() {
 							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
 						}()
-						timeout := time.Minute * 20
+						timeout := time.Hour
 						// If a test.Spec specifies a timeout, use that instead
 						if currentTest.GetTimeout() != 0 {
 							timeout = time.Second * time.Duration(currentTest.GetTimeout())
