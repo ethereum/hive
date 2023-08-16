@@ -205,7 +205,7 @@ func LoadChain(path string) types.Blocks {
 	return blocks
 }
 
-func LoadGenesis(path string) Genesis {
+func LoadGenesis(path string, genesis Genesis) Genesis {
 	reader, err := os.Open(path)
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
@@ -215,7 +215,7 @@ func LoadGenesis(path string) Genesis {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}
 
-	var genesis NethermindChainSpec
+	//var genesis NethermindChainSpec
 	err = genesis.UnmarshalJSON(contents)
 	if err != nil {
 		return nil
@@ -223,7 +223,7 @@ func LoadGenesis(path string) Genesis {
 	if err := json.Unmarshal(contents, &genesis); err != nil {
 		panic(fmt.Errorf("can't parse genesis JSON: %v", err))
 	}
-	return Genesis(&genesis)
+	return genesis
 }
 
 func LoadGenesisTest(path string) string {
@@ -236,19 +236,6 @@ func LoadGenesisTest(path string) string {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}
 	return string(contents)
-}
-
-func LoadGenesisBlock(path string) *types.Block {
-	genesis := LoadGenesis(path)
-	return genesis.ToBlock()
-}
-
-func GenesisStartOption(genesis Genesis) (hivesim.StartOption, error) {
-	out, err := genesis.MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
-	}
-	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
 }
 
 func GenesisStartOptionBasedOnClient(genesis Genesis, clientName string) (hivesim.StartOption, error) {
@@ -265,20 +252,7 @@ func GenesisStartOptionBasedOnClient(genesis Genesis, clientName string) (hivesi
 	}
 	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
 }
-func GenesisStartOptionBasedOnClientTest(genesis string, clientName string) (hivesim.StartOption, error) {
-	//out, err := genesis.MarshalJSON()
-	//if err != nil {
-	//	return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
-	//}
-	// We don't need mappers
-	//switch clientName {
-	//case "erigon":
-	//return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
-	//case "nethermind":
-	return hivesim.WithDynamicFile("/chainspec.json", bytesSource([]byte(genesis))), nil
-	//}
-	//return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
-}
+
 func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
 	result := new(big.Int).Set(genesis.Difficulty)
 	for _, b := range chain {

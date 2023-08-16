@@ -1,16 +1,19 @@
-name: Daily Command
+name: Daily Run Nethermind 
 
 on:
   schedule:
     - cron: '0 0 * * *'  # Run every day at midnight UTC
   workflow_dispatch:
+  push:
+    branches:
+      - master
   pull_request:
     branches:
       - master
     types: [ closed ]
 
 jobs:
-  run-command:
+  hive-run:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go

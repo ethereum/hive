@@ -6,11 +6,7 @@ FROM thorax/erigon:$branch
 USER root
 
 # Install script tools.
-RUN apk add --update bash curl jq
-
-# Add genesis mapper script.
-ADD genesis.json /genesis.json
-ADD mapper.jq /mapper.jq
+RUN apk add --update bash curl
 
 # Add the startup script.
 ADD erigon.sh /erigon.sh
