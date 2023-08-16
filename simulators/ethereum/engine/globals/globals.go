@@ -2,6 +2,7 @@ package globals
 
 import (
 	"crypto/ecdsa"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -142,10 +143,35 @@ func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
 	if f.ShanghaiTimestamp != nil {
 		shanghaiTime := f.ShanghaiTimestamp.Uint64()
 		genesis.Config.ShanghaiTime = &shanghaiTime
+
+		if genesis.Timestamp >= shanghaiTime {
+			// Remove PoW altogether
+			genesis.Difficulty = common.Big0
+			genesis.Config.TerminalTotalDifficulty = common.Big0
+			genesis.Config.Clique = nil
+			genesis.ExtraData = []byte{}
+		}
 	}
 	if f.CancunTimestamp != nil {
+		if genesis.Config.ShanghaiTime == nil {
+			return fmt.Errorf("Cancun fork requires Shanghai fork")
+		}
 		cancunTime := f.CancunTimestamp.Uint64()
 		genesis.Config.CancunTime = &cancunTime
+		if *genesis.Config.ShanghaiTime > cancunTime {
+			return fmt.Errorf("Cancun fork must be after Shanghai fork")
+		}
+		if genesis.Timestamp >= cancunTime {
+			if genesis.BlobGasUsed == nil {
+				genesis.BlobGasUsed = new(uint64)
+			}
+			if genesis.ExcessBlobGas == nil {
+				genesis.ExcessBlobGas = new(uint64)
+			}
+			if genesis.BeaconRoot == nil {
+				genesis.BeaconRoot = new(common.Hash)
+			}
+		}
 	}
 	return nil
 }

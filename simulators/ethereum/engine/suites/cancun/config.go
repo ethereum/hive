@@ -68,18 +68,6 @@ func (cs *CancunBaseSpec) GetBlobsForkTime() uint64 {
 func (cs *CancunBaseSpec) GetGenesis() *core.Genesis {
 	genesis := cs.Spec.GetGenesis()
 
-	// Remove PoW altogether
-	genesis.Difficulty = common.Big0
-	genesis.Config.TerminalTotalDifficulty = common.Big0
-	genesis.Config.Clique = nil
-	genesis.ExtraData = []byte{}
-
-	if cs.CancunForkHeight == 0 {
-		genesis.BlobGasUsed = new(uint64)
-		genesis.ExcessBlobGas = new(uint64)
-		genesis.BeaconRoot = new(common.Hash)
-	}
-
 	// Add accounts that use the DATAHASH opcode
 	datahashCode := []byte{
 		0x5F, // PUSH0

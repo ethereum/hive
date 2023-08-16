@@ -975,12 +975,6 @@ func AddUnconditionalBytecode(g *core.Genesis, start *big.Int, end *big.Int) {
 func (ws *WithdrawalsBaseSpec) GetGenesis() *core.Genesis {
 	genesis := ws.Spec.GetGenesis()
 
-	// Remove PoW altogether
-	genesis.Difficulty = common.Big0
-	genesis.Config.TerminalTotalDifficulty = common.Big0
-	genesis.Config.Clique = nil
-	genesis.ExtraData = []byte{}
-
 	// Add some accounts to withdraw to with unconditional SSTOREs
 	startAccount := big.NewInt(0x1000)
 	endAccount := big.NewInt(0x1000 + int64(ws.GetWithdrawableAccountCount()) - 1)
