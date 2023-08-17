@@ -124,16 +124,14 @@ type NewPayloads struct {
 	ExpectedBlobs []helper.BlobID
 	// Delay between FcU and GetPayload calls
 	GetPayloadDelay uint64
-	// Extra modifications on NewPayload to the versioned hashes
-	VersionedHashes *VersionedHashes
+	// ForkchoiceUpdate modifier when requesting the new Payload
+	FcUOnPayloadRequest helper.ForkchoiceUpdatedCustomizer
 	// Extra modifications on NewPayload to potentially generate an invalid payload
-	PayloadCustomizer helper.PayloadCustomizer
-	// Version to use to call NewPayload
-	Version int
+	NewPayloadCustomizer helper.NewPayloadCustomizer
+	// ForkchoiceUpdate modifier when setting the new payload as head
+	FcUOnHeadSet helper.ForkchoiceUpdatedCustomizer
 	// Expected responses on the NewPayload call
-	ExpectedError          *int
 	ExpectationDescription string
-	ExpectedStatus         test.PayloadStatus
 }
 
 type VersionedHashes struct {
@@ -141,7 +139,7 @@ type VersionedHashes struct {
 	HashVersions []byte
 }
 
-func (v *VersionedHashes) VersionedHashes() (*[]common.Hash, error) {
+func (v *VersionedHashes) GetVersionedHashes(*[]common.Hash) (*[]common.Hash, error) {
 	if v.Blobs == nil {
 		return nil, nil
 	}
@@ -431,48 +429,52 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 				// Send a test NewPayload directive with either a modified payload or modifed versioned hashes
 				var (
 					payload                        = &t.CLMock.LatestPayloadBuilt
+					version                        = t.Env.ForkConfig.NewPayloadVersion(payload.Timestamp)
 					versionedHashes *[]common.Hash = nil
 					beaconRoot      *common.Hash   = t.CLMock.LatestPayloadAttributes.BeaconRoot
 					r               *test.NewPayloadResponseExpectObject
+					expectedError   *int
+					expectedStatus  test.PayloadStatus = test.Valid
 					err             error
 				)
-				if step.VersionedHashes != nil {
-					// Send a new payload with the modified versioned hashes
-					versionedHashes, err = step.VersionedHashes.VersionedHashes()
+
+				if t.CLMock.LatestBlobBundle != nil {
+					versionedHashes, err = t.CLMock.LatestBlobBundle.VersionedHashes(BLOB_COMMITMENT_VERSION_KZG)
 					if err != nil {
-						t.Fatalf("FAIL: Error getting modified versioned hashes (payload %d/%d): %v", p+1, payloadCount, err)
-					}
-				} else {
-					if t.CLMock.LatestBlobBundle != nil {
-						versionedHashes, err = t.CLMock.LatestBlobBundle.VersionedHashes(BLOB_COMMITMENT_VERSION_KZG)
-						if err != nil {
-							t.Fatalf("FAIL: Error getting versioned hashes (payload %d/%d): %v", p+1, payloadCount, err)
-						}
+						t.Fatalf("FAIL: Error getting versioned hashes (payload %d/%d): %v", p+1, payloadCount, err)
 					}
 				}
 
-				if step.PayloadCustomizer != nil {
+				if step.NewPayloadCustomizer != nil {
 					// Send a custom new payload
-					payload, beaconRoot, err = step.PayloadCustomizer.CustomizePayload(payload, beaconRoot)
+					version, err = step.NewPayloadCustomizer.GetVersion(t.Env.ForkConfig, payload)
+					if err != nil {
+						t.Fatalf("FAIL: Error getting custom payload version (payload %d/%d): %v", p+1, payloadCount, err)
+					}
+					payload, beaconRoot, err = step.NewPayloadCustomizer.CustomizePayload(payload, beaconRoot)
 					if err != nil {
 						t.Fatalf("FAIL: Error customizing payload (payload %d/%d): %v", p+1, payloadCount, err)
 					}
-
+					versionedHashes, err = step.NewPayloadCustomizer.GetVersionedHashes(versionedHashes)
+					if err != nil {
+						t.Fatalf("FAIL: Error getting custom versioned hashes (payload %d/%d): %v", p+1, payloadCount, err)
+					}
+					expectedError, err = step.NewPayloadCustomizer.GetExpectedError()
+					if err != nil {
+						t.Fatalf("FAIL: Error getting custom expected error (payload %d/%d): %v", p+1, payloadCount, err)
+					}
+					if step.NewPayloadCustomizer.GetExpectInvalidStatus() {
+						expectedStatus = test.Invalid
+					}
 				}
 
-				version := step.Version
-				if version == 0 {
-					version = t.Env.ForkConfig.NewPayloadVersion(payload.Timestamp)
-				}
 				r = t.TestEngine.TestEngineNewPayload(payload, versionedHashes, beaconRoot, version)
 				r.ExpectationDescription = step.ExpectationDescription
-				if step.ExpectedError != nil {
-					r.ExpectErrorCode(*step.ExpectedError)
+				if expectedError != nil {
+					r.ExpectErrorCode(*expectedError)
 				} else {
 					r.ExpectNoError()
-					if step.ExpectedStatus != "" {
-						r.ExpectStatus(step.ExpectedStatus)
-					}
+					r.ExpectStatus(expectedStatus)
 				}
 			},
 			OnForkchoiceBroadcast: func() {
@@ -499,9 +501,12 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 }
 
 func (step NewPayloads) Description() string {
-	if step.VersionedHashes != nil {
-		return fmt.Sprintf("NewPayloads: %d payloads, %d blobs expected, %s", step.GetPayloadCount(), step.ExpectedIncludedBlobCount, step.VersionedHashes.Description())
-	}
+	/*
+		TODO: Figure out if we need this.
+		if step.VersionedHashes != nil {
+			return fmt.Sprintf("NewPayloads: %d payloads, %d blobs expected, %s", step.GetPayloadCount(), step.ExpectedIncludedBlobCount, step.VersionedHashes.Description())
+		}
+	*/
 	return fmt.Sprintf("NewPayloads: %d payloads, %d blobs expected", step.GetPayloadCount(), step.ExpectedIncludedBlobCount)
 }
 
@@ -598,56 +603,74 @@ func (step SendBlobTransactions) Description() string {
 
 // Send a modified version of the latest payload produced using NewPayloadV3
 type SendModifiedLatestPayload struct {
-	ClientID uint64
-	// Versioned hashes modification
-	VersionedHashes *VersionedHashes
-	// Other modifications
-	PayloadCustomizer helper.PayloadCustomizer
-	// Expected responses on the NewPayload call
-	ExpectedError  *int
-	ExpectedStatus test.PayloadStatus
+	ClientID             uint64
+	NewPayloadCustomizer helper.NewPayloadCustomizer
 }
 
 func (step SendModifiedLatestPayload) Execute(t *CancunTestContext) error {
 	// Get the latest payload
 	var (
-		payload    = &t.CLMock.LatestPayloadBuilt
-		beaconRoot = t.CLMock.LatestPayloadAttributes.BeaconRoot
+		payload                            = &t.CLMock.LatestPayloadBuilt
+		beaconRoot                         = t.CLMock.LatestPayloadAttributes.BeaconRoot
+		version         int                = t.Env.ForkConfig.NewPayloadVersion(payload.Timestamp)
+		versionedHashes *[]common.Hash     = nil
+		expectedError   *int               = nil
+		expectedStatus  test.PayloadStatus = test.Valid
+		err             error              = nil
 	)
 	if payload == nil {
-		return fmt.Errorf("no payload available")
+		return fmt.Errorf("TEST-FAIL: no payload available")
 	}
-	// Modify the versioned hashes
-	versionedHashes, err := step.VersionedHashes.VersionedHashes()
+	if t.CLMock.LatestBlobBundle == nil {
+		return fmt.Errorf("TEST-FAIL: no blob bundle available")
+	}
+	if step.NewPayloadCustomizer == nil {
+		return fmt.Errorf("TEST-FAIL: no payload customizer available")
+	}
+
+	// Send a custom new payload
+	version, err = step.NewPayloadCustomizer.GetVersion(t.Env.ForkConfig, payload)
 	if err != nil {
-		return fmt.Errorf("error getting modified versioned hashes: %v", err)
+		t.Fatalf("FAIL: Error getting custom payload version: %v", err)
 	}
-	// Modify the payload
-	if step.PayloadCustomizer != nil {
-		payload, beaconRoot, err = step.PayloadCustomizer.CustomizePayload(payload, beaconRoot)
-		if err != nil {
-			return fmt.Errorf("error modifying payload: %v", err)
-		}
+	payload, beaconRoot, err = step.NewPayloadCustomizer.CustomizePayload(payload, beaconRoot)
+	if err != nil {
+		t.Fatalf("FAIL: Error customizing payload: %v", err)
 	}
+	versionedHashes, err = step.NewPayloadCustomizer.GetVersionedHashes(versionedHashes)
+	if err != nil {
+		t.Fatalf("FAIL: Error getting custom versioned hashes: %v", err)
+	}
+	expectedError, err = step.NewPayloadCustomizer.GetExpectedError()
+	if err != nil {
+		t.Fatalf("FAIL: Error getting custom expected error: %v", err)
+	}
+	if step.NewPayloadCustomizer.GetExpectInvalidStatus() {
+		expectedStatus = test.Invalid
+	}
+
 	// Send the payload
 	if step.ClientID >= uint64(len(t.TestEngines)) {
 		return fmt.Errorf("invalid client index %d", step.ClientID)
 	}
 	testEngine := t.TestEngines[step.ClientID]
-	r := testEngine.TestEngineNewPayloadV3(payload, versionedHashes, beaconRoot)
-	if step.ExpectedError != nil {
-		r.ExpectErrorCode(*step.ExpectedError)
+	r := testEngine.TestEngineNewPayload(payload, versionedHashes, beaconRoot, version)
+	if expectedError != nil {
+		r.ExpectErrorCode(*expectedError)
 	} else {
-		r.ExpectStatus(step.ExpectedStatus)
+		r.ExpectStatus(expectedStatus)
 	}
 	return nil
 }
 
 func (step SendModifiedLatestPayload) Description() string {
-	desc := fmt.Sprintf("SendModifiedLatestPayload: client %d, expected status %s, ", step.ClientID, step.ExpectedStatus)
-	if step.VersionedHashes != nil {
-		desc += step.VersionedHashes.Description()
-	}
+	desc := fmt.Sprintf("SendModifiedLatestPayload: client %d, expected invalid=%T, ", step.ClientID, step.NewPayloadCustomizer.GetExpectInvalidStatus())
+	/*
+		TODO: Figure out if we need this.
+		if step.VersionedHashes != nil {
+			desc += step.VersionedHashes.Description()
+		}
+	*/
 
 	return desc
 }
