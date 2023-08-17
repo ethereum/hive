@@ -270,16 +270,19 @@ var counter = 0
 // Returns the timestamp value to be included in the next payload attributes
 func (cl *CLMocker) GetNextBlockTimestamp() uint64 {
 
-	now := time.Now()
-	ret := uint64(now.Truncate(time.Minute).Add(5 * time.Second).Add(time.Duration(counter) * time.Second).Unix())
-	counter += 1
-	return ret
+	// now := time.Now()
+	// ret := uint64(now.Truncate(time.Minute).Add(time.Duration(cl.GetTimestampIncrement())).Add(time.Duration(counter) * time.Second).Unix())
+	// counter += 1
+	// return ret
 	//if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
 	//	// We are producing the transition payload and there's a value specified
 	//	// for this specific payload
 	//	return cl.TransitionPayloadTimestamp.Uint64()
 	//}
-	//return cl.LatestHeader.Time + cl.GetTimestampIncrement()
+	if isShanghai(cl.LatestHeader.Time, cl.ShanghaiTimestamp) && cl.LatestHeader.Time < cl.ShanghaiTimestamp.Uint64() {
+		return cl.ShanghaiTimestamp.Uint64() + cl.GetTimestampIncrement()
+	}
+	return cl.LatestHeader.Time + cl.GetTimestampIncrement()
 }
 
 // Picks the next payload producer from the set of clients registered

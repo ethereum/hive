@@ -188,7 +188,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 						if currentTest.GetTimeout() != 0 {
 							timeout = time.Second * time.Duration(currentTest.GetTimeout())
 						}
-						//time.Sleep(30 * time.Second)
+						time.Sleep(30 * time.Second)
 						// Run the test case
 						test.Run(
 							currentTest,

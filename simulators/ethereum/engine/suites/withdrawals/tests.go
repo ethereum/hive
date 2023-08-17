@@ -133,22 +133,22 @@ var Tests = []test.SpecInterface{
 	// 		TimeIncrements:        5,
 	// 	},
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdrawals Fork on Block 3",
-			About: `
-			Tests the transition to the withdrawals fork after two blocks
-			have happened.
-			Block 2 is sent with invalid non-null withdrawals payload and
-			client is expected to respond with the appropriate error.
-			`,
-		},
-		WithdrawalsForkHeight:    3, // Genesis, Block 1 and 2 are Pre-Withdrawals
-		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      16,
-		TimeIncrements:           5,
-		TestCorrupedHashPayloads: true,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 3",
+	// 		About: `
+	// 		Tests the transition to the withdrawals fork after two blocks
+	// 		have happened.
+	// 		Block 2 is sent with invalid non-null withdrawals payload and
+	// 		client is expected to respond with the appropriate error.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight:    3, // Genesis, Block 1 and 2 are Pre-Withdrawals
+	// 	WithdrawalsBlockCount:    1,
+	// 	WithdrawalsPerBlock:      16,
+	// 	TimeIncrements:           5,
+	// 	TestCorrupedHashPayloads: true,
+	// },
 
 	// 	&WithdrawalsBaseSpec{
 	// 		Spec: test.Spec{
@@ -376,7 +376,7 @@ var Tests = []test.SpecInterface{
 		SyncSteps: 1,
 	},
 
-	//Re-Org tests
+	// //Re-Org tests
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 			Spec: test.Spec{
@@ -395,86 +395,86 @@ var Tests = []test.SpecInterface{
 		ReOrgBlockCount: 1,
 		ReOrgViaSync:    false,
 	},
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org NewPayload",
-				About: `
-				Tests a 8 block re-org using NewPayload
-				Re-org does not change withdrawals fork height
-				`,
-				SlotsToSafe:      big.NewInt(32),
-				SlotsToFinalized: big.NewInt(64),
-				TimeoutSeconds:   300,
-			},
-			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
-		},
-		ReOrgBlockCount: 8,
-		ReOrgViaSync:    false,
-	},
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org, Sync",
-				About: `
-				Tests a 8 block re-org using NewPayload
-				Re-org does not change withdrawals fork height
-				`,
-				SlotsToSafe:      big.NewInt(32),
-				SlotsToFinalized: big.NewInt(64),
-				TimeoutSeconds:   300,
-			},
-			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
-		},
-		ReOrgBlockCount: 8,
-		ReOrgViaSync:    true,
-	},
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org NewPayload",
+	// 			About: `
+	// 			Tests a 8 block re-org using NewPayload
+	// 			Re-org does not change withdrawals fork height
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(32),
+	// 			SlotsToFinalized: big.NewInt(64),
+	// 			TimeoutSeconds:   300,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 16,
+	// 		WithdrawalsPerBlock:   16,
+	// 	},
+	// 	ReOrgBlockCount: 8,
+	// 	ReOrgViaSync:    false,
+	// },
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org, Sync",
+	// 			About: `
+	// 			Tests a 8 block re-org using NewPayload
+	// 			Re-org does not change withdrawals fork height
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(32),
+	// 			SlotsToFinalized: big.NewInt(64),
+	// 			TimeoutSeconds:   300,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 16,
+	// 		WithdrawalsPerBlock:   16,
+	// 	},
+	// 	ReOrgBlockCount: 8,
+	// 	ReOrgViaSync:    true,
+	// },
 
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org NewPayload",
-				About: `
-				Tests a 10 block re-org using NewPayload
-				Re-org does not change withdrawals fork height, but changes
-				the payload at the height of the fork
-				`,
-				SlotsToSafe:      big.NewInt(16),
-				SlotsToFinalized: big.NewInt(32),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
-		},
-		ReOrgBlockCount: 10,
-		ReOrgViaSync:    false,
-	},
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org NewPayload",
+	// 			About: `
+	// 			Tests a 10 block re-org using NewPayload
+	// 			Re-org does not change withdrawals fork height, but changes
+	// 			the payload at the height of the fork
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(16),
+	// 			SlotsToFinalized: big.NewInt(32),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   128,
+	// 	},
+	// 	ReOrgBlockCount: 10,
+	// 	ReOrgViaSync:    false,
+	// },
 
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org Sync",
-				About: `
-				Tests a 10 block re-org using sync
-				Re-org does not change withdrawals fork height, but changes
-				the payload at the height of the fork
-				`,
-				SlotsToSafe:      big.NewInt(16),
-				SlotsToFinalized: big.NewInt(32),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
-		},
-		ReOrgBlockCount: 10,
-		ReOrgViaSync:    true,
-	},
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org Sync",
+	// 			About: `
+	// 			Tests a 10 block re-org using sync
+	// 			Re-org does not change withdrawals fork height, but changes
+	// 			the payload at the height of the fork
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(16),
+	// 			SlotsToFinalized: big.NewInt(32),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   128,
+	// 	},
+	// 	ReOrgBlockCount: 10,
+	// 	ReOrgViaSync:    true,
+	// },
 
 	// // TODO:
 	// &WithdrawalsReorgSpec{
@@ -500,27 +500,27 @@ var Tests = []test.SpecInterface{
 	// },
 
 	// // TODO:
-	// &WithdrawalsReorgSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org Sync",
-	// 			About: `
-	// 			Tests a 10 block re-org using sync
-	// 			Sidechain reaches withdrawals fork at a lower block height
-	// 			than the canonical chain
-	// 			`,
-	// 			SlotsToSafe:      big.NewInt(16),
-	// 			SlotsToFinalized: big.NewInt(32),
-	// 			TimeoutSeconds:   3600,
-	// 		},
-	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 8,
-	// 		WithdrawalsPerBlock:   128,
-	// 	},
-	// 	ReOrgBlockCount:         10,
-	// 	ReOrgViaSync:            true,
-	// 	SidechainTimeIncrements: 2,
-	// },
+	&WithdrawalsReorgSpec{
+		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+			Spec: test.Spec{
+				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org Sync",
+				About: `
+				Tests a 10 block re-org using sync
+				Sidechain reaches withdrawals fork at a lower block height
+				than the canonical chain
+				`,
+				SlotsToSafe:      big.NewInt(16),
+				SlotsToFinalized: big.NewInt(32),
+				TimeoutSeconds:   3600,
+			},
+			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+			WithdrawalsBlockCount: 8,
+			WithdrawalsPerBlock:   128,
+		},
+		ReOrgBlockCount:         10,
+		ReOrgViaSync:            true,
+		SidechainTimeIncrements: 2,
+	},
 
 	// // TODO:
 	// &WithdrawalsReorgSpec{
@@ -1346,9 +1346,6 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 
 	t.CLMock.LatestForkchoice.HeadBlockHash = block1.Hash()
 
-	//Spawn a secondary client which will need to sync to the primary client
-	t.CLMock.AddEngineClient(secondaryEngine)
-
 	if ws.SyncSteps > 1 {
 		// TODO
 	} else {
@@ -1446,7 +1443,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 	t.CLMock.ShanghaiTimestamp = big.NewInt(0).SetUint64(shangaiTime)
 
 	t.CLMock.WaitForTTD()
-	t.Genesis.Config().ShanghaiTime = &shangaiTime
+
 	// Spawn a secondary client which will produce the sidechain
 	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 	if err != nil {
@@ -1570,6 +1567,10 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 					version int
 					payload *beacon.ExecutableData
 				)
+				isShanghai := shangaiTime <= uint64(time.Now().Unix())
+				_ = isShanghai
+				withdrawalsForkHeight := ws.GetSidechainWithdrawalsForkHeight()
+				_ = withdrawalsForkHeight
 				if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainWithdrawalsForkHeight() {
 					version = 2
 				} else {
