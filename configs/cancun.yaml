@@ -2,8 +2,8 @@
   nametag: cancun-git
   dockerfile: git
   build_args:
-      github: hyperledger/besu
-      tag: main
+      github: pinges/besu
+      tag: EIP4788
 
 - client: erigon
   nametag: cancun-git
