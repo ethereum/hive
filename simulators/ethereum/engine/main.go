@@ -19,6 +19,8 @@ import (
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
+const SetupTime = 3 * time.Minute
+
 func main() {
 	var (
 		//	engine = hivesim.Suite{
@@ -85,8 +87,6 @@ type ClientGenesis interface {
 	GetTTD()
 }
 
-// Load the genesis based on each client
-
 func getTimestamp(spec test.SpecInterface) int64 {
 	now := time.Now()
 
@@ -95,8 +95,9 @@ func getTimestamp(spec test.SpecInterface) int64 {
 		preShapellaBlock = 1
 	}
 
-	nextMinute := now.Truncate(time.Minute).Add(time.Duration(preShapellaBlock) * 1 * time.Minute).Add(time.Minute)
-	return nextMinute.Unix()
+	preShapellaTime := time.Duration(uint64(preShapellaBlock)*spec.GetBlockTimeIncrements()) * time.Second
+	shanghaiTimestamp := now.Add(SetupTime).Add(preShapellaTime)
+	return shanghaiTimestamp.Unix()
 }
 
 // Add test cases to a given test suite

@@ -33,6 +33,7 @@ type SpecInterface interface {
 	GetTimeout() int
 	GetTTD() int64
 	GetPreShapellaBlockCount() int
+	GetBlockTimeIncrements() uint64
 	IsMiningDisabled() bool
 }
 
@@ -164,5 +165,9 @@ func (s Spec) IsMiningDisabled() bool {
 }
 
 func (s Spec) GetPreShapellaBlockCount() int {
+	return 0
+}
+
+func (s Spec) GetBlockTimeIncrements() uint64 {
 	return 0
 }

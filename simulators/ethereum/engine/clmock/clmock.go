@@ -274,14 +274,18 @@ func (cl *CLMocker) GetNextBlockTimestamp() uint64 {
 	// ret := uint64(now.Truncate(time.Minute).Add(time.Duration(cl.GetTimestampIncrement())).Add(time.Duration(counter) * time.Second).Unix())
 	// counter += 1
 	// return ret
-	//if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
-	//	// We are producing the transition payload and there's a value specified
-	//	// for this specific payload
-	//	return cl.TransitionPayloadTimestamp.Uint64()
-	//}
-	if isShanghai(cl.LatestHeader.Time, cl.ShanghaiTimestamp) && cl.LatestHeader.Time < cl.ShanghaiTimestamp.Uint64() {
-		return cl.ShanghaiTimestamp.Uint64() + cl.GetTimestampIncrement()
+	if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
+		// We are producing the transition payload and there's a value specified
+		// for this specific payload
+		return cl.TransitionPayloadTimestamp.Uint64()
 	}
+	// if isShanghai(cl.LatestHeader.Time, cl.ShanghaiTimestamp) && cl.LatestHeader.Time < cl.ShanghaiTimestamp.Uint64() {
+	// 	return cl.ShanghaiTimestamp.Uint64() + cl.GetTimestampIncrement()
+	// }
+
+	// if cl.LatestHeader.Time == 0 {
+	// 	return uint64(time.Now().Unix()) + cl.GetTimestampIncrement()
+	// }
 	return cl.LatestHeader.Time + cl.GetTimestampIncrement()
 }
 
@@ -353,6 +357,7 @@ func (cl *CLMocker) RequestNextPayload() {
 	defer cancel()
 	var (
 		resp       api.ForkChoiceResponse
+		b          *client.Block
 		fcUVersion int
 		err        error
 	)
@@ -362,7 +367,10 @@ func (cl *CLMocker) RequestNextPayload() {
 			resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV2(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 
 		} else {
-			b, _ := cl.EngineClients[0].BlockByNumber(ctx, nil)
+			b, err = cl.EngineClients[0].BlockByNumber(ctx, nil)
+			if err != nil {
+				cl.Fatalf("Can't get latest block from the first client: %v", err)
+			}
 			latestBlockHash := b.Hash()
 			if cl.LatestForkchoice.HeadBlockHash != latestBlockHash {
 				cl.Fatalf("CLMocker: Latest forkchoice head block hash (%v) does not match latest block hash (%v)", cl.LatestForkchoice.HeadBlockHash.Hex(), latestBlockHash.Hex())
