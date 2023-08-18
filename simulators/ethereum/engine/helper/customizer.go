@@ -134,6 +134,22 @@ func (customData *BasePayloadAttributesCustomizer) GetPayloadAttributes(basePayl
 	return customPayloadAttributes, nil
 }
 
+type TimestampDeltaPayloadAttributesCustomizer struct {
+	PayloadAttributesCustomizer
+	TimestampDelta int64
+}
+
+var _ PayloadAttributesCustomizer = (*TimestampDeltaPayloadAttributesCustomizer)(nil)
+
+func (customData *TimestampDeltaPayloadAttributesCustomizer) GetPayloadAttributes(basePayloadAttributes *typ.PayloadAttributes) (*typ.PayloadAttributes, error) {
+	customPayloadAttributes, err := customData.PayloadAttributesCustomizer.GetPayloadAttributes(basePayloadAttributes)
+	if err != nil {
+		return nil, err
+	}
+	customPayloadAttributes.Timestamp = uint64(int64(customPayloadAttributes.Timestamp) + customData.TimestampDelta)
+	return customPayloadAttributes, nil
+}
+
 // Customizer that makes no modifications to the forkchoice directive call.
 // Used as base to other customizers.
 type BaseForkchoiceUpdatedCustomizer struct {
