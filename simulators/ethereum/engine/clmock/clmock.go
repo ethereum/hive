@@ -265,7 +265,7 @@ func (cl *CLMocker) GetTimestampIncrement() uint64 {
 	return cl.BlockTimestampIncrement.Uint64()
 }
 
-// Returns the timestamp value to be included in the next payload attributes
+// Returns the next timestamp value to be included in the next payload attributes
 func (cl *CLMocker) GetNextBlockTimestamp() uint64 {
 	if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
 		// We are producing the transition payload and there's a value specified

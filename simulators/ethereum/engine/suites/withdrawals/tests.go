@@ -1015,15 +1015,19 @@ func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
 	}
 }
 
+// waitForSetup sleeps for some time to allow clients start properly and prepare for execution.
+// This function also sets timestamp for genesis block == (end of setup wait):
+//
+// Shapella timestamp == SetupTime + (pre-shapella blocks count * blockTimeIncrements)
+// => genesis block timestamp == shapella timestamp - (pre-shapella blocks count * blockTimeIncrements)
 func (ws *WithdrawalsBaseSpec) waitForSetup(t *test.Env) {
 	preShapellaBlocksTime := time.Duration(uint64(ws.GetPreShapellaBlockCount())*ws.GetBlockTimeIncrements()) * time.Second
-	setupTimestamp := time.Unix(int64(*t.Genesis.Config().ShanghaiTime), 0).Add(-preShapellaBlocksTime)
+	endOfSetupTimestamp := time.Unix(int64(*t.Genesis.Config().ShanghaiTime), 0).Add(-preShapellaBlocksTime)
 	defer func() {
-		// set genesis timestamp to the end of setup time to increment block times corretly
-		t.CLMock.LatestHeader.Time = uint64(setupTimestamp.Unix())
+		t.CLMock.LatestHeader.Time = uint64(endOfSetupTimestamp.Unix())
 	}()
-	if time.Now().Unix() < setupTimestamp.Unix() {
-		durationUntilFuture := time.Until(setupTimestamp)
+	if time.Now().Unix() < endOfSetupTimestamp.Unix() {
+		durationUntilFuture := time.Until(endOfSetupTimestamp)
 		if durationUntilFuture > 0 {
 			t.Logf("INFO: Waiting for setup: ~ %.2f min...", durationUntilFuture.Minutes())
 			time.Sleep(durationUntilFuture)

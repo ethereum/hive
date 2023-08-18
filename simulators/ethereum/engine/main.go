@@ -19,6 +19,8 @@ import (
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
+// we will wait that time before every test execution to be sure environment is ready
+// may be changed to other value if necessary
 const SetupTime = 3 * time.Minute
 
 func main() {
@@ -96,6 +98,7 @@ func getTimestamp(spec test.SpecInterface) int64 {
 	}
 
 	preShapellaTime := time.Duration(uint64(preShapellaBlock)*spec.GetBlockTimeIncrements()) * time.Second
+	// after setup wait chain will produce blocks in preShapellaTime and than shapella happens
 	shanghaiTimestamp := now.Add(SetupTime).Add(preShapellaTime)
 	return shanghaiTimestamp.Unix()
 }
@@ -184,7 +187,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 						defer func() {
 							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
 						}()
-						timeout := time.Hour
+						timeout := 30 * time.Minute
 						// If a test.Spec specifies a timeout, use that instead
 						if currentTest.GetTimeout() != 0 {
 							timeout = time.Second * time.Duration(currentTest.GetTimeout())
