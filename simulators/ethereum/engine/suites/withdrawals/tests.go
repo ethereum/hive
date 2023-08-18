@@ -1015,17 +1015,6 @@ func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
 	}
 }
 
-func (ws *WithdrawalsBaseSpec) waitForShanghai(t *test.Env) {
-	if time.Now().Unix() < int64(*t.Genesis.Config().ShanghaiTime) {
-		tUnix := time.Unix(t.CLMock.ShanghaiTimestamp.Int64(), 0)
-		durationUntilFuture := time.Until(tUnix)
-		if durationUntilFuture > 0 {
-			t.Logf("INFO (%s): Waiting for shanghai timestamp: ~ %.2f min", t.TestName, durationUntilFuture.Minutes())
-			time.Sleep(durationUntilFuture)
-		}
-	}
-}
-
 func (ws *WithdrawalsBaseSpec) waitForSetup(t *test.Env) {
 	preShapellaBlocksTime := time.Duration(uint64(ws.GetPreShapellaBlockCount())*ws.GetBlockTimeIncrements()) * time.Second
 	setupTimestamp := time.Unix(int64(*t.Genesis.Config().ShanghaiTime), 0).Add(-preShapellaBlocksTime)
@@ -1456,9 +1445,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 	sidechainStartAccount.Sub(sidechainStartAccount, big.NewInt(int64(ws.GetWithdrawableAccountCount())+1))
 	ws.waitForSetup(t)
 	for i := 0; i < int(ws.GetPreWithdrawalsBlockCount()+ws.WithdrawalsBlockCount); i++ {
-		// if uint64(i) == ws.GetPreWithdrawalsBlockCount() {
-		// 	ws.waitForShaghai(t)
-		// }
+
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnPayloadProducerSelected: func() {
 				t.CLMock.NextWithdrawals = nil
