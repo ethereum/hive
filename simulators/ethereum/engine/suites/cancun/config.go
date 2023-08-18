@@ -49,7 +49,10 @@ func (cs *CancunBaseSpec) GetForkConfig() globals.ForkConfig {
 
 // Get the per-block timestamp increments configured for this test
 func (cs *CancunBaseSpec) GetBlockTimeIncrements() uint64 {
-	return 1
+	if cs.TimeIncrements == 0 {
+		return 1
+	}
+	return cs.TimeIncrements
 }
 
 // Timestamp delta between genesis and the withdrawals fork
