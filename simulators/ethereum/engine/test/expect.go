@@ -880,6 +880,20 @@ func (tec *TestEngineClient) TestBalanceAt(account common.Address, number *big.I
 	if err, ok := err.(rpc.Error); ok {
 		ret.ErrorCode = err.ErrorCode()
 	}
+	if err != nil {
+		return ret
+	}
+	if number == nil {
+		n, err := tec.Engine.BlockNumber(ctx)
+		if err != nil {
+			ret.Error = err
+			if err, ok := err.(rpc.Error); ok {
+				ret.ErrorCode = err.ErrorCode()
+			}
+			return ret
+		}
+		ret.Block = big.NewInt(int64(n))
+	}
 	return ret
 }
 
@@ -890,7 +904,7 @@ func (exp *BalanceResponseExpectObject) ExpectNoError() {
 }
 
 func (exp *BalanceResponseExpectObject) ExpectBalanceEqual(expBalance *big.Int) {
-	exp.Logf("INFO (%s): Testing balance for account %s on block %d: actual=%d, expected=%d",
+	exp.Logf("INFO (%s): Testing balance for account %s on block %s: actual=%d, expected=%d",
 		exp.TestName,
 		exp.Account,
 		exp.Block,

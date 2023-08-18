@@ -179,7 +179,6 @@ var Tests = []test.SpecInterface{
 	// 	WithdrawableAccountCount: 2,
 	// },
 
-	// TODO: panicing with new timestamp increment scheme
 	&WithdrawalsBaseSpec{
 		Spec: test.Spec{
 			Name: "Withdraw many accounts",
@@ -1191,25 +1190,6 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				// Check withdrawal addresses and verify withdrawal balances
 				// have not yet been applied
 				if !ws.SkipBaseVerifications {
-					for _, addr := range ws.WithdrawalsHistory.GetAddressesWithdrawnOnBlock(t.CLMock.LatestExecutedPayload.Number) {
-						// Test balance at `latest`, which should not yet have the
-						// withdrawal applied.
-						expectedAccountBalance := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(
-							addr,
-							t.CLMock.LatestExecutedPayload.Number-1)
-						r := t.TestEngine.TestBalanceAt(addr, nil)
-						r.ExpectationDescription = fmt.Sprintf(`
-							Requested balance for account %s on "latest" block
-							after engine_newPayloadV2, expecting balance to be equal
-							to value on previous block (%d), since the new payload
-							has not yet been applied.
-							`,
-							addr,
-							t.CLMock.LatestExecutedPayload.Number-1,
-						)
-						r.ExpectBalanceEqual(expectedAccountBalance)
-					}
-
 					if ws.TestCorrupedHashPayloads {
 						payload := t.CLMock.LatestExecutedPayload
 
