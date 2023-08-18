@@ -725,7 +725,7 @@ var Tests = []test.SpecInterface{
 			`,
 		},
 
-		CancunForkHeight: 1,
+		CancunForkHeight: 0,
 
 		TestSequence: TestSequence{
 			SendBlobTransactions{
