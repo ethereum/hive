@@ -15,6 +15,71 @@ import (
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
+type GetPayloadCustomizer interface {
+	GetPayloadID(basePayloadID *api.PayloadID) (*api.PayloadID, error)
+	GetVersion(forkConfig *globals.ForkConfig, requestedTimestamp uint64) (int, error)
+	GetExpectedError() (*int, error)
+}
+
+type BaseGetPayloadCustomizer struct {
+	CustomPayloadID *api.PayloadID
+	ExpectedError   *int
+}
+
+var _ GetPayloadCustomizer = (*BaseGetPayloadCustomizer)(nil)
+
+func (customizer *BaseGetPayloadCustomizer) GetPayloadID(basePayloadID *api.PayloadID) (*api.PayloadID, error) {
+	if customizer.CustomPayloadID != nil {
+		return customizer.CustomPayloadID, nil
+	}
+	return basePayloadID, nil
+}
+
+func (customizer *BaseGetPayloadCustomizer) GetVersion(forkConfig *globals.ForkConfig, requestedTimestamp uint64) (int, error) {
+	return forkConfig.GetPayloadVersion(requestedTimestamp), nil
+}
+
+func (customizer *BaseGetPayloadCustomizer) GetExpectedError() (*int, error) {
+	return customizer.ExpectedError, nil
+}
+
+type UpgradeGetPayloadVersion struct {
+	GetPayloadCustomizer
+}
+
+var _ GetPayloadCustomizer = (*UpgradeGetPayloadVersion)(nil)
+
+func (customizer *UpgradeGetPayloadVersion) GetVersion(forkConfig *globals.ForkConfig, requestedTimestamp uint64) (int, error) {
+	if customizer.GetPayloadCustomizer == nil {
+		return 0, fmt.Errorf("base customizer not set")
+	}
+	baseVersion, err := customizer.GetPayloadCustomizer.GetVersion(forkConfig, requestedTimestamp)
+	if err != nil {
+		return 0, err
+	}
+	return baseVersion + 1, nil
+}
+
+type DowngradeGetPayloadVersion struct {
+	GetPayloadCustomizer
+}
+
+var _ GetPayloadCustomizer = (*DowngradeGetPayloadVersion)(nil)
+
+func (customizer *DowngradeGetPayloadVersion) GetVersion(forkConfig *globals.ForkConfig, requestedTimestamp uint64) (int, error) {
+	if customizer.GetPayloadCustomizer == nil {
+		return 0, fmt.Errorf("base customizer not set")
+	}
+	baseVersion, err := customizer.GetPayloadCustomizer.GetVersion(forkConfig, requestedTimestamp)
+	if err != nil {
+		return 0, err
+	}
+	if baseVersion == 1 {
+		return 1, fmt.Errorf("cannot downgrade version 1")
+	}
+	return baseVersion - 1, nil
+}
+
 type PayloadAttributesCustomizer interface {
 	GetPayloadAttributes(basePayloadAttributes *typ.PayloadAttributes) (*typ.PayloadAttributes, error)
 }
