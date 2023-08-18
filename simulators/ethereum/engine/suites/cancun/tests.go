@@ -1039,6 +1039,48 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
+	// Fork time tests
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "ForkchoiceUpdatedV2 then ForkchoiceUpdatedV3 Valid Payload Building Requests",
+			About: `
+			Test requesting a Shanghai ForkchoiceUpdatedV2 payload followed by a Cancun ForkchoiceUpdatedV3 request.
+			Verify that client correctly returns the Cancun payload.
+			`,
+		},
+
+		// We request two blocks from the client, first on shanghai and then on cancun, both with
+		// the same parent.
+		// Client must respond correctly to later request.
+		CancunForkHeight: 1,
+		TimeIncrements:   2,
+
+		TestSequence: TestSequence{
+			// First, we send a couple of blob transactions on genesis,
+			// with enough data gas cost to make sure they are included in the first block.
+			SendBlobTransactions{
+				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				BlobTransactionMaxBlobGasCost: big.NewInt(1),
+			},
+			NewPayloads{
+				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
+				// This customizer only simulates requesting a Shanghai payload 1 second before cancun.
+				// CL Mock will still request the Cancun payload afterwards
+				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{
+					PayloadAttributesCustomizer: &helper.TimestampDeltaPayloadAttributesCustomizer{
+						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
+							RemoveBeaconRoot: true,
+						},
+						TimestampDelta: -1,
+					},
+				},
+				ExpectationDescription: `
+				ForkchoiceUpdatedV3 must construct transaction with blob payloads even if a ForkchoiceUpdatedV2 was previously requested
+				`,
+			},
+		},
+	},
+
 	// Test versioned hashes in Engine API NewPayloadV3
 	&CancunBaseSpec{
 
