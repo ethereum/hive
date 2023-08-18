@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -23,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -89,6 +89,9 @@ type CLMocker struct {
 	// Chain History
 	HeaderHistory map[uint64]*types.Header
 
+	// Payload ID History
+	PayloadIDHistory map[api.PayloadID]interface{}
+
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
 	ExecutedPayloadHistory ExecutableDataHistory
@@ -147,6 +150,7 @@ func NewCLMocker(t *hivesim.T, genesis *core.Genesis, slotsToSafe, slotsToFinali
 		SlotsToFinalized:                slotsToFinalized,
 		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
 		PayloadProductionClientDelay:    DefaultPayloadProductionClientDelay,
+		PayloadIDHistory:                make(map[api.PayloadID]interface{}),
 		LatestHeader:                    nil,
 		FirstPoSBlockNumber:             nil,
 		LatestHeadNumber:                nil,
@@ -417,6 +421,17 @@ func (cl *CLMocker) GeneratePayloadAttributes() {
 	cl.PrevRandaoHistory[cl.LatestHeader.Number.Uint64()+1] = nextPrevRandao
 }
 
+func (cl *CLMocker) AddPayloadID(newPayloadID *api.PayloadID) error {
+	if newPayloadID == nil {
+		return errors.New("nil payload ID")
+	}
+	if _, ok := cl.PayloadIDHistory[*newPayloadID]; ok {
+		return fmt.Errorf("Reused payload ID: %v", *newPayloadID)
+	}
+	cl.PayloadIDHistory[*newPayloadID] = nil
+	return nil
+}
+
 func (cl *CLMocker) RequestNextPayload() {
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
@@ -430,6 +445,9 @@ func (cl *CLMocker) RequestNextPayload() {
 	}
 	if resp.PayloadStatus.LatestValidHash == nil || *resp.PayloadStatus.LatestValidHash != cl.LatestForkchoice.HeadBlockHash {
 		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated LatestValidHash Response from Payload builder: %v != %v", resp.PayloadStatus.LatestValidHash, cl.LatestForkchoice.HeadBlockHash)
+	}
+	if err = cl.AddPayloadID(resp.PayloadID); err != nil {
+		cl.Fatalf("CLMocker: Payload ID failure: %v", err)
 	}
 	cl.NextPayloadID = resp.PayloadID
 }
