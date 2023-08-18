@@ -714,6 +714,49 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
+	// ForkchoiceUpdatedV3 with modified BeaconRoot Attribute
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "ForkchoiceUpdatedV3 Modifies Payload ID on Different Beacon Root",
+			About: `
+			Test requesting a Cancun Payload using ForkchoiceUpdatedV3 twice with the beacon root
+			payload attribute as the only change between requests and verify that the payload ID is
+			different.
+			`,
+		},
+
+		CancunForkHeight: 1,
+
+		TestSequence: TestSequence{
+			SendBlobTransactions{
+				TransactionCount:              1,
+				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+				BlobTransactionMaxBlobGasCost: big.NewInt(100),
+			},
+			NewPayloads{
+				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{
+					PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
+						BeaconRoot: &(common.Hash{}),
+					},
+				},
+			},
+			SendBlobTransactions{
+				TransactionCount:              1,
+				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+				BlobTransactionMaxBlobGasCost: big.NewInt(100),
+			},
+			NewPayloads{
+				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{
+					PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
+						BeaconRoot: &(common.Hash{1}),
+					},
+				},
+			},
+		},
+	},
+
 	// GetPayloadV3 Before Cancun, Negative Tests
 	&CancunBaseSpec{
 		Spec: test.Spec{
