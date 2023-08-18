@@ -537,6 +537,235 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
+	// ForkchoiceUpdatedV3 before cancun
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "ForkchoiceUpdatedV3 Set Head to Shanghai Payload, Nil Payload Attributes",
+			About: `
+			Test sending ForkchoiceUpdatedV3 to set the head of the chain to a Shanghai payload:
+			- Send NewPayloadV2 with Shanghai payload on block 1
+			- Use ForkchoiceUpdatedV3 to set the head to the payload, with nil payload attributes
+
+			Verify that client returns no error.
+			`,
+		},
+
+		CancunForkHeight: 2,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				FcUOnHeadSet: &helper.UpgradeForkchoiceUpdatedVersion{
+					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{},
+				},
+				ExpectationDescription: `
+				ForkchoiceUpdatedV3 before Cancun returns no error without payload attributes
+				`,
+			},
+		},
+	},
+
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Nil Beacon Root",
+			About: `
+			Test sending ForkchoiceUpdatedV3 to request a Shanghai payload:
+			- Payload Attributes uses Shanghai timestamp
+			- Payload Attributes' Beacon Root is nil
+
+			Verify that client returns INVALID_PARAMS_ERROR.
+			`,
+		},
+
+		CancunForkHeight: 2,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				FcUOnPayloadRequest: &helper.UpgradeForkchoiceUpdatedVersion{
+					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
+						ExpectedError: INVALID_PARAMS_ERROR,
+					},
+				},
+				ExpectationDescription: fmt.Sprintf(`
+				ForkchoiceUpdatedV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
+				`, *INVALID_PARAMS_ERROR),
+			},
+		},
+	},
+
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Zero Beacon Root",
+			About: `
+			Test sending ForkchoiceUpdatedV3 to request a Shanghai payload:
+			- Payload Attributes uses Shanghai timestamp
+			- Payload Attributes' Beacon Root zero
+
+			Verify that client returns UNSUPPORTED_FORK_ERROR.
+			`,
+		},
+
+		CancunForkHeight: 2,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				FcUOnPayloadRequest: &helper.UpgradeForkchoiceUpdatedVersion{
+					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
+						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
+							BeaconRoot: &(common.Hash{}),
+						},
+						ExpectedError: UNSUPPORTED_FORK_ERROR,
+					},
+				},
+				ExpectationDescription: fmt.Sprintf(`
+				ForkchoiceUpdatedV3 before Cancun with beacon root must return UNSUPPORTED_FORK_ERROR (code %d)
+				`, *UNSUPPORTED_FORK_ERROR),
+			},
+		},
+	},
+
+	// ForkchoiceUpdatedV2 before cancun with beacon root
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "ForkchoiceUpdatedV2 To Request Shanghai Payload, Zero Beacon Root",
+			About: `
+			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
+			- Payload Attributes uses Shanghai timestamp
+			- Payload Attributes' Beacon Root zero
+
+			Verify that client returns INVALID_PARAMS_ERROR.
+			`,
+		},
+
+		CancunForkHeight: 1,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				FcUOnPayloadRequest: &helper.DowngradeForkchoiceUpdatedVersion{
+					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
+						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
+							BeaconRoot: &(common.Hash{}),
+						},
+						ExpectedError: INVALID_PARAMS_ERROR,
+					},
+				},
+				ExpectationDescription: fmt.Sprintf(`
+				ForkchoiceUpdatedV2 before Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
+				`, *INVALID_PARAMS_ERROR),
+			},
+		},
+	},
+
+	// ForkchoiceUpdatedV2 after cancun
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Zero Beacon Root",
+			About: `
+			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
+			- Payload Attributes uses Cancun timestamp
+			- Payload Attributes' Beacon Root zero
+
+			Verify that client returns INVALID_PARAMS_ERROR.
+			`,
+		},
+
+		CancunForkHeight: 1,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				FcUOnPayloadRequest: &helper.DowngradeForkchoiceUpdatedVersion{
+					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
+						ExpectedError: INVALID_PARAMS_ERROR,
+					},
+				},
+				ExpectationDescription: fmt.Sprintf(`
+				ForkchoiceUpdatedV2 after Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
+				`, *INVALID_PARAMS_ERROR),
+			},
+		},
+	},
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Nil Beacon Root",
+			About: `
+			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
+			- Payload Attributes uses Cancun timestamp
+			- Payload Attributes' Beacon Root nil (not provided)
+
+			Verify that client returns UNSUPPORTED_FORK_ERROR.
+			`,
+		},
+
+		CancunForkHeight: 1,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				FcUOnPayloadRequest: &helper.DowngradeForkchoiceUpdatedVersion{
+					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
+						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
+							RemoveBeaconRoot: true,
+						},
+						ExpectedError: UNSUPPORTED_FORK_ERROR,
+					},
+				},
+				ExpectationDescription: fmt.Sprintf(`
+				ForkchoiceUpdatedV2 after Cancun must return UNSUPPORTED_FORK_ERROR (code %d)
+				`, *UNSUPPORTED_FORK_ERROR),
+			},
+		},
+	},
+
+	// GetPayloadV3 Before Cancun, Negative Tests
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "GetPayloadV3 To Request Shanghai Payload",
+			About: `
+			Test requesting a Shanghai PayloadID using GetPayloadV3.
+			Verify that client returns UNSUPPORTED_FORK_ERROR.
+			`,
+		},
+
+		CancunForkHeight: 2,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				GetPayloadCustomizer: &helper.UpgradeGetPayloadVersion{
+					GetPayloadCustomizer: &helper.BaseGetPayloadCustomizer{
+						ExpectedError: UNSUPPORTED_FORK_ERROR,
+					},
+				},
+				ExpectationDescription: fmt.Sprintf(`
+				GetPayloadV3 To Request Shanghai Payload must return UNSUPPORTED_FORK_ERROR (code %d)
+				`, *UNSUPPORTED_FORK_ERROR),
+			},
+		},
+	},
+
+	// GetPayloadV2 After Cancun, Negative Tests
+	&CancunBaseSpec{
+		Spec: test.Spec{
+			Name: "GetPayloadV2 To Request Cancun Payload",
+			About: `
+			Test requesting a Cancun PayloadID using GetPayloadV2.
+			Verify that client returns UNSUPPORTED_FORK_ERROR.
+			`,
+		},
+
+		CancunForkHeight: 1,
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				GetPayloadCustomizer: &helper.DowngradeGetPayloadVersion{
+					GetPayloadCustomizer: &helper.BaseGetPayloadCustomizer{
+						ExpectedError: UNSUPPORTED_FORK_ERROR,
+					},
+				},
+				ExpectationDescription: fmt.Sprintf(`
+				GetPayloadV2 To Request Cancun Payload must return UNSUPPORTED_FORK_ERROR (code %d)
+				`, *UNSUPPORTED_FORK_ERROR),
+			},
+		},
+	},
+
 	// NewPayloadV3 Before Cancun, Negative Tests
 	&CancunBaseSpec{
 		Spec: test.Spec{
@@ -556,7 +785,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.UpgradeNewPayloadVersion{
 					NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 						VersionedHashesCustomizer: &VersionedHashes{
@@ -567,7 +795,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, INVALID_PARAMS_ERROR),
+				`, *INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -587,7 +815,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.UpgradeNewPayloadVersion{
 					NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 						PayloadCustomizer: &helper.CustomPayloadData{
@@ -598,7 +825,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, INVALID_PARAMS_ERROR),
+				`, *INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -618,7 +845,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.UpgradeNewPayloadVersion{
 					NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 						PayloadCustomizer: &helper.CustomPayloadData{
@@ -629,7 +855,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, INVALID_PARAMS_ERROR),
+				`, *INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -649,7 +875,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.UpgradeNewPayloadVersion{
 					NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 						VersionedHashesCustomizer: &VersionedHashes{
@@ -660,7 +885,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, INVALID_PARAMS_ERROR),
+				`, *INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -680,7 +905,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.UpgradeNewPayloadVersion{
 					NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 						PayloadCustomizer: &helper.CustomPayloadData{
@@ -691,7 +915,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, INVALID_PARAMS_ERROR),
+				`, *INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -711,7 +935,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.UpgradeNewPayloadVersion{
 					NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 						PayloadCustomizer: &helper.CustomPayloadData{
@@ -727,7 +950,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with no nil fields must return UNSUPPORTED_FORK_ERROR (code %d)
-				`, UNSUPPORTED_FORK_ERROR),
+				`, *UNSUPPORTED_FORK_ERROR),
 			},
 		},
 	},
@@ -749,7 +972,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						RemoveExcessBlobGas: true,
@@ -758,7 +980,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 after Cancun with nil ExcessBlobGas must return INVALID_PARAMS_ERROR (code %d)
-				`, INVALID_PARAMS_ERROR),
+				`, *INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -777,7 +999,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						RemoveBlobGasUsed: true,
@@ -786,7 +1007,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 after Cancun with nil BlobGasUsed must return INVALID_PARAMS_ERROR (code %d)
-				`, INVALID_PARAMS_ERROR),
+				`, *INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -805,7 +1026,6 @@ var Tests = []test.SpecInterface{
 
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						RemoveParentBeaconRoot: true,
@@ -814,7 +1034,7 @@ var Tests = []test.SpecInterface{
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 after Cancun with nil parentBeaconBlockRoot must return INVALID_PARAMS_ERROR (code %d)
-				`, INVALID_PARAMS_ERROR),
+				`, *INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -1065,8 +1285,7 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
-				ExpectedBlobs:             []helper.BlobID{},
+				ExpectedBlobs: []helper.BlobID{},
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					VersionedHashesCustomizer: &VersionedHashes{
 						Blobs: []helper.BlobID{0},
@@ -1382,8 +1601,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
-				ExpectedBlobs:             []helper.BlobID{},
+				ExpectedBlobs: []helper.BlobID{},
 			},
 
 			LaunchClients{
@@ -1416,7 +1634,6 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						BlobGasUsed: pUint64(1),
@@ -1436,7 +1653,6 @@ var Tests = []test.SpecInterface{
 		},
 		TestSequence: TestSequence{
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						BlobGasUsed: pUint64(GAS_PER_BLOB),
@@ -1584,7 +1800,7 @@ var Tests = []test.SpecInterface{
 		TestSequence: TestSequence{
 			// Get past the genesis
 			NewPayloads{
-				ExpectedIncludedBlobCount: 0,
+				PayloadCount: 1,
 			},
 			// Send multiple transactions with multiple blobs each
 			SendBlobTransactions{
