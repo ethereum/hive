@@ -50,11 +50,13 @@ type btHeader struct {
 	TransactionsTrie common.Hash      `json:"transactionsRoot"`
 	UncleHash        common.Hash      `json:"sha3Uncles"`
 	ExtraData        []byte           `json:"extraData"`
-	Difficulty       *big.Int         `json:"difficulty`
+	Difficulty       *big.Int         `json:"difficulty"`
 	GasLimit         uint64           `json:"gasLimit"`
 	GasUsed          uint64           `json:"gasUsed"`
 	Timestamp        *big.Int         `json:"timestamp"`
-	BaseFee          *big.Int         `json:"baseFeePerGas"`
+	BaseFee          *big.Int         `json:"baseFeePerGas"` // EIP-1559
+	ExcessBlobGas    uint64           `json:"excessBlobGas"` // EIP-4844
+	BlobGasUsed      uint64           `json:"blobGasUsed"`   // EIP-4844
 }
 
 func (b *btHeader) UnmarshalJSON(input []byte) error {
@@ -76,11 +78,13 @@ func (b *btHeader) UnmarshalJSON(input []byte) error {
 		UncleHash           *common.Hash          `json:"sha3Uncles"`       // name in std json
 		UncleHashAlt        *common.Hash          `json:"uncleHash"`        // name in blocktests
 		ExtraData           *hexutil.Bytes        `json:"extraData"`
-		Difficulty          *math.HexOrDecimal256 `json:"difficulty`
+		Difficulty          *math.HexOrDecimal256 `json:"difficulty"`
 		GasLimit            *math.HexOrDecimal64  `json:"gasLimit"`
 		GasUsed             *math.HexOrDecimal64  `json:"gasUsed"`
 		Timestamp           *math.HexOrDecimal256 `json:"timestamp"`
 		BaseFee             *math.HexOrDecimal256 `json:"baseFeePerGas"`
+		ExcessBlobGas       *math.HexOrDecimal64  `json:"excessBlobGas"`
+		BlobGasUsed         *math.HexOrDecimal64  `json:"blobGasUsed"`
 	}
 	var dec btHeader
 	if err := json.Unmarshal(input, &dec); err != nil {
@@ -146,6 +150,12 @@ func (b *btHeader) UnmarshalJSON(input []byte) error {
 	}
 	if dec.BaseFee != nil {
 		b.BaseFee = (*big.Int)(dec.BaseFee)
+	}
+	if dec.ExcessBlobGas != nil {
+		b.ExcessBlobGas = uint64(*dec.ExcessBlobGas)
+	}
+	if dec.BlobGasUsed != nil {
+		b.BlobGasUsed = uint64(*dec.BlobGasUsed)
 	}
 	return nil
 }

@@ -647,8 +647,11 @@ func compareGenesis(have string, want btHeader) (string, error) {
 	cmp(haveGenesis.ExtraData, want.ExtraData, "extraData")
 	cmp(haveGenesis.Difficulty, want.Difficulty, "difficulty")
 	cmp(haveGenesis.Timestamp, want.Timestamp, "timestamp")
-	cmp(haveGenesis.BaseFee, want.BaseFee, "baseFeePerGas")
 	cmp(haveGenesis.GasLimit, want.GasLimit, "gasLimit")
-	cmp(haveGenesis.GasUsed, want.GasUsed, "gasused")
+	cmp(haveGenesis.GasUsed, want.GasUsed, "gasUsed")
+	cmp(haveGenesis.Nonce, want.Nonce, "nonce")
+	cmp(haveGenesis.BaseFee, want.BaseFee, "baseFeePerGas")
+	cmp(haveGenesis.ExcessBlobGas, want.ExcessBlobGas, "excessBlobGas")
+	cmp(haveGenesis.BlobGasUsed, want.BlobGasUsed, "blobGasUsed")
 	return output, nil
 }
