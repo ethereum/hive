@@ -193,7 +193,10 @@ function selectWithOptions(api, colIdx, modifyRE) {
         .unique()
         .each(function (d) {
             d.split(',').forEach(function (d) {
-                options.add(d.trim());
+                d = d.trim();
+                if (d.length > 0) {
+                    options.add(d);
+                }
             });
         });
     Array.from(options.values()).sort().forEach(function (d) {
