@@ -191,7 +191,7 @@ func runDiscv5Test(t *hivesim.T, c *hivesim.Client) {
 
 	// Run the test tool.
 	_, pattern := t.Sim.TestPattern()
-	cmd := exec.Command("./devp2p", "discv5", "test", "--run", pattern, "--tap", "--remote", nodeURL, "--listen1", bridgeIP, "--listen2", net1IP)
+	cmd := exec.Command("./devp2p", "discv5", "test", "--run", pattern, "--tap", "--listen1", bridgeIP, "--listen2", net1IP, nodeURL)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}
