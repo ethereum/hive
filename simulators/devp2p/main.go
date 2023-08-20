@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"sync"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/shogo82148/go-tap"
@@ -151,19 +150,20 @@ func runSnapTest(t *hivesim.T, c *hivesim.Client) {
 
 const network = "network1"
 
-var createNetworkOnce sync.Once
+var networkCreated = make(map[hivesim.SuiteID]bool)
 
 // createNetwork ensures there is a separate network to be able to send the client traffic
 // from two separate IP addrs.
 func createTestNetwork(t *hivesim.T) (bridgeIP, net1IP string) {
-	createNetworkOnce.Do(func() {
+	if !networkCreated[t.SuiteID] {
 		if err := t.Sim.CreateNetwork(t.SuiteID, network); err != nil {
 			t.Fatal("can't create network:", err)
 		}
 		if err := t.Sim.ConnectContainer(t.SuiteID, network, "simulation"); err != nil {
 			t.Fatal("can't connect simulation to network1:", err)
 		}
-	})
+		networkCreated[t.SuiteID] = true
+	}
 	// Find our IPs on the bridge network and network1.
 	var err error
 	bridgeIP, err = t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
@@ -178,7 +178,6 @@ func createTestNetwork(t *hivesim.T) (bridgeIP, net1IP string) {
 }
 
 func runDiscv5Test(t *hivesim.T, c *hivesim.Client) {
-	createTestNetwork(t)
 	bridgeIP, net1IP := createTestNetwork(t)
 
 	nodeURL, err := c.EnodeURL()
@@ -199,7 +198,6 @@ func runDiscv5Test(t *hivesim.T, c *hivesim.Client) {
 }
 
 func runDiscv4Test(t *hivesim.T, c *hivesim.Client) {
-	createTestNetwork(t)
 	bridgeIP, net1IP := createTestNetwork(t)
 
 	nodeURL, err := c.EnodeURL()
