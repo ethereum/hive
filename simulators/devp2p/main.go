@@ -28,7 +28,40 @@ func main() {
 					"HIVE_LOGLEVEL":       "5",
 				},
 				AlwaysRun: true,
-				Run:       runDiscoveryTest,
+				Run:       runDiscv4Test,
+			},
+		},
+	}
+
+	discv5 := hivesim.Suite{
+		Name:        "discv5",
+		Description: "This suite runs Discovery v5 protocol tests.",
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Parameters: hivesim.Params{
+					"HIVE_NETWORK_ID":     "19763",
+					"HIVE_CHAIN_ID":       "19763",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_LOGLEVEL":       "5",
+				},
+				AlwaysRun: true,
+				Run:       runDiscv5Test,
+			},
+			hivesim.ClientTestSpec{
+				Role: "beacon",
+				Parameters: hivesim.Params{
+					"HIVE_LOGLEVEL": "5",
+				},
+				Files: map[string]string{
+					"/hive/input/genesis.ssz": "./init/beacon/genesis.ssz",
+					"/hive/input/config.yaml": "./init/beacon/config.yaml",
+				},
+				AlwaysRun: true,
+				Run:       runDiscv5Test,
 			},
 		},
 	}
@@ -89,7 +122,7 @@ Results from the test tool are reported as individual sub-tests.`,
 		},
 	}
 
-	hivesim.MustRun(hivesim.New(), discv4, eth, snap)
+	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap)
 }
 
 func runEthTest(t *hivesim.T, c *hivesim.Client) {
@@ -116,16 +149,13 @@ func runSnapTest(t *hivesim.T, c *hivesim.Client) {
 	}
 }
 
+const network = "network1"
+
 var createNetworkOnce sync.Once
 
-func runDiscoveryTest(t *hivesim.T, c *hivesim.Client) {
-	nodeURL, err := c.EnodeURL()
-	if err != nil {
-		t.Fatal("can't get client enode URL:", err)
-	}
-
-	// Create a separate network to be able to send the client traffic from two separate IP addrs.
-	const network = "network1"
+// createNetwork ensures there is a separate network to be able to send the client traffic
+// from two separate IP addrs.
+func createTestNetwork(t *hivesim.T) (bridgeIP, net1IP string) {
 	createNetworkOnce.Do(func() {
 		if err := t.Sim.CreateNetwork(t.SuiteID, network); err != nil {
 			t.Fatal("can't create network:", err)
@@ -134,19 +164,51 @@ func runDiscoveryTest(t *hivesim.T, c *hivesim.Client) {
 			t.Fatal("can't connect simulation to network1:", err)
 		}
 	})
-
-	// Connect both simulation and client to this network.
-	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
-		t.Fatal("can't connect client to network1:", err)
-	}
 	// Find our IPs on the bridge network and network1.
-	bridgeIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
+	var err error
+	bridgeIP, err = t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container:", err)
 	}
-	net1IP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
+	net1IP, err = t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container on network1:", err)
+	}
+	return bridgeIP, net1IP
+}
+
+func runDiscv5Test(t *hivesim.T, c *hivesim.Client) {
+	createTestNetwork(t)
+	bridgeIP, net1IP := createTestNetwork(t)
+
+	nodeURL, err := c.EnodeURL()
+	if err != nil {
+		t.Fatal("can't get client enode URL:", err)
+	}
+	// Connect client to the test network.
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
+		t.Fatal("can't connect client to network1:", err)
+	}
+
+	// Run the test tool.
+	_, pattern := t.Sim.TestPattern()
+	cmd := exec.Command("./devp2p", "discv5", "test", "--run", pattern, "--tap", "--remote", nodeURL, "--listen1", bridgeIP, "--listen2", net1IP)
+	if err := runTAP(t, c.Type, cmd); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runDiscv4Test(t *hivesim.T, c *hivesim.Client) {
+	createTestNetwork(t)
+	bridgeIP, net1IP := createTestNetwork(t)
+
+	nodeURL, err := c.EnodeURL()
+	if err != nil {
+		t.Fatal("can't get client enode URL:", err)
+	}
+	// Connect client to the test network.
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
+		t.Fatal("can't connect client to network1:", err)
 	}
 
 	// Run the test tool.
