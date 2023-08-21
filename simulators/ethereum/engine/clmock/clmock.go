@@ -265,21 +265,14 @@ func (cl *CLMocker) GetTimestampIncrement() uint64 {
 	return cl.BlockTimestampIncrement.Uint64()
 }
 
-var counter = 0
-
-// Returns the timestamp value to be included in the next payload attributes
+// Returns the next timestamp value to be included in the next payload attributes
 func (cl *CLMocker) GetNextBlockTimestamp() uint64 {
-
-	now := time.Now()
-	ret := uint64(now.Truncate(time.Minute).Add(5 * time.Second).Add(time.Duration(counter) * time.Second).Unix())
-	counter += 1
-	return ret
-	//if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
-	//	// We are producing the transition payload and there's a value specified
-	//	// for this specific payload
-	//	return cl.TransitionPayloadTimestamp.Uint64()
-	//}
-	//return cl.LatestHeader.Time + cl.GetTimestampIncrement()
+	if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
+		// We are producing the transition payload and there's a value specified
+		// for this specific payload
+		return cl.TransitionPayloadTimestamp.Uint64()
+	}
+	return cl.LatestHeader.Time + cl.GetTimestampIncrement()
 }
 
 // Picks the next payload producer from the set of clients registered
@@ -350,6 +343,7 @@ func (cl *CLMocker) RequestNextPayload() {
 	defer cancel()
 	var (
 		resp       api.ForkChoiceResponse
+		b          *client.Block
 		fcUVersion int
 		err        error
 	)
@@ -359,7 +353,10 @@ func (cl *CLMocker) RequestNextPayload() {
 			resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV2(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 
 		} else {
-			b, _ := cl.EngineClients[0].BlockByNumber(ctx, nil)
+			b, err = cl.EngineClients[0].BlockByNumber(ctx, nil)
+			if err != nil {
+				cl.Fatalf("Can't get latest block from the first client: %v", err)
+			}
 			latestBlockHash := b.Hash()
 			if cl.LatestForkchoice.HeadBlockHash != latestBlockHash {
 				cl.Fatalf("CLMocker: Latest forkchoice head block hash (%v) does not match latest block hash (%v)", cl.LatestForkchoice.HeadBlockHash.Hex(), latestBlockHash.Hex())
