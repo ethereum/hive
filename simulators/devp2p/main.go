@@ -1,11 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
-	"sync"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/shogo82148/go-tap"
@@ -28,7 +29,45 @@ func main() {
 					"HIVE_LOGLEVEL":       "5",
 				},
 				AlwaysRun: true,
-				Run:       runDiscoveryTest,
+				Run:       runDiscv4Test,
+			},
+		},
+	}
+
+	discv5 := hivesim.Suite{
+		Name:        "discv5",
+		Description: "This suite runs Discovery v5 protocol tests.",
+		Tests: []hivesim.AnyTest{
+			hivesim.ClientTestSpec{
+				Role: "eth1",
+				Parameters: hivesim.Params{
+					"HIVE_NETWORK_ID":     "19763",
+					"HIVE_CHAIN_ID":       "19763",
+					"HIVE_FORK_HOMESTEAD": "0",
+					"HIVE_FORK_TANGERINE": "0",
+					"HIVE_FORK_SPURIOUS":  "0",
+					"HIVE_FORK_BYZANTIUM": "0",
+					"HIVE_LOGLEVEL":       "5",
+				},
+				AlwaysRun: true,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					runDiscv5Test(t, c, (*hivesim.Client).EnodeURL)
+				},
+			},
+			hivesim.ClientTestSpec{
+				Role: "beacon",
+				Parameters: hivesim.Params{
+					"HIVE_LOGLEVEL":        "5",
+					"HIVE_CHECK_LIVE_PORT": "4000",
+				},
+				Files: map[string]string{
+					"/hive/input/genesis.ssz": "./init/beacon/genesis.ssz",
+					"/hive/input/config.yaml": "./init/beacon/config.yaml",
+				},
+				AlwaysRun: true,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					runDiscv5Test(t, c, getBeaconENR)
+				},
 			},
 		},
 	}
@@ -89,7 +128,7 @@ Results from the test tool are reported as individual sub-tests.`,
 		},
 	}
 
-	hivesim.MustRun(hivesim.New(), discv4, eth, snap)
+	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap)
 }
 
 func runEthTest(t *hivesim.T, c *hivesim.Client) {
@@ -116,37 +155,67 @@ func runSnapTest(t *hivesim.T, c *hivesim.Client) {
 	}
 }
 
-var createNetworkOnce sync.Once
+const network = "network1"
 
-func runDiscoveryTest(t *hivesim.T, c *hivesim.Client) {
-	nodeURL, err := c.EnodeURL()
-	if err != nil {
-		t.Fatal("can't get client enode URL:", err)
-	}
+var networkCreated = make(map[hivesim.SuiteID]bool)
 
-	// Create a separate network to be able to send the client traffic from two separate IP addrs.
-	const network = "network1"
-	createNetworkOnce.Do(func() {
+// createNetwork ensures there is a separate network to be able to send the client traffic
+// from two separate IP addrs.
+func createTestNetwork(t *hivesim.T) (bridgeIP, net1IP string) {
+	if !networkCreated[t.SuiteID] {
 		if err := t.Sim.CreateNetwork(t.SuiteID, network); err != nil {
 			t.Fatal("can't create network:", err)
 		}
 		if err := t.Sim.ConnectContainer(t.SuiteID, network, "simulation"); err != nil {
 			t.Fatal("can't connect simulation to network1:", err)
 		}
-	})
-
-	// Connect both simulation and client to this network.
-	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
-		t.Fatal("can't connect client to network1:", err)
+		networkCreated[t.SuiteID] = true
 	}
 	// Find our IPs on the bridge network and network1.
-	bridgeIP, err := t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
+	var err error
+	bridgeIP, err = t.Sim.ContainerNetworkIP(t.SuiteID, "bridge", "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container:", err)
 	}
-	net1IP, err := t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
+	net1IP, err = t.Sim.ContainerNetworkIP(t.SuiteID, network, "simulation")
 	if err != nil {
 		t.Fatal("can't get IP of simulation container on network1:", err)
+	}
+	return bridgeIP, net1IP
+}
+
+func runDiscv5Test(t *hivesim.T, c *hivesim.Client, getENR func(*hivesim.Client) (string, error)) {
+	bridgeIP, net1IP := createTestNetwork(t)
+
+	// Connect client to the test network.
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
+		t.Fatal("can't connect client to network1:", err)
+	}
+
+	nodeURL, err := getENR(c)
+	if err != nil {
+		t.Fatal("can't get client enode URL:", err)
+	}
+	t.Log("ENR:", nodeURL)
+
+	// Run the test tool.
+	_, pattern := t.Sim.TestPattern()
+	cmd := exec.Command("./devp2p", "discv5", "test", "--run", pattern, "--tap", "--listen1", bridgeIP, "--listen2", net1IP, nodeURL)
+	if err := runTAP(t, c.Type, cmd); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func runDiscv4Test(t *hivesim.T, c *hivesim.Client) {
+	bridgeIP, net1IP := createTestNetwork(t)
+
+	nodeURL, err := c.EnodeURL()
+	if err != nil {
+		t.Fatal("can't get client enode URL:", err)
+	}
+	// Connect client to the test network.
+	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
+		t.Fatal("can't connect client to network1:", err)
 	}
 
 	// Run the test tool.
@@ -203,4 +272,26 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 		result := hivesim.TestResult{Pass: test.Ok, Details: test.Diagnostic}
 		t.Sim.EndTest(t.SuiteID, testID, result)
 	}
+}
+
+func getBeaconENR(c *hivesim.Client) (string, error) {
+	url := fmt.Sprintf("http://%v:4000/eth/v1/node/identity", c.IP)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("HTTP request to get ENR failed with status code %d", resp.StatusCode)
+	}
+	var responseJSON struct {
+		Data struct {
+			ENR string `json:"enr"`
+		} `json:"data"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&responseJSON)
+	if err != nil {
+		return "", err
+	}
+	return responseJSON.Data.ENR, nil
 }
