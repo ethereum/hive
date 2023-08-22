@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"os/exec"
 
@@ -48,19 +50,24 @@ func main() {
 					"HIVE_LOGLEVEL":       "5",
 				},
 				AlwaysRun: true,
-				Run:       runDiscv5Test,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					runDiscv5Test(t, c, (*hivesim.Client).EnodeURL)
+				},
 			},
 			hivesim.ClientTestSpec{
 				Role: "beacon",
 				Parameters: hivesim.Params{
-					"HIVE_LOGLEVEL": "5",
+					"HIVE_LOGLEVEL":        "5",
+					"HIVE_CHECK_LIVE_PORT": "4000",
 				},
 				Files: map[string]string{
 					"/hive/input/genesis.ssz": "./init/beacon/genesis.ssz",
 					"/hive/input/config.yaml": "./init/beacon/config.yaml",
 				},
 				AlwaysRun: true,
-				Run:       runDiscv5Test,
+				Run: func(t *hivesim.T, c *hivesim.Client) {
+					runDiscv5Test(t, c, getBeaconENR)
+				},
 			},
 		},
 	}
@@ -177,17 +184,19 @@ func createTestNetwork(t *hivesim.T) (bridgeIP, net1IP string) {
 	return bridgeIP, net1IP
 }
 
-func runDiscv5Test(t *hivesim.T, c *hivesim.Client) {
+func runDiscv5Test(t *hivesim.T, c *hivesim.Client, getENR func(*hivesim.Client) (string, error)) {
 	bridgeIP, net1IP := createTestNetwork(t)
 
-	nodeURL, err := c.EnodeURL()
-	if err != nil {
-		t.Fatal("can't get client enode URL:", err)
-	}
 	// Connect client to the test network.
 	if err := t.Sim.ConnectContainer(t.SuiteID, network, c.Container); err != nil {
 		t.Fatal("can't connect client to network1:", err)
 	}
+
+	nodeURL, err := getENR(c)
+	if err != nil {
+		t.Fatal("can't get client enode URL:", err)
+	}
+	t.Log("ENR:", nodeURL)
 
 	// Run the test tool.
 	_, pattern := t.Sim.TestPattern()
@@ -263,4 +272,26 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 		result := hivesim.TestResult{Pass: test.Ok, Details: test.Diagnostic}
 		t.Sim.EndTest(t.SuiteID, testID, result)
 	}
+}
+
+func getBeaconENR(c *hivesim.Client) (string, error) {
+	url := fmt.Sprintf("http://%v:4000/eth/v1/node/identity", c.IP)
+	resp, err := http.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("HTTP request to get ENR failed with status code %d", resp.StatusCode)
+	}
+	var responseJSON struct {
+		Data struct {
+			ENR string `json:"enr"`
+		} `json:"data"`
+	}
+	err = json.NewDecoder(resp.Body).Decode(&responseJSON)
+	if err != nil {
+		return "", err
+	}
+	return responseJSON.Data.ENR, nil
 }
