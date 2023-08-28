@@ -476,15 +476,10 @@ func (v *ErigonGenesis) Alloc() GenesisAlloc {
 }
 
 func (v *ErigonGenesis) AllocGenesis(address common.Address, account Account) {
-	code := account.Code()
-	prefixed := "0x" + code
-	balance := account.Balance().String()
-	acc := ErigonAccount{
-		Balance: balance,
-		Code:    prefixed,
+	v.ErigonAlloc[address.Hex()] = ErigonAccount{
+		Balance: account.Balance().String(),
+		Code:    "0x" + account.Code(),
 	}
-	v.ErigonAlloc[address.Hex()] = acc
-
 }
 
 func (v *ErigonGenesis) UpdateTimestamp(timestamp string) {

@@ -909,20 +909,6 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 	r := t.TestEngine.TestStorageAt(WARM_COINBASE_ADDRESS, common.BigToHash(latestPayloadNumberBig), latestPayloadNumberBig)
 	p := t.TestEngine.TestStorageAt(PUSH0_ADDRESS, common.Hash{}, latestPayloadNumberBig)
 
-	// start client
-	client := getClient(t)
-	if client == nil {
-		t.Fatalf("Couldn't connect to client")
-		return
-	}
-	defer client.Close()
-	code, err := client.CodeAt(context.Background(), WARM_COINBASE_ADDRESS, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-	if err != nil {
-		t.Fatalf("")
-	}
-	codeHex := common.Bytes2Hex(code)
-	t.Logf(codeHex)
-	_ = codeHex
 	if latestPayloadNumber >= ws.WithdrawalsForkHeight {
 		// Shanghai
 		r.ExpectBigIntStorageEqual(big.NewInt(100))        // WARM_STORAGE_READ_COST
@@ -1137,13 +1123,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		return
 	}
 	defer client.Close()
-	code, err := client.CodeAt(context.Background(), WARM_COINBASE_ADDRESS, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
-	if err != nil {
-		t.Fatalf("")
-	}
-	codeHex := common.Bytes2Hex(code)
-	t.Logf(codeHex)
-	_ = codeHex
+
 	// Produce requested post-shanghai blocks:
 	// 1. Send some withdrawals and transactions
 	// 2. Check that contract withdrawable amount matches the expectations
