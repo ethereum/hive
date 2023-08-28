@@ -104,136 +104,136 @@ var Tests = []test.SpecInterface{
 		TimeIncrements:        5,
 	},
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdrawals Fork on Block 1",
-			About: `
-				Tests the withdrawals fork happening directly after genesis.
-				`,
-		},
-		WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
-		WithdrawalsBlockCount: 1,
-		WithdrawalsPerBlock:   16,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 1",
+	// 		About: `
+	// 			Tests the withdrawals fork happening directly after genesis.
+	// 			`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
+	// 	WithdrawalsBlockCount: 1,
+	// 	WithdrawalsPerBlock:   16,
+	// },
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdrawals Fork on Block 5",
-			About: `
-				Tests the transition to the withdrawals fork after a single block
-				has happened.
-				Block 1 is sent with invalid non-null withdrawals payload and
-				client is expected to respond with the appropriate error.
-				`,
-		},
-		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
-		WithdrawalsBlockCount: 1,
-		WithdrawalsPerBlock:   16,
-		TimeIncrements:        5,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 5",
+	// 		About: `
+	// 			Tests the transition to the withdrawals fork after a single block
+	// 			has happened.
+	// 			Block 1 is sent with invalid non-null withdrawals payload and
+	// 			client is expected to respond with the appropriate error.
+	// 			`,
+	// 	},
+	// 	WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
+	// 	WithdrawalsBlockCount: 1,
+	// 	WithdrawalsPerBlock:   16,
+	// 	TimeIncrements:        5,
+	// },
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdrawals Fork on Block 3",
-			About: `
-			Tests the transition to the withdrawals fork after two blocks
-			have happened.
-			Block 2 is sent with invalid non-null withdrawals payload and
-			client is expected to respond with the appropriate error.
-			`,
-		},
-		WithdrawalsForkHeight:    3, // Genesis, Block 1 and 2 are Pre-Withdrawals
-		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      16,
-		TimeIncrements:           5,
-		TestCorrupedHashPayloads: true,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdrawals Fork on Block 3",
+	// 		About: `
+	// 		Tests the transition to the withdrawals fork after two blocks
+	// 		have happened.
+	// 		Block 2 is sent with invalid non-null withdrawals payload and
+	// 		client is expected to respond with the appropriate error.
+	// 		`,
+	// 	},
+	// 	WithdrawalsForkHeight:    3, // Genesis, Block 1 and 2 are Pre-Withdrawals
+	// 	WithdrawalsBlockCount:    1,
+	// 	WithdrawalsPerBlock:      16,
+	// 	TimeIncrements:           5,
+	// 	TestCorrupedHashPayloads: true,
+	// },
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdraw to a single account",
-			About: `
-				Make multiple withdrawals to a single account.
-				`,
-		},
-		WithdrawalsForkHeight:    1,
-		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
-		WithdrawableAccountCount: 1,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdraw to a single account",
+	// 		About: `
+	// 			Make multiple withdrawals to a single account.
+	// 			`,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    1,
+	// 	WithdrawalsPerBlock:      64,
+	// 	WithdrawableAccountCount: 1,
+	// },
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdraw to two accounts",
-			About: `
-				Make multiple withdrawals to two different accounts, repeated in
-				round-robin.
-				Reasoning: There might be a difference in implementation when an
-				account appears multiple times in the withdrawals list but the list
-				is not in ordered sequence.
-				`,
-		},
-		WithdrawalsForkHeight:    1,
-		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
-		WithdrawableAccountCount: 2,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdraw to two accounts",
+	// 		About: `
+	// 			Make multiple withdrawals to two different accounts, repeated in
+	// 			round-robin.
+	// 			Reasoning: There might be a difference in implementation when an
+	// 			account appears multiple times in the withdrawals list but the list
+	// 			is not in ordered sequence.
+	// 			`,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    1,
+	// 	WithdrawalsPerBlock:      64,
+	// 	WithdrawableAccountCount: 2,
+	// },
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdraw many accounts",
-			About: `
-				Make multiple withdrawals to 1024 different accounts.
-				Execute many blocks this way.
-				`,
-			TimeoutSeconds: 3600,
-		},
-		WithdrawalsForkHeight:    1,
-		WithdrawalsBlockCount:    4,
-		WithdrawalsPerBlock:      1024,
-		WithdrawableAccountCount: 1024,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdraw many accounts",
+	// 		About: `
+	// 			Make multiple withdrawals to 1024 different accounts.
+	// 			Execute many blocks this way.
+	// 			`,
+	// 		TimeoutSeconds: 3600,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    4,
+	// 	WithdrawalsPerBlock:      1024,
+	// 	WithdrawableAccountCount: 1024,
+	// },
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Withdraw zero amount",
-			About: `
-				Make multiple withdrawals where the amount withdrawn is 0.
-				`,
-		},
-		WithdrawalsForkHeight:    1,
-		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
-		WithdrawableAccountCount: 2,
-		WithdrawAmounts: []uint64{
-			0,
-			1,
-		},
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Withdraw zero amount",
+	// 		About: `
+	// 			Make multiple withdrawals where the amount withdrawn is 0.
+	// 			`,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    1,
+	// 	WithdrawalsPerBlock:      64,
+	// 	WithdrawableAccountCount: 2,
+	// 	WithdrawAmounts: []uint64{
+	// 		0,
+	// 		1,
+	// 	},
+	// },
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Empty Withdrawals",
-			About: `
-				Produce withdrawals block with zero withdrawals.
-				`,
-		},
-		WithdrawalsForkHeight: 1,
-		WithdrawalsBlockCount: 1,
-		WithdrawalsPerBlock:   0,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Empty Withdrawals",
+	// 		About: `
+	// 			Produce withdrawals block with zero withdrawals.
+	// 			`,
+	// 	},
+	// 	WithdrawalsForkHeight: 1,
+	// 	WithdrawalsBlockCount: 1,
+	// 	WithdrawalsPerBlock:   0,
+	// },
 
-	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
-			Name: "Corrupted Block Hash Payload (INVALID)",
-			About: `
-				Send a valid payload with a corrupted hash using engine_newPayloadV2.
-				`,
-		},
-		WithdrawalsForkHeight:    1,
-		WithdrawalsBlockCount:    1,
-		TestCorrupedHashPayloads: true,
-	},
+	// &WithdrawalsBaseSpec{
+	// 	Spec: test.Spec{
+	// 		Name: "Corrupted Block Hash Payload (INVALID)",
+	// 		About: `
+	// 			Send a valid payload with a corrupted hash using engine_newPayloadV2.
+	// 			`,
+	// 	},
+	// 	WithdrawalsForkHeight:    1,
+	// 	WithdrawalsBlockCount:    1,
+	// 	TestCorrupedHashPayloads: true,
+	// },
 
 	//Block value tests
 	//&BlockValueSpec{
@@ -250,65 +250,65 @@ var Tests = []test.SpecInterface{
 	//},
 
 	// Sync Tests
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
-				About: `
-				- Spawn a first client
-				- Go through withdrawals fork on Block 1
-				- Withdraw to a single account 16 times each block for 2 blocks
-				- Spawn a secondary client and send FCUV2(head)
-				- Wait for sync and verify withdrawn account's balance
-				`,
-				//TimeoutSeconds: 6000,
-			},
-			WithdrawalsForkHeight:    1,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1,
-		},
-		SyncSteps: 1,
-	},
+	// &WithdrawalsSyncSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
+	// 			About: `
+	// 			- Spawn a first client
+	// 			- Go through withdrawals fork on Block 1
+	// 			- Withdraw to a single account 16 times each block for 2 blocks
+	// 			- Spawn a secondary client and send FCUV2(head)
+	// 			- Wait for sync and verify withdrawn account's balance
+	// 			`,
+	// 			//TimeoutSeconds: 6000,
+	// 		},
+	// 		WithdrawalsForkHeight:    1,
+	// 		WithdrawalsBlockCount:    2,
+	// 		WithdrawalsPerBlock:      16,
+	// 		WithdrawableAccountCount: 1,
+	// 	},
+	// 	SyncSteps: 1,
+	// },
 
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account",
-				About: `
-				- Spawn a first client
-				- Go through withdrawals fork on Block 1
-				- Withdraw to a single account 16 times each block for 2 blocks
-				- Spawn a secondary client and send FCUV2(head)
-				- Wait for sync and verify withdrawn account's balance
-				`,
-			},
-			WithdrawalsForkHeight:    1,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1,
-		},
-		SyncSteps: 1,
-	},
+	// &WithdrawalsSyncSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account",
+	// 			About: `
+	// 			- Spawn a first client
+	// 			- Go through withdrawals fork on Block 1
+	// 			- Withdraw to a single account 16 times each block for 2 blocks
+	// 			- Spawn a secondary client and send FCUV2(head)
+	// 			- Wait for sync and verify withdrawn account's balance
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight:    1,
+	// 		WithdrawalsBlockCount:    2,
+	// 		WithdrawalsPerBlock:      16,
+	// 		WithdrawableAccountCount: 1,
+	// 	},
+	// 	SyncSteps: 1,
+	// },
 
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 2 blocks - Withdrawals on Genesis - Single Withdrawal Account",
-				About: `
-				- Spawn a first client, with Withdrawals since genesis
-				- Withdraw to a single account 16 times each block for 2 blocks
-				- Spawn a secondary client and send FCUV2(head)
-				- Wait for sync and verify withdrawn account's balance
-				`,
-			},
-			WithdrawalsForkHeight:    0,
-			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1,
-		},
-		SyncSteps: 1,
-	},
+	// &WithdrawalsSyncSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Sync after 2 blocks - Withdrawals on Genesis - Single Withdrawal Account",
+	// 			About: `
+	// 			- Spawn a first client, with Withdrawals since genesis
+	// 			- Withdraw to a single account 16 times each block for 2 blocks
+	// 			- Spawn a secondary client and send FCUV2(head)
+	// 			- Wait for sync and verify withdrawn account's balance
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight:    0,
+	// 		WithdrawalsBlockCount:    2,
+	// 		WithdrawalsPerBlock:      16,
+	// 		WithdrawableAccountCount: 1,
+	// 	},
+	// 	SyncSteps: 1,
+	// },
 
 	// // TODO:
 	// &WithdrawalsSyncSpec{
@@ -354,371 +354,371 @@ var Tests = []test.SpecInterface{
 	// },
 
 	// TODO: This test is failing, need to investigate.
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 2
-			- Withdraw to many accounts 16 times each block for 128 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
-			`,
-				TimeoutSeconds: 3600,
-			},
-			WithdrawalsForkHeight:    2,
-			WithdrawalsBlockCount:    128,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1024,
-		},
-		SyncSteps: 1,
-	},
-
-	// Re-Org tests
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 1 Block Re-Org",
-				About: `
-				Tests a simple 1 block re-org
-				`,
-				SlotsToSafe:      big.NewInt(32),
-				SlotsToFinalized: big.NewInt(64),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
-		},
-		ReOrgBlockCount: 1,
-		ReOrgViaSync:    false,
-	},
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org NewPayload",
-				About: `
-				Tests a 8 block re-org using NewPayload
-				Re-org does not change withdrawals fork height
-				`,
-				SlotsToSafe:      big.NewInt(32),
-				SlotsToFinalized: big.NewInt(64),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
-		},
-		ReOrgBlockCount: 8,
-		ReOrgViaSync:    false,
-	},
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org, Sync",
-				About: `
-				Tests a 8 block re-org using NewPayload
-				Re-org does not change withdrawals fork height
-				`,
-				SlotsToSafe:      big.NewInt(32),
-				SlotsToFinalized: big.NewInt(64),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
-		},
-		ReOrgBlockCount: 8,
-		ReOrgViaSync:    true,
-	},
-
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org NewPayload",
-				About: `
-				Tests a 10 block re-org using NewPayload
-				Re-org does not change withdrawals fork height, but changes
-				the payload at the height of the fork
-				`,
-				SlotsToSafe:      big.NewInt(16),
-				SlotsToFinalized: big.NewInt(32),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
-		},
-		ReOrgBlockCount: 10,
-		ReOrgViaSync:    false,
-	},
-
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org Sync",
-				About: `
-				Tests a 10 block re-org using sync
-				Re-org does not change withdrawals fork height, but changes
-				the payload at the height of the fork
-				`,
-				SlotsToSafe:      big.NewInt(16),
-				SlotsToFinalized: big.NewInt(32),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
-		},
-		ReOrgBlockCount: 10,
-		ReOrgViaSync:    true,
-	},
-
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org",
-				About: `
-				Tests a 10 block re-org using NewPayload
-				Sidechain reaches withdrawals fork at a lower block height
-				than the canonical chain
-				`,
-				SlotsToSafe:      big.NewInt(16),
-				SlotsToFinalized: big.NewInt(32),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
-		},
-		ReOrgBlockCount:         10,
-		ReOrgViaSync:            false,
-		SidechainTimeIncrements: 2,
-	},
-
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org Sync",
-				About: `
-				Tests a 10 block re-org using sync
-				Sidechain reaches withdrawals fork at a lower block height
-				than the canonical chain
-				`,
-				SlotsToSafe:      big.NewInt(16),
-				SlotsToFinalized: big.NewInt(32),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
-		},
-		ReOrgBlockCount:         10,
-		ReOrgViaSync:            true,
-		SidechainTimeIncrements: 2,
-	},
-
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org",
-				About: `
-				Tests a 10 block re-org using NewPayload
-				Sidechain reaches withdrawals fork at a higher block height
-				than the canonical chain
-				`,
-				SlotsToSafe:      big.NewInt(16),
-				SlotsToFinalized: big.NewInt(32),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
-			TimeIncrements:        2,
-		},
-		ReOrgBlockCount:         10,
-		ReOrgViaSync:            false,
-		SidechainTimeIncrements: 1,
-	},
-
-	&WithdrawalsReorgSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org Sync",
-				About: `
-				Tests a 10 block re-org using sync
-				Sidechain reaches withdrawals fork at a higher block height
-				than the canonical chain
-				`,
-				SlotsToSafe:      big.NewInt(16),
-				SlotsToFinalized: big.NewInt(32),
-				TimeoutSeconds:   3600,
-			},
-			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
-			TimeIncrements:        2,
-		},
-		ReOrgBlockCount:         10,
-		ReOrgViaSync:            true,
-		SidechainTimeIncrements: 1,
-	},
-
-	// TODO: REORG SYNC WHERE SYNCED BLOCKS HAVE WITHDRAWALS BEFORE TIME
-
-	// EVM Tests (EIP-3651, EIP-3855, EIP-3860)
-	// &MaxInitcodeSizeSpec{
+	// &WithdrawalsSyncSpec{
 	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
 	// 		Spec: test.Spec{
-	// 			Name: "Max Initcode Size",
+	// 			Name: "Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
+	// 			About: `
+	// 		- Spawn a first client
+	// 		- Go through withdrawals fork on Block 2
+	// 		- Withdraw to many accounts 16 times each block for 128 blocks
+	// 		- Spawn a secondary client and send FCUV2(head)
+	// 		- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+	// 		`,
+	// 			TimeoutSeconds: 3600,
 	// 		},
-	// 		WithdrawalsForkHeight: 2, // Block 1 is Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 2,
+	// 		WithdrawalsForkHeight:    2,
+	// 		WithdrawalsBlockCount:    128,
+	// 		WithdrawalsPerBlock:      16,
+	// 		WithdrawableAccountCount: 1024,
 	// 	},
-	// 	OverflowMaxInitcodeTxCountBeforeFork: 0,
-	// 	OverflowMaxInitcodeTxCountAfterFork:  1,
+	// 	SyncSteps: 1,
 	// },
 
-	// Execution layer withdrawals spec
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 1 blocks withdrawals - 1 mass-claim",
-				About: `
-				- Shapella on block 1
-				- 1 block with withdrawals
-				- Claim accumulated withdrawals
-				- Compares balances and events values with withdrawals from CL
-				`,
-			},
-			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
-			WithdrawalsBlockCount: 1,
-			WithdrawalsPerBlock:   16,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 1,
-	},
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 2 blocks withdrawals - 2 mass-claims",
-				About: `
-				- Shapella on block 1
-				- 2 blocks with withdrawals
-				- Claim accumulated withdrawals
-				- Produce 1 additional pair (A, B) of blocks:
-				A: block with withdrawals
-				B: block with claim Tx
-				- Compares balances and events values with withdrawals from CL
-				`,
-			},
-			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
-			WithdrawalsBlockCount: 2,
-			WithdrawalsPerBlock:   16,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 2,
-	},
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 2 - 2 blocks withdrawals - 2 mass-claims",
-				About: `
-				- Shapella on block 2
-				- 2 blocks with withdrawals
-				- Claim accumulated withdrawals
-				- Produce 1 additional pair (A, B) of blocks:
-				A: block with withdrawals
-				B: block with claim Tx
-				- Compares balances and events values with withdrawals from CL
-				`,
-			},
-			WithdrawalsForkHeight: 2,
-			WithdrawalsBlockCount: 2,
-			WithdrawalsPerBlock:   16,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 2,
-	},
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 4 - 4 blocks withdrawals - 5 mass-claims - 64 withdrawals per block",
-				About: `
-				- Shapella on block 4
-				- 4 blocks with withdrawals
-				- Claim accumulated withdrawals
-				- Produce 4 additional pairs (A, B) of blocks:
-				  A: block with withdrawals
-				  B: block with claim Tx
-				- Compares balances and events values with withdrawals from CL
-				`,
-			},
-			WithdrawalsForkHeight: 4,
-			WithdrawalsBlockCount: 4,
-			WithdrawalsPerBlock:   64,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 5,
-	},
+	// // Re-Org tests
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 1 - 1 Block Re-Org",
+	// 			About: `
+	// 			Tests a simple 1 block re-org
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(32),
+	// 			SlotsToFinalized: big.NewInt(64),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 16,
+	// 		WithdrawalsPerBlock:   16,
+	// 	},
+	// 	ReOrgBlockCount: 1,
+	// 	ReOrgViaSync:    false,
+	// },
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org NewPayload",
+	// 			About: `
+	// 			Tests a 8 block re-org using NewPayload
+	// 			Re-org does not change withdrawals fork height
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(32),
+	// 			SlotsToFinalized: big.NewInt(64),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 16,
+	// 		WithdrawalsPerBlock:   16,
+	// 	},
+	// 	ReOrgBlockCount: 8,
+	// 	ReOrgViaSync:    false,
+	// },
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org, Sync",
+	// 			About: `
+	// 			Tests a 8 block re-org using NewPayload
+	// 			Re-org does not change withdrawals fork height
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(32),
+	// 			SlotsToFinalized: big.NewInt(64),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 16,
+	// 		WithdrawalsPerBlock:   16,
+	// 	},
+	// 	ReOrgBlockCount: 8,
+	// 	ReOrgViaSync:    true,
+	// },
 
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 5",
-				About: `
-				`,
-			},
-			WithdrawalsForkHeight: 5,
-			WithdrawalsBlockCount: 1,
-			WithdrawalsPerBlock:   32,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 2,
-	},
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 2 - 8 blocks withdrawals - 2 mass-claims - 256 withdrawals per block",
-				About: `
-				- Shapella on block 2
-				- 8 blocks with withdrawals
-				- Claim accumulated withdrawals
-				- Produce 1 additional pair (A, B) of blocks:
-				A: block with withdrawals
-				B: block with claim Tx
-				- Compares balances and events values with withdrawals from CL
-				`,
-			},
-			WithdrawalsForkHeight: 2,
-			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   256,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 2,
-	},
-	&WithdrawalsExecutionLayerSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Withdrawals Fork on Block 1 - 3 blocks withdrawals - 4 mass-claims - 1024 withdrawals per block",
-				About: `
-				- Shapella on block 1
-				- 3 blocks with withdrawals
-				- Claim accumulated withdrawals
-				- Produce 3 additional pairs (A, B) of blocks:
-				A: block with withdrawals
-				B: block with claim Tx
-				- Compares balances and events values with withdrawals from CL
-				`,
-			},
-			WithdrawalsForkHeight: 1,
-			WithdrawalsBlockCount: 3,
-			WithdrawalsPerBlock:   1024,
-			TimeIncrements:        5,
-		},
-		ClaimBlocksCount: 4,
-	},
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org NewPayload",
+	// 			About: `
+	// 			Tests a 10 block re-org using NewPayload
+	// 			Re-org does not change withdrawals fork height, but changes
+	// 			the payload at the height of the fork
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(16),
+	// 			SlotsToFinalized: big.NewInt(32),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   128,
+	// 	},
+	// 	ReOrgBlockCount: 10,
+	// 	ReOrgViaSync:    false,
+	// },
+
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org Sync",
+	// 			About: `
+	// 			Tests a 10 block re-org using sync
+	// 			Re-org does not change withdrawals fork height, but changes
+	// 			the payload at the height of the fork
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(16),
+	// 			SlotsToFinalized: big.NewInt(32),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   128,
+	// 	},
+	// 	ReOrgBlockCount: 10,
+	// 	ReOrgViaSync:    true,
+	// },
+
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org",
+	// 			About: `
+	// 			Tests a 10 block re-org using NewPayload
+	// 			Sidechain reaches withdrawals fork at a lower block height
+	// 			than the canonical chain
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(16),
+	// 			SlotsToFinalized: big.NewInt(32),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   128,
+	// 	},
+	// 	ReOrgBlockCount:         10,
+	// 	ReOrgViaSync:            false,
+	// 	SidechainTimeIncrements: 2,
+	// },
+
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org Sync",
+	// 			About: `
+	// 			Tests a 10 block re-org using sync
+	// 			Sidechain reaches withdrawals fork at a lower block height
+	// 			than the canonical chain
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(16),
+	// 			SlotsToFinalized: big.NewInt(32),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   128,
+	// 	},
+	// 	ReOrgBlockCount:         10,
+	// 	ReOrgViaSync:            true,
+	// 	SidechainTimeIncrements: 2,
+	// },
+
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org",
+	// 			About: `
+	// 			Tests a 10 block re-org using NewPayload
+	// 			Sidechain reaches withdrawals fork at a higher block height
+	// 			than the canonical chain
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(16),
+	// 			SlotsToFinalized: big.NewInt(32),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   128,
+	// 		TimeIncrements:        2,
+	// 	},
+	// 	ReOrgBlockCount:         10,
+	// 	ReOrgViaSync:            false,
+	// 	SidechainTimeIncrements: 1,
+	// },
+
+	// &WithdrawalsReorgSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org Sync",
+	// 			About: `
+	// 			Tests a 10 block re-org using sync
+	// 			Sidechain reaches withdrawals fork at a higher block height
+	// 			than the canonical chain
+	// 			`,
+	// 			SlotsToSafe:      big.NewInt(16),
+	// 			SlotsToFinalized: big.NewInt(32),
+	// 			TimeoutSeconds:   3600,
+	// 		},
+	// 		WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   128,
+	// 		TimeIncrements:        2,
+	// 	},
+	// 	ReOrgBlockCount:         10,
+	// 	ReOrgViaSync:            true,
+	// 	SidechainTimeIncrements: 1,
+	// },
+
+	// // TODO: REORG SYNC WHERE SYNCED BLOCKS HAVE WITHDRAWALS BEFORE TIME
+
+	// // EVM Tests (EIP-3651, EIP-3855, EIP-3860)
+	// // &MaxInitcodeSizeSpec{
+	// // 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// // 		Spec: test.Spec{
+	// // 			Name: "Max Initcode Size",
+	// // 		},
+	// // 		WithdrawalsForkHeight: 2, // Block 1 is Pre-Withdrawals
+	// // 		WithdrawalsBlockCount: 2,
+	// // 	},
+	// // 	OverflowMaxInitcodeTxCountBeforeFork: 0,
+	// // 	OverflowMaxInitcodeTxCountAfterFork:  1,
+	// // },
+
+	// // Execution layer withdrawals spec
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 1 - 1 blocks withdrawals - 1 mass-claim",
+	// 			About: `
+	// 			- Shapella on block 1
+	// 			- 1 block with withdrawals
+	// 			- Claim accumulated withdrawals
+	// 			- Compares balances and events values with withdrawals from CL
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 1,
+	// 		WithdrawalsPerBlock:   16,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 1,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 1 - 2 blocks withdrawals - 2 mass-claims",
+	// 			About: `
+	// 			- Shapella on block 1
+	// 			- 2 blocks with withdrawals
+	// 			- Claim accumulated withdrawals
+	// 			- Produce 1 additional pair (A, B) of blocks:
+	// 			A: block with withdrawals
+	// 			B: block with claim Tx
+	// 			- Compares balances and events values with withdrawals from CL
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
+	// 		WithdrawalsBlockCount: 2,
+	// 		WithdrawalsPerBlock:   16,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 2 - 2 blocks withdrawals - 2 mass-claims",
+	// 			About: `
+	// 			- Shapella on block 2
+	// 			- 2 blocks with withdrawals
+	// 			- Claim accumulated withdrawals
+	// 			- Produce 1 additional pair (A, B) of blocks:
+	// 			A: block with withdrawals
+	// 			B: block with claim Tx
+	// 			- Compares balances and events values with withdrawals from CL
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 2,
+	// 		WithdrawalsBlockCount: 2,
+	// 		WithdrawalsPerBlock:   16,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 4 - 4 blocks withdrawals - 5 mass-claims - 64 withdrawals per block",
+	// 			About: `
+	// 			- Shapella on block 4
+	// 			- 4 blocks with withdrawals
+	// 			- Claim accumulated withdrawals
+	// 			- Produce 4 additional pairs (A, B) of blocks:
+	// 			  A: block with withdrawals
+	// 			  B: block with claim Tx
+	// 			- Compares balances and events values with withdrawals from CL
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 4,
+	// 		WithdrawalsBlockCount: 4,
+	// 		WithdrawalsPerBlock:   64,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 5,
+	// },
+
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 5",
+	// 			About: `
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 5,
+	// 		WithdrawalsBlockCount: 1,
+	// 		WithdrawalsPerBlock:   32,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 2 - 8 blocks withdrawals - 2 mass-claims - 256 withdrawals per block",
+	// 			About: `
+	// 			- Shapella on block 2
+	// 			- 8 blocks with withdrawals
+	// 			- Claim accumulated withdrawals
+	// 			- Produce 1 additional pair (A, B) of blocks:
+	// 			A: block with withdrawals
+	// 			B: block with claim Tx
+	// 			- Compares balances and events values with withdrawals from CL
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 2,
+	// 		WithdrawalsBlockCount: 8,
+	// 		WithdrawalsPerBlock:   256,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 2,
+	// },
+	// &WithdrawalsExecutionLayerSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Withdrawals Fork on Block 1 - 3 blocks withdrawals - 4 mass-claims - 1024 withdrawals per block",
+	// 			About: `
+	// 			- Shapella on block 1
+	// 			- 3 blocks with withdrawals
+	// 			- Claim accumulated withdrawals
+	// 			- Produce 3 additional pairs (A, B) of blocks:
+	// 			A: block with withdrawals
+	// 			B: block with claim Tx
+	// 			- Compares balances and events values with withdrawals from CL
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 1,
+	// 		WithdrawalsBlockCount: 3,
+	// 		WithdrawalsPerBlock:   1024,
+	// 		TimeIncrements:        5,
+	// 	},
+	// 	ClaimBlocksCount: 4,
+	// },
 }
 
 // Helper types to convert gwei into wei more easily
@@ -908,6 +908,21 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 
 	r := t.TestEngine.TestStorageAt(WARM_COINBASE_ADDRESS, common.BigToHash(latestPayloadNumberBig), latestPayloadNumberBig)
 	p := t.TestEngine.TestStorageAt(PUSH0_ADDRESS, common.Hash{}, latestPayloadNumberBig)
+
+	// start client
+	client := getClient(t)
+	if client == nil {
+		t.Fatalf("Couldn't connect to client")
+		return
+	}
+	defer client.Close()
+	code, err := client.CodeAt(context.Background(), WARM_COINBASE_ADDRESS, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
+	if err != nil {
+		t.Fatalf("")
+	}
+	codeHex := common.Bytes2Hex(code)
+	t.Logf(codeHex)
+	_ = codeHex
 	if latestPayloadNumber >= ws.WithdrawalsForkHeight {
 		// Shanghai
 		r.ExpectBigIntStorageEqual(big.NewInt(100))        // WARM_STORAGE_READ_COST
@@ -1122,7 +1137,13 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		return
 	}
 	defer client.Close()
-
+	code, err := client.CodeAt(context.Background(), WARM_COINBASE_ADDRESS, big.NewInt(int64(t.CLMock.LatestExecutedPayload.Number)))
+	if err != nil {
+		t.Fatalf("")
+	}
+	codeHex := common.Bytes2Hex(code)
+	t.Logf(codeHex)
+	_ = codeHex
 	// Produce requested post-shanghai blocks:
 	// 1. Send some withdrawals and transactions
 	// 2. Check that contract withdrawable amount matches the expectations

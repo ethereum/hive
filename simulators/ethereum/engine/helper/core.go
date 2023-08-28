@@ -101,7 +101,7 @@ func (a Account) Code() string {
 	if !ok {
 		return ""
 	}
-	return fmt.Sprintf("%x", code.(string))
+	return code.(string)
 }
 
 func (a Account) SetCode(code []byte) {
@@ -377,6 +377,7 @@ type ErigonConfig struct {
 type ErigonAccount struct {
 	Balance     string `json:"balance"`
 	Constructor string `json:"constructor,omitempty"`
+	Code        string `json:"code"`
 }
 
 type ErigonGenesis struct {
@@ -475,10 +476,15 @@ func (v *ErigonGenesis) Alloc() GenesisAlloc {
 }
 
 func (v *ErigonGenesis) AllocGenesis(address common.Address, account Account) {
-	v.ErigonAlloc[address.Hex()] = ErigonAccount{
-		Balance:     account.Balance().String(),
-		Constructor: account.Constructor(),
+	code := account.Code()
+	prefixed := "0x" + code
+	balance := account.Balance().String()
+	acc := ErigonAccount{
+		Balance: balance,
+		Code:    prefixed,
 	}
+	v.ErigonAlloc[address.Hex()] = acc
+
 }
 
 func (v *ErigonGenesis) UpdateTimestamp(timestamp string) {
