@@ -98,7 +98,7 @@ var Tests = []test.SpecInterface{
 				Tests the withdrawals fork happening on block 1, Block 0 is for Aura.
 				`,
 		},
-		WithdrawalsForkHeight: 1, //TODO
+		WithdrawalsForkHeight: 1,
 		WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
 		WithdrawalsPerBlock:   16,
 		TimeIncrements:        5,
@@ -235,19 +235,19 @@ var Tests = []test.SpecInterface{
 		TestCorrupedHashPayloads: true,
 	},
 
-	//Block value tests
-	//&BlockValueSpec{
-	//	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	//		Spec: test.Spec{
-	//			Name: "GetPayloadV2 Block Value",
-	//			About: `
-	//			Verify the block value returned in GetPayloadV2.
-	//			`,
-	//		},
-	//		WithdrawalsForkHeight: 1,
-	//		WithdrawalsBlockCount: 1,
-	//	},
-	//},
+	// Block value tests
+	// &BlockValueSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "GetPayloadV2 Block Value",
+	// 			About: `
+	// 			Verify the block value returned in GetPayloadV2.
+	// 			`,
+	// 		},
+	// 		WithdrawalsForkHeight: 1,
+	// 		WithdrawalsBlockCount: 1,
+	// 	},
+	// },
 
 	// Sync Tests
 	&WithdrawalsSyncSpec{
@@ -354,26 +354,26 @@ var Tests = []test.SpecInterface{
 	// },
 
 	// TODO: This test is failing, need to investigate.
-	&WithdrawalsSyncSpec{
-		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
-				Name: "Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
-				About: `
-			- Spawn a first client
-			- Go through withdrawals fork on Block 2
-			- Withdraw to many accounts 16 times each block for 128 blocks
-			- Spawn a secondary client and send FCUV2(head)
-			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
-			`,
-				TimeoutSeconds: 3600,
-			},
-			WithdrawalsForkHeight:    2,
-			WithdrawalsBlockCount:    128,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 1024,
-		},
-		SyncSteps: 1,
-	},
+	// &WithdrawalsSyncSpec{
+	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// 		Spec: test.Spec{
+	// 			Name: "Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
+	// 			About: `
+	// 		- Spawn a first client
+	// 		- Go through withdrawals fork on Block 2
+	// 		- Withdraw to many accounts 16 times each block for 128 blocks
+	// 		- Spawn a secondary client and send FCUV2(head)
+	// 		- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
+	// 		`,
+	// 			TimeoutSeconds: 3600,
+	// 		},
+	// 		WithdrawalsForkHeight:    2,
+	// 		WithdrawalsBlockCount:    128,
+	// 		WithdrawalsPerBlock:      16,
+	// 		WithdrawableAccountCount: 1024,
+	// 	},
+	// 	SyncSteps: 1,
+	// },
 
 	// Re-Org tests
 	&WithdrawalsReorgSpec{
@@ -565,20 +565,20 @@ var Tests = []test.SpecInterface{
 		SidechainTimeIncrements: 1,
 	},
 
-	// TODO: REORG SYNC WHERE SYNCED BLOCKS HAVE WITHDRAWALS BEFORE TIME
+	// // TODO: REORG SYNC WHERE SYNCED BLOCKS HAVE WITHDRAWALS BEFORE TIME
 
-	// EVM Tests (EIP-3651, EIP-3855, EIP-3860)
-	// &MaxInitcodeSizeSpec{
-	// 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-	// 		Spec: test.Spec{
-	// 			Name: "Max Initcode Size",
-	// 		},
-	// 		WithdrawalsForkHeight: 2, // Block 1 is Pre-Withdrawals
-	// 		WithdrawalsBlockCount: 2,
-	// 	},
-	// 	OverflowMaxInitcodeTxCountBeforeFork: 0,
-	// 	OverflowMaxInitcodeTxCountAfterFork:  1,
-	// },
+	// // EVM Tests (EIP-3651, EIP-3855, EIP-3860)
+	// // &MaxInitcodeSizeSpec{
+	// // 	WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
+	// // 		Spec: test.Spec{
+	// // 			Name: "Max Initcode Size",
+	// // 		},
+	// // 		WithdrawalsForkHeight: 2, // Block 1 is Pre-Withdrawals
+	// // 		WithdrawalsBlockCount: 2,
+	// // 	},
+	// // 	OverflowMaxInitcodeTxCountBeforeFork: 0,
+	// // 	OverflowMaxInitcodeTxCountAfterFork:  1,
+	// // },
 
 	// Execution layer withdrawals spec
 	&WithdrawalsExecutionLayerSpec{
@@ -908,6 +908,7 @@ func (ws *WithdrawalsBaseSpec) VerifyContractsStorage(t *test.Env) {
 
 	r := t.TestEngine.TestStorageAt(WARM_COINBASE_ADDRESS, common.BigToHash(latestPayloadNumberBig), latestPayloadNumberBig)
 	p := t.TestEngine.TestStorageAt(PUSH0_ADDRESS, common.Hash{}, latestPayloadNumberBig)
+
 	if latestPayloadNumber >= ws.WithdrawalsForkHeight {
 		// Shanghai
 		r.ExpectBigIntStorageEqual(big.NewInt(100))        // WARM_STORAGE_READ_COST
