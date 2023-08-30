@@ -1421,6 +1421,24 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunForkSpec{
+		GenesisTimestamp:  1,
+		ShanghaiTimestamp: 0,
+		CancunTimestamp:   1,
+
+		CancunBaseSpec: CancunBaseSpec{
+			Spec: test.Spec{
+				Name: "ForkID, genesis at 1, shanghai at 0, cancun at 1",
+				About: `
+			Attemp to peer client with the following configuration at height 0:
+			- genesis timestamp 1
+			- shanghai fork at timestamp 0
+			- cancun fork at timestamp 1
+			`,
+			},
+		},
+	},
+
+	&CancunForkSpec{
 		GenesisTimestamp:           0,
 		ShanghaiTimestamp:          0,
 		CancunTimestamp:            1,
