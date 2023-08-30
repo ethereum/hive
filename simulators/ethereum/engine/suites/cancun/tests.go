@@ -671,7 +671,7 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: 0,
 				Version:                   3,
 				PayloadCustomizer: &helper.CustomPayloadData{
-					BeaconRoot: &(common.Hash{}),
+					ParentBeaconRoot: &(common.Hash{}),
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
 				ExpectationDescription: fmt.Sprintf(`
@@ -702,9 +702,9 @@ var Tests = []test.SpecInterface{
 					Blobs: []helper.BlobID{},
 				},
 				PayloadCustomizer: &helper.CustomPayloadData{
-					ExcessBlobGas: pUint64(0),
-					BlobGasUsed:   pUint64(0),
-					BeaconRoot:    &(common.Hash{}),
+					ExcessBlobGas:    pUint64(0),
+					BlobGasUsed:      pUint64(0),
+					ParentBeaconRoot: &(common.Hash{}),
 				},
 				ExpectedError: UNSUPPORTED_FORK_ERROR,
 				ExpectationDescription: fmt.Sprintf(`
@@ -788,7 +788,7 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: 0,
 				Version:                   3,
 				PayloadCustomizer: &helper.CustomPayloadData{
-					RemoveBeaconRoot: true,
+					RemoveParentBeaconRoot: true,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
 				ExpectationDescription: fmt.Sprintf(`

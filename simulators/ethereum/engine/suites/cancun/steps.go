@@ -61,7 +61,7 @@ func (step ParallelSteps) Execute(t *CancunTestContext) error {
 }
 
 func (step ParallelSteps) Description() string {
-	desc := fmt.Sprintf("ParallelSteps: running steps in parallel:\n")
+	desc := "ParallelSteps: running steps in parallel:\n"
 	for i, step := range step.Steps {
 		desc += fmt.Sprintf("%d: %s\n", i, step.Description())
 	}
@@ -794,7 +794,7 @@ func (step DevP2PRequestPooledTransactionHash) Execute(t *CancunTestContext) err
 				return fmt.Errorf("expected size %d, got %d", len(expBytes), len(txBytes))
 			}
 
-			if bytes.Compare(expBytes, txBytes) != 0 {
+			if !bytes.Equal(expBytes, txBytes) {
 				return fmt.Errorf("expected tx %#x, got %#x", expBytes, txBytes)
 			}
 
