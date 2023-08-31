@@ -221,7 +221,7 @@ func ExecutableDataToBlock(ed ExecutableData, versionedHashes []common.Hash, bea
 
 func BlockToExecutableData(block *types.Block, fees *big.Int) ExecutableData {
 	// TODO (DEVNET 8): Add blobs
-	gethEnvelope := geth_beacon.BlockToExecutableData(block, fees, nil, nil, nil)
+	gethEnvelope := geth_beacon.BlockToExecutableData(block, fees, nil)
 	ed, err := FromBeaconExecutableData(gethEnvelope.ExecutionPayload)
 	if err != nil {
 		panic(err)

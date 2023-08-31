@@ -168,9 +168,6 @@ func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
 			if genesis.ExcessBlobGas == nil {
 				genesis.ExcessBlobGas = new(uint64)
 			}
-			if genesis.BeaconRoot == nil {
-				genesis.BeaconRoot = new(common.Hash)
-			}
 		}
 	}
 	return nil

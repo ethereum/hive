@@ -19,28 +19,28 @@ type PayloadCustomizer interface {
 }
 
 type CustomPayloadData struct {
-	ParentHash          *common.Hash
-	FeeRecipient        *common.Address
-	StateRoot           *common.Hash
-	ReceiptsRoot        *common.Hash
-	LogsBloom           *[]byte
-	PrevRandao          *common.Hash
-	Number              *uint64
-	GasLimit            *uint64
-	GasUsed             *uint64
-	Timestamp           *uint64
-	ExtraData           *[]byte
-	BaseFeePerGas       *big.Int
-	BlockHash           *common.Hash
-	Transactions        *[][]byte
-	Withdrawals         types.Withdrawals
-	RemoveWithdrawals   bool
-	BlobGasUsed         *uint64
-	RemoveBlobGasUsed   bool
-	ExcessBlobGas       *uint64
-	RemoveExcessBlobGas bool
-	BeaconRoot          *common.Hash
-	RemoveBeaconRoot    bool
+	ParentHash             *common.Hash
+	FeeRecipient           *common.Address
+	StateRoot              *common.Hash
+	ReceiptsRoot           *common.Hash
+	LogsBloom              *[]byte
+	PrevRandao             *common.Hash
+	Number                 *uint64
+	GasLimit               *uint64
+	GasUsed                *uint64
+	Timestamp              *uint64
+	ExtraData              *[]byte
+	BaseFeePerGas          *big.Int
+	BlockHash              *common.Hash
+	Transactions           *[][]byte
+	Withdrawals            types.Withdrawals
+	RemoveWithdrawals      bool
+	BlobGasUsed            *uint64
+	RemoveBlobGasUsed      bool
+	ExcessBlobGas          *uint64
+	RemoveExcessBlobGas    bool
+	ParentBeaconRoot       *common.Hash
+	RemoveParentBeaconRoot bool
 }
 
 var _ PayloadCustomizer = (*CustomPayloadData)(nil)
@@ -136,12 +136,12 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 	} else if basePayload.ExcessBlobGas != nil {
 		customPayloadHeader.ExcessBlobGas = basePayload.ExcessBlobGas
 	}
-	if customData.RemoveBeaconRoot {
-		customPayloadHeader.BeaconRoot = nil
-	} else if customData.BeaconRoot != nil {
-		customPayloadHeader.BeaconRoot = customData.BeaconRoot
+	if customData.RemoveParentBeaconRoot {
+		customPayloadHeader.ParentBeaconRoot = nil
+	} else if customData.ParentBeaconRoot != nil {
+		customPayloadHeader.ParentBeaconRoot = customData.ParentBeaconRoot
 	} else if baseBeaconRoot != nil {
-		customPayloadHeader.BeaconRoot = baseBeaconRoot
+		customPayloadHeader.ParentBeaconRoot = baseBeaconRoot
 	}
 
 	// Return the new payload
@@ -170,7 +170,7 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 	} else if basePayload.Withdrawals != nil {
 		result.Withdrawals = basePayload.Withdrawals
 	}
-	return result, customPayloadHeader.BeaconRoot, nil
+	return result, customPayloadHeader.ParentBeaconRoot, nil
 }
 
 func CustomizePayloadTransactions(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash, customTransactions types.Transactions) (*typ.ExecutableData, *common.Hash, error) {

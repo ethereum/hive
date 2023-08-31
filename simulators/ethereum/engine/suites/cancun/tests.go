@@ -671,7 +671,7 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: 0,
 				Version:                   3,
 				PayloadCustomizer: &helper.CustomPayloadData{
-					BeaconRoot: &(common.Hash{}),
+					ParentBeaconRoot: &(common.Hash{}),
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
 				ExpectationDescription: fmt.Sprintf(`
@@ -702,9 +702,9 @@ var Tests = []test.SpecInterface{
 					Blobs: []helper.BlobID{},
 				},
 				PayloadCustomizer: &helper.CustomPayloadData{
-					ExcessBlobGas: pUint64(0),
-					BlobGasUsed:   pUint64(0),
-					BeaconRoot:    &(common.Hash{}),
+					ExcessBlobGas:    pUint64(0),
+					BlobGasUsed:      pUint64(0),
+					ParentBeaconRoot: &(common.Hash{}),
 				},
 				ExpectedError: UNSUPPORTED_FORK_ERROR,
 				ExpectationDescription: fmt.Sprintf(`
@@ -788,7 +788,7 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: 0,
 				Version:                   3,
 				PayloadCustomizer: &helper.CustomPayloadData{
-					RemoveBeaconRoot: true,
+					RemoveParentBeaconRoot: true,
 				},
 				ExpectedError: INVALID_PARAMS_ERROR,
 				ExpectationDescription: fmt.Sprintf(`
@@ -1413,6 +1413,24 @@ var Tests = []test.SpecInterface{
 				About: `
 			Attemp to peer client with the following configuration at height 0:
 			- genesis timestamp 0
+			- shanghai fork at timestamp 0
+			- cancun fork at timestamp 1
+			`,
+			},
+		},
+	},
+
+	&CancunForkSpec{
+		GenesisTimestamp:  1,
+		ShanghaiTimestamp: 0,
+		CancunTimestamp:   1,
+
+		CancunBaseSpec: CancunBaseSpec{
+			Spec: test.Spec{
+				Name: "ForkID, genesis at 1, shanghai at 0, cancun at 1",
+				About: `
+			Attemp to peer client with the following configuration at height 0:
+			- genesis timestamp 1
 			- shanghai fork at timestamp 0
 			- cancun fork at timestamp 1
 			`,
