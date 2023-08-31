@@ -678,7 +678,6 @@ func (step DevP2PClientPeering) Execute(t *CancunTestContext) error {
 	timeout := 20 * time.Second
 
 	// Send a ping request to verify that we are not immediately disconnected
-	// Send the request for the pooled transactions
 	pingReq := &devp2p.Ping{}
 	if size, err := conn.Write(pingReq); err != nil {
 		return errors.Wrap(err, "could not write to conn")
