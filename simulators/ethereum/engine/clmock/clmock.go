@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -23,6 +22,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/pkg/errors"
 )
 
 var (
@@ -89,6 +89,9 @@ type CLMocker struct {
 	// Chain History
 	HeaderHistory map[uint64]*types.Header
 
+	// Payload ID History
+	PayloadIDHistory map[api.PayloadID]interface{}
+
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
 	ExecutedPayloadHistory ExecutableDataHistory
@@ -147,6 +150,7 @@ func NewCLMocker(t *hivesim.T, genesis *core.Genesis, slotsToSafe, slotsToFinali
 		SlotsToFinalized:                slotsToFinalized,
 		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
 		PayloadProductionClientDelay:    DefaultPayloadProductionClientDelay,
+		PayloadIDHistory:                make(map[api.PayloadID]interface{}),
 		LatestHeader:                    nil,
 		FirstPoSBlockNumber:             nil,
 		LatestHeadNumber:                nil,
@@ -392,7 +396,7 @@ func TimestampToBeaconRoot(timestamp uint64) common.Hash {
 	return beaconRoot
 }
 
-func (cl *CLMocker) RequestNextPayload() {
+func (cl *CLMocker) GeneratePayloadAttributes() {
 	// Generate a random value for the PrevRandao field
 	nextPrevRandao := common.Hash{}
 	rand.Read(nextPrevRandao[:])
@@ -415,10 +419,23 @@ func (cl *CLMocker) RequestNextPayload() {
 
 	// Save random value
 	cl.PrevRandaoHistory[cl.LatestHeader.Number.Uint64()+1] = nextPrevRandao
+}
 
+func (cl *CLMocker) AddPayloadID(newPayloadID *api.PayloadID) error {
+	if newPayloadID == nil {
+		return errors.New("nil payload ID")
+	}
+	if _, ok := cl.PayloadIDHistory[*newPayloadID]; ok {
+		return fmt.Errorf("Reused payload ID: %v", *newPayloadID)
+	}
+	cl.PayloadIDHistory[*newPayloadID] = nil
+	return nil
+}
+
+func (cl *CLMocker) RequestNextPayload() {
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
-	fcUVersion := cl.ForkchoiceUpdatedVersion(cl.LatestPayloadAttributes.Timestamp)
+	fcUVersion := cl.ForkchoiceUpdatedVersion(cl.LatestHeader.Time, &cl.LatestPayloadAttributes.Timestamp)
 	resp, err := cl.NextBlockProducer.ForkchoiceUpdated(ctx, fcUVersion, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV%d (%v): %v", fcUVersion, cl.NextBlockProducer.ID(), err)
@@ -429,6 +446,9 @@ func (cl *CLMocker) RequestNextPayload() {
 	if resp.PayloadStatus.LatestValidHash == nil || *resp.PayloadStatus.LatestValidHash != cl.LatestForkchoice.HeadBlockHash {
 		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated LatestValidHash Response from Payload builder: %v != %v", resp.PayloadStatus.LatestValidHash, cl.LatestForkchoice.HeadBlockHash)
 	}
+	if err = cl.AddPayloadID(resp.PayloadID); err != nil {
+		cl.Fatalf("CLMocker: Payload ID failure: %v", err)
+	}
 	cl.NextPayloadID = resp.PayloadID
 }
 
@@ -436,16 +456,8 @@ func (cl *CLMocker) GetNextPayload() {
 	var err error
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
-	if cl.IsCancun(cl.LatestPayloadAttributes.Timestamp) {
-		cl.LatestPayloadBuilt, cl.LatestBlockValue, cl.LatestBlobBundle, cl.LatestShouldOverrideBuilder, err = cl.NextBlockProducer.GetPayloadV3(ctx, cl.NextPayloadID)
-	} else if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
-		cl.LatestPayloadBuilt, cl.LatestBlockValue, err = cl.NextBlockProducer.GetPayloadV2(ctx, cl.NextPayloadID)
-		cl.LatestBlobBundle = nil
-	} else {
-		cl.LatestPayloadBuilt, err = cl.NextBlockProducer.GetPayloadV1(ctx, cl.NextPayloadID)
-		cl.LatestBlockValue = nil
-		cl.LatestBlobBundle = nil
-	}
+	version := cl.ForkConfig.GetPayloadVersion(cl.LatestPayloadAttributes.Timestamp)
+	cl.LatestPayloadBuilt, cl.LatestBlockValue, cl.LatestBlobBundle, cl.LatestShouldOverrideBuilder, err = cl.NextBlockProducer.GetPayload(ctx, version, cl.NextPayloadID)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not getPayload (%v, %v): %v", cl.NextBlockProducer.ID(), cl.NextPayloadID, err)
 	}
@@ -519,7 +531,7 @@ func (cl *CLMocker) broadcastNextNewPayload() {
 }
 
 func (cl *CLMocker) broadcastLatestForkchoice() {
-	version := cl.ForkchoiceUpdatedVersion(cl.LatestExecutedPayload.Timestamp)
+	version := cl.ForkchoiceUpdatedVersion(cl.LatestExecutedPayload.Timestamp, nil)
 	for _, resp := range cl.BroadcastForkchoiceUpdated(&cl.LatestForkchoice, nil, version) {
 		if resp.Error != nil {
 			cl.Logf("CLMocker: BroadcastForkchoiceUpdated Error (%v): %v\n", resp.Container, resp.Error)
@@ -543,13 +555,14 @@ func (cl *CLMocker) broadcastLatestForkchoice() {
 }
 
 type BlockProcessCallbacks struct {
-	OnPayloadProducerSelected func()
-	OnRequestNextPayload      func()
-	OnGetPayload              func()
-	OnNewPayloadBroadcast     func()
-	OnForkchoiceBroadcast     func()
-	OnSafeBlockChange         func()
-	OnFinalizedBlockChange    func()
+	OnPayloadProducerSelected    func()
+	OnPayloadAttributesGenerated func()
+	OnRequestNextPayload         func()
+	OnGetPayload                 func()
+	OnNewPayloadBroadcast        func()
+	OnForkchoiceBroadcast        func()
+	OnSafeBlockChange            func()
+	OnFinalizedBlockChange       func()
 }
 
 func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
@@ -574,6 +587,12 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 
 	if callbacks.OnPayloadProducerSelected != nil {
 		callbacks.OnPayloadProducerSelected()
+	}
+
+	cl.GeneratePayloadAttributes()
+
+	if callbacks.OnPayloadAttributesGenerated != nil {
+		callbacks.OnPayloadAttributesGenerated()
 	}
 
 	cl.RequestNextPayload()

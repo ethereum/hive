@@ -37,6 +37,7 @@ type Engine interface {
 	GetPayloadV1(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, error)
 	GetPayloadV2(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, error)
 	GetPayloadV3(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error)
+	GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error)
 
 	NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (api.PayloadStatusV1, error)
 	NewPayloadV1(ctx context.Context, payload *typ.ExecutableDataV1) (api.PayloadStatusV1, error)
@@ -85,6 +86,6 @@ var (
 	Pending                        = big.NewInt(-2)
 	Finalized                      = big.NewInt(-3)
 	Safe                           = big.NewInt(-4)
-	LatestForkchoiceUpdatedVersion = 2
+	LatestForkchoiceUpdatedVersion = 3
 	LatestNewPayloadVersion        = 3
 )

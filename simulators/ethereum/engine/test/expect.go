@@ -125,10 +125,19 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.Forkchoice
 	if version == -1 {
 		version = client.LatestForkchoiceUpdatedVersion
 	}
-	if version == 2 {
-		return tec.TestEngineForkchoiceUpdatedV2(fcState, pAttributes)
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	resp, err := tec.Engine.ForkchoiceUpdated(ctx, version, fcState, pAttributes)
+	ret := &ForkchoiceResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
+		Response:  resp,
+		Version:   version,
+		Error:     err,
 	}
-	return tec.TestEngineForkchoiceUpdatedV1(fcState, pAttributes)
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (exp *ForkchoiceResponseExpectObject) ExpectNoError() {
@@ -338,11 +347,13 @@ func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Has
 // GetPayload
 type GetPayloadResponseExpectObject struct {
 	*ExpectEnv
-	Payload    typ.ExecutableData
-	BlockValue *big.Int
-	Version    int
-	Error      error
-	ErrorCode  int
+	Payload               typ.ExecutableData
+	BlockValue            *big.Int
+	BlobsBundle           *typ.BlobsBundle
+	ShouldOverrideBuilder *bool
+	Version               int
+	Error                 error
+	ErrorCode             int
 }
 
 func (tec *TestEngineClient) TestEngineGetPayloadV1(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
@@ -380,10 +391,22 @@ func (tec *TestEngineClient) TestEngineGetPayloadV2(payloadID *api.PayloadID) *G
 }
 
 func (tec *TestEngineClient) TestEngineGetPayload(payloadID *api.PayloadID, version int) *GetPayloadResponseExpectObject {
-	if version == 2 {
-		return tec.TestEngineGetPayloadV2(payloadID)
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	payload, blockValue, blobBundle, shouldOverride, err := tec.Engine.GetPayload(ctx, version, payloadID)
+	ret := &GetPayloadResponseExpectObject{
+		ExpectEnv:             &ExpectEnv{Env: tec.Env},
+		Payload:               payload,
+		Version:               version,
+		BlockValue:            blockValue,
+		BlobsBundle:           blobBundle,
+		ShouldOverrideBuilder: shouldOverride,
+		Error:                 err,
 	}
-	return tec.TestEngineGetPayloadV1(payloadID)
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
 }
 
 func (exp *GetPayloadResponseExpectObject) ExpectNoError() {
