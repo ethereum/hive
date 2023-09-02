@@ -1,0 +1,39 @@
+### Build Besu From Git:
+
+## Builder stage: Compiles besu from a git repository
+FROM openjdk:17-jdk-slim as builder
+
+ARG tag=main
+ARG github=hyperledger/besu
+
+RUN echo "Cloning: $github - $tag" && \
+    apt-get update && apt-get install -y git libsodium-dev libnss3-dev \
+    && git clone --depth 1 --branch $tag https://github.com/$github \
+    && cd besu && ./gradlew installDist
+
+## Final stage: Sets up the environment for running besu
+FROM openjdk:17-jdk-slim
+
+# Copy compiled binary from builder
+COPY --from=builder /besu/build/install/besu /opt/besu
+
+RUN apt-get update && apt-get install -y curl jq libsodium23 libnss3-dev \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Create version.txt
+RUN /opt/besu/bin/besu --version > /version.txt
+
+# Add genesis mapper script, startup script, and enode URL retriever script
+COPY genesis.json /genesis.json
+COPY mapper.jq /mapper.jq
+COPY besu.sh /opt/besu/bin/besu-hive.sh
+COPY enode.sh /hive-bin/enode.sh
+COPY trusted_setup.txt /trusted_setup.txt
+
+# Set execute permissions for scripts
+RUN chmod +x /opt/besu/bin/besu-hive.sh /hive-bin/enode.sh
+
+# Expose networking ports (incl 5005 for JVM debugging)
+EXPOSE 8545 8546 8551 30303 30303/udp 5005
+
+ENTRYPOINT ["/opt/besu/bin/besu-hive.sh"]

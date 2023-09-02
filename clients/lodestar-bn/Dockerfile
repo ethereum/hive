@@ -1,6 +1,7 @@
-ARG branch=next
+ARG tag=next
+ARG baseimage=chainsafe/lodestar
 
-FROM chainsafe/lodestar:$branch
+FROM $baseimage:$tag
 
 ADD lodestar_bn.sh /lodestar_bn.sh
 RUN chmod +x /lodestar_bn.sh

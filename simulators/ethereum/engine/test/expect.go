@@ -14,8 +14,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
-	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
 // Print the caller to this file
@@ -89,7 +89,7 @@ type ForkchoiceResponseExpectObject struct {
 	ErrorCode int
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) *ForkchoiceResponseExpectObject {
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) *ForkchoiceResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	resp, err := tec.Engine.ForkchoiceUpdatedV1(ctx, fcState, pAttributes)
@@ -105,7 +105,7 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV1(fcState *api.Forkchoi
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes) *ForkchoiceResponseExpectObject {
+func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) *ForkchoiceResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	resp, err := tec.Engine.ForkchoiceUpdatedV2(ctx, fcState, pAttributes)
@@ -121,7 +121,7 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.Forkchoi
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *api.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
+func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
 	//if version == -1 {
 	//	version = client.LatestForkchoiceUpdatedVersion
 	//}
@@ -208,17 +208,17 @@ func (exp *ForkchoiceResponseExpectObject) ExpectUpdatedPayloadID(previousID *ap
 
 type NewPayloadResponseExpectObject struct {
 	*ExpectEnv
-	Payload   *api.ExecutableData
+	Payload   *typ.ExecutableData
 	Status    api.PayloadStatusV1
 	Version   int
 	Error     error
 	ErrorCode int
 }
 
-func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
+func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *typ.ExecutableData) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	edv1 := &client_types.ExecutableDataV1{}
+	edv1 := &typ.ExecutableDataV1{}
 	edv1.FromExecutableData(payload)
 	status, err := tec.Engine.NewPayloadV1(ctx, edv1)
 	ret := &NewPayloadResponseExpectObject{
@@ -234,7 +234,7 @@ func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *api.ExecutableData)
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *api.ExecutableData) *NewPayloadResponseExpectObject {
+func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *typ.ExecutableData) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	status, err := tec.Engine.NewPayloadV2(ctx, payload)
@@ -251,11 +251,32 @@ func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *api.ExecutableData)
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineNewPayload(payload *api.ExecutableData, version int) *NewPayloadResponseExpectObject {
-	if version == 2 {
-		return tec.TestEngineNewPayloadV2(payload)
+func (tec *TestEngineClient) TestEngineNewPayloadV3(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) *NewPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	status, err := tec.Engine.NewPayloadV3(ctx, payload, versionedHashes, beaconRoot)
+	ret := &NewPayloadResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
+		Payload:   payload,
+		Status:    status,
+		Version:   3,
+		Error:     err,
 	}
-	return tec.TestEngineNewPayloadV1(payload)
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+func (tec *TestEngineClient) TestEngineNewPayload(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash, version int) *NewPayloadResponseExpectObject {
+	if version == 3 {
+		return tec.TestEngineNewPayloadV3(payload, versionedHashes, beaconRoot)
+	} else if version == 2 {
+		return tec.TestEngineNewPayloadV2(payload)
+	} else if version == 1 {
+		return tec.TestEngineNewPayloadV1(payload)
+	}
+	panic(fmt.Sprintf("Unsupported version: %d", version))
 }
 
 func (exp *NewPayloadResponseExpectObject) PayloadJson() string {
@@ -317,7 +338,7 @@ func (exp *NewPayloadResponseExpectObject) ExpectLatestValidHash(lvh *common.Has
 // GetPayload
 type GetPayloadResponseExpectObject struct {
 	*ExpectEnv
-	Payload    api.ExecutableData
+	Payload    typ.ExecutableData
 	BlockValue *big.Int
 	Version    int
 	Error      error
@@ -384,7 +405,7 @@ func (exp *GetPayloadResponseExpectObject) ExpectErrorCode(code int) {
 	}
 }
 
-func ComparePayloads(want *api.ExecutableData, got *api.ExecutableData) error {
+func ComparePayloads(want *typ.ExecutableData, got *typ.ExecutableData) error {
 	if want == nil || got == nil {
 		if want == nil && got == nil {
 			return nil
@@ -455,7 +476,7 @@ func ComparePayloads(want *api.ExecutableData, got *api.ExecutableData) error {
 	return nil
 }
 
-func (exp *GetPayloadResponseExpectObject) ExpectPayload(expectedPayload *api.ExecutableData) {
+func (exp *GetPayloadResponseExpectObject) ExpectPayload(expectedPayload *typ.ExecutableData) {
 	exp.ExpectNoError()
 	if err := ComparePayloads(expectedPayload, &exp.Payload); err != nil {
 		exp.Fatalf("FAIL (%s): Unexpected payload returned on EngineGetPayloadV%d: %v", exp.TestName, exp.Version, err)
@@ -493,7 +514,7 @@ func (exp *GetPayloadResponseExpectObject) ExpectTimestamp(expectedTimestamp uin
 // GetPayloadBodies
 type GetPayloadBodiesResponseExpectObject struct {
 	*ExpectEnv
-	PayloadBodies []*client_types.ExecutionPayloadBodyV1
+	PayloadBodies []*typ.ExecutionPayloadBodyV1
 	BlockValue    *big.Int
 	Version       int
 	Error         error
@@ -501,7 +522,8 @@ type GetPayloadBodiesResponseExpectObject struct {
 }
 
 func (tec *TestEngineClient) TestEngineGetPayloadBodiesByRangeV1(start uint64, count uint64) *GetPayloadBodiesResponseExpectObject {
-	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	// Get Payload Bodies can take a long time to respond
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout*6)
 	defer cancel()
 	payloadBodies, err := tec.Engine.GetPayloadBodiesByRangeV1(ctx, start, count)
 	ret := &GetPayloadBodiesResponseExpectObject{
@@ -518,7 +540,7 @@ func (tec *TestEngineClient) TestEngineGetPayloadBodiesByRangeV1(start uint64, c
 }
 
 func (tec *TestEngineClient) TestEngineGetPayloadBodiesByHashV1(hashes []common.Hash) *GetPayloadBodiesResponseExpectObject {
-	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout*6)
 	defer cancel()
 	payloadBodies, err := tec.Engine.GetPayloadBodiesByHashV1(ctx, hashes)
 	ret := &GetPayloadBodiesResponseExpectObject{
@@ -629,7 +651,7 @@ func CompareWithdrawals(want []*types.Withdrawal, got []*types.Withdrawal) error
 	return nil
 }
 
-func ComparePayloadBodies(want *client_types.ExecutionPayloadBodyV1, got *client_types.ExecutionPayloadBodyV1) error {
+func ComparePayloadBodies(want *typ.ExecutionPayloadBodyV1, got *typ.ExecutionPayloadBodyV1) error {
 	if want == nil || got == nil {
 		if want == nil && got == nil {
 			return nil
@@ -648,7 +670,7 @@ func ComparePayloadBodies(want *client_types.ExecutionPayloadBodyV1, got *client
 	return nil
 }
 
-func (exp *GetPayloadBodiesResponseExpectObject) ExpectPayloadBody(index uint64, payloadBody *client_types.ExecutionPayloadBodyV1) {
+func (exp *GetPayloadBodiesResponseExpectObject) ExpectPayloadBody(index uint64, payloadBody *typ.ExecutionPayloadBodyV1) {
 	exp.ExpectNoError()
 	if exp.PayloadBodies == nil {
 		exp.Fatalf("FAIL (%s): Expected payload body in list on EngineGetPayloadBodiesV%d, but list is nil", exp.TestName, exp.Version)
@@ -984,35 +1006,52 @@ func (tec *TestEngineClient) TestTransactionReceipt(txHash common.Hash) *Transac
 	return ret
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectError() {
-	if exp.Error == nil {
-		exp.Fatalf("FAIL (%s): Expected error on %s: block=%v", exp.TestName, exp.Call, exp.Receipt)
+func (tr *TransactionReceiptExpectObject) ExpectError() {
+	if tr.Error == nil {
+		tr.Fatalf("FAIL (%s): Expected error on %s: block=%v", tr.TestName, tr.Call, tr.Receipt)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectErrorCode(code int) {
-	exp.ExpectError()
-	if exp.ErrorCode != code {
-		exp.Fatalf("FAIL (%s): Expected error code on %s: want=%d, got=%d", exp.TestName, exp.Call, code, exp.ErrorCode)
+func (tr *TransactionReceiptExpectObject) ExpectErrorCode(code int) {
+	tr.ExpectError()
+	if tr.ErrorCode != code {
+		tr.Fatalf("FAIL (%s): Expected error code on %s: want=%d, got=%d", tr.TestName, tr.Call, code, tr.ErrorCode)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectNoError() {
-	if exp.Error != nil {
-		exp.Fatalf("FAIL (%s): Unexpected error on %s: %v, expected=<None>", exp.TestName, exp.Call, exp.Error)
+func (tr *TransactionReceiptExpectObject) ExpectNoError() {
+	if tr.Error != nil {
+		tr.Fatalf("FAIL (%s): Unexpected error on %s: %v, expected=<None>", tr.TestName, tr.Call, tr.Error)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectTransactionHash(expectedHash common.Hash) {
-	exp.ExpectNoError()
-	if exp.Receipt.TxHash != expectedHash {
-		exp.Fatalf("FAIL (%s): Unexpected transaction hash on %s: %v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, expectedHash)
+func (tr *TransactionReceiptExpectObject) ExpectTransactionHash(expectedHash common.Hash) {
+	tr.ExpectNoError()
+	if tr.Receipt.TxHash != expectedHash {
+		tr.Fatalf("FAIL (%s): Unexpected transaction hash on %s: %v, expected=%v", tr.TestName, tr.Call, tr.Receipt.TxHash, expectedHash)
 	}
 }
 
-func (exp *TransactionReceiptExpectObject) ExpectBlockHash(expectedHash common.Hash) {
-	exp.ExpectNoError()
-	if exp.Receipt.BlockHash != expectedHash {
-		exp.Fatalf("FAIL (%s): Unexpected transaction block hash on %s: %v, blockhash=%v, expected=%v", exp.TestName, exp.Call, exp.Receipt.TxHash, exp.Receipt.BlockHash, expectedHash)
+func (tr *TransactionReceiptExpectObject) ExpectBlockHash(expectedHash common.Hash) {
+	tr.ExpectNoError()
+	if tr.Receipt.BlockHash != expectedHash {
+		tr.Fatalf("FAIL (%s): Unexpected transaction block hash on %s: %v, blockhash=%v, expected=%v", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlockHash, expectedHash)
+	}
+}
+
+func (tr *TransactionReceiptExpectObject) ExpectBlobGasUsed(expectedBlobGasUsed uint64) {
+	tr.ExpectNoError()
+
+	if expectedBlobGasUsed != tr.Receipt.BlobGasUsed {
+		tr.Fatalf("FAIL (%s): Unexpected transaction blob gas used on %s: %v, blobGasUsed=%d, expected=%d", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlobGasUsed, expectedBlobGasUsed)
+	}
+}
+
+func (tr *TransactionReceiptExpectObject) ExpectBlobGasPrice(expectedBlobGasPrice *big.Int) {
+	tr.ExpectNoError()
+	if (expectedBlobGasPrice == nil || tr.Receipt.BlobGasPrice == nil) && expectedBlobGasPrice != tr.Receipt.BlobGasPrice {
+		tr.Fatalf("FAIL (%s): Unexpected transaction blob gas price on %s: %v, BlobGasPrice=%v, expected=%v", tr.TestName, tr.Call, tr.Receipt.TxHash, tr.Receipt.BlobGasPrice, expectedBlobGasPrice)
+	} else if expectedBlobGasPrice != nil && tr.Receipt.BlobGasPrice != nil && expectedBlobGasPrice.Cmp(tr.Receipt.BlobGasPrice) != 0 {
+		tr.Fatalf("FAIL (%s): Unexpected transaction blob gas price on %s: %v, BlobGasPrice=0x%x, expected=0x%x", tr.TestName, tr.Call, tr.Receipt.TxHash, *tr.Receipt.BlobGasPrice, *expectedBlobGasPrice)
 	}
 }

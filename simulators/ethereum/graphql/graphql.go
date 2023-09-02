@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path"
@@ -31,9 +31,23 @@ and reads the test case files. The individual test cases are run as sub-tests ag
 the client launched by this test.`,
 		Parameters: hivesim.Params{
 			// The graphql chain comes from the Besu codebase, and is built on Frontier.
-			"HIVE_CHAIN_ID":             "1",
-			"HIVE_GRAPHQL_ENABLED":      "1",
-			"HIVE_ALLOW_UNPROTECTED_TX": "1",
+			"HIVE_CHAIN_ID":                  "1",
+			"HIVE_GRAPHQL_ENABLED":           "1",
+			"HIVE_ALLOW_UNPROTECTED_TX":      "1",
+			"HIVE_FORK_FRONTIER":             "0",
+			"HIVE_FORK_HOMESTEAD":            "33",
+			"HIVE_FORK_TANGERINE":            "33",
+			"HIVE_FORK_SPURIOUS":             "33",
+			"HIVE_FORK_BYZANTIUM":            "33",
+			"HIVE_FORK_CONSTANTINOPLE":       "33",
+			"HIVE_FORK_PETERSBURG":           "33",
+			"HIVE_FORK_ISTANBUL":             "33",
+			"HIVE_FORK_MUIR_GLACIER":         "33",
+			"HIVE_FORK_BERLIN":               "33",
+			"HIVE_FORK_LONDON":               "33",
+			"HIVE_MERGE_BLOCK_ID":            "33",
+			"HIVE_TERMINAL_TOTAL_DIFFICULTY": "4357120",
+			"HIVE_SHANGHAI_TIMESTAMP":        "1444660030",
 		},
 		Files: map[string]string{
 			"/genesis.json": "./init/testGenesis.json",
@@ -90,7 +104,7 @@ func deliverTests(t *hivesim.T, wg *sync.WaitGroup, limit int) <-chan *testCase 
 			if fname := info.Name(); !strings.HasSuffix(fname, ".json") {
 				return nil
 			}
-			data, err := ioutil.ReadFile(filepath)
+			data, err := os.ReadFile(filepath)
 			if err != nil {
 				t.Logf("Warning: can't read test file %s: %v", filepath, err)
 				return nil
@@ -143,7 +157,7 @@ func (tc *testCase) run(t *hivesim.T, c *hivesim.Client) {
 	if err != nil {
 		t.Fatal("HTTP post failed:", err)
 	}
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal("can't read HTTP response:", err)
 	}

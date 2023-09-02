@@ -8,41 +8,53 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
-type CustomPayloadData struct {
-	ParentHash        *common.Hash
-	FeeRecipient      *common.Address
-	StateRoot         *common.Hash
-	ReceiptsRoot      *common.Hash
-	LogsBloom         *[]byte
-	PrevRandao        *common.Hash
-	Number            *uint64
-	GasLimit          *uint64
-	GasUsed           *uint64
-	Timestamp         *uint64
-	ExtraData         *[]byte
-	BaseFeePerGas     *big.Int
-	BlockHash         *common.Hash
-	Transactions      *[][]byte
-	Withdrawals       types.Withdrawals
-	RemoveWithdrawals bool
+type PayloadCustomizer interface {
+	CustomizePayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash) (modifiedPayload *typ.ExecutableData, modifiedBeaconRoot *common.Hash, err error)
 }
+
+type CustomPayloadData struct {
+	ParentHash          *common.Hash
+	FeeRecipient        *common.Address
+	StateRoot           *common.Hash
+	ReceiptsRoot        *common.Hash
+	LogsBloom           *[]byte
+	PrevRandao          *common.Hash
+	Number              *uint64
+	GasLimit            *uint64
+	GasUsed             *uint64
+	Timestamp           *uint64
+	ExtraData           *[]byte
+	BaseFeePerGas       *big.Int
+	BlockHash           *common.Hash
+	Transactions        *[][]byte
+	Withdrawals         types.Withdrawals
+	RemoveWithdrawals   bool
+	BlobGasUsed         *uint64
+	RemoveBlobGasUsed   bool
+	ExcessBlobGas       *uint64
+	RemoveExcessBlobGas bool
+	BeaconRoot          *common.Hash
+	RemoveBeaconRoot    bool
+}
+
+var _ PayloadCustomizer = (*CustomPayloadData)(nil)
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
 // BlockHash is calculated automatically.
-func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayloadData) (*api.ExecutableData, error) {
+func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash) (*typ.ExecutableData, *common.Hash, error) {
 	txs := basePayload.Transactions
 	if customData.Transactions != nil {
 		txs = *customData.Transactions
 	}
 	txsHash, err := calcTxsHash(txs)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	fmt.Printf("txsHash: %v\n", txsHash)
 	// Start by filling the header with the basePayload information
@@ -110,9 +122,30 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		h := types.DeriveSha(types.Withdrawals(basePayload.Withdrawals), trie.NewStackTrie(nil))
 		customPayloadHeader.WithdrawalsHash = &h
 	}
+	if customData.RemoveBlobGasUsed {
+		customPayloadHeader.BlobGasUsed = nil
+	} else if customData.BlobGasUsed != nil {
+		customPayloadHeader.BlobGasUsed = customData.BlobGasUsed
+	} else if basePayload.BlobGasUsed != nil {
+		customPayloadHeader.BlobGasUsed = basePayload.BlobGasUsed
+	}
+	if customData.RemoveExcessBlobGas {
+		customPayloadHeader.ExcessBlobGas = nil
+	} else if customData.ExcessBlobGas != nil {
+		customPayloadHeader.ExcessBlobGas = customData.ExcessBlobGas
+	} else if basePayload.ExcessBlobGas != nil {
+		customPayloadHeader.ExcessBlobGas = basePayload.ExcessBlobGas
+	}
+	if customData.RemoveBeaconRoot {
+		customPayloadHeader.BeaconRoot = nil
+	} else if customData.BeaconRoot != nil {
+		customPayloadHeader.BeaconRoot = customData.BeaconRoot
+	} else if baseBeaconRoot != nil {
+		customPayloadHeader.BeaconRoot = baseBeaconRoot
+	}
 
 	// Return the new payload
-	result := &api.ExecutableData{
+	result := &typ.ExecutableData{
 		ParentHash:    customPayloadHeader.ParentHash,
 		FeeRecipient:  customPayloadHeader.Coinbase,
 		StateRoot:     customPayloadHeader.Root,
@@ -127,6 +160,8 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 		BaseFeePerGas: customPayloadHeader.BaseFee,
 		BlockHash:     customPayloadHeader.Hash(),
 		Transactions:  txs,
+		BlobGasUsed:   customPayloadHeader.BlobGasUsed,
+		ExcessBlobGas: customPayloadHeader.ExcessBlobGas,
 	}
 	if customData.RemoveWithdrawals {
 		result.Withdrawals = nil
@@ -135,21 +170,21 @@ func CustomizePayload(basePayload *api.ExecutableData, customData *CustomPayload
 	} else if basePayload.Withdrawals != nil {
 		result.Withdrawals = basePayload.Withdrawals
 	}
-	return result, nil
+	return result, customPayloadHeader.BeaconRoot, nil
 }
 
-func CustomizePayloadTransactions(basePayload *api.ExecutableData, customTransactions types.Transactions) (*api.ExecutableData, error) {
+func CustomizePayloadTransactions(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash, customTransactions types.Transactions) (*typ.ExecutableData, *common.Hash, error) {
 	byteTxs := make([][]byte, 0)
 	for _, tx := range customTransactions {
 		bytes, err := tx.MarshalBinary()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		byteTxs = append(byteTxs, bytes)
 	}
-	return CustomizePayload(basePayload, &CustomPayloadData{
+	return (&CustomPayloadData{
 		Transactions: &byteTxs,
-	})
+	}).CustomizePayload(basePayload, baseBeaconRoot)
 }
 
 func (customData *CustomPayloadData) String() string {
@@ -201,7 +236,7 @@ func (customData *CustomPayloadData) String() string {
 
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
 // One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
-func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField InvalidPayloadBlockField) (*api.ExecutableData, error) {
+func GenerateInvalidPayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash, payloadField InvalidPayloadBlockField) (*typ.ExecutableData, *common.Hash, error) {
 
 	var customPayloadMod *CustomPayloadData
 	switch payloadField {
@@ -265,11 +300,11 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 		InvalidTransactionChainID:
 
 		if len(basePayload.Transactions) == 0 {
-			return nil, fmt.Errorf("no transactions available for modification")
+			return nil, nil, fmt.Errorf("no transactions available for modification")
 		}
 		var baseTx types.Transaction
 		if err := baseTx.UnmarshalBinary(basePayload.Transactions[0]); err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		var customTxData CustomTransactionData
 		switch payloadField {
@@ -300,12 +335,12 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 
 		modifiedTx, err := customizeTransaction(&baseTx, globals.VaultKey, &customTxData)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		modifiedTxBytes, err := modifiedTx.MarshalBinary()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		modifiedTransactions := [][]byte{
 			modifiedTxBytes,
@@ -317,15 +352,10 @@ func GenerateInvalidPayload(basePayload *api.ExecutableData, payloadField Invali
 
 	if customPayloadMod == nil {
 		copyPayload := *basePayload
-		return &copyPayload, nil
+		return &copyPayload, nil, nil
 	}
 
-	alteredPayload, err := CustomizePayload(basePayload, customPayloadMod)
-	if err != nil {
-		return nil, err
-	}
-
-	return alteredPayload, nil
+	return customPayloadMod.CustomizePayload(basePayload, baseBeaconRoot)
 }
 
 /*

@@ -12,7 +12,6 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -29,16 +28,19 @@ type Env struct {
 	TestContext context.Context
 
 	// RPC Clients
-	Engine     client.EngineClient
-	Eth        client.Eth
-	TestEngine *TestEngineClient
-	HiveEngine *hive_rpc.HiveRPCEngineClient
+	Engine      client.EngineClient
+	Eth         client.Eth
+	TestEngine  *TestEngineClient
+	HiveEngine  *hive_rpc.HiveRPCEngineClient
+	Engines     []client.EngineClient
+	TestEngines []*TestEngineClient
 
 	// Consensus Layer Mocker Instance
 	CLMock *clmock.CLMocker
 
 	// Client parameters used to launch the default client
 	Genesis      helper.Genesis
+	ForkConfig   *globals.ForkConfig
 	ClientParams hivesim.Params
 	ClientFiles  hivesim.Params
 
@@ -46,15 +48,16 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis helper.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis helper.Genesis, forkConfig *globals.ForkConfig, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	consensusConfig := testSpec.GetConsensusConfig()
 	clMocker := clmock.NewCLMocker(
 		t,
+		genesis,
 		consensusConfig.SlotsToSafe,
 		consensusConfig.SlotsToFinalized,
 		big.NewInt(consensusConfig.SafeSlotsToImportOptimistically),
-		testSpec.GetForkConfig().ShanghaiTimestamp)
+		testSpec.GetForkConfig())
 
 	// Send the CLMocker for configuration by the spec, if any.
 	testSpec.ConfigureCLMock(clMocker)
@@ -80,14 +83,18 @@ func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim
 		TestName:            testSpec.GetName(),
 		Client:              c,
 		Engine:              ec,
+		Engines:             make([]client.EngineClient, 0),
 		Eth:                 ec,
 		HiveEngine:          ec,
 		CLMock:              clMocker,
 		Genesis:             genesis,
+		ForkConfig:          forkConfig,
 		ClientParams:        cParams,
 		ClientFiles:         cFiles,
 		TestTransactionType: testSpec.GetTestTransactionType(),
 	}
+	env.Engines = append(env.Engines, ec)
+	env.TestEngines = append(env.TestEngines, env.TestEngine)
 
 	// Before running the test, make sure Eth and Engine ports are open for the client
 	if err := hive_rpc.CheckEthEngineLive(c); err != nil {
@@ -138,37 +145,5 @@ func (t *Env) MainTTD() *big.Int {
 func (t *Env) HandleClientPostRunVerification(ec client.EngineClient) {
 	if err := ec.PostRunVerifications(); err != nil {
 		t.Fatalf("FAIL (%s): Client failed post-run verification: %v", t.TestName, err)
-	}
-}
-
-// Verify that the client progresses after a certain PoW block still in PoW mode
-func (t *Env) VerifyPoWProgress(lastBlockHash common.Hash) {
-	// Get the block number first
-	ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-	defer cancel()
-	lb, err := t.Eth.BlockByHash(ctx, lastBlockHash)
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to fetch block: %v", t.TestName, err)
-	}
-	nextNum := lb.Number().Int64() + 1
-	for {
-		ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
-		defer cancel()
-		nh, err := t.Eth.HeaderByNumber(ctx, big.NewInt(nextNum))
-		if err == nil && nh != nil {
-			// Chain has progressed, check that the next block is also PoW
-			// Difficulty must NOT be zero
-			if nh.Difficulty.Cmp(common.Big0) == 0 {
-				t.Fatalf("FAIL (%s): Expected PoW chain to progress in PoW mode, but following block difficulty==%v", t.TestName, nh.Difficulty)
-			}
-			// Chain is still PoW/Clique
-			return
-		}
-		t.Logf("INFO (%s): Error getting block, will try again: %v", t.TestName, err)
-		select {
-		case <-t.TimeoutContext.Done():
-			t.Fatalf("FAIL (%s): Timeout while waiting for PoW chain to progress", t.TestName)
-		case <-time.After(time.Second):
-		}
 	}
 }

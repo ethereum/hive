@@ -20,15 +20,17 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/ethereum/hive/simulators/ethereum/engine/libgno"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
 var (
-	Head               *big.Int // Nil
-	Pending            = big.NewInt(-2)
-	Finalized          = big.NewInt(-3)
-	Safe               = big.NewInt(-4)
-	InvalidParamsError = -32602
-	MAX_INITCODE_SIZE  = 49152
+	Head                                   *big.Int // Nil
+	Pending                                         = big.NewInt(-2)
+	Finalized                                       = big.NewInt(-3)
+	Safe                                            = big.NewInt(-4)
+	InvalidParamsError                              = -32602
+	MAX_INITCODE_SIZE                               = 49152
+	MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK uint64   = 16
 
 	/*
 		Warm coinbase contract needs to check if EIP-3651 applied after shapella
@@ -100,7 +102,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight: 1, //TODO
 		WithdrawalsBlockCount: 1, // Genesis is not a withdrawals block
-		WithdrawalsPerBlock:   16,
+		WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		TimeIncrements:        5,
 	},
 
@@ -113,7 +115,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight: 1, // Only Genesis is Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
-		WithdrawalsPerBlock:   16,
+		WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 	},
 
 	&WithdrawalsBaseSpec{
@@ -128,7 +130,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight: 5, // Genesis and Block 1 are Pre-Withdrawals
 		WithdrawalsBlockCount: 1,
-		WithdrawalsPerBlock:   16,
+		WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		TimeIncrements:        5,
 	},
 
@@ -156,7 +158,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
+		WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		WithdrawableAccountCount: 1,
 	},
 
@@ -173,7 +175,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
+		WithdrawalsPerBlock:      MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		WithdrawableAccountCount: 2,
 	},
 
@@ -181,14 +183,14 @@ var Tests = []test.SpecInterface{
 		Spec: test.Spec{
 			Name: "Withdraw many accounts",
 			About: `
-			Make multiple withdrawals to 1024 different accounts.
+			Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK * 5 different accounts.
 			Execute many blocks this way.
 			`,
 			TimeoutSeconds: 240,
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    4,
-		WithdrawalsPerBlock:      1024,
+		WithdrawalsPerBlock:      uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK * 5),
 		WithdrawableAccountCount: 1024,
 	},
 
@@ -201,7 +203,7 @@ var Tests = []test.SpecInterface{
 		},
 		WithdrawalsForkHeight:    1,
 		WithdrawalsBlockCount:    1,
-		WithdrawalsPerBlock:      64,
+		WithdrawalsPerBlock:      uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
 		WithdrawableAccountCount: 2,
 		WithdrawAmounts: []uint64{
 			0,
@@ -255,7 +257,7 @@ var Tests = []test.SpecInterface{
 				About: `
 				- Spawn a first client
 				- Go through withdrawals fork on Block 1
-				- Withdraw to a single account 16 times each block for 2 blocks
+				- Withdraw to a single account MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK times each block for 2 blocks
 				- Spawn a secondary client and send FCUV2(head)
 				- Wait for sync and verify withdrawn account's balance
 				`,
@@ -263,7 +265,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight:    1,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
 			WithdrawableAccountCount: 1,
 		},
 		SyncSteps: 1,
@@ -276,14 +278,14 @@ var Tests = []test.SpecInterface{
 				About: `
 				- Spawn a first client
 				- Go through withdrawals fork on Block 1
-				- Withdraw to a single account 16 times each block for 2 blocks
+				- Withdraw to a single account MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK times each block for 2 blocks
 				- Spawn a secondary client and send FCUV2(head)
 				- Wait for sync and verify withdrawn account's balance
 				`,
 			},
 			WithdrawalsForkHeight:    1,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
 			WithdrawableAccountCount: 1,
 		},
 		SyncSteps: 1,
@@ -295,14 +297,14 @@ var Tests = []test.SpecInterface{
 				Name: "Sync after 2 blocks - Withdrawals on Genesis - Single Withdrawal Account",
 				About: `
 				- Spawn a first client, with Withdrawals since genesis
-				- Withdraw to a single account 16 times each block for 2 blocks
+				- Withdraw to a single account MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK times each block for 2 blocks
 				- Spawn a secondary client and send FCUV2(head)
 				- Wait for sync and verify withdrawn account's balance
 				`,
 			},
 			WithdrawalsForkHeight:    0,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
 			WithdrawableAccountCount: 1,
 		},
 		SyncSteps: 1,
@@ -315,15 +317,15 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 2
-			- Withdraw to 16 accounts each block for 2 blocks
+			- Withdraw to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
 			`,
 			},
 			WithdrawalsForkHeight:    2,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 16,
+			WithdrawalsPerBlock:      uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
+			WithdrawableAccountCount: uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
 			TransactionsPerBlock:     common.Big0,
 		},
 		SyncSteps: 1,
@@ -336,15 +338,15 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 2
-			- Withdraw to 16 accounts each block for 2 blocks
+			- Withdraw to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each block for 2 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
 			`,
 			},
 			WithdrawalsForkHeight:    2,
 			WithdrawalsBlockCount:    2,
-			WithdrawalsPerBlock:      16,
-			WithdrawableAccountCount: 16,
+			WithdrawalsPerBlock:      uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
+			WithdrawableAccountCount: uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
 		},
 		SyncSteps: 1,
 	},
@@ -357,7 +359,7 @@ var Tests = []test.SpecInterface{
 				About: `
 			- Spawn a first client
 			- Go through withdrawals fork on Block 2
-			- Withdraw to many accounts 16 times each block for 128 blocks
+			- Withdraw to many accounts MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK times each block for 128 blocks
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync, which include syncing a pre-Withdrawals block, and verify withdrawn account's balance
 			`,
@@ -365,7 +367,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight:    2,
 			WithdrawalsBlockCount:    128,
-			WithdrawalsPerBlock:      16,
+			WithdrawalsPerBlock:      uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
 			WithdrawableAccountCount: 1024,
 		},
 		SyncSteps: 1,
@@ -384,8 +386,8 @@ var Tests = []test.SpecInterface{
 				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
+			WithdrawalsBlockCount: uint64(MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK),
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 1,
 		ReOrgViaSync:    false,
@@ -403,8 +405,8 @@ var Tests = []test.SpecInterface{
 				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
+			WithdrawalsBlockCount: MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 8,
 		ReOrgViaSync:    false,
@@ -422,8 +424,8 @@ var Tests = []test.SpecInterface{
 				TimeoutSeconds:   300,
 			},
 			WithdrawalsForkHeight: 1, // Genesis is Pre-Withdrawals
-			WithdrawalsBlockCount: 16,
-			WithdrawalsPerBlock:   16,
+			WithdrawalsBlockCount: MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 8,
 		ReOrgViaSync:    true,
@@ -445,7 +447,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 10,
 		ReOrgViaSync:    false,
@@ -467,7 +469,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount: 10,
 		ReOrgViaSync:    true,
@@ -489,7 +491,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount:         10,
 		ReOrgViaSync:            false,
@@ -512,7 +514,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 		},
 		ReOrgBlockCount:         10,
 		ReOrgViaSync:            true,
@@ -535,7 +537,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			TimeIncrements:        2,
 		},
 		ReOrgBlockCount:         10,
@@ -559,7 +561,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 8, // Genesis is Pre-Withdrawals
 			WithdrawalsBlockCount: 8,
-			WithdrawalsPerBlock:   128,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			TimeIncrements:        2,
 		},
 		ReOrgBlockCount:         10,
@@ -617,7 +619,7 @@ var Tests = []test.SpecInterface{
 			},
 			WithdrawalsForkHeight: 1, // Genesis and Block 1 are Pre-Withdrawals
 			WithdrawalsBlockCount: 2,
-			WithdrawalsPerBlock:   16,
+			WithdrawalsPerBlock:   MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK,
 			TimeIncrements:        5,
 		},
 		ClaimBlocksCount: 2,
@@ -836,6 +838,11 @@ type WithdrawalsBaseSpec struct {
 	SkipBaseVerifications    bool               // For code reuse of the base spec procedure
 }
 
+func (ws *WithdrawalsBaseSpec) GetTTD() int64 {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (ws *WithdrawalsBaseSpec) GetPreShapellaBlockCount() int {
 	return int(ws.WithdrawalsForkHeight)
 }
@@ -860,8 +867,8 @@ func (ws *WithdrawalsBaseSpec) GetWithdrawalsForkTime() uint64 {
 }
 
 // Generates the fork config, including withdrawals fork timestamp.
-func (ws *WithdrawalsBaseSpec) GetForkConfig() test.ForkConfig {
-	return test.ForkConfig{
+func (ws *WithdrawalsBaseSpec) GetForkConfig() globals.ForkConfig {
+	return globals.ForkConfig{
 		ShanghaiTimestamp: big.NewInt(int64(ws.GetWithdrawalsForkTime())),
 	}
 }
@@ -945,8 +952,8 @@ func (ws *WithdrawalsBaseSpec) GetTotalPayloadCount() uint64 {
 
 func (ws *WithdrawalsBaseSpec) GetWithdrawableAccountCount() uint64 {
 	if ws.WithdrawableAccountCount == 0 {
-		// Withdraw to 16 accounts by default
-		return 16
+		// Withdraw to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts by default
+		return MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK
 	}
 	return ws.WithdrawableAccountCount
 }
@@ -1007,7 +1014,7 @@ func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
 				TxType:    t.TestTransactionType,
 				// TODO: figure out why contract storage check fails on block 2 with Genesis.GasLimit()
 				GasLimit: 75000,
-				ChainID:  t.Genesis.Config().ChainID,
+				//ChainID:  t.Genesis.Config().ChainID,
 			},
 		)
 
@@ -1056,7 +1063,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
-					&beacon.PayloadAttributes{
+					&typ.PayloadAttributes{
 						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},
@@ -1090,50 +1097,50 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				Requested "latest" block expecting block to contain
 				withdrawalRoot=nil, because (block %d).timestamp < shanghaiTime
 				`,
-				t.CLMock.LatestPayloadBuilt.Number,
-			)
-			r.ExpectWithdrawalsRoot(nil)
-		}
-	},
-	OnForkchoiceBroadcast: func() {
-		if !ws.SkipBaseVerifications {
-			ws.VerifyContractsStorage(t)
-		}
-	},
-})
-
-ws.waitForShanghai(t)
-
-var (
-	startAccount = ws.GetWithdrawalsStartAccount()
-	nextIndex    = uint64(0)
-)
-
-// start client
-client := getClient(t)
-if client == nil {
-	t.Fatalf("Couldn't connect to client")
-	return
-}
-defer client.Close()
-
-// Produce requested post-shanghai blocks:
-// 1. Send some withdrawals and transactions
-// 2. Check that contract withdrawable amount matches the expectations
-for i := 0; i < int(ws.WithdrawalsBlockCount); i++ {
-	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-		OnPayloadProducerSelected: func() {
-			// Send some withdrawals
-			t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
-			ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
-
-			ws.sendPayloadTransactions(t)
+					t.CLMock.LatestPayloadBuilt.Number,
+				)
+				r.ExpectWithdrawalsRoot(nil)
+			}
 		},
-		OnGetPayload: func() {
+		OnForkchoiceBroadcast: func() {
 			if !ws.SkipBaseVerifications {
+				ws.VerifyContractsStorage(t)
+			}
+		},
+	})
 
-				// Verify the list of withdrawals returned on the payload built
-				// engine_forkchoiceUpdatedV2 method call
+	ws.waitForShanghai(t)
+
+	var (
+		startAccount = ws.GetWithdrawalsStartAccount()
+		nextIndex    = uint64(0)
+	)
+
+	// start client
+	client := getClient(t)
+	if client == nil {
+		t.Fatalf("Couldn't connect to client")
+		return
+	}
+	defer client.Close()
+
+	// Produce requested post-shanghai blocks:
+	// 1. Send some withdrawals and transactions
+	// 2. Check that contract withdrawable amount matches the expectations
+	for i := 0; i < int(ws.WithdrawalsBlockCount); i++ {
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+			OnPayloadProducerSelected: func() {
+				// Send some withdrawals
+				t.CLMock.NextWithdrawals, nextIndex = ws.GenerateWithdrawalsForBlock(nextIndex, startAccount)
+				ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber] = t.CLMock.NextWithdrawals
+
+				ws.sendPayloadTransactions(t)
+			},
+			OnGetPayload: func() {
+				if !ws.SkipBaseVerifications {
+
+					// Verify the list of withdrawals returned on the payload built
+					// engine_forkchoiceUpdatedV2 method call
 					if sentList, ok := ws.WithdrawalsHistory[t.CLMock.CurrentPayloadNumber]; !ok {
 						t.Fatalf("FAIL (%s): Withdrawals sent list was not saved", t.TestName)
 					} else {
@@ -1162,54 +1169,54 @@ for i := 0; i < int(ws.WithdrawalsBlockCount); i++ {
 							t.Fatalf("FAIL (%s): Error trying to get balance of token: %v, address: %v", t.TestName, err, addr.Hex())
 						}
 
-					expectBalanceMGNO := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(addr, t.CLMock.LatestExecutedPayload.Number)
-					expectBalance := libgno.UnwrapToGNO(expectBalanceMGNO)
+						expectBalanceMGNO := ws.WithdrawalsHistory.GetExpectedAccumulatedBalance(addr, t.CLMock.LatestExecutedPayload.Number)
+						expectBalance := libgno.UnwrapToGNO(expectBalanceMGNO)
 
-					if withdrawableAmount.Cmp(expectBalance) != 0 {
-						t.Fatalf(
-							"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
-							t.TestName,
-							addr,
-							expectBalance,
-							withdrawableAmount,
-						)
+						if withdrawableAmount.Cmp(expectBalance) != 0 {
+							t.Fatalf(
+								"FAIL (%s): Incorrect balance on account %s after withdrawals applied: want=%d, got=%d",
+								t.TestName,
+								addr,
+								expectBalance,
+								withdrawableAmount,
+							)
+						}
 					}
 				}
+			},
+		})
+	}
+
+	// Iterate over balance history of withdrawn accounts using RPC and
+	// check that the balances match expected values.
+	// Also check one block before the withdrawal took place, verify that
+	// withdrawal has not been updated.
+	if !ws.SkipBaseVerifications {
+		for block := uint64(0); block <= t.CLMock.LatestExecutedPayload.Number; block++ {
+			ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
+
+			// Check the correct withdrawal root on past blocks
+			r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
+			var expectedWithdrawalsRoot *common.Hash = nil
+			if block >= ws.WithdrawalsForkHeight {
+				calcWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
+					ws.WithdrawalsHistory.GetWithdrawals(block),
+				)
+				expectedWithdrawalsRoot = &calcWithdrawalsRoot
 			}
-		},
-	})
-}
-
-// Iterate over balance history of withdrawn accounts using RPC and
-// check that the balances match expected values.
-// Also check one block before the withdrawal took place, verify that
-// withdrawal has not been updated.
-if !ws.SkipBaseVerifications {
-	for block := uint64(0); block <= t.CLMock.LatestExecutedPayload.Number; block++ {
-		ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
-
-		// Check the correct withdrawal root on past blocks
-		r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
-		var expectedWithdrawalsRoot *common.Hash = nil
-		if block >= ws.WithdrawalsForkHeight {
-			calcWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
-				ws.WithdrawalsHistory.GetWithdrawals(block),
-			)
-			expectedWithdrawalsRoot = &calcWithdrawalsRoot
-		}
-		jsWithdrawals, _ := json.MarshalIndent(ws.WithdrawalsHistory.GetWithdrawals(block), "", " ")
-		r.ExpectationDescription = fmt.Sprintf(`
+			jsWithdrawals, _ := json.MarshalIndent(ws.WithdrawalsHistory.GetWithdrawals(block), "", " ")
+			r.ExpectationDescription = fmt.Sprintf(`
 		Requested block %d to verify withdrawalsRoot with the
 		following withdrawals:
 		%s`, block, jsWithdrawals)
 
-		r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
+			r.ExpectWithdrawalsRoot(expectedWithdrawalsRoot)
 
+		}
+
+		// Verify on `latest`
+		ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
 	}
-
-	// Verify on `latest`
-	ws.WithdrawalsHistory.VerifyWithdrawals(t.CLMock.LatestExecutedPayload.Number, nil, t.TestEngine)
-}
 }
 
 func getClient(t *test.Env) *ethclient.Client {
@@ -1311,7 +1318,7 @@ func (ws *WithdrawalsSyncSpec) Execute(t *test.Env) {
 		// TODO
 	} else {
 		// Send the FCU to trigger sync on the secondary client
-		loop:
+	loop:
 		for {
 			select {
 			case <-t.TimeoutContext.Done():
@@ -1417,7 +1424,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		sidechainStartAccount       = new(big.Int).SetBit(common.Big0, 160, 1)
 		sidechainNextIndex          = uint64(0)
 		sidechainWithdrawalsHistory = make(WithdrawalsHistory)
-		sidechain                   = make(map[uint64]*beacon.ExecutableData)
+		sidechain                   = make(map[uint64]*typ.ExecutableData)
 		sidechainPayloadId          *beacon.PayloadID
 	)
 
@@ -1466,7 +1473,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 			}
 
 			// Error will be ignored here since the tx could have been already relayed
-			secondaryEngine.SendTransactions(t.TestContext, txs)
+			secondaryEngine.SendTransactions(t.TestContext, txs...)
 
 			if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainSplitHeight() {
 				// Also request a payload from the sidechain
@@ -1483,7 +1490,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 				}
 
 				var version int
-				pAttributes := beacon.PayloadAttributes{
+				pAttributes := typ.PayloadAttributes{
 					Random:                t.CLMock.LatestPayloadAttributes.Random,
 					SuggestedFeeRecipient: t.CLMock.LatestPayloadAttributes.SuggestedFeeRecipient,
 				}
@@ -1517,7 +1524,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		OnGetPayload: func() {
 			var (
 				version int
-				payload *beacon.ExecutableData
+				payload *typ.ExecutableData
 			)
 			if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainWithdrawalsForkHeight() {
 				version = 2
@@ -1534,7 +1541,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 				// This block is part of both chains, simply forward it to the secondary client
 				payload = &t.CLMock.LatestPayloadBuilt
 			}
-			r := secondaryEngineTest.TestEngineNewPayload(payload, version)
+			r := secondaryEngineTest.TestEngineNewPayload(payload, nil, nil, version)
 			r.ExpectStatus(test.Valid)
 			p := secondaryEngineTest.TestEngineForkchoiceUpdated(
 				&beacon.ForkchoiceStateV1{
@@ -1556,7 +1563,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		// the sidechain.
 		for i := uint64(0); i < ws.GetSidechainWithdrawalsForkHeight()-ws.WithdrawalsForkHeight; i++ {
 			sidechainWithdrawalsHistory[sidechainHeight+1], sidechainNextIndex = ws.GenerateWithdrawalsForBlock(sidechainNextIndex, sidechainStartAccount)
-			pAttributes := beacon.PayloadAttributes{
+			pAttributes := typ.PayloadAttributes{
 				Timestamp:             sidechain[sidechainHeight].Timestamp + ws.GetSidechainBlockTimeIncrements(),
 				Random:                t.CLMock.LatestPayloadAttributes.Random,
 				SuggestedFeeRecipient: t.CLMock.LatestPayloadAttributes.SuggestedFeeRecipient,
@@ -1592,7 +1599,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 
 	if ws.ReOrgViaSync {
 		// Send latest sidechain payload as NewPayload + FCU and wait for sync
-		loop:
+	loop:
 		for {
 			r := t.TestEngine.TestEngineNewPayloadV2(sidechain[sidechainHeight])
 			r.ExpectNoError()
@@ -1637,7 +1644,7 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 				payload.BlockHash,
 				payload.ParentHash,
 			)
-			r := t.TestEngine.TestEngineNewPayload(payload, version)
+			r := t.TestEngine.TestEngineNewPayload(payload, nil, nil, version)
 			r.ExpectStatusEither(test.Valid, test.Accepted)
 			p := t.TestEngine.TestEngineForkchoiceUpdated(
 				&beacon.ForkchoiceStateV1{
@@ -1710,7 +1717,7 @@ func (ws *WithdrawalsBaseSpec) ClaimWithdrawals(t *test.Env) {
 			PrivateKey: globals.GnoVaultVaultKey,
 			TxType:     t.TestTransactionType,
 			GasLimit:   t.Genesis.GasLimit(),
-			ChainID:    t.Genesis.Config().ChainID,
+			//ChainID:    t.Genesis.Config().ChainID,
 		},
 		globals.GnoVaultAccountAddress,
 	)
@@ -1794,7 +1801,7 @@ func (ws *WithdrawalsExecutionLayerSpec) Execute(t *test.Env) {
 					&beacon.ForkchoiceStateV1{
 						HeadBlockHash: t.CLMock.LatestHeader.Hash(),
 					},
-					&beacon.PayloadAttributes{
+					&typ.PayloadAttributes{
 						Timestamp:             t.CLMock.LatestHeader.Time + ws.GetBlockTimeIncrements(),
 						Random:                common.Hash{},
 						SuggestedFeeRecipient: common.Address{},

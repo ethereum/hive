@@ -99,7 +99,7 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 						}
 
 						// Run the test case
-						test.Run(currentTest, big.NewInt(ttd), timeout, t, c, &genesis, syncClientParams, testFiles.Copy())
+						test.Run(currentTest, big.NewInt(ttd), timeout, t, c, &genesis, nil, syncClientParams, testFiles.Copy())
 					},
 				})
 			}

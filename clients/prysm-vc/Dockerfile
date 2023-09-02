@@ -1,5 +1,7 @@
-ARG branch=latest-debug
-FROM gcr.io/prysmaticlabs/prysm/validator:$branch as upstream
+ARG tag=latest-debug
+ARG baseimage=gcr.io/prysmaticlabs/prysm/validator
+
+FROM $baseimage:$branch as upstream
 
 FROM debian:buster-slim
 COPY --from=upstream /app/cmd/validator/validator validator

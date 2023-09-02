@@ -7,7 +7,7 @@ import $ from 'jquery';
 import * as common from './app-common.js';
 import * as routes from './routes.js';
 import { makeButton } from './html.js';
-import { formatBytes } from './utils.js';
+import { formatBytes, escapeRegExp } from './utils.js';
 
 $(document).ready(function () {
     common.updateHeader();
@@ -133,5 +133,95 @@ function showFileListing(data) {
                 },
             },
         ],
+        initComplete: function () {
+            const api = this.api();
+            $('<tr class="filters"><th></th><th></th><th></th><th></th><th></th></tr>')
+                .appendTo($('#filetable thead'));
+            dateSelect(api, 0);
+            selectWithOptions(api, 1, anchorStartEnd);
+            selectWithOptions(api, 2, anchorWord);
+            statusSelect(api, 3);
+        }
     });
+}
+
+function anchorWord(re) {
+    return '\\b' + re + '\\b';
+}
+
+function anchorStartEnd(re) {
+    return '^' + re + '$';
+}
+
+function genericSelect(api, colIdx, modifyRE) {
+    const table = $('#filetable').DataTable();
+    const cell = $('.filters th').eq(
+        $(api.column(colIdx).header()).index()
+    );
+
+    // Create the select list and search operation
+    const select = $('<select />')
+        .appendTo(cell)
+        .on('change', function () {
+            let re = escapeRegExp($(this).val());
+            if (re !== '') {
+                if (modifyRE) {
+                    re = modifyRE(re);
+                }
+                console.log(`searching column ${colIdx} with regexp ${re}`);
+                table.column(colIdx).search(re, true, false);
+            } else {
+                // Empty query clears search.
+                table.column(colIdx).search('');
+            }
+            table.draw();
+        });
+
+    select.append($('<option value="">Show all</option>'));
+    return select;
+}
+
+function selectWithOptions(api, colIdx, modifyRE) {
+    const table = $('#filetable').DataTable();
+    const select = genericSelect(api, colIdx, modifyRE);
+    let options = new Set();
+
+    // Get the search data for the first column and add to the select list
+    table
+        .column(colIdx)
+        .cache('search')
+        .unique()
+        .each(function (d) {
+            d.split(',').forEach(function (d) {
+                options.add(d.trim());
+            });
+        });
+    Array.from(options.values()).sort().forEach(function (d) {
+        select.append($('<option value="'+d+'">'+d+'</option>'));
+    });
+}
+
+function statusSelect(api, colIdx) {
+    const select = genericSelect(api, colIdx);
+    select.append($('<option value="✓">SUCCESS</option>'));
+    select.append($('<option value="FAIL">FAIL</option>'));
+    select.append($('<option value="TIMEOUT">TIMEOUT</option>'));
+}
+
+function minusXDaysDate(x) {
+    const date = new Date(new Date().setDate(new Date().getDate() - x))
+    return date.toLocaleDateString()
+}
+
+function dateSelect(api, colIdx) {
+    const select = genericSelect(api, colIdx);
+    const today = new Date().toLocaleDateString();
+    select.append($('<option value="' + today + '">Today</option>'));
+    select.append($('<option value="' + minusXDaysDate(1) + '">Yesterday</option>'));
+    select.append($('<option value="' + minusXDaysDate(2) + '">2 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(3) + '">3 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(4) + '">4 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(5) + '">5 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(6) + '">6 days ago</option>'));
+    select.append($('<option value="' + minusXDaysDate(7) + '">7 days ago</option>'));
 }

@@ -1,0 +1,40 @@
+### Build Nethermind Locally:
+### Requires a copy of nethermind/ -> hive/clients/nethermind/
+
+## Builder stage: Compiles nethermind from a local directory
+FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+
+# Default local client path: clients/nethermind/<nethermind>
+ARG local_path=nethermind
+ADD $local_path /nethermind
+
+RUN cd /nethermind/src/Nethermind/Nethermind.Runner && dotnet build -c release
+
+## Final stage: Sets up the environment for running nethermind
+FROM mcr.microsoft.com/dotnet/aspnet:7.0
+
+# Copy compiled binary from builder
+COPY --from=build /nethermind/src/Nethermind/Nethermind.Runner/bin/release/net7.0 /nethermind
+WORKDIR /nethermind
+
+RUN apt-get update && apt-get install -y jq libsnappy-dev libc6-dev libc6 && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create version.txt
+RUN dotnet /nethermind/nethermind.dll --version > /raw_version.txt && tail -n 1 /raw_version.txt > /version.txt
+
+# Add genesis mapper script, startup script, and enode URL retriever script
+ADD genesis.json /genesis.json
+ADD mapper.jq /mapper.jq
+ADD mkconfig.jq /mkconfig.jq
+ADD nethermind.sh /nethermind.sh
+ADD enode.sh /hive-bin/enode.sh
+
+# Set execute permissions for scripts
+RUN chmod +x /nethermind.sh /hive-bin/enode.sh
+
+# Expose networking ports
+EXPOSE 8545 30303 30303/udp
+
+ENV NETHERMIND_HIVE_ENABLED true
+ENTRYPOINT ["/nethermind.sh"]

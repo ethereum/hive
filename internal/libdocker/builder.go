@@ -13,7 +13,6 @@ import (
 
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
-	"gopkg.in/yaml.v3"
 
 	"github.com/ethereum/hive/internal/libhive"
 )
@@ -39,32 +38,23 @@ func NewBuilder(client *docker.Client, cfg *Config, auth Authenticator) *Builder
 	return b
 }
 
-// ReadClientMetadata reads metadata of the given client.
-func (b *Builder) ReadClientMetadata(name string) (*libhive.ClientMetadata, error) {
-	dir := b.config.Inventory.ClientDirectory(name)
-	f, err := os.Open(filepath.Join(dir, "hive.yaml"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Eth1 client by default.
-			return &libhive.ClientMetadata{Roles: []string{"eth1"}}, nil
-		} else {
-			return nil, fmt.Errorf("failed to read hive metadata file in '%s': %v", dir, err)
+// BuildClientImage builds a docker image of the given client.
+func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDesignator) (string, error) {
+	dir := b.config.Inventory.ClientDirectory(client)
+	tag := fmt.Sprintf("hive/clients/%s:latest", client.Name())
+	dockerFile := client.Dockerfile()
+	buildArgs := make([]docker.BuildArg, 0)
+	for key, value := range client.BuildArgs {
+		buildArgs = append(buildArgs, docker.BuildArg{Name: key, Value: value})
+
+		// Backwards-compatibility for non-updated client Dockerfiles.
+		// TODO(fjl): remove this when all clients have been updated to "tag".
+		if key == "tag" {
+			buildArgs = append(buildArgs, docker.BuildArg{Name: "branch", Value: value})
 		}
 	}
-	defer f.Close()
-	var out libhive.ClientMetadata
-	if err := yaml.NewDecoder(f).Decode(&out); err != nil {
-		return nil, fmt.Errorf("failed to decode hive metadata file in '%s': %v", dir, err)
-	}
-	return &out, nil
-}
 
-// BuildClientImage builds a docker image of the given client.
-func (b *Builder) BuildClientImage(ctx context.Context, name string) (string, error) {
-	dir := b.config.Inventory.ClientDirectory(name)
-	_, branch := libhive.SplitClientName(name)
-	tag := fmt.Sprintf("hive/clients/%s:latest", name)
-	err := b.buildImage(ctx, dir, "Dockerfile", branch, tag)
+	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs)
 	return tag, err
 }
 
@@ -89,7 +79,7 @@ func (b *Builder) BuildSimulatorImage(ctx context.Context, name string) (string,
 		}
 	}
 	tag := fmt.Sprintf("hive/simulators/%s:latest", name)
-	err := b.buildImage(ctx, buildContextPath, buildDockerfile, "", tag)
+	err := b.buildImage(ctx, buildContextPath, buildDockerfile, tag, nil)
 	return tag, err
 }
 
@@ -235,7 +225,7 @@ func (b *Builder) ReadFile(ctx context.Context, image, path string) ([]byte, err
 
 // buildImage builds a single docker image from the specified context.
 // branch specifes a build argument to use a specific base image branch or github source branch.
-func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, branch, imageTag string) error {
+func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, imageTag string, buildArgs []docker.BuildArg) error {
 	logger := b.logger.New("image", imageTag)
 	context, err := filepath.Abs(contextDir)
 	if err != nil {
@@ -247,9 +237,11 @@ func (b *Builder) buildImage(ctx context.Context, contextDir, dockerFile, branch
 	opts.ContextDir = context
 	opts.Dockerfile = dockerFile
 	logctx := []interface{}{"dir", contextDir, "nocache", opts.NoCache, "pull", opts.Pull}
-	if branch != "" {
-		logctx = append(logctx, "branch", branch)
-		opts.BuildArgs = []docker.BuildArg{{Name: "branch", Value: branch}}
+	if len(buildArgs) > 0 {
+		for _, arg := range buildArgs {
+			logctx = append(logctx, arg.Name, arg.Value)
+		}
+		opts.BuildArgs = buildArgs
 	}
 
 	logger.Info("building image", logctx...)

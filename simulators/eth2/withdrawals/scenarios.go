@@ -8,11 +8,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
-	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
+	mock_builder "github.com/marioevz/mock-builder/mock"
 
 	beacon_verification "github.com/ethereum/hive/simulators/eth2/common/spoofing/beacon"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
+	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
 	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
@@ -160,7 +161,7 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 	}
 
 	// Get the beacon state and verify the credentials were updated
-	var versionedBeaconState *clients.VersionedBeaconStateResponse
+	var versionedBeaconState *beacon_client.VersionedBeaconStateResponse
 	for _, bn := range testnet.BeaconClients().Running() {
 		versionedBeaconState, err = bn.BeaconStateV2(
 			ctx,
@@ -344,6 +345,19 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 	testnet := tn.StartTestnet(ctx, t, env, config)
 	defer testnet.Stop()
 
+	blsDomain := ComputeBLSToExecutionDomain(testnet)
+
+	// Get all validators info
+	allValidators, err := ValidatorsFromBeaconState(
+		testnet.GenesisBeaconState(),
+		*testnet.Spec().Spec,
+		env.Keys,
+		&blsDomain,
+	)
+	if err != nil {
+		t.Fatalf("FAIL: Error parsing validators from beacon state")
+	}
+
 	go func() {
 		lastNonce := uint64(0)
 		txPerIteration := 5
@@ -386,7 +400,14 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 
 	// Check that the builder was working properly until now
 	for i, b := range testnet.BeaconClients().Running() {
-		builder := b.Builder
+		builder, ok := b.Builder.(*mock_builder.MockBuilder)
+		if !ok {
+			t.Fatalf(
+				"FAIL: client %d (%s) is not a mock builder",
+				i,
+				b.ClientName(),
+			)
+		}
 		if builder.GetBuiltPayloadsCount() == 0 {
 			t.Fatalf("FAIL: builder %d did not build any payloads", i)
 		}
@@ -396,6 +417,32 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 				i,
 			)
 		}
+	}
+
+	// If there are any remaining validators that cannot withdraw yet, send
+	// BLS-to-execution-changes now.
+	nonWithdrawableValidators := allValidators.NonWithdrawable()
+	if len(nonWithdrawableValidators) > 0 {
+		beaconClients := testnet.BeaconClients()
+		for i := 0; i < len(nonWithdrawableValidators); i++ {
+			b := beaconClients[i%len(beaconClients)]
+			v := nonWithdrawableValidators[i]
+			if err := v.SignSendBLSToExecutionChange(
+				ctx,
+				b,
+				common.Address{byte(v.Index + 0x100)},
+			); err != nil {
+				t.Fatalf(
+					"FAIL: Unable to submit bls-to-execution changes: %v",
+					err,
+				)
+			} else {
+				t.Logf("INFO: Sent validator %d BLS-To-Exec-Change on Capella (%s)", v.Index, b.ClientName())
+			}
+		}
+
+	} else {
+		t.Logf("INFO: no validators left on BLS credentials")
 	}
 
 	// Wait for finalization, to verify that builder modifications
@@ -415,7 +462,14 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 		// Simply verify that builder's capella payloads were included in the
 		// canonical chain
 		for i, n := range testnet.Nodes.Running() {
-			b := n.BeaconClient.Builder
+			b, ok := n.BeaconClient.Builder.(*mock_builder.MockBuilder)
+			if !ok {
+				t.Fatalf(
+					"FAIL: client %d (%s) is not a mock builder",
+					i,
+					n.BeaconClient.ClientName(),
+				)
+			}
 			ec := n.ExecutionClient
 			includedPayloads := 0
 			for _, p := range b.GetBuiltPayloads() {
@@ -443,7 +497,15 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 		}
 	} else if ts.InvalidatePayloadAttributes != "" {
 		for i, n := range testnet.VerificationNodes().Running() {
-			modifiedPayloads := n.BeaconClient.Builder.GetModifiedPayloads()
+			b, ok := n.BeaconClient.Builder.(*mock_builder.MockBuilder)
+			if !ok {
+				t.Fatalf(
+					"FAIL: client %d (%s) is not a mock builder",
+					i,
+					n.BeaconClient.ClientName(),
+				)
+			}
+			modifiedPayloads := b.GetModifiedPayloads()
 			if len(modifiedPayloads) == 0 {
 				t.Fatalf("FAIL: No payloads were modified by builder %d", i)
 			}
@@ -508,4 +570,67 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 		}
 
 	}
+
+	// Verify all submited blinded beacon blocks have correct signatures
+	spec := testnet.Spec().Spec
+	genesisValsRoot := testnet.GenesisValidatorsRoot()
+	for i, n := range testnet.Nodes.Running() {
+		b, ok := n.BeaconClient.Builder.(*mock_builder.MockBuilder)
+		if !ok {
+			t.Fatalf(
+				"FAIL: client %d (%s) is not a mock builder",
+				i,
+				n.BeaconClient.ClientName(),
+			)
+		}
+		for slot, b := range b.GetSignedBeaconBlocks() {
+			if slot != b.Slot() {
+				t.Fatalf(
+					"FAIL: Beacon block slot %d does not match slot %d",
+					b.Slot(),
+					slot,
+				)
+			}
+			proposerIndex := b.ProposerIndex()
+			v := allValidators.GetValidatorByIndex(proposerIndex)
+			if v == nil {
+				t.Fatalf(
+					"FAIL: Unable to find validator with index %d",
+					proposerIndex,
+				)
+			}
+			blockProposerDomain := beacon.ComputeDomain(
+				beacon.DOMAIN_BEACON_PROPOSER,
+				spec.ForkVersion(slot),
+				genesisValsRoot,
+			)
+			signature := b.BlockSignature()
+			blockRoot := b.Root(spec)
+			if valid, err := v.VerifySignature(
+				signature,
+				blockRoot,
+				blockProposerDomain,
+			); err != nil {
+				t.Fatalf(
+					"FAIL: Error verifying signature for slot %d on node %d: err",
+					slot,
+					i,
+					err,
+				)
+			} else if !valid {
+				t.Fatalf(
+					"FAIL: Invalid signature for slot %d on node %d, root=%s, signature=%s, public key=%s",
+					slot,
+					i,
+					blockRoot.String(),
+					b.BlockSignature().String(),
+					v.PubKey.String(),
+				)
+			}
+
+		}
+	}
+	t.Logf(
+		"INFO: Validated all signatures of beacon blocks received by builders",
+	)
 }

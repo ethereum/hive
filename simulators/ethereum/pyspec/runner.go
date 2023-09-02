@@ -4,13 +4,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
+	"io/fs"
+	"math/big"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/go-ethereum/tests"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -18,14 +23,14 @@ import (
 
 // loadFixtureTests extracts tests from fixture.json files in a given directory,
 // creates a testcase for each test, and passes the testcase struct to fn.
-func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) {
+	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		// check file is actually a fixture
 		if err != nil {
 			t.Logf("unable to walk path: %s", err)
 			return err
 		}
-		if info.IsDir() || !strings.HasSuffix(info.Name(), ".json") {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), ".json") {
 			return nil
 		}
 		excludePaths := []string{"example/"} // modify for tests to exclude
@@ -53,8 +58,15 @@ func loadFixtureTests(t *hivesim.T, root string, fn func(testcase)) {
 				name:     path[10:len(path)-5] + "/" + name,
 				filepath: path,
 			}
+			// match test case name against regex if provided
+			if !re.MatchString(tc.name) {
+				continue
+			}
 			// extract genesis, payloads & post allocation field to tc
-			tc.extractFixtureFields(fixture.json)
+			if err := tc.extractFixtureFields(fixture.json); err != nil {
+				t.Logf("test %v / %v: unable to extract fixture fields: %v", d.Name(), name, err)
+				tc.failedErr = fmt.Errorf("unable to extract fixture fields: %v", err)
+			}
 			// feed tc to single worker within fixtureRunner()
 			fn(tc)
 		}
@@ -80,12 +92,15 @@ func (tc *testcase) run(t *hivesim.T) {
 	env := hivesim.Params{
 		"HIVE_FORK_DAO_VOTE": "1",
 		"HIVE_CHAIN_ID":      "1",
-		"HIVE_SKIP_POW":      "1",
 		"HIVE_NODETYPE":      "full",
 	}
 	tc.updateEnv(env)
 	t0 := time.Now()
-
+	// If test is already failed, don't bother spinning up a client
+	if tc.failedErr != nil {
+		t.Errorf("test failed early: %v", tc.failedErr)
+		return
+	}
 	// start client (also creates an engine RPC client internally)
 	t.Log("starting client with Engine API.")
 	engineClient, err := engineStarter.StartClient(t, ctx, tc.genesis, env, nil)
@@ -93,32 +108,50 @@ func (tc *testcase) run(t *hivesim.T) {
 		tc.failedErr = err
 		t.Fatalf("can't start client with Engine API: %v", err)
 	}
+	// verify genesis hash matches that of the fixture
+	genesisBlock, err := engineClient.BlockByNumber(ctx, big.NewInt(0))
+	if err != nil {
+		tc.failedErr = err
+		t.Fatalf("unable to get genesis block: %v", err)
+	}
+	if genesisBlock.Hash() != tc.fixture.json.Genesis.Hash {
+		tc.failedErr = errors.New("genesis hash mismatch")
+		t.Fatalf("genesis hash mismatch")
+	}
 	t1 := time.Now()
 
 	// send payloads and check response
 	latestValidHash := common.Hash{}
-	for blockNumber, payload := range tc.payloads {
-		plException := tc.fixture.json.Blocks[blockNumber].Exception
+	latestVersion := uint64(1)
+	for i, engineNewPayload := range tc.payloads {
+		// execute fixture block payload
+		plStatus, plErr := engineClient.NewPayload(
+			context.Background(),
+			int(engineNewPayload.Version),
+			engineNewPayload.Payload,
+			&engineNewPayload.BlobVersionedHashes,
+			engineNewPayload.ParentBeaconBlockRoot,
+		)
+		latestVersion = engineNewPayload.Version
+		// check for rpc errors and compare error codes
+		fxErrCode := int(tc.fixture.json.Blocks[i].EngineNewPayload.ErrorCode)
+		if fxErrCode != 0 {
+			checkRPCErrors(plErr, fxErrCode, t, tc)
+			continue
+		}
+		// set expected payload return status
 		expectedStatus := "VALID"
-		if plException != "" {
+		if tc.fixture.json.Blocks[i].Exception != "" {
 			expectedStatus = "INVALID"
 		}
-		// execute fixture block payload
-		plStatus, plErr := engineClient.NewPayloadV2(context.Background(), payload)
-		if plErr != nil {
-			tc.failedErr = plErr
-			t.Fatalf("unable to send block %v in test %s: %v ", blockNumber+1, tc.name, plErr)
+		// check payload status matches expected
+		if plStatus.Status != expectedStatus {
+			tc.failedErr = fmt.Errorf("payload status mismatch: client returned %v and fixture expected %v", plStatus.Status, expectedStatus)
+			t.Fatalf("payload status mismatch: client returned %v\n fixture expected %v\n", plStatus.Status, expectedStatus, tc.name)
 		}
-		// update latest valid block hash
+		// update latest valid block hash if payload status is VALID
 		if plStatus.Status == "VALID" {
 			latestValidHash = *plStatus.LatestValidHash
-		}
-		// check payload status is expected from fixture
-		if expectedStatus != plStatus.Status {
-			tc.failedErr = errors.New("payload status mismatch")
-			t.Fatalf(`payload status mismatch for block %v in test %s.
-				expected from fixture: %s
-				got from payload: %s`, blockNumber+1, tc.name, expectedStatus, plStatus.Status)
 		}
 	}
 	t2 := time.Now()
@@ -127,7 +160,9 @@ func (tc *testcase) run(t *hivesim.T) {
 	if latestValidHash != (common.Hash{}) {
 		// update with latest valid response
 		fcState := &api.ForkchoiceStateV1{HeadBlockHash: latestValidHash}
-		if _, fcErr := engineClient.ForkchoiceUpdatedV2(ctx, fcState, nil); fcErr != nil {
+		// TODO: This is incorrect, up to this point, the `engine_forkchoiceUpdated` and `engine_newPayload` versions for each
+		// fork match, but it could change in the future. Ideally we should embed the version in the fixture.
+		if _, fcErr := engineClient.ForkchoiceUpdated(ctx, int(latestVersion), fcState, nil); fcErr != nil {
 			tc.failedErr = fcErr
 			t.Fatalf("unable to update head of beacon chain in test %s: %v ", tc.name, fcErr)
 		}
@@ -204,5 +239,58 @@ func (tc *testcase) updateEnv(env hivesim.Params) {
 	forkRules := envForks[tc.fixture.json.Network]
 	for k, v := range forkRules {
 		env[k] = fmt.Sprintf("%d", v)
+	}
+}
+
+// extractFixtureFields extracts the genesis, post allocation and payload
+// fields from the given fixture test and stores them in the testcase struct.
+func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
+	tc.genesis = extractGenesis(fixture)
+	tc.postAlloc = &fixture.Post
+	var engineNewPayloads []*engineNewPayload
+	for _, bl := range fixture.Blocks {
+		if bl.EngineNewPayload == nil {
+			return errors.New("engineNewPayload is nil")
+		}
+		engineNewPayloads = append(engineNewPayloads, bl.EngineNewPayload)
+	}
+	tc.payloads = engineNewPayloads
+	return nil
+}
+
+// extractGenesis extracts the genesis block information from the given fixture
+// and returns a core.Genesis struct containing the extracted information.
+func extractGenesis(fixture fixtureJSON) *core.Genesis {
+	genesis := &core.Genesis{
+		Config:        tests.Forks[fixture.Network],
+		Coinbase:      fixture.Genesis.Coinbase,
+		Difficulty:    fixture.Genesis.Difficulty,
+		GasLimit:      fixture.Genesis.GasLimit,
+		Timestamp:     fixture.Genesis.Timestamp.Uint64(),
+		ExtraData:     fixture.Genesis.ExtraData,
+		Mixhash:       fixture.Genesis.MixHash,
+		Nonce:         fixture.Genesis.Nonce.Uint64(),
+		BaseFee:       fixture.Genesis.BaseFee,
+		BlobGasUsed:   fixture.Genesis.BlobGasUsed,
+		ExcessBlobGas: fixture.Genesis.ExcessBlobGas,
+		BeaconRoot:    fixture.Genesis.BeaconRoot,
+		Alloc:         fixture.Pre,
+	}
+	return genesis
+}
+
+// checkRPCErrors checks for RPC errors and compares error codes if expected.
+func checkRPCErrors(plErr error, fxErrCode int, t *hivesim.T, tc *testcase) {
+	rpcErr, isRpcErr := plErr.(rpc.Error)
+	if isRpcErr {
+		plErrCode := rpcErr.ErrorCode()
+		if plErrCode != fxErrCode {
+			tc.failedErr = fmt.Errorf("error code mismatch: client returned %v and fixture expected %v", plErrCode, fxErrCode)
+			t.Fatalf("error code mismatch\n client returned: %v\n fixture expected: %v\n in test %s", plErrCode, fxErrCode, tc.name)
+		}
+		t.Logf("expected error code caught by client: %v", plErrCode)
+	} else {
+		tc.failedErr = fmt.Errorf("fixture expected rpc error code: %v but none was returned from client", fxErrCode)
+		t.Fatalf("fixture expected rpc error code: %v but none was returned from client in test %s", fxErrCode, tc.name)
 	}
 }

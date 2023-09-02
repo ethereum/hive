@@ -42,7 +42,7 @@ func NewRunner(inv Inventory, b Builder, cb ContainerBackend) *Runner {
 }
 
 // Build builds client and simulator images.
-func (r *Runner) Build(ctx context.Context, clientList, simList []string) error {
+func (r *Runner) Build(ctx context.Context, clientList []ClientDesignator, simList []string) error {
 	if err := r.container.Build(ctx, r.builder); err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (r *Runner) Build(ctx context.Context, clientList, simList []string) error 
 }
 
 // buildClients builds client images.
-func (r *Runner) buildClients(ctx context.Context, clientList []string) error {
+func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator) error {
 	if len(clientList) == 0 {
 		return errors.New("client list is empty, cannot simulate")
 	}
@@ -63,13 +63,6 @@ func (r *Runner) buildClients(ctx context.Context, clientList []string) error {
 	var anyBuilt bool
 	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
 	for _, client := range clientList {
-		if !r.inv.HasClient(client) {
-			return fmt.Errorf("unknown client %q", client)
-		}
-		meta, err := r.builder.ReadClientMetadata(client)
-		if err != nil {
-			return err
-		}
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
 			continue
@@ -77,13 +70,13 @@ func (r *Runner) buildClients(ctx context.Context, clientList []string) error {
 		anyBuilt = true
 		version, err := r.builder.ReadFile(ctx, image, "/version.txt")
 		if err != nil {
-			log15.Warn("can't read version info of "+client, "image", image, "err", err)
+			log15.Warn("can't read version info of "+client.Client, "image", image, "err", err)
 		}
-		r.clientDefs[client] = &ClientDefinition{
-			Name:    client,
+		r.clientDefs[client.Name()] = &ClientDefinition{
+			Name:    client.Name(),
 			Version: strings.TrimSpace(string(version)),
 			Image:   image,
-			Meta:    *meta,
+			Meta:    r.inv.Clients[client.Client].Meta,
 		}
 	}
 	if !anyBuilt {
@@ -173,12 +166,12 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 			clientDefs[name] = def
 		}
 	} else {
-		for _, name := range env.ClientList {
-			def, ok := r.clientDefs[name]
+		for _, client := range env.ClientList {
+			def, ok := r.clientDefs[client.Client]
 			if !ok {
-				return SimResult{}, fmt.Errorf("unknown client %q in simulation client list", name)
+				return SimResult{}, fmt.Errorf("unknown client %q in simulation client list", client.Client)
 			}
-			clientDefs[name] = def
+			clientDefs[client.Client] = def
 		}
 	}
 

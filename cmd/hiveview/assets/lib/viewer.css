@@ -25,6 +25,10 @@ h3 {
     font-size: 80%;
 }
 
+#raw-url {
+    float: right;
+}
+
 #file-content-container {
     overflow-x: auto;
     flex: 99 0 auto;
@@ -40,7 +44,7 @@ h3 {
     border: 0;
     margin: 0;
     padding: 0 0 0 8px;
-    line-height: 18px;
+    line-height: 20px;
     font-size: 14px;
 }
 
@@ -54,8 +58,8 @@ h3 {
 .num {
     display: block;
     clear: right;
-    height: 18px;
-    line-height: 18px;
+    height: 20px;
+    line-height: 20px;
     font-size: 12px;
     color: #bbb;
     padding: 0 5px;

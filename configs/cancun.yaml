@@ -1,0 +1,33 @@
+- client: besu
+  nametag: cancun-git
+  dockerfile: git
+  build_args:
+      github: pinges/besu
+      tag: EIP4788
+
+- client: erigon
+  nametag: cancun-git
+  dockerfile: git
+  build_args:
+      github: ledgerwatch/erigon
+      tag: devel
+
+- client: ethereumjs
+  nametag: cancun-git
+  build_args:
+      github: ethereumjs/ethereumjs-monorepo
+      tag: master
+
+- client: go-ethereum
+  nametag: cancun-git
+  dockerfile: git
+  build_args:
+      github: lightclient/go-ethereum
+      tag: devnet-8
+
+- client: nethermind
+  nametag: cancun-git
+  dockerfile: git
+  build_args:
+      github: NethermindEth/nethermind
+      tag: cancun

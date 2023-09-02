@@ -54,6 +54,7 @@ fi
 # Create the data directory.
 mkdir /erigon-hive-datadir
 FLAGS="$FLAGS --datadir /erigon-hive-datadir  --nodiscover"
+FLAGS="$FLAGS --db.size.limit 2GB"
 
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
