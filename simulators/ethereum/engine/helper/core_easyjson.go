@@ -1737,6 +1737,8 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(
 			out.Balance = string(in.String())
 		case "constructor":
 			out.Constructor = string(in.String())
+		case "code":
+			out.Code = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -1760,6 +1762,11 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(
 		const prefix string = ",\"constructor\":"
 		out.RawString(prefix)
 		out.String(string(in.Constructor))
+	}
+	if in.Code != "" {
+		const prefix string = ",\"code\":"
+		out.RawString(prefix)
+		out.String(string(in.Code))
 	}
 	out.RawByte('}')
 }
