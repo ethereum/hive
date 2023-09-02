@@ -1,82 +1,83 @@
 package suite_exchange_capabilities
 
 import (
-	"math/big"
+	"fmt"
 
+	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	"golang.org/x/exp/slices"
 )
 
-var (
-	ShanghaiCapabilities = []string{
+var CapabilitiesMap = map[config.Fork][]string{
+	config.Shanghai: {
 		"engine_newPayloadV1",
 		"engine_newPayloadV2",
 		"engine_forkchoiceUpdatedV1",
 		"engine_forkchoiceUpdatedV2",
 		"engine_getPayloadV1",
 		"engine_getPayloadV2",
-	}
-	CancunCapabilities = []string{
+	},
+	config.Cancun: {
 		"engine_newPayloadV1",
 		"engine_newPayloadV2",
 		"engine_newPayloadV3",
 		"engine_forkchoiceUpdatedV1",
 		"engine_forkchoiceUpdatedV2",
+		"engine_forkchoiceUpdatedV3",
 		"engine_getPayloadV1",
 		"engine_getPayloadV2",
 		"engine_getPayloadV3",
-	}
-)
-
-var Tests = []test.SpecInterface{
-
-	// Shanghai
-	ExchangeCapabilitiesSpec{
-		Spec: test.Spec{
-			Name: "Exchange Capabilities - Shanghai",
-			ForkConfig: globals.ForkConfig{
-				ShanghaiTimestamp: big.NewInt(0),
-			},
-		},
-		MinimalExpectedCapabilitiesSet: ShanghaiCapabilities,
-	},
-	ExchangeCapabilitiesSpec{
-		Spec: test.Spec{
-			Name: "Exchange Capabilities - Shanghai (Not active)",
-			ForkConfig: globals.ForkConfig{
-				ShanghaiTimestamp: big.NewInt(1000),
-			},
-		},
-		MinimalExpectedCapabilitiesSet: ShanghaiCapabilities,
-	},
-
-	// Cancun
-	ExchangeCapabilitiesSpec{
-		Spec: test.Spec{
-			Name: "Exchange Capabilities - Cancun",
-			ForkConfig: globals.ForkConfig{
-				ShanghaiTimestamp: big.NewInt(0),
-				CancunTimestamp:   big.NewInt(0),
-			},
-		},
-		MinimalExpectedCapabilitiesSet: CancunCapabilities,
-	},
-	ExchangeCapabilitiesSpec{
-		Spec: test.Spec{
-			Name: "Exchange Capabilities - Cancun (Not active)",
-			ForkConfig: globals.ForkConfig{
-				ShanghaiTimestamp: big.NewInt(0),
-				CancunTimestamp:   big.NewInt(1000),
-			},
-		},
-		MinimalExpectedCapabilitiesSet: CancunCapabilities,
 	},
 }
 
+var Tests = make([]test.Spec, 0)
+
+func init() {
+	for _, fork := range []config.Fork{
+		config.Shanghai,
+		config.Cancun,
+	} {
+		// Each fork we test:
+		// - The fork is configured and active
+		// - The fork is configured but not active
+		capabilities, ok := CapabilitiesMap[fork]
+		if !ok {
+			panic("Capabilities not defined for fork")
+		}
+		for _, active := range []bool{true, false} {
+			var (
+				nameStr  string
+				forkTime int64
+			)
+			if active {
+				nameStr = "Active"
+				forkTime = 0
+			} else {
+				nameStr = "Not active"
+				forkTime = globals.GenesisTimestamp * 2
+			}
+			Tests = append(Tests, ExchangeCapabilitiesSpec{
+				BaseSpec: test.BaseSpec{
+					Name:     fmt.Sprintf("Exchange Capabilities - %s (%s)", fork, nameStr),
+					MainFork: fork,
+					ForkTime: forkTime,
+				},
+				MinimalExpectedCapabilitiesSet: capabilities,
+			})
+		}
+	}
+}
+
 type ExchangeCapabilitiesSpec struct {
-	test.Spec
+	test.BaseSpec
 	MinimalExpectedCapabilitiesSet []string
+}
+
+func (s ExchangeCapabilitiesSpec) WithMainFork(fork config.Fork) test.Spec {
+	specCopy := s
+	specCopy.MainFork = fork
+	return specCopy
 }
 
 func (s ExchangeCapabilitiesSpec) Execute(t *test.Env) {

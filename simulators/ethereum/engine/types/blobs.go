@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	gokzg4844 "github.com/crate-crypto/go-kzg-4844"
+	beacon "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 )
@@ -145,6 +146,34 @@ type BlobsBundle struct {
 	Commitments []KZGCommitment `json:"commitments" gencodec:"required"`
 	Blobs       []Blob          `json:"blobs"       gencodec:"required"`
 	Proofs      []KZGProof      `json:"proofs"      gencodec:"required"`
+}
+
+func (bb *BlobsBundle) FromBeaconBlobsBundle(src *beacon.BlobsBundleV1) error {
+	if src == nil {
+		return errors.New("nil blobs bundle")
+	}
+	if src.Commitments == nil {
+		return errors.New("nil commitments")
+	}
+	if src.Blobs == nil {
+		return errors.New("nil blobs")
+	}
+	if src.Proofs == nil {
+		return errors.New("nil proofs")
+	}
+	bb.Commitments = make([]KZGCommitment, len(src.Commitments))
+	bb.Blobs = make([]Blob, len(src.Blobs))
+	bb.Proofs = make([]KZGProof, len(src.Proofs))
+	for i, commitment := range src.Commitments {
+		copy(bb.Commitments[i][:], commitment[:])
+	}
+	for i, blob := range src.Blobs {
+		copy(bb.Blobs[i][:], blob[:])
+	}
+	for i, proof := range src.Proofs {
+		copy(bb.Proofs[i][:], proof[:])
+	}
+	return nil
 }
 
 func (bb *BlobsBundle) VersionedHashes(commitmentVersion byte) (*[]common.Hash, error) {

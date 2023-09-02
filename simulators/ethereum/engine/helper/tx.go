@@ -174,12 +174,12 @@ func calcTxsHash(txsBytes [][]byte) (common.Hash, error) {
 	return types.DeriveSha(types.Transactions(txs), trie.NewStackTrie(nil)), nil
 }
 
-type TestTransactionType int
+type TestTransactionType string
 
 const (
-	UnspecifiedTransactionType TestTransactionType = iota
-	LegacyTxOnly
-	DynamicFeeTxOnly
+	UnspecifiedTransactionType TestTransactionType = ""
+	LegacyTxOnly               TestTransactionType = "LegacyTransactions"
+	DynamicFeeTxOnly           TestTransactionType = "DynamicFeeTransactions"
 )
 
 type TransactionCreator interface {

@@ -11,32 +11,39 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
+type EngineAPIVersionResolver interface {
+	client.EngineAPIVersionResolver
+	SetEngineAPIVersionResolver(client.EngineAPIVersionResolver)
+}
+
 type GetPayloadCustomizer interface {
+	EngineAPIVersionResolver
 	GetPayloadID(basePayloadID *api.PayloadID) (*api.PayloadID, error)
-	GetVersion(forkConfig *globals.ForkConfig, requestedTimestamp uint64) (int, error)
 	GetExpectedError() (*int, error)
 }
 
 type BaseGetPayloadCustomizer struct {
+	client.EngineAPIVersionResolver
 	CustomPayloadID *api.PayloadID
 	ExpectedError   *int
 }
 
 var _ GetPayloadCustomizer = (*BaseGetPayloadCustomizer)(nil)
 
+func (customizer *BaseGetPayloadCustomizer) SetEngineAPIVersionResolver(v client.EngineAPIVersionResolver) {
+	customizer.EngineAPIVersionResolver = v
+}
+
 func (customizer *BaseGetPayloadCustomizer) GetPayloadID(basePayloadID *api.PayloadID) (*api.PayloadID, error) {
 	if customizer.CustomPayloadID != nil {
 		return customizer.CustomPayloadID, nil
 	}
 	return basePayloadID, nil
-}
-
-func (customizer *BaseGetPayloadCustomizer) GetVersion(forkConfig *globals.ForkConfig, requestedTimestamp uint64) (int, error) {
-	return forkConfig.GetPayloadVersion(requestedTimestamp), nil
 }
 
 func (customizer *BaseGetPayloadCustomizer) GetExpectedError() (*int, error) {
@@ -49,15 +56,8 @@ type UpgradeGetPayloadVersion struct {
 
 var _ GetPayloadCustomizer = (*UpgradeGetPayloadVersion)(nil)
 
-func (customizer *UpgradeGetPayloadVersion) GetVersion(forkConfig *globals.ForkConfig, requestedTimestamp uint64) (int, error) {
-	if customizer.GetPayloadCustomizer == nil {
-		return 0, fmt.Errorf("base customizer not set")
-	}
-	baseVersion, err := customizer.GetPayloadCustomizer.GetVersion(forkConfig, requestedTimestamp)
-	if err != nil {
-		return 0, err
-	}
-	return baseVersion + 1, nil
+func (customizer *UpgradeGetPayloadVersion) GetPayloadVersion(timestamp uint64) int {
+	return customizer.GetPayloadCustomizer.GetPayloadVersion(timestamp) + 1
 }
 
 type DowngradeGetPayloadVersion struct {
@@ -66,18 +66,12 @@ type DowngradeGetPayloadVersion struct {
 
 var _ GetPayloadCustomizer = (*DowngradeGetPayloadVersion)(nil)
 
-func (customizer *DowngradeGetPayloadVersion) GetVersion(forkConfig *globals.ForkConfig, requestedTimestamp uint64) (int, error) {
-	if customizer.GetPayloadCustomizer == nil {
-		return 0, fmt.Errorf("base customizer not set")
+func (customizer *DowngradeGetPayloadVersion) GetPayloadVersion(timestamp uint64) int {
+	version := customizer.GetPayloadCustomizer.GetPayloadVersion(timestamp)
+	if version == 1 {
+		panic("cannot downgrade version 1")
 	}
-	baseVersion, err := customizer.GetPayloadCustomizer.GetVersion(forkConfig, requestedTimestamp)
-	if err != nil {
-		return 0, err
-	}
-	if baseVersion == 1 {
-		return 1, fmt.Errorf("cannot downgrade version 1")
-	}
-	return baseVersion - 1, nil
+	return version - 1
 }
 
 type PayloadAttributesCustomizer interface {
@@ -85,9 +79,9 @@ type PayloadAttributesCustomizer interface {
 }
 
 type ForkchoiceUpdatedCustomizer interface {
+	EngineAPIVersionResolver
 	PayloadAttributesCustomizer
 	GetForkchoiceState(baseForkchoiceUpdate api.ForkchoiceStateV1) (api.ForkchoiceStateV1, error)
-	GetVersion(forkConfig *globals.ForkConfig, headTimestamp uint64, basePayloadAttributes *typ.PayloadAttributes) (int, error)
 	GetExpectedError() (*int, error)
 	GetExpectInvalidStatus() bool
 }
@@ -153,6 +147,7 @@ func (customData *TimestampDeltaPayloadAttributesCustomizer) GetPayloadAttribute
 // Customizer that makes no modifications to the forkchoice directive call.
 // Used as base to other customizers.
 type BaseForkchoiceUpdatedCustomizer struct {
+	client.EngineAPIVersionResolver
 	PayloadAttributesCustomizer
 	ExpectedError       *int
 	ExpectInvalidStatus bool
@@ -169,14 +164,9 @@ func (customizer *BaseForkchoiceUpdatedCustomizer) GetForkchoiceState(baseForkch
 	return baseForkchoiceUpdate, nil
 }
 
-func (customizer *BaseForkchoiceUpdatedCustomizer) GetVersion(forkConfig *globals.ForkConfig, headTimestamp uint64, basePayloadAttributes *typ.PayloadAttributes) (int, error) {
-	// We use the version meant for the head block unless there are payload attributes
-	// in which case we use the version meant for the new payload requested.
-	var payloadAttributesTimestamp *uint64
-	if basePayloadAttributes != nil {
-		payloadAttributesTimestamp = &basePayloadAttributes.Timestamp
-	}
-	return forkConfig.ForkchoiceUpdatedVersion(headTimestamp, payloadAttributesTimestamp), nil
+func (customizer *BaseForkchoiceUpdatedCustomizer) SetEngineAPIVersionResolver(v client.EngineAPIVersionResolver) {
+	// No-Op
+	customizer.EngineAPIVersionResolver = v
 }
 
 func (customizer *BaseForkchoiceUpdatedCustomizer) GetExpectedError() (*int, error) {
@@ -196,15 +186,8 @@ type UpgradeForkchoiceUpdatedVersion struct {
 
 var _ ForkchoiceUpdatedCustomizer = (*UpgradeForkchoiceUpdatedVersion)(nil)
 
-func (customizer *UpgradeForkchoiceUpdatedVersion) GetVersion(forkConfig *globals.ForkConfig, headTimestamp uint64, basePayloadAttributes *typ.PayloadAttributes) (int, error) {
-	if customizer.ForkchoiceUpdatedCustomizer == nil {
-		return 0, fmt.Errorf("base customizer not set")
-	}
-	baseVersion, err := customizer.ForkchoiceUpdatedCustomizer.GetVersion(forkConfig, headTimestamp, basePayloadAttributes)
-	if err != nil {
-		return 0, err
-	}
-	return baseVersion + 1, nil
+func (customizer *UpgradeForkchoiceUpdatedVersion) ForkchoiceUpdatedVersion(headTimestamp uint64, payloadAttributesTimestamp *uint64) int {
+	return customizer.ForkchoiceUpdatedCustomizer.ForkchoiceUpdatedVersion(headTimestamp, payloadAttributesTimestamp) + 1
 }
 
 // Customizer that downgrades the version of the forkchoice directive call to the previous version.
@@ -212,24 +195,18 @@ type DowngradeForkchoiceUpdatedVersion struct {
 	ForkchoiceUpdatedCustomizer
 }
 
-var _ ForkchoiceUpdatedCustomizer = (*DowngradeForkchoiceUpdatedVersion)(nil)
-
-func (customizer *DowngradeForkchoiceUpdatedVersion) GetVersion(forkConfig *globals.ForkConfig, headTimestamp uint64, basePayloadAttributes *typ.PayloadAttributes) (int, error) {
-	if customizer.ForkchoiceUpdatedCustomizer == nil {
-		return 0, fmt.Errorf("base customizer not set")
+func (customizer *DowngradeForkchoiceUpdatedVersion) ForkchoiceUpdatedVersion(headTimestamp uint64, payloadAttributesTimestamp *uint64) int {
+	version := customizer.ForkchoiceUpdatedCustomizer.ForkchoiceUpdatedVersion(headTimestamp, payloadAttributesTimestamp)
+	if version == 1 {
+		panic("cannot downgrade version 1")
 	}
-	baseVersion, err := customizer.ForkchoiceUpdatedCustomizer.GetVersion(forkConfig, headTimestamp, basePayloadAttributes)
-	if err != nil {
-		return 0, err
-	}
-	if baseVersion == 1 {
-		return 1, fmt.Errorf("cannot downgrade version 1")
-	}
-	return baseVersion - 1, nil
+	return version - 1
 }
 
+var _ ForkchoiceUpdatedCustomizer = (*DowngradeForkchoiceUpdatedVersion)(nil)
+
 type PayloadCustomizer interface {
-	CustomizePayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash) (modifiedPayload *typ.ExecutableData, modifiedBeaconRoot *common.Hash, err error)
+	CustomizePayload(basePayload *typ.ExecutableData) (*typ.ExecutableData, error)
 	GetTimestamp(basePayload *typ.ExecutableData) (uint64, error)
 }
 
@@ -238,36 +215,36 @@ type VersionedHashesCustomizer interface {
 }
 
 type NewPayloadCustomizer interface {
+	EngineAPIVersionResolver
 	PayloadCustomizer
-	VersionedHashesCustomizer
-	GetVersion(forkConfig *globals.ForkConfig, basePayload *typ.ExecutableData) (int, error)
 	GetExpectedError() (*int, error)
 	GetExpectInvalidStatus() bool
 }
 
 type CustomPayloadData struct {
-	ParentHash             *common.Hash
-	FeeRecipient           *common.Address
-	StateRoot              *common.Hash
-	ReceiptsRoot           *common.Hash
-	LogsBloom              *[]byte
-	PrevRandao             *common.Hash
-	Number                 *uint64
-	GasLimit               *uint64
-	GasUsed                *uint64
-	Timestamp              *uint64
-	ExtraData              *[]byte
-	BaseFeePerGas          *big.Int
-	BlockHash              *common.Hash
-	Transactions           *[][]byte
-	Withdrawals            types.Withdrawals
-	RemoveWithdrawals      bool
-	BlobGasUsed            *uint64
-	RemoveBlobGasUsed      bool
-	ExcessBlobGas          *uint64
-	RemoveExcessBlobGas    bool
-	ParentBeaconRoot       *common.Hash
-	RemoveParentBeaconRoot bool
+	ParentHash                *common.Hash
+	FeeRecipient              *common.Address
+	StateRoot                 *common.Hash
+	ReceiptsRoot              *common.Hash
+	LogsBloom                 *[]byte
+	PrevRandao                *common.Hash
+	Number                    *uint64
+	GasLimit                  *uint64
+	GasUsed                   *uint64
+	Timestamp                 *uint64
+	ExtraData                 *[]byte
+	BaseFeePerGas             *big.Int
+	BlockHash                 *common.Hash
+	Transactions              *[][]byte
+	Withdrawals               types.Withdrawals
+	RemoveWithdrawals         bool
+	BlobGasUsed               *uint64
+	RemoveBlobGasUsed         bool
+	ExcessBlobGas             *uint64
+	RemoveExcessBlobGas       bool
+	ParentBeaconRoot          *common.Hash
+	RemoveParentBeaconRoot    bool
+	VersionedHashesCustomizer VersionedHashesCustomizer
 }
 
 var _ PayloadCustomizer = (*CustomPayloadData)(nil)
@@ -281,14 +258,14 @@ func (customData *CustomPayloadData) GetTimestamp(basePayload *typ.ExecutableDat
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
 // BlockHash is calculated automatically.
-func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash) (*typ.ExecutableData, *common.Hash, error) {
+func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.ExecutableData) (*typ.ExecutableData, error) {
 	txs := basePayload.Transactions
 	if customData.Transactions != nil {
 		txs = *customData.Transactions
 	}
 	txsHash, err := calcTxsHash(txs)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	fmt.Printf("txsHash: %v\n", txsHash)
 	// Start by filling the header with the basePayload information
@@ -374,8 +351,8 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 		customPayloadHeader.ParentBeaconRoot = nil
 	} else if customData.ParentBeaconRoot != nil {
 		customPayloadHeader.ParentBeaconRoot = customData.ParentBeaconRoot
-	} else if baseBeaconRoot != nil {
-		customPayloadHeader.ParentBeaconRoot = baseBeaconRoot
+	} else if basePayload.ParentBeaconBlockRoot != nil {
+		customPayloadHeader.ParentBeaconRoot = basePayload.ParentBeaconBlockRoot
 	}
 
 	// Return the new payload
@@ -396,7 +373,12 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 		Transactions:  txs,
 		BlobGasUsed:   customPayloadHeader.BlobGasUsed,
 		ExcessBlobGas: customPayloadHeader.ExcessBlobGas,
+
+		// Metadata
+		ParentBeaconBlockRoot: customPayloadHeader.ParentBeaconRoot,
+		PayloadAttributes:     basePayload.PayloadAttributes,
 	}
+
 	if customData.RemoveWithdrawals {
 		result.Withdrawals = nil
 	} else if customData.Withdrawals != nil {
@@ -404,47 +386,39 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 	} else if basePayload.Withdrawals != nil {
 		result.Withdrawals = basePayload.Withdrawals
 	}
-	return result, customPayloadHeader.ParentBeaconRoot, nil
+
+	if customData.VersionedHashesCustomizer != nil {
+		result.VersionedHashes, err = customData.VersionedHashesCustomizer.GetVersionedHashes(basePayload.VersionedHashes)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		result.VersionedHashes = basePayload.VersionedHashes
+	}
+
+	return result, nil
 }
 
 // Base new payload directive call customizer.
 // Used as base to other customizers.
 type BaseNewPayloadVersionCustomizer struct {
+	client.EngineAPIVersionResolver
 	PayloadCustomizer
-	VersionedHashesCustomizer
 	ExpectedError       *int
 	ExpectInvalidStatus bool
 }
 
 var _ NewPayloadCustomizer = (*BaseNewPayloadVersionCustomizer)(nil)
 
-func (customNewPayload *BaseNewPayloadVersionCustomizer) CustomizePayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash) (*typ.ExecutableData, *common.Hash, error) {
+func (customizer *BaseNewPayloadVersionCustomizer) SetEngineAPIVersionResolver(v client.EngineAPIVersionResolver) {
+	customizer.EngineAPIVersionResolver = v
+}
+
+func (customNewPayload *BaseNewPayloadVersionCustomizer) CustomizePayload(basePayload *typ.ExecutableData) (*typ.ExecutableData, error) {
 	if customNewPayload.PayloadCustomizer == nil {
-		return basePayload, baseBeaconRoot, nil
+		return basePayload, nil
 	}
-	return customNewPayload.PayloadCustomizer.CustomizePayload(basePayload, baseBeaconRoot)
-}
-
-func (customNewPayload *BaseNewPayloadVersionCustomizer) GetVersionedHashes(baseVersionedHashes *[]common.Hash) (*[]common.Hash, error) {
-	if customNewPayload.VersionedHashesCustomizer != nil {
-		return customNewPayload.VersionedHashesCustomizer.GetVersionedHashes(baseVersionedHashes)
-	}
-	return baseVersionedHashes, nil
-}
-
-func (customNewPayload *BaseNewPayloadVersionCustomizer) GetVersion(forkConfig *globals.ForkConfig, basePayload *typ.ExecutableData) (int, error) {
-	var (
-		timestamp = basePayload.Timestamp
-		err       error
-	)
-	if customNewPayload.PayloadCustomizer != nil {
-		timestamp, err = customNewPayload.PayloadCustomizer.GetTimestamp(basePayload)
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	return forkConfig.NewPayloadVersion(timestamp), nil
+	return customNewPayload.PayloadCustomizer.CustomizePayload(basePayload)
 }
 
 func (customNewPayload *BaseNewPayloadVersionCustomizer) GetExpectedError() (*int, error) {
@@ -462,12 +436,8 @@ type UpgradeNewPayloadVersion struct {
 
 var _ NewPayloadCustomizer = (*UpgradeNewPayloadVersion)(nil)
 
-func (customNewPayload *UpgradeNewPayloadVersion) GetVersion(forkConfig *globals.ForkConfig, basePayload *typ.ExecutableData) (int, error) {
-	if customNewPayload.NewPayloadCustomizer == nil {
-		return 0, fmt.Errorf("base customizer not set")
-	}
-	version, err := customNewPayload.NewPayloadCustomizer.GetVersion(forkConfig, basePayload)
-	return version + 1, err
+func (customNewPayload *UpgradeNewPayloadVersion) NewPayloadVersion(timestamp uint64) int {
+	return customNewPayload.NewPayloadCustomizer.NewPayloadVersion(timestamp) + 1
 }
 
 // Customizer that downgrades the version of the payload to the previous version.
@@ -477,29 +447,26 @@ type DowngradeNewPayloadVersion struct {
 
 var _ NewPayloadCustomizer = (*DowngradeNewPayloadVersion)(nil)
 
-func (customNewPayload *DowngradeNewPayloadVersion) GetVersion(forkConfig *globals.ForkConfig, basePayload *typ.ExecutableData) (int, error) {
-	if customNewPayload.NewPayloadCustomizer == nil {
-		return 0, fmt.Errorf("base customizer not set")
-	}
-	version, err := customNewPayload.NewPayloadCustomizer.GetVersion(forkConfig, basePayload)
+func (customNewPayload *DowngradeNewPayloadVersion) NewPayloadVersion(timestamp uint64) int {
+	version := customNewPayload.NewPayloadCustomizer.NewPayloadVersion(timestamp)
 	if version == 1 {
-		return 1, fmt.Errorf("cannot downgrade version 1")
+		panic("cannot downgrade version 1")
 	}
-	return version - 1, err
+	return version - 1
 }
 
-func CustomizePayloadTransactions(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash, customTransactions types.Transactions) (*typ.ExecutableData, *common.Hash, error) {
+func CustomizePayloadTransactions(basePayload *typ.ExecutableData, customTransactions types.Transactions) (*typ.ExecutableData, error) {
 	byteTxs := make([][]byte, 0)
 	for _, tx := range customTransactions {
 		bytes, err := tx.MarshalBinary()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		byteTxs = append(byteTxs, bytes)
 	}
 	return (&CustomPayloadData{
 		Transactions: &byteTxs,
-	}).CustomizePayload(basePayload, baseBeaconRoot)
+	}).CustomizePayload(basePayload)
 }
 
 func (customData *CustomPayloadData) String() string {
@@ -551,7 +518,7 @@ func (customData *CustomPayloadData) String() string {
 
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
 // One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
-func GenerateInvalidPayload(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash, payloadField InvalidPayloadBlockField) (*typ.ExecutableData, *common.Hash, error) {
+func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField InvalidPayloadBlockField) (*typ.ExecutableData, error) {
 
 	var customPayloadMod *CustomPayloadData
 	switch payloadField {
@@ -601,6 +568,10 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, baseBeaconRoot *com
 		customPayloadMod = &CustomPayloadData{
 			PrevRandao: &modPrevRandao,
 		}
+	case InvalidWithdrawals, InvalidBlobGasUsed, InvalidExcessBlobGas, InvalidParentBeaconBlockRoot, InvalidVersionedHashes:
+		// These options are not supported yet.
+		// TODO: Implement
+		return nil, fmt.Errorf("invalid payload field %v not supported yet", payloadField)
 	case RemoveTransaction:
 		emptyTxs := make([][]byte, 0)
 		customPayloadMod = &CustomPayloadData{
@@ -615,11 +586,11 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, baseBeaconRoot *com
 		InvalidTransactionChainID:
 
 		if len(basePayload.Transactions) == 0 {
-			return nil, nil, fmt.Errorf("no transactions available for modification")
+			return nil, fmt.Errorf("no transactions available for modification")
 		}
 		var baseTx types.Transaction
 		if err := baseTx.UnmarshalBinary(basePayload.Transactions[0]); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		var customTxData CustomTransactionData
 		switch payloadField {
@@ -650,12 +621,12 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, baseBeaconRoot *com
 
 		modifiedTx, err := customizeTransaction(&baseTx, globals.VaultKey, &customTxData)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		modifiedTxBytes, err := modifiedTx.MarshalBinary()
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 		modifiedTransactions := [][]byte{
 			modifiedTxBytes,
@@ -667,10 +638,10 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, baseBeaconRoot *com
 
 	if customPayloadMod == nil {
 		copyPayload := *basePayload
-		return &copyPayload, nil, nil
+		return &copyPayload, nil
 	}
 
-	return customPayloadMod.CustomizePayload(basePayload, baseBeaconRoot)
+	return customPayloadMod.CustomizePayload(basePayload)
 }
 
 /*

@@ -7,7 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
+	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
 
@@ -55,10 +57,10 @@ func pInt(v int) *int {
 // https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md
 
 // List of all blob tests
-var Tests = []test.SpecInterface{
+var Tests = []test.Spec{
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Blob Transactions On Block 1, Shanghai Genesis",
 			About: `
 			Tests the Cancun fork since Block 1.
@@ -128,7 +130,7 @@ var Tests = []test.SpecInterface{
 
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Blob Transactions On Block 1, Cancun Genesis",
 			About: `
 			Tests the Cancun fork since genesis.
@@ -186,7 +188,7 @@ var Tests = []test.SpecInterface{
 	},
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Blob Transaction Ordering, Single Account",
 			About: `
 			Send N blob transactions with MAX_BLOBS_PER_BLOCK-1 blobs each,
@@ -233,7 +235,7 @@ var Tests = []test.SpecInterface{
 	},
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Blob Transaction Ordering, Single Account 2",
 			About: `
 			Send N blob transactions with MAX_BLOBS_PER_BLOCK-1 blobs each,
@@ -290,7 +292,7 @@ var Tests = []test.SpecInterface{
 
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Blob Transaction Ordering, Multiple Accounts",
 			About: `
 			Send N blob transactions with MAX_BLOBS_PER_BLOCK-1 blobs each,
@@ -333,7 +335,7 @@ var Tests = []test.SpecInterface{
 
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Blob Transaction Ordering, Multiple Clients",
 			About: `
 			Send N blob transactions with MAX_BLOBS_PER_BLOCK-1 blobs each,
@@ -398,7 +400,7 @@ var Tests = []test.SpecInterface{
 
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Replace Blob Transactions",
 			About: `
 			Test sending multiple blob transactions with the same nonce, but
@@ -450,7 +452,7 @@ var Tests = []test.SpecInterface{
 
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Parallel Blob Transactions",
 			About: `
 			Test sending multiple blob transactions in parallel from different accounts.
@@ -539,7 +541,7 @@ var Tests = []test.SpecInterface{
 
 	// ForkchoiceUpdatedV3 before cancun
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "ForkchoiceUpdatedV3 Set Head to Shanghai Payload, Nil Payload Attributes",
 			About: `
 			Test sending ForkchoiceUpdatedV3 to set the head of the chain to a Shanghai payload:
@@ -565,7 +567,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Nil Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV3 to request a Shanghai payload:
@@ -593,7 +595,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Zero Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV3 to request a Shanghai payload:
@@ -625,7 +627,7 @@ var Tests = []test.SpecInterface{
 
 	// ForkchoiceUpdatedV2 before cancun with beacon root
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "ForkchoiceUpdatedV2 To Request Shanghai Payload, Zero Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
@@ -657,7 +659,7 @@ var Tests = []test.SpecInterface{
 
 	// ForkchoiceUpdatedV2 after cancun
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Zero Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
@@ -684,7 +686,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Nil Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
@@ -716,7 +718,7 @@ var Tests = []test.SpecInterface{
 
 	// ForkchoiceUpdatedV3 with modified BeaconRoot Attribute
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "ForkchoiceUpdatedV3 Modifies Payload ID on Different Beacon Root",
 			About: `
 			Test requesting a Cancun Payload using ForkchoiceUpdatedV3 twice with the beacon root
@@ -759,7 +761,7 @@ var Tests = []test.SpecInterface{
 
 	// GetPayloadV3 Before Cancun, Negative Tests
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "GetPayloadV3 To Request Shanghai Payload",
 			About: `
 			Test requesting a Shanghai PayloadID using GetPayloadV3.
@@ -785,7 +787,7 @@ var Tests = []test.SpecInterface{
 
 	// GetPayloadV2 After Cancun, Negative Tests
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "GetPayloadV2 To Request Cancun Payload",
 			About: `
 			Test requesting a Cancun PayloadID using GetPayloadV2.
@@ -811,7 +813,7 @@ var Tests = []test.SpecInterface{
 
 	// NewPayloadV3 Before Cancun, Negative Tests
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
@@ -830,8 +832,10 @@ var Tests = []test.SpecInterface{
 			NewPayloads{
 				NewPayloadCustomizer: &helper.UpgradeNewPayloadVersion{
 					NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: nil,
+						PayloadCustomizer: &helper.CustomPayloadData{
+							VersionedHashesCustomizer: &VersionedHashes{
+								Blobs: nil,
+							},
 						},
 						ExpectedError: INVALID_PARAMS_ERROR,
 					},
@@ -843,7 +847,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Before Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
@@ -873,7 +877,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Before Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
@@ -903,7 +907,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Empty Array Versioned Hashes, Nil Beacon Root",
 			About: `
 				Test sending NewPayloadV3 Before Cancun with:
@@ -920,8 +924,10 @@ var Tests = []test.SpecInterface{
 			NewPayloads{
 				NewPayloadCustomizer: &helper.UpgradeNewPayloadVersion{
 					NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: []helper.BlobID{},
+						PayloadCustomizer: &helper.CustomPayloadData{
+							VersionedHashesCustomizer: &VersionedHashes{
+								Blobs: []helper.BlobID{},
+							},
 						},
 						ExpectedError: INVALID_PARAMS_ERROR,
 					},
@@ -933,7 +939,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Zero Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
@@ -963,7 +969,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Before Cancun, 0x00 Data Fields, Empty Array Versioned Hashes, Zero Beacon Root",
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
@@ -984,9 +990,9 @@ var Tests = []test.SpecInterface{
 							ExcessBlobGas:    pUint64(0),
 							BlobGasUsed:      pUint64(0),
 							ParentBeaconRoot: &(common.Hash{}),
-						},
-						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: []helper.BlobID{},
+							VersionedHashesCustomizer: &VersionedHashes{
+								Blobs: []helper.BlobID{},
+							},
 						},
 						ExpectedError: UNSUPPORTED_FORK_ERROR,
 					},
@@ -1000,7 +1006,7 @@ var Tests = []test.SpecInterface{
 
 	// NewPayloadV3 After Cancun, Negative Tests
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 After Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Empty Array Versioned Hashes, Zero Beacon Root",
 			About: `
 			Test sending NewPayloadV3 After Cancun with:
@@ -1028,7 +1034,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 After Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Empty Array Versioned Hashes",
 			About: `
 			Test sending NewPayloadV3 After Cancun with:
@@ -1055,7 +1061,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 After Cancun, 0x00 Blob Fields, Empty Array Versioned Hashes, Nil Beacon Root",
 			About: `
 			Test sending NewPayloadV3 After Cancun with:
@@ -1084,7 +1090,7 @@ var Tests = []test.SpecInterface{
 
 	// Fork time tests
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "ForkchoiceUpdatedV2 then ForkchoiceUpdatedV3 Valid Payload Building Requests",
 			About: `
 			Test requesting a Shanghai ForkchoiceUpdatedV2 payload followed by a Cancun ForkchoiceUpdatedV3 request.
@@ -1127,7 +1133,7 @@ var Tests = []test.SpecInterface{
 	// Test versioned hashes in Engine API NewPayloadV3
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Missing Hash",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1143,8 +1149,10 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
 				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1156,7 +1164,7 @@ var Tests = []test.SpecInterface{
 	},
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Extra Hash",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1174,8 +1182,10 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
 				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK+1),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK+1),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1187,7 +1197,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Out of Order",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1203,8 +1213,10 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
 				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: helper.GetBlobListByIndex(helper.BlobID(TARGET_BLOBS_PER_BLOCK-1), 0),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: helper.GetBlobListByIndex(helper.BlobID(TARGET_BLOBS_PER_BLOCK-1), 0),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1216,7 +1228,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1232,8 +1244,10 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
 				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK), helper.BlobID(TARGET_BLOBS_PER_BLOCK-1)),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK), helper.BlobID(TARGET_BLOBS_PER_BLOCK-1)),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1245,7 +1259,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1261,8 +1275,10 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
 				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(TARGET_BLOBS_PER_BLOCK)),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(TARGET_BLOBS_PER_BLOCK)),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1273,7 +1289,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1289,9 +1305,11 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
 				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs:        helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
-						HashVersions: []byte{BLOB_COMMITMENT_VERSION_KZG, BLOB_COMMITMENT_VERSION_KZG + 1},
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs:        helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+							HashVersions: []byte{BLOB_COMMITMENT_VERSION_KZG, BLOB_COMMITMENT_VERSION_KZG + 1},
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1303,7 +1321,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1319,8 +1337,10 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
 				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: nil,
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: nil,
+						},
 					},
 					ExpectedError: INVALID_PARAMS_ERROR,
 				},
@@ -1332,7 +1352,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1348,8 +1368,10 @@ var Tests = []test.SpecInterface{
 				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
 				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: []helper.BlobID{},
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: []helper.BlobID{},
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1361,7 +1383,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1372,8 +1394,10 @@ var Tests = []test.SpecInterface{
 			NewPayloads{
 				ExpectedBlobs: []helper.BlobID{},
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: []helper.BlobID{0},
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: []helper.BlobID{0},
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1387,7 +1411,7 @@ var Tests = []test.SpecInterface{
 	// Test versioned hashes in Engine API NewPayloadV3 on syncing clients
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Missing Hash (Syncing)",
 			About: `
 				Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1413,8 +1437,10 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1423,7 +1449,7 @@ var Tests = []test.SpecInterface{
 	},
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Extra Hash (Syncing)",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1451,8 +1477,10 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK+1),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK+1),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1461,7 +1489,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Out of Order (Syncing)",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1486,8 +1514,10 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: helper.GetBlobListByIndex(helper.BlobID(TARGET_BLOBS_PER_BLOCK-1), 0),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: helper.GetBlobListByIndex(helper.BlobID(TARGET_BLOBS_PER_BLOCK-1), 0),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1496,7 +1526,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash (Syncing)",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1522,8 +1552,10 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK), helper.BlobID(TARGET_BLOBS_PER_BLOCK-1)),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK), helper.BlobID(TARGET_BLOBS_PER_BLOCK-1)),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1532,7 +1564,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash (Syncing)",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1558,8 +1590,10 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(TARGET_BLOBS_PER_BLOCK)),
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(TARGET_BLOBS_PER_BLOCK)),
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1567,7 +1601,7 @@ var Tests = []test.SpecInterface{
 		},
 	},
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version (Syncing)",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1593,9 +1627,11 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs:        helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
-						HashVersions: []byte{BLOB_COMMITMENT_VERSION_KZG, BLOB_COMMITMENT_VERSION_KZG + 1},
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs:        helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+							HashVersions: []byte{BLOB_COMMITMENT_VERSION_KZG, BLOB_COMMITMENT_VERSION_KZG + 1},
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1604,7 +1640,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes (Syncing)",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1630,8 +1666,10 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: nil,
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: nil,
+						},
 					},
 					ExpectedError: INVALID_PARAMS_ERROR,
 				},
@@ -1640,7 +1678,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes (Syncing)",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1666,8 +1704,10 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: []helper.BlobID{},
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: []helper.BlobID{},
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1676,7 +1716,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes (Syncing)",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
@@ -1697,8 +1737,10 @@ var Tests = []test.SpecInterface{
 			SendModifiedLatestPayload{
 				ClientID: 1,
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
-					VersionedHashesCustomizer: &VersionedHashes{
-						Blobs: []helper.BlobID{0},
+					PayloadCustomizer: &helper.CustomPayloadData{
+						VersionedHashesCustomizer: &VersionedHashes{
+							Blobs: []helper.BlobID{0},
+						},
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1711,7 +1753,7 @@ var Tests = []test.SpecInterface{
 	// and can be executed using `pyspec` simulator.
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Incorrect BlobGasUsed: Non-Zero on Zero Blobs",
 			About: `
 			Send a payload with zero blobs, but non-zero BlobGasUsed.
@@ -1730,7 +1772,7 @@ var Tests = []test.SpecInterface{
 	},
 	&CancunBaseSpec{
 
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Incorrect BlobGasUsed: GAS_PER_BLOB on Zero Blobs",
 			About: `
 			Send a payload with zero blobs, but non-zero BlobGasUsed.
@@ -1748,135 +1790,9 @@ var Tests = []test.SpecInterface{
 		},
 	},
 
-	// ForkID tests
-	&CancunForkSpec{
-		GenesisTimestamp:  0,
-		ShanghaiTimestamp: 0,
-		CancunTimestamp:   0,
-
-		CancunBaseSpec: CancunBaseSpec{
-			Spec: test.Spec{
-				Name: "ForkID, genesis at 0, shanghai at 0, cancun at 0",
-				About: `
-			Attemp to peer client with the following configuration at height 0:
-			- genesis timestamp 0
-			- shanghai fork at timestamp 0
-			- cancun fork at timestamp 0
-			`,
-			},
-		},
-	},
-	&CancunForkSpec{
-		GenesisTimestamp:  0,
-		ShanghaiTimestamp: 0,
-		CancunTimestamp:   1,
-
-		CancunBaseSpec: CancunBaseSpec{
-			Spec: test.Spec{
-				Name: "ForkID, genesis at 0, shanghai at 0, cancun at 1",
-				About: `
-			Attemp to peer client with the following configuration at height 0:
-			- genesis timestamp 0
-			- shanghai fork at timestamp 0
-			- cancun fork at timestamp 1
-			`,
-			},
-		},
-	},
-
-	&CancunForkSpec{
-		GenesisTimestamp:  1,
-		ShanghaiTimestamp: 0,
-		CancunTimestamp:   1,
-
-		CancunBaseSpec: CancunBaseSpec{
-			Spec: test.Spec{
-				Name: "ForkID, genesis at 1, shanghai at 0, cancun at 1",
-				About: `
-			Attemp to peer client with the following configuration at height 0:
-			- genesis timestamp 1
-			- shanghai fork at timestamp 0
-			- cancun fork at timestamp 1
-			`,
-			},
-		},
-	},
-
-	&CancunForkSpec{
-		GenesisTimestamp:           0,
-		ShanghaiTimestamp:          0,
-		CancunTimestamp:            1,
-		ProduceBlocksBeforePeering: 1,
-
-		CancunBaseSpec: CancunBaseSpec{
-			Spec: test.Spec{
-				Name: "ForkID, genesis at 0, shanghai at 0, cancun at 1, transition",
-				About: `
-			Attemp to peer client with the following configuration at height 1:
-			- genesis timestamp 0
-			- shanghai fork at timestamp 0
-			- cancun fork at timestamp 1
-			`,
-			},
-		},
-	},
-
-	&CancunForkSpec{
-		GenesisTimestamp:  1,
-		ShanghaiTimestamp: 1,
-		CancunTimestamp:   1,
-
-		CancunBaseSpec: CancunBaseSpec{
-			Spec: test.Spec{
-				Name: "ForkID, genesis at 1, shanghai at 1, cancun at 1",
-				About: `
-			Attemp to peer client with the following configuration at height 0:
-			- genesis timestamp 1
-			- shanghai fork at timestamp 1
-			- cancun fork at timestamp 1
-			`,
-			},
-		},
-	},
-	&CancunForkSpec{
-		GenesisTimestamp:  1,
-		ShanghaiTimestamp: 1,
-		CancunTimestamp:   2,
-
-		CancunBaseSpec: CancunBaseSpec{
-			Spec: test.Spec{
-				Name: "ForkID, genesis at 1, shanghai at 1, cancun at 2",
-				About: `
-			Attemp to peer client with the following configuration at height 0:
-			- genesis timestamp 1
-			- shanghai fork at timestamp 1
-			- cancun fork at timestamp 2
-			`,
-			},
-		},
-	},
-	&CancunForkSpec{
-		GenesisTimestamp:           1,
-		ShanghaiTimestamp:          1,
-		CancunTimestamp:            2,
-		ProduceBlocksBeforePeering: 1,
-
-		CancunBaseSpec: CancunBaseSpec{
-			Spec: test.Spec{
-				Name: "ForkID, genesis at 1, shanghai at 1, cancun at 2, transition",
-				About: `
-			Attemp to peer client with the following configuration at height 1:
-			- genesis timestamp 1
-			- shanghai fork at timestamp 1
-			- cancun fork at timestamp 2
-			`,
-			},
-		},
-	},
-
 	// DevP2P tests
 	&CancunBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Request Blob Pooled Transactions",
 			About: `
 			Requests blob pooled transactions and verify correct encoding.
@@ -1899,4 +1815,33 @@ var Tests = []test.SpecInterface{
 			},
 		},
 	},
+}
+
+var EngineAPITests []test.Spec
+
+func init() {
+	// Append all engine api tests with Cancun as main fork
+	for _, test := range suite_engine.Tests {
+		Tests = append(Tests, test.WithMainFork(config.Cancun))
+	}
+
+	// Cancun specific variants for pre-existing tests
+	// Payload Attributes
+	for _, t := range []suite_engine.InvalidPayloadAttributesTest{
+		{
+			BaseSpec: test.BaseSpec{
+				MainFork: config.Cancun,
+			},
+			Description: "Missing BeaconRoot",
+			Customizer: &helper.BasePayloadAttributesCustomizer{
+				RemoveBeaconRoot: true,
+			},
+			// Error is expected on syncing because V3 checks all fields to be present
+			ErrorOnSync: true,
+		},
+	} {
+		Tests = append(Tests, t)
+		t.Syncing = true
+		Tests = append(Tests, t)
+	}
 }

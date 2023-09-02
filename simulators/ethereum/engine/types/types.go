@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"math/big"
 
 	geth_beacon "github.com/ethereum/go-ethereum/beacon/engine"
@@ -134,6 +133,13 @@ type ExecutableData struct {
 	Withdrawals   []*types.Withdrawal `json:"withdrawals"`
 	BlobGasUsed   *uint64             `json:"blobGasUsed,omitempty"`
 	ExcessBlobGas *uint64             `json:"excessBlobGas,omitempty"`
+
+	// NewPayload parameters
+	VersionedHashes       *[]common.Hash `json:"-"`
+	ParentBeaconBlockRoot *common.Hash   `json:"-"`
+
+	// Payload Attributes used to build the block
+	PayloadAttributes PayloadAttributes `json:"-"`
 }
 
 // JSON type overrides for executableData.
@@ -208,23 +214,14 @@ func FromBeaconExecutableData(ed *geth_beacon.ExecutableData) (ExecutableData, e
 	}, nil
 }
 
-func ExecutableDataToBlock(ed ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash) (*types.Block, error) {
-	if beaconRoot != nil {
-		return nil, fmt.Errorf("parent geth_beacon block root is not nil is unsupported")
-	}
+func ExecutableDataToBlock(ed ExecutableData) (*types.Block, error) {
 	gethEd, err := ToBeaconExecutableData(&ed)
 	if err != nil {
 		return nil, err
 	}
-	return geth_beacon.ExecutableDataToBlock(gethEd, versionedHashes, beaconRoot)
-}
-
-func BlockToExecutableData(block *types.Block, fees *big.Int) ExecutableData {
-	// TODO (DEVNET 8): Add blobs
-	gethEnvelope := geth_beacon.BlockToExecutableData(block, fees, nil)
-	ed, err := FromBeaconExecutableData(gethEnvelope.ExecutionPayload)
-	if err != nil {
-		panic(err)
+	var versionedHashes []common.Hash
+	if ed.VersionedHashes != nil {
+		versionedHashes = *ed.VersionedHashes
 	}
-	return ed
+	return geth_beacon.ExecutableDataToBlock(gethEd, versionedHashes, ed.ParentBeaconBlockRoot)
 }

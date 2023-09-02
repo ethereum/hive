@@ -54,8 +54,8 @@ func main() {
 
 	simulator := hivesim.New()
 
-	addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
-	addTestsToSuite(simulator, &auth, specToInterface(suite_auth.Tests), "full")
+	addTestsToSuite(simulator, &engine, suite_engine.Tests, "full")
+	addTestsToSuite(simulator, &auth, suite_auth.Tests, "full")
 	addTestsToSuite(simulator, &excap, suite_ex_cap.Tests, "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
@@ -70,22 +70,19 @@ func main() {
 	hivesim.MustRunSuite(simulator, cancun)
 }
 
-func specToInterface(src []test.Spec) []test.SpecInterface {
-	res := make([]test.SpecInterface, len(src))
-	for i := 0; i < len(src); i++ {
-		res[i] = src[i]
-	}
-	return res
-}
-
 // Add test cases to a given test suite
-func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.SpecInterface, nodeType string) {
+func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.Spec, nodeType string) {
 	for _, currentTest := range tests {
 		currentTest := currentTest
-
+		currentTestName := fmt.Sprintf("%s (%s)", currentTest.GetName(), currentTest.GetMainFork())
 		// Load the genesis file specified and dynamically bundle it.
 		genesis := currentTest.GetGenesis()
 		forkConfig := currentTest.GetForkConfig()
+		if forkConfig == nil {
+			// Test cannot be configured as is for current fork, skip
+			fmt.Printf("skipping test \"%s\" because fork configuration is not possible\n", currentTestName)
+			continue
+		}
 		forkConfig.ConfigGenesis(genesis)
 		genesisStartOption, err := helper.GenesisStartOption(genesis)
 		if err != nil {
@@ -136,7 +133,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		if clientTypes, err := sim.ClientTypes(); err == nil {
 			for _, clientType := range clientTypes {
 				suite.Add(hivesim.TestSpec{
-					Name:        fmt.Sprintf("%s (%s)", currentTest.GetName(), clientType.Name),
+					Name:        fmt.Sprintf("%s (%s)", currentTestName, clientType.Name),
 					Description: currentTest.GetAbout(),
 					Run: func(t *hivesim.T) {
 						// Start the client with given options
@@ -146,9 +143,9 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 							genesisStartOption,
 							hivesim.WithStaticFiles(testFiles),
 						)
-						t.Logf("Start test (%s): %s", c.Type, currentTest.GetName())
+						t.Logf("Start test (%s): %s", c.Type, currentTestName)
 						defer func() {
-							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
+							t.Logf("End test (%s): %s", c.Type, currentTestName)
 						}()
 						timeout := globals.DefaultTestCaseTimeout
 						// If a test.Spec specifies a timeout, use that instead
@@ -163,7 +160,6 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 							t,
 							c,
 							genesis,
-							&forkConfig,
 							newParams,
 							testFiles,
 						)

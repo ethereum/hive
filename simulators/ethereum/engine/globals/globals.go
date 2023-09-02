@@ -2,12 +2,10 @@ package globals
 
 import (
 	"crypto/ecdsa"
-	"fmt"
 	"math/big"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/hivesim"
@@ -132,85 +130,3 @@ var (
 		"HIVE_MERGE_BLOCK_ID": "100",
 	}
 )
-
-// Global types
-type ForkConfig struct {
-	ShanghaiTimestamp *big.Int
-	CancunTimestamp   *big.Int
-}
-
-func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
-	if f.ShanghaiTimestamp != nil {
-		shanghaiTime := f.ShanghaiTimestamp.Uint64()
-		genesis.Config.ShanghaiTime = &shanghaiTime
-
-		if genesis.Timestamp >= shanghaiTime {
-			// Remove PoW altogether
-			genesis.Difficulty = common.Big0
-			genesis.Config.TerminalTotalDifficulty = common.Big0
-			genesis.Config.Clique = nil
-			genesis.ExtraData = []byte{}
-		}
-	}
-	if f.CancunTimestamp != nil {
-		if genesis.Config.ShanghaiTime == nil {
-			return fmt.Errorf("Cancun fork requires Shanghai fork")
-		}
-		cancunTime := f.CancunTimestamp.Uint64()
-		genesis.Config.CancunTime = &cancunTime
-		if *genesis.Config.ShanghaiTime > cancunTime {
-			return fmt.Errorf("Cancun fork must be after Shanghai fork")
-		}
-		if genesis.Timestamp >= cancunTime {
-			if genesis.BlobGasUsed == nil {
-				genesis.BlobGasUsed = new(uint64)
-			}
-			if genesis.ExcessBlobGas == nil {
-				genesis.ExcessBlobGas = new(uint64)
-			}
-		}
-	}
-	return nil
-}
-
-func (f *ForkConfig) IsShanghai(blockTimestamp uint64) bool {
-	return f.ShanghaiTimestamp != nil && new(big.Int).SetUint64(blockTimestamp).Cmp(f.ShanghaiTimestamp) >= 0
-}
-
-func (f *ForkConfig) IsCancun(blockTimestamp uint64) bool {
-	return f.CancunTimestamp != nil && new(big.Int).SetUint64(blockTimestamp).Cmp(f.CancunTimestamp) >= 0
-}
-
-func (f *ForkConfig) ForkchoiceUpdatedVersion(headTimestamp uint64, payloadAttributesTimestamp *uint64) int {
-	// If the payload attributes timestamp is nil, use the head timestamp
-	// to calculate the FcU version.
-	timestamp := headTimestamp
-	if payloadAttributesTimestamp != nil {
-		timestamp = *payloadAttributesTimestamp
-	}
-
-	if f.IsCancun(timestamp) {
-		return 3
-	} else if f.IsShanghai(timestamp) {
-		return 2
-	}
-	return 1
-}
-
-func (f *ForkConfig) NewPayloadVersion(timestamp uint64) int {
-	if f.IsCancun(timestamp) {
-		return 3
-	} else if f.IsShanghai(timestamp) {
-		return 2
-	}
-	return 1
-}
-
-func (f *ForkConfig) GetPayloadVersion(timestamp uint64) int {
-	if f.IsCancun(timestamp) {
-		return 3
-	} else if f.IsShanghai(timestamp) {
-		return 2
-	}
-	return 1
-}

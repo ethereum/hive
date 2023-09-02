@@ -7,6 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 )
@@ -17,26 +18,44 @@ type ConsensusConfig struct {
 	SafeSlotsToImportOptimistically int64
 }
 
-type SpecInterface interface {
+type Spec interface {
+	// Execute the test
 	Execute(*Env)
+	// Configure the CLMocker for this specific test
 	ConfigureCLMock(*clmock.CLMocker)
-	GetAbout() string
-	GetConsensusConfig() ConsensusConfig
-	GetChainFile() string
-	GetForkConfig() globals.ForkConfig
-	GetGenesis() *core.Genesis
+	// Get the name of the test
 	GetName() string
+	// Get a brief description of the test
+	GetAbout() string
+	// Get the consensus configuration for this test
+	GetConsensusConfig() ConsensusConfig
+	// Get the chain file to initialize the clients
+	GetChainFile() string
+	// Get the main fork for this test
+	GetMainFork() config.Fork
+	// Create a copy of the spec with a different main fork
+	WithMainFork(config.Fork) Spec
+	// Get the fork config for this test
+	GetForkConfig() *config.ForkConfig
+	// Get the genesis file to initialize the clients
+	GetGenesis() *core.Genesis
+	// Get the test transaction type to use throughout the test
 	GetTestTransactionType() helper.TestTransactionType
+	// Get the maximum execution time until a timeout is raised
 	GetTimeout() int
+	// Get whether mining is disabled for this test
 	IsMiningDisabled() bool
 }
 
-type Spec struct {
+type BaseSpec struct {
 	// Name of the test
 	Name string
 
 	// Brief description of the test
 	About string
+
+	// Expectation Description
+	Expectation string
 
 	// Test procedure to execute the test
 	Run func(*Env)
@@ -59,7 +78,8 @@ type Spec struct {
 
 	// Genesis file to be used for all clients launched during test
 	// Default: genesis.json (init/genesis.json)
-	GenesisFile string
+	GenesisFile      string
+	GenesisTimestamp *uint64
 
 	// Chain file to initialize the clients.
 	// When used, clique consensus mechanism is disabled.
@@ -73,37 +93,79 @@ type Spec struct {
 	TestTransactionType helper.TestTransactionType
 
 	// Fork Config
-	globals.ForkConfig
+	MainFork         config.Fork
+	ForkTime         int64
+	PreviousForkTime int64
 }
 
-func (s Spec) Execute(env *Env) {
+func (s BaseSpec) Execute(env *Env) {
 	s.Run(env)
 }
 
-func (s Spec) ConfigureCLMock(*clmock.CLMocker) {
+func (s BaseSpec) ConfigureCLMock(*clmock.CLMocker) {
 	// No-op
 }
 
-func (s Spec) GetAbout() string {
+func (s BaseSpec) GetAbout() string {
 	return s.About
 }
 
-func (s Spec) GetConsensusConfig() ConsensusConfig {
+func (s BaseSpec) GetConsensusConfig() ConsensusConfig {
 	return ConsensusConfig{
 		SlotsToSafe:                     s.SlotsToSafe,
 		SlotsToFinalized:                s.SlotsToFinalized,
 		SafeSlotsToImportOptimistically: s.SafeSlotsToImportOptimistically,
 	}
 }
-func (s Spec) GetChainFile() string {
+func (s BaseSpec) GetChainFile() string {
 	return s.ChainFile
 }
 
-func (s Spec) GetForkConfig() globals.ForkConfig {
-	return s.ForkConfig
+func (s BaseSpec) GetMainFork() config.Fork {
+	mainFork := s.MainFork
+	if mainFork == "" {
+		mainFork = config.Paris
+	}
+	return mainFork
 }
 
-func (s Spec) GetGenesis() *core.Genesis {
+func (s BaseSpec) WithMainFork(fork config.Fork) Spec {
+	specCopy := s
+	specCopy.MainFork = fork
+	return specCopy
+}
+
+func (s BaseSpec) GetForkConfig() *config.ForkConfig {
+	forkTime := s.ForkTime
+	previousForkTime := s.PreviousForkTime
+	forkConfig := config.ForkConfig{}
+	mainFork := s.GetMainFork()
+	genesisTimestamp := globals.GenesisTimestamp
+	if s.GenesisTimestamp != nil {
+		genesisTimestamp = int64(*s.GenesisTimestamp)
+	}
+	if previousForkTime > forkTime {
+		panic(errors.New("previous fork time cannot be greater than fork time"))
+	}
+	if mainFork == config.Paris {
+		if forkTime > genesisTimestamp || previousForkTime != 0 {
+			return nil // Cannot configure a fork before Paris, skip test
+		}
+	} else if mainFork == config.Shanghai {
+		if previousForkTime != 0 {
+			return nil // Cannot configure a fork before Shanghai, skip test
+		}
+		forkConfig.ShanghaiTimestamp = big.NewInt(forkTime)
+	} else if mainFork == config.Cancun {
+		forkConfig.ShanghaiTimestamp = big.NewInt(previousForkTime)
+		forkConfig.CancunTimestamp = big.NewInt(forkTime)
+	} else {
+		panic(fmt.Errorf("unknown fork: %s", mainFork))
+	}
+	return &forkConfig
+}
+
+func (s BaseSpec) GetGenesis() *core.Genesis {
 	genesisPath := "./init/genesis.json"
 	if s.GenesisFile != "" {
 		genesisPath = fmt.Sprintf("./init/%s", s.GenesisFile)
@@ -112,6 +174,10 @@ func (s Spec) GetGenesis() *core.Genesis {
 	genesis.Config.TerminalTotalDifficulty = big.NewInt(genesis.Difficulty.Int64() + s.TTD)
 	if genesis.Difficulty.Cmp(genesis.Config.TerminalTotalDifficulty) <= 0 {
 		genesis.Config.TerminalTotalDifficultyPassed = true
+	}
+
+	if s.GenesisTimestamp != nil {
+		genesis.Timestamp = *s.GenesisTimestamp
 	}
 
 	// Add balance to all the test accounts
@@ -128,22 +194,22 @@ func (s Spec) GetGenesis() *core.Genesis {
 	return &genesis
 }
 
-func (s Spec) GetName() string {
+func (s BaseSpec) GetName() string {
 	return s.Name
 }
 
-func (s Spec) GetTestTransactionType() helper.TestTransactionType {
+func (s BaseSpec) GetTestTransactionType() helper.TestTransactionType {
 	return s.TestTransactionType
 }
 
-func (s Spec) GetTimeout() int {
+func (s BaseSpec) GetTimeout() int {
 	return s.TimeoutSeconds
 }
 
-func (s Spec) IsMiningDisabled() bool {
+func (s BaseSpec) IsMiningDisabled() bool {
 	return s.DisableMining
 }
 
-var LatestFork = globals.ForkConfig{
+var LatestFork = config.ForkConfig{
 	ShanghaiTimestamp: big.NewInt(0),
 }

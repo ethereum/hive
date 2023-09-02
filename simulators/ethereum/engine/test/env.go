@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 
@@ -41,7 +42,7 @@ type Env struct {
 
 	// Client parameters used to launch the default client
 	Genesis      *core.Genesis
-	ForkConfig   *globals.ForkConfig
+	ForkConfig   *config.ForkConfig
 	ClientParams hivesim.Params
 	ClientFiles  hivesim.Params
 
@@ -49,16 +50,17 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testSpec SpecInterface, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, forkConfig *globals.ForkConfig, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	consensusConfig := testSpec.GetConsensusConfig()
+	forkConfig := testSpec.GetForkConfig()
 	clMocker := clmock.NewCLMocker(
 		t,
 		genesis,
 		consensusConfig.SlotsToSafe,
 		consensusConfig.SlotsToFinalized,
 		big.NewInt(consensusConfig.SafeSlotsToImportOptimistically),
-		testSpec.GetForkConfig())
+		forkConfig)
 
 	// Send the CLMocker for configuration by the spec, if any.
 	testSpec.ConfigureCLMock(clMocker)

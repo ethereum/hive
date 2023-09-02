@@ -39,10 +39,10 @@ type Engine interface {
 	GetPayloadV3(ctx context.Context, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error)
 	GetPayload(ctx context.Context, version int, payloadId *api.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error)
 
-	NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (api.PayloadStatusV1, error)
-	NewPayloadV1(ctx context.Context, payload *typ.ExecutableDataV1) (api.PayloadStatusV1, error)
+	NewPayload(ctx context.Context, version int, payload *typ.ExecutableData) (api.PayloadStatusV1, error)
+	NewPayloadV1(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error)
 	NewPayloadV2(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error)
-	NewPayloadV3(ctx context.Context, payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (api.PayloadStatusV1, error)
+	NewPayloadV3(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error)
 
 	GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error)
 	GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*typ.ExecutionPayloadBodyV1, error)
@@ -52,6 +52,12 @@ type Engine interface {
 
 	LatestForkchoiceResponse() (fcuResponse *api.ForkChoiceResponse)
 	LatestNewPayloadResponse() (payloadResponse *api.PayloadStatusV1)
+}
+
+type EngineAPIVersionResolver interface {
+	ForkchoiceUpdatedVersion(headTimestamp uint64, payloadAttributesTimestamp *uint64) int
+	NewPayloadVersion(timestamp uint64) int
+	GetPayloadVersion(timestamp uint64) int
 }
 
 type EngineClient interface {

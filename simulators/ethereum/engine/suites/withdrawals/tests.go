@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
@@ -45,9 +46,9 @@ var (
 // https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
 
 // List of all withdrawals tests
-var Tests = []test.SpecInterface{
+var Tests = []test.Spec{
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Withdrawals Fork On Genesis",
 			About: `
 			Tests the withdrawals fork happening since genesis (e.g. on a
@@ -60,7 +61,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Withdrawals Fork on Block 1",
 			About: `
 			Tests the withdrawals fork happening directly after genesis.
@@ -72,7 +73,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Withdrawals Fork on Block 2",
 			About: `
 			Tests the transition to the withdrawals fork after a single block
@@ -87,7 +88,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Withdrawals Fork on Block 3",
 			About: `
 			Tests the transition to the withdrawals fork after two blocks
@@ -102,7 +103,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Withdraw to a single account",
 			About: `
 			Make multiple withdrawals to a single account.
@@ -115,7 +116,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Withdraw to two accounts",
 			About: `
 			Make multiple withdrawals to two different accounts, repeated in
@@ -132,7 +133,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Withdraw many accounts",
 			About: `
 			Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK * 5 different accounts.
@@ -147,7 +148,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Withdraw zero amount",
 			About: `
 			Make multiple withdrawals where the amount withdrawn is 0.
@@ -164,7 +165,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Empty Withdrawals",
 			About: `
 			Produce withdrawals block with zero withdrawals.
@@ -176,7 +177,7 @@ var Tests = []test.SpecInterface{
 	},
 
 	&WithdrawalsBaseSpec{
-		Spec: test.Spec{
+		BaseSpec: test.BaseSpec{
 			Name: "Corrupted Block Hash Payload (INVALID)",
 			About: `
 			Send a valid payload with a corrupted hash using engine_newPayloadV2.
@@ -190,7 +191,7 @@ var Tests = []test.SpecInterface{
 	// Block value tests
 	&BlockValueSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "GetPayloadV2 Block Value",
 				About: `
 				Verify the block value returned in GetPayloadV2.
@@ -204,7 +205,7 @@ var Tests = []test.SpecInterface{
 	// Sync Tests
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account - No Transactions",
 				About: `
 			- Spawn a first client
@@ -225,7 +226,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 1 - Single Withdrawal Account",
 				About: `
 			- Spawn a first client
@@ -244,7 +245,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Sync after 2 blocks - Withdrawals on Genesis - Single Withdrawal Account",
 				About: `
 			- Spawn a first client, with Withdrawals since genesis
@@ -262,7 +263,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts - No Transactions",
 				About: `
 			- Spawn a first client
@@ -282,7 +283,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Sync after 2 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
 				About: `
 			- Spawn a first client
@@ -301,7 +302,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsSyncSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Sync after 128 blocks - Withdrawals on Block 2 - Multiple Withdrawal Accounts",
 				About: `
 			- Spawn a first client
@@ -323,7 +324,7 @@ var Tests = []test.SpecInterface{
 	//Re-Org tests
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Block 1 - 1 Block Re-Org",
 				About: `
 				Tests a simple 1 block re-org 
@@ -341,7 +342,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org NewPayload",
 				About: `
 				Tests a 8 block re-org using NewPayload
@@ -360,7 +361,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Block 1 - 8 Block Re-Org, Sync",
 				About: `
 				Tests a 8 block re-org using NewPayload
@@ -379,7 +380,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org NewPayload",
 				About: `
 				Tests a 10 block re-org using NewPayload
@@ -399,7 +400,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Block 8 - 10 Block Re-Org Sync",
 				About: `
 				Tests a 10 block re-org using sync
@@ -419,7 +420,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org",
 				About: `
 				Tests a 10 block re-org using NewPayload
@@ -440,7 +441,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 7 - 10 Block Re-Org Sync",
 				About: `
 				Tests a 10 block re-org using sync
@@ -461,7 +462,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org",
 				About: `
 				Tests a 10 block re-org using NewPayload
@@ -483,7 +484,7 @@ var Tests = []test.SpecInterface{
 	},
 	&WithdrawalsReorgSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Withdrawals Fork on Canonical Block 8 / Side Block 9 - 10 Block Re-Org Sync",
 				About: `
 				Tests a 10 block re-org using sync
@@ -508,7 +509,7 @@ var Tests = []test.SpecInterface{
 	// EVM Tests (EIP-3651, EIP-3855, EIP-3860)
 	&MaxInitcodeSizeSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "Max Initcode Size",
 			},
 			WithdrawalsForkHeight: 2, // Block 1 is Pre-Withdrawals
@@ -521,7 +522,7 @@ var Tests = []test.SpecInterface{
 	// Get Payload Bodies Requests
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "GetPayloadBodiesByRange",
 				About: `
 				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
@@ -594,7 +595,7 @@ var Tests = []test.SpecInterface{
 
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "GetPayloadBodies After Sync",
 				About: `
 				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
@@ -644,7 +645,7 @@ var Tests = []test.SpecInterface{
 
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "GetPayloadBodiesByRange (Sidechain)",
 				About: `
 				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
@@ -675,7 +676,7 @@ var Tests = []test.SpecInterface{
 
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "GetPayloadBodiesByRange (Empty Transactions/Withdrawals)",
 				About: `
 				Make no withdrawals and no transactions in many payloads.
@@ -707,7 +708,7 @@ var Tests = []test.SpecInterface{
 	},
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "GetPayloadBodiesByHash",
 				About: `
 				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
@@ -760,7 +761,7 @@ var Tests = []test.SpecInterface{
 
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "GetPayloadBodiesByHash (Empty Transactions/Withdrawals)",
 				About: `
 				Make no withdrawals and no transactions in many payloads.
@@ -785,7 +786,7 @@ var Tests = []test.SpecInterface{
 
 	&GetPayloadBodiesSpec{
 		WithdrawalsBaseSpec: &WithdrawalsBaseSpec{
-			Spec: test.Spec{
+			BaseSpec: test.BaseSpec{
 				Name: "GetPayloadBodies Parallel",
 				About: `
 				Make multiple withdrawals to MAINNET_MAX_WITHDRAWAL_COUNT_PER_BLOCK accounts each payload.
@@ -906,7 +907,7 @@ func (wh WithdrawalsHistory) Copy() WithdrawalsHistory {
 // Specifies a simple withdrawals test where the withdrawals fork can happen
 // on genesis or afterwards.
 type WithdrawalsBaseSpec struct {
-	test.Spec
+	test.BaseSpec
 	TimeIncrements           uint64             // Timestamp increments per block throughout the test
 	WithdrawalsForkHeight    uint64             // Withdrawals activation fork height
 	WithdrawalsBlockCount    uint64             // Number of blocks on and after withdrawals fork activation
@@ -939,8 +940,8 @@ func (ws *WithdrawalsBaseSpec) GetWithdrawalsForkTime() uint64 {
 }
 
 // Generates the fork config, including withdrawals fork timestamp.
-func (ws *WithdrawalsBaseSpec) GetForkConfig() globals.ForkConfig {
-	return globals.ForkConfig{
+func (ws *WithdrawalsBaseSpec) GetForkConfig() *config.ForkConfig {
+	return &config.ForkConfig{
 		ShanghaiTimestamp: big.NewInt(int64(ws.GetWithdrawalsForkTime())),
 	}
 }
@@ -973,7 +974,7 @@ func AddUnconditionalBytecode(g *core.Genesis, start *big.Int, end *big.Int) {
 // Append the accounts we are going to withdraw to, which should also include
 // bytecode for testing purposes.
 func (ws *WithdrawalsBaseSpec) GetGenesis() *core.Genesis {
-	genesis := ws.Spec.GetGenesis()
+	genesis := ws.BaseSpec.GetGenesis()
 
 	// Add some accounts to withdraw to with unconditional SSTOREs
 	startAccount := big.NewInt(0x1000)
@@ -1208,14 +1209,13 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				// Send produced payload but try to include non-nil
 				// `withdrawals`, it should fail.
 				emptyWithdrawalsList := make(types.Withdrawals, 0)
-				customizer := &helper.CustomPayloadData{
+				payloadWithEmptyWithdrawalsList, err := (&helper.CustomPayloadData{
 					Withdrawals: emptyWithdrawalsList,
-				}
-				payloadPlusWithdrawals, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
+				}).CustomizePayload(&t.CLMock.LatestPayloadBuilt)
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
-				r := t.TestEngine.TestEngineNewPayloadV2(payloadPlusWithdrawals)
+				r := t.TestEngine.TestEngineNewPayloadV2(payloadWithEmptyWithdrawalsList)
 				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2+Withdrawals, error is expected"
 				r.ExpectErrorCode(InvalidParamsError)
 
@@ -1304,10 +1304,9 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				// with null, and client must respond with `InvalidParamsError`.
 				// Note that StateRoot is also incorrect but null withdrawals should
 				// be checked first instead of responding `INVALID`
-				customizer := &helper.CustomPayloadData{
+				nilWithdrawalsPayload, err := (&helper.CustomPayloadData{
 					RemoveWithdrawals: true,
-				}
-				nilWithdrawalsPayload, _, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot)
+				}).CustomizePayload(&t.CLMock.LatestPayloadBuilt)
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
@@ -1567,6 +1566,8 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 	// Sidechain withdraws on the max account value range 0xffffffffffffffffffffffffffffffffffffffff
 	sidechainStartAccount.Sub(sidechainStartAccount, big.NewInt(int64(ws.GetWithdrawableAccountCount())+1))
 
+	var sidechainPayloadAttributes *typ.PayloadAttributes
+
 	t.CLMock.ProduceBlocks(int(ws.GetPreWithdrawalsBlockCount()+ws.WithdrawalsBlockCount), clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			t.CLMock.NextWithdrawals = nil
@@ -1625,30 +1626,25 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 					}
 				}
 
-				var version int
-				pAttributes := typ.PayloadAttributes{
+				sidechainPayloadAttributes = &typ.PayloadAttributes{
 					Random:                t.CLMock.LatestPayloadAttributes.Random,
 					SuggestedFeeRecipient: t.CLMock.LatestPayloadAttributes.SuggestedFeeRecipient,
 				}
 				if t.CLMock.CurrentPayloadNumber > ws.GetSidechainSplitHeight() {
-					pAttributes.Timestamp = sidechain[t.CLMock.CurrentPayloadNumber-1].Timestamp + uint64(ws.GetSidechainBlockTimeIncrements())
+					sidechainPayloadAttributes.Timestamp = sidechain[t.CLMock.CurrentPayloadNumber-1].Timestamp + uint64(ws.GetSidechainBlockTimeIncrements())
 				} else if t.CLMock.CurrentPayloadNumber == ws.GetSidechainSplitHeight() {
-					pAttributes.Timestamp = t.CLMock.LatestHeader.Time + uint64(ws.GetSidechainBlockTimeIncrements())
+					sidechainPayloadAttributes.Timestamp = t.CLMock.LatestHeader.Time + uint64(ws.GetSidechainBlockTimeIncrements())
 				} else {
-					pAttributes.Timestamp = t.CLMock.LatestPayloadAttributes.Timestamp
+					sidechainPayloadAttributes.Timestamp = t.CLMock.LatestPayloadAttributes.Timestamp
 				}
 				if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainWithdrawalsForkHeight() {
 					// Withdrawals
-					version = 2
-					pAttributes.Withdrawals = sidechainWithdrawalsHistory[t.CLMock.CurrentPayloadNumber]
-				} else {
-					// No withdrawals
-					version = 1
+					sidechainPayloadAttributes.Withdrawals = sidechainWithdrawalsHistory[t.CLMock.CurrentPayloadNumber]
 				}
 
-				t.Logf("INFO (%s): Requesting sidechain payload %d: %v", t.TestName, t.CLMock.CurrentPayloadNumber, pAttributes)
+				t.Logf("INFO (%s): Requesting sidechain payload %d: %v", t.TestName, t.CLMock.CurrentPayloadNumber, sidechainPayloadAttributes)
 
-				r := secondaryEngineTest.TestEngineForkchoiceUpdated(&fcU, &pAttributes, version)
+				r := secondaryEngineTest.TestEngineForkchoiceUpdated(&fcU, sidechainPayloadAttributes, sidechainPayloadAttributes.Timestamp)
 				r.ExpectNoError()
 				r.ExpectPayloadStatus(test.Valid)
 				if r.Response.PayloadID == nil {
@@ -1659,17 +1655,14 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 		},
 		OnGetPayload: func() {
 			var (
-				version int
 				payload *typ.ExecutableData
 			)
-			if t.CLMock.CurrentPayloadNumber >= ws.GetSidechainWithdrawalsForkHeight() {
-				version = 2
-			} else {
-				version = 1
-			}
 			if t.CLMock.LatestPayloadBuilt.Number >= ws.GetSidechainSplitHeight() {
+				if sidechainPayloadAttributes == nil {
+					panic("sidechain payload attributes not set")
+				}
 				// This payload is built by the secondary client, hence need to manually fetch it here
-				r := secondaryEngineTest.TestEngineGetPayload(sidechainPayloadId, version)
+				r := secondaryEngineTest.TestEngineGetPayload(sidechainPayloadId, sidechainPayloadAttributes)
 				r.ExpectNoError()
 				payload = &r.Payload
 				sidechain[payload.Number] = payload
@@ -1677,14 +1670,14 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 				// This block is part of both chains, simply forward it to the secondary client
 				payload = &t.CLMock.LatestPayloadBuilt
 			}
-			r := secondaryEngineTest.TestEngineNewPayload(payload, nil, nil, version)
+			r := secondaryEngineTest.TestEngineNewPayload(payload)
 			r.ExpectStatus(test.Valid)
 			p := secondaryEngineTest.TestEngineForkchoiceUpdated(
 				&beacon.ForkchoiceStateV1{
 					HeadBlockHash: payload.BlockHash,
 				},
 				nil,
-				version,
+				payload.Timestamp,
 			)
 			p.ExpectPayloadStatus(test.Valid)
 		},
@@ -1767,21 +1760,15 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 			if !ok {
 				t.Fatalf("FAIL (%s): Invalid payload %d requested.", t.TestName, payloadNumber)
 			}
-			var version int
-			if payloadNumber >= ws.GetSidechainWithdrawalsForkHeight() {
-				version = 2
-			} else {
-				version = 1
-			}
 			t.Logf("INFO (%s): Sending sidechain payload %d, hash=%s, parent=%s", t.TestName, payloadNumber, payload.BlockHash, payload.ParentHash)
-			r := t.TestEngine.TestEngineNewPayload(payload, nil, nil, version)
+			r := t.TestEngine.TestEngineNewPayload(payload)
 			r.ExpectStatusEither(test.Valid, test.Accepted)
 			p := t.TestEngine.TestEngineForkchoiceUpdated(
 				&beacon.ForkchoiceStateV1{
 					HeadBlockHash: payload.BlockHash,
 				},
 				nil,
-				version,
+				payload.Timestamp,
 			)
 			p.ExpectPayloadStatus(test.Valid)
 		}
@@ -1914,7 +1901,7 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 			// Customize the payload to include a tx with an invalid initcode
 			if invTx, ok := invalidTx.(*types.Transaction); ok {
 
-				customPayload, _, err := helper.CustomizePayloadTransactions(&t.CLMock.LatestPayloadBuilt, t.CLMock.LatestPayloadAttributes.BeaconRoot, types.Transactions{invTx})
+				customPayload, err := helper.CustomizePayloadTransactions(&t.CLMock.LatestPayloadBuilt, types.Transactions{invTx})
 				if err != nil {
 					t.Fatalf("FAIL: Unable to customize payload: %v", err)
 				}
@@ -2089,7 +2076,7 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 		customizer := &helper.CustomPayloadData{
 			Withdrawals: helper.RandomizeWithdrawalsOrder(t.CLMock.LatestExecutedPayload.Withdrawals),
 		}
-		sidechainCurrent, _, err := customizer.CustomizePayload(&t.CLMock.LatestExecutedPayload, t.CLMock.LatestPayloadAttributes.BeaconRoot)
+		sidechainCurrent, err := customizer.CustomizePayload(&t.CLMock.LatestExecutedPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
 		}
@@ -2097,7 +2084,7 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 			ParentHash:  &sidechainCurrent.BlockHash,
 			Withdrawals: helper.RandomizeWithdrawalsOrder(nextCanonicalPayload.Withdrawals),
 		}
-		sidechainHead, _, err := customizer.CustomizePayload(nextCanonicalPayload, t.CLMock.LatestPayloadAttributes.BeaconRoot)
+		sidechainHead, err := customizer.CustomizePayload(nextCanonicalPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
 		}

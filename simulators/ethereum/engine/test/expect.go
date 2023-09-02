@@ -69,14 +69,22 @@ func (e ExpectEnv) Fatalf(format string, values ...interface{}) {
 
 type TestEngineClient struct {
 	*ExpectEnv
-	Engine client.EngineClient
+	EngineAPIVersionResolver client.EngineAPIVersionResolver
+	Engine                   client.EngineClient
 }
 
 func NewTestEngineClient(t *Env, ec client.EngineClient) *TestEngineClient {
 	return &TestEngineClient{
-		ExpectEnv: &ExpectEnv{Env: t},
-		Engine:    ec,
+		ExpectEnv:                &ExpectEnv{Env: t},
+		EngineAPIVersionResolver: t.ForkConfig,
+		Engine:                   ec,
 	}
+}
+
+func (tec *TestEngineClient) WithEngineAPIVersionResolver(res client.EngineAPIVersionResolver) *TestEngineClient {
+	newTestEngineClient := *tec
+	newTestEngineClient.EngineAPIVersionResolver = res
+	return &newTestEngineClient
 }
 
 // ForkchoiceUpdated
@@ -121,10 +129,12 @@ func (tec *TestEngineClient) TestEngineForkchoiceUpdatedV2(fcState *api.Forkchoi
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes, version int) *ForkchoiceResponseExpectObject {
-	if version == -1 {
-		version = client.LatestForkchoiceUpdatedVersion
+func (tec *TestEngineClient) TestEngineForkchoiceUpdated(fcState *api.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes, headTimestamp uint64) *ForkchoiceResponseExpectObject {
+	var pAttrTimestamp *uint64
+	if pAttributes != nil {
+		pAttrTimestamp = &pAttributes.Timestamp
 	}
+	version := tec.EngineAPIVersionResolver.ForkchoiceUpdatedVersion(headTimestamp, pAttrTimestamp)
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	resp, err := tec.Engine.ForkchoiceUpdated(ctx, version, fcState, pAttributes)
@@ -227,9 +237,7 @@ type NewPayloadResponseExpectObject struct {
 func (tec *TestEngineClient) TestEngineNewPayloadV1(payload *typ.ExecutableData) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	edv1 := &typ.ExecutableDataV1{}
-	edv1.FromExecutableData(payload)
-	status, err := tec.Engine.NewPayloadV1(ctx, edv1)
+	status, err := tec.Engine.NewPayloadV1(ctx, payload)
 	ret := &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Payload:   payload,
@@ -260,10 +268,10 @@ func (tec *TestEngineClient) TestEngineNewPayloadV2(payload *typ.ExecutableData)
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineNewPayloadV3(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) *NewPayloadResponseExpectObject {
+func (tec *TestEngineClient) TestEngineNewPayloadV3(payload *typ.ExecutableData) *NewPayloadResponseExpectObject {
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
-	status, err := tec.Engine.NewPayloadV3(ctx, payload, versionedHashes, beaconRoot)
+	status, err := tec.Engine.NewPayloadV3(ctx, payload)
 	ret := &NewPayloadResponseExpectObject{
 		ExpectEnv: &ExpectEnv{Env: tec.Env},
 		Payload:   payload,
@@ -277,9 +285,13 @@ func (tec *TestEngineClient) TestEngineNewPayloadV3(payload *typ.ExecutableData,
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineNewPayload(payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash, version int) *NewPayloadResponseExpectObject {
+func (tec *TestEngineClient) TestEngineNewPayload(payload *typ.ExecutableData) *NewPayloadResponseExpectObject {
+	if payload == nil {
+		panic("Payload is nil")
+	}
+	version := tec.EngineAPIVersionResolver.NewPayloadVersion(payload.Timestamp)
 	if version == 3 {
-		return tec.TestEngineNewPayloadV3(payload, versionedHashes, beaconRoot)
+		return tec.TestEngineNewPayloadV3(payload)
 	} else if version == 2 {
 		return tec.TestEngineNewPayloadV2(payload)
 	} else if version == 1 {
@@ -390,10 +402,42 @@ func (tec *TestEngineClient) TestEngineGetPayloadV2(payloadID *api.PayloadID) *G
 	return ret
 }
 
-func (tec *TestEngineClient) TestEngineGetPayload(payloadID *api.PayloadID, version int) *GetPayloadResponseExpectObject {
+func (tec *TestEngineClient) TestEngineGetPayloadV3(payloadID *api.PayloadID) *GetPayloadResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	payload, blockValue, blobsBundle, shouldOverride, err := tec.Engine.GetPayloadV3(ctx, payloadID)
+	ret := &GetPayloadResponseExpectObject{
+		ExpectEnv:             &ExpectEnv{Env: tec.Env},
+		Payload:               payload,
+		Version:               3,
+		BlockValue:            blockValue,
+		BlobsBundle:           blobsBundle,
+		ShouldOverrideBuilder: shouldOverride,
+		Error:                 err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
+var (
+	BLOB_COMMITMENT_VERSION_KZG = byte(0x01)
+)
+
+func (tec *TestEngineClient) TestEngineGetPayload(payloadID *api.PayloadID, payloadAttributes *typ.PayloadAttributes) *GetPayloadResponseExpectObject {
+	version := tec.EngineAPIVersionResolver.GetPayloadVersion(payloadAttributes.Timestamp)
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	payload, blockValue, blobBundle, shouldOverride, err := tec.Engine.GetPayload(ctx, version, payloadID)
+	if blobBundle != nil {
+		payload.VersionedHashes, err = blobBundle.VersionedHashes(BLOB_COMMITMENT_VERSION_KZG)
+		if err != nil {
+			panic(err)
+		}
+	}
+	payload.ParentBeaconBlockRoot = payloadAttributes.BeaconRoot
+	// TODO: Where do we get the beacon root from ???
 	ret := &GetPayloadResponseExpectObject{
 		ExpectEnv:             &ExpectEnv{Env: tec.Env},
 		Payload:               payload,
@@ -406,6 +450,7 @@ func (tec *TestEngineClient) TestEngineGetPayload(payloadID *api.PayloadID, vers
 	if err, ok := err.(rpc.Error); ok {
 		ret.ErrorCode = err.ErrorCode()
 	}
+
 	return ret
 }
 
