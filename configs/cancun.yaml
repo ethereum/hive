@@ -2,8 +2,8 @@
   nametag: cancun-git
   dockerfile: git
   build_args:
-      github: hyperledger/besu
-      tag: main
+      github: Gabriel-Trintinalia/besu
+      tag: add-decode-type-to-transaction-decoder
 
 - client: erigon
   nametag: cancun-git
