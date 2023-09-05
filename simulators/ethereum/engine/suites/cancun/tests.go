@@ -30,7 +30,7 @@ var (
 	BLOB_COMMITMENT_VERSION_KZG = byte(0x01)
 
 	// EIP 4788 specific constants
-	HISTORY_STORAGE_ADDRESS  = common.HexToAddress("0x000000000000000000000000000000000000000b")
+	BEACON_ROOTS_ADDRESS  = common.HexToAddress("0xbEac00dDB15f3B6d645C48263dC93862413A222D")
 	HISTORICAL_ROOTS_MODULUS = uint64(98304)
 
 	// Engine API errors
@@ -77,7 +77,6 @@ var Tests = []test.SpecInterface{
 			`,
 		},
 
-		// We fork on genesis
 		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{

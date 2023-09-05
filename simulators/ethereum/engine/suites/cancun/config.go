@@ -16,12 +16,12 @@ type CancunBaseSpec struct {
 	test.Spec
 	TimeIncrements   uint64 // Timestamp increments per block throughout the test
 	GetPayloadDelay  uint64 // Delay between FcU and GetPayload calls
-	CancunForkHeight uint64 // Withdrawals activation fork height
+	CancunForkHeight uint64 // Cancun activation fork height
 	GenesisTimestamp *uint64
 	TestSequence
 }
 
-// Timestamp delta between genesis and the withdrawals fork
+// Timestamp delta between genesis and the cancun fork
 func (cs *CancunBaseSpec) GetCancunGenesisTimeDelta() uint64 {
 	return cs.CancunForkHeight * cs.GetBlockTimeIncrements()
 }
@@ -55,7 +55,7 @@ func (cs *CancunBaseSpec) GetBlockTimeIncrements() uint64 {
 	return cs.TimeIncrements
 }
 
-// Timestamp delta between genesis and the withdrawals fork
+// Timestamp delta between genesis and the cancun fork
 func (cs *CancunBaseSpec) GetBlobsGenesisTimeDelta() uint64 {
 	return cs.CancunForkHeight * cs.GetBlockTimeIncrements()
 }
@@ -66,12 +66,12 @@ func (cs *CancunBaseSpec) GetBlobsForkTime() uint64 {
 	return cs.GetGenesisTimestamp() + cs.GetBlobsGenesisTimeDelta()
 }
 
-// Append the accounts we are going to withdraw to, which should also include
-// bytecode for testing purposes.
+// Append the accounts that are going to use the BLOBHASH with, we will also
+// predeploy the EIP-4788 bytecode at the HISTORY_STORAGE_ADDRESS.
 func (cs *CancunBaseSpec) GetGenesis() *core.Genesis {
 	genesis := cs.Spec.GetGenesis()
 
-	// Add accounts that use the DATAHASH opcode
+	// Add accounts that use the BLOBHASH opcode
 	datahashCode := []byte{
 		0x5F, // PUSH0
 		0x80, // DUP1
@@ -103,7 +103,7 @@ func (cs *CancunBaseSpec) GetGenesis() *core.Genesis {
 	}
 
 	// Add bytecode pre deploy to the EIP-4788 address.
-	genesis.Alloc[HISTORY_STORAGE_ADDRESS] = core.GenesisAccount{
+	genesis.Alloc[BEACON_ROOTS_ADDRESS] = core.GenesisAccount{
 		Balance: common.Big0,
 		Nonce:   1,
 		Code:    common.Hex2Bytes("3373fffffffffffffffffffffffffffffffffffffffe14604457602036146024575f5ffd5b620180005f350680545f35146037575f5ffd5b6201800001545f5260205ff35b42620180004206555f3562018000420662018000015500"),
