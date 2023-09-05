@@ -21,6 +21,8 @@
 #  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/Petersburg transition
 #  - HIVE_FORK_ISTANBUL        block number for Istanbul transition
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
+#  - HIVE_SHANGHAI_TIMESTAMP   timestamp for Shanghai transition
+#  - HIVE_CANCUN_TIMESTAMP     timestamp for Cancun transition
 #  - HIVE_LOGLEVEL             client log level
 #
 # These flags are NOT supported by reth
