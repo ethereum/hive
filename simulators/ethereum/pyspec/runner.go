@@ -49,7 +49,7 @@ func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(test
 		// create testcase structure from fixtureTests
 		for name, fixture := range fixtureTests {
 			// skip networks post merge or not supported
-			network := fixture.json.Network
+			network := fixture.json.Fork
 			if _, exist := envForks[network]; !exist {
 				continue
 			}
@@ -123,7 +123,6 @@ func (tc *testcase) run(t *hivesim.T) {
 
 	// send payloads and check response
 	latestValidHash := common.Hash{}
-	latestVersion := uint64(1)
 	for i, engineNewPayload := range tc.payloads {
 		// execute fixture block payload
 		ed, err := engineNewPayload.ToExecutableData()
@@ -136,7 +135,6 @@ func (tc *testcase) run(t *hivesim.T) {
 			int(engineNewPayload.Version),
 			ed,
 		)
-		latestVersion = engineNewPayload.Version
 		// check for rpc errors and compare error codes
 		fxErrCode := int(tc.fixture.json.Blocks[i].EngineNewPayload.ErrorCode)
 		if fxErrCode != 0 {
@@ -164,9 +162,7 @@ func (tc *testcase) run(t *hivesim.T) {
 	if latestValidHash != (common.Hash{}) {
 		// update with latest valid response
 		fcState := &api.ForkchoiceStateV1{HeadBlockHash: latestValidHash}
-		// TODO: This is incorrect, up to this point, the `engine_forkchoiceUpdated` and `engine_newPayload` versions for each
-		// fork match, but it could change in the future. Ideally we should embed the version in the fixture.
-		if _, fcErr := engineClient.ForkchoiceUpdated(ctx, int(latestVersion), fcState, nil); fcErr != nil {
+		if _, fcErr := engineClient.ForkchoiceUpdated(ctx, int(tc.fixture.json.EngineFcuVersion), fcState, nil); fcErr != nil {
 			tc.failedErr = fcErr
 			t.Fatalf("unable to update head of beacon chain in test %s: %v ", tc.name, fcErr)
 		}
@@ -240,7 +236,7 @@ func (tc *testcase) run(t *hivesim.T) {
 // updateEnv updates the environment variables against the fork rules
 // defined in envForks, for the network specified in the testcase fixture.
 func (tc *testcase) updateEnv(env hivesim.Params) {
-	forkRules := envForks[tc.fixture.json.Network]
+	forkRules := envForks[tc.fixture.json.Fork]
 	for k, v := range forkRules {
 		env[k] = fmt.Sprintf("%d", v)
 	}
@@ -276,7 +272,7 @@ func extractGenesis(fixture fixtureJSON) (*core.Genesis, error) {
 		}
 	}
 	genesis := &core.Genesis{
-		Config:        tests.Forks[fixture.Network],
+		Config:        tests.Forks[fixture.Fork],
 		Coinbase:      fixture.Genesis.Coinbase,
 		Difficulty:    fixture.Genesis.Difficulty,
 		GasLimit:      fixture.Genesis.GasLimit,
