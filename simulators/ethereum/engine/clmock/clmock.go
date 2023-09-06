@@ -16,6 +16,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
@@ -27,15 +28,14 @@ import (
 )
 
 var (
-	DefaultSlotsToSafe      = big.NewInt(1)
-	DefaultSlotsToFinalized = big.NewInt(2)
+	DefaultSafeSlotsToImportOptimistically = big.NewInt(0)
+	DefaultSlotsToSafe                     = big.NewInt(1)
+	DefaultSlotsToFinalized                = big.NewInt(2)
+	DefaultBlockTimestampIncrement         = big.NewInt(1)
 
 	// Time delay between ForkchoiceUpdated and GetPayload to allow the clients
 	// to produce a new Payload
 	DefaultPayloadProductionClientDelay = time.Second
-
-	// Fork specific constants
-	BLOB_COMMITMENT_VERSION_KZG = byte(0x01)
 )
 
 type ExecutableDataHistory map[uint64]*typ.ExecutableData
@@ -127,36 +127,31 @@ type CLMocker struct {
 	TimeoutContext context.Context
 }
 
-func NewCLMocker(t *hivesim.T, genesis *core.Genesis, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int, forkConfig *config.ForkConfig) *CLMocker {
+func NewCLMocker(t *hivesim.T, genesis *core.Genesis, forkConfig *config.ForkConfig) *CLMocker {
 	// Init random seed for different purposes
 	seed := time.Now().Unix()
 	t.Logf("Randomness seed: %v\n", seed)
 	rand.Seed(seed)
 
-	if slotsToSafe == nil {
-		// Use default
-		slotsToSafe = DefaultSlotsToSafe
-	}
-	if slotsToFinalized == nil {
-		// Use default
-		slotsToFinalized = DefaultSlotsToFinalized
-	}
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
-		T:                               t,
-		EngineClients:                   make([]client.EngineClient, 0),
-		PrevRandaoHistory:               map[uint64]common.Hash{},
-		ExecutedPayloadHistory:          ExecutableDataHistory{},
-		SlotsToSafe:                     slotsToSafe,
-		SlotsToFinalized:                slotsToFinalized,
-		SafeSlotsToImportOptimistically: safeSlotsToImportOptimistically,
+		T:                      t,
+		EngineClients:          make([]client.EngineClient, 0),
+		PrevRandaoHistory:      map[uint64]common.Hash{},
+		ExecutedPayloadHistory: ExecutableDataHistory{},
+
+		SlotsToSafe:                     DefaultSlotsToSafe,
+		SlotsToFinalized:                DefaultSlotsToFinalized,
+		SafeSlotsToImportOptimistically: DefaultSafeSlotsToImportOptimistically,
 		PayloadProductionClientDelay:    DefaultPayloadProductionClientDelay,
-		PayloadIDHistory:                make(map[api.PayloadID]interface{}),
-		LatestHeader:                    nil,
-		FirstPoSBlockNumber:             nil,
-		LatestHeadNumber:                nil,
-		TTDReached:                      false,
-		NextFeeRecipient:                common.Address{},
+		BlockTimestampIncrement:         DefaultBlockTimestampIncrement,
+
+		PayloadIDHistory:    make(map[api.PayloadID]interface{}),
+		LatestHeader:        nil,
+		FirstPoSBlockNumber: nil,
+		LatestHeadNumber:    nil,
+		TTDReached:          false,
+		NextFeeRecipient:    common.Address{},
 		LatestForkchoice: api.ForkchoiceStateV1{
 			HeadBlockHash:      common.Hash{},
 			SafeBlockHash:      common.Hash{},
@@ -327,9 +322,6 @@ func (cl *CLMocker) IsBlockPoS(bn *big.Int) bool {
 
 // Return the per-block timestamp value increment
 func (cl *CLMocker) GetTimestampIncrement() uint64 {
-	if cl.BlockTimestampIncrement == nil {
-		return 1
-	}
 	return cl.BlockTimestampIncrement.Uint64()
 }
 
@@ -513,7 +505,7 @@ func (cl *CLMocker) GetNextPayload() {
 			cl.Fatalf("CLMocker: No blob bundle on cancun")
 		}
 		// Broadcast the blob bundle to all clients
-		cl.LatestPayloadBuilt.VersionedHashes, err = cl.LatestBlobBundle.VersionedHashes(BLOB_COMMITMENT_VERSION_KZG)
+		cl.LatestPayloadBuilt.VersionedHashes, err = cl.LatestBlobBundle.VersionedHashes(cancun.BLOB_COMMITMENT_VERSION_KZG)
 		if err != nil {
 			cl.Fatalf("CLMocker: Could not get versioned hashes from blob bundle: %v", err)
 		}

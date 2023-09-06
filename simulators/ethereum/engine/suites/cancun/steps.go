@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/devp2p"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -260,7 +261,7 @@ func VerifyBeaconRootStorage(ctx context.Context, testEngine *test.TestEngineCli
 	// Read the storage keys from the stateful precompile that stores the beacon roots and verify
 	// that the beacon root is the same as the one in the payload
 	blockNumber := new(big.Int).SetUint64(payload.Number)
-	precompileAddress := HISTORY_STORAGE_ADDRESS
+	precompileAddress := cancun.HISTORY_STORAGE_ADDRESS
 
 	timestampKey, beaconRootKey := BeaconRootStorageIndexes(payload.Timestamp)
 
@@ -314,7 +315,7 @@ func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *config.Fo
 
 			// Retrieve receipt from client
 			r := testEngine.TestTransactionReceipt(tx.Hash())
-			expectedBlobGasUsed := blobCount * GAS_PER_BLOB
+			expectedBlobGasUsed := blobCount * cancun.GAS_PER_BLOB
 			r.ExpectBlobGasUsed(expectedBlobGasUsed)
 			r.ExpectBlobGasPrice(expectedBlobGasPrice)
 		}
@@ -634,7 +635,7 @@ func (step SendBlobTransactions) GetBlobsPerTransaction() uint64 {
 
 func (step SendBlobTransactions) Execute(t *CancunTestContext) error {
 	// Send a blob transaction
-	addr := common.BigToAddress(DATAHASH_START_ADDRESS)
+	addr := common.BigToAddress(cancun.DATAHASH_START_ADDRESS)
 	blobCountPerTx := step.GetBlobsPerTransaction()
 	var engine client.EngineClient
 	if step.ClientIndex >= uint64(len(t.Engines)) {

@@ -44,7 +44,7 @@ var (
 	GasPrice         = big.NewInt(30 * params.GWei)
 	GasTipPrice      = big.NewInt(1 * params.GWei)
 	NetworkID        = big.NewInt(7)
-	GenesisTimestamp = int64(0x1234)
+	GenesisTimestamp = uint64(0x1234)
 
 	// RPC Timeout for every call
 	RPCTimeout = 10 * time.Second

@@ -8,36 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
-)
-
-var (
-	DATAHASH_START_ADDRESS = big.NewInt(0x100)
-	DATAHASH_ADDRESS_COUNT = 1000
-
-	// EIP 4844 specific constants
-	GAS_PER_BLOB = uint64(0x20000)
-
-	MIN_DATA_GASPRICE         = uint64(1)
-	MAX_BLOB_GAS_PER_BLOCK    = uint64(786432)
-	TARGET_BLOB_GAS_PER_BLOCK = uint64(393216)
-
-	TARGET_BLOBS_PER_BLOCK = uint64(TARGET_BLOB_GAS_PER_BLOCK / GAS_PER_BLOB)
-	MAX_BLOBS_PER_BLOCK    = uint64(MAX_BLOB_GAS_PER_BLOCK / GAS_PER_BLOB)
-
-	BLOB_GASPRICE_UPDATE_FRACTION = uint64(3338477)
-
-	BLOB_COMMITMENT_VERSION_KZG = byte(0x01)
-
-	// EIP 4788 specific constants
-	HISTORY_STORAGE_ADDRESS  = common.HexToAddress("0x000000000000000000000000000000000000000b")
-	HISTORICAL_ROOTS_MODULUS = uint64(98304)
-
-	// Engine API errors
-	INVALID_PARAMS_ERROR   = pInt(-32602)
-	UNSUPPORTED_FORK_ERROR = pInt(-38005)
 )
 
 // Precalculate the first data gas cost increase
@@ -46,10 +21,6 @@ var (
 )
 
 func pUint64(v uint64) *uint64 {
-	return &v
-}
-
-func pInt(v int) *int {
 	return &v
 }
 
@@ -77,10 +48,10 @@ var Tests = []test.Spec{
 			  - Beacon root in eth_getBlockByNumber
 			  - Blob fields in transaction receipts from eth_getTransactionReceipt
 			`,
+			MainFork: config.Cancun,
+			// We fork after genesis
+			ForkHeight: 1,
 		},
-
-		// We fork on genesis
-		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{
 			// We are starting at Shanghai genesis so send a couple payloads to reach the fork
@@ -89,7 +60,7 @@ var Tests = []test.Spec{
 			// First, we send a couple of blob transactions on genesis,
 			// with enough data gas cost to make sure they are included in the first block.
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 
@@ -97,22 +68,22 @@ var Tests = []test.Spec{
 			// are included in the payload.
 			// We also verify that the blob transactions are included in the blobs bundle.
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			// Try to increase the data gas cost of the blob transactions
 			// by maxing out the number of blobs for the next payloads.
 			SendBlobTransactions{
-				TransactionCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(MAX_BLOBS_PER_BLOCK-TARGET_BLOBS_PER_BLOCK) + 1,
-				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+				TransactionCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(cancun.MAX_BLOBS_PER_BLOCK-cancun.TARGET_BLOBS_PER_BLOCK) + 1,
+				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 
 			// Next payloads will have max data blobs each
 			NewPayloads{
-				PayloadCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS / (MAX_BLOBS_PER_BLOCK - TARGET_BLOBS_PER_BLOCK),
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				PayloadCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS / (cancun.MAX_BLOBS_PER_BLOCK - cancun.TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 			},
 
 			// But there will be an empty payload, since the data gas cost increased
@@ -123,7 +94,7 @@ var Tests = []test.Spec{
 
 			// But it will be included in the next payload
 			NewPayloads{
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 			},
 		},
 	},
@@ -138,17 +109,15 @@ var Tests = []test.Spec{
 			Verifications performed:
 			* See Blob Transactions On Block 1, Shanghai Genesis
 			`,
+			MainFork: config.Cancun,
 		},
-
-		// We fork on genesis
-		CancunForkHeight: 0,
 
 		TestSequence: TestSequence{
 			NewPayloads{}, // Create a single empty payload to push the client through the fork.
 			// First, we send a couple of blob transactions on genesis,
 			// with enough data gas cost to make sure they are included in the first block.
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 
@@ -156,22 +125,22 @@ var Tests = []test.Spec{
 			// are included in the payload.
 			// We also verify that the blob transactions are included in the blobs bundle.
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			// Try to increase the data gas cost of the blob transactions
 			// by maxing out the number of blobs for the next payloads.
 			SendBlobTransactions{
-				TransactionCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(MAX_BLOBS_PER_BLOCK-TARGET_BLOBS_PER_BLOCK) + 1,
-				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+				TransactionCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(cancun.MAX_BLOBS_PER_BLOCK-cancun.TARGET_BLOBS_PER_BLOCK) + 1,
+				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 
 			// Next payloads will have max data blobs each
 			NewPayloads{
-				PayloadCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS / (MAX_BLOBS_PER_BLOCK - TARGET_BLOBS_PER_BLOCK),
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				PayloadCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS / (cancun.MAX_BLOBS_PER_BLOCK - cancun.TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 			},
 
 			// But there will be an empty payload, since the data gas cost increased
@@ -182,7 +151,7 @@ var Tests = []test.Spec{
 
 			// But it will be included in the next payload
 			NewPayloads{
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 			},
 		},
 	},
@@ -191,7 +160,7 @@ var Tests = []test.Spec{
 		BaseSpec: test.BaseSpec{
 			Name: "Blob Transaction Ordering, Single Account",
 			About: `
-			Send N blob transactions with MAX_BLOBS_PER_BLOCK-1 blobs each,
+			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
 			using account A.
 			Using same account, and an increased nonce from the previously sent
 			transactions, send N blob transactions with 1 blob each.
@@ -201,35 +170,33 @@ var Tests = []test.Spec{
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
+			MainFork: config.Cancun,
 		},
 
-		// We fork on genesis
-		CancunForkHeight: 0,
-
 		TestSequence: TestSequence{
-			// First send the MAX_BLOBS_PER_BLOCK-1 blob transactions.
+			// First send the cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions.
 			SendBlobTransactions{
 				TransactionCount:              5,
-				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK - 1,
+				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 			// Then send the single-blob transactions
 			SendBlobTransactions{
-				TransactionCount:              MAX_BLOBS_PER_BLOCK + 1,
+				TransactionCount:              cancun.MAX_BLOBS_PER_BLOCK + 1,
 				BlobsPerTransaction:           1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 
-			// First four payloads have MAX_BLOBS_PER_BLOCK-1 blobs each
+			// First four payloads have cancun.MAX_BLOBS_PER_BLOCK-1 blobs each
 			NewPayloads{
 				PayloadCount:              4,
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK - 1,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK - 1,
 			},
 
 			// The rest of the payloads have full blobs
 			NewPayloads{
 				PayloadCount:              2,
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 			},
 		},
 	},
@@ -238,7 +205,7 @@ var Tests = []test.Spec{
 		BaseSpec: test.BaseSpec{
 			Name: "Blob Transaction Ordering, Single Account 2",
 			About: `
-			Send N blob transactions with MAX_BLOBS_PER_BLOCK-1 blobs each,
+			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
 			using account A.
 			Using same account, and an increased nonce from the previously sent
 			transactions, send a single 2-blob transaction, and send N blob
@@ -249,16 +216,14 @@ var Tests = []test.Spec{
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
+			MainFork: config.Cancun,
 		},
 
-		// We fork on genesis
-		CancunForkHeight: 0,
-
 		TestSequence: TestSequence{
-			// First send the MAX_BLOBS_PER_BLOCK-1 blob transactions.
+			// First send the cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions.
 			SendBlobTransactions{
 				TransactionCount:              5,
-				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK - 1,
+				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 
@@ -271,21 +236,21 @@ var Tests = []test.Spec{
 
 			// Then send the single-blob transactions
 			SendBlobTransactions{
-				TransactionCount:              MAX_BLOBS_PER_BLOCK - 2,
+				TransactionCount:              cancun.MAX_BLOBS_PER_BLOCK - 2,
 				BlobsPerTransaction:           1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 
-			// First five payloads have MAX_BLOBS_PER_BLOCK-1 blobs each
+			// First five payloads have cancun.MAX_BLOBS_PER_BLOCK-1 blobs each
 			NewPayloads{
 				PayloadCount:              5,
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK - 1,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK - 1,
 			},
 
 			// The rest of the payloads have full blobs
 			NewPayloads{
 				PayloadCount:              1,
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 			},
 		},
 	},
@@ -295,7 +260,7 @@ var Tests = []test.Spec{
 		BaseSpec: test.BaseSpec{
 			Name: "Blob Transaction Ordering, Multiple Accounts",
 			About: `
-			Send N blob transactions with MAX_BLOBS_PER_BLOCK-1 blobs each,
+			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
 			using account A.
 			Send N blob transactions with 1 blob each from account B.
 			Verify that the payloads are created with the correct ordering:
@@ -303,17 +268,15 @@ var Tests = []test.Spec{
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
+			MainFork: config.Cancun,
 		},
 
-		// We fork on genesis
-		CancunForkHeight: 0,
-
 		TestSequence: TestSequence{
-			// First send the MAX_BLOBS_PER_BLOCK-1 blob transactions from
+			// First send the cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions from
 			// account A.
 			SendBlobTransactions{
 				TransactionCount:              5,
-				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK - 1,
+				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 				AccountIndex:                  0,
 			},
@@ -328,7 +291,7 @@ var Tests = []test.Spec{
 			// All payloads have full blobs
 			NewPayloads{
 				PayloadCount:              5,
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 			},
 		},
 	},
@@ -338,7 +301,7 @@ var Tests = []test.Spec{
 		BaseSpec: test.BaseSpec{
 			Name: "Blob Transaction Ordering, Multiple Clients",
 			About: `
-			Send N blob transactions with MAX_BLOBS_PER_BLOCK-1 blobs each,
+			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
 			using account A, to client A.
 			Send N blob transactions with 1 blob each from account B, to client
 			B.
@@ -347,10 +310,8 @@ var Tests = []test.Spec{
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
+			MainFork: config.Cancun,
 		},
-
-		// We fork on genesis
-		CancunForkHeight: 0,
 
 		TestSequence: TestSequence{
 			// Start a secondary client to also receive blob transactions
@@ -369,11 +330,11 @@ var Tests = []test.Spec{
 				ExpectedIncludedBlobCount: 0,
 			},
 
-			// First send the MAX_BLOBS_PER_BLOCK-1 blob transactions from
+			// First send the cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions from
 			// account A, to client A.
 			SendBlobTransactions{
 				TransactionCount:              5,
-				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK - 1,
+				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK - 1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(120),
 				AccountIndex:                  0,
 				ClientIndex:                   0,
@@ -391,7 +352,7 @@ var Tests = []test.Spec{
 			// All payloads have full blobs
 			NewPayloads{
 				PayloadCount:              5,
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 				// Wait a bit more on before requesting the built payload from the client
 				GetPayloadDelay: 2,
 			},
@@ -406,10 +367,8 @@ var Tests = []test.Spec{
 			Test sending multiple blob transactions with the same nonce, but
 			higher gas tip so the transaction is replaced.
 			`,
+			MainFork: config.Cancun,
 		},
-
-		// We fork on genesis
-		CancunForkHeight: 0,
 
 		TestSequence: TestSequence{
 			// Send multiple blob transactions with the same nonce.
@@ -459,10 +418,8 @@ var Tests = []test.Spec{
 
 			Verify that a payload is created with the maximum number of blobs.
 			`,
+			MainFork: config.Cancun,
 		},
-
-		// We fork on genesis
-		CancunForkHeight: 0,
 
 		TestSequence: TestSequence{
 			// Send multiple blob transactions with the same nonce.
@@ -470,71 +427,71 @@ var Tests = []test.Spec{
 				Steps: []TestStep{
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  0,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  1,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  2,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  3,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  4,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  5,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  6,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  7,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  8,
 					},
 					SendBlobTransactions{
 						TransactionCount:              5,
-						BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+						BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 						BlobTransactionMaxBlobGasCost: big.NewInt(100),
 						AccountIndex:                  9,
 					},
 				},
 			},
 
-			// We create the first payload, which is guaranteed to have the first MAX_BLOBS_PER_BLOCK blobs.
+			// We create the first payload, which is guaranteed to have the first cancun.MAX_BLOBS_PER_BLOCK blobs.
 			NewPayloads{
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, MAX_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.MAX_BLOBS_PER_BLOCK),
 			},
 		},
 	},
@@ -550,9 +507,9 @@ var Tests = []test.Spec{
 
 			Verify that client returns no error.
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -576,20 +533,20 @@ var Tests = []test.Spec{
 
 			Verify that client returns INVALID_PARAMS_ERROR.
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
 				FcUOnPayloadRequest: &helper.UpgradeForkchoiceUpdatedVersion{
 					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
-						ExpectedError: INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				ForkchoiceUpdatedV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -604,9 +561,9 @@ var Tests = []test.Spec{
 
 			Verify that client returns UNSUPPORTED_FORK_ERROR.
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -615,12 +572,12 @@ var Tests = []test.Spec{
 						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
 							BeaconRoot: &(common.Hash{}),
 						},
-						ExpectedError: UNSUPPORTED_FORK_ERROR,
+						ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				ForkchoiceUpdatedV3 before Cancun with beacon root must return UNSUPPORTED_FORK_ERROR (code %d)
-				`, *UNSUPPORTED_FORK_ERROR),
+				`, *globals.UNSUPPORTED_FORK_ERROR),
 			},
 		},
 	},
@@ -636,9 +593,9 @@ var Tests = []test.Spec{
 
 			Verify that client returns INVALID_PARAMS_ERROR.
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 1,
 		},
-
-		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -647,12 +604,12 @@ var Tests = []test.Spec{
 						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
 							BeaconRoot: &(common.Hash{}),
 						},
-						ExpectedError: INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				ForkchoiceUpdatedV2 before Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -668,20 +625,20 @@ var Tests = []test.Spec{
 
 			Verify that client returns INVALID_PARAMS_ERROR.
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 1,
 		},
-
-		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{
 			NewPayloads{
 				FcUOnPayloadRequest: &helper.DowngradeForkchoiceUpdatedVersion{
 					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
-						ExpectedError: INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				ForkchoiceUpdatedV2 after Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -695,9 +652,9 @@ var Tests = []test.Spec{
 
 			Verify that client returns UNSUPPORTED_FORK_ERROR.
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 1,
 		},
-
-		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -706,12 +663,12 @@ var Tests = []test.Spec{
 						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
 							RemoveBeaconRoot: true,
 						},
-						ExpectedError: UNSUPPORTED_FORK_ERROR,
+						ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				ForkchoiceUpdatedV2 after Cancun must return UNSUPPORTED_FORK_ERROR (code %d)
-				`, *UNSUPPORTED_FORK_ERROR),
+				`, *globals.UNSUPPORTED_FORK_ERROR),
 			},
 		},
 	},
@@ -725,18 +682,17 @@ var Tests = []test.Spec{
 			payload attribute as the only change between requests and verify that the payload ID is
 			different.
 			`,
+			MainFork: config.Cancun,
 		},
-
-		CancunForkHeight: 0,
 
 		TestSequence: TestSequence{
 			SendBlobTransactions{
 				TransactionCount:              1,
-				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{
 					PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
 						BeaconRoot: &(common.Hash{}),
@@ -745,11 +701,11 @@ var Tests = []test.Spec{
 			},
 			SendBlobTransactions{
 				TransactionCount:              1,
-				BlobsPerTransaction:           MAX_BLOBS_PER_BLOCK,
+				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(100),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: MAX_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.MAX_BLOBS_PER_BLOCK,
 				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{
 					PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
 						BeaconRoot: &(common.Hash{1}),
@@ -767,20 +723,20 @@ var Tests = []test.Spec{
 			Test requesting a Shanghai PayloadID using GetPayloadV3.
 			Verify that client returns UNSUPPORTED_FORK_ERROR.
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
 				GetPayloadCustomizer: &helper.UpgradeGetPayloadVersion{
 					GetPayloadCustomizer: &helper.BaseGetPayloadCustomizer{
-						ExpectedError: UNSUPPORTED_FORK_ERROR,
+						ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				GetPayloadV3 To Request Shanghai Payload must return UNSUPPORTED_FORK_ERROR (code %d)
-				`, *UNSUPPORTED_FORK_ERROR),
+				`, *globals.UNSUPPORTED_FORK_ERROR),
 			},
 		},
 	},
@@ -793,20 +749,20 @@ var Tests = []test.Spec{
 			Test requesting a Cancun PayloadID using GetPayloadV2.
 			Verify that client returns UNSUPPORTED_FORK_ERROR.
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 1,
 		},
-
-		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{
 			NewPayloads{
 				GetPayloadCustomizer: &helper.DowngradeGetPayloadVersion{
 					GetPayloadCustomizer: &helper.BaseGetPayloadCustomizer{
-						ExpectedError: UNSUPPORTED_FORK_ERROR,
+						ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				GetPayloadV2 To Request Cancun Payload must return UNSUPPORTED_FORK_ERROR (code %d)
-				`, *UNSUPPORTED_FORK_ERROR),
+				`, *globals.UNSUPPORTED_FORK_ERROR),
 			},
 		},
 	},
@@ -824,9 +780,9 @@ var Tests = []test.Spec{
 
 			Verify that client returns INVALID_PARAMS_ERROR
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -837,12 +793,12 @@ var Tests = []test.Spec{
 								Blobs: nil,
 							},
 						},
-						ExpectedError: INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -856,9 +812,9 @@ var Tests = []test.Spec{
 			- nil Versioned Hashes Array
 			- nil Beacon Root
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -867,12 +823,12 @@ var Tests = []test.Spec{
 						PayloadCustomizer: &helper.CustomPayloadData{
 							BlobGasUsed: pUint64(0),
 						},
-						ExpectedError: INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -886,9 +842,9 @@ var Tests = []test.Spec{
 			- nil Versioned Hashes Array
 			- nil Beacon Root
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -897,12 +853,12 @@ var Tests = []test.Spec{
 						PayloadCustomizer: &helper.CustomPayloadData{
 							ExcessBlobGas: pUint64(0),
 						},
-						ExpectedError: INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -916,9 +872,9 @@ var Tests = []test.Spec{
 				- Empty Versioned Hashes Array
 				- nil Beacon Root
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -929,12 +885,12 @@ var Tests = []test.Spec{
 								Blobs: []helper.BlobID{},
 							},
 						},
-						ExpectedError: INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -948,9 +904,9 @@ var Tests = []test.Spec{
 			- nil Versioned Hashes Array
 			- Zero Beacon Root
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -959,12 +915,12 @@ var Tests = []test.Spec{
 						PayloadCustomizer: &helper.CustomPayloadData{
 							ParentBeaconRoot: &(common.Hash{}),
 						},
-						ExpectedError: INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -978,9 +934,9 @@ var Tests = []test.Spec{
 			- Empty Versioned Hashes Array
 			- Zero Beacon Root
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
 		},
-
-		CancunForkHeight: 2,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -994,12 +950,12 @@ var Tests = []test.Spec{
 								Blobs: []helper.BlobID{},
 							},
 						},
-						ExpectedError: UNSUPPORTED_FORK_ERROR,
+						ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 before Cancun with no nil fields must return UNSUPPORTED_FORK_ERROR (code %d)
-				`, *UNSUPPORTED_FORK_ERROR),
+				`, *globals.UNSUPPORTED_FORK_ERROR),
 			},
 		},
 	},
@@ -1015,9 +971,9 @@ var Tests = []test.Spec{
 			- Empty Versioned Hashes Array
 			- Zero Beacon Root
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 1,
 		},
-
-		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -1025,11 +981,11 @@ var Tests = []test.Spec{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						RemoveExcessBlobGas: true,
 					},
-					ExpectedError: INVALID_PARAMS_ERROR,
+					ExpectedError: globals.INVALID_PARAMS_ERROR,
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 after Cancun with nil ExcessBlobGas must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -1042,9 +998,9 @@ var Tests = []test.Spec{
 			- nil BlobGasUsed
 			- Empty Versioned Hashes Array
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 1,
 		},
-
-		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -1052,11 +1008,11 @@ var Tests = []test.Spec{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						RemoveBlobGasUsed: true,
 					},
-					ExpectedError: INVALID_PARAMS_ERROR,
+					ExpectedError: globals.INVALID_PARAMS_ERROR,
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 after Cancun with nil BlobGasUsed must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -1069,9 +1025,9 @@ var Tests = []test.Spec{
 			- nil BlobGasUsed
 			- Empty Versioned Hashes Array
 			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 1,
 		},
-
-		CancunForkHeight: 1,
 
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -1079,11 +1035,11 @@ var Tests = []test.Spec{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						RemoveParentBeaconRoot: true,
 					},
-					ExpectedError: INVALID_PARAMS_ERROR,
+					ExpectedError: globals.INVALID_PARAMS_ERROR,
 				},
 				ExpectationDescription: fmt.Sprintf(`
 				NewPayloadV3 after Cancun with nil parentBeaconBlockRoot must return INVALID_PARAMS_ERROR (code %d)
-				`, *INVALID_PARAMS_ERROR),
+				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
 	},
@@ -1096,23 +1052,23 @@ var Tests = []test.Spec{
 			Test requesting a Shanghai ForkchoiceUpdatedV2 payload followed by a Cancun ForkchoiceUpdatedV3 request.
 			Verify that client correctly returns the Cancun payload.
 			`,
+			MainFork: config.Cancun,
+			// We request two blocks from the client, first on shanghai and then on cancun, both with
+			// the same parent.
+			// Client must respond correctly to later request.
+			ForkHeight:              1,
+			BlockTimestampIncrement: 2,
 		},
-
-		// We request two blocks from the client, first on shanghai and then on cancun, both with
-		// the same parent.
-		// Client must respond correctly to later request.
-		CancunForkHeight: 1,
-		TimeIncrements:   2,
 
 		TestSequence: TestSequence{
 			// First, we send a couple of blob transactions on genesis,
 			// with enough data gas cost to make sure they are included in the first block.
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
 				// This customizer only simulates requesting a Shanghai payload 1 second before cancun.
 				// CL Mock will still request the Cancun payload afterwards
 				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{
@@ -1139,19 +1095,20 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is missing one of the hashes.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1),
+							Blobs: helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK-1),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1170,21 +1127,22 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is has an extra hash for a blob that is not in the payload.
 			`,
+			MainFork: config.Cancun,
 		},
 		// TODO: It could be worth it to also test this with a blob that is in the
 		// mempool but was not included in the payload.
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK+1),
+							Blobs: helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK+1),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1203,19 +1161,20 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is out of order.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: helper.GetBlobListByIndex(helper.BlobID(TARGET_BLOBS_PER_BLOCK-1), 0),
+							Blobs: helper.GetBlobListByIndex(helper.BlobID(cancun.TARGET_BLOBS_PER_BLOCK-1), 0),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1234,19 +1193,20 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK), helper.BlobID(TARGET_BLOBS_PER_BLOCK-1)),
+							Blobs: append(helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK), helper.BlobID(cancun.TARGET_BLOBS_PER_BLOCK-1)),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1265,19 +1225,20 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob hash that does not belong to any blob contained in the payload.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(TARGET_BLOBS_PER_BLOCK)),
+							Blobs: append(helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(cancun.TARGET_BLOBS_PER_BLOCK)),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1295,20 +1256,21 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a single blob that has an incorrect version.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs:        helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
-							HashVersions: []byte{BLOB_COMMITMENT_VERSION_KZG, BLOB_COMMITMENT_VERSION_KZG + 1},
+							Blobs:        helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
+							HashVersions: []byte{cancun.BLOB_COMMITMENT_VERSION_KZG, cancun.BLOB_COMMITMENT_VERSION_KZG + 1},
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1327,22 +1289,23 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is nil, even though the fork has already happened.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
 							Blobs: nil,
 						},
 					},
-					ExpectedError: INVALID_PARAMS_ERROR,
+					ExpectedError: globals.INVALID_PARAMS_ERROR,
 				},
 				ExpectationDescription: `
 				NewPayloadV3 after Cancun with nil VersionedHashes must return INVALID_PARAMS_ERROR (code -32602)
@@ -1358,15 +1321,16 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is empty, even though there are blobs in the payload.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
@@ -1389,6 +1353,7 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is contains hashes, even though there are no blobs in the payload.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -1417,16 +1382,17 @@ var Tests = []test.Spec{
 				Tests VersionedHashes in Engine API NewPayloadV3 where the array
 				is missing one of the hashes.
 				`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			LaunchClients{
@@ -1439,7 +1405,7 @@ var Tests = []test.Spec{
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1),
+							Blobs: helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK-1),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1455,18 +1421,19 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is has an extra hash for a blob that is not in the payload.
 			`,
+			MainFork: config.Cancun,
 		},
 		// TODO: It could be worth it to also test this with a blob that is in the
 		// mempool but was not included in the payload.
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			LaunchClients{
@@ -1479,7 +1446,7 @@ var Tests = []test.Spec{
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK+1),
+							Blobs: helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK+1),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1495,16 +1462,17 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is out of order.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 			LaunchClients{
 				EngineStarter:            hive_rpc.HiveRPCEngineStarter{},
@@ -1516,7 +1484,7 @@ var Tests = []test.Spec{
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: helper.GetBlobListByIndex(helper.BlobID(TARGET_BLOBS_PER_BLOCK-1), 0),
+							Blobs: helper.GetBlobListByIndex(helper.BlobID(cancun.TARGET_BLOBS_PER_BLOCK-1), 0),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1532,16 +1500,17 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			LaunchClients{
@@ -1554,7 +1523,7 @@ var Tests = []test.Spec{
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK), helper.BlobID(TARGET_BLOBS_PER_BLOCK-1)),
+							Blobs: append(helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK), helper.BlobID(cancun.TARGET_BLOBS_PER_BLOCK-1)),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1570,16 +1539,17 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			LaunchClients{
@@ -1592,7 +1562,7 @@ var Tests = []test.Spec{
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs: append(helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(TARGET_BLOBS_PER_BLOCK)),
+							Blobs: append(helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK-1), helper.BlobID(cancun.TARGET_BLOBS_PER_BLOCK)),
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1607,16 +1577,17 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a single blob that has an incorrect version.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			LaunchClients{
@@ -1629,8 +1600,8 @@ var Tests = []test.Spec{
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
 						VersionedHashesCustomizer: &VersionedHashes{
-							Blobs:        helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
-							HashVersions: []byte{BLOB_COMMITMENT_VERSION_KZG, BLOB_COMMITMENT_VERSION_KZG + 1},
+							Blobs:        helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
+							HashVersions: []byte{cancun.BLOB_COMMITMENT_VERSION_KZG, cancun.BLOB_COMMITMENT_VERSION_KZG + 1},
 						},
 					},
 					ExpectInvalidStatus: true,
@@ -1646,16 +1617,17 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is nil, even though the fork has already happened.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			LaunchClients{
@@ -1671,7 +1643,7 @@ var Tests = []test.Spec{
 							Blobs: nil,
 						},
 					},
-					ExpectedError: INVALID_PARAMS_ERROR,
+					ExpectedError: globals.INVALID_PARAMS_ERROR,
 				},
 			},
 		},
@@ -1684,16 +1656,17 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is empty, even though there are blobs in the payload.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
 			SendBlobTransactions{
-				TransactionCount:              TARGET_BLOBS_PER_BLOCK,
+				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: TARGET_BLOBS_PER_BLOCK,
-				ExpectedBlobs:             helper.GetBlobList(0, TARGET_BLOBS_PER_BLOCK),
+				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedBlobs:             helper.GetBlobList(0, cancun.TARGET_BLOBS_PER_BLOCK),
 			},
 
 			LaunchClients{
@@ -1722,6 +1695,7 @@ var Tests = []test.Spec{
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is contains hashes, even though there are no blobs in the payload.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{}, // Send new payload so the parent is unknown to the secondary client
@@ -1752,12 +1726,12 @@ var Tests = []test.Spec{
 	// Most cases are contained in https://github.com/ethereum/execution-spec-tests/tree/main/tests/cancun/eip4844_blobs
 	// and can be executed using `pyspec` simulator.
 	&CancunBaseSpec{
-
 		BaseSpec: test.BaseSpec{
 			Name: "Incorrect BlobGasUsed: Non-Zero on Zero Blobs",
 			About: `
 			Send a payload with zero blobs, but non-zero BlobGasUsed.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{
@@ -1777,12 +1751,13 @@ var Tests = []test.Spec{
 			About: `
 			Send a payload with zero blobs, but non-zero BlobGasUsed.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			NewPayloads{
 				NewPayloadCustomizer: &helper.BaseNewPayloadVersionCustomizer{
 					PayloadCustomizer: &helper.CustomPayloadData{
-						BlobGasUsed: pUint64(GAS_PER_BLOB),
+						BlobGasUsed: pUint64(cancun.GAS_PER_BLOB),
 					},
 					ExpectInvalidStatus: true,
 				},
@@ -1797,6 +1772,7 @@ var Tests = []test.Spec{
 			About: `
 			Requests blob pooled transactions and verify correct encoding.
 			`,
+			MainFork: config.Cancun,
 		},
 		TestSequence: TestSequence{
 			// Get past the genesis

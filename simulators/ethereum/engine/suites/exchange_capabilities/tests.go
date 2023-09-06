@@ -48,7 +48,7 @@ func init() {
 		for _, active := range []bool{true, false} {
 			var (
 				nameStr  string
-				forkTime int64
+				forkTime uint64
 			)
 			if active {
 				nameStr = "Active"

@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
@@ -421,17 +422,13 @@ func (tec *TestEngineClient) TestEngineGetPayloadV3(payloadID *api.PayloadID) *G
 	return ret
 }
 
-var (
-	BLOB_COMMITMENT_VERSION_KZG = byte(0x01)
-)
-
 func (tec *TestEngineClient) TestEngineGetPayload(payloadID *api.PayloadID, payloadAttributes *typ.PayloadAttributes) *GetPayloadResponseExpectObject {
 	version := tec.EngineAPIVersionResolver.GetPayloadVersion(payloadAttributes.Timestamp)
 	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
 	defer cancel()
 	payload, blockValue, blobBundle, shouldOverride, err := tec.Engine.GetPayload(ctx, version, payloadID)
 	if blobBundle != nil {
-		payload.VersionedHashes, err = blobBundle.VersionedHashes(BLOB_COMMITMENT_VERSION_KZG)
+		payload.VersionedHashes, err = blobBundle.VersionedHashes(cancun.BLOB_COMMITMENT_VERSION_KZG)
 		if err != nil {
 			panic(err)
 		}

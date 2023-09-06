@@ -52,15 +52,12 @@ type Env struct {
 
 func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
-	consensusConfig := testSpec.GetConsensusConfig()
 	forkConfig := testSpec.GetForkConfig()
 	clMocker := clmock.NewCLMocker(
 		t,
 		genesis,
-		consensusConfig.SlotsToSafe,
-		consensusConfig.SlotsToFinalized,
-		big.NewInt(consensusConfig.SafeSlotsToImportOptimistically),
-		forkConfig)
+		forkConfig,
+	)
 
 	// Send the CLMocker for configuration by the spec, if any.
 	testSpec.ConfigureCLMock(clMocker)

@@ -1,11 +1,7 @@
 package config
 
 import (
-	"fmt"
 	"math/big"
-
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 )
 
 type Fork string
@@ -19,40 +15,6 @@ const (
 type ForkConfig struct {
 	ShanghaiTimestamp *big.Int
 	CancunTimestamp   *big.Int
-}
-
-func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
-	if f.ShanghaiTimestamp != nil {
-		shanghaiTime := f.ShanghaiTimestamp.Uint64()
-		genesis.Config.ShanghaiTime = &shanghaiTime
-
-		if genesis.Timestamp >= shanghaiTime {
-			// Remove PoW altogether
-			genesis.Difficulty = common.Big0
-			genesis.Config.TerminalTotalDifficulty = common.Big0
-			genesis.Config.Clique = nil
-			genesis.ExtraData = []byte{}
-		}
-	}
-	if f.CancunTimestamp != nil {
-		if genesis.Config.ShanghaiTime == nil {
-			return fmt.Errorf("cancun fork requires Shanghai fork")
-		}
-		cancunTime := f.CancunTimestamp.Uint64()
-		genesis.Config.CancunTime = &cancunTime
-		if *genesis.Config.ShanghaiTime > cancunTime {
-			return fmt.Errorf("cancun fork must be after Shanghai fork")
-		}
-		if genesis.Timestamp >= cancunTime {
-			if genesis.BlobGasUsed == nil {
-				genesis.BlobGasUsed = new(uint64)
-			}
-			if genesis.ExcessBlobGas == nil {
-				genesis.ExcessBlobGas = new(uint64)
-			}
-		}
-	}
-	return nil
 }
 
 func (f *ForkConfig) IsShanghai(blockTimestamp uint64) bool {
