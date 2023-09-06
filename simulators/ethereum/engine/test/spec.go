@@ -161,7 +161,7 @@ func (s BaseSpec) GetForkTime() uint64 {
 }
 
 func (s BaseSpec) GetForkConfig() *config.ForkConfig {
-	forkTime := s.ForkTime
+	forkTime := s.GetForkTime()
 	previousForkTime := s.PreviousForkTime
 	forkConfig := config.ForkConfig{}
 	mainFork := s.GetMainFork()
