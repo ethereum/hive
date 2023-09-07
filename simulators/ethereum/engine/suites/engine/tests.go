@@ -890,7 +890,7 @@ func buildPayloadWithInvalidChainIDTx(t *test.Env) {
 			}
 			invalidChainID := new(big.Int).Set(globals.ChainID)
 			invalidChainID.Add(invalidChainID, big1)
-			invalidChainIDTx, err := types.SignTx(types.NewTx(txData), types.NewLondonSigner(invalidChainID), globals.VaultKey)
+			invalidChainIDTx, err := types.SignTx(types.NewTx(txData), types.NewCancunSigner(invalidChainID), globals.VaultKey)
 			if err != nil {
 				t.Fatalf("FAIL(%s): Unable to sign tx with invalid chain ID: %v", t.TestName, err)
 			}

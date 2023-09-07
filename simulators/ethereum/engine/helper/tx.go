@@ -146,6 +146,58 @@ func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateK
 		}
 
 		modifiedTxData = modifiedDynamicFeeTxBase
+	case types.BlobTxType:
+		modifiedBlobTxBase := &types.BlobTx{}
+
+		if customData.Nonce != nil {
+			modifiedBlobTxBase.Nonce = *customData.Nonce
+		} else {
+			modifiedBlobTxBase.Nonce = baseTransaction.Nonce()
+		}
+		if customData.GasPriceOrGasFeeCap != nil {
+			modifiedBlobTxBase.GasFeeCap = uint256.MustFromBig(customData.GasPriceOrGasFeeCap)
+		} else {
+			modifiedBlobTxBase.GasFeeCap = uint256.MustFromBig(baseTransaction.GasFeeCap())
+		}
+		if customData.GasTipCap != nil {
+			modifiedBlobTxBase.GasTipCap = uint256.MustFromBig(customData.GasTipCap)
+		} else {
+			modifiedBlobTxBase.GasTipCap = uint256.MustFromBig(baseTransaction.GasTipCap())
+		}
+		if customData.Gas != nil {
+			modifiedBlobTxBase.Gas = *customData.Gas
+		} else {
+			modifiedBlobTxBase.Gas = baseTransaction.Gas()
+		}
+		to := customData.To
+		if to == nil {
+			to = baseTransaction.To()
+		}
+		if to == nil {
+			to = &common.Address{}
+		}
+		modifiedBlobTxBase.To = *to
+		if customData.Value != nil {
+			modifiedBlobTxBase.Value = uint256.MustFromBig(customData.Value)
+		} else {
+			modifiedBlobTxBase.Value = uint256.MustFromBig(baseTransaction.Value())
+		}
+		if customData.Data != nil {
+			modifiedBlobTxBase.Data = *customData.Data
+		} else {
+			modifiedBlobTxBase.Data = baseTransaction.Data()
+		}
+		modifiedBlobTxBase.AccessList = baseTransaction.AccessList()
+		modifiedBlobTxBase.BlobFeeCap = uint256.MustFromBig(baseTransaction.BlobGasFeeCap())
+		modifiedBlobTxBase.BlobHashes = baseTransaction.BlobHashes()
+		modifiedBlobTxBase.Sidecar = baseTransaction.BlobTxSidecar()
+		if customData.Signature != nil {
+			modifiedBlobTxBase.V = uint256.MustFromBig(customData.Signature.V)
+			modifiedBlobTxBase.R = uint256.MustFromBig(customData.Signature.R)
+			modifiedBlobTxBase.S = uint256.MustFromBig(customData.Signature.S)
+		}
+
+		modifiedTxData = modifiedBlobTxBase
 
 	}
 
@@ -156,7 +208,7 @@ func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateK
 			// Use the default value if an invaild chain ID was not specified
 			customData.ChainID = globals.ChainID
 		}
-		signer := types.NewLondonSigner(customData.ChainID)
+		signer := types.NewCancunSigner(customData.ChainID)
 		var err error
 		if modifiedTx, err = types.SignTx(modifiedTx, signer, pk); err != nil {
 			return nil, err
