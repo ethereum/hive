@@ -63,10 +63,6 @@ var Tests = []test.Spec{
 		Run:  missingFcu,
 	},
 	&test.BaseSpec{
-		Name: "Payload Build after New Invalid Payload",
-		Run:  payloadBuildAfterNewInvalidPayload,
-	},
-	&test.BaseSpec{
 		Name:                "Build Payload with Invalid ChainID Transaction (Legacy Tx)",
 		Run:                 buildPayloadWithInvalidChainIDTx,
 		TestTransactionType: helper.LegacyTxOnly,
@@ -784,81 +780,6 @@ func missingFcu(t *test.Env) {
 
 }
 
-// Build on top of the latest valid payload after an invalid payload has been received:
-// P <- INV_P, newPayload(INV_P), fcU(head: P, payloadAttributes: attrs) + getPayload(…)
-func payloadBuildAfterNewInvalidPayload(t *test.Env) {
-	// Add a second client to build the invalid payload
-	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
-
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
-	}
-	secondaryEngineTest := test.NewTestEngineClient(t, secondaryEngine)
-	t.CLMock.AddEngineClient(secondaryEngine)
-
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
-	// Produce blocks before starting the test
-	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
-
-	// Produce another block, but at the same time send an invalid payload from the other client
-	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-		OnPayloadProducerSelected: func() {
-			// We are going to use the client that was not selected
-			// by the CLMocker to produce the invalid payload
-			invalidPayloadProducer := t.TestEngine
-			if t.CLMock.NextBlockProducer == invalidPayloadProducer.Engine {
-				invalidPayloadProducer = secondaryEngineTest
-			}
-			var inv_p *typ.ExecutableData
-
-			{
-				// Get a payload from the invalid payload producer and invalidate it
-				var (
-					prevRandao            = common.Hash{}
-					suggestedFeeRecipient = common.Address{}
-				)
-				payloadAttributes, err := (&helper.BasePayloadAttributesCustomizer{
-					Random:                &prevRandao,
-					SuggestedFeeRecipient: &suggestedFeeRecipient,
-				}).GetPayloadAttributes(&t.CLMock.LatestPayloadAttributes)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Unable to customize payload attributes: %v", t.TestName, err)
-				}
-
-				r := invalidPayloadProducer.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, payloadAttributes, t.CLMock.LatestHeader.Time)
-				r.ExpectPayloadStatus(test.Valid)
-				// Wait for the payload to be produced by the EL
-				time.Sleep(time.Second)
-
-				s := invalidPayloadProducer.TestEngineGetPayload(
-					r.Response.PayloadID,
-					payloadAttributes,
-				)
-				s.ExpectNoError()
-
-				inv_p, err = helper.GenerateInvalidPayload(&s.Payload, helper.InvalidStateRoot)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Unable to invalidate payload: %v", t.TestName, err)
-				}
-			}
-
-			// Broadcast the invalid payload
-			r := t.TestEngine.TestEngineNewPayload(inv_p)
-			r.ExpectStatus(test.Invalid)
-			r.ExpectLatestValidHash(&t.CLMock.LatestForkchoice.HeadBlockHash)
-			s := secondaryEngineTest.TestEngineNewPayload(inv_p)
-			s.ExpectStatus(test.Invalid)
-			s.ExpectLatestValidHash(&t.CLMock.LatestForkchoice.HeadBlockHash)
-
-			// Let the block production continue.
-			// At this point the selected payload producer will
-			// try to continue creating a valid payload.
-		},
-	})
-}
-
 // Attempt to produce a payload after a transaction with an invalid Chain ID was sent to the client
 // using `eth_sendRawTransaction`.
 func buildPayloadWithInvalidChainIDTx(t *test.Env) {
@@ -1048,15 +969,6 @@ func pUint64(v uint64) *uint64 {
 	return &v
 }
 
-func pInt(v int) *int {
-	return &v
-}
-
-var (
-	INVALID_PARAMS_ERROR   = pInt(-32602)
-	UNSUPPORTED_FORK_ERROR = pInt(-38005)
-)
-
 // Register all test combinations for Paris
 func init() {
 	// Register bad hash tests
@@ -1142,21 +1054,23 @@ func init() {
 	Tests = append(Tests,
 		ForkchoiceUpdatedOnPayloadRequestTest{
 			BaseSpec: test.BaseSpec{
-				Name: "Early upgrade",
+				Name:       "Early upgrade",
+				ForkHeight: 2,
 			},
 			ForkchoiceUpdatedCustomizer: &helper.UpgradeForkchoiceUpdatedVersion{
 				ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
-					ExpectedError: UNSUPPORTED_FORK_ERROR,
+					ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
 				},
 			},
 		},
 		ForkchoiceUpdatedOnHeadBlockUpdateTest{
 			BaseSpec: test.BaseSpec{
-				Name: "Early upgrade",
+				Name:       "Early upgrade",
+				ForkHeight: 2,
 			},
 			ForkchoiceUpdatedCustomizer: &helper.UpgradeForkchoiceUpdatedVersion{
 				ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
-					ExpectedError: UNSUPPORTED_FORK_ERROR,
+					ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
 				},
 			},
 		},
@@ -1188,6 +1102,10 @@ func init() {
 			})
 		}
 	}
+
+	Tests = append(Tests, PayloadBuildAfterInvalidPayloadTest{
+		InvalidField: helper.InvalidStateRoot,
+	})
 
 	// Invalid Transaction Payload Tests
 	for _, invalidField := range []helper.InvalidPayloadBlockField{

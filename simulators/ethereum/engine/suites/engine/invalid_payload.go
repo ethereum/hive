@@ -2,6 +2,7 @@ package suite_engine
 
 import (
 	"fmt"
+	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -17,9 +18,14 @@ import (
 // Generate test cases for each field of NewPayload, where the payload contains a single invalid field and a valid hash.
 type InvalidPayloadTestCase struct {
 	test.BaseSpec
-	InvalidField      helper.InvalidPayloadBlockField
-	Syncing           bool
+	// InvalidField is the field that will be modified to create an invalid payload
+	InvalidField helper.InvalidPayloadBlockField
+	// Syncing is true if the client is expected to be in SYNCING mode after receiving the invalid payload
+	Syncing bool
+	// EmptyTransactions is true if the payload should not contain any transactions
 	EmptyTransactions bool
+	// If true, the payload can be detected to be invalid even when syncing
+	InvalidDetectedOnSync bool
 }
 
 func (s InvalidPayloadTestCase) WithMainFork(fork config.Fork) test.Spec {
@@ -129,8 +135,13 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				// {status: SYNCING, latestValidHash: null, validationError: null}
 				// if the payload extends the canonical chain and requisite data for its validation is missing
 				// (the client can assume the payload extends the canonical because the linking payload could be missing)
-				r.ExpectStatusEither(test.Accepted, test.Syncing)
-				r.ExpectLatestValidHash(nil)
+				if tc.InvalidDetectedOnSync {
+					// For some fields, the client can detect the invalid payload even when it doesn't have the parent
+					r.ExpectStatusEither(test.Invalid)
+				} else {
+					r.ExpectStatusEither(test.Accepted, test.Syncing)
+					r.ExpectLatestValidHash(nil)
+				}
 			} else {
 				r.ExpectStatus(test.Invalid)
 				r.ExpectLatestValidHash(&alteredPayload.ParentHash)
@@ -251,6 +262,97 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 			} else if r.Status.Status == test.Invalid {
 				r.ExpectLatestValidHash(&alteredPayload.ParentHash)
 			}
+		},
+	})
+}
+
+// Build on top of the latest valid payload after an invalid payload had been received:
+// P <- INV_P, newPayload(INV_P), fcU(head: P, payloadAttributes: attrs) + getPayload(…)
+type PayloadBuildAfterInvalidPayloadTest struct {
+	test.BaseSpec
+	InvalidField helper.InvalidPayloadBlockField
+}
+
+func (s PayloadBuildAfterInvalidPayloadTest) WithMainFork(fork config.Fork) test.Spec {
+	specCopy := s
+	specCopy.MainFork = fork
+	return specCopy
+}
+
+func (i PayloadBuildAfterInvalidPayloadTest) GetName() string {
+	name := fmt.Sprintf("Payload Build after New Invalid Payload: Invalid %s", i.InvalidField)
+	return name
+}
+
+func (tc PayloadBuildAfterInvalidPayloadTest) Execute(t *test.Env) {
+	// Add a second client to build the invalid payload
+	secondaryEngine, err := hive_rpc.HiveRPCEngineStarter{}.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
+
+	if err != nil {
+		t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
+	}
+	secondaryEngineTest := test.NewTestEngineClient(t, secondaryEngine)
+	t.CLMock.AddEngineClient(secondaryEngine)
+
+	// Wait until TTD is reached by this client
+	t.CLMock.WaitForTTD()
+
+	// Produce blocks before starting the test
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
+
+	// Produce another block, but at the same time send an invalid payload from the other client
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		OnPayloadAttributesGenerated: func() {
+			// We are going to use the client that was not selected
+			// by the CLMocker to produce the invalid payload
+			invalidPayloadProducer := t.TestEngine
+			if t.CLMock.NextBlockProducer == invalidPayloadProducer.Engine {
+				invalidPayloadProducer = secondaryEngineTest
+			}
+			var inv_p *typ.ExecutableData
+
+			{
+				// Get a payload from the invalid payload producer and invalidate it
+				var (
+					prevRandao            = common.Hash{}
+					suggestedFeeRecipient = common.Address{}
+				)
+				payloadAttributes, err := (&helper.BasePayloadAttributesCustomizer{
+					Random:                &prevRandao,
+					SuggestedFeeRecipient: &suggestedFeeRecipient,
+				}).GetPayloadAttributes(&t.CLMock.LatestPayloadAttributes)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Unable to customize payload attributes: %v", t.TestName, err)
+				}
+
+				r := invalidPayloadProducer.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, payloadAttributes, t.CLMock.LatestHeader.Time)
+				r.ExpectPayloadStatus(test.Valid)
+				// Wait for the payload to be produced by the EL
+				time.Sleep(time.Second)
+
+				s := invalidPayloadProducer.TestEngineGetPayload(
+					r.Response.PayloadID,
+					payloadAttributes,
+				)
+				s.ExpectNoError()
+
+				inv_p, err = helper.GenerateInvalidPayload(&s.Payload, helper.InvalidStateRoot)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Unable to invalidate payload: %v", t.TestName, err)
+				}
+			}
+
+			// Broadcast the invalid payload
+			r := t.TestEngine.TestEngineNewPayload(inv_p)
+			r.ExpectStatus(test.Invalid)
+			r.ExpectLatestValidHash(&t.CLMock.LatestForkchoice.HeadBlockHash)
+			s := secondaryEngineTest.TestEngineNewPayload(inv_p)
+			s.ExpectStatus(test.Invalid)
+			s.ExpectLatestValidHash(&t.CLMock.LatestForkchoice.HeadBlockHash)
+
+			// Let the block production continue.
+			// At this point the selected payload producer will
+			// try to continue creating a valid payload.
 		},
 	})
 }

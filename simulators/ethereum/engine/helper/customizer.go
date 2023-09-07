@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
@@ -212,6 +213,40 @@ type PayloadCustomizer interface {
 
 type VersionedHashesCustomizer interface {
 	GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error)
+}
+
+type IncreaseVersionVersionedHashes struct{}
+
+func (customizer *IncreaseVersionVersionedHashes) GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
+	if baseVesionedHashes == nil {
+		return nil, fmt.Errorf("no versioned hashes available for modification")
+	}
+	if len(*baseVesionedHashes) == 0 {
+		return nil, fmt.Errorf("no versioned hashes available for modification")
+	}
+	result := make([]common.Hash, len(*baseVesionedHashes))
+	for i, h := range *baseVesionedHashes {
+		result[i] = h
+		result[i][0] = result[i][0] + 1
+	}
+	return &result, nil
+}
+
+type CorruptVersionedHashes struct{}
+
+func (customizer *CorruptVersionedHashes) GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
+	if baseVesionedHashes == nil {
+		return nil, fmt.Errorf("no versioned hashes available for modification")
+	}
+	if len(*baseVesionedHashes) == 0 {
+		return nil, fmt.Errorf("no versioned hashes available for modification")
+	}
+	result := make([]common.Hash, len(*baseVesionedHashes))
+	for i, h := range *baseVesionedHashes {
+		result[i] = h
+		result[i][len(h)-1] = result[i][len(h)-1] + 1
+	}
+	return &result, nil
 }
 
 type NewPayloadCustomizer interface {
@@ -568,7 +603,54 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 		customPayloadMod = &CustomPayloadData{
 			PrevRandao: &modPrevRandao,
 		}
-	case InvalidWithdrawals, InvalidBlobGasUsed, InvalidExcessBlobGas, InvalidParentBeaconBlockRoot, InvalidVersionedHashes:
+	case InvalidParentBeaconBlockRoot:
+		if basePayload.ParentBeaconBlockRoot == nil {
+			return nil, fmt.Errorf("no parent beacon block root available for modification")
+		}
+		modParentBeaconBlockRoot := *basePayload.ParentBeaconBlockRoot
+		modParentBeaconBlockRoot[0] = byte(255 - modParentBeaconBlockRoot[0])
+		customPayloadMod = &CustomPayloadData{
+			ParentBeaconRoot: &modParentBeaconBlockRoot,
+		}
+	case InvalidBlobGasUsed:
+		if basePayload.BlobGasUsed == nil {
+			return nil, fmt.Errorf("no blob gas used available for modification")
+		}
+		modBlobGasUsed := *basePayload.BlobGasUsed + 1
+		customPayloadMod = &CustomPayloadData{
+			BlobGasUsed: &modBlobGasUsed,
+		}
+	case InvalidBlobCountGasUsed:
+		if basePayload.BlobGasUsed == nil {
+			return nil, fmt.Errorf("no blob gas used available for modification")
+		}
+		modBlobGasUsed := *basePayload.BlobGasUsed + cancun.GAS_PER_BLOB
+		customPayloadMod = &CustomPayloadData{
+			BlobGasUsed: &modBlobGasUsed,
+		}
+	case InvalidExcessBlobGas:
+		if basePayload.ExcessBlobGas == nil {
+			return nil, fmt.Errorf("no excess blob gas available for modification")
+		}
+		modExcessBlobGas := *basePayload.ExcessBlobGas + 1
+		customPayloadMod = &CustomPayloadData{
+			ExcessBlobGas: &modExcessBlobGas,
+		}
+	case InvalidVersionedHashes:
+		if basePayload.VersionedHashes == nil {
+			return nil, fmt.Errorf("no versioned hashes available for modification")
+		}
+		customPayloadMod = &CustomPayloadData{
+			VersionedHashesCustomizer: &IncreaseVersionVersionedHashes{},
+		}
+	case InvalidVersionedHashesVersion:
+		if basePayload.VersionedHashes == nil {
+			return nil, fmt.Errorf("no versioned hashes available for modification")
+		}
+		customPayloadMod = &CustomPayloadData{
+			VersionedHashesCustomizer: &CorruptVersionedHashes{},
+		}
+	case InvalidWithdrawals:
 		// These options are not supported yet.
 		// TODO: Implement
 		return nil, fmt.Errorf("invalid payload field %v not supported yet", payloadField)

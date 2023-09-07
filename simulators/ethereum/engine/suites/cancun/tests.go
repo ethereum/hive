@@ -1802,12 +1802,18 @@ func init() {
 	}
 
 	// Cancun specific variants for pre-existing tests
+	baseSpec := test.BaseSpec{
+		MainFork: config.Cancun,
+	}
+	onlyBlobTxsSpec := test.BaseSpec{
+		MainFork:            config.Cancun,
+		TestTransactionType: helper.BlobTxOnly,
+	}
+
 	// Payload Attributes
 	for _, t := range []suite_engine.InvalidPayloadAttributesTest{
 		{
-			BaseSpec: test.BaseSpec{
-				MainFork: config.Cancun,
-			},
+			BaseSpec:    baseSpec,
 			Description: "Missing BeaconRoot",
 			Customizer: &helper.BasePayloadAttributesCustomizer{
 				RemoveBeaconRoot: true,
@@ -1820,4 +1826,32 @@ func init() {
 		t.Syncing = true
 		Tests = append(Tests, t)
 	}
+
+	// Invalid Payload Tests
+	for _, invalidField := range []helper.InvalidPayloadBlockField{
+		helper.InvalidParentBeaconBlockRoot,
+		helper.InvalidBlobGasUsed,
+		helper.InvalidBlobCountGasUsed,
+		helper.InvalidExcessBlobGas,
+		helper.InvalidVersionedHashes,
+		helper.InvalidVersionedHashesVersion,
+	} {
+		for _, syncing := range []bool{false, true} {
+			// Invalidity of payload can be detected even when syncing because the
+			// blob gas only depends on the transactions contained.
+			invalidDetectedOnSync := invalidField == helper.InvalidBlobGasUsed || invalidField == helper.InvalidBlobCountGasUsed
+
+			Tests = append(Tests, suite_engine.InvalidPayloadTestCase{
+				BaseSpec:              onlyBlobTxsSpec,
+				InvalidField:          invalidField,
+				Syncing:               syncing,
+				InvalidDetectedOnSync: invalidDetectedOnSync,
+			})
+		}
+	}
+
+	Tests = append(Tests, suite_engine.PayloadBuildAfterInvalidPayloadTest{
+		BaseSpec:     onlyBlobTxsSpec,
+		InvalidField: helper.InvalidParentBeaconBlockRoot,
+	})
 }
