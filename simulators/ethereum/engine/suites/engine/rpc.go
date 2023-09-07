@@ -63,11 +63,12 @@ func (b BlockStatus) Execute(t *test.Env) {
 			tx, err = helper.SendNextTransaction(
 				t.TestContext,
 				t.Engine, &helper.BaseTransactionCreator{
-					Recipient: &ZeroAddr,
-					Amount:    big1,
-					Payload:   nil,
-					TxType:    t.TestTransactionType,
-					GasLimit:  75000,
+					Recipient:  &ZeroAddr,
+					Amount:     big1,
+					Payload:    nil,
+					TxType:     t.TestTransactionType,
+					GasLimit:   75000,
+					ForkConfig: t.ForkConfig,
 				},
 			)
 			if err != nil {

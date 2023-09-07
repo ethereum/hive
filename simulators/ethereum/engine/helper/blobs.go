@@ -257,7 +257,7 @@ func (tc *BlobTransactionCreator) GetSourceAddress() common.Address {
 	return crypto.PubkeyToAddress(tc.PrivateKey.PublicKey)
 }
 
-func (tc *BlobTransactionCreator) MakeTransaction(nonce uint64) (typ.Transaction, error) {
+func (tc *BlobTransactionCreator) MakeTransaction(nonce uint64, _ uint64) (typ.Transaction, error) {
 	// Need tx wrap data that will pass blob verification
 	hashes, blobData, err := BlobDataGenerator(tc.BlobID, tc.BlobCount)
 	if err != nil {

@@ -93,11 +93,12 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 					t.TestContext,
 					t.Engine,
 					&helper.BaseTransactionCreator{
-						Recipient: &sstoreContractAddr,
-						Amount:    big0,
-						Payload:   data,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
+						Recipient:  &sstoreContractAddr,
+						Amount:     big0,
+						Payload:    data,
+						TxType:     t.TestTransactionType,
+						GasLimit:   75000,
+						ForkConfig: t.ForkConfig,
 					},
 				)
 				if err != nil {

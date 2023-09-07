@@ -63,11 +63,12 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				t.TestContext,
 				t.CLMock.NextBlockProducer,
 				&helper.BaseTransactionCreator{
-					Recipient: &globals.PrevRandaoContractAddr,
-					Amount:    big1,
-					Payload:   nil,
-					TxType:    t.TestTransactionType,
-					GasLimit:  75000,
+					Recipient:  &globals.PrevRandaoContractAddr,
+					Amount:     big1,
+					Payload:    nil,
+					TxType:     t.TestTransactionType,
+					GasLimit:   75000,
+					ForkConfig: t.ForkConfig,
 				},
 			)
 			if err != nil {

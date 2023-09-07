@@ -2,6 +2,8 @@ package config
 
 import (
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 type Fork string
@@ -57,4 +59,12 @@ func (f *ForkConfig) GetPayloadVersion(timestamp uint64) int {
 		return 2
 	}
 	return 1
+}
+
+func (f *ForkConfig) GetSupportedTransactionTypes(timestamp uint64) []int {
+	if f.IsCancun(timestamp) {
+		// Put the blob type at the start to try to guarantee at least one blob tx makes it into the test
+		return []int{types.BlobTxType, types.LegacyTxType /* types.AccessListTxType,*/, types.DynamicFeeTxType}
+	}
+	return []int{types.LegacyTxType /* types.AccessListTxType,*/, types.DynamicFeeTxType}
 }

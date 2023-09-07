@@ -422,11 +422,12 @@ func sidechainReorg(t *test.Env) {
 		t.TestContext,
 		t.Engine,
 		&helper.BaseTransactionCreator{
-			Recipient: &globals.PrevRandaoContractAddr,
-			Amount:    big0,
-			Payload:   nil,
-			TxType:    t.TestTransactionType,
-			GasLimit:  75000,
+			Recipient:  &globals.PrevRandaoContractAddr,
+			Amount:     big0,
+			Payload:    nil,
+			TxType:     t.TestTransactionType,
+			GasLimit:   75000,
+			ForkConfig: t.ForkConfig,
 		},
 	)
 	if err != nil {
@@ -575,11 +576,12 @@ func inOrderPayloads(t *test.Env) {
 					t.TestContext,
 					t.CLMock.NextBlockProducer,
 					&helper.BaseTransactionCreator{
-						Recipient: &recipient,
-						Amount:    amountPerTx,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
+						Recipient:  &recipient,
+						Amount:     amountPerTx,
+						Payload:    nil,
+						TxType:     t.TestTransactionType,
+						GasLimit:   75000,
+						ForkConfig: t.ForkConfig,
 					},
 				)
 				if err != nil {
@@ -927,11 +929,12 @@ func suggestedFeeRecipient(t *test.Env) {
 			t.TestContext,
 			t.Engine,
 			&helper.BaseTransactionCreator{
-				Recipient: &globals.VaultAccountAddress,
-				Amount:    big0,
-				Payload:   nil,
-				TxType:    t.TestTransactionType,
-				GasLimit:  75000,
+				Recipient:  &globals.VaultAccountAddress,
+				Amount:     big0,
+				Payload:    nil,
+				TxType:     t.TestTransactionType,
+				GasLimit:   75000,
+				ForkConfig: t.ForkConfig,
 			},
 		)
 		if err != nil {
@@ -1001,11 +1004,12 @@ func prevRandaoOpcodeTx(t *test.Env) {
 				t.TestContext,
 				t.Engine,
 				&helper.BaseTransactionCreator{
-					Recipient: &globals.PrevRandaoContractAddr,
-					Amount:    big0,
-					Payload:   nil,
-					TxType:    t.TestTransactionType,
-					GasLimit:  75000,
+					Recipient:  &globals.PrevRandaoContractAddr,
+					Amount:     big0,
+					Payload:    nil,
+					TxType:     t.TestTransactionType,
+					GasLimit:   75000,
+					ForkConfig: t.ForkConfig,
 				},
 			)
 			if err != nil {

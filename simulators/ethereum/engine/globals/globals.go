@@ -43,6 +43,7 @@ var (
 	ChainID          = big.NewInt(7)
 	GasPrice         = big.NewInt(30 * params.GWei)
 	GasTipPrice      = big.NewInt(1 * params.GWei)
+	BlobGasPrice     = big.NewInt(1 * params.GWei)
 	NetworkID        = big.NewInt(7)
 	GenesisTimestamp = uint64(0x1234)
 

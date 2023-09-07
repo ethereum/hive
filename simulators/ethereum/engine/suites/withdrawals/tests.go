@@ -1153,11 +1153,12 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					t.TestContext,
 					t.CLMock.NextBlockProducer,
 					&helper.BaseTransactionCreator{
-						Recipient: &destAddr,
-						Amount:    common.Big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
+						Recipient:  &destAddr,
+						Amount:     common.Big1,
+						Payload:    nil,
+						TxType:     t.TestTransactionType,
+						GasLimit:   75000,
+						ForkConfig: t.ForkConfig,
 					},
 				)
 
@@ -1285,11 +1286,12 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					t.TestContext,
 					t.CLMock.NextBlockProducer,
 					&helper.BaseTransactionCreator{
-						Recipient: &destAddr,
-						Amount:    common.Big1,
-						Payload:   nil,
-						TxType:    t.TestTransactionType,
-						GasLimit:  75000,
+						Recipient:  &destAddr,
+						Amount:     common.Big1,
+						Payload:    nil,
+						TxType:     t.TestTransactionType,
+						GasLimit:   75000,
+						ForkConfig: t.ForkConfig,
 					},
 				)
 
@@ -1597,11 +1599,12 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 				t.TestContext,
 				t.CLMock.NextBlockProducer,
 				&helper.BaseTransactionCreator{
-					Recipient: &globals.PrevRandaoContractAddr,
-					Amount:    common.Big1,
-					Payload:   nil,
-					TxType:    t.TestTransactionType,
-					GasLimit:  75000,
+					Recipient:  &globals.PrevRandaoContractAddr,
+					Amount:     common.Big1,
+					Payload:    nil,
+					TxType:     t.TestTransactionType,
+					GasLimit:   75000,
+					ForkConfig: t.ForkConfig,
 				},
 				ws.GetTransactionCountPerPayload(),
 			)
@@ -1814,13 +1817,15 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 	invalidTxCreator := &helper.BigInitcodeTransactionCreator{
 		InitcodeLength: MAX_INITCODE_SIZE + 1,
 		BaseTransactionCreator: helper.BaseTransactionCreator{
-			GasLimit: 2000000,
+			GasLimit:   2000000,
+			ForkConfig: t.ForkConfig,
 		},
 	}
 	validTxCreator := &helper.BigInitcodeTransactionCreator{
 		InitcodeLength: MAX_INITCODE_SIZE,
 		BaseTransactionCreator: helper.BaseTransactionCreator{
-			GasLimit: 2000000,
+			GasLimit:   2000000,
+			ForkConfig: t.ForkConfig,
 		},
 	}
 
@@ -1830,7 +1835,7 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 		}
 
 		for i := uint64(0); i < s.OverflowMaxInitcodeTxCountBeforeFork; i++ {
-			tx, err := invalidTxCreator.MakeTransaction(i)
+			tx, err := invalidTxCreator.MakeTransaction(i, t.CLMock.LatestHeader.Time)
 			if err != nil {
 				t.Fatalf("FAIL: Error creating max initcode transaction: %v", err)
 			}
@@ -1867,7 +1872,7 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 
 	// Send transactions after the fork
 	for i := txIncluded; i < (txIncluded + s.OverflowMaxInitcodeTxCountAfterFork); i++ {
-		tx, err := invalidTxCreator.MakeTransaction(i)
+		tx, err := invalidTxCreator.MakeTransaction(i, t.CLMock.LatestHeader.Time)
 		if err != nil {
 			t.Fatalf("FAIL: Error creating max initcode transaction: %v", err)
 		}
@@ -1883,8 +1888,8 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 
 	// Try to include an invalid tx in new payload
 	var (
-		validTx, _   = validTxCreator.MakeTransaction(txIncluded)
-		invalidTx, _ = invalidTxCreator.MakeTransaction(txIncluded)
+		validTx, _   = validTxCreator.MakeTransaction(txIncluded, t.CLMock.LatestHeader.Time)
+		invalidTx, _ = invalidTxCreator.MakeTransaction(txIncluded, t.CLMock.LatestHeader.Time)
 	)
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
