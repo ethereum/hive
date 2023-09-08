@@ -1839,7 +1839,10 @@ func init() {
 		for _, syncing := range []bool{false, true} {
 			// Invalidity of payload can be detected even when syncing because the
 			// blob gas only depends on the transactions contained.
-			invalidDetectedOnSync := invalidField == helper.InvalidBlobGasUsed || invalidField == helper.InvalidBlobCountGasUsed
+			invalidDetectedOnSync := (invalidField == helper.InvalidBlobGasUsed ||
+				invalidField == helper.InvalidBlobCountGasUsed ||
+				invalidField == helper.InvalidVersionedHashes ||
+				invalidField == helper.InvalidVersionedHashesVersion)
 
 			Tests = append(Tests, suite_engine.InvalidPayloadTestCase{
 				BaseSpec:              onlyBlobTxsSpec,
