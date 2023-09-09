@@ -175,7 +175,7 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 				}, nil, altPayload.Timestamp)
 				s.ExpectPayloadStatus(test.Valid)
 
-				p := t.TestEngine.TestBlockByNumber(Head)
+				p := t.TestEngine.TestHeaderByNumber(Head)
 				p.ExpectHash(altPayload.BlockHash)
 
 				txt = t.TestEngine.TestTransactionReceipt(tx.Hash())
@@ -341,7 +341,7 @@ func (spec ReOrgBackToCanonicalTest) Execute(t *test.Env) {
 	}
 
 	// Verify that the client is pointing to the latest payload sent
-	r := t.TestEngine.TestBlockByNumber(Head)
+	r := t.TestEngine.TestHeaderByNumber(Head)
 	r.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
 
 }

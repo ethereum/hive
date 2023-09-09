@@ -1124,7 +1124,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		// contain `withdrawalsRoot`, including genesis.
 
 		// Genesis should not contain `withdrawalsRoot` either
-		r := t.TestEngine.TestBlockByNumber(nil)
+		r := t.TestEngine.TestHeaderByNumber(nil)
 		r.ExpectationDescription = `
 		Requested "latest" block expecting genesis to contain
 		withdrawalRoot=nil, because genesis.timestamp < shanghaiTime
@@ -1132,7 +1132,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 		r.ExpectWithdrawalsRoot(nil)
 	} else {
 		// Genesis is post shanghai, it should contain EmptyWithdrawalsRoot
-		r := t.TestEngine.TestBlockByNumber(nil)
+		r := t.TestEngine.TestHeaderByNumber(nil)
 		r.ExpectationDescription = `
 		Requested "latest" block expecting genesis to contain
 		withdrawalRoot=EmptyTrieRoot, because genesis.timestamp >= shanghaiTime
@@ -1230,7 +1230,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			if !ws.SkipBaseVerifications {
 				// We sent a pre-shanghai FCU.
 				// Keep expecting `nil` until Shanghai.
-				r := t.TestEngine.TestBlockByNumber(nil)
+				r := t.TestEngine.TestHeaderByNumber(nil)
 				r.ExpectationDescription = fmt.Sprintf(`
 				Requested "latest" block expecting block to contain
 				withdrawalRoot=nil, because (block %d).timestamp < shanghaiTime
@@ -1394,7 +1394,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					)
 				}
 				// Check the correct withdrawal root on `latest` block
-				r := t.TestEngine.TestBlockByNumber(nil)
+				r := t.TestEngine.TestHeaderByNumber(nil)
 				expectedWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
 					ws.WithdrawalsHistory.GetWithdrawals(
 						t.CLMock.LatestExecutedPayload.Number,
@@ -1420,7 +1420,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 			ws.WithdrawalsHistory.VerifyWithdrawals(block, big.NewInt(int64(block)), t.TestEngine)
 
 			// Check the correct withdrawal root on past blocks
-			r := t.TestEngine.TestBlockByNumber(big.NewInt(int64(block)))
+			r := t.TestEngine.TestHeaderByNumber(big.NewInt(int64(block)))
 			var expectedWithdrawalsRoot *common.Hash = nil
 			if block >= ws.WithdrawalsForkHeight {
 				calcWithdrawalsRoot := helper.ComputeWithdrawalsRoot(
@@ -1749,8 +1749,8 @@ func (ws *WithdrawalsReorgSpec) Execute(t *test.Env) {
 			case <-t.TimeoutContext.Done():
 				t.Fatalf("FAIL (%s): Timeout waiting for sync", t.TestName)
 			case <-time.After(time.Second):
-				b := t.TestEngine.TestBlockByNumber(nil)
-				if b.Block.Hash() == sidechain[sidechainHeight].BlockHash {
+				h := t.TestEngine.TestHeaderByNumber(nil)
+				if h.Header.Hash() == sidechain[sidechainHeight].BlockHash {
 					// sync successful
 					break loop
 				}

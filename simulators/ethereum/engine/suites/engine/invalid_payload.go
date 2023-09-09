@@ -220,7 +220,7 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 			}
 
 			// Finally, attempt to fetch the invalid payload using the JSON-RPC endpoint
-			p := t.TestEngine.TestBlockByHash(alteredPayload.BlockHash)
+			p := t.TestEngine.TestHeaderByHash(alteredPayload.BlockHash)
 			p.ExpectError()
 		},
 	})

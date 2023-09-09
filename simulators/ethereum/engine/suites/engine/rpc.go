@@ -86,7 +86,7 @@ func (b BlockStatus) Execute(t *test.Env) {
 			s := t.TestEngine.TestBlockNumber()
 			s.ExpectNumber(t.CLMock.LatestHeadNumber.Uint64())
 
-			p := t.TestEngine.TestBlockByNumber(Head)
+			p := t.TestEngine.TestHeaderByNumber(Head)
 			p.ExpectHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 
 			// Check that the receipt for the transaction we just sent is still not available

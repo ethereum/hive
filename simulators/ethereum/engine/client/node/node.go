@@ -631,6 +631,17 @@ func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.
 	return b.Header(), err
 }
 
+func (n *GethNode) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	b, err := n.eth.APIBackend.BlockByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	if b == nil {
+		return nil, fmt.Errorf("Header not found (%v)", hash)
+	}
+	return b.Header(), err
+}
+
 func (n *GethNode) SendTransaction(ctx context.Context, tx typ.Transaction) error {
 	if v, ok := tx.(*types.Transaction); ok {
 		return n.eth.APIBackend.SendTx(ctx, v)

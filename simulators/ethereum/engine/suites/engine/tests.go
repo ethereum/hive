@@ -704,7 +704,7 @@ func missingFcu(t *test.Env) {
 	t.CLMock.WaitForTTD()
 
 	// Get last PoW block hash (genesis)
-	lastPoWBlockHash := t.TestEngine.TestBlockByNumber(Head).Block.Hash()
+	lastPoWBlockHash := t.TestEngine.TestHeaderByNumber(Head).Header.Hash()
 
 	// Produce blocks on the main client, these payloads will be replayed on the secondary client.
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
@@ -729,7 +729,7 @@ func missingFcu(t *test.Env) {
 	}
 
 	// Verify that at this point, the client's head still points to the last non-PoS block
-	r := secondaryEngineTest.TestBlockByNumber(Head)
+	r := secondaryEngineTest.TestHeaderByNumber(Head)
 	r.ExpectHash(lastPoWBlockHash)
 
 	// Verify that the head correctly changes after the last ForkchoiceUpdated
@@ -743,7 +743,7 @@ func missingFcu(t *test.Env) {
 	p.ExpectLatestValidHash(&fcU.HeadBlockHash)
 
 	// Now the head should've changed to the latest PoS block
-	s := secondaryEngineTest.TestBlockByNumber(Head)
+	s := secondaryEngineTest.TestHeaderByNumber(Head)
 	s.ExpectHash(fcU.HeadBlockHash)
 
 }

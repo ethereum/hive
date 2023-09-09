@@ -816,6 +816,22 @@ func (tec *TestEngineClient) TestHeaderByNumber(number *big.Int) *HeaderResponse
 	return ret
 }
 
+func (tec *TestEngineClient) TestHeaderByHash(hash common.Hash) *HeaderResponseExpectObject {
+	ctx, cancel := context.WithTimeout(tec.TestContext, globals.RPCTimeout)
+	defer cancel()
+	header, err := tec.Engine.HeaderByHash(ctx, hash)
+	ret := &HeaderResponseExpectObject{
+		ExpectEnv: &ExpectEnv{Env: tec.Env},
+		Call:      "HeaderByNumber",
+		Header:    header,
+		Error:     err,
+	}
+	if err, ok := err.(rpc.Error); ok {
+		ret.ErrorCode = err.ErrorCode()
+	}
+	return ret
+}
+
 func (exp *HeaderResponseExpectObject) ExpectNoError() {
 	if exp.Error != nil {
 		exp.Fatalf("FAIL (%s): Unexpected error on %s: %v, expected=<None>", exp.TestName, exp.Call, exp.Error)
@@ -839,6 +855,15 @@ func (exp *HeaderResponseExpectObject) ExpectHash(expHash common.Hash) {
 	exp.ExpectNoError()
 	if exp.Header.Hash() != expHash {
 		exp.Fatalf("FAIL (%s): Unexpected hash on %s: %v, expected=%v", exp.TestName, exp.Call, exp.Header.Hash(), expHash)
+	}
+}
+
+func (exp *HeaderResponseExpectObject) ExpectWithdrawalsRoot(expectedRoot *common.Hash) {
+	exp.ExpectNoError()
+	actualWithdrawalsRoot := exp.Header.WithdrawalsHash
+	if ((expectedRoot == nil || actualWithdrawalsRoot == nil) && actualWithdrawalsRoot != expectedRoot) ||
+		(expectedRoot != nil && actualWithdrawalsRoot != nil && *actualWithdrawalsRoot != *expectedRoot) {
+		exp.Fatalf("FAIL (%s): Unexpected WithdrawalsRoot on %s: %v, expected=%v", exp.TestName, exp.Call, actualWithdrawalsRoot, expectedRoot)
 	}
 }
 
