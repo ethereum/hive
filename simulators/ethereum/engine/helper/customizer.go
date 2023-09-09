@@ -701,7 +701,7 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 			customTxData.ChainID = customChainID
 		}
 
-		modifiedTx, err := customizeTransaction(&baseTx, globals.VaultKey, &customTxData)
+		modifiedTx, err := customizeTransaction(&baseTx, globals.TestAccounts[0], &customTxData)
 		if err != nil {
 			return nil, err
 		}

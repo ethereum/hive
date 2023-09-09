@@ -65,7 +65,7 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 		if !tc.EmptyTransactions {
 			// Function to send at least one transaction each block produced
 			// Send the transaction to the globals.PrevRandaoContractAddr
-			_, err := helper.SendNextTransaction(
+			_, err := t.SendNextTransaction(
 				t.TestContext,
 				t.CLMock.NextBlockProducer,
 				&helper.BaseTransactionCreator{

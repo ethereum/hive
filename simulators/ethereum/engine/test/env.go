@@ -20,6 +20,7 @@ import (
 // Env is the environment of a single test.
 type Env struct {
 	*hivesim.T
+	*helper.TransactionSender
 	TestName string
 	Client   *hivesim.Client
 
@@ -80,6 +81,7 @@ func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hi
 
 	env := &Env{
 		T:                   t,
+		TransactionSender:   helper.NewTransactionSender(globals.TestAccounts, false),
 		TestName:            testSpec.GetName(),
 		Client:              c,
 		Engine:              ec,

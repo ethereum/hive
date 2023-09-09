@@ -60,7 +60,7 @@ func (b BlockStatus) Execute(t *test.Env) {
 	callbacks := clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			var err error
-			tx, err = helper.SendNextTransaction(
+			tx, err = t.SendNextTransaction(
 				t.TestContext,
 				t.Engine, &helper.BaseTransactionCreator{
 					Recipient:  &ZeroAddr,

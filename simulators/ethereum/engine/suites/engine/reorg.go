@@ -3,6 +3,8 @@ package suite_engine
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"math/big"
 	"math/rand"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -15,6 +17,7 @@ import (
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
+// Test performing a re-org that involves removing or modifying a transaction
 type TransactionReOrgTest struct {
 	test.BaseSpec
 	ReorgOut            bool
@@ -88,8 +91,7 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 				data := common.LeftPadBytes([]byte{byte(i)}, 32)
 				t.Logf("transactionReorg, i=%v, data=%v\n", i, data)
 				var err error
-				// TODO: Add test for blobs
-				tx, err = helper.SendNextTransaction(
+				tx, err = t.SendNextTransaction(
 					t.TestContext,
 					t.Engine,
 					&helper.BaseTransactionCreator{
@@ -201,5 +203,145 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 		})
 
 	}
+
+}
+
+// Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain
+// is still capable of progressing.
+type ReOrgBackToCanonicalTest struct {
+	test.BaseSpec
+	// Depth of the re-org to back in the canonical chain
+	ReOrgDepth uint64
+	// Number of transactions to send on each payload
+	TransactionPerPayload uint64
+	// Whether to execute a sidechain payload on the re-org
+	ExecuteSidePayloadOnReOrg bool
+}
+
+func (s ReOrgBackToCanonicalTest) WithMainFork(fork config.Fork) test.Spec {
+	specCopy := s
+	specCopy.MainFork = fork
+	return specCopy
+}
+
+func (s ReOrgBackToCanonicalTest) GetName() string {
+	name := fmt.Sprintf("Re-Org Back into Canonical Chain (Depth: %d)", s.ReOrgDepth)
+
+	if s.ExecuteSidePayloadOnReOrg {
+		name += ", Execute Side Payload on Re-Org"
+	}
+	return name
+}
+
+func (s ReOrgBackToCanonicalTest) GetDepth() uint64 {
+	if s.ReOrgDepth == 0 {
+		return 3
+	}
+	return s.ReOrgDepth
+}
+
+// Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain
+// is still capable of progressing.
+func (spec ReOrgBackToCanonicalTest) Execute(t *test.Env) {
+	// Wait until this client catches up with latest PoS
+	t.CLMock.WaitForTTD()
+
+	// Check the CLMock configured safe and finalized
+	if t.CLMock.SlotsToSafe.Cmp(new(big.Int).SetUint64(spec.ReOrgDepth)) <= 0 {
+		t.Fatalf("FAIL (%s): [TEST ISSUE] CLMock configured slots to safe less than re-org depth: %v <= %v", t.TestName, t.CLMock.SlotsToSafe, spec.ReOrgDepth)
+	}
+	if t.CLMock.SlotsToFinalized.Cmp(new(big.Int).SetUint64(spec.ReOrgDepth)) <= 0 {
+		t.Fatalf("FAIL (%s): [TEST ISSUE] CLMock configured slots to finalized less than re-org depth: %v <= %v", t.TestName, t.CLMock.SlotsToFinalized, spec.ReOrgDepth)
+	}
+
+	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
+
+	// We are going to reorg back to a previous hash several times
+	previousHash := t.CLMock.LatestForkchoice.HeadBlockHash
+	previousTimestamp := t.CLMock.LatestPayloadBuilt.Timestamp
+
+	if spec.ExecuteSidePayloadOnReOrg {
+		var (
+			sidePayload                 *typ.ExecutableData
+			sidePayloadParentForkchoice api.ForkchoiceStateV1
+			sidePayloadParentTimestamp  uint64
+		)
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+			OnPayloadAttributesGenerated: func() {
+				payloadAttributes := t.CLMock.LatestPayloadAttributes
+				rand.Read(payloadAttributes.Random[:])
+				r := t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, &payloadAttributes, t.CLMock.LatestHeader.Time)
+				r.ExpectNoError()
+				if r.Response.PayloadID == nil {
+					t.Fatalf("FAIL (%s): No payload ID returned by TestEngineForkchoiceUpdated", t.TestName)
+				}
+				g := t.TestEngine.TestEngineGetPayload(r.Response.PayloadID, &payloadAttributes)
+				g.ExpectNoError()
+				sidePayload = &g.Payload
+				sidePayloadParentForkchoice = t.CLMock.LatestForkchoice
+				sidePayloadParentTimestamp = t.CLMock.LatestHeader.Time
+			},
+		})
+		// Continue producing blocks until we reach the depth of the re-org
+		t.CLMock.ProduceBlocks(int(spec.GetDepth()-1), clmock.BlockProcessCallbacks{
+			OnPayloadProducerSelected: func() {
+				// Send a transaction on each payload of the canonical chain
+				var err error
+				_, err = t.SendNextTransactions(
+					t.TestContext,
+					t.Engine,
+					&helper.BaseTransactionCreator{
+						Recipient:  &ZeroAddr,
+						Amount:     big1,
+						Payload:    nil,
+						TxType:     t.TestTransactionType,
+						GasLimit:   75000,
+						ForkConfig: t.ForkConfig,
+					},
+					spec.TransactionPerPayload,
+				)
+				if err != nil {
+					t.Fatalf("FAIL (%s): Error trying to send transactions: %v", t.TestName, err)
+				}
+			},
+		})
+		// On the last block, before executing the next payload of the canonical chain,
+		// re-org back to the parent of the side payload and execute the side payload first
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+			OnGetPayload: func() {
+				// We are about to execute the new payload of the canonical chain, re-org back to
+				// the side payload
+				f := t.TestEngine.TestEngineForkchoiceUpdated(&sidePayloadParentForkchoice, nil, sidePayloadParentTimestamp)
+				f.ExpectPayloadStatus(test.Valid)
+				f.ExpectLatestValidHash(&sidePayloadParentForkchoice.HeadBlockHash)
+				// Execute the side payload
+				n := t.TestEngine.TestEngineNewPayload(sidePayload)
+				n.ExpectStatus(test.Valid)
+				n.ExpectLatestValidHash(&sidePayload.BlockHash)
+				// At this point the next canonical payload will be executed by the CL mock, so we can
+				// continue producing blocks
+			},
+		})
+	} else {
+		t.CLMock.ProduceBlocks(int(spec.GetDepth()), clmock.BlockProcessCallbacks{
+			OnForkchoiceBroadcast: func() {
+				// Send a fcU with the HeadBlockHash pointing back to the previous block
+				forkchoiceUpdatedBack := api.ForkchoiceStateV1{
+					HeadBlockHash:      previousHash,
+					SafeBlockHash:      previousHash,
+					FinalizedBlockHash: previousHash,
+				}
+
+				// It is only expected that the client does not produce an error and the CL Mocker is able to progress after the re-org
+				r := t.TestEngine.TestEngineForkchoiceUpdated(&forkchoiceUpdatedBack, nil, previousTimestamp)
+				r.ExpectNoError()
+			},
+		})
+	}
+
+	// Verify that the client is pointing to the latest payload sent
+	r := t.TestEngine.TestBlockByNumber(Head)
+	r.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
 
 }

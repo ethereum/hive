@@ -67,8 +67,8 @@ type EngineClient interface {
 	EnodeURL() (string, error)
 
 	// Local Test Account Management
-	GetLastAccountNonce(testCtx context.Context, account common.Address) (uint64, error)
-	GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error)
+	GetLastAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error)
+	GetNextAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error)
 	UpdateNonce(testCtx context.Context, account common.Address, newNonce uint64) error
 
 	// TTD Methods

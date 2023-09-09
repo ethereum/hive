@@ -500,13 +500,16 @@ func (ec *HiveRPCEngineClient) ExchangeCapabilities(ctx context.Context, clCapab
 }
 
 // Account Nonce
-func (ec *HiveRPCEngineClient) GetLastAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+func (ec *HiveRPCEngineClient) GetLastAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
 	// First get the current head of the client where we will send the tx
-	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
-	defer cancel()
-	head, err := ec.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return 0, err
+	if head == nil {
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+		defer cancel()
+		var err error
+		head, err = ec.HeaderByNumber(ctx, nil)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	// Then check if we have any info about this account, and when it was last updated
@@ -519,13 +522,16 @@ func (ec *HiveRPCEngineClient) GetLastAccountNonce(testCtx context.Context, acco
 	return 0, fmt.Errorf("no previous nonce for account %s", account.String())
 }
 
-func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
 	// First get the current head of the client where we will send the tx
-	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
-	defer cancel()
-	head, err := ec.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return 0, err
+	if head == nil {
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+		defer cancel()
+		var err error
+		head, err = ec.HeaderByNumber(ctx, nil)
+		if err != nil {
+			return 0, err
+		}
 	}
 	// Then check if we have any info about this account, and when it was last updated
 	if accTxInfo, ok := ec.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
@@ -536,7 +542,7 @@ func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, acco
 		return accTxInfo.PreviousNonce, nil
 	}
 	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
-	ctx, cancel = context.WithTimeout(testCtx, globals.RPCTimeout)
+	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
 	defer cancel()
 	nonce, err := ec.NonceAt(ctx, account, head.Number)
 	if err != nil {

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/kzg4844"
 	"github.com/ethereum/go-ethereum/trie"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
@@ -49,7 +49,7 @@ type CustomTransactionData struct {
 	Signature           *SignatureValues
 }
 
-func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateKey, customData *CustomTransactionData) (*types.Transaction, error) {
+func customizeTransaction(baseTransaction *types.Transaction, sender SenderAccount, customData *CustomTransactionData) (*types.Transaction, error) {
 	// Create a modified transaction base, from the base transaction and customData mix
 	var (
 		modifiedTxData types.TxData
@@ -210,7 +210,7 @@ func customizeTransaction(baseTransaction *types.Transaction, pk *ecdsa.PrivateK
 		}
 		signer := types.NewCancunSigner(customData.ChainID)
 		var err error
-		if modifiedTx, err = types.SignTx(modifiedTx, signer, pk); err != nil {
+		if modifiedTx, err = types.SignTx(modifiedTx, signer, sender.GetKey()); err != nil {
 			return nil, err
 		}
 	}
@@ -239,9 +239,14 @@ const (
 	BlobTxOnly                 TestTransactionType = "BlobTransactions"
 )
 
+type SenderAccount interface {
+	GetKey() *ecdsa.PrivateKey
+	GetAddress() common.Address
+	GetIndex() uint64
+}
+
 type TransactionCreator interface {
-	MakeTransaction(nonce uint64, blockTimestamp uint64) (typ.Transaction, error)
-	GetSourceAddress() common.Address
+	MakeTransaction(sender SenderAccount, nonce uint64, blockTimestamp uint64) (typ.Transaction, error)
 }
 
 type BaseTransactionCreator struct {
@@ -255,18 +260,10 @@ type BaseTransactionCreator struct {
 	Payload    []byte
 	AccessList types.AccessList
 	TxType     TestTransactionType
-	PrivateKey *ecdsa.PrivateKey
 	ForkConfig *config.ForkConfig
 }
 
-func (tc *BaseTransactionCreator) GetSourceAddress() common.Address {
-	if tc.PrivateKey == nil {
-		return globals.VaultAccountAddress
-	}
-	return crypto.PubkeyToAddress(tc.PrivateKey.PublicKey)
-}
-
-func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64, blockTimestamp uint64) (typ.Transaction, error) {
+func (tc *BaseTransactionCreator) MakeTransaction(sender SenderAccount, nonce uint64, blockTimestamp uint64) (typ.Transaction, error) {
 	var newTxData types.TxData
 
 	// Determine the type of transaction to use
@@ -274,12 +271,12 @@ func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64, blockTimestamp u
 	switch tc.TxType {
 	case UnspecifiedTransactionType:
 		// Test case has no specific type of transaction to use.
-		// Select the type of tx based on the nonce.
+		// Select the type of tx based on the nonce and the account index.
 		if tc.ForkConfig == nil {
 			return nil, fmt.Errorf("fork config is nil")
 		}
 		forkSupportedTransactionTypes := tc.ForkConfig.GetSupportedTransactionTypes(blockTimestamp)
-		txTypeToUse = forkSupportedTransactionTypes[int(nonce)%len(forkSupportedTransactionTypes)]
+		txTypeToUse = forkSupportedTransactionTypes[int(sender.GetIndex()+nonce)%len(forkSupportedTransactionTypes)]
 		if txTypeToUse == types.BlobTxType && tc.Recipient == nil {
 			// Blob txs require a recipient, revert to legacy tx
 			txTypeToUse = types.LegacyTxType
@@ -398,10 +395,7 @@ func (tc *BaseTransactionCreator) MakeTransaction(nonce uint64, blockTimestamp u
 	}
 
 	tx := types.NewTx(newTxData)
-	key := tc.PrivateKey
-	if key == nil {
-		key = globals.VaultKey
-	}
+	key := sender.GetKey()
 	return types.SignTx(tx, types.NewCancunSigner(globals.ChainID), key)
 }
 
@@ -410,7 +404,7 @@ type BigContractTransactionCreator struct {
 	BaseTransactionCreator
 }
 
-func (tc *BigContractTransactionCreator) MakeTransaction(nonce uint64, blockTimestamp uint64) (typ.Transaction, error) {
+func (tc *BigContractTransactionCreator) MakeTransaction(sender SenderAccount, nonce uint64, blockTimestamp uint64) (typ.Transaction, error) {
 	// Total GAS: Gtransaction == 21000, Gcreate == 32000, Gcodedeposit == 200
 	contractLength := uint64(0)
 	if tc.GasLimit > (21000 + 32000) {
@@ -432,7 +426,7 @@ func (tc *BigContractTransactionCreator) MakeTransaction(nonce uint64, blockTime
 	if tc.Recipient != nil {
 		panic("invalid configuration for big contract tx creator")
 	}
-	return tc.BaseTransactionCreator.MakeTransaction(nonce, blockTimestamp)
+	return tc.BaseTransactionCreator.MakeTransaction(sender, nonce, blockTimestamp)
 }
 
 // Create a tx with the specified initcode length (all zeros)
@@ -443,7 +437,7 @@ type BigInitcodeTransactionCreator struct {
 	Initcode       []byte
 }
 
-func (tc *BigInitcodeTransactionCreator) MakeTransaction(nonce uint64, blockTimestamp uint64) (typ.Transaction, error) {
+func (tc *BigInitcodeTransactionCreator) MakeTransaction(sender SenderAccount, nonce uint64, blockTimestamp uint64) (typ.Transaction, error) {
 	// This method caches the payload with the crafted initcode after first execution.
 	if tc.Payload == nil {
 		// Prepare initcode payload
@@ -466,7 +460,7 @@ func (tc *BigInitcodeTransactionCreator) MakeTransaction(nonce uint64, blockTime
 	if tc.Recipient != nil {
 		panic("invalid configuration for big contract tx creator")
 	}
-	return tc.BaseTransactionCreator.MakeTransaction(nonce, blockTimestamp)
+	return tc.BaseTransactionCreator.MakeTransaction(sender, nonce, blockTimestamp)
 }
 
 // Determines if the error we got from sending the raw tx is because the client
@@ -477,16 +471,63 @@ func SentTxAlreadyKnown(err error) bool {
 		strings.Contains(err.Error(), "AlreadyKnown")
 }
 
-func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (typ.Transaction, error) {
-	nonce, err := node.GetNextAccountNonce(testCtx, txCreator.GetSourceAddress())
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting next account nonce")
+type TransactionSender struct {
+	Accounts         []SenderAccount
+	nonceMap         map[common.Address]uint64
+	nonceMapLock     sync.Mutex
+	transactionsSent int
+}
+
+func NewTransactionSender(accounts []*globals.TestAccount, disableInternalNonceCounter bool) *TransactionSender {
+	sender := &TransactionSender{
+		Accounts: make([]SenderAccount, len(accounts)),
 	}
+	for i, account := range accounts {
+		sender.Accounts[i] = account
+	}
+	if !disableInternalNonceCounter {
+		sender.nonceMap = make(map[common.Address]uint64)
+	}
+	return sender
+}
+
+func (txSender *TransactionSender) GetNextNonce(ctx context.Context, node client.EngineClient, sender SenderAccount, header *types.Header) (uint64, error) {
+	var err error
+	nonce := uint64(0)
+	if txSender.nonceMap != nil {
+		txSender.nonceMapLock.Lock()
+		defer txSender.nonceMapLock.Unlock()
+		nonce = txSender.nonceMap[sender.GetAddress()]
+		txSender.nonceMap[sender.GetAddress()] = nonce + 1
+	} else {
+		nonce, err = node.GetNextAccountNonce(ctx, sender.GetAddress(), header)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return nonce, nil
+}
+
+func (txSender *TransactionSender) GetLastNonce(ctx context.Context, node client.EngineClient, sender SenderAccount, header *types.Header) (uint64, error) {
+	if txSender.nonceMap != nil {
+		txSender.nonceMapLock.Lock()
+		defer txSender.nonceMapLock.Unlock()
+		return txSender.nonceMap[sender.GetAddress()], nil
+	} else {
+		return node.GetLastAccountNonce(ctx, sender.GetAddress(), header)
+	}
+}
+
+func (txSender *TransactionSender) SendTransaction(testCtx context.Context, account SenderAccount, node client.EngineClient, txCreator TransactionCreator) (typ.Transaction, error) {
 	header, err := node.HeaderByNumber(testCtx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting header")
 	}
-	tx, err := txCreator.MakeTransaction(nonce, header.Time)
+	nonce, err := txSender.GetNextNonce(testCtx, node, account, header)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting next account nonce")
+	}
+	tx, err := txCreator.MakeTransaction(account, nonce, header.Time)
 	if err != nil {
 		return nil, errors.Wrap(err, "error crafting transaction")
 	}
@@ -494,10 +535,8 @@ func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCr
 		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
 		defer cancel()
 		err := node.SendTransaction(ctx, tx)
-		if err == nil {
-			return tx, nil
-		} else if SentTxAlreadyKnown(err) {
-			return tx, nil
+		if err == nil || SentTxAlreadyKnown(err) {
+			break
 		}
 		select {
 		case <-time.After(time.Second):
@@ -505,25 +544,100 @@ func SendNextTransaction(testCtx context.Context, node client.EngineClient, txCr
 			return nil, errors.Wrapf(testCtx.Err(), "timeout retrying SendTransaction, last error: %v", err)
 		}
 	}
+	return tx, nil
 }
 
-func SendNextTransactions(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, txCount uint64) ([]typ.Transaction, error) {
-	var err error
-	nonce, err := node.GetNextAccountNonce(testCtx, txCreator.GetSourceAddress())
+func (txSender *TransactionSender) SendNextTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (typ.Transaction, error) {
+	nextAccount := txSender.Accounts[txSender.transactionsSent%len(txSender.Accounts)]
+	tx, err := txSender.SendTransaction(testCtx, nextAccount, node, txCreator)
 	if err != nil {
-		return nil, errors.Wrap(err, "error getting next account nonce")
+		return nil, err
 	}
+	txSender.transactionsSent += 1
+	return tx, nil
+}
+
+func (txSender *TransactionSender) SendNextTransactions(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, txCount uint64) ([]typ.Transaction, error) {
+	var err error
 	header, err := node.HeaderByNumber(testCtx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting header")
 	}
+
 	txs := make([]typ.Transaction, txCount)
+
+	wg := sync.WaitGroup{}
+	wgDone := make(chan interface{})
+	errs := make(chan error, txCount)
 	for i := range txs {
-		txs[i], err = txCreator.MakeTransaction(nonce, header.Time)
+		wg.Add(1)
+		i := i
+		sender := txSender.Accounts[txSender.transactionsSent%len(txSender.Accounts)]
+		go func(sender SenderAccount) {
+			defer wg.Done()
+			nonce, err := txSender.GetNextNonce(testCtx, node, sender, header)
+			if err != nil {
+				errs <- errors.Wrap(err, "error getting next account nonce")
+				return
+			}
+
+			txs[i], err = txCreator.MakeTransaction(sender, nonce, header.Time)
+			if err != nil {
+				errs <- errors.Wrap(err, "error crafting transaction")
+			}
+			for {
+				ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+				defer cancel()
+				err := node.SendTransaction(ctx, txs[i])
+				if err == nil {
+					break
+				} else if SentTxAlreadyKnown(err) {
+					break
+				}
+				select {
+				case <-time.After(time.Second):
+				case <-testCtx.Done():
+					errs <- errors.Wrapf(testCtx.Err(), "timeout retrying SendTransaction (%d), last error: %v", i, err)
+					return
+				}
+			}
+		}(sender)
+		txSender.transactionsSent += 1
+	}
+	go func() {
+		wg.Wait()
+		close(wgDone)
+	}()
+	select {
+	case <-wgDone:
+		return txs, nil
+	case err := <-errs:
+		return nil, errors.Wrap(err, "error sending transaction")
+	case <-testCtx.Done():
+		return txs, errors.Wrapf(testCtx.Err(), "timeout waiting for SendTransactions")
+	}
+}
+
+func (txSender *TransactionSender) SendNextTransactionsBatch(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, txCount uint64) ([]typ.Transaction, error) {
+	var err error
+	header, err := node.HeaderByNumber(testCtx, nil)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting header")
+	}
+
+	txs := make([]typ.Transaction, txCount)
+
+	for i := range txs {
+		nextAccount := txSender.Accounts[txSender.transactionsSent%len(txSender.Accounts)]
+		nonce, err := txSender.GetNextNonce(testCtx, node, nextAccount, header)
+		if err != nil {
+			return nil, errors.Wrap(err, "error getting next account nonce")
+		}
+		txs[i], err = txCreator.MakeTransaction(nextAccount, nonce, header.Time)
 		if err != nil {
 			return nil, errors.Wrap(err, "error crafting transaction")
 		}
-		nonce++
+		txSender.transactionsSent += 1
 	}
 	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
 	defer cancel()
@@ -533,20 +647,19 @@ func SendNextTransactions(testCtx context.Context, node client.EngineClient, txC
 			return txs, errors.Wrap(err, "error on SendTransactions")
 		}
 	}
-	node.UpdateNonce(testCtx, txCreator.GetSourceAddress(), nonce+txCount)
 	return txs, nil
 }
 
-func ReplaceLastTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (typ.Transaction, error) {
-	nonce, err := node.GetLastAccountNonce(testCtx, txCreator.GetSourceAddress())
-	if err != nil {
-		return nil, errors.Wrap(err, "error getting last account nonce")
-	}
+func (txSender *TransactionSender) ReplaceTransaction(testCtx context.Context, account SenderAccount, node client.EngineClient, txCreator TransactionCreator) (typ.Transaction, error) {
 	header, err := node.HeaderByNumber(testCtx, nil)
 	if err != nil {
 		return nil, errors.Wrap(err, "error getting header")
 	}
-	tx, err := txCreator.MakeTransaction(nonce, header.Time)
+	nonce, err := txSender.GetLastNonce(testCtx, node, account, header)
+	if err != nil {
+		return nil, errors.Wrap(err, "error getting last account nonce")
+	}
+	tx, err := txCreator.MakeTransaction(account, nonce, header.Time)
 	if err != nil {
 		return nil, errors.Wrap(err, "error crafting transaction")
 	}
@@ -565,4 +678,12 @@ func ReplaceLastTransaction(testCtx context.Context, node client.EngineClient, t
 			return nil, errors.Wrapf(testCtx.Err(), "timeout retrying ReplaceLastTransaction, last error: %v", err)
 		}
 	}
+}
+
+func (txSender *TransactionSender) ReplaceLastTransaction(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator) (typ.Transaction, error) {
+	if txSender.transactionsSent == 0 {
+		return nil, errors.New("no transactions sent yet")
+	}
+	lastSender := txSender.Accounts[(txSender.transactionsSent-1)%len(txSender.Accounts)]
+	return txSender.ReplaceTransaction(testCtx, lastSender, node, txCreator)
 }

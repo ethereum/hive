@@ -2,7 +2,6 @@ package helper
 
 import (
 	"bytes"
-	"crypto/ecdsa"
 	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
@@ -15,7 +14,6 @@ import (
 	gokzg4844 "github.com/crate-crypto/go-kzg-4844"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
@@ -90,7 +88,6 @@ type BlobTransactionCreator struct {
 	BlobCount  uint64
 	Value      *big.Int
 	Data       []byte
-	PrivateKey *ecdsa.PrivateKey
 }
 
 func (blobId BlobID) VerifyBlob(blob *typ.Blob) (bool, error) {
@@ -250,14 +247,7 @@ func BlobDataGenerator(startBlobId BlobID, blobCount uint64) ([]common.Hash, *ty
 	return hashes, &blobData, nil
 }
 
-func (tc *BlobTransactionCreator) GetSourceAddress() common.Address {
-	if tc.PrivateKey == nil {
-		return globals.VaultAccountAddress
-	}
-	return crypto.PubkeyToAddress(tc.PrivateKey.PublicKey)
-}
-
-func (tc *BlobTransactionCreator) MakeTransaction(nonce uint64, _ uint64) (typ.Transaction, error) {
+func (tc *BlobTransactionCreator) MakeTransaction(sender SenderAccount, nonce uint64, blockTimestamp uint64) (typ.Transaction, error) {
 	// Need tx wrap data that will pass blob verification
 	hashes, blobData, err := BlobDataGenerator(tc.BlobID, tc.BlobCount)
 	if err != nil {
@@ -308,10 +298,7 @@ func (tc *BlobTransactionCreator) MakeTransaction(nonce uint64, _ uint64) (typ.T
 		BlobHashes: hashes,
 	}
 
-	key := tc.PrivateKey
-	if key == nil {
-		key = globals.VaultKey
-	}
+	key := sender.GetKey()
 
 	signedTx, err := types.SignNewTx(key, types.NewCancunSigner(globals.ChainID), sbtx)
 	if err != nil {

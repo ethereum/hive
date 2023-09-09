@@ -70,7 +70,7 @@ func (tc InvalidMissingAncestorReOrgTest) Execute(t *test.Env) {
 			// Empty Txs Payload with invalid stateRoot discovered an issue in geth sync, hence this is customizable.
 			if !tc.EmptyTransactions {
 				// Send the transaction to the globals.PrevRandaoContractAddr
-				_, err := helper.SendNextTransaction(
+				_, err := t.SendNextTransaction(
 					t.TestContext,
 					t.CLMock.NextBlockProducer,
 					&helper.BaseTransactionCreator{
@@ -280,7 +280,7 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 			// Empty Txs Payload with invalid stateRoot discovered an issue in geth sync, hence this is customizable.
 			if !tc.EmptyTransactions {
 				// Send the transaction to the globals.PrevRandaoContractAddr
-				_, err := helper.SendNextTransaction(
+				_, err := t.SendNextTransaction(
 					t.TestContext,
 					t.CLMock.NextBlockProducer,
 					&helper.BaseTransactionCreator{
@@ -320,7 +320,7 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 			}
 			altChainPayloads = append(altChainPayloads, sidePayload)
 
-			// TODO: REMOVE THIS
+			// TODO: This could be useful to try to produce an invalid block that has some invalid field not included in the ExecutableData
 			sideBlock, err := typ.ExecutableDataToBlock(*sidePayload)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Error converting payload to block: %v", t.TestName, err)

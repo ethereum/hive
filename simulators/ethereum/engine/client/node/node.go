@@ -731,15 +731,19 @@ func (n *GethNode) ID() string {
 	return n.node.Config().Name
 }
 
-func (n *GethNode) GetLastAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+func (n *GethNode) GetLastAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
+
 	// First get the current head of the client where we will send the tx
-	head, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
-	if err != nil {
-		return 0, err
+	if head == nil {
+		block, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
+		if err != nil {
+			return 0, err
+		}
+		head = block.Header()
 	}
 
 	// Then check if we have any info about this account, and when it was last updated
-	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash()) {
+	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
 		// We have info about this account and is up to date (or up to date until the very last block).
 		// Return the previous nonce
 		return accTxInfo.PreviousNonce, nil
@@ -748,14 +752,17 @@ func (n *GethNode) GetLastAccountNonce(testCtx context.Context, account common.A
 	return 0, fmt.Errorf("no previous nonce for account %s", account.String())
 }
 
-func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
-	// First get the current head of the client where we will send the tx
-	head, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
-	if err != nil {
-		return 0, err
+func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
+	if head == nil {
+		// First get the current head of the client where we will send the tx
+		block, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
+		if err != nil {
+			return 0, err
+		}
+		head = block.Header()
 	}
 	// Check if we have any info about this account, and when it was last updated
-	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash()) {
+	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
 		// We have info about this account and is up to date (or up to date until the very last block).
 		// Increase the nonce and return it
 		accTxInfo.PreviousBlock = head.Hash()
@@ -763,7 +770,7 @@ func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.A
 		return accTxInfo.PreviousNonce, nil
 	}
 	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
-	nonce, err := n.NonceAt(testCtx, account, head.Number())
+	nonce, err := n.NonceAt(testCtx, account, head.Number)
 	if err != nil {
 		return 0, err
 	}

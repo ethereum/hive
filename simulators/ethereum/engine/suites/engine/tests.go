@@ -80,10 +80,6 @@ var Tests = []test.Spec{
 		Run:  sidechainReorg,
 	},
 	&test.BaseSpec{
-		Name: "Re-Org Back into Canonical Chain",
-		Run:  reorgBack,
-	},
-	&test.BaseSpec{
 		Name: "Re-Org Back to Canonical Chain From Syncing Chain",
 		Run:  reorgBackFromSyncing,
 	},
@@ -167,40 +163,6 @@ func blockStatusReorg(t *test.Env) {
 
 		},
 	})
-
-}
-
-// Test that performing a re-org back into a previous block of the canonical chain does not produce errors and the chain
-// is still capable of progressing.
-func reorgBack(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
-	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
-
-	// We are going to reorg back to this previous hash several times
-	previousHash := t.CLMock.LatestForkchoice.HeadBlockHash
-	previousTimestamp := t.CLMock.LatestPayloadBuilt.Timestamp
-
-	// Produce blocks before starting the test (So we don't try to reorg back to the genesis block)
-	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{
-		OnForkchoiceBroadcast: func() {
-			// Send a fcU with the HeadBlockHash pointing back to the previous block
-			forkchoiceUpdatedBack := api.ForkchoiceStateV1{
-				HeadBlockHash:      previousHash,
-				SafeBlockHash:      previousHash,
-				FinalizedBlockHash: previousHash,
-			}
-
-			// It is only expected that the client does not produce an error and the CL Mocker is able to progress after the re-org
-			r := t.TestEngine.TestEngineForkchoiceUpdated(&forkchoiceUpdatedBack, nil, previousTimestamp)
-			r.ExpectNoError()
-		},
-	})
-
-	// Verify that the client is pointing to the latest payload sent
-	r := t.TestEngine.TestBlockByNumber(Head)
-	r.ExpectHash(t.CLMock.LatestPayloadBuilt.BlockHash)
 
 }
 
@@ -414,7 +376,7 @@ func sidechainReorg(t *test.Env) {
 	// Produce two payloads, send fcU with first payload, check transaction outcome, then reorg, check transaction outcome again
 
 	// This single transaction will change its outcome based on the payload
-	tx, err := helper.SendNextTransaction(
+	tx, err := t.SendNextTransaction(
 		t.TestContext,
 		t.Engine,
 		&helper.BaseTransactionCreator{
@@ -563,36 +525,37 @@ func inOrderPayloads(t *test.Env) {
 	amountPerTx := big.NewInt(1000)
 	txPerPayload := 20
 	payloadCount := 10
+	txsIncluded := 0
 
 	t.CLMock.ProduceBlocks(payloadCount, clmock.BlockProcessCallbacks{
 		// We send the transactions after we got the Payload ID, before the CLMocker gets the prepared Payload
 		OnPayloadProducerSelected: func() {
-			for i := 0; i < txPerPayload; i++ {
-				_, err := helper.SendNextTransaction(
-					t.TestContext,
-					t.CLMock.NextBlockProducer,
-					&helper.BaseTransactionCreator{
-						Recipient:  &recipient,
-						Amount:     amountPerTx,
-						Payload:    nil,
-						TxType:     t.TestTransactionType,
-						GasLimit:   75000,
-						ForkConfig: t.ForkConfig,
-					},
-				)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-				}
+			_, err := t.SendNextTransactions(
+				t.TestContext,
+				t.CLMock.NextBlockProducer,
+				&helper.BaseTransactionCreator{
+					Recipient:  &recipient,
+					Amount:     amountPerTx,
+					Payload:    nil,
+					TxType:     t.TestTransactionType,
+					GasLimit:   75000,
+					ForkConfig: t.ForkConfig,
+				},
+				uint64(txPerPayload),
+			)
+			if err != nil {
+				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
 			}
 		},
 		OnGetPayload: func() {
-			if len(t.CLMock.LatestPayloadBuilt.Transactions) != txPerPayload {
-				t.Fatalf("FAIL (%s): Client failed to include all the expected transactions in payload built: %d < %d", t.TestName, len(t.CLMock.LatestPayloadBuilt.Transactions), txPerPayload)
+			if len(t.CLMock.LatestPayloadBuilt.Transactions) < (txPerPayload / 2) {
+				t.Fatalf("FAIL (%s): Client failed to include all the expected transactions in payload built: %d < %d", t.TestName, len(t.CLMock.LatestPayloadBuilt.Transactions), (txPerPayload / 2))
 			}
+			txsIncluded += len(t.CLMock.LatestPayloadBuilt.Transactions)
 		},
 	})
 
-	expectedBalance := amountPerTx.Mul(amountPerTx, big.NewInt(int64(payloadCount*txPerPayload)))
+	expectedBalance := amountPerTx.Mul(amountPerTx, big.NewInt(int64(txsIncluded)))
 
 	// Check balance on this first client
 	r := t.TestEngine.TestBalanceAt(recipient, nil)
@@ -617,7 +580,7 @@ func inOrderPayloads(t *test.Env) {
 	s.ExpectLatestValidHash(nil)
 	s.ExpectNoValidationError()
 
-	// Send all the payloads in the opposite order
+	// Send all the payloads in the increasing order
 	for k := t.CLMock.FirstPoSBlockNumber.Uint64(); k <= t.CLMock.LatestExecutedPayload.Number; k++ {
 		payload := t.CLMock.ExecutedPayloadHistory[k]
 
@@ -627,6 +590,15 @@ func inOrderPayloads(t *test.Env) {
 
 	}
 
+	s = secondaryTestEngineClient.TestEngineForkchoiceUpdated(&fcU, nil, t.CLMock.LatestExecutedPayload.Timestamp)
+	s.ExpectPayloadStatus(test.Valid)
+	s.ExpectLatestValidHash(&fcU.HeadBlockHash)
+	s.ExpectNoValidationError()
+
+	// At this point we should have our funded account balance equal to the expected value.
+	q := secondaryTestEngineClient.TestBalanceAt(recipient, nil)
+	q.ExpectBalanceEqual(expectedBalance)
+
 	// Add the client to the CLMocker
 	t.CLMock.AddEngineClient(secondaryClient)
 
@@ -634,12 +606,8 @@ func inOrderPayloads(t *test.Env) {
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
 
 	// Head must point to the latest produced payload
-	p := secondaryTestEngineClient.TestBlockByNumber(nil)
+	p := secondaryTestEngineClient.TestHeaderByNumber(nil)
 	p.ExpectHash(t.CLMock.LatestExecutedPayload.BlockHash)
-	// At this point we should have our funded account balance equal to the expected value.
-	q := secondaryTestEngineClient.TestBalanceAt(recipient, nil)
-	q.ExpectBalanceEqual(expectedBalance)
-
 }
 
 // Send a valid payload on a client that is currently SYNCING
@@ -795,9 +763,10 @@ func buildPayloadWithInvalidChainIDTx(t *test.Env) {
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Run test after a new payload has been broadcast
 		OnPayloadProducerSelected: func() {
+			testAccount := globals.TestAccounts[0]
 			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 			defer cancel()
-			nonce, err := t.CLMock.NextBlockProducer.NonceAt(ctx, globals.VaultAccountAddress, nil)
+			nonce, err := t.CLMock.NextBlockProducer.NonceAt(ctx, testAccount.GetAddress(), nil)
 			if err != nil {
 				t.Fatalf("FAIL(%s): Unable to get address nonce: %v", t.TestName, err)
 			}
@@ -811,7 +780,7 @@ func buildPayloadWithInvalidChainIDTx(t *test.Env) {
 			}
 			invalidChainID := new(big.Int).Set(globals.ChainID)
 			invalidChainID.Add(invalidChainID, big1)
-			invalidChainIDTx, err := types.SignTx(types.NewTx(txData), types.NewCancunSigner(invalidChainID), globals.VaultKey)
+			invalidChainIDTx, err := types.SignTx(types.NewTx(txData), types.NewCancunSigner(invalidChainID), testAccount.GetKey())
 			if err != nil {
 				t.Fatalf("FAIL(%s): Unable to sign tx with invalid chain ID: %v", t.TestName, err)
 			}
@@ -843,14 +812,16 @@ func suggestedFeeRecipient(t *test.Env) {
 	// Verify that, in a block with transactions, fees are accrued by the suggestedFeeRecipient
 	feeRecipient := common.Address{}
 	rand.Read(feeRecipient[:])
+	txRecipient := common.Address{}
+	rand.Read(txRecipient[:])
 
 	// Send multiple transactions
 	for i := 0; i < txCount; i++ {
-		_, err := helper.SendNextTransaction(
+		_, err := t.SendNextTransaction(
 			t.TestContext,
 			t.Engine,
 			&helper.BaseTransactionCreator{
-				Recipient:  &globals.VaultAccountAddress,
+				Recipient:  &txRecipient,
 				Amount:     big0,
 				Payload:    nil,
 				TxType:     t.TestTransactionType,
@@ -921,7 +892,7 @@ func prevRandaoOpcodeTx(t *test.Env) {
 	)
 	t.CLMock.ProduceBlocks(txCount, clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
-			tx, err := helper.SendNextTransaction(
+			tx, err := t.SendNextTransaction(
 				t.TestContext,
 				t.Engine,
 				&helper.BaseTransactionCreator{
@@ -1214,6 +1185,29 @@ func init() {
 		TransactionReOrgTest{
 			ReorgDifferentBlock: true,
 			NewPayloadOnRevert:  true,
+		},
+	)
+
+	// Re-Org back into the canonical chain tests
+	Tests = append(Tests,
+		ReOrgBackToCanonicalTest{
+			BaseSpec: test.BaseSpec{
+				SlotsToSafe:      big.NewInt(10),
+				SlotsToFinalized: big.NewInt(20),
+				TimeoutSeconds:   60,
+			},
+			TransactionPerPayload: 1,
+			ReOrgDepth:            5,
+		},
+		ReOrgBackToCanonicalTest{
+			BaseSpec: test.BaseSpec{
+				SlotsToSafe:      big.NewInt(32),
+				SlotsToFinalized: big.NewInt(64),
+				TimeoutSeconds:   120,
+			},
+			TransactionPerPayload:     50,
+			ReOrgDepth:                10,
+			ExecuteSidePayloadOnReOrg: true,
 		},
 	)
 

@@ -653,23 +653,17 @@ func (step SendBlobTransactions) Execute(t *CancunTestContext) error {
 			BlobCount:  blobCountPerTx,
 			BlobID:     t.CurrentBlobID,
 		}
-		if step.AccountIndex != 0 {
-			if step.AccountIndex >= uint64(len(globals.TestAccounts)) {
-				return fmt.Errorf("invalid account index %d", step.AccountIndex)
-			}
-			key := globals.TestAccounts[step.AccountIndex].GetKey()
-			blobTxCreator.PrivateKey = key
-		}
+		sender := globals.TestAccounts[step.AccountIndex]
 		var (
 			blobTx typ.Transaction
 			err    error
 		)
 		if step.ReplaceTransactions {
-			blobTx, err = helper.ReplaceLastTransaction(t.TestContext, engine,
+			blobTx, err = t.ReplaceTransaction(t.TestContext, sender, engine,
 				blobTxCreator,
 			)
 		} else {
-			blobTx, err = helper.SendNextTransaction(t.TestContext, engine,
+			blobTx, err = t.SendTransaction(t.TestContext, sender, engine,
 				blobTxCreator,
 			)
 		}
