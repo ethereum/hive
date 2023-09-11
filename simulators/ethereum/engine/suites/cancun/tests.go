@@ -1865,4 +1865,10 @@ func init() {
 			TransactionCount: 1, // Only one blob tx gets through due to blob gas limit
 		},
 	)
+	// Prev Randao Tests (New Transaction Type)
+	Tests = append(Tests,
+		suite_engine.PrevRandaoTransactionTest{
+			BaseSpec: onlyBlobTxsSpec,
+		},
+	)
 }

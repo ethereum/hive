@@ -95,18 +95,6 @@ var Tests = []test.Spec{
 		SlotsToSafe:      big.NewInt(1),
 		SlotsToFinalized: big.NewInt(2),
 	},
-
-	// PrevRandao opcode tests
-	&test.BaseSpec{
-		Name:                "PrevRandao Opcode Transactions",
-		Run:                 prevRandaoOpcodeTx,
-		TestTransactionType: helper.LegacyTxOnly,
-	},
-	&test.BaseSpec{
-		Name:                "PrevRandao Opcode Transactions (EIP-1559 Transactions)",
-		Run:                 prevRandaoOpcodeTx,
-		TestTransactionType: helper.DynamicFeeTxOnly,
-	},
 }
 
 // Test to verify Block information available after a reorg using forkchoiceUpdated
@@ -789,72 +777,7 @@ func buildPayloadWithInvalidChainIDTx(t *test.Env) {
 
 }
 
-// TODO: Do a PENDING block suggestedFeeRecipient
-
-func checkPrevRandaoValue(t *test.Env, expectedPrevRandao common.Hash, blockNumber uint64) {
-	storageKey := common.Hash{}
-	storageKey[31] = byte(blockNumber)
-	r := t.TestEngine.TestStorageAt(globals.PrevRandaoContractAddr, storageKey, nil)
-	r.ExpectStorageEqual(expectedPrevRandao)
-
-}
-
-// PrevRandao Opcode tests
-func prevRandaoOpcodeTx(t *test.Env) {
-	t.CLMock.WaitForTTD()
-
-	// Send transactions in PoS, the value of the storage in these blocks must match the prevRandao value
-	var (
-		txCount        = 10
-		currentTxIndex = 0
-		txs            = make([]typ.Transaction, 0)
-	)
-	t.CLMock.ProduceBlocks(txCount, clmock.BlockProcessCallbacks{
-		OnPayloadProducerSelected: func() {
-			tx, err := t.SendNextTransaction(
-				t.TestContext,
-				t.Engine,
-				&helper.BaseTransactionCreator{
-					Recipient:  &globals.PrevRandaoContractAddr,
-					Amount:     big0,
-					Payload:    nil,
-					TxType:     t.TestTransactionType,
-					GasLimit:   75000,
-					ForkConfig: t.ForkConfig,
-				},
-			)
-			if err != nil {
-				t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-			}
-			txs = append(txs, tx)
-			currentTxIndex++
-		},
-		OnForkchoiceBroadcast: func() {
-			// Check the transaction tracing, which is client specific
-			expectedPrevRandao := t.CLMock.PrevRandaoHistory[t.CLMock.LatestHeader.Number.Uint64()+1]
-			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-			defer cancel()
-			if err := helper.DebugPrevRandaoTransaction(ctx, t.Client.RPC(), t.Client.Type, txs[currentTxIndex-1],
-				&expectedPrevRandao); err != nil {
-				t.Fatalf("FAIL (%s): Error during transaction tracing: %v", t.TestName, err)
-			}
-		},
-	})
-
-	ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-	defer cancel()
-	lastBlockNumber, err := t.Eth.BlockNumber(ctx)
-	if err != nil {
-		t.Fatalf("FAIL (%s): Unable to get latest block number: %v", t.TestName, err)
-	}
-	for i := uint64(1); i <= lastBlockNumber; i++ {
-		checkPrevRandaoValue(t, t.CLMock.PrevRandaoHistory[i], i)
-	}
-
-}
-
 // Engine API errors
-
 func pUint64(v uint64) *uint64 {
 	return &v
 }
@@ -1147,6 +1070,20 @@ func init() {
 				TestTransactionType: helper.DynamicFeeTxOnly,
 			},
 			TransactionCount: 20,
+		},
+	)
+
+	// PrevRandao opcode tests
+	Tests = append(Tests,
+		PrevRandaoTransactionTest{
+			BaseSpec: test.BaseSpec{
+				TestTransactionType: helper.LegacyTxOnly,
+			},
+		},
+		PrevRandaoTransactionTest{
+			BaseSpec: test.BaseSpec{
+				TestTransactionType: helper.DynamicFeeTxOnly,
+			},
 		},
 	)
 
