@@ -49,7 +49,7 @@ type CustomTransactionData struct {
 	Signature           *SignatureValues
 }
 
-func customizeTransaction(baseTransaction *types.Transaction, sender SenderAccount, customData *CustomTransactionData) (*types.Transaction, error) {
+func CustomizeTransaction(baseTransaction *types.Transaction, sender SenderAccount, customData *CustomTransactionData) (*types.Transaction, error) {
 	// Create a modified transaction base, from the base transaction and customData mix
 	var (
 		modifiedTxData types.TxData

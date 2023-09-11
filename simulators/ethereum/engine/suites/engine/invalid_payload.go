@@ -1,11 +1,15 @@
 package suite_engine
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
+	"math/big"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
@@ -362,4 +366,85 @@ func (tc PayloadBuildAfterInvalidPayloadTest) Execute(t *test.Env) {
 			// try to continue creating a valid payload.
 		},
 	})
+}
+
+type InvalidTxChainIDTest struct {
+	test.BaseSpec
+}
+
+func (s InvalidTxChainIDTest) WithMainFork(fork config.Fork) test.Spec {
+	specCopy := s
+	specCopy.MainFork = fork
+	return specCopy
+}
+
+func (s InvalidTxChainIDTest) GetName() string {
+	name := fmt.Sprintf("Build Payload with Invalid ChainID Transaction (%s)", s.TestTransactionType)
+	return name
+}
+
+// Attempt to produce a payload after a transaction with an invalid Chain ID was sent to the client
+// using `eth_sendRawTransaction`.
+func (spec InvalidTxChainIDTest) Execute(t *test.Env) {
+	// Wait until TTD is reached by this client
+	t.CLMock.WaitForTTD()
+
+	// Produce blocks before starting the test
+	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{})
+
+	// Send a transaction with an incorrect ChainID.
+	// Transaction must be not be included in payload creation.
+	var invalidChainIDTx *types.Transaction
+	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+		// Run test after a new payload has been broadcast
+		OnPayloadAttributesGenerated: func() {
+			txCreator := helper.BaseTransactionCreator{
+				Recipient:  &globals.PrevRandaoContractAddr,
+				Amount:     big1,
+				Payload:    nil,
+				TxType:     t.TestTransactionType,
+				GasLimit:   75000,
+				ForkConfig: t.ForkConfig,
+			}
+			sender := globals.TestAccounts[0]
+
+			ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			nonce, err := t.CLMock.NextBlockProducer.NonceAt(ctx, sender.GetAddress(), nil)
+			if err != nil {
+				t.Fatalf("FAIL(%s): Unable to get address nonce: %v", t.TestName, err)
+			}
+
+			tx, err := txCreator.MakeTransaction(sender, nonce, t.CLMock.LatestPayloadAttributes.Timestamp)
+			if err != nil {
+				t.Fatalf("FAIL(%s): Unable to create transaction: %v", t.TestName, err)
+			}
+
+			txCast, ok := tx.(*types.Transaction)
+			if !ok {
+				t.Fatalf("FAIL(%s): Unable to cast transaction to types.Transaction", t.TestName)
+			}
+
+			txCustomizerData := &helper.CustomTransactionData{
+				ChainID: new(big.Int).Add(globals.ChainID, big1),
+			}
+			invalidChainIDTx, err = helper.CustomizeTransaction(txCast, sender, txCustomizerData)
+			if err != nil {
+				t.Fatalf("FAIL(%s): Unable to customize transaction: %v", t.TestName, err)
+			}
+
+			ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
+			defer cancel()
+			err = t.Engine.SendTransaction(ctx, invalidChainIDTx)
+			if err != nil {
+				t.Logf("INFO (%s): Error on sending transaction with incorrect chain ID (Expected): %v", t.TestName, err)
+			}
+		},
+	})
+
+	// Verify that the latest payload built does NOT contain the invalid chain Tx
+	if helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, invalidChainIDTx) {
+		p, _ := json.MarshalIndent(t.CLMock.LatestPayloadBuilt, "", " ")
+		t.Fatalf("FAIL (%s): Invalid chain ID tx was included in payload: %s", t.TestName, p)
+	}
 }

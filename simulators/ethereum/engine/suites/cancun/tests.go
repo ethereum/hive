@@ -1853,6 +1853,13 @@ func init() {
 		}
 	}
 
+	// Invalid Transaction ChainID Tests
+	Tests = append(Tests,
+		suite_engine.InvalidTxChainIDTest{
+			BaseSpec: onlyBlobTxsSpec,
+		},
+	)
+
 	Tests = append(Tests, suite_engine.PayloadBuildAfterInvalidPayloadTest{
 		BaseSpec:     onlyBlobTxsSpec,
 		InvalidField: helper.InvalidParentBeaconBlockRoot,
