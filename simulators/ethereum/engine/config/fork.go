@@ -9,10 +9,22 @@ import (
 type Fork string
 
 const (
+	NA       Fork = ""
 	Paris    Fork = "Paris"
 	Shanghai Fork = "Shanghai"
 	Cancun   Fork = "Cancun"
 )
+
+func (f Fork) PreviousFork() Fork {
+	switch f {
+	case Shanghai:
+		return Paris
+	case Cancun:
+		return Shanghai
+	default:
+		return NA
+	}
+}
 
 type ForkConfig struct {
 	ShanghaiTimestamp *big.Int

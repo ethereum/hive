@@ -388,67 +388,23 @@ func init() {
 	)
 
 	// Fork ID Tests
-	Tests = append(Tests,
-		ForkIDSpec{
-			BaseSpec: test.BaseSpec{
-				Name:             "Fork ID: Genesis at 0, Fork at 0",
-				GenesisTimestamp: pUint64(0),
-				MainFork:         config.Paris,
-				ForkTime:         0,
-			},
-		},
-		ForkIDSpec{
-			BaseSpec: test.BaseSpec{
-				Name:             "Fork ID: Genesis at 0, Fork at 1",
-				GenesisTimestamp: pUint64(0),
-				MainFork:         config.Paris,
-				ForkTime:         1,
-			},
-		},
-		ForkIDSpec{
-			BaseSpec: test.BaseSpec{
-				Name:             "Fork ID: Genesis at 1, Fork at 1",
-				GenesisTimestamp: pUint64(0),
-				MainFork:         config.Paris,
-				ForkTime:         1,
-			},
-		},
-		ForkIDSpec{
-			BaseSpec: test.BaseSpec{
-				Name:             "Fork ID: Genesis at 0, Fork at 1, Current Block 1",
-				GenesisTimestamp: pUint64(0),
-				MainFork:         config.Paris,
-				ForkTime:         1,
-			},
-			ProduceBlocksBeforePeering: 1,
-		},
-		ForkIDSpec{
-			BaseSpec: test.BaseSpec{
-				Name:             "Fork ID: Genesis at 1, Fork at 1, Previous Fork at 1",
-				GenesisTimestamp: pUint64(1),
-				MainFork:         config.Paris,
-				ForkTime:         1,
-				PreviousForkTime: 1,
-			},
-		},
-		ForkIDSpec{
-			BaseSpec: test.BaseSpec{
-				Name:             "Fork ID: Genesis at 1, Fork at 2, Previous Fork at 1",
-				GenesisTimestamp: pUint64(1),
-				MainFork:         config.Paris,
-				ForkTime:         2,
-				PreviousForkTime: 1,
-			},
-		},
-		ForkIDSpec{
-			BaseSpec: test.BaseSpec{
-				Name:             "Fork ID: Genesis at 1, Fork at 2, Previous Fork at 1, Current Block 1",
-				GenesisTimestamp: pUint64(1),
-				MainFork:         config.Paris,
-				ForkTime:         2,
-				PreviousForkTime: 1,
-			},
-			ProduceBlocksBeforePeering: 1,
-		},
-	)
+	for genesisTimestamp := uint64(0); genesisTimestamp <= 1; genesisTimestamp++ {
+		for forkTime := uint64(0); forkTime <= 2; forkTime++ {
+			for prevForkTime := uint64(0); prevForkTime <= forkTime; prevForkTime++ {
+				for currentBlock := 0; currentBlock <= 1; currentBlock++ {
+					Tests = append(Tests,
+						ForkIDSpec{
+							BaseSpec: test.BaseSpec{
+								MainFork:         config.Paris,
+								GenesisTimestamp: pUint64(genesisTimestamp),
+								ForkTime:         forkTime,
+								PreviousForkTime: prevForkTime,
+							},
+							ProduceBlocksBeforePeering: currentBlock,
+						},
+					)
+				}
+			}
+		}
+	}
 }
