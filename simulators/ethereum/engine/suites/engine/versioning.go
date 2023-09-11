@@ -41,11 +41,8 @@ func (tc ForkchoiceUpdatedOnPayloadRequestTest) Execute(t *test.Env) {
 	// Wait until TTD is reached by this client
 	t.CLMock.WaitForTTD()
 
-	// Downgrade the
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		OnPayloadAttributesGenerated: func() {
-			// At this point the payload attributes are generated for the next version by the CLMock.
-			// The ForkchoiceUpdated version should be downgraded to the previous version to test that the client returns error.
 			var (
 				payloadAttributes                    = &t.CLMock.LatestPayloadAttributes
 				expectedStatus    test.PayloadStatus = test.Valid
@@ -99,11 +96,8 @@ func (tc ForkchoiceUpdatedOnHeadBlockUpdateTest) Execute(t *test.Env) {
 	// Wait until TTD is reached by this client
 	t.CLMock.WaitForTTD()
 
-	// Downgrade the
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-		OnNewPayloadBroadcast: func() {
-			// At this point the payload attributes are generated for the next version by the CLMock.
-			// The ForkchoiceUpdated version should be downgraded to the previous version to test that the client returns error.
+		OnPayloadAttributesGenerated: func() {
 			var (
 				forkchoiceState *api.ForkchoiceStateV1 = &api.ForkchoiceStateV1{
 					HeadBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,

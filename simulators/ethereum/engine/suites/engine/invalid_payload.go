@@ -102,8 +102,9 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 	}
 
 	var (
-		alteredPayload *typ.ExecutableData
-		err            error
+		alteredPayload        *typ.ExecutableData
+		invalidDetectedOnSync bool = tc.InvalidDetectedOnSync
+		err                   error
 	)
 
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
@@ -124,6 +125,12 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				t.Fatalf("FAIL (%s): Unable to modify payload (%v): %v", t.TestName, tc.InvalidField, err)
 			}
 
+			if t.CLMock.LatestPayloadBuilt.VersionedHashes != nil && len(*t.CLMock.LatestPayloadBuilt.VersionedHashes) > 0 && tc.InvalidField == helper.RemoveTransaction {
+				// If the payload has versioned hashes, and we removed any transaction, it's highly likely the client will
+				// be able to detect the invalid payload even when syncing because of the blob gas used.
+				invalidDetectedOnSync = true
+			}
+
 			// Depending on the field we modified, we expect a different status
 			r := t.TestEngine.TestEngineNewPayload(alteredPayload)
 			if tc.Syncing || tc.InvalidField == helper.InvalidParentHash {
@@ -135,7 +142,7 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				// {status: SYNCING, latestValidHash: null, validationError: null}
 				// if the payload extends the canonical chain and requisite data for its validation is missing
 				// (the client can assume the payload extends the canonical because the linking payload could be missing)
-				if tc.InvalidDetectedOnSync {
+				if invalidDetectedOnSync {
 					// For some fields, the client can detect the invalid payload even when it doesn't have the parent
 					r.ExpectStatusEither(test.Invalid)
 				} else {
