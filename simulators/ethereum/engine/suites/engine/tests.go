@@ -26,7 +26,6 @@ var (
 
 var Tests = make([]test.Spec, 0)
 
-// Engine API errors
 func pUint64(v uint64) *uint64 {
 	return &v
 }
