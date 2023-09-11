@@ -96,18 +96,6 @@ var Tests = []test.Spec{
 		SlotsToFinalized: big.NewInt(2),
 	},
 
-	// Suggested Fee Recipient in Payload creation
-	&test.BaseSpec{
-		Name:                "Suggested Fee Recipient Test",
-		Run:                 suggestedFeeRecipient,
-		TestTransactionType: helper.LegacyTxOnly,
-	},
-	&test.BaseSpec{
-		Name:                "Suggested Fee Recipient Test (EIP-1559 Transactions)",
-		Run:                 suggestedFeeRecipient,
-		TestTransactionType: helper.DynamicFeeTxOnly,
-	},
-
 	// PrevRandao opcode tests
 	&test.BaseSpec{
 		Name:                "PrevRandao Opcode Transactions",
@@ -801,75 +789,6 @@ func buildPayloadWithInvalidChainIDTx(t *test.Env) {
 
 }
 
-// Fee Recipient Tests
-func suggestedFeeRecipient(t *test.Env) {
-	// Wait until this client catches up with latest PoS
-	t.CLMock.WaitForTTD()
-
-	// Amount of transactions to send
-	txCount := 20
-
-	// Verify that, in a block with transactions, fees are accrued by the suggestedFeeRecipient
-	feeRecipient := common.Address{}
-	rand.Read(feeRecipient[:])
-	txRecipient := common.Address{}
-	rand.Read(txRecipient[:])
-
-	// Send multiple transactions
-	for i := 0; i < txCount; i++ {
-		_, err := t.SendNextTransaction(
-			t.TestContext,
-			t.Engine,
-			&helper.BaseTransactionCreator{
-				Recipient:  &txRecipient,
-				Amount:     big0,
-				Payload:    nil,
-				TxType:     t.TestTransactionType,
-				GasLimit:   75000,
-				ForkConfig: t.ForkConfig,
-			},
-		)
-		if err != nil {
-			t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
-		}
-	}
-	// Produce the next block with the fee recipient set
-	t.CLMock.NextFeeRecipient = feeRecipient
-	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
-
-	// Calculate the fees and check that they match the balance of the fee recipient
-	r := t.TestEngine.TestBlockByNumber(Head)
-	r.ExpectTransactionCountEqual(txCount)
-	r.ExpectCoinbase(feeRecipient)
-	blockIncluded := r.Block
-
-	feeRecipientFees := big.NewInt(0)
-	for _, tx := range blockIncluded.Transactions() {
-		effGasTip, err := tx.EffectiveGasTip(blockIncluded.BaseFee())
-		if err != nil {
-			t.Fatalf("FAIL (%s): unable to obtain EffectiveGasTip: %v", t.TestName, err)
-		}
-		ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-		defer cancel()
-		receipt, err := t.Eth.TransactionReceipt(ctx, tx.Hash())
-		if err != nil {
-			t.Fatalf("FAIL (%s): unable to obtain receipt: %v", t.TestName, err)
-		}
-		feeRecipientFees = feeRecipientFees.Add(feeRecipientFees, effGasTip.Mul(effGasTip, big.NewInt(int64(receipt.GasUsed))))
-	}
-
-	s := t.TestEngine.TestBalanceAt(feeRecipient, nil)
-	s.ExpectBalanceEqual(feeRecipientFees)
-
-	// Produce another block without txns and get the balance again
-	t.CLMock.NextFeeRecipient = feeRecipient
-	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{})
-
-	s = t.TestEngine.TestBalanceAt(feeRecipient, nil)
-	s.ExpectBalanceEqual(feeRecipientFees)
-
-}
-
 // TODO: Do a PENDING block suggestedFeeRecipient
 
 func checkPrevRandaoValue(t *test.Env, expectedPrevRandao common.Hash, blockNumber uint64) {
@@ -1212,6 +1131,22 @@ func init() {
 			TransactionPerPayload:     50,
 			ReOrgDepth:                10,
 			ExecuteSidePayloadOnReOrg: true,
+		},
+	)
+
+	// Suggested Fee Recipient Tests
+	Tests = append(Tests,
+		SuggestedFeeRecipientTest{
+			BaseSpec: test.BaseSpec{
+				TestTransactionType: helper.LegacyTxOnly,
+			},
+			TransactionCount: 20,
+		},
+		SuggestedFeeRecipientTest{
+			BaseSpec: test.BaseSpec{
+				TestTransactionType: helper.DynamicFeeTxOnly,
+			},
+			TransactionCount: 20,
 		},
 	)
 

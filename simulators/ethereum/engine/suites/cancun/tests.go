@@ -1857,4 +1857,12 @@ func init() {
 		BaseSpec:     onlyBlobTxsSpec,
 		InvalidField: helper.InvalidParentBeaconBlockRoot,
 	})
+
+	// Suggested Fee Recipient Tests (New Transaction Type)
+	Tests = append(Tests,
+		suite_engine.SuggestedFeeRecipientTest{
+			BaseSpec:         onlyBlobTxsSpec,
+			TransactionCount: 1, // Only one blob tx gets through due to blob gas limit
+		},
+	)
 }
