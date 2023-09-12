@@ -59,6 +59,12 @@ function showFileListing(data) {
         suites.push(suite);
     });
 
+    // Filter based on client before rendering
+    const clientFilter = new URLSearchParams(window.location.search).get('client');
+    if (clientFilter) {
+        suites = suites.filter(suite => suite.clients.some(client => client.split('_')[0] === clientFilter));
+    }
+
     $('#filetable').DataTable({
         data: suites,
         pageLength: 50,
