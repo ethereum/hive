@@ -432,38 +432,21 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 }
 
 // Engine API
-func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}, vh *[]common.Hash, beaconRoot *common.Hash) (beacon.PayloadStatusV1, error) {
+func (n *GethNode) NewPayload(ctx context.Context, version int, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
 	switch version {
 	case 1:
-		if c, ok := pl.(*typ.ExecutableDataV1); ok {
-			return n.NewPayloadV1(ctx, c)
-		} else if c, ok := pl.(*typ.ExecutableData); ok {
-			edv1 := new(typ.ExecutableDataV1)
-			edv1.FromExecutableData(c)
-			return n.NewPayloadV1(ctx, edv1)
-		} else {
-			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
-		}
+		return n.NewPayloadV1(ctx, pl)
 	case 2:
-		if c, ok := pl.(*typ.ExecutableData); ok {
-			return n.NewPayloadV2(ctx, c)
-		} else {
-			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
-		}
+		return n.NewPayloadV2(ctx, pl)
 	case 3:
-		if c, ok := pl.(*typ.ExecutableData); ok {
-			return n.NewPayloadV3(ctx, c, vh, beaconRoot)
-		} else {
-			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
-		}
+		return n.NewPayloadV3(ctx, pl)
 	}
 	return beacon.PayloadStatusV1{}, fmt.Errorf("unknown version %d", version)
 }
 
-func (n *GethNode) NewPayloadV1(ctx context.Context, pl *typ.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
-	ed := pl.ToExecutableData()
-	n.latestPayloadSent = &ed
-	edConverted, err := typ.ToBeaconExecutableData(&ed)
+func (n *GethNode) NewPayloadV1(ctx context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
+	n.latestPayloadSent = pl
+	edConverted, err := typ.ToBeaconExecutableData(pl)
 	if err != nil {
 		return beacon.PayloadStatusV1{}, err
 	}
@@ -483,13 +466,16 @@ func (n *GethNode) NewPayloadV2(ctx context.Context, pl *typ.ExecutableData) (be
 	return resp, err
 }
 
-func (n *GethNode) NewPayloadV3(ctx context.Context, pl *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (beacon.PayloadStatusV1, error) {
+func (n *GethNode) NewPayloadV3(ctx context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
 	n.latestPayloadSent = pl
 	ed, err := typ.ToBeaconExecutableData(pl)
 	if err != nil {
 		return beacon.PayloadStatusV1{}, err
 	}
-	resp, err := n.api.NewPayloadV3(ed, *versionedHashes, beaconRoot)
+	if pl.VersionedHashes == nil {
+		return beacon.PayloadStatusV1{}, fmt.Errorf("versioned hashes are nil")
+	}
+	resp, err := n.api.NewPayloadV3(ed, *pl.VersionedHashes, pl.ParentBeaconBlockRoot)
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
@@ -500,6 +486,8 @@ func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beac
 		return n.ForkchoiceUpdatedV1(ctx, fcs, payload)
 	case 2:
 		return n.ForkchoiceUpdatedV2(ctx, fcs, payload)
+	case 3:
+		return n.ForkchoiceUpdatedV3(ctx, fcs, payload)
 	default:
 		return beacon.ForkChoiceResponse{}, fmt.Errorf("unknown version %d", version)
 	}
@@ -565,18 +553,27 @@ func (n *GethNode) GetPayloadV3(ctx context.Context, payloadId *beacon.PayloadID
 		return typ.ExecutableData{}, nil, nil, nil, err
 	}
 	ed, err := typ.FromBeaconExecutableData(p.ExecutionPayload)
-	// TODO: Convert and return the blobs bundle
-	return ed, p.BlockValue, nil, &p.Override, err
+	blobsBundle := &typ.BlobsBundle{}
+	if err := blobsBundle.FromBeaconBlobsBundle(p.BlobsBundle); err != nil {
+		return typ.ExecutableData{}, nil, nil, nil, err
+	}
+	return ed, p.BlockValue, blobsBundle, &p.Override, err
 }
 
 func (n *GethNode) GetPayload(ctx context.Context, version int, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
-	p, err := n.api.GetPayloadV3(*payloadId)
-	if p == nil || err != nil {
-		return typ.ExecutableData{}, nil, nil, nil, err
+
+	switch version {
+	case 1:
+		ed, err := n.GetPayloadV1(ctx, payloadId)
+		return ed, nil, nil, nil, err
+	case 2:
+		ed, value, err := n.GetPayloadV2(ctx, payloadId)
+		return ed, value, nil, nil, err
+	case 3:
+		return n.GetPayloadV3(ctx, payloadId)
+	default:
+		return typ.ExecutableData{}, nil, nil, nil, fmt.Errorf("unknown version %d", version)
 	}
-	ed, err := typ.FromBeaconExecutableData(p.ExecutionPayload)
-	// TODO: Convert and return the blobs bundle
-	return ed, p.BlockValue, nil, &p.Override, err
 }
 
 func (n *GethNode) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error) {
@@ -630,6 +627,17 @@ func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*types.
 	}
 	if b == nil {
 		return nil, fmt.Errorf("Block not found (%v)", number)
+	}
+	return b.Header(), err
+}
+
+func (n *GethNode) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	b, err := n.eth.APIBackend.BlockByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	if b == nil {
+		return nil, fmt.Errorf("Header not found (%v)", hash)
 	}
 	return b.Header(), err
 }
@@ -734,15 +742,19 @@ func (n *GethNode) ID() string {
 	return n.node.Config().Name
 }
 
-func (n *GethNode) GetLastAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+func (n *GethNode) GetLastAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
+
 	// First get the current head of the client where we will send the tx
-	head, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
-	if err != nil {
-		return 0, err
+	if head == nil {
+		block, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
+		if err != nil {
+			return 0, err
+		}
+		head = block.Header()
 	}
 
 	// Then check if we have any info about this account, and when it was last updated
-	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash()) {
+	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
 		// We have info about this account and is up to date (or up to date until the very last block).
 		// Return the previous nonce
 		return accTxInfo.PreviousNonce, nil
@@ -751,14 +763,17 @@ func (n *GethNode) GetLastAccountNonce(testCtx context.Context, account common.A
 	return 0, fmt.Errorf("no previous nonce for account %s", account.String())
 }
 
-func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
-	// First get the current head of the client where we will send the tx
-	head, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
-	if err != nil {
-		return 0, err
+func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
+	if head == nil {
+		// First get the current head of the client where we will send the tx
+		block, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
+		if err != nil {
+			return 0, err
+		}
+		head = block.Header()
 	}
 	// Check if we have any info about this account, and when it was last updated
-	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash()) {
+	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
 		// We have info about this account and is up to date (or up to date until the very last block).
 		// Increase the nonce and return it
 		accTxInfo.PreviousBlock = head.Hash()
@@ -766,7 +781,7 @@ func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.A
 		return accTxInfo.PreviousNonce, nil
 	}
 	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
-	nonce, err := n.NonceAt(testCtx, account, head.Number())
+	nonce, err := n.NonceAt(testCtx, account, head.Number)
 	if err != nil {
 		return 0, err
 	}

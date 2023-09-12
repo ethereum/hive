@@ -454,13 +454,13 @@ func (ec *HiveRPCEngineClient) GetBlobsBundleV1(ctx context.Context, payloadId *
 }
 
 // New Payload API Call Methods
-func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload interface{}, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (result api.PayloadStatusV1, err error) {
+func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payload *typ.ExecutableData) (result api.PayloadStatusV1, err error) {
 	if err := ec.PrepareDefaultAuthCallToken(); err != nil {
 		return result, err
 	}
 
 	if version >= 3 {
-		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload, versionedHashes, beaconRoot)
+		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload, payload.VersionedHashes, payload.ParentBeaconBlockRoot)
 	} else {
 		err = ec.c.CallContext(ctx, &result, fmt.Sprintf("engine_newPayloadV%d", version), payload)
 	}
@@ -468,20 +468,19 @@ func (ec *HiveRPCEngineClient) NewPayload(ctx context.Context, version int, payl
 	return result, err
 }
 
-func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *typ.ExecutableDataV1) (api.PayloadStatusV1, error) {
-	ed := payload.ToExecutableData()
-	ec.latestPayloadSent = &ed
-	return ec.NewPayload(ctx, 1, payload, nil, nil)
+func (ec *HiveRPCEngineClient) NewPayloadV1(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error) {
+	ec.latestPayloadSent = payload
+	return ec.NewPayload(ctx, 1, payload)
 }
 
 func (ec *HiveRPCEngineClient) NewPayloadV2(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error) {
 	ec.latestPayloadSent = payload
-	return ec.NewPayload(ctx, 2, payload, nil, nil)
+	return ec.NewPayload(ctx, 2, payload)
 }
 
-func (ec *HiveRPCEngineClient) NewPayloadV3(ctx context.Context, payload *typ.ExecutableData, versionedHashes *[]common.Hash, beaconRoot *common.Hash) (api.PayloadStatusV1, error) {
+func (ec *HiveRPCEngineClient) NewPayloadV3(ctx context.Context, payload *typ.ExecutableData) (api.PayloadStatusV1, error) {
 	ec.latestPayloadSent = payload
-	return ec.NewPayload(ctx, 3, payload, versionedHashes, beaconRoot)
+	return ec.NewPayload(ctx, 3, payload)
 }
 
 // Exchange Transition Configuration API Call Methods
@@ -501,13 +500,16 @@ func (ec *HiveRPCEngineClient) ExchangeCapabilities(ctx context.Context, clCapab
 }
 
 // Account Nonce
-func (ec *HiveRPCEngineClient) GetLastAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+func (ec *HiveRPCEngineClient) GetLastAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
 	// First get the current head of the client where we will send the tx
-	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
-	defer cancel()
-	head, err := ec.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return 0, err
+	if head == nil {
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+		defer cancel()
+		var err error
+		head, err = ec.HeaderByNumber(ctx, nil)
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	// Then check if we have any info about this account, and when it was last updated
@@ -520,13 +522,16 @@ func (ec *HiveRPCEngineClient) GetLastAccountNonce(testCtx context.Context, acco
 	return 0, fmt.Errorf("no previous nonce for account %s", account.String())
 }
 
-func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
 	// First get the current head of the client where we will send the tx
-	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
-	defer cancel()
-	head, err := ec.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return 0, err
+	if head == nil {
+		ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
+		defer cancel()
+		var err error
+		head, err = ec.HeaderByNumber(ctx, nil)
+		if err != nil {
+			return 0, err
+		}
 	}
 	// Then check if we have any info about this account, and when it was last updated
 	if accTxInfo, ok := ec.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
@@ -537,7 +542,7 @@ func (ec *HiveRPCEngineClient) GetNextAccountNonce(testCtx context.Context, acco
 		return accTxInfo.PreviousNonce, nil
 	}
 	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
-	ctx, cancel = context.WithTimeout(testCtx, globals.RPCTimeout)
+	ctx, cancel := context.WithTimeout(testCtx, globals.RPCTimeout)
 	defer cancel()
 	nonce, err := ec.NonceAt(ctx, account, head.Number)
 	if err != nil {

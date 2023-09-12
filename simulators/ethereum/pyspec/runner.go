@@ -126,12 +126,15 @@ func (tc *testcase) run(t *hivesim.T) {
 	latestVersion := uint64(1)
 	for i, engineNewPayload := range tc.payloads {
 		// execute fixture block payload
+		ed, err := engineNewPayload.ToExecutableData()
+		if err != nil {
+			tc.failedErr = err
+			t.Fatalf("unable to convert engineNewPayload to executableData: %v", err)
+		}
 		plStatus, plErr := engineClient.NewPayload(
 			context.Background(),
 			int(engineNewPayload.Version),
-			engineNewPayload.Payload,
-			&engineNewPayload.BlobVersionedHashes,
-			engineNewPayload.ParentBeaconBlockRoot,
+			ed,
 		)
 		latestVersion = engineNewPayload.Version
 		// check for rpc errors and compare error codes

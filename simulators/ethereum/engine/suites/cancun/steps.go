@@ -13,6 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/devp2p"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -259,7 +261,7 @@ func VerifyBeaconRootStorage(ctx context.Context, testEngine *test.TestEngineCli
 	// Read the storage keys from the stateful precompile that stores the beacon roots and verify
 	// that the beacon root is the same as the one in the payload
 	blockNumber := new(big.Int).SetUint64(payload.Number)
-	precompileAddress := HISTORY_STORAGE_ADDRESS
+	precompileAddress := cancun.HISTORY_STORAGE_ADDRESS
 
 	timestampKey, beaconRootKey := BeaconRootStorageIndexes(payload.Timestamp)
 
@@ -274,7 +276,7 @@ func VerifyBeaconRootStorage(ctx context.Context, testEngine *test.TestEngineCli
 	return nil
 }
 
-func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.ForkConfig, testEngine *test.TestEngineClient, blobTxsInPayload []*typ.TransactionWithBlobData, shouldOverrideBuilder *bool, payload *typ.ExecutableData, previousPayload *typ.ExecutableData) error {
+func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *config.ForkConfig, testEngine *test.TestEngineClient, blobTxsInPayload []*typ.TransactionWithBlobData, shouldOverrideBuilder *bool, payload *typ.ExecutableData, previousPayload *typ.ExecutableData) error {
 	var (
 		parentExcessBlobGas = uint64(0)
 		parentBlobGasUsed   = uint64(0)
@@ -313,7 +315,7 @@ func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *globals.F
 
 			// Retrieve receipt from client
 			r := testEngine.TestTransactionReceipt(tx.Hash())
-			expectedBlobGasUsed := blobCount * GAS_PER_BLOB
+			expectedBlobGasUsed := blobCount * cancun.GAS_PER_BLOB
 			r.ExpectBlobGasUsed(expectedBlobGasUsed)
 			r.ExpectBlobGasPrice(expectedBlobGasPrice)
 		}
@@ -409,18 +411,16 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 					var (
 						payloadAttributes *typ.PayloadAttributes = &t.CLMock.LatestPayloadAttributes
 						forkchoiceState   api.ForkchoiceStateV1  = t.CLMock.LatestForkchoice
-						version           int
 						expectedError     *int
 						expectedStatus    test.PayloadStatus = test.Valid
 						err               error
 					)
+					step.FcUOnPayloadRequest.SetEngineAPIVersionResolver(t.ForkConfig)
+					testEngine := t.TestEngine.WithEngineAPIVersionResolver(step.FcUOnPayloadRequest)
+
 					payloadAttributes, err = step.FcUOnPayloadRequest.GetPayloadAttributes(payloadAttributes)
 					if err != nil {
 						t.Fatalf("FAIL: Error getting custom payload attributes (payload %d/%d): %v", p+1, payloadCount, err)
-					}
-					version, err = step.FcUOnPayloadRequest.GetVersion(t.Env.ForkConfig, t.CLMock.LatestHeader.Time, payloadAttributes)
-					if err != nil {
-						t.Fatalf("FAIL: Error getting custom fcU version (payload %d/%d): %v", p+1, payloadCount, err)
 					}
 					expectedError, err = step.FcUOnPayloadRequest.GetExpectedError()
 					if err != nil {
@@ -430,7 +430,7 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 						expectedStatus = test.Invalid
 					}
 
-					r := t.TestEngine.TestEngineForkchoiceUpdated(&forkchoiceState, payloadAttributes, version)
+					r := testEngine.TestEngineForkchoiceUpdated(&forkchoiceState, payloadAttributes, t.CLMock.LatestHeader.Time)
 					r.ExpectationDescription = step.ExpectationDescription
 					if expectedError != nil {
 						r.ExpectErrorCode(*expectedError)
@@ -449,11 +449,12 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 					var (
 						payloadAttributes = &t.CLMock.LatestPayloadAttributes
 						payloadID         = t.CLMock.NextPayloadID
-						version           int
-						r                 *test.GetPayloadResponseExpectObject
 						expectedError     *int
 						err               error
 					)
+
+					step.GetPayloadCustomizer.SetEngineAPIVersionResolver(t.ForkConfig)
+					testEngine := t.TestEngine.WithEngineAPIVersionResolver(step.GetPayloadCustomizer)
 
 					// We are going to sleep twice because there is no way to skip the CL Mock's sleep
 					time.Sleep(time.Duration(step.GetPayloadDelay) * time.Second)
@@ -463,17 +464,12 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 						t.Fatalf("FAIL: Error getting custom payload ID (payload %d/%d): %v", p+1, payloadCount, err)
 					}
 
-					version, err = step.GetPayloadCustomizer.GetVersion(t.Env.ForkConfig, payloadAttributes.Timestamp)
-					if err != nil {
-						t.Fatalf("FAIL: Error getting custom get-payload version (payload %d/%d): %v", p+1, payloadCount, err)
-					}
-
 					expectedError, err = step.GetPayloadCustomizer.GetExpectedError()
 					if err != nil {
 						t.Fatalf("FAIL: Error getting custom expected error (payload %d/%d): %v", p+1, payloadCount, err)
 					}
 
-					r = t.TestEngine.TestEngineGetPayload(payloadID, version)
+					r := testEngine.TestEngineGetPayload(payloadID, payloadAttributes)
 					r.ExpectationDescription = step.ExpectationDescription
 					if expectedError != nil {
 						r.ExpectErrorCode(*expectedError)
@@ -511,35 +507,20 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 				if step.NewPayloadCustomizer != nil {
 					// Send a test NewPayload directive with either a modified payload or modifed versioned hashes
 					var (
-						payload                        = &t.CLMock.LatestPayloadBuilt
-						version                        = t.Env.ForkConfig.NewPayloadVersion(payload.Timestamp)
-						versionedHashes *[]common.Hash = nil
-						beaconRoot      *common.Hash   = t.CLMock.LatestPayloadAttributes.BeaconRoot
-						r               *test.NewPayloadResponseExpectObject
-						expectedError   *int
-						expectedStatus  test.PayloadStatus = test.Valid
-						err             error
+						payload        = &t.CLMock.LatestPayloadBuilt
+						r              *test.NewPayloadResponseExpectObject
+						expectedError  *int
+						expectedStatus test.PayloadStatus = test.Valid
+						err            error
 					)
 
-					if t.CLMock.LatestBlobBundle != nil {
-						versionedHashes, err = t.CLMock.LatestBlobBundle.VersionedHashes(BLOB_COMMITMENT_VERSION_KZG)
-						if err != nil {
-							t.Fatalf("FAIL: Error getting versioned hashes (payload %d/%d): %v", p+1, payloadCount, err)
-						}
-					}
-
 					// Send a custom new payload
-					version, err = step.NewPayloadCustomizer.GetVersion(t.Env.ForkConfig, payload)
-					if err != nil {
-						t.Fatalf("FAIL: Error getting custom payload version (payload %d/%d): %v", p+1, payloadCount, err)
-					}
-					payload, beaconRoot, err = step.NewPayloadCustomizer.CustomizePayload(payload, beaconRoot)
+					step.NewPayloadCustomizer.SetEngineAPIVersionResolver(t.ForkConfig)
+					testEngine := t.TestEngine.WithEngineAPIVersionResolver(step.NewPayloadCustomizer)
+
+					payload, err = step.NewPayloadCustomizer.CustomizePayload(payload)
 					if err != nil {
 						t.Fatalf("FAIL: Error customizing payload (payload %d/%d): %v", p+1, payloadCount, err)
-					}
-					versionedHashes, err = step.NewPayloadCustomizer.GetVersionedHashes(versionedHashes)
-					if err != nil {
-						t.Fatalf("FAIL: Error getting custom versioned hashes (payload %d/%d): %v", p+1, payloadCount, err)
 					}
 					expectedError, err = step.NewPayloadCustomizer.GetExpectedError()
 					if err != nil {
@@ -549,7 +530,7 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 						expectedStatus = test.Invalid
 					}
 
-					r = t.TestEngine.TestEngineNewPayload(payload, versionedHashes, beaconRoot, version)
+					r = testEngine.TestEngineNewPayload(payload)
 					r.ExpectationDescription = step.ExpectationDescription
 					if expectedError != nil {
 						r.ExpectErrorCode(*expectedError)
@@ -561,21 +542,13 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 
 				if step.FcUOnHeadSet != nil {
 					var (
-						payloadAttributes *typ.PayloadAttributes = nil
-						forkchoiceState   api.ForkchoiceStateV1  = t.CLMock.LatestForkchoice
-						version           int
-						expectedError     *int
-						expectedStatus    test.PayloadStatus = test.Valid
-						err               error
+						forkchoiceState api.ForkchoiceStateV1 = t.CLMock.LatestForkchoice
+						expectedError   *int
+						expectedStatus  test.PayloadStatus = test.Valid
+						err             error
 					)
-					payloadAttributes, err = step.FcUOnHeadSet.GetPayloadAttributes(payloadAttributes)
-					if err != nil {
-						t.Fatalf("FAIL: Error getting custom payload attributes (payload %d/%d): %v", p+1, payloadCount, err)
-					}
-					version, err = step.FcUOnHeadSet.GetVersion(t.Env.ForkConfig, t.CLMock.LatestHeader.Time, payloadAttributes)
-					if err != nil {
-						t.Fatalf("FAIL: Error getting custom fcU version (payload %d/%d): %v", p+1, payloadCount, err)
-					}
+					step.FcUOnHeadSet.SetEngineAPIVersionResolver(t.ForkConfig)
+					testEngine := t.TestEngine.WithEngineAPIVersionResolver(step.FcUOnHeadSet)
 					expectedError, err = step.FcUOnHeadSet.GetExpectedError()
 					if err != nil {
 						t.Fatalf("FAIL: Error getting custom expected error (payload %d/%d): %v", p+1, payloadCount, err)
@@ -584,7 +557,9 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 						expectedStatus = test.Invalid
 					}
 
-					r := t.TestEngine.TestEngineForkchoiceUpdated(&forkchoiceState, payloadAttributes, version)
+					forkchoiceState.HeadBlockHash = t.CLMock.LatestPayloadBuilt.BlockHash
+
+					r := testEngine.TestEngineForkchoiceUpdated(&forkchoiceState, nil, t.CLMock.LatestPayloadBuilt.Timestamp)
 					r.ExpectationDescription = step.ExpectationDescription
 					if expectedError != nil {
 						r.ExpectErrorCode(*expectedError)
@@ -660,7 +635,7 @@ func (step SendBlobTransactions) GetBlobsPerTransaction() uint64 {
 
 func (step SendBlobTransactions) Execute(t *CancunTestContext) error {
 	// Send a blob transaction
-	addr := common.BigToAddress(DATAHASH_START_ADDRESS)
+	addr := common.BigToAddress(cancun.DATAHASH_START_ADDRESS)
 	blobCountPerTx := step.GetBlobsPerTransaction()
 	var engine client.EngineClient
 	if step.ClientIndex >= uint64(len(t.Engines)) {
@@ -678,23 +653,17 @@ func (step SendBlobTransactions) Execute(t *CancunTestContext) error {
 			BlobCount:  blobCountPerTx,
 			BlobID:     t.CurrentBlobID,
 		}
-		if step.AccountIndex != 0 {
-			if step.AccountIndex >= uint64(len(globals.TestAccounts)) {
-				return fmt.Errorf("invalid account index %d", step.AccountIndex)
-			}
-			key := globals.TestAccounts[step.AccountIndex].GetKey()
-			blobTxCreator.PrivateKey = key
-		}
+		sender := globals.TestAccounts[step.AccountIndex]
 		var (
 			blobTx typ.Transaction
 			err    error
 		)
 		if step.ReplaceTransactions {
-			blobTx, err = helper.ReplaceLastTransaction(t.TestContext, engine,
+			blobTx, err = t.ReplaceTransaction(t.TestContext, sender, engine,
 				blobTxCreator,
 			)
 		} else {
-			blobTx, err = helper.SendNextTransaction(t.TestContext, engine,
+			blobTx, err = t.SendTransaction(t.TestContext, sender, engine,
 				blobTxCreator,
 			)
 		}
@@ -728,13 +697,10 @@ type SendModifiedLatestPayload struct {
 func (step SendModifiedLatestPayload) Execute(t *CancunTestContext) error {
 	// Get the latest payload
 	var (
-		payload                            = &t.CLMock.LatestPayloadBuilt
-		beaconRoot                         = t.CLMock.LatestPayloadAttributes.BeaconRoot
-		version         int                = t.Env.ForkConfig.NewPayloadVersion(payload.Timestamp)
-		versionedHashes *[]common.Hash     = nil
-		expectedError   *int               = nil
-		expectedStatus  test.PayloadStatus = test.Valid
-		err             error              = nil
+		payload                           = &t.CLMock.LatestPayloadBuilt
+		expectedError  *int               = nil
+		expectedStatus test.PayloadStatus = test.Valid
+		err            error              = nil
 	)
 	if payload == nil {
 		return fmt.Errorf("TEST-FAIL: no payload available")
@@ -747,17 +713,10 @@ func (step SendModifiedLatestPayload) Execute(t *CancunTestContext) error {
 	}
 
 	// Send a custom new payload
-	version, err = step.NewPayloadCustomizer.GetVersion(t.Env.ForkConfig, payload)
-	if err != nil {
-		t.Fatalf("FAIL: Error getting custom payload version: %v", err)
-	}
-	payload, beaconRoot, err = step.NewPayloadCustomizer.CustomizePayload(payload, beaconRoot)
+	step.NewPayloadCustomizer.SetEngineAPIVersionResolver(t.ForkConfig)
+	payload, err = step.NewPayloadCustomizer.CustomizePayload(payload)
 	if err != nil {
 		t.Fatalf("FAIL: Error customizing payload: %v", err)
-	}
-	versionedHashes, err = step.NewPayloadCustomizer.GetVersionedHashes(versionedHashes)
-	if err != nil {
-		t.Fatalf("FAIL: Error getting custom versioned hashes: %v", err)
 	}
 	expectedError, err = step.NewPayloadCustomizer.GetExpectedError()
 	if err != nil {
@@ -771,8 +730,8 @@ func (step SendModifiedLatestPayload) Execute(t *CancunTestContext) error {
 	if step.ClientID >= uint64(len(t.TestEngines)) {
 		return fmt.Errorf("invalid client index %d", step.ClientID)
 	}
-	testEngine := t.TestEngines[step.ClientID]
-	r := testEngine.TestEngineNewPayload(payload, versionedHashes, beaconRoot, version)
+	testEngine := t.TestEngines[step.ClientID].WithEngineAPIVersionResolver(step.NewPayloadCustomizer)
+	r := testEngine.TestEngineNewPayload(payload)
 	if expectedError != nil {
 		r.ExpectErrorCode(*expectedError)
 	} else {
