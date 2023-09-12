@@ -249,6 +249,41 @@ func (customizer *CorruptVersionedHashes) GetVersionedHashes(baseVesionedHashes 
 	return &result, nil
 }
 
+type RemoveVersionedHash struct{}
+
+func (customizer *RemoveVersionedHash) GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
+	if baseVesionedHashes == nil {
+		return nil, fmt.Errorf("no versioned hashes available for modification")
+	}
+	if len(*baseVesionedHashes) == 0 {
+		return nil, fmt.Errorf("no versioned hashes available for modification")
+	}
+	result := make([]common.Hash, len(*baseVesionedHashes)-1)
+	for i, h := range *baseVesionedHashes {
+		if i < len(*baseVesionedHashes)-1 {
+			result[i] = h
+			result[i][len(h)-1] = result[i][len(h)-1] + 1
+		}
+	}
+	return &result, nil
+}
+
+type ExtraVersionedHash struct{}
+
+func (customizer *ExtraVersionedHash) GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
+	if baseVesionedHashes == nil {
+		return nil, fmt.Errorf("no versioned hashes available for modification")
+	}
+	result := make([]common.Hash, len(*baseVesionedHashes)+1)
+	copy(result, *baseVesionedHashes)
+	extraHash := common.Hash{}
+	rand.Read(extraHash[:])
+	extraHash[0] = cancun.BLOB_COMMITMENT_VERSION_KZG
+	result[len(result)-1] = extraHash
+
+	return &result, nil
+}
+
 type NewPayloadCustomizer interface {
 	EngineAPIVersionResolver
 	PayloadCustomizer
@@ -636,19 +671,33 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 		customPayloadMod = &CustomPayloadData{
 			ExcessBlobGas: &modExcessBlobGas,
 		}
-	case InvalidVersionedHashes:
+	case InvalidVersionedHashesVersion:
 		if basePayload.VersionedHashes == nil {
 			return nil, fmt.Errorf("no versioned hashes available for modification")
 		}
 		customPayloadMod = &CustomPayloadData{
 			VersionedHashesCustomizer: &IncreaseVersionVersionedHashes{},
 		}
-	case InvalidVersionedHashesVersion:
+	case InvalidVersionedHashes:
 		if basePayload.VersionedHashes == nil {
 			return nil, fmt.Errorf("no versioned hashes available for modification")
 		}
 		customPayloadMod = &CustomPayloadData{
 			VersionedHashesCustomizer: &CorruptVersionedHashes{},
+		}
+	case IncompleteVersionedHashes:
+		if basePayload.VersionedHashes == nil {
+			return nil, fmt.Errorf("no versioned hashes available for modification")
+		}
+		customPayloadMod = &CustomPayloadData{
+			VersionedHashesCustomizer: &RemoveVersionedHash{},
+		}
+	case ExtraVersionedHashes:
+		if basePayload.VersionedHashes == nil {
+			return nil, fmt.Errorf("no versioned hashes available for modification")
+		}
+		customPayloadMod = &CustomPayloadData{
+			VersionedHashesCustomizer: &ExtraVersionedHash{},
 		}
 	case InvalidWithdrawals:
 		// These options are not supported yet.

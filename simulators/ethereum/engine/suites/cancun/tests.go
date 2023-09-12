@@ -1835,6 +1835,8 @@ func init() {
 		helper.InvalidExcessBlobGas,
 		helper.InvalidVersionedHashes,
 		helper.InvalidVersionedHashesVersion,
+		helper.IncompleteVersionedHashes,
+		helper.ExtraVersionedHashes,
 	} {
 		for _, syncing := range []bool{false, true} {
 			// Invalidity of payload can be detected even when syncing because the

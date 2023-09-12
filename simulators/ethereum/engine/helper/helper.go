@@ -91,6 +91,8 @@ const (
 	InvalidParentBeaconBlockRoot  = "ParentBeaconBlockRoot"
 	InvalidVersionedHashes        = "VersionedHashes"
 	InvalidVersionedHashesVersion = "VersionedHashes Version"
+	IncompleteVersionedHashes     = "Incomplete VersionedHashes"
+	ExtraVersionedHashes          = "Extra VersionedHashes"
 	RemoveTransaction             = "Incomplete Transactions"
 	InvalidTransactionSignature   = "Transaction Signature"
 	InvalidTransactionNonce       = "Transaction Nonce"
