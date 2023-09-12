@@ -132,8 +132,8 @@ func VerifyTransactionFromNode(ctx context.Context, eth client.Eth, tx typ.Trans
 
 func BeaconRootStorageIndexes(timestamp uint64) (common.Hash, common.Hash) {
 	// Calculate keys
-	timestampReduced := timestamp % cancun.HISTORICAL_ROOTS_MODULUS
-	timestampExtended := timestampReduced + cancun.HISTORICAL_ROOTS_MODULUS
+	timestampReduced := timestamp % cancun.HISTORY_BUFFER_LENGTH
+	timestampExtended := timestampReduced + cancun.HISTORY_BUFFER_LENGTH
 
 	return common.BigToHash(new(big.Int).SetUint64(timestampReduced)), common.BigToHash(new(big.Int).SetUint64(timestampExtended))
 }
