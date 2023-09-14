@@ -137,34 +137,40 @@ function showFileListing(data) {
 
     const filters = new ColumnFilterSet(theTable);
     filters.build();
+    $('#filters-clear').click(function () {
+        filters.clear();
+        return false;
+    });
 }
 
 // ColumnFilterSet manages the column filters.
 class ColumnFilterSet {
+    table = null; // holds the DataTable
+
     constructor(table) {
-        this._table = table;
+        this.table = table;
         this._filters = [
-            new DateFilter(table, 0),
-            new SuiteFilter(table, 1),
-            new ClientFilter(table, 2),
-            new StatusFilter(table, 3),
+            new DateFilter(this, 0),
+            new SuiteFilter(this, 1),
+            new ClientFilter(this, 2),
+            new StatusFilter(this, 3),
         ];
     }
 
     // build creates the filters in the table.
     build() {
         // Build header row.
-        const ncol = this._table.columns().nodes().length;
+        const ncol = this.table.columns().nodes().length;
         const th = '<th></th>';
-        const thead = $('thead', this._table.table);
+        const thead = $('thead', this.table.table);
         $('<tr class="filters">' + th.repeat(ncol) + '</tr>').appendTo(thead);
 
         // Create select boxes.
-        const selects = {};
+        this._selects = {};
         this._filters.forEach(function (f) {
             const sel = f.build();
-            selects[f.key()] = sel;
-        })
+            this._selects[f.key()] = sel;
+        }.bind(this))
 
         // Apply filters from the URL hash segment.
         const p = new URLSearchParams(window.location.hash.substring(1));
@@ -175,13 +181,22 @@ class ColumnFilterSet {
                 return;
             }
             f.apply(value);
-            selects[key].val(value);
+            this._selects[key].val(value);
         }.bind(this));
     }
 
     // clear unsets all filters.
     clear() {
-        this._filters.forEach((f) => f.apply(''));
+        this._filters.forEach(function (f) {
+            f.apply('');
+            this._selects[f.key()].val('');
+        }.bind(this));
+    }
+
+    // filterChanged is called by the filter when their value has changed.
+    filterChanged(f) {
+        const any = this._filters.some((f) => f.isActive());
+        $('#filters-notice').toggle(any);
     }
 
     // byKey finds a filter by its key.
@@ -192,8 +207,8 @@ class ColumnFilterSet {
 
 // ColumnFilter is an abstract column filter.
 class ColumnFilter {
-    constructor(table, columnIndex) {
-        this._table = table;
+    constructor(controller, columnIndex) {
+        this._controller = controller;
         this._columnIndex = columnIndex;
     }
 
@@ -202,7 +217,7 @@ class ColumnFilter {
 
     // apply filters the table.
     apply(value) {
-        const api = this._table;
+        const api = this._controller.table;
         if (value !== '') {
             let re = this.valueToRegExp(value);
             console.log(`searching column ${this._columnIndex} with regexp ${re}`);
@@ -212,7 +227,21 @@ class ColumnFilter {
             api.column(this._columnIndex).search('');
         }
         api.draw();
+
+        // Update URL hash segment.
         this.storeToURL(value);
+
+        // Notify controller.
+        const changed = value !== this.value;
+        this._value = value;
+        if (changed) {
+            this._controller.filterChanged(this);
+        }
+    }
+
+    // isActive reports whether the filter is set.
+    isActive() {
+        return this._value && this._value.length > 0;
     }
 
     // storeToURL saves the filter value to the URL.
@@ -233,7 +262,7 @@ class ColumnFilter {
 
     // buildSelect creates an empty <select> element and adds it to the table header.
     buildSelect() {
-        const header = $('.filters th', this._table.table);
+        const header = $('.filters th', this._controller.table.table);
         const cell = header.eq(this._columnIndex);
 
         // Create the select list and search operation
@@ -249,7 +278,7 @@ class ColumnFilter {
     // buildSelectWithColumnValues creates the <select> with <option> values
     // for all values in the filter's table column.
     buildSelectWithOptions() {
-        const api = this._table;
+        const api = this._controller.table;
         const select = this.buildSelect();
         let options = new Set();
 
@@ -275,7 +304,7 @@ class ColumnFilter {
 // DateFilter is for the date column.
 class DateFilter extends ColumnFilter {
     key() { return "date"; }
-    
+
     build() {
         const select = this.buildSelect();
         select.append($('<option value="0">Today</option>'));
