@@ -1,0 +1,38 @@
+### Build Reth Locally:
+## Requires a copy of <reth>/ -> hive/clients/reth/<reth>
+
+## Builder stage: Compiles reth from a git repository
+FROM rust:latest as builder
+
+# Default local client path: clients/reth/<reth>
+ARG local_path=reth
+COPY $local_path reth
+
+RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential \
+    && cd reth && cargo build --release \
+    && cp target/release/reth /usr/local/bin/reth
+
+## Final stage: Sets up the environment for running reth
+FROM debian:latest
+RUN apt-get update && apt-get install -y bash curl jq \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled binary from builder
+COPY --from=builder /usr/local/bin/reth /usr/local/bin/reth
+
+# Add genesis mapper script, startup script, and enode URL retriever script
+COPY genesis.json /genesis.json
+COPY mapper.jq /mapper.jq
+COPY reth.sh /reth.sh
+COPY enode.sh /hive-bin/enode.sh
+
+# Set execute permissions for scripts
+RUN chmod +x /reth.sh /hive-bin/enode.sh
+
+# Create version.txt
+RUN /usr/local/bin/reth --version | head -1 > /version.txt
+
+# Export the usual networking ports
+EXPOSE 8545 8546 30303 30303/udp
+
+ENTRYPOINT ["/reth.sh"]
