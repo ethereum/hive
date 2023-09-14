@@ -303,28 +303,28 @@ class ColumnFilter {
 
 // DateFilter is for the date column.
 class DateFilter extends ColumnFilter {
-    key() { return "date"; }
+    key() { return "daysago"; }
 
     build() {
         const select = this.buildSelect();
         select.append($('<option value="0">Today</option>'));
-        select.append($('<option value="-1">Yesterday</option>'));
-        select.append($('<option value="-2">2 days ago</option>'));
-        select.append($('<option value="-3">3 days ago</option>'));
-        select.append($('<option value="-4">4 days ago</option>'));
-        select.append($('<option value="-5">5 days ago</option>'));
-        select.append($('<option value="-6">6 days ago</option>'));
-        select.append($('<option value="-7">7 days ago</option>'));
+        select.append($('<option value="1">Yesterday</option>'));
+        select.append($('<option value="2">2 days ago</option>'));
+        select.append($('<option value="3">3 days ago</option>'));
+        select.append($('<option value="4">4 days ago</option>'));
+        select.append($('<option value="5">5 days ago</option>'));
+        select.append($('<option value="6">6 days ago</option>'));
+        select.append($('<option value="7">7 days ago</option>'));
         return select;
     }
 
-    plusXdays(x) {
+    minusXdays(x) {
         const date = new Date(new Date().setDate(new Date().getDate() - x));
-        return date.toLocaleDateString()
+        return date.toLocaleDateString();
     }
 
     valueToRegExp(x) {
-        const date = this.plusXdays(0 + x);
+        const date = this.minusXdays(0 + x);
         return escapeRegExp(date);
     }
 }
@@ -334,7 +334,7 @@ class ClientFilter extends ColumnFilter {
     key() { return "client"; }
 
     build() {
-        return this.buildSelectWithOptions()
+        return this.buildSelectWithOptions();
     }
 
     valueToRegExp(value) {
@@ -347,7 +347,7 @@ class SuiteFilter extends ColumnFilter {
     key() { return "suite"; }
 
     build() {
-        return this.buildSelectWithOptions()
+        return this.buildSelectWithOptions();
     }
 
     valueToRegExp(value) {
