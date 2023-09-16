@@ -252,7 +252,7 @@ class ColumnFilter {
         } else {
             p.delete(this.key());
         }
-        window.location.hash = p.toString();
+        window.history.replaceState(null, '', '#' + p.toString());
     }
 
     // valueToRegExp turns the filter value in to a regular expression for searching.
