@@ -406,4 +406,13 @@ func init() {
 			}
 		}
 	}
+
+	// Misc Tests
+	Tests = append(Tests,
+		NonZeroPreMergeFork{
+			BaseSpec: test.BaseSpec{
+				ForkHeight: 1,
+			},
+		},
+	)
 }
