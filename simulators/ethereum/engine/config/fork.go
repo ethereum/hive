@@ -27,6 +27,7 @@ func (f Fork) PreviousFork() Fork {
 }
 
 type ForkConfig struct {
+	LondonNumber      *big.Int
 	ShanghaiTimestamp *big.Int
 	CancunTimestamp   *big.Int
 }

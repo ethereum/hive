@@ -141,6 +141,9 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 
 			// Configure Forks
 			newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
+			if forkConfig.LondonNumber != nil {
+				newParams = newParams.Set("HIVE_FORK_LONDON", fmt.Sprintf("%d", forkConfig.LondonNumber))
+			}
 			if forkConfig.ShanghaiTimestamp != nil {
 				newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", forkConfig.ShanghaiTimestamp))
 				// Ensure the merge transition is activated before shanghai.
