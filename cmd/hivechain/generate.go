@@ -23,6 +23,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/trie"
 )
 
 func init() {
@@ -51,7 +52,6 @@ type generatorConfig struct {
 	blockCount    int // number of generated pow blocks
 	posBlockCount int // number of generated pos blocks
 	blockTimeSec  int // block time in seconds, influences difficulty
-	powMode       ethash.Mode
 	genesis       core.Genesis
 	isPoS         bool                            // true if the generator should create post pos blocks
 	modifyBlock   func(*types.Block) *types.Block // modify the block during exporting
@@ -165,7 +165,7 @@ func generateTx(txType int, key *ecdsa.PrivateKey, genesis *core.Genesis, gen *c
 		tx = types.NewContractCreation(gen.TxNonce(src), new(big.Int), gas, gasprice, input)
 	}
 	// Sign the transaction.
-	signer := types.MakeSigner(genesis.Config, gen.Number())
+	signer := types.MakeSigner(genesis.Config, gen.Number(), gen.Timestamp())
 	signedTx, err := types.SignTx(tx, signer, key)
 	if err != nil {
 		panic(err)
@@ -176,7 +176,7 @@ func generateTx(txType int, key *ecdsa.PrivateKey, genesis *core.Genesis, gen *c
 func createTxGasLimit(gen *core.BlockGen, genesis *core.Genesis, data []byte) uint64 {
 	isHomestead := genesis.Config.IsHomestead(gen.Number())
 	isEIP2028 := genesis.Config.IsIstanbul(gen.Number())
-	isEIP3860 := genesis.Config.IsShanghai(gen.Timestamp())
+	isEIP3860 := genesis.Config.IsShanghai(gen.Number(), gen.Timestamp())
 	igas, err := core.IntrinsicGas(data, nil, true, isHomestead, isEIP2028, isEIP3860)
 	if err != nil {
 		panic(err)
@@ -187,16 +187,10 @@ func createTxGasLimit(gen *core.BlockGen, genesis *core.Genesis, data []byte) ui
 // generateAndSave produces a chain based on the config.
 func (cfg generatorConfig) generateAndSave(path string, blockModifier func(i int, gen *core.BlockGen)) error {
 	db := rawdb.NewMemoryDatabase()
-	genesis := cfg.genesis.MustCommit(db)
+	triedb := trie.NewDatabase(db, trie.HashDefaults)
+	genesis := cfg.genesis.MustCommit(db, triedb)
 	config := cfg.genesis.Config
-	ethashConf := ethash.Config{
-		PowMode:        cfg.powMode,
-		CachesInMem:    2,
-		DatasetsOnDisk: 2,
-		DatasetDir:     ethashDir(),
-	}
-
-	powEngine := ethash.New(ethashConf, nil, false)
+	powEngine := ethash.NewFaker()
 	posEngine := beacon.New(powEngine)
 	engine := instaSeal{posEngine}
 
