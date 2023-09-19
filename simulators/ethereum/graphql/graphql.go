@@ -8,10 +8,8 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
 	"reflect"
 	"strconv"
-	"strings"
 	"sync"
 
 	"github.com/ethereum/hive/hivesim"
@@ -50,8 +48,8 @@ the client launched by this test.`,
 			"HIVE_SHANGHAI_TIMESTAMP":        "1444660030",
 		},
 		Files: map[string]string{
-			"/genesis.json": "./init/testGenesis.json",
-			"/chain.rlp":    "./init/testBlockchain.blocks",
+			"/genesis.json": "./tests/genesis.json",
+			"/chain.rlp":    "./tests/chain.rlp",
 		},
 		Run: graphqlTest,
 	})
@@ -75,7 +73,7 @@ func graphqlTest(t *hivesim.T, c *hivesim.Client) {
 		go func() {
 			defer wg.Done()
 			for test := range testCh {
-				url := "https://github.com/ethereum/hive/blob/master/simulators/ethereum/graphql/testcases"
+				url := "https://github.com/ethereum/execution-apis/blob/master/graphql/tests"
 				t.Run(hivesim.TestSpec{
 					Name:        fmt.Sprintf("%s (%s)", test.name, c.Type),
 					Description: fmt.Sprintf("Test case source: %s/%v.json", url, test.name),
@@ -90,38 +88,55 @@ func graphqlTest(t *hivesim.T, c *hivesim.Client) {
 // deliverTests reads the test case files, sending them to the output channel.
 func deliverTests(t *hivesim.T, wg *sync.WaitGroup, limit int) <-chan *testCase {
 	out := make(chan *testCase)
+	root := "tests"
+	files, err := os.ReadDir(root)
+	if err != nil {
+		t.Fatalf("Warning: can't read test directory %s: %v", root, err)
+	}
+
 	var i = 0
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		filepath.Walk("./testcases", func(filepath string, info os.FileInfo, err error) error {
+
+		for _, file := range files {
 			if limit >= 0 && i >= limit {
-				return nil
+				return
 			}
-			if info.IsDir() {
-				return nil
+			if !file.IsDir() {
+				continue
 			}
-			if fname := info.Name(); !strings.HasSuffix(fname, ".json") {
-				return nil
-			}
-			data, err := os.ReadFile(filepath)
+			var (
+				requestFile  = path.Join(root, file.Name(), "request.gql")
+				responseFile = path.Join(root, file.Name(), "response.json")
+			)
+
+			request, err := os.ReadFile(requestFile)
 			if err != nil {
-				t.Logf("Warning: can't read test file %s: %v", filepath, err)
-				return nil
+				t.Logf("Warning: can't read test file %s: %v", requestFile, err)
+				continue
 			}
+
+			response, err := os.ReadFile(responseFile)
+			if err != nil {
+				t.Logf("Warning: can't read test file %s: %v", responseFile, err)
+				continue
+			}
+
 			var gqlTest graphQLTest
-			if err = json.Unmarshal(data, &gqlTest); err != nil {
-				t.Logf("Warning: can't unmarshal test file %s: %v", filepath, err)
-				return nil
+			if err = json.Unmarshal(response, &gqlTest); err != nil {
+				t.Logf("Warning: can't unmarshal test file %s: %v", responseFile, err)
+				continue
 			}
+			gqlTest.Request = string(request)
 			i = i + 1
 			t := testCase{
-				name:    strings.TrimSuffix(info.Name(), path.Ext(info.Name())),
+				name:    file.Name(),
 				gqlTest: &gqlTest,
 			}
 			out <- &t
-			return nil
-		})
+		}
+
 		close(out)
 	}()
 	return out
