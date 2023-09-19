@@ -22,15 +22,28 @@ type gasPrice struct {
 func Test_responseMatch(t *testing.T) {
 	// create hivesim tester
 	hivesimT := &hivesim.T{}
-	// unmarshal JSON test file
-	fp := "./testcases/07_eth_gasPrice.json"
-	data, err := os.ReadFile(fp)
-	if err != nil {
-		t.Fatalf("Warning: can't read test file %s: %v", fp, err)
-	}
+	data := `
+{
+  "request":
+    "{ gasPrice }",
+  "responses": [
+    {
+      "data" : {
+        "gasPrice" : "0x10"
+      }
+    },
+    {
+      "data" : {
+        "gasPrice" : "0x1"
+      }
+    }
+  ],
+  "statusCode": 200
+}
+    `
 	var gqlTest graphQLTest
-	if err = json.Unmarshal(data, &gqlTest); err != nil {
-		t.Fatalf("Warning: can't unmarshal test file %s: %v", fp, err)
+	if err := json.Unmarshal([]byte(data), &gqlTest); err != nil {
+		t.Fatalf("Warning: can't unmarshal test %v", err)
 	}
 	// build test case
 	tc := testCase{
