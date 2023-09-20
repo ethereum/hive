@@ -20,12 +20,9 @@ import (
 func main() {
 	suite := hivesim.Suite{
 		Name: "pyspec",
-		Description: "The 'pyspec' test suite runs every test fixture from " +
-			"the execution-spec-tests repository (https://github.com/ethereum/execution-spec-tests)" +
-			"against each client specified in the hive simulation run for forks >= Merge. " +
-			"The clients are first fed a fixture genesis field, followed by each fixture block. " +
-			"The last valid block is then queried for its storage, nonce & balance, that are compared" +
-			"against the expected values from the test fixture file. This is all achieved using the EngineAPI.",
+		Description: "The pyspec test suite runs every fixture from " +
+			"the execution-spec-tests repo (https://github.com/ethereum/execution-spec-tests) where the fork >= Merge. " +
+			"For each test clients are first fed the fixture genesis data followed by engine new payloads specfic to the test.",
 	}
 	suite.Add(hivesim.TestSpec{
 		Name: "pytest_fixture_runner",
@@ -121,14 +118,12 @@ func fixtureRunner(t *hivesim.T) {
 
 // repoLink coverts a pyspec test path into a github repository link.
 func repoLink(testPath string) string {
-	// Example for withdrawals_zero_amout.json:
-	// Converts '/fixtures/withdrawals/withdrawals/withdrawals_zero_amount.json'
-	// into 'fillers/withdrawals/withdrawals.py',
-	// and appends onto main branch repo link.
-	filePath := strings.Replace(testPath, "/fixtures", "fillers", -1)
-	fileDir := strings.TrimSuffix(filePath, "/"+filepath.Base(filePath)) + ".py"
-	repoLink := fmt.Sprintf(
-		"https://github.com/ethereum/execution-spec-tests/blob/main/%v",
-		fileDir)
+	// Example: Converts '/fixtures/cancun/eip4844_blobs/blob_txs/invalid_normal_gas.json'
+	// into 'tests/cancun/eip4844_blobs/test_blob_txs.py', and appends onto main branch repo link.
+	filePath := strings.Replace(testPath, "/fixtures", "tests", -1)
+	fileDir := filepath.Dir(filePath)
+	fileBase := filepath.Base(fileDir)
+	fileName := filepath.Join(filepath.Dir(fileDir), "test_"+fileBase+".py")
+	repoLink := fmt.Sprintf("https://github.com/ethereum/execution-spec-tests/tree/main/%v", fileName)
 	return repoLink
 }

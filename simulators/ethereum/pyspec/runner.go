@@ -144,7 +144,7 @@ func (tc *testcase) run(t *hivesim.T) {
 		// check payload status matches expected
 		if plStatus.Status != expectedStatus {
 			tc.failedErr = fmt.Errorf("payload status mismatch: client returned %v and fixture expected %v", plStatus.Status, expectedStatus)
-			t.Fatalf("payload status mismatch: client returned %v\n fixture expected %v\n", plStatus.Status, expectedStatus, tc.name)
+			t.Fatalf("payload status mismatch: client returned %v fixture expected %v", plStatus.Status, expectedStatus)
 		}
 		// update latest valid block hash if payload status is VALID
 		if plStatus.Status == "VALID" {
