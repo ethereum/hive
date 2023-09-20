@@ -1,9 +1,7 @@
 package test
 
 import (
-	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core"
 	"math/big"
 
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
@@ -139,21 +137,21 @@ func (s Spec) GetGenesisTest(base string) string {
 		genesisPath = fmt.Sprintf("./init/%s", s.GenesisFile)
 	}
 	genesis := helper.LoadGenesisTest(genesisPath)
-	genesis.Config.TerminalTotalDifficulty = big.NewInt(genesis.Difficulty.Int64() + s.TTD)
-	if genesis.Difficulty.Cmp(genesis.Config.TerminalTotalDifficulty) <= 0 {
-		genesis.Config.TerminalTotalDifficultyPassed = true
-	}
+	//genesis.Config.TerminalTotalDifficulty = big.NewInt(genesis.Difficulty.Int64() + s.TTD)
+	//if genesis.Difficulty.Cmp(genesis.Config.TerminalTotalDifficulty) <= 0 {
+	//	genesis.Config.TerminalTotalDifficultyPassed = true
+	//}
 
 	// Add balance to all the test accounts
-	for _, testAcc := range globals.TestAccounts {
-		balance, ok := new(big.Int).SetString("123450000000000000000", 16)
-		if !ok {
-			panic(errors.New("failed to parse balance"))
-		}
-		genesis.Alloc[testAcc.GetAddress()] = core.GenesisAccount{
-			Balance: balance,
-		}
-	}
+	//for _, testAcc := range globals.TestAccounts {
+	//	balance, ok := new(big.Int).SetString("123450000000000000000", 16)
+	//	if !ok {
+	//		panic(errors.New("failed to parse balance"))
+	//	}
+	//genesis.Alloc[testAcc.GetAddress()] = core.GenesisAccount{
+	//	Balance: balance,
+	//}
+	//}
 
 	return genesis
 }

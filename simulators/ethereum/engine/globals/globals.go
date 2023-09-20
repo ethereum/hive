@@ -1,7 +1,6 @@
 package globals
 
 import (
-	"github.com/ethereum/go-ethereum/crypto"
 	"crypto/ecdsa"
 	"fmt"
 	"math/big"
@@ -172,13 +171,54 @@ func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
 			if genesis.ExcessBlobGas == nil {
 				genesis.ExcessBlobGas = new(uint64)
 			}
-			if genesis.BeaconRoot == nil {
-				genesis.BeaconRoot = new(common.Hash)
-			}
+			//if genesis.BeaconRoot == nil {
+			//	genesis.BeaconRoot = new(common.Hash)
+			//}
 		}
 	}
 	return nil
 }
+
+//
+//func (f *ForkConfig) ConfigGenesisHelper(genesis helper.Genesis) error {
+//	config := genesis.Config()
+//	if f.ShanghaiTimestamp != nil {
+//		shanghaiTime := f.ShanghaiTimestamp.Uint64()
+//		config.ShanghaiTime = &shanghaiTime
+//
+//		if genesis.Timestamp() >= shanghaiTime {
+//			// Remove PoW altogether
+//			genesis.SetDifficulty(common.Big0)
+//			config.TerminalTotalDifficulty = common.Big0
+//			config.Clique = nil
+//			genesis.SetExtraData([]byte{})
+//			genesis.SetConfig(config)
+//		}
+//	}
+//	if f.CancunTimestamp != nil {
+//		if config.ShanghaiTime == nil {
+//			return fmt.Errorf("Cancun fork requires Shanghai fork")
+//		}
+//		cancunTime := f.CancunTimestamp.Uint64()
+//		config.CancunTime = &cancunTime
+//		if *config.ShanghaiTime > cancunTime {
+//			return fmt.Errorf("Cancun fork must be after Shanghai fork")
+//		}
+//		if genesis.Timestamp() >= cancunTime {
+//			if genesis.BlobGasUsed() == nil {
+//				genesis.SetBlobGasUsed(new(uint64))
+//			}
+//			if genesis.ExcessBlobGas() == nil {
+//				genesis.SetExcessBlobGas(new(uint64))
+//			}
+//			//if genesis.BeaconRoot == nil {
+//			//	genesis.BeaconRoot = new(common.Hash)
+//			//}
+//		}
+//	}
+//	genesis.SetConfig(config)
+//	return nil
+//}
 
 func (f *ForkConfig) IsShanghai(blockTimestamp uint64) bool {
 	return f.ShanghaiTimestamp != nil && new(big.Int).SetUint64(blockTimestamp).Cmp(f.ShanghaiTimestamp) >= 0

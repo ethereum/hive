@@ -52,6 +52,10 @@ type Genesis interface {
 	Alloc() GenesisAlloc
 	AllocGenesis(address common.Address, account Account)
 	UpdateTimestamp(timestamp string)
+	BlobGasUsed() *uint64
+	SetBlobGasUsed(*uint64)
+	ExcessBlobGas() *uint64
+	SetExcessBlobGas(*uint64)
 
 	// Used for testing
 	Number() uint64
@@ -202,6 +206,22 @@ type NethermindChainSpec struct {
 	Params   NethermindParams   `json:"params,omitempty"`
 	Genesis  NethermindGenesis  `json:"genesis,omitempty"`
 	Accounts map[string]Account `json:"accounts,omitempty"`
+}
+
+func (n *NethermindChainSpec) BlobGasUsed() *uint64 {
+	val := uint64(0)
+	return &val
+}
+
+func (n *NethermindChainSpec) SetBlobGasUsed(u *uint64) {
+}
+
+func (n *NethermindChainSpec) ExcessBlobGas() *uint64 {
+	val := uint64(0)
+	return &val
+}
+
+func (n *NethermindChainSpec) SetExcessBlobGas(u *uint64) {
 }
 
 func (n *NethermindChainSpec) UpdateTimestamp(timestamp string) {
@@ -386,6 +406,22 @@ type ErigonGenesis struct {
 	ErigonGasLimit   string                   `json:"gasLimit"`
 	ErigonDifficulty string                   `json:"difficulty"`
 	ErigonAlloc      map[string]ErigonAccount `json:"alloc"`
+}
+
+func (v *ErigonGenesis) BlobGasUsed() *uint64 {
+	val := uint64(0)
+	return &val
+}
+
+func (v *ErigonGenesis) SetBlobGasUsed(u *uint64) {
+}
+
+func (v *ErigonGenesis) ExcessBlobGas() *uint64 {
+	val := uint64(0)
+	return &val
+}
+
+func (v *ErigonGenesis) SetExcessBlobGas(u *uint64) {
 }
 
 func (v *ErigonGenesis) Config() *params.ChainConfig {

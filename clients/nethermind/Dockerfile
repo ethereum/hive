@@ -1,13 +1,13 @@
 ## Build Nethermind Via Pre-Built Image:
-ARG baseimage=nethermindeth/nethermind
+ARG baseimage=nethermindeth/hive
 ARG tag=master
 FROM $baseimage:$tag
 
 RUN apt-get update && apt-get install -y jq && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
-RUN dotnet /nethermind/nethermind.dll --version > /raw_version.txt && tail -n 1 /raw_version.txt > /version.txt
+RUN dotnet /nethermind/nethermind --version > /raw_version.txt && tail -n 1 /raw_version.txt > /version.txt
 
 ADD miner-0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875.json /networkdata/miner_keystores/miner-0x5cd99ac2f0f8c25a1e670f6bab19d52aad69d875.json
 ADD keystore-password /networkdata/keystore_password_filename

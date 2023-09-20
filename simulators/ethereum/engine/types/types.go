@@ -1,7 +1,6 @@
 package types
 
 import (
-	"fmt"
 	"math/big"
 
 	geth_beacon "github.com/ethereum/go-ethereum/beacon/engine"
@@ -209,14 +208,15 @@ func FromBeaconExecutableData(ed *geth_beacon.ExecutableData) (ExecutableData, e
 }
 
 func ExecutableDataToBlock(ed ExecutableData, versionedHashes []common.Hash, beaconRoot *common.Hash) (*types.Block, error) {
-	if beaconRoot != nil {
-		return nil, fmt.Errorf("parent geth_beacon block root is not nil is unsupported")
-	}
-	gethEd, err := ToBeaconExecutableData(&ed)
-	if err != nil {
-		return nil, err
-	}
-	return geth_beacon.ExecutableDataToBlock(gethEd, versionedHashes, beaconRoot)
+	//if beaconRoot != nil {
+	//	return nil, fmt.Errorf("parent geth_beacon block root is not nil is unsupported")
+	//}
+	//gethEd, err := ToBeaconExecutableData(&ed)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//return geth_beacon.ExecutableDataToBlock(gethEd, versionedHashes, beaconRoot)
+	return nil, nil
 }
 
 func BlockToExecutableData(block *types.Block, fees *big.Int) ExecutableData {

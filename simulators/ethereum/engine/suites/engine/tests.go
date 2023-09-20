@@ -1539,14 +1539,14 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 			secondaryClient *node.GethNode
 		)
 		// To allow having the invalid payload delivered via P2P, we need a second client to serve the payload
-		starter := node.GethNodeEngineStarter{
-			Config: node.GethNodeTestConfiguration{},
-		}
+		//starter := node.GethNodeEngineStarter{
+		//	Config: node.GethNodeTestConfiguration{},
+		//}
 		if spec.ReOrgFromCanonical {
 			// If we are doing a re-org from canonical, we can add both nodes as peers from the start
-			secondaryClient, err = starter.StartGethNode(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
+			//			secondaryClient, err = starter.StartGethNode(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engine)
 		} else {
-			secondaryClient, err = starter.StartGethNode(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
+			//			secondaryClient, err = starter.StartGethNode(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
 		}
 		if err != nil {
 			t.Fatalf("FAIL (%s): Unable to spawn a secondary client: %v", t.TestName, err)
@@ -1803,12 +1803,12 @@ func (spec InvalidMissingAncestorReOrgSpec) GenerateSync() func(*test.Env) {
 						for ; k <= latestBlock.Number().Int64(); k++ {
 							ctx, cancel = context.WithTimeout(t.TestContext, globals.RPCTimeout)
 							defer cancel()
-							latestBlock, err := t.Eth.BlockByNumber(ctx, big.NewInt(k))
+							//					latestBlock, err := t.Eth.BlockByNumber(ctx, big.NewInt(k))
 							if err != nil {
 								t.Fatalf("FAIL (%s): Unable to get block %d: %v", t.TestName, k, err)
 							}
-							js, _ := json.MarshalIndent(latestBlock.Header(), "", "  ")
-							t.Logf("INFO (%s): Block %d: %s", t.TestName, k, js)
+							//js, _ := json.MarshalIndent(latestBlock.Header(), "", "  ")
+							//t.Logf("INFO (%s): Block %d: %s", t.TestName, k, js)
 						}
 
 						t.Fatalf("FAIL (%s): Client returned VALID on an invalid chain: %v", t.TestName, r.Status)

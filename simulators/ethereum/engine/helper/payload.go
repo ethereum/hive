@@ -136,13 +136,13 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 	} else if basePayload.ExcessBlobGas != nil {
 		customPayloadHeader.ExcessBlobGas = basePayload.ExcessBlobGas
 	}
-	if customData.RemoveBeaconRoot {
-		customPayloadHeader.BeaconRoot = nil
-	} else if customData.BeaconRoot != nil {
-		customPayloadHeader.BeaconRoot = customData.BeaconRoot
-	} else if baseBeaconRoot != nil {
-		customPayloadHeader.BeaconRoot = baseBeaconRoot
-	}
+	//if customData.RemoveBeaconRoot {
+	//	customPayloadHeader.BeaconRoot = nil
+	//} else if customData.BeaconRoot != nil {
+	//	customPayloadHeader.BeaconRoot = customData.BeaconRoot
+	//} else if baseBeaconRoot != nil {
+	//	customPayloadHeader.BeaconRoot = baseBeaconRoot
+	//}
 
 	// Return the new payload
 	result := &typ.ExecutableData{
@@ -170,7 +170,8 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 	} else if basePayload.Withdrawals != nil {
 		result.Withdrawals = basePayload.Withdrawals
 	}
-	return result, customPayloadHeader.BeaconRoot, nil
+	//return result, customPayloadHeader.BeaconRoot, nil
+	return result, nil, nil
 }
 
 func CustomizePayloadTransactions(basePayload *typ.ExecutableData, baseBeaconRoot *common.Hash, customTransactions types.Transactions) (*typ.ExecutableData, *common.Hash, error) {

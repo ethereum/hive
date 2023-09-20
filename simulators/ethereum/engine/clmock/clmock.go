@@ -13,7 +13,6 @@ import (
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/forkid"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
@@ -114,7 +113,7 @@ type CLMocker struct {
 
 	// Fork configuration
 	*globals.ForkConfig
-	Genesis *core.Genesis
+	Genesis helper.Genesis
 
 	NextWithdrawals types.Withdrawals
 
@@ -123,7 +122,7 @@ type CLMocker struct {
 	TimeoutContext context.Context
 }
 
-func NewCLMocker(t *hivesim.T, genesis *core.Genesis, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int, forkConfig globals.ForkConfig) *CLMocker {
+func NewCLMocker(t *hivesim.T, genesis helper.Genesis, slotsToSafe, slotsToFinalized, safeSlotsToImportOptimistically *big.Int, forkConfig globals.ForkConfig) *CLMocker {
 	// Init random seed for different purposes
 	seed := time.Now().Unix()
 	t.Logf("Randomness seed: %v\n", seed)
@@ -157,7 +156,7 @@ func NewCLMocker(t *hivesim.T, genesis *core.Genesis, slotsToSafe, slotsToFinali
 			SafeBlockHash:      common.Hash{},
 			FinalizedBlockHash: common.Hash{},
 		},
-		ChainTotalDifficulty: genesis.Difficulty,
+		ChainTotalDifficulty: genesis.Difficulty(),
 		ForkConfig:           &forkConfig,
 		Genesis:              genesis,
 		TestContext:          context.Background(),
@@ -223,7 +222,8 @@ func (cl *CLMocker) IsOptimisticallySyncing() bool {
 }
 
 func (cl *CLMocker) ForkID() forkid.ID {
-	return forkid.NewID(cl.Genesis.Config, cl.GenesisBlock(), cl.LatestHeader.Number.Uint64(), cl.LatestHeader.Time)
+	//return forkid.NewID(cl.Genesis.Config, cl.GenesisBlock(), cl.LatestHeader.Number.Uint64(), cl.LatestHeader.Time)
+	return forkid.ID{} //forkid.NewID(cl.Genesis.Config, , cl.LatestHeader.Number.Uint64(), cl.LatestHeader.Time)
 }
 
 func (cl *CLMocker) GetHeaders(amount uint64, originHash common.Hash, originNumber uint64, reverse bool, skip uint64) ([]*types.Header, error) {
@@ -272,7 +272,7 @@ func (cl *CLMocker) SetTTDBlockClient(ec client.EngineClient) {
 		cl.Fatalf("CLMocker: Unable to get latest header: %v", err)
 		panic(err)
 	}
-	cl.HeaderHistory[cl.LatestHeader.Number.Uint64()] = cl.LatestHeader
+	cl.HeaderHistory[cl.LatestHeader.Number.Uint64()] = &cl.LatestHeader.Header
 
 	ctx, cancel = context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
@@ -432,7 +432,7 @@ func (cl *CLMocker) RequestNextPayload() {
 		err        error
 	)
 	for {
-		if isShanghai(cl.LatestPayloadAttributes.Timestamp, cl.ShanghaiTimestamp) {
+		if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
 			fcUVersion = 2
 			resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV2(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 
@@ -465,8 +465,8 @@ func (cl *CLMocker) RequestNextPayload() {
 		cl.NextPayloadID = resp.PayloadID
 		break
 	}
-	fcUVersion := cl.ForkchoiceUpdatedVersion(cl.LatestPayloadAttributes.Timestamp)
-	resp, err := cl.NextBlockProducer.ForkchoiceUpdated(ctx, fcUVersion, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
+	fcUVersion = cl.ForkchoiceUpdatedVersion(cl.LatestPayloadAttributes.Timestamp)
+	resp, err = cl.NextBlockProducer.ForkchoiceUpdated(ctx, fcUVersion, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV%d (%v): %v", fcUVersion, cl.NextBlockProducer.ID(), err)
 	}
@@ -724,7 +724,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 		cl.Fatalf("CLMocker: None of the clients accepted the newly constructed payload")
 		panic("None of the clients accepted the newly constructed payload")
 	}
-	cl.HeaderHistory[cl.LatestHeadNumber.Uint64()] = cl.LatestHeader
+	cl.HeaderHistory[cl.LatestHeadNumber.Uint64()] = &cl.LatestHeader.Header
 }
 
 // Loop produce PoS blocks by using the Engine API
