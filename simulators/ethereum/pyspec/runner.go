@@ -138,7 +138,7 @@ func (tc *testcase) run(t *hivesim.T) {
 		}
 		// set expected payload return status
 		expectedStatus := "VALID"
-		if errCode != 0 {
+		if !engineNewPayload.Valid {
 			expectedStatus = "INVALID"
 		}
 		// check payload status matches expected
@@ -272,6 +272,7 @@ func extractGenesis(fixture fixtureJSON) (*core.Genesis, error) {
 func extractEngineNewPayloads(fixture fixtureJSON) ([]engineNewPayload, error) {
 	var engineNewPayloads []engineNewPayload
 	for _, engineNewPayload := range fixture.EngineNewPayloads {
+		engineNewPayload := engineNewPayload
 		hiveExecutionPayload, err := typ.FromBeaconExecutableData(engineNewPayload.ExecutionPayload)
 		if err != nil {
 			return nil, errors.New("executionPayload param within engineNewPayload is invalid")
