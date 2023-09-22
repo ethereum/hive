@@ -1159,8 +1159,8 @@
         _ref3$y = _ref3.y,
         y = _ref3$y === void 0 ? 0 : _ref3$y;
 
-    var hasX = offsets.hasOwnProperty('x');
-    var hasY = offsets.hasOwnProperty('y');
+    var hasX = Object.prototype.hasOwnProperty.call(offsets, 'x');
+    var hasY = Object.prototype.hasOwnProperty.call(offsets, 'y');
     var sideX = left;
     var sideY = top;
     var win = window;
@@ -1323,7 +1323,7 @@
       Object.keys(state.elements).forEach(function (name) {
         var element = state.elements[name];
         var attributes = state.attributes[name] || {};
-        var styleProperties = Object.keys(state.styles.hasOwnProperty(name) ? state.styles[name] : initialStyles[name]); // Set all values to an empty string to unset them
+        var styleProperties = Object.keys(Object.prototype.hasOwnProperty.call(state.styles, name) ? state.styles[name] : initialStyles[name]); // Set all values to an empty string to unset them
 
         var style = styleProperties.reduce(function (style, property) {
           style[property] = '';

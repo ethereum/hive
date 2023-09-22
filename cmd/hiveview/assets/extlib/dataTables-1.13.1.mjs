@@ -2149,7 +2149,7 @@ function _fnReduce ( that, fn, init, start, end, inc )
 	}
 
 	while ( i !== end ) {
-		if ( ! that.hasOwnProperty(i) ) {
+		if ( ! Object.prototype.hasOwnProperty.call(that, i) ) {
 			continue;
 		}
 
@@ -6629,7 +6629,7 @@ function _fnExtend( out, extender, breakRefs )
 	var val;
 
 	for ( var prop in extender ) {
-		if ( extender.hasOwnProperty(prop) ) {
+		if ( Object.prototype.hasOwnProperty.call(extender, prop) ) {
 			val = extender[prop];
 
 			if ( $.isPlainObject( val ) ) {
@@ -7931,7 +7931,7 @@ var _selector_row_indexes = function ( settings, opts )
 			}
 
 			a = $.map( displayMaster, function (el) {
-				return ! displayFilteredMap.hasOwnProperty(el) ?
+				return ! Object.prototype.hasOwnProperty.call(displayFilteredMap, el) ?
 					el :
 					null;
 			} );
