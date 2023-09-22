@@ -66,7 +66,7 @@ func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Con
 	return s.StartGethNode(T, testContext, genesis, ClientParams, ClientFiles, bootClients...)
 }
 
-func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
+func (s GethNodeEngineStarter) StartGethNode(_ *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (*GethNode, error) {
 	var (
 		ttd = s.TerminalTotalDifficulty
 		err error
@@ -344,16 +344,16 @@ func (n *GethNode) Close() error {
 
 type validator struct{}
 
-func (v *validator) ValidateBody(block *types.Block) error {
+func (v *validator) ValidateBody(_ *types.Block) error {
 	return nil
 }
-func (v *validator) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error {
+func (v *validator) ValidateState(_ *types.Block, _ *state.StateDB, _ types.Receipts, _ uint64) error {
 	return nil
 }
 
 type processor struct{}
 
-func (p *processor) Process(block *types.Block, statedb *state.StateDB, cfg vm.Config) (types.Receipts, []*types.Log, uint64, error) {
+func (p *processor) Process(_ *types.Block, _ *state.StateDB, _ vm.Config) (types.Receipts, []*types.Log, uint64, error) {
 	return types.Receipts{}, []*types.Log{}, 21000, nil
 }
 
@@ -444,7 +444,7 @@ func (n *GethNode) NewPayload(ctx context.Context, version int, pl *typ.Executab
 	return beacon.PayloadStatusV1{}, fmt.Errorf("unknown version %d", version)
 }
 
-func (n *GethNode) NewPayloadV1(ctx context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
+func (n *GethNode) NewPayloadV1(_ context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
 	n.latestPayloadSent = pl
 	edConverted, err := typ.ToBeaconExecutableData(pl)
 	if err != nil {
@@ -455,7 +455,7 @@ func (n *GethNode) NewPayloadV1(ctx context.Context, pl *typ.ExecutableData) (be
 	return resp, err
 }
 
-func (n *GethNode) NewPayloadV2(ctx context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
+func (n *GethNode) NewPayloadV2(_ context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
 	n.latestPayloadSent = pl
 	ed, err := typ.ToBeaconExecutableData(pl)
 	if err != nil {
@@ -466,7 +466,7 @@ func (n *GethNode) NewPayloadV2(ctx context.Context, pl *typ.ExecutableData) (be
 	return resp, err
 }
 
-func (n *GethNode) NewPayloadV3(ctx context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
+func (n *GethNode) NewPayloadV3(_ context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
 	n.latestPayloadSent = pl
 	ed, err := typ.ToBeaconExecutableData(pl)
 	if err != nil {
@@ -506,7 +506,7 @@ func GethPayloadAttributes(payload *typ.PayloadAttributes) *beacon.PayloadAttrib
 	}
 }
 
-func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdatedV1(_ context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
 	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, GethPayloadAttributes(payload))
@@ -514,7 +514,7 @@ func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.Forkchoi
 	return fcr, err
 }
 
-func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdatedV2(_ context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
 	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, GethPayloadAttributes(payload))
@@ -522,7 +522,7 @@ func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.Forkchoi
 	return fcr, err
 }
 
-func (n *GethNode) ForkchoiceUpdatedV3(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdatedV3(_ context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
 	fcr, err := n.api.ForkchoiceUpdatedV3(*fcs, GethPayloadAttributes(payload))
@@ -530,7 +530,7 @@ func (n *GethNode) ForkchoiceUpdatedV3(ctx context.Context, fcs *beacon.Forkchoi
 	return fcr, err
 }
 
-func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
+func (n *GethNode) GetPayloadV1(_ context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
 	p, err := n.api.GetPayloadV1(*payloadId)
 	if p == nil || err != nil {
 		return typ.ExecutableData{}, err
@@ -538,7 +538,7 @@ func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID
 	return typ.FromBeaconExecutableData(p)
 }
 
-func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, error) {
+func (n *GethNode) GetPayloadV2(_ context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, error) {
 	p, err := n.api.GetPayloadV2(*payloadId)
 	if p == nil || err != nil {
 		return typ.ExecutableData{}, nil, err
@@ -547,7 +547,7 @@ func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID
 	return ed, p.BlockValue, err
 }
 
-func (n *GethNode) GetPayloadV3(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
+func (n *GethNode) GetPayloadV3(_ context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
 	p, err := n.api.GetPayloadV3(*payloadId)
 	if p == nil || err != nil {
 		return typ.ExecutableData{}, nil, nil, nil, err
@@ -576,15 +576,15 @@ func (n *GethNode) GetPayload(ctx context.Context, version int, payloadId *beaco
 	}
 }
 
-func (n *GethNode) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error) {
+func (n *GethNode) GetPayloadBodiesByRangeV1(_ context.Context, _ uint64, _ uint64) ([]*typ.ExecutionPayloadBodyV1, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (n *GethNode) GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*typ.ExecutionPayloadBodyV1, error) {
+func (n *GethNode) GetPayloadBodiesByHashV1(_ context.Context, _ []common.Hash) ([]*typ.ExecutionPayloadBodyV1, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (n *GethNode) GetBlobsBundleV1(ctx context.Context, payloadId *beacon.PayloadID) (*typ.BlobsBundle, error) {
+func (n *GethNode) GetBlobsBundleV1(_ context.Context, _ *beacon.PayloadID) (*typ.BlobsBundle, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -606,7 +606,7 @@ func (n *GethNode) BlockByNumber(ctx context.Context, number *big.Int) (*types.B
 	return n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 }
 
-func (n *GethNode) BlockNumber(ctx context.Context) (uint64, error) {
+func (n *GethNode) BlockNumber(_ context.Context) (uint64, error) {
 	if n.mustHeadBlock != nil {
 		return n.mustHeadBlock.Number.Uint64(), nil
 	}
@@ -688,11 +688,11 @@ func (n *GethNode) StorageAt(ctx context.Context, account common.Address, key co
 	return stateDB.GetState(account, key).Bytes(), nil
 }
 
-func (n *GethNode) StorageAtKeys(ctx context.Context, account common.Address, keys []common.Hash, blockNumber *big.Int) (map[common.Hash]*common.Hash, error) {
+func (n *GethNode) StorageAtKeys(_ context.Context, _ common.Address, _ []common.Hash, _ *big.Int) (map[common.Hash]*common.Hash, error) {
 	return nil, fmt.Errorf("StorageAtKeys not implemented")
 }
 
-func (n *GethNode) TransactionReceipt(ctx context.Context, txHash common.Hash) (*types.Receipt, error) {
+func (n *GethNode) TransactionReceipt(_ context.Context, _ common.Hash) (*types.Receipt, error) {
 	return nil, fmt.Errorf("TransactionReceipt not implemented")
 }
 
@@ -704,15 +704,15 @@ func (n *GethNode) NonceAt(ctx context.Context, account common.Address, blockNum
 	return stateDB.GetNonce(account), nil
 }
 
-func (n *GethNode) TransactionByHash(ctx context.Context, hash common.Hash) (tx *types.Transaction, isPending bool, err error) {
+func (n *GethNode) TransactionByHash(_ context.Context, _ common.Hash) (tx *types.Transaction, isPending bool, err error) {
 	panic("NOT IMPLEMENTED")
 }
 
-func (n *GethNode) PendingTransactionCount(ctx context.Context) (uint, error) {
+func (n *GethNode) PendingTransactionCount(_ context.Context) (uint, error) {
 	panic("NOT IMPLEMENTED")
 }
 
-func (n *GethNode) GetBlockTotalDifficulty(ctx context.Context, hash common.Hash) (*big.Int, error) {
+func (n *GethNode) GetBlockTotalDifficulty(_ context.Context, hash common.Hash) (*big.Int, error) {
 	block := n.eth.BlockChain().GetBlockByHash(hash)
 	if block == nil {
 		return big.NewInt(0), nil

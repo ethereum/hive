@@ -164,7 +164,7 @@ func (manager *TestManager) Terminate() error {
 }
 
 // GetNodeInfo gets some info on a client belonging to some test
-func (manager *TestManager) GetNodeInfo(testSuite TestSuiteID, test TestID, nodeID string) (*ClientInfo, error) {
+func (manager *TestManager) GetNodeInfo(_ TestSuiteID, test TestID, nodeID string) (*ClientInfo, error) {
 	manager.testCaseMutex.RLock()
 	defer manager.testCaseMutex.RUnlock()
 

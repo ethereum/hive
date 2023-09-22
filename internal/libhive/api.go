@@ -60,7 +60,7 @@ type simAPI struct {
 }
 
 // getClientTypes returns all known client types.
-func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
+func (api *simAPI) getClientTypes(w http.ResponseWriter, _ *http.Request) {
 	clients := make([]*ClientDefinition, 0, len(api.tm.clientDefs))
 	for _, def := range api.tm.clientDefs {
 		clients = append(clients, def)

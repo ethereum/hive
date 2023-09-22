@@ -96,7 +96,7 @@ func (c NethermindSyncConfig) String() string {
 	return fmt.Sprintf("%s", b)
 }
 
-func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string, ChainFile string) []SyncTestVariant {
+func (NethermindSyncVariantGenerator) Configure(_ *big.Int, GenesisFile string, ChainFile string) []SyncTestVariant {
 	result := make([]SyncTestVariant, 0)
 
 	var (

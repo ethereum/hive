@@ -9,7 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-func TestGenesisParsing(t *testing.T) {
+func TestGenesisParsing(_ *testing.T) {
 	// Taken from a failing nethermind test
 	genesisResponse := `{
   "author": "0x2adc25665018aa1fe0e6bc666dac8fc2697ff9ba",

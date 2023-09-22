@@ -247,7 +247,7 @@ func BlobDataGenerator(startBlobId BlobID, blobCount uint64) ([]common.Hash, *ty
 	return hashes, &blobData, nil
 }
 
-func (tc *BlobTransactionCreator) MakeTransaction(sender SenderAccount, nonce uint64, blockTimestamp uint64) (typ.Transaction, error) {
+func (tc *BlobTransactionCreator) MakeTransaction(sender SenderAccount, nonce uint64, _ uint64) (typ.Transaction, error) {
 	// Need tx wrap data that will pass blob verification
 	hashes, blobData, err := BlobDataGenerator(tc.BlobID, tc.BlobCount)
 	if err != nil {

@@ -26,7 +26,7 @@ func StateBundle(state common.BeaconState) (hivesim.StartOption, error) {
 func ConsensusConfigsBundle(
 	spec *common.Spec,
 	genesis *core.Genesis,
-	valCount uint64,
+	_ uint64,
 ) (hivesim.StartOption, error) {
 	specConfig, err := yaml.Marshal(spec.Config)
 	if err != nil {

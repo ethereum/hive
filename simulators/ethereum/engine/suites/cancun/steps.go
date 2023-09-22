@@ -257,7 +257,7 @@ func GetBlobDataInPayload(pool *TestBlobTxPool, payload *typ.ExecutableData) ([]
 	return blobTxsInPayload, blobDataInPayload, nil
 }
 
-func VerifyBeaconRootStorage(ctx context.Context, testEngine *test.TestEngineClient, payload *typ.ExecutableData) error {
+func VerifyBeaconRootStorage(_ context.Context, testEngine *test.TestEngineClient, payload *typ.ExecutableData) error {
 	// Read the storage keys from the stateful precompile that stores the beacon roots and verify
 	// that the beacon root is the same as the one in the payload
 	blockNumber := new(big.Int).SetUint64(payload.Number)
@@ -340,7 +340,7 @@ func (step NewPayloads) VerifyPayload(ctx context.Context, forkConfig *config.Fo
 	return nil
 }
 
-func (step NewPayloads) VerifyBlobBundle(blobDataInPayload []*BlobWrapData, payload *typ.ExecutableData, blobBundle *typ.BlobsBundle) error {
+func (step NewPayloads) VerifyBlobBundle(blobDataInPayload []*BlobWrapData, _ *typ.ExecutableData, blobBundle *typ.BlobsBundle) error {
 
 	if len(blobBundle.Blobs) != len(blobBundle.Commitments) || len(blobBundle.Blobs) != len(blobBundle.Proofs) {
 		return fmt.Errorf("unexpected length in blob bundle: %d blobs, %d proofs, %d commitments", len(blobBundle.Blobs), len(blobBundle.Proofs), len(blobBundle.Commitments))

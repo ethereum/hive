@@ -335,7 +335,7 @@ func (p *PreparedTestnet) createTestnet(t *hivesim.T) *Testnet {
 // Prepares an execution client object with all the necessary information
 // to start
 func (p *PreparedTestnet) prepareExecutionNode(
-	parentCtx context.Context,
+	_ context.Context,
 	testnet *Testnet,
 	eth1Def *hivesim.ClientDefinition,
 	consensus el.ExecutionConsensus,
@@ -585,7 +585,7 @@ func (p *PreparedTestnet) prepareBeaconNode(
 // Prepares a validator client object with all the necessary information
 // to eventually start the client.
 func (p *PreparedTestnet) prepareValidatorClient(
-	parentCtx context.Context,
+	_ context.Context,
 	testnet *Testnet,
 	validatorDef *hivesim.ClientDefinition,
 	bn *beacon_client.BeaconClient,

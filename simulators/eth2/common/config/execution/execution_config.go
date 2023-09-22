@@ -113,7 +113,7 @@ func (c ExecutionPreChain) Configure(*ExecutionGenesis) error {
 	return nil
 }
 
-func (c ExecutionPreChain) HiveParams(node int) hivesim.Params {
+func (c ExecutionPreChain) HiveParams(_ int) hivesim.Params {
 	return hivesim.Params{}
 }
 
@@ -134,7 +134,7 @@ func (c ExecutionPostMergeGenesis) Configure(*ExecutionGenesis) error {
 	return nil
 }
 
-func (c ExecutionPostMergeGenesis) HiveParams(node int) hivesim.Params {
+func (c ExecutionPostMergeGenesis) HiveParams(_ int) hivesim.Params {
 	return hivesim.Params{}
 }
 

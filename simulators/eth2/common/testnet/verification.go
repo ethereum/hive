@@ -30,7 +30,7 @@ type FirstSlotAfterCheckpoint struct {
 }
 
 func (c FirstSlotAfterCheckpoint) Slot(
-	ctx context.Context,
+	_ context.Context,
 	t *Testnet,
 	_ *beacon_client.BeaconClient,
 ) (common.Slot, error) {
@@ -43,7 +43,7 @@ type LastSlotAtCheckpoint struct {
 }
 
 func (c LastSlotAtCheckpoint) Slot(
-	ctx context.Context,
+	_ context.Context,
 	t *Testnet,
 	_ *beacon_client.BeaconClient,
 ) (common.Slot, error) {
@@ -54,7 +54,7 @@ func (c LastSlotAtCheckpoint) Slot(
 type LastestSlotByTime struct{}
 
 func (l LastestSlotByTime) Slot(
-	ctx context.Context,
+	_ context.Context,
 	t *Testnet,
 	_ *beacon_client.BeaconClient,
 ) (common.Slot, error) {
@@ -68,7 +68,7 @@ type LastestSlotByHead struct{}
 
 func (l LastestSlotByHead) Slot(
 	ctx context.Context,
-	t *Testnet,
+	_ *Testnet,
 	bn *beacon_client.BeaconClient,
 ) (common.Slot, error) {
 	headInfo, err := bn.BlockHeader(ctx, eth2api.BlockHead)

@@ -69,7 +69,7 @@ func runServer(config serverConfig) {
 
 type serveListing struct{ fsys fs.FS }
 
-func (h serveListing) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h serveListing) ServeHTTP(w http.ResponseWriter, _ *http.Request) {
 	log.Printf("Generating listing...")
 	err := generateListing(h.fsys, ".", w)
 	if err != nil {

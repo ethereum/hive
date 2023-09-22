@@ -42,7 +42,7 @@ func (b *fakeBuilder) BuildSimulatorImage(ctx context.Context, sim string) (stri
 	return "fakebuild/simulator/" + sim + ":latest", nil
 }
 
-func (b *fakeBuilder) BuildImage(ctx context.Context, name string, fsys fs.FS) error {
+func (b *fakeBuilder) BuildImage(_ context.Context, _ string, _ fs.FS) error {
 	return nil
 }
 

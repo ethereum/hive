@@ -40,7 +40,7 @@ type HiveRPCEngineStarter struct {
 
 var _ client.EngineStarter = (*HiveRPCEngineStarter)(nil)
 
-func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
+func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, _ context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
 	var (
 		clientType = s.ClientType
 		enginePort = s.EnginePort

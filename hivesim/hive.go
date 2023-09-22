@@ -83,7 +83,7 @@ func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, testResult TestRe
 }
 
 // StartSuite signals the start of a test suite.
-func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, error) {
+func (sim *Simulation) StartSuite(name, description, _ string) (SuiteID, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite", sim.url)
 		req  = &simapi.TestRequest{Name: name, Description: description}

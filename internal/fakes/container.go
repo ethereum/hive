@@ -67,7 +67,7 @@ func (b *fakeBackend) Build(context.Context, libhive.Builder) error {
 	return nil
 }
 
-func (b *fakeBackend) ServeAPI(ctx context.Context, h http.Handler) (libhive.APIServer, error) {
+func (b *fakeBackend) ServeAPI(_ context.Context, h http.Handler) (libhive.APIServer, error) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ func (b *fakeBackend) ServeAPI(ctx context.Context, h http.Handler) (libhive.API
 	return apiServer{srv, l.Addr()}, nil
 }
 
-func (b *fakeBackend) CreateContainer(ctx context.Context, image string, opt libhive.ContainerOptions) (string, error) {
+func (b *fakeBackend) CreateContainer(_ context.Context, image string, opt libhive.ContainerOptions) (string, error) {
 	var id string
 	var err error
 	if b.hooks.CreateContainer != nil {
@@ -99,7 +99,7 @@ func (b *fakeBackend) CreateContainer(ctx context.Context, image string, opt lib
 	return id, nil
 }
 
-func (b *fakeBackend) StartContainer(ctx context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
+func (b *fakeBackend) StartContainer(_ context.Context, containerID string, opt libhive.ContainerOptions) (*libhive.ContainerInfo, error) {
 	// Get image name.
 	b.mutex.Lock()
 	image, ok := b.cimg[containerID]
@@ -161,7 +161,7 @@ func (b *fakeBackend) UnpauseContainer(containerID string) error {
 	return nil
 }
 
-func (b *fakeBackend) RunProgram(ctx context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
+func (b *fakeBackend) RunProgram(_ context.Context, containerID string, cmd []string) (*libhive.ExecInfo, error) {
 	if b.hooks.RunProgram != nil {
 		return b.hooks.RunProgram(containerID, cmd)
 	}

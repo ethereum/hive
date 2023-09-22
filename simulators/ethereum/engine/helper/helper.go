@@ -177,7 +177,7 @@ func gethDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx typ.T
 	return nil
 }
 
-func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx typ.Transaction, expectedPrevRandao *common.Hash) error {
+func nethermindDebugPrevRandaoTransaction(ctx context.Context, c *rpc.Client, tx typ.Transaction, _ *common.Hash) error {
 	var er *interface{}
 	if err := c.CallContext(ctx, &er, "trace_transaction", tx.Hash()); err != nil {
 		return err
