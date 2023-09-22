@@ -120,7 +120,7 @@ func fixtureRunner(t *hivesim.T) {
 func repoLink(testPath string) string {
 	// Example: Converts '/fixtures/cancun/eip4844_blobs/blob_txs/invalid_normal_gas.json'
 	// into 'tests/cancun/eip4844_blobs/test_blob_txs.py', and appends onto main branch repo link.
-	filePath := strings.Replace(testPath, "/fixtures", "tests", -1)
+	filePath := strings.ReplaceAll(testPath, "/fixtures", "tests")
 	fileDir := filepath.Dir(filePath)
 	fileBase := filepath.Base(fileDir)
 	fileName := filepath.Join(filepath.Dir(fileDir), "test_"+fileBase+".py")
