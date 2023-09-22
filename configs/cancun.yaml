@@ -38,3 +38,42 @@
   build_args:
     github: paradigmxyz/reth
     tag: main
+
+- client: teku-bn
+- client: teku-vc
+
+- client: prysm-bn
+  nametag: deneb
+  build_args:
+      baseimage: ethpandaops/prysm
+      tag: develop-linux-amd64
+- client: prysm-vc
+  nametag: deneb
+  build_args:
+      baseimage: ethpandaops/prysm-validator
+      tag: develop-linux-amd64
+
+- client: lighthouse-bn
+  nametag: deneb
+  build_args:
+      baseimage: sigp/lighthouse
+      tag: deneb-modern
+- client: lighthouse-vc
+  nametag: deneb
+  build_args:
+      baseimage: sigp/lighthouse
+      tag: deneb-modern
+
+- client: lodestar-bn
+  nametag: deneb
+  build_args:
+      baseimage: ethpandaops/lodestar
+      tag: deneb-builder
+- client: lodestar-vc
+  nametag: deneb
+  build_args:
+      baseimage: ethpandaops/lodestar
+      tag: deneb-builder
+
+- client: nimbus-bn
+- client: nimbus-vc

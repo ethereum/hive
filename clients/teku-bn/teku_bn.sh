@@ -23,6 +23,10 @@ if [[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" != "" ]]; then
     echo "SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY: $HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" >> /data/testnet_setup/config.yaml
 fi
 
+trusted_setup_path="/trusted_setup.txt"
+
+echo "Xtrusted-setup: $trusted_setup_path" >> /data/testnet_setup/config.yaml
+
 echo config.yaml:
 cat /data/testnet_setup/config.yaml
 
@@ -47,7 +51,6 @@ enr_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "" || echo --p2p-dis
 static_option=$([[ "$HIVE_ETH2_STATIC_PEERS" == "" ]] && echo "" || echo --p2p-static-peers="$HIVE_ETH2_STATIC_PEERS")
 opt_sync_option=$([[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" == "" ]] && echo "" || echo "--Xnetwork-safe-slots-to-import-optimistically=$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY")
 builder_option=$([[ "$HIVE_ETH2_BUILDER_ENDPOINT" == "" ]] && echo "" || echo "--validators-builder-registration-default-enabled=true --validators-proposer-blinded-blocks-enabled=true --builder-endpoint=$HIVE_ETH2_BUILDER_ENDPOINT")
-echo $builder_option
 
 if [ "$HIVE_ETH2_MERGE_ENABLED" != "" ]; then
     echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
@@ -55,7 +58,7 @@ if [ "$HIVE_ETH2_MERGE_ENABLED" != "" ]; then
 fi
 
 echo Starting Teku Beacon Node
-
+/opt/teku/bin/teku --version
 /opt/teku/bin/teku \
     --network=/data/testnet_setup/config.yaml \
     --data-path=/data/teku \
@@ -72,4 +75,5 @@ echo Starting Teku Beacon Node
     --rest-api-enabled=true --rest-api-interface=0.0.0.0 --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" --rest-api-host-allowlist="*" \
     --data-storage-mode=ARCHIVE \
     --Xstartup-target-peer-count=0 \
-    --p2p-subscribe-all-subnets-enabled
+    --p2p-subscribe-all-subnets-enabled \
+    --Xtrusted-setup="$trusted_setup_path"
