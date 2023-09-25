@@ -9,6 +9,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
+	"github.com/ethereum/hive/simulators/eth2/common/config"
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
@@ -52,12 +53,16 @@ var (
 
 	// Default config used for all tests unless a client specific config exists
 	DEFAULT_CONFIG = &testnet.Config{
-		ValidatorCount:          big.NewInt(int64(DEFAULT_VALIDATOR_COUNT)),
-		TerminalTotalDifficulty: common.Big0,
-		AltairForkEpoch:         common.Big0,
-		BellatrixForkEpoch:      common.Big0,
-		CapellaForkEpoch:        common.Big1,
-		Eth1Consensus:           &el.ExecutionPostMergeGenesis{},
+		ForkConfig: &config.ForkConfig{
+			TerminalTotalDifficulty: common.Big0,
+			AltairForkEpoch:         common.Big0,
+			BellatrixForkEpoch:      common.Big0,
+			CapellaForkEpoch:        common.Big1,
+		},
+		ConsensusConfig: &cl.ConsensusConfig{
+			ValidatorCount: big.NewInt(int64(DEFAULT_VALIDATOR_COUNT)),
+		},
+		Eth1Consensus: &el.ExecutionPostMergeGenesis{},
 	}
 
 	// This is the account that sends vault funding transactions.
@@ -152,12 +157,11 @@ func (ts BaseWithdrawalsTestSpec) GetValidatorCount() uint64 {
 
 func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 	mnemonic string,
-) []*cl.ValidatorDetails {
+) []*cl.ValidatorSetupDetails {
 	keySrc := &cl.MnemonicsKeySource{
-		From:       0,
-		To:         ts.GetValidatorCount(),
-		Validator:  mnemonic,
-		Withdrawal: mnemonic,
+		From:     0,
+		To:       ts.GetValidatorCount(),
+		Mnemonic: mnemonic,
 	}
 	keys, err := keySrc.Keys()
 	if err != nil {

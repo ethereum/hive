@@ -62,7 +62,7 @@ func (ts BaseWithdrawalsTestSpec) Execute(
 	allValidators, err := ValidatorsFromBeaconState(
 		testnet.GenesisBeaconState(),
 		*testnet.Spec().Spec,
-		env.Keys,
+		env.Validators,
 		&blsDomain,
 	)
 	if err != nil {
@@ -351,7 +351,7 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 	allValidators, err := ValidatorsFromBeaconState(
 		testnet.GenesisBeaconState(),
 		*testnet.Spec().Spec,
-		env.Keys,
+		env.Validators,
 		&blsDomain,
 	)
 	if err != nil {
@@ -472,7 +472,14 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 			}
 			ec := n.ExecutionClient
 			includedPayloads := 0
-			for _, p := range b.GetBuiltPayloads() {
+			for _, b := range b.GetBuiltPayloads() {
+				p, _, err := b.FullPayload().ToExecutableData()
+				if err != nil {
+					t.Fatalf(
+						"FAIL: error getting executable data from payload: %v",
+						err,
+					)
+				}
 				if p.Withdrawals != nil {
 					if h, err := ec.HeaderByNumber(ctx, big.NewInt(int64(p.Number))); err != nil {
 						t.Fatalf(
@@ -509,7 +516,14 @@ func (ts BuilderWithdrawalsTestSpec) Execute(
 			if len(modifiedPayloads) == 0 {
 				t.Fatalf("FAIL: No payloads were modified by builder %d", i)
 			}
-			for _, p := range modifiedPayloads {
+			for _, modP := range modifiedPayloads {
+				p, _, err := modP.ToExecutableData()
+				if err != nil {
+					t.Fatalf(
+						"FAIL: error getting executable data from payload: %v",
+						err,
+					)
+				}
 				for _, ec := range testnet.ExecutionClients().Running() {
 					b, err := ec.BlockByNumber(
 						ctx,
