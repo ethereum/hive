@@ -30,7 +30,7 @@ func ConfigGenesis(genesis *core.Genesis, forkTimestamp uint64) error {
 	genesis.Alloc[BEACON_ROOTS_ADDRESS] = core.GenesisAccount{
 		Balance: common.Big0,
 		Nonce:   1,
-		Code:    common.Hex2Bytes("3373fffffffffffffffffffffffffffffffffffffffe14604457602036146024575f5ffd5b620180005f350680545f35146037575f5ffd5b6201800001545f5260205ff35b6201800042064281555f359062018000015500"),
+		Code:    common.Hex2Bytes("0x3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"),
 	}
 
 	return nil
