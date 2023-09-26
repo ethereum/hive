@@ -12,7 +12,7 @@ COPY genesis.json /genesis.json
 COPY mapper.jq /mapper.jq
 
 CMD ["sh", "-c", "\
-     socat -V > /version.txt \
+     socat -V > /version.txt & \
      socat TCP-LISTEN:8545,fork TCP:host.docker.internal:8545 & \
      socat TCP-LISTEN:8551,fork TCP:host.docker.internal:8551 & \
      socat TCP-LISTEN:30303,fork TCP:host.docker.internal:30303 & \
