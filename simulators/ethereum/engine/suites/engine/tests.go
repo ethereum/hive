@@ -115,30 +115,29 @@ func init() {
 	Tests = append(Tests,
 		ForkchoiceUpdatedOnPayloadRequestTest{
 			BaseSpec: test.BaseSpec{
-				Name:       "Early upgrade",
-				ForkHeight: 2,
+				Name: "Early upgrade",
+				About: `
+				Early upgrade of ForkchoiceUpdated when requesting a payload.
+				The test sets the fork height to 1, and the block timestamp increments to 2
+				seconds each block.
+				CL Mock prepares the payload attributes for the first block, which should contain
+				the attributes of the next fork.
+				The test then reduces the timestamp by 1, but still uses the next forkchoice updated
+				version, which should result in UNSUPPORTED_FORK_ERROR error.
+				`,
+				ForkHeight:              1,
+				BlockTimestampIncrement: 2,
 			},
 			ForkchoiceUpdatedCustomizer: &helper.UpgradeForkchoiceUpdatedVersion{
 				ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
+					PayloadAttributesCustomizer: &helper.TimestampDeltaPayloadAttributesCustomizer{
+						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{},
+						TimestampDelta:              -1,
+					},
 					ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
 				},
 			},
 		},
-		/*
-			TODO: This test is failing because the upgraded version of the ForkchoiceUpdated does not contain the
-			      expected fields of the following version.
-			ForkchoiceUpdatedOnHeadBlockUpdateTest{
-				BaseSpec: test.BaseSpec{
-					Name:       "Early upgrade",
-					ForkHeight: 2,
-				},
-				ForkchoiceUpdatedCustomizer: &helper.UpgradeForkchoiceUpdatedVersion{
-					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
-						ExpectedError: globals.UNSUPPORTED_FORK_ERROR,
-					},
-				},
-			},
-		*/
 	)
 
 	// Payload Execution Tests
