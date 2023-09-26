@@ -19,6 +19,6 @@ FROM alpine:latest
 ADD . /source
 WORKDIR /source
 COPY --from=builder /source/rpc-compat .
-COPY --from=builder /execution-apis/tests ./tests
+COPY --from=builder /execution-apis/tests/jsonrpc ./tests
 
 ENTRYPOINT ["./rpc-compat"]
