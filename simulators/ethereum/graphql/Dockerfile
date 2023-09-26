@@ -15,5 +15,5 @@ FROM alpine:latest
 ADD . /source
 WORKDIR /source
 COPY --from=builder /source/graphql .
-COPY --from=builder /execution-apis/graphql/tests ./tests
+COPY --from=builder /execution-apis/tests/graphql ./tests
 ENTRYPOINT ["./graphql"]
