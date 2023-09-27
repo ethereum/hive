@@ -1,22 +1,26 @@
 ### Build Besu Locally:
 
 ## Builder stage: Compiles besu from a local directory
-FROM openjdk:17-jdk-slim as builder
+FROM ubuntu:22.04 as builder
 
 # Default local client path: clients/besu/<besu>
 ARG local_path=besu
 COPY $local_path besu
 
 RUN apt-get update && apt-get install -y git libsodium-dev libnss3-dev \
+    && apt-get install --no-install-recommends -q --assume-yes ca-certificates-java=20190909 \
+    && apt-get install --no-install-recommends -q --assume-yes openjdk-17-jre-headless=17* libjemalloc-dev=5.* \
     && cd besu && ./gradlew installDist
 
 ## Final stage: Sets up the environment for running besu
-FROM openjdk:17-jdk-slim
+FROM ubuntu:22.04
 
 # Copy compiled binary from builder
 COPY --from=builder /besu/build/install/besu /opt/besu
 
 RUN apt-get update && apt-get install -y curl jq libsodium23 libnss3-dev \
+    && apt-get install --no-install-recommends -q --assume-yes ca-certificates-java=20190909 \
+    && apt-get install --no-install-recommends -q --assume-yes openjdk-17-jre-headless=17* libjemalloc-dev=5.* \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Create version.txt
