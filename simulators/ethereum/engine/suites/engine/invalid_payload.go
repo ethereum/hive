@@ -30,6 +30,8 @@ type InvalidPayloadTestCase struct {
 	EmptyTransactions bool
 	// If true, the payload can be detected to be invalid even when syncing
 	InvalidDetectedOnSync bool
+	// If true, latest valid hash can be nil for this test.
+	NilLatestValidHash bool
 }
 
 func (s InvalidPayloadTestCase) WithMainFork(fork config.Fork) test.Spec {
@@ -155,7 +157,9 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				}
 			} else {
 				r.ExpectStatus(test.Invalid)
-				r.ExpectLatestValidHash(&alteredPayload.ParentHash)
+				if !(tc.NilLatestValidHash && r.Status.LatestValidHash == nil) {
+					r.ExpectLatestValidHash(&alteredPayload.ParentHash)
+				}
 			}
 
 			// Send the forkchoiceUpdated with a reference to the invalid payload.
@@ -218,7 +222,9 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				} else {
 					// Otherwise the response should be INVALID.
 					q.ExpectStatus(test.Invalid)
-					q.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
+					if !(tc.NilLatestValidHash && r.Status.LatestValidHash == nil) {
+						q.ExpectLatestValidHash(&t.CLMock.LatestExecutedPayload.BlockHash)
+					}
 				}
 
 				// Try sending the fcU again, this time we should get the proper invalid response.
@@ -254,6 +260,11 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Run test after the new payload has been obtained
 		OnGetPayload: func() {
+			if t.CLMock.LatestPayloadBuilt.ParentHash == alteredPayload.BlockHash {
+				// In some instances the payload is indiscernible from the altered one because the
+				// difference lies in the new payload parameters, in this case skip this check.
+				return
+			}
 			followUpAlteredPayload, err := (&helper.CustomPayloadData{
 				ParentHash: &alteredPayload.BlockHash,
 			}).CustomizePayload(&t.CLMock.LatestPayloadBuilt)
@@ -271,7 +282,9 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 			if r.Status.Status == test.Accepted || r.Status.Status == test.Syncing {
 				r.ExpectLatestValidHash(nil)
 			} else if r.Status.Status == test.Invalid {
-				r.ExpectLatestValidHash(&alteredPayload.ParentHash)
+				if !(tc.NilLatestValidHash && r.Status.LatestValidHash == nil) {
+					r.ExpectLatestValidHash(&alteredPayload.ParentHash)
+				}
 			}
 		},
 	})

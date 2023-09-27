@@ -1844,13 +1844,21 @@ func init() {
 			invalidDetectedOnSync := (invalidField == helper.InvalidBlobGasUsed ||
 				invalidField == helper.InvalidBlobCountGasUsed ||
 				invalidField == helper.InvalidVersionedHashes ||
-				invalidField == helper.InvalidVersionedHashesVersion)
+				invalidField == helper.InvalidVersionedHashesVersion ||
+				invalidField == helper.IncompleteVersionedHashes ||
+				invalidField == helper.ExtraVersionedHashes)
+
+			nilLatestValidHash := (invalidField == helper.InvalidVersionedHashes ||
+				invalidField == helper.InvalidVersionedHashesVersion ||
+				invalidField == helper.IncompleteVersionedHashes ||
+				invalidField == helper.ExtraVersionedHashes)
 
 			Tests = append(Tests, suite_engine.InvalidPayloadTestCase{
 				BaseSpec:              onlyBlobTxsSpec,
 				InvalidField:          invalidField,
 				Syncing:               syncing,
 				InvalidDetectedOnSync: invalidDetectedOnSync,
+				NilLatestValidHash:    nilLatestValidHash,
 			})
 		}
 	}
