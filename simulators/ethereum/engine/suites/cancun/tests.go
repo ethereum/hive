@@ -1827,6 +1827,23 @@ func init() {
 		Tests = append(Tests, t)
 	}
 
+	// Unique Payload ID Tests
+	for _, t := range []suite_engine.PayloadAttributesFieldChange{
+		suite_engine.PayloadAttributesParentBeaconRoot,
+		// TODO: Remove when withdrawals suite is refactored
+		suite_engine.PayloadAttributesAddWithdrawal,
+		suite_engine.PayloadAttributesModifyWithdrawalAmount,
+		suite_engine.PayloadAttributesModifyWithdrawalIndex,
+		suite_engine.PayloadAttributesModifyWithdrawalValidator,
+		suite_engine.PayloadAttributesModifyWithdrawalAddress,
+		suite_engine.PayloadAttributesRemoveWithdrawal,
+	} {
+		Tests = append(Tests, suite_engine.UniquePayloadIDTest{
+			BaseSpec:          baseSpec,
+			FieldModification: t,
+		})
+	}
+
 	// Invalid Payload Tests
 	for _, invalidField := range []helper.InvalidPayloadBlockField{
 		helper.InvalidParentBeaconBlockRoot,
