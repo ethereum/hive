@@ -512,7 +512,11 @@ func (txSender *TransactionSender) GetLastNonce(ctx context.Context, node client
 	if txSender.nonceMap != nil {
 		txSender.nonceMapLock.Lock()
 		defer txSender.nonceMapLock.Unlock()
-		return txSender.nonceMap[sender.GetAddress()], nil
+		nextNonce := txSender.nonceMap[sender.GetAddress()]
+		if nextNonce > 0 {
+			return nextNonce - 1, nil
+		}
+		return 0, fmt.Errorf("no previous nonce found in map for %s", sender.GetAddress().Hex())
 	} else {
 		return node.GetLastAccountNonce(ctx, sender.GetAddress(), header)
 	}

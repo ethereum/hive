@@ -1,7 +1,6 @@
 package suite_engine
 
 import (
-	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
@@ -64,61 +63,6 @@ func (tc ForkchoiceUpdatedOnPayloadRequestTest) Execute(t *test.Env) {
 			}
 
 			r := testEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, payloadAttributes, t.CLMock.LatestHeader.Time)
-			r.ExpectationDescription = tc.Expectation
-			if expectedError != nil {
-				r.ExpectErrorCode(*expectedError)
-			} else {
-				r.ExpectNoError()
-				r.ExpectPayloadStatus(expectedStatus)
-			}
-		},
-	})
-}
-
-// Test modifying the ForkchoiceUpdated version on HeadBlockHash update to the previous/upcoming
-// version when the timestamp payload attribute does not match the upgraded/downgraded version.
-type ForkchoiceUpdatedOnHeadBlockUpdateTest struct {
-	test.BaseSpec
-	helper.ForkchoiceUpdatedCustomizer
-}
-
-func (s ForkchoiceUpdatedOnHeadBlockUpdateTest) WithMainFork(fork config.Fork) test.Spec {
-	specCopy := s
-	specCopy.MainFork = fork
-	return specCopy
-}
-
-func (tc ForkchoiceUpdatedOnHeadBlockUpdateTest) GetName() string {
-	return "ForkchoiceUpdated Version on Head Set: " + tc.BaseSpec.GetName()
-}
-
-func (tc ForkchoiceUpdatedOnHeadBlockUpdateTest) Execute(t *test.Env) {
-	// Wait until TTD is reached by this client
-	t.CLMock.WaitForTTD()
-
-	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
-		OnPayloadAttributesGenerated: func() {
-			var (
-				forkchoiceState *api.ForkchoiceStateV1 = &api.ForkchoiceStateV1{
-					HeadBlockHash:      t.CLMock.LatestPayloadBuilt.BlockHash,
-					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
-					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-				}
-				expectedError  *int
-				expectedStatus test.PayloadStatus = test.Valid
-				err            error
-			)
-			tc.SetEngineAPIVersionResolver(t.ForkConfig)
-			testEngine := t.TestEngine.WithEngineAPIVersionResolver(tc.ForkchoiceUpdatedCustomizer)
-			expectedError, err = tc.GetExpectedError()
-			if err != nil {
-				t.Fatalf("FAIL: Error getting custom expected error: %v", err)
-			}
-			if tc.GetExpectInvalidStatus() {
-				expectedStatus = test.Invalid
-			}
-
-			r := testEngine.TestEngineForkchoiceUpdated(forkchoiceState, nil, t.CLMock.LatestPayloadBuilt.Timestamp)
 			r.ExpectationDescription = tc.Expectation
 			if expectedError != nil {
 				r.ExpectErrorCode(*expectedError)

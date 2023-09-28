@@ -91,7 +91,7 @@ type CLMocker struct {
 	HeaderHistory map[uint64]*types.Header
 
 	// Payload ID History
-	PayloadIDHistory map[api.PayloadID]interface{}
+	payloadIDHistory map[string]map[api.PayloadID]interface{}
 
 	// PoS Chain History Information
 	PrevRandaoHistory      map[uint64]common.Hash
@@ -146,7 +146,7 @@ func NewCLMocker(t *hivesim.T, genesis *core.Genesis, forkConfig *config.ForkCon
 		PayloadProductionClientDelay:    DefaultPayloadProductionClientDelay,
 		BlockTimestampIncrement:         DefaultBlockTimestampIncrement,
 
-		PayloadIDHistory:    make(map[api.PayloadID]interface{}),
+		payloadIDHistory:    make(map[string]map[api.PayloadID]interface{}),
 		LatestHeader:        nil,
 		FirstPoSBlockNumber: nil,
 		LatestHeadNumber:    nil,
@@ -442,14 +442,21 @@ func (cl *CLMocker) GeneratePayloadAttributes() {
 	cl.PrevRandaoHistory[cl.LatestHeader.Number.Uint64()+1] = nextPrevRandao
 }
 
-func (cl *CLMocker) AddPayloadID(newPayloadID *api.PayloadID) error {
+func (cl *CLMocker) AddPayloadID(ec client.EngineClient, newPayloadID *api.PayloadID) error {
 	if newPayloadID == nil {
 		return errors.New("nil payload ID")
 	}
-	if _, ok := cl.PayloadIDHistory[*newPayloadID]; ok {
+	// Get map for given client
+	if _, ok := cl.payloadIDHistory[ec.ID()]; !ok {
+		cl.payloadIDHistory[ec.ID()] = make(map[api.PayloadID]interface{})
+	}
+	// Check if payload ID has been used before
+	if _, ok := cl.payloadIDHistory[ec.ID()][*newPayloadID]; ok {
 		return fmt.Errorf("reused payload ID: %v", *newPayloadID)
 	}
-	cl.PayloadIDHistory[*newPayloadID] = nil
+	// Add payload ID to history
+	cl.payloadIDHistory[ec.ID()][*newPayloadID] = nil
+	fmt.Printf("CLMocker: Added payload ID %v for client %v\n", *newPayloadID, ec.ID())
 	return nil
 }
 
@@ -467,7 +474,7 @@ func (cl *CLMocker) RequestNextPayload() {
 	if resp.PayloadStatus.LatestValidHash == nil || *resp.PayloadStatus.LatestValidHash != cl.LatestForkchoice.HeadBlockHash {
 		cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated LatestValidHash Response from Payload builder: %v != %v", resp.PayloadStatus.LatestValidHash, cl.LatestForkchoice.HeadBlockHash)
 	}
-	if err = cl.AddPayloadID(resp.PayloadID); err != nil {
+	if err = cl.AddPayloadID(cl.NextBlockProducer, resp.PayloadID); err != nil {
 		cl.Fatalf("CLMocker: Payload ID failure: %v", err)
 	}
 	cl.NextPayloadID = resp.PayloadID
