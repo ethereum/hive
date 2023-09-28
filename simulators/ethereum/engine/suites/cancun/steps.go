@@ -439,7 +439,7 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 						r.ExpectPayloadStatus(expectedStatus)
 					}
 					if r.Response.PayloadID != nil {
-						t.CLMock.AddPayloadID(r.Response.PayloadID)
+						t.CLMock.AddPayloadID(t.Engine, r.Response.PayloadID)
 					}
 				}
 			},

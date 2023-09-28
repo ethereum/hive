@@ -89,7 +89,7 @@ func (tc UniquePayloadIDTest) Execute(t *test.Env) {
 			r := t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.
 				LatestForkchoice, &payloadAttributes, t.CLMock.LatestHeader.Time)
 			r.ExpectNoError()
-			t.CLMock.AddPayloadID(r.Response.PayloadID)
+			t.CLMock.AddPayloadID(t.Engine, r.Response.PayloadID)
 		},
 	})
 }
