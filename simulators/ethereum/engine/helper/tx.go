@@ -31,9 +31,9 @@ type SignatureValues struct {
 
 func SignatureValuesFromRaw(v *big.Int, r *big.Int, s *big.Int) SignatureValues {
 	return SignatureValues{
-		V: v,
-		R: r,
-		S: s,
+		V: new(big.Int).Set(v),
+		R: new(big.Int).Set(r),
+		S: new(big.Int).Set(s),
 	}
 }
 
@@ -104,6 +104,11 @@ func CustomizeTransaction(baseTransaction *types.Transaction, sender SenderAccou
 	case types.DynamicFeeTxType:
 		modifiedDynamicFeeTxBase := &types.DynamicFeeTx{}
 
+		if customData.ChainID != nil {
+			modifiedDynamicFeeTxBase.ChainID = customData.ChainID
+		} else {
+			modifiedDynamicFeeTxBase.ChainID = baseTransaction.ChainId()
+		}
 		if customData.Nonce != nil {
 			modifiedDynamicFeeTxBase.Nonce = *customData.Nonce
 		} else {
@@ -148,7 +153,11 @@ func CustomizeTransaction(baseTransaction *types.Transaction, sender SenderAccou
 		modifiedTxData = modifiedDynamicFeeTxBase
 	case types.BlobTxType:
 		modifiedBlobTxBase := &types.BlobTx{}
-
+		if customData.ChainID != nil {
+			modifiedBlobTxBase.ChainID = uint256.MustFromBig(customData.ChainID)
+		} else {
+			modifiedBlobTxBase.ChainID = uint256.MustFromBig(baseTransaction.ChainId())
+		}
 		if customData.Nonce != nil {
 			modifiedBlobTxBase.Nonce = *customData.Nonce
 		} else {
@@ -206,7 +215,7 @@ func CustomizeTransaction(baseTransaction *types.Transaction, sender SenderAccou
 		// If a custom invalid signature was not specified, simply sign the transaction again
 		if customData.ChainID == nil {
 			// Use the default value if an invaild chain ID was not specified
-			customData.ChainID = globals.ChainID
+			customData.ChainID = baseTransaction.ChainId()
 		}
 		signer := types.NewCancunSigner(customData.ChainID)
 		var err error

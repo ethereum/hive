@@ -728,7 +728,8 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 		var customTxData CustomTransactionData
 		switch payloadField {
 		case InvalidTransactionSignature:
-			modifiedSignature := SignatureValuesFromRaw(baseTx.RawSignatureValues())
+			baseV, baseR, baseS := baseTx.RawSignatureValues()
+			modifiedSignature := SignatureValuesFromRaw(baseV, baseR, baseS)
 			modifiedSignature.R = modifiedSignature.R.Sub(modifiedSignature.R, common.Big1)
 			customTxData.Signature = &modifiedSignature
 		case InvalidTransactionNonce:
@@ -740,10 +741,11 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 			}
 			customTxData.Nonce = &customNonce
 		case InvalidTransactionGas:
-			customGas := uint64(0)
+			customGas := uint64(baseTx.Gas() + 1)
 			customTxData.Gas = &customGas
 		case InvalidTransactionGasPrice:
-			customTxData.GasPriceOrGasFeeCap = common.Big0
+			customTxData.GasPriceOrGasFeeCap = new(big.Int).Set(baseTx.GasPrice())
+			customTxData.GasPriceOrGasFeeCap.Div(customTxData.GasPriceOrGasFeeCap, big.NewInt(2))
 		case InvalidTransactionGasTipPrice:
 			invalidGasTip := new(big.Int).Set(globals.GasTipPrice)
 			invalidGasTip.Mul(invalidGasTip, big.NewInt(2))
