@@ -54,16 +54,11 @@ func runAllTests(t *hivesim.T, c *clients.ClientDefinitionsByRole) {
 
 	// Generate validator keys to use for all tests.
 	keySrc := &cl.MnemonicsKeySource{
-		From:       0,
-		To:         64,
-		Validator:  mnemonic,
-		Withdrawal: mnemonic,
+		From:     0,
+		To:       64,
+		Mnemonic: mnemonic,
 	}
 	keys, err := keySrc.Keys()
-	if err != nil {
-		t.Fatal(err)
-	}
-	secrets, err := cl.SecretKeys(keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,9 +70,8 @@ func runAllTests(t *hivesim.T, c *clients.ClientDefinitionsByRole) {
 				Description: test.About,
 				Run: func(t *hivesim.T) {
 					env := &testnet.Environment{
-						Clients: c,
-						Keys:    keys,
-						Secrets: secrets,
+						Clients:    c,
+						Validators: keys,
 					}
 					test.Run(t, env, node)
 				},
