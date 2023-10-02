@@ -15,6 +15,7 @@
         "londonBlock"     : 33,
         "terminalTotalDifficulty": 4357120,
         "shanghaiTime": 1444660030,
+        "cancunTime": 1444660040,
         "terminalTotalDifficultyPassed": true
     },
     "coinbase"   : "0x8888f1f195afa192cfee860698584c030f4c9db1",
