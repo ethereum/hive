@@ -730,7 +730,7 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 		case InvalidTransactionSignature:
 			baseV, baseR, baseS := baseTx.RawSignatureValues()
 			modifiedSignature := SignatureValuesFromRaw(baseV, baseR, baseS)
-			modifiedSignature.R = modifiedSignature.R.Sub(modifiedSignature.R, common.Big1)
+			modifiedSignature.S = modifiedSignature.S.Sub(modifiedSignature.S, common.Big1)
 			customTxData.Signature = &modifiedSignature
 		case InvalidTransactionNonce:
 			customNonce := baseTx.Nonce()
