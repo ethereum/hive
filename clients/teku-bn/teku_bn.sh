@@ -62,6 +62,7 @@ echo Starting Teku Beacon Node
 /opt/teku/bin/teku \
     --network=/data/testnet_setup/config.yaml \
     --data-path=/data/teku \
+    --data-storage-mode=ARCHIVE \
     --initial-state=/data/testnet_setup/genesis.ssz \
     --eth1-deposit-contract-address="${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" \
     --log-destination console \
@@ -72,8 +73,12 @@ echo Starting Teku Beacon Node
     --p2p-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --p2p-advertised-ip="${CONTAINER_IP}" \
     --p2p-peer-lower-bound="${HIVE_ETH2_P2P_TARGET_PEERS:-10}" \
-    --rest-api-enabled=true --rest-api-interface=0.0.0.0 --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" --rest-api-host-allowlist="*" \
-    --data-storage-mode=ARCHIVE \
-    --Xstartup-target-peer-count=0 \
     --p2p-subscribe-all-subnets-enabled \
+    --rest-api-enabled=true \
+    --rest-api-interface=0.0.0.0 \
+    --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" \
+    --rest-api-host-allowlist="*" \
+    --Xpeer-rate-limit=100000 \
+    --Xpeer-request-limit=1000 \
+    --Xstartup-target-peer-count=0 \
     --Xtrusted-setup="$trusted_setup_path"
