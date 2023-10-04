@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -125,12 +126,15 @@ func (tc *testcase) run(t *hivesim.T) {
 	latestVersion := uint64(1)
 	for i, engineNewPayload := range tc.payloads {
 		// execute fixture block payload
+		ed, err := engineNewPayload.ToExecutableData()
+		if err != nil {
+			tc.failedErr = err
+			t.Fatalf("unable to convert engineNewPayload to executableData: %v", err)
+		}
 		plStatus, plErr := engineClient.NewPayload(
 			context.Background(),
 			int(engineNewPayload.Version),
-			engineNewPayload.Payload,
-			&engineNewPayload.BlobVersionedHashes,
-			engineNewPayload.ParentBeaconBlockRoot,
+			ed,
 		)
 		latestVersion = engineNewPayload.Version
 		// check for rpc errors and compare error codes
@@ -245,7 +249,11 @@ func (tc *testcase) updateEnv(env hivesim.Params) {
 // extractFixtureFields extracts the genesis, post allocation and payload
 // fields from the given fixture test and stores them in the testcase struct.
 func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
-	tc.genesis = extractGenesis(fixture)
+	var err error
+	tc.genesis, err = extractGenesis(fixture)
+	if err != nil {
+		return err
+	}
 	tc.postAlloc = &fixture.Post
 	var engineNewPayloads []*engineNewPayload
 	for _, bl := range fixture.Blocks {
@@ -260,7 +268,13 @@ func (tc *testcase) extractFixtureFields(fixture fixtureJSON) error {
 
 // extractGenesis extracts the genesis block information from the given fixture
 // and returns a core.Genesis struct containing the extracted information.
-func extractGenesis(fixture fixtureJSON) *core.Genesis {
+func extractGenesis(fixture fixtureJSON) (*core.Genesis, error) {
+	if fixture.Genesis.BeaconRoot != nil {
+		emptyHash := common.Hash{}
+		if !bytes.Equal(fixture.Genesis.BeaconRoot[:], emptyHash[:]) {
+			return nil, errors.New("beacon root in genesis is not empty")
+		}
+	}
 	genesis := &core.Genesis{
 		Config:        tests.Forks[fixture.Network],
 		Coinbase:      fixture.Genesis.Coinbase,
@@ -273,10 +287,9 @@ func extractGenesis(fixture fixtureJSON) *core.Genesis {
 		BaseFee:       fixture.Genesis.BaseFee,
 		BlobGasUsed:   fixture.Genesis.BlobGasUsed,
 		ExcessBlobGas: fixture.Genesis.ExcessBlobGas,
-		BeaconRoot:    fixture.Genesis.BeaconRoot,
 		Alloc:         fixture.Pre,
 	}
-	return genesis
+	return genesis, nil
 }
 
 // checkRPCErrors checks for RPC errors and compares error codes if expected.

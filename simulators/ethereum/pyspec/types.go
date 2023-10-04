@@ -10,6 +10,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/math"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
 type testcase struct {
@@ -161,4 +163,14 @@ type engineNewPayload struct {
 
 type engineNewPayloadUnmarshaling struct {
 	Version math.HexOrDecimal64 `json:"version"`
+}
+
+func (p *engineNewPayload) ToExecutableData() (*typ.ExecutableData, error) {
+	ed, err := typ.FromBeaconExecutableData(p.Payload)
+	if err != nil {
+		return nil, err
+	}
+	ed.VersionedHashes = &p.BlobVersionedHashes
+	ed.ParentBeaconBlockRoot = p.ParentBeaconBlockRoot
+	return &ed, nil
 }

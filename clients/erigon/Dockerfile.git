@@ -19,7 +19,7 @@ FROM alpine:latest
 # Copy compiled binary from builder
 COPY --from=builder /usr/local/bin/erigon /usr/local/bin/
 
-RUN apk add --no-cache bash gcc jq libstdc++
+RUN apk add --no-cache bash curl gcc jq libstdc++
 
 # Create version.txt
 RUN erigon --version | sed -e 's/erigon version \(.*\)/\1/' > /version.txt

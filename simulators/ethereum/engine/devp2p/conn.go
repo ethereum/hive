@@ -346,7 +346,7 @@ func (c *Conn) negotiateEthProtocol(caps []p2p.Cap) {
 func (c *Conn) statusExchange(status *Status) (Message, error) {
 	defer c.SetDeadline(time.Time{})
 	c.SetDeadline(time.Now().Add(20 * time.Second))
-
+	localForkID := c.consensusEngine.ForkID()
 	// read status message from client
 	var message Message
 loop:
@@ -364,7 +364,7 @@ loop:
 			if have, want := msg.TD.Cmp(c.consensusEngine.ChainTotalDifficulty), 0; have != want {
 				return nil, fmt.Errorf("wrong TD in status: have %d want %d", have, want)
 			}
-			if have, want := msg.ForkID, c.consensusEngine.ForkID(); !reflect.DeepEqual(have, want) {
+			if have, want := msg.ForkID, localForkID; !reflect.DeepEqual(have, want) {
 				return nil, fmt.Errorf("wrong fork ID in status: have (hash=%#x, next=%d), want (hash=%#x, next=%d)", have.Hash, have.Next, want.Hash, want.Next)
 			}
 			if have, want := msg.ProtocolVersion, c.ourHighestProtoVersion; have != uint32(want) {
@@ -393,7 +393,7 @@ loop:
 			TD:      c.consensusEngine.ChainTotalDifficulty,
 			Head:    c.consensusEngine.LatestHeader.Hash(),
 			Genesis: c.consensusEngine.GenesisBlock().Hash(),
-			ForkID:  c.consensusEngine.ForkID(),
+			ForkID:  localForkID,
 		}
 	}
 	if _, err := c.Write(status); err != nil {

@@ -59,7 +59,7 @@ function showFileListing(data) {
         suites.push(suite);
     });
 
-    $('#filetable').DataTable({
+    let theTable = $('#filetable').DataTable({
         data: suites,
         pageLength: 50,
         autoWidth: false,
@@ -133,95 +133,244 @@ function showFileListing(data) {
                 },
             },
         ],
-        initComplete: function () {
-            const api = this.api();
-            $('<tr class="filters"><th></th><th></th><th></th><th></th><th></th></tr>')
-                .appendTo($('#filetable thead'));
-            dateSelect(api, 0);
-            selectWithOptions(api, 1, anchorStartEnd);
-            selectWithOptions(api, 2, anchorWord);
-            statusSelect(api, 3);
-        }
+    });
+
+    const filters = new ColumnFilterSet(theTable);
+    filters.build();
+    $('#filters-clear').click(function () {
+        filters.clear();
+        return false;
     });
 }
 
-function anchorWord(re) {
-    return '\\b' + re + '\\b';
-}
+// ColumnFilterSet manages the column filters.
+class ColumnFilterSet {
+    table = null; // holds the DataTable
 
-function anchorStartEnd(re) {
-    return '^' + re + '$';
-}
+    constructor(table) {
+        this.table = table;
+        this._filters = [
+            new DateFilter(this, 0),
+            new SuiteFilter(this, 1),
+            new ClientFilter(this, 2),
+            new StatusFilter(this, 3),
+        ];
+    }
 
-function genericSelect(api, colIdx, modifyRE) {
-    const table = $('#filetable').DataTable();
-    const cell = $('.filters th').eq(
-        $(api.column(colIdx).header()).index()
-    );
+    // build creates the filters in the table.
+    build() {
+        // Build header row.
+        const ncol = this.table.columns().nodes().length;
+        const th = '<th></th>';
+        const thead = $('thead', this.table.table);
+        $('<tr class="filters">' + th.repeat(ncol) + '</tr>').appendTo(thead);
 
-    // Create the select list and search operation
-    const select = $('<select />')
-        .appendTo(cell)
-        .on('change', function () {
-            let re = escapeRegExp($(this).val());
-            if (re !== '') {
-                if (modifyRE) {
-                    re = modifyRE(re);
-                }
-                console.log(`searching column ${colIdx} with regexp ${re}`);
-                table.column(colIdx).search(re, true, false);
-            } else {
-                // Empty query clears search.
-                table.column(colIdx).search('');
+        // Create select boxes.
+        this._selects = {};
+        this._filters.forEach(function (f) {
+            const sel = f.build();
+            this._selects[f.key()] = sel;
+        }.bind(this))
+
+        // Apply filters from the URL hash segment.
+        const p = new URLSearchParams(window.location.hash.substring(1));
+        p.forEach(function (value, key) {
+            const f = this.byKey(key);
+            if (!f) {
+                console.log(`unknown filter ${key} in URL!`);
+                return;
             }
-            table.draw();
+            f.apply(value);
+            this._selects[key].val(value);
+        }.bind(this));
+    }
+
+    // clear unsets all filters.
+    clear() {
+        this._filters.forEach(function (f) {
+            f.apply('');
+            this._selects[f.key()].val('');
+        }.bind(this));
+    }
+
+    // filterChanged is called by the filter when their value has changed.
+    filterChanged(f) {
+        const any = this._filters.some((f) => f.isActive());
+        $('#filters-notice').toggle(any);
+    }
+
+    // byKey finds a filter by its key.
+    byKey(key) {
+        return this._filters.find((f) => f.key() == key);
+    }
+}
+
+// ColumnFilter is an abstract column filter.
+class ColumnFilter {
+    constructor(controller, columnIndex) {
+        this._controller = controller;
+        this._columnIndex = columnIndex;
+    }
+
+    build() { throw new Error('build() not implemented'); }
+    key() { throw new Error('key() not implemented'); }
+
+    // apply filters the table.
+    apply(value) {
+        const api = this._controller.table;
+        if (value !== '') {
+            let re = this.valueToRegExp(value);
+            console.log(`searching column ${this._columnIndex} with regexp ${re}`);
+            api.column(this._columnIndex).search(re, true, false);
+        } else {
+            // Empty query clears search.
+            api.column(this._columnIndex).search('');
+        }
+        api.draw();
+
+        // Update URL hash segment.
+        this.storeToURL(value);
+
+        // Notify controller.
+        const changed = value !== this.value;
+        this._value = value;
+        if (changed) {
+            this._controller.filterChanged(this);
+        }
+    }
+
+    // isActive reports whether the filter is set.
+    isActive() {
+        return this._value && this._value.length > 0;
+    }
+
+    // storeToURL saves the filter value to the URL.
+    storeToURL(value) {
+        const p = new URLSearchParams(window.location.hash.substring(1))
+        if (value !== '') {
+            p.set(this.key(), '' + value);
+        } else {
+            p.delete(this.key());
+        }
+        window.history.replaceState(null, '', '#' + p.toString());
+    }
+
+    // valueToRegExp turns the filter value in to a regular expression for searching.
+    valueToRegExp(value) {
+        return escapeRegExp(value);
+    }
+
+    // buildSelect creates an empty <select> element and adds it to the table header.
+    buildSelect() {
+        const header = $('.filters th', this._controller.table.table);
+        const cell = header.eq(this._columnIndex);
+
+        // Create the select list and search operation
+        const _this = this;
+        const callback = function () { _this.apply($(this).val()) };
+        const select = $('<select />');
+        select.on('change', callback);
+        select.appendTo(cell);
+        select.append($('<option value="">Show all</option>'));
+        return select;
+    }
+
+    // buildSelectWithColumnValues creates the <select> with <option> values
+    // for all values in the filter's table column.
+    buildSelectWithOptions() {
+        const api = this._controller.table;
+        const select = this.buildSelect();
+        let options = new Set();
+
+        // Get the search data for the first column and add to the select list
+        api.column(this._columnIndex)
+           .cache('search')
+           .unique()
+           .each(function (d) {
+               d.split(',').forEach(function (d) {
+                   d = d.trim();
+                   if (d.length > 0) {
+                       options.add(d);
+                   }
+               });
+           });
+        Array.from(options.values()).sort().forEach(function (d) {
+            select.append($('<option value="'+d+'">'+d+'</option>'));
         });
-
-    select.append($('<option value="">Show all</option>'));
-    return select;
+        return select;
+    }
 }
 
-function selectWithOptions(api, colIdx, modifyRE) {
-    const table = $('#filetable').DataTable();
-    const select = genericSelect(api, colIdx, modifyRE);
-    let options = new Set();
+// DateFilter is for the date column.
+class DateFilter extends ColumnFilter {
+    key() { return "daysago"; }
 
-    // Get the search data for the first column and add to the select list
-    table
-        .column(colIdx)
-        .cache('search')
-        .unique()
-        .each(function (d) {
-            d.split(',').forEach(function (d) {
-                options.add(d.trim());
-            });
-        });
-    Array.from(options.values()).sort().forEach(function (d) {
-        select.append($('<option value="'+d+'">'+d+'</option>'));
-    });
+    build() {
+        const select = this.buildSelect();
+        select.append($('<option value="0">Today</option>'));
+        select.append($('<option value="1">Yesterday</option>'));
+        select.append($('<option value="2">2 days ago</option>'));
+        select.append($('<option value="3">3 days ago</option>'));
+        select.append($('<option value="4">4 days ago</option>'));
+        select.append($('<option value="5">5 days ago</option>'));
+        select.append($('<option value="6">6 days ago</option>'));
+        select.append($('<option value="7">7 days ago</option>'));
+        return select;
+    }
+
+    minusXdays(x) {
+        const date = new Date(new Date().setDate(new Date().getDate() - x));
+        return date.toLocaleDateString();
+    }
+
+    valueToRegExp(x) {
+        const date = this.minusXdays(0 + x);
+        return escapeRegExp(date);
+    }
 }
 
-function statusSelect(api, colIdx) {
-    const select = genericSelect(api, colIdx);
-    select.append($('<option value="✓">SUCCESS</option>'));
-    select.append($('<option value="FAIL">FAIL</option>'));
-    select.append($('<option value="TIMEOUT">TIMEOUT</option>'));
+// ClientFilter is for the clients column.
+class ClientFilter extends ColumnFilter {
+    key() { return "client"; }
+
+    build() {
+        return this.buildSelectWithOptions();
+    }
+
+    valueToRegExp(value) {
+        return '\\b' + escapeRegExp(value) + '\\b'; // anchor match to words
+    }
 }
 
-function minusXDaysDate(x) {
-    const date = new Date(new Date().setDate(new Date().getDate() - x))
-    return date.toLocaleDateString()
+// SuiteFilter is for the suite name column.
+class SuiteFilter extends ColumnFilter {
+    key() { return "suite"; }
+
+    build() {
+        return this.buildSelectWithOptions();
+    }
+
+    valueToRegExp(value) {
+        return '^' + escapeRegExp(value) + '$'; // anchor match to whole field
+    }
 }
 
-function dateSelect(api, colIdx) {
-    const select = genericSelect(api, colIdx);
-    const today = new Date().toLocaleDateString();
-    select.append($('<option value="' + today + '">Today</option>'));
-    select.append($('<option value="' + minusXDaysDate(1) + '">Yesterday</option>'));
-    select.append($('<option value="' + minusXDaysDate(2) + '">2 days ago</option>'));
-    select.append($('<option value="' + minusXDaysDate(3) + '">3 days ago</option>'));
-    select.append($('<option value="' + minusXDaysDate(4) + '">4 days ago</option>'));
-    select.append($('<option value="' + minusXDaysDate(5) + '">5 days ago</option>'));
-    select.append($('<option value="' + minusXDaysDate(6) + '">6 days ago</option>'));
-    select.append($('<option value="' + minusXDaysDate(7) + '">7 days ago</option>'));
+// StatusFilter is for the suite status column.
+class StatusFilter extends ColumnFilter {
+    key() { return "status"; }
+
+    build() {
+        const select = this.buildSelect();
+        select.append($('<option value="SUCCESS">SUCCESS</option>'));
+        select.append($('<option value="FAIL">FAIL</option>'));
+        select.append($('<option value="TIMEOUT">TIMEOUT</option>'));
+        return select;
+    }
+
+    valueToRegExp(value) {
+        if (value === 'SUCCESS') {
+            return '✓';
+        }
+        return escapeRegExp(value);
+    }
 }

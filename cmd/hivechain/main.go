@@ -25,7 +25,6 @@ import (
 	"io"
 	"os"
 
-	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
@@ -158,7 +157,6 @@ func generateCommand(args []string) {
 		cfg     generatorConfig
 		genesis = flag.String("genesis", "", "The path and filename to the source genesis.json")
 		outdir  = flag.String("output", ".", "Chain destination folder")
-		mine    = flag.Bool("mine", false, "Enables ethash mining")
 		pos     = flag.Bool("pos", false, "Enables PoS chain")
 	)
 	flag.IntVar(&cfg.blockCount, "length", 2, "The length of the pow chain to generate")
@@ -171,12 +169,6 @@ func generateCommand(args []string) {
 	if *genesis == "" {
 		fatalf("Missing -genesis option, please supply a genesis.json file.")
 	}
-	if *mine {
-		cfg.powMode = ethash.ModeNormal
-	} else {
-		cfg.powMode = ethash.ModeFullFake
-	}
-
 	cfg.isPoS = *pos
 
 	gspec, err := loadGenesis(*genesis)

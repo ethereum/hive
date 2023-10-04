@@ -378,9 +378,12 @@ function formatTestDetails(suiteData, row) {
         let spinner = $('<div><div class="spinner-grow text-secondary" role="status"></div>');
         $(container).append(spinner);
 
+        const testlogMaxLines = 25;
+        const testlogMaxBytes = 2097152;
+
         let url = routes.resultsRoot + suiteData.testDetailsLog;
         let loader = new testlog.Loader(url, d.summaryResult.log);
-        loader.headAndTailLines(25).then(function (log) {
+        loader.headAndTailLines(testlogMaxLines, testlogMaxBytes).then(function (log) {
             spinner.remove();
             formatTestLog(suiteData, d.testIndex, log, container);
         }).catch(function (error) {

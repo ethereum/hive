@@ -20,7 +20,6 @@ import (
 
 	gokzg4844 "github.com/crate-crypto/go-kzg-4844"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -85,6 +84,14 @@ const (
 	InvalidPrevRandao             = "PrevRandao"
 	InvalidOmmers                 = "Ommers"
 	InvalidWithdrawals            = "Withdrawals"
+	InvalidBlobGasUsed            = "BlobGasUsed"
+	InvalidBlobCountGasUsed       = "Blob Count on BlobGasUsed"
+	InvalidExcessBlobGas          = "ExcessBlobGas"
+	InvalidParentBeaconBlockRoot  = "ParentBeaconBlockRoot"
+	InvalidVersionedHashes        = "VersionedHashes"
+	InvalidVersionedHashesVersion = "VersionedHashes Version"
+	IncompleteVersionedHashes     = "Incomplete VersionedHashes"
+	ExtraVersionedHashes          = "Extra VersionedHashes"
 	RemoveTransaction             = "Incomplete Transactions"
 	InvalidTransactionSignature   = "Transaction Signature"
 	InvalidTransactionNonce       = "Transaction Nonce"
@@ -253,8 +260,8 @@ func GenesisStartOptionBasedOnClient(genesis Genesis, clientName string) (hivesi
 	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
 }
 
-func CalculateTotalDifficulty(genesis core.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
-	result := new(big.Int).Set(genesis.Difficulty)
+func CalculateTotalDifficulty(genesis Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
+	result := new(big.Int).Set(genesis.Difficulty())
 	for _, b := range chain {
 		result.Add(result, b.Difficulty())
 		if lastBlock != 0 && lastBlock == b.NumberU64() {
@@ -352,12 +359,12 @@ func WaitAnyClientForTTD(ecs []client.EngineClient, testCtx context.Context) (cl
 		return nil, testCtx.Err()
 	}
 }
-func SendNextTransactionWithAccount(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, sender common.Address) (typ.Transaction, error) {
-	nonce, err := node.GetNextAccountNonce(testCtx, sender)
+func SendNextTransactionWithAccount(testCtx context.Context, node client.EngineClient, txCreator TransactionCreator, sender *globals.TestAccount) (typ.Transaction, error) {
+	nonce, err := node.GetNextAccountNonce(testCtx, sender.GetAddress(), nil)
 	if err != nil {
 		return nil, err
 	}
-	tx, err := txCreator.MakeTransaction(nonce)
+	tx, err := txCreator.MakeTransaction(sender, nonce, 0)
 	if err != nil {
 		return nil, err
 	}

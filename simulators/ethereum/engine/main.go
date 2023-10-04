@@ -64,7 +64,6 @@ func main() {
 		//Test Engine API on Cancun.`[1:],
 		//	}
 	)
-
 	simulator := hivesim.New()
 
 	//addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
@@ -80,7 +79,7 @@ func main() {
 	//hivesim.MustRunSuite(simulator, transition)
 	//hivesim.MustRunSuite(simulator, auth)
 	//hivesim.MustRunSuite(simulator, excap)
-	//hivesim.MustRunSuite(simulator, sync)
+	// hivesim.MustRunSuite(simulator, syncSuite)
 	hivesim.MustRunSuite(simulator, withdrawals)
 	//hivesim.MustRunSuite(simulator, cancun)
 }
@@ -96,7 +95,7 @@ type ClientGenesis interface {
 	GetTTD()
 }
 
-func getTimestamp(spec test.SpecInterface) int64 {
+func getTimestamp(spec test.Spec) int64 {
 	now := time.Now()
 
 	preShapellaBlock := spec.GetPreShapellaBlockCount()
@@ -111,7 +110,7 @@ func getTimestamp(spec test.SpecInterface) int64 {
 }
 
 // Add test cases to a given test suite
-func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.SpecInterface, nodeType string) {
+func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.Spec, nodeType string) {
 	for _, currentTest := range tests {
 		currentTest := currentTest
 
@@ -135,7 +134,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		if err != nil {
 			panic("unable to inject genesis")
 		}
-		forkConfig := currentTest.GetForkConfig()
+		//forkConfig := currentTest.GetForkConfig()
 		//forkConfig.ConfigGenesisHelper(genesis)
 		// Calculate and set the TTD for this test
 		// ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
@@ -209,7 +208,6 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 							t,
 							c,
 							genesis,
-							&forkConfig,
 							newParams,
 							testFiles,
 						)
@@ -217,6 +215,5 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 				})
 			}
 		}
-
 	}
 }

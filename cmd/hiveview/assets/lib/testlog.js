@@ -56,7 +56,7 @@ function countLines(text) {
 }
 
 const NEWLINE = 10;
-const LOADER_CHUNK_SIZE = 32768;
+const LOADER_CHUNK_SIZE = 262144;
 
 // Loader provides incremental access to log files.
 export class Loader {
@@ -99,7 +99,7 @@ export class Loader {
 
     // headAndTailLines returns up to n lines from the beginning and
     // end of the log.
-    async headAndTailLines(n) {
+    async headAndTailLines(n, maxBytes) {
         var head = [];
         var headEndPosition = 0;
         var tail = [];
@@ -108,7 +108,8 @@ export class Loader {
         let eofReached = await this.iterLines(function (line, offset) {
             headEndPosition = offset;
             head.push(line);
-            return head.length < n;
+            let tooMuchData = maxBytes && offset > maxBytes && head.length > 0;
+            return head.length < n && !tooMuchData;
         });
         if (eofReached || head.length < n) {
             return {head, tail};
@@ -117,13 +118,16 @@ export class Loader {
         // Now read from tail. This stops when the read enters the
         // region already covered by the head.
         let linkWithHead = false;
+        const totalSize = this.length;
         await this._iterTailLines(function (line, offset) {
             if (offset < headEndPosition) {
                 linkWithHead = true;
                 return false;
             }
             tail.unshift(line);
-            return tail.length < n;
+            let tailSize = totalSize - offset;
+            let tooMuchData = maxBytes && tailSize > maxBytes && tail.length > 0;
+            return tail.length < n && !tooMuchData;
         });
         if (linkWithHead) {
             head = head.concat(tail);

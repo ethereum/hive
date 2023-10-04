@@ -11,6 +11,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
+	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
@@ -31,7 +32,7 @@ func FakeExponential(factor, numerator, denominator uint64) uint64 {
 }
 
 func GetBlobGasPrice(excessBlobGas uint64) uint64 {
-	return FakeExponential(MIN_DATA_GASPRICE, excessBlobGas, BLOB_GASPRICE_UPDATE_FRACTION)
+	return FakeExponential(cancun.MIN_DATA_GASPRICE, excessBlobGas, cancun.BLOB_GASPRICE_UPDATE_FRACTION)
 }
 
 func GetMinExcessBlobGasForBlobGasPrice(data_gas_price uint64) uint64 {
@@ -40,7 +41,7 @@ func GetMinExcessBlobGasForBlobGasPrice(data_gas_price uint64) uint64 {
 		current_data_gas_price  = uint64(1)
 	)
 	for current_data_gas_price < data_gas_price {
-		current_excess_data_gas += GAS_PER_BLOB
+		current_excess_data_gas += cancun.GAS_PER_BLOB
 		current_data_gas_price = GetBlobGasPrice(current_excess_data_gas)
 	}
 
@@ -48,14 +49,14 @@ func GetMinExcessBlobGasForBlobGasPrice(data_gas_price uint64) uint64 {
 }
 
 func GetMinExcessBlobsForBlobGasPrice(data_gas_price uint64) uint64 {
-	return GetMinExcessBlobGasForBlobGasPrice(data_gas_price) / GAS_PER_BLOB
+	return GetMinExcessBlobGasForBlobGasPrice(data_gas_price) / cancun.GAS_PER_BLOB
 }
 
 func CalcExcessBlobGas(parentExcessBlobGas, parentBlobGasUsed uint64) uint64 {
-	if (parentExcessBlobGas + parentBlobGasUsed) < TARGET_BLOB_GAS_PER_BLOCK {
+	if (parentExcessBlobGas + parentBlobGasUsed) < cancun.TARGET_BLOB_GAS_PER_BLOCK {
 		return 0
 	} else {
-		return (parentExcessBlobGas + parentBlobGasUsed) - TARGET_BLOB_GAS_PER_BLOCK
+		return (parentExcessBlobGas + parentBlobGasUsed) - cancun.TARGET_BLOB_GAS_PER_BLOCK
 	}
 }
 
@@ -131,8 +132,8 @@ func VerifyTransactionFromNode(ctx context.Context, eth client.Eth, tx typ.Trans
 
 func BeaconRootStorageIndexes(timestamp uint64) (common.Hash, common.Hash) {
 	// Calculate keys
-	timestampReduced := timestamp % HISTORICAL_ROOTS_MODULUS
-	timestampExtended := timestampReduced + HISTORICAL_ROOTS_MODULUS
+	timestampReduced := timestamp % cancun.HISTORY_BUFFER_LENGTH
+	timestampExtended := timestampReduced + cancun.HISTORY_BUFFER_LENGTH
 
 	return common.BigToHash(new(big.Int).SetUint64(timestampReduced)), common.BigToHash(new(big.Int).SetUint64(timestampExtended))
 }
