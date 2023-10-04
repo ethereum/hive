@@ -99,3 +99,5 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+replace github.com/ethereum/go-ethereum => github.com/lightclient/go-ethereum v1.10.10-0.20230926150549-ae44519d720c

@@ -80,7 +80,12 @@ func (tc UniquePayloadIDTest) Execute(t *test.Env) {
 				}
 				payloadAttributes.Withdrawals = append(types.Withdrawals{&modifiedWithdrawal}, payloadAttributes.Withdrawals[1:]...)
 			case PayloadAttributesParentBeaconRoot:
-				payloadAttributes.BeaconRoot[0] = payloadAttributes.BeaconRoot[0] + 1
+				if payloadAttributes.BeaconRoot == nil {
+					t.Fatalf("Cannot modify parent beacon root when there is no parent beacon root")
+				}
+				newBeaconRoot := *payloadAttributes.BeaconRoot
+				newBeaconRoot[0] = newBeaconRoot[0] + 1
+				payloadAttributes.BeaconRoot = &newBeaconRoot
 			default:
 				t.Fatalf("Unknown field change: %s", tc.FieldModification)
 			}
@@ -89,7 +94,7 @@ func (tc UniquePayloadIDTest) Execute(t *test.Env) {
 			r := t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.
 				LatestForkchoice, &payloadAttributes, t.CLMock.LatestHeader.Time)
 			r.ExpectNoError()
-			t.CLMock.AddPayloadID(r.Response.PayloadID)
+			t.CLMock.AddPayloadID(t.Engine, r.Response.PayloadID)
 		},
 	})
 }

@@ -1,24 +1,28 @@
 ### Build Besu From Git:
 
 ## Builder stage: Compiles besu from a git repository
-FROM openjdk:17-jdk-slim as builder
+FROM ubuntu:22.04 as builder
 
 ARG tag=main
 ARG github=hyperledger/besu
 
-RUN echo "Cloning: $github - $tag" && \
-    apt-get update && apt-get install -y git libsodium-dev libnss3-dev \
+RUN echo "installing java on ubuntu base image" \
+    && apt-get update && apt-get install -y git libsodium-dev libnss3-dev \
+    && apt-get install --no-install-recommends -q --assume-yes ca-certificates-java=20190909 \
+    && apt-get install --no-install-recommends -q --assume-yes openjdk-17-jre-headless=17* libjemalloc-dev=5.* \
+    && echo "Cloning: $github - $tag" \
     && git clone --depth 1 --branch $tag https://github.com/$github \
     && cd besu && ./gradlew installDist
 
 ## Final stage: Sets up the environment for running besu
-FROM openjdk:17-jdk-slim
+FROM ubuntu:22.04
 
 # Copy compiled binary from builder
 COPY --from=builder /besu/build/install/besu /opt/besu
 
 RUN apt-get update && apt-get install -y curl jq libsodium23 libnss3-dev \
-    && apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get install --no-install-recommends -q --assume-yes openjdk-17-jre-headless=17* libjemalloc-dev=5.*  \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* 
 
 # Create version.txt
 RUN /opt/besu/bin/besu --version > /version.txt

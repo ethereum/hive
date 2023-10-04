@@ -1,6 +1,8 @@
 package suite_engine
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
@@ -28,6 +30,11 @@ func (s NonZeroPreMergeFork) GetForkConfig() *config.ForkConfig {
 		return nil
 	}
 	forkConfig.LondonNumber = common.Big1
+	// All post merge forks must happen at the same time as the latest fork
+	mainFork := s.GetMainFork()
+	if mainFork == config.Cancun {
+		forkConfig.ShanghaiTimestamp = new(big.Int).Set(forkConfig.CancunTimestamp)
+	}
 	return forkConfig
 }
 

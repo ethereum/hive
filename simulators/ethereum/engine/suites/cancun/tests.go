@@ -1826,6 +1826,23 @@ func init() {
 		Tests = append(Tests, t)
 	}
 
+	// Unique Payload ID Tests
+	for _, t := range []suite_engine.PayloadAttributesFieldChange{
+		suite_engine.PayloadAttributesParentBeaconRoot,
+		// TODO: Remove when withdrawals suite is refactored
+		suite_engine.PayloadAttributesAddWithdrawal,
+		suite_engine.PayloadAttributesModifyWithdrawalAmount,
+		suite_engine.PayloadAttributesModifyWithdrawalIndex,
+		suite_engine.PayloadAttributesModifyWithdrawalValidator,
+		suite_engine.PayloadAttributesModifyWithdrawalAddress,
+		suite_engine.PayloadAttributesRemoveWithdrawal,
+	} {
+		Tests = append(Tests, suite_engine.UniquePayloadIDTest{
+			BaseSpec:          baseSpec,
+			FieldModification: t,
+		})
+	}
+
 	// Invalid Payload Tests
 	for _, invalidField := range []helper.InvalidPayloadBlockField{
 		helper.InvalidParentBeaconBlockRoot,
@@ -1843,13 +1860,21 @@ func init() {
 			invalidDetectedOnSync := (invalidField == helper.InvalidBlobGasUsed ||
 				invalidField == helper.InvalidBlobCountGasUsed ||
 				invalidField == helper.InvalidVersionedHashes ||
-				invalidField == helper.InvalidVersionedHashesVersion)
+				invalidField == helper.InvalidVersionedHashesVersion ||
+				invalidField == helper.IncompleteVersionedHashes ||
+				invalidField == helper.ExtraVersionedHashes)
+
+			nilLatestValidHash := (invalidField == helper.InvalidVersionedHashes ||
+				invalidField == helper.InvalidVersionedHashesVersion ||
+				invalidField == helper.IncompleteVersionedHashes ||
+				invalidField == helper.ExtraVersionedHashes)
 
 			Tests = append(Tests, suite_engine.InvalidPayloadTestCase{
 				BaseSpec:              onlyBlobTxsSpec,
 				InvalidField:          invalidField,
 				Syncing:               syncing,
 				InvalidDetectedOnSync: invalidDetectedOnSync,
+				NilLatestValidHash:    nilLatestValidHash,
 			})
 		}
 	}
