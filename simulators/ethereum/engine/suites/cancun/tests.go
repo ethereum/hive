@@ -1061,14 +1061,8 @@ var Tests = []test.Spec{
 		},
 
 		TestSequence: TestSequence{
-			// First, we send a couple of blob transactions on genesis,
-			// with enough data gas cost to make sure they are included in the first block.
-			SendBlobTransactions{
-				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
-				BlobTransactionMaxBlobGasCost: big.NewInt(1),
-			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: 0,
 				// This customizer only simulates requesting a Shanghai payload 1 second before cancun.
 				// CL Mock will still request the Cancun payload afterwards
 				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{

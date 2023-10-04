@@ -195,6 +195,7 @@ func init() {
 		helper.InvalidTransactionValue,
 		helper.InvalidTransactionChainID,
 	} {
+		invalidDetectedOnSync := invalidField == helper.InvalidTransactionChainID
 		for _, syncing := range []bool{false, true} {
 			if invalidField != helper.InvalidTransactionGasTipPrice {
 				for _, testTxType := range []helper.TestTransactionType{helper.LegacyTxOnly, helper.DynamicFeeTxOnly} {
@@ -202,8 +203,9 @@ func init() {
 						BaseSpec: test.BaseSpec{
 							TestTransactionType: testTxType,
 						},
-						InvalidField: invalidField,
-						Syncing:      syncing,
+						InvalidField:          invalidField,
+						Syncing:               syncing,
+						InvalidDetectedOnSync: invalidDetectedOnSync,
 					})
 				}
 			} else {
@@ -211,8 +213,9 @@ func init() {
 					BaseSpec: test.BaseSpec{
 						TestTransactionType: helper.DynamicFeeTxOnly,
 					},
-					InvalidField: invalidField,
-					Syncing:      syncing,
+					InvalidField:          invalidField,
+					Syncing:               syncing,
+					InvalidDetectedOnSync: invalidDetectedOnSync,
 				})
 			}
 		}

@@ -28,7 +28,8 @@ type InvalidPayloadTestCase struct {
 	Syncing bool
 	// EmptyTransactions is true if the payload should not contain any transactions
 	EmptyTransactions bool
-	// If true, the payload can be detected to be invalid even when syncing
+	// If true, the payload can be detected to be invalid even when syncing,
+	// but this check is optional and both `INVALID` and `SYNCING` are valid responses.
 	InvalidDetectedOnSync bool
 	// If true, latest valid hash can be nil for this test.
 	NilLatestValidHash bool
@@ -153,8 +154,11 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				// if the payload extends the canonical chain and requisite data for its validation is missing
 				// (the client can assume the payload extends the canonical because the linking payload could be missing)
 				if invalidDetectedOnSync {
-					// For some fields, the client can detect the invalid payload even when it doesn't have the parent
-					r.ExpectStatusEither(test.Invalid)
+					// For some fields, the client can detect the invalid payload even when it doesn't have the parent.
+					// However this behavior is up to the client, so we can't expect it to happen and syncing is also valid.
+					// `VALID` response is still incorrect though.
+					r.ExpectStatusEither(test.Invalid, test.Accepted, test.Syncing)
+					// TODO: It seems like latestValidHash==nil should always be expected here.
 				} else {
 					r.ExpectStatusEither(test.Accepted, test.Syncing)
 					r.ExpectLatestValidHash(nil)
