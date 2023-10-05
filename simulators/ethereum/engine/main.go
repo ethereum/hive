@@ -144,10 +144,15 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 			if forkConfig.LondonNumber != nil {
 				newParams = newParams.Set("HIVE_FORK_LONDON", fmt.Sprintf("%d", forkConfig.LondonNumber))
 			}
+			if forkConfig.ParisNumber != nil {
+				newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", fmt.Sprintf("%d", forkConfig.ParisNumber))
+			}
 			if forkConfig.ShanghaiTimestamp != nil {
 				newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", forkConfig.ShanghaiTimestamp))
-				// Ensure the merge transition is activated before shanghai.
-				newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
+				// Ensure merge transition is activated before shanghai if not already
+				if forkConfig.ParisNumber == nil {
+					newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
+				}
 				if forkConfig.CancunTimestamp != nil {
 					newParams = newParams.Set("HIVE_CANCUN_TIMESTAMP", fmt.Sprintf("%d", forkConfig.CancunTimestamp))
 				}

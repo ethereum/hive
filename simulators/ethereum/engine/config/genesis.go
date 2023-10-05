@@ -9,16 +9,17 @@ import (
 )
 
 func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
+	if f.ParisNumber != nil {
+		genesis.Config.MergeNetsplitBlock = f.ParisNumber
+		if genesis.Number >= f.ParisNumber.Uint64() {
+			removePoW(genesis)
+		}
+	}
 	if f.ShanghaiTimestamp != nil {
 		shanghaiTime := f.ShanghaiTimestamp.Uint64()
 		genesis.Config.ShanghaiTime = &shanghaiTime
-
 		if genesis.Timestamp >= shanghaiTime {
-			// Remove PoW altogether
-			genesis.Difficulty = common.Big0
-			genesis.Config.TerminalTotalDifficulty = common.Big0
-			genesis.Config.Clique = nil
-			genesis.ExtraData = []byte{}
+			removePoW(genesis)
 		}
 	}
 	if f.CancunTimestamp != nil {
@@ -27,4 +28,11 @@ func (f *ForkConfig) ConfigGenesis(genesis *core.Genesis) error {
 		}
 	}
 	return nil
+}
+
+func removePoW(genesis *core.Genesis) {
+	genesis.Difficulty = common.Big0
+	genesis.Config.TerminalTotalDifficulty = common.Big0
+	genesis.Config.Clique = nil
+	genesis.ExtraData = []byte{}
 }
