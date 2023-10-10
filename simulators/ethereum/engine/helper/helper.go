@@ -364,7 +364,7 @@ func SendNextTransactionWithAccount(testCtx context.Context, node client.EngineC
 	if err != nil {
 		return nil, err
 	}
-	tx, err := txCreator.MakeTransaction(sender, nonce, 0)
+	tx, err := txCreator.MakeTransaction(sender, nonce, uint64(time.Now().Unix()))
 	if err != nil {
 		return nil, err
 	}

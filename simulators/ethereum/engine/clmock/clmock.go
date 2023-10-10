@@ -166,7 +166,8 @@ func NewCLMocker(t *hivesim.T, genesis helper.Genesis, forkConfig *config.ForkCo
 	newCLMocker.HeaderHistory = make(map[uint64]*types.Header)
 
 	// Add genesis to the header history
-	newCLMocker.HeaderHistory[0] = genesis.ToBlock().Header()
+	block := genesis.ToBlock()
+	newCLMocker.HeaderHistory[0] = block.Header()
 
 	return newCLMocker
 }

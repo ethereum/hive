@@ -3,6 +3,7 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core"
 	"math/big"
 	"strconv"
 
@@ -244,9 +245,29 @@ func (n *NethermindChainSpec) Config() *params.ChainConfig {
 	}
 
 	return &params.ChainConfig{
-		ChainID:                 chainID,
-		TerminalTotalDifficulty: big.NewInt(ttd),
-		ShanghaiTime:            &unixTimestampUint64,
+		ChainID:                       chainID,
+		HomesteadBlock:                big.NewInt(0),
+		DAOForkBlock:                  big.NewInt(0),
+		DAOForkSupport:                false,
+		EIP150Block:                   big.NewInt(0),
+		EIP155Block:                   big.NewInt(0),
+		EIP158Block:                   big.NewInt(0),
+		ByzantiumBlock:                big.NewInt(0),
+		ConstantinopleBlock:           big.NewInt(0),
+		PetersburgBlock:               big.NewInt(0),
+		IstanbulBlock:                 big.NewInt(0),
+		MuirGlacierBlock:              big.NewInt(0),
+		BerlinBlock:                   big.NewInt(0),
+		LondonBlock:                   big.NewInt(0),
+		ArrowGlacierBlock:             big.NewInt(0),
+		GrayGlacierBlock:              big.NewInt(0),
+		MergeNetsplitBlock:            big.NewInt(0),
+		ShanghaiTime:                  &unixTimestampUint64,
+		TerminalTotalDifficulty:       big.NewInt(ttd),
+		TerminalTotalDifficultyPassed: false,
+		Ethash:                        &params.EthashConfig{},
+		Clique:                        &params.CliqueConfig{},
+		IsDevMode:                     false,
 	}
 }
 
@@ -323,8 +344,7 @@ func (n *NethermindChainSpec) SetCoinbase(address common.Address) {
 }
 
 func (n *NethermindChainSpec) Alloc() GenesisAlloc {
-	//TODO implement me
-	panic("implement me")
+	return n.Accounts
 }
 
 func (n *NethermindChainSpec) AllocGenesis(address common.Address, account Account) {
@@ -352,8 +372,45 @@ func (n *NethermindChainSpec) BaseFee() *big.Int {
 }
 
 func (n *NethermindChainSpec) ToBlock() *types.Block {
-	//TODO implement me
-	panic("implement me")
+	alloc := make(core.GenesisAlloc)
+	for address, account := range n.Accounts {
+		balance := big.NewInt(0)
+		code := make([]byte, 0)
+		if val, ok := account["balance"]; ok && val != nil {
+			switch v := val.(type) {
+			case common.Hash:
+				bytesBalance := v.Bytes()
+				balance = new(big.Int).SetBytes(bytesBalance)
+			case string:
+				bytesBalance := common.Hex2Bytes(v)
+				balance = new(big.Int).SetBytes(bytesBalance)
+			}
+		}
+		if val, ok := account["code"]; ok && val != nil {
+			code = common.FromHex(val.(string))
+		}
+		alloc[common.HexToAddress(address)] = core.GenesisAccount{
+			Balance: balance,
+			Code:    code,
+		}
+	}
+	config := n.Config()
+	s := core.Genesis{
+		Config:     config,
+		Nonce:      0,
+		Timestamp:  0,
+		ExtraData:  nil,
+		GasLimit:   n.GasLimit(),
+		Difficulty: config.TerminalTotalDifficulty,
+		Mixhash:    n.MixHash(),
+		Coinbase:   n.Coinbase(),
+		Alloc:      alloc,
+		Number:     0,
+		GasUsed:    0,
+		ParentHash: common.Hash{},
+	}
+
+	return s.ToBlock()
 }
 
 type ErigonAura struct {
