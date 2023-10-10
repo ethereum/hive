@@ -1013,22 +1013,18 @@ func (ws *WithdrawalsBaseSpec) sendPayloadTransactions(t *test.Env) {
 	for i := uint64(0); i < ws.GetTransactionCountPerPayload(); i++ {
 		var destAddr = TX_CONTRACT_ADDRESSES[int(i)%len(TX_CONTRACT_ADDRESSES)]
 
-		sender := globals.TestAccounts[0]
+		// TODO: found test accounts list during load
+		sender := globals.NewTestAccount(globals.VaultKey, &globals.VaultAccountAddress, 0)
 
 		_, err := helper.SendNextTransactionWithAccount(
 			t.TestContext,
 			t.CLMock.NextBlockProducer,
 			&helper.BaseTransactionCreator{
 				Recipient: &destAddr,
-				GasFee:    nil,
-				GasTip:    nil,
 				// TODO: figure out why contract storage check fails on block 2 with Genesis.GasLimit()
-				GasLimit:   t.CLMock.Genesis.GasLimit(),
-				BlobGasFee: nil,
-				BlobCount:  nil,
+				GasLimit:   75000,
 				Amount:     common.Big1,
 				Payload:    nil,
-				AccessList: nil,
 				TxType:     t.TestTransactionType,
 				ForkConfig: t.ForkConfig,
 			},

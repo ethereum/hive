@@ -396,7 +396,9 @@ func (tc *BaseTransactionCreator) MakeTransaction(sender SenderAccount, nonce ui
 
 	tx := types.NewTx(newTxData)
 	key := sender.GetKey()
-	return types.SignTx(tx, types.NewCancunSigner(globals.ChainID), key)
+	// TODO: load chain ID from genesis
+	// TOOD: remove hardcode
+	return types.SignTx(tx, types.NewCancunSigner(big.NewInt(10202)), key)
 }
 
 // Create a contract filled with zeros without going over the specified GasLimit
