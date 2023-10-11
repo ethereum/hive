@@ -29,8 +29,10 @@ func (s NonZeroPreMergeFork) GetForkConfig() *config.ForkConfig {
 	if forkConfig == nil {
 		return nil
 	}
+	// Merge fork & pre-merge happen at block 1
 	forkConfig.LondonNumber = common.Big1
-	// All post merge forks must happen at the same time as the latest fork
+	forkConfig.ParisNumber = common.Big1
+	// Post-merge fork happens at block 2
 	mainFork := s.GetMainFork()
 	if mainFork == config.Cancun {
 		forkConfig.ShanghaiTimestamp = new(big.Int).Set(forkConfig.CancunTimestamp)

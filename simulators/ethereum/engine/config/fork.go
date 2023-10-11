@@ -10,6 +10,7 @@ type Fork string
 
 const (
 	NA       Fork = ""
+	London   Fork = "London"
 	Paris    Fork = "Paris"
 	Shanghai Fork = "Shanghai"
 	Cancun   Fork = "Cancun"
@@ -17,6 +18,8 @@ const (
 
 func (f Fork) PreviousFork() Fork {
 	switch f {
+	case Paris:
+		return London
 	case Shanghai:
 		return Paris
 	case Cancun:
@@ -28,6 +31,7 @@ func (f Fork) PreviousFork() Fork {
 
 type ForkConfig struct {
 	LondonNumber      *big.Int
+	ParisNumber       *big.Int
 	ShanghaiTimestamp *big.Int
 	CancunTimestamp   *big.Int
 }
