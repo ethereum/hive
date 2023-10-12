@@ -50,11 +50,10 @@ echo Starting Prysm Validator Client
     --verbosity="$LOG" \
     --accept-terms-of-use=true \
     --prater \
-    --beacon-rpc-provider="$HIVE_ETH2_BN_API_IP:${HIVE_ETH2_BN_GRPC_PORT:-3500}" \
-    --beacon-rpc-gateway-provider="$HIVE_ETH2_BN_API_IP:${HIVE_ETH2_BN_API_PORT:-4000}" \
+    --enable-beacon-rest-api=true \
+    --beacon-rest-api-provider="http://$HIVE_ETH2_BN_API_IP:${HIVE_ETH2_BN_API_PORT:-4000}" \
     --datadir="/data/vc" \
     --wallet-dir="/data/validators" \
     --wallet-password-file="/wallet.pass" \
     --chain-config-file="/hive/input/config.yaml" \
     $builder_option
-# NOTE: gRPC/RPC ports are inverted to allow the simulator to access the REST API
