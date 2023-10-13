@@ -240,6 +240,10 @@ func init() {
 	for _, invalidIndex := range []int{1, 9, 10} {
 		for _, emptyTxs := range []bool{false, true} {
 			Tests = append(Tests, InvalidMissingAncestorReOrgTest{
+				BaseSpec: test.BaseSpec{
+					SlotsToSafe:      big.NewInt(32),
+					SlotsToFinalized: big.NewInt(64),
+				},
 				SidechainLength:   10,
 				InvalidIndex:      invalidIndex,
 				InvalidField:      helper.InvalidStateRoot,
@@ -251,7 +255,8 @@ func init() {
 	// Invalid Ancestor Re-Org Tests (Reveal Via Sync)
 	spec := test.BaseSpec{
 		TimeoutSeconds:   60,
-		SlotsToFinalized: big.NewInt(20),
+		SlotsToSafe:      big.NewInt(32),
+		SlotsToFinalized: big.NewInt(64),
 	}
 	for _, invalidField := range []helper.InvalidPayloadBlockField{
 		helper.InvalidStateRoot,
