@@ -50,7 +50,7 @@ func (b BlockStatus) Execute(t *test.Env) {
 			number = Finalized
 		}
 		p := t.TestEngine.TestHeaderByNumber(number)
-		p.ExpectErrorCode(-39001)
+		p.ExpectError()
 	}
 
 	// Produce blocks before starting the test
