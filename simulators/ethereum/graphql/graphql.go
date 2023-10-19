@@ -81,7 +81,7 @@ func graphqlTest(t *hivesim.T, c *hivesim.Client) {
 		func() {
 			defer wg.Done()
 			for test := range testCh {
-				url := "https://github.com/ethereum/execution-apis/blob/master/tests/graphql"
+				url := "https://github.com/ethereum/execution-apis/blob/main/tests/graphql"
 				t.Run(hivesim.TestSpec{
 					Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
 					Description: fmt.Sprintf("Test case source: %s/%v.io", url, test.Name),
