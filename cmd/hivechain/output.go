@@ -115,7 +115,7 @@ func (g *generator) writeChain() error {
 	}
 	defer out.Close()
 	lastBlock := g.blockchain.CurrentBlock().Number.Uint64()
-	return exportN(g.blockchain, out, 0, lastBlock)
+	return exportN(g.blockchain, out, 1, lastBlock)
 }
 
 // writePoWChain writes pre-merge RLP blocks to a file.
@@ -130,7 +130,7 @@ func (g *generator) writePoWChain() error {
 	if !ok {
 		lastBlock = g.blockchain.CurrentBlock().Number.Uint64()
 	}
-	return exportN(g.blockchain, out, 0, lastBlock)
+	return exportN(g.blockchain, out, 1, lastBlock)
 }
 
 func (g *generator) mergeBlock() (uint64, bool) {
