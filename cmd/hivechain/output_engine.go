@@ -11,7 +11,7 @@ import (
 // writeEngineNewPayload writes engine API newPayload requests for the chain.
 // Note this only works for post-merge blocks.
 func (g *generator) writeEngineNewPayload() error {
-	var list []*rpcRequest
+	list := make([]*rpcRequest, 0)
 	start, ok := g.mergeBlock()
 	if ok {
 		last := g.blockchain.CurrentBlock().Number.Uint64()
@@ -26,7 +26,7 @@ func (g *generator) writeEngineNewPayload() error {
 // writeEngineFcU writes engine API forkchoiceUpdated requests for the chain.
 // Note this only works for post-merge blocks.
 func (g *generator) writeEngineFcU() error {
-	var list []*rpcRequest
+	list := make([]*rpcRequest, 0)
 	start, ok := g.mergeBlock()
 	if ok {
 		last := g.blockchain.CurrentBlock().Number.Uint64()
