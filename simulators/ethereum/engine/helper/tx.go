@@ -258,6 +258,8 @@ type TransactionCreator interface {
 	MakeTransaction(sender SenderAccount, nonce uint64, blockTimestamp uint64) (typ.Transaction, error)
 }
 
+const BLOBS_PER_SENDER_ACCOUNT = 10000
+
 type BaseTransactionCreator struct {
 	Recipient  *common.Address
 	GasFee     *big.Int
@@ -371,7 +373,8 @@ func (tc *BaseTransactionCreator) MakeTransaction(sender SenderAccount, nonce ui
 		}
 
 		// Need tx wrap data that will pass blob verification
-		hashes, blobData, err := BlobDataGenerator(BlobID(nonce), blobCount)
+		blobID := BlobID((nonce * cancun.MAX_BLOBS_PER_BLOCK) + (sender.GetIndex() * BLOBS_PER_SENDER_ACCOUNT))
+		hashes, blobData, err := BlobDataGenerator(blobID, blobCount)
 		if err != nil {
 			return nil, err
 		}
