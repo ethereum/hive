@@ -67,12 +67,30 @@ jobs:
       - run:
           name: "Compile Go simulators"
           command: ".circleci/compile-simulators.sh"
-
+  # this makes sure the rust code is good
+  rust-simulators:
+    docker:
+      - image: cimg/rust:1.71.1
+    steps:
+      - checkout
+      - run:
+          name: Install rustfmt
+          command: rustup component add rustfmt
+      - run:
+          name: Install Clippy
+          command: rustup component add clippy
+      - run:
+          name: Install Clang
+          command: sudo apt update && sudo apt-get install clang -y
+      - run:
+          name: "Lint, build, test Rust simulators"
+          command: ".circleci/rust-simulators.sh"
 workflows:
   main:
     jobs:
       - go-test
       - build
+      - rust-simulators
       - smoke-tests:
           requires: ["build"]
       - smoke-tests-remote-docker:

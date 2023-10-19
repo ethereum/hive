@@ -3,3 +3,7 @@ workspace
 .idea/
 # build output
 /hive
+
+# build output for portal/lock files
+simulators/portal/*/Cargo.lock
+simulators/portal/*/target
