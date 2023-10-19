@@ -25,9 +25,11 @@ func (s InvalidPayloadAttributesTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (tc InvalidPayloadAttributesTest) GetName() string {
-	name := fmt.Sprintf("Invalid PayloadAttributes: %s", tc.Description)
+	name := fmt.Sprintf("Invalid PayloadAttributes, %s,", tc.Description)
 	if tc.Syncing {
-		name += " (Syncing)"
+		name += " Syncing=True"
+	} else {
+		name += " Syncing=False"
 	}
 	return name
 }

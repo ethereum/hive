@@ -26,7 +26,7 @@ func (s SuggestedFeeRecipientTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (t SuggestedFeeRecipientTest) GetName() string {
-	return fmt.Sprintf("Suggested Fee Recipient Test (%s)", t.TestTransactionType)
+	return fmt.Sprintf("Suggested Fee Recipient Test, %s", t.TestTransactionType)
 }
 
 func (tc SuggestedFeeRecipientTest) Execute(t *test.Env) {

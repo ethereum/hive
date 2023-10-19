@@ -36,7 +36,7 @@ func (s UniquePayloadIDTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (tc UniquePayloadIDTest) GetName() string {
-	return fmt.Sprintf("Unique Payload ID - %s", tc.FieldModification)
+	return fmt.Sprintf("Unique Payload ID, %s", tc.FieldModification)
 }
 
 // Check that the payload id returned on a forkchoiceUpdated call is different

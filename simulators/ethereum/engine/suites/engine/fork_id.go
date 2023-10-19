@@ -2,6 +2,7 @@ package suite_engine
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
@@ -22,14 +23,15 @@ func (s ForkIDSpec) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (ft ForkIDSpec) GetName() string {
-	name := fmt.Sprintf("Fork ID: Genesis at %d, %s at %d", ft.GetGenesisTimestamp(), ft.MainFork, ft.ForkTime)
+	var name []string
+	name = append(name, fmt.Sprintf("Fork ID: Genesis=%d, %s=%d", ft.GetGenesisTimestamp(), ft.MainFork, ft.ForkTime))
 	if ft.PreviousForkTime != 0 {
-		name += fmt.Sprintf(", %s at %d", ft.MainFork.PreviousFork(), ft.PreviousForkTime)
+		name = append(name, fmt.Sprintf("%s=%d", ft.MainFork.PreviousFork(), ft.PreviousForkTime))
 	}
 	if ft.ProduceBlocksBeforePeering > 0 {
-		name += fmt.Sprintf(", Produce %d blocks before peering", ft.ProduceBlocksBeforePeering)
+		name = append(name, fmt.Sprintf("BlocksBeforePeering=%d", ft.ProduceBlocksBeforePeering))
 	}
-	return name
+	return strings.Join(name, ", ")
 }
 
 func (ft ForkIDSpec) Execute(t *test.Env) {

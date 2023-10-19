@@ -222,9 +222,11 @@ func (s MultiplePayloadsExtendingCanonicalChainTest) WithMainFork(fork config.Fo
 }
 
 func (s MultiplePayloadsExtendingCanonicalChainTest) GetName() string {
-	name := "Multiple New Payloads Extending Canonical Chain"
+	name := "Multiple New Payloads Extending Canonical Chain,"
 	if s.SetHeadToFirstPayloadReceived {
-		name += " (FcU to first payload received)"
+		name += " Set Head to First Payload Received"
+	} else {
+		name += " Wait for Canonical Payload"
 	}
 	return name
 }
