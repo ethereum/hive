@@ -1,0 +1,36 @@
+;;; -*- mode: asm -*-
+;;; This contract returns EVM environment data.
+
+#define %store {                ; [value, ptr]
+    dup2                        ; [ptr, value, ptr]
+    mstore                      ; [ptr]
+    push 32                     ; [32, ptr]
+    add                         ; [newptr]
+}
+
+.start:
+    push 0                      ; [ptr]
+
+    number                      ; [v, ptr]
+    %store                      ; [ptr]
+
+    chainid                     ; [v, ptr]
+    %store                      ; [ptr]
+
+    coinbase                    ; [v, ptr]
+    %store                      ; [ptr]
+
+    basefee                     ; [v, ptr]
+    %store                      ; [ptr]
+
+    difficulty                  ; [v, ptr]
+    %store                      ; [ptr]
+
+    origin                      ; [v, ptr]
+    %store                      ; [ptr]
+
+    callvalue                   ; [v, ptr]
+    %store                      ; [ptr]
+
+    push 0                      ; [offset, ptr]
+    return                      ; []

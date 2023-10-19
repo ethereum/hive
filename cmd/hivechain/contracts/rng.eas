@@ -1,0 +1,32 @@
+;;; -*- mode: asm -*-
+;;; deterministic random data generator using block number.
+;;; all macros take the memory location of an rng state as argument.
+
+#define RngSize 64
+
+;; initialize random generator
+#define %RngInit(ptr) {         ; []
+    number                      ; [number]
+    push $ptr                   ; [offset, number]
+    mstore                      ; []
+    push 0                      ; [value]
+    push $ptr+32                ; [offset, value]
+    mstore                      ; []
+}
+
+;;; creates random data based on block number
+#define %Rng(ptr) {             ; []
+    ;; compute
+    push RngSize                ; [size]
+    push $ptr                   ; [offset, size]
+    keccak256                   ; [hash]
+
+    ;; increment the counter
+    push $ptr+32                ; [offset, hash]
+    dup1                        ; [offset, offset, hash]
+    mload                       ; [counter, offset, hash]
+    push 1                      ; [1, counter, offset, hash]
+    add                         ; [counter+1, offset, hash]
+    swap1                       ; [offset, counter+1, hash]
+    mstore                      ; [hash]
+}
