@@ -890,8 +890,8 @@ func (step DevP2PRequestPooledTransactionHash) Execute(t *CancunTestContext) err
 
 	// Send the request for the pooled transactions
 	getTxReq := &devp2p.GetPooledTransactions{
-		RequestId:                   1234,
-		GetPooledTransactionsPacket: txHashes,
+		RequestId:                    1234,
+		GetPooledTransactionsRequest: txHashes,
 	}
 	if size, err := conn.Write(getTxReq); err != nil {
 		return errors.Wrap(err, "could not write to conn")

@@ -23,7 +23,7 @@
   dockerfile: git
   build_args:
       github: lightclient/go-ethereum
-      tag: devnet-9
+      tag: devnet-10
 
 - client: nethermind
   nametag: cancun-git

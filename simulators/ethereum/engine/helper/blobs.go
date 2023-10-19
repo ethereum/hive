@@ -3,7 +3,9 @@ package helper
 import (
 	"bytes"
 	"crypto/sha256"
+	"embed"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"sync"
@@ -21,12 +23,23 @@ import (
 var gCryptoCtx gokzg4844.Context
 var initCryptoCtx sync.Once
 
+//go:embed trusted_setup.json
+var content embed.FS
+
 // InitializeCryptoCtx initializes the global context object returned via CryptoCtx
 func InitializeCryptoCtx() {
 	initCryptoCtx.Do(func() {
 		// Initialize context to match the configurations that the
 		// specs are using.
-		ctx, err := gokzg4844.NewContext4096Insecure1337()
+		config, err := content.ReadFile("trusted_setup.json")
+		if err != nil {
+			panic(err)
+		}
+		params := new(gokzg4844.JSONTrustedSetup)
+		if err = json.Unmarshal(config, params); err != nil {
+			panic(err)
+		}
+		ctx, err := gokzg4844.NewContext4096(params)
 		if err != nil {
 			panic(fmt.Sprintf("could not create context, err : %v", err))
 		}
