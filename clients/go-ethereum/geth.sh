@@ -169,5 +169,7 @@ fi
 
 # Run the go-ethereum implementation with the requested flags.
 FLAGS="$FLAGS --nat=none"
+# Disable disk space free monitor
+FLAGS="$FLAGS --datadir.minfreedisk=0"
 echo "Running go-ethereum with flags $FLAGS"
 $geth $FLAGS
