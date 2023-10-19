@@ -31,16 +31,17 @@ import (
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-const usage = "Usage: hivechain generate|print|print-genesis|trim [ options ] ..."
-
 func main() {
 	// Initialize go-ethereum logging.
 	// This is mostly for displaying the DAG generator progress.
 	handler := ethlog.StreamHandler(os.Stderr, ethlog.TerminalFormat(false))
 	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlWarn, handler))
 
+	flag.Usage = usage
+
 	if len(os.Args) < 2 {
-		fatalf(usage)
+		flag.Usage()
+		os.Exit(1)
 	}
 	switch os.Args[1] {
 	case "generate":
@@ -48,7 +49,8 @@ func main() {
 	case "print":
 		printCommand(os.Args[2:])
 	default:
-		fatalf(usage)
+		flag.Usage()
+		os.Exit(1)
 	}
 }
 
@@ -68,6 +70,9 @@ func generateCommand(args []string) {
 	flag.CommandLine.Parse(args)
 
 	if *outlist != "" {
+		if *outlist == "all" {
+			cfg.outputs = outputFunctionNames()
+		}
 		cfg.outputs = splitAndTrim(*outlist)
 	}
 
@@ -78,6 +83,17 @@ func generateCommand(args []string) {
 	g := newGenerator(cfg)
 	if err := g.run(); err != nil {
 		fatal(err)
+	}
+}
+
+func usage() {
+	o := flag.CommandLine.Output()
+	fmt.Fprintln(o, "Usage: hivechain generate|print [options...]")
+	flag.PrintDefaults()
+	fmt.Fprintln(o, "")
+	fmt.Fprintln(o, "List of available -output functions:")
+	for _, name := range outputFunctionNames() {
+		fmt.Fprintln(o, "  ", name)
 	}
 }
 

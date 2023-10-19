@@ -6,47 +6,51 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/state"
+	"golang.org/x/exp/maps"
 )
+
+var outputFunctions = map[string]func(*generator) error{
+	"genesis":    (*generator).writeGenesis,
+	"chain":      (*generator).writeChain,
+	"powchain":   (*generator).writePoWChain,
+	"headstate":  (*generator).writeState,
+	"headblock":  (*generator).writeHeadBlock,
+	"accounts":   (*generator).writeAccounts,
+	"txinfo":     (*generator).writeTxInfo,
+	"headfcu":    (*generator).writeEngineHeadFcU,
+	"fcu":        (*generator).writeEngineFcU,
+	"newpayload": (*generator).writeEngineNewPayload,
+}
+
+func outputFunctionNames() []string {
+	names := maps.Keys(outputFunctions)
+	sort.Strings(names)
+	return names
+}
 
 // write creates the generator output files.
 func (g *generator) write() error {
-	var wf []func() error
+	var wf []func(*generator) error
 	for _, name := range g.cfg.outputs {
 		fmt.Println("writing", name)
-		f := g.writerFunc(name)
+		f := outputFunctions[name]
 		if f == nil {
 			return fmt.Errorf("unknown output %q", name)
 		}
 		wf = append(wf, f)
 	}
 	for _, f := range wf {
-		if err := f(); err != nil {
+		if err := f(g); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// writerFunc returns a named output function.
-func (g *generator) writerFunc(name string) func() error {
-	fm := map[string]func() error{
-		"genesis":    g.writeGenesis,
-		"chain":      g.writeChain,
-		"powchain":   g.writePoWChain,
-		"headstate":  g.writeState,
-		"headblock":  g.writeHeadBlock,
-		"accounts":   g.writeAccounts,
-		"txinfo":     g.writeTxInfo,
-		"headfcu":    g.writeEngineHeadFcU,
-		"fcu":        g.writeEngineFcU,
-		"newpayload": g.writeEngineNewPayload,
-	}
-	return fm[name]
 }
 
 func (g *generator) openOutputFile(file string) (*os.File, error) {

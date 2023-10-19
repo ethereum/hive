@@ -24,10 +24,9 @@ type generatorConfig struct {
 	lastFork     string // last enabled fork
 
 	// chain options
-	modifiers   []string // enabled generators
-	txInterval  int      // frequency of blocks containing transactions
-	txCount     int      // number of txs in block
-	chainLength int      // number of generated blocks
+	txInterval  int // frequency of blocks containing transactions
+	txCount     int // number of txs in block
+	chainLength int // number of generated blocks
 
 	// output options
 	outputs   []string // enabled outputs
