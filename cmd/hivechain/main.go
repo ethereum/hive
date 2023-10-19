@@ -91,7 +91,7 @@ func usage() {
 	fmt.Fprintln(o, "Usage: hivechain generate|print [options...]")
 	flag.PrintDefaults()
 	fmt.Fprintln(o, "")
-	fmt.Fprintln(o, "List of available -output functions:")
+	fmt.Fprintln(o, "List of available -outputs:")
 	for _, name := range outputFunctionNames() {
 		fmt.Fprintln(o, "  ", name)
 	}
