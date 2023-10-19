@@ -1,0 +1,17 @@
+;;; -*- mode: asm -*-
+;;; creates storage slots until less than 25k gas remaining.
+
+#define minGas 25000
+
+    number                      ; [block]
+genstorage:
+    dup1                        ; [block, block]
+    dup1                        ; [block, block, block]
+    sstore                      ; [block]
+    push 1                      ; [1, block]
+    add                         ; [block+1]
+    ;; enough gas left? loop!
+    gas                         ; [gas], block+1]
+    push minGas                 ; [limit, gas, block+1]
+    lt                          ; [limit<gas, block+1]
+    jumpi @genstorage           ; [block+1]
