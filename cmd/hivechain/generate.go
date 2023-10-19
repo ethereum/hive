@@ -79,7 +79,7 @@ func newGenerator(cfg generatorConfig) *generator {
 		genesis:  genesis,
 		td:       new(big.Int).Set(genesis.Difficulty),
 		modlist:  cfg.createBlockModifiers(),
-		accounts: knownAccountsList(),
+		accounts: slices.Clone(knownAccounts),
 	}
 }
 
@@ -94,16 +94,6 @@ func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 		return strings.Compare(a.name, b.name)
 	})
 	return list
-}
-
-func knownAccountsList() (l []genAccount) {
-	for addr, key := range knownAccounts {
-		l = append(l, genAccount{addr, key})
-	}
-	slices.SortFunc(l, func(a, b genAccount) int {
-		return a.addr.Cmp(b.addr)
-	})
-	return l
 }
 
 // run produces a chain.

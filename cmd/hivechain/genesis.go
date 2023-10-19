@@ -1,19 +1,14 @@
 package main
 
 import (
-	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"strings"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/exp/slices"
 )
-
-var knownAccounts = make(map[common.Address]*ecdsa.PrivateKey)
 
 var initialBalance, _ = new(big.Int).SetString("1000000000000000000000000000000000000", 10)
 
@@ -22,18 +17,6 @@ const (
 	genesisBaseFee          = params.InitialBaseFee
 	blocktimeSec            = 10 // hard-coded in core.GenerateChain
 )
-
-func init() {
-	addr1 := common.HexToAddress("0x71562b71999873DB5b286dF957af199Ec94617F7")
-	addr2 := common.HexToAddress("0x703c4b2bD70c169f5717101CaeE543299Fc946C7")
-	addr3 := common.HexToAddress("0x0D3ab14BBaD3D99F4203bd7a11aCB94882050E7e")
-	key1, _ := crypto.HexToECDSA("b71c71a67e1177ad4e901695e1b4b9ee17ae16c6668d313eac2f96dbcda3f291")
-	key2, _ := crypto.HexToECDSA("8a1f9a8f95be41cd7ccb6168179afb4504aefe388d1e14474d32c45c72ce7b7a")
-	key3, _ := crypto.HexToECDSA("49a7b37aa6f6645917e7b807e9d1c00d4fa71f18343b0d4122a4d2df64dd6fee")
-	knownAccounts[addr1] = key1
-	knownAccounts[addr2] = key2
-	knownAccounts[addr3] = key3
-}
 
 // Ethereum mainnet forks in order of introduction.
 var (
@@ -143,8 +126,8 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	// Initialize allocation.
 	// Here we add balance to the known accounts.
 	g.Alloc = make(core.GenesisAlloc)
-	for acc := range knownAccounts {
-		g.Alloc[acc] = core.GenesisAccount{Balance: initialBalance}
+	for _, acc := range knownAccounts {
+		g.Alloc[acc.addr] = core.GenesisAccount{Balance: initialBalance}
 	}
 
 	// Also deploy the beacon chain deposit contract.
