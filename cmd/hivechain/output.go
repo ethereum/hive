@@ -79,9 +79,14 @@ func (g *generator) writeGenesis() error {
 
 // writeAccounts writes the account keys file.
 func (g *generator) writeAccounts() error {
-	m := make(map[common.Address]string, len(g.accounts))
+	type accountObj struct {
+		Key string `json:"key"`
+	}
+	m := make(map[common.Address]*accountObj, len(g.accounts))
 	for _, a := range g.accounts {
-		m[a.addr] = hexutil.Encode(a.key.D.Bytes())
+		m[a.addr] = &accountObj{
+			Key: hexutil.Encode(a.key.D.Bytes()),
+		}
 	}
 	return g.writeJSON("accounts.json", &m)
 }
