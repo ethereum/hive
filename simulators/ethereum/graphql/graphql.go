@@ -152,6 +152,10 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 	var (
 		client = &http.Client{
 			Timeout: 5 * time.Second,
+			Transport: &loggingRoundTrip{
+				t:     t,
+				inner: http.DefaultTransport,
+			},
 		}
 		url  = fmt.Sprintf("http://%s:8545/graphql", c.IP.String())
 		err  error
@@ -249,4 +253,39 @@ func sendHTTP(c *http.Client, url string, query string) (int, []byte, error) {
 	}
 	resp.Body.Close()
 	return resp.StatusCode, body, nil
+}
+
+// loggingRoundTrip writes requests and responses to the test log.
+type loggingRoundTrip struct {
+	t     *hivesim.T
+	inner http.RoundTripper
+}
+
+func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
+	// Read and log the request body.
+	reqBytes, err := io.ReadAll(req.Body)
+	req.Body.Close()
+	if err != nil {
+		return nil, err
+	}
+	rt.t.Logf(">>  %s", bytes.TrimSpace(reqBytes))
+	reqCopy := *req
+	reqCopy.Body = io.NopCloser(bytes.NewReader(reqBytes))
+
+	// Do the round trip.
+	resp, err := rt.inner.RoundTrip(&reqCopy)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// Read and log the response bytes.
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	respCopy := *resp
+	respCopy.Body = io.NopCloser(bytes.NewReader(respBytes))
+	rt.t.Logf("<<  %s", bytes.TrimSpace(respBytes))
+	return &respCopy, nil
 }
