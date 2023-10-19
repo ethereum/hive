@@ -30,7 +30,7 @@ type Runner struct {
 
 	// This holds the image names of all built simulators.
 	simImages  map[string]string
-	clientDefs map[string]*ClientDefinition
+	clientDefs []*ClientDefinition
 }
 
 func NewRunner(inv Inventory, b Builder, cb ContainerBackend) *Runner {
@@ -58,11 +58,11 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 		return errors.New("client list is empty, cannot simulate")
 	}
 
-	r.clientDefs = make(map[string]*ClientDefinition, len(clientList))
+	r.clientDefs = make([]*ClientDefinition, len(clientList))
 
 	var anyBuilt bool
 	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
-	for _, client := range clientList {
+	for i, client := range clientList {
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
 			continue
@@ -72,7 +72,7 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 		if err != nil {
 			log15.Warn("can't read version info of "+client.Client, "image", image, "err", err)
 		}
-		r.clientDefs[client.Name()] = &ClientDefinition{
+		r.clientDefs[i] = &ClientDefinition{
 			Name:    client.Name(),
 			Version: strings.TrimSpace(string(version)),
 			Image:   image,
@@ -117,8 +117,11 @@ func (r *Runner) RunDevMode(ctx context.Context, env SimEnv, endpoint string) er
 	if err := createWorkspace(env.LogDir); err != nil {
 		return err
 	}
-
-	tm := NewTestManager(env, r.container, r.clientDefs)
+	clientDefs := make([]*ClientDefinition, 0)
+	for _, def := range r.clientDefs {
+		clientDefs = append(clientDefs, def)
+	}
+	tm := NewTestManager(env, r.container, clientDefs)
 	defer func() {
 		if err := tm.Terminate(); err != nil {
 			log15.Error("could not terminate test manager", "error", err)
@@ -159,19 +162,23 @@ HIVE_SIMULATOR=http://%v
 func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, error) {
 	log15.Info(fmt.Sprintf("running simulation: %s", sim))
 
-	clientDefs := make(map[string]*ClientDefinition)
+	clientDefs := make([]*ClientDefinition, 0)
 	if env.ClientList == nil {
 		// Unspecified, make all clients available.
-		for name, def := range r.clientDefs {
-			clientDefs[name] = def
-		}
+		clientDefs = append(clientDefs, r.clientDefs...)
 	} else {
 		for _, client := range env.ClientList {
-			def, ok := r.clientDefs[client.Client]
-			if !ok {
+			found := false
+			for _, def := range r.clientDefs {
+				if def.Name == client.Client {
+					clientDefs = append(clientDefs, def)
+					found = true
+					break
+				}
+			}
+			if !found {
 				return SimResult{}, fmt.Errorf("unknown client %q in simulation client list", client.Client)
 			}
-			clientDefs[client.Client] = def
 		}
 	}
 

@@ -400,9 +400,9 @@ func TestStartClientInitialNetworks(t *testing.T) {
 }
 
 func newFakeAPI(hooks *fakes.BackendHooks) (*libhive.TestManager, *httptest.Server) {
-	defs := map[string]*libhive.ClientDefinition{
-		"client-1": {Name: "client-1", Image: "/ignored/in/api", Version: "client-1-version", Meta: libhive.ClientMetadata{Roles: []string{"eth1"}}},
-		"client-2": {Name: "client-2", Image: "/not/exposed/", Version: "client-2-version", Meta: libhive.ClientMetadata{Roles: []string{"beacon"}}},
+	defs := []*libhive.ClientDefinition{
+		{Name: "client-1", Image: "/ignored/in/api", Version: "client-1-version", Meta: libhive.ClientMetadata{Roles: []string{"eth1"}}},
+		{Name: "client-2", Image: "/not/exposed/", Version: "client-2-version", Meta: libhive.ClientMetadata{Roles: []string{"beacon"}}},
 	}
 	env := libhive.SimEnv{}
 	backend := fakes.NewContainerBackend(hooks)
