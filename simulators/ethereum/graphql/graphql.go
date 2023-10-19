@@ -3,16 +3,21 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"path"
-	"reflect"
+	"path/filepath"
+	"regexp"
 	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/ethereum/hive/hivesim"
+	diff "github.com/yudai/gojsondiff"
+	"github.com/yudai/gojsondiff/formatter"
 )
 
 func main() {
@@ -66,18 +71,25 @@ func graphqlTest(t *hivesim.T, c *hivesim.Client) {
 		}
 	}
 
+	_, testPattern := t.Sim.TestPattern()
+	re := regexp.MustCompile(testPattern)
+
 	var wg sync.WaitGroup
-	testCh := deliverTests(t, &wg, -1)
+	testCh := deliverTests(t, "tests", &wg, re)
 	for i := 0; i < parallelism; i++ {
 		wg.Add(1)
-		go func() {
+		func() {
 			defer wg.Done()
 			for test := range testCh {
 				url := "https://github.com/ethereum/execution-apis/blob/master/tests/graphql"
 				t.Run(hivesim.TestSpec{
-					Name:        fmt.Sprintf("%s (%s)", test.name, c.Type),
-					Description: fmt.Sprintf("Test case source: %s/%v.json", url, test.name),
-					Run:         func(t *hivesim.T) { test.run(t, c) },
+					Name:        fmt.Sprintf("%s (%s)", test.Name, c.Type),
+					Description: fmt.Sprintf("Test case source: %s/%v.io", url, test.Name),
+					Run: func(t *hivesim.T) {
+						if err := runTest(t, c, test.Data); err != nil {
+							t.Fatalf("failed in test: %s, error: %v\n", test.Name, err)
+						}
+					},
 				})
 			}
 		}()
@@ -85,150 +97,157 @@ func graphqlTest(t *hivesim.T, c *hivesim.Client) {
 	wg.Wait()
 }
 
-// deliverTests reads the test case files, sending them to the output channel.
-func deliverTests(t *hivesim.T, wg *sync.WaitGroup, limit int) <-chan *testCase {
-	out := make(chan *testCase)
-	root := "tests"
-	files, err := os.ReadDir(root)
-	if err != nil {
-		t.Fatalf("Warning: can't read test directory %s: %v", root, err)
-	}
+type test struct {
+	Name string
+	Data []byte
+}
 
-	var i = 0
+// deliverTests reads the test case files, sending them to the output channel.
+func deliverTests(t *hivesim.T, root string, wg *sync.WaitGroup, re *regexp.Regexp) <-chan *test {
+	out := make(chan *test)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 
-		for _, file := range files {
-			if limit >= 0 && i >= limit {
-				return
-			}
-			if !file.IsDir() {
-				continue
-			}
-			var (
-				requestFile  = path.Join(root, file.Name(), "request.gql")
-				responseFile = path.Join(root, file.Name(), "response.json")
-			)
-
-			request, err := os.ReadFile(requestFile)
+		filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				t.Logf("Warning: can't read test file %s: %v", requestFile, err)
-				continue
+				t.Logf("unable to walk path: %s", err)
+				return err
 			}
-
-			response, err := os.ReadFile(responseFile)
+			if info.IsDir() {
+				return nil
+			}
+			if fname := info.Name(); !strings.HasSuffix(fname, ".io") {
+				return nil
+			}
+			pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".io")
+			if !re.MatchString(pathname) {
+				t.Log("skip", pathname)
+				return nil // skip
+			}
+			data, err := os.ReadFile(path)
 			if err != nil {
-				t.Logf("Warning: can't read test file %s: %v", responseFile, err)
-				continue
+				return err
 			}
-
-			var gqlTest graphQLTest
-			if err = json.Unmarshal(response, &gqlTest); err != nil {
-				t.Logf("Warning: can't unmarshal test file %s: %v", responseFile, err)
-				continue
-			}
-			gqlTest.Request = string(request)
-			i = i + 1
-			t := testCase{
-				name:    file.Name(),
-				gqlTest: &gqlTest,
-			}
-			out <- &t
-		}
+			name := strings.TrimLeft(strings.TrimLeft(pathname, root), "/")
+			out <- &test{Name: name, Data: data}
+			return nil
+		})
 
 		close(out)
 	}()
 	return out
 }
 
-type testCase struct {
-	name    string
-	gqlTest *graphQLTest
-}
-
-// graphQLTest is the JSON object structure of a test case file.
-type graphQLTest struct {
-	Request    string        `json:"request"`
-	Responses  []interface{} `json:"responses"`
-	StatusCode int           `json:"statusCode"`
-}
-
 type qlQuery struct {
 	Query string `json:"query"`
 }
 
-// prepareRunTest administers the hive-specific test stuff, registering the suite and reporting back the suite results
-func (tc *testCase) run(t *hivesim.T, c *hivesim.Client) {
-	// Example of working queries:
-	// curl 'http://127.0.0.1:8545/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n"}'
-	// curl 'http://127.0.0.1:8545/graphql' --data-binary '{"query":"query blockNumber {\n  block {\n    number\n  }\n}\n","variables":null,"operationName":"blockNumber"}'
-	postData, err := json.Marshal(qlQuery{Query: tc.gqlTest.Request})
-	if err != nil {
-		t.Fatal("can't marshal query:", err)
-	}
-	url := fmt.Sprintf("http://%v:8545/graphql", c.IP)
-	resp, err := http.Post(url, "application/json", bytes.NewReader(postData))
-	if err != nil {
-		t.Fatal("HTTP post failed:", err)
-	}
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		t.Fatal("can't read HTTP response:", err)
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode != tc.gqlTest.StatusCode {
-		t.Errorf("HTTP response code is %d, want %d \n response body: %s", resp.StatusCode, tc.gqlTest.StatusCode, string(respBytes))
-	}
-	if resp.StatusCode != 200 {
-		// Test expects HTTP error, and the client sent one, test done.
-		// We don't bother to check the exact error messages, those aren't fully specified.
-		return
-	}
-
-	tc.responseMatch(t, resp.Status, respBytes)
+type qlResponse struct {
+	Errors *[]interface{} `json:"errors,omitempty"`
+	Data   *interface{}   `json:"data,omitempty"`
 }
 
-func (tc *testCase) responseMatch(t *hivesim.T, respStatus string, respBytes []byte) error {
-	// Check that the response matches.
-	var got interface{}
-	if err := json.Unmarshal(respBytes, &got); err != nil {
-		t.Fatal("can't decode response:", err)
-	}
-	// return if a response matches. If not, error out.
-	for _, response := range tc.gqlTest.Responses {
-		if reflect.DeepEqual(response, got) {
-			return nil
+func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
+	var (
+		client = &http.Client{
+			Timeout: 5 * time.Second,
+		}
+		url  = fmt.Sprintf("http://%s:8545/graphql", c.IP.String())
+		err  error
+		code int
+		resp []byte
+	)
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		switch {
+		case len(line) == 0 || strings.HasPrefix(line, "//"):
+			// Skip comments, blank lines.
+			continue
+		case strings.HasPrefix(line, ">> "):
+			// Send request.
+			code, resp, err = sendHTTP(client, url, line[3:])
+			if err != nil {
+				return err
+			}
+		case strings.HasPrefix(line, "<< "):
+			// Read response. Unmarshal to interface{} to verify deep equality. Marshal
+			// again to remove padding differences and to print each field in the same
+			// order. This makes it easy to spot any discrepancies.
+			if resp == nil {
+				// t.Error("invalid test, response before request")
+				return errors.New("invalid test, response before request")
+			}
+
+			var have qlResponse
+			if err := json.Unmarshal(resp, &have); err != nil {
+				t.Fatal("can't decode response:", err)
+			}
+
+			// Check error with StatusCode only
+			if have.Errors != nil {
+				if code != 400 {
+					return fmt.Errorf("invalid test stateCode, want 400, have %d", code)
+				}
+			} else {
+				if code != 200 {
+					return fmt.Errorf("invalid test stateCode, want 200, have %d", code)
+				}
+				want := []byte(strings.TrimSpace(line)[3:]) // trim leading "<< "
+
+				// Now compare the response body.
+				d, err := diff.New().Compare(resp, want)
+				if err != nil {
+					return fmt.Errorf("failed to unmarshal value: %s\n", err)
+				}
+				// If there is a discrepancy, return error.
+				if d.Modified() {
+					var got map[string]interface{}
+					json.Unmarshal(resp, &got)
+					config := formatter.AsciiFormatterConfig{
+						ShowArrayIndex: true,
+						Coloring:       false,
+					}
+					formatter := formatter.NewAsciiFormatter(got, config)
+					diffString, _ := formatter.Format(d)
+					return fmt.Errorf("response differs from expected:\n%s", diffString)
+				}
+			}
+			resp = nil
+		default:
+			t.Fatalf("invalid line in test script: %s", line)
 		}
 	}
-
-	prettyQuery, ok := reindentJSON(tc.gqlTest.Request)
-	prettyResponse, _ := json.MarshalIndent(got, "", "  ")
-
-	t.Log("Test failed.")
-	t.Log("HTTP response code:", respStatus)
-	if ok {
-		t.Log("query:", prettyQuery)
+	if resp != nil {
+		t.Fatalf("unhandled response in test case")
 	}
-	t.Log("expected value(s):")
-
-	for _, expected := range tc.gqlTest.Responses {
-		prettyExpected, _ := json.MarshalIndent(expected, "", "  ")
-		t.Log(string(prettyExpected), "\n_____________________\n")
-	}
-
-	t.Log("got:", string(prettyResponse))
-	t.Fail()
-
-	return fmt.Errorf("test failed")
+	return nil
 }
 
-func reindentJSON(text string) (string, bool) {
-	var obj interface{}
-	if json.Unmarshal([]byte(text), &obj) != nil {
-		return "", false
+// sendHttp sends an HTTP GraphQL POST with the provided data and reads the
+// response into a byte slice and returns it.
+// Example of working queries:
+// curl 'http://127.0.0.1:8545/graphql' --data-binary '{"query":"query blockNumber {block {number}}"}'
+// curl 'http://127.0.0.1:8545/graphql' --data-binary '{"query":"query blockNumber {block {number}}","variables":null,"operationName":"blockNumber"}'
+func sendHTTP(c *http.Client, url string, query string) (int, []byte, error) {
+	data, err := json.Marshal(qlQuery{Query: query})
+	if err != nil {
+		return 0, nil, err
 	}
-	indented, _ := json.MarshalIndent(&obj, "", "  ")
-	return string(indented), true
+	req, err := http.NewRequest("POST", url, bytes.NewReader(data))
+	if err != nil {
+		return 0, nil, fmt.Errorf("error building request: %v", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.Do(req)
+	if err != nil {
+		return 0, nil, fmt.Errorf("write error: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return 0, nil, fmt.Errorf("read error: %v", err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode, body, nil
 }
