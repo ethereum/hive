@@ -176,7 +176,6 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 			// again to remove padding differences and to print each field in the same
 			// order. This makes it easy to spot any discrepancies.
 			if resp == nil {
-				// t.Error("invalid test, response before request")
 				return errors.New("invalid test, response before request")
 			}
 
@@ -211,7 +210,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 					}
 					formatter := formatter.NewAsciiFormatter(got, config)
 					diffString, _ := formatter.Format(d)
-					return fmt.Errorf("response differs from expected:\n%s", diffString)
+					return fmt.Errorf("response differs from expected(-/have +/want):\n%s", diffString)
 				}
 			}
 			resp = nil
@@ -228,8 +227,8 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 // sendHttp sends an HTTP GraphQL POST with the provided data and reads the
 // response into a byte slice and returns it.
 // Example of working queries:
-// curl 'http://127.0.0.1:8545/graphql' --data-binary '{"query":"query blockNumber {block {number}}"}'
-// curl 'http://127.0.0.1:8545/graphql' --data-binary '{"query":"query blockNumber {block {number}}","variables":null,"operationName":"blockNumber"}'
+// curl 'http://127.0.0.1:8545/graphql' -H 'Content-Type: application/json' -d '{"query":"query blockNumber {block {number}}"}'
+// curl 'http://127.0.0.1:8545/graphql' -H 'Content-Type: application/json' -d '{"query":"query blockNumber {block {number}}","variables":null,"operationName":"blockNumber"}'
 func sendHTTP(c *http.Client, url string, query string) (int, []byte, error) {
 	data, err := json.Marshal(qlQuery{Query: query})
 	if err != nil {
