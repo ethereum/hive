@@ -64,6 +64,7 @@ func generateCommand(args []string) {
 	flag.IntVar(&cfg.txCount, "tx-count", 1, "Maximum number of txs per block")
 	flag.IntVar(&cfg.forkInterval, "fork-interval", 0, "Number of blocks between fork activations")
 	flag.StringVar(&cfg.outputDir, "outdir", ".", "Destination directory")
+	flag.StringVar(&cfg.lastFork, "lastfork", "", "Name of the last fork to activate")
 	flag.CommandLine.Parse(args)
 
 	if *outlist != "" {
