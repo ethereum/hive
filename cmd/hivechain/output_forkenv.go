@@ -10,6 +10,7 @@ func (g *generator) writeForkEnv() error {
 	cfg := g.genesis.Config
 	env := make(map[string]string)
 	env["HIVE_CHAIN_ID"] = fmt.Sprint(cfg.ChainID)
+	env["HIVE_NETWORK_ID"] = fmt.Sprint(cfg.ChainID)
 
 	setNum := func(hive string, blocknum *big.Int) {
 		if blocknum != nil {
