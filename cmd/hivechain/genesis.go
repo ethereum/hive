@@ -90,6 +90,7 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 			chaincfg.GrayGlacierBlock = new(big.Int).SetUint64(b)
 		case "merge":
 			chaincfg.MergeNetsplitBlock = new(big.Int).SetUint64(b)
+			chaincfg.TerminalTotalDifficultyPassed = true
 		// time-based forks
 		case "shanghai":
 			chaincfg.ShanghaiTime = &timestamp
