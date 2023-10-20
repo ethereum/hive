@@ -38,6 +38,14 @@ func (g *generator) writeEngineFcU() error {
 	return g.writeJSON("fcu.json", list)
 }
 
+// writeEngineHeadNewPayload writes an engine API newPayload request for the head block.
+func (g *generator) writeEngineHeadNewPayload() error {
+	h := g.blockchain.CurrentBlock()
+	b := g.blockchain.GetBlock(h.Hash(), h.Number.Uint64())
+	np := g.block2newpayload(b)
+	return g.writeJSON("headnewpayload.json", np)
+}
+
 // writeEngineHeadFcU writes an engine API forkchoiceUpdated request for the head block.
 func (g *generator) writeEngineHeadFcU() error {
 	h := g.blockchain.CurrentBlock()

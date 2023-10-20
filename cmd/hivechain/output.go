@@ -16,17 +16,18 @@ import (
 )
 
 var outputFunctions = map[string]func(*generator) error{
-	"genesis":    (*generator).writeGenesis,
-	"forkenv":    (*generator).writeForkEnv,
-	"chain":      (*generator).writeChain,
-	"powchain":   (*generator).writePoWChain,
-	"headstate":  (*generator).writeState,
-	"headblock":  (*generator).writeHeadBlock,
-	"accounts":   (*generator).writeAccounts,
-	"txinfo":     (*generator).writeTxInfo,
-	"headfcu":    (*generator).writeEngineHeadFcU,
-	"fcu":        (*generator).writeEngineFcU,
-	"newpayload": (*generator).writeEngineNewPayload,
+	"genesis":        (*generator).writeGenesis,
+	"forkenv":        (*generator).writeForkEnv,
+	"chain":          (*generator).writeChain,
+	"powchain":       (*generator).writePoWChain,
+	"headstate":      (*generator).writeState,
+	"headblock":      (*generator).writeHeadBlock,
+	"accounts":       (*generator).writeAccounts,
+	"txinfo":         (*generator).writeTxInfo,
+	"fcu":            (*generator).writeEngineFcU,
+	"newpayload":     (*generator).writeEngineNewPayload,
+	"headfcu":        (*generator).writeEngineHeadFcU,
+	"headnewpayload": (*generator).writeEngineHeadNewPayload,
 }
 
 func outputFunctionNames() []string {
