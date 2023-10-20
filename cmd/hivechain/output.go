@@ -17,6 +17,7 @@ import (
 
 var outputFunctions = map[string]func(*generator) error{
 	"genesis":    (*generator).writeGenesis,
+	"forkenv":    (*generator).writeForkEnv,
 	"chain":      (*generator).writeChain,
 	"powchain":   (*generator).writePoWChain,
 	"headstate":  (*generator).writeState,

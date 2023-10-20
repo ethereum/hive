@@ -25,9 +25,8 @@ var (
 
 	numberBasedForkNames = []string{
 		"homestead",
-		"eip150",
-		"eip155",
-		"eip158",
+		"tangerinewhistle",
+		"spuriousdragon",
 		"byzantium",
 		"constantinople",
 		"petersburg",
@@ -64,11 +63,10 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 		// number-based forks
 		case "homestead":
 			chaincfg.HomesteadBlock = new(big.Int).SetUint64(b)
-		case "eip150":
+		case "tangerinewhistle":
 			chaincfg.EIP150Block = new(big.Int).SetUint64(b)
-		case "eip155":
+		case "spuriousdragon":
 			chaincfg.EIP155Block = new(big.Int).SetUint64(b)
-		case "eip158":
 			chaincfg.EIP158Block = new(big.Int).SetUint64(b)
 		case "byzantium":
 			chaincfg.ByzantiumBlock = new(big.Int).SetUint64(b)
@@ -98,6 +96,8 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 			chaincfg.CancunTime = &timestamp
 		case "prague":
 			chaincfg.PragueTime = &timestamp
+		default:
+			panic(fmt.Sprintf("unknown fork name %q", fork))
 		}
 	}
 
