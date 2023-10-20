@@ -23,10 +23,6 @@ if [[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" != "" ]]; then
     echo "SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY: $HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" >> /data/testnet_setup/config.yaml
 fi
 
-trusted_setup_path="/trusted_setup.txt"
-
-echo "Xtrusted-setup: $trusted_setup_path" >> /data/testnet_setup/config.yaml
-
 echo config.yaml:
 cat /data/testnet_setup/config.yaml
 
@@ -79,5 +75,4 @@ echo Starting Teku Beacon Node
     --rest-api-interface=0.0.0.0 \
     --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" \
     --rest-api-host-allowlist="*" \
-    --Xstartup-target-peer-count=0 \
-    --Xtrusted-setup="$trusted_setup_path"
+    --Xstartup-target-peer-count=0
