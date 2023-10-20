@@ -154,11 +154,12 @@ func (n *node) triggerSync(t *hivesim.T) error {
 	ctx := context.Background()
 	c, _ := rpc.DialOptions(ctx, engineURL, rpc.WithHTTPAuth(gnode.NewJWTAuth(token)))
 
-	// deliver the newPayload
+	// deliver newPayload
 	t.Logf("sending %s: %s", newpayload.Method, newpayload.Params)
 	if err := c.Call(nil, newpayload.Method, conv2any(newpayload.Params)...); err != nil {
 		return err
 	}
+	// deliver forkchoiceUpdated
 	var resp struct {
 		PayloadStatus json.RawMessage
 	}
