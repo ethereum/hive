@@ -50,7 +50,7 @@ var (
 func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 	chaincfg := new(params.ChainConfig)
 
-	chainid, _ := new(big.Int).SetString("350399587408492635", 10)
+	chainid, _ := new(big.Int).SetString("3503995874084926", 10)
 	chaincfg.ChainID = chainid
 	chaincfg.Ethash = new(params.EthashConfig)
 
