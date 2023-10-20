@@ -1,0 +1,13 @@
+{
+  "jsonrpc": "2.0",
+  "id": "fcu2000",
+  "method": "engine_forkchoiceUpdatedV2",
+  "params": [
+    {
+      "headBlockHash": "0x8ea837fde2097056bffb47655a2e863076dd0f30de8d53d96c3e7fcd6745a77d",
+      "safeBlockHash": "0x8ea837fde2097056bffb47655a2e863076dd0f30de8d53d96c3e7fcd6745a77d",
+      "finalizedBlockHash": "0x8ea837fde2097056bffb47655a2e863076dd0f30de8d53d96c3e7fcd6745a77d"
+    },
+    null
+  ]
+}
