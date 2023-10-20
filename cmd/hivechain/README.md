@@ -54,6 +54,10 @@ Creates `accounts.json` containing accounts and corresponding private keys.
 This writes the `genesis.json` file containing a go-ethereum style genesis spec. Note
 this file includes the fork block numbers/timestamps.
 
+### forkenv
+
+This writes `forkenv.json` with fork configuration environment variables for hive tests.
+
 ### headblock
 
 This creates `headblock.json` with a dump of the head header.
