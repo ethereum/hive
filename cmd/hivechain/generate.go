@@ -14,7 +14,6 @@ import (
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/ethereum/go-ethereum/trie/triedb/hashdb"
 	"golang.org/x/exp/slices"
 )
 
@@ -99,7 +98,9 @@ func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 // run produces a chain.
 func (g *generator) run() error {
 	db := rawdb.NewMemoryDatabase()
-	triedb := trie.NewDatabase(db, &trie.Config{Preimages: true, HashDB: hashdb.Defaults})
+	trieconfig := *trie.HashDefaults
+	trieconfig.Preimages = true
+	triedb := trie.NewDatabase(db, &trieconfig)
 	genesis := g.genesis.MustCommit(db, triedb)
 	config := g.genesis.Config
 
