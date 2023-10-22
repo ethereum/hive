@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -155,19 +156,20 @@ func (n *node) triggerSync(t *hivesim.T) error {
 	c, _ := rpc.DialOptions(ctx, engineURL, rpc.WithHTTPAuth(gnode.NewJWTAuth(token)))
 
 	// deliver newPayload
-	t.Logf("sending %s: %s", newpayload.Method, newpayload.Params)
-	if err := c.Call(nil, newpayload.Method, conv2any(newpayload.Params)...); err != nil {
+	t.Logf("%s: %s", newpayload.Method, newpayload.Params)
+	var npresp engine.PayloadStatusV1
+	if err := c.Call(&npresp, newpayload.Method, conv2any(newpayload.Params)...); err != nil {
 		return err
 	}
+	t.Logf("response: %+v", npresp)
+
 	// deliver forkchoiceUpdated
-	var resp struct {
-		PayloadStatus json.RawMessage
-	}
-	t.Logf("sending %s: %s", fcu.Method, fcu.Params)
-	if err := c.Call(&resp, fcu.Method, conv2any(fcu.Params)...); err != nil {
+	t.Logf("%s: %s", fcu.Method, fcu.Params)
+	var fcuresp engine.ForkChoiceResponse
+	if err := c.Call(&fcuresp, fcu.Method, conv2any(fcu.Params)...); err != nil {
 		return err
 	}
-	t.Logf("response: payloadStatus=%s", resp.PayloadStatus)
+	t.Logf("response: %+v", fcuresp)
 	return nil
 }
 
