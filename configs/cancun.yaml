@@ -30,7 +30,7 @@
   dockerfile: git
   build_args:
       github: NethermindEth/nethermind
-      tag: cancun
+      tag: master
 
 - client: reth
   nametag: cancun-git
