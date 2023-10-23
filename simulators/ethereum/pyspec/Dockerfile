@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------#
 
 # 1) Create pyspec builder container.
-FROM golang:1-alpine as builder
+FROM golang:1.20-alpine as builder
 RUN apk add --update git ca-certificates gcc musl-dev linux-headers
 
 # Build the pyspec simulator executable.
