@@ -93,6 +93,16 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper(i
 			out.Eip3651TransitionTimestamp = string(in.String())
 		case "eip3860TransitionTimestamp":
 			out.Eip3860TransitionTimestamp = string(in.String())
+		case "eip4844TransitionTimestamp":
+			out.Eip4844TransitionTimestamp = string(in.String())
+		case "eip4788TransitionTimestamp":
+			out.Eip4788TransitionTimestamp = string(in.String())
+		case "eip1153TransitionTimestamp":
+			out.Eip1153TransitionTimestamp = string(in.String())
+		case "eip5656TransitionTimestamp":
+			out.Eip5656TransitionTimestamp = string(in.String())
+		case "eip6780TransitionTimestamp":
+			out.Eip6780TransitionTimestamp = string(in.String())
 		case "eip1559BaseFeeMaxChangeDenominator":
 			out.Eip1559BaseFeeMaxChangeDenominator = string(in.String())
 		case "eip1559ElasticityMultiplier":
@@ -398,6 +408,56 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper(o
 			out.RawString(prefix)
 		}
 		out.String(string(in.Eip3860TransitionTimestamp))
+	}
+	if in.Eip4844TransitionTimestamp != "" {
+		const prefix string = ",\"eip4844TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip4844TransitionTimestamp))
+	}
+	if in.Eip4788TransitionTimestamp != "" {
+		const prefix string = ",\"eip4788TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip4788TransitionTimestamp))
+	}
+	if in.Eip1153TransitionTimestamp != "" {
+		const prefix string = ",\"eip1153TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip1153TransitionTimestamp))
+	}
+	if in.Eip5656TransitionTimestamp != "" {
+		const prefix string = ",\"eip5656TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip5656TransitionTimestamp))
+	}
+	if in.Eip6780TransitionTimestamp != "" {
+		const prefix string = ",\"eip6780TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip6780TransitionTimestamp))
 	}
 	if in.Eip1559BaseFeeMaxChangeDenominator != "" {
 		const prefix string = ",\"eip1559BaseFeeMaxChangeDenominator\":"
@@ -1763,7 +1823,7 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(
 		out.RawString(prefix)
 		out.String(string(in.Constructor))
 	}
-	if in.Code != "" {
+	{
 		const prefix string = ",\"code\":"
 		out.RawString(prefix)
 		out.String(string(in.Code))

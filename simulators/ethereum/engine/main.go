@@ -16,7 +16,7 @@ import (
 	//suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	//suite_ex_cap "github.com/ethereum/hive/simulators/ethereum/engine/suites/exchange_capabilities"
 	//suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
-	//suite_cancun "github.com/ethereum/hive/simulators/ethereum/engine/suites/cancun"
+	suite_cancun "github.com/ethereum/hive/simulators/ethereum/engine/suites/cancun"
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
@@ -58,11 +58,11 @@ func main() {
 			Description: `
 	Test Engine API withdrawals, pre/post Shanghai.`[1:],
 		}
-		//cancun = hivesim.Suite{
-		//	Name: "engine-cancun",
-		//	Description: `
-		//Test Engine API on Cancun.`[1:],
-		//	}
+		cancun = hivesim.Suite{
+			Name: "engine-cancun",
+			Description: `
+		Test Engine API on Cancun.`[1:],
+		}
 	)
 	simulator := hivesim.New()
 
@@ -72,7 +72,7 @@ func main() {
 	//addTestsToSuite(simulator, &excap, specToInterface(suite_ex_cap.Tests), "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
-	//addTestsToSuite(simulator, &cancun, suite_cancun.Tests, "full")
+	addTestsToSuite(simulator, &cancun, suite_cancun.Tests, "full")
 
 	// Mark suites for execution
 	//hivesim.MustRunSuite(simulator, engine)
@@ -81,7 +81,7 @@ func main() {
 	//hivesim.MustRunSuite(simulator, excap)
 	// hivesim.MustRunSuite(simulator, syncSuite)
 	hivesim.MustRunSuite(simulator, withdrawals)
-	//hivesim.MustRunSuite(simulator, cancun)
+	hivesim.MustRunSuite(simulator, cancun)
 }
 
 //	func specToInterface(src []test.Spec) []test.SpecInterface {
@@ -215,5 +215,6 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 				})
 			}
 		}
+
 	}
 }

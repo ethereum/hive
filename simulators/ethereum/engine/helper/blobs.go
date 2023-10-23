@@ -258,15 +258,17 @@ func (tc *BlobTransactionCreator) MakeTransaction(sender SenderAccount, nonce ui
 		return nil, errors.New("nil to address")
 	}
 
+	chain := 10202
 	// Collect fields for transaction
 	var (
-		address    = *tc.To
-		chainID    = uint256.MustFromBig(globals.ChainID)
+		address = *tc.To
+		//chainID    *uint256.Int
 		gasFeeCap  *uint256.Int
 		gasTipCap  *uint256.Int
 		value      *uint256.Int
 		blobGasFee *uint256.Int
 	)
+	chainID := uint256.NewInt(uint64(chain))
 	if tc.GasFee != nil {
 		gasFeeCap = uint256.MustFromBig(tc.GasFee)
 	} else {
@@ -300,7 +302,7 @@ func (tc *BlobTransactionCreator) MakeTransaction(sender SenderAccount, nonce ui
 
 	key := sender.GetKey()
 
-	signedTx, err := types.SignNewTx(key, types.NewCancunSigner(globals.ChainID), sbtx)
+	signedTx, err := types.SignNewTx(key, types.NewCancunSigner(big.NewInt(int64(chain))), sbtx)
 	if err != nil {
 		return nil, err
 	}

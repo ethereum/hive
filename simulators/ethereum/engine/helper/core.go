@@ -6,6 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -168,6 +169,11 @@ type NethermindParams struct {
 	Eip3855TransitionTimestamp              string `json:"eip3855TransitionTimestamp,omitempty"`
 	Eip3651TransitionTimestamp              string `json:"eip3651TransitionTimestamp,omitempty"`
 	Eip3860TransitionTimestamp              string `json:"eip3860TransitionTimestamp,omitempty"`
+	Eip4844TransitionTimestamp              string `json:"eip4844TransitionTimestamp,omitempty"`
+	Eip4788TransitionTimestamp              string `json:"eip4788TransitionTimestamp,omitempty"`
+	Eip1153TransitionTimestamp              string `json:"eip1153TransitionTimestamp,omitempty"`
+	Eip5656TransitionTimestamp              string `json:"eip5656TransitionTimestamp,omitempty"`
+	Eip6780TransitionTimestamp              string `json:"eip6780TransitionTimestamp,omitempty"`
 	Eip1559BaseFeeMaxChangeDenominator      string `json:"eip1559BaseFeeMaxChangeDenominator,omitempty"`
 	Eip1559ElasticityMultiplier             string `json:"eip1559ElasticityMultiplier,omitempty"`
 	Eip1559FeeCollector                     string `json:"eip1559FeeCollector,omitempty"`
@@ -230,6 +236,11 @@ func (n *NethermindChainSpec) UpdateTimestamp(timestamp string) {
 	n.Params.Eip3855TransitionTimestamp = timestamp
 	n.Params.Eip3860TransitionTimestamp = timestamp
 	n.Params.Eip4895TransitionTimestamp = timestamp
+	n.Params.Eip4844TransitionTimestamp = timestamp
+	n.Params.Eip4788TransitionTimestamp = timestamp
+	n.Params.Eip1153TransitionTimestamp = timestamp
+	n.Params.Eip5656TransitionTimestamp = timestamp
+	n.Params.Eip6780TransitionTimestamp = timestamp
 }
 
 func (n *NethermindChainSpec) Config() *params.ChainConfig {
@@ -263,6 +274,7 @@ func (n *NethermindChainSpec) Config() *params.ChainConfig {
 		GrayGlacierBlock:              big.NewInt(0),
 		MergeNetsplitBlock:            big.NewInt(0),
 		ShanghaiTime:                  &unixTimestampUint64,
+		CancunTime:                    &unixTimestampUint64,
 		TerminalTotalDifficulty:       big.NewInt(ttd),
 		TerminalTotalDifficultyPassed: false,
 		Ethash:                        &params.EthashConfig{},
@@ -298,6 +310,11 @@ func (n *NethermindChainSpec) SetTimestamp(timestamp int64) {
 	n.Params.Eip3855TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip3651TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip3860TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip4844TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip4788TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip1153TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip5656TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip6780TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 }
 
 func (n *NethermindChainSpec) ExtraData() []byte {
@@ -398,7 +415,7 @@ func (n *NethermindChainSpec) ToBlock() *types.Block {
 	s := core.Genesis{
 		Config:     config,
 		Nonce:      0,
-		Timestamp:  0,
+		Timestamp:  uint64(time.Now().Unix()),
 		ExtraData:  nil,
 		GasLimit:   n.GasLimit(),
 		Difficulty: config.TerminalTotalDifficulty,

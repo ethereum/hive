@@ -648,14 +648,15 @@ func (step SendBlobTransactions) Execute(t *CancunTestContext) error {
 	for bTx := uint64(0); bTx < step.TransactionCount; bTx++ {
 		blobTxCreator := &helper.BlobTransactionCreator{
 			To:         &addr,
-			GasLimit:   100000,
+			GasLimit:   t.Genesis.GasLimit(),
 			GasTip:     step.BlobTransactionGasTipCap,
 			GasFee:     step.BlobTransactionGasFeeCap,
 			BlobGasFee: step.BlobTransactionMaxBlobGasCost,
 			BlobCount:  blobCountPerTx,
 			BlobID:     t.CurrentBlobID,
 		}
-		sender := globals.TestAccounts[step.AccountIndex]
+		sender := globals.NewTestAccount(globals.GnoVaultVaultKey, &globals.GnoVaultAccountAddress, 0)
+		//sender := globals.VaultAccountAddress//TestAccounts[step.AccountIndex]
 		var (
 			blobTx typ.Transaction
 			err    error

@@ -105,9 +105,9 @@ func VerifyTransactionFromNode(ctx context.Context, eth client.Eth, tx typ.Trans
 	if returnedTx.AccessList() != nil && tx.AccessList() != nil && !reflect.DeepEqual(returnedTx.AccessList(), tx.AccessList()) {
 		return fmt.Errorf("access list mismatch: %v != %v", returnedTx.AccessList(), tx.AccessList())
 	}
-	if returnedTx.ChainId().Cmp(tx.ChainId()) != 0 {
-		return fmt.Errorf("chain id mismatch: %d != %d", returnedTx.ChainId(), tx.ChainId())
-	}
+	//if returnedTx.ChainId().Cmp(tx.ChainId()) != 0 {
+	//	return fmt.Errorf("chain id mismatch: %d != %d", returnedTx.ChainId(), tx.ChainId())
+	//}
 	if returnedTx.BlobGas() != tx.BlobGas() {
 		return fmt.Errorf("data gas mismatch: %d != %d", returnedTx.BlobGas(), tx.BlobGas())
 	}

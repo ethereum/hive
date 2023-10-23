@@ -166,8 +166,7 @@ func NewCLMocker(t *hivesim.T, genesis helper.Genesis, forkConfig *config.ForkCo
 	newCLMocker.HeaderHistory = make(map[uint64]*types.Header)
 
 	// Add genesis to the header history
-	block := genesis.ToBlock()
-	newCLMocker.HeaderHistory[0] = block.Header()
+	newCLMocker.HeaderHistory[0] = genesis.ToBlock().Header()
 
 	return newCLMocker
 }
@@ -330,7 +329,7 @@ func (cl *CLMocker) GetTimestampIncrement() uint64 {
 	return cl.BlockTimestampIncrement.Uint64()
 }
 
-// Returns the next timestamp value to be included in the next payload attributes
+// Returns the timestamp value to be included in the next payload attributes
 func (cl *CLMocker) GetNextBlockTimestamp() uint64 {
 	if cl.FirstPoSBlockNumber == nil && cl.TransitionPayloadTimestamp != nil {
 		// We are producing the transition payload and there's a value specified
@@ -430,6 +429,7 @@ func (cl *CLMocker) GeneratePayloadAttributes() {
 	// Generate a random value for the PrevRandao field
 	nextPrevRandao := common.Hash{}
 	rand.Read(nextPrevRandao[:])
+
 	cl.LatestPayloadAttributes = typ.PayloadAttributes{
 		Random:                nextPrevRandao,
 		SuggestedFeeRecipient: cl.NextFeeRecipient,
@@ -471,48 +471,8 @@ func (cl *CLMocker) AddPayloadID(ec client.EngineClient, newPayloadID *api.Paylo
 func (cl *CLMocker) RequestNextPayload() {
 	ctx, cancel := context.WithTimeout(cl.TestContext, globals.RPCTimeout)
 	defer cancel()
-	var (
-		resp       api.ForkChoiceResponse
-		b          *client.Block
-		fcUVersion int
-		err        error
-	)
-	for {
-		if cl.IsShanghai(cl.LatestPayloadAttributes.Timestamp) {
-			fcUVersion = 2
-			resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV2(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
-
-		} else {
-			b, err = cl.EngineClients[0].BlockByNumber(ctx, nil)
-			if err != nil {
-				cl.Fatalf("Can't get latest block from the first client: %v", err)
-			}
-			latestBlockHash := b.Hash()
-			if cl.LatestForkchoice.HeadBlockHash != latestBlockHash {
-				cl.Fatalf("CLMocker: Latest forkchoice head block hash (%v) does not match latest block hash (%v)", cl.LatestForkchoice.HeadBlockHash.Hex(), latestBlockHash.Hex())
-			}
-			fcUVersion = 1
-			resp, err = cl.NextBlockProducer.ForkchoiceUpdatedV1(ctx, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
-		}
-		if err != nil {
-			cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV%d (%v): %v", fcUVersion, cl.NextBlockProducer.ID(), err)
-		}
-		if resp.PayloadStatus.Status == "SYNCING" {
-			// Wait for the node to sync
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		if resp.PayloadStatus.Status != api.VALID {
-			cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated Response from Payload builder: %v", resp)
-		}
-		if resp.PayloadStatus.LatestValidHash == nil || *resp.PayloadStatus.LatestValidHash != cl.LatestForkchoice.HeadBlockHash {
-			cl.Fatalf("CLMocker: Unexpected forkchoiceUpdated LatestValidHash Response from Payload builder: %v != %v", resp.PayloadStatus.LatestValidHash, cl.LatestForkchoice.HeadBlockHash)
-		}
-		cl.NextPayloadID = resp.PayloadID
-		break
-	}
-	fcUVersion = cl.ForkConfig.ForkchoiceUpdatedVersion(cl.LatestHeader.Time, &cl.LatestPayloadAttributes.Timestamp)
-	resp, err = cl.NextBlockProducer.ForkchoiceUpdated(ctx, fcUVersion, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
+	fcUVersion := cl.ForkConfig.ForkchoiceUpdatedVersion(cl.LatestHeader.Time, &cl.LatestPayloadAttributes.Timestamp)
+	resp, err := cl.NextBlockProducer.ForkchoiceUpdated(ctx, fcUVersion, &cl.LatestForkchoice, &cl.LatestPayloadAttributes)
 	if err != nil {
 		cl.Fatalf("CLMocker: Could not send forkchoiceUpdatedV%d (%v): %v", fcUVersion, cl.NextBlockProducer.ID(), err)
 	}
@@ -714,6 +674,7 @@ func (cl *CLMocker) ProduceSingleBlock(callbacks BlockProcessCallbacks) {
 		cl.LatestForkchoice.FinalizedBlockHash = cl.HeadHashHistory[len(cl.HeadHashHistory)-int(cl.SlotsToFinalized.Int64())-1]
 	}
 	cl.broadcastLatestForkchoice()
+
 	if callbacks.OnForkchoiceBroadcast != nil {
 		callbacks.OnForkchoiceBroadcast()
 	}
