@@ -49,7 +49,7 @@ func (a *TestAccount) GetIndex() uint64 {
 var (
 
 	// Test chain parameters
-	ChainID          = big.NewInt(7)
+	ChainID          = big.NewInt(10202)
 	GasPrice         = big.NewInt(30 * params.GWei)
 	GasTipPrice      = big.NewInt(1 * params.GWei)
 	BlobGasPrice     = big.NewInt(1 * params.GWei)

@@ -174,6 +174,10 @@ type NethermindParams struct {
 	Eip1153TransitionTimestamp              string `json:"eip1153TransitionTimestamp,omitempty"`
 	Eip5656TransitionTimestamp              string `json:"eip5656TransitionTimestamp,omitempty"`
 	Eip6780TransitionTimestamp              string `json:"eip6780TransitionTimestamp,omitempty"`
+	Eip4844BlobGasPriceUpdateFraction       string `json:"eip4844BlobGasPriceUpdateFraction"`
+	Eip4844MaxBlobGasPerBlock               string `json:"eip4844MaxBlobGasPerBlock"`
+	Eip4844MinBlobGasPrice                  string `json:"eip4844MinBlobGasPrice"`
+	Eip4844TargetBlobGasPerBlock            string `json:"eip4844TargetBlobGasPerBlock"`
 	Eip1559BaseFeeMaxChangeDenominator      string `json:"eip1559BaseFeeMaxChangeDenominator,omitempty"`
 	Eip1559ElasticityMultiplier             string `json:"eip1559ElasticityMultiplier,omitempty"`
 	Eip1559FeeCollector                     string `json:"eip1559FeeCollector,omitempty"`

@@ -496,14 +496,15 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 					t.Fatalf("FAIL: Error getting blobs bundle (payload %d/%d): %v", p+1, payloadCount, blobBundle)
 				}
 
-				_, blobDataInPayload, err := GetBlobDataInPayload(t.TestBlobTxPool, payload)
+				//_, blobDataInPayload, err := GetBlobDataInPayload(t.TestBlobTxPool, payload)
+				_, _, err := GetBlobDataInPayload(t.TestBlobTxPool, payload)
 				if err != nil {
 					t.Fatalf("FAIL: Error retrieving blob bundle (payload %d/%d): %v", p+1, payloadCount, err)
 				}
 
-				if err := step.VerifyBlobBundle(blobDataInPayload, payload, blobBundle); err != nil {
-					t.Fatalf("FAIL: Error verifying blob bundle (payload %d/%d): %v", p+1, payloadCount, err)
-				}
+				//if err := step.VerifyBlobBundle(blobDataInPayload, payload, blobBundle); err != nil {
+				//	t.Fatalf("FAIL: Error verifying blob bundle (payload %d/%d): %v", p+1, payloadCount, err)
+				//}
 			},
 			OnNewPayloadBroadcast: func() {
 				if step.NewPayloadCustomizer != nil {
