@@ -69,6 +69,19 @@ def sync_config:
   end
 ;
 
+def txpool_config:
+  if env.HIVE_CANCUN_TIMESTAMP != null then
+    {
+      "TxPool": {
+        "BlobSupportEnabled": true,
+        "PersistentBlobStorageEnabled": true
+      }
+    }
+  else
+    {}
+  end
+;
+
 def base_config:
   {
     "Init": {
@@ -101,4 +114,4 @@ def base_config:
 ;
 
 # This is the main expression that outputs the config.
-base_config * keystore_config * merge_config * json_rpc_config * sync_config
+base_config * keystore_config * merge_config * json_rpc_config * sync_config * txpool_config
