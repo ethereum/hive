@@ -93,9 +93,14 @@ fi
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis
+# Dump genesis. 
 echo "Supplied genesis state:"
-cat /genesis.json
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+else
+    # Log full genesis only at higher log levels.
+    cat /genesis.json
+fi
 
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."

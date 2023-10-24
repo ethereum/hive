@@ -57,9 +57,16 @@ fi
 
 # Generate the genesis and chainspec file.
 mkdir -p /chainspec
-echo "Supplied genesis state:" 
 jq -f /mapper.jq /genesis.json > /chainspec/test.json
-jq . /chainspec/test.json
+
+# Dump genesis. 
+echo "Supplied genesis state:"
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    jq 'del(.accounts[] | select(.balance == "0x123450000000000000000" or has("builtin")))' /chainspec/test.json
+else
+    # Log full genesis only at higher log levels.
+    cat /chainspec/test.json
+fi
 
 # Generate the config file.
 mkdir /configs

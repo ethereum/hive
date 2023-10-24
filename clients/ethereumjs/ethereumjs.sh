@@ -51,14 +51,18 @@ set -e
 ethereumjs="node /ethereumjs-monorepo/packages/client/dist/bin/cli.js"
 FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcAddr 0.0.0.0 --rpcEngineAddr 0.0.0.0 --rpcEnginePort 8551 --ws false --logLevel debug --rpcDebug --isSingleNode"
 
-
 # Configure the chain.
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis
+# Dump genesis. 
 echo "Supplied genesis state:"
-cat /genesis.json
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+else
+    # Log full genesis only at higher log levels.
+    cat /genesis.json
+fi
 
 # Import clique signing key.
 if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
@@ -74,7 +78,6 @@ fi
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     FLAGS="$FLAGS --jwt-secret ./jwtsecret"
 fi
-
 
 # Load the test chain if present
 echo "Loading initial blockchain..."

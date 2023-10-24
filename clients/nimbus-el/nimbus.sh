@@ -81,10 +81,18 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
   fi
 fi
 
-# Configure the genesis chain and use it as start block and dump it to stdout
-echo "Supplied genesis state:"
-jq -f /mapper.jq /genesis.json | tee /genesis-start.json
+# Configure the chain.
+jq -f /mapper.jq /genesis.json > /genesis-start.json
 FLAGS="$FLAGS --custom-network:/genesis-start.json"
+
+# Dump genesis.
+echo "Supplied genesis state:"
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    jq 'del(.genesis.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis-start.json
+else
+    # Log full genesis only at higher log levels.
+    cat /genesis-start.json
+fi
 
 # Don't immediately abort, some imports are meant to fail
 set +e
