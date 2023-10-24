@@ -63,9 +63,19 @@ esac
 FLAGS="--logging=$LOG --data-storage-format=BONSAI"
 
 # Configure the chain.
-jq -f /mapper.jq /genesis.json > /besugenesis.json
-echo -n "Genesis: "; cat /besugenesis.json
-FLAGS="$FLAGS --genesis-file=/besugenesis.json "
+mv /genesis.json /genesis-input.json
+jq -f /mapper.jq /genesis-input.json > /genesis.json
+FLAGS="$FLAGS --genesis-file=/genesis.json "
+
+# Dump genesis. 
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+else
+    echo "Supplied genesis state:"
+    cat /genesis.json
+fi
+
 
 # Enable experimental 'berlin' hard-fork features if configured.
 #if [ -n "$HIVE_FORK_BERLIN" ]; then
