@@ -43,6 +43,8 @@ type LoggingRoundTrip struct {
 	Inner  http.RoundTripper
 }
 
+const MAX_LOG_BYTES = 1024 * 4
+
 func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Read and log the request body.
 	reqBytes, err := io.ReadAll(req.Body)
@@ -50,7 +52,12 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	if err != nil {
 		return nil, err
 	}
-	rt.Logger.Logf(">> (%s) %s", rt.ID, bytes.TrimSpace(reqBytes))
+	reqLogBytes := bytes.TrimSpace(reqBytes[:])
+	if len(reqLogBytes) > MAX_LOG_BYTES {
+		rt.Logger.Logf(">> (%s) %s... (Log trimmed)", rt.ID, reqLogBytes[:MAX_LOG_BYTES])
+	} else {
+		rt.Logger.Logf(">> (%s) %s", rt.ID, reqLogBytes)
+	}
 	reqCopy := *req
 	reqCopy.Body = io.NopCloser(bytes.NewReader(reqBytes))
 
@@ -68,7 +75,12 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	}
 	respCopy := *resp
 	respCopy.Body = io.NopCloser(bytes.NewReader(respBytes))
-	rt.Logger.Logf("<< (%s) %s", rt.ID, bytes.TrimSpace(respBytes))
+	respLogBytes := bytes.TrimSpace(respBytes[:])
+	if len(respLogBytes) > MAX_LOG_BYTES {
+		rt.Logger.Logf("<< (%s) %s... (Log trimmed)", rt.ID, respLogBytes[:MAX_LOG_BYTES])
+	} else {
+		rt.Logger.Logf("<< (%s) %s", rt.ID, respLogBytes)
+	}
 	return &respCopy, nil
 }
 
