@@ -594,7 +594,7 @@ var Tests = []test.Spec{
 			Verify that client returns INVALID_PARAMS_ERROR.
 			`,
 			MainFork:   config.Cancun,
-			ForkHeight: 1,
+			ForkHeight: 2,
 		},
 
 		TestSequence: TestSequence{
@@ -633,6 +633,9 @@ var Tests = []test.Spec{
 			NewPayloads{
 				FcUOnPayloadRequest: &helper.DowngradeForkchoiceUpdatedVersion{
 					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
+						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
+							BeaconRoot: &(common.Hash{}),
+						},
 						ExpectedError: globals.INVALID_PARAMS_ERROR,
 					},
 				},
