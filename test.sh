@@ -57,10 +57,8 @@ mkdir $RESULTS
 # Sync are quick tests
 #
 
-# These three can succsessfully sync with themselves
-#testsync openethereum_latest
+# These can succsessfully sync with themselves
 #testsync go-ethereum_latest
-testsync openethereum_latest,go-ethereum_latest
 
 # These two are failing - even against themselves
 testsync besu_latest       # fails
@@ -69,7 +67,6 @@ testsync nethermind_latest # fails
 #testsync besu_latest,nethermind_latest
 
 #testsync go-ethereum_latest go-ethereum_stable
-#testsync go-ethereum_latest openethereum_latest
 #testsync go-ethereum_latest nethermind_latest
 #testsync go-ethereum_latest besu_latest
 
@@ -84,12 +81,10 @@ testgraphql besu_latest
 #testdevp2p go-ethereum_latest
 #testdevp2p nethermind_latest
 #testdevp2p besu_latest
-#testdevp2p openethereum_latest
 
 
 # These take an extremely long time to run
 #testconsensus go-ethereum_latest
-#testconsensus openethereum_latest
 #testconsensus nethermind_latest
 #testconsensus besu_latest
 
