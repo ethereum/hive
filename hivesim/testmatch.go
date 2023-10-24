@@ -6,9 +6,24 @@ import (
 )
 
 type testMatcher struct {
-	suite   *regexp.Regexp
-	test    *regexp.Regexp
-	pattern string
+	suite      *regexp.Regexp
+	test       *regexp.Regexp
+	pattern    string
+	exactSuite string
+	exactTest  string
+	isExact    bool
+}
+
+func parseTestExact(e string) (m testMatcher, err error) {
+	parts := strings.Split(e, "/")
+	if len(parts) > 0 {
+		m.exactSuite = parts[0]
+	}
+	if len(parts) > 1 {
+		m.exactTest = parts[1]
+	}
+	m.isExact = true
+	return m, nil
 }
 
 func parseTestPattern(p string) (m testMatcher, err error) {

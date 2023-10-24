@@ -35,6 +35,7 @@ type SimEnv struct {
 	SimLogLevel    int
 	SimParallelism int
 	SimTestPattern string
+	SimTestExact   string
 
 	// This is the time limit for the simulation run.
 	// There is no default limit.

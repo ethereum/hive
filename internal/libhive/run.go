@@ -205,6 +205,7 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 			"HIVE_PARALLELISM":  strconv.Itoa(env.SimParallelism),
 			"HIVE_LOGLEVEL":     strconv.Itoa(env.SimLogLevel),
 			"HIVE_TEST_PATTERN": env.SimTestPattern,
+			"HIVE_TEST_EXACT":   env.SimTestExact,
 		},
 	}
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)

@@ -35,6 +35,13 @@ func New() *Simulation {
 		panic("HIVE_SIMULATOR environment variable is empty")
 	}
 	sim := &Simulation{url: url}
+	if e := os.Getenv("HIVE_TEST_EXACT"); e != "" {
+		m, err := parseTestExact(e)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Warning: invalid exact simulator/test match: "+err.Error())
+		}
+		sim.m = m
+	}
 	if p := os.Getenv("HIVE_TEST_PATTERN"); p != "" {
 		m, err := parseTestPattern(p)
 		if err != nil {
