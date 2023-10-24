@@ -67,11 +67,11 @@ mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
 # Dump genesis. 
-echo "Supplied genesis state:"
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
     jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
 else
-    # Log full genesis only at higher log levels.
+    echo "Supplied genesis state:"
     cat /genesis.json
 fi
 
