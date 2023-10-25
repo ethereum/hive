@@ -71,7 +71,7 @@ This section explains what happens during a simulation run.
 For a single run, the user provides the name of the simulator to run, and a set of client
 names to run against. For example:
 
-    ./hive --sim ethereum/sync --client go-ethereum,besu,openethereum
+    ./hive --sim ethereum/sync --client go-ethereum,besu,nethermind
 
 Hive first builds simulator and client images using docker. It expects a Dockerfile in the
 `./simulators/ethereum/sync` directory as well as a Dockerfile for each client (in
