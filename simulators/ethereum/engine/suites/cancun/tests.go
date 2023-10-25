@@ -403,7 +403,7 @@ var Tests = []test.Spec{
 			// with the higher tip.
 			NewPayloads{
 				ExpectedIncludedBlobCount: 1,
-				ExpectedBlobs:             []helper.BlobID{3},
+				ExpectedBlobs:             []helper.BlobID{1},
 			},
 		},
 	},
