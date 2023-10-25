@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -39,7 +40,16 @@ func (s InvalidMissingAncestorReOrgTest) WithMainFork(fork config.Fork) test.Spe
 }
 
 func (tc InvalidMissingAncestorReOrgTest) GetName() string {
-	return fmt.Sprintf("Invalid Missing Ancestor ReOrg, Invalid %s, Invalid P%d'", tc.InvalidField, tc.InvalidIndex)
+	name := []string{
+		"Invalid Missing Ancestor ReOrg",
+		fmt.Sprintf("Invalid %s", tc.InvalidField),
+	}
+	if tc.EmptyTransactions {
+		name = append(name, "Empty Txs")
+	}
+	name = append(name, fmt.Sprintf("Invalid P%d'", tc.InvalidIndex))
+
+	return strings.Join(name, ", ")
 }
 
 func (tc InvalidMissingAncestorReOrgTest) Execute(t *test.Env) {
@@ -128,9 +138,7 @@ func (tc InvalidMissingAncestorReOrgTest) Execute(t *test.Env) {
 
 				r := t.TestEngine.TestEngineNewPayload(altChainPayloads[i])
 				p := t.TestEngine.TestEngineForkchoiceUpdated(&api.ForkchoiceStateV1{
-					HeadBlockHash:      altChainPayloads[i].BlockHash,
-					SafeBlockHash:      altChainPayloads[i].BlockHash,
-					FinalizedBlockHash: common.Hash{},
+					HeadBlockHash: altChainPayloads[i].BlockHash,
 				}, nil, altChainPayloads[i].Timestamp)
 				if i == tc.InvalidIndex {
 					// If this is the first payload after the common ancestor, and this is the payload we invalidated,
@@ -199,15 +207,21 @@ func (s InvalidMissingAncestorReOrgSyncTest) WithMainFork(fork config.Fork) test
 }
 
 func (tc InvalidMissingAncestorReOrgSyncTest) GetName() string {
-	name := fmt.Sprintf("Invalid Missing Ancestor ReOrg, Invalid %s, ", tc.InvalidField)
+	name := []string{
+		"Invalid Missing Ancestor ReOrg",
+		fmt.Sprintf("Invalid %s", tc.InvalidField),
+	}
 	if tc.EmptyTransactions {
-		name += "Empty Txs, "
+		name = append(name, "Empty Txs")
 	}
-	name += fmt.Sprintf("Invalid P%d', Reveal using sync", tc.InvalidIndex)
+	name = append(name,
+		fmt.Sprintf("Invalid P%d'", tc.InvalidIndex),
+		"Reveal using sync",
+	)
 	if tc.ReOrgFromCanonical {
-		name += " (ReOrg from Canonical)"
+		name = append(name, "ReOrg from Canonical")
 	}
-	return name
+	return strings.Join(name, ", ")
 }
 
 func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
@@ -373,9 +387,7 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 					r.ExpectStatusEither(test.Valid, test.Accepted)
 
 					s := secondaryTestClient.TestEngineForkchoiceUpdated(&api.ForkchoiceStateV1{
-						HeadBlockHash:      p.BlockHash,
-						SafeBlockHash:      cA.BlockHash,
-						FinalizedBlockHash: common.Hash{},
+						HeadBlockHash: p.BlockHash,
 					}, nil, p.Timestamp)
 					s.ExpectationDescription = "Sent modified payload forkchoice updated to secondary client, expected to be accepted"
 					s.ExpectAnyPayloadStatus(test.Valid, test.Syncing)
@@ -423,9 +435,7 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 				r := t.TestEngine.TestEngineNewPayload(altChainPayloads[n])
 				t.Logf("INFO (%s): Response from main client: %v", t.TestName, r.Status)
 				s := t.TestEngine.TestEngineForkchoiceUpdated(&api.ForkchoiceStateV1{
-					HeadBlockHash:      altChainPayloads[n].BlockHash,
-					SafeBlockHash:      altChainPayloads[n].BlockHash,
-					FinalizedBlockHash: common.Hash{},
+					HeadBlockHash: altChainPayloads[n].BlockHash,
 				}, nil, altChainPayloads[n].Timestamp)
 				t.Logf("INFO (%s): Response from main client fcu: %v", t.TestName, s.Response.PayloadStatus)
 

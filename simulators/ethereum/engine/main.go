@@ -134,17 +134,28 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		if err != nil {
 			panic("unable to inject genesis")
 		}
-		//forkConfig := currentTest.GetForkConfig()
+		forkConfig := currentTest.GetForkConfig()
 		//forkConfig.ConfigGenesisHelper(genesis)
 		// Calculate and set the TTD for this test
-		// ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
+		//ttd := helper.CalculateulateRealTTD(genesis, currentTest.GetTTD())
 
 		// Configure Forks
-		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", genesis.Difficulty()))
-		if currentTest.GetForkConfig().ShanghaiTimestamp != nil {
-			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", currentTest.GetForkConfig().ShanghaiTimestamp))
-			// Ensure the merge transition is activated before shanghai.
-			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
+		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", genesis.Difficulty().Uint64()))
+		if forkConfig.LondonNumber != nil {
+			newParams = newParams.Set("HIVE_FORK_LONDON", fmt.Sprintf("%d", forkConfig.LondonNumber))
+		}
+		if forkConfig.ParisNumber != nil {
+			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", fmt.Sprintf("%d", forkConfig.ParisNumber))
+		}
+		if forkConfig.ShanghaiTimestamp != nil {
+			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", forkConfig.ShanghaiTimestamp))
+			// Ensure merge transition is activated before shanghai if not already
+			if forkConfig.ParisNumber == nil {
+				newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
+			}
+			if forkConfig.CancunTimestamp != nil {
+				newParams = newParams.Set("HIVE_CANCUN_TIMESTAMP", fmt.Sprintf("%d", forkConfig.CancunTimestamp))
+			}
 		}
 
 		if nodeType != "" {

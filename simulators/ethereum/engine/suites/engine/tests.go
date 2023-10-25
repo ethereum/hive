@@ -194,6 +194,7 @@ func init() {
 		helper.InvalidTransactionValue,
 		helper.InvalidTransactionChainID,
 	} {
+		invalidDetectedOnSync := invalidField == helper.InvalidTransactionChainID
 		for _, syncing := range []bool{false, true} {
 			if invalidField != helper.InvalidTransactionGasTipPrice {
 				for _, testTxType := range []helper.TestTransactionType{helper.LegacyTxOnly, helper.DynamicFeeTxOnly} {
@@ -201,8 +202,9 @@ func init() {
 						BaseSpec: test.BaseSpec{
 							TestTransactionType: testTxType,
 						},
-						InvalidField: invalidField,
-						Syncing:      syncing,
+						InvalidField:          invalidField,
+						Syncing:               syncing,
+						InvalidDetectedOnSync: invalidDetectedOnSync,
 					})
 				}
 			} else {
@@ -210,8 +212,9 @@ func init() {
 					BaseSpec: test.BaseSpec{
 						TestTransactionType: helper.DynamicFeeTxOnly,
 					},
-					InvalidField: invalidField,
-					Syncing:      syncing,
+					InvalidField:          invalidField,
+					Syncing:               syncing,
+					InvalidDetectedOnSync: invalidDetectedOnSync,
 				})
 			}
 		}
@@ -236,6 +239,10 @@ func init() {
 	for _, invalidIndex := range []int{1, 9, 10} {
 		for _, emptyTxs := range []bool{false, true} {
 			Tests = append(Tests, InvalidMissingAncestorReOrgTest{
+				BaseSpec: test.BaseSpec{
+					SlotsToSafe:      big.NewInt(32),
+					SlotsToFinalized: big.NewInt(64),
+				},
 				SidechainLength:   10,
 				InvalidIndex:      invalidIndex,
 				InvalidField:      helper.InvalidStateRoot,
@@ -247,7 +254,8 @@ func init() {
 	// Invalid Ancestor Re-Org Tests (Reveal Via Sync)
 	spec := test.BaseSpec{
 		TimeoutSeconds:   60,
-		SlotsToFinalized: big.NewInt(20),
+		SlotsToSafe:      big.NewInt(32),
+		SlotsToFinalized: big.NewInt(64),
 	}
 	for _, invalidField := range []helper.InvalidPayloadBlockField{
 		helper.InvalidStateRoot,
@@ -407,9 +415,10 @@ func init() {
 
 	// Misc Tests
 	Tests = append(Tests,
+		// Pre-merge & merge fork occur at block 1, post-merge forks occur at block 2
 		NonZeroPreMergeFork{
 			BaseSpec: test.BaseSpec{
-				ForkHeight: 1,
+				ForkHeight: 2,
 			},
 		},
 	)

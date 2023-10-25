@@ -61,7 +61,7 @@ type SimResult struct {
 type TestManager struct {
 	config     SimEnv
 	backend    ContainerBackend
-	clientDefs map[string]*ClientDefinition
+	clientDefs []*ClientDefinition
 
 	simContainerID string
 	simLogFile     string
@@ -80,7 +80,7 @@ type TestManager struct {
 	results           map[TestSuiteID]*TestSuite
 }
 
-func NewTestManager(config SimEnv, b ContainerBackend, clients map[string]*ClientDefinition) *TestManager {
+func NewTestManager(config SimEnv, b ContainerBackend, clients []*ClientDefinition) *TestManager {
 	return &TestManager{
 		clientDefs:        clients,
 		config:            config,

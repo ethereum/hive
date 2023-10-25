@@ -498,13 +498,13 @@ var Tests = []test.Spec{
 	// ForkchoiceUpdatedV3 before cancun
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV3 Set Head to Shanghai Payload, Nil Payload Attributes",
+			Name: "ForkchoiceUpdatedV3 Set Head to Shanghai Payload, Null Payload Attributes",
 			About: `
 			Test sending ForkchoiceUpdatedV3 to set the head of the chain to a Shanghai payload:
 			- Send NewPayloadV2 with Shanghai payload on block 1
-			- Use ForkchoiceUpdatedV3 to set the head to the payload, with nil payload attributes
+			- Use ForkchoiceUpdatedV3 to set the head to the payload, with null payload attributes
 
-			Verify that client returns no error.
+			Verify that client returns no error
 			`,
 			MainFork:   config.Cancun,
 			ForkHeight: 2,
@@ -524,11 +524,11 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Nil Beacon Root",
+			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Null Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV3 to request a Shanghai payload:
 			- Payload Attributes uses Shanghai timestamp
-			- Payload Attributes' Beacon Root is nil
+			- Payload Attributes Beacon Root is null
 
 			Verify that client returns INVALID_PARAMS_ERROR.
 			`,
@@ -544,7 +544,7 @@ var Tests = []test.Spec{
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
-				ForkchoiceUpdatedV3 before Cancun with any nil field must return INVALID_PARAMS_ERROR (code %d)
+				ForkchoiceUpdatedV3 before Cancun with any null field must return INVALID_PARAMS_ERROR (code %d)
 				`, *globals.INVALID_PARAMS_ERROR),
 			},
 		},
@@ -552,11 +552,11 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Zero Beacon Root",
+			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Non-Null Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV3 to request a Shanghai payload:
 			- Payload Attributes uses Shanghai timestamp
-			- Payload Attributes' Beacon Root zero
+			- Payload Attributes Beacon Root is non-null
 
 			Verify that client returns UNSUPPORTED_FORK_ERROR.
 			`,
@@ -575,7 +575,7 @@ var Tests = []test.Spec{
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
-				ForkchoiceUpdatedV3 before Cancun with beacon root must return UNSUPPORTED_FORK_ERROR (code %d)
+				ForkchoiceUpdatedV3 before Cancun with beacon root field present must return UNSUPPORTED_FORK_ERROR (code %d)
 				`, *globals.UNSUPPORTED_FORK_ERROR),
 			},
 		},
@@ -584,11 +584,41 @@ var Tests = []test.Spec{
 	// ForkchoiceUpdatedV2 before cancun with beacon root
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV2 To Request Shanghai Payload, Zero Beacon Root",
+			Name: "ForkchoiceUpdatedV2 To Request Shanghai Payload, Non-Null Beacon Root ",
+			About: `
+			Test sending ForkchoiceUpdatedV2 to request a Shanghai payload:
+			- Payload Attributes uses Shanghai timestamp
+			- Payload Attributes Beacon Root is non-null
+
+			Verify that client returns INVALID_PARAMS_ERROR.
+			`,
+			MainFork:   config.Cancun,
+			ForkHeight: 2,
+		},
+
+		TestSequence: TestSequence{
+			NewPayloads{
+				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{
+					PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
+						BeaconRoot: &(common.Hash{}),
+					},
+					ExpectedError: globals.INVALID_PARAMS_ERROR,
+				},
+				ExpectationDescription: fmt.Sprintf(`
+				ForkchoiceUpdatedV2 before Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
+				`, *globals.INVALID_PARAMS_ERROR),
+			},
+		},
+	},
+
+	// ForkchoiceUpdatedV2 after cancun with beacon root
+	&CancunBaseSpec{
+		BaseSpec: test.BaseSpec{
+			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Non-Null Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
-			- Payload Attributes uses Shanghai timestamp
-			- Payload Attributes' Beacon Root zero
+			- Payload Attributes uses Cancun timestamp
+			- Payload Attributes Beacon Root is non-null
 
 			Verify that client returns INVALID_PARAMS_ERROR.
 			`,
@@ -607,35 +637,6 @@ var Tests = []test.Spec{
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
-				ForkchoiceUpdatedV2 before Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
-				`, *globals.INVALID_PARAMS_ERROR),
-			},
-		},
-	},
-
-	// ForkchoiceUpdatedV2 after cancun
-	&CancunBaseSpec{
-		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Zero Beacon Root",
-			About: `
-			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
-			- Payload Attributes uses Cancun timestamp
-			- Payload Attributes' Beacon Root zero
-
-			Verify that client returns INVALID_PARAMS_ERROR.
-			`,
-			MainFork:   config.Cancun,
-			ForkHeight: 1,
-		},
-
-		TestSequence: TestSequence{
-			NewPayloads{
-				FcUOnPayloadRequest: &helper.DowngradeForkchoiceUpdatedVersion{
-					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
-						ExpectedError: globals.INVALID_PARAMS_ERROR,
-					},
-				},
-				ExpectationDescription: fmt.Sprintf(`
 				ForkchoiceUpdatedV2 after Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
 				`, *globals.INVALID_PARAMS_ERROR),
 			},
@@ -643,11 +644,11 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Nil Beacon Root",
+			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Missing Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
 			- Payload Attributes uses Cancun timestamp
-			- Payload Attributes' Beacon Root nil (not provided)
+			- Payload Attributes Beacon Root is missing
 
 			Verify that client returns UNSUPPORTED_FORK_ERROR.
 			`,
@@ -1060,14 +1061,8 @@ var Tests = []test.Spec{
 		},
 
 		TestSequence: TestSequence{
-			// First, we send a couple of blob transactions on genesis,
-			// with enough data gas cost to make sure they are included in the first block.
-			SendBlobTransactions{
-				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
-				BlobTransactionMaxBlobGasCost: big.NewInt(1),
-			},
 			NewPayloads{
-				ExpectedIncludedBlobCount: cancun.TARGET_BLOBS_PER_BLOCK,
+				ExpectedIncludedBlobCount: 0,
 				// This customizer only simulates requesting a Shanghai payload 1 second before cancun.
 				// CL Mock will still request the Cancun payload afterwards
 				FcUOnPayloadRequest: &helper.BaseForkchoiceUpdatedCustomizer{
