@@ -158,7 +158,7 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transaction Ordering, Single Account",
+			Name: "Blob Transaction Ordering, Single Account, Single Blob",
 			About: `
 			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
 			using account A.
@@ -203,7 +203,7 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transaction Ordering, Single Account 2",
+			Name: "Blob Transaction Ordering, Single Account, Dual Blob",
 			About: `
 			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
 			using account A.
@@ -1085,7 +1085,7 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Missing Hash",
+			Name: "NewPayloadV3 Versioned Hashes, Missing Hash, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is missing one of the hashes.
@@ -1117,7 +1117,7 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Extra Hash",
+			Name: "NewPayloadV3 Versioned Hashes, Extra Hash, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is has an extra hash for a blob that is not in the payload.
@@ -1151,7 +1151,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Out of Order",
+			Name: "NewPayloadV3 Versioned Hashes, Out of Order, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is out of order.
@@ -1183,7 +1183,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash",
+			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
@@ -1215,7 +1215,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash",
+			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob hash that does not belong to any blob contained in the payload.
@@ -1246,7 +1246,7 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version",
+			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a single blob that has an incorrect version.
@@ -1279,7 +1279,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes",
+			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is nil, even though the fork has already happened.
@@ -1311,7 +1311,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes",
+			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is empty, even though there are blobs in the payload.
@@ -1343,7 +1343,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes",
+			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes, Syncing=False",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is contains hashes, even though there are no blobs in the payload.
@@ -1372,7 +1372,7 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Missing Hash (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Missing Hash, Syncing=True",
 			About: `
 				Tests VersionedHashes in Engine API NewPayloadV3 where the array
 				is missing one of the hashes.
@@ -1411,7 +1411,7 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Extra Hash (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Extra Hash, Syncing=True",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is has an extra hash for a blob that is not in the payload.
@@ -1452,7 +1452,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Out of Order (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Out of Order, Syncing=True",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is out of order.
@@ -1490,7 +1490,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash, Syncing=True",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
@@ -1529,7 +1529,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash, Syncing=True",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
@@ -1567,7 +1567,7 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version, Syncing=True",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a single blob that has an incorrect version.
@@ -1607,7 +1607,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes, Syncing=True",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is nil, even though the fork has already happened.
@@ -1646,7 +1646,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes, Syncing=True",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is empty, even though there are blobs in the payload.
@@ -1685,7 +1685,7 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes (Syncing)",
+			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes, Syncing=True",
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is contains hashes, even though there are no blobs in the payload.
@@ -1722,7 +1722,7 @@ var Tests = []test.Spec{
 	// and can be executed using `pyspec` simulator.
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "Incorrect BlobGasUsed: Non-Zero on Zero Blobs",
+			Name: "Incorrect BlobGasUsed, Non-Zero on Zero Blobs",
 			About: `
 			Send a payload with zero blobs, but non-zero BlobGasUsed.
 			`,
@@ -1742,7 +1742,7 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Incorrect BlobGasUsed: GAS_PER_BLOB on Zero Blobs",
+			Name: "Incorrect BlobGasUsed, GAS_PER_BLOB on Zero Blobs",
 			About: `
 			Send a payload with zero blobs, but non-zero BlobGasUsed.
 			`,

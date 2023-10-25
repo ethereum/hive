@@ -130,17 +130,19 @@ func (s TransactionReOrgTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (s TransactionReOrgTest) GetName() string {
-	name := "Transaction Re-Org"
-	if s.ReorgOut {
-		name += ", Re-Org Out"
-	}
+	reOrgType := "Out Of Block"
 	if s.ReorgDifferentBlock {
-		name += ", Re-Org to Different Block"
+		reOrgType = "To Different Block"
 	}
+	payloadOnRevertStatus := "False"
 	if s.NewPayloadOnRevert {
-		name += ", New Payload on Revert Back"
+		payloadOnRevertStatus = "True"
 	}
-	return name
+	return fmt.Sprintf(
+		"Transaction ReOrg %s, NewPayloadOnRevert=%s",
+		reOrgType,
+		payloadOnRevertStatus,
+	)
 }
 
 // Test transaction status after a forkchoiceUpdated re-orgs to an alternative hash where a transaction is not present
@@ -323,7 +325,7 @@ func (s ReOrgBackToCanonicalTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (s ReOrgBackToCanonicalTest) GetName() string {
-	name := fmt.Sprintf("Re-Org Back into Canonical Chain (Depth: %d)", s.ReOrgDepth)
+	name := fmt.Sprintf("Re-Org Back into Canonical Chain, Depth=%d", s.ReOrgDepth)
 
 	if s.ExecuteSidePayloadOnReOrg {
 		name += ", Execute Side Payload on Re-Org"
@@ -544,7 +546,7 @@ func (s ReOrgPrevValidatedPayloadOnSideChainTest) WithMainFork(fork config.Fork)
 }
 
 func (s ReOrgPrevValidatedPayloadOnSideChainTest) GetName() string {
-	name := "Import and re-org to previously validated payload on a side chain"
+	name := "Re-org to Previously Validated Sidechain Payload"
 	return name
 }
 

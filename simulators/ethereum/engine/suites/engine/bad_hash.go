@@ -152,9 +152,11 @@ func (s ParentHashOnNewPayload) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (p ParentHashOnNewPayload) GetName() string {
-	name := "ParentHash==BlockHash on NewPayload"
+	name := "ParentHash equals BlockHash on NewPayload,"
 	if p.Syncing {
-		name += " (Syncing)"
+		name += " Syncing=True"
+	} else {
+		name += " Syncing=False"
 	}
 	return name
 }

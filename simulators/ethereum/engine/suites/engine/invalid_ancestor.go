@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -40,16 +39,16 @@ func (s InvalidMissingAncestorReOrgTest) WithMainFork(fork config.Fork) test.Spe
 }
 
 func (tc InvalidMissingAncestorReOrgTest) GetName() string {
-	name := []string{
-		"Invalid Missing Ancestor ReOrg",
-		fmt.Sprintf("Invalid %s", tc.InvalidField),
-	}
+	emptyTxsStatus := "False"
 	if tc.EmptyTransactions {
-		name = append(name, "Empty Txs")
+		emptyTxsStatus = "True"
 	}
-	name = append(name, fmt.Sprintf("Invalid P%d'", tc.InvalidIndex))
-
-	return strings.Join(name, ", ")
+	return fmt.Sprintf(
+		"Invalid Missing Ancestor ReOrg, %s, EmptyTxs=%s, Invalid P%d",
+		tc.InvalidField,
+		emptyTxsStatus,
+		tc.InvalidIndex,
+	)
 }
 
 func (tc InvalidMissingAncestorReOrgTest) Execute(t *test.Env) {
@@ -207,21 +206,21 @@ func (s InvalidMissingAncestorReOrgSyncTest) WithMainFork(fork config.Fork) test
 }
 
 func (tc InvalidMissingAncestorReOrgSyncTest) GetName() string {
-	name := []string{
-		"Invalid Missing Ancestor ReOrg",
-		fmt.Sprintf("Invalid %s", tc.InvalidField),
-	}
+	emptyTxsStatus := "False"
 	if tc.EmptyTransactions {
-		name = append(name, "Empty Txs")
+		emptyTxsStatus = "True"
 	}
-	name = append(name,
-		fmt.Sprintf("Invalid P%d'", tc.InvalidIndex),
-		"Reveal using sync",
-	)
+	canonicalReOrgStatus := "False"
 	if tc.ReOrgFromCanonical {
-		name = append(name, "ReOrg from Canonical")
+		canonicalReOrgStatus = "True"
 	}
-	return strings.Join(name, ", ")
+	return fmt.Sprintf(
+		"Invalid Missing Ancestor Syncing ReOrg, %s, EmptyTxs=%s, CanonicalReOrg=%s, Invalid P%d",
+		tc.InvalidField,
+		emptyTxsStatus,
+		canonicalReOrgStatus,
+		tc.InvalidIndex,
+	)
 }
 
 func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {

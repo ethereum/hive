@@ -42,17 +42,25 @@ func (s InvalidPayloadTestCase) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (i InvalidPayloadTestCase) GetName() string {
-	name := fmt.Sprintf("Invalid %s NewPayload", i.InvalidField)
+	syncStatus := "False"
 	if i.Syncing {
-		name += " - Syncing"
+		syncStatus = "True"
 	}
+	emptyTxsStatus := "False"
 	if i.EmptyTransactions {
-		name += " - Empty Transactions"
+		emptyTxsStatus = "True"
 	}
+	dynFeeTxsStatus := "False"
 	if i.BaseSpec.TestTransactionType == helper.DynamicFeeTxOnly {
-		name += fmt.Sprintf(" - %s", i.BaseSpec.TestTransactionType)
+		dynFeeTxsStatus = "True"
 	}
-	return name
+	return fmt.Sprintf(
+		"Invalid NewPayload, %s, Syncing=%s, EmptyTxs=%s, DynFeeTxs=%s",
+		i.InvalidField,
+		syncStatus,
+		emptyTxsStatus,
+		dynFeeTxsStatus,
+	)
 }
 
 func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
@@ -400,7 +408,7 @@ func (s InvalidTxChainIDTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (s InvalidTxChainIDTest) GetName() string {
-	name := fmt.Sprintf("Build Payload with Invalid ChainID Transaction (%s)", s.TestTransactionType)
+	name := fmt.Sprintf("Build Payload with Invalid ChainID Transaction, %s", s.TestTransactionType)
 	return name
 }
 

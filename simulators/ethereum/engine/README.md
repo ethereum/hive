@@ -114,7 +114,7 @@ Send a NewPayload directive to the client including an incorrect BlockHash, shou
    - NewPayload while syncing, on canonical chain
    - NewPayload while syncing, on side chain
 
-- ParentHash==BlockHash on NewPayload:  
+- ParentHash equals BlockHash on NewPayload:  
 Send a NewPayload directive to the client including ParentHash that is equal to the BlockHash (Incorrect hash).
 
 - Invalid Transition Payload:
@@ -176,10 +176,10 @@ Test that performing a re-org back into a previous block of the canonical chain 
 Build an alternative chain of 10 payloads.
 Perform `newPayload(P10')` + `fcU(P10')`, which should result in client `SYNCING`. Verify that the client can re-org back to the canonical chain after sending `newPayload(P11)` + `fcU(P11)`.
 
-- Import and re-org to previously validated payload on a side chain:
+- Re-org to Previously Validated Sidechain Payload:
 Attempt to re-org to one of the sidechain (previously validated) payloads, but not the leaf, and also build a new payload from this sidechain.
 
-- Safe Re-Org to Side Chain
+- Safe Re-Org to Side Chain:
 Perform a re-org of the safe block (and head block) to a valid sidechain.
 
 ### Suggested Fee Recipient in Payload creation
