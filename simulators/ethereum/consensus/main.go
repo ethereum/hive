@@ -331,7 +331,7 @@ func main() {
 	suite := hivesim.Suite{
 		Name: "consensus",
 		Description: "The 'consensus' test suite executes BlockchainTests from the " +
-			"offical test repository (https://github.com/ethereum/tests). For every test, it starts an instance of the client, " +
+			"official test repository (https://github.com/ethereum/tests). For every test, it starts an instance of the client, " +
 			"and makes it import the RLP blocks. After import phase, the node is queried about it's latest blocks, which is matched " +
 			"to the expected last blockhash according to the test.",
 	}

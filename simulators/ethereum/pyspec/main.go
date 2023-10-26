@@ -22,7 +22,7 @@ func main() {
 		Name: "pyspec",
 		Description: "The pyspec test suite runs every fixture from " +
 			"the execution-spec-tests repo (https://github.com/ethereum/execution-spec-tests) where the fork >= Merge. " +
-			"For each test clients are first fed the fixture genesis data followed by engine new payloads specfic to the test.",
+			"For each test clients are first fed the fixture genesis data followed by engine new payloads specific to the test.",
 	}
 	suite.Add(hivesim.TestSpec{
 		Name: "pytest_fixture_runner",
