@@ -7,12 +7,17 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
+	"github.com/ethereum/go-ethereum/consensus/clique"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
+	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/trie"
 	"golang.org/x/exp/slices"
 )
@@ -98,15 +103,20 @@ func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 // run produces a chain.
 func (g *generator) run() error {
 	db := rawdb.NewMemoryDatabase()
+	cliqueEngine := clique.New(g.genesis.Config.Clique, db)
+	cliqueEngine.Authorize(cliqueSignerAddr, func(signer accounts.Account, mimeType string, message []byte) ([]byte, error) {
+		sig, err := crypto.Sign(crypto.Keccak256(message), cliqueSignerKey)
+		return sig, err
+	})
+	instaEngine := instaSeal{cliqueEngine}
+	posEngine := beacon.New(instaEngine)
+	engine := posEngine
+
 	trieconfig := *trie.HashDefaults
 	trieconfig.Preimages = true
 	triedb := trie.NewDatabase(db, &trieconfig)
 	genesis := g.genesis.MustCommit(db, triedb)
 	config := g.genesis.Config
-
-	powEngine := ethash.NewFaker()
-	posEngine := beacon.New(powEngine)
-	engine := posEngine
 
 	// Create the PoW chain.
 	chain, _ := core.GenerateChain(config, genesis, engine, db, g.cfg.chainLength, g.modifyBlock)
@@ -120,6 +130,8 @@ func (g *generator) run() error {
 		return fmt.Errorf("can't create blockchain: %v", err)
 	}
 	defer blockchain.Stop()
+
+	// Import the chain. This runs all block validation rules.
 	if i, err := blockchain.InsertChain(chain); err != nil {
 		return fmt.Errorf("chain validation error (block %d): %v", chain[i].Number(), err)
 	}
@@ -142,19 +154,16 @@ func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
 		mergeblock = new(big.Int).SetUint64(math.MaxUint64)
 	}
 	mergecmp := gen.Number().Cmp(mergeblock)
-	if mergecmp > 0 {
+	switch {
+	case mergecmp > 0:
 		gen.SetPoS()
-		return
-	}
-
-	prev := gen.PrevBlock(i - 1)
-	diff := ethash.CalcDifficulty(g.genesis.Config, gen.Timestamp(), prev.Header())
-	if mergecmp == 0 {
+	case mergecmp == 0:
 		gen.SetPoS()
 		chaincfg.TerminalTotalDifficulty = new(big.Int).Set(g.td)
-	} else {
-		g.td = g.td.Add(g.td, diff)
-		gen.SetDifficulty(diff)
+	default:
+		g.td = g.td.Add(g.td, gen.Difficulty())
+		// clique requires the block to have empty extra-data before sealing.
+		gen.SetExtra(make([]byte, 32+65))
 	}
 }
 
@@ -187,4 +196,22 @@ func (g *generator) runModifiers(i int, gen *core.BlockGen) {
 			refused++
 		}
 	}
+}
+
+// instaSeal wraps a consensus engine with instant block sealing. When a block is produced
+// using FinalizeAndAssemble, it also applies Seal.
+type instaSeal struct{ consensus.Engine }
+
+// FinalizeAndAssemble implements consensus.Engine, accumulating the block and uncle rewards,
+// setting the final state and assembling the block.
+func (e instaSeal) FinalizeAndAssemble(chain consensus.ChainHeaderReader, header *types.Header, state *state.StateDB, txs []*types.Transaction, uncles []*types.Header, receipts []*types.Receipt, withdrawals []*types.Withdrawal) (*types.Block, error) {
+	block, err := e.Engine.FinalizeAndAssemble(chain, header, state, txs, uncles, receipts, withdrawals)
+	if err != nil {
+		return nil, err
+	}
+	sealedBlock := make(chan *types.Block, 1)
+	if err = e.Engine.Seal(chain, block, sealedBlock, nil); err != nil {
+		return nil, err
+	}
+	return <-sealedBlock, nil
 }

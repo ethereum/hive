@@ -1,11 +1,13 @@
 package main
 
 import (
+	"crypto/ecdsa"
 	"fmt"
 	"math/big"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/core"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
 	"golang.org/x/exp/slices"
 )
@@ -13,9 +15,15 @@ import (
 var initialBalance, _ = new(big.Int).SetString("1000000000000000000000000000000000000", 10)
 
 const (
-	ethashMinimumDifficulty = 131072
-	genesisBaseFee          = params.InitialBaseFee
-	blocktimeSec            = 10 // hard-coded in core.GenerateChain
+	genesisDifficulty = 1
+	genesisBaseFee    = params.InitialBaseFee
+	blocktimeSec      = 10 // hard-coded in core.GenerateChain
+	cliqueEpoch       = 30000
+)
+
+var (
+	cliqueSignerKey  = knownAccounts[8].key
+	cliqueSignerAddr = crypto.PubkeyToAddress(cliqueSignerKey.PublicKey)
 )
 
 // Ethereum mainnet forks in order of introduction.
@@ -52,7 +60,10 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 
 	chainid, _ := new(big.Int).SetString("3503995874084926", 10)
 	chaincfg.ChainID = chainid
-	chaincfg.Ethash = new(params.EthashConfig)
+	chaincfg.Clique = &params.CliqueConfig{
+		Period: blocktimeSec,
+		Epoch:  cliqueEpoch,
+	}
 
 	// Apply forks.
 	forks := cfg.forkBlocks()
@@ -104,7 +115,7 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 	// Special case for merged-from-genesis networks.
 	// Need to assign TTD here because the genesis block won't be processed by GenerateChain.
 	if chaincfg.MergeNetsplitBlock != nil && chaincfg.MergeNetsplitBlock.Sign() == 0 {
-		chaincfg.TerminalTotalDifficulty = big.NewInt(ethashMinimumDifficulty)
+		chaincfg.TerminalTotalDifficulty = big.NewInt(genesisDifficulty)
 	}
 
 	return chaincfg
@@ -116,8 +127,8 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	g.Config = cfg.createChainConfig()
 
 	// Block attributes.
-	g.Difficulty = big.NewInt(ethashMinimumDifficulty)
-	g.ExtraData = []byte("hivechain")
+	g.Difficulty = big.NewInt(genesisDifficulty)
+	g.ExtraData = cliqueInit(cliqueSignerKey)
 	g.GasLimit = params.GenesisGasLimit * 8
 	zero := new(big.Int)
 	if g.Config.IsLondon(zero) {
@@ -172,4 +183,13 @@ func (cfg *generatorConfig) lastForkIndex() int {
 
 func (cfg *generatorConfig) blockTimestamp(num uint64) uint64 {
 	return num * blocktimeSec
+}
+
+// cliqueInit creates the genesis extradata for a clique network with one signer.
+func cliqueInit(signer *ecdsa.PrivateKey) []byte {
+	vanity := make([]byte, 32)
+	copy(vanity, "hivechain")
+	d := append(vanity, cliqueSignerAddr[:]...)
+	d = append(d, make([]byte, 65)...) // signature
+	return d
 }
