@@ -174,10 +174,6 @@ func (g *generator) runModifiers(i int, gen *core.BlockGen) {
 	}
 
 	ctx := &genBlockContext{index: i, block: gen, gen: g}
-	if gen.Number().Uint64() > 0 {
-		prev := gen.PrevBlock(-1)
-		ctx.gasLimit = core.CalcGasLimit(prev.GasLimit(), g.genesis.GasLimit)
-	}
 
 	// Modifier scheduling: we cycle through the available modifiers until enough have
 	// executed successfully. It also stops when all of them return false from apply()
