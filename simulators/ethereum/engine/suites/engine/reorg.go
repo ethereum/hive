@@ -529,12 +529,16 @@ func (spec ReOrgBackToCanonicalTest) Execute(t *test.Env) {
 				// Send a fcU with the HeadBlockHash pointing back to the previous block
 				forkchoiceUpdatedBack := api.ForkchoiceStateV1{
 					HeadBlockHash:      previousHash,
-					SafeBlockHash:      previousHash,
-					FinalizedBlockHash: previousHash,
+					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
+					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				}
 
 				// It is only expected that the client does not produce an error and the CL Mocker is able to progress after the re-org
 				r := t.TestEngine.TestEngineForkchoiceUpdated(&forkchoiceUpdatedBack, nil, previousTimestamp)
+				r.ExpectNoError()
+
+				// Re-send the ForkchoiceUpdated that the CLMock had sent
+				r = t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil, t.CLMock.LatestExecutedPayload.Timestamp)
 				r.ExpectNoError()
 			},
 		})
