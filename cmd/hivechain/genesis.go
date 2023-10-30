@@ -60,9 +60,15 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 
 	chainid, _ := new(big.Int).SetString("3503995874084926", 10)
 	chaincfg.ChainID = chainid
-	chaincfg.Clique = &params.CliqueConfig{
-		Period: blocktimeSec,
-		Epoch:  cliqueEpoch,
+
+	// Set consensus algorithm.
+	if cfg.clique {
+		chaincfg.Clique = &params.CliqueConfig{
+			Period: blocktimeSec,
+			Epoch:  cliqueEpoch,
+		}
+	} else {
+		chaincfg.Ethash = new(params.EthashConfig)
 	}
 
 	// Apply forks.

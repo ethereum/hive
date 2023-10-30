@@ -12,12 +12,14 @@ import (
 	"github.com/ethereum/go-ethereum/consensus"
 	"github.com/ethereum/go-ethereum/consensus/beacon"
 	"github.com/ethereum/go-ethereum/consensus/clique"
+	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/trie"
 	"golang.org/x/exp/slices"
 )
@@ -27,6 +29,7 @@ type generatorConfig struct {
 	// genesis options
 	forkInterval int    // number of blocks between forks
 	lastFork     string // last enabled fork
+	clique       bool   // create a clique chain
 
 	// chain options
 	txInterval  int // frequency of blocks containing transactions
@@ -100,26 +103,19 @@ func (cfg *generatorConfig) createBlockModifiers() (list []*modifierInstance) {
 	return list
 }
 
-// run produces a chain.
+// run produces a chain and writes it.
 func (g *generator) run() error {
 	db := rawdb.NewMemoryDatabase()
-	cliqueEngine := clique.New(g.genesis.Config.Clique, db)
-	cliqueEngine.Authorize(cliqueSignerAddr, func(signer accounts.Account, mimeType string, message []byte) ([]byte, error) {
-		sig, err := crypto.Sign(crypto.Keccak256(message), cliqueSignerKey)
-		return sig, err
-	})
-	instaEngine := instaSeal{cliqueEngine}
-	posEngine := beacon.New(instaEngine)
-	engine := posEngine
+	engine := g.createConsensusEngine(db)
 
+	// Init genesis block.
 	trieconfig := *trie.HashDefaults
 	trieconfig.Preimages = true
 	triedb := trie.NewDatabase(db, &trieconfig)
 	genesis := g.genesis.MustCommit(db, triedb)
-	config := g.genesis.Config
 
 	// Create the blocks.
-	chain, _ := core.GenerateChain(config, genesis, engine, db, g.cfg.chainLength, g.modifyBlock)
+	chain, _ := core.GenerateChain(g.genesis.Config, genesis, engine, db, g.cfg.chainLength, g.modifyBlock)
 
 	// Import the chain. This runs all block validation rules.
 	bc, err := g.importChain(engine, chain)
@@ -129,6 +125,21 @@ func (g *generator) run() error {
 
 	g.blockchain = bc
 	return g.write()
+}
+
+func (g *generator) createConsensusEngine(db ethdb.Database) consensus.Engine {
+	var inner consensus.Engine
+	if g.genesis.Config.Clique != nil {
+		cliqueEngine := clique.New(g.genesis.Config.Clique, db)
+		cliqueEngine.Authorize(cliqueSignerAddr, func(signer accounts.Account, mimeType string, message []byte) ([]byte, error) {
+			sig, err := crypto.Sign(crypto.Keccak256(message), cliqueSignerKey)
+			return sig, err
+		})
+		inner = instaSeal{cliqueEngine}
+	} else {
+		inner = ethash.NewFaker()
+	}
+	return beacon.New(inner)
 }
 
 func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (*core.BlockChain, error) {
@@ -151,7 +162,9 @@ func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (
 
 func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 	fmt.Println("generating block", gen.Number())
-	g.setClique(i, gen)
+	if g.genesis.Config.Clique != nil {
+		g.setClique(i, gen)
+	}
 	g.setDifficulty(i, gen)
 	g.runModifiers(i, gen)
 }

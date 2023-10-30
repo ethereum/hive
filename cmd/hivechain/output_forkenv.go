@@ -14,8 +14,12 @@ func (g *generator) writeForkEnv() error {
 	env["HIVE_CHAIN_ID"] = fmt.Sprint(cfg.ChainID)
 	env["HIVE_NETWORK_ID"] = fmt.Sprint(cfg.ChainID)
 
-	// enable clique
-	env["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(blocktimeSec)
+	// config consensus algorithm
+	if cfg.Clique != nil {
+		env["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(cfg.Clique.Period)
+	} else {
+		env["HIVE_SKIP_POW"] = "1"
+	}
 
 	// forks
 	setNum := func(hive string, blocknum *big.Int) {
