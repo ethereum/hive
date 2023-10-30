@@ -39,7 +39,6 @@
 #
 #  - HIVE_MINER                   enable mining. value is coinbase address.
 #  - HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
-#  - HIVE_SKIP_POW                if set, skip PoW verification during block import
 #  - HIVE_LOGLEVEL                client loglevel (0-5)
 #  - HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 #  - HIVE_LES_SERVER              set to '1' to enable LES server
