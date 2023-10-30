@@ -16,15 +16,18 @@
     "grayGlacierBlock": 110,
     "mergeNetsplitBlock": 120,
     "shanghaiTime": 1300,
-    "terminalTotalDifficulty": 15736896,
+    "terminalTotalDifficulty": 239,
     "terminalTotalDifficultyPassed": true,
-    "ethash": {}
+    "clique": {
+      "period": 10,
+      "epoch": 30000
+    }
   },
   "nonce": "0x0",
   "timestamp": "0x0",
-  "extraData": "0x68697665636861696e",
+  "extraData": "0x68697665636861696e00000000000000000000000000000000000000000000002d389075be5be9f2246ad654ce152cf05990b2090000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
   "gasLimit": "0x23f3e20",
-  "difficulty": "0x20000",
+  "difficulty": "0x1",
   "mixHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
   "coinbase": "0x0000000000000000000000000000000000000000",
   "alloc": {
