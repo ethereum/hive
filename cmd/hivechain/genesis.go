@@ -15,10 +15,9 @@ import (
 var initialBalance, _ = new(big.Int).SetString("1000000000000000000000000000000000000", 10)
 
 const (
-	genesisDifficulty = 1
-	genesisBaseFee    = params.InitialBaseFee
-	blocktimeSec      = 10 // hard-coded in core.GenerateChain
-	cliqueEpoch       = 30000
+	genesisBaseFee = params.InitialBaseFee
+	blocktimeSec   = 10 // hard-coded in core.GenerateChain
+	cliqueEpoch    = 30000
 )
 
 var (
@@ -121,10 +120,17 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 	// Special case for merged-from-genesis networks.
 	// Need to assign TTD here because the genesis block won't be processed by GenerateChain.
 	if chaincfg.MergeNetsplitBlock != nil && chaincfg.MergeNetsplitBlock.Sign() == 0 {
-		chaincfg.TerminalTotalDifficulty = big.NewInt(genesisDifficulty)
+		chaincfg.TerminalTotalDifficulty = cfg.genesisDifficulty()
 	}
 
 	return chaincfg
+}
+
+func (cfg *generatorConfig) genesisDifficulty() *big.Int {
+	if cfg.clique {
+		return big.NewInt(1)
+	}
+	return new(big.Int).Set(params.MinimumDifficulty)
 }
 
 // createGenesis creates the genesis block and config.
@@ -133,8 +139,12 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	g.Config = cfg.createChainConfig()
 
 	// Block attributes.
-	g.Difficulty = big.NewInt(genesisDifficulty)
-	g.ExtraData = cliqueInit(cliqueSignerKey)
+	g.Difficulty = cfg.genesisDifficulty()
+	if cfg.clique {
+		g.ExtraData = cliqueInit(cliqueSignerKey)
+	} else {
+		g.ExtraData = []byte("hivechain")
+	}
 	g.GasLimit = params.GenesisGasLimit * 8
 	zero := new(big.Int)
 	if g.Config.IsLondon(zero) {
