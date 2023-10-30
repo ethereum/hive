@@ -171,7 +171,7 @@ func (cfg *generatorConfig) forkBlocks() map[string]uint64 {
 
 // lastForkIndex returns the index of the latest enabled for in allForkNames.
 func (cfg *generatorConfig) lastForkIndex() int {
-	if cfg.lastFork == "" {
+	if cfg.lastFork == "" || cfg.lastFork == "frontier" {
 		return len(allForkNames) - 1
 	}
 	index := slices.Index(allForkNames, strings.ToLower(cfg.lastFork))
