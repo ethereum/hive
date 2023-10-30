@@ -176,11 +176,10 @@ func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
 	if mergeblock == nil {
 		mergeblock = new(big.Int).SetUint64(math.MaxUint64)
 	}
-	mergecmp := gen.Number().Cmp(mergeblock)
-	switch {
-	case mergecmp > 0:
+	switch gen.Number().Cmp(mergeblock) {
+	case 1:
 		gen.SetPoS()
-	case mergecmp == 0:
+	case 0:
 		gen.SetPoS()
 		chaincfg.TerminalTotalDifficulty = new(big.Int).Set(g.td)
 	default:
