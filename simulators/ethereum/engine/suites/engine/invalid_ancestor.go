@@ -359,6 +359,12 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 			}
 		},
 	})
+
+	if !tc.ReOrgFromCanonical {
+		// Add back the original client before side chain production
+		t.CLMock.AddEngineClient(t.Engine)
+	}
+
 	t.Log("INFO: Starting side chain production")
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Note: We perform the test in the middle of payload creation by the CL Mock, in order to be able to
