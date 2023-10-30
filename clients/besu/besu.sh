@@ -35,7 +35,6 @@
 #
 #  - HIVE_MINER                enables mining. value is coinbase.
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
-#  - HIVE_SKIP_POW             If set, skip PoW verification
 #  - HIVE_LOGLEVEL             Client log level
 #  - HIVE_GRAPHQL_ENABLED      If set, GraphQL is enabled on port 8545 and RPC is disabled
 #
@@ -85,10 +84,8 @@ fi
 # The client should start after loading the blocks, this option configures it.
 IMPORTFLAGS="--run"
 
-# Disable PoW check if requested.
-if [ -n "$HIVE_SKIP_POW" ]; then
-    IMPORTFLAGS="$IMPORTFLAGS --skip-pow-validation-enabled"
-fi
+# Skip PoW checks on import.
+IMPORTFLAGS="$IMPORTFLAGS --skip-pow-validation-enabled"
 
 # Load chain.rlp if present.
 if [ -f /chain.rlp ]; then
