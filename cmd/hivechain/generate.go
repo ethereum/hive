@@ -118,33 +118,56 @@ func (g *generator) run() error {
 	genesis := g.genesis.MustCommit(db, triedb)
 	config := g.genesis.Config
 
-	// Create the PoW chain.
+	// Create the blocks.
 	chain, _ := core.GenerateChain(config, genesis, engine, db, g.cfg.chainLength, g.modifyBlock)
 
 	// Import the chain. This runs all block validation rules.
+	bc, err := g.importChain(engine, chain)
+	if err != nil {
+		return err
+	}
+
+	g.blockchain = bc
+	return g.write()
+}
+
+func (g *generator) importChain(engine consensus.Engine, chain []*types.Block) (*core.BlockChain, error) {
+	db := rawdb.NewMemoryDatabase()
 	cacheconfig := core.DefaultCacheConfigWithScheme("hash")
 	cacheconfig.Preimages = true
 	vmconfig := vm.Config{EnablePreimageRecording: true}
 	blockchain, err := core.NewBlockChain(db, cacheconfig, g.genesis, nil, engine, vmconfig, nil, nil)
 	if err != nil {
-		return fmt.Errorf("can't create blockchain: %v", err)
-	}
-	defer blockchain.Stop()
-
-	// Import the chain. This runs all block validation rules.
-	if i, err := blockchain.InsertChain(chain); err != nil {
-		return fmt.Errorf("chain validation error (block %d): %v", chain[i].Number(), err)
+		return nil, fmt.Errorf("can't create blockchain: %v", err)
 	}
 
-	// Write the outputs.
-	g.blockchain = blockchain
-	return g.write()
+	i, err := blockchain.InsertChain(chain)
+	if err != nil {
+		blockchain.Stop()
+		return nil, fmt.Errorf("chain validation error (block %d): %v", chain[i].Number(), err)
+	}
+	return blockchain, nil
 }
 
 func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 	fmt.Println("generating block", gen.Number())
+	g.setClique(i, gen)
 	g.setDifficulty(i, gen)
 	g.runModifiers(i, gen)
+}
+
+func (g *generator) setClique(i int, gen *core.BlockGen) {
+	mergeblock := g.genesis.Config.MergeNetsplitBlock
+	if mergeblock != nil && gen.Number().Cmp(mergeblock) >= 0 {
+		return
+	}
+
+	gen.SetCoinbase(cliqueSignerAddr)
+	// Add a positive vote to keep the signer in the set.
+	gen.SetNonce(types.BlockNonce{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
+	// The clique engine requires the block to have blank extra-data of the correct length
+	// before sealing.
+	gen.SetExtra(make([]byte, 32+65))
 }
 
 func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
@@ -162,8 +185,6 @@ func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
 		chaincfg.TerminalTotalDifficulty = new(big.Int).Set(g.td)
 	default:
 		g.td = g.td.Add(g.td, gen.Difficulty())
-		// clique requires the block to have empty extra-data before sealing.
-		gen.SetExtra(make([]byte, 32+65))
 	}
 }
 
