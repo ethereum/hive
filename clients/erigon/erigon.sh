@@ -21,8 +21,6 @@
 #  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/Petersburg transition
 #  - HIVE_FORK_ISTANBUL        block number for Istanbul transition
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
-#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
-#  - HIVE_LOGLEVEL             client log level
 #  - HIVE_MINER                address to credit with mining rewards
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #
@@ -47,9 +45,8 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --staticpeers $HIVE_BOOTNODE --nodiscover"
 fi
 
-if [ "$HIVE_SKIP_POW" != "" ]; then
-    FLAGS="$FLAGS --fakepow"
-fi
+# Disable PoW validation.
+FLAGS="$FLAGS --fakepow"
 
 # Create the data directory.
 mkdir /erigon-hive-datadir
