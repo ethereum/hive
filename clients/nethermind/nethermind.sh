@@ -15,7 +15,6 @@
 #  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
 #  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
-#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
 #
 # Forks:
 #
