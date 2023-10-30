@@ -60,7 +60,8 @@ func runSourceTest(t *hivesim.T, c *hivesim.Client, params hivesim.Params) {
 		t.Fatal(err)
 	}
 
-	// Send forkchoiceUpdated to ensure the client shares this block with others.
+	// Send forkchoiceUpdated to the source. This is to make the client really
+	// consider itself synced.
 	if err := source.sendForkchoiceUpdated(t); err != nil {
 		t.Fatal(err)
 	}
@@ -221,7 +222,7 @@ func conv2any[T any](s []T) []any {
 }
 
 func jsonString(v any) string {
-	enc, err := json.Marshal(v)
+	enc, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return fmt.Sprint(v)
 	}
