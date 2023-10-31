@@ -3,8 +3,8 @@ module github.com/ethereum/hive/simulators/ethereum/pyspec
 go 1.20
 
 require (
-	github.com/ethereum/go-ethereum v1.13.1
-	github.com/ethereum/hive v0.0.0-20230919110229-d58aec4a3eb5
+	github.com/ethereum/go-ethereum v1.13.5-0.20231031113925-bc42e88415d3
+	github.com/ethereum/hive v0.0.0-20231031133732-dcd7ddb75960
 	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20230919054339-322945164a97
 )
 
@@ -23,10 +23,10 @@ require (
 	github.com/cockroachdb/tokenbucket v0.0.0-20230807174530-cc333fc44b06 // indirect
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
-	github.com/crate-crypto/go-kzg-4844 v0.6.1-0.20231019121413-3621cc59f0c7 // indirect
+	github.com/crate-crypto/go-kzg-4844 v0.7.0 // indirect
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
-	github.com/ethereum/c-kzg-4844 v0.3.2-0.20231019020040-748283cced54 // indirect
+	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
 	github.com/getsentry/sentry-go v0.18.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
