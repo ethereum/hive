@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/p2p/enode"
@@ -20,8 +21,9 @@ import (
 
 // Simulation wraps the simulation HTTP API provided by hive.
 type Simulation struct {
-	url string
-	m   testMatcher
+	url      string
+	m        testMatcher
+	ll int
 }
 
 // New looks up the hive host URI using the HIVE_SIMULATOR environment variable
@@ -41,6 +43,9 @@ func New() *Simulation {
 			fmt.Fprintln(os.Stderr, "Warning: ignoring invalid test pattern regexp: "+err.Error())
 		}
 		sim.m = m
+	}
+	if ll := os.Getenv("HIVE_LOGLEVEL"); ll != "" {
+		sim.ll, _ = strconv.Atoi(ll)
 	}
 	return sim
 }

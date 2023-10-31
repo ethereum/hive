@@ -50,7 +50,9 @@ func MustRun(host *Simulation, suites ...Suite) {
 // RunSuite runs all tests in a suite.
 func RunSuite(host *Simulation, suite Suite) error {
 	if !host.m.match(suite.Name, "") {
-		fmt.Fprintf(os.Stderr, "skipping suite %q because it doesn't match test pattern %s\n", suite.Name, host.m.pattern)
+		if host.ll > 3 { // hive log level > 3
+			fmt.Fprintf(os.Stderr, "skipping suite %q because it doesn't match test pattern %s\n", suite.Name, host.m.pattern)
+		}
 		return nil
 	}
 
@@ -82,13 +84,12 @@ func MustRunSuite(host *Simulation, suite Suite) {
 // Using this test type doesn't launch any clients by default. To interact with clients,
 // you can launch them using the t.Client method:
 //
-//    c := t.Client()
-//    c.RPC().Call(...)
+//	c := t.Client()
+//	c.RPC().Call(...)
 //
 // or run a subtest using t.RunClientTest():
 //
-//    t.RunClientTest(hivesim.ClientTestSpec{...})
-//
+//	t.RunClientTest(hivesim.ClientTestSpec{...})
 type TestSpec struct {
 	// These fields are displayed in the UI. Be sure to add
 	// a meaningful description here.
@@ -306,7 +307,9 @@ type testSpec struct {
 
 func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
 	if !test.alwaysRun && !host.m.match(test.suite.Name, test.name) {
-		fmt.Fprintf(os.Stderr, "skipping test %q because it doesn't match test pattern %s\n", test.name, host.m.pattern)
+		if host.ll > 3 { // hive log level > 3
+			fmt.Fprintf(os.Stderr, "skipping test %q because it doesn't match test pattern %s\n", test.name, host.m.pattern)
+		}
 		return nil
 	}
 
