@@ -66,6 +66,7 @@ func generateCommand(args []string) {
 	flag.IntVar(&cfg.forkInterval, "fork-interval", 0, "Number of blocks between fork activations")
 	flag.StringVar(&cfg.outputDir, "outdir", ".", "Destination directory")
 	flag.StringVar(&cfg.lastFork, "lastfork", "", "Name of the last fork to activate")
+	flag.BoolVar(&cfg.clique, "clique", false, "Create a clique chain")
 	flag.CommandLine.Parse(args)
 
 	if *outlist != "" {
