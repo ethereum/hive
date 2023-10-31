@@ -34,7 +34,7 @@ var Tests = []test.Spec{
 			Name: "Blob Transactions On Block 1, Shanghai Genesis",
 			About: `
 			Tests the Cancun fork since Block 1.
-
+	
 			Verifications performed:
 			- Correct implementation of Engine API changes for Cancun:
 			  - engine_newPayloadV3, engine_forkchoiceUpdatedV3, engine_getPayloadV3
@@ -60,7 +60,7 @@ var Tests = []test.Spec{
 			// with enough data gas cost to make sure they are included in the first block.
 			SendBlobTransactions{
 				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
-				BlobTransactionMaxBlobGasCost: big.NewInt(1),
+				BlobTransactionMaxBlobGasCost: big.NewInt(1000000000),
 			},
 
 			// We create the first payload, and verify that the blob transactions
@@ -76,7 +76,7 @@ var Tests = []test.Spec{
 			SendBlobTransactions{
 				TransactionCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(cancun.MAX_BLOBS_PER_BLOCK-cancun.TARGET_BLOBS_PER_BLOCK) + 1,
 				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
-				BlobTransactionMaxBlobGasCost: big.NewInt(1),
+				BlobTransactionMaxBlobGasCost: big.NewInt(1000000000),
 			},
 
 			// Next payloads will have max data blobs each
@@ -104,7 +104,7 @@ var Tests = []test.Spec{
 			Name: "Blob Transactions On Block 1, Cancun Genesis",
 			About: `
 			Tests the Cancun fork since genesis.
-
+	
 			Verifications performed:
 			* See Blob Transactions On Block 1, Shanghai Genesis
 			`,
@@ -117,7 +117,7 @@ var Tests = []test.Spec{
 			// with enough data gas cost to make sure they are included in the first block.
 			SendBlobTransactions{
 				TransactionCount:              cancun.TARGET_BLOBS_PER_BLOCK,
-				BlobTransactionMaxBlobGasCost: big.NewInt(1),
+				BlobTransactionMaxBlobGasCost: big.NewInt(1000000000),
 			},
 
 			// We create the first payload, and verify that the blob transactions
@@ -133,7 +133,7 @@ var Tests = []test.Spec{
 			SendBlobTransactions{
 				TransactionCount:              DATA_GAS_COST_INCREMENT_EXCEED_BLOBS/(cancun.MAX_BLOBS_PER_BLOCK-cancun.TARGET_BLOBS_PER_BLOCK) + 1,
 				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK,
-				BlobTransactionMaxBlobGasCost: big.NewInt(1),
+				BlobTransactionMaxBlobGasCost: big.NewInt(1000000000),
 			},
 
 			// Next payloads will have max data blobs each
@@ -173,17 +173,19 @@ var Tests = []test.Spec{
 		},
 
 		TestSequence: TestSequence{
+			NewPayloads{},
 			// First send the cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions.
 			SendBlobTransactions{
-				TransactionCount:              5,
-				BlobsPerTransaction:           cancun.MAX_BLOBS_PER_BLOCK - 1,
-				BlobTransactionMaxBlobGasCost: big.NewInt(100),
+				TransactionCount:    5,
+				BlobsPerTransaction: 2,
+				//BlobTransactionGasTipCap:
+				BlobTransactionMaxBlobGasCost: big.NewInt(500000000),
 			},
 			// Then send the single-blob transactions
 			SendBlobTransactions{
 				TransactionCount:              cancun.MAX_BLOBS_PER_BLOCK + 1,
 				BlobsPerTransaction:           1,
-				BlobTransactionMaxBlobGasCost: big.NewInt(100),
+				BlobTransactionMaxBlobGasCost: big.NewInt(500000000),
 			},
 
 			// First four payloads have cancun.MAX_BLOBS_PER_BLOCK-1 blobs each
@@ -1852,17 +1854,17 @@ func init() {
 		for _, syncing := range []bool{false, true} {
 			// Invalidity of payload can be detected even when syncing because the
 			// blob gas only depends on the transactions contained.
-			invalidDetectedOnSync := (invalidField == helper.InvalidBlobGasUsed ||
+			invalidDetectedOnSync := invalidField == helper.InvalidBlobGasUsed ||
 				invalidField == helper.InvalidBlobCountGasUsed ||
 				invalidField == helper.InvalidVersionedHashes ||
 				invalidField == helper.InvalidVersionedHashesVersion ||
 				invalidField == helper.IncompleteVersionedHashes ||
-				invalidField == helper.ExtraVersionedHashes)
+				invalidField == helper.ExtraVersionedHashes
 
-			nilLatestValidHash := (invalidField == helper.InvalidVersionedHashes ||
+			nilLatestValidHash := invalidField == helper.InvalidVersionedHashes ||
 				invalidField == helper.InvalidVersionedHashesVersion ||
 				invalidField == helper.IncompleteVersionedHashes ||
-				invalidField == helper.ExtraVersionedHashes)
+				invalidField == helper.ExtraVersionedHashes
 
 			Tests = append(Tests, suite_engine.InvalidPayloadTestCase{
 				BaseSpec:              onlyBlobTxsSpec,

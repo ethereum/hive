@@ -670,22 +670,6 @@ func (step SendBlobTransactions) Execute(t *CancunTestContext) error {
 				blobTxCreator,
 			)
 		}
-		t.Logf("Transaction.Protected: %+v", blobTx.Protected())
-		t.Logf("Transaction.Type: %+v", blobTx.Type())
-		t.Logf("Transaction.ChainId: %+v", blobTx.ChainId())
-		t.Logf("Transaction.Data: %+v", blobTx.Data())
-		t.Logf("Transaction.AccessList: %+v", blobTx.AccessList())
-		t.Logf("Transaction.Gas: %+v", blobTx.Gas())
-		t.Logf("Transaction.GasPrice: %+v", blobTx.GasPrice())
-		t.Logf("Transaction.GasTipCap: %+v", blobTx.GasTipCap())
-		t.Logf("Transaction.GasFeeCap: %+v", blobTx.GasFeeCap())
-		t.Logf("Transaction.Value: %+v", blobTx.Value())
-		t.Logf("Transaction.Nonce: %+v", blobTx.Nonce())
-		t.Logf("Transaction.To: %+v", blobTx.To())
-		t.Logf("Transaction.Hash: %+v", blobTx.Hash())
-		t.Logf("Transaction.BlobGas: %+v", blobTx.BlobGas())
-		t.Logf("Transaction.BlobGasFeeCap: %+v", blobTx.BlobGasFeeCap())
-		t.Logf("Transaction.BlobHashes: %+v", blobTx.BlobHashes())
 		if err != nil {
 			t.Fatalf("FAIL: Error sending blob transaction: %v", err)
 		}

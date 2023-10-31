@@ -8,7 +8,7 @@ import (
 
 var (
 	// EIP 4844
-	GAS_PER_BLOB = uint64(0x20000)
+	GAS_PER_BLOB = uint64(131072)
 
 	MIN_DATA_GASPRICE         = uint64(1000000000)
 	MAX_BLOB_GAS_PER_BLOCK    = uint64(262144)
