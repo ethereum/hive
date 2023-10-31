@@ -70,3 +70,4 @@ require (
 )
 
 replace github.com/ethereum/go-ethereum => github.com/lightclient/go-ethereum v1.10.10-0.20231019143932-4d161dee0c4c
+replace github.com/ethereum/hive/simulators/ethereum/engine => ../engine
