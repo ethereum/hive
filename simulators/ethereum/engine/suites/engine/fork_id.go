@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/devp2p"
@@ -32,6 +33,19 @@ func (ft ForkIDSpec) GetName() string {
 		name = append(name, fmt.Sprintf("BlocksBeforePeering=%d", ft.ProduceBlocksBeforePeering))
 	}
 	return strings.Join(name, ", ")
+}
+
+func (s ForkIDSpec) GetForkConfig() *config.ForkConfig {
+	forkConfig := s.BaseSpec.GetForkConfig()
+	if forkConfig == nil {
+		return nil
+	}
+	// Merge fork happen at block 0
+	mainFork := s.GetMainFork()
+	if mainFork == config.Paris {
+		forkConfig.ParisNumber = common.Big0
+	}
+	return forkConfig
 }
 
 func (ft ForkIDSpec) Execute(t *test.Env) {
