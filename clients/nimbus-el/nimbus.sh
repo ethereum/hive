@@ -14,7 +14,6 @@
 #  - [x] HIVE_BOOTNODE                enode URL of the remote bootstrap node
 #  - [x] HIVE_NETWORK_ID              network ID number to use for the eth protocol
 #  - [x] HIVE_CHAIN_ID                chain ID is used in transaction signature process
-#  - [ ] HIVE_TESTNET                 whether testnet nonces (2^20) are needed
 #  - [ ] HIVE_NODETYPE                sync and pruning selector (archive, full, light)
 #
 # Forks:

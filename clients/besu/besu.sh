@@ -40,7 +40,6 @@
 #
 # These flags are not supported by the Besu hive client
 #
-#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 #  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
 
 set -e

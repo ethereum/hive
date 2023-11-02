@@ -26,7 +26,6 @@
 #
 # These flags are NOT supported by Erigon
 #
-#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 #  - HIVE_GRAPHQL_ENABLED      turns on GraphQL server
 #  - HIVE_CLIQUE_PRIVATEKEY    private key for clique mining
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)

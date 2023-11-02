@@ -12,7 +12,6 @@
 #
 #  - HIVE_BOOTNODE                enode URL of the remote bootstrap node
 #  - HIVE_NETWORK_ID              network ID number to use for the eth protocol
-#  - HIVE_TESTNET                 whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE                sync and pruning selector (archive, full, light)
 #
 # Forks:

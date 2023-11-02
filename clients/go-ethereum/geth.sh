@@ -13,7 +13,6 @@
 #
 #  - HIVE_BOOTNODE                enode URL of the remote bootstrap node
 #  - HIVE_NETWORK_ID              network ID number to use for the eth protocol
-#  - HIVE_TESTNET                 whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE                sync and pruning selector (archive, full, light)
 #
 # Forks:
@@ -64,11 +63,6 @@ else
     # Unless otherwise specified by hive, we try to avoid mainnet networkid. If geth detects mainnet network id,
     # then it tries to bump memory quite a lot
     FLAGS="$FLAGS --networkid 1337"
-fi
-
-# If the client is to be run in testnet mode, flag it as such
-if [ "$HIVE_TESTNET" == "1" ]; then
-    FLAGS="$FLAGS --testnet"
 fi
 
 # Handle any client mode or operation requests
