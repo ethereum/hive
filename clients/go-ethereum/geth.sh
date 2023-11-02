@@ -48,7 +48,7 @@
 set -e
 
 geth=/usr/local/bin/geth
-FLAGS="--pcscdpath=\"\""
+FLAGS="--state.scheme=path"
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
     FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL"
