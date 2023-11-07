@@ -129,7 +129,6 @@ may map these to command line flags or use them to generate a config file, for e
 | `HIVE_MINER_EXTRA`         | hex           | extradata for mined blocks                     |
 | `HIVE_CLIQUE_PERIOD`       | decimal       | enables clique PoA. value is target block time |
 | `HIVE_CLIQUE_PRIVATEKEY`   | hex           | private key for signing of clique blocks       |
-| `HIVE_SKIP_POW`            | 0 - 1         | disables PoW check during block import         |
 | `HIVE_NETWORK_ID`          | decimal       | p2p network ID                                 |
 | `HIVE_CHAIN_ID`            | decimal       | [EIP-155] chain ID                             |
 | `HIVE_FORK_HOMESTEAD`      | decimal       | [Homestead][EIP-606] transition block          |
