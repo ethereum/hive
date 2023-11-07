@@ -17,8 +17,6 @@ func (g *generator) writeForkEnv() error {
 	// config consensus algorithm
 	if cfg.Clique != nil {
 		env["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(cfg.Clique.Period)
-	} else {
-		env["HIVE_SKIP_POW"] = "1"
 	}
 
 	// forks
