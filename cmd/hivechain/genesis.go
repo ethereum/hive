@@ -41,8 +41,8 @@ var (
 		"muirglacier",
 		"berlin",
 		"london",
-		"arrowglacier",
-		"grayglacier",
+		// "arrowglacier", "grayglacier" forks were difficulty bomb changes. They are not
+		// available here because hive doesn't support configuring them on clients.
 		"merge",
 	}
 
@@ -98,10 +98,6 @@ func (cfg *generatorConfig) createChainConfig() *params.ChainConfig {
 			chaincfg.BerlinBlock = new(big.Int).SetUint64(b)
 		case "london":
 			chaincfg.LondonBlock = new(big.Int).SetUint64(b)
-		case "arrowglacier":
-			chaincfg.ArrowGlacierBlock = new(big.Int).SetUint64(b)
-		case "grayglacier":
-			chaincfg.GrayGlacierBlock = new(big.Int).SetUint64(b)
 		case "merge":
 			chaincfg.MergeNetsplitBlock = new(big.Int).SetUint64(b)
 			chaincfg.TerminalTotalDifficultyPassed = true
