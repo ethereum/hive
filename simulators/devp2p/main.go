@@ -12,6 +12,10 @@ import (
 	"github.com/shogo82148/go-tap"
 )
 
+// Location of the test chain files. They are copied from
+// go-ethereum/cmd/devp2p/internal/ethtest/testdata by the simulator dockerfile.
+const testChainDir = "/testchain"
+
 func main() {
 	discv4 := hivesim.Suite{
 		Name:        "discv4",
@@ -72,6 +76,7 @@ func main() {
 		},
 	}
 
+	forkenv := loadTestChainConfig()
 	eth := hivesim.Suite{
 		Name:        "eth",
 		Description: "This suite tests a client's ability to accurately respond to basic eth protocol messages.",
@@ -81,18 +86,10 @@ func main() {
 				Name: "client launch",
 				Description: `This test launches the client and runs the test tool.
 Results from the test tool are reported as individual sub-tests.`,
-				Parameters: hivesim.Params{
-					"HIVE_NETWORK_ID":     "19763",
-					"HIVE_CHAIN_ID":       "19763",
-					"HIVE_FORK_HOMESTEAD": "0",
-					"HIVE_FORK_TANGERINE": "0",
-					"HIVE_FORK_SPURIOUS":  "0",
-					"HIVE_FORK_BYZANTIUM": "0",
-					"HIVE_LOGLEVEL":       "4",
-				},
+				Parameters: forkenv,
 				Files: map[string]string{
-					"genesis.json": "./init/genesis.json",
-					"chain.rlp":    "./init/halfchain.rlp",
+					"genesis.json": testChainDir + "/genesis.json",
+					"chain.rlp":    testChainDir + "/chain.rlp",
 				},
 				AlwaysRun: true,
 				Run:       runEthTest,
@@ -109,18 +106,10 @@ Results from the test tool are reported as individual sub-tests.`,
 				Name: "client launch",
 				Description: `This test launches the client and runs the test tool.
 Results from the test tool are reported as individual sub-tests.`,
-				Parameters: hivesim.Params{
-					"HIVE_NETWORK_ID":     "19763",
-					"HIVE_CHAIN_ID":       "19763",
-					"HIVE_FORK_HOMESTEAD": "0",
-					"HIVE_FORK_TANGERINE": "0",
-					"HIVE_FORK_SPURIOUS":  "0",
-					"HIVE_FORK_BYZANTIUM": "0",
-					"HIVE_LOGLEVEL":       "4",
-				},
+				Parameters: forkenv,
 				Files: map[string]string{
-					"genesis.json": "./init/genesis.json",
-					"chain.rlp":    "./init/halfchain.rlp",
+					"genesis.json": testChainDir + "/genesis.json",
+					"chain.rlp":    testChainDir + "/chain.rlp",
 				},
 				AlwaysRun: true,
 				Run:       runSnapTest,
@@ -131,13 +120,33 @@ Results from the test tool are reported as individual sub-tests.`,
 	hivesim.MustRun(hivesim.New(), discv4, discv5, eth, snap)
 }
 
+func loadTestChainConfig() hivesim.Params {
+	content, err := os.ReadFile(testChainDir + "/forkenv.json")
+	if err != nil {
+		panic(err)
+	}
+	var p hivesim.Params
+	if err := json.Unmarshal(content, &p); err != nil {
+		panic(err)
+	}
+	return p
+}
+
 func runEthTest(t *hivesim.T, c *hivesim.Client) {
 	enode, err := c.EnodeURL()
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	_, pattern := t.Sim.TestPattern()
-	cmd := exec.Command("./devp2p", "rlpx", "eth-test", "--run", pattern, "--tap", enode, "./init/fullchain.rlp", "./init/genesis.json")
+	cmd := exec.Command("./devp2p", "rlpx", "eth-test",
+		"--tap",
+		"--run", pattern,
+		"--node", enode,
+		"--chain", testChainDir,
+		"--engineapi", fmt.Sprintf("http://%s:8551", c.IP),
+		"--jwtsecret", "0x7365637265747365637265747365637265747365637265747365637265747365",
+	)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}
@@ -148,8 +157,16 @@ func runSnapTest(t *hivesim.T, c *hivesim.Client) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	_, pattern := t.Sim.TestPattern()
-	cmd := exec.Command("./devp2p", "rlpx", "snap-test", "--run", pattern, "--tap", enode, "./init/fullchain.rlp", "./init/genesis.json")
+	cmd := exec.Command("./devp2p", "rlpx", "snap-test",
+		"--tap",
+		"--run", pattern,
+		"--node", enode,
+		"--chain", testChainDir,
+		"--engineapi", fmt.Sprintf("http://%s:8551", c.IP),
+		"--jwtsecret", "0x7365637265747365637265747365637265747365637265747365637265747365",
+	)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}
