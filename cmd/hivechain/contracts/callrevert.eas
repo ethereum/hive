@@ -1,0 +1,62 @@
+;;; -*- mode: asm -*-
+;;; This contract is for testing two common Solidity revert encodings:
+;;; panic(uint) and error(string).
+
+;;; Dispatch
+.start:
+    push 0                      ; [offset]
+    calldataload                ; [word]
+
+    ;; if word == 0 revert with panic
+    iszero                      ; [word==0]
+    iszero                      ; [word!=0]
+    jumpi @error                ; [word]
+
+#define s_panic .selector("panic(uint)")
+#define panicv 17
+
+;;; Solidity ABI `panic(17)`
+;;; Revert data layout:
+;;;
+;;;     selector :: 4  ||  value :: 32
+;;;
+.panic:
+    push s_panic << (28*8)      ; [sel]
+    push 0                      ; [offset, sel]
+    mstore                      ; []
+    push 17                     ; [panicv]
+    push 4                      ; [offset, panicv]
+    mstore                      ; []
+
+    push 36                     ; [length]
+    push 0                      ; [offset, length]
+    revert                      ; []
+
+
+#define s_error .selector("error(string)")
+#define errmsg "user error"
+#define errmsg_word errmsg << (255-.bitlen(errmsg))
+
+;;; Solidity ABI error
+;;;
+;;; Revert data layout:
+;;;
+;;;     selector :: 4  ||  0x20 :: 32  ||  len :: 32  ||  data :: len
+;;;
+error:
+    push s_error << (28*8)      ; [sel]
+    push 0                      ; [offset, sel]
+    mstore                      ; []
+    push 0x20                   ; [ptr]
+    push 4                      ; [offset, ptr]
+    mstore                      ; []
+    push .bytelen(errmsg)       ; [len]
+    push 36                     ; [offset, len]
+    mstore                      ; []
+    push errmsg_word            ; [data]
+    push 68                     ; [offset, data]
+    mstore                      ; []
+
+    push 68 + .bytelen(errmsg)  ; [length]
+    push 0                      ; [offset, length]
+    revert

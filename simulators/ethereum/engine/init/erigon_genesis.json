@@ -94,7 +94,7 @@
     }
   },
   "config": {
-    "chainId": 10200,
+    "chainId": 10202,
     "consensus": "aura",
     "homesteadBlock": 0,
     "eip150Block": 0,
@@ -110,6 +110,11 @@
     "terminalTotalDifficulty": 0,
     "terminalTotalDifficultyPassed": true,
     "shanghaiTime": 1684934220,
+    "cancunTime": 1696272200,
+    "minBlobGasPrice": 1000000000,
+    "maxBlobGasPerBlock": 262144,
+    "targetBlobGasPerBlock": 131072,
+    "blobGasPriceUpdateFraction": 1112826,
     "aura": {
       "stepDuration": 5,
       "blockReward": 0,

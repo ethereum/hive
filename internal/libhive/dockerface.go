@@ -80,8 +80,7 @@ type ContainerInfo struct {
 
 // Builder can build docker images of clients and simulators.
 type Builder interface {
-	ReadClientMetadata(name string) (*ClientMetadata, error)
-	BuildClientImage(ctx context.Context, name string) (string, error)
+	BuildClientImage(ctx context.Context, client ClientDesignator) (string, error)
 	BuildSimulatorImage(ctx context.Context, name string) (string, error)
 	BuildImage(ctx context.Context, name string, fsys fs.FS) error
 

@@ -5,8 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
@@ -188,14 +189,14 @@ type loggingRoundTrip struct {
 
 func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Read and log the request body.
-	reqBytes, err := ioutil.ReadAll(req.Body)
+	reqBytes, err := io.ReadAll(req.Body)
 	req.Body.Close()
 	if err != nil {
 		return nil, err
 	}
 	rt.t.Logf(">>  %s", bytes.TrimSpace(reqBytes))
 	reqCopy := *req
-	reqCopy.Body = ioutil.NopCloser(bytes.NewReader(reqBytes))
+	reqCopy.Body = io.NopCloser(bytes.NewReader(reqBytes))
 
 	// Do the round trip.
 	resp, err := rt.inner.RoundTrip(&reqCopy)
@@ -205,18 +206,18 @@ func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	defer resp.Body.Close()
 
 	// Read and log the response bytes.
-	respBytes, err := ioutil.ReadAll(resp.Body)
+	respBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
 	respCopy := *resp
-	respCopy.Body = ioutil.NopCloser(bytes.NewReader(respBytes))
+	respCopy.Body = io.NopCloser(bytes.NewReader(respBytes))
 	rt.t.Logf("<<  %s", bytes.TrimSpace(respBytes))
 	return &respCopy, nil
 }
 
 func loadGenesis() *types.Block {
-	contents, err := ioutil.ReadFile("init/genesis.json")
+	contents, err := os.ReadFile("init/genesis.json")
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
 	}

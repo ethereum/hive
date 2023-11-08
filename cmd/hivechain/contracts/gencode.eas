@@ -1,0 +1,34 @@
+;;; -*- mode: asm -*-
+;;; creates a contract with code based on block number.
+
+#include "rng.eas"
+
+#define outputSize 512
+
+#define p_rng        0
+#define p_output     p_rng + RngSize
+#define p_outputEnd  p_output + outputSize
+
+.start:
+    %RngInit(p_rng)             ; []
+
+    ;; loop to create the code using rng
+    push p_output               ; [ptr]
+loop:
+    ;; store random word to output
+    %Rng(p_rng)                 ; [word, ptr]
+    dup2                        ; [ptr, word, ptr]
+    mstore                      ; [ptr]
+    ;; increment output pointer
+    push 32                     ; [1, ptr]
+    add                         ; [newptr]
+    push p_outputEnd            ; [end, newptr]
+    dup2                        ; [newptr, end, newtpr]
+    lt                          ; [newptr<end, newptr]
+    jumpi @loop                 ; [newptr]
+    pop                         ; []
+
+    ;; code was built, return it
+    push outputSize             ; [size]
+    push p_output               ; [size, offset]
+    return                      ; []

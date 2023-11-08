@@ -1,6 +1,7 @@
 package globals
 
 import (
+	"crypto/ecdsa"
 	"math/big"
 	"time"
 
@@ -11,14 +12,47 @@ import (
 	"github.com/ethereum/hive/hivesim"
 )
 
+type TestAccount struct {
+	key     *ecdsa.PrivateKey
+	address *common.Address
+	index   uint64
+}
+
+// NewTestAccount creates a new test account with a deterministic address and private key.
+func NewTestAccount(key *ecdsa.PrivateKey, address *common.Address, index uint64) *TestAccount {
+	return &TestAccount{
+		key:     key,
+		address: address,
+		index:   index,
+	}
+}
+
+func (a *TestAccount) GetKey() *ecdsa.PrivateKey {
+	return a.key
+}
+
+func (a *TestAccount) GetAddress() common.Address {
+	if a.address == nil {
+		key := a.key
+		addr := crypto.PubkeyToAddress(key.PublicKey)
+		a.address = &addr
+	}
+	return *a.address
+}
+
+func (a *TestAccount) GetIndex() uint64 {
+	return a.index
+}
+
 var (
 
 	// Test chain parameters
-	ChainID          = big.NewInt(7)
+	ChainID          = big.NewInt(10202)
 	GasPrice         = big.NewInt(30 * params.GWei)
 	GasTipPrice      = big.NewInt(1 * params.GWei)
+	BlobGasPrice     = big.NewInt(1 * params.GWei)
 	NetworkID        = big.NewInt(7)
-	GenesisTimestamp = int64(0x1234)
+	GenesisTimestamp = uint64(0x1234)
 
 	// RPC Timeout for every call
 	RPCTimeout = 100 * time.Second
@@ -36,6 +70,10 @@ var (
 	VaultKey, _            = crypto.HexToECDSA("ff804d09c833619af673fa99c92ae506d30ff60f37ad41a3d098dcf714db1e4a")
 	GnoVaultAccountAddress = common.HexToAddress("0xcC4e00A72d871D6c328BcFE9025AD93d0a26dF51")
 	GnoVaultVaultKey, _    = crypto.HexToECDSA("82fcff5c93519f3615d6a92a5a7d146ee305082d3d768d63eb1b45f11f419346")
+
+	// Accounts used for testing
+	TestAccountCount = uint64(1000)
+	TestAccounts     []*TestAccount
 
 	// Global test case timeout
 	DefaultTestCaseTimeout = time.Minute * 10
@@ -72,3 +110,20 @@ var (
 		"HIVE_MERGE_BLOCK_ID": "100",
 	}
 )
+
+func init() {
+	// Fill the test accounts with deterministic addresses
+	TestAccounts = make([]*TestAccount, TestAccountCount)
+	TestAccounts[0] = NewTestAccount(GnoVaultVaultKey, &GnoVaultAccountAddress, 0)
+	TestAccounts[1] = NewTestAccount(VaultKey, &VaultAccountAddress, 0)
+	//for i := uint64(0); i < TestAccountCount; i++ {
+	//	bs := make([]byte, 8)
+	//	binary.BigEndian.PutUint64(bs, uint64(i))
+	//	b := sha256.Sum256(bs)
+	//	k, err := crypto.ToECDSA(b[:])
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	TestAccounts[i] = &TestAccount{key: k, index: i}
+	//}
+}

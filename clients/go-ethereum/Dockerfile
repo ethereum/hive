@@ -1,21 +1,7 @@
-## By default, the geth is pulled from Docker Hub.
+ARG baseimage=ethereum/client-go
+ARG tag=latest
 
-ARG branch=latest
-FROM ethereum/client-go:$branch as builder
-
-## ----
-## Uncomment the steps below (and comment out the steps above!) to build go-ethereum
-## from local sources in the ./go-ethereum directory.
-
-# FROM golang:1-alpine as builder
-# ARG branch=master
-# ADD go-ethereum /go-ethereum
-# WORKDIR /go-ethereum
-# RUN apk add --update bash curl jq git make
-# RUN make geth
-# RUN mv ./build/bin/geth /usr/local/bin/geth
-
-## ----
+FROM $baseimage:$tag as builder
 
 FROM alpine:latest
 RUN apk add --update bash curl jq
@@ -39,10 +25,5 @@ ADD genesis.json /genesis.json
 
 # Export the usual networking ports to allow outside access to the node
 EXPOSE 8545 8546 8547 8551 30303 30303/udp
-
-# Generate the ethash verification caches
-RUN \
- /usr/local/bin/geth makecache     1 ~/.ethereum/geth/ethash && \
- /usr/local/bin/geth makecache 30001 ~/.ethereum/geth/ethash
 
 ENTRYPOINT ["/geth.sh"]

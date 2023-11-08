@@ -10,16 +10,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	api "github.com/ethereum/go-ethereum/beacon/engine"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/chain_generators/pow"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/debug"
 	payload_spoof "github.com/ethereum/hive/simulators/eth2/common/spoofing/payload"
-	"github.com/ethereum/hive/simulators/eth2/common/spoofing/proxy"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
+	"github.com/marioevz/eth-clients/clients/node"
 	"github.com/protolambda/eth2api"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 	spoof "github.com/rauljordan/engine-proxy/proxy"
@@ -27,7 +28,7 @@ import (
 
 var (
 	DEFAULT_VALIDATOR_COUNT           uint64 = 60
-	DEFAULT_SLOT_TIME                 uint64 = 6
+	MAINNET_SLOT_TIME                 uint64 = 12
 	DEFAULT_TERMINAL_TOTAL_DIFFICULTY uint64 = 100
 
 	EPOCHS_TO_FINALITY beacon.Epoch = 4
@@ -35,7 +36,6 @@ var (
 	// Default config used for all tests unless a client specific config exists
 	DEFAULT_CONFIG = &tn.Config{
 		ValidatorCount: big.NewInt(int64(DEFAULT_VALIDATOR_COUNT)),
-		SlotTime:       big.NewInt(int64(DEFAULT_SLOT_TIME)),
 		TerminalTotalDifficulty: big.NewInt(
 			int64(DEFAULT_TERMINAL_TOTAL_DIFFICULTY),
 		),
@@ -44,29 +44,12 @@ var (
 		Eth1Consensus:      &el.ExecutionCliqueConsensus{},
 	}
 
-	// Clients that do not support starting on epoch 0 with all forks enabled.
-	// Tests take longer for these clients.
-	INCREMENTAL_FORKS_CONFIG = &tn.Config{
-		TerminalTotalDifficulty: big.NewInt(
-			int64(DEFAULT_TERMINAL_TOTAL_DIFFICULTY) * 5,
-		),
-		AltairForkEpoch:    common.Big1,
-		BellatrixForkEpoch: common.Big2,
-	}
-	INCREMENTAL_FORKS_CLIENTS = map[string]bool{
-		"nimbus": true,
-		"prysm":  true,
-	}
-
 	SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE = map[string]*big.Int{}
 )
 
 func getClientConfig(n clients.NodeDefinition) *tn.Config {
-	config := DEFAULT_CONFIG
-	if INCREMENTAL_FORKS_CLIENTS[n.ConsensusClient] {
-		config = config.Join(INCREMENTAL_FORKS_CONFIG)
-	}
-	return config
+	config := *DEFAULT_CONFIG
+	return &config
 }
 
 func TransitionTestnet(t *hivesim.T, env *tn.Environment,
@@ -172,12 +155,11 @@ func TestRPCError(t *hivesim.T, env *tn.Environment,
 
 	fields := make(map[string]interface{})
 	fields["headBlockHash"] = "weird error"
-	spoof := &spoof.Spoof{
-		Method: EngineForkchoiceUpdatedV1,
-		Fields: fields,
-	}
 
-	testnet.Proxies().Running()[0].AddRequest(spoof)
+	testnet.Proxies().Running()[0].AddRequests(
+		exec_client.MakeSpoofs(
+			fields,
+			exec_client.AllForkchoiceUpdatedCalls...)...)
 
 	time.Sleep(24 * time.Second)
 
@@ -263,12 +245,8 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 			getPayloadCount++
 			// Invalidate the transition payload
 			if getPayloadCount == 1 {
-				var (
-					payload api.ExecutableData
-					spoof   *spoof.Spoof
-					err     error
-				)
-				err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+				var spoof *spoof.Spoof
+				payload, err := PayloadFromResponse(res)
 				if err != nil {
 					panic(err)
 				}
@@ -279,7 +257,7 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 				)
 				invalidPayloadHash, spoof, err = payload_spoof.GenerateInvalidPayloadSpoof(
 					EngineGetPayloadV1,
-					&payload,
+					payload,
 					payload_spoof.InvalidParentHash,
 					VaultSigner,
 				)
@@ -306,7 +284,7 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 				spoof   *spoof.Spoof
 				err     error
 			)
-			err = proxy.UnmarshalFromJsonRPCRequest(req, &payload)
+			err = exec_client.UnmarshalFromJsonRPCRequest(req, &payload)
 			if err != nil {
 				panic(err)
 			}
@@ -346,7 +324,11 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 				spoof   *spoof.Spoof
 				err     error
 			)
-			err = proxy.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+			err = exec_client.UnmarshalFromJsonRPCRequest(
+				req,
+				&fcState,
+				&pAttr,
+			)
 			if err != nil {
 				panic(err)
 			}
@@ -378,9 +360,15 @@ func UnknownPoWParent(t *hivesim.T, env *tn.Environment,
 		}
 	}
 	for n, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(n))
-		p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(n))
-		p.AddResponseCallback(EngineForkchoiceUpdatedV1, fcUCallbackGen(n))
+		p.AddResponseCallbacks(
+			getPayloadCallbackGen(n),
+			exec_client.AllGetPayloadCalls...)
+		p.AddResponseCallbacks(
+			newPayloadCallbackGen(n),
+			exec_client.AllNewPayloadCalls...)
+		p.AddResponseCallbacks(
+			fcUCallbackGen(n),
+			exec_client.AllForkchoiceUpdatedCalls...)
 	}
 
 	// Network should recover from this
@@ -471,10 +459,7 @@ func InvalidPayloadGen(
 				if getPayloadCount == invalidPayloadNumber {
 					// We are not going to spoof anything here, we just need to save the transition payload hash and the id of the validator that generated it
 					// to invalidate it in other clients.
-					var (
-						payload api.ExecutableData
-					)
-					err := proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+					payload, err := PayloadFromResponse(res)
 					if err != nil {
 						panic(err)
 					}
@@ -496,7 +481,7 @@ func InvalidPayloadGen(
 					spoof   *spoof.Spoof
 					err     error
 				)
-				err = proxy.UnmarshalFromJsonRPCRequest(req, &payload)
+				err = exec_client.UnmarshalFromJsonRPCRequest(req, &payload)
 				if err != nil {
 					panic(err)
 				}
@@ -542,8 +527,12 @@ func InvalidPayloadGen(
 		callback
 		*/
 		for i, p := range testnet.Proxies().Running() {
-			p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
-			p.AddResponseCallback(EngineNewPayloadV1, newPayloadCallbackGen(i))
+			p.AddResponseCallbacks(
+				getPayloadCallbackGen(i),
+				exec_client.AllGetPayloadCalls...)
+			p.AddResponseCallbacks(
+				newPayloadCallbackGen(i),
+				exec_client.AllNewPayloadCalls...)
 		}
 
 		execPayloadCtx, cancel := testnet.Spec().SlotTimeoutContext(
@@ -611,19 +600,15 @@ func IncorrectHeaderPrevRandaoPayload(
 		getPayloadCount++
 		// Invalidate a payload after the transition payload
 		if getPayloadCount == 2 {
-			var (
-				payload api.ExecutableData
-				spoof   *spoof.Spoof
-				err     error
-			)
-			err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+			var spoof *spoof.Spoof
+			payload, err := PayloadFromResponse(res)
 			if err != nil {
 				panic(err)
 			}
 			t.Logf("INFO (%v): Invalidating payload: %s", t.TestID, res)
 			invalidPayloadHash, spoof, err = payload_spoof.GenerateInvalidPayloadSpoof(
 				EngineGetPayloadV1,
-				&payload,
+				payload,
 				payload_spoof.InvalidPrevRandao,
 				VaultSigner,
 			)
@@ -640,7 +625,7 @@ func IncorrectHeaderPrevRandaoPayload(
 		return nil
 	}
 	for _, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(EngineGetPayloadV1, c)
+		p.AddResponseCallbacks(c, exec_client.AllGetPayloadCalls...)
 	}
 
 	execPayloadCtx, cancel := testnet.Spec().SlotTimeoutContext(
@@ -686,7 +671,7 @@ func Timeouts(t *hivesim.T, env *tn.Environment, n clients.NodeDefinition) {
 			n,
 		},
 		// Use the default mainnet slot time to allow the timeout value to make sense
-		SlotTime: big.NewInt(int64(12)),
+		SlotTime: big.NewInt(int64(MAINNET_SLOT_TIME)),
 	})
 
 	testnet := tn.StartTestnet(ctx, t, env, config)
@@ -710,13 +695,13 @@ func Timeouts(t *hivesim.T, env *tn.Environment, n clients.NodeDefinition) {
 		p0 = testnet.Proxies().Running()[0]
 		p1 = testnet.Proxies().Running()[1]
 	)
-	p0.AddResponseCallback(
-		EngineNewPayloadV1,
+	p0.AddResponseCallbacks(
 		gen(NewPayloadTimeoutSeconds-ToleranceSeconds),
+		exec_client.AllNewPayloadCalls...,
 	)
-	p1.AddResponseCallback(
-		EngineForkchoiceUpdatedV1,
+	p1.AddResponseCallbacks(
 		gen(ForkchoiceUpdatedTimeoutSeconds-ToleranceSeconds),
+		exec_client.AllForkchoiceUpdatedCalls...,
 	)
 
 	// Finality should be reached anyway because the time limit is not reached on the engine calls
@@ -766,16 +751,14 @@ func InvalidTimestampPayload(
 		defer getPayloadLock.Unlock()
 		getPayloadCount++
 		var (
-			payload   api.ExecutableData
-			payloadID api.PayloadID
+			payloadID = new(api.PayloadID)
 			spoof     *spoof.Spoof
-			err       error
 		)
-		err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+		payload, err := PayloadFromResponse(res)
 		if err != nil {
 			panic(err)
 		}
-		err = proxy.UnmarshalFromJsonRPCRequest(req, &payloadID)
+		err = exec_client.UnmarshalFromJsonRPCRequest(req, payloadID)
 		if err != nil {
 			panic(err)
 		}
@@ -795,7 +778,7 @@ func InvalidTimestampPayload(
 			extraData := []byte("alt")
 			invalidPayloadHash, spoof, err = payload_spoof.CustomizePayloadSpoof(
 				EngineGetPayloadV1,
-				&payload,
+				payload,
 				&payload_spoof.CustomPayloadData{
 					Timestamp: &newTimestamp,
 					ExtraData: &extraData,
@@ -827,15 +810,15 @@ func InvalidTimestampPayload(
 	)
 
 	for _, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(EngineGetPayloadV1, c)
-		p.AddResponseCallback(
-			EngineForkchoiceUpdatedV1,
+		p.AddResponseCallbacks(c, exec_client.AllGetPayloadCalls...)
+		p.AddResponseCallbacks(
 			payload_spoof.CheckErrorOnForkchoiceUpdatedPayloadAttributes(
 				&fcuLock,
 				fcUCountLimit,
 				&fcUAttrCount,
 				fcudone,
 			),
+			exec_client.AllForkchoiceUpdatedCalls...,
 		)
 	}
 
@@ -1103,7 +1086,7 @@ func SyncingWithInvalidChain(
 			spoof   *spoof.Spoof
 			err     error
 		)
-		err = proxy.UnmarshalFromJsonRPCRequest(req, &payload)
+		err = exec_client.UnmarshalFromJsonRPCRequest(req, &payload)
 		if err != nil {
 			panic(err)
 		}
@@ -1160,7 +1143,7 @@ func SyncingWithInvalidChain(
 			spoof   *spoof.Spoof
 			err     error
 		)
-		err = proxy.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+		err = exec_client.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
 		if err != nil {
 			panic(err)
 		}
@@ -1217,10 +1200,12 @@ func SyncingWithInvalidChain(
 	importerProxy := testnet.Proxies().Running()[2]
 
 	// Add the callback to the last proxy which will not produce blocks
-	importerProxy.AddResponseCallback(EngineNewPayloadV1, newPayloadCallback)
-	importerProxy.AddResponseCallback(
-		EngineForkchoiceUpdatedV1,
+	importerProxy.AddResponseCallbacks(
+		newPayloadCallback,
+		exec_client.AllNewPayloadCalls...)
+	importerProxy.AddResponseCallbacks(
 		forkchoiceUpdatedCallback,
+		exec_client.AllForkchoiceUpdatedCalls...,
 	)
 
 	<-done
@@ -1375,14 +1360,14 @@ func EqualTimestampTerminalTransitionBlock(
 	)
 
 	for _, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(
-			EngineForkchoiceUpdatedV1,
+		p.AddResponseCallbacks(
 			payload_spoof.CheckErrorOnForkchoiceUpdatedPayloadAttributes(
 				&fcuLock,
 				fcUCountLimit,
 				&fcUAttrCount,
 				fcudone,
 			),
+			exec_client.AllForkchoiceUpdatedCalls...,
 		)
 	}
 
@@ -1484,7 +1469,7 @@ func InvalidQuantityPayloadFields(
 
 	invalidateQuantityType := func(id int, method string, response []byte, q QuantityType, invType InvalidationType) *spoof.Spoof {
 		responseFields := make(map[string]json.RawMessage)
-		if err := proxy.UnmarshalFromJsonRPCResponse(response, &responseFields); err != nil {
+		if err := exec_client.UnmarshalFromJsonRPCResponse(response, &responseFields); err != nil {
 			panic(
 				fmt.Errorf("unable to unmarshal: %v. json: %s", err, response),
 			)
@@ -1579,8 +1564,7 @@ func InvalidQuantityPayloadFields(
 			defer func() {
 				getPayloadCount++
 			}()
-			var payload api.ExecutableData
-			err := proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+			payload, err := PayloadFromResponse(res)
 			if err != nil {
 				panic(err)
 			}
@@ -1607,13 +1591,13 @@ func InvalidQuantityPayloadFields(
 			)
 			newHash, spoof, _ := payload_spoof.CustomizePayloadSpoof(
 				EngineGetPayloadV1,
-				&payload,
+				payload,
 				&payload_spoof.CustomPayloadData{
 					ExtraData: &customExtraData,
 				},
 			)
 			invalidPayloadHashes = append(invalidPayloadHashes, newHash)
-			return proxy.Combine(
+			return exec_client.Combine(
 				spoof,
 				invalidateQuantityType(
 					id,
@@ -1628,7 +1612,9 @@ func InvalidQuantityPayloadFields(
 
 	// We pass the id of the proxy to identify which one it is within the callback
 	for i, p := range testnet.Proxies().Running() {
-		p.AddResponseCallback(EngineGetPayloadV1, getPayloadCallbackGen(i))
+		p.AddResponseCallbacks(
+			getPayloadCallbackGen(i),
+			exec_client.AllGetPayloadCalls...)
 	}
 
 	// Wait until we are done
@@ -2224,8 +2210,8 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(
 	// because they are not interconnected.
 	// Therefore only one client pair will end up in optimistic sync mode.
 	type BuilderImporterInfo struct {
-		Builder        *clients.Node
-		Importer       *clients.Node
+		Builder        *node.Node
+		Importer       *node.Node
 		ChainGenerator *pow.ChainGenerator
 	}
 	builderImporterPairs := []BuilderImporterInfo{
@@ -2345,7 +2331,7 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(
 	}
 
 	// Verify the heads match
-	optimisticClients := clients.ExecutionClients{
+	optimisticClients := exec_client.ExecutionClients{
 		optimisticPair.Builder.ExecutionClient,
 		optimisticPair.Importer.ExecutionClient,
 	}
@@ -2360,7 +2346,7 @@ func ReOrgSyncWithChainHavingInvalidTerminalBlock(
 	}
 
 	// Verify heads of the two client pairs are different
-	forkedClients := clients.ExecutionClients{
+	forkedClients := exec_client.ExecutionClients{
 		testnet.ExecutionClients().Running()[0],
 		testnet.ExecutionClients().Running()[2],
 	}
@@ -2438,7 +2424,7 @@ func NoViableHeadDueToOptimisticSync(
 		importerProxy = testnet.Proxies().Running()[1]
 		// Not yet started
 		builder2      = testnet.BeaconClients()[2]
-		builder2Proxy *proxy.Proxy
+		builder2Proxy *exec_client.Proxy
 	)
 
 	importerNewPayloadResponseMocker := payload_spoof.NewEngineResponseMocker(
@@ -2462,11 +2448,7 @@ func NoViableHeadDueToOptimisticSync(
 	)
 	getPayloadCallback := func(res []byte, req []byte) *spoof.Spoof {
 		getPayloadCount++
-		var (
-			payload api.ExecutableData
-			err     error
-		)
-		err = proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+		payload, err := PayloadFromResponse(res)
 		if err != nil {
 			panic(err)
 		}
@@ -2532,7 +2514,9 @@ func NoViableHeadDueToOptimisticSync(
 		}
 		return nil
 	}
-	builder1Proxy.AddResponseCallback(EngineGetPayloadV1, getPayloadCallback)
+	builder1Proxy.AddResponseCallbacks(
+		getPayloadCallback,
+		exec_client.AllGetPayloadCalls...)
 
 	execPayloadCtx, cancel := testnet.Spec().SlotTimeoutContext(
 		ctx,

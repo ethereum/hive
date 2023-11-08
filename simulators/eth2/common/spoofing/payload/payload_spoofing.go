@@ -7,12 +7,12 @@ import (
 	"strings"
 	"sync"
 
+	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
-	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/ethereum/hive/simulators/eth2/common/spoofing/proxy"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
 	spoof "github.com/rauljordan/engine-proxy/proxy"
 )
 
@@ -627,28 +627,29 @@ func (e *EngineResponseMocker) SetDefaultResponse(r *api.PayloadStatusV1) {
 }
 
 func (e *EngineResponseMocker) AddGetPayloadPassthroughToProxy(
-	p *proxy.Proxy,
+	p *exec_client.Proxy,
 ) {
-	p.AddResponseCallback(
-		EngineGetPayloadV1,
+	p.AddResponseCallbacks(
 		func(res []byte, req []byte) *spoof.Spoof {
 			// Hash of the payload built is being added to the passthrough list
 			var (
 				payload api.ExecutableData // ExecutableDataV1
 			)
-			err := proxy.UnmarshalFromJsonRPCResponse(res, &payload)
+			err := exec_client.UnmarshalFromJsonRPCResponse(res, &payload)
 			if err != nil {
 				panic(err)
 			}
 			e.AddPassthrough(payload.BlockHash, true)
 			return nil
 		},
+		exec_client.AllGetPayloadCalls...,
 	)
 }
 
-func (e *EngineResponseMocker) AddNewPayloadCallbackToProxy(p *proxy.Proxy) {
-	p.AddResponseCallback(
-		EngineNewPayloadV1,
+func (e *EngineResponseMocker) AddNewPayloadCallbackToProxy(
+	p *exec_client.Proxy,
+) {
+	p.AddResponseCallbacks(
 		func(res []byte, req []byte) *spoof.Spoof {
 			var (
 				payload api.ExecutableData
@@ -656,11 +657,11 @@ func (e *EngineResponseMocker) AddNewPayloadCallbackToProxy(p *proxy.Proxy) {
 				spoof   *spoof.Spoof
 				err     error
 			)
-			err = proxy.UnmarshalFromJsonRPCRequest(req, &payload)
+			err = exec_client.UnmarshalFromJsonRPCRequest(req, &payload)
 			if err != nil {
 				panic(err)
 			}
-			err = proxy.UnmarshalFromJsonRPCResponse(res, &status)
+			err = exec_client.UnmarshalFromJsonRPCResponse(res, &status)
 			if err != nil {
 				panic(err)
 			}
@@ -698,14 +699,14 @@ func (e *EngineResponseMocker) AddNewPayloadCallbackToProxy(p *proxy.Proxy) {
 			}
 			return nil
 		},
+		exec_client.AllNewPayloadCalls...,
 	)
 }
 
 func (e *EngineResponseMocker) AddForkchoiceUpdatedCallbackToProxy(
-	p *proxy.Proxy,
+	p *exec_client.Proxy,
 ) {
-	p.AddResponseCallback(
-		EngineForkchoiceUpdatedV1,
+	p.AddResponseCallbacks(
 		func(res []byte, req []byte) *spoof.Spoof {
 			var (
 				fcState api.ForkchoiceStateV1
@@ -714,11 +715,15 @@ func (e *EngineResponseMocker) AddForkchoiceUpdatedCallbackToProxy(
 				spoof   *spoof.Spoof
 				err     error
 			)
-			err = proxy.UnmarshalFromJsonRPCRequest(req, &fcState, &pAttr)
+			err = exec_client.UnmarshalFromJsonRPCRequest(
+				req,
+				&fcState,
+				&pAttr,
+			)
 			if err != nil {
 				panic(err)
 			}
-			err = proxy.UnmarshalFromJsonRPCResponse(res, &fResp)
+			err = exec_client.UnmarshalFromJsonRPCResponse(res, &fResp)
 			if err != nil {
 				panic(err)
 			}
@@ -760,10 +765,11 @@ func (e *EngineResponseMocker) AddForkchoiceUpdatedCallbackToProxy(
 			}
 			return nil
 		},
+		exec_client.AllForkchoiceUpdatedCalls...,
 	)
 }
 
-func (e *EngineResponseMocker) AddCallbacksToProxy(p *proxy.Proxy) {
+func (e *EngineResponseMocker) AddCallbacksToProxy(p *exec_client.Proxy) {
 	e.AddForkchoiceUpdatedCallbackToProxy(p)
 	e.AddNewPayloadCallbackToProxy(p)
 }
@@ -783,7 +789,7 @@ func CheckErrorOnForkchoiceUpdatedPayloadAttributes(
 			fcS api.ForkchoiceStateV1
 			pA  *api.PayloadAttributes
 		)
-		if err := proxy.UnmarshalFromJsonRPCRequest(req, &fcS, &pA); err != nil {
+		if err := exec_client.UnmarshalFromJsonRPCRequest(req, &fcS, &pA); err != nil {
 			panic(
 				fmt.Errorf(
 					"unable to parse ForkchoiceUpdated request: %v",
@@ -799,7 +805,7 @@ func CheckErrorOnForkchoiceUpdatedPayloadAttributes(
 			var (
 				fcResponse api.ForkChoiceResponse
 			)
-			err := proxy.UnmarshalFromJsonRPCResponse(res, &fcResponse)
+			err := exec_client.UnmarshalFromJsonRPCResponse(res, &fcResponse)
 			if err == nil && fcResponse.PayloadID == nil {
 				err = fmt.Errorf(
 					"PayloadID null on ForkchoiceUpdated with attributes",

@@ -24,35 +24,75 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
-	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core/types"
 	ethlog "github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/rlp"
 )
 
-const usage = "Usage: hivechain generate|print|print-genesis|trim [ options ] ..."
-
 func main() {
 	// Initialize go-ethereum logging.
 	// This is mostly for displaying the DAG generator progress.
 	handler := ethlog.StreamHandler(os.Stderr, ethlog.TerminalFormat(false))
-	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlInfo, handler))
+	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlWarn, handler))
+
+	flag.Usage = usage
 
 	if len(os.Args) < 2 {
-		fatalf(usage)
+		flag.Usage()
+		os.Exit(1)
 	}
 	switch os.Args[1] {
 	case "generate":
 		generateCommand(os.Args[2:])
 	case "print":
 		printCommand(os.Args[2:])
-	case "print-genesis":
-		printGenesisCommand(os.Args[2:])
-	case "trim":
-		trimCommand(os.Args[2:])
 	default:
-		fatalf(usage)
+		flag.Usage()
+		os.Exit(1)
+	}
+}
+
+// generateCommand generates a test chain.
+func generateCommand(args []string) {
+	var (
+		cfg     generatorConfig
+		outlist = flag.String("outputs", "", "Enabled output modules")
+	)
+	flag.IntVar(&cfg.chainLength, "length", 2, "The length of the pow chain to generate")
+	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transactions to chain every n blocks")
+	flag.IntVar(&cfg.txCount, "tx-count", 1, "Maximum number of txs per block")
+	flag.IntVar(&cfg.forkInterval, "fork-interval", 0, "Number of blocks between fork activations")
+	flag.StringVar(&cfg.outputDir, "outdir", ".", "Destination directory")
+	flag.StringVar(&cfg.lastFork, "lastfork", "", "Name of the last fork to activate")
+	flag.CommandLine.Parse(args)
+
+	if *outlist != "" {
+		if *outlist == "all" {
+			cfg.outputs = outputFunctionNames()
+		}
+		cfg.outputs = splitAndTrim(*outlist)
+	}
+
+	cfg, err := cfg.withDefaults()
+	if err != nil {
+		panic(err)
+	}
+	g := newGenerator(cfg)
+	if err := g.run(); err != nil {
+		fatal(err)
+	}
+}
+
+func usage() {
+	o := flag.CommandLine.Output()
+	fmt.Fprintln(o, "Usage: hivechain generate|print [options...]")
+	flag.PrintDefaults()
+	fmt.Fprintln(o, "")
+	fmt.Fprintln(o, "List of available -outputs:")
+	for _, name := range outputFunctionNames() {
+		fmt.Fprintln(o, "  ", name)
 	}
 }
 
@@ -90,104 +130,15 @@ func printCommand(args []string) {
 	}
 }
 
-// printGenesisCommand displays the genesis post-state.
-func printGenesisCommand(args []string) {
-	flag.CommandLine.Parse(args)
-	if flag.NArg() != 1 {
-		fatalf("Usage: hivechain print-genesis <genesis.json>")
-	}
-
-	gspec, err := loadGenesis(flag.Arg(0))
-	if err != nil {
-		fatal(err)
-	}
-	block := gspec.ToBlock()
-	js, _ := json.MarshalIndent(block.Header(), "", "  ")
-	fmt.Println(string(js))
-}
-
-// trimCommand exports a subset of chain.rlp to a new file.
-func trimCommand(args []string) {
-	var (
-		from = flag.Uint("from", 0, "Start of block range to output")
-		to   = flag.Uint("to", 0, "End of block range to output (0 = all blocks)")
-	)
-	flag.CommandLine.Parse(args)
-	if flag.NArg() != 2 {
-		fatalf("Usage: hivechain trim [ options ] <chain.rlp> <newchain.rlp>")
-	}
-	if *to > 0 && *to <= *from {
-		fatalf("-to must be greater than -from")
-	}
-
-	input, err := os.Open(flag.Arg(0))
-	if err != nil {
-		fatal(err)
-	}
-	defer input.Close()
-
-	output, err := os.OpenFile(flag.Arg(1), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
-	if err != nil {
-		fatal(err)
-	}
-	defer output.Close()
-
-	s := rlp.NewStream(bufio.NewReader(input), 0)
-	written := 0
-	for i := uint(0); ; i++ {
-		data, err := s.Raw()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			fatalf("block %d: %v", i, err)
-		}
-		if i >= *from {
-			if *to != 0 && i >= *to {
-				break
-			}
-			output.Write(data)
-			written++
+func splitAndTrim(s string) []string {
+	var list []string
+	for _, s := range strings.Split(s, ",") {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			list = append(list, s)
 		}
 	}
-	fmt.Println(written, "blocks written to", flag.Arg(1))
-}
-
-// generateCommand generates a test chain.
-func generateCommand(args []string) {
-	var (
-		cfg     generatorConfig
-		genesis = flag.String("genesis", "", "The path and filename to the source genesis.json")
-		outdir  = flag.String("output", ".", "Chain destination folder")
-		mine    = flag.Bool("mine", false, "Enables ethash mining")
-		pos     = flag.Bool("pos", false, "Enables PoS chain")
-	)
-	flag.IntVar(&cfg.blockCount, "length", 2, "The length of the pow chain to generate")
-	flag.IntVar(&cfg.posBlockCount, "poslength", 2, "The length of the pos chain to generate")
-	flag.IntVar(&cfg.blockTimeSec, "blocktime", 30, "The desired block time in seconds")
-	flag.IntVar(&cfg.txInterval, "tx-interval", 10, "Add transactions to chain every n blocks")
-	flag.IntVar(&cfg.txCount, "tx-count", 1, "Maximum number of txs per block")
-	flag.CommandLine.Parse(args)
-
-	if *genesis == "" {
-		fatalf("Missing -genesis option, please supply a genesis.json file.")
-	}
-	if *mine {
-		cfg.powMode = ethash.ModeNormal
-	} else {
-		cfg.powMode = ethash.ModeFullFake
-	}
-
-	cfg.isPoS = *pos
-
-	gspec, err := loadGenesis(*genesis)
-	if err != nil {
-		fatal(err)
-	}
-	cfg.genesis = *gspec
-
-	if err := cfg.writeTestChain(*outdir); err != nil {
-		fatal(err)
-	}
+	return list
 }
 
 func fatalf(format string, args ...interface{}) {

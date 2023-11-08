@@ -7,6 +7,7 @@ import $ from 'jquery';
 import * as common from './app-common.js';
 import * as routes from './routes.js';
 import * as html from './html.js';
+import * as testlog from './testlog.js';
 import { formatDuration, queryParam } from './utils.js';
 
 $(document).ready(function () {
@@ -39,7 +40,7 @@ $(document).ready(function () {
             }
         },
         error: function(xhr, status, error) {
-            showError('error fetching ' + filename + ' : ' + error);
+            showError('error fetching ' + filename + ': ' + error);
         },
     });
 });
@@ -364,104 +365,90 @@ function formatTestDetails(suiteData, row) {
         container.appendChild(p);
     }
 
-    if (d.summaryResult.details != '') {
-        let p = document.createElement('p');
-        p.innerHTML = '<b>Details:</b>';
-        container.appendChild(p);
-        let detailsOutput = formatTestLog(suiteData, d);
-        container.appendChild(detailsOutput);
+    if (d.summaryResult.details) {
+        // Test output is contained directly in the test, so it can just be displayed.
+        // In order to avoid freezing the browser with lots of output, we limit the display to
+        // at most 25 lines from the head and tail.
+        let log = testlog.splitHeadTail(d.summaryResult.details, 25);
+        formatTestLog(suiteData, d.testIndex, log, container);
+    } else if (d.summaryResult.log) {
+        // Test output is stored in a separate file, so we need to load that here.
+        // The .log field contains the offsets into that file, it's an object
+        // like {begin: 732, end: 812}.
+        let spinner = $('<div><div class="spinner-grow text-secondary" role="status"></div>');
+        $(container).append(spinner);
+
+        const testlogMaxLines = 25;
+        const testlogMaxBytes = 2097152;
+
+        let url = routes.resultsRoot + suiteData.testDetailsLog;
+        let loader = new testlog.Loader(url, d.summaryResult.log);
+        loader.headAndTailLines(testlogMaxLines, testlogMaxBytes).then(function (log) {
+            spinner.remove();
+            formatTestLog(suiteData, d.testIndex, log, container);
+        }).catch(function (error) {
+            console.error(error);
+            spinner.remove();
+            let p = document.createElement('p');
+            p.innerHTML = highlightErrorsInTestOutput(error.toString());
+            container.appendChild(p);
+        });
+    } else {
+        $(container).append('<b>Details:</b> Test has no log output.');
     }
 
     return container;
 }
 
-// countLines returns the number of lines in the given string.
-function countLines(text) {
-    var lines = 0, offset = 0;
-    for (;;) {
-        lines++;
-        offset = text.indexOf('\n', offset);
-        if (offset == -1) {
-            return lines;
-        }
-        offset++;
-    }
-}
-
-// formatTestLog processes the test output. Log output from the test is shortened
-// to avoid freezing the browser.
-function formatTestLog(suiteData, test) {
-    const maxLines = 25;
-
-    let text = test.summaryResult.details;
-    let totalLines = countLines(text);
-
-    var offset = 0, end = 0, lineNumber = 0;
-    var prefixOutput = '';
-    var suffixOutput = '';
-    var hiddenLines = 0;
-    while (end < text.length) {
-        // Find bounding indexes of the next line.
-        end = text.indexOf('\n', offset);
-        if (end == -1) {
-            end = text.length;
-        }
-        let begin = offset;
-        offset = end+1;
-
-        // Collect lines if they're in the visible range.
-        let inPrefix = lineNumber < maxLines;
-        let inSuffix = lineNumber > (totalLines-maxLines);
-        if (inPrefix || inSuffix) {
-            let line = text.substring(begin, end);
-            let content = highlightErrorsInTestOutput(html.encode(line));
-            if (lineNumber < totalLines-1) {
-                content += '\n';
-            }
-            if (inPrefix) {
-                prefixOutput += content;
-            } else {
-                suffixOutput += content;
-            }
-        } else {
-            hiddenLines++;
-        }
-        lineNumber++;
-    }
+// formatTestLog formats the test output.
+// logData is an object like { head: "...", tail: "...", hiddenLines: 10 }.
+function formatTestLog(suiteData, testIndex, logData, container) {
+    let p = document.createElement('p');
+    p.innerHTML = '<b>Details:</b>';
+    container.appendChild(p);
 
     // Create the output sections.
     let output = document.createElement('div');
     output.classList.add('test-output');
 
-    if (prefixOutput.length > 0) {
+    if (logData.head.length > 0) {
         // Add the beginning of text.
         let el = document.createElement('code');
-        el.innerHTML = prefixOutput;
         el.classList.add('output-prefix');
-        if (suffixOutput.length == 0) {
+        if (logData.tail.length == 0) {
             el.classList.add('output-suffix');
         }
+        el.innerHTML = formatTestDetailLines(logData.head);
         output.appendChild(el);
     }
 
-    if (hiddenLines > 0) {
+    if (logData.tail.length > 0) {
         // Create the truncation marker.
-        let linkText = '...' + hiddenLines + ' lines hidden: click for full output...';
-        let linkURL = routes.testLog(suiteData.suiteID, suiteData.name, test.testIndex);
+        var linkText;
+        if (logData.hiddenLines) {
+            linkText = '' + logData.hiddenLines + ' lines hidden. Click here to see full log.';
+        } else {
+            linkText = 'Output truncated. Click here to see full log.';
+        }
+        let linkURL = routes.testLog(suiteData.suiteID, suiteData.name, testIndex);
         let trunc = html.makeLink(linkURL, linkText);
         trunc.classList.add('output-trunc');
         output.appendChild(trunc);
-    }
 
-    if (suffixOutput.length > 0) {
         // Add the remaining text.
         let el = document.createElement('code');
-        el.innerHTML = suffixOutput;
         el.classList.add('output-suffix');
+        el.innerHTML = formatTestDetailLines(logData.tail);
         output.appendChild(el);
     }
 
-    return output;
+    container.appendChild(output);
+}
+
+function formatTestDetailLines(lines) {
+    return lines.reduce(function (o, line) {
+        return o + highlightErrorsInTestOutput(html.encode(line));
+    }, '');
 }
 
 function highlightErrorsInTestOutput(content) {

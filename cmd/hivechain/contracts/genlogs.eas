@@ -1,0 +1,21 @@
+;;; -*- mode: asm -*-
+;;; creates random logs until less than 10k gas remaining.
+
+#include "rng.eas"
+
+.start:
+    %RngInit(0)              ; []
+
+genlogs:
+    ;; emit log with random topic.
+    ;; the rng counter is used as log data.
+    %Rng(0)                     ; [topic]
+    push 32                     ; [offset, topic]
+    push 32                     ; [size, offset, topic]
+    log1                        ; []
+
+    ;; enough gas left? loop!
+    gas                         ; [gas]
+    push 10000                  ; [limit, gas]
+    lt                          ; [limit<gas]
+    jumpi @genlogs              ; []

@@ -8,10 +8,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/hive/hivesim"
-	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	consensus_config "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
+	mock_builder "github.com/marioevz/mock-builder/mock"
 )
 
 var (
@@ -29,7 +29,7 @@ type TestSpec interface {
 	GetName() string
 	GetDescription() string
 	Execute(*hivesim.T, *testnet.Environment, []clients.NodeDefinition)
-	GetValidatorKeys(string) []*consensus_config.KeyDetails
+	GetValidatorKeys(string) []*consensus_config.ValidatorDetails
 }
 
 var tests = []TestSpec{
@@ -162,8 +162,8 @@ var builderTests = []TestSpec{
 			Description: `
 			Test canonical chain includes capella payloads built by the builder api.
 			`,
-			// All validators can withdraw from the start
-			GenesisExecutionWithdrawalCredentialsShares: 1,
+			// All validators start with BLS withdrawal credentials
+			GenesisExecutionWithdrawalCredentialsShares: 0,
 		},
 	},
 }

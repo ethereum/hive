@@ -31,6 +31,7 @@
 #  - [x] HIVE_FORK_MUIRGLACIER        block number for Muir Glacier transition
 #  - [x] HIVE_FORK_BERLIN             block number for Berlin transition
 #  - [x] HIVE_FORK_LONDON             block number for London transition
+#  - [x] HIVE_FORK_MERGE              block number for Merge transition
 #
 # Clique PoA:
 #
@@ -51,9 +52,15 @@ set -e
 nimbus=/usr/bin/nimbus
 FLAGS="--prune-mode:archive --nat:extip:0.0.0.0"
 
-if [ "$HIVE_LOGLEVEL" != "" ]; then
-  FLAGS="$FLAGS --log-level:DEBUG"
-fi
+loglevel=DEBUG
+case "$HIVE_LOGLEVEL" in
+    0|1) loglevel=ERROR ;;
+    2)   loglevel=WARN  ;;
+    3)   loglevel=INFO  ;;
+    4)   loglevel=DEBUG ;;
+    5)   loglevel=TRACE ;;
+esac
+FLAGS="$FLAGS --log-level:$loglevel"
 
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 if [ "$HIVE_BOOTNODE" != "" ]; then
@@ -74,10 +81,18 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
   fi
 fi
 
-# Configure the genesis chain and use it as start block and dump it to stdout
-echo "Supplied genesis state:"
-jq -f /mapper.jq /genesis.json | tee /genesis-start.json
+# Configure the chain.
+jq -f /mapper.jq /genesis.json > /genesis-start.json
 FLAGS="$FLAGS --custom-network:/genesis-start.json"
+
+# Dump genesis.
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+  echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
+  jq 'del(.genesis.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis-start.json
+else
+  echo "Supplied genesis state:"
+  cat /genesis-start.json
+fi
 
 # Don't immediately abort, some imports are meant to fail
 set +e
@@ -95,7 +110,7 @@ fi
 # Load the remainder of the test chain
 echo "Loading remaining individual blocks..."
 if [ -d /blocks ]; then
-  (cd /blocks && cat `ls | sort -n` > blocks.rlp && $nimbus import blocks.rlp $FLAGS)
+  (cd /blocks && $nimbus import `ls | sort -n` $FLAGS)
 else
   echo "Warning: blocks folder not found."
 fi

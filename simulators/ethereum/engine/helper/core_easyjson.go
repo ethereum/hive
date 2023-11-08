@@ -93,6 +93,24 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper(i
 			out.Eip3651TransitionTimestamp = string(in.String())
 		case "eip3860TransitionTimestamp":
 			out.Eip3860TransitionTimestamp = string(in.String())
+		case "eip4844TransitionTimestamp":
+			out.Eip4844TransitionTimestamp = string(in.String())
+		case "eip4788TransitionTimestamp":
+			out.Eip4788TransitionTimestamp = string(in.String())
+		case "eip1153TransitionTimestamp":
+			out.Eip1153TransitionTimestamp = string(in.String())
+		case "eip5656TransitionTimestamp":
+			out.Eip5656TransitionTimestamp = string(in.String())
+		case "eip6780TransitionTimestamp":
+			out.Eip6780TransitionTimestamp = string(in.String())
+		case "eip4844BlobGasPriceUpdateFraction":
+			out.Eip4844BlobGasPriceUpdateFraction = string(in.String())
+		case "eip4844MaxBlobGasPerBlock":
+			out.Eip4844MaxBlobGasPerBlock = string(in.String())
+		case "eip4844MinBlobGasPrice":
+			out.Eip4844MinBlobGasPrice = string(in.String())
+		case "eip4844TargetBlobGasPerBlock":
+			out.Eip4844TargetBlobGasPerBlock = string(in.String())
 		case "eip1559BaseFeeMaxChangeDenominator":
 			out.Eip1559BaseFeeMaxChangeDenominator = string(in.String())
 		case "eip1559ElasticityMultiplier":
@@ -399,84 +417,119 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper(o
 		}
 		out.String(string(in.Eip3860TransitionTimestamp))
 	}
-	if in.Eip1559BaseFeeMaxChangeDenominator != "" {
-		const prefix string = ",\"eip1559BaseFeeMaxChangeDenominator\":"
+	if in.Eip4844TransitionTimestamp != "" {
+		const prefix string = ",\"eip4844TransitionTimestamp\":"
 		if first {
 			first = false
 			out.RawString(prefix[1:])
 		} else {
 			out.RawString(prefix)
 		}
+		out.String(string(in.Eip4844TransitionTimestamp))
+	}
+	if in.Eip4788TransitionTimestamp != "" {
+		const prefix string = ",\"eip4788TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip4788TransitionTimestamp))
+	}
+	if in.Eip1153TransitionTimestamp != "" {
+		const prefix string = ",\"eip1153TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip1153TransitionTimestamp))
+	}
+	if in.Eip5656TransitionTimestamp != "" {
+		const prefix string = ",\"eip5656TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip5656TransitionTimestamp))
+	}
+	if in.Eip6780TransitionTimestamp != "" {
+		const prefix string = ",\"eip6780TransitionTimestamp\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip6780TransitionTimestamp))
+	}
+	{
+		const prefix string = ",\"eip4844BlobGasPriceUpdateFraction\":"
+		if first {
+			first = false
+			out.RawString(prefix[1:])
+		} else {
+			out.RawString(prefix)
+		}
+		out.String(string(in.Eip4844BlobGasPriceUpdateFraction))
+	}
+	{
+		const prefix string = ",\"eip4844MaxBlobGasPerBlock\":"
+		out.RawString(prefix)
+		out.String(string(in.Eip4844MaxBlobGasPerBlock))
+	}
+	{
+		const prefix string = ",\"eip4844MinBlobGasPrice\":"
+		out.RawString(prefix)
+		out.String(string(in.Eip4844MinBlobGasPrice))
+	}
+	{
+		const prefix string = ",\"eip4844TargetBlobGasPerBlock\":"
+		out.RawString(prefix)
+		out.String(string(in.Eip4844TargetBlobGasPerBlock))
+	}
+	if in.Eip1559BaseFeeMaxChangeDenominator != "" {
+		const prefix string = ",\"eip1559BaseFeeMaxChangeDenominator\":"
+		out.RawString(prefix)
 		out.String(string(in.Eip1559BaseFeeMaxChangeDenominator))
 	}
 	if in.Eip1559ElasticityMultiplier != "" {
 		const prefix string = ",\"eip1559ElasticityMultiplier\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.Eip1559ElasticityMultiplier))
 	}
 	if in.Eip1559FeeCollector != "" {
 		const prefix string = ",\"eip1559FeeCollector\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.Eip1559FeeCollector))
 	}
 	if in.Eip1559FeeCollectorTransition != 0 {
 		const prefix string = ",\"eip1559FeeCollectorTransition\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.Int(int(in.Eip1559FeeCollectorTransition))
 	}
 	if in.Registrar != "" {
 		const prefix string = ",\"registrar\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.Registrar))
 	}
 	if in.TransactionPermissionContract != "" {
 		const prefix string = ",\"transactionPermissionContract\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.TransactionPermissionContract))
 	}
 	if in.TransactionPermissionContractTransition != "" {
 		const prefix string = ",\"transactionPermissionContractTransition\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.TransactionPermissionContractTransition))
 	}
 	if in.TerminalTotalDifficulty != "" {
 		const prefix string = ",\"terminalTotalDifficulty\":"
-		if first {
-			first = false
-			out.RawString(prefix[1:])
-		} else {
-			out.RawString(prefix)
-		}
+		out.RawString(prefix)
 		out.String(string(in.TerminalTotalDifficulty))
 	}
 	out.RawByte('}')
@@ -1226,6 +1279,26 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 					in.AddError((*out.ShanghaiTimestamp).UnmarshalJSON(data))
 				}
 			}
+		case "cancunTime":
+			if in.IsNull() {
+				in.Skip()
+				out.CancunTime = nil
+			} else {
+				if out.CancunTime == nil {
+					out.CancunTime = new(big.Int)
+				}
+				if data := in.Raw(); in.Ok() {
+					in.AddError((*out.CancunTime).UnmarshalJSON(data))
+				}
+			}
+		case "minBlobGasPrice":
+			out.MinBlobGasPrice = int(in.Int())
+		case "maxBlobGasPerBlock":
+			out.MaxBlobGasPerBlock = int(in.Int())
+		case "targetBlobGasPerBlock":
+			out.TargetBlobGasPerBlock = int(in.Int())
+		case "blobGasPriceUpdateFraction":
+			out.BlobGasPriceUpdateFraction = int(in.Int())
 		case "aura":
 			(out.Aura).UnmarshalEasyJSON(in)
 		default:
@@ -1334,6 +1407,35 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 		} else {
 			out.Raw((*in.ShanghaiTimestamp).MarshalJSON())
 		}
+	}
+	{
+		const prefix string = ",\"cancunTime\":"
+		out.RawString(prefix)
+		if in.CancunTime == nil {
+			out.RawString("null")
+		} else {
+			out.Raw((*in.CancunTime).MarshalJSON())
+		}
+	}
+	{
+		const prefix string = ",\"minBlobGasPrice\":"
+		out.RawString(prefix)
+		out.Int(int(in.MinBlobGasPrice))
+	}
+	{
+		const prefix string = ",\"maxBlobGasPerBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.MaxBlobGasPerBlock))
+	}
+	{
+		const prefix string = ",\"targetBlobGasPerBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.TargetBlobGasPerBlock))
+	}
+	{
+		const prefix string = ",\"blobGasPriceUpdateFraction\":"
+		out.RawString(prefix)
+		out.Int(int(in.BlobGasPriceUpdateFraction))
 	}
 	{
 		const prefix string = ",\"aura\":"
@@ -1763,7 +1865,7 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper7(
 		out.RawString(prefix)
 		out.String(string(in.Constructor))
 	}
-	if in.Code != "" {
+	{
 		const prefix string = ",\"code\":"
 		out.RawString(prefix)
 		out.String(string(in.Code))

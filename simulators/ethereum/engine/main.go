@@ -16,6 +16,7 @@ import (
 	//suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	//suite_ex_cap "github.com/ethereum/hive/simulators/ethereum/engine/suites/exchange_capabilities"
 	//suite_transition "github.com/ethereum/hive/simulators/ethereum/engine/suites/transition"
+	suite_cancun "github.com/ethereum/hive/simulators/ethereum/engine/suites/cancun"
 	suite_withdrawals "github.com/ethereum/hive/simulators/ethereum/engine/suites/withdrawals"
 )
 
@@ -57,8 +58,12 @@ func main() {
 			Description: `
 	Test Engine API withdrawals, pre/post Shanghai.`[1:],
 		}
+		cancun = hivesim.Suite{
+			Name: "engine-cancun",
+			Description: `
+		Test Engine API on Cancun.`[1:],
+		}
 	)
-
 	simulator := hivesim.New()
 
 	//addTestsToSuite(simulator, &engine, specToInterface(suite_engine.Tests), "full")
@@ -67,29 +72,30 @@ func main() {
 	//addTestsToSuite(simulator, &excap, specToInterface(suite_ex_cap.Tests), "full")
 	//suite_sync.AddSyncTestsToSuite(simulator, &sync, suite_sync.Tests)
 	addTestsToSuite(simulator, &withdrawals, suite_withdrawals.Tests, "full")
+	addTestsToSuite(simulator, &cancun, suite_cancun.Tests, "full")
 
 	// Mark suites for execution
 	//hivesim.MustRunSuite(simulator, engine)
 	//hivesim.MustRunSuite(simulator, transition)
 	//hivesim.MustRunSuite(simulator, auth)
 	//hivesim.MustRunSuite(simulator, excap)
-	//hivesim.MustRunSuite(simulator, sync)
+	// hivesim.MustRunSuite(simulator, syncSuite)
 	hivesim.MustRunSuite(simulator, withdrawals)
+	hivesim.MustRunSuite(simulator, cancun)
 }
 
-func specToInterface(src []test.Spec) []test.SpecInterface {
-	res := make([]test.SpecInterface, len(src))
-	for i := 0; i < len(src); i++ {
-		res[i] = src[i]
-	}
-	return res
-}
-
+//	func specToInterface(src []test.Spec) []test.SpecInterface {
+//		res := make([]test.SpecInterface, len(src))
+//		for i := 0; i < len(src); i++ {
+//			res[i] = src[i]
+//		}
+//		return res
+//	}
 type ClientGenesis interface {
 	GetTTD()
 }
 
-func getTimestamp(spec test.SpecInterface) int64 {
+func getTimestamp(spec test.Spec) int64 {
 	now := time.Now()
 
 	preShapellaBlock := spec.GetPreShapellaBlockCount()
@@ -104,7 +110,7 @@ func getTimestamp(spec test.SpecInterface) int64 {
 }
 
 // Add test cases to a given test suite
-func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.SpecInterface, nodeType string) {
+func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.Spec, nodeType string) {
 	for _, currentTest := range tests {
 		currentTest := currentTest
 
@@ -128,16 +134,28 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 		if err != nil {
 			panic("unable to inject genesis")
 		}
-
+		forkConfig := currentTest.GetForkConfig()
+		//forkConfig.ConfigGenesisHelper(genesis)
 		// Calculate and set the TTD for this test
-		// ttd := helper.CalculateRealTTD(genesis, currentTest.GetTTD())
+		//ttd := helper.CalculateulateRealTTD(genesis, currentTest.GetTTD())
 
 		// Configure Forks
-		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", genesis.Difficulty()))
-		if currentTest.GetForkConfig().ShanghaiTimestamp != nil {
-			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", currentTest.GetForkConfig().ShanghaiTimestamp))
-			// Ensure the merge transition is activated before shanghai.
-			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
+		newParams := globals.DefaultClientEnv.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", genesis.Difficulty().Uint64()))
+		if forkConfig.LondonNumber != nil {
+			newParams = newParams.Set("HIVE_FORK_LONDON", fmt.Sprintf("%d", forkConfig.LondonNumber))
+		}
+		if forkConfig.ParisNumber != nil {
+			newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", fmt.Sprintf("%d", forkConfig.ParisNumber))
+		}
+		if forkConfig.ShanghaiTimestamp != nil {
+			newParams = newParams.Set("HIVE_SHANGHAI_TIMESTAMP", fmt.Sprintf("%d", forkConfig.ShanghaiTimestamp))
+			// Ensure merge transition is activated before shanghai if not already
+			if forkConfig.ParisNumber == nil {
+				newParams = newParams.Set("HIVE_MERGE_BLOCK_ID", "0")
+			}
+			if forkConfig.CancunTimestamp != nil {
+				newParams = newParams.Set("HIVE_CANCUN_TIMESTAMP", fmt.Sprintf("%d", forkConfig.CancunTimestamp))
+			}
 		}
 
 		if nodeType != "" {

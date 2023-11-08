@@ -58,10 +58,6 @@ fi
 # It doesn't make sense to dial out, use only a pre-set bootnode.
 FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 
-if [ "$HIVE_SKIP_POW" != "" ]; then
-    FLAGS="$FLAGS --fakepow"
-fi
-
 # If a specific network ID is requested, use that
 if [ "$HIVE_NETWORK_ID" != "" ]; then
     FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
@@ -97,9 +93,14 @@ fi
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis
-echo "Supplied genesis state:"
-cat /genesis.json
+# Dump genesis. 
+if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+else
+    echo "Supplied genesis state:"
+    cat /genesis.json
+fi
 
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
@@ -131,7 +132,7 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
     # Create password file.
     echo "Importing clique key..."
     echo "secret" > /geth-password-file.txt
-    $geth --nousb account import --password /geth-password-file.txt <(echo "$HIVE_CLIQUE_PRIVATEKEY")
+    $geth account import --password /geth-password-file.txt <(echo "$HIVE_CLIQUE_PRIVATEKEY")
 
     # Ensure password file is used when running geth in mining mode.
     if [ "$HIVE_MINER" != "" ]; then
@@ -141,7 +142,7 @@ fi
 
 # Configure any mining operation
 if [ "$HIVE_MINER" != "" ] && [ "$HIVE_NODETYPE" != "light" ]; then
-    FLAGS="$FLAGS --mine --miner.threads 1 --miner.etherbase $HIVE_MINER"
+    FLAGS="$FLAGS --mine --miner.etherbase $HIVE_MINER"
 fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
@@ -173,5 +174,7 @@ fi
 
 # Run the go-ethereum implementation with the requested flags.
 FLAGS="$FLAGS --nat=none"
+# Disable disk space free monitor
+FLAGS="$FLAGS --datadir.minfreedisk=0"
 echo "Running go-ethereum with flags $FLAGS"
 $geth $FLAGS

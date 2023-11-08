@@ -3,8 +3,10 @@ package helper
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/go-ethereum/core"
 	"math/big"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -52,6 +54,10 @@ type Genesis interface {
 	Alloc() GenesisAlloc
 	AllocGenesis(address common.Address, account Account)
 	UpdateTimestamp(timestamp string)
+	BlobGasUsed() *uint64
+	SetBlobGasUsed(*uint64)
+	ExcessBlobGas() *uint64
+	SetExcessBlobGas(*uint64)
 
 	// Used for testing
 	Number() uint64
@@ -163,6 +169,15 @@ type NethermindParams struct {
 	Eip3855TransitionTimestamp              string `json:"eip3855TransitionTimestamp,omitempty"`
 	Eip3651TransitionTimestamp              string `json:"eip3651TransitionTimestamp,omitempty"`
 	Eip3860TransitionTimestamp              string `json:"eip3860TransitionTimestamp,omitempty"`
+	Eip4844TransitionTimestamp              string `json:"eip4844TransitionTimestamp,omitempty"`
+	Eip4788TransitionTimestamp              string `json:"eip4788TransitionTimestamp,omitempty"`
+	Eip1153TransitionTimestamp              string `json:"eip1153TransitionTimestamp,omitempty"`
+	Eip5656TransitionTimestamp              string `json:"eip5656TransitionTimestamp,omitempty"`
+	Eip6780TransitionTimestamp              string `json:"eip6780TransitionTimestamp,omitempty"`
+	Eip4844BlobGasPriceUpdateFraction       string `json:"eip4844BlobGasPriceUpdateFraction"`
+	Eip4844MaxBlobGasPerBlock               string `json:"eip4844MaxBlobGasPerBlock"`
+	Eip4844MinBlobGasPrice                  string `json:"eip4844MinBlobGasPrice"`
+	Eip4844TargetBlobGasPerBlock            string `json:"eip4844TargetBlobGasPerBlock"`
 	Eip1559BaseFeeMaxChangeDenominator      string `json:"eip1559BaseFeeMaxChangeDenominator,omitempty"`
 	Eip1559ElasticityMultiplier             string `json:"eip1559ElasticityMultiplier,omitempty"`
 	Eip1559FeeCollector                     string `json:"eip1559FeeCollector,omitempty"`
@@ -204,11 +219,32 @@ type NethermindChainSpec struct {
 	Accounts map[string]Account `json:"accounts,omitempty"`
 }
 
+func (n *NethermindChainSpec) BlobGasUsed() *uint64 {
+	val := uint64(0)
+	return &val
+}
+
+func (n *NethermindChainSpec) SetBlobGasUsed(u *uint64) {
+}
+
+func (n *NethermindChainSpec) ExcessBlobGas() *uint64 {
+	val := uint64(0)
+	return &val
+}
+
+func (n *NethermindChainSpec) SetExcessBlobGas(u *uint64) {
+}
+
 func (n *NethermindChainSpec) UpdateTimestamp(timestamp string) {
 	n.Params.Eip3651TransitionTimestamp = timestamp
 	n.Params.Eip3855TransitionTimestamp = timestamp
 	n.Params.Eip3860TransitionTimestamp = timestamp
 	n.Params.Eip4895TransitionTimestamp = timestamp
+	n.Params.Eip4844TransitionTimestamp = timestamp
+	n.Params.Eip4788TransitionTimestamp = timestamp
+	n.Params.Eip1153TransitionTimestamp = timestamp
+	n.Params.Eip5656TransitionTimestamp = timestamp
+	n.Params.Eip6780TransitionTimestamp = timestamp
 }
 
 func (n *NethermindChainSpec) Config() *params.ChainConfig {
@@ -224,9 +260,30 @@ func (n *NethermindChainSpec) Config() *params.ChainConfig {
 	}
 
 	return &params.ChainConfig{
-		ChainID:                 chainID,
-		TerminalTotalDifficulty: big.NewInt(ttd),
-		ShanghaiTime:            &unixTimestampUint64,
+		ChainID:                       chainID,
+		HomesteadBlock:                big.NewInt(0),
+		DAOForkBlock:                  big.NewInt(0),
+		DAOForkSupport:                false,
+		EIP150Block:                   big.NewInt(0),
+		EIP155Block:                   big.NewInt(0),
+		EIP158Block:                   big.NewInt(0),
+		ByzantiumBlock:                big.NewInt(0),
+		ConstantinopleBlock:           big.NewInt(0),
+		PetersburgBlock:               big.NewInt(0),
+		IstanbulBlock:                 big.NewInt(0),
+		MuirGlacierBlock:              big.NewInt(0),
+		BerlinBlock:                   big.NewInt(0),
+		LondonBlock:                   big.NewInt(0),
+		ArrowGlacierBlock:             big.NewInt(0),
+		GrayGlacierBlock:              big.NewInt(0),
+		MergeNetsplitBlock:            big.NewInt(0),
+		ShanghaiTime:                  &unixTimestampUint64,
+		CancunTime:                    &unixTimestampUint64,
+		TerminalTotalDifficulty:       big.NewInt(ttd),
+		TerminalTotalDifficultyPassed: false,
+		Ethash:                        &params.EthashConfig{},
+		Clique:                        &params.CliqueConfig{},
+		IsDevMode:                     false,
 	}
 }
 
@@ -257,6 +314,11 @@ func (n *NethermindChainSpec) SetTimestamp(timestamp int64) {
 	n.Params.Eip3855TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip3651TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip3860TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip4844TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip4788TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip1153TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip5656TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	n.Params.Eip6780TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 }
 
 func (n *NethermindChainSpec) ExtraData() []byte {
@@ -303,8 +365,7 @@ func (n *NethermindChainSpec) SetCoinbase(address common.Address) {
 }
 
 func (n *NethermindChainSpec) Alloc() GenesisAlloc {
-	//TODO implement me
-	panic("implement me")
+	return n.Accounts
 }
 
 func (n *NethermindChainSpec) AllocGenesis(address common.Address, account Account) {
@@ -332,8 +393,45 @@ func (n *NethermindChainSpec) BaseFee() *big.Int {
 }
 
 func (n *NethermindChainSpec) ToBlock() *types.Block {
-	//TODO implement me
-	panic("implement me")
+	alloc := make(core.GenesisAlloc)
+	for address, account := range n.Accounts {
+		balance := big.NewInt(0)
+		code := make([]byte, 0)
+		if val, ok := account["balance"]; ok && val != nil {
+			switch v := val.(type) {
+			case common.Hash:
+				bytesBalance := v.Bytes()
+				balance = new(big.Int).SetBytes(bytesBalance)
+			case string:
+				bytesBalance := common.Hex2Bytes(v)
+				balance = new(big.Int).SetBytes(bytesBalance)
+			}
+		}
+		if val, ok := account["code"]; ok && val != nil {
+			code = common.FromHex(val.(string))
+		}
+		alloc[common.HexToAddress(address)] = core.GenesisAccount{
+			Balance: balance,
+			Code:    code,
+		}
+	}
+	config := n.Config()
+	s := core.Genesis{
+		Config:     config,
+		Nonce:      0,
+		Timestamp:  uint64(time.Now().Unix()),
+		ExtraData:  nil,
+		GasLimit:   n.GasLimit(),
+		Difficulty: config.TerminalTotalDifficulty,
+		Mixhash:    n.MixHash(),
+		Coinbase:   n.Coinbase(),
+		Alloc:      alloc,
+		Number:     0,
+		GasUsed:    0,
+		ParentHash: common.Hash{},
+	}
+
+	return s.ToBlock()
 }
 
 type ErigonAura struct {
@@ -371,6 +469,11 @@ type ErigonConfig struct {
 	TerminalTotalDifficulty       *big.Int   `json:"terminalTotalDifficulty"`
 	TerminalTotalDifficultyPassed bool       `json:"terminalTotalDifficultyPassed"`
 	ShanghaiTimestamp             *big.Int   `json:"shanghaiTime"`
+	CancunTime                    *big.Int   `json:"cancunTime"`
+	MinBlobGasPrice               int        `json:"minBlobGasPrice"`
+	MaxBlobGasPerBlock            int        `json:"maxBlobGasPerBlock"`
+	TargetBlobGasPerBlock         int        `json:"targetBlobGasPerBlock"`
+	BlobGasPriceUpdateFraction    int        `json:"blobGasPriceUpdateFraction"`
 	Aura                          ErigonAura `json:"aura"`
 }
 
@@ -388,14 +491,32 @@ type ErigonGenesis struct {
 	ErigonAlloc      map[string]ErigonAccount `json:"alloc"`
 }
 
+func (v *ErigonGenesis) BlobGasUsed() *uint64 {
+	val := uint64(0)
+	return &val
+}
+
+func (v *ErigonGenesis) SetBlobGasUsed(u *uint64) {
+}
+
+func (v *ErigonGenesis) ExcessBlobGas() *uint64 {
+	val := uint64(0)
+	return &val
+}
+
+func (v *ErigonGenesis) SetExcessBlobGas(u *uint64) {
+}
+
 func (v *ErigonGenesis) Config() *params.ChainConfig {
 	chainID := big.NewInt(int64(v.ErigonConfig.ChainID))
 	ttd := big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonDifficulty))
 	shangai := v.ErigonConfig.ShanghaiTimestamp.Uint64() //big.NewInt(v.ErigonConfig.ShanghaiTimestamp
+	cancun := v.ErigonConfig.CancunTime.Uint64()         //big.NewInt(v.ErigonConfig.ShanghaiTimestamp
 	return &params.ChainConfig{
 		ChainID:                 chainID,
 		TerminalTotalDifficulty: ttd,
 		ShanghaiTime:            &shangai,
+		CancunTime:              &cancun,
 	}
 }
 
@@ -421,6 +542,7 @@ func (v *ErigonGenesis) Timestamp() uint64 {
 
 func (v *ErigonGenesis) SetTimestamp(timestamp int64) {
 	v.ErigonConfig.ShanghaiTimestamp = big.NewInt(timestamp)
+	v.ErigonConfig.CancunTime = big.NewInt(timestamp)
 }
 
 func (v *ErigonGenesis) ExtraData() []byte {
@@ -451,8 +573,7 @@ func (v *ErigonGenesis) SetDifficulty(difficulty *big.Int) {
 }
 
 func (v *ErigonGenesis) MixHash() common.Hash {
-	//TODO implement me
-	panic("implement me")
+	return common.Hash{}
 }
 
 func (v *ErigonGenesis) SetMixHash(hash common.Hash) {
@@ -461,8 +582,7 @@ func (v *ErigonGenesis) SetMixHash(hash common.Hash) {
 }
 
 func (v *ErigonGenesis) Coinbase() common.Address {
-	//TODO implement me
-	panic("implement me")
+	return common.Address{}
 }
 
 func (v *ErigonGenesis) SetCoinbase(address common.Address) {
@@ -508,6 +628,37 @@ func (v *ErigonGenesis) BaseFee() *big.Int {
 }
 
 func (v *ErigonGenesis) ToBlock() *types.Block {
-	//TODO implement me
-	panic("implement me")
+	alloc := make(core.GenesisAlloc)
+	for address, account := range v.ErigonAlloc {
+		balance := big.NewInt(0)
+		code := make([]byte, 0)
+		val := account.Balance
+		if val != "" {
+			bytesBalance := common.Hex2Bytes(val)
+			balance = new(big.Int).SetBytes(bytesBalance)
+		}
+		valCode := account.Code
+		code = common.FromHex(valCode)
+		alloc[common.HexToAddress(address)] = core.GenesisAccount{
+			Balance: balance,
+			Code:    code,
+		}
+	}
+	config := v.Config()
+	s := core.Genesis{
+		Config:     config,
+		Nonce:      0,
+		Timestamp:  uint64(time.Now().Unix()),
+		ExtraData:  nil,
+		GasLimit:   v.GasLimit(),
+		Difficulty: config.TerminalTotalDifficulty,
+		Mixhash:    v.MixHash(),
+		Coinbase:   v.Coinbase(),
+		Alloc:      alloc,
+		Number:     0,
+		GasUsed:    0,
+		ParentHash: common.Hash{},
+	}
+
+	return s.ToBlock()
 }

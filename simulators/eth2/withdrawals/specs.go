@@ -8,11 +8,11 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
-	mock_builder "github.com/ethereum/hive/simulators/eth2/common/builder/mock"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	cl "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	el "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/testnet"
+	mock_builder "github.com/marioevz/mock-builder/mock"
 	beacon "github.com/protolambda/zrnt/eth2/beacon/common"
 )
 
@@ -47,42 +47,18 @@ type BaseWithdrawalsTestSpec struct {
 
 var (
 	DEFAULT_VALIDATOR_COUNT uint64 = 128
-	MAINNET_SLOT_TIME       int64  = 12
-	MINIMAL_SLOT_TIME       int64  = 6
 
 	EPOCHS_TO_FINALITY beacon.Epoch = 4
 
 	// Default config used for all tests unless a client specific config exists
 	DEFAULT_CONFIG = &testnet.Config{
 		ValidatorCount:          big.NewInt(int64(DEFAULT_VALIDATOR_COUNT)),
-		SlotTime:                big.NewInt(MAINNET_SLOT_TIME),
 		TerminalTotalDifficulty: common.Big0,
 		AltairForkEpoch:         common.Big0,
 		BellatrixForkEpoch:      common.Big0,
 		CapellaForkEpoch:        common.Big1,
 		Eth1Consensus:           &el.ExecutionPostMergeGenesis{},
 	}
-
-	MINIMAL_SLOT_TIME_CLIENTS = []string{
-		"lighthouse",
-		"teku",
-		"prysm",
-		"lodestar",
-	}
-
-	// Clients that do not support starting on epoch 0 with all forks enabled.
-	// Tests take longer for these clients.
-	/*
-		INCREMENTAL_FORKS_CONFIG = &testnet.Config{
-			AltairForkEpoch:    common.Big0,
-			BellatrixForkEpoch: common.Big0,
-			CapellaForkEpoch:   common.Big1,
-		}
-		INCREMENTAL_FORKS_CLIENTS = map[string]bool{
-			"nimbus": true,
-			"prysm":  true,
-		}
-	*/
 
 	// This is the account that sends vault funding transactions.
 	VaultAccountAddress = common.HexToAddress(
@@ -108,22 +84,6 @@ func (ts BaseWithdrawalsTestSpec) GetTestnetConfig(
 	allNodeDefinitions clients.NodeDefinitions,
 ) *testnet.Config {
 	config := *DEFAULT_CONFIG
-
-	/*
-		if INCREMENTAL_FORKS_CLIENTS[n.ConsensusClient] {
-			config = config.Join(INCREMENTAL_FORKS_CONFIG)
-		}
-	*/
-
-	if len(
-		allNodeDefinitions.FilterByCL(MINIMAL_SLOT_TIME_CLIENTS),
-	) == len(
-		allNodeDefinitions,
-	) {
-		// If all clients support using minimal 6 second slot time, use it
-		config.SlotTime = big.NewInt(MINIMAL_SLOT_TIME)
-	}
-	fmt.Printf("INFO: using %d second slot time\n", config.SlotTime)
 
 	if ts.CapellaGenesis {
 		config.CapellaForkEpoch = common.Big0
@@ -192,7 +152,7 @@ func (ts BaseWithdrawalsTestSpec) GetValidatorCount() uint64 {
 
 func (ts BaseWithdrawalsTestSpec) GetValidatorKeys(
 	mnemonic string,
-) []*cl.KeyDetails {
+) []*cl.ValidatorDetails {
 	keySrc := &cl.MnemonicsKeySource{
 		From:       0,
 		To:         ts.GetValidatorCount(),

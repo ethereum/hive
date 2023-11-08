@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
 
-var Tests = []test.Spec{
+var Tests = []test.BaseSpec{
 	{
 		Name:           "Sync Client Post Merge",
 		Run:            postMergeSync,
@@ -33,7 +33,7 @@ var Tests = []test.Spec{
 }
 
 // Routine that adds all sync tests to a test suite
-func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.Spec) {
+func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.BaseSpec) {
 	clientDefs, err := sim.ClientTypes()
 	if err != nil {
 		panic(err)
@@ -99,7 +99,7 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 						}
 
 						// Run the test case
-						test.Run(currentTest, big.NewInt(ttd), timeout, t, c, &genesis, syncClientParams, testFiles.Copy())
+						test.Run(&currentTest, big.NewInt(ttd), timeout, t, c, &genesis, syncClientParams, testFiles.Copy())
 					},
 				})
 			}

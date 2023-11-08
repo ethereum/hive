@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"path"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -61,14 +60,7 @@ type simAPI struct {
 
 // getClientTypes returns all known client types.
 func (api *simAPI) getClientTypes(w http.ResponseWriter, r *http.Request) {
-	clients := make([]*ClientDefinition, 0, len(api.tm.clientDefs))
-	for _, def := range api.tm.clientDefs {
-		clients = append(clients, def)
-	}
-	sort.Slice(clients, func(i, j int) bool {
-		return clients[i].Name < clients[j].Name
-	})
-	serveJSON(w, clients)
+	serveJSON(w, api.tm.clientDefs)
 }
 
 // startSuite starts a suite.
@@ -332,11 +324,12 @@ func (api *simAPI) checkClient(req *simapi.NodeConfig) (*ClientDefinition, error
 	if req.Client == "" {
 		return nil, errors.New("missing client type in start request")
 	}
-	def, ok := api.tm.clientDefs[req.Client]
-	if !ok {
-		return nil, errors.New("unknown client type in start request")
+	for _, client := range api.tm.clientDefs {
+		if client.Name == req.Client {
+			return client, nil
+		}
 	}
-	return def, nil
+	return nil, errors.New("unknown client type in start request")
 }
 
 // checkClientNetworks pre-checks the existence of initial networks for a client container.

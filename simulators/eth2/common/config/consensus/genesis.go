@@ -115,7 +115,7 @@ func genesisPayloadHeaderCapella(
 
 func createValidators(
 	spec *common.Spec,
-	keys []*KeyDetails,
+	keys []*ValidatorDetails,
 ) []phase0.KickstartValidatorData {
 	validators := make([]phase0.KickstartValidatorData, 0, len(keys))
 	for _, key := range keys {
@@ -136,7 +136,7 @@ func BuildBeaconState(
 	spec *common.Spec,
 	eth1Genesis *core.Genesis,
 	eth2GenesisTime common.Timestamp,
-	keys []*KeyDetails,
+	keys []*ValidatorDetails,
 ) (common.BeaconState, error) {
 	if uint64(len(keys)) < uint64(spec.MIN_GENESIS_ACTIVE_VALIDATOR_COUNT) {
 		return nil, fmt.Errorf(

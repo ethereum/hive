@@ -2,6 +2,7 @@ import $ from 'jquery';
 
 import * as common from './app-common.js';
 import * as routes from './routes.js';
+import * as testlog from './testlog.js';
 import { makeLink } from './html.js';
 import { formatBytes, queryParam } from './utils.js';
 
@@ -91,17 +92,28 @@ function showTitle(type, title) {
     $('#file-title').text(title);
 }
 
-function showError(text) {
+function showError(text, err) {
+    let errtext = text;
+    if (err instanceof Error) {
+        errtext += `\n${err.name}: ${err.message}`;
+    } else if (err) {
+        if (err.status) {
+            errtext += `\nstatus ${err.status}`;
+        } else {
+            errtext += `\n${err}`;
+        }
+    }
+
     $('#file-title').text('Error');
-    showText('Error:\n\n' + text);
+    showText('Error!\n' + errtext);
 }
 
-// showFileContent shows a file + fileinfo.
-// This is called by the loader, after a successful fetch.
-function showFileContent(text, filename) {
-    showText(text);
+function showRawLink(url, text) {
     let raw = $('#raw-url');
-    raw.attr('href', filename);
+    raw.attr('href', url);
+    if (text) {
+        raw.text(text);
+    }
     raw.show();
 }
 
@@ -117,6 +129,10 @@ function showText(text) {
     // Add the lines.
     let lines = text.split('\n');
     for (let i = 0; i < lines.length; i++) {
+        // Avoid showing empty last line when there is a newline at the end.
+        if (i === lines.length-1 && lines[i] == "") {
+            break;
+        }
         appendLine(contentArea, gutter, i + 1, lines[i]);
     }
 
@@ -148,46 +164,62 @@ function lineNumberClicked() {
 }
 
 // fetchFile loads up a new file to view
-function fetchFile(url, line /* optional jump to line */ ) {
+async function fetchFile(url, line /* optional jump to line */ ) {
     let resultsRE = new RegExp('^' + routes.resultsRoot);
-    $.ajax({
-        xhr: common.newXhrWithProgressBar,
-        url: url,
-        dataType: 'text',
-        success: function(data) {
-            let title = url.replace(resultsRE, '');
-            showTitle(null, title);
-            showFileContent(data, url);
-            setHL(line, true);
-        },
-        error: function(jq, status, error) {
-            alert('Failed to load ' + url + '\nstatus:' + status + '\nerror:' + error);
-        },
-    });
+    let text;
+    try {
+        showRawLink(url);
+        text = await load(url, 'text');
+    } catch (err) {
+        showError(`Failed to load ${url}`, err);
+        return;
+    }
+    let title = url.replace(resultsRE, '');
+    showTitle(null, title);
+    showText(text);
+    setHL(line, true);
 }
 
 // fetchTestLog loads the suite file and displays the output of a test.
-function fetchTestLog(suiteFile, testIndex, line) {
-    $.ajax({
-        xhr: common.newXhrWithProgressBar,
-        url: suiteFile,
-        dataType: 'json',
-        success: function(data) {
-            if (!data['testCases'] || !data['testCases'][testIndex]) {
-                let errtext = 'Invalid test data returned by server: ' + JSON.stringify(data, null, 2);
-                showError(errtext);
-                return;
-            }
+async function fetchTestLog(suiteFile, testIndex, line) {
+    let data;
+    try {
+        data = await load(suiteFile, 'json');
+    } catch(err) {
+        showError(`Can't load suite file: ${suiteFile}`, err);
+        return;
+    }
+    if (!data['testCases'] || !data['testCases'][testIndex]) {
+        showError('Invalid test data returned by server: ' + JSON.stringify(data, null, 2));
+        return;
+    }
 
-            let test = data.testCases[testIndex];
-            let name = test.name;
-            let logtext = test.summaryResult.details;
-            showTitle('Test:', name);
-            showText(logtext);
-            setHL(line, true);
-        },
-        error: function(jq, status, error) {
-            alert('Failed to load ' + suiteFile + '\nstatus:' + status + '\nerror:' + error);
-        },
-    });
+    let test = data.testCases[testIndex];
+    let name = test.name;
+    let logtext;
+    if (test.summaryResult.details) {
+        logtext = test.summaryResult.details;
+    } else if (test.summaryResult.log) {
+        try {
+            let url = routes.resultsRoot + data.testDetailsLog;
+            let loader = new testlog.Loader(url, test.summaryResult.log);
+            showRawLink(url, 'raw suite output');
+            logtext = await loader.text(function (received, length) {
+                common.showLoadProgress(received/length);
+            });
+            common.showLoadProgress(false);
+        } catch(err) {
+            showError('Loading test log failed.', err);
+            return;
+        }
+    } else {
+        showError('test has no details/log');
+    }
+    showTitle('Test:', name);
+    showText(logtext);
+    setHL(line, true);
+}
+
+async function load(url, dataType) {
+    return $.ajax({url, dataType, xhr: common.newXhrWithProgressBar});
 }

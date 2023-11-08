@@ -2,15 +2,15 @@
 
 FROM debian:buster-slim AS build
 
-ARG branch=unstable
+ARG tag=unstable
+ARG github=status-im/nimbus-eth2
 
 RUN apt-get update \
  && apt-get install -y --fix-missing build-essential make git libpcre3-dev librocksdb-dev curl \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-RUN git clone --recurse-submodules --depth 1 --branch "${branch}" \
-    https://github.com/status-im/nimbus-eth2.git
+RUN git clone --recurse-submodules --depth 1 --branch "$tag" https://github.com/$github
 
 WORKDIR /nimbus-eth2
 

@@ -8,7 +8,7 @@ import (
 
 type Environment struct {
 	Clients        *clients.ClientDefinitionsByRole
-	Keys           []*consensus_config.KeyDetails
+	Keys           []*consensus_config.ValidatorDetails
 	Secrets        *[]blsu.SecretKey
 	LogEngineCalls bool
 }

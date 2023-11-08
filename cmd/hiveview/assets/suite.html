@@ -18,26 +18,33 @@
         </nav>
       </div>
 
-      <div class="row">
-        <div class="col-md-7">
-          <h2><span id="testsuite_state">Results:</span> <span id="testsuite_name"></span></h2>
-          <p><span id="testsuite_desc"></span></p>
-          <p><span id="testsuite_clients"></span></p>
-        </div>
-        <div class="col-md-5">
-          <ul id="testsuite_info" class="justify-content-end list-group list-group-horizontal-xl" style="display: none;">
-            <li id="testsuite_start" class="list-group-item"></li>
-            <li id="testsuite_duration" class="list-group-item"></li>
-            <li class="list-group-item"><a id="sim-log-link"></a></li>
-          </ul>
-        </div>
-      </div>
+      <noscript>
+        <h3>Please enable JavaScript to use hiveview.</h3>
+        <style>.script-content{ display: none; }</style>
+      </noscript>
 
-      <div id="load-progress-bar-container" class="progress" style="display: none;">
-        <div id="load-progress-bar" class="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
-      </div>
+      <div class="script-loaded">
+        <div class="row">
+          <div class="col-md-7">
+            <h2><span id="testsuite_state">Results:</span> <span id="testsuite_name"></span></h2>
+            <p><span id="testsuite_desc"></span></p>
+            <p><span id="testsuite_clients"></span></p>
+          </div>
+          <div class="col-md-5">
+            <ul id="testsuite_info" class="justify-content-end list-group list-group-horizontal-xl" style="display: none;">
+              <li id="testsuite_start" class="list-group-item"></li>
+              <li id="testsuite_duration" class="list-group-item"></li>
+              <li class="list-group-item"><a id="sim-log-link"></a></li>
+            </ul>
+          </div>
+        </div>
 
-      <table id="execresults" class="table table-bordered"></table>
+        <div id="load-progress-bar-container" class="progress" style="display: none;">
+          <div id="load-progress-bar" class="progress-bar" role="progressbar" style="width: 0" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+
+        <table id="execresults" class="table table-bordered"></table>
+      </div>
     </main>
   </body>
 </html>

@@ -3,6 +3,7 @@ package suite_sync
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -96,11 +97,27 @@ func (c NethermindSyncConfig) String() string {
 	return fmt.Sprintf("%s", b)
 }
 
+func GetGenesis(base, genesisFile string) helper.Genesis {
+	// Load the default test genesis file
+	if len(base) != 0 {
+		base += "_"
+	}
+	gen := test.GenesisFactory(base)
+	genesisPath := "./init/" + base + "genesis.json"
+	if genesisFile != "" {
+		genesisPath = fmt.Sprintf("./init/%s", genesisFile)
+	}
+	genesis := helper.LoadGenesis(genesisPath, gen)
+	return genesis
+}
+
 func (NethermindSyncVariantGenerator) Configure(TTD *big.Int, GenesisFile string, ChainFile string) []SyncTestVariant {
 	result := make([]SyncTestVariant, 0)
 
+	//genesis := test.GenesisFactory(GenesisFile)
+
 	var (
-		genesis = helper.LoadGenesis(GenesisFile)
+		genesis = GetGenesis("nethermind", GenesisFile)
 		chain   types.Blocks
 	)
 

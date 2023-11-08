@@ -22,9 +22,12 @@ import (
 	"github.com/protolambda/ztyp/tree"
 
 	"github.com/ethereum/hive/hivesim"
-	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	execution_config "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
+	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
+	exec_client "github.com/marioevz/eth-clients/clients/execution"
+	node "github.com/marioevz/eth-clients/clients/node"
+	builder_types "github.com/marioevz/mock-builder/types"
 )
 
 const (
@@ -41,7 +44,7 @@ var (
 
 type Testnet struct {
 	*hivesim.T
-	clients.Nodes
+	node.Nodes
 
 	genesisTime           common.Timestamp
 	genesisValidatorsRoot common.Root
@@ -61,6 +64,8 @@ type ActiveSpec struct {
 	*common.Spec
 }
 
+const slotsTolerance common.Slot = 2
+
 func (spec *ActiveSpec) EpochTimeoutContext(
 	parent context.Context,
 	epochs common.Epoch,
@@ -68,7 +73,7 @@ func (spec *ActiveSpec) EpochTimeoutContext(
 	return context.WithTimeout(
 		parent,
 		time.Duration(
-			uint64(spec.SLOTS_PER_EPOCH*common.Slot(epochs))*
+			uint64((spec.SLOTS_PER_EPOCH*common.Slot(epochs))+slotsTolerance)*
 				uint64(spec.SECONDS_PER_SLOT),
 		)*time.Second,
 	)
@@ -81,7 +86,7 @@ func (spec *ActiveSpec) SlotTimeoutContext(
 	return context.WithTimeout(
 		parent,
 		time.Duration(
-			uint64(slots)*
+			uint64(slots+slotsTolerance)*
 				uint64(spec.SECONDS_PER_SLOT))*time.Second,
 	)
 }
@@ -161,11 +166,11 @@ func StartTestnet(
 		simulatorIP = net.ParseIP(simIPStr)
 	}
 
-	testnet.Nodes = make(clients.Nodes, len(config.NodeDefinitions))
+	testnet.Nodes = make(node.Nodes, len(config.NodeDefinitions))
 
 	// Init all client bundles
 	for nodeIndex := range testnet.Nodes {
-		testnet.Nodes[nodeIndex] = new(clients.Node)
+		testnet.Nodes[nodeIndex] = new(node.Node)
 	}
 
 	// For each key partition, we start a client bundle that consists of:
@@ -198,9 +203,13 @@ func StartTestnet(
 		}
 		if node.ExecutionClientTTD != nil {
 			executionTTD = node.ExecutionClientTTD.Int64()
+		} else if testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty != nil {
+			executionTTD = testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty.Int64()
 		}
 		if node.BeaconNodeTTD != nil {
 			beaconTTD = node.BeaconNodeTTD.Int64()
+		} else if testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty != nil {
+			beaconTTD = testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty.Int64()
 		}
 
 		// Prepare the client objects with all the information necessary to
@@ -211,14 +220,14 @@ func StartTestnet(
 			executionDef,
 			config.Eth1Consensus,
 			node.Chain,
-			clients.ExecutionClientConfig{
+			exec_client.ExecutionClientConfig{
 				ClientIndex:             nodeIndex,
 				TerminalTotalDifficulty: executionTTD,
 				Subnet:                  node.GetExecutionSubnet(),
 				JWTSecret:               JWT_SECRET,
-				ProxyConfig: &clients.ExecutionProxyConfig{
+				ProxyConfig: &exec_client.ExecutionProxyConfig{
 					Host:                   simulatorIP,
-					Port:                   clients.PortEngineRPC + nodeIndex,
+					Port:                   exec_client.PortEngineRPC + nodeIndex,
 					TrackForkchoiceUpdated: true,
 					LogEngineCalls:         env.LogEngineCalls,
 				},
@@ -232,7 +241,7 @@ func StartTestnet(
 				beaconDef,
 				config.EnableBuilders,
 				config.BuilderOptions,
-				clients.BeaconClientConfig{
+				beacon_client.BeaconClientConfig{
 					ClientIndex:             nodeIndex,
 					TerminalTotalDifficulty: beaconTTD,
 					Spec:                    testnet.spec,
@@ -273,7 +282,9 @@ func (t *Testnet) Stop() {
 	}
 	for _, b := range t.BeaconClients() {
 		if b.Builder != nil {
-			b.Builder.Cancel()
+			if builder, ok := b.Builder.(builder_types.Builder); ok {
+				builder.Cancel()
+			}
 		}
 	}
 }
@@ -345,18 +356,12 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 				wg.Add(1)
 				go func(
 					ctx context.Context,
-					n *clients.Node,
+					n *node.Node,
 					r *result,
 				) {
 					defer wg.Done()
 
 					b := n.BeaconClient
-
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
-					if err != nil {
-						r.err = errors.Wrap(err, "failed to poll head")
-						return
-					}
 
 					checkpoints, err := b.BlockFinalityCheckpoints(
 						ctx,
@@ -372,7 +377,7 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 
 					versionedBlock, err := b.BlockV2(
 						ctx,
-						eth2api.BlockIdRoot(headInfo.Root),
+						eth2api.BlockHead,
 					)
 					if err != nil {
 						r.err = errors.Wrap(err, "failed to retrieve block")
@@ -384,7 +389,7 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 						execution = executionPayload.BlockHash
 					}
 
-					slot := headInfo.Header.Message.Slot
+					slot := versionedBlock.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -400,7 +405,7 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 						versionedBlock.Version,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(versionedBlock.Root().String()),
 						utils.Shorten(execution.String()),
 						utils.Shorten(checkpoints.CurrentJustified.String()),
 						utils.Shorten(checkpoints.Finalized.String()),
@@ -460,16 +465,10 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(ctx context.Context, n *clients.Node, r *result) {
+				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 
 					b := n.BeaconClient
-
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
-					if err != nil {
-						r.err = errors.Wrap(err, "failed to poll head")
-						return
-					}
 
 					checkpoints, err := b.BlockFinalityCheckpoints(
 						ctx,
@@ -485,7 +484,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 
 					versionedBlock, err := b.BlockV2(
 						ctx,
-						eth2api.BlockIdRoot(headInfo.Root),
+						eth2api.BlockHead,
 					)
 					if err != nil {
 						r.err = errors.Wrap(err, "failed to retrieve block")
@@ -496,7 +495,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 						execution = executionPayload.BlockHash
 					}
 
-					slot := headInfo.Header.Message.Slot
+					slot := versionedBlock.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -516,7 +515,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 						versionedBlock.Version,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(versionedBlock.Root().String()),
 						health,
 						utils.Shorten(execution.String()),
 						utils.Shorten(checkpoints.CurrentJustified.String()),
@@ -581,19 +580,19 @@ func (t *Testnet) WaitForExecutionFinality(
 
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(ctx context.Context, n *clients.Node, r *result) {
+				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 					var (
-						b       = n.BeaconClient
-						version string
+						b             = n.BeaconClient
+						finalizedFork string
 					)
 
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
+					headBlock, err := b.BlockV2(ctx, eth2api.BlockHead)
 					if err != nil {
 						r.err = errors.Wrap(err, "failed to poll head")
 						return
 					}
-					slot := headInfo.Header.Message.Slot
+					slot := headBlock.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -617,8 +616,13 @@ func (t *Testnet) WaitForExecutionFinality(
 					}
 
 					execution := ethcommon.Hash{}
+					if exeuctionPayload, err := headBlock.ExecutionPayload(); err == nil {
+						execution = exeuctionPayload.BlockHash
+					}
+
+					finalizedExecution := ethcommon.Hash{}
 					if (checkpoints.Finalized != common.Checkpoint{}) {
-						if versionedBlock, err := b.BlockV2(
+						if finalizedBlock, err := b.BlockV2(
 							ctx,
 							eth2api.BlockIdRoot(checkpoints.Finalized.Root),
 						); err != nil {
@@ -628,26 +632,31 @@ func (t *Testnet) WaitForExecutionFinality(
 							)
 							return
 						} else {
-							version = versionedBlock.Version
-							if exeuctionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
-								execution = exeuctionPayload.BlockHash
+							finalizedFork = finalizedBlock.Version
+							if exeuctionPayload, err := finalizedBlock.ExecutionPayload(); err == nil {
+								finalizedExecution = exeuctionPayload.BlockHash
 							}
 						}
 					}
 
 					r.msg = fmt.Sprintf(
-						"fork=%s, clock_slot=%s, slot=%d, head=%s, "+
-							"exec_payload=%s, justified=%s, finalized=%s",
-						version,
+						"fork=%s, finalized_fork=%s, clock_slot=%s, slot=%d, head=%s, "+
+							"exec_payload=%s, finalized_exec_payload=%s, justified=%s, finalized=%s",
+						headBlock.Version,
+						finalizedFork,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(headBlock.Root().String()),
 						utils.Shorten(execution.Hex()),
+						utils.Shorten(finalizedExecution.Hex()),
 						utils.Shorten(checkpoints.CurrentJustified.String()),
 						utils.Shorten(checkpoints.Finalized.String()),
 					)
 
-					if !bytes.Equal(execution[:], EMPTY_EXEC_HASH[:]) {
+					if !bytes.Equal(
+						finalizedExecution[:],
+						EMPTY_EXEC_HASH[:],
+					) {
 						r.done = true
 						r.result = checkpoints.Finalized
 					}
@@ -717,7 +726,7 @@ func (t *Testnet) WaitForCurrentEpochFinalization(
 			for i, n := range runningNodes {
 				i := i
 				wg.Add(1)
-				go func(ctx context.Context, n *clients.Node, r *result) {
+				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 
 					b := n.BeaconClient
@@ -842,18 +851,21 @@ func (t *Testnet) WaitForExecutionPayload(
 
 			for i, n := range runningNodes {
 				wg.Add(1)
-				go func(ctx context.Context, n *clients.Node, r *result) {
+				go func(ctx context.Context, n *node.Node, r *result) {
 					defer wg.Done()
 
 					b := n.BeaconClient
 
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
+					versionedBlock, err := b.BlockV2(
+						ctx,
+						eth2api.BlockHead,
+					)
 					if err != nil {
-						r.err = errors.Wrap(err, "failed to poll head")
+						r.err = errors.Wrap(err, "failed to retrieve block")
 						return
 					}
 
-					slot := headInfo.Header.Message.Slot
+					slot := versionedBlock.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -861,15 +873,6 @@ func (t *Testnet) WaitForExecutionPayload(
 							clockSlot,
 							slot,
 						)
-						return
-					}
-
-					versionedBlock, err := b.BlockV2(
-						ctx,
-						eth2api.BlockIdRoot(headInfo.Root),
-					)
-					if err != nil {
-						r.err = errors.Wrap(err, "failed to retrieve block")
 						return
 					}
 
@@ -886,7 +889,7 @@ func (t *Testnet) WaitForExecutionPayload(
 						versionedBlock.Version,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(versionedBlock.Root().String()),
 						health,
 						utils.Shorten(executionHash.Hex()),
 					)
@@ -915,7 +918,7 @@ func (t *Testnet) WaitForExecutionPayload(
 
 func GetHealth(
 	parentCtx context.Context,
-	bn *clients.BeaconClient,
+	bn *beacon_client.BeaconClient,
 	spec *common.Spec,
 	slot common.Slot,
 ) (float64, error) {

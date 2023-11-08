@@ -125,6 +125,7 @@ td.ellipsis {
     color: #fff;
     padding: 0 10px;
     text-decoration: none;
+    white-space: nowrap;
 }
 
 .test-output .output-error {

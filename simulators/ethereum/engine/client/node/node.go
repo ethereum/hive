@@ -2,9 +2,7 @@ package node
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"os"
@@ -14,12 +12,9 @@ import (
 	beacon "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/cmd/utils"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/consensus/ethash"
-	"github.com/ethereum/go-ethereum/consensus/misc"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/txpool"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
@@ -36,33 +31,13 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
-	client_types "github.com/ethereum/hive/simulators/ethereum/engine/client/types"
-	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
-	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
+	//"github.com/ethereum/hive/simulators/ethereum/engine/helper"
+	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
 
 type GethNodeTestConfiguration struct {
 	// Node name
 	Name string
-
-	// The node mines proof of work blocks
-	PoWMiner              bool
-	PoWMinerEtherBase     common.Address
-	PoWRandomTransactions bool
-	// Prepare the Ethash instance even if we don't mine (to seal blocks)
-	Ethash bool
-	// Disable gossiping of newly mined blocks (peers need to sync to obtain the blocks)
-	DisableGossiping bool
-
-	// Block Modifier
-	BlockModifier helper.BlockModifier
-
-	// In PoW production mode, produce many terminal blocks which shall be gossiped
-	TerminalBlockSiblingCount *big.Int
-	TerminalBlockSiblingDepth *big.Int
-
-	// Of all terminal blocks produced, the index of the one to send as terminal block when queried
-	NthTerminalBlockToReturnAsHead *big.Int
 
 	// To allow testing terminal block gossiping on the other clients, restrict this client
 	// to only connect to the boot node
@@ -73,9 +48,6 @@ type GethNodeTestConfiguration struct {
 
 	// Chain to import
 	ChainFile string
-
-	// How many seconds to delay PoW mining start
-	MiningStartDelaySeconds *big.Int
 }
 type GethNodeEngineStarter struct {
 	// Client parameters used to launch the default client
@@ -87,9 +59,7 @@ type GethNodeEngineStarter struct {
 }
 
 var (
-	DefaultMaxPeers                  = big.NewInt(25)
-	DefaultMiningStartDelaySeconds   = big.NewInt(10)
-	DefaultTerminalBlockSiblingDepth = big.NewInt(1)
+	DefaultMaxPeers = big.NewInt(25)
 )
 
 func (s GethNodeEngineStarter) StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...client.EngineClient) (client.EngineClient, error) {
@@ -111,7 +81,7 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 			}
 		}
 	} else {
-		ttd = big.NewInt(helper.CalculateRealTTD(genesis, ttd.Int64()))
+		//ttd = big.NewInt(helper.CalculateRealTTD(genesis, ttd.Int64()))
 		ClientParams = ClientParams.Set("HIVE_TERMINAL_TOTAL_DIFFICULTY", fmt.Sprintf("%d", ttd))
 	}
 
@@ -144,14 +114,6 @@ func (s GethNodeEngineStarter) StartGethNode(T *hivesim.T, testContext context.C
 		}
 	}
 
-	if s.Config.MiningStartDelaySeconds == nil {
-		s.Config.MiningStartDelaySeconds = DefaultMiningStartDelaySeconds
-	}
-
-	if s.Config.TerminalBlockSiblingDepth == nil {
-		s.Config.TerminalBlockSiblingDepth = DefaultTerminalBlockSiblingDepth
-	}
-
 	g, err := newNode(s.Config, enodes, &genesisCopy)
 	if err != nil {
 		return nil, err
@@ -175,10 +137,8 @@ type AccountTransactionInfo struct {
 	PreviousNonce uint64
 }
 type GethNode struct {
-	node            *node.Node
-	eth             *eth.Ethereum
-	ethashEngine    *ethash.Ethash
-	ethashWaitGroup sync.WaitGroup
+	node *node.Node
+	eth  *eth.Ethereum
 
 	mustHeadBlock *types.Header
 
@@ -192,19 +152,21 @@ type GethNode struct {
 
 	// Engine updates info
 	latestFcUStateSent *beacon.ForkchoiceStateV1
-	latestPAttrSent    *beacon.PayloadAttributes
+	latestPAttrSent    *typ.PayloadAttributes
 	latestFcUResponse  *beacon.ForkChoiceResponse
 
-	latestPayloadSent          *beacon.ExecutableData
+	latestPayloadSent          *typ.ExecutableData
 	latestPayloadStatusReponse *beacon.PayloadStatusV1
 
 	// Test specific configuration
 	accTxInfoMap                      map[common.Address]*AccountTransactionInfo
+	accTxInfoMapLock                  sync.Mutex
 	totalReceivedOrAnnouncedNewBlocks *big.Int
-	terminalBlocksMined               *big.Int
 
 	config GethNodeTestConfiguration
 }
+
+var _ client.EngineClient = (*GethNode)(nil)
 
 func newNode(config GethNodeTestConfiguration, bootnodes []string, genesis *core.Genesis) (*GethNode, error) {
 	// Define the basic configurations for the Ethereum node
@@ -233,15 +195,20 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 	if err != nil {
 		return nil, err
 	}
+	if genesis == nil || genesis.Config == nil {
+		return nil, fmt.Errorf("genesis configuration is nil")
+	}
+	if genesis.Config.TerminalTotalDifficultyPassed == false {
+		return nil, fmt.Errorf("genesis configuration is has not passed terminal total difficulty")
+	}
 	econfig := &ethconfig.Config{
 		Genesis:          genesis,
 		NetworkId:        genesis.Config.ChainID.Uint64(),
 		SyncMode:         downloader.FullSync,
 		DatabaseCache:    256,
 		DatabaseHandles:  256,
-		TxPool:           txpool.DefaultConfig,
+		TxPool:           ethconfig.Defaults.TxPool,
 		GPO:              ethconfig.Defaults.GPO,
-		Ethash:           ethconfig.Defaults.Ethash,
 		Miner:            ethconfig.Defaults.Miner,
 		LightServ:        100,
 		LightPeers:       int(startConfig.MaxPeers.Int64()) - 1,
@@ -283,23 +250,10 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		accTxInfoMap: make(map[common.Address]*AccountTransactionInfo),
 		// Test related configuration
 		totalReceivedOrAnnouncedNewBlocks: big.NewInt(0),
-		terminalBlocksMined:               big.NewInt(0),
 		config:                            startConfig,
 	}
 
 	g.running, g.closing = context.WithCancel(context.Background())
-	if startConfig.PoWMiner || startConfig.Ethash {
-		// Create the ethash consensus module
-		ethashConfig := ethconfig.Defaults.Ethash
-		ethashConfig.PowMode = ethash.ModeNormal
-		ethashConfig.CacheDir = "/ethash"
-		ethashConfig.DatasetDir = ethashConfig.CacheDir
-		g.ethashEngine = ethash.New(ethashConfig, nil, false)
-	}
-	if startConfig.PoWMiner {
-		// Enable mining
-		go g.EnablePoWMining()
-	}
 
 	// Start thread to monitor the amount of gossiped blocks this node receives
 	go g.SubscribeP2PEvents()
@@ -316,217 +270,6 @@ func (n *GethNode) AddPeer(ec client.EngineClient) error {
 	n.node.Server().AddTrustedPeer(node)
 	n.node.Server().AddPeer(node)
 	return nil
-}
-
-func (n *GethNode) isBlockTerminal(b *types.Header) (bool, *big.Int, error) {
-	ctx, cancel := context.WithTimeout(n.running, globals.RPCTimeout)
-	defer cancel()
-	parentTD, err := n.GetBlockTotalDifficulty(ctx, b.ParentHash)
-	if err != nil {
-		return false, nil, err
-	}
-	blockTD := new(big.Int).Add(parentTD, b.Difficulty)
-	return blockTD.Cmp(n.ttd) >= 0 && parentTD.Cmp(n.ttd) < 0, blockTD, nil
-}
-
-func (n *GethNode) EnablePoWMining() {
-	// Delay mining start:
-	// This is useful in some cases where we try to test gossip blocks,
-	// because subsequent client docker container might take a while to
-	// start, and miss some of the gossipped blocks, thus failing the
-	// test.
-	select {
-	case <-time.After(time.Second * time.Duration(n.config.MiningStartDelaySeconds.Int64())):
-	case <-n.running.Done():
-		return
-	}
-
-	// Start PoW Mining Loop
-	go n.PoWMiningLoop()
-}
-
-func (n *GethNode) PrepareNextBlock(currentBlock *types.Header) (*state.StateDB, *types.Block, error) {
-	if t, _, err := n.isBlockTerminal(currentBlock); err == nil {
-		if t {
-			if n.config.TerminalBlockSiblingCount != nil && n.config.TerminalBlockSiblingCount.Cmp(n.terminalBlocksMined) > 0 {
-				// Reset the canonical chain to the parent of the terminal block to keep the miner mining.
-				if currentBlock, err = n.ReOrgBackBlockChain(n.config.TerminalBlockSiblingDepth.Uint64(), currentBlock); err != nil {
-					panic(err)
-				}
-			} else {
-				// PoW has finished
-				return nil, nil, nil
-			}
-		}
-	}
-
-	timestamp := uint64(time.Now().Unix())
-	if currentBlock.Time >= timestamp {
-		timestamp = currentBlock.Time + 1
-	}
-	num := new(big.Int).Set(currentBlock.Number)
-	nextHeader := &types.Header{
-		ParentHash: currentBlock.Hash(),
-		Number:     num.Add(num, common.Big1),
-		GasLimit:   currentBlock.GasLimit,
-		Time:       timestamp,
-		Coinbase:   n.config.PoWMinerEtherBase,
-	}
-
-	if nextHeader.Coinbase == (common.Address{}) {
-		// Coinbase was not specified, use a random address here to have a different stateRoot each mined block
-		rand.Read(nextHeader.Coinbase[:])
-	}
-
-	// Always randomize extra to try to generate different seal hash
-	rand.Read(nextHeader.Extra)
-
-	// Set baseFee and GasLimit if we are on an EIP-1559 chain
-	if n.eth.BlockChain().Config().IsLondon(nextHeader.Number) {
-		nextHeader.BaseFee = misc.CalcBaseFee(n.eth.BlockChain().Config(), currentBlock)
-		if !n.eth.BlockChain().Config().IsLondon(currentBlock.Number) {
-			parentGasLimit := currentBlock.GasLimit * n.eth.BlockChain().Config().ElasticityMultiplier()
-			nextHeader.GasLimit = parentGasLimit
-		}
-	}
-
-	if err := n.ethashEngine.Prepare(n.eth.BlockChain(), nextHeader); err != nil {
-		log.Error("Failed to prepare header for sealing", "err", err)
-		return nil, nil, err
-	}
-
-	state, err := n.eth.BlockChain().StateAt(currentBlock.Root)
-	if err != nil {
-		panic(err)
-	}
-	b, err := n.ethashEngine.FinalizeAndAssemble(n.eth.BlockChain(), nextHeader, state, nil, nil, nil, nil)
-	return state, b, err
-}
-
-func (n *GethNode) PoWMiningLoop() {
-	n.ethashWaitGroup.Add(1)
-	defer n.ethashWaitGroup.Done()
-	currentBlock := n.eth.BlockChain().CurrentBlock()
-
-	// During the Pow mining, the node must respond with the latest mined block, not what the blockchain actually states
-	n.mustHeadBlock = currentBlock
-
-	// When the node stops mining, the head must now point to the actual head
-	defer func() {
-		n.mustHeadBlock = nil
-	}()
-
-	for {
-		select {
-		case <-n.running.Done():
-			return
-		default:
-		}
-		s, b, err := n.PrepareNextBlock(currentBlock)
-		if err != nil {
-			panic(err)
-		}
-		if b == nil {
-			// Nothing left to mine
-			return
-		}
-
-		// Wait until the previous block is succesfully propagated
-		<-time.After(time.Millisecond * 200)
-
-		// Modify the block before sealing
-		if n.config.BlockModifier != nil {
-			b, err = n.config.BlockModifier.ModifyUnsealedBlock(n.eth.BlockChain(), s, b)
-			if err != nil {
-				panic(err)
-			}
-		}
-
-		// Seal the next block to broadcast
-		rChan := make(chan *types.Block, 0)
-		stopChan := make(chan struct{})
-		n.ethashEngine.Seal(n.eth.BlockChain(), b, rChan, stopChan)
-		select {
-		case b := <-rChan:
-			if b == nil {
-				panic(fmt.Errorf("no block got sealed"))
-			}
-			jsH, _ := json.MarshalIndent(b.Header(), "", " ")
-			fmt.Printf("INFO (%s): Mined block:\n%s\n", n.config.Name, jsH)
-
-			// Modify the sealed block if necessary
-			if n.config.BlockModifier != nil {
-				sealVerifier := func(h *types.Header) bool {
-					return n.ethashEngine.VerifyHeader(n.eth.BlockChain(), h, true) == nil
-				}
-				b, err = n.config.BlockModifier.ModifySealedBlock(sealVerifier, b)
-				if err != nil {
-					panic(err)
-				}
-			}
-
-			// Broadcast
-			if !n.config.DisableGossiping {
-				n.eth.EventMux().Post(core.NewMinedBlockEvent{Block: b})
-			}
-
-			// Check whether the block was a terminal block
-			header := b.Header()
-			if t, td, err := n.isBlockTerminal(header); err == nil {
-				if t {
-					n.terminalBlocksMined.Add(n.terminalBlocksMined, common.Big1)
-					fmt.Printf("DEBUG (%s) [%v]: Mined a New Terminal Block: hash=%v, parent=%v, number=%d, td=%d, ttd=%d\n", n.config.Name, time.Now(), b.Hash(), b.ParentHash(), b.Number(), td, n.ttd)
-				} else {
-					fmt.Printf("DEBUG (%s) [%v]: Mined a New Block: hash=%v, parent=%v, number=%d, td=%d, ttd=%d\n", n.config.Name, time.Now(), b.Hash(), b.ParentHash(), b.Number(), td, n.ttd)
-				}
-			} else {
-				panic(err)
-			}
-
-			// Write to the chain
-			_, err = n.eth.BlockChain().WriteBlockAndSetHead(b, nil, nil, s, false)
-			if err != nil {
-				panic(err)
-			}
-
-			// Update the block on top of which to proceed with mining
-			currentBlock = header
-			n.mustHeadBlock = header
-		case <-n.running.Done():
-			close(stopChan)
-			return
-		}
-	}
-}
-
-// Seal a block for testing purposes
-func (n *GethNode) SealBlock(ctx context.Context, block *types.Block) (*types.Block, error) {
-	if n.ethashEngine == nil {
-		return nil, fmt.Errorf("Node was not configured with an ethash instance")
-	}
-	n.ethashWaitGroup.Add(1)
-	defer n.ethashWaitGroup.Done()
-	newHeader := types.CopyHeader(block.Header())
-	// Reset nonce and mixHash
-	newHeader.Nonce = types.BlockNonce{}
-	newHeader.MixDigest = common.Hash{}
-
-	rChan := make(chan *types.Block, 0)
-	stopChan := make(chan struct{})
-	blockToSeal := types.NewBlockWithHeader(newHeader).WithBody(block.Transactions(), block.Uncles())
-
-	n.ethashEngine.Seal(n.eth.BlockChain(), blockToSeal, rChan, stopChan)
-
-	select {
-	case b := <-rChan:
-		if b == nil {
-			panic(fmt.Errorf("no block got sealed"))
-		}
-		return b, nil
-	case <-ctx.Done():
-		close(stopChan)
-		return nil, ctx.Err()
-	}
 }
 
 // Sets the canonical block to an ancestor of the provided block.
@@ -589,12 +332,6 @@ func (n *GethNode) Close() error {
 	default:
 	}
 	n.closing()
-	if n.ethashEngine != nil {
-		n.ethashWaitGroup.Wait()
-		if err := n.ethashEngine.Close(); err != nil {
-			panic(err)
-		}
-	}
 	err := n.node.Close()
 	if err != nil {
 		return err
@@ -661,7 +398,7 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 		failedProcessing = true
 	}
 	rawdb.WriteReceipts(n.eth.ChainDb(), block.Hash(), block.NumberU64(), receipts)
-	root, err := statedb.Commit(false)
+	root, err := statedb.Commit(block.NumberU64(), false)
 	if err != nil {
 		return err
 	}
@@ -695,105 +432,167 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 }
 
 // Engine API
-func (n *GethNode) NewPayload(ctx context.Context, version int, pl interface{}) (beacon.PayloadStatusV1, error) {
+func (n *GethNode) NewPayload(ctx context.Context, version int, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
 	switch version {
 	case 1:
-		if c, ok := pl.(*client_types.ExecutableDataV1); ok {
-			return n.NewPayloadV1(ctx, c)
-		} else {
-			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
-		}
+		return n.NewPayloadV1(ctx, pl)
 	case 2:
-		if c, ok := pl.(*beacon.ExecutableData); ok {
-			return n.NewPayloadV2(ctx, c)
-		} else {
-			return beacon.PayloadStatusV1{}, fmt.Errorf("wrong type %T", pl)
-		}
+		return n.NewPayloadV2(ctx, pl)
+	case 3:
+		return n.NewPayloadV3(ctx, pl)
 	}
 	return beacon.PayloadStatusV1{}, fmt.Errorf("unknown version %d", version)
 }
-func (n *GethNode) NewPayloadV1(ctx context.Context, pl *client_types.ExecutableDataV1) (beacon.PayloadStatusV1, error) {
-	ed := pl.ToExecutableData()
-	n.latestPayloadSent = &ed
-	resp, err := n.api.NewPayloadV1(ed)
-	n.latestPayloadStatusReponse = &resp
-	return resp, err
-}
-func (n *GethNode) NewPayloadV2(ctx context.Context, pl *beacon.ExecutableData) (beacon.PayloadStatusV1, error) {
+
+func (n *GethNode) NewPayloadV1(ctx context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
 	n.latestPayloadSent = pl
-	resp, err := n.api.NewPayloadV2(*pl)
+	edConverted, err := typ.ToBeaconExecutableData(pl)
+	if err != nil {
+		return beacon.PayloadStatusV1{}, err
+	}
+	resp, err := n.api.NewPayloadV1(edConverted)
 	n.latestPayloadStatusReponse = &resp
 	return resp, err
 }
-func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+
+func (n *GethNode) NewPayloadV2(ctx context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
+	n.latestPayloadSent = pl
+	ed, err := typ.ToBeaconExecutableData(pl)
+	if err != nil {
+		return beacon.PayloadStatusV1{}, err
+	}
+	resp, err := n.api.NewPayloadV2(ed)
+	n.latestPayloadStatusReponse = &resp
+	return resp, err
+}
+
+func (n *GethNode) NewPayloadV3(ctx context.Context, pl *typ.ExecutableData) (beacon.PayloadStatusV1, error) {
+	n.latestPayloadSent = pl
+	ed, err := typ.ToBeaconExecutableData(pl)
+	if err != nil {
+		return beacon.PayloadStatusV1{}, err
+	}
+	if pl.VersionedHashes == nil {
+		return beacon.PayloadStatusV1{}, fmt.Errorf("versioned hashes are nil")
+	}
+	resp, err := n.api.NewPayloadV3(ed, *pl.VersionedHashes, pl.ParentBeaconBlockRoot)
+	n.latestPayloadStatusReponse = &resp
+	return resp, err
+}
+
+func (n *GethNode) ForkchoiceUpdated(ctx context.Context, version int, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	switch version {
 	case 1:
 		return n.ForkchoiceUpdatedV1(ctx, fcs, payload)
 	case 2:
 		return n.ForkchoiceUpdatedV2(ctx, fcs, payload)
+	case 3:
+		return n.ForkchoiceUpdatedV3(ctx, fcs, payload)
 	default:
 		return beacon.ForkChoiceResponse{}, fmt.Errorf("unknown version %d", version)
 	}
 }
-func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+
+func GethPayloadAttributes(payload *typ.PayloadAttributes) *beacon.PayloadAttributes {
+	if payload == nil {
+		return nil
+	}
+	return &beacon.PayloadAttributes{
+		Timestamp:             payload.Timestamp,
+		Random:                payload.Random,
+		SuggestedFeeRecipient: payload.SuggestedFeeRecipient,
+		Withdrawals:           payload.Withdrawals,
+		BeaconRoot:            payload.BeaconRoot,
+	}
+}
+
+func (n *GethNode) ForkchoiceUpdatedV1(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
-	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, payload)
+	fcr, err := n.api.ForkchoiceUpdatedV1(*fcs, GethPayloadAttributes(payload))
 	n.latestFcUResponse = &fcr
 	return fcr, err
 }
 
-func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *beacon.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+func (n *GethNode) ForkchoiceUpdatedV2(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
 	n.latestFcUStateSent = fcs
 	n.latestPAttrSent = payload
-	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, payload)
+	fcr, err := n.api.ForkchoiceUpdatedV2(*fcs, GethPayloadAttributes(payload))
 	n.latestFcUResponse = &fcr
 	return fcr, err
 }
 
-func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableData, error) {
+func (n *GethNode) ForkchoiceUpdatedV3(ctx context.Context, fcs *beacon.ForkchoiceStateV1, payload *typ.PayloadAttributes) (beacon.ForkChoiceResponse, error) {
+	n.latestFcUStateSent = fcs
+	n.latestPAttrSent = payload
+	fcr, err := n.api.ForkchoiceUpdatedV3(*fcs, GethPayloadAttributes(payload))
+	n.latestFcUResponse = &fcr
+	return fcr, err
+}
+
+func (n *GethNode) GetPayloadV1(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, error) {
 	p, err := n.api.GetPayloadV1(*payloadId)
 	if p == nil || err != nil {
-		return beacon.ExecutableData{}, err
+		return typ.ExecutableData{}, err
 	}
-	return *p, err
+	return typ.FromBeaconExecutableData(p)
 }
 
-func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID) (beacon.ExecutableData, *big.Int, error) {
+func (n *GethNode) GetPayloadV2(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, error) {
 	p, err := n.api.GetPayloadV2(*payloadId)
 	if p == nil || err != nil {
-		return beacon.ExecutableData{}, nil, err
+		return typ.ExecutableData{}, nil, err
 	}
-	return *p.ExecutionPayload, p.BlockValue, err
+	ed, err := typ.FromBeaconExecutableData(p.ExecutionPayload)
+	return ed, p.BlockValue, err
 }
 
-func (n *GethNode) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*client_types.ExecutionPayloadBodyV1, error) {
+func (n *GethNode) GetPayloadV3(ctx context.Context, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
+	p, err := n.api.GetPayloadV3(*payloadId)
+	if p == nil || err != nil {
+		return typ.ExecutableData{}, nil, nil, nil, err
+	}
+	ed, err := typ.FromBeaconExecutableData(p.ExecutionPayload)
+	blobsBundle := &typ.BlobsBundle{}
+	if err := blobsBundle.FromBeaconBlobsBundle(p.BlobsBundle); err != nil {
+		return typ.ExecutableData{}, nil, nil, nil, err
+	}
+	return ed, p.BlockValue, blobsBundle, &p.Override, err
+}
+
+func (n *GethNode) GetPayload(ctx context.Context, version int, payloadId *beacon.PayloadID) (typ.ExecutableData, *big.Int, *typ.BlobsBundle, *bool, error) {
+
+	switch version {
+	case 1:
+		ed, err := n.GetPayloadV1(ctx, payloadId)
+		return ed, nil, nil, nil, err
+	case 2:
+		ed, value, err := n.GetPayloadV2(ctx, payloadId)
+		return ed, value, nil, nil, err
+	case 3:
+		return n.GetPayloadV3(ctx, payloadId)
+	default:
+		return typ.ExecutableData{}, nil, nil, nil, fmt.Errorf("unknown version %d", version)
+	}
+}
+
+func (n *GethNode) GetPayloadBodiesByRangeV1(ctx context.Context, start uint64, count uint64) ([]*typ.ExecutionPayloadBodyV1, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (n *GethNode) GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*client_types.ExecutionPayloadBodyV1, error) {
+func (n *GethNode) GetPayloadBodiesByHashV1(ctx context.Context, hashes []common.Hash) ([]*typ.ExecutionPayloadBodyV1, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (n *GethNode) GetBlobsBundleV1(ctx context.Context, payloadId *beacon.PayloadID) (*typ.BlobsBundle, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
 // Eth JSON RPC
-const (
-	SafeBlockNumber      = rpc.BlockNumber(-4) // This is not yet true
-	FinalizedBlockNumber = rpc.BlockNumber(-3)
-	PendingBlockNumber   = rpc.BlockNumber(-2)
-	LatestBlockNumber    = rpc.BlockNumber(-1)
-	EarliestBlockNumber  = rpc.BlockNumber(0)
-)
-
-var (
-	Head      *big.Int // Nil
-	Pending   = big.NewInt(-2)
-	Finalized = big.NewInt(-3)
-	Safe      = big.NewInt(-4)
-)
 
 func parseBlockNumber(number *big.Int) rpc.BlockNumber {
 	if number == nil {
-		return LatestBlockNumber
+		return rpc.LatestBlockNumber
 	}
 	return rpc.BlockNumber(number.Int64())
 }
@@ -802,9 +601,10 @@ func (n *GethNode) BlockByNumber(ctx context.Context, number *big.Int) (*client.
 	if number == nil && n.mustHeadBlock != nil {
 		mustHeadHash := n.mustHeadBlock.Hash()
 		block := n.eth.BlockChain().GetBlock(mustHeadHash, n.mustHeadBlock.Number.Uint64())
-		return block, nil
+		return client.NewBlock(block, client.NewBlockHeader(block.Header(), block.Hash())), nil
 	}
-	return n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
+	block, err := n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
+	return client.NewBlock(block, client.NewBlockHeader(block.Header(), block.Hash())), err
 }
 
 //	type LocalBlock struct {
@@ -865,12 +665,12 @@ func (n *GethNode) BlockByHash(ctx context.Context, hash common.Hash) (*client.B
 	if err != nil {
 		return nil, err
 	}
-
+	return client.NewBlock(block, client.NewBlockHeader(block.Header(), block.Hash())), nil
 }
 
 func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*client.BlockHeader, error) {
 	if number == nil && n.mustHeadBlock != nil {
-		return n.mustHeadBlock, nil
+		return nil, nil
 	}
 	b, err := n.eth.APIBackend.BlockByNumber(ctx, parseBlockNumber(number))
 	if err != nil {
@@ -879,19 +679,38 @@ func (n *GethNode) HeaderByNumber(ctx context.Context, number *big.Int) (*client
 	if b == nil {
 		return nil, fmt.Errorf("Block not found (%v)", number)
 	}
+	return client.NewBlockHeader(b.Header(), b.Hash()), err
+}
+
+func (n *GethNode) HeaderByHash(ctx context.Context, hash common.Hash) (*types.Header, error) {
+	b, err := n.eth.APIBackend.BlockByHash(ctx, hash)
+	if err != nil {
+		return nil, err
+	}
+	if b == nil {
+		return nil, fmt.Errorf("Header not found (%v)", hash)
+	}
 	return b.Header(), err
 }
 
-func (n *GethNode) SendTransaction(ctx context.Context, tx *types.Transaction) error {
-	return n.eth.APIBackend.SendTx(ctx, tx)
+func (n *GethNode) SendTransaction(ctx context.Context, tx typ.Transaction) error {
+	if v, ok := tx.(*types.Transaction); ok {
+		return n.eth.APIBackend.SendTx(ctx, v)
+	}
+	return fmt.Errorf("invalid transaction type")
 }
 
-func (n *GethNode) SendTransactions(ctx context.Context, txs []*types.Transaction) []error {
+func (n *GethNode) SendTransactions(ctx context.Context, txs ...typ.Transaction) []error {
 	for _, tx := range txs {
-		err := n.eth.APIBackend.SendTx(ctx, tx)
-		if err != nil {
-			return []error{err}
+		if v, ok := tx.(*types.Transaction); ok {
+			err := n.eth.APIBackend.SendTx(ctx, v)
+			if err != nil {
+				return []error{err}
+			}
+		} else {
+			return []error{fmt.Errorf("invalid transaction type")}
 		}
+
 	}
 	return nil
 }
@@ -940,6 +759,10 @@ func (n *GethNode) TransactionByHash(ctx context.Context, hash common.Hash) (tx 
 	panic("NOT IMPLEMENTED")
 }
 
+func (n *GethNode) PendingTransactionCount(ctx context.Context) (uint, error) {
+	panic("NOT IMPLEMENTED")
+}
+
 func (n *GethNode) GetBlockTotalDifficulty(ctx context.Context, hash common.Hash) (*big.Int, error) {
 	block := n.eth.BlockChain().GetBlockByHash(hash)
 	if block == nil {
@@ -974,14 +797,38 @@ func (n *GethNode) ID() string {
 	return n.node.Config().Name
 }
 
-func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address) (uint64, error) {
+func (n *GethNode) GetLastAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
+
 	// First get the current head of the client where we will send the tx
-	head, err := n.eth.APIBackend.BlockByNumber(testCtx, LatestBlockNumber)
-	if err != nil {
-		return 0, err
+	if head == nil {
+		block, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
+		if err != nil {
+			return 0, err
+		}
+		head = block.Header()
+	}
+
+	// Then check if we have any info about this account, and when it was last updated
+	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
+		// We have info about this account and is up to date (or up to date until the very last block).
+		// Return the previous nonce
+		return accTxInfo.PreviousNonce, nil
+	}
+	// We don't have info about this account, so there is no previous nonce
+	return 0, fmt.Errorf("no previous nonce for account %s", account.String())
+}
+
+func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.Address, head *types.Header) (uint64, error) {
+	if head == nil {
+		// First get the current head of the client where we will send the tx
+		block, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
+		if err != nil {
+			return 0, err
+		}
+		head = block.Header()
 	}
 	// Check if we have any info about this account, and when it was last updated
-	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash()) {
+	if accTxInfo, ok := n.accTxInfoMap[account]; ok && accTxInfo != nil && (accTxInfo.PreviousBlock == head.Hash() || accTxInfo.PreviousBlock == head.ParentHash) {
 		// We have info about this account and is up to date (or up to date until the very last block).
 		// Increase the nonce and return it
 		accTxInfo.PreviousBlock = head.Hash()
@@ -989,10 +836,12 @@ func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.A
 		return accTxInfo.PreviousNonce, nil
 	}
 	// We don't have info about this account, or is outdated, or we re-org'd, we must request the nonce
-	nonce, err := n.NonceAt(testCtx, account, head.Number())
+	nonce, err := n.NonceAt(testCtx, account, head.Number)
 	if err != nil {
 		return 0, err
 	}
+	n.accTxInfoMapLock.Lock()
+	defer n.accTxInfoMapLock.Unlock()
 	n.accTxInfoMap[account] = &AccountTransactionInfo{
 		PreviousBlock: head.Hash(),
 		PreviousNonce: nonce,
@@ -1002,7 +851,7 @@ func (n *GethNode) GetNextAccountNonce(testCtx context.Context, account common.A
 
 func (n *GethNode) UpdateNonce(testCtx context.Context, account common.Address, newNonce uint64) error {
 	// First get the current head of the client where we will send the tx
-	head, err := n.eth.APIBackend.BlockByNumber(testCtx, LatestBlockNumber)
+	head, err := n.eth.APIBackend.BlockByNumber(testCtx, rpc.LatestBlockNumber)
 	if err != nil {
 		return err
 	}
@@ -1020,20 +869,14 @@ func (n *GethNode) PostRunVerifications() error {
 			return fmt.Errorf("Node received gossiped blocks count different than expected: %d != %d", n.totalReceivedOrAnnouncedNewBlocks, n.config.ExpectedGossipNewBlocksCount)
 		}
 	}
-	if n.config.PoWMiner && n.config.TerminalBlockSiblingCount != nil {
-		if n.terminalBlocksMined.Cmp(n.config.TerminalBlockSiblingCount) != 0 {
-			return fmt.Errorf("PoW Miner node could not mine expected amount of terminal blocks: %d != %d", n.terminalBlocksMined, n.config.TerminalBlockSiblingCount)
-
-		}
-	}
 	return nil
 }
 
-func (n *GethNode) LatestForkchoiceSent() (fcState *beacon.ForkchoiceStateV1, pAttributes *beacon.PayloadAttributes) {
+func (n *GethNode) LatestForkchoiceSent() (fcState *beacon.ForkchoiceStateV1, pAttributes *typ.PayloadAttributes) {
 	return n.latestFcUStateSent, n.latestPAttrSent
 }
 
-func (n *GethNode) LatestNewPayloadSent() (payload *beacon.ExecutableData) {
+func (n *GethNode) LatestNewPayloadSent() (payload *typ.ExecutableData) {
 	return n.latestPayloadSent
 }
 
