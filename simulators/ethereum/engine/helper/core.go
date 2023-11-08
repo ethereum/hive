@@ -469,6 +469,11 @@ type ErigonConfig struct {
 	TerminalTotalDifficulty       *big.Int   `json:"terminalTotalDifficulty"`
 	TerminalTotalDifficultyPassed bool       `json:"terminalTotalDifficultyPassed"`
 	ShanghaiTimestamp             *big.Int   `json:"shanghaiTime"`
+	CancunTime                    *big.Int   `json:"cancunTime"`
+	MinBlobGasPrice               int        `json:"minBlobGasPrice"`
+	MaxBlobGasPerBlock            int        `json:"maxBlobGasPerBlock"`
+	TargetBlobGasPerBlock         int        `json:"targetBlobGasPerBlock"`
+	BlobGasPriceUpdateFraction    int        `json:"blobGasPriceUpdateFraction"`
 	Aura                          ErigonAura `json:"aura"`
 }
 
@@ -506,10 +511,12 @@ func (v *ErigonGenesis) Config() *params.ChainConfig {
 	chainID := big.NewInt(int64(v.ErigonConfig.ChainID))
 	ttd := big.NewInt(0).SetBytes(common.Hex2Bytes(v.ErigonDifficulty))
 	shangai := v.ErigonConfig.ShanghaiTimestamp.Uint64() //big.NewInt(v.ErigonConfig.ShanghaiTimestamp
+	cancun := v.ErigonConfig.CancunTime.Uint64()         //big.NewInt(v.ErigonConfig.ShanghaiTimestamp
 	return &params.ChainConfig{
 		ChainID:                 chainID,
 		TerminalTotalDifficulty: ttd,
 		ShanghaiTime:            &shangai,
+		CancunTime:              &cancun,
 	}
 }
 
@@ -535,6 +542,7 @@ func (v *ErigonGenesis) Timestamp() uint64 {
 
 func (v *ErigonGenesis) SetTimestamp(timestamp int64) {
 	v.ErigonConfig.ShanghaiTimestamp = big.NewInt(timestamp)
+	v.ErigonConfig.CancunTime = big.NewInt(timestamp)
 }
 
 func (v *ErigonGenesis) ExtraData() []byte {
@@ -565,8 +573,7 @@ func (v *ErigonGenesis) SetDifficulty(difficulty *big.Int) {
 }
 
 func (v *ErigonGenesis) MixHash() common.Hash {
-	//TODO implement me
-	panic("implement me")
+	return common.Hash{}
 }
 
 func (v *ErigonGenesis) SetMixHash(hash common.Hash) {
@@ -575,8 +582,7 @@ func (v *ErigonGenesis) SetMixHash(hash common.Hash) {
 }
 
 func (v *ErigonGenesis) Coinbase() common.Address {
-	//TODO implement me
-	panic("implement me")
+	return common.Address{}
 }
 
 func (v *ErigonGenesis) SetCoinbase(address common.Address) {
@@ -622,6 +628,37 @@ func (v *ErigonGenesis) BaseFee() *big.Int {
 }
 
 func (v *ErigonGenesis) ToBlock() *types.Block {
-	//TODO implement me
-	panic("implement me")
+	alloc := make(core.GenesisAlloc)
+	for address, account := range v.ErigonAlloc {
+		balance := big.NewInt(0)
+		code := make([]byte, 0)
+		val := account.Balance
+		if val != "" {
+			bytesBalance := common.Hex2Bytes(val)
+			balance = new(big.Int).SetBytes(bytesBalance)
+		}
+		valCode := account.Code
+		code = common.FromHex(valCode)
+		alloc[common.HexToAddress(address)] = core.GenesisAccount{
+			Balance: balance,
+			Code:    code,
+		}
+	}
+	config := v.Config()
+	s := core.Genesis{
+		Config:     config,
+		Nonce:      0,
+		Timestamp:  uint64(time.Now().Unix()),
+		ExtraData:  nil,
+		GasLimit:   v.GasLimit(),
+		Difficulty: config.TerminalTotalDifficulty,
+		Mixhash:    v.MixHash(),
+		Coinbase:   v.Coinbase(),
+		Alloc:      alloc,
+		Number:     0,
+		GasUsed:    0,
+		ParentHash: common.Hash{},
+	}
+
+	return s.ToBlock()
 }

@@ -60,21 +60,21 @@ FLAGS="$FLAGS --db.size.limit 2GB"
 if [ "$HIVE_NETWORK_ID" != "" ]; then
     FLAGS="$FLAGS --networkid $HIVE_NETWORK_ID"
 else
-    FLAGS="$FLAGS --networkid 1337"
+    FLAGS="$FLAGS --networkid 10202"
 fi
 
-# Configure the chain.
-mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
-
+## Configure the chain.
+#mv /genesis.json /genesis-input.json
+#jq -f /mapper.jq /genesis-input.json > /genesis.json
+#
 # Dump genesis. 
-if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
-    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
-else
-    echo "Supplied genesis state:"
-    cat /genesis.json
-fi
+#if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
+#    echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
+#    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+#else
+#    echo "Supplied genesis state:"
+#    cat /genesis.json
+#fi
 
 echo "Command flags till now:"
 echo $FLAGS

@@ -1279,6 +1279,26 @@ func easyjson3d34c335DecodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 					in.AddError((*out.ShanghaiTimestamp).UnmarshalJSON(data))
 				}
 			}
+		case "cancunTime":
+			if in.IsNull() {
+				in.Skip()
+				out.CancunTime = nil
+			} else {
+				if out.CancunTime == nil {
+					out.CancunTime = new(big.Int)
+				}
+				if data := in.Raw(); in.Ok() {
+					in.AddError((*out.CancunTime).UnmarshalJSON(data))
+				}
+			}
+		case "minBlobGasPrice":
+			out.MinBlobGasPrice = int(in.Int())
+		case "maxBlobGasPerBlock":
+			out.MaxBlobGasPerBlock = int(in.Int())
+		case "targetBlobGasPerBlock":
+			out.TargetBlobGasPerBlock = int(in.Int())
+		case "blobGasPriceUpdateFraction":
+			out.BlobGasPriceUpdateFraction = int(in.Int())
 		case "aura":
 			(out.Aura).UnmarshalEasyJSON(in)
 		default:
@@ -1387,6 +1407,35 @@ func easyjson3d34c335EncodeGithubComEthereumHiveSimulatorsEthereumEngineHelper5(
 		} else {
 			out.Raw((*in.ShanghaiTimestamp).MarshalJSON())
 		}
+	}
+	{
+		const prefix string = ",\"cancunTime\":"
+		out.RawString(prefix)
+		if in.CancunTime == nil {
+			out.RawString("null")
+		} else {
+			out.Raw((*in.CancunTime).MarshalJSON())
+		}
+	}
+	{
+		const prefix string = ",\"minBlobGasPrice\":"
+		out.RawString(prefix)
+		out.Int(int(in.MinBlobGasPrice))
+	}
+	{
+		const prefix string = ",\"maxBlobGasPerBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.MaxBlobGasPerBlock))
+	}
+	{
+		const prefix string = ",\"targetBlobGasPerBlock\":"
+		out.RawString(prefix)
+		out.Int(int(in.TargetBlobGasPerBlock))
+	}
+	{
+		const prefix string = ",\"blobGasPriceUpdateFraction\":"
+		out.RawString(prefix)
+		out.Int(int(in.BlobGasPriceUpdateFraction))
 	}
 	{
 		const prefix string = ",\"aura\":"
