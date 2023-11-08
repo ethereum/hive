@@ -2,8 +2,6 @@ package globals
 
 import (
 	"crypto/ecdsa"
-	"crypto/sha256"
-	"encoding/binary"
 	"math/big"
 	"time"
 
@@ -116,14 +114,16 @@ var (
 func init() {
 	// Fill the test accounts with deterministic addresses
 	TestAccounts = make([]*TestAccount, TestAccountCount)
-	for i := uint64(0); i < TestAccountCount; i++ {
-		bs := make([]byte, 8)
-		binary.BigEndian.PutUint64(bs, uint64(i))
-		b := sha256.Sum256(bs)
-		k, err := crypto.ToECDSA(b[:])
-		if err != nil {
-			panic(err)
-		}
-		TestAccounts[i] = &TestAccount{key: k, index: i}
-	}
+	TestAccounts[0] = NewTestAccount(GnoVaultVaultKey, &GnoVaultAccountAddress, 0)
+	TestAccounts[1] = NewTestAccount(VaultKey, &VaultAccountAddress, 0)
+	//for i := uint64(0); i < TestAccountCount; i++ {
+	//	bs := make([]byte, 8)
+	//	binary.BigEndian.PutUint64(bs, uint64(i))
+	//	b := sha256.Sum256(bs)
+	//	k, err := crypto.ToECDSA(b[:])
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//	TestAccounts[i] = &TestAccount{key: k, index: i}
+	//}
 }

@@ -655,8 +655,8 @@ func (step SendBlobTransactions) Execute(t *CancunTestContext) error {
 			BlobCount:  blobCountPerTx,
 			BlobID:     t.CurrentBlobID,
 		}
-		sender := globals.NewTestAccount(globals.GnoVaultVaultKey, &globals.GnoVaultAccountAddress, 0)
-		//sender := globals.VaultAccountAddress//TestAccounts[step.AccountIndex]
+		//sender := globals.NewTestAccount(globals.GnoVaultVaultKey, &globals.GnoVaultAccountAddress, 0)
+		sender := globals.TestAccounts[step.AccountIndex]
 		var (
 			blobTx typ.Transaction
 			err    error

@@ -273,6 +273,7 @@ var Tests = []test.Spec{
 		},
 
 		TestSequence: TestSequence{
+			NewPayloads{},
 			// First send the cancun.MAX_BLOBS_PER_BLOCK-1 blob transactions from
 			// account A.
 			SendBlobTransactions{
