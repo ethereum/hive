@@ -38,6 +38,8 @@ func (g *generator) writeForkEnv() error {
 	setNum("HIVE_FORK_PETERSBURG", cfg.PetersburgBlock)
 	setNum("HIVE_FORK_ISTANBUL", cfg.IstanbulBlock)
 	setNum("HIVE_FORK_MUIR_GLACIER", cfg.MuirGlacierBlock)
+	setNum("HIVE_FORK_ARROW_GLACIER", cfg.ArrowGlacierBlock)
+	setNum("HIVE_FORK_GRAY_GLACIER", cfg.GrayGlacierBlock)
 	setNum("HIVE_FORK_BERLIN", cfg.BerlinBlock)
 	setNum("HIVE_FORK_LONDON", cfg.LondonBlock)
 	setNum("HIVE_MERGE_BLOCK_ID", cfg.MergeNetsplitBlock)
