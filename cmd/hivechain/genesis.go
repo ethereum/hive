@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/params"
@@ -162,6 +163,10 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	// dca := common.HexToAddress(depositContractAddr)
 	// dcc := hexutil.MustDecode("0x" + depositCode)
 	// g.Alloc[dca] = core.GenesisAccount{Code: dcc}
+
+	// Deploy beacon roots storage contract (EIP-4788).
+	asm4788 := common.FromHex("0x3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500")
+	g.Alloc[params.BeaconRootsStorageAddress] = core.GenesisAccount{Code: asm4788, Balance: big.NewInt(42)}
 
 	return &g
 }

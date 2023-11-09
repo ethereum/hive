@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"math/rand"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts"
@@ -61,6 +62,7 @@ type generator struct {
 	genesis  *core.Genesis
 	td       *big.Int
 	accounts []genAccount
+	rand     *rand.Rand
 
 	modlist   []*modifierInstance
 	modOffset int
@@ -84,6 +86,7 @@ func newGenerator(cfg generatorConfig) *generator {
 	return &generator{
 		cfg:      cfg,
 		genesis:  genesis,
+		rand:     rand.New(rand.NewSource(10)),
 		td:       new(big.Int).Set(genesis.Difficulty),
 		modlist:  cfg.createBlockModifiers(),
 		accounts: slices.Clone(knownAccounts),
@@ -166,6 +169,7 @@ func (g *generator) modifyBlock(i int, gen *core.BlockGen) {
 		g.setClique(i, gen)
 	}
 	g.setDifficulty(i, gen)
+	g.setParentBeaconRoot(i, gen)
 	g.runModifiers(i, gen)
 }
 
@@ -197,6 +201,14 @@ func (g *generator) setDifficulty(i int, gen *core.BlockGen) {
 		chaincfg.TerminalTotalDifficulty = new(big.Int).Set(g.td)
 	default:
 		g.td = g.td.Add(g.td, gen.Difficulty())
+	}
+}
+
+func (g *generator) setParentBeaconRoot(i int, gen *core.BlockGen) {
+	if g.genesis.Config.IsCancun(gen.Number(), gen.Timestamp()) {
+		var h common.Hash
+		g.rand.Read(h[:])
+		gen.SetParentBeaconRoot(h)
 	}
 }
 
