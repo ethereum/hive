@@ -125,14 +125,12 @@ type CLMocker struct {
 	// Global context which all procedures shall stop
 	TestContext    context.Context
 	TimeoutContext context.Context
+
+	// Randomness source used to generate prevRandao
+	Rand *rand.Rand
 }
 
-func NewCLMocker(t *hivesim.T, genesis *core.Genesis, forkConfig *config.ForkConfig) *CLMocker {
-	// Init random seed for different purposes
-	seed := time.Now().Unix()
-	t.Logf("Randomness seed: %v\n", seed)
-	rand.Seed(seed)
-
+func NewCLMocker(t *hivesim.T, genesis *core.Genesis, forkConfig *config.ForkConfig, randSource *rand.Rand) *CLMocker {
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
 		T:                      t,
@@ -161,6 +159,7 @@ func NewCLMocker(t *hivesim.T, genesis *core.Genesis, forkConfig *config.ForkCon
 		ForkConfig:           forkConfig,
 		Genesis:              genesis,
 		TestContext:          context.Background(),
+		Rand:                 randSource,
 	}
 
 	// Create header history
@@ -420,7 +419,7 @@ func TimestampToBeaconRoot(timestamp uint64) common.Hash {
 func (cl *CLMocker) GeneratePayloadAttributes() {
 	// Generate a random value for the PrevRandao field
 	nextPrevRandao := common.Hash{}
-	rand.Read(nextPrevRandao[:])
+	cl.Rand.Read(nextPrevRandao[:])
 
 	cl.LatestPayloadAttributes = typ.PayloadAttributes{
 		Random:                nextPrevRandao,

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -66,7 +65,7 @@ func (spec SidechainReOrgTest) Execute(t *test.Env) {
 			// At this point the CLMocker has a payload that will result in a specific outcome,
 			// we can produce an alternative payload, send it, fcU to it, and verify the changes
 			alternativePrevRandao := common.Hash{}
-			rand.Read(alternativePrevRandao[:])
+			t.Rand.Read(alternativePrevRandao[:])
 			timestamp := t.CLMock.LatestPayloadBuilt.Timestamp + 1
 			payloadAttributes, err := (&helper.BasePayloadAttributesCustomizer{
 				Timestamp: &timestamp,
@@ -199,7 +198,7 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 				if spec.Scenario == TransactionReOrgScenarioReOrgOut {
 					// Any payload we get should not contain any
 					payloadAttributes := t.CLMock.LatestPayloadAttributes
-					rand.Read(payloadAttributes.Random[:])
+					t.Rand.Read(payloadAttributes.Random[:])
 					r := t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, &payloadAttributes, t.CLMock.LatestHeader.Time)
 					r.ExpectNoError()
 					if r.Response.PayloadID == nil {
@@ -246,7 +245,7 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 					customizer := &helper.CustomPayloadData{
 						ExtraData: &([]byte{0x01}),
 					}
-					altPayload, err = customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+					altPayload, err = customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 					if err != nil {
 						t.Fatalf("Error creating reorg payload %v", err)
 					}
@@ -272,7 +271,7 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 						// impede it from being included in the next payload
 						forkchoiceUpdated := t.CLMock.LatestForkchoice
 						payloadAttributes := t.CLMock.LatestPayloadAttributes
-						rand.Read(payloadAttributes.SuggestedFeeRecipient[:])
+						t.Rand.Read(payloadAttributes.SuggestedFeeRecipient[:])
 						f := t.TestEngine.TestEngineForkchoiceUpdated(
 							&forkchoiceUpdated,
 							&payloadAttributes,
@@ -470,7 +469,7 @@ func (spec ReOrgBackToCanonicalTest) Execute(t *test.Env) {
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnPayloadAttributesGenerated: func() {
 				payloadAttributes := t.CLMock.LatestPayloadAttributes
-				rand.Read(payloadAttributes.Random[:])
+				t.Rand.Read(payloadAttributes.Random[:])
 				r := t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, &payloadAttributes, t.CLMock.LatestHeader.Time)
 				r.ExpectNoError()
 				if r.Response.PayloadID == nil {
@@ -606,7 +605,7 @@ func (spec ReOrgBackFromSyncingTest) Execute(t *test.Env) {
 				ParentHash: &altParentHash,
 				ExtraData:  &([]byte{0x01}),
 			}
-			altPayload, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			altPayload, err := customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
@@ -701,7 +700,7 @@ func (spec ReOrgPrevValidatedPayloadOnSideChainTest) Execute(t *test.Env) {
 			if len(sidechainPayloads) > 0 {
 				customData.ParentHash = &sidechainPayloads[len(sidechainPayloads)-1].BlockHash
 			}
-			altPayload, err := customData.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			altPayload, err := customData.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
@@ -721,7 +720,7 @@ func (spec ReOrgPrevValidatedPayloadOnSideChainTest) Execute(t *test.Env) {
 				prevRandao            = common.Hash{}
 				suggestedFeeRecipient = common.Address{0x12, 0x34}
 			)
-			rand.Read(prevRandao[:])
+			t.Rand.Read(prevRandao[:])
 			payloadAttributesCustomizer := &helper.BasePayloadAttributesCustomizer{
 				Random:                &prevRandao,
 				SuggestedFeeRecipient: &suggestedFeeRecipient,
@@ -800,7 +799,7 @@ func (s SafeReOrgToSideChainTest) Execute(t *test.Env) {
 				ParentHash: &altParentHash,
 				ExtraData:  &([]byte{0x01}),
 			}
-			altPayload, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			altPayload, err := customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}

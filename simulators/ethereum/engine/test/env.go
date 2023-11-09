@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"math/big"
+	"math/rand"
 	"net/http"
 	"time"
 
@@ -30,6 +31,9 @@ type Env struct {
 	// Test context will be done after timeout to allow test to gracefully finish
 	TestContext context.Context
 
+	// Randomness source
+	Rand *rand.Rand
+
 	// RPC Clients
 	Engine      client.EngineClient
 	Eth         client.Eth
@@ -51,13 +55,14 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis *core.Genesis, randSource *rand.Rand, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	forkConfig := testSpec.GetForkConfig()
 	clMocker := clmock.NewCLMocker(
 		t,
 		genesis,
 		forkConfig,
+		randSource,
 	)
 
 	// Send the CLMocker for configuration by the spec, if any.
@@ -94,6 +99,7 @@ func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hi
 		ClientParams:        cParams,
 		ClientFiles:         cFiles,
 		TestTransactionType: testSpec.GetTestTransactionType(),
+		Rand:                randSource,
 	}
 	env.Engines = append(env.Engines, ec)
 	env.TestEngines = append(env.TestEngines, env.TestEngine)

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"math/rand"
 	"os"
 	"strconv"
 	"sync"
@@ -105,7 +106,17 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 				parallelism = p
 			}
 		}
-		t.Log("parallelism:", parallelism)
+		t.Log("parallelism", parallelism)
+
+		random_seed := time.Now().Unix()
+		if val, ok := os.LookupEnv("HIVE_RANDOM_SEED"); ok {
+			if p, err := strconv.Atoi(val); err != nil {
+				t.Logf("Warning: invalid HIVE_RANDOM_SEED value %q", val)
+			} else {
+				random_seed = int64(p)
+			}
+		}
+		t.Log("random_seed", random_seed)
 
 		var wg sync.WaitGroup
 		var testCh = make(chan hivesim.TestSpec)
@@ -214,6 +225,7 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 								t,
 								c,
 								genesis,
+								rand.New(rand.NewSource(random_seed)),
 								newParams,
 								testFiles,
 							)
