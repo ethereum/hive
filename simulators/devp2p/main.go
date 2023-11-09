@@ -273,14 +273,12 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("error parsing TAP: %v", err)
 	}
+	suite, err := parser.Suite()
+	if err != nil {
+		return fmt.Errorf("error parsing TAP tests: %v", err)
+	}
 	// Forward results to hive.
-	for {
-		test, err := parser.Next()
-		if err == io.EOF {
-			return nil
-		} else if err != nil {
-			return err
-		}
+	for _, test := range suite.Tests {
 		name := fmt.Sprintf("%s (%s)", test.Description, clientName)
 		testID, err := t.Sim.StartTest(t.SuiteID, name, "")
 		if err != nil {
@@ -289,6 +287,7 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 		result := hivesim.TestResult{Pass: test.Ok, Details: test.Diagnostic}
 		t.Sim.EndTest(t.SuiteID, testID, result)
 	}
+	return nil
 }
 
 func getBeaconENR(c *hivesim.Client) (string, error) {
