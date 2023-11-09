@@ -122,6 +122,10 @@ This sets the default value of `HIVE_LOGLEVEL` in client containers.
 interpreted by simulators. It sets the `HIVE_PARALLELISM` environment variable. Defaults
 to 1.
 
+`--sim.randomseed <number>`: Sets a fixed number as the randomness seed to be used by all
+simulators. It sets the `HIVE_RANDOM_SEED` environment variable. Defaults to zero, which
+translates being unset and the simulators decide the source of randomness.
+
 ## Viewing simulation results (hiveview)
 
 The results of hive simulation runs are stored in JSON files containing test results, and
