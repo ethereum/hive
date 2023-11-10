@@ -112,7 +112,7 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 		if val, ok := os.LookupEnv("HIVE_RANDOM_SEED"); ok {
 			if p, err := strconv.Atoi(val); err != nil {
 				t.Logf("Warning: invalid HIVE_RANDOM_SEED value %q", val)
-			} else {
+			} else if p > 0 {
 				random_seed = int64(p)
 			}
 		}
