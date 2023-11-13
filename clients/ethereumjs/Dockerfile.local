@@ -11,29 +11,10 @@ RUN npm i -g ts-node
 # Default local client path: clients/ethereumjs/<ethereumjs-monorepo>
 ARG local_path=ethereumjs-monorepo
 
-
-COPY ${local_path}/package-lock.json ethereumjs-monorepo/package-lock.json
-COPY ${local_path}/package.json ethereumjs-monorepo/package.json
-
-COPY ${local_path}/.editorconfig ethereumjs-monorepo/.editorconfig
-COPY ${local_path}/.githooks ethereumjs-monorepo/.githooks
-COPY ${local_path}/.github ethereumjs-monorepo/.github
-COPY ${local_path}/.gitignore ethereumjs-monorepo/.gitignore
-COPY ${local_path}/.gitmodules ethereumjs-monorepo/.gitmodules
-COPY ${local_path}/.prettierignore ethereumjs-monorepo/.prettierignore
-COPY ${local_path}/.vscode ethereumjs-monorepo/.vscode
-COPY ${local_path}/Dockerfile ethereumjs-monorepo/Dockerfile
-COPY ${local_path}/README.md ethereumjs-monorepo/README.md
-COPY ${local_path}/codecov.yml ethereumjs-monorepo/codecov.yml
 COPY ${local_path}/config ethereumjs-monorepo/config
-COPY ${local_path}/docker ethereumjs-monorepo/docker
-COPY ${local_path}/eslint ethereumjs-monorepo/eslint
-COPY ${local_path}/lint-staged.config.js ethereumjs-monorepo/lint-staged.config.js
 COPY ${local_path}/package-lock.json ethereumjs-monorepo/package-lock.json
 COPY ${local_path}/package.json ethereumjs-monorepo/package.json
-COPY ${local_path}/prettier.config.js ethereumjs-monorepo/prettier.config.js
 COPY ${local_path}/scripts ethereumjs-monorepo/scripts
-COPY ${local_path}/verdaccio.yml ethereumjs-monorepo/verdaccio.yml
 
 COPY ${local_path}/packages/block/package.json ethereumjs-monorepo/packages/block/package.json
 COPY ${local_path}/packages/blockchain/package.json ethereumjs-monorepo/packages/blockchain/package.json
