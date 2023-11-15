@@ -75,7 +75,7 @@ func (api *simAPI) startSuite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	suiteID, err := api.tm.StartTestSuite(suite.Name, suite.Description)
+	suiteID, err := api.tm.StartTestSuite(&suite)
 	if err != nil {
 		log15.Error("API: StartTestSuite failed", "error", err)
 		serveError(w, err, http.StatusInternalServerError)
@@ -117,7 +117,7 @@ func (api *simAPI) startTest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	testID, err := api.tm.StartTest(suiteID, test.Name, test.Description)
+	testID, err := api.tm.StartTest(suiteID, &test)
 	if err != nil {
 		err := fmt.Errorf("can't start test case: %s", err.Error())
 		serveError(w, err, http.StatusInternalServerError)

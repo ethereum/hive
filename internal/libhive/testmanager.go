@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/hive/internal/simapi"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -371,7 +372,7 @@ func (manager *TestManager) doEndSuite(testSuite TestSuiteID) error {
 }
 
 // StartTestSuite starts a test suite and returns the context id
-func (manager *TestManager) StartTestSuite(name string, description string) (TestSuiteID, error) {
+func (manager *TestManager) StartTestSuite(tr *simapi.TestRequest) (TestSuiteID, error) {
 	manager.testSuiteMutex.Lock()
 	defer manager.testSuiteMutex.Unlock()
 
@@ -397,8 +398,10 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 
 	manager.runningTestSuites[newSuiteID] = &TestSuite{
 		ID:              newSuiteID,
-		Name:            name,
-		Description:     description,
+		Name:            tr.Name,
+		DisplayName:     tr.DisplayName,
+		Category:        tr.Category,
+		Description:     tr.Description,
 		ClientVersions:  make(map[string]string),
 		TestCases:       make(map[TestID]*TestCase),
 		SimulatorLog:    manager.simLogFile,
@@ -410,7 +413,7 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 }
 
 // StartTest starts a new test case, returning the testcase id as a context identifier
-func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, description string) (TestID, error) {
+func (manager *TestManager) StartTest(testSuiteID TestSuiteID, tr *simapi.TestRequest) (TestID, error) {
 	manager.testCaseMutex.Lock()
 	defer manager.testCaseMutex.Unlock()
 
@@ -424,8 +427,10 @@ func (manager *TestManager) StartTest(testSuiteID TestSuiteID, name string, desc
 	var newCaseID = TestID(manager.testCaseCounter)
 	// create a new test case and add it to the test suite
 	newTestCase := &TestCase{
-		Name:        name,
-		Description: description,
+		Name:        tr.Name,
+		DisplayName: tr.DisplayName,
+		Category:    tr.Category,
+		Description: tr.Description,
 		Start:       time.Now(),
 	}
 	// add the test case to the test suite
