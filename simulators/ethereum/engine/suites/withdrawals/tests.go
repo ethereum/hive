@@ -1221,7 +1221,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				emptyWithdrawalsList := make(types.Withdrawals, 0)
 				payloadWithEmptyWithdrawalsList, err := (&helper.CustomPayloadData{
 					Withdrawals: emptyWithdrawalsList,
-				}).CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+				}).CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
@@ -1317,7 +1317,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				// be checked first instead of responding `INVALID`
 				nilWithdrawalsPayload, err := (&helper.CustomPayloadData{
 					RemoveWithdrawals: true,
-				}).CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+				}).CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 				if err != nil {
 					t.Fatalf("Unable to append withdrawals: %v", err)
 				}
@@ -1370,7 +1370,7 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 					payload := t.CLMock.LatestExecutedPayload
 
 					// Corrupt the hash
-					rand.Read(payload.BlockHash[:])
+					t.Rand.Read(payload.BlockHash[:])
 
 					// On engine_newPayloadV2 `INVALID_BLOCK_HASH` is deprecated
 					// in favor of reusing `INVALID`
@@ -1916,7 +1916,7 @@ func (s *MaxInitcodeSizeSpec) Execute(t *test.Env) {
 			// Customize the payload to include a tx with an invalid initcode
 			if invTx, ok := invalidTx.(*types.Transaction); ok {
 
-				customPayload, err := helper.CustomizePayloadTransactions(&t.CLMock.LatestPayloadBuilt, types.Transactions{invTx})
+				customPayload, err := helper.CustomizePayloadTransactions(t.Rand, &t.CLMock.LatestPayloadBuilt, types.Transactions{invTx})
 				if err != nil {
 					t.Fatalf("FAIL: Unable to customize payload: %v", err)
 				}
@@ -1944,7 +1944,7 @@ type GetPayloadBodiesSpec struct {
 }
 
 type GetPayloadBodyRequest interface {
-	Verify(int, *test.TestEngineClient, clmock.ExecutableDataHistory)
+	Verify(*rand.Rand, int, *test.TestEngineClient, clmock.ExecutableDataHistory)
 }
 
 type GetPayloadBodyRequestByRange struct {
@@ -1952,7 +1952,7 @@ type GetPayloadBodyRequestByRange struct {
 	Count uint64
 }
 
-func (req GetPayloadBodyRequestByRange) Verify(reqIndex int, testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
+func (req GetPayloadBodyRequestByRange) Verify(_ *rand.Rand, reqIndex int, testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
 	testEngine.Logf("INFO: Starting GetPayloadBodyByRange request %d", reqIndex)
 	startTime := time.Now()
 	defer func() {
@@ -1997,7 +1997,7 @@ type GetPayloadBodyRequestByHashIndex struct {
 	End          uint64
 }
 
-func (req GetPayloadBodyRequestByHashIndex) Verify(reqIndex int, testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
+func (req GetPayloadBodyRequestByHashIndex) Verify(randSource *rand.Rand, reqIndex int, testEngine *test.TestEngineClient, payloadHistory clmock.ExecutableDataHistory) {
 	testEngine.Logf("INFO: Starting GetPayloadBodyByHash request %d", reqIndex)
 	startTime := time.Now()
 	defer func() {
@@ -2013,7 +2013,7 @@ func (req GetPayloadBodyRequestByHashIndex) Verify(reqIndex int, testEngine *tes
 			} else {
 				// signal to request an unknown hash (random)
 				randHash := common.Hash{}
-				rand.Read(randHash[:])
+				randSource.Read(randHash[:])
 				payloads = append(payloads, nil)
 				hashes = append(hashes, randHash)
 			}
@@ -2027,7 +2027,7 @@ func (req GetPayloadBodyRequestByHashIndex) Verify(reqIndex int, testEngine *tes
 			} else {
 				// signal to request an unknown hash (random)
 				randHash := common.Hash{}
-				rand.Read(randHash[:])
+				randSource.Read(randHash[:])
 				payloads = append(payloads, nil)
 				hashes = append(hashes, randHash)
 			}
@@ -2089,17 +2089,17 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 		// Now we have an extra payload that follows the canonical chain,
 		// but we need a side chain for the test.
 		customizer := &helper.CustomPayloadData{
-			Withdrawals: helper.RandomizeWithdrawalsOrder(t.CLMock.LatestExecutedPayload.Withdrawals),
+			Withdrawals: helper.RandomizeWithdrawalsOrder(t.Rand, t.CLMock.LatestExecutedPayload.Withdrawals),
 		}
-		sidechainCurrent, err := customizer.CustomizePayload(&t.CLMock.LatestExecutedPayload)
+		sidechainCurrent, err := customizer.CustomizePayload(t.Rand, &t.CLMock.LatestExecutedPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
 		}
 		customizer = &helper.CustomPayloadData{
 			ParentHash:  &sidechainCurrent.BlockHash,
-			Withdrawals: helper.RandomizeWithdrawalsOrder(nextCanonicalPayload.Withdrawals),
+			Withdrawals: helper.RandomizeWithdrawalsOrder(t.Rand, nextCanonicalPayload.Withdrawals),
 		}
-		sidechainHead, err := customizer.CustomizePayload(nextCanonicalPayload)
+		sidechainHead, err := customizer.CustomizePayload(t.Rand, nextCanonicalPayload)
 		if err != nil {
 			t.Fatalf("FAIL (%s): Error obtaining custom sidechain payload: %v", t.TestName, err)
 		}
@@ -2158,7 +2158,7 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 			go func() {
 				defer wg.Done()
 				for req := range workChan {
-					req.Request.Verify(req.Index, testEngine, payloadHistory)
+					req.Request.Verify(t.Rand, req.Index, testEngine, payloadHistory)
 				}
 			}()
 		}
@@ -2179,7 +2179,7 @@ func (ws *GetPayloadBodiesSpec) Execute(t *test.Env) {
 		wg.Wait()
 	} else {
 		for i, req := range ws.GetPayloadBodiesRequests {
-			req.Verify(i, testEngine, payloadHistory)
+			req.Verify(t.Rand, i, testEngine, payloadHistory)
 		}
 	}
 

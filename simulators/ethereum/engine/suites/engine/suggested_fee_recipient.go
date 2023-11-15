@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"math/rand"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
@@ -38,9 +37,9 @@ func (tc SuggestedFeeRecipientTest) Execute(t *test.Env) {
 
 	// Verify that, in a block with transactions, fees are accrued by the suggestedFeeRecipient
 	feeRecipient := common.Address{}
-	rand.Read(feeRecipient[:])
+	t.Rand.Read(feeRecipient[:])
 	txRecipient := common.Address{}
-	rand.Read(txRecipient[:])
+	t.Rand.Read(txRecipient[:])
 
 	// Send multiple transactions
 	for i := 0; i < tc.TransactionCount; i++ {

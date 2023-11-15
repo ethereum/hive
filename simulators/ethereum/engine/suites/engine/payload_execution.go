@@ -2,7 +2,6 @@ package suite_engine
 
 import (
 	"math/big"
-	"math/rand"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -117,7 +116,7 @@ func (spec InOrderPayloadExecutionTest) Execute(t *test.Env) {
 	// We will be also verifying that the transactions are correctly interpreted in the canonical chain,
 	// prepare a random account to receive funds.
 	recipient := common.Address{}
-	rand.Read(recipient[:])
+	t.Rand.Read(recipient[:])
 	amountPerTx := big.NewInt(1000)
 	txPerPayload := 20
 	payloadCount := 10
@@ -243,7 +242,7 @@ func (spec MultiplePayloadsExtendingCanonicalChainTest) Execute(t *test.Env) {
 		// We send the transactions after we got the Payload ID, before the CLMocker gets the prepared Payload
 		OnPayloadProducerSelected: func() {
 			recipient := common.Address{}
-			rand.Read(recipient[:])
+			t.Rand.Read(recipient[:])
 			_, err := t.SendNextTransaction(
 				t.TestContext,
 				t.CLMock.NextBlockProducer,
@@ -278,11 +277,11 @@ func (spec MultiplePayloadsExtendingCanonicalChainTest) Execute(t *test.Env) {
 		// Fabricate and send multiple new payloads by changing the PrevRandao field
 		for i := 0; i < payloadCount; i++ {
 			newPrevRandao := common.Hash{}
-			rand.Read(newPrevRandao[:])
+			t.Rand.Read(newPrevRandao[:])
 			customizer := &helper.CustomPayloadData{
 				PrevRandao: &newPrevRandao,
 			}
-			newPayload, err := customizer.CustomizePayload(&basePayload)
+			newPayload, err := customizer.CustomizePayload(t.Rand, &basePayload)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload %v: %v", t.TestName, i, err)
 			}
@@ -347,7 +346,7 @@ func (spec NewPayloadOnSyncingClientTest) Execute(t *test.Env) {
 
 	// Set a random transaction recipient
 	recipient := common.Address{}
-	rand.Read(recipient[:])
+	t.Rand.Read(recipient[:])
 
 	// Disconnect the first engine client from the CL Mocker and produce a block
 	t.CLMock.RemoveEngineClient(t.Engine)
@@ -484,7 +483,7 @@ func (spec NewPayloadWithMissingFcUTest) Execute(t *test.Env) {
 	t.CLMock.ProduceBlocks(5, clmock.BlockProcessCallbacks{
 		OnPayloadProducerSelected: func() {
 			var recipient common.Address
-			rand.Read(recipient[:])
+			t.Rand.Read(recipient[:])
 			// Send at least one transaction per payload
 			_, err := t.SendNextTransaction(
 				t.TestContext,

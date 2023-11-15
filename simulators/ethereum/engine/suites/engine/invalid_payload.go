@@ -136,7 +136,7 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				t.Fatalf("FAIL (%s): No transactions in the base payload", t.TestName)
 			}
 
-			alteredPayload, err = helper.GenerateInvalidPayload(&t.CLMock.LatestPayloadBuilt, tc.InvalidField)
+			alteredPayload, err = helper.GenerateInvalidPayload(t.Rand, &t.CLMock.LatestPayloadBuilt, tc.InvalidField)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to modify payload (%v): %v", t.TestName, tc.InvalidField, err)
 			}
@@ -283,7 +283,7 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 			}
 			followUpAlteredPayload, err := (&helper.CustomPayloadData{
 				ParentHash: &alteredPayload.BlockHash,
-			}).CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			}).CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
 			}
@@ -376,7 +376,7 @@ func (tc PayloadBuildAfterInvalidPayloadTest) Execute(t *test.Env) {
 				)
 				s.ExpectNoError()
 
-				inv_p, err = helper.GenerateInvalidPayload(&s.Payload, helper.InvalidStateRoot)
+				inv_p, err = helper.GenerateInvalidPayload(t.Rand, &s.Payload, helper.InvalidStateRoot)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to invalidate payload: %v", t.TestName, err)
 				}

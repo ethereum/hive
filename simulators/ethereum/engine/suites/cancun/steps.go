@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -144,7 +145,7 @@ type VersionedHashes struct {
 	HashVersions []byte
 }
 
-func (v *VersionedHashes) GetVersionedHashes(*[]common.Hash) (*[]common.Hash, error) {
+func (v *VersionedHashes) GetVersionedHashes(_ *rand.Rand, _ *[]common.Hash) (*[]common.Hash, error) {
 	if v.Blobs == nil {
 		return nil, nil
 	}
@@ -518,7 +519,7 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 					step.NewPayloadCustomizer.SetEngineAPIVersionResolver(t.ForkConfig)
 					testEngine := t.TestEngine.WithEngineAPIVersionResolver(step.NewPayloadCustomizer)
 
-					payload, err = step.NewPayloadCustomizer.CustomizePayload(payload)
+					payload, err = step.NewPayloadCustomizer.CustomizePayload(t.Rand, payload)
 					if err != nil {
 						t.Fatalf("FAIL: Error customizing payload (payload %d/%d): %v", p+1, payloadCount, err)
 					}
@@ -714,7 +715,7 @@ func (step SendModifiedLatestPayload) Execute(t *CancunTestContext) error {
 
 	// Send a custom new payload
 	step.NewPayloadCustomizer.SetEngineAPIVersionResolver(t.ForkConfig)
-	payload, err = step.NewPayloadCustomizer.CustomizePayload(payload)
+	payload, err = step.NewPayloadCustomizer.CustomizePayload(t.Rand, payload)
 	if err != nil {
 		t.Fatalf("FAIL: Error customizing payload: %v", err)
 	}

@@ -106,12 +106,12 @@ func (tc InvalidMissingAncestorReOrgTest) Execute(t *test.Env) {
 				ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
 				ExtraData:  &([]byte{0x01}),
 			}
-			sidePayload, err = customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			sidePayload, err = customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
 			if len(altChainPayloads) == tc.InvalidIndex {
-				sidePayload, err = helper.GenerateInvalidPayload(sidePayload, tc.InvalidField)
+				sidePayload, err = helper.GenerateInvalidPayload(t.Rand, sidePayload, tc.InvalidField)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
@@ -321,12 +321,12 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 				ParentHash: &pHash,
 				ExtraData:  &([]byte{0x01}),
 			}
-			sidePayload, err = customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			sidePayload, err = customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
 			if len(altChainPayloads) == tc.InvalidIndex {
-				sidePayload, err = helper.GenerateInvalidPayload(sidePayload, tc.InvalidField)
+				sidePayload, err = helper.GenerateInvalidPayload(t.Rand, sidePayload, tc.InvalidField)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
