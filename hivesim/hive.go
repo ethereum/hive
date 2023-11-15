@@ -21,9 +21,10 @@ import (
 
 // Simulation wraps the simulation HTTP API provided by hive.
 type Simulation struct {
-	url      string
-	m        testMatcher
-	ll int
+	url  string
+	m    testMatcher
+	docs bool
+	ll   int
 }
 
 // New looks up the hive host URI using the HIVE_SIMULATOR environment variable
@@ -47,6 +48,8 @@ func New() *Simulation {
 	if ll := os.Getenv("HIVE_LOGLEVEL"); ll != "" {
 		sim.ll, _ = strconv.Atoi(ll)
 	}
+	cc := os.Getenv("HIVE_DOCS_MODE")
+	sim.docs = (cc == "true")
 	return sim
 }
 

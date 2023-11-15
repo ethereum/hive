@@ -372,6 +372,10 @@ func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
 			}
 			close(done)
 		}()
+		if host.docs && !test.alwaysRun {
+			// Don't run the test if we're just generating docs.
+			return
+		}
 		runit(t)
 	}()
 	<-done
