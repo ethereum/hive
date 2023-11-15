@@ -36,6 +36,7 @@ type SimEnv struct {
 	SimParallelism int
 	SimRandomSeed  int
 	SimTestPattern string
+	SimDocsMode    bool
 
 	// This is the time limit for the simulation run.
 	// There is no default limit.
