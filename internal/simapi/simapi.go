@@ -3,6 +3,8 @@ package simapi
 
 type TestRequest struct {
 	Name        string `json:"name"`
+	DisplayName string `json:"display_name"`
+	Category    string `json:"category"`
 	Description string `json:"description"`
 }
 

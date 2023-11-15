@@ -24,6 +24,8 @@ func (tsID TestID) String() string {
 type TestSuite struct {
 	ID             TestSuiteID          `json:"id"`
 	Name           string               `json:"name"`
+	DisplayName    string               `json:"displayName"`
+	Category       string               `json:"category"`
 	Description    string               `json:"description"`
 	ClientVersions map[string]string    `json:"clientVersions"`
 	TestCases      map[TestID]*TestCase `json:"testCases"`
@@ -38,6 +40,8 @@ type TestSuite struct {
 // TestCase represents a single test case in a test suite.
 type TestCase struct {
 	Name          string                 `json:"name"`        // Test case short name.
+	DisplayName   string                 `json:"displayName"` // Test case display name.
+	Category      string                 `json:"category"`    // Test case category.
 	Description   string                 `json:"description"` // Test case long description in MD.
 	Start         time.Time              `json:"start"`
 	End           time.Time              `json:"end"`
