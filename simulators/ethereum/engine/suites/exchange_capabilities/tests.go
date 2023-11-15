@@ -48,18 +48,36 @@ func init() {
 		for _, active := range []bool{true, false} {
 			var (
 				nameStr  string
+				descStr  string
 				forkTime uint64
 			)
 			if active {
 				nameStr = "Active"
+				descStr = fmt.Sprintf(`
+				- Start a node with the %s fork configured at genesis
+				- Query engine_exchangeCapabilities and verify the capabilities returned
+				- Capabilities must include the following list:
+			`, fork)
 				forkTime = 0
 			} else {
 				nameStr = "Not active"
+				descStr = fmt.Sprintf(`
+				- Start a node with the %s fork configured in the future
+				- Query engine_exchangeCapabilities and verify the capabilities returned
+				- Capabilities must include the following list, even when the fork is not active yet:
+			`, fork)
 				forkTime = globals.GenesisTimestamp * 2
 			}
+			for _, cap := range capabilities {
+				descStr += fmt.Sprintf(`
+				- %s\n`, cap)
+			}
+
 			Tests = append(Tests, ExchangeCapabilitiesSpec{
 				BaseSpec: test.BaseSpec{
 					Name:     fmt.Sprintf("Exchange Capabilities - %s (%s)", fork, nameStr),
+					About:    descStr,
+					Category: string(fork),
 					MainFork: fork,
 					ForkTime: forkTime,
 				},

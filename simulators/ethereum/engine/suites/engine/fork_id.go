@@ -35,6 +35,27 @@ func (ft ForkIDSpec) GetName() string {
 	return strings.Join(name, ", ")
 }
 
+func (b ForkIDSpec) GetDescription() string {
+	desc := fmt.Sprintf(`
+	- Start a client with the following genesis configuration:
+		- Genesis Timestamp: %d
+		- %s Time: %d
+		- %s Time: %d
+	`, *b.GenesisTimestamp, b.MainFork.PreviousFork(), b.PreviousForkTime, b.MainFork, b.ForkTime)
+	if b.ProduceBlocksBeforePeering > 0 {
+		desc += fmt.Sprintf(`
+	- Produce %d blocks`, b.ProduceBlocksBeforePeering)
+	}
+	desc += `
+	- Peer with the client and verify the Fork ID is correct
+	`
+	return desc
+}
+
+func (b ForkIDSpec) GetCategory() string {
+	return "Fork ID"
+}
+
 func (s ForkIDSpec) GetForkConfig() *config.ForkConfig {
 	forkConfig := s.BaseSpec.GetForkConfig()
 	if forkConfig == nil {

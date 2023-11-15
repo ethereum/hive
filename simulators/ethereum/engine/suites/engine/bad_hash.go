@@ -51,7 +51,38 @@ func (s BadHashOnNewPayload) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (b BadHashOnNewPayload) GetName() string {
-	return fmt.Sprintf("Bad Hash on NewPayload (Syncing=%v, Sidechain=%v)", b.Syncing, b.Sidechain)
+	return fmt.Sprintf("Incorrect BlockHash on NewPayload (Syncing=%v, Sidechain=%v)", b.Syncing, b.Sidechain)
+}
+
+func (b BadHashOnNewPayload) GetCategory() string {
+	return "Engine API: NewPayload"
+}
+
+func (b BadHashOnNewPayload) GetDescription() string {
+	desc := `
+	Corrupt the hash of an otherwise valid payload:
+	- Produce 5 valid blocks`
+	if b.Syncing {
+		if b.Sidechain {
+			desc += `
+	- Send a ForkchoiceUpdated to set the head to an unknown head hash, to set the client in SYNCING state
+	- Send a NewPayload with an invalid hash and a known parent hash`
+		} else {
+			desc += `
+	- Send a NewPayload with an invalid hash and an unknown parent hash`
+		}
+	} else {
+		if b.Sidechain {
+			desc += `
+	- Send a NewPayload with an invalid hash and a parent hash pointing to a known ancestor of the canonical head`
+		} else {
+			desc += `
+	- Send a NewPayload with an invalid hash and a parent hash pointing to the canonical head`
+		}
+	}
+	desc += `
+	- Verify that the client rejects the payload`
+	return desc
 }
 
 func (b BadHashOnNewPayload) Execute(t *test.Env) {
@@ -158,6 +189,25 @@ func (p ParentHashOnNewPayload) GetName() string {
 		name += " Syncing=False"
 	}
 	return name
+}
+
+func (b ParentHashOnNewPayload) GetDescription() string {
+	desc := `
+	Incorrectly set the parent hash into the block hash of an otherwise valid payload:
+	- Produce 5 valid blocks
+	`
+	if b.Syncing {
+		desc += `
+	- Modify next payload to set the blockHash set to the same value as the parentHash and send using NewPayload, where parentHash is an unknown block`
+	} else {
+		desc += `
+	- Modify next payload to set the blockHash set to the same value as the parentHash and send using NewPayload, where parentHash is the head of the canonical chain`
+	}
+	return desc
+}
+
+func (b ParentHashOnNewPayload) GetCategory() string {
+	return "Engine API: NewPayload"
 }
 
 // Copy the parentHash into the blockHash, client should reject the payload

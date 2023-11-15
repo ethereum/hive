@@ -35,6 +35,15 @@ func (tc InconsistentForkchoiceTest) GetName() string {
 	return fmt.Sprintf("Inconsistent %s in ForkchoiceState", tc.Field)
 }
 
+func (tc InconsistentForkchoiceTest) GetDescription() string {
+	return fmt.Sprintf(`
+	- Send an inconsistent ForkchoiceState with a known payload that belongs to a side chain as %sBlockHash.
+	- Execution specification:
+		- {payloadStatus: {status: INVALID, latestValidHash: null, validationError: null}, payloadId: null}
+		if the forkchoiceState is inconsistent
+	`, tc.Field)
+}
+
 // Send an inconsistent ForkchoiceState with a known payload that belongs to a side chain as head, safe or finalized.
 func (tc InconsistentForkchoiceTest) Execute(t *test.Env) {
 	// Wait until TTD is reached by this client

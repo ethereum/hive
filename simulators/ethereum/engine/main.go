@@ -22,35 +22,35 @@ import (
 
 var (
 	engine = hivesim.Suite{
-		Name: "engine-api",
+		Name: "engine-paris",
 		Description: `
 	Test Engine API tests using CL mocker to inject commands into clients after they 
-	have reached the Terminal Total Difficulty.`[1:],
+	have reached the Terminal Total Difficulty: https://github.com/ethereum/execution-apis/blob/main/src/engine/paris.md`,
 	}
 	auth = hivesim.Suite{
 		Name: "engine-auth",
 		Description: `
-	Test Engine API authentication features.`[1:],
+	Test Engine API authentication features: https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md`,
 	}
 	excap = hivesim.Suite{
 		Name: "engine-exchange-capabilities",
 		Description: `
-	Test Engine API exchange capabilities.`[1:],
+	Test Engine API exchange capabilities: https://github.com/ethereum/execution-apis/blob/main/src/engine/common.md#capabilities`,
 	}
 	syncSuite = hivesim.Suite{
 		Name: "engine-sync",
 		Description: `
-        Test Engine API sync, pre/post merge.`[1:],
+        Test Engine API sync, pre/post merge.`,
 	}
 	withdrawals = hivesim.Suite{
-		Name: "engine-withdrawals",
+		Name: "engine-shanghai",
 		Description: `
-	Test Engine API withdrawals, pre/post Shanghai.`[1:],
+	Test Engine API withdrawals, pre/post Shanghai: https://github.com/ethereum/execution-apis/blob/main/src/engine/shanghai.md`,
 	}
 	cancun = hivesim.Suite{
 		Name: "engine-cancun",
 		Description: `
-	Test Engine API on Cancun.`[1:],
+	Test Engine API on Cancun: https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md`,
 	}
 )
 
@@ -144,7 +144,7 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 			forkConfig.ConfigGenesis(genesis)
 			genesisStartOption, err := helper.GenesisStartOption(genesis)
 			if err != nil {
-				panic("unable to inject genmsis")
+				panic("unable to inject genesis")
 			}
 
 			// Calculate and set the TTD for this test
@@ -199,7 +199,8 @@ func makeRunner(tests []test.Spec, nodeType string) func(t *hivesim.T) {
 				for _, clientType := range clientTypes {
 					test := hivesim.TestSpec{
 						Name:        fmt.Sprintf("%s (%s)", currentTestName, clientType.Name),
-						Description: currentTest.GetAbout(),
+						Description: currentTest.GetDescription(),
+						// Category:    currentTest.GetCategory(),
 						Run: func(t *hivesim.T) {
 							// Start the client with given options
 							c := t.StartClient(

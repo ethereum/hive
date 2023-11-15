@@ -20,7 +20,9 @@ type Spec interface {
 	// Get the name of the test
 	GetName() string
 	// Get a brief description of the test
-	GetAbout() string
+	GetDescription() string
+	// Get the category of this test
+	GetCategory() string
 	// Get the chain file to initialize the clients
 	GetChainFile() string
 	// Get the main fork for this test
@@ -45,6 +47,9 @@ type BaseSpec struct {
 
 	// Brief description of the test
 	About string
+
+	// Test case category
+	Category string
 
 	// Expectation Description
 	Expectation string
@@ -111,8 +116,12 @@ func (s BaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
 	cl.BlockTimestampIncrement = new(big.Int).SetUint64(s.GetBlockTimeIncrements())
 }
 
-func (s BaseSpec) GetAbout() string {
+func (s BaseSpec) GetDescription() string {
 	return s.About
+}
+
+func (s BaseSpec) GetCategory() string {
+	return s.Category
 }
 
 func (s BaseSpec) GetChainFile() string {

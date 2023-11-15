@@ -20,6 +20,17 @@ var (
 	DATA_GAS_COST_INCREMENT_EXCEED_BLOBS = GetMinExcessBlobsForBlobGasPrice(2)
 )
 
+const (
+	test_category_blob_txs         = "Cancun: Blob Transactions"
+	test_category_fcuv3            = "Cancun: ForkchoiceUpdatedV3"
+	test_category_getpayloadv3     = "Cancun: GetPayloadV3"
+	test_category_newpayloadv3     = "Cancun: NewPayloadV3"
+	test_category_forktime         = "Cancun: Fork Timestamp"
+	test_category_versioned_hashes = "Cancun: NewPayloadV3 Versioned Hashes"
+	test_category_blobgasused      = "Cancun: BlobGasUsed"
+	test_category_devp2p           = "Cancun: Blob Transactions DevP2P"
+)
+
 func pUint64(v uint64) *uint64 {
 	return &v
 }
@@ -32,7 +43,8 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transactions On Block 1, Shanghai Genesis",
+			Name:     "Blob Transactions On Block 1, Shanghai Genesis",
+			Category: test_category_blob_txs,
 			About: `
 			Tests the Cancun fork since Block 1.
 
@@ -102,7 +114,8 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transactions On Block 1, Cancun Genesis",
+			Name:     "Blob Transactions On Block 1, Cancun Genesis",
+			Category: test_category_blob_txs,
 			About: `
 			Tests the Cancun fork since genesis.
 
@@ -158,15 +171,19 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transaction Ordering, Single Account, Single Blob",
+			Name:     "Blob Transaction Ordering, Single Account, Single Blob",
+			Category: test_category_blob_txs,
 			About: `
-			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
+			Send N blob transactions with 'cancun.MAX_BLOBS_PER_BLOCK-1' blobs each,
 			using account A.
+
 			Using same account, and an increased nonce from the previously sent
 			transactions, send N blob transactions with 1 blob each.
+
 			Verify that the payloads are created with the correct ordering:
 			 - The first payloads must include the first N blob transactions
 			 - The last payloads must include the last single-blob transactions
+			
 			All transactions have sufficient data gas price to be included any
 			of the payloads.
 			`,
@@ -203,10 +220,12 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transaction Ordering, Single Account, Dual Blob",
+			Name:     "Blob Transaction Ordering, Single Account, Dual Blob",
+			Category: test_category_blob_txs,
 			About: `
-			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
+			Send N blob transactions with 'cancun.MAX_BLOBS_PER_BLOCK-1' blobs each,
 			using account A.
+			
 			Using same account, and an increased nonce from the previously sent
 			transactions, send a single 2-blob transaction, and send N blob
 			transactions with 1 blob each.
@@ -258,9 +277,10 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transaction Ordering, Multiple Accounts",
+			Name:     "Blob Transaction Ordering, Multiple Accounts",
+			Category: test_category_blob_txs,
 			About: `
-			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
+			Send N blob transactions with 'cancun.MAX_BLOBS_PER_BLOCK-1' blobs each,
 			using account A.
 			Send N blob transactions with 1 blob each from account B.
 			Verify that the payloads are created with the correct ordering:
@@ -299,9 +319,10 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Blob Transaction Ordering, Multiple Clients",
+			Name:     "Blob Transaction Ordering, Multiple Clients",
+			Category: test_category_blob_txs,
 			About: `
-			Send N blob transactions with cancun.MAX_BLOBS_PER_BLOCK-1 blobs each,
+			Send N blob transactions with 'cancun.MAX_BLOBS_PER_BLOCK-1' blobs each,
 			using account A, to client A.
 			Send N blob transactions with 1 blob each from account B, to client
 			B.
@@ -362,7 +383,8 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Replace Blob Transactions",
+			Name:     "Replace Blob Transactions",
+			Category: test_category_blob_txs,
 			About: `
 			Test sending multiple blob transactions with the same nonce, but
 			higher gas tip so the transaction is replaced.
@@ -412,7 +434,8 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Parallel Blob Transactions",
+			Name:     "Parallel Blob Transactions",
+			Category: test_category_blob_txs,
 			About: `
 			Test sending multiple blob transactions in parallel from different accounts.
 
@@ -499,7 +522,8 @@ var Tests = []test.Spec{
 	// ForkchoiceUpdatedV3 before cancun
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV3 Set Head to Shanghai Payload, Null Payload Attributes",
+			Name:     "ForkchoiceUpdatedV3 Set Head to Shanghai Payload, Null Payload Attributes",
+			Category: test_category_fcuv3,
 			About: `
 			Test sending ForkchoiceUpdatedV3 to set the head of the chain to a Shanghai payload:
 			- Send NewPayloadV2 with Shanghai payload on block 1
@@ -525,7 +549,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Null Beacon Root",
+			Name:     "ForkchoiceUpdatedV3 To Request Shanghai Payload, Null Beacon Root",
+			Category: test_category_fcuv3,
 			About: `
 			Test sending ForkchoiceUpdatedV3 to request a Shanghai payload:
 			- Payload Attributes uses Shanghai timestamp
@@ -553,7 +578,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV3 To Request Shanghai Payload, Non-Null Beacon Root",
+			Name:     "ForkchoiceUpdatedV3 To Request Shanghai Payload, Non-Null Beacon Root",
+			Category: test_category_fcuv3,
 			About: `
 			Test sending ForkchoiceUpdatedV3 to request a Shanghai payload:
 			- Payload Attributes uses Shanghai timestamp
@@ -585,7 +611,8 @@ var Tests = []test.Spec{
 	// ForkchoiceUpdatedV2 before cancun with beacon root
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV2 To Request Shanghai Payload, Non-Null Beacon Root ",
+			Name:     "ForkchoiceUpdatedV2 To Request Shanghai Payload, Non-Null Beacon Root ",
+			Category: test_category_fcuv3,
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Shanghai payload:
 			- Payload Attributes uses Shanghai timestamp
@@ -615,7 +642,8 @@ var Tests = []test.Spec{
 	// ForkchoiceUpdatedV2 after cancun with beacon root
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Non-Null Beacon Root",
+			Name:     "ForkchoiceUpdatedV2 To Request Cancun Payload, Non-Null Beacon Root",
+			Category: test_category_fcuv3,
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
 			- Payload Attributes uses Cancun timestamp
@@ -645,7 +673,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV2 To Request Cancun Payload, Missing Beacon Root",
+			Name:     "ForkchoiceUpdatedV2 To Request Cancun Payload, Missing Beacon Root",
+			Category: test_category_fcuv3,
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Cancun payload:
 			- Payload Attributes uses Cancun timestamp
@@ -677,7 +706,8 @@ var Tests = []test.Spec{
 	// ForkchoiceUpdatedV3 with modified BeaconRoot Attribute
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV3 Modifies Payload ID on Different Beacon Root",
+			Name:     "ForkchoiceUpdatedV3 Modifies Payload ID on Different Beacon Root",
+			Category: test_category_fcuv3,
 			About: `
 			Test requesting a Cancun Payload using ForkchoiceUpdatedV3 twice with the beacon root
 			payload attribute as the only change between requests and verify that the payload ID is
@@ -719,7 +749,8 @@ var Tests = []test.Spec{
 	// GetPayloadV3 Before Cancun, Negative Tests
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "GetPayloadV3 To Request Shanghai Payload",
+			Name:     "GetPayloadV3 To Request Shanghai Payload",
+			Category: test_category_getpayloadv3,
 			About: `
 			Test requesting a Shanghai PayloadID using GetPayloadV3.
 			Verify that client returns UNSUPPORTED_FORK_ERROR.
@@ -745,7 +776,8 @@ var Tests = []test.Spec{
 	// GetPayloadV2 After Cancun, Negative Tests
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "GetPayloadV2 To Request Cancun Payload",
+			Name:     "GetPayloadV2 To Request Cancun Payload",
+			Category: test_category_getpayloadv3,
 			About: `
 			Test requesting a Cancun PayloadID using GetPayloadV2.
 			Verify that client returns UNSUPPORTED_FORK_ERROR.
@@ -771,7 +803,8 @@ var Tests = []test.Spec{
 	// NewPayloadV3 Before Cancun, Negative Tests
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Nil Beacon Root",
+			Name:     "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Nil Beacon Root",
+			Category: test_category_newpayloadv3,
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- nil ExcessBlobGas
@@ -805,7 +838,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Before Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
+			Name:     "NewPayloadV3 Before Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
+			Category: test_category_newpayloadv3,
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- nil ExcessBlobGas
@@ -835,7 +869,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Before Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
+			Name:     "NewPayloadV3 Before Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Nil Versioned Hashes, Nil Beacon Root",
+			Category: test_category_newpayloadv3,
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- 0x00 ExcessBlobGas
@@ -865,7 +900,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Empty Array Versioned Hashes, Nil Beacon Root",
+			Name:     "NewPayloadV3 Before Cancun, Nil Data Fields, Empty Array Versioned Hashes, Nil Beacon Root",
+			Category: test_category_newpayloadv3,
 			About: `
 				Test sending NewPayloadV3 Before Cancun with:
 				- nil ExcessBlobGas
@@ -897,7 +933,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Zero Beacon Root",
+			Name:     "NewPayloadV3 Before Cancun, Nil Data Fields, Nil Versioned Hashes, Zero Beacon Root",
+			Category: test_category_newpayloadv3,
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- nil ExcessBlobGas
@@ -927,7 +964,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Before Cancun, 0x00 Data Fields, Empty Array Versioned Hashes, Zero Beacon Root",
+			Name:     "NewPayloadV3 Before Cancun, 0x00 Data Fields, Empty Array Versioned Hashes, Zero Beacon Root",
+			Category: test_category_newpayloadv3,
 			About: `
 			Test sending NewPayloadV3 Before Cancun with:
 			- 0x00 ExcessBlobGas
@@ -964,7 +1002,8 @@ var Tests = []test.Spec{
 	// NewPayloadV3 After Cancun, Negative Tests
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 After Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Empty Array Versioned Hashes, Zero Beacon Root",
+			Name:     "NewPayloadV3 After Cancun, Nil ExcessBlobGas, 0x00 BlobGasUsed, Empty Array Versioned Hashes, Zero Beacon Root",
+			Category: test_category_newpayloadv3,
 			About: `
 			Test sending NewPayloadV3 After Cancun with:
 			- nil ExcessBlobGas
@@ -992,7 +1031,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 After Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Empty Array Versioned Hashes",
+			Name:     "NewPayloadV3 After Cancun, 0x00 ExcessBlobGas, Nil BlobGasUsed, Empty Array Versioned Hashes",
+			Category: test_category_newpayloadv3,
 			About: `
 			Test sending NewPayloadV3 After Cancun with:
 			- 0x00 ExcessBlobGas
@@ -1019,7 +1059,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 After Cancun, 0x00 Blob Fields, Empty Array Versioned Hashes, Nil Beacon Root",
+			Name:     "NewPayloadV3 After Cancun, 0x00 Blob Fields, Empty Array Versioned Hashes, Nil Beacon Root",
+			Category: test_category_newpayloadv3,
 			About: `
 			Test sending NewPayloadV3 After Cancun with:
 			- 0x00 ExcessBlobGas
@@ -1048,7 +1089,8 @@ var Tests = []test.Spec{
 	// Fork time tests
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV2 then ForkchoiceUpdatedV3 Valid Payload Building Requests",
+			Name:     "ForkchoiceUpdatedV2 then ForkchoiceUpdatedV3 Valid Payload Building Requests",
+			Category: test_category_forktime,
 			About: `
 			Test requesting a Shanghai ForkchoiceUpdatedV2 payload followed by a Cancun ForkchoiceUpdatedV3 request.
 			Verify that client correctly returns the Cancun payload.
@@ -1083,9 +1125,9 @@ var Tests = []test.Spec{
 
 	// Test versioned hashes in Engine API NewPayloadV3
 	&CancunBaseSpec{
-
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Missing Hash, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Missing Hash, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is missing one of the hashes.
@@ -1117,7 +1159,8 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Extra Hash, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Extra Hash, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is has an extra hash for a blob that is not in the payload.
@@ -1151,7 +1194,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Out of Order, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Out of Order, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is out of order.
@@ -1183,7 +1227,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Repeated Hash, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
@@ -1215,7 +1260,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Incorrect Hash, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob hash that does not belong to any blob contained in the payload.
@@ -1246,7 +1292,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Incorrect Version, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a single blob that has an incorrect version.
@@ -1279,7 +1326,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Nil Hashes, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is nil, even though the fork has already happened.
@@ -1311,7 +1359,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Empty Hashes, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is empty, even though there are blobs in the payload.
@@ -1343,7 +1392,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes, Syncing=False",
+			Name:     "NewPayloadV3 Versioned Hashes, Non-Empty Hashes, Syncing=False",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is contains hashes, even though there are no blobs in the payload.
@@ -1370,9 +1420,9 @@ var Tests = []test.Spec{
 
 	// Test versioned hashes in Engine API NewPayloadV3 on syncing clients
 	&CancunBaseSpec{
-
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Missing Hash, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Missing Hash, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 				Tests VersionedHashes in Engine API NewPayloadV3 where the array
 				is missing one of the hashes.
@@ -1411,7 +1461,8 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Extra Hash, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Extra Hash, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is has an extra hash for a blob that is not in the payload.
@@ -1452,7 +1503,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Out of Order, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Out of Order, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is out of order.
@@ -1490,7 +1542,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Repeated Hash, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Repeated Hash, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
@@ -1529,7 +1582,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Incorrect Hash, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Incorrect Hash, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a blob that is repeated in the array.
@@ -1567,7 +1621,8 @@ var Tests = []test.Spec{
 	},
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Incorrect Version, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Incorrect Version, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			has a single blob that has an incorrect version.
@@ -1607,7 +1662,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Nil Hashes, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Nil Hashes, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is nil, even though the fork has already happened.
@@ -1646,7 +1702,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Empty Hashes, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Empty Hashes, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is empty, even though there are blobs in the payload.
@@ -1685,7 +1742,8 @@ var Tests = []test.Spec{
 
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "NewPayloadV3 Versioned Hashes, Non-Empty Hashes, Syncing=True",
+			Name:     "NewPayloadV3 Versioned Hashes, Non-Empty Hashes, Syncing=True",
+			Category: test_category_versioned_hashes,
 			About: `
 			Tests VersionedHashes in Engine API NewPayloadV3 where the array
 			is contains hashes, even though there are no blobs in the payload.
@@ -1722,7 +1780,8 @@ var Tests = []test.Spec{
 	// and can be executed using `pyspec` simulator.
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "Incorrect BlobGasUsed, Non-Zero on Zero Blobs",
+			Name:     "Incorrect BlobGasUsed, Non-Zero on Zero Blobs",
+			Category: test_category_blobgasused,
 			About: `
 			Send a payload with zero blobs, but non-zero BlobGasUsed.
 			`,
@@ -1742,7 +1801,8 @@ var Tests = []test.Spec{
 	&CancunBaseSpec{
 
 		BaseSpec: test.BaseSpec{
-			Name: "Incorrect BlobGasUsed, GAS_PER_BLOB on Zero Blobs",
+			Name:     "Incorrect BlobGasUsed, GAS_PER_BLOB on Zero Blobs",
+			Category: test_category_blobgasused,
 			About: `
 			Send a payload with zero blobs, but non-zero BlobGasUsed.
 			`,
@@ -1763,7 +1823,8 @@ var Tests = []test.Spec{
 	// DevP2P tests
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "Request Blob Pooled Transactions",
+			Name:     "Request Blob Pooled Transactions",
+			Category: test_category_devp2p,
 			About: `
 			Requests blob pooled transactions and verify correct encoding.
 			`,
