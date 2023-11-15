@@ -9,13 +9,25 @@ import (
 	"sync"
 
 	"github.com/ethereum/go-ethereum/rpc"
+	"github.com/ethereum/hive/internal/simapi"
 )
 
 // Suite is the description of a test suite.
 type Suite struct {
 	Name        string
+	DisplayName string
+	Category    string
 	Description string
 	Tests       []AnyTest
+}
+
+func (s *Suite) request() *simapi.TestRequest {
+	return &simapi.TestRequest{
+		Name:        s.Name,
+		DisplayName: s.DisplayName,
+		Category:    s.Category,
+		Description: s.Description,
+	}
 }
 
 // Add adds a test to the suite.
@@ -56,7 +68,7 @@ func RunSuite(host *Simulation, suite Suite) error {
 		return nil
 	}
 
-	suiteID, err := host.StartSuite(suite.Name, suite.Description, "")
+	suiteID, err := host.StartSuite(suite.request(), "")
 	if err != nil {
 		return err
 	}
@@ -93,8 +105,10 @@ func MustRunSuite(host *Simulation, suite Suite) {
 type TestSpec struct {
 	// These fields are displayed in the UI. Be sure to add
 	// a meaningful description here.
-	Name        string
-	Description string
+	Name        string // Name is the unique identifier for the test [Mandatory]
+	DisplayName string // Display name for the test (Name will be used if unset) [Optional]
+	Description string // Description of the test (if empty, test won't appear in documentation) [Optional]
+	Category    string // Category of the test [Optional]
 
 	// If AlwaysRun is true, the test will run even if Name does not match the test
 	// pattern. This option is useful for tests that launch a client instance and
@@ -115,8 +129,10 @@ type TestSpec struct {
 type ClientTestSpec struct {
 	// These fields are displayed in the UI. Be sure to add
 	// a meaningful description here.
-	Name        string
-	Description string
+	Name        string // Name is the unique identifier for the test [Mandatory]
+	DisplayName string // Display name for the test (Name will be used if unset) [Optional]
+	Description string // Description of the test (if empty, test won't appear in documentation) [Optional]
+	Category    string // Category of the test [Optional]
 
 	// If AlwaysRun is true, the test will run even if Name does not match the test
 	// pattern. This option is useful for tests that launch a client instance and
@@ -208,11 +224,13 @@ func (t *T) StartClient(clientType string, option ...StartOption) *Client {
 // It waits for the subtest to complete.
 func (t *T) RunClient(clientType string, spec ClientTestSpec) {
 	test := testSpec{
-		suiteID:   t.SuiteID,
-		suite:     t.suite,
-		name:      clientTestName(spec.Name, clientType),
-		desc:      spec.Description,
-		alwaysRun: spec.AlwaysRun,
+		suiteID:     t.SuiteID,
+		suite:       t.suite,
+		name:        clientTestName(spec.Name, clientType),
+		displayName: spec.DisplayName,
+		category:    spec.Category,
+		desc:        spec.Description,
+		alwaysRun:   spec.AlwaysRun,
 	}
 	runTest(t.Sim, test, func(t *T) {
 		client := t.StartClient(clientType, spec.Parameters, WithStaticFiles(spec.Files))
@@ -298,11 +316,22 @@ func (t *T) FailNow() {
 }
 
 type testSpec struct {
-	suiteID   SuiteID
-	suite     *Suite
-	name      string
-	desc      string
-	alwaysRun bool
+	suiteID     SuiteID
+	suite       *Suite
+	name        string
+	displayName string
+	category    string
+	desc        string
+	alwaysRun   bool
+}
+
+func (spec testSpec) request() *simapi.TestRequest {
+	return &simapi.TestRequest{
+		Name:        spec.name,
+		DisplayName: spec.displayName,
+		Category:    spec.category,
+		Description: spec.desc,
+	}
 }
 
 func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
@@ -319,7 +348,7 @@ func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
 		SuiteID: test.suiteID,
 		suite:   test.suite,
 	}
-	testID, err := host.StartTest(test.suiteID, test.name, test.desc)
+	testID, err := host.StartTest(test.suiteID, test.request())
 	if err != nil {
 		return err
 	}
@@ -361,11 +390,13 @@ func (spec ClientTestSpec) runTest(host *Simulation, suiteID SuiteID, suite *Sui
 			continue
 		}
 		test := testSpec{
-			suiteID:   suiteID,
-			suite:     suite,
-			name:      clientTestName(spec.Name, clientDef.Name),
-			desc:      spec.Description,
-			alwaysRun: spec.AlwaysRun,
+			suiteID:     suiteID,
+			suite:       suite,
+			name:        clientTestName(spec.Name, clientDef.Name),
+			displayName: spec.DisplayName,
+			category:    spec.Category,
+			desc:        spec.Description,
+			alwaysRun:   spec.AlwaysRun,
 		}
 		err := runTest(host, test, func(t *T) {
 			client := t.StartClient(clientDef.Name, spec.Parameters, WithStaticFiles(spec.Files))
@@ -391,11 +422,13 @@ func clientTestName(name, clientType string) string {
 
 func (spec TestSpec) runTest(host *Simulation, suiteID SuiteID, suite *Suite) error {
 	test := testSpec{
-		suiteID:   suiteID,
-		suite:     suite,
-		name:      spec.Name,
-		desc:      spec.Description,
-		alwaysRun: spec.AlwaysRun,
+		suiteID:     suiteID,
+		suite:       suite,
+		name:        spec.Name,
+		displayName: spec.DisplayName,
+		category:    spec.Category,
+		desc:        spec.Description,
+		alwaysRun:   spec.AlwaysRun,
 	}
 	return runTest(host, test, spec.Run)
 }

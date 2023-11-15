@@ -88,10 +88,10 @@ func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, testResult TestRe
 }
 
 // StartSuite signals the start of a test suite.
-func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, error) {
+func (sim *Simulation) StartSuite(suite *simapi.TestRequest, simlog string) (SuiteID, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite", sim.url)
-		req  = &simapi.TestRequest{Name: name, Description: description}
+		req  = suite
 		resp SuiteID
 	)
 	err := post(url, req, &resp)
@@ -105,10 +105,10 @@ func (sim *Simulation) EndSuite(testSuite SuiteID) error {
 }
 
 // StartTest starts a new test case, returning the testcase id as a context identifier.
-func (sim *Simulation) StartTest(testSuite SuiteID, name string, description string) (TestID, error) {
+func (sim *Simulation) StartTest(testSuite SuiteID, test *simapi.TestRequest) (TestID, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test", sim.url, testSuite)
-		req  = &simapi.TestRequest{Name: name, Description: description}
+		req  = test
 		resp TestID
 	)
 	err := post(url, req, &resp)
