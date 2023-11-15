@@ -273,6 +273,12 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 			}
 		}
 	}
+	if env.SimDocsMode {
+		docsOutputDir := filepath.Join(env.SimDocsOutputBaseDir, "simulators", filepath.FromSlash(sim))
+		if err := GenSimulatorMarkdownFiles(NewFileWriter(docsOutputDir), sim, tm.Results()); err != nil {
+			log15.Error("can't generate markdown files", "err", err)
+		}
+	}
 
 	return result, err
 }

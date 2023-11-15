@@ -17,6 +17,10 @@ import (
 )
 
 func main() {
+	cwd, err := os.Getwd()
+	if err != nil {
+		fatal(err)
+	}
 	var (
 		testResultsRoot       = flag.String("results-root", "workspace/logs", "Target `directory` for results files and logs.")
 		loglevelFlag          = flag.Int("loglevel", 3, "Log `level` for system events. Supports values 0-5.")
@@ -34,6 +38,7 @@ func main() {
 		simDevMode            = flag.Bool("dev", false, "Only starts the simulator API endpoint (listening at 127.0.0.1:3000 by default) without starting any simulators.")
 		simDevModeAPIEndpoint = flag.String("dev.addr", "127.0.0.1:3000", "Endpoint that the simulator API listens on")
 		simDocsMode           = flag.Bool("docs", false, "Starts the simulator in docs mode, where it will not execute any tests, but will instead generate documentation for the tests.")
+		simDocsOutput         = flag.String("docs.output", cwd, "Base output directory for generated documentation. Defaults to cwd.")
 		useCredHelper         = flag.Bool("docker.cred-helper", false, "configure docker authentication using locally-configured credential helper")
 
 		clientsFile = flag.String("client-file", "", `YAML `+"`file`"+` containing client configurations.`)
@@ -108,14 +113,15 @@ func main() {
 
 	// Run.
 	env := libhive.SimEnv{
-		LogDir:             *testResultsRoot,
-		SimLogLevel:        *simLogLevel,
-		SimTestPattern:     *simTestPattern,
-		SimParallelism:     *simParallelism,
-		SimRandomSeed:      *simRandomSeed,
-		SimDurationLimit:   *simTimeLimit,
-		SimDocsMode:        *simDocsMode,
-		ClientStartTimeout: *clientTimeout,
+		LogDir:               *testResultsRoot,
+		SimLogLevel:          *simLogLevel,
+		SimTestPattern:       *simTestPattern,
+		SimParallelism:       *simParallelism,
+		SimRandomSeed:        *simRandomSeed,
+		SimDurationLimit:     *simTimeLimit,
+		SimDocsMode:          *simDocsMode,
+		SimDocsOutputBaseDir: *simDocsOutput,
+		ClientStartTimeout:   *clientTimeout,
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
 
