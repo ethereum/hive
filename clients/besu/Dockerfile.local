@@ -31,7 +31,6 @@ COPY genesis.json /genesis.json
 COPY mapper.jq /mapper.jq
 COPY besu.sh /opt/besu/bin/besu-hive.sh
 COPY enode.sh /hive-bin/enode.sh
-COPY trusted_setup.txt /trusted_setup.txt
 
 # Set execute permissions for scripts
 RUN chmod +x /opt/besu/bin/besu-hive.sh /hive-bin/enode.sh
