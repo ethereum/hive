@@ -19,16 +19,50 @@ import (
 	"github.com/ethereum/hive/internal/simapi"
 )
 
+type Simulation interface {
+	SetTestPattern(p string)
+	TestPattern() (suiteExpr string, testNameExpr string)
+	Match(suite, test string) bool
+	LogLevel() int
+	CollectTestsOnly() bool
+	StartSuite(suite *simapi.TestRequest, simlog string) (SuiteID, error)
+	EndSuite(testSuite SuiteID) error
+	StartTest(testSuite SuiteID, test *simapi.TestRequest) (TestID, error)
+	EndTest(testSuite SuiteID, test TestID, testResult TestResult) error
+	ClientTypes() ([]*ClientDefinition, error)
+	StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error)
+	StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error)
+	StopClient(testSuite SuiteID, test TestID, nodeid string) error
+	PauseClient(testSuite SuiteID, test TestID, nodeid string) error
+	UnpauseClient(testSuite SuiteID, test TestID, nodeid string) error
+	ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error)
+	ClientEnodeURLNetwork(testSuite SuiteID, test TestID, node string, network string) (string, error)
+	ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd []string) (*ExecInfo, error)
+	CreateNetwork(testSuite SuiteID, networkName string) error
+	RemoveNetwork(testSuite SuiteID, network string) error
+	ConnectContainer(testSuite SuiteID, network, containerID string) error
+	DisconnectContainer(testSuite SuiteID, network, containerID string) error
+	ContainerNetworkIP(testSuite SuiteID, network, containerID string) (string, error)
+}
+
 // Simulation wraps the simulation HTTP API provided by hive.
-type Simulation struct {
-	url      string
-	m        testMatcher
+type simulation struct {
+	url string
+	testMatcher
 	ll int
 }
 
+var _ Simulation = (*simulation)(nil)
+
 // New looks up the hive host URI using the HIVE_SIMULATOR environment variable
 // and connects to it. It will panic if HIVE_SIMULATOR is not set.
-func New() *Simulation {
+// If HIVE_DOCS_MODE is set to "true", it will return a dummy simulation that
+// does not connect to a hive host. This is used to generate documentation.
+func New() Simulation {
+	cc := os.Getenv("HIVE_DOCS_MODE")
+	if cc == "true" {
+		return NewDocsSimulation()
+	}
 	url, isSet := os.LookupEnv("HIVE_SIMULATOR")
 	if !isSet {
 		panic("HIVE_SIMULATOR environment variable not set")
@@ -36,13 +70,13 @@ func New() *Simulation {
 	if url == "" {
 		panic("HIVE_SIMULATOR environment variable is empty")
 	}
-	sim := &Simulation{url: url}
+	sim := &simulation{url: url}
 	if p := os.Getenv("HIVE_TEST_PATTERN"); p != "" {
 		m, err := parseTestPattern(p)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Warning: ignoring invalid test pattern regexp: "+err.Error())
 		}
-		sim.m = m
+		sim.testMatcher = m
 	}
 	if ll := os.Getenv("HIVE_LOGLEVEL"); ll != "" {
 		sim.ll, _ = strconv.Atoi(ll)
@@ -52,46 +86,54 @@ func New() *Simulation {
 
 // NewAt creates a simulation connected to the given API endpoint. You'll will rarely need
 // to use this. In simulations launched by hive, use New() instead.
-func NewAt(url string) *Simulation {
-	return &Simulation{url: url}
+func NewAt(url string) Simulation {
+	return &simulation{url: url}
 }
 
 // SetTestPattern sets the regular expression that enables/skips suites and test cases.
 // This method is provided for use in unit tests. For simulator runs launched by hive, the
 // test pattern is set automatically in New().
-func (sim *Simulation) SetTestPattern(p string) {
+func (sim *simulation) SetTestPattern(p string) {
 	m, err := parseTestPattern(p)
 	if err != nil {
 		panic("invalid test pattern regexp: " + err.Error())
 	}
-	sim.m = m
+	sim.testMatcher = m
 }
 
 // TestPattern returns the regular expressions used to enable/skip suite and test names.
-func (sim *Simulation) TestPattern() (suiteExpr string, testNameExpr string) {
-	se := ""
-	if sim.m.suite != nil {
-		se = sim.m.suite.String()
+func (sim *simulation) TestPattern() (suiteExpr string, testNameExpr string) {
+	if sim.testMatcher.suite != nil {
+		suiteExpr = sim.testMatcher.suite.String()
 	}
-	te := ""
-	if sim.m.test != nil {
-		te = sim.m.test.String()
+	if sim.testMatcher.test != nil {
+		testNameExpr = sim.testMatcher.test.String()
 	}
-	return se, te
+	return
+}
+
+// Return the simulation log level.
+func (sim *simulation) LogLevel() int {
+	return sim.ll
+}
+
+// CollectTestsOnly returns true if the simulation is running in collect-tests-only mode.
+func (sim *simulation) CollectTestsOnly() bool {
+	return false
 }
 
 // EndTest finishes the test case, cleaning up everything, logging results, and returning
 // an error if the process could not be completed.
-func (sim *Simulation) EndTest(testSuite SuiteID, test TestID, testResult TestResult) error {
+func (sim *simulation) EndTest(testSuite SuiteID, test TestID, testResult TestResult) error {
 	url := fmt.Sprintf("%s/testsuite/%d/test/%d", sim.url, testSuite, test)
 	return post(url, &testResult, nil)
 }
 
 // StartSuite signals the start of a test suite.
-func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, error) {
+func (sim *simulation) StartSuite(suite *simapi.TestRequest, simlog string) (SuiteID, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite", sim.url)
-		req  = &simapi.TestRequest{Name: name, Description: description}
+		req  = suite
 		resp SuiteID
 	)
 	err := post(url, req, &resp)
@@ -99,16 +141,16 @@ func (sim *Simulation) StartSuite(name, description, simlog string) (SuiteID, er
 }
 
 // EndSuite signals the end of a test suite.
-func (sim *Simulation) EndSuite(testSuite SuiteID) error {
+func (sim *simulation) EndSuite(testSuite SuiteID) error {
 	url := fmt.Sprintf("%s/testsuite/%d", sim.url, testSuite)
 	return requestDelete(url)
 }
 
 // StartTest starts a new test case, returning the testcase id as a context identifier.
-func (sim *Simulation) StartTest(testSuite SuiteID, name string, description string) (TestID, error) {
+func (sim *simulation) StartTest(testSuite SuiteID, test *simapi.TestRequest) (TestID, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test", sim.url, testSuite)
-		req  = &simapi.TestRequest{Name: name, Description: description}
+		req  = test
 		resp TestID
 	)
 	err := post(url, req, &resp)
@@ -117,7 +159,7 @@ func (sim *Simulation) StartTest(testSuite SuiteID, name string, description str
 
 // ClientTypes returns all client types available to this simulator run. This depends on
 // both the available client set and the command line filters.
-func (sim *Simulation) ClientTypes() ([]*ClientDefinition, error) {
+func (sim *simulation) ClientTypes() ([]*ClientDefinition, error) {
 	var (
 		url  = fmt.Sprintf("%s/clients", sim.url)
 		resp []*ClientDefinition
@@ -130,7 +172,7 @@ func (sim *Simulation) ClientTypes() ([]*ClientDefinition, error) {
 // parameter must be named CLIENT and should contain one of the client types from
 // GetClientTypes. The input is used as environment variables in the new container.
 // Returns container id and ip.
-func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
+func (sim *simulation) StartClient(testSuite SuiteID, test TestID, parameters map[string]string, initFiles map[string]string) (string, net.IP, error) {
 	clientType, ok := parameters["CLIENT"]
 	if !ok {
 		return "", nil, errors.New("missing 'CLIENT' parameter")
@@ -140,7 +182,7 @@ func (sim *Simulation) StartClient(testSuite SuiteID, test TestID, parameters ma
 
 // StartClientWithOptions starts a new node (or other container) with specified options.
 // Returns container id and ip.
-func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error) {
+func (sim *simulation) StartClientWithOptions(testSuite SuiteID, test TestID, clientType string, options ...StartOption) (string, net.IP, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node", sim.url, testSuite, test)
 		resp simapi.StartNodeResponse
@@ -169,7 +211,7 @@ func (sim *Simulation) StartClientWithOptions(testSuite SuiteID, test TestID, cl
 }
 
 // StopClient signals to the host that the node is no longer required.
-func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
+func (sim *simulation) StopClient(testSuite SuiteID, test TestID, nodeid string) error {
 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s", sim.url, testSuite, test, nodeid), nil)
 	if err != nil {
 		return err
@@ -179,7 +221,7 @@ func (sim *Simulation) StopClient(testSuite SuiteID, test TestID, nodeid string)
 }
 
 // PauseClient signals to the host that the node needs to be paused.
-func (sim *Simulation) PauseClient(testSuite SuiteID, test TestID, nodeid string) error {
+func (sim *simulation) PauseClient(testSuite SuiteID, test TestID, nodeid string) error {
 	req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid), nil)
 	if err != nil {
 		return err
@@ -189,7 +231,7 @@ func (sim *Simulation) PauseClient(testSuite SuiteID, test TestID, nodeid string
 }
 
 // UnpauseClient signals to the host that the node needs to be unpaused.
-func (sim *Simulation) UnpauseClient(testSuite SuiteID, test TestID, nodeid string) error {
+func (sim *simulation) UnpauseClient(testSuite SuiteID, test TestID, nodeid string) error {
 	req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/pause", sim.url, testSuite, test, nodeid), nil)
 	if err != nil {
 		return err
@@ -199,12 +241,12 @@ func (sim *Simulation) UnpauseClient(testSuite SuiteID, test TestID, nodeid stri
 }
 
 // ClientEnodeURL returns the enode URL of a running client.
-func (sim *Simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
+func (sim *simulation) ClientEnodeURL(testSuite SuiteID, test TestID, node string) (string, error) {
 	return sim.ClientEnodeURLNetwork(testSuite, test, node, "bridge")
 }
 
 // ClientEnodeURLCustomNetwork returns the enode URL of a running client in a custom network.
-func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, node string, network string) (string, error) {
+func (sim *simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, node string, network string) (string, error) {
 	resp, err := sim.ClientExec(testSuite, test, node, []string{"enode.sh"})
 	if err != nil {
 		return "", err
@@ -242,7 +284,7 @@ func (sim *Simulation) ClientEnodeURLNetwork(testSuite SuiteID, test TestID, nod
 }
 
 // ClientExec runs a command in a running client.
-func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd []string) (*ExecInfo, error) {
+func (sim *simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string, cmd []string) (*ExecInfo, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/test/%d/node/%s/exec", sim.url, testSuite, test, nodeid)
 		req  = &simapi.ExecRequest{Command: cmd}
@@ -254,34 +296,34 @@ func (sim *Simulation) ClientExec(testSuite SuiteID, test TestID, nodeid string,
 
 // CreateNetwork sends a request to the hive server to create a docker network by
 // the given name.
-func (sim *Simulation) CreateNetwork(testSuite SuiteID, networkName string) error {
+func (sim *simulation) CreateNetwork(testSuite SuiteID, networkName string) error {
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, networkName)
 	return post(url, nil, nil)
 }
 
 // RemoveNetwork sends a request to the hive server to remove the given network.
-func (sim *Simulation) RemoveNetwork(testSuite SuiteID, network string) error {
+func (sim *simulation) RemoveNetwork(testSuite SuiteID, network string) error {
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s", sim.url, testSuite, network)
 	return requestDelete(url)
 }
 
 // ConnectContainer sends a request to the hive server to connect the given
 // container to the given network.
-func (sim *Simulation) ConnectContainer(testSuite SuiteID, network, containerID string) error {
+func (sim *simulation) ConnectContainer(testSuite SuiteID, network, containerID string) error {
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 	return post(url, nil, nil)
 }
 
 // DisconnectContainer sends a request to the hive server to disconnect the given
 // container from the given network.
-func (sim *Simulation) DisconnectContainer(testSuite SuiteID, network, containerID string) error {
+func (sim *simulation) DisconnectContainer(testSuite SuiteID, network, containerID string) error {
 	url := fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 	return requestDelete(url)
 }
 
 // ContainerNetworkIP returns the IP address of a container on the given network. If the
 // container ID is "simulation", it returns the IP address of the simulator container.
-func (sim *Simulation) ContainerNetworkIP(testSuite SuiteID, network, containerID string) (string, error) {
+func (sim *simulation) ContainerNetworkIP(testSuite SuiteID, network, containerID string) (string, error) {
 	var (
 		url  = fmt.Sprintf("%s/testsuite/%d/network/%s/%s", sim.url, testSuite, network, containerID)
 		resp string

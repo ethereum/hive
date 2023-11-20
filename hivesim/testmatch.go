@@ -28,7 +28,7 @@ func parseTestPattern(p string) (m testMatcher, err error) {
 }
 
 // match checks whether the pattern matches suite and test name.
-func (m *testMatcher) match(suite, test string) bool {
+func (m *testMatcher) Match(suite, test string) bool {
 	if m.suite != nil && !m.suite.MatchString(suite) {
 		return false
 	}

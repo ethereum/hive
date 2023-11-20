@@ -10,16 +10,16 @@ func TestMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !tm.match("sim", "test") {
+	if !tm.Match("sim", "test") {
 		t.Fatal("expected match")
 	}
-	if !tm.match("Sim", "Test") {
+	if !tm.Match("Sim", "Test") {
 		t.Fatal("expected match")
 	}
-	if !tm.match("Sim", "TestTest") {
+	if !tm.Match("Sim", "TestTest") {
 		t.Fatal("expected match")
 	}
-	if tm.match("Sim", "Tst") {
+	if tm.Match("Sim", "Tst") {
 		t.Fatal("expected no match")
 	}
 }
