@@ -16,7 +16,14 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
 
-var Tests = []test.BaseSpec{
+var suite = hivesim.Suite{
+	Name: "engine-sync",
+	Description: `
+	Test Engine API sync, pre/post merge.`,
+	Location: "suites/sync",
+}
+
+var tests = []test.BaseSpec{
 	{
 		Name:           "Sync Client Post Merge",
 		Run:            postMergeSync,
@@ -34,7 +41,7 @@ var Tests = []test.BaseSpec{
 }
 
 // Routine that adds all sync tests to a test suite
-func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test.BaseSpec) {
+func Suite(sim hivesim.Simulation) hivesim.Suite {
 	clientDefs, err := sim.ClientTypes()
 	if err != nil {
 		panic(err)
@@ -106,7 +113,7 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 			}
 		}
 	}
-
+	return suite
 }
 
 // Client Sync tests

@@ -1,4 +1,4 @@
-package suite_engine
+package suite_paris
 
 import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"

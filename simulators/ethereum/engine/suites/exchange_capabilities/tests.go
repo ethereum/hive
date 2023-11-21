@@ -3,11 +3,20 @@ package suite_exchange_capabilities
 import (
 	"fmt"
 
+	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"github.com/ethereum/hive/simulators/ethereum/engine/suites/filler"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	"golang.org/x/exp/slices"
 )
+
+var Suite = hivesim.Suite{
+	Name: "engine-exchange-capabilities",
+	Description: `
+Test Engine API exchange capabilities: https://github.com/ethereum/execution-apis/blob/main/src/engine/common.md#capabilities`,
+	Location: "suites/exchange_capabilities",
+}
 
 var CapabilitiesMap = map[config.Fork][]string{
 	config.Shanghai: {
@@ -31,9 +40,9 @@ var CapabilitiesMap = map[config.Fork][]string{
 	},
 }
 
-var Tests = make([]test.Spec, 0)
-
 func init() {
+	tests := make([]test.Spec, 0)
+
 	for _, fork := range []config.Fork{
 		config.Shanghai,
 		config.Cancun,
@@ -73,7 +82,7 @@ func init() {
 				- %s\n`, cap)
 			}
 
-			Tests = append(Tests, ExchangeCapabilitiesSpec{
+			tests = append(tests, ExchangeCapabilitiesSpec{
 				BaseSpec: test.BaseSpec{
 					Name:     fmt.Sprintf("Exchange Capabilities - %s (%s)", fork, nameStr),
 					About:    descStr,
@@ -85,6 +94,8 @@ func init() {
 			})
 		}
 	}
+	// Add the tests to the suite
+	filler.FillSuite(&Suite, tests, filler.FullNode)
 }
 
 type ExchangeCapabilitiesSpec struct {

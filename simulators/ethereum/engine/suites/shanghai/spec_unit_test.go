@@ -1,4 +1,4 @@
-package suite_withdrawals
+package suite_shanghai
 
 import (
 	"testing"

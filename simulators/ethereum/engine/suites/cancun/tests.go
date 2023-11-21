@@ -6,14 +6,25 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
-	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
+	"github.com/ethereum/hive/simulators/ethereum/engine/suites/filler"
+	suite_paris "github.com/ethereum/hive/simulators/ethereum/engine/suites/paris"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
+
+// Execution specification reference:
+// https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md
+var Suite = hivesim.Suite{
+	Name: "engine-cancun",
+	Description: `
+Test Engine API on Cancun: https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md`,
+	Location: "suites/cancun",
+}
 
 // Precalculate the first data gas cost increase
 var (
@@ -34,9 +45,6 @@ const (
 func pUint64(v uint64) *uint64 {
 	return &v
 }
-
-// Execution specification reference:
-// https://github.com/ethereum/execution-apis/blob/main/src/engine/cancun.md
 
 // List of all blob tests
 var Tests = []test.Spec{
@@ -1853,7 +1861,7 @@ var EngineAPITests []test.Spec
 
 func init() {
 	// Append all engine api tests with Cancun as main fork
-	for _, test := range suite_engine.Tests {
+	for _, test := range suite_paris.Tests {
 		Tests = append(Tests, test.WithMainFork(config.Cancun))
 	}
 
@@ -1867,7 +1875,7 @@ func init() {
 	}
 
 	// Payload Attributes
-	for _, t := range []suite_engine.InvalidPayloadAttributesTest{
+	for _, t := range []suite_paris.InvalidPayloadAttributesTest{
 		{
 			BaseSpec:    baseSpec,
 			Description: "Missing BeaconRoot",
@@ -1884,17 +1892,17 @@ func init() {
 	}
 
 	// Unique Payload ID Tests
-	for _, t := range []suite_engine.PayloadAttributesFieldChange{
-		suite_engine.PayloadAttributesParentBeaconRoot,
+	for _, t := range []suite_paris.PayloadAttributesFieldChange{
+		suite_paris.PayloadAttributesParentBeaconRoot,
 		// TODO: Remove when withdrawals suite is refactored
-		suite_engine.PayloadAttributesAddWithdrawal,
-		suite_engine.PayloadAttributesModifyWithdrawalAmount,
-		suite_engine.PayloadAttributesModifyWithdrawalIndex,
-		suite_engine.PayloadAttributesModifyWithdrawalValidator,
-		suite_engine.PayloadAttributesModifyWithdrawalAddress,
-		suite_engine.PayloadAttributesRemoveWithdrawal,
+		suite_paris.PayloadAttributesAddWithdrawal,
+		suite_paris.PayloadAttributesModifyWithdrawalAmount,
+		suite_paris.PayloadAttributesModifyWithdrawalIndex,
+		suite_paris.PayloadAttributesModifyWithdrawalValidator,
+		suite_paris.PayloadAttributesModifyWithdrawalAddress,
+		suite_paris.PayloadAttributesRemoveWithdrawal,
 	} {
-		Tests = append(Tests, suite_engine.UniquePayloadIDTest{
+		Tests = append(Tests, suite_paris.UniquePayloadIDTest{
 			BaseSpec:          baseSpec,
 			FieldModification: t,
 		})
@@ -1926,7 +1934,7 @@ func init() {
 				invalidField == helper.IncompleteVersionedHashes ||
 				invalidField == helper.ExtraVersionedHashes)
 
-			Tests = append(Tests, suite_engine.InvalidPayloadTestCase{
+			Tests = append(Tests, suite_paris.InvalidPayloadTestCase{
 				BaseSpec:              onlyBlobTxsSpec,
 				InvalidField:          invalidField,
 				Syncing:               syncing,
@@ -1938,27 +1946,30 @@ func init() {
 
 	// Invalid Transaction ChainID Tests
 	Tests = append(Tests,
-		suite_engine.InvalidTxChainIDTest{
+		suite_paris.InvalidTxChainIDTest{
 			BaseSpec: onlyBlobTxsSpec,
 		},
 	)
 
-	Tests = append(Tests, suite_engine.PayloadBuildAfterInvalidPayloadTest{
+	Tests = append(Tests, suite_paris.PayloadBuildAfterInvalidPayloadTest{
 		BaseSpec:     onlyBlobTxsSpec,
 		InvalidField: helper.InvalidParentBeaconBlockRoot,
 	})
 
 	// Suggested Fee Recipient Tests (New Transaction Type)
 	Tests = append(Tests,
-		suite_engine.SuggestedFeeRecipientTest{
+		suite_paris.SuggestedFeeRecipientTest{
 			BaseSpec:         onlyBlobTxsSpec,
 			TransactionCount: 1, // Only one blob tx gets through due to blob gas limit
 		},
 	)
 	// Prev Randao Tests (New Transaction Type)
 	Tests = append(Tests,
-		suite_engine.PrevRandaoTransactionTest{
+		suite_paris.PrevRandaoTransactionTest{
 			BaseSpec: onlyBlobTxsSpec,
 		},
 	)
+
+	// Add the tests to the suite
+	filler.FillSuite(&Suite, Tests, filler.FullNode)
 }

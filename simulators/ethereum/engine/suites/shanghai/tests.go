@@ -1,5 +1,5 @@
 // # Test suite for withdrawals tests
-package suite_withdrawals
+package suite_shanghai
 
 import (
 	"bytes"
@@ -14,15 +14,26 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
-	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
+	"github.com/ethereum/hive/simulators/ethereum/engine/suites/filler"
+	suite_paris "github.com/ethereum/hive/simulators/ethereum/engine/suites/paris"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
 )
+
+// Execution specification reference:
+// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+var Suite = hivesim.Suite{
+	Name: "engine-shanghai",
+	Description: `
+Test Engine API shanghai, pre/post Shanghai: https://github.com/ethereum/execution-apis/blob/main/src/engine/shanghai.md`,
+	Location: "suites/shanghai",
+}
 
 var (
 	Head               *big.Int // Nil
@@ -42,9 +53,6 @@ var (
 		PUSH0_ADDRESS,
 	}
 )
-
-// Execution specification reference:
-// https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
 
 // List of all withdrawals tests
 var Tests = []test.Spec{
@@ -817,12 +825,18 @@ var Tests = []test.Spec{
 	},
 
 	// TODO: Remove since this will be automatically inherited when this test suite is refactored
-	suite_engine.NonZeroPreMergeFork{
+	suite_paris.NonZeroPreMergeFork{
 		BaseSpec: test.BaseSpec{
 			MainFork:   config.Shanghai,
 			ForkHeight: 1,
 		},
 	},
+}
+
+// Create suite in init function
+func init() {
+	// Add all tests to the suite
+	filler.FillSuite(&Suite, Tests, filler.FullNode)
 }
 
 // Helper types to convert gwei into wei more easily

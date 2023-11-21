@@ -1,11 +1,13 @@
-package suite_engine
+package suite_paris
 
 import (
 	"math/big"
 
+	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
+	"github.com/ethereum/hive/simulators/ethereum/engine/suites/filler"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -13,6 +15,14 @@ import (
 
 // Execution specification reference:
 // https://github.com/ethereum/execution-apis/blob/main/src/engine/specification.md
+var Suite = hivesim.Suite{
+	Name: "engine-paris",
+	Description: `
+Test Engine API tests using CL mocker to inject commands into clients after they 
+have reached the Terminal Total Difficulty: https://github.com/ethereum/execution-apis/blob/main/src/engine/paris.md`,
+	Location: "suites/paris",
+}
+var Tests = make([]test.Spec, 0)
 
 var (
 	big0      = new(big.Int)
@@ -23,8 +33,6 @@ var (
 	Safe      = big.NewInt(-4)
 	ZeroAddr  = common.Address{}
 )
-
-var Tests = make([]test.Spec, 0)
 
 func pUint64(v uint64) *uint64 {
 	return &v
@@ -425,4 +433,7 @@ func init() {
 			},
 		},
 	)
+
+	// Add all tests to the suite
+	filler.FillSuite(&Suite, Tests, filler.FullNode)
 }

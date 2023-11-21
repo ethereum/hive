@@ -7,74 +7,19 @@ import (
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+	"github.com/ethereum/hive/simulators/ethereum/engine/suites/filler"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
 
 // JWT Authentication Tests
-
-var Tests = []test.Spec{
-	AuthTestSpec{
-		BaseSpec: test.BaseSpec{
-			Name: "JWT Authentication: No time drift, correct secret",
-		},
-		TimeDriftSeconds:      0,
-		CustomAuthSecretBytes: nil,
-		AuthOk:                true,
-	},
-	AuthTestSpec{
-		BaseSpec: test.BaseSpec{
-			Name: "JWT Authentication: No time drift, incorrect secret (shorter)",
-		},
-		TimeDriftSeconds:      0,
-		CustomAuthSecretBytes: []byte("secretsecretsecretsecretsecrets"),
-		AuthOk:                false,
-	},
-	AuthTestSpec{
-		BaseSpec: test.BaseSpec{
-			Name: "JWT Authentication: No time drift, incorrect secret (longer)",
-		},
-		TimeDriftSeconds:      0,
-		CustomAuthSecretBytes: append([]byte{0}, []byte("secretsecretsecretsecretsecretse")...),
-		AuthOk:                false,
-	},
-	AuthTestSpec{
-		BaseSpec: test.BaseSpec{
-			Name: "JWT Authentication: Negative time drift, exceeding limit, correct secret",
-		},
-		TimeDriftSeconds:      -1 - globals.MaxTimeDriftSeconds,
-		CustomAuthSecretBytes: nil,
-		AuthOk:                false,
-		RetryAttempts:         5,
-	},
-	AuthTestSpec{
-		BaseSpec: test.BaseSpec{
-			Name: "JWT Authentication: Negative time drift, within limit, correct secret",
-		},
-		TimeDriftSeconds:      1 - globals.MaxTimeDriftSeconds,
-		CustomAuthSecretBytes: nil,
-		AuthOk:                true,
-		RetryAttempts:         5,
-	},
-	AuthTestSpec{
-		BaseSpec: test.BaseSpec{
-			Name: "JWT Authentication: Positive time drift, exceeding limit, correct secret",
-		},
-		TimeDriftSeconds:      globals.MaxTimeDriftSeconds + 1,
-		CustomAuthSecretBytes: nil,
-		AuthOk:                false,
-		RetryAttempts:         5,
-	},
-	AuthTestSpec{
-		BaseSpec: test.BaseSpec{
-			Name: "JWT Authentication: Positive time drift, within limit, correct secret",
-		},
-		TimeDriftSeconds:      globals.MaxTimeDriftSeconds - 1,
-		CustomAuthSecretBytes: nil,
-		AuthOk:                true,
-		RetryAttempts:         5,
-	},
+var Suite = hivesim.Suite{
+	Name: "engine-auth",
+	Description: `
+Test Engine API authentication features: https://github.com/ethereum/execution-apis/blob/main/src/engine/authentication.md`,
+	Location: "suites/auth",
 }
 
 type AuthTestSpec struct {
@@ -83,6 +28,74 @@ type AuthTestSpec struct {
 	CustomAuthSecretBytes []byte
 	AuthOk                bool
 	RetryAttempts         int64
+}
+
+func init() {
+	tests := []test.Spec{
+		AuthTestSpec{
+			BaseSpec: test.BaseSpec{
+				Name: "JWT Authentication: No time drift, correct secret",
+			},
+			TimeDriftSeconds:      0,
+			CustomAuthSecretBytes: nil,
+			AuthOk:                true,
+		},
+		AuthTestSpec{
+			BaseSpec: test.BaseSpec{
+				Name: "JWT Authentication: No time drift, incorrect secret (shorter)",
+			},
+			TimeDriftSeconds:      0,
+			CustomAuthSecretBytes: []byte("secretsecretsecretsecretsecrets"),
+			AuthOk:                false,
+		},
+		AuthTestSpec{
+			BaseSpec: test.BaseSpec{
+				Name: "JWT Authentication: No time drift, incorrect secret (longer)",
+			},
+			TimeDriftSeconds:      0,
+			CustomAuthSecretBytes: append([]byte{0}, []byte("secretsecretsecretsecretsecretse")...),
+			AuthOk:                false,
+		},
+		AuthTestSpec{
+			BaseSpec: test.BaseSpec{
+				Name: "JWT Authentication: Negative time drift, exceeding limit, correct secret",
+			},
+			TimeDriftSeconds:      -1 - globals.MaxTimeDriftSeconds,
+			CustomAuthSecretBytes: nil,
+			AuthOk:                false,
+			RetryAttempts:         5,
+		},
+		AuthTestSpec{
+			BaseSpec: test.BaseSpec{
+				Name: "JWT Authentication: Negative time drift, within limit, correct secret",
+			},
+			TimeDriftSeconds:      1 - globals.MaxTimeDriftSeconds,
+			CustomAuthSecretBytes: nil,
+			AuthOk:                true,
+			RetryAttempts:         5,
+		},
+		AuthTestSpec{
+			BaseSpec: test.BaseSpec{
+				Name: "JWT Authentication: Positive time drift, exceeding limit, correct secret",
+			},
+			TimeDriftSeconds:      globals.MaxTimeDriftSeconds + 1,
+			CustomAuthSecretBytes: nil,
+			AuthOk:                false,
+			RetryAttempts:         5,
+		},
+		AuthTestSpec{
+			BaseSpec: test.BaseSpec{
+				Name: "JWT Authentication: Positive time drift, within limit, correct secret",
+			},
+			TimeDriftSeconds:      globals.MaxTimeDriftSeconds - 1,
+			CustomAuthSecretBytes: nil,
+			AuthOk:                true,
+			RetryAttempts:         5,
+		},
+	}
+
+	// Add the tests to the suite
+	filler.FillSuite(&Suite, tests, filler.FullNode)
 }
 
 func (authTestSpec AuthTestSpec) Execute(t *test.Env) {
