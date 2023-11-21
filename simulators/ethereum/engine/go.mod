@@ -6,7 +6,7 @@ require (
 	github.com/crate-crypto/go-kzg-4844 v0.7.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/ethereum/go-ethereum v1.13.5-0.20231031113925-bc42e88415d3
-	github.com/ethereum/hive v0.0.0-20231120235919-61b56eac973b
+	github.com/ethereum/hive v0.0.0-20231121215939-dcb91dbfc549
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/holiman/uint256 v1.2.3
 	github.com/pkg/errors v0.9.1

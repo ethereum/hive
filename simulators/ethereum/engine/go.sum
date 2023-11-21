@@ -112,6 +112,8 @@ github.com/ethereum/hive v0.0.0-20231031133732-dcd7ddb75960 h1:7H9z2o/KImWQ/1PAC
 github.com/ethereum/hive v0.0.0-20231031133732-dcd7ddb75960/go.mod h1:sV7LrFBlEii71kI9udVbUVj7SXIifZ2VzFjQ8S6rZns=
 github.com/ethereum/hive v0.0.0-20231120235919-61b56eac973b h1:+yKE1ItRYt8xmT/cAHCR4ZzjHgH4FmGG1oNSjKDnVVQ=
 github.com/ethereum/hive v0.0.0-20231120235919-61b56eac973b/go.mod h1:lT6CsiAFb+HTThYzu3veK2x2/BlazxNQD6KWPDlvjfo=
+github.com/ethereum/hive v0.0.0-20231121215939-dcb91dbfc549 h1:1TiCU99R3/jem1z7J+82gsmKBUEMxAkwpDc7WDgsCaQ=
+github.com/ethereum/hive v0.0.0-20231121215939-dcb91dbfc549/go.mod h1:lT6CsiAFb+HTThYzu3veK2x2/BlazxNQD6KWPDlvjfo=
 github.com/ethereum/hive/hiveproxy v0.0.0-20230919105823-37cbbe1ef86d h1:gvP03hTWxVwiI7oeQvtGSnBYDvx+3baNzGMrucyXIQQ=
 github.com/ethereum/hive/hiveproxy v0.0.0-20230919105823-37cbbe1ef86d/go.mod h1:0tWUtPhJgk9z3K41wqHV0IYY6/jJWOlfo4rI4v3Mr1E=
 github.com/fasthttp-contrib/websocket v0.0.0-20160511215533-1f3b11f56072/go.mod h1:duJ4Jxv5lDcvg4QuQr0oowTf7dz4/CR8NtyCooz9HL8=
