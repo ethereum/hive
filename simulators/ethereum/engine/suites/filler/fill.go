@@ -125,7 +125,7 @@ func FillSuite(suite *hivesim.Suite, tests []test.Spec, nodeType NodeType) {
 					test := hivesim.TestSpec{
 						Name:        fmt.Sprintf("%s (%s)", currentTestName, clientType.Name),
 						Description: currentTest.GetDescription(),
-						// Category:    currentTest.GetCategory(),
+						Category:    currentTest.GetCategory(),
 						Run: func(t *hivesim.T) {
 							// Start the client with given options
 							c := t.StartClient(
