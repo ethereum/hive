@@ -13,6 +13,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/ethereum/hive/internal/fakes"
 	"github.com/ethereum/hive/internal/libhive"
+	"github.com/ethereum/hive/internal/simapi"
 )
 
 // This test checks that the API returns configured client names correctly.
@@ -73,11 +74,11 @@ func TestEnodeReplaceIP(t *testing.T) {
 
 	// Start the client.
 	sim := NewAt(srv.URL)
-	suiteID, err := sim.StartSuite("suite", "", "")
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, "test", "")
+	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
@@ -125,11 +126,11 @@ func TestStartClientStartOptions(t *testing.T) {
 
 	// Start the suite and test.
 	sim := NewAt(srv.URL)
-	suiteID, err := sim.StartSuite("suite", "", "")
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, "test", "")
+	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
@@ -262,11 +263,11 @@ func TestRunProgram(t *testing.T) {
 	defer tm.Terminate()
 
 	sim := NewAt(srv.URL)
-	suiteID, err := sim.StartSuite("suite", "", "")
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, "test", "")
+	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
@@ -309,11 +310,11 @@ func TestStartClientErrors(t *testing.T) {
 	defer tm.Terminate()
 
 	sim := NewAt(srv.URL)
-	suiteID, err := sim.StartSuite("suite", "", "")
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, "test", "")
+	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
@@ -365,11 +366,11 @@ func TestStartClientInitialNetworks(t *testing.T) {
 	defer tm.Terminate()
 
 	sim := NewAt(srv.URL)
-	suiteID, err := sim.StartSuite("suite", "", "")
+	suiteID, err := sim.StartSuite(&simapi.TestRequest{Name: "suite"}, "")
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, "test", "")
+	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
