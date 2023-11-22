@@ -273,12 +273,12 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("error parsing TAP: %v", err)
 	}
-	suite, err := parser.Suite()
-	if err != nil {
-		return fmt.Errorf("error parsing TAP tests: %v", err)
-	}
-	// Forward results to hive.
-	for _, test := range suite.Tests {
+	for {
+		test, err := parser.Next()
+		if test == nil {
+			return err
+		} 
+		// Forward result to hive.
 		name := fmt.Sprintf("%s (%s)", test.Description, clientName)
 		testID, err := t.Sim.StartTest(t.SuiteID, name, "")
 		if err != nil {
