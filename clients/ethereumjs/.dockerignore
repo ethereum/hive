@@ -1,0 +1,5 @@
+ethereumjs-monorepo/packages/ethereum-tests
+ethereumjs-monorepo/packages/*/node_modules
+ethereumjs-monorepo/packages/vm/benchmarks
+ethereumjs-monorepo/node_modules
+!ethereumjs-monorepo/node_modules/@ethereumjs
