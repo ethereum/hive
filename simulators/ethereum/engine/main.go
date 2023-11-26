@@ -129,7 +129,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 
 		// Set the timestamp of the genesis to the next 2 minutes
 		timestamp := getTimestamp(currentTest)
-		genesis.SetTimestamp(timestamp)
+		genesis.SetTimestamp(timestamp, suite.Name == "engine-cancun")
 		genesis.SetDifficulty(big.NewInt(100))
 		//genesis.UpdateTimestamp(getTimestamp())
 		genesisStartOption, err := helper.GenesisStartOptionBasedOnClient(genesis, clientName)

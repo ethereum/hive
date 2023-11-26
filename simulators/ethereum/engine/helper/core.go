@@ -40,7 +40,7 @@ type Genesis interface {
 	Nonce() uint64
 	SetNonce(nonce uint64)
 	Timestamp() uint64
-	SetTimestamp(timestamp int64)
+	SetTimestamp(timestamp int64, cancun bool)
 	ExtraData() []byte
 	SetExtraData(data []byte)
 	GasLimit() uint64
@@ -307,18 +307,20 @@ func (n *NethermindChainSpec) Timestamp() uint64 {
 	panic("implement me")
 }
 
-func (n *NethermindChainSpec) SetTimestamp(timestamp int64) {
+func (n *NethermindChainSpec) SetTimestamp(timestamp int64, cancun bool) {
 	//n.Params.TerminalTotalDifficulty = fmt.Sprintf("%v", timestamp)
 	n.Params.Eip3651TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip4895TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip3855TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip3651TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
 	n.Params.Eip3860TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
-	n.Params.Eip4844TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
-	n.Params.Eip4788TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
-	n.Params.Eip1153TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
-	n.Params.Eip5656TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
-	n.Params.Eip6780TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	if cancun {
+		n.Params.Eip4844TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+		n.Params.Eip4788TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+		n.Params.Eip1153TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+		n.Params.Eip5656TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+		n.Params.Eip6780TransitionTimestamp = fmt.Sprintf("%#x", timestamp)
+	}
 }
 
 func (n *NethermindChainSpec) ExtraData() []byte {
@@ -540,9 +542,11 @@ func (v *ErigonGenesis) Timestamp() uint64 {
 	panic("implement me")
 }
 
-func (v *ErigonGenesis) SetTimestamp(timestamp int64) {
+func (v *ErigonGenesis) SetTimestamp(timestamp int64, cancun bool) {
 	v.ErigonConfig.ShanghaiTimestamp = big.NewInt(timestamp)
-	v.ErigonConfig.CancunTime = big.NewInt(timestamp)
+	if cancun {
+		v.ErigonConfig.CancunTime = big.NewInt(timestamp)
+	}
 }
 
 func (v *ErigonGenesis) ExtraData() []byte {
