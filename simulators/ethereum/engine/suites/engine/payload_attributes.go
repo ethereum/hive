@@ -2,7 +2,6 @@ package suite_engine
 
 import (
 	"fmt"
-	"math/rand"
 
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
@@ -25,9 +24,11 @@ func (s InvalidPayloadAttributesTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (tc InvalidPayloadAttributesTest) GetName() string {
-	name := fmt.Sprintf("Invalid PayloadAttributes: %s", tc.Description)
+	name := fmt.Sprintf("Invalid PayloadAttributes, %s,", tc.Description)
 	if tc.Syncing {
-		name += " (Syncing)"
+		name += " Syncing=True"
+	} else {
+		name += " Syncing=False"
 	}
 	return name
 }
@@ -46,7 +47,7 @@ func (tc InvalidPayloadAttributesTest) Execute(t *test.Env) {
 			fcu := t.CLMock.LatestForkchoice
 			if tc.Syncing {
 				// Setting a random hash will put the client into `SYNCING`
-				rand.Read(fcu.HeadBlockHash[:])
+				t.Rand.Read(fcu.HeadBlockHash[:])
 			} else {
 				fcu.HeadBlockHash = t.CLMock.LatestPayloadBuilt.BlockHash
 			}

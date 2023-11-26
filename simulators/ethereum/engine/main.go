@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/big"
+	"math/rand"
 	"strconv"
 	"strings"
 	"time"
@@ -123,11 +124,12 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 			panic("missing client")
 		}
 		clientName := strings.Split(clientTypes[0].Name, "_")[0]
+		random_seed := time.Now().Unix()
 		genesis := currentTest.GetGenesis(clientName)
 
 		// Set the timestamp of the genesis to the next 2 minutes
 		timestamp := getTimestamp(currentTest)
-		genesis.SetTimestamp(timestamp)
+		genesis.SetTimestamp(timestamp, suite.Name == "engine-cancun")
 		genesis.SetDifficulty(big.NewInt(100))
 		//genesis.UpdateTimestamp(getTimestamp())
 		genesisStartOption, err := helper.GenesisStartOptionBasedOnClient(genesis, clientName)
@@ -205,6 +207,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 						defer func() {
 							t.Logf("End test (%s): %s", c.Type, currentTest.GetName())
 						}()
+						currentTest.GetName()
 						timeout := 30 * time.Minute
 						// If a test.Spec specifies a timeout, use that instead
 						if currentTest.GetTimeout() != 0 {
@@ -219,7 +222,7 @@ func addTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []test
 							t,
 							c,
 							genesis,
-							newParams,
+							rand.New(rand.NewSource(random_seed)), newParams,
 							testFiles,
 						)
 					},

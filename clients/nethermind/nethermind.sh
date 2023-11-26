@@ -15,7 +15,6 @@
 #  - HIVE_NETWORK_ID           network ID number to use for the eth protocol
 #  - HIVE_CHAIN_ID             network ID number to use for the eth protocol
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
-#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
 #
 # Forks:
 #
@@ -44,7 +43,6 @@
 #
 #  - HIVE_FORK_DAO_VOTE        whether the node support (or opposes) the DAO fork
 #  - HIVE_GRAPHQL_ENABLED      if set, GraphQL is enabled on port 8545
-#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 
 # Immediately abort the script on any error encountered
 set -e

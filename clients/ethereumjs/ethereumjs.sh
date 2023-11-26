@@ -12,7 +12,6 @@
 #
 #  - HIVE_BOOTNODE                enode URL of the remote bootstrap node
 #  - HIVE_NETWORK_ID              network ID number to use for the eth protocol
-#  - HIVE_TESTNET                 whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE                sync and pruning selector (archive, full, light)
 #
 # Forks:
@@ -39,7 +38,6 @@
 #
 #  - HIVE_MINER                   enable mining. value is coinbase address.
 #  - HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
-#  - HIVE_SKIP_POW                if set, skip PoW verification during block import
 #  - HIVE_LOGLEVEL                client loglevel (0-5)
 #  - HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 #  - HIVE_LES_SERVER              set to '1' to enable LES server
@@ -49,7 +47,7 @@
 set -e
 
 ethereumjs="node /ethereumjs-monorepo/packages/client/dist/bin/cli.js"
-FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcAddr 0.0.0.0 --rpcEngineAddr 0.0.0.0 --rpcEnginePort 8551 --ws false --logLevel debug --rpcDebug --isSingleNode"
+FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcAddr 0.0.0.0 --rpcEngineAddr 0.0.0.0 --rpcEnginePort 8551 --ws false --logLevel debug --rpcDebug all --rpcDebugVerbose all --isSingleNode"
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json

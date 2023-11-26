@@ -13,7 +13,6 @@
 #
 #  - HIVE_BOOTNODE                enode URL of the remote bootstrap node
 #  - HIVE_NETWORK_ID              network ID number to use for the eth protocol
-#  - HIVE_TESTNET                 whether testnet nonces (2^20) are needed
 #  - HIVE_NODETYPE                sync and pruning selector (archive, full, light)
 #
 # Forks:
@@ -40,7 +39,6 @@
 #
 #  - HIVE_MINER                   enable mining. value is coinbase address.
 #  - HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
-#  - HIVE_SKIP_POW                if set, skip PoW verification during block import
 #  - HIVE_LOGLEVEL                client loglevel (0-5)
 #  - HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 #  - HIVE_LES_SERVER              set to '1' to enable LES server
@@ -49,7 +47,7 @@
 set -e
 
 geth=/usr/local/bin/geth
-FLAGS="--pcscdpath=\"\""
+FLAGS="--state.scheme=path"
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
     FLAGS="$FLAGS --verbosity=$HIVE_LOGLEVEL"
@@ -65,11 +63,6 @@ else
     # Unless otherwise specified by hive, we try to avoid mainnet networkid. If geth detects mainnet network id,
     # then it tries to bump memory quite a lot
     FLAGS="$FLAGS --networkid 1337"
-fi
-
-# If the client is to be run in testnet mode, flag it as such
-if [ "$HIVE_TESTNET" == "1" ]; then
-    FLAGS="$FLAGS --testnet"
 fi
 
 # Handle any client mode or operation requests
@@ -112,7 +105,7 @@ set +e
 # Load the test chain if present
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
-    $geth $FLAGS --gcmode=archive import /chain.rlp
+    $geth $FLAGS import /chain.rlp
 else
     echo "Warning: chain.rlp not found."
 fi

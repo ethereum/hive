@@ -2,8 +2,10 @@ package suite_engine
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/devp2p"
@@ -22,14 +24,28 @@ func (s ForkIDSpec) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (ft ForkIDSpec) GetName() string {
-	name := fmt.Sprintf("Fork ID: Genesis at %d, %s at %d", ft.GetGenesisTimestamp(), ft.MainFork, ft.ForkTime)
+	var name []string
+	name = append(name, fmt.Sprintf("Fork ID: Genesis=%d, %s=%d", ft.GetGenesisTimestamp(), ft.MainFork, ft.ForkTime))
 	if ft.PreviousForkTime != 0 {
-		name += fmt.Sprintf(", %s at %d", ft.MainFork.PreviousFork(), ft.PreviousForkTime)
+		name = append(name, fmt.Sprintf("%s=%d", ft.MainFork.PreviousFork(), ft.PreviousForkTime))
 	}
 	if ft.ProduceBlocksBeforePeering > 0 {
-		name += fmt.Sprintf(", Produce %d blocks before peering", ft.ProduceBlocksBeforePeering)
+		name = append(name, fmt.Sprintf("BlocksBeforePeering=%d", ft.ProduceBlocksBeforePeering))
 	}
-	return name
+	return strings.Join(name, ", ")
+}
+
+func (s ForkIDSpec) GetForkConfig() *config.ForkConfig {
+	forkConfig := s.BaseSpec.GetForkConfig()
+	if forkConfig == nil {
+		return nil
+	}
+	// Merge fork happen at block 0
+	mainFork := s.GetMainFork()
+	if mainFork == config.Paris {
+		forkConfig.ParisNumber = common.Big0
+	}
+	return forkConfig
 }
 
 func (ft ForkIDSpec) Execute(t *test.Env) {

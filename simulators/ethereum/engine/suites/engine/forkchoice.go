@@ -2,7 +2,6 @@ package suite_engine
 
 import (
 	"fmt"
-	"math/rand"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -52,7 +51,7 @@ func (tc InconsistentForkchoiceTest) Execute(t *test.Env) {
 			if len(alternativePayloads) > 0 {
 				customData.ParentHash = &alternativePayloads[len(alternativePayloads)-1].BlockHash
 			}
-			alternativePayload, err := customData.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			alternativePayload, err := customData.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to construct alternative payload: %v", t.TestName, err)
 			}
@@ -112,7 +111,7 @@ func (tc ForkchoiceUpdatedUnknownBlockHashTest) Execute(t *test.Env) {
 
 	// Generate a random block hash
 	randomBlockHash := common.Hash{}
-	rand.Read(randomBlockHash[:])
+	t.Rand.Read(randomBlockHash[:])
 
 	if tc.Field == HeadBlockHash {
 

@@ -29,10 +29,10 @@ simulation, use the following command:
 
     ./hive --sim <simulation> --client <client(s) you want to test against>
 
-For example, if you want to run the `discv4` test against geth and openethereum, here is
+For example, if you want to run the `discv4` test against geth, here is
 how the command would look:
 
-    ./hive --sim devp2p --sim.limit discv4 --client go-ethereum,openethereum
+    ./hive --sim devp2p --sim.limit discv4 --client go-ethereum,nethermind
 
 The client list may contain any number of clients. You can select a specific client
 version by appending it to the client name with `_`, for example:
@@ -121,6 +121,10 @@ This sets the default value of `HIVE_LOGLEVEL` in client containers.
 `--sim.parallelism <number>`: Sets max number of parallel clients/containers. This is
 interpreted by simulators. It sets the `HIVE_PARALLELISM` environment variable. Defaults
 to 1.
+
+`--sim.randomseed <number>`: Sets a fixed number as the randomness seed to be used by all
+simulators. It sets the `HIVE_RANDOM_SEED` environment variable. Defaults to zero, which
+translates being unset and the simulators decide the source of randomness.
 
 ## Viewing simulation results (hiveview)
 

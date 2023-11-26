@@ -14,7 +14,6 @@
 #  - [x] HIVE_BOOTNODE                enode URL of the remote bootstrap node
 #  - [x] HIVE_NETWORK_ID              network ID number to use for the eth protocol
 #  - [x] HIVE_CHAIN_ID                chain ID is used in transaction signature process
-#  - [ ] HIVE_TESTNET                 whether testnet nonces (2^20) are needed
 #  - [ ] HIVE_NODETYPE                sync and pruning selector (archive, full, light)
 #
 # Forks:
@@ -42,7 +41,6 @@
 #
 #  - [x] HIVE_MINER                   enable mining. value is coinbase address.
 #  - [ ] HIVE_MINER_EXTRA             extra-data field to set for newly minted blocks
-#  - [ ] HIVE_SKIP_POW                if set, skip PoW verification during block import
 #  - [x] HIVE_LOGLEVEL                client loglevel (0-5)
 #  - [x] HIVE_GRAPHQL_ENABLED         enables graphql on port 8545
 
