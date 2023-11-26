@@ -50,7 +50,9 @@ func MustRun(host *Simulation, suites ...Suite) {
 // RunSuite runs all tests in a suite.
 func RunSuite(host *Simulation, suite Suite) error {
 	if !host.m.match(suite.Name, "") {
-		fmt.Fprintf(os.Stderr, "skipping suite %q because it doesn't match test pattern %s\n", suite.Name, host.m.pattern)
+		if host.ll > 3 { // hive log level > 3
+			fmt.Fprintf(os.Stderr, "skipping suite %q because it doesn't match test pattern %s\n", suite.Name, host.m.pattern)
+		}
 		return nil
 	}
 
@@ -305,7 +307,9 @@ type testSpec struct {
 
 func runTest(host *Simulation, test testSpec, runit func(t *T)) error {
 	if !test.alwaysRun && !host.m.match(test.suite.Name, test.name) {
-		fmt.Fprintf(os.Stderr, "skipping test %q because it doesn't match test pattern %s\n", test.name, host.m.pattern)
+		if host.ll > 3 { // hive log level > 3
+			fmt.Fprintf(os.Stderr, "skipping test %q because it doesn't match test pattern %s\n", test.name, host.m.pattern)
+		}
 		return nil
 	}
 

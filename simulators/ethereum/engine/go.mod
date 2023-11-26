@@ -3,10 +3,10 @@ module github.com/ethereum/hive/simulators/ethereum/engine
 go 1.20
 
 require (
-	github.com/crate-crypto/go-kzg-4844 v0.6.1-0.20231019121413-3621cc59f0c7
+	github.com/crate-crypto/go-kzg-4844 v0.7.0
 	github.com/davecgh/go-spew v1.1.1
-	github.com/ethereum/go-ethereum v1.13.1
-	github.com/ethereum/hive v0.0.0-20230919110229-d58aec4a3eb5
+	github.com/ethereum/go-ethereum v1.13.5-0.20231031113925-bc42e88415d3
+	github.com/ethereum/hive v0.0.0-20231031133732-dcd7ddb75960
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/holiman/uint256 v1.2.3
 	github.com/mailru/easyjson v0.7.7
@@ -35,7 +35,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.1.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.1.0 // indirect
 	github.com/deepmap/oapi-codegen v1.12.4 // indirect
-	github.com/ethereum/c-kzg-4844 v0.3.2-0.20231019020040-748283cced54 // indirect
+	github.com/ethereum/c-kzg-4844 v0.4.0 // indirect
 	github.com/fjl/memsize v0.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect

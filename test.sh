@@ -57,20 +57,25 @@ mkdir $RESULTS
 # Sync are quick tests
 #
 
-# These three can succsessfully sync with themselves
+# These can succsessfully sync with themselves
+#testsync go-ethereum_latest
 
 # These two are failing - even against themselves
 #testsync nethermind_latest # fails
 
 #testsync besu_latest,nethermind_latest
 
+#testsync go-ethereum_latest go-ethereum_stable
 #testsync go-ethereum_latest nethermind_latest
 
 # The devp2p tests are pretty quick -- a few minutes
-testdevp2p nethermind_local
+#testdevp2p go-ethereum_latest
+#testdevp2p nethermind_latest
+#testdevp2p besu_latest
 
 
 # These take an extremely long time to run
+#testconsensus go-ethereum_latest
 #testconsensus nethermind_latest
 
 

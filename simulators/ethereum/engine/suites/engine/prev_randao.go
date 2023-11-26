@@ -25,7 +25,7 @@ func (s PrevRandaoTransactionTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (t PrevRandaoTransactionTest) GetName() string {
-	return fmt.Sprintf("PrevRandao Opcode Transactions Test (%s)", t.TestTransactionType)
+	return fmt.Sprintf("PrevRandao Opcode Transactions Test, %s", t.TestTransactionType)
 }
 
 func (tc PrevRandaoTransactionTest) Execute(t *test.Env) {

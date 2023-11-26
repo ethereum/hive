@@ -14,10 +14,17 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
 )
 
 func main() {
+	var (
+		genesisPath = "./init/testGenesis.json"
+		genesis     = loadGenesis(genesisPath)
+		params      = getParameters(genesis)
+	)
+
 	suite := hivesim.Suite{
 		Name: "graphql",
 		Description: `Test suite covering the graphql API surface.
@@ -29,28 +36,11 @@ The GraphQL tests were initially imported from the Besu codebase.`,
 		Description: `This is a meta-test. It launches the client with the test chain
 and reads the test case files. The individual test cases are run as sub-tests against
 the client launched by this test.`,
-		Parameters: hivesim.Params{
-			// The graphql chain comes from the Besu codebase, and is built on Frontier.
-			"HIVE_CHAIN_ID":                  "1",
-			"HIVE_GRAPHQL_ENABLED":           "1",
-			"HIVE_ALLOW_UNPROTECTED_TX":      "1",
-			"HIVE_FORK_FRONTIER":             "0",
-			"HIVE_FORK_HOMESTEAD":            "33",
-			"HIVE_FORK_TANGERINE":            "33",
-			"HIVE_FORK_SPURIOUS":             "33",
-			"HIVE_FORK_BYZANTIUM":            "33",
-			"HIVE_FORK_CONSTANTINOPLE":       "33",
-			"HIVE_FORK_PETERSBURG":           "33",
-			"HIVE_FORK_ISTANBUL":             "33",
-			"HIVE_FORK_MUIR_GLACIER":         "33",
-			"HIVE_FORK_BERLIN":               "33",
-			"HIVE_FORK_LONDON":               "33",
-			"HIVE_MERGE_BLOCK_ID":            "33",
-			"HIVE_TERMINAL_TOTAL_DIFFICULTY": "4357120",
-			"HIVE_SHANGHAI_TIMESTAMP":        "1444660030",
-		},
+		Parameters: params,
 		Files: map[string]string{
-			"/genesis.json": "./init/testGenesis.json",
+			// The chain has originated from the Besu client. It consisted of Frontier blocks.
+			// It has been since extended with post-merge blocks.
+			"/genesis.json": genesisPath,
 			"/chain.rlp":    "./init/testBlockchain.blocks",
 		},
 		Run: graphqlTest,
@@ -216,4 +206,37 @@ func reindentJSON(text string) (string, bool) {
 	}
 	indented, _ := json.MarshalIndent(&obj, "", "  ")
 	return string(indented), true
+}
+
+func loadGenesis(path string) core.Genesis {
+	contents, err := os.ReadFile(path)
+	if err != nil {
+		panic(fmt.Errorf("can't to read genesis file: %v", err))
+	}
+	var genesis core.Genesis
+	if err := json.Unmarshal(contents, &genesis); err != nil {
+		panic(fmt.Errorf("can't parse genesis JSON: %v", err))
+	}
+	return genesis
+}
+
+func getParameters(genesis core.Genesis) hivesim.Params {
+	return hivesim.Params{
+		"HIVE_CHAIN_ID":                  genesis.Config.ChainID.String(),
+		"HIVE_GRAPHQL_ENABLED":           "1",
+		"HIVE_ALLOW_UNPROTECTED_TX":      "1",
+		"HIVE_FORK_FRONTIER":             "0",
+		"HIVE_FORK_HOMESTEAD":            genesis.Config.HomesteadBlock.String(),
+		"HIVE_FORK_TANGERINE":            genesis.Config.EIP150Block.String(),
+		"HIVE_FORK_SPURIOUS":             genesis.Config.EIP155Block.String(),
+		"HIVE_FORK_BYZANTIUM":            genesis.Config.ByzantiumBlock.String(),
+		"HIVE_FORK_CONSTANTINOPLE":       genesis.Config.ConstantinopleBlock.String(),
+		"HIVE_FORK_PETERSBURG":           genesis.Config.PetersburgBlock.String(),
+		"HIVE_FORK_ISTANBUL":             genesis.Config.IstanbulBlock.String(),
+		"HIVE_FORK_MUIR_GLACIER":         genesis.Config.MuirGlacierBlock.String(),
+		"HIVE_FORK_BERLIN":               genesis.Config.BerlinBlock.String(),
+		"HIVE_FORK_LONDON":               genesis.Config.LondonBlock.String(),
+		"HIVE_TERMINAL_TOTAL_DIFFICULTY": genesis.Config.TerminalTotalDifficulty.String(),
+		"HIVE_SHANGHAI_TIMESTAMP":        fmt.Sprintf("%d", *genesis.Config.ShanghaiTime),
+	}
 }

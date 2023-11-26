@@ -9,9 +9,17 @@ import (
 func (g *generator) writeForkEnv() error {
 	cfg := g.genesis.Config
 	env := make(map[string]string)
+
+	// basic settings
 	env["HIVE_CHAIN_ID"] = fmt.Sprint(cfg.ChainID)
 	env["HIVE_NETWORK_ID"] = fmt.Sprint(cfg.ChainID)
 
+	// config consensus algorithm
+	if cfg.Clique != nil {
+		env["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(cfg.Clique.Period)
+	}
+
+	// forks
 	setNum := func(hive string, blocknum *big.Int) {
 		if blocknum != nil {
 			env[hive] = blocknum.Text(10)

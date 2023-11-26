@@ -328,14 +328,16 @@ func init() {
 	// Re-org a transaction out of a block, or into a new block
 	Tests = append(Tests,
 		TransactionReOrgTest{
-			ReorgOut: true,
+			Scenario: TransactionReOrgScenarioReOrgOut,
 		},
 		TransactionReOrgTest{
-			ReorgDifferentBlock: true,
+			Scenario: TransactionReOrgScenarioReOrgDifferentBlock,
 		},
 		TransactionReOrgTest{
-			ReorgDifferentBlock: true,
-			NewPayloadOnRevert:  true,
+			Scenario: TransactionReOrgScenarioNewPayloadOnRevert,
+		},
+		TransactionReOrgTest{
+			Scenario: TransactionReOrgScenarioReOrgBackIn,
 		},
 	)
 

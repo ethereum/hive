@@ -79,7 +79,7 @@ func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(test
 // run executes a testcase against the client, called within a test channel from
 // fixtureRunner, all testcase payloads are sent and executed using the EngineAPI. for
 // verification all fixture nonce, balance and storage values are checked against the
-// response recieved from the lastest block.
+// response received from the lastest block.
 func (tc *testcase) run(t *hivesim.T) {
 	start := time.Now()
 
@@ -178,15 +178,15 @@ func (tc *testcase) run(t *hivesim.T) {
 		}
 		// check final nonce & balance matches expected in fixture
 		if genesisAccount.Nonce != gotNonce {
-			tc.failedErr = errors.New("nonce recieved doesn't match expected from fixture")
-			t.Errorf(`nonce recieved from account %v doesn't match expected from fixture in test %s:
-			recieved from block: %v
+			tc.failedErr = errors.New("nonce received doesn't match expected from fixture")
+			t.Errorf(`nonce received from account %v doesn't match expected from fixture in test %s:
+			received from block: %v
 			expected in fixture: %v`, account, tc.name, gotNonce, genesisAccount.Nonce)
 		}
 		if genesisAccount.Balance.Cmp(gotBalance) != 0 {
-			tc.failedErr = errors.New("balance recieved doesn't match expected from fixture")
-			t.Errorf(`balance recieved from account %v doesn't match expected from fixture in test %s:
-			recieved from block: %v
+			tc.failedErr = errors.New("balance received doesn't match expected from fixture")
+			t.Errorf(`balance received from account %v doesn't match expected from fixture in test %s:
+			received from block: %v
 			expected in fixture: %v`, account, tc.name, gotBalance, genesisAccount.Balance)
 		}
 		// check final storage
@@ -205,9 +205,9 @@ func (tc *testcase) run(t *hivesim.T) {
 			// check values in storage match with fixture
 			for _, key := range keys {
 				if genesisAccount.Storage[key] != *gotStorage[key] {
-					tc.failedErr = errors.New("storage recieved doesn't match expected from fixture")
-					t.Errorf(`storage recieved from account %v doesn't match expected from fixture in test %s: from storage address: %v
-						recieved from block:  %v
+					tc.failedErr = errors.New("storage received doesn't match expected from fixture")
+					t.Errorf(`storage received from account %v doesn't match expected from fixture in test %s: from storage address: %v
+						received from block:  %v
 						expected in fixture:  %v`, account, tc.name, key, gotStorage[key], genesisAccount.Storage[key])
 				}
 			}

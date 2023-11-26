@@ -21,14 +21,11 @@
 #  - HIVE_FORK_PETERSBURG      block number for ConstantinopleFix/Petersburg transition
 #  - HIVE_FORK_ISTANBUL        block number for Istanbul transition
 #  - HIVE_FORK_MUIR_GLACIER    block number for MuirGlacier transition
-#  - HIVE_SKIP_POW             If set, skip PoW verification during block import
-#  - HIVE_LOGLEVEL             client log level
 #  - HIVE_MINER                address to credit with mining rewards
 #  - HIVE_MINER_EXTRA          extra-data field to set for newly minted blocks
 #
 # These flags are NOT supported by Erigon
 #
-#  - HIVE_TESTNET              whether testnet nonces (2^20) are needed
 #  - HIVE_GRAPHQL_ENABLED      turns on GraphQL server
 #  - HIVE_CLIQUE_PRIVATEKEY    private key for clique mining
 #  - HIVE_NODETYPE             sync and pruning selector (archive, full, light)
@@ -47,9 +44,8 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --staticpeers $HIVE_BOOTNODE --nodiscover"
 fi
 
-if [ "$HIVE_SKIP_POW" != "" ]; then
-    FLAGS="$FLAGS --fakepow"
-fi
+# Disable PoW validation.
+FLAGS="$FLAGS --fakepow"
 
 # Create the data directory.
 mkdir /erigon-hive-datadir

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -66,7 +65,7 @@ func (spec SidechainReOrgTest) Execute(t *test.Env) {
 			// At this point the CLMocker has a payload that will result in a specific outcome,
 			// we can produce an alternative payload, send it, fcU to it, and verify the changes
 			alternativePrevRandao := common.Hash{}
-			rand.Read(alternativePrevRandao[:])
+			t.Rand.Read(alternativePrevRandao[:])
 			timestamp := t.CLMock.LatestPayloadBuilt.Timestamp + 1
 			payloadAttributes, err := (&helper.BasePayloadAttributesCustomizer{
 				Timestamp: &timestamp,
@@ -116,11 +115,19 @@ func (spec SidechainReOrgTest) Execute(t *test.Env) {
 }
 
 // Test performing a re-org that involves removing or modifying a transaction
+type TransactionReOrgScenario string
+
+const (
+	TransactionReOrgScenarioReOrgOut            TransactionReOrgScenario = "Re-Org Out"
+	TransactionReOrgScenarioReOrgBackIn         TransactionReOrgScenario = "Re-Org Back In"
+	TransactionReOrgScenarioReOrgDifferentBlock TransactionReOrgScenario = "Re-Org to Different Block"
+	TransactionReOrgScenarioNewPayloadOnRevert  TransactionReOrgScenario = "New Payload on Revert Back"
+)
+
 type TransactionReOrgTest struct {
 	test.BaseSpec
-	ReorgOut            bool
-	ReorgDifferentBlock bool
-	NewPayloadOnRevert  bool
+	TransactionCount int
+	Scenario         TransactionReOrgScenario
 }
 
 func (s TransactionReOrgTest) WithMainFork(fork config.Fork) test.Spec {
@@ -131,14 +138,8 @@ func (s TransactionReOrgTest) WithMainFork(fork config.Fork) test.Spec {
 
 func (s TransactionReOrgTest) GetName() string {
 	name := "Transaction Re-Org"
-	if s.ReorgOut {
-		name += ", Re-Org Out"
-	}
-	if s.ReorgDifferentBlock {
-		name += ", Re-Org to Different Block"
-	}
-	if s.NewPayloadOnRevert {
-		name += ", New Payload on Revert Back"
+	if s.Scenario != "" {
+		name = fmt.Sprintf("%s, %s", name, s.Scenario)
 	}
 	return name
 }
@@ -153,23 +154,51 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 
 	// Create transactions that modify the state in order to check after the reorg.
 	var (
-		txCount            = 5
+		err                error
+		txCount            = spec.TransactionCount
 		sstoreContractAddr = common.HexToAddress("0000000000000000000000000000000000000317")
 	)
 
-	for i := 0; i < txCount; i++ {
-		var (
-			altPayload *typ.ExecutableData
-			tx         typ.Transaction
+	if txCount == 0 {
+		// Default is to send 5 transactions
+		txCount = 5
+	}
+
+	// Send a transaction on each payload of the canonical chain
+	sendTransaction := func(i int) (typ.Transaction, error) {
+		data := common.LeftPadBytes([]byte{byte(i)}, 32)
+		t.Logf("transactionReorg, i=%v, data=%v\n", i, data)
+		return t.SendNextTransaction(
+			t.TestContext,
+			t.Engine,
+			&helper.BaseTransactionCreator{
+				Recipient:  &sstoreContractAddr,
+				Amount:     big0,
+				Payload:    data,
+				TxType:     t.TestTransactionType,
+				GasLimit:   75000,
+				ForkConfig: t.ForkConfig,
+			},
 		)
+
+	}
+
+	var (
+		altPayload *typ.ExecutableData
+		nextTx     typ.Transaction
+		tx         typ.Transaction
+	)
+
+	for i := 0; i < txCount; i++ {
+
 		// Generate two payloads, one with the transaction and the other one without it
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnPayloadAttributesGenerated: func() {
 				// At this point we have not broadcast the transaction.
-				if spec.ReorgOut {
+				if spec.Scenario == TransactionReOrgScenarioReOrgOut {
 					// Any payload we get should not contain any
 					payloadAttributes := t.CLMock.LatestPayloadAttributes
-					rand.Read(payloadAttributes.Random[:])
+					t.Rand.Read(payloadAttributes.Random[:])
 					r := t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, &payloadAttributes, t.CLMock.LatestHeader.Time)
 					r.ExpectNoError()
 					if r.Response.PayloadID == nil {
@@ -184,47 +213,39 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 					}
 				}
 
-				// At this point we can broadcast the transaction and it will be included in the next payload
-				// Data is the key where a `1` will be stored
-				data := common.LeftPadBytes([]byte{byte(i)}, 32)
-				t.Logf("transactionReorg, i=%v, data=%v\n", i, data)
-				var err error
-				tx, err = t.SendNextTransaction(
-					t.TestContext,
-					t.Engine,
-					&helper.BaseTransactionCreator{
-						Recipient:  &sstoreContractAddr,
-						Amount:     big0,
-						Payload:    data,
-						TxType:     t.TestTransactionType,
-						GasLimit:   75000,
-						ForkConfig: t.ForkConfig,
-					},
-				)
-				if err != nil {
-					t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+				if spec.Scenario != TransactionReOrgScenarioReOrgBackIn {
+					// At this point we can broadcast the transaction and it will be included in the next payload
+					// Data is the key where a `1` will be stored
+					tx, err = sendTransaction(i)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+					}
+
+					// Get the receipt
+					ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+					defer cancel()
+					receipt, _ := t.Eth.TransactionReceipt(ctx, tx.Hash())
+					if receipt != nil {
+						t.Fatalf("FAIL (%s): Receipt obtained before tx included in block: %v", t.TestName, receipt)
+					}
 				}
 
-				// Get the receipt
-				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
-				defer cancel()
-				receipt, _ := t.Eth.TransactionReceipt(ctx, tx.Hash())
-				if receipt != nil {
-					t.Fatalf("FAIL (%s): Receipt obtained before tx included in block: %v", t.TestName, receipt)
-				}
 			},
 			OnGetPayload: func() {
 				// Check that indeed the payload contains the transaction
-				if !helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, tx) {
-					t.Fatalf("FAIL (%s): Payload built does not contain the transaction: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
+				if tx != nil {
+					if !helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, tx) {
+						t.Fatalf("FAIL (%s): Payload built does not contain the transaction: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
+					}
 				}
-				if spec.ReorgDifferentBlock {
+
+				if spec.Scenario == TransactionReOrgScenarioReOrgDifferentBlock || spec.Scenario == TransactionReOrgScenarioNewPayloadOnRevert {
 					// Create side payload with different hash
 					var err error
 					customizer := &helper.CustomPayloadData{
 						ExtraData: &([]byte{0x01}),
 					}
-					altPayload, err = customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+					altPayload, err = customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 					if err != nil {
 						t.Fatalf("Error creating reorg payload %v", err)
 					}
@@ -235,68 +256,148 @@ func (spec TransactionReOrgTest) Execute(t *test.Env) {
 					if altPayload.BlockHash == t.CLMock.LatestPayloadBuilt.BlockHash {
 						t.Fatalf("FAIL (%s): Incorrect hash for payloads: %v == %v", t.TestName, altPayload.BlockHash, t.CLMock.LatestPayloadBuilt.BlockHash)
 					}
+				} else if spec.Scenario == TransactionReOrgScenarioReOrgBackIn {
+					// At this point we broadcast the transaction and request a new payload from the client that must
+					// contain the transaction.
+					// Since we are re-orging out and back in on the next block, the verification of this transaction
+					// being included happens on the next block
+					nextTx, err = sendTransaction(i)
+					if err != nil {
+						t.Fatalf("FAIL (%s): Error trying to send transaction: %v", t.TestName, err)
+					}
+
+					if i == 0 {
+						// We actually can only do this once because the transaction carries over and we cannot
+						// impede it from being included in the next payload
+						forkchoiceUpdated := t.CLMock.LatestForkchoice
+						payloadAttributes := t.CLMock.LatestPayloadAttributes
+						t.Rand.Read(payloadAttributes.SuggestedFeeRecipient[:])
+						f := t.TestEngine.TestEngineForkchoiceUpdated(
+							&forkchoiceUpdated,
+							&payloadAttributes,
+							t.CLMock.LatestHeader.Time,
+						)
+						f.ExpectPayloadStatus(test.Valid)
+
+						// Wait a second for the client to prepare the payload with the included transaction
+
+						time.Sleep(t.CLMock.PayloadProductionClientDelay)
+
+						g := t.TestEngine.TestEngineGetPayload(f.Response.PayloadID, &t.CLMock.LatestPayloadAttributes)
+						g.ExpectNoError()
+
+						if !helper.TransactionInPayload(&g.Payload, nextTx) {
+							t.Fatalf("FAIL (%s): Payload built does not contain the transaction: %v", t.TestName, g.Payload)
+						}
+
+						// Send the new payload and forkchoiceUpdated to it
+						n := t.TestEngine.TestEngineNewPayload(&g.Payload)
+						n.ExpectStatus(test.Valid)
+
+						forkchoiceUpdated.HeadBlockHash = g.Payload.BlockHash
+
+						s := t.TestEngine.TestEngineForkchoiceUpdated(&forkchoiceUpdated, nil, g.Payload.Timestamp)
+						s.ExpectPayloadStatus(test.Valid)
+					}
 				}
 			},
 			OnNewPayloadBroadcast: func() {
+				if tx != nil {
+					// Get the receipt
+					ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
+					defer cancel()
+					receipt, _ := t.Eth.TransactionReceipt(ctx, tx.Hash())
+					if receipt != nil {
+						t.Fatalf("FAIL (%s): Receipt obtained before tx included in block (NewPayload): %v", t.TestName, receipt)
+					}
+				}
+			},
+			OnForkchoiceBroadcast: func() {
+				if spec.Scenario != TransactionReOrgScenarioReOrgBackIn {
+					// Transaction is now in the head of the canonical chain, re-org and verify it's removed
+					// Get the receipt
+					txt := t.TestEngine.TestTransactionReceipt(tx.Hash())
+					txt.ExpectBlockHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+
+					if altPayload.ParentHash != t.CLMock.LatestPayloadBuilt.ParentHash {
+						t.Fatalf("FAIL (%s): Incorrect parent hash for payloads: %v != %v", t.TestName, altPayload.ParentHash, t.CLMock.LatestPayloadBuilt.ParentHash)
+					}
+					if altPayload.BlockHash == t.CLMock.LatestPayloadBuilt.BlockHash {
+						t.Fatalf("FAIL (%s): Incorrect hash for payloads: %v == %v", t.TestName, altPayload.BlockHash, t.CLMock.LatestPayloadBuilt.BlockHash)
+					}
+
+					if altPayload == nil {
+						t.Fatalf("FAIL (%s): No payload to re-org to", t.TestName)
+					}
+					r := t.TestEngine.TestEngineNewPayload(altPayload)
+					r.ExpectStatus(test.Valid)
+					r.ExpectLatestValidHash(&altPayload.BlockHash)
+
+					s := t.TestEngine.TestEngineForkchoiceUpdated(&api.ForkchoiceStateV1{
+						HeadBlockHash:      altPayload.BlockHash,
+						SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
+						FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
+					}, nil, altPayload.Timestamp)
+					s.ExpectPayloadStatus(test.Valid)
+
+					p := t.TestEngine.TestHeaderByNumber(Head)
+					p.ExpectHash(altPayload.BlockHash)
+
+					txt = t.TestEngine.TestTransactionReceipt(tx.Hash())
+					if spec.Scenario == TransactionReOrgScenarioReOrgOut {
+						if txt.Receipt != nil {
+							receiptJson, _ := json.MarshalIndent(txt.Receipt, "", "  ")
+							t.Fatalf("FAIL (%s): Receipt was obtained when the tx had been re-org'd out: %s", t.TestName, receiptJson)
+						}
+					} else if spec.Scenario == TransactionReOrgScenarioReOrgDifferentBlock || spec.Scenario == TransactionReOrgScenarioNewPayloadOnRevert {
+						txt.ExpectBlockHash(altPayload.BlockHash)
+					}
+
+					// Re-org back
+					if spec.Scenario == TransactionReOrgScenarioNewPayloadOnRevert {
+						r = t.TestEngine.TestEngineNewPayload(&t.CLMock.LatestPayloadBuilt)
+						r.ExpectStatus(test.Valid)
+						r.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.BlockHash)
+					}
+					t.CLMock.BroadcastForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil, 1)
+				}
+
+				if tx != nil {
+					// Now it should be back with main payload
+					txt := t.TestEngine.TestTransactionReceipt(tx.Hash())
+					txt.ExpectBlockHash(t.CLMock.LatestForkchoice.HeadBlockHash)
+
+					if spec.Scenario != TransactionReOrgScenarioReOrgBackIn {
+						tx = nil
+					}
+				}
+
+				if spec.Scenario == TransactionReOrgScenarioReOrgBackIn && i > 0 {
+					// Reasoning: Most of the clients do not re-add blob transactions to the pool
+					// after a re-org, so we need to wait until the next tx is sent to actually
+					// verify.
+					tx = nextTx
+				}
+
+			},
+		})
+
+	}
+
+	if tx != nil {
+		// Produce one last block and verify that the block contains the transaction
+		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
+			OnForkchoiceBroadcast: func() {
+				if !helper.TransactionInPayload(&t.CLMock.LatestPayloadBuilt, tx) {
+					t.Fatalf("FAIL (%s): Payload built does not contain the transaction: %v", t.TestName, t.CLMock.LatestPayloadBuilt)
+				}
 				// Get the receipt
 				ctx, cancel := context.WithTimeout(t.TestContext, globals.RPCTimeout)
 				defer cancel()
 				receipt, _ := t.Eth.TransactionReceipt(ctx, tx.Hash())
-				if receipt != nil {
-					t.Fatalf("FAIL (%s): Receipt obtained before tx included in block (NewPayload): %v", t.TestName, receipt)
+				if receipt == nil {
+					t.Fatalf("FAIL (%s): Receipt not obtained after tx included in block: %v", t.TestName, receipt)
 				}
-			},
-			OnForkchoiceBroadcast: func() {
-				// Transaction is now in the head of the canonical chain, re-org and verify it's removed
-				// Get the receipt
-				txt := t.TestEngine.TestTransactionReceipt(tx.Hash())
-				txt.ExpectBlockHash(t.CLMock.LatestForkchoice.HeadBlockHash)
-
-				if altPayload.ParentHash != t.CLMock.LatestPayloadBuilt.ParentHash {
-					t.Fatalf("FAIL (%s): Incorrect parent hash for payloads: %v != %v", t.TestName, altPayload.ParentHash, t.CLMock.LatestPayloadBuilt.ParentHash)
-				}
-				if altPayload.BlockHash == t.CLMock.LatestPayloadBuilt.BlockHash {
-					t.Fatalf("FAIL (%s): Incorrect hash for payloads: %v == %v", t.TestName, altPayload.BlockHash, t.CLMock.LatestPayloadBuilt.BlockHash)
-				}
-
-				if altPayload == nil {
-					t.Fatalf("FAIL (%s): No payload to re-org to", t.TestName)
-				}
-				r := t.TestEngine.TestEngineNewPayload(altPayload)
-				r.ExpectStatus(test.Valid)
-				r.ExpectLatestValidHash(&altPayload.BlockHash)
-
-				s := t.TestEngine.TestEngineForkchoiceUpdated(&api.ForkchoiceStateV1{
-					HeadBlockHash:      altPayload.BlockHash,
-					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
-					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
-				}, nil, altPayload.Timestamp)
-				s.ExpectPayloadStatus(test.Valid)
-
-				p := t.TestEngine.TestHeaderByNumber(Head)
-				p.ExpectHash(altPayload.BlockHash)
-
-				txt = t.TestEngine.TestTransactionReceipt(tx.Hash())
-				if spec.ReorgOut {
-					if txt.Receipt != nil {
-						receiptJson, _ := json.MarshalIndent(txt.Receipt, "", "  ")
-						t.Fatalf("FAIL (%s): Receipt was obtained when the tx had been re-org'd out: %s", t.TestName, receiptJson)
-					}
-				} else if spec.ReorgDifferentBlock {
-					txt.ExpectBlockHash(altPayload.BlockHash)
-				}
-
-				// Re-org back
-				if spec.NewPayloadOnRevert {
-					r = t.TestEngine.TestEngineNewPayload(&t.CLMock.LatestPayloadBuilt)
-					r.ExpectStatus(test.Valid)
-					r.ExpectLatestValidHash(&t.CLMock.LatestPayloadBuilt.BlockHash)
-				}
-				t.CLMock.BroadcastForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil, 1)
-
-				// Not it should be back with main payload
-				txt = t.TestEngine.TestTransactionReceipt(tx.Hash())
-				txt.ExpectBlockHash(t.CLMock.LatestForkchoice.HeadBlockHash)
 			},
 		})
 
@@ -323,7 +424,7 @@ func (s ReOrgBackToCanonicalTest) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (s ReOrgBackToCanonicalTest) GetName() string {
-	name := fmt.Sprintf("Re-Org Back into Canonical Chain (Depth: %d)", s.ReOrgDepth)
+	name := fmt.Sprintf("Re-Org Back into Canonical Chain, Depth=%d", s.ReOrgDepth)
 
 	if s.ExecuteSidePayloadOnReOrg {
 		name += ", Execute Side Payload on Re-Org"
@@ -368,7 +469,7 @@ func (spec ReOrgBackToCanonicalTest) Execute(t *test.Env) {
 		t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 			OnPayloadAttributesGenerated: func() {
 				payloadAttributes := t.CLMock.LatestPayloadAttributes
-				rand.Read(payloadAttributes.Random[:])
+				t.Rand.Read(payloadAttributes.Random[:])
 				r := t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, &payloadAttributes, t.CLMock.LatestHeader.Time)
 				r.ExpectNoError()
 				if r.Response.PayloadID == nil {
@@ -427,12 +528,16 @@ func (spec ReOrgBackToCanonicalTest) Execute(t *test.Env) {
 				// Send a fcU with the HeadBlockHash pointing back to the previous block
 				forkchoiceUpdatedBack := api.ForkchoiceStateV1{
 					HeadBlockHash:      previousHash,
-					SafeBlockHash:      previousHash,
-					FinalizedBlockHash: previousHash,
+					SafeBlockHash:      t.CLMock.LatestForkchoice.SafeBlockHash,
+					FinalizedBlockHash: t.CLMock.LatestForkchoice.FinalizedBlockHash,
 				}
 
 				// It is only expected that the client does not produce an error and the CL Mocker is able to progress after the re-org
 				r := t.TestEngine.TestEngineForkchoiceUpdated(&forkchoiceUpdatedBack, nil, previousTimestamp)
+				r.ExpectNoError()
+
+				// Re-send the ForkchoiceUpdated that the CLMock had sent
+				r = t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil, t.CLMock.LatestExecutedPayload.Timestamp)
 				r.ExpectNoError()
 			},
 		})
@@ -500,7 +605,7 @@ func (spec ReOrgBackFromSyncingTest) Execute(t *test.Env) {
 				ParentHash: &altParentHash,
 				ExtraData:  &([]byte{0x01}),
 			}
-			altPayload, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			altPayload, err := customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
@@ -544,7 +649,7 @@ func (s ReOrgPrevValidatedPayloadOnSideChainTest) WithMainFork(fork config.Fork)
 }
 
 func (s ReOrgPrevValidatedPayloadOnSideChainTest) GetName() string {
-	name := "Import and re-org to previously validated payload on a side chain"
+	name := "Re-org to Previously Validated Sidechain Payload"
 	return name
 }
 
@@ -595,7 +700,7 @@ func (spec ReOrgPrevValidatedPayloadOnSideChainTest) Execute(t *test.Env) {
 			if len(sidechainPayloads) > 0 {
 				customData.ParentHash = &sidechainPayloads[len(sidechainPayloads)-1].BlockHash
 			}
-			altPayload, err := customData.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			altPayload, err := customData.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
@@ -615,7 +720,7 @@ func (spec ReOrgPrevValidatedPayloadOnSideChainTest) Execute(t *test.Env) {
 				prevRandao            = common.Hash{}
 				suggestedFeeRecipient = common.Address{0x12, 0x34}
 			)
-			rand.Read(prevRandao[:])
+			t.Rand.Read(prevRandao[:])
 			payloadAttributesCustomizer := &helper.BasePayloadAttributesCustomizer{
 				Random:                &prevRandao,
 				SuggestedFeeRecipient: &suggestedFeeRecipient,
@@ -694,7 +799,7 @@ func (s SafeReOrgToSideChainTest) Execute(t *test.Env) {
 				ParentHash: &altParentHash,
 				ExtraData:  &([]byte{0x01}),
 			}
-			altPayload, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			altPayload, err := customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}

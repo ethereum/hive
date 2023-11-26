@@ -1102,10 +1102,22 @@ func (ws *WithdrawalsBaseSpec) Execute(t *test.Env) {
 				// Try to get the same payload but use `engine_getPayloadV2`
 				g := t.TestEngine.TestEngineGetPayloadV2(t.CLMock.NextPayloadID)
 				g.ExpectPayload(&t.CLMock.LatestPayloadBuilt)
-				g.ExpectNoError()
+
+				// Send produced payload but try to include non-nil
+				// `withdrawals`, it should fail.
+				emptyWithdrawalsList := make(types.Withdrawals, 0)
+				payloadWithEmptyWithdrawalsList, err := (&helper.CustomPayloadData{
+					Withdrawals: emptyWithdrawalsList,
+				}).CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
+				if err != nil {
+					t.Fatalf("Unable to append withdrawals: %v", err)
+				}
+				r := t.TestEngine.TestEngineNewPayloadV2(payloadWithEmptyWithdrawalsList)
+				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2+Withdrawals, error is expected"
+				r.ExpectErrorCode(InvalidParamsError)
 
 				// Send valid ExecutionPayloadV1 using engine_newPayloadV2
-				r := t.TestEngine.TestEngineNewPayloadV2(&t.CLMock.LatestPayloadBuilt)
+				r = t.TestEngine.TestEngineNewPayloadV2(&t.CLMock.LatestPayloadBuilt)
 				r.ExpectationDescription = "Sent pre-shanghai payload using NewPayloadV2, no error is expected"
 				r.ExpectNoError()
 				r.ExpectStatus(test.Valid)

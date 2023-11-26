@@ -25,9 +25,6 @@ type genBlockContext struct {
 	index int
 	block *core.BlockGen
 	gen   *generator
-
-	gasLimit uint64
-	txCount  int
 }
 
 // Number returns the block number.
@@ -47,7 +44,7 @@ func (ctx *genBlockContext) Timestamp() uint64 {
 
 // HasGas reports whether the block still has more than the given amount of gas left.
 func (ctx *genBlockContext) HasGas(gas uint64) bool {
-	return ctx.gasLimit > gas
+	return ctx.block.Gas() > gas
 }
 
 // AddNewTx adds a transaction into the block.
@@ -56,11 +53,7 @@ func (ctx *genBlockContext) AddNewTx(sender *genAccount, data types.TxData) *typ
 	if err != nil {
 		panic(err)
 	}
-	if ctx.gasLimit < tx.Gas() {
-		panic("not enough gas for tx")
-	}
 	ctx.block.AddTx(tx)
-	ctx.gasLimit -= tx.Gas()
 	return tx
 }
 
@@ -99,7 +92,7 @@ func (ctx *genBlockContext) AccountNonce(addr common.Address) uint64 {
 
 // Signer returns a signer for the current block.
 func (ctx *genBlockContext) Signer() types.Signer {
-	return types.MakeSigner(ctx.ChainConfig(), ctx.block.Number(), ctx.block.Timestamp())
+	return ctx.block.Signer()
 }
 
 // ChainConfig returns the chain config.

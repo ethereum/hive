@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"strings"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -40,16 +39,16 @@ func (s InvalidMissingAncestorReOrgTest) WithMainFork(fork config.Fork) test.Spe
 }
 
 func (tc InvalidMissingAncestorReOrgTest) GetName() string {
-	name := []string{
-		"Invalid Missing Ancestor ReOrg",
-		fmt.Sprintf("Invalid %s", tc.InvalidField),
-	}
+	emptyTxsStatus := "False"
 	if tc.EmptyTransactions {
-		name = append(name, "Empty Txs")
+		emptyTxsStatus = "True"
 	}
-	name = append(name, fmt.Sprintf("Invalid P%d'", tc.InvalidIndex))
-
-	return strings.Join(name, ", ")
+	return fmt.Sprintf(
+		"Invalid Missing Ancestor ReOrg, %s, EmptyTxs=%s, Invalid P%d",
+		tc.InvalidField,
+		emptyTxsStatus,
+		tc.InvalidIndex,
+	)
 }
 
 func (tc InvalidMissingAncestorReOrgTest) Execute(t *test.Env) {
@@ -107,12 +106,12 @@ func (tc InvalidMissingAncestorReOrgTest) Execute(t *test.Env) {
 				ParentHash: &altChainPayloads[len(altChainPayloads)-1].BlockHash,
 				ExtraData:  &([]byte{0x01}),
 			}
-			sidePayload, err = customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			sidePayload, err = customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
 			if len(altChainPayloads) == tc.InvalidIndex {
-				sidePayload, err = helper.GenerateInvalidPayload(sidePayload, tc.InvalidField)
+				sidePayload, err = helper.GenerateInvalidPayload(t.Rand, sidePayload, tc.InvalidField)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
@@ -207,21 +206,21 @@ func (s InvalidMissingAncestorReOrgSyncTest) WithMainFork(fork config.Fork) test
 }
 
 func (tc InvalidMissingAncestorReOrgSyncTest) GetName() string {
-	name := []string{
-		"Invalid Missing Ancestor ReOrg",
-		fmt.Sprintf("Invalid %s", tc.InvalidField),
-	}
+	emptyTxsStatus := "False"
 	if tc.EmptyTransactions {
-		name = append(name, "Empty Txs")
+		emptyTxsStatus = "True"
 	}
-	name = append(name,
-		fmt.Sprintf("Invalid P%d'", tc.InvalidIndex),
-		"Reveal using sync",
-	)
+	canonicalReOrgStatus := "False"
 	if tc.ReOrgFromCanonical {
-		name = append(name, "ReOrg from Canonical")
+		canonicalReOrgStatus = "True"
 	}
-	return strings.Join(name, ", ")
+	return fmt.Sprintf(
+		"Invalid Missing Ancestor Syncing ReOrg, %s, EmptyTxs=%s, CanonicalReOrg=%s, Invalid P%d",
+		tc.InvalidField,
+		emptyTxsStatus,
+		canonicalReOrgStatus,
+		tc.InvalidIndex,
+	)
 }
 
 func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
@@ -324,12 +323,12 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 				ParentHash: &pHash,
 				ExtraData:  &([]byte{0x01}),
 			}
-			sidePayload, err = customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			sidePayload, err = customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 			}
 			if len(altChainPayloads) == tc.InvalidIndex {
-				sidePayload, err = helper.GenerateInvalidPayload(sidePayload, tc.InvalidField)
+				sidePayload, err = helper.GenerateInvalidPayload(t.Rand, sidePayload, tc.InvalidField)
 				if err != nil {
 					t.Fatalf("FAIL (%s): Unable to customize payload: %v", t.TestName, err)
 				}
@@ -362,6 +361,12 @@ func (tc InvalidMissingAncestorReOrgSyncTest) Execute(t *test.Env) {
 			}
 		},
 	})
+
+	if !tc.ReOrgFromCanonical {
+		// Add back the original client before side chain production
+		t.CLMock.AddEngineClient(t.Engine)
+	}
+
 	t.Log("INFO: Starting side chain production")
 	t.CLMock.ProduceSingleBlock(clmock.BlockProcessCallbacks{
 		// Note: We perform the test in the middle of payload creation by the CL Mock, in order to be able to

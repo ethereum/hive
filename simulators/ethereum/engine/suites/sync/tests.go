@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"time"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
@@ -99,7 +100,7 @@ func AddSyncTestsToSuite(sim *hivesim.Simulation, suite *hivesim.Suite, tests []
 						}
 
 						// Run the test case
-						test.Run(&currentTest, big.NewInt(ttd), timeout, t, c, &genesis, syncClientParams, testFiles.Copy())
+						test.Run(&currentTest, big.NewInt(ttd), timeout, t, c, &genesis, rand.New(rand.NewSource(0)), syncClientParams, testFiles.Copy())
 					},
 				})
 			}

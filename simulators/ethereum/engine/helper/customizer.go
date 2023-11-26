@@ -209,17 +209,17 @@ func (customizer *DowngradeForkchoiceUpdatedVersion) ForkchoiceUpdatedVersion(he
 var _ ForkchoiceUpdatedCustomizer = (*DowngradeForkchoiceUpdatedVersion)(nil)
 
 type PayloadCustomizer interface {
-	CustomizePayload(basePayload *typ.ExecutableData) (*typ.ExecutableData, error)
+	CustomizePayload(randSource *rand.Rand, basePayload *typ.ExecutableData) (*typ.ExecutableData, error)
 	GetTimestamp(basePayload *typ.ExecutableData) (uint64, error)
 }
 
 type VersionedHashesCustomizer interface {
-	GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error)
+	GetVersionedHashes(randSource *rand.Rand, baseVesionedHashes *[]common.Hash) (*[]common.Hash, error)
 }
 
 type IncreaseVersionVersionedHashes struct{}
 
-func (customizer *IncreaseVersionVersionedHashes) GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
+func (customizer *IncreaseVersionVersionedHashes) GetVersionedHashes(_ *rand.Rand, baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
 	if baseVesionedHashes == nil {
 		return nil, fmt.Errorf("no versioned hashes available for modification")
 	}
@@ -236,7 +236,7 @@ func (customizer *IncreaseVersionVersionedHashes) GetVersionedHashes(baseVesione
 
 type CorruptVersionedHashes struct{}
 
-func (customizer *CorruptVersionedHashes) GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
+func (customizer *CorruptVersionedHashes) GetVersionedHashes(_ *rand.Rand, baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
 	if baseVesionedHashes == nil {
 		return nil, fmt.Errorf("no versioned hashes available for modification")
 	}
@@ -253,7 +253,7 @@ func (customizer *CorruptVersionedHashes) GetVersionedHashes(baseVesionedHashes 
 
 type RemoveVersionedHash struct{}
 
-func (customizer *RemoveVersionedHash) GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
+func (customizer *RemoveVersionedHash) GetVersionedHashes(_ *rand.Rand, baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
 	if baseVesionedHashes == nil {
 		return nil, fmt.Errorf("no versioned hashes available for modification")
 	}
@@ -272,14 +272,14 @@ func (customizer *RemoveVersionedHash) GetVersionedHashes(baseVesionedHashes *[]
 
 type ExtraVersionedHash struct{}
 
-func (customizer *ExtraVersionedHash) GetVersionedHashes(baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
+func (customizer *ExtraVersionedHash) GetVersionedHashes(randSource *rand.Rand, baseVesionedHashes *[]common.Hash) (*[]common.Hash, error) {
 	if baseVesionedHashes == nil {
 		return nil, fmt.Errorf("no versioned hashes available for modification")
 	}
 	result := make([]common.Hash, len(*baseVesionedHashes)+1)
 	copy(result, *baseVesionedHashes)
 	extraHash := common.Hash{}
-	rand.Read(extraHash[:])
+	randSource.Read(extraHash[:])
 	extraHash[0] = cancun.BLOB_COMMITMENT_VERSION_KZG
 	result[len(result)-1] = extraHash
 
@@ -330,7 +330,7 @@ func (customData *CustomPayloadData) GetTimestamp(basePayload *typ.ExecutableDat
 
 // Construct a customized payload by taking an existing payload as base and mixing it CustomPayloadData
 // BlockHash is calculated automatically.
-func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.ExecutableData) (*typ.ExecutableData, error) {
+func (customData *CustomPayloadData) CustomizePayload(randSource *rand.Rand, basePayload *typ.ExecutableData) (*typ.ExecutableData, error) {
 	txs := basePayload.Transactions
 	if customData.Transactions != nil {
 		txs = *customData.Transactions
@@ -460,7 +460,7 @@ func (customData *CustomPayloadData) CustomizePayload(basePayload *typ.Executabl
 	}
 
 	if customData.VersionedHashesCustomizer != nil {
-		result.VersionedHashes, err = customData.VersionedHashesCustomizer.GetVersionedHashes(basePayload.VersionedHashes)
+		result.VersionedHashes, err = customData.VersionedHashesCustomizer.GetVersionedHashes(randSource, basePayload.VersionedHashes)
 		if err != nil {
 			return nil, err
 		}
@@ -486,11 +486,11 @@ func (customizer *BaseNewPayloadVersionCustomizer) SetEngineAPIVersionResolver(v
 	customizer.EngineAPIVersionResolver = v
 }
 
-func (customNewPayload *BaseNewPayloadVersionCustomizer) CustomizePayload(basePayload *typ.ExecutableData) (*typ.ExecutableData, error) {
+func (customNewPayload *BaseNewPayloadVersionCustomizer) CustomizePayload(randSource *rand.Rand, basePayload *typ.ExecutableData) (*typ.ExecutableData, error) {
 	if customNewPayload.PayloadCustomizer == nil {
 		return basePayload, nil
 	}
-	return customNewPayload.PayloadCustomizer.CustomizePayload(basePayload)
+	return customNewPayload.PayloadCustomizer.CustomizePayload(randSource, basePayload)
 }
 
 func (customNewPayload *BaseNewPayloadVersionCustomizer) GetExpectedError() (*int, error) {
@@ -527,7 +527,7 @@ func (customNewPayload *DowngradeNewPayloadVersion) NewPayloadVersion(timestamp 
 	return version - 1
 }
 
-func CustomizePayloadTransactions(basePayload *typ.ExecutableData, customTransactions types.Transactions) (*typ.ExecutableData, error) {
+func CustomizePayloadTransactions(randSource *rand.Rand, basePayload *typ.ExecutableData, customTransactions types.Transactions) (*typ.ExecutableData, error) {
 	byteTxs := make([][]byte, 0)
 	for _, tx := range customTransactions {
 		bytes, err := tx.MarshalBinary()
@@ -538,7 +538,7 @@ func CustomizePayloadTransactions(basePayload *typ.ExecutableData, customTransac
 	}
 	return (&CustomPayloadData{
 		Transactions: &byteTxs,
-	}).CustomizePayload(basePayload)
+	}).CustomizePayload(randSource, basePayload)
 }
 
 func (customData *CustomPayloadData) String() string {
@@ -590,7 +590,7 @@ func (customData *CustomPayloadData) String() string {
 
 // This function generates an invalid payload by taking a base payload and modifying the specified field such that it ends up being invalid.
 // One small consideration is that the payload needs to contain transactions and specially transactions using the PREVRANDAO opcode for all the fields to be compatible with this function.
-func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField InvalidPayloadBlockField) (*typ.ExecutableData, error) {
+func GenerateInvalidPayload(randSource *rand.Rand, basePayload *typ.ExecutableData, payloadField InvalidPayloadBlockField) (*typ.ExecutableData, error) {
 
 	var customPayloadMod *CustomPayloadData
 	switch payloadField {
@@ -636,7 +636,7 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 		// This option potentially requires a transaction that uses the PREVRANDAO opcode.
 		// Otherwise the payload will still be valid.
 		modPrevRandao := common.Hash{}
-		rand.Read(modPrevRandao[:])
+		randSource.Read(modPrevRandao[:])
 		customPayloadMod = &CustomPayloadData{
 			PrevRandao: &modPrevRandao,
 		}
@@ -781,7 +781,7 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 		return &copyPayload, nil
 	}
 
-	return customPayloadMod.CustomizePayload(basePayload)
+	return customPayloadMod.CustomizePayload(randSource, basePayload)
 }
 
 /*
@@ -789,7 +789,7 @@ func GenerateInvalidPayload(basePayload *typ.ExecutableData, payloadField Invali
 		amounts and accounts, but the order in the list is different, so
 		stateRoot of the resulting payload should be the same.
 */
-func RandomizeWithdrawalsOrder(src types.Withdrawals) types.Withdrawals {
+func RandomizeWithdrawalsOrder(rand *rand.Rand, src types.Withdrawals) types.Withdrawals {
 	dest := make(types.Withdrawals, len(src))
 	perm := rand.Perm(len(src))
 	for i, v := range perm {

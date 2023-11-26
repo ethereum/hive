@@ -2,7 +2,6 @@ package suite_engine
 
 import (
 	"fmt"
-	"math/rand"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
@@ -84,7 +83,7 @@ func (b BadHashOnNewPayload) Execute(t *test.Env) {
 			} else if b.Syncing {
 				// We need to send an fcU to put the client in SYNCING state.
 				randomHeadBlock := common.Hash{}
-				rand.Read(randomHeadBlock[:])
+				t.Rand.Read(randomHeadBlock[:])
 				fcU := api.ForkchoiceStateV1{
 					HeadBlockHash:      randomHeadBlock,
 					SafeBlockHash:      t.CLMock.LatestHeader.Hash(),
@@ -125,7 +124,7 @@ func (b BadHashOnNewPayload) Execute(t *test.Env) {
 			customizer := &helper.CustomPayloadData{
 				ParentHash: &alteredPayload.BlockHash,
 			}
-			alteredPayload, err := customizer.CustomizePayload(&t.CLMock.LatestPayloadBuilt)
+			alteredPayload, err := customizer.CustomizePayload(t.Rand, &t.CLMock.LatestPayloadBuilt)
 			if err != nil {
 				t.Fatalf("FAIL (%s): Unable to modify payload: %v", t.TestName, err)
 			}
@@ -152,9 +151,11 @@ func (s ParentHashOnNewPayload) WithMainFork(fork config.Fork) test.Spec {
 }
 
 func (p ParentHashOnNewPayload) GetName() string {
-	name := "ParentHash==BlockHash on NewPayload"
+	name := "ParentHash equals BlockHash on NewPayload,"
 	if p.Syncing {
-		name += " (Syncing)"
+		name += " Syncing=True"
+	} else {
+		name += " Syncing=False"
 	}
 	return name
 }
@@ -175,7 +176,7 @@ func (b ParentHashOnNewPayload) Execute(t *test.Env) {
 			alteredPayload := t.CLMock.LatestPayloadBuilt
 			if b.Syncing {
 				// Parent hash is unknown but also (incorrectly) set as the block hash
-				rand.Read(alteredPayload.ParentHash[:])
+				t.Rand.Read(alteredPayload.ParentHash[:])
 			}
 			alteredPayload.BlockHash = alteredPayload.ParentHash
 			// Execution specification::
