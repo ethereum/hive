@@ -51,6 +51,7 @@ enr_option=$([[ "$HIVE_ETH2_BOOTNODE_ENRS" == "" ]] && echo "" || echo --p2p-dis
 static_option=$([[ "$HIVE_ETH2_STATIC_PEERS" == "" ]] && echo "" || echo --p2p-static-peers="$HIVE_ETH2_STATIC_PEERS")
 opt_sync_option=$([[ "$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY" == "" ]] && echo "" || echo "--Xnetwork-safe-slots-to-import-optimistically=$HIVE_ETH2_SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY")
 builder_option=$([[ "$HIVE_ETH2_BUILDER_ENDPOINT" == "" ]] && echo "" || echo "--validators-builder-registration-default-enabled=true --validators-proposer-blinded-blocks-enabled=true --builder-endpoint=$HIVE_ETH2_BUILDER_ENDPOINT")
+peer_score_option=$([[ "$HIVE_ETH2_DISABLE_PEER_SCORING" == "" ]] && echo "" || echo "--Xp2p-gossip-scoring-enabled=false --Xpeer-rate-limit=100000 --Xpeer-request-limit=1000")
 
 if [ "$HIVE_ETH2_MERGE_ENABLED" != "" ]; then
     echo -n "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
@@ -62,18 +63,21 @@ echo Starting Teku Beacon Node
 /opt/teku/bin/teku \
     --network=/data/testnet_setup/config.yaml \
     --data-path=/data/teku \
+    --data-storage-mode=ARCHIVE \
     --initial-state=/data/testnet_setup/genesis.ssz \
     --eth1-deposit-contract-address="${HIVE_ETH2_CONFIG_DEPOSIT_CONTRACT_ADDRESS:-0x1111111111111111111111111111111111111111}" \
     --log-destination console \
     --logging="$LOG" \
-    $metrics_option $eth1_option $merge_option $enr_option $static_option $opt_sync_option $builder_option \
+    $metrics_option $eth1_option $merge_option $enr_option $static_option $opt_sync_option $builder_option $peer_score_option \
     --validators-proposer-default-fee-recipient="0xa94f5374fce5edbc8e2a8697c15331677e6ebf0b" \
     --p2p-port="${HIVE_ETH2_P2P_TCP_PORT:-9000}" \
     --p2p-udp-port="${HIVE_ETH2_P2P_UDP_PORT:-9000}" \
     --p2p-advertised-ip="${CONTAINER_IP}" \
     --p2p-peer-lower-bound="${HIVE_ETH2_P2P_TARGET_PEERS:-10}" \
-    --rest-api-enabled=true --rest-api-interface=0.0.0.0 --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" --rest-api-host-allowlist="*" \
-    --data-storage-mode=ARCHIVE \
-    --Xstartup-target-peer-count=0 \
     --p2p-subscribe-all-subnets-enabled \
+    --rest-api-enabled=true \
+    --rest-api-interface=0.0.0.0 \
+    --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" \
+    --rest-api-host-allowlist="*" \
+    --Xstartup-target-peer-count=0 \
     --Xtrusted-setup="$trusted_setup_path"
