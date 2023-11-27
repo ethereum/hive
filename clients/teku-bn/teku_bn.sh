@@ -75,4 +75,5 @@ echo Starting Teku Beacon Node
     --rest-api-interface=0.0.0.0 \
     --rest-api-port="${HIVE_ETH2_BN_API_PORT:-4000}" \
     --rest-api-host-allowlist="*" \
+    --ignore-weak-subjectivity-period-enabled=true \
     --Xstartup-target-peer-count=0
