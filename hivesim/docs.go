@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/ethereum/hive/internal/simapi"
@@ -54,7 +55,7 @@ func (tc *markdownTestCase) toMarkdown(simName string, suiteName string, depth i
 	sb := strings.Builder{}
 
 	// Print test case display name
-	sb.WriteString(fmt.Sprintf("%s %s\n\n", strings.Repeat("#", depth), tc.displayName()))
+	sb.WriteString(fmt.Sprintf("%s - %s\n\n", strings.Repeat("#", depth), tc.displayName()))
 
 	// Print command-line to run
 	sb.WriteString(fmt.Sprintf("%s Run\n\n", strings.Repeat("#", depth+1)))
@@ -68,20 +69,6 @@ func (tc *markdownTestCase) toMarkdown(simName string, suiteName string, depth i
 	sb.WriteString(fmt.Sprintf("%s\n\n", tc.description()))
 
 	return sb.String()
-}
-
-func getCategories(testCases map[TestID]*markdownTestCase) []string {
-	categoryMap := make(map[string]struct{})
-	categories := make([]string, 0)
-	for _, tc := range testCases {
-		if tc.toBePrinted() {
-			if _, ok := categoryMap[tc.Category]; !ok {
-				categories = append(categories, tc.Category)
-				categoryMap[tc.Category] = struct{}{}
-			}
-		}
-	}
-	return categories
 }
 
 type markdownSuite struct {
@@ -113,6 +100,33 @@ func (s *markdownSuite) description() string {
 	return formatDescription(s.Description)
 }
 
+func (s *markdownSuite) testIDs() []TestID {
+	// Returns a sorted list of the test IDs
+	testIDs := make([]TestID, 0, len(s.tests))
+	for testID := range s.tests {
+		testIDs = append(testIDs, testID)
+	}
+	sort.Slice(testIDs, func(i, j int) bool {
+		return testIDs[i] < testIDs[j]
+	})
+	return testIDs
+}
+
+func (s *markdownSuite) getCategories() []string {
+	categoryMap := make(map[string]struct{})
+	categories := make([]string, 0)
+	for _, tcID := range s.testIDs() {
+		tc := s.tests[tcID]
+		if tc.toBePrinted() {
+			if _, ok := categoryMap[tc.Category]; !ok {
+				categories = append(categories, tc.Category)
+				categoryMap[tc.Category] = struct{}{}
+			}
+		}
+	}
+	return categories
+}
+
 func (s *markdownSuite) toMarkdown(simName string) (string, error) {
 	headerBuilder := strings.Builder{}
 	categoryBuilder := map[string]*strings.Builder{}
@@ -127,7 +141,7 @@ func (s *markdownSuite) toMarkdown(simName string) (string, error) {
 	headerBuilder.WriteString(fmt.Sprintf("```bash\n%s\n```\n\n", s.commandLine(simName)))
 	headerBuilder.WriteString("</details>\n\n")
 
-	categories := getCategories(s.tests)
+	categories := s.getCategories()
 
 	tcDepth := 3
 	if len(categories) > 1 {
@@ -142,7 +156,8 @@ func (s *markdownSuite) toMarkdown(simName string) (string, error) {
 		headerBuilder.WriteString("## Test Cases\n\n")
 	}
 
-	for _, tc := range s.tests {
+	for _, tcID := range s.testIDs() {
+		tc := s.tests[tcID]
 		if !tc.toBePrinted() {
 			continue
 		}
@@ -253,6 +268,18 @@ func (docs *docsCollector) AnyRunning() bool {
 	return false
 }
 
+func (docs *docsCollector) suiteIDs() []SuiteID {
+	// Returns a sorted list of the suite IDs
+	suiteIDs := make([]SuiteID, 0, len(docs.suites))
+	for suiteID := range docs.suites {
+		suiteIDs = append(suiteIDs, suiteID)
+	}
+	sort.Slice(suiteIDs, func(i, j int) bool {
+		return suiteIDs[i] < suiteIDs[j]
+	})
+	return suiteIDs
+}
+
 func (docs *docsCollector) StartSuite(suite *simapi.TestRequest, simlog string) (SuiteID, error) {
 	// Create a new markdown suite.
 	markdownSuite := &markdownSuite{
@@ -317,7 +344,8 @@ func (docs *docsCollector) generateIndex(simName string) (string, error) {
 	headerBuilder := strings.Builder{}
 	headerBuilder.WriteString(fmt.Sprintf("# Simulator `%s` Test Cases\n\n", simName))
 	headerBuilder.WriteString("## Test Suites\n\n")
-	for _, s := range docs.suites {
+	for _, sID := range docs.suiteIDs() {
+		s := docs.suites[sID]
 		headerBuilder.WriteString(fmt.Sprintf("### - [%s](%s)\n", s.displayName(), s.mardownFilePath()))
 		headerBuilder.WriteString(s.Description)
 		headerBuilder.WriteString("\n\n")
@@ -366,7 +394,8 @@ func (docs *docsCollector) genSimulatorMarkdownFiles(fw FileWriter) error {
 	if err != nil {
 		return err
 	}
-	for _, s := range docs.suites {
+	for _, sID := range docs.suiteIDs() {
+		s := docs.suites[sID]
 		if err := s.toMarkdownFile(fw, docs.simName); err != nil {
 			return err
 		}
