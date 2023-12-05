@@ -1,17 +1,73 @@
+mod constants;
+
+use crate::constants::{
+    BERLIN_BLOCK_NUMBER, BOOTNODES_ENVIRONMENT_VARIABLE, BYZANTIUM_BLOCK_NUMBER,
+    CONSTANTINOPLE_BLOCK_NUMBER, HIVE_CHECK_LIVE_PORT, HOMESTEAD_BLOCK_NUMBER,
+    ISTANBUL_BLOCK_NUMBER, LONDON_BLOCK_NUMBER, MERGE_BLOCK_NUMBER, SHANGHAI_BLOCK_NUMBER,
+    TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE,
+};
 use ethportal_api::HistoryContentKey;
 use ethportal_api::HistoryContentValue;
 use ethportal_api::PossibleHistoryContentValue;
 use ethportal_api::{Discv5ApiClient, HistoryNetworkApiClient};
+use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, Simulation, Suite, Test, TestSpec, TwoClientTestSpec};
 use itertools::Itertools;
-use portal_bridge::bridge::Bridge;
-use portal_bridge::execution_api::ExecutionApi;
-use portal_bridge::mode::BridgeMode;
-use portal_bridge::pandaops::PandaOpsMiddleware;
 use serde_yaml::Value;
+use std::collections::HashMap;
 use tokio::time::Duration;
-use trin_validation::accumulator::MasterAccumulator;
-use trin_validation::oracle::HeaderOracle;
+
+fn get_flair(block_number: u64) -> String {
+    if block_number > SHANGHAI_BLOCK_NUMBER {
+        " (post-shanghai)".to_string()
+    } else if block_number > MERGE_BLOCK_NUMBER {
+        " (post-merge)".to_string()
+    } else if block_number > LONDON_BLOCK_NUMBER {
+        " (post-london)".to_string()
+    } else if block_number > BERLIN_BLOCK_NUMBER {
+        " (post-berlin)".to_string()
+    } else if block_number > ISTANBUL_BLOCK_NUMBER {
+        " (post-istanbul)".to_string()
+    } else if block_number > CONSTANTINOPLE_BLOCK_NUMBER {
+        " (post-constantinople)".to_string()
+    } else if block_number > BYZANTIUM_BLOCK_NUMBER {
+        " (post-byzantium)".to_string()
+    } else if block_number > HOMESTEAD_BLOCK_NUMBER {
+        " (post-homestead)".to_string()
+    } else {
+        "".to_string()
+    }
+}
+
+fn process_content(content: Vec<(HistoryContentKey, HistoryContentValue)>) -> Vec<String> {
+    let mut last_header = content.get(0).unwrap().clone();
+
+    let mut result: Vec<String> = vec![];
+    for history_content in content.into_iter() {
+        if let HistoryContentKey::BlockHeaderWithProof(_) = &history_content.0 {
+            last_header = history_content.clone();
+        }
+        let comment =
+            if let HistoryContentValue::BlockHeaderWithProof(header_with_proof) = &last_header.1 {
+                let content_type = match &history_content.0 {
+                    HistoryContentKey::BlockHeaderWithProof(_) => "header".to_string(),
+                    HistoryContentKey::BlockBody(_) => "body".to_string(),
+                    HistoryContentKey::BlockReceipts(_) => "receipt".to_string(),
+                    HistoryContentKey::EpochAccumulator(_) => "epoch accumulator".to_string(),
+                };
+                format!(
+                    "{}{} {}",
+                    header_with_proof.header.number,
+                    get_flair(header_with_proof.header.number),
+                    content_type
+                )
+            } else {
+                unreachable!("History test dated is formatted incorrectly")
+            };
+        result.push(comment)
+    }
+    result
+}
 
 #[tokio::main]
 async fn main() {
@@ -52,6 +108,10 @@ dyn_async! {
    async fn test_portal_bridge<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
+        if !clients.iter().any(|client_definition| client_definition.name == *TRIN_BRIDGE_CLIENT_TYPE) {
+            panic!("This simulator is required to be ran with client `trin-bridge`")
+        }
+        let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
         // Iterate over all possible pairings of clients and run the tests (including self-pairings)
         for (client_a, client_b) in clients.iter().cartesian_product(clients.iter()) {
@@ -71,15 +131,6 @@ dyn_async! {
 
 dyn_async! {
     async fn test_bridge<'a> (client_a: Client, client_b: Client) {
-        let master_acc = MasterAccumulator::default();
-        let header_oracle = HeaderOracle::new(master_acc);
-        let portal_clients = vec![client_a.rpc.clone()];
-        let epoch_acc_path = "validation_assets/epoch_acc.bin".into();
-        let mode = BridgeMode::Test("./test-data/test_data_collection_of_forks_blocks.yaml".into());
-        let pandaops_middleware = PandaOpsMiddleware::default();
-        let execution_api = ExecutionApi::new(pandaops_middleware);
-
-        // connect clients
         let client_b_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
             Err(err) => {
@@ -93,37 +144,34 @@ dyn_async! {
             Err(err) => panic!("{}", &err.to_string()),
         }
 
-        // start the bridge
-        let bridge = Bridge::new(
-            mode,
-            execution_api,
-            portal_clients,
-            header_oracle,
-            epoch_acc_path,
-        );
-        bridge.launch().await;
+        let client_a_enr = match client_a.rpc.node_info().await {
+            Ok(node_info) => node_info.enr,
+            Err(err) => {
+                panic!("Error getting node info: {err:?}");
+            }
+        };
+        client_a.test.start_client(TRIN_BRIDGE_CLIENT_TYPE.to_string(), Some(HashMap::from([(BOOTNODES_ENVIRONMENT_VARIABLE.to_string(), client_a_enr.to_base64()), (HIVE_CHECK_LIVE_PORT.to_string(), 0.to_string())]))).await;
 
-        // wait 2 seconds for data to propagate
-        // This value is determined by how long the sleeps are in the bridge code
-        // So we may lower this or remove it depending on what we find.
-        tokio::time::sleep(Duration::from_secs(2)).await;
+
 
         // With default node settings nodes should be storing all content
-        let values = std::fs::read_to_string("./test-data/test_data_collection_of_forks_blocks.yaml")
+        let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
             .expect("cannot find test asset");
         let values: Value = serde_yaml::from_str(&values).unwrap();
-        let comments = vec!["1 header", "1 block body", "100 header",
-            "100 block body", "7000000 header", "7000000 block body",
-            "7000000 receipt", "15600000 (post-merge) header", "15600000 (post-merge) block body", "15600000 (post-merge) receipt",
-            "17510000 (post-shanghai) header", "17510000 (post-shanghai) block body", "17510000 (post-shanghai) receipt"];
-
-        let mut result = vec![];
-        for (index, value) in values.as_sequence().unwrap().iter().enumerate() {
+        let content_vec: Vec<(HistoryContentKey, HistoryContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
             let content_key: HistoryContentKey =
                 serde_yaml::from_value(value.get("content_key").unwrap().clone()).unwrap();
             let content_value: HistoryContentValue =
                 serde_yaml::from_value(value.get("content_value").unwrap().clone()).unwrap();
+            (content_key, content_value)
+        }).collect();
+        let comments = process_content(content_vec.clone());
 
+        // wait content_vec.len() seconds for data to propagate, giving more time if more items are propagating
+        tokio::time::sleep(Duration::from_secs(content_vec.len() as u64)).await;
+
+        let mut result = vec![];
+        for (index, (content_key, content_value)) in content_vec.into_iter().enumerate() {
             match client_b.rpc.local_content(content_key.clone()).await {
                 Ok(possible_content) => {
                    match possible_content {

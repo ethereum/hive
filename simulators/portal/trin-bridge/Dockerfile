@@ -27,14 +27,8 @@ RUN dpkg -i libssl1.1_1.1.0g-2ubuntu4_amd64.deb
 
 # copy build artifacts from build stage
 COPY --from=builder /trin-bridge/target/release/trin-bridge .
-COPY --from=builder /trin-bridge/src/test-data ./test-data
-
-RUN apt-get update && apt-get install libcurl4 -y
+ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml ./test-data/test_data_collection_of_forks_blocks.yaml
 
 ENV RUST_LOG=debug
-
-# Fake secrets for Trin bridge activation, not actually used in the used `BridgeMode::Test` mode
-ENV PANDAOPS_CLIENT_ID=xxx
-ENV PANDAOPS_CLIENT_SECRET=xxx
 
 ENTRYPOINT ["./trin-bridge"]

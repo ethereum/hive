@@ -6,9 +6,7 @@ edition = "2021"
 
 [dependencies]
 ethportal-api = { git = "https://github.com/ethereum/trin", rev = "b530dc3d40d51c21c800089eacb2852ebd8c4d45" }
-portal-bridge = { git = "https://github.com/ethereum/trin", rev = "b530dc3d40d51c21c800089eacb2852ebd8c4d45" }
-trin-validation = { git = "https://github.com/ethereum/trin", rev = "b530dc3d40d51c21c800089eacb2852ebd8c4d45" }
-hivesim = { git = "https://github.com/KolbyML/portal-hive", rev = "c58ad6b9106569def7953954bb3f6e6ea612df50" }
+hivesim = { git = "https://github.com/ethereum/portal-hive", rev = "927e0ff53e445e2eea6b45256ca8c6ed5fcb3241" }
 itertools = "0.10.5"
 serde_yaml = "0.9"
 tokio = { version = "1", features = ["full"] }

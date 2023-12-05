@@ -6,7 +6,7 @@ edition = "2021"
 
 [dependencies]
 ethportal-api = { git = "https://github.com/ethereum/trin", rev = "2a32224e3c2b0b80bc37c1b692c33016371f197a" }
-hivesim = { git = "https://github.com/KolbyML/portal-hive", rev = "c58ad6b9106569def7953954bb3f6e6ea612df50" }
+hivesim = { git = "https://github.com/ethereum/portal-hive", rev = "927e0ff53e445e2eea6b45256ca8c6ed5fcb3241" }
 itertools = "0.10.5"
 serde_json = "1.0.87"
 serde_yaml = "0.9"

@@ -18,7 +18,7 @@ RUN apt update && apt install wget -y
 
 # copy build artifacts from build stage
 COPY --from=builder /portal-interop/target/release/portal-interop .
-COPY --from=builder /portal-interop/src/test-data ./test-data
+ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml ./test-data/test_data_collection_of_forks_blocks.yaml
 
 ENV RUST_LOG=debug
 

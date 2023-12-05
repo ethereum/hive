@@ -1,3 +1,10 @@
+mod constants;
+
+use crate::constants::{
+    BERLIN_BLOCK_NUMBER, BYZANTIUM_BLOCK_NUMBER, CONSTANTINOPLE_BLOCK_NUMBER,
+    HOMESTEAD_BLOCK_NUMBER, ISTANBUL_BLOCK_NUMBER, LONDON_BLOCK_NUMBER, MERGE_BLOCK_NUMBER,
+    SHANGHAI_BLOCK_NUMBER, TEST_DATA_FILE_PATH,
+};
 use ethportal_api::types::portal::ContentInfo;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
@@ -26,7 +33,7 @@ async fn main() {
     let mut suite = Suite {
         name: "portal-interop".to_string(),
         description:
-            "The portal portal-interop test suite runs a set of scenarios to test interoperability between
+            "The portal interop test suite runs a set of scenarios to test interoperability between
         portal network clients"
                 .to_string(),
         tests: vec![],
@@ -64,6 +71,7 @@ fn content_pair_to_string_pair(
     (content_key.to_hex(), hex_encode(content_value.encode()))
 }
 
+/// Processed content data for history tests
 struct ProcessedContent {
     content_type: String,
     block_number: u64,
@@ -123,21 +131,21 @@ fn process_content(
 }
 
 fn get_flair(block_number: u64) -> String {
-    if block_number > 17034870 {
+    if block_number > SHANGHAI_BLOCK_NUMBER {
         " (post-shanghai)".to_string()
-    } else if block_number > 15537394 {
+    } else if block_number > MERGE_BLOCK_NUMBER {
         " (post-merge)".to_string()
-    } else if block_number > 12965000 {
+    } else if block_number > LONDON_BLOCK_NUMBER {
         " (post-london)".to_string()
-    } else if block_number > 12244000 {
+    } else if block_number > BERLIN_BLOCK_NUMBER {
         " (post-berlin)".to_string()
-    } else if block_number > 9069000 {
+    } else if block_number > ISTANBUL_BLOCK_NUMBER {
         " (post-istanbul)".to_string()
-    } else if block_number > 7280000 {
+    } else if block_number > CONSTANTINOPLE_BLOCK_NUMBER {
         " (post-constantinople)".to_string()
-    } else if block_number > 4370000 {
+    } else if block_number > BYZANTIUM_BLOCK_NUMBER {
         " (post-byzantium)".to_string()
-    } else if block_number > 1150000 {
+    } else if block_number > HOMESTEAD_BLOCK_NUMBER {
         " (post-homestead)".to_string()
     } else {
         "".to_string()
@@ -149,15 +157,15 @@ dyn_async! {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
 
-        let values = std::fs::read_to_string("./test-data/test_data_collection_of_forks_blocks.yaml")
+        let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
             .expect("cannot find test asset");
         let values: Value = serde_yaml::from_str(&values).unwrap();
         let content: Vec<(HistoryContentKey, HistoryContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
-            let header_key: HistoryContentKey =
+            let content_key: HistoryContentKey =
                 serde_yaml::from_value(value.get("content_key").unwrap().clone()).unwrap();
-            let header_value: HistoryContentValue =
+            let content_value: HistoryContentValue =
                 serde_yaml::from_value(value.get("content_value").unwrap().clone()).unwrap();
-            (header_key, header_value)
+            (content_key, content_value)
         }).collect();
 
         // Iterate over all possible pairings of clients and run the tests (including self-pairings)
@@ -168,8 +176,32 @@ dyn_async! {
                         name: format!("OFFER {}: block number {}{} {} --> {}", content_type, block_number, get_flair(block_number), client_a.name, client_b.name),
                         description: "".to_string(),
                         always_run: false,
-                        run: test_offer_x,
-                        environment: None,
+                        run: test_offer,
+                        environments: None,
+                        test_data: Some(test_data.clone()),
+                        clients: vec![client_a.clone(), client_b.clone()],
+                    }
+                ).await;
+
+                test.run(
+                    NClientTestSpec {
+                        name: format!("RecursiveFindContent {}: block number {}{} {} --> {}", content_type, block_number, get_flair(block_number), client_a.name, client_b.name),
+                        description: "".to_string(),
+                        always_run: false,
+                        run: test_recursive_find_content,
+                        environments: None,
+                        test_data: Some(test_data.clone()),
+                        clients: vec![client_a.clone(), client_b.clone()],
+                    }
+                ).await;
+
+                test.run(
+                    NClientTestSpec {
+                        name: format!("FindContent {}: block number {}{} {} --> {}", content_type, block_number, get_flair(block_number), client_a.name, client_b.name),
+                        description: "".to_string(),
+                        always_run: false,
+                        run: test_find_content,
+                        environments: None,
                         test_data: Some(test_data),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
@@ -209,34 +241,6 @@ dyn_async! {
                 }
             ).await;
 
-            for ProcessedContent { content_type, block_number, test_data } in process_content(content.clone()) {
-                test.run(
-                    NClientTestSpec {
-                        name: format!("RecursiveFindContent {}: block number {}{} {} --> {}", content_type, block_number, get_flair(block_number), client_a.name, client_b.name),
-                        description: "".to_string(),
-                        always_run: false,
-                        run: test_recursive_find_content_x,
-                        environment: None,
-                        test_data: Some(test_data),
-                        clients: vec![client_a.clone(), client_b.clone()],
-                    }
-                ).await;
-            }
-
-            for ProcessedContent { content_type, block_number, test_data } in process_content(content.clone()) {
-                test.run(
-                    NClientTestSpec {
-                        name: format!("FindContent {}: block number {}{} {} --> {}", content_type, block_number, get_flair(block_number), client_a.name, client_b.name),
-                        description: "".to_string(),
-                        always_run: false,
-                        run: test_find_content_x,
-                        environment: None,
-                        test_data: Some(test_data),
-                        clients: vec![client_a.clone(), client_b.clone()],
-                    }
-                ).await;
-            }
-
             // Test gossiping a collection of blocks to node B (B will gossip back to A)
             test.run(
                 NClientTestSpec {
@@ -244,7 +248,7 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_gossip_two_nodes,
-                    environment: None,
+                    environments: None,
                     test_data: Some(content.clone().into_iter().map(content_pair_to_string_pair).collect()),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -291,7 +295,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_offer_x<'a>(clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_offer<'a>(clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -427,7 +431,7 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a content via RECURSIVEFINDCONTENT template that it has stored locally
-    async fn test_recursive_find_content_x<'a>(clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -512,7 +516,7 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a x content via FINDCONTENT that it has stored locally
-    async fn test_find_content_x<'a> (clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_find_content<'a> (clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -521,7 +525,7 @@ dyn_async! {
         };
         let test_data = match test_data {
             Some(test_data) => test_data,
-            None => panic!("Expected test data non was provided"),
+            None => panic!("Expected test data none was provided"),
         };
         if let Some((optional_key, optional_value)) = test_data.get(1) {
             let optional_key: HistoryContentKey =
@@ -637,33 +641,53 @@ dyn_async! {
             }
         }
 
-        // wait 8 seconds for data to propagate
-        // This value is determined by how long the sleeps are in the gossip code
-        // So we may lower this or remove it depending on what we find.
-        tokio::time::sleep(Duration::from_secs(8)).await;
+        // wait content_vec.len() seconds for data to propagate, giving more time if more items are propagating
+        tokio::time::sleep(Duration::from_secs(test_data.len() as u64)).await;
 
-        let comments = vec!["1 header", "1 block body", "100 header",
-            "100 block body", "7000000 header", "7000000 block body",
-            "7000000 receipt", "15600000 (post-merge) header", "15600000 (post-merge) block body", "15600000 (post-merge) receipt",
-            "17510000 (post-shanghai) header", "17510000 (post-shanghai) block body", "17510000 (post-shanghai) receipt"];
-
+        let (first_header_key, first_header_value) = test_data.get(0).unwrap();
+        let first_header_key: HistoryContentKey =
+                serde_json::from_value(json!(first_header_key)).unwrap();
+        let first_header_value: HistoryContentValue =
+                serde_json::from_value(json!(first_header_value)).unwrap();
+        let mut last_header: (HistoryContentKey, HistoryContentValue) = (first_header_key, first_header_value);
         let mut result = vec![];
-        for (index, (content_key, content_value)) in test_data.into_iter().enumerate() {
+        for (content_key, content_value) in test_data.into_iter() {
             let content_key: HistoryContentKey =
                 serde_json::from_value(json!(content_key)).unwrap();
             let content_value: HistoryContentValue =
                 serde_json::from_value(json!(content_value)).unwrap();
 
+            if let HistoryContentKey::BlockHeaderWithProof(_) = &content_key {
+                last_header = (content_key.clone(), content_value.clone());
+            }
+            let comment =
+                if let HistoryContentValue::BlockHeaderWithProof(header_with_proof) = &last_header.1 {
+                    let content_type = match &content_key {
+                        HistoryContentKey::BlockHeaderWithProof(_) => "header".to_string(),
+                        HistoryContentKey::BlockBody(_) => "body".to_string(),
+                        HistoryContentKey::BlockReceipts(_) => "receipt".to_string(),
+                        HistoryContentKey::EpochAccumulator(_) => "epoch accumulator".to_string(),
+                    };
+                    format!(
+                        "{}{} {}",
+                        header_with_proof.header.number,
+                        get_flair(header_with_proof.header.number),
+                        content_type
+                    )
+                } else {
+                    unreachable!("History test dated is formatted incorrectly")
+                };
+
             match client_b.rpc.local_content(content_key.clone()).await {
                 Ok(possible_content) => {
-                   match possible_content {
+                    match possible_content {
                         PossibleHistoryContentValue::ContentPresent(content) => {
                             if content != content_value {
-                                result.push(format!("Error content received for block {} was different then expected", comments[index]));
+                                result.push(format!("Error content received for block {comment} was different then expected"));
                             }
                         }
                         PossibleHistoryContentValue::ContentAbsent => {
-                            result.push(format!("Error content for block {} was absent", comments[index]));
+                            result.push(format!("Error content for block {comment} was absent"));
                         }
                     }
                 }
