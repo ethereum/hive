@@ -9,6 +9,7 @@ require (
 	github.com/evanw/esbuild v0.17.6
 	github.com/fsouza/go-dockerclient v1.9.8
 	github.com/gorilla/mux v1.8.0
+	github.com/lithammer/dedent v1.1.0
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	golang.org/x/net v0.17.0
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1

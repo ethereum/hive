@@ -283,7 +283,6 @@ func (n *NethermindChainSpec) Config() *params.ChainConfig {
 		TerminalTotalDifficultyPassed: false,
 		Ethash:                        &params.EthashConfig{},
 		Clique:                        &params.CliqueConfig{},
-		IsDevMode:                     false,
 	}
 }
 

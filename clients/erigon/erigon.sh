@@ -128,7 +128,7 @@ fi
 
 # Configure RPC.
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,txpool,web3"
-FLAGS="$FLAGS --ws"
+FLAGS="$FLAGS --ws --ws.port=8546"
 
 # Increase blob slots for tests
 FLAGS="$FLAGS --txpool.blobslots=1000"
