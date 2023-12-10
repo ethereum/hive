@@ -23,7 +23,7 @@ import (
 
 // we will wait that time before every test execution to be sure environment is ready
 // may be changed to other value if necessary
-const SetupTime = 3 * time.Minute
+const SetupTime = time.Minute
 
 func main() {
 	var (
