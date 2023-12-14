@@ -276,8 +276,11 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 	for {
 		test, err := parser.Next()
 		if test == nil {
+			if err == io.EOF {
+				return nil
+			}
 			return err
-		} 
+		}
 		// Forward result to hive.
 		name := fmt.Sprintf("%s (%s)", test.Description, clientName)
 		testID, err := t.Sim.StartTest(t.SuiteID, name, "")
