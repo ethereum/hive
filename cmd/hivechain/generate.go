@@ -182,8 +182,7 @@ func (g *generator) setClique(i int, gen *core.BlockGen) {
 	gen.SetCoinbase(cliqueSignerAddr)
 	// Add a positive vote to keep the signer in the set.
 	gen.SetNonce(types.BlockNonce{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
-	// The clique engine requires the block to have blank extra-data of the correct length
-	// before sealing.
+	// The clique engine requires the block to have blank extra-data of the correct length before sealing.
 	gen.SetExtra(make([]byte, 32+65))
 }
 
