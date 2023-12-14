@@ -4,7 +4,7 @@
 #include "rng.eas"
 
 .start:
-    %RngInit(0)              ; []
+    %RngInit(0)                 ; []
 
 genlogs:
     ;; emit log with random topic.

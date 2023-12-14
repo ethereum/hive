@@ -11,7 +11,7 @@ genstorage:
     push 1                      ; [1, block]
     add                         ; [block+1]
     ;; enough gas left? loop!
-    gas                         ; [gas], block+1]
+    gas                         ; [gas, block+1]
     push minGas                 ; [limit, gas, block+1]
     lt                          ; [limit<gas, block+1]
     jumpi @genstorage           ; [block+1]
