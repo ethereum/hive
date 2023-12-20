@@ -224,7 +224,7 @@ func LoadChain(path string) types.Blocks {
 	return blocks
 }
 
-func LoadGenesis(path string, genesis Genesis) Genesis {
+func LoadGenesis(path string, genesis client.Genesis) client.Genesis {
 	reader, err := os.Open(path)
 	if err != nil {
 		panic(fmt.Errorf("can't to read genesis file: %v", err))
@@ -257,7 +257,7 @@ func LoadGenesisTest(path string) string {
 	return string(contents)
 }
 
-func GenesisStartOptionBasedOnClient(genesis Genesis, clientName string) (hivesim.StartOption, error) {
+func GenesisStartOptionBasedOnClient(genesis client.Genesis, clientName string) (hivesim.StartOption, error) {
 	out, err := genesis.MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("failed to serialize genesis state: %v", err)
@@ -272,7 +272,7 @@ func GenesisStartOptionBasedOnClient(genesis Genesis, clientName string) (hivesi
 	return hivesim.WithDynamicFile("/genesis.json", bytesSource(out)), nil
 }
 
-func CalculateTotalDifficulty(genesis Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
+func CalculateTotalDifficulty(genesis client.Genesis, chain types.Blocks, lastBlock uint64) *big.Int {
 	result := new(big.Int).Set(genesis.Difficulty())
 	for _, b := range chain {
 		result.Add(result, b.Difficulty())
@@ -284,7 +284,7 @@ func CalculateTotalDifficulty(genesis Genesis, chain types.Blocks, lastBlock uin
 }
 
 // TTD is the value specified in the test.Spec + Genesis.Difficulty
-func CalculateRealTTD(g Genesis, ttdValue int64) int64 {
+func CalculateRealTTD(g client.Genesis, ttdValue int64) int64 {
 	return g.Config().TerminalTotalDifficulty.Int64() + ttdValue
 }
 

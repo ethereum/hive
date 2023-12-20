@@ -3,6 +3,7 @@ package suite_sync
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	"math/big"
 
@@ -97,7 +98,7 @@ func (c NethermindSyncConfig) String() string {
 	return fmt.Sprintf("%s", b)
 }
 
-func GetGenesis(base, genesisFile string) helper.Genesis {
+func GetGenesis(base, genesisFile string) client.Genesis {
 	// Load the default test genesis file
 	if len(base) != 0 {
 		base += "_"

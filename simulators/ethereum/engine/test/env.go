@@ -45,7 +45,7 @@ type Env struct {
 	CLMock *clmock.CLMocker
 
 	// Client parameters used to launch the default client
-	Genesis      helper.Genesis
+	Genesis      client.Genesis
 	ForkConfig   *config.ForkConfig
 	ClientParams hivesim.Params
 	ClientFiles  hivesim.Params
@@ -54,7 +54,7 @@ type Env struct {
 	TestTransactionType helper.TestTransactionType
 }
 
-func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis helper.Genesis, randSource *rand.Rand, cParams hivesim.Params, cFiles hivesim.Params) {
+func Run(testSpec Spec, ttd *big.Int, timeout time.Duration, t *hivesim.T, c *hivesim.Client, genesis client.Genesis, randSource *rand.Rand, cParams hivesim.Params, cFiles hivesim.Params) {
 	// Setup the CL Mocker for this test
 	forkConfig := testSpec.GetForkConfig()
 	clMocker := clmock.NewCLMocker(

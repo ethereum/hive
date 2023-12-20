@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"math/big"
 	"time"
 
@@ -896,12 +897,12 @@ func (ws *WithdrawalsBaseSpec) GetWithdrawalsStartAccount() *big.Int {
 
 // Append the accounts we are going to withdraw to, which should also include
 // bytecode for testing purposes.
-func (ws *WithdrawalsBaseSpec) GetGenesis(base string) helper.Genesis {
+func (ws *WithdrawalsBaseSpec) GetGenesis(base string) client.Genesis {
 
 	genesis := ws.BaseSpec.GetGenesis(base)
 
-	warmCoinbaseAcc := helper.NewAccount()
-	push0Acc := helper.NewAccount()
+	warmCoinbaseAcc := client.NewAccount()
+	push0Acc := client.NewAccount()
 
 	warmCoinbaseAcc.SetBalance(common.Big0)
 	warmCoinbaseAcc.SetCode(warmCoinbaseCode)

@@ -117,7 +117,7 @@ type CLMocker struct {
 
 	// Fork configuration
 	*config.ForkConfig
-	Genesis helper.Genesis
+	Genesis client.Genesis
 
 	NextWithdrawals types.Withdrawals
 
@@ -128,7 +128,8 @@ type CLMocker struct {
 	// Randomness source used to generate prevRandao
 	Rand *rand.Rand
 }
-func NewCLMocker(t *hivesim.T, genesis helper.Genesis, forkConfig *config.ForkConfig, randSource *rand.Rand) *CLMocker {
+
+func NewCLMocker(t *hivesim.T, genesis client.Genesis, forkConfig *config.ForkConfig, randSource *rand.Rand) *CLMocker {
 	// Create the new CL mocker
 	newCLMocker := &CLMocker{
 		T:                      t,

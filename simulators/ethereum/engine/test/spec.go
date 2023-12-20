@@ -3,6 +3,7 @@ package test
 import (
 	"errors"
 	"fmt"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"math/big"
 
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
@@ -29,7 +30,7 @@ type Spec interface {
 	// Get the fork config for this test
 	GetForkConfig() *config.ForkConfig
 	// Get the genesis file to initialize the clients
-	GetGenesis(string) helper.Genesis
+	GetGenesis(string) client.Genesis
 	//GetGenesisTest(string) string
 	// Get the test transaction type to use throughout the test
 	GetTestTransactionType() helper.TestTransactionType
@@ -195,18 +196,18 @@ func (s BaseSpec) GetForkConfig() *config.ForkConfig {
 	return &forkConfig
 }
 
-func GenesisFactory(clientName string) helper.Genesis {
+func GenesisFactory(clientName string) client.Genesis {
 	switch clientName {
 	case "erigon_":
-		return &helper.ErigonGenesis{}
+		return &client.ErigonGenesis{}
 	case "nethermind_":
-		return &helper.NethermindChainSpec{}
+		return &client.NethermindChainSpec{}
 	default:
 		panic("unsupported client provided")
 	}
 }
 
-func (s BaseSpec) GetGenesis(base string) helper.Genesis {
+func (s BaseSpec) GetGenesis(base string) client.Genesis {
 	// Load the default test genesis file
 	if len(base) != 0 {
 		base += "_"

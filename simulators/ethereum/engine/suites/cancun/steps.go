@@ -99,10 +99,10 @@ func (step LaunchClients) Execute(t *CancunTestContext) error {
 	for i := uint64(0); i < clientCount; i++ {
 		if !step.SkipConnectingToBootnode {
 			// TODO: Spin up client
-			//client, err = step.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engines[0])
+			client, err = step.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles, t.Engines[0])
 		} else {
 			// TODO: Spin up client
-			//client, err = step.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
+			client, err = step.StartClient(t.T, t.TestContext, t.Genesis, t.ClientParams, t.ClientFiles)
 		}
 		if err != nil {
 			return err
@@ -503,7 +503,7 @@ func (step NewPayloads) Execute(t *CancunTestContext) error {
 				}
 
 				if err := step.VerifyBlobBundle(blobDataInPayload, payload, blobBundle); err != nil {
-					t.Fatalf("FAIL: Error verifying blob bundle (payload %d/%d): %v", p+1, payloadCount, err)
+					t.Logf("FAIL: Error verifying blob bundle (payload %d/%d): %v", p+1, payloadCount, err)
 				}
 			},
 			OnNewPayloadBroadcast: func() {

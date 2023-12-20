@@ -1,4 +1,4 @@
-package helper
+package client
 
 import (
 	"encoding/json"

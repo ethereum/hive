@@ -1,7 +1,7 @@
 package suite_cancun
 
 import (
-	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
+	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -70,13 +70,13 @@ type CancunBaseSpec struct {
 
 // Append the accounts we are going to withdraw to, which should also include
 // bytecode for testing purposes.
-func (cs *CancunBaseSpec) GetGenesis(base string) helper.Genesis {
+func (cs *CancunBaseSpec) GetGenesis(base string) client.Genesis {
 
 	genesis := cs.BaseSpec.GetGenesis(base)
 
-	warmCoinbaseAcc := helper.NewAccount()
-	push0Acc := helper.NewAccount()
-	beaconRootsAcc := helper.NewAccount()
+	warmCoinbaseAcc := client.NewAccount()
+	push0Acc := client.NewAccount()
+	beaconRootsAcc := client.NewAccount()
 
 	beaconRootsAcc.SetBalance(common.Big0)
 	beaconRootsAcc.SetCode(common.Hex2Bytes("3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"))

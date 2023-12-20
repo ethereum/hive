@@ -5,7 +5,6 @@ import (
 	"math/big"
 
 	api "github.com/ethereum/go-ethereum/beacon/engine"
-	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/hivesim"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -120,7 +119,7 @@ type EngineClient interface {
 }
 
 type EngineStarter interface {
-	StartClient(T *hivesim.T, testContext context.Context, genesis *core.Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...EngineClient) (EngineClient, error)
+	StartClient(T *hivesim.T, testContext context.Context, genesis Genesis, ClientParams hivesim.Params, ClientFiles hivesim.Params, bootClients ...EngineClient) (EngineClient, error)
 }
 
 var (
