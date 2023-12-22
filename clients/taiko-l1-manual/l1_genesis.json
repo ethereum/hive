@@ -1,0 +1,170 @@
+{
+  "config": {
+    "chainId": CHAIN_ID_PLACE_HOLDER,
+    "homesteadBlock": 0,
+    "eip150Block": 0,
+    "eip150Hash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "eip155Block": 0,
+    "eip158Block": 0,
+    "byzantiumBlock": 0,
+    "constantinopleBlock": 0,
+    "petersburgBlock": 0,
+    "istanbulBlock": 0,
+    "muirGlacierBlock": 0,
+    "berlinBlock": 0,
+    "londonBlock": 0,
+    "arrowGlacierBlock": 0,
+    "grayGlacierBlock": 0,
+    "mergeNetsplitBlock": 0,
+    "clique": {
+      "period": PERIOD_PLACE_HOLDER,
+      "epoch": 30000
+    }
+  },
+  "gasLimit": "10000000",
+  "difficulty": "0",
+  "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000f39Fd6e51aad88F6F4ce6aB8827279cffFb922660000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "alloc": {
+    "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x70997970C51812dc3A010C7d01b50e0d17dc79C8": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x90F79bf6EB2c4f870365E785982E1f101E93b906": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x976EA74026E726554dB657fA54763abd0C3a0aa9": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x14dC79964da2C08b23698B3D3cc7Ca32193d9955": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xBcd4042DE499D14e55001CcbB24a551F3b954096": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x71bE63f3384f5fb98995898A86B02Fb2426c5788": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xFABB0ac9d68B0B445fB7357272Ff202C5651694a": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x1CBd3b2770909D4e10f157cABC84C7264073C9Ec": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xdF3e18d64BC6A983f673Ab319CCaE4f1a57C7097": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xcd3B766CCDd6AE721141F452C550Ca635964ce71": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x2546BcD3c84621e976D8185a91A922aE77ECEc30": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xbDA5747bFD65F08deb54cb465eB87D40e51B197E": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xdD2FD4581271e230360230F9337D5c0430Bf44C0": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x7D86687F980A56b832e9378952B738b614A99dc6": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x11e8F3eA3C6FcF12EcfF2722d75CEFC539c51a1C": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x9eAF5590f2c84912A08de97FA28d0529361Deb9E": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x1003ff39d25F2Ab16dBCc18EcE05a9B6154f65F4": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x1c87Bb9234aeC6aDc580EaE6C8B59558A4502220": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x4779d18931B35540F84b0cd0e9633855B84df7b8": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x0d803cdeEe5990f22C2a8DF10A695D2312dA26CC": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xAb707cb80e7de7C75d815B1A653433F3EEc44c74": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xe8B1ff302A740fD2C6e76B620d45508dAEc2DDFf": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xa0EC9eE47802CeB56eb58ce80F3E41630B771b04": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x042a63149117602129B6922ecFe3111168C2C323": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xA1196426b41627ae75Ea7f7409E074BE97367da2": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xE74cEf90b6CF1a77FEfAd731713e6f53e575C183": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x7Df8Efa6d6F1CB5C4f36315e0AcB82b02Ae8BA40": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x9E126C57330FA71556628e0aabd6B6B6783d99fA": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xcBDc0F9a4C38f1e010bD3B6e43598A55D1868c23": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xBc5BdceE96b1BC47822C74e6f64186fbA7d686be": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x0536896a5e38BbD59F3F369FF3682677965aBD19": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xFE0f143FcAD5B561b1eD2AC960278A2F23559Ef9": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x98D08079928FcCB30598c6C6382ABfd7dbFaA1cD": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xD6393D8bA9406FF5252E86Bd8aEF1a8A9be5afaa": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x0cAC6E2Fd10e92Bf798341Ad0A57b5Cb39DA8D0D": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xdEe6A0b4B4F38373453602a3d730Bd96eDc4B0D9": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x1011fF45708aDB10C1855e16765A0E8A4407391f": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x70Ca5054D902b6c7Ae35316B116b4b99049d4411": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0x2b3e9Edd08E8549FC78391439ac3c4262e30274f": {
+      "balance": "0x3782dace9d90000000"
+    },
+    "0xC73c222d7d39778Bf9212f23a8F4356ff7c1E77F": {
+      "balance": "0x3782dace9d90000000"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "l1_network_id": 31336,
+  "l2_network_id": 167001,
+  "l1_clique_period": 0,
+  "deploy_private_key": "2bdd21761a483f71054e14f5b827213567971c676928d9a1808cbfa4b7501200",
+  "deploy_address": "0xDf08F82De32B8d460adbE8D72043E3a7e25A3B39",
+  "prover_private_key": "6bff9a8ffd7f94f43f4f5f642be8a3f32a94c1f316d90862884b2e276293b6ee",
+  "jwt_secret": "c49690b5a9bc72c7b451b48c5fee2b542e66559d840a133d090769abc56e39e7"
+}

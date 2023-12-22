@@ -1,0 +1,83 @@
+[32mINFO[0m[12-14|14:47:12] building image                           [32mimage[0m=hive/hiveproxy [32mnocache[0m=false [32mpull[0m=false
+[32mINFO[0m[12-14|14:47:12] building 1 clients... 
+[32mINFO[0m[12-14|14:47:12] building image                           [32mimage[0m=hive/clients/go-ethereum:latest [32mdir[0m=clients/go-ethereum [32mnocache[0m=false [32mpull[0m=false
+[32mINFO[0m[12-14|14:47:12] building 1 simulators... 
+[32mINFO[0m[12-14|14:47:12] building image                           [32mimage[0m=hive/simulators/devp2p:latest [32mdir[0m=simulators/devp2p [32mnocache[0m=false [32mpull[0m=false
+[32mINFO[0m[12-14|14:47:12] running simulation: devp2p 
+[32mINFO[0m[12-14|14:47:12] hiveproxy started                        [32mcontainer[0m=c3b2679bc887 [32maddr[0m=172.17.0.2:8081
+[32mINFO[0m[12-14|14:47:12] API: suite started                       [32msuite[0m=0 [32mname[0m=discv4
+[32mINFO[0m[12-14|14:47:12] API: test started                        [32msuite[0m=0 [32mtest[0m=1 [32mname[0m=go-ethereum
+[32mINFO[0m[12-14|14:47:13] API: client go-ethereum started          [32msuite[0m=0 [32mtest[0m=1 [32mcontainer[0m=b4254817
+[32mINFO[0m[12-14|14:47:13] API: network created                     [32mname[0m=network1
+[32mINFO[0m[12-14|14:47:13] API: container connected to network      [32mnetwork[0m=network1 [32mcontainer[0m=simulation
+[32mINFO[0m[12-14|14:47:13] API: container IP requested              [32mnetwork[0m=bridge [32mcontainer[0m=simulation [32mip[0m=172.17.0.5
+[32mINFO[0m[12-14|14:47:13] API: container IP requested              [32mnetwork[0m=network1 [32mcontainer[0m=simulation [32mip[0m=172.28.0.2
+[32mINFO[0m[12-14|14:47:13] API: container IP requested              [32mnetwork[0m=bridge [32mcontainer[0m=b4254817 [32mip[0m=172.17.0.6
+[32mINFO[0m[12-14|14:47:13] API: container connected to network      [32mnetwork[0m=network1 [32mcontainer[0m=b4254817
+[32mINFO[0m[12-14|14:47:13] API: test started                        [32msuite[0m=0 [32mtest[0m=2 [32mname[0m="Ping/Basic (go-ethereum)"
+[32mINFO[0m[12-14|14:47:13] API: test ended                          [32msuite[0m=0 [32mtest[0m=2 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:13] API: test started                        [32msuite[0m=0 [32mtest[0m=3 [32mname[0m="Ping/WrongTo (go-ethereum)"
+[32mINFO[0m[12-14|14:47:13] API: test ended                          [32msuite[0m=0 [32mtest[0m=3 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:13] API: test started                        [32msuite[0m=0 [32mtest[0m=4 [32mname[0m="Ping/WrongFrom (go-ethereum)"
+[32mINFO[0m[12-14|14:47:13] API: test ended                          [32msuite[0m=0 [32mtest[0m=4 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:13] API: test started                        [32msuite[0m=0 [32mtest[0m=5 [32mname[0m="Ping/ExtraData (go-ethereum)"
+[32mINFO[0m[12-14|14:47:13] API: test ended                          [32msuite[0m=0 [32mtest[0m=5 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:13] API: test started                        [32msuite[0m=0 [32mtest[0m=6 [32mname[0m="Ping/ExtraDataWrongFrom (go-ethereum)"
+[32mINFO[0m[12-14|14:47:13] API: test ended                          [32msuite[0m=0 [32mtest[0m=6 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:14] API: test started                        [32msuite[0m=0 [32mtest[0m=7 [32mname[0m="Ping/PastExpiration (go-ethereum)"
+[32mINFO[0m[12-14|14:47:14] API: test ended                          [32msuite[0m=0 [32mtest[0m=7 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:14] API: test started                        [32msuite[0m=0 [32mtest[0m=8 [32mname[0m="Ping/WrongPacketType (go-ethereum)"
+[32mINFO[0m[12-14|14:47:14] API: test ended                          [32msuite[0m=0 [32mtest[0m=8 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:14] API: test started                        [32msuite[0m=0 [32mtest[0m=9 [32mname[0m="Ping/BondThenPingWithWrongFrom (go-ethereum)"
+[32mINFO[0m[12-14|14:47:14] API: test ended                          [32msuite[0m=0 [32mtest[0m=9 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:14] API: test started                        [32msuite[0m=0 [32mtest[0m=10 [32mname[0m="Findnode/WithoutEndpointProof (go-ethereum)"
+[32mINFO[0m[12-14|14:47:14] API: test ended                          [32msuite[0m=0 [32mtest[0m=10 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:14] API: test started                        [32msuite[0m=0 [32mtest[0m=11 [32mname[0m="Findnode/BasicFindnode (go-ethereum)"
+[32mINFO[0m[12-14|14:47:14] API: test ended                          [32msuite[0m=0 [32mtest[0m=11 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:14] API: test started                        [32msuite[0m=0 [32mtest[0m=12 [32mname[0m="Findnode/UnsolicitedNeighbors (go-ethereum)"
+[32mINFO[0m[12-14|14:47:14] API: test ended                          [32msuite[0m=0 [32mtest[0m=12 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:15] API: test started                        [32msuite[0m=0 [32mtest[0m=13 [32mname[0m="Findnode/PastExpiration (go-ethereum)"
+[32mINFO[0m[12-14|14:47:15] API: test ended                          [32msuite[0m=0 [32mtest[0m=13 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:15] API: test started                        [32msuite[0m=0 [32mtest[0m=14 [32mname[0m="Amplification/InvalidPongHash (go-ethereum)"
+[32mINFO[0m[12-14|14:47:15] API: test ended                          [32msuite[0m=0 [32mtest[0m=14 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:15] API: test ended                          [32msuite[0m=0 [32mtest[0m=1 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:15] removing docker network                  [32mname[0m=network1
+[32mINFO[0m[12-14|14:47:16] API: suite ended                         [32msuite[0m=0
+[32mINFO[0m[12-14|14:47:16] API: suite started                       [32msuite[0m=1 [32mname[0m=discv5
+[32mINFO[0m[12-14|14:47:16] API: test started                        [32msuite[0m=1 [32mtest[0m=15 [32mname[0m=go-ethereum
+[32mINFO[0m[12-14|14:47:16] API: client go-ethereum started          [32msuite[0m=1 [32mtest[0m=15 [32mcontainer[0m=c55488a9
+[32mINFO[0m[12-14|14:47:16] API: network created                     [32mname[0m=network1
+[32mINFO[0m[12-14|14:47:16] API: container connected to network      [32mnetwork[0m=network1 [32mcontainer[0m=simulation
+[32mINFO[0m[12-14|14:47:16] API: container IP requested              [32mnetwork[0m=bridge [32mcontainer[0m=simulation [32mip[0m=172.17.0.5
+[32mINFO[0m[12-14|14:47:16] API: container IP requested              [32mnetwork[0m=network1 [32mcontainer[0m=simulation [32mip[0m=172.29.0.2
+[32mINFO[0m[12-14|14:47:16] API: container connected to network      [32mnetwork[0m=network1 [32mcontainer[0m=c55488a9
+[32mINFO[0m[12-14|14:47:17] API: container IP requested              [32mnetwork[0m=bridge [32mcontainer[0m=c55488a9 [32mip[0m=172.17.0.6
+[32mINFO[0m[12-14|14:47:17] API: test started                        [32msuite[0m=1 [32mtest[0m=16 [32mname[0m="Ping (go-ethereum)"
+[32mINFO[0m[12-14|14:47:17] API: test ended                          [32msuite[0m=1 [32mtest[0m=16 [32mpass[0m=false
+[32mINFO[0m[12-14|14:47:18] API: test started                        [32msuite[0m=1 [32mtest[0m=17 [32mname[0m="PingLargeRequestID (go-ethereum)"
+[32mINFO[0m[12-14|14:47:18] API: test ended                          [32msuite[0m=1 [32mtest[0m=17 [32mpass[0m=true
+[32mINFO[0m[12-14|14:47:18] API: test started                        [32msuite[0m=1 [32mtest[0m=18 [32mname[0m="PingMultiIP (go-ethereum)"
+[32mINFO[0m[12-14|14:47:18] API: test ended                          [32msuite[0m=1 [32mtest[0m=18 [32mpass[0m=false
+[32mINFO[0m[12-14|14:47:18] API: test started                        [32msuite[0m=1 [32mtest[0m=19 [32mname[0m="PingHandshakeInterrupted (go-ethereum)"
+[32mINFO[0m[12-14|14:47:18] API: test ended                          [32msuite[0m=1 [32mtest[0m=19 [32mpass[0m=false
+[32mINFO[0m[12-14|14:47:18] API: test started                        [32msuite[0m=1 [32mtest[0m=20 [32mname[0m="TalkRequest (go-ethereum)"
+[32mINFO[0m[12-14|14:47:18] API: test ended                          [32msuite[0m=1 [32mtest[0m=20 [32mpass[0m=false
+[32mINFO[0m[12-14|14:48:18] API: test started                        [32msuite[0m=1 [32mtest[0m=21 [32mname[0m="FindnodeZeroDistance (go-ethereum)"
+[32mINFO[0m[12-14|14:48:18] API: test ended                          [32msuite[0m=1 [32mtest[0m=21 [32mpass[0m=false
+[32mINFO[0m[12-14|14:48:19] API: test ended                          [32msuite[0m=1 [32mtest[0m=15 [32mpass[0m=false
+[32mINFO[0m[12-14|14:48:19] removing docker network                  [32mname[0m=network1
+[32mINFO[0m[12-14|14:48:19] API: suite ended                         [32msuite[0m=1
+[32mINFO[0m[12-14|14:48:19] API: suite started                       [32msuite[0m=2 [32mname[0m=eth
+[32mINFO[0m[12-14|14:48:19] API: test started                        [32msuite[0m=2 [32mtest[0m=22 [32mname[0m="client launch (go-ethereum)"
+[32mINFO[0m[12-14|14:48:28] API: client go-ethereum started          [32msuite[0m=2 [32mtest[0m=22 [32mcontainer[0m=fbbcfac0
+[32mINFO[0m[12-14|14:48:28] API: container IP requested              [32mnetwork[0m=bridge [32mcontainer[0m=fbbcfac0 [32mip[0m=172.17.0.6
+[32mINFO[0m[12-14|14:48:28] API: test started                        [32msuite[0m=2 [32mtest[0m=23 [32mname[0m="TestStatus (go-ethereum)"
+[32mINFO[0m[12-14|14:48:28] API: test ended                          [32msuite[0m=2 [32mtest[0m=23 [32mpass[0m=true
+[32mINFO[0m[12-14|14:48:28] API: test started                        [32msuite[0m=2 [32mtest[0m=24 [32mname[0m="TestGetBlockHeaders (go-ethereum)"
+[32mINFO[0m[12-14|14:48:28] API: test ended                          [32msuite[0m=2 [32mtest[0m=24 [32mpass[0m=true
+[32mINFO[0m[12-14|14:48:28] API: test started                        [32msuite[0m=2 [32mtest[0m=25 [32mname[0m="TestSimultaneousRequests (go-ethereum)"
+[32mINFO[0m[12-14|14:48:28] API: test ended                          [32msuite[0m=2 [32mtest[0m=25 [32mpass[0m=true
+[32mINFO[0m[12-14|14:48:28] API: test started                        [32msuite[0m=2 [32mtest[0m=26 [32mname[0m="TestSameRequestID (go-ethereum)"
+[32mINFO[0m[12-14|14:48:28] API: test ended                          [32msuite[0m=2 [32mtest[0m=26 [32mpass[0m=true
+[32mINFO[0m[12-14|14:48:28] API: test started                        [32msuite[0m=2 [32mtest[0m=27 [32mname[0m="TestZeroRequestID (go-ethereum)"
+[32mINFO[0m[12-14|14:48:28] API: test ended                          [32msuite[0m=2 [32mtest[0m=27 [32mpass[0m=true
