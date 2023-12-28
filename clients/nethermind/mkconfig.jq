@@ -73,8 +73,7 @@ def txpool_config:
   if env.HIVE_CANCUN_TIMESTAMP != null then
     {
       "TxPool": {
-        "BlobSupportEnabled": true,
-        "PersistentBlobStorageEnabled": true
+        "BlobsSupport": "StorageWithReorgs"
       }
     }
   else
