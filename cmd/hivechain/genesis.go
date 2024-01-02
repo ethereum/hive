@@ -153,22 +153,36 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	}
 
 	// Initialize allocation.
-	// Here we add balance to the known accounts.
+	// Here we add balance to known accounts and initialize built-in contracts.
 	g.Alloc = make(core.GenesisAlloc)
 	for _, acc := range knownAccounts {
 		g.Alloc[acc.addr] = core.GenesisAccount{Balance: initialBalance}
 	}
-
-	// Also deploy the beacon chain deposit contract.
-	// dca := common.HexToAddress(depositContractAddr)
-	// dcc := hexutil.MustDecode("0x" + depositCode)
-	// g.Alloc[dca] = core.GenesisAccount{Code: dcc}
-
-	// Deploy beacon roots storage contract (EIP-4788).
-	asm4788 := common.FromHex("0x3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500")
-	g.Alloc[params.BeaconRootsStorageAddress] = core.GenesisAccount{Code: asm4788, Balance: big.NewInt(42)}
+	add4788Contract(g.Alloc)
+	addSnapTestContract(g.Alloc)
 
 	return &g
+}
+
+func add4788Contract(ga core.GenesisAlloc) {
+	ga[params.BeaconRootsStorageAddress] = core.GenesisAccount{
+		Balance: big.NewInt(42),
+		Code:    common.FromHex("0x3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"),
+	}
+}
+
+func addSnapTestContract(ga core.GenesisAlloc) {
+	addr := common.HexToAddress("0x8bebc8ba651aee624937e7d897853ac30c95a067")
+	h := common.HexToHash
+	ga[addr] = core.GenesisAccount{
+		Balance: big.NewInt(1),
+		Nonce:   1,
+		Storage: map[common.Hash]common.Hash{
+			h("0x01"): h("0x01"),
+			h("0x02"): h("0x02"),
+			h("0x03"): h("0x03"),
+		},
+	}
 }
 
 // forkBlocks computes the block numbers where forks occur. Forks get enabled based on the

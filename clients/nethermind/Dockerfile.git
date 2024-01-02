@@ -1,7 +1,7 @@
 ### Build Nethermind From Git:
 
 ## Builder stage: Compiles nethermind from a git repository
-FROM mcr.microsoft.com/dotnet/sdk:7.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 ARG github=nethermindeth/nethermind
 ARG tag=master
@@ -12,10 +12,10 @@ RUN echo "Cloning: $github - $tag" && \
     dotnet build -c release
 
 ## Final stage: Sets up the environment for running nethermind
-FROM mcr.microsoft.com/dotnet/aspnet:7.0
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
 
 # Copy compiled binary from builder
-COPY --from=build /nethermind/src/Nethermind/Nethermind.Runner/bin/release/net7.0 /nethermind
+COPY --from=build /nethermind/src/Nethermind/artifacts/bin/Nethermind.Runner/release /nethermind
 WORKDIR /nethermind
 
 RUN apt-get update && apt-get install -y jq libsnappy-dev libc6-dev libc6 && \
