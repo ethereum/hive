@@ -368,7 +368,7 @@ var Tests = []test.Spec{
 			},
 		},
 	},
-	//
+
 	//&CancunBaseSpec{
 	//
 	//	BaseSpec: test.BaseSpec{
@@ -381,6 +381,7 @@ var Tests = []test.Spec{
 	//	},
 	//
 	//	TestSequence: TestSequence{
+	//		NewPayloads{},
 	//		// Send multiple blob transactions with the same nonce.
 	//		SendBlobTransactions{ // Blob ID 0
 	//			TransactionCount:              1,
