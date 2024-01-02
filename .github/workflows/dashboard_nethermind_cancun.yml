@@ -1,4 +1,4 @@
-name: Daily Run Erigon Withdrawals
+name: Daily Run Nethermind Cancun
 
 on:
   schedule:
@@ -41,10 +41,10 @@ jobs:
       - name: Build hive
         run: go build -v -o hive hive.go
 
-      - name: Run Erigon Withdrawals tests
+      - name: Run Nethermind Cancun tests
         continue-on-error: true
         run: |
-          ./hive --sim ethereum/engine --sim.limit="withdrawals" --client erigon --results-root=${{ github.workspace }}/runs --loglevel=5 --client.checktimelimit=10m --docker.output 
+          ./hive --sim ethereum/engine --sim.limit="cancun" --client nethermind --results-root=${{ github.workspace }}/runs --loglevel=5 --client.checktimelimit=10m --docker.output 
 
       - name: Send file over SSH
         if: always()
