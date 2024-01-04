@@ -54,7 +54,7 @@ def to_bool:
     "grayGlacierBlock": env.HIVE_FORK_GRAY_GLACIER|to_int,
     "mergeNetsplitBlock": env.HIVE_MERGE_BLOCK_ID|to_int,
     "terminalTotalDifficulty": env.HIVE_TERMINAL_TOTAL_DIFFICULTY|to_int,
-    "terminalTotalDifficultyPassed": (if env.HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED == null then 1 else env.HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED|to_bool end),
+    "terminalTotalDifficultyPassed": (if env.HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED == null then true else env.HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED|to_bool end),
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
   }|remove_empty
