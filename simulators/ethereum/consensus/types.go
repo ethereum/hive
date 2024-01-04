@@ -55,8 +55,8 @@ type btHeader struct {
 	GasUsed          uint64           `json:"gasUsed"`
 	Timestamp        *big.Int         `json:"timestamp"`
 	BaseFee          *big.Int         `json:"baseFeePerGas"` // EIP-1559
-	ExcessBlobGas    uint64           `json:"excessBlobGas"` // EIP-4844
-	BlobGasUsed      uint64           `json:"blobGasUsed"`   // EIP-4844
+	ExcessBlobGas    *uint64          `json:"excessBlobGas"` // EIP-4844
+	BlobGasUsed      *uint64          `json:"blobGasUsed"`   // EIP-4844
 }
 
 func (b *btHeader) UnmarshalJSON(input []byte) error {
@@ -152,10 +152,12 @@ func (b *btHeader) UnmarshalJSON(input []byte) error {
 		b.BaseFee = (*big.Int)(dec.BaseFee)
 	}
 	if dec.ExcessBlobGas != nil {
-		b.ExcessBlobGas = uint64(*dec.ExcessBlobGas)
+		ebg := uint64(*dec.ExcessBlobGas)
+		b.ExcessBlobGas = &ebg
 	}
 	if dec.BlobGasUsed != nil {
-		b.BlobGasUsed = uint64(*dec.BlobGasUsed)
+		bgu := uint64(*dec.BlobGasUsed)
+		b.BlobGasUsed = &bgu
 	}
 	return nil
 }

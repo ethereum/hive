@@ -553,15 +553,16 @@ func (tc *testcase) updateEnv(env hivesim.Params) {
 // toGethGenesis creates the genesis specification from a test block.
 func toGethGenesis(test *btJSON) *core.Genesis {
 	genesis := &core.Genesis{
-		Nonce:      test.Genesis.Nonce.Uint64(),
-		Timestamp:  test.Genesis.Timestamp.Uint64(),
-		ExtraData:  test.Genesis.ExtraData,
-		GasLimit:   test.Genesis.GasLimit,
-		Difficulty: test.Genesis.Difficulty,
-		Mixhash:    test.Genesis.MixHash,
-		Coinbase:   test.Genesis.Coinbase,
-		Alloc:      test.Pre,
-		BaseFee:    test.Genesis.BaseFee,
+		Nonce:         test.Genesis.Nonce.Uint64(),
+		Timestamp:     test.Genesis.Timestamp.Uint64(),
+		ExtraData:     test.Genesis.ExtraData,
+		GasLimit:      test.Genesis.GasLimit,
+		Difficulty:    test.Genesis.Difficulty,
+		Mixhash:       test.Genesis.MixHash,
+		Coinbase:      test.Genesis.Coinbase,
+		Alloc:         test.Pre,
+		BaseFee:       test.Genesis.BaseFee,
+		ExcessBlobGas: test.Genesis.ExcessBlobGas,
 	}
 	return genesis
 }
@@ -651,7 +652,15 @@ func compareGenesis(have string, want btHeader) (string, error) {
 	cmp(haveGenesis.GasUsed, want.GasUsed, "gasUsed")
 	cmp(haveGenesis.Nonce, want.Nonce, "nonce")
 	cmp(haveGenesis.BaseFee, want.BaseFee, "baseFeePerGas")
-	cmp(haveGenesis.ExcessBlobGas, want.ExcessBlobGas, "excessBlobGas")
-	cmp(haveGenesis.BlobGasUsed, want.BlobGasUsed, "blobGasUsed")
+	if haveGenesis.ExcessBlobGas != nil && want.ExcessBlobGas != nil {
+		cmp(*haveGenesis.ExcessBlobGas, *want.ExcessBlobGas, "excessBlobGas")
+	} else {
+		cmp(haveGenesis.ExcessBlobGas, want.ExcessBlobGas, "excessBlobGas")
+	}
+	if haveGenesis.BlobGasUsed != nil && want.BlobGasUsed != nil {
+		cmp(*haveGenesis.BlobGasUsed, *want.BlobGasUsed, "blobGasUsed")
+	} else {
+		cmp(haveGenesis.BlobGasUsed, want.BlobGasUsed, "blobGasUsed")
+	}
 	return output, nil
 }
