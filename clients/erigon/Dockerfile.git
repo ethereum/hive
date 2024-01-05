@@ -10,7 +10,7 @@ RUN echo "Cloning: $github - $tag" \
     && apk add bash build-base ca-certificates git jq \
     && git clone --depth 1 --branch $tag https://github.com/$github \
     && cd erigon \
-    && make erigon \
+    && make BUILD_TAGS=nosqlite,noboltdb,nosilkworm erigon \
     && cp build/bin/erigon /usr/local/bin/erigon
 
 ## Final stage: Sets up the environment for running erigon
