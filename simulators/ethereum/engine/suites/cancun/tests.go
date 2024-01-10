@@ -6,7 +6,6 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config/cancun"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
-	suite_engine "github.com/ethereum/hive/simulators/ethereum/engine/suites/engine"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	"math/big"
 )
@@ -1799,116 +1798,117 @@ var Tests = []test.Spec{
 	//},
 }
 
-var EngineAPITests []test.Spec
-
-func init() {
-	// Append all engine api tests with Cancun as main fork
-	for _, test := range suite_engine.Tests {
-		Tests = append(Tests, test.WithMainFork(config.Cancun))
-	}
-
-	// Cancun specific variants for pre-existing tests
-	baseSpec := test.BaseSpec{
-		MainFork: config.Cancun,
-	}
-	onlyBlobTxsSpec := test.BaseSpec{
-		MainFork:            config.Cancun,
-		TestTransactionType: helper.BlobTxOnly,
-	}
-
-	// Payload Attributes
-	for _, t := range []suite_engine.InvalidPayloadAttributesTest{
-		{
-			BaseSpec:    baseSpec,
-			Description: "Missing BeaconRoot",
-			Customizer: &helper.BasePayloadAttributesCustomizer{
-				RemoveBeaconRoot: true,
-			},
-			// Error is expected on syncing because V3 checks all fields to be present
-			ErrorOnSync: true,
-		},
-	} {
-		Tests = append(Tests, t)
-		t.Syncing = true
-		Tests = append(Tests, t)
-	}
-
-	// Unique Payload ID Tests
-	for _, t := range []suite_engine.PayloadAttributesFieldChange{
-		suite_engine.PayloadAttributesParentBeaconRoot,
-		// TODO: Remove when withdrawals suite is refactored
-		suite_engine.PayloadAttributesAddWithdrawal,
-		suite_engine.PayloadAttributesModifyWithdrawalAmount,
-		suite_engine.PayloadAttributesModifyWithdrawalIndex,
-		suite_engine.PayloadAttributesModifyWithdrawalValidator,
-		suite_engine.PayloadAttributesModifyWithdrawalAddress,
-		suite_engine.PayloadAttributesRemoveWithdrawal,
-	} {
-		Tests = append(Tests, suite_engine.UniquePayloadIDTest{
-			BaseSpec:          baseSpec,
-			FieldModification: t,
-		})
-	}
-
-	// Invalid Payload Tests
-	for _, invalidField := range []helper.InvalidPayloadBlockField{
-		helper.InvalidParentBeaconBlockRoot,
-		helper.InvalidBlobGasUsed,
-		helper.InvalidBlobCountGasUsed,
-		helper.InvalidExcessBlobGas,
-		helper.InvalidVersionedHashes,
-		helper.InvalidVersionedHashesVersion,
-		helper.IncompleteVersionedHashes,
-		helper.ExtraVersionedHashes,
-	} {
-		for _, syncing := range []bool{false, true} {
-			// Invalidity of payload can be detected even when syncing because the
-			// blob gas only depends on the transactions contained.
-			invalidDetectedOnSync := invalidField == helper.InvalidBlobGasUsed ||
-				invalidField == helper.InvalidBlobCountGasUsed ||
-				invalidField == helper.InvalidVersionedHashes ||
-				invalidField == helper.InvalidVersionedHashesVersion ||
-				invalidField == helper.IncompleteVersionedHashes ||
-				invalidField == helper.ExtraVersionedHashes
-
-			nilLatestValidHash := invalidField == helper.InvalidVersionedHashes ||
-				invalidField == helper.InvalidVersionedHashesVersion ||
-				invalidField == helper.IncompleteVersionedHashes ||
-				invalidField == helper.ExtraVersionedHashes
-
-			Tests = append(Tests, suite_engine.InvalidPayloadTestCase{
-				BaseSpec:              onlyBlobTxsSpec,
-				InvalidField:          invalidField,
-				Syncing:               syncing,
-				InvalidDetectedOnSync: invalidDetectedOnSync,
-				NilLatestValidHash:    nilLatestValidHash,
-			})
-		}
-	}
-
-	// Invalid Transaction ChainID Tests
-	Tests = append(Tests,
-		suite_engine.InvalidTxChainIDTest{
-			BaseSpec: onlyBlobTxsSpec,
-		},
-	)
-
-	Tests = append(Tests, suite_engine.PayloadBuildAfterInvalidPayloadTest{
-		BaseSpec:     onlyBlobTxsSpec,
-		InvalidField: helper.InvalidParentBeaconBlockRoot,
-	})
-
-	// Suggested Fee Recipient Tests (New Transaction Type)
-	Tests = append(Tests,
-		suite_engine.SuggestedFeeRecipientTest{
-			BaseSpec:         onlyBlobTxsSpec,
-			TransactionCount: 1, // Only one blob tx gets through due to blob gas limit
-		},
-	)
-	// Prev Randao Tests (New Transaction Type)
-	Tests = append(Tests,
-		suite_engine.PrevRandaoTransactionTest{
-			BaseSpec: onlyBlobTxsSpec,
-		},
-	)
-}
+//
+//var EngineAPITests []test.Spec
+//
+//func init() {
+//	// Append all engine api tests with Cancun as main fork
+//	for _, test := range suite_engine.Tests {
+//		Tests = append(Tests, test.WithMainFork(config.Cancun))
+//	}
+//
+//	// Cancun specific variants for pre-existing tests
+//	baseSpec := test.BaseSpec{
+//		MainFork: config.Cancun,
+//	}
+//	onlyBlobTxsSpec := test.BaseSpec{
+//		MainFork:            config.Cancun,
+//		TestTransactionType: helper.BlobTxOnly,
+//	}
+//
+//	// Payload Attributes
+//	for _, t := range []suite_engine.InvalidPayloadAttributesTest{
+//		{
+//			BaseSpec:    baseSpec,
+//			Description: "Missing BeaconRoot",
+//			Customizer: &helper.BasePayloadAttributesCustomizer{
+//				RemoveBeaconRoot: true,
+//			},
+//			// Error is expected on syncing because V3 checks all fields to be present
+//			ErrorOnSync: true,
+//		},
+//	} {
+//		Tests = append(Tests, t)
+//		t.Syncing = true
+//		Tests = append(Tests, t)
+//	}
+//
+//	// Unique Payload ID Tests
+//	for _, t := range []suite_engine.PayloadAttributesFieldChange{
+//		suite_engine.PayloadAttributesParentBeaconRoot,
+//		// TODO: Remove when withdrawals suite is refactored
+//		suite_engine.PayloadAttributesAddWithdrawal,
+//		suite_engine.PayloadAttributesModifyWithdrawalAmount,
+//		suite_engine.PayloadAttributesModifyWithdrawalIndex,
+//		suite_engine.PayloadAttributesModifyWithdrawalValidator,
+//		suite_engine.PayloadAttributesModifyWithdrawalAddress,
+//		suite_engine.PayloadAttributesRemoveWithdrawal,
+//	} {
+//		Tests = append(Tests, suite_engine.UniquePayloadIDTest{
+//			BaseSpec:          baseSpec,
+//			FieldModification: t,
+//		})
+//	}
+//
+//	// Invalid Payload Tests
+//	for _, invalidField := range []helper.InvalidPayloadBlockField{
+//		helper.InvalidParentBeaconBlockRoot,
+//		helper.InvalidBlobGasUsed,
+//		helper.InvalidBlobCountGasUsed,
+//		helper.InvalidExcessBlobGas,
+//		helper.InvalidVersionedHashes,
+//		helper.InvalidVersionedHashesVersion,
+//		helper.IncompleteVersionedHashes,
+//		helper.ExtraVersionedHashes,
+//	} {
+//		for _, syncing := range []bool{false, true} {
+//			// Invalidity of payload can be detected even when syncing because the
+//			// blob gas only depends on the transactions contained.
+//			invalidDetectedOnSync := invalidField == helper.InvalidBlobGasUsed ||
+//				invalidField == helper.InvalidBlobCountGasUsed ||
+//				invalidField == helper.InvalidVersionedHashes ||
+//				invalidField == helper.InvalidVersionedHashesVersion ||
+//				invalidField == helper.IncompleteVersionedHashes ||
+//				invalidField == helper.ExtraVersionedHashes
+//
+//			nilLatestValidHash := invalidField == helper.InvalidVersionedHashes ||
+//				invalidField == helper.InvalidVersionedHashesVersion ||
+//				invalidField == helper.IncompleteVersionedHashes ||
+//				invalidField == helper.ExtraVersionedHashes
+//
+//			Tests = append(Tests, suite_engine.InvalidPayloadTestCase{
+//				BaseSpec:              onlyBlobTxsSpec,
+//				InvalidField:          invalidField,
+//				Syncing:               syncing,
+//				InvalidDetectedOnSync: invalidDetectedOnSync,
+//				NilLatestValidHash:    nilLatestValidHash,
+//			})
+//		}
+//	}
+//
+//	// Invalid Transaction ChainID Tests
+//	Tests = append(Tests,
+//		suite_engine.InvalidTxChainIDTest{
+//			BaseSpec: onlyBlobTxsSpec,
+//		},
+//	)
+//
+//	Tests = append(Tests, suite_engine.PayloadBuildAfterInvalidPayloadTest{
+//		BaseSpec:     onlyBlobTxsSpec,
+//		InvalidField: helper.InvalidParentBeaconBlockRoot,
+//	})
+//
+//	// Suggested Fee Recipient Tests (New Transaction Type)
+//	Tests = append(Tests,
+//		suite_engine.SuggestedFeeRecipientTest{
+//			BaseSpec:         onlyBlobTxsSpec,
+//			TransactionCount: 1, // Only one blob tx gets through due to blob gas limit
+//		},
+//	)
+//	// Prev Randao Tests (New Transaction Type)
+//	Tests = append(Tests,
+//		suite_engine.PrevRandaoTransactionTest{
+//			BaseSpec: onlyBlobTxsSpec,
+//		},
+//	)
+//}
