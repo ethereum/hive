@@ -81,9 +81,17 @@ func (b *ContainerBackend) CreateContainer(ctx context.Context, imageName string
 	createOpts := docker.CreateContainerOptions{
 		Context: ctx,
 		Config: &docker.Config{
-			Image: imageName,
-			Env:   vars,
+			Image:  imageName,
+			Env:    vars,
+			Mounts: opt.Mounts,
 		},
+	}
+
+	if len(opt.Mounts) > 0 {
+		createOpts.HostConfig = &docker.HostConfig{}
+		for _, mount := range opt.Mounts {
+			createOpts.HostConfig.Binds = append(createOpts.HostConfig.Binds, fmt.Sprintf("%s:%s", mount.Source, mount.Destination))
+		}
 	}
 
 	if opt.Input != nil {

@@ -48,6 +48,9 @@ type SimEnv struct {
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
 	ClientStartTimeout time.Duration
+
+	MountSource      string
+	MountDestination string
 }
 
 // SimResult summarizes the results of a simulation run.

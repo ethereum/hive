@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/ethereum/hive/internal/simapi"
+	docker "github.com/fsouza/go-dockerclient"
 	"github.com/gorilla/mux"
 	"gopkg.in/inconshreveable/log15.v2"
 )
@@ -240,6 +241,19 @@ func (api *simAPI) startClient(w http.ResponseWriter, r *http.Request) {
 
 	// Create the client container.
 	options := ContainerOptions{Env: env, Files: files}
+
+	// add mounts if any
+	for _, mount := range clientConfig.Mounts {
+		options.Mounts = append(options.Mounts, docker.Mount{
+			Name:        mount.Name,
+			Source:      mount.Source,
+			Destination: mount.Destination,
+			Driver:      mount.Driver,
+			Mode:        mount.Mode,
+			RW:          mount.RW,
+		})
+	}
+
 	containerID, err := api.backend.CreateContainer(ctx, clientDef.Image, options)
 	if err != nil {
 		log15.Error("API: client container create failed", "client", clientDef.Name, "error", err)

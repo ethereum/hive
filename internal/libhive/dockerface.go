@@ -8,6 +8,8 @@ import (
 	"mime/multipart"
 	"net"
 	"net/http"
+
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 // ContainerBackend captures the docker interactions of the simulation API.
@@ -49,8 +51,9 @@ var ErrNetworkNotFound = fmt.Errorf("network not found")
 
 // ContainerOptions contains the launch parameters for docker containers.
 type ContainerOptions struct {
-	Env   map[string]string
-	Files map[string]*multipart.FileHeader
+	Env    map[string]string
+	Files  map[string]*multipart.FileHeader
+	Mounts []docker.Mount
 
 	// This requests checking for the given TCP port to be opened by the container.
 	CheckLive uint16

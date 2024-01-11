@@ -14,6 +14,16 @@ type NodeConfig struct {
 	Client      string            `json:"client"`
 	Networks    []string          `json:"networks"`
 	Environment map[string]string `json:"environment"`
+	Mounts      []Mount           `json:"mounts"`
+}
+
+type Mount struct {
+	Name        string `json:"name"`
+	Source      string `json:"source"`
+	Destination string `json:"destination"`
+	Driver      string `json:"driver"`
+	Mode        string `json:"mode"`
+	RW          bool   `json:"rw"`
 }
 
 // StartNodeReponse is returned by the client startup endpoint.

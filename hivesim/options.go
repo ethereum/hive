@@ -66,6 +66,17 @@ func Bundle(option ...StartOption) StartOption {
 	})
 }
 
+func WithMounts(mounts ...simapi.Mount) StartOption {
+	return optionFunc(func(setup *clientSetup) {
+		if setup.config.Mounts == nil {
+			setup.config.Mounts = make([]simapi.Mount, len(mounts))
+		}
+		for i, mount := range mounts {
+			setup.config.Mounts[i] = mount
+		}
+	})
+}
+
 // Params contains client launch parameters.
 // This exists because tests usually want to define common parameters as
 // a global variable and then customize them for specific clients.

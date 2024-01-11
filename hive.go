@@ -47,6 +47,9 @@ func main() {
 			"If a very long chain is imported, this timeout may need to be quite large.\n"+
 			"A lower value means that hive won't wait as long in case the node crashes and\n"+
 			"never opens the RPC port.")
+
+		mountDestination = flag.String("mount.destination", "", "destination mount")
+		mountSource      = flag.String("mount.source", "", "source of mount")
 	)
 
 	// Parse the flags and configure the logger.
@@ -114,6 +117,8 @@ func main() {
 		SimRandomSeed:      *simRandomSeed,
 		SimDurationLimit:   *simTimeLimit,
 		ClientStartTimeout: *clientTimeout,
+		MountDestination:   *mountDestination,
+		MountSource:        *mountSource,
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
 

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -208,6 +209,18 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 			"HIVE_RANDOM_SEED":  strconv.Itoa(env.SimRandomSeed),
 		},
 	}
+
+	if env.MountSource != "" && env.MountDestination != "" {
+		opts.Env["HIVE_MOUNT_SOURCE"] = env.MountSource
+		opts.Mounts = []docker.Mount{
+			{
+				Source:      env.MountSource,
+				Destination: env.MountDestination,
+				RW:          true,
+			},
+		}
+	}
+
 	containerID, err := r.container.CreateContainer(ctx, r.simImages[sim], opts)
 	if err != nil {
 		return SimResult{}, err
