@@ -20,6 +20,9 @@ var callmeCode []byte
 //go:embed bytecode/callenv.bin
 var callenvCode []byte
 
+//go:embed bytecode/callrevert.bin
+var callrevertCode []byte
+
 //go:embed bytecode/emit.bin
 var emitCode []byte
 

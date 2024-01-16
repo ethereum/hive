@@ -14,6 +14,9 @@ func init() {
 	register("deploy-callenv", func() blockModifier {
 		return &modDeploy{code: callenvCode}
 	})
+	register("deploy-callrevert", func() blockModifier {
+		return &modDeploy{code: callrevertCode}
+	})
 }
 
 type modDeploy struct {
