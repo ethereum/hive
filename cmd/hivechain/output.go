@@ -158,8 +158,8 @@ func exportN(bc *core.BlockChain, w io.Writer, first uint64, last uint64) error 
 
 // writeTxInfo writes information about the transactions that were added into the chain.
 func (g *generator) writeTxInfo() error {
-	m := make(map[string]any, len(g.modlist))
-	for _, inst := range g.modlist {
+	m := make(map[string]any, len(g.mods))
+	for _, inst := range g.mods {
 		m[inst.name] = inst.txInfo()
 	}
 	return g.writeJSON("txinfo.json", &m)

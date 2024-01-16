@@ -64,7 +64,9 @@ type generator struct {
 	accounts []genAccount
 	rand     *rand.Rand
 
-	modlist   []*modifierInstance
+	// Modifier lists.
+	virgins   []*modifierInstance
+	mods      []*modifierInstance
 	modOffset int
 
 	// for write/export
@@ -88,7 +90,7 @@ func newGenerator(cfg generatorConfig) *generator {
 		genesis:  genesis,
 		rand:     rand.New(rand.NewSource(10)),
 		td:       new(big.Int).Set(genesis.Difficulty),
-		modlist:  cfg.createBlockModifiers(),
+		virgins:  cfg.createBlockModifiers(),
 		accounts: slices.Clone(knownAccounts),
 	}
 }
@@ -213,7 +215,8 @@ func (g *generator) setParentBeaconRoot(i int, gen *core.BlockGen) {
 
 // runModifiers executes the chain modifiers.
 func (g *generator) runModifiers(i int, gen *core.BlockGen) {
-	if len(g.modlist) == 0 || g.cfg.txInterval == 0 || i%g.cfg.txInterval != 0 {
+	totalMods := len(g.mods) + len(g.virgins)
+	if totalMods == 0 || g.cfg.txInterval == 0 || i%g.cfg.txInterval != 0 {
 		return
 	}
 
@@ -224,9 +227,7 @@ func (g *generator) runModifiers(i int, gen *core.BlockGen) {
 	// because this usually means there is no gas left.
 	count := 0
 	refused := 0 // count of consecutive times apply() returned false
-	for ; count < g.cfg.txCount && refused < len(g.modlist); g.modOffset++ {
-		index := g.modOffset % len(g.modlist)
-		mod := g.modlist[index]
+	run := func(mod *modifierInstance) bool {
 		ok := mod.apply(ctx)
 		if ok {
 			fmt.Println("    -", mod.name)
@@ -235,6 +236,24 @@ func (g *generator) runModifiers(i int, gen *core.BlockGen) {
 		} else {
 			refused++
 		}
+		return ok
+	}
+
+	// In order to avoid a pathological situation where a modifier never executes because
+	// of unfortunate scheduling, we first try modifiers from g.virgins.
+	for i := 0; i < len(g.virgins) && count < g.cfg.txCount; i++ {
+		mod := g.virgins[i]
+		if run(mod) {
+			g.mods = append(g.mods, mod)
+			g.virgins = append(g.virgins[:i], g.virgins[i+1:]...)
+			i--
+		}
+	}
+	// If there is any space left, fill it using g.mods.
+	for len(g.mods) > 0 && count < g.cfg.txCount && refused < totalMods {
+		index := g.modOffset % len(g.mods)
+		run(g.mods[index])
+		g.modOffset++
 	}
 }
 
