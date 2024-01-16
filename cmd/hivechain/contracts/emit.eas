@@ -1,0 +1,35 @@
+;;; -*- mode: asm -*-
+;;; Example contract which emits storage and logs when invoked.
+
+#define s_counter 0
+
+    ;; hash calldata
+    calldatasize                ; [size]
+    dup1                        ; [size]
+    push 0                      ; [offset, size, size]
+    dup1                        ; [dest, offset, size, size]
+    calldatacopy                ; [size]
+    push 0                      ; [offset, size]
+    keccak256                   ; [hash]
+
+    ;; write a storage entry
+    push s_counter              ; [slot]
+    sload                       ; [addr, counter, hash]
+    dup1                        ; [counter, counter, hash]
+    dup3                        ; [hash, counter, counter, hash]
+    sstore                      ; [counter, hash]
+
+    ;; increment counter
+    push 1                      ; [1, counter, hash]
+    add                         ; [counter+1, hash]
+    push s_counter              ; [slot, counter+1, hash]
+    sstore                      ; [hash]
+
+    ;; emit log
+    push 0                      ; [offset, hash]
+    mstore                      ; []
+    origin                      ; [topic2]
+    push "emit"                 ; [topic1, topic2]
+    push 32                     ; [size, topic1, topic2]
+    push 0                      ; [offset, size, topic1, topic2]
+    log2                        ; []

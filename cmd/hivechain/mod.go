@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -22,9 +24,10 @@ func register(name string, new func() blockModifier) {
 }
 
 type genBlockContext struct {
-	index int
-	block *core.BlockGen
-	gen   *generator
+	index   int
+	block   *core.BlockGen
+	gen     *generator
+	txcount int
 }
 
 // Number returns the block number.
@@ -54,6 +57,7 @@ func (ctx *genBlockContext) AddNewTx(sender *genAccount, data types.TxData) *typ
 		panic(err)
 	}
 	ctx.block.AddTx(tx)
+	ctx.txcount++
 	return tx
 }
 
@@ -95,6 +99,11 @@ func (ctx *genBlockContext) Signer() types.Signer {
 	return ctx.block.Signer()
 }
 
+// TxCount returns the number of transactions added so far.
+func (ctx *genBlockContext) TxCount() int {
+	return ctx.txcount
+}
+
 // ChainConfig returns the chain config.
 func (ctx *genBlockContext) ChainConfig() *params.ChainConfig {
 	return ctx.gen.genesis.Config
@@ -103,4 +112,14 @@ func (ctx *genBlockContext) ChainConfig() *params.ChainConfig {
 // ParentBlock returns the parent of the current block.
 func (ctx *genBlockContext) ParentBlock() *types.Block {
 	return ctx.block.PrevBlock(ctx.index - 1)
+}
+
+// TxRandomValue returns a random value that depends on the block number and current transaction index.
+func (ctx *genBlockContext) TxRandomValue() uint64 {
+	var txindex [8]byte
+	binary.BigEndian.PutUint64(txindex[:], uint64(ctx.TxCount()))
+	h := sha256.New()
+	h.Write(ctx.Number().Bytes())
+	h.Write(txindex[:])
+	return binary.BigEndian.Uint64(h.Sum(nil))
 }

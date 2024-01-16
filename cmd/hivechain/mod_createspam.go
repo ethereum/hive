@@ -4,33 +4,36 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
+// Here we create transactions that create spam contracts. These exist simply to fill up
+// the state. We need a decent amount of state in the sync tests, for example.
+
 func init() {
 	register("randomlogs", func() blockModifier {
-		return &modCreateTx{
+		return &modCreateSpam{
 			code: genlogsCode,
 			gas:  20000,
 		}
 	})
 	register("randomcode", func() blockModifier {
-		return &modCreateTx{
+		return &modCreateSpam{
 			code: gencodeCode,
 			gas:  30000,
 		}
 	})
 	register("randomstorage", func() blockModifier {
-		return &modCreateTx{
+		return &modCreateSpam{
 			code: genstorageCode,
 			gas:  80000,
 		}
 	})
 }
 
-type modCreateTx struct {
+type modCreateSpam struct {
 	code []byte
 	gas  uint64
 }
 
-func (m *modCreateTx) apply(ctx *genBlockContext) bool {
+func (m *modCreateSpam) apply(ctx *genBlockContext) bool {
 	gas := ctx.TxCreateIntrinsicGas(m.code) + m.gas
 	if !ctx.HasGas(gas) {
 		return false
@@ -47,6 +50,6 @@ func (m *modCreateTx) apply(ctx *genBlockContext) bool {
 	return true
 }
 
-func (m *modCreateTx) txInfo() any {
+func (m *modCreateSpam) txInfo() any {
 	return nil
 }

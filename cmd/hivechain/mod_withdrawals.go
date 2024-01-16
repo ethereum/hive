@@ -31,7 +31,7 @@ func (m *modWithdrawals) apply(ctx *genBlockContext) bool {
 
 	w := types.Withdrawal{
 		Validator: 5,
-		Address:   randomRecipient(ctx.Number()),
+		Address:   pickRecipient(ctx),
 		Amount:    100,
 	}
 	w.Index = ctx.block.AddWithdrawal(&w)

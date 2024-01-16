@@ -160,6 +160,7 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 	}
 	add4788Contract(g.Alloc)
 	addSnapTestContract(g.Alloc)
+	addEmitContract(g.Alloc)
 
 	return &g
 }
@@ -182,6 +183,16 @@ func addSnapTestContract(ga core.GenesisAlloc) {
 			h("0x02"): h("0x02"),
 			h("0x03"): h("0x03"),
 		},
+	}
+}
+
+const emitAddr = "0x7dcd17433742f4c0ca53122ab541d0ba67fc27df"
+
+func addEmitContract(ga core.GenesisAlloc) {
+	addr := common.HexToAddress(emitAddr)
+	ga[addr] = core.GenesisAccount{
+		Balance: new(big.Int),
+		Code:    emitCode,
 	}
 }
 
