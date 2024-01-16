@@ -17,7 +17,7 @@ func init() {
 	register("randomcode", func() blockModifier {
 		return &modCreateSpam{
 			code: gencodeCode,
-			gas:  30000,
+			gas:  60000,
 		}
 	})
 	register("randomstorage", func() blockModifier {

@@ -3,7 +3,7 @@
 
 #include "rng.eas"
 
-#define outputSize 512
+#define outputSize 256
 
 #define p_rng        0
 #define p_output     p_rng + RngSize
@@ -20,7 +20,7 @@ loop:
     dup2                        ; [ptr, word, ptr]
     mstore                      ; [ptr]
     ;; increment output pointer
-    push 32                     ; [1, ptr]
+    push 32                     ; [32, ptr]
     add                         ; [newptr]
     push p_outputEnd            ; [end, newptr]
     dup2                        ; [newptr, end, newtpr]
