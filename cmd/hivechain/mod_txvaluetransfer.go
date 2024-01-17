@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -55,6 +56,15 @@ func (m *modValueTransfer) apply(ctx *genBlockContext) bool {
 
 	var txdata types.TxData
 	switch m.txType {
+	case types.LegacyTxType:
+		txdata = &types.LegacyTx{
+			Nonce:    ctx.AccountNonce(sender.addr),
+			Gas:      m.gasLimit,
+			GasPrice: ctx.TxGasFeeCap(),
+			To:       &recipient,
+			Value:    big.NewInt(1),
+		}
+
 	case types.AccessListTxType:
 		if !ctx.ChainConfig().IsBerlin(ctx.Number()) {
 			return false
@@ -80,14 +90,8 @@ func (m *modValueTransfer) apply(ctx *genBlockContext) bool {
 			Value:     big.NewInt(1),
 		}
 
-	case types.LegacyTxType:
-		txdata = &types.LegacyTx{
-			Nonce:    ctx.AccountNonce(sender.addr),
-			Gas:      m.gasLimit,
-			GasPrice: ctx.TxGasFeeCap(),
-			To:       &recipient,
-			Value:    big.NewInt(1),
-		}
+	default:
+		panic(fmt.Errorf("unhandled tx type %d", m.txType))
 	}
 
 	txindex := ctx.TxCount()

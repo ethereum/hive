@@ -56,7 +56,7 @@ func (ctx *genBlockContext) AddNewTx(sender *genAccount, data types.TxData) *typ
 	if err != nil {
 		panic(err)
 	}
-	ctx.block.AddTx(tx)
+	ctx.block.AddTx(tx.WithoutBlobTxSidecar())
 	ctx.txcount++
 	return tx
 }

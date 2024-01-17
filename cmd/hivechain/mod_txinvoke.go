@@ -2,12 +2,16 @@ package main
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/kzg4844"
+	"github.com/ethereum/go-ethereum/params"
+	"github.com/holiman/uint256"
 )
 
 func init() {
@@ -26,6 +30,12 @@ func init() {
 	register("tx-emit-eip1559", func() blockModifier {
 		return &modInvokeEmit{
 			txType:   types.DynamicFeeTxType,
+			gasLimit: 100000,
+		}
+	})
+	register("tx-emit-eip4844", func() blockModifier {
+		return &modInvokeEmit{
+			txType:   types.BlobTxType,
 			gasLimit: 100000,
 		}
 	})
@@ -59,6 +69,16 @@ func (m *modInvokeEmit) apply(ctx *genBlockContext) bool {
 
 	var txdata types.TxData
 	switch m.txType {
+	case types.LegacyTxType:
+		txdata = &types.LegacyTx{
+			Nonce:    ctx.AccountNonce(sender.addr),
+			Gas:      m.gasLimit,
+			GasPrice: ctx.TxGasFeeCap(),
+			To:       &recipient,
+			Data:     calldata,
+			Value:    big.NewInt(2),
+		}
+
 	case types.AccessListTxType:
 		if !ctx.ChainConfig().IsBerlin(ctx.Number()) {
 			return false
@@ -98,15 +118,41 @@ func (m *modInvokeEmit) apply(ctx *genBlockContext) bool {
 			},
 		}
 
-	case types.LegacyTxType:
-		txdata = &types.LegacyTx{
-			Nonce:    ctx.AccountNonce(sender.addr),
-			Gas:      m.gasLimit,
-			GasPrice: ctx.TxGasFeeCap(),
-			To:       &recipient,
-			Data:     calldata,
-			Value:    big.NewInt(2),
+	case types.BlobTxType:
+		if !ctx.ChainConfig().IsCancun(ctx.Number(), ctx.Timestamp()) {
+			return false
 		}
+		var (
+			blob1     = kzg4844.Blob{0x01}
+			blob1C, _ = kzg4844.BlobToCommitment(blob1)
+			blob1P, _ = kzg4844.ComputeBlobProof(blob1, blob1C)
+		)
+		sidecar := &types.BlobTxSidecar{
+			Blobs:       []kzg4844.Blob{blob1},
+			Commitments: []kzg4844.Commitment{blob1C},
+			Proofs:      []kzg4844.Proof{blob1P},
+		}
+		txdata = &types.BlobTx{
+			Nonce:     ctx.AccountNonce(sender.addr),
+			GasTipCap: uint256.NewInt(1),
+			GasFeeCap: uint256.MustFromBig(ctx.TxGasFeeCap()),
+			Gas:       m.gasLimit,
+			To:        recipient,
+			Value:     uint256.NewInt(3),
+			Data:      calldata,
+			AccessList: types.AccessList{
+				{
+					Address:     recipient,
+					StorageKeys: []common.Hash{{}, datahash},
+				},
+			},
+			BlobFeeCap: uint256.NewInt(params.BlobTxBlobGasPerBlob),
+			BlobHashes: sidecar.BlobHashes(),
+			Sidecar:    sidecar,
+		}
+
+	default:
+		panic(fmt.Errorf("unhandled tx type %d", m.txType))
 	}
 
 	txindex := ctx.TxCount()
