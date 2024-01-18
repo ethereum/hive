@@ -1,5 +1,5 @@
-ARG baseimage=paradigmxyz/reth
-ARG tag=main
+ARG baseimage=ghcr.io/paradigmxyz/reth
+ARG tag=latest
 
 FROM $baseimage:$tag as builder
 
