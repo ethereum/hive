@@ -1,4 +1,4 @@
-ARG baseimage=paradigmxyz/reth
+ARG baseimage=ghcr.io/paradigmxyz/reth
 ARG tag=main
 
 FROM $baseimage:$tag as builder
