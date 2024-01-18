@@ -50,11 +50,12 @@ type modInvokeEmit struct {
 }
 
 type invokeEmitTxInfo struct {
-	TxHash   common.Hash    `json:"txhash"`
-	Sender   common.Address `json:"sender"`
-	Block    hexutil.Uint64 `json:"block"`
-	Index    int            `json:"indexInBlock"`
-	DataHash common.Hash    `json:"datahash"`
+	TxHash    common.Hash    `json:"txhash"`
+	Sender    common.Address `json:"sender"`
+	Block     hexutil.Uint64 `json:"block"`
+	Index     int            `json:"indexInBlock"`
+	LogTopic0 common.Hash    `json:"logtopic0"`
+	LogTopic1 common.Hash    `json:"logtopic1"`
 }
 
 func (m *modInvokeEmit) apply(ctx *genBlockContext) bool {
@@ -158,11 +159,12 @@ func (m *modInvokeEmit) apply(ctx *genBlockContext) bool {
 	txindex := ctx.TxCount()
 	tx := ctx.AddNewTx(sender, txdata)
 	m.txs = append(m.txs, invokeEmitTxInfo{
-		Block:    hexutil.Uint64(ctx.NumberU64()),
-		Sender:   sender.addr,
-		TxHash:   tx.Hash(),
-		Index:    txindex,
-		DataHash: datahash,
+		Block:     hexutil.Uint64(ctx.NumberU64()),
+		Sender:    sender.addr,
+		TxHash:    tx.Hash(),
+		Index:     txindex,
+		LogTopic0: common.HexToHash("0x00000000000000000000000000000000000000000000000000000000656d6974"),
+		LogTopic1: datahash,
 	})
 	return true
 }

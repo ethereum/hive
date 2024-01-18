@@ -1,5 +1,7 @@
 ;;; -*- mode: asm -*-
 ;;; Example contract which emits storage and logs when invoked.
+;;; The storage entry uses the hash of calldata as the value.
+;;; In the log, the same hash is used as the second topic.
 
 #define s_counter 0
 
@@ -19,17 +21,17 @@
     dup3                        ; [hash, counter, counter, hash]
     sstore                      ; [counter, hash]
 
-    ;; increment counter
-    push 1                      ; [1, counter, hash]
-    add                         ; [counter+1, hash]
-    push s_counter              ; [slot, counter+1, hash]
-    sstore                      ; [hash]
+    ;; increment counter in storage
+    dup1                        ; [counter, counter, hash]
+    push 1                      ; [1, counter, counter, hash]
+    add                         ; [counter+1, counter, hash]
+    push s_counter              ; [slot, counter+1, counter, hash]
+    sstore                      ; [counter, hash]
 
     ;; emit log
-    push 0                      ; [offset, hash]
-    mstore                      ; []
-    origin                      ; [topic2]
-    push "emit"                 ; [topic1, topic2]
+    push 0                      ; [offset, counter, hash]
+    mstore                      ; [hash]
+    push "emit"                 ; [topic1, hash=topic2]
     push 32                     ; [size, topic1, topic2]
     push 0                      ; [offset, size, topic1, topic2]
     log2                        ; []
