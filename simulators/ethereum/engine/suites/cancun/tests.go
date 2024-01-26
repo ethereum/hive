@@ -531,7 +531,7 @@ var Tests = []test.Spec{
 			- Payload Attributes uses Shanghai timestamp
 			- Payload Attributes Beacon Root is null
 
-			Verify that client returns INVALID_PARAMS_ERROR.
+			Verify that client returns INVALID_PAYLOAD_ATTRIBUTES.
 			`,
 			MainFork:   config.Cancun,
 			ForkHeight: 2,
@@ -541,12 +541,12 @@ var Tests = []test.Spec{
 			NewPayloads{
 				FcUOnPayloadRequest: &helper.UpgradeForkchoiceUpdatedVersion{
 					ForkchoiceUpdatedCustomizer: &helper.BaseForkchoiceUpdatedCustomizer{
-						ExpectedError: globals.INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PAYLOAD_ATTRIBUTES,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
-				ForkchoiceUpdatedV3 before Cancun with any null field must return INVALID_PARAMS_ERROR (code %d)
-				`, *globals.INVALID_PARAMS_ERROR),
+				ForkchoiceUpdatedV3 before Cancun with any null field must return INVALID_PAYLOAD_ATTRIBUTES (code %d)
+				`, *globals.INVALID_PAYLOAD_ATTRIBUTES),
 			},
 		},
 	},
@@ -585,13 +585,13 @@ var Tests = []test.Spec{
 	// ForkchoiceUpdatedV2 before cancun with beacon root
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "ForkchoiceUpdatedV2 To Request Shanghai Payload, Non-Null Beacon Root ",
+			Name: "ForkchoiceUpdatedV2 To Request Shanghai Payload, Non-Null Beacon Root",
 			About: `
 			Test sending ForkchoiceUpdatedV2 to request a Shanghai payload:
 			- Payload Attributes uses Shanghai timestamp
 			- Payload Attributes Beacon Root is non-null
 
-			Verify that client returns INVALID_PARAMS_ERROR.
+			Verify that client returns INVALID_PAYLOAD_ATTRIBUTES.
 			`,
 			MainFork:   config.Cancun,
 			ForkHeight: 2,
@@ -603,11 +603,11 @@ var Tests = []test.Spec{
 					PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
 						BeaconRoot: &(common.Hash{}),
 					},
-					ExpectedError: globals.INVALID_PARAMS_ERROR,
+					ExpectedError: globals.INVALID_PAYLOAD_ATTRIBUTES,
 				},
 				ExpectationDescription: fmt.Sprintf(`
-				ForkchoiceUpdatedV2 before Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
-				`, *globals.INVALID_PARAMS_ERROR),
+				ForkchoiceUpdatedV2 before Cancun with beacon root field must return INVALID_PAYLOAD_ATTRIBUTES (code %d)
+				`, *globals.INVALID_PAYLOAD_ATTRIBUTES),
 			},
 		},
 	},
@@ -621,7 +621,7 @@ var Tests = []test.Spec{
 			- Payload Attributes uses Cancun timestamp
 			- Payload Attributes Beacon Root is non-null
 
-			Verify that client returns INVALID_PARAMS_ERROR.
+			Verify that client returns INVALID_PAYLOAD_ATTRIBUTES.
 			`,
 			MainFork:   config.Cancun,
 			ForkHeight: 1,
@@ -634,12 +634,12 @@ var Tests = []test.Spec{
 						PayloadAttributesCustomizer: &helper.BasePayloadAttributesCustomizer{
 							BeaconRoot: &(common.Hash{}),
 						},
-						ExpectedError: globals.INVALID_PARAMS_ERROR,
+						ExpectedError: globals.INVALID_PAYLOAD_ATTRIBUTES,
 					},
 				},
 				ExpectationDescription: fmt.Sprintf(`
-				ForkchoiceUpdatedV2 after Cancun with beacon root field must return INVALID_PARAMS_ERROR (code %d)
-				`, *globals.INVALID_PARAMS_ERROR),
+				ForkchoiceUpdatedV2 after Cancun with beacon root field must return INVALID_PAYLOAD_ATTRIBUTES (code %d)
+				`, *globals.INVALID_PAYLOAD_ATTRIBUTES),
 			},
 		},
 	},
