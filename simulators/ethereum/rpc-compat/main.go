@@ -127,7 +127,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 				}
 				formatter := formatter.NewAsciiFormatter(got, config)
 				diffString, _ := formatter.Format(d)
-				return fmt.Errorf("response differs from expected:\n%s", diffString)
+				return fmt.Errorf("response differs from expected (-- client, ++ test):\n%s", diffString)
 			}
 			resp = nil
 		default:
