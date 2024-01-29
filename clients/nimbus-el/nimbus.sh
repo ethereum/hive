@@ -115,14 +115,17 @@ fi
 
 set -e
 
-# Configure RPC.
+# Configure RPC
+FLAGS="$FLAGS --http-address:0.0.0.0 --http-port:8545"
+FLAGS="$FLAGS --rpc --rpc-api:eth,debug"
+FLAGS="$FLAGS --ws --ws-api:eth,debug"
+
+# Configure graphql
 if [ "$HIVE_GRAPHQL_ENABLED" != "" ]; then
-  FLAGS="$FLAGS --graphql --graphql-address:0.0.0.0 --graphql-port:8545"
-else
-  FLAGS="$FLAGS --rpc --rpc-api:eth,debug --rpc-address:0.0.0.0 --rpc-port:8545"
-  FLAGS="$FLAGS --ws --ws-api:eth,debug --ws-address:0.0.0.0 --ws-port:8546"
+  FLAGS="$FLAGS --graphql"
 fi
 
+# Configure engine api
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
   echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
   FLAGS="$FLAGS --engine-api:true --engine-api-address:0.0.0.0 --engine-api-port:8551 --jwt-secret:/jwtsecret"
