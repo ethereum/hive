@@ -13,30 +13,13 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
 	diff "github.com/yudai/gojsondiff"
 	"github.com/yudai/gojsondiff/formatter"
 )
 
 var (
-	clientEnv = hivesim.Params{
-		"HIVE_NODETYPE":       "full",
-		"HIVE_NETWORK_ID":     "1337",
-		"HIVE_CHAIN_ID":       "1337",
-		"HIVE_FORK_HOMESTEAD": "0",
-		//"HIVE_FORK_DAO_BLOCK":      2000,
-		"HIVE_FORK_TANGERINE":                   "0",
-		"HIVE_FORK_SPURIOUS":                    "0",
-		"HIVE_FORK_BYZANTIUM":                   "0",
-		"HIVE_FORK_CONSTANTINOPLE":              "0",
-		"HIVE_FORK_PETERSBURG":                  "0",
-		"HIVE_FORK_ISTANBUL":                    "0",
-		"HIVE_FORK_BERLIN":                      "0",
-		"HIVE_FORK_LONDON":                      "0",
-		"HIVE_SHANGHAI_TIMESTAMP":               "0",
-		"HIVE_TERMINAL_TOTAL_DIFFICULTY":        "0",
-		"HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED": "1",
-	}
 	files = map[string]string{
 		"genesis.json": "./tests/genesis.json",
 		"chain.rlp":    "./tests/chain.rlp",
@@ -49,6 +32,13 @@ type test struct {
 }
 
 func main() {
+	// Load fork environment.
+	var clientEnv hivesim.Params
+	err := common.LoadJSON("tests/forkenv.json", &clientEnv)
+	if err != nil {
+		panic(err)
+	}
+
 	suite := hivesim.Suite{
 		Name: "rpc-compat",
 		Description: `
