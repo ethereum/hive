@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
@@ -60,6 +61,9 @@ type BaseSpec struct {
 	// CL Mocker configuration for time increments
 	BlockTimestampIncrement uint64
 
+	// CL Mocker configuration for payload delay in seconds
+	GetPayloadDelay uint64
+
 	// CL Mocker configuration for slots to `safe` and `finalized` respectively
 	SlotsToSafe      *big.Int
 	SlotsToFinalized *big.Int
@@ -109,6 +113,9 @@ func (s BaseSpec) ConfigureCLMock(cl *clmock.CLMocker) {
 		cl.SafeSlotsToImportOptimistically = s.SafeSlotsToImportOptimistically
 	}
 	cl.BlockTimestampIncrement = new(big.Int).SetUint64(s.GetBlockTimeIncrements())
+	if s.GetPayloadDelay != 0 {
+		cl.PayloadProductionClientDelay = time.Duration(s.GetPayloadDelay) * time.Second
+	}
 }
 
 func (s BaseSpec) GetAbout() string {
