@@ -1813,8 +1813,6 @@ func init() {
 			Customizer: &helper.BasePayloadAttributesCustomizer{
 				RemoveBeaconRoot: true,
 			},
-			// Error is expected on syncing because V3 checks all fields to be present
-			ErrorOnSync: true,
 		},
 	} {
 		Tests = append(Tests, t)
