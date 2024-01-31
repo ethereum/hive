@@ -100,7 +100,7 @@ workflows:
           requires: ["build"]
       - smoke-tests-remote-docker:
           requires: ["build"]
-      - rust-jobs:
-          when: << pipeline.parameters.rust-ci >>
-          jobs:
-            - rust-simulators
+  rust-jobs:
+    when: << pipeline.parameters.rust-ci >>
+    jobs:
+      - rust-simulators
