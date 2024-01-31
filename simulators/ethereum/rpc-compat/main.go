@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/node"
 	"github.com/ethereum/hive/hivesim"
 	diff "github.com/yudai/gojsondiff"
 	"github.com/yudai/gojsondiff/formatter"
@@ -189,24 +188,16 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
 }
 
 func sendForkchoiceUpdated(t *hivesim.T, client *hivesim.Client) {
-	requestData, err := os.ReadFile("tests/headfcu.json")
-	if err != nil {
+	var request struct {
+		Method string
+		Params []any
+	}
+	if err := common.LoadJSON("tests/headfcu.json", &request); err != nil {
 		t.Fatal("error loading forkchoiceUpdated:", err)
 	}
-
-	var (
-		token      = [32]byte{0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65}
-		engineURL  = fmt.Sprintf("http://%v:8551/", client.IP)
-		httpclient = http.Client{
-			Transport: &loggingRoundTrip{t, http.DefaultTransport},
-			Timeout:   10 * time.Second,
-		}
-	)
-	post, _ := http.NewRequest("POST", engineURL, bytes.NewReader(requestData))
-	node.NewJWTAuth(token)(post.Header)
-	post.Header.Set("content-type", "application/json")
-	if _, err := httpclient.Do(post); err != nil {
-		t.Fatal("error sending forkchoiceUpdated:", err)
+	err := client.EngineAPI().Call(nil, request.Method, request.Params...)
+	if err != nil {
+		t.Fatal("client rejected forkchoiceUpdated:", err)
 	}
 }
 
