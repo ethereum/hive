@@ -3,3 +3,7 @@ workspace
 .idea/
 # build output
 /hive
+
+# build output for rust simulators files
+simulators/**/Cargo.lock
+simulators/**/target
