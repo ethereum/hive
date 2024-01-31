@@ -1,6 +1,7 @@
 package hivesim
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -159,9 +160,10 @@ type Client struct {
 	Container string
 	IP        net.IP
 
-	mu   sync.Mutex
-	rpc  *rpc.Client
-	test *T
+	mu        sync.Mutex
+	rpc       *rpc.Client
+	enginerpc *rpc.Client
+	test      *T
 }
 
 // EnodeURL returns the default peer-to-peer endpoint of the client.
@@ -182,6 +184,20 @@ func (c *Client) RPC() *rpc.Client {
 		c.rpc, _ = rpc.DialHTTP(fmt.Sprintf("http://%v:8545", c.IP))
 	}
 	return c.rpc
+}
+
+// EngineAPI returns an RPC client connected to an execution-layer client's engine API server.
+func (c *Client) EngineAPI() *rpc.Client {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.enginerpc != nil {
+		return c.enginerpc
+	}
+	auth := rpc.WithHTTPAuth(jwtAuth(ENGINEAPI_JWT_SECRET))
+	url := fmt.Sprintf("http://%v:8551", c.IP)
+	c.enginerpc, _ = rpc.DialOptions(context.Background(), url, auth)
+	return c.enginerpc
 }
 
 // Exec runs a script in the client container.
