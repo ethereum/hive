@@ -3,10 +3,11 @@ package client
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/ethereum/go-ethereum/core"
 	"math/big"
 	"strconv"
 	"time"
+
+	"github.com/ethereum/go-ethereum/core"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -545,6 +546,8 @@ func (v *ErigonGenesis) SetTimestamp(timestamp int64, cancun bool) {
 	v.ErigonConfig.ShanghaiTimestamp = big.NewInt(timestamp)
 	if cancun {
 		v.ErigonConfig.CancunTime = big.NewInt(timestamp)
+	} else {
+		v.ErigonConfig.CancunTime = big.NewInt(timestamp+12000000)
 	}
 }
 
