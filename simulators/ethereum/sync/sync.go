@@ -10,8 +10,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	gnode "github.com/ethereum/go-ethereum/node"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/ethereum/hive/hivesim"
 )
 
@@ -151,12 +149,10 @@ func (n *node) triggerSync(t *hivesim.T) error {
 	if err := common.LoadJSON("chain/headnewpayload.json", &newpayload); err != nil {
 		return err
 	}
-	c := n.engineClient()
-
 	// deliver newPayload
 	t.Logf("%s: %s", newpayload.Method, jsonString(newpayload.Params))
 	var resp engine.PayloadStatusV1
-	if err := c.Call(&resp, newpayload.Method, conv2any(newpayload.Params)...); err != nil {
+	if err := n.EngineAPI().Call(&resp, newpayload.Method, conv2any(newpayload.Params)...); err != nil {
 		return err
 	}
 	t.Logf("response: %+v", jsonString(resp))
@@ -169,24 +165,13 @@ func (n *node) sendForkchoiceUpdated(t *hivesim.T) error {
 	if err := common.LoadJSON("chain/headfcu.json", &fcu); err != nil {
 		return err
 	}
-	c := n.engineClient()
-
 	t.Logf("%s: %s", fcu.Method, jsonString(fcu.Params))
 	var fcuresp engine.ForkChoiceResponse
-	if err := c.Call(&fcuresp, fcu.Method, conv2any(fcu.Params)...); err != nil {
+	if err := n.EngineAPI().Call(&fcuresp, fcu.Method, conv2any(fcu.Params)...); err != nil {
 		return err
 	}
 	t.Logf("response: %s", jsonString(&fcuresp))
 	return nil
-}
-
-func (n *node) engineClient() *rpc.Client {
-	// engine client setup
-	token := [32]byte{0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65, 0x63, 0x72, 0x65, 0x74, 0x73, 0x65}
-	engineURL := fmt.Sprintf("http://%v:8551/", n.IP)
-	ctx := context.Background()
-	c, _ := rpc.DialOptions(ctx, engineURL, rpc.WithHTTPAuth(gnode.NewJWTAuth(token)))
-	return c
 }
 
 // checkHead checks whether the remote chain head matches the given values.
