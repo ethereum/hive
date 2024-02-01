@@ -7,8 +7,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -25,11 +23,6 @@ var (
 		"chain.rlp":    "./tests/chain.rlp",
 	}
 )
-
-type test struct {
-	Name string
-	Data []byte
-}
 
 func main() {
 	// Load fork environment.
@@ -69,10 +62,12 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 
 	tests := loadTests(t, "tests", re)
 	for _, test := range tests {
+		test := test
 		t.Run(hivesim.TestSpec{
-			Name: fmt.Sprintf("%s (%s)", test.Name, clientName),
+			Name:        fmt.Sprintf("%s (%s)", test.name, clientName),
+			Description: test.comment,
 			Run: func(t *hivesim.T) {
-				if err := runTest(t, c, test.Data); err != nil {
+				if err := runTest(t, c, &test); err != nil {
 					t.Fatal(err)
 				}
 			},
@@ -80,7 +75,7 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 	}
 }
 
-func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
+func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 	var (
 		client = &http.Client{
 			Timeout: 5 * time.Second,
@@ -94,26 +89,22 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 		resp []byte
 	)
 
-	for _, line := range strings.Split(string(data), "\n") {
-		line = strings.TrimSpace(line)
-		switch {
-		case len(line) == 0 || strings.HasPrefix(line, "//"):
-			// Skip comments, blank lines.
-			continue
-		case strings.HasPrefix(line, ">> "):
+	for _, msg := range test.messages {
+		if msg.send {
 			// Send request.
-			resp, err = postHttp(client, url, []byte(line[3:]))
+			resp, err = postHttp(client, url, strings.NewReader(msg.data))
 			if err != nil {
 				return err
 			}
-		case strings.HasPrefix(line, "<< "):
+		} else {
 			// Read response. Unmarshal to interface{} to verify deep equality. Marshal
 			// again to remove padding differences and to print each field in the same
 			// order. This makes it easy to spot any discrepancies.
 			if resp == nil {
 				return fmt.Errorf("invalid test, response before request")
 			}
-			want := []byte(strings.TrimSpace(line)[3:]) // trim leading "<< "
+			want := []byte(msg.data)
+
 			// Now compare.
 			d, err := diff.New().Compare(resp, want)
 			if err != nil {
@@ -132,10 +123,9 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 				return fmt.Errorf("response differs from expected (-- client, ++ test):\n%s", diffString)
 			}
 			resp = nil
-		default:
-			t.Fatalf("invalid line in test script: %s", line)
 		}
 	}
+
 	if resp != nil {
 		t.Fatalf("unhandled response in test case")
 	}
@@ -144,9 +134,8 @@ func runTest(t *hivesim.T, c *hivesim.Client, data []byte) error {
 
 // sendHttp sends an HTTP POST with the provided json data and reads the
 // response into a byte slice and returns it.
-func postHttp(c *http.Client, url string, d []byte) ([]byte, error) {
-	data := bytes.NewBuffer(d)
-	req, err := http.NewRequest("POST", url, data)
+func postHttp(c *http.Client, url string, d io.Reader) ([]byte, error) {
+	req, err := http.NewRequest("POST", url, d)
 	if err != nil {
 		return nil, fmt.Errorf("error building request: %v", err)
 	}
@@ -156,35 +145,6 @@ func postHttp(c *http.Client, url string, d []byte) ([]byte, error) {
 		return nil, fmt.Errorf("write error: %v", err)
 	}
 	return io.ReadAll(resp.Body)
-}
-
-// loadTests walks the given directory looking for *.io files to load.
-func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
-	tests := make([]test, 0)
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			t.Logf("unable to walk path: %s", err)
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if fname := info.Name(); !strings.HasSuffix(fname, ".io") {
-			return nil
-		}
-		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".io")
-		if !re.MatchString(pathname) {
-			fmt.Println("skip", pathname)
-			return nil // skip
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		tests = append(tests, test{strings.TrimLeft(pathname, "/"), data})
-		return nil
-	})
-	return tests
 }
 
 func sendForkchoiceUpdated(t *hivesim.T, client *hivesim.Client) {
