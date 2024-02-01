@@ -82,7 +82,7 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []rpcTest {
 		if fname := info.Name(); !strings.HasSuffix(fname, ".io") {
 			return nil
 		}
-		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".io")
+		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root+"/"), ".io")
 		if !re.MatchString(pathname) {
 			fmt.Println("skip", pathname)
 			return nil // skip
