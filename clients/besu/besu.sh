@@ -156,7 +156,7 @@ RPCFLAGS="$RPCFLAGS --rpc-ws-enabled --rpc-ws-api=DEBUG,ETH,NET,WEB3,ADMIN --rpc
 # Enable merge support if needed
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     echo "0x7365637265747365637265747365637265747365637265747365637265747365" > /jwtsecret
-    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --engine-jwt-enabled --engine-jwt-secret /jwtsecret"
+    RPCFLAGS="$RPCFLAGS --engine-host-allowlist=* --engine-jwt-secret /jwtsecret"
 fi
 
 # Start Besu.
