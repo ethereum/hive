@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -97,7 +98,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid test, response before request")
 			}
 			expectedData := msg.data
-			resp := string(respBytes)
+			resp := string(bytes.TrimSpace(respBytes))
 			t.Log("<< ", resp)
 			if !gjson.Valid(resp) {
 				return fmt.Errorf("invalid JSON response")
@@ -105,10 +106,11 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 
 			// Patch object for errors. We only do this in the specific case
 			// where an error is expected AND returned by the client.
+			var errorRedacted bool
 			if gjson.Get(resp, "error").Exists() && gjson.Get(expectedData, "error").Exists() {
 				resp, _ = sjson.Delete(resp, "error.message")
 				expectedData, _ = sjson.Delete(expectedData, "error.message")
-				t.Log("note: error messages removed from comparison")
+				errorRedacted = true
 			}
 
 			// Compare responses.
@@ -119,6 +121,9 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 
 			// If there is a discrepancy, return error.
 			if d.Modified() {
+				if errorRedacted {
+					t.Log("note: error messages removed from comparison")
+				}
 				var got map[string]any
 				json.Unmarshal([]byte(resp), &got)
 				config := formatter.AsciiFormatterConfig{
