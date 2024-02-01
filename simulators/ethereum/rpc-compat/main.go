@@ -195,10 +195,13 @@ func sendForkchoiceUpdated(t *hivesim.T, client *hivesim.Client) {
 	if err := common.LoadJSON("tests/headfcu.json", &request); err != nil {
 		t.Fatal("error loading forkchoiceUpdated:", err)
 	}
-	err := client.EngineAPI().Call(nil, request.Method, request.Params...)
+	t.Logf("sending %s: %v", request.Method, request.Params)
+	var resp any
+	err := client.EngineAPI().Call(&resp, request.Method, request.Params...)
 	if err != nil {
 		t.Fatal("client rejected forkchoiceUpdated:", err)
 	}
+	t.Logf("response: %v", resp)
 }
 
 // loggingRoundTrip writes requests and responses to the test log.
