@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/ethereum/hive/hivesim"
+	"github.com/tidwall/gjson"
 )
 
 type rpcTest struct {
@@ -48,17 +49,15 @@ func loadTestFile(name string, r io.Reader) (rpcTest, error) {
 				test.speconly = true
 			}
 
-		case strings.HasPrefix(line, ">>"):
+		case strings.HasPrefix(line, ">>") || strings.HasPrefix(line, "<<"):
 			inHeader = false
+			data := strings.TrimSpace(line[2:])
+			if !gjson.Valid(data) {
+				return test, fmt.Errorf("invalid JSON in line %q", line)
+			}
 			test.messages = append(test.messages, rpcTestMessage{
-				data: strings.TrimSpace(strings.TrimPrefix(line, ">>")),
-				send: true,
-			})
-
-		case strings.HasPrefix(line, "<<"):
-			inHeader = false
-			test.messages = append(test.messages, rpcTestMessage{
-				data: strings.TrimSpace(strings.TrimPrefix(line, "<<")),
+				data: data,
+				send: strings.HasPrefix(line, ">>"),
 			})
 
 		default:

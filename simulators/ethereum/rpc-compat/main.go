@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +12,8 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/hivesim"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	diff "github.com/yudai/gojsondiff"
 	"github.com/yudai/gojsondiff/formatter"
 )
@@ -77,43 +78,49 @@ func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 
 func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 	var (
-		client = &http.Client{
-			Timeout: 5 * time.Second,
-			Transport: &loggingRoundTrip{
-				t:     t,
-				inner: http.DefaultTransport,
-			},
-		}
-		url  = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
-		err  error
-		resp []byte
+		client    = &http.Client{Timeout: 5 * time.Second}
+		url       = fmt.Sprintf("http://%s", net.JoinHostPort(c.IP.String(), "8545"))
+		err       error
+		respBytes []byte
 	)
 
 	for _, msg := range test.messages {
 		if msg.send {
 			// Send request.
-			resp, err = postHttp(client, url, strings.NewReader(msg.data))
+			t.Log(">> ", msg.data)
+			respBytes, err = postHttp(client, url, strings.NewReader(msg.data))
 			if err != nil {
 				return err
 			}
 		} else {
-			// Read response. Unmarshal to interface{} to verify deep equality. Marshal
-			// again to remove padding differences and to print each field in the same
-			// order. This makes it easy to spot any discrepancies.
-			if resp == nil {
+			if respBytes == nil {
 				return fmt.Errorf("invalid test, response before request")
 			}
-			want := []byte(msg.data)
+			resp := string(respBytes)
+			t.Logf("<< ", string(msg.data))
+			if !gjson.Valid(string(resp)) {
+				return fmt.Errorf("invalid JSON response")
+			}
+			expectedData := msg.data
 
-			// Now compare.
-			d, err := diff.New().Compare(resp, want)
+			// Patch object for errors. We only do this in the specific case
+			// where an error is expected AND returned by the client.
+			if gjson.Get(resp, "error").Exists() && gjson.Get(expectedData, "error").Exists() {
+				resp, _ = sjson.Delete(resp, "error.message")
+				expectedData, _ = sjson.Delete(expectedData, "error.message")
+				t.Log("note: error messages removed from comparison")
+			}
+
+			// Compare responses.
+			d, err := diff.New().Compare([]byte(resp), []byte(expectedData))
 			if err != nil {
 				return fmt.Errorf("failed to unmarshal value: %s\n", err)
 			}
+
 			// If there is a discrepancy, return error.
 			if d.Modified() {
-				var got map[string]interface{}
-				json.Unmarshal(resp, &got)
+				var got map[string]any
+				json.Unmarshal([]byte(resp), &got)
 				config := formatter.AsciiFormatterConfig{
 					ShowArrayIndex: true,
 					Coloring:       false,
@@ -122,11 +129,11 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				diffString, _ := formatter.Format(d)
 				return fmt.Errorf("response differs from expected (-- client, ++ test):\n%s", diffString)
 			}
-			resp = nil
+			respBytes = nil
 		}
 	}
 
-	if resp != nil {
+	if respBytes != nil {
 		t.Fatalf("unhandled response in test case")
 	}
 	return nil
@@ -162,39 +169,4 @@ func sendForkchoiceUpdated(t *hivesim.T, client *hivesim.Client) {
 		t.Fatal("client rejected forkchoiceUpdated:", err)
 	}
 	t.Logf("response: %v", resp)
-}
-
-// loggingRoundTrip writes requests and responses to the test log.
-type loggingRoundTrip struct {
-	t     *hivesim.T
-	inner http.RoundTripper
-}
-
-func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error) {
-	// Read and log the request body.
-	reqBytes, err := io.ReadAll(req.Body)
-	req.Body.Close()
-	if err != nil {
-		return nil, err
-	}
-	rt.t.Logf(">>  %s", bytes.TrimSpace(reqBytes))
-	reqCopy := *req
-	reqCopy.Body = io.NopCloser(bytes.NewReader(reqBytes))
-
-	// Do the round trip.
-	resp, err := rt.inner.RoundTrip(&reqCopy)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	// Read and log the response bytes.
-	respBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	respCopy := *resp
-	respCopy.Body = io.NopCloser(bytes.NewReader(respBytes))
-	rt.t.Logf("<<  %s", bytes.TrimSpace(respBytes))
-	return &respCopy, nil
 }
