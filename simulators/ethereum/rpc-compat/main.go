@@ -39,6 +39,7 @@ func main() {
 		panic(err)
 	}
 
+	// Run the test suite.
 	suite := hivesim.Suite{
 		Name: "rpc-compat",
 		Description: `
@@ -53,6 +54,7 @@ conformance with the execution API specification.`[1:],
 		Parameters:  clientEnv,
 		Files:       files,
 		Run: func(t *hivesim.T, c *hivesim.Client) {
+			sendForkchoiceUpdated(t, c)
 			runAllTests(t, c, c.Type)
 		},
 		AlwaysRun: true,
@@ -156,6 +158,49 @@ func postHttp(c *http.Client, url string, d []byte) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// loadTests walks the given directory looking for *.io files to load.
+func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
+	tests := make([]test, 0)
+	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			t.Logf("unable to walk path: %s", err)
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if fname := info.Name(); !strings.HasSuffix(fname, ".io") {
+			return nil
+		}
+		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".io")
+		if !re.MatchString(pathname) {
+			fmt.Println("skip", pathname)
+			return nil // skip
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		tests = append(tests, test{strings.TrimLeft(pathname, "/"), data})
+		return nil
+	})
+	return tests
+}
+
+func sendForkchoiceUpdated(t *hivesim.T, client *hivesim.Client) {
+	var request struct {
+		Method string
+		Params []any
+	}
+	if err := common.LoadJSON("tests/headfcu.json", &request); err != nil {
+		t.Fatal("error loading forkchoiceUpdated:", err)
+	}
+	err := client.EngineAPI().Call(nil, request.Method, request.Params...)
+	if err != nil {
+		t.Fatal("client rejected forkchoiceUpdated:", err)
+	}
+}
+
 // loggingRoundTrip writes requests and responses to the test log.
 type loggingRoundTrip struct {
 	t     *hivesim.T
@@ -189,33 +234,4 @@ func (rt *loggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	respCopy.Body = io.NopCloser(bytes.NewReader(respBytes))
 	rt.t.Logf("<<  %s", bytes.TrimSpace(respBytes))
 	return &respCopy, nil
-}
-
-// loadTests walks the given directory looking for *.io files to load.
-func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []test {
-	tests := make([]test, 0)
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			t.Logf("unable to walk path: %s", err)
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		if fname := info.Name(); !strings.HasSuffix(fname, ".io") {
-			return nil
-		}
-		pathname := strings.TrimSuffix(strings.TrimPrefix(path, root), ".io")
-		if !re.MatchString(pathname) {
-			fmt.Println("skip", pathname)
-			return nil // skip
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		tests = append(tests, test{strings.TrimLeft(pathname, "/"), data})
-		return nil
-	})
-	return tests
 }
