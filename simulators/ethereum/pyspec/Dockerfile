@@ -21,9 +21,9 @@ COPY --from=builder /source/pyspec/pyspec .
 # To run locally generated fixtures, comment the following RUN lines and
 # uncomment the ADD line.
 # Download the latest fixture release.
-RUN wget https://github.com/ethereum/execution-spec-tests/releases/latest/download/fixtures_develop_hive.tar.gz
-RUN tar -xzvf fixtures_develop_hive.tar.gz
-RUN mv fixtures /fixtures
+RUN wget https://github.com/ethereum/execution-spec-tests/releases/latest/download/fixtures_develop.tar.gz
+RUN tar -xzvf fixtures_develop.tar.gz
+RUN mv fixtures/blockchain_tests_hive /fixtures
 
 # ADD ./pyspec/fixtures /fixtures
 
