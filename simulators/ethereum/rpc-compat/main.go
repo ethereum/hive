@@ -96,12 +96,12 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 			if respBytes == nil {
 				return fmt.Errorf("invalid test, response before request")
 			}
+			expectedData := msg.data
 			resp := string(respBytes)
-			t.Logf("<< ", string(msg.data))
-			if !gjson.Valid(string(resp)) {
+			t.Log("<< ", resp)
+			if !gjson.Valid(resp) {
 				return fmt.Errorf("invalid JSON response")
 			}
-			expectedData := msg.data
 
 			// Patch object for errors. We only do this in the specific case
 			// where an error is expected AND returned by the client.
