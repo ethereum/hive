@@ -61,7 +61,6 @@ conformance with the execution API specification.`[1:],
 func runAllTests(t *hivesim.T, c *hivesim.Client, clientName string) {
 	_, testPattern := t.Sim.TestPattern()
 	re := regexp.MustCompile(testPattern)
-
 	tests := loadTests(t, "tests", re)
 	for _, test := range tests {
 		test := test
@@ -94,6 +93,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return err
 			}
 		} else {
+			// Receive a response.
 			if respBytes == nil {
 				return fmt.Errorf("invalid test, response before request")
 			}
@@ -104,7 +104,7 @@ func runTest(t *hivesim.T, c *hivesim.Client, test *rpcTest) error {
 				return fmt.Errorf("invalid JSON response")
 			}
 
-			// Patch object for errors. We only do this in the specific case
+			// Patch JSON to remove error messages. We only do this in the specific case
 			// where an error is expected AND returned by the client.
 			var errorRedacted bool
 			if gjson.Get(resp, "error").Exists() && gjson.Get(expectedData, "error").Exists() {
@@ -159,6 +159,7 @@ func postHttp(c *http.Client, url string, d io.Reader) ([]byte, error) {
 	return io.ReadAll(resp.Body)
 }
 
+// sendForkchoiceUpdated delivers the initial FcU request to the client.
 func sendForkchoiceUpdated(t *hivesim.T, client *hivesim.Client) {
 	var request struct {
 		Method string
