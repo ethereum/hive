@@ -138,7 +138,7 @@ func (tc *testcase) run(t *hivesim.T) {
 		}
 		// set expected payload return status
 		expectedStatus := "VALID"
-		if !engineNewPayload.Valid {
+		if engineNewPayload.ValidationError != nil {
 			expectedStatus = "INVALID"
 		}
 		// check payload status matches expected
