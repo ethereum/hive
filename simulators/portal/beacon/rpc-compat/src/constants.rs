@@ -1,0 +1,2 @@
+pub const HIVE_PORTAL_NETWORKS_SELECTED: &str = "HIVE_PORTAL_NETWORKS_SELECTED";
+pub const BEACON_STRING: &str = "beacon";
