@@ -78,7 +78,7 @@ type engineNewPayload struct {
 	BlobVersionedHashes   []common.Hash       `json:"expectedBlobVersionedHashes"`
 	ParentBeaconBlockRoot *common.Hash        `json:"parentBeaconBlockRoot"`
 	Version               math.HexOrDecimal64 `json:"version"`
-	Valid                 bool                `json:"valid"`
+	ValidationError       *string             `json:"validationError"`
 	ErrorCode             int64               `json:"errorCode,string"`
 
 	HiveExecutionPayload *typ.ExecutableData
