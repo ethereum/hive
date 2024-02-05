@@ -171,7 +171,7 @@ func TestRPCError(t *hivesim.T, env *tn.Environment,
 		t.Fatalf("FAIL: %v", err)
 	}
 
-	if err := testnet.VerifyELHeads(ctx); err == nil {
+	if err := testnet.VerifyELHeads(ctx); err != nil {
 		t.Fatalf("FAIL: Expected different heads after spoof %v", err)
 	}
 }
@@ -1225,7 +1225,7 @@ func SyncingWithInvalidChain(
 			// Block can't contain an executable payload
 			t.Fatalf("FAIL: Head of the chain is not a bellatrix fork block")
 		}
-		if payload, err := versionedBlock.ExecutionPayload(); err == nil {
+		if payload, err := versionedBlock.ExecutionPayload(); err != nil {
 			t.Fatalf(
 				"FAIL: error getting execution payload: %v",
 				err,
