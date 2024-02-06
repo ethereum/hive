@@ -139,6 +139,9 @@ if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     FLAGS="$FLAGS --authrpc.addr=0.0.0.0 --authrpc.jwtsecret=/jwt.secret"
 fi
 
+# Configure snapshots.
+FLAGS="$FLAGS --snapshots=false"
+
 # Launch the main client.
 FLAGS="$FLAGS --nat=none"
 echo "Running erigon with flags $FLAGS"
