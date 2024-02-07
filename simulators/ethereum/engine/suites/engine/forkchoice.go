@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
@@ -79,7 +80,7 @@ func (tc InconsistentForkchoiceTest) Execute(t *test.Env) {
 		inconsistentFcU.FinalizedBlockHash = alternativePayloads[len(canonicalPayloads)-3].BlockHash
 	}
 	r := t.TestEngine.TestEngineForkchoiceUpdated(&inconsistentFcU, nil, t.CLMock.LatestPayloadBuilt.Timestamp)
-	r.ExpectError()
+	r.ExpectErrorCode(*globals.INVALID_FORKCHOICE_STATE)
 
 	// Return to the canonical chain
 	r = t.TestEngine.TestEngineForkchoiceUpdated(&t.CLMock.LatestForkchoice, nil, t.CLMock.LatestPayloadBuilt.Timestamp)

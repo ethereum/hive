@@ -14,7 +14,6 @@ type InvalidPayloadAttributesTest struct {
 	Description string
 	Customizer  helper.PayloadAttributesCustomizer
 	Syncing     bool
-	ErrorOnSync bool
 }
 
 func (s InvalidPayloadAttributesTest) WithMainFork(fork config.Fork) test.Spec {
@@ -69,12 +68,8 @@ func (tc InvalidPayloadAttributesTest) Execute(t *test.Env) {
 			if tc.Syncing {
 				// If we are SYNCING, the outcome should be SYNCING regardless of the validity of the payload atttributes
 				r := t.TestEngine.TestEngineForkchoiceUpdated(&fcu, attr, t.CLMock.LatestPayloadBuilt.Timestamp)
-				if tc.ErrorOnSync {
-					r.ExpectError()
-				} else {
-					r.ExpectPayloadStatus(test.Syncing)
-					r.ExpectPayloadID(nil)
-				}
+				r.ExpectPayloadStatus(test.Syncing)
+				r.ExpectPayloadID(nil)
 			} else {
 				r := t.TestEngine.TestEngineForkchoiceUpdated(&fcu, attr, t.CLMock.LatestPayloadBuilt.Timestamp)
 				r.ExpectError()
