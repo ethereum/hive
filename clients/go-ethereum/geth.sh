@@ -140,7 +140,6 @@ fi
 if [ "$HIVE_MINER_EXTRA" != "" ]; then
     FLAGS="$FLAGS --miner.extradata $HIVE_MINER_EXTRA"
 fi
-FLAGS="$FLAGS --miner.gasprice 16000000000"
 
 # Configure LES.
 if [ "$HIVE_LES_SERVER" == "1" ]; then
