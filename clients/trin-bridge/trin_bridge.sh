@@ -13,4 +13,4 @@ else
     exit 1
 fi
 
-RUST_LOG=debug portal-bridge --node-count 1 $FLAGS --executable-path ./usr/bin/trin --mode test:/test_data_collection_of_forks_blocks.yaml --external-ip $IP_ADDR --epoch-accumulator-path . trin
+RUST_LOG=debug portal-bridge --node-count 1 $FLAGS --executable-path ./usr/bin/trin --mode test:/test_data_collection_of_forks_blocks.yaml --el-provider test --external-ip $IP_ADDR --epoch-accumulator-path . trin
