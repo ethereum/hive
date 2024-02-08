@@ -75,7 +75,7 @@ jobs:
   # this makes sure the rust code is good
   rust-simulators:
     docker:
-      - image: cimg/rust:1.71.1
+      - image: cimg/rust:1.75.0
     steps:
       - checkout
       - run:
