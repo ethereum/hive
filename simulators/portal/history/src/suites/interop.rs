@@ -1,13 +1,12 @@
-mod constants;
-
-use crate::constants::TEST_DATA_FILE_PATH;
+use crate::suites::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
 use ethportal_api::types::portal::ContentInfo;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
     ContentValue, Discv5ApiClient, HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient,
     OverlayContentKey, PossibleHistoryContentValue,
 };
-use hivesim::{dyn_async, Client, NClientTestSpec, Simulation, Suite, Test, TestSpec};
+use hivesim::types::ClientDefinition;
+use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use portal_spec_test_utils_rs::get_flair;
 use serde_json::json;
@@ -20,44 +19,6 @@ const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
 // Header with proof for block number 14764013
 const HEADER_WITH_PROOF_KEY: &str =
     "0x00720704f3aa11c53cf344ea069db95cecb81ad7453c8f276b2a1062979611f09c";
-
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::fmt::init();
-
-    let mut suite = Suite {
-        name: "portal-interop".to_string(),
-        description:
-            "The portal interop test suite runs a set of scenarios to test interoperability between
-        portal network clients"
-                .to_string(),
-        tests: vec![],
-    };
-
-    suite.add(TestSpec {
-        name: "Portal Network interop".to_string(),
-        description: "".to_string(),
-        always_run: false,
-        run: test_portal_interop,
-        client: None,
-    });
-
-    let sim = Simulation::new();
-    run_suite(sim, suite).await;
-}
-
-async fn run_suite(host: Simulation, suite: Suite) {
-    let name = suite.clone().name;
-    let description = suite.clone().description;
-
-    let suite_id = host.start_suite(name, description, "".to_string()).await;
-
-    for test in &suite.tests {
-        test.run_test(host.clone(), suite_id, suite.clone()).await;
-    }
-
-    host.end_suite(suite_id).await;
-}
 
 fn content_pair_to_string_pair(
     content_pair: (HistoryContentKey, HistoryContentValue),
@@ -126,9 +87,11 @@ fn process_content(
 }
 
 dyn_async! {
-   async fn test_portal_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
+   pub async fn test_portal_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
+        // todo: remove this once we implement role in hivesim-rs
+        let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
         let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
             .expect("cannot find test asset");
