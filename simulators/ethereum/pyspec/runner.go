@@ -16,6 +16,10 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 )
 
+var (
+	SyncTimeout = 10 * time.Second
+)
+
 // loadFixtureTests extracts tests from fixture.json files in a given directory,
 // creates a testcase for each test, and passes the testcase struct to fn.
 func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(TestCase)) {
@@ -172,7 +176,7 @@ func (tc *TestCase) run(t *hivesim.T) {
 			tc.Fatalf("unable to send sync payload: %v", err)
 		} // Don't check syncing here because some clients do sync immediately
 
-		timeoutCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		timeoutCtx, cancel := context.WithTimeout(ctx, SyncTimeout)
 		defer cancel()
 		for {
 			if syncing, err := tc.SyncPayload.ForkchoiceValidate(ctx, secondEngineClient, tc.EngineFcuVersion); err != nil {
