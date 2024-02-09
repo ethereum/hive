@@ -68,21 +68,21 @@ func fixtureRunner(t *hivesim.T) {
 
 	// spawn `parallelism` workers to run fixtures against clients
 	var wg sync.WaitGroup
-	var testCh = make(chan *testcase)
+	var testCh = make(chan *TestCase)
 	wg.Add(parallelism)
 	for i := 0; i < parallelism; i++ {
 		go func() {
 			defer wg.Done()
 			for test := range testCh {
 				t.Run(hivesim.TestSpec{
-					Name: test.name,
+					Name: test.Name,
 					Description: ("Test Link: " +
-						repoLink(test.filepath)),
+						repoLink(test.FilePath)),
 					Run:       test.run,
 					AlwaysRun: false,
 				})
-				if test.failedErr != nil {
-					failedTests[test.clientType+"/"+test.name] = test.failedErr
+				if test.FailedErr != nil {
+					failedTests[test.ClientType+"/"+test.Name] = test.FailedErr
 				}
 			}
 		}()
@@ -92,13 +92,13 @@ func fixtureRunner(t *hivesim.T) {
 	re := regexp.MustCompile(testPattern)
 
 	// deliver and run test cases against each client
-	loadFixtureTests(t, fileRoot, re, func(tc testcase) {
+	loadFixtureTests(t, fileRoot, re, func(tc TestCase) {
 		for _, client := range clientTypes {
 			if !client.HasRole("eth1") {
 				continue
 			}
 			tc := tc // shallow copy
-			tc.clientType = client.Name
+			tc.ClientType = client.Name
 			testCh <- &tc
 		}
 	})
