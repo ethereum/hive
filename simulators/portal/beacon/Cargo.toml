@@ -1,5 +1,5 @@
 [package]
-name = "rpc-compat"
+name = "beacon"
 version = "0.1.0"
 authors = ["Ognyan Genev <ognian.genev@gmail.com>", "Kolby ML (Moroz Liebl) <kolbydml@gmail.com>"]
 edition = "2021"

@@ -1,6 +1,4 @@
-mod constants;
-
-use crate::constants::{
+use super::constants::{
     BOOTNODES_ENVIRONMENT_VARIABLE, HIVE_CHECK_LIVE_PORT, TEST_DATA_FILE_PATH,
     TRIN_BRIDGE_CLIENT_TYPE,
 };
@@ -9,7 +7,7 @@ use ethportal_api::HistoryContentValue;
 use ethportal_api::PossibleHistoryContentValue;
 use ethportal_api::{Discv5ApiClient, HistoryNetworkApiClient};
 use hivesim::types::ClientDefinition;
-use hivesim::{dyn_async, Client, NClientTestSpec, Simulation, Suite, Test, TestSpec};
+use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use portal_spec_test_utils_rs::get_flair;
 use serde_yaml::Value;
@@ -46,43 +44,8 @@ fn process_content(content: Vec<(HistoryContentKey, HistoryContentValue)>) -> Ve
     result
 }
 
-#[tokio::main]
-async fn main() {
-    tracing_subscriber::fmt::init();
-
-    let mut suite = Suite {
-        name: "trin-bridge-tests".to_string(),
-        description: "The portal bridge test suite".to_string(),
-        tests: vec![],
-    };
-
-    suite.add(TestSpec {
-        name: "Trin bridge tests".to_string(),
-        description: "".to_string(),
-        always_run: false,
-        run: test_portal_bridge,
-        client: None,
-    });
-
-    let sim = Simulation::new();
-    run_suite(sim, suite).await;
-}
-
-async fn run_suite(host: Simulation, suite: Suite) {
-    let name = suite.clone().name;
-    let description = suite.clone().description;
-
-    let suite_id = host.start_suite(name, description, "".to_string()).await;
-
-    for test in &suite.tests {
-        test.run_test(host.clone(), suite_id, suite.clone()).await;
-    }
-
-    host.end_suite(suite_id).await;
-}
-
 dyn_async! {
-   async fn test_portal_bridge<'a> (test: &'a mut Test, _client: Option<Client>) {
+   pub async fn test_portal_bridge<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
         if !clients.iter().any(|client_definition| client_definition.name == *TRIN_BRIDGE_CLIENT_TYPE) {

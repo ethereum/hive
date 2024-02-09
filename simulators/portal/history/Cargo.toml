@@ -1,14 +1,17 @@
 [package]
-name = "rpc-compat"
+name = "history"
 version = "0.1.0"
 authors = ["Ognyan Genev <ognian.genev@gmail.com>", "Kolby ML (Moroz Liebl) <kolbydml@gmail.com>"]
 edition = "2021"
 
 [dependencies]
 ethportal-api = { git = "https://github.com/ethereum/trin", rev = "2a32224e3c2b0b80bc37c1b692c33016371f197a" }
+portal-spec-test-utils-rs = { git = "https://github.com/ethereum/portal-spec-tests", rev = "d1e996d0d4dc2136b3cd38d9e25cdc3a6b74dcd9" }
 hivesim = { git = "https://github.com/ethereum/portal-hive", rev = "8ff1e3d3c941dd00d56dacd777a5dfb71edf402f" }
 futures = "0.3.25"
 serde_json = "1.0.87"
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
+itertools = "0.10.5"
+serde_yaml = "0.9"
 tokio = { version = "1", features = ["full"] }
