@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/hive/simulators/ethereum/engine/clmock"
 	"github.com/ethereum/hive/simulators/ethereum/engine/config"
+	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	"github.com/ethereum/hive/simulators/ethereum/engine/test"
 )
@@ -72,7 +73,7 @@ func (tc InvalidPayloadAttributesTest) Execute(t *test.Env) {
 				r.ExpectPayloadID(nil)
 			} else {
 				r := t.TestEngine.TestEngineForkchoiceUpdated(&fcu, attr, t.CLMock.LatestPayloadBuilt.Timestamp)
-				r.ExpectError()
+				r.ExpectErrorCode(*globals.INVALID_PAYLOAD_ATTRIBUTES)
 
 				// Check that the forkchoice was applied, regardless of the error
 				s := t.TestEngine.TestHeaderByNumber(Head)
