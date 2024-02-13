@@ -51,6 +51,10 @@ if [[ "$HIVE_ETH2_BEACON_NODE_INDEX" != "" ]]; then
     fi
 fi
 
+if [[ "$HIVE_ETH2_TRUSTED_PEER_IDS" != "" ]]; then
+    trustedpeers="$trustedpeers,$HIVE_ETH2_TRUSTED_PEER_IDS"
+fi
+
 LOG=info
 case "$HIVE_LOGLEVEL" in
     0|1) LOG=error ;;
