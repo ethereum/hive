@@ -8,7 +8,6 @@ use ethportal_api::PossibleHistoryContentValue;
 use ethportal_api::{Discv5ApiClient, HistoryNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
-use itertools::Itertools;
 use portal_spec_test_utils_rs::get_flair;
 use serde_yaml::Value;
 use std::collections::HashMap;
