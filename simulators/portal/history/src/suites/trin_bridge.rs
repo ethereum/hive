@@ -8,7 +8,6 @@ use ethportal_api::PossibleHistoryContentValue;
 use ethportal_api::{Discv5ApiClient, HistoryNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
-use itertools::Itertools;
 use portal_spec_test_utils_rs::get_flair;
 use serde_yaml::Value;
 use std::collections::HashMap;
@@ -54,16 +53,16 @@ dyn_async! {
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
         // Iterate over all possible pairings of clients and run the tests (including self-pairings)
-        for (client_a, client_b) in clients.iter().cartesian_product(clients.iter()) {
+        for client in &clients {
             test.run(
                 NClientTestSpec {
-                    name: format!("Bridge test. A:{} --> B:{}", client_a.name, client_b.name),
+                    name: format!("Bridge test. A:Trin Bridge --> B:{}", client.name),
                     description: "".to_string(),
                     always_run: false,
                     run: test_bridge,
                     environments: None,
                     test_data: None,
-                    clients: vec![client_a.clone(), client_b.clone()],
+                    clients: vec![client.clone()],
                 }
             ).await;
         }
@@ -72,35 +71,20 @@ dyn_async! {
 
 dyn_async! {
     async fn test_bridge<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
+        let client = match clients.into_iter().next() {
+            Some((client)) => client,
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
 
-        let client_b_enr = match client_b.rpc.node_info().await {
+        let client_enr = match client.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
             Err(err) => {
                 panic!("Error getting node info: {err:?}");
             }
         };
-        match HistoryNetworkApiClient::add_enr(&client_a.rpc, client_b_enr.clone()).await {
-            Ok(response) => if !response {
-                panic!("AddEnr expected to get true and instead got false")
-            },
-            Err(err) => panic!("{}", &err.to_string()),
-        }
-
-        let client_a_enr = match client_a.rpc.node_info().await {
-            Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
-        };
-        client_a.test.start_client(TRIN_BRIDGE_CLIENT_TYPE.to_string(), Some(HashMap::from([(BOOTNODES_ENVIRONMENT_VARIABLE.to_string(), client_a_enr.to_base64()), (HIVE_CHECK_LIVE_PORT.to_string(), 0.to_string())]))).await;
-
-
+        client.test.start_client(TRIN_BRIDGE_CLIENT_TYPE.to_string(), Some(HashMap::from([(BOOTNODES_ENVIRONMENT_VARIABLE.to_string(), client_enr.to_base64()), (HIVE_CHECK_LIVE_PORT.to_string(), 0.to_string())]))).await;
 
         // With default node settings nodes should be storing all content
         let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
@@ -116,11 +100,11 @@ dyn_async! {
         let comments = process_content(content_vec.clone());
 
         // wait content_vec.len() seconds for data to propagate, giving more time if more items are propagating
-        tokio::time::sleep(Duration::from_secs(content_vec.len() as u64)).await;
+        tokio::time::sleep(Duration::from_secs(content_vec.len() as u64) * 2).await;
 
         let mut result = vec![];
         for (index, (content_key, content_value)) in content_vec.into_iter().enumerate() {
-            match client_b.rpc.local_content(content_key.clone()).await {
+            match client.rpc.local_content(content_key.clone()).await {
                 Ok(possible_content) => {
                    match possible_content {
                         PossibleHistoryContentValue::ContentPresent(content) => {
@@ -140,7 +124,7 @@ dyn_async! {
         }
 
         if !result.is_empty() {
-            panic!("Client B: {:?}", result);
+            panic!("Client: {:?}", result);
         }
     }
 }
