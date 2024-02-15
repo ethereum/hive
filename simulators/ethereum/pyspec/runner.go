@@ -195,7 +195,7 @@ func (tc *TestCase) run(t *hivesim.T) {
 
 	end := time.Now()
 
-	if tc.FailedErr == nil {
+	if false { // TODO: Activate only on --sim.loglevel > 3
 		t.Logf(`test timing:
 			setupClientEnv %v
  			startClient %v
