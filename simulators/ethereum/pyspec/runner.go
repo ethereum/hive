@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/fs"
 	"math/big"
@@ -11,21 +10,19 @@ import (
 	"strings"
 	"time"
 
-	api "github.com/ethereum/go-ethereum/beacon/engine"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/rpc"
-	"github.com/ethereum/go-ethereum/tests"
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/ethereum/engine/client/hive_rpc"
 	"github.com/ethereum/hive/simulators/ethereum/engine/globals"
+)
 
-	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
+var (
+	SyncTimeout = 10 * time.Second
 )
 
 // loadFixtureTests extracts tests from fixture.json files in a given directory,
 // creates a testcase for each test, and passes the testcase struct to fn.
-func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) {
+func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(TestCase)) {
 	filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		// check file is actually a fixture
 		if err != nil {
@@ -40,8 +37,8 @@ func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(test
 			return nil
 		}
 
-		// extract fixture.json tests (multiple forks) into fixtureTest structs
-		var fixtureTests map[string]fixtureTest
+		// extract fixture.json tests (multiple forks) into fixture structs
+		var fixtureTests map[string]*Fixture
 		if err := common.LoadJSON(path, &fixtureTests); err != nil {
 			t.Logf("invalid test file: %v, unable to load json", err)
 			return nil
@@ -50,24 +47,19 @@ func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(test
 		// create testcase structure from fixtureTests
 		for name, fixture := range fixtureTests {
 			// skip networks post merge or not supported
-			network := fixture.json.Fork
+			network := fixture.Fork
 			if _, exist := envForks[network]; !exist {
 				continue
 			}
 			// define testcase (tc) struct with initial fields
-			tc := testcase{
-				fixture:  fixture,
-				name:     path[10:len(path)-5] + "/" + name,
-				filepath: path,
+			tc := TestCase{
+				Name:     path[10:len(path)-5] + "/" + name,
+				FilePath: path,
+				Fixture:  fixture,
 			}
 			// match test case name against regex if provided
-			if !re.MatchString(tc.name) {
+			if !re.MatchString(tc.Name) {
 				continue
-			}
-			// extract genesis, payloads & post allocation field to tc
-			if err := tc.extractFixtureFields(fixture.json); err != nil {
-				t.Logf("test %v / %v: unable to extract fixture fields: %v", d.Name(), name, err)
-				tc.failedErr = fmt.Errorf("unable to extract fixture fields: %v", err)
 			}
 			// feed tc to single worker within fixtureRunner()
 			fn(tc)
@@ -80,12 +72,13 @@ func loadFixtureTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(test
 // fixtureRunner, all testcase payloads are sent and executed using the EngineAPI. for
 // verification all fixture nonce, balance and storage values are checked against the
 // response received from the lastest block.
-func (tc *testcase) run(t *hivesim.T) {
+func (tc *TestCase) run(t *hivesim.T) {
 	start := time.Now()
+	tc.FailCallback = t
 
 	t.Log("setting variables required for starting client.")
 	engineStarter := hive_rpc.HiveRPCEngineStarter{
-		ClientType: tc.clientType,
+		ClientType: tc.ClientType,
 		EnginePort: globals.EnginePortHTTP,
 		EthPort:    globals.EthPortHTTP,
 		JWTSecret:  globals.DefaultJwtTokenSecretBytes,
@@ -99,123 +92,110 @@ func (tc *testcase) run(t *hivesim.T) {
 	tc.updateEnv(env)
 	t0 := time.Now()
 	// If test is already failed, don't bother spinning up a client
-	if tc.failedErr != nil {
-		t.Errorf("test failed early: %v", tc.failedErr)
-		return
+	if tc.FailedErr != nil {
+		t.Fatalf("test failed early: %v", tc.FailedErr)
 	}
 	// start client (also creates an engine RPC client internally)
 	t.Log("starting client with Engine API.")
-	engineClient, err := engineStarter.StartClient(t, ctx, tc.genesis, env, nil)
+	engineClient, err := engineStarter.StartClient(t, ctx, tc.Genesis(), env, nil)
 	if err != nil {
-		tc.failedErr = err
-		t.Fatalf("can't start client with Engine API: %v", err)
+		tc.Fatalf("can't start client with Engine API: %v", err)
 	}
 	// verify genesis hash matches that of the fixture
 	genesisBlock, err := engineClient.BlockByNumber(ctx, big.NewInt(0))
 	if err != nil {
-		tc.failedErr = err
-		t.Fatalf("unable to get genesis block: %v", err)
+		tc.Fatalf("unable to get genesis block: %v", err)
 	}
-	if genesisBlock.Hash() != tc.fixture.json.Genesis.Hash {
-		tc.failedErr = errors.New("genesis hash mismatch")
-		t.Fatalf("genesis hash mismatch")
+	if genesisBlock.Hash() != tc.GenesisBlock.Hash {
+		tc.Fatalf("genesis hash mismatch")
 	}
 	t1 := time.Now()
 
 	// send payloads and check response
-	latestValidHash := common.Hash{}
-	for _, engineNewPayload := range tc.engineNewPayloads {
-		plStatus, plErr := engineClient.NewPayload(
-			context.Background(),
-			int(engineNewPayload.Version),
-			engineNewPayload.HiveExecutionPayload,
-		)
-		// check for rpc errors and compare error codes
-		errCode := int(engineNewPayload.ErrorCode)
-		if errCode != 0 {
-			checkRPCErrors(plErr, errCode, t, tc)
-			continue
-		}
-		// set expected payload return status
-		expectedStatus := "VALID"
-		if engineNewPayload.ValidationError != nil {
-			expectedStatus = "INVALID"
-		}
-		// check payload status matches expected
-		if plStatus.Status != expectedStatus {
-			tc.failedErr = fmt.Errorf("payload status mismatch: client returned %v and fixture expected %v", plStatus.Status, expectedStatus)
-			t.Fatalf("payload status mismatch: client returned %v fixture expected %v", plStatus.Status, expectedStatus)
+	var latestValidPayload *EngineNewPayload
+	for _, engineNewPayload := range tc.EngineNewPayloads {
+		engineNewPayload := engineNewPayload
+		if syncing, err := engineNewPayload.ExecuteValidate(
+			ctx,
+			engineClient,
+		); err != nil {
+			tc.Fatalf("Payload validation error: %v", err)
+		} else if syncing {
+			tc.Fatalf("Payload validation failed (not synced)")
 		}
 		// update latest valid block hash if payload status is VALID
-		if plStatus.Status == "VALID" {
-			latestValidHash = *plStatus.LatestValidHash
+		if engineNewPayload.Valid() {
+			latestValidPayload = engineNewPayload
 		}
 	}
 	t2 := time.Now()
 
 	// only update head of beacon chain if valid response occurred
-	if latestValidHash != (common.Hash{}) {
-		// update with latest valid response
-		fcState := &api.ForkchoiceStateV1{HeadBlockHash: latestValidHash}
-		if _, fcErr := engineClient.ForkchoiceUpdated(ctx, int(tc.fixture.json.EngineFcuVersion), fcState, nil); fcErr != nil {
-			tc.failedErr = fcErr
-			t.Fatalf("unable to update head of beacon chain in test %s: %v ", tc.name, fcErr)
+	if latestValidPayload != nil {
+		if syncing, err := latestValidPayload.ForkchoiceValidate(ctx, engineClient, tc.EngineFcuVersion); err != nil {
+			tc.Fatalf("unable to update head of chain: %v", err)
+		} else if syncing {
+			tc.Fatalf("forkchoice update failed (not synced)")
 		}
 	}
 	t3 := time.Now()
+	if err := tc.ValidatePost(ctx, engineClient); err != nil {
+		tc.Fatalf("unable to verify post allocation in test %s: %v", tc.Name, err)
+	}
 
-	// check nonce, balance & storage of accounts in final block against fixture values
-	for account, genesisAccount := range *tc.postAlloc {
-		// get nonce & balance from last block (end of test execution)
-		gotNonce, errN := engineClient.NonceAt(ctx, account, nil)
-		gotBalance, errB := engineClient.BalanceAt(ctx, account, nil)
-		if errN != nil {
-			tc.failedErr = errN
-			t.Errorf("unable to call nonce from account: %v, in test %s: %v", account, tc.name, errN)
-		} else if errB != nil {
-			tc.failedErr = errB
-			t.Errorf("unable to call balance from account: %v, in test %s: %v", account, tc.name, errB)
+	if tc.SyncPayload != nil {
+		// First send a new payload to the already running client
+		if syncing, err := tc.SyncPayload.ExecuteValidate(
+			ctx,
+			engineClient,
+		); err != nil {
+			tc.Fatalf("unable to send sync payload: %v", err)
+		} else if syncing {
+			tc.Fatalf("sync payload failed (not synced)")
 		}
-		// check final nonce & balance matches expected in fixture
-		if genesisAccount.Nonce != gotNonce {
-			tc.failedErr = errors.New("nonce received doesn't match expected from fixture")
-			t.Errorf(`nonce received from account %v doesn't match expected from fixture in test %s:
-			received from block: %v
-			expected in fixture: %v`, account, tc.name, gotNonce, genesisAccount.Nonce)
+		// Send a forkchoice update to the already running client to head to the sync payload
+		if syncing, err := tc.SyncPayload.ForkchoiceValidate(ctx, engineClient, tc.EngineFcuVersion); err != nil {
+			tc.Fatalf("unable to update head of chain: %v", err)
+		} else if syncing {
+			tc.Fatalf("forkchoice update failed (not synced)")
 		}
-		if genesisAccount.Balance.Cmp(gotBalance) != 0 {
-			tc.failedErr = errors.New("balance received doesn't match expected from fixture")
-			t.Errorf(`balance received from account %v doesn't match expected from fixture in test %s:
-			received from block: %v
-			expected in fixture: %v`, account, tc.name, gotBalance, genesisAccount.Balance)
+
+		// Spawn a second client connected to the already running client,
+		// send the forkchoice updated with the head hash and wait for sync.
+		// Then verify the post allocation.
+		// Add a timeout too.
+		secondEngineClient, err := engineStarter.StartClient(t, ctx, tc.Genesis(), env, nil, engineClient)
+		if err != nil {
+			tc.Fatalf("can't start client with Engine API: %v", err)
 		}
-		// check final storage
-		if len(genesisAccount.Storage) > 0 {
-			// extract fixture storage keys
-			keys := make([]common.Hash, 0, len(genesisAccount.Storage))
-			for key := range genesisAccount.Storage {
-				keys = append(keys, key)
+
+		if _, err := tc.SyncPayload.ExecuteValidate(
+			ctx,
+			secondEngineClient,
+		); err != nil {
+			tc.Fatalf("unable to send sync payload: %v", err)
+		} // Don't check syncing here because some clients do sync immediately
+
+		timeoutCtx, cancel := context.WithTimeout(ctx, SyncTimeout)
+		defer cancel()
+		for {
+			if syncing, err := tc.SyncPayload.ForkchoiceValidate(ctx, secondEngineClient, tc.EngineFcuVersion); err != nil {
+				tc.Fatalf("unable to update head of chain: %v", err)
+			} else if !syncing {
+				break
 			}
-			// get storage values for account with keys: keys
-			gotStorage, errS := engineClient.StorageAtKeys(ctx, account, keys, nil)
-			if errS != nil {
-				tc.failedErr = errS
-				t.Errorf("unable to get storage values from account: %v, in test %s: %v", account, tc.name, errS)
+			select {
+			case <-timeoutCtx.Done():
+				tc.Fatalf("timeout waiting for sync of secondary client")
+			default:
 			}
-			// check values in storage match with fixture
-			for _, key := range keys {
-				if genesisAccount.Storage[key] != *gotStorage[key] {
-					tc.failedErr = errors.New("storage received doesn't match expected from fixture")
-					t.Errorf(`storage received from account %v doesn't match expected from fixture in test %s: from storage address: %v
-						received from block:  %v
-						expected in fixture:  %v`, account, tc.name, key, gotStorage[key], genesisAccount.Storage[key])
-				}
-			}
+			time.Sleep(time.Second)
 		}
 	}
+
 	end := time.Now()
 
-	if tc.failedErr == nil {
+	if false { // TODO: Activate only on --sim.loglevel > 3
 		t.Logf(`test timing:
 			setupClientEnv %v
  			startClient %v
@@ -229,74 +209,9 @@ func (tc *testcase) run(t *hivesim.T) {
 
 // updateEnv updates the environment variables against the fork rules
 // defined in envForks, for the network specified in the testcase fixture.
-func (tc *testcase) updateEnv(env hivesim.Params) {
-	forkRules := envForks[tc.fixture.json.Fork]
+func (tc *TestCase) updateEnv(env hivesim.Params) {
+	forkRules := envForks[tc.Fork]
 	for k, v := range forkRules {
 		env[k] = fmt.Sprintf("%d", v)
-	}
-}
-
-// extractFixtureFields extracts the genesis, post allocation and payload
-// fields from the given fixture test and stores them in the testcase struct.
-func (tc *testcase) extractFixtureFields(fixture fixtureJSON) (err error) {
-	if tc.genesis, err = extractGenesis(fixture); err != nil {
-		return fmt.Errorf("failed to extract genesis: %w", err)
-	}
-	if tc.engineNewPayloads, err = extractEngineNewPayloads(fixture); err != nil {
-		return fmt.Errorf("failed to extract engineNewPayloads: %w", err)
-	}
-	tc.postAlloc = &fixture.Post
-	return nil
-}
-
-// extracts the genesis block information from the given fixture.
-func extractGenesis(fixture fixtureJSON) (*core.Genesis, error) {
-	genesis := &core.Genesis{
-		Config:        tests.Forks[fixture.Fork],
-		Coinbase:      fixture.Genesis.Coinbase,
-		Difficulty:    fixture.Genesis.Difficulty,
-		GasLimit:      fixture.Genesis.GasLimit,
-		Timestamp:     fixture.Genesis.Timestamp.Uint64(),
-		ExtraData:     fixture.Genesis.ExtraData,
-		Mixhash:       fixture.Genesis.MixHash,
-		Nonce:         fixture.Genesis.Nonce.Uint64(),
-		BaseFee:       fixture.Genesis.BaseFee,
-		BlobGasUsed:   fixture.Genesis.BlobGasUsed,
-		ExcessBlobGas: fixture.Genesis.ExcessBlobGas,
-		Alloc:         fixture.Pre,
-	}
-	return genesis, nil
-}
-
-// extracts all the engineNewPayload information from the given fixture.
-func extractEngineNewPayloads(fixture fixtureJSON) ([]engineNewPayload, error) {
-	var engineNewPayloads []engineNewPayload
-	for _, engineNewPayload := range fixture.EngineNewPayloads {
-		engineNewPayload := engineNewPayload
-		hiveExecutionPayload, err := typ.FromBeaconExecutableData(engineNewPayload.ExecutionPayload)
-		if err != nil {
-			return nil, errors.New("executionPayload param within engineNewPayload is invalid")
-		}
-		hiveExecutionPayload.VersionedHashes = &engineNewPayload.BlobVersionedHashes
-		hiveExecutionPayload.ParentBeaconBlockRoot = engineNewPayload.ParentBeaconBlockRoot
-		engineNewPayload.HiveExecutionPayload = &hiveExecutionPayload
-		engineNewPayloads = append(engineNewPayloads, engineNewPayload)
-	}
-	return engineNewPayloads, nil
-}
-
-// checks for RPC errors and compares error codes if expected.
-func checkRPCErrors(plErr error, fxErrCode int, t *hivesim.T, tc *testcase) {
-	rpcErr, isRpcErr := plErr.(rpc.Error)
-	if isRpcErr {
-		plErrCode := rpcErr.ErrorCode()
-		if plErrCode != fxErrCode {
-			tc.failedErr = fmt.Errorf("error code mismatch: client returned %v and fixture expected %v", plErrCode, fxErrCode)
-			t.Fatalf("error code mismatch\n client returned: %v\n fixture expected: %v\n in test %s", plErrCode, fxErrCode, tc.name)
-		}
-		t.Logf("expected error code caught by client: %v", plErrCode)
-	} else {
-		tc.failedErr = fmt.Errorf("fixture expected rpc error code: %v but none was returned from client", fxErrCode)
-		t.Fatalf("fixture expected rpc error code: %v but none was returned from client in test %s", fxErrCode, tc.name)
 	}
 }
