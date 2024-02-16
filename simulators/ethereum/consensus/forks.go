@@ -115,7 +115,7 @@ var envForks = map[string]map[string]int{
 		"HIVE_FORK_LONDON":         2000,
 	},
 	"HomesteadToEIP150At5": {
-		"HIVE_FORK_HOMESTEAD": 0,
+		"HIVE_FORK_HOMESTEAD":      0,
 		"HIVE_FORK_TANGERINE":      5,
 		"HIVE_FORK_SPURIOUS":       2000,
 		"HIVE_FORK_BYZANTIUM":      2000,
@@ -138,7 +138,7 @@ var envForks = map[string]map[string]int{
 		"HIVE_FORK_LONDON":         2000,
 	},
 	"EIP158ToByzantiumAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
+		"HIVE_FORK_HOMESTEAD":      0,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       0,
 		"HIVE_FORK_BYZANTIUM":      5,
@@ -149,7 +149,7 @@ var envForks = map[string]map[string]int{
 		"HIVE_FORK_LONDON":         2000,
 	},
 	"ByzantiumToConstantinopleAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
+		"HIVE_FORK_HOMESTEAD":      0,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       0,
 		"HIVE_FORK_BYZANTIUM":      0,
@@ -160,7 +160,7 @@ var envForks = map[string]map[string]int{
 		"HIVE_FORK_LONDON":         2000,
 	},
 	"ByzantiumToConstantinopleFixAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
+		"HIVE_FORK_HOMESTEAD":      0,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       0,
 		"HIVE_FORK_BYZANTIUM":      0,
@@ -171,7 +171,7 @@ var envForks = map[string]map[string]int{
 		"HIVE_FORK_LONDON":         2000,
 	},
 	"ConstantinopleFixToIstanbulAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
+		"HIVE_FORK_HOMESTEAD":      0,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       0,
 		"HIVE_FORK_BYZANTIUM":      0,
@@ -182,7 +182,7 @@ var envForks = map[string]map[string]int{
 		"HIVE_FORK_LONDON":         2000,
 	},
 	"IstanbulToBerlinAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
+		"HIVE_FORK_HOMESTEAD":      0,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       0,
 		"HIVE_FORK_BYZANTIUM":      0,
@@ -193,7 +193,7 @@ var envForks = map[string]map[string]int{
 		"HIVE_FORK_LONDON":         2000,
 	},
 	"BerlinToLondonAt5": {
-		"HIVE_FORK_HOMESTEAD": 0,
+		"HIVE_FORK_HOMESTEAD":      0,
 		"HIVE_FORK_TANGERINE":      0,
 		"HIVE_FORK_SPURIOUS":       0,
 		"HIVE_FORK_BYZANTIUM":      0,
@@ -215,6 +215,18 @@ var envForks = map[string]map[string]int{
 		"HIVE_FORK_LONDON":         0,
 	},
 	"ArrowGlacierToMergeAtDiffC0000": {
+		"HIVE_FORK_HOMESTEAD":            0,
+		"HIVE_FORK_TANGERINE":            0,
+		"HIVE_FORK_SPURIOUS":             0,
+		"HIVE_FORK_BYZANTIUM":            0,
+		"HIVE_FORK_CONSTANTINOPLE":       0,
+		"HIVE_FORK_PETERSBURG":           0,
+		"HIVE_FORK_ISTANBUL":             0,
+		"HIVE_FORK_BERLIN":               0,
+		"HIVE_FORK_LONDON":               0,
+		"HIVE_TERMINAL_TOTAL_DIFFICULTY": 786432,
+	},
+	"ArrowGlacierToParisAtDiffC0000": {
 		"HIVE_FORK_HOMESTEAD":            0,
 		"HIVE_FORK_TANGERINE":            0,
 		"HIVE_FORK_SPURIOUS":             0,
@@ -267,6 +279,20 @@ var envForks = map[string]map[string]int{
 		"HIVE_SHANGHAI_TIMESTAMP":        0,
 	},
 	"MergeToShanghaiAtTime15k": {
+		"HIVE_FORK_HOMESTEAD":            0,
+		"HIVE_FORK_TANGERINE":            0,
+		"HIVE_FORK_SPURIOUS":             0,
+		"HIVE_FORK_BYZANTIUM":            0,
+		"HIVE_FORK_CONSTANTINOPLE":       0,
+		"HIVE_FORK_PETERSBURG":           0,
+		"HIVE_FORK_ISTANBUL":             0,
+		"HIVE_FORK_BERLIN":               0,
+		"HIVE_FORK_LONDON":               0,
+		"HIVE_FORK_MERGE":                0,
+		"HIVE_TERMINAL_TOTAL_DIFFICULTY": 0,
+		"HIVE_SHANGHAI_TIMESTAMP":        15000,
+	},
+	"ParisToShanghaiAtTime15k": {
 		"HIVE_FORK_HOMESTEAD":            0,
 		"HIVE_FORK_TANGERINE":            0,
 		"HIVE_FORK_SPURIOUS":             0,
