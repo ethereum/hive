@@ -56,16 +56,16 @@ fn process_content(
                         "Block Body".to_string(),
                         header_with_proof.header.number,
                         vec![
-                            content_pair_to_string_pair(last_header.clone()),
                             content_pair_to_string_pair(history_content),
+                            content_pair_to_string_pair(last_header.clone()),
                         ],
                     ),
                     HistoryContentKey::BlockReceipts(_) => (
                         "Block Receipt".to_string(),
                         header_with_proof.header.number,
                         vec![
-                            content_pair_to_string_pair(last_header.clone()),
                             content_pair_to_string_pair(history_content),
+                            content_pair_to_string_pair(last_header.clone()),
                         ],
                     ),
                     HistoryContentKey::EpochAccumulator(_) => (
