@@ -12,12 +12,14 @@ import (
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/config"
+	"github.com/ethereum/hive/simulators/eth2/common/config/consensus/genesis/interfaces"
 	"github.com/google/uuid"
 	hbls "github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/marioevz/eth-clients/clients/validator"
 	"github.com/pkg/errors"
 	"github.com/protolambda/go-keystorev4"
 	"github.com/protolambda/zrnt/eth2/beacon/common"
+	"github.com/protolambda/zrnt/eth2/beacon/phase0"
 	"github.com/tyler-smith/go-bip39"
 	util "github.com/wealdtech/go-eth2-util"
 )
@@ -32,7 +34,7 @@ func init() {
 	}
 }
 
-type ValidatorDetails struct {
+type ValidatorSetupDetails struct {
 	validator.ValidatorKeys
 	// Withdrawal credential type: can be 0, BLS, or 1, execution
 	WithdrawalCredentialType int
@@ -46,7 +48,14 @@ type ValidatorDetails struct {
 	Slashed bool
 }
 
-func (kd *ValidatorDetails) WithdrawalCredentials() (out common.Root) {
+func (kd *ValidatorSetupDetails) KickstartValidatorData(spec *common.Spec) (out phase0.KickstartValidatorData) {
+	out.Pubkey = kd.ValidatorPubkey
+	out.WithdrawalCredentials = kd.WithdrawalCredentials()
+	out.Balance = spec.MAX_EFFECTIVE_BALANCE + kd.ExtraInitialBalance
+	return
+}
+
+func (kd *ValidatorSetupDetails) WithdrawalCredentials() (out common.Root) {
 	if kd.WithdrawalCredentialType == common.BLS_WITHDRAWAL_PREFIX {
 		hasher := sha256.New()
 		hasher.Write(kd.WithdrawalPubkey[:])
@@ -60,14 +69,129 @@ func (kd *ValidatorDetails) WithdrawalCredentials() (out common.Root) {
 	return
 }
 
-type ValidatorDetailsMap map[common.ValidatorIndex]*ValidatorDetails
+type ValidatorsSetupDetails []*ValidatorSetupDetails
 
-func (m ValidatorDetailsMap) Keys() map[common.ValidatorIndex]*validator.ValidatorKeys {
-	keys := make(map[common.ValidatorIndex]*validator.ValidatorKeys, len(m))
-	for k, v := range m {
-		keys[k] = &v.ValidatorKeys
+func (l ValidatorsSetupDetails) KeysMap(startIndex common.ValidatorIndex) ValidatorsKeys {
+	keys := make(ValidatorsKeys, len(l))
+	for k, v := range l {
+		keys[common.ValidatorIndex(k)+startIndex] = &v.ValidatorKeys
 	}
 	return keys
+}
+
+func (keys ValidatorsSetupDetails) KeyTranches(shares Shares) []ValidatorsKeys {
+	tranches := make(
+		[]ValidatorsKeys,
+		0,
+		len(shares),
+	)
+	i := uint64(0)
+	for _, c := range shares.ValidatorSplits(uint64(len(keys))) {
+		tranche := make(ValidatorsKeys)
+		for j := i; j < (i + c); j++ {
+			tranche[common.ValidatorIndex(j)] = &keys[j].ValidatorKeys
+		}
+		tranches = append(tranches, tranche)
+		i += c
+	}
+	return tranches
+}
+
+func (keys ValidatorsSetupDetails) CreateKickstartValidatorData(spec *common.Spec) []phase0.KickstartValidatorData {
+	validators := make([]phase0.KickstartValidatorData, 0, len(keys))
+	for _, key := range keys {
+		validators = append(validators, key.KickstartValidatorData(spec))
+	}
+	return validators
+}
+
+func (keys ValidatorsSetupDetails) AddToGenesisState(spec *common.Spec, state interfaces.StateViewGenesis) error {
+	validators := keys.CreateKickstartValidatorData(spec)
+
+	for _, v := range validators {
+		if err := state.AddValidator(spec, v.Pubkey, v.WithdrawalCredentials, v.Balance); err != nil {
+			return err
+		}
+	}
+	vals, err := state.Validators()
+	if err != nil {
+		return err
+	}
+	// Process activations and exits
+	for i := 0; i < len(validators); i++ {
+		val, err := vals.Validator(common.ValidatorIndex(i))
+		if err != nil {
+			return err
+		}
+		vEff, err := val.EffectiveBalance()
+		if err != nil {
+			return err
+		}
+		if vEff == spec.MAX_EFFECTIVE_BALANCE {
+			if err := val.SetActivationEligibilityEpoch(common.GENESIS_EPOCH); err != nil {
+				return err
+			}
+			if err := val.SetActivationEpoch(common.GENESIS_EPOCH); err != nil {
+				return err
+			}
+		}
+		// Process exits/slashings
+		slashings, err := state.Slashings()
+		if err != nil {
+			return err
+		}
+		if keys[i].Exited || keys[i].Slashed {
+			exit_epoch := common.GENESIS_EPOCH
+			val.SetExitEpoch(exit_epoch)
+			val.SetWithdrawableEpoch(
+				exit_epoch + spec.MIN_VALIDATOR_WITHDRAWABILITY_DELAY,
+			)
+			if keys[i].Slashed {
+				if err := val.MakeSlashed(); err != nil {
+					return err
+				}
+
+				bal, err := val.EffectiveBalance()
+				if err != nil {
+					return err
+				}
+
+				if err := slashings.AddSlashing(exit_epoch, bal); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+type ValidatorsKeys map[common.ValidatorIndex]*validator.ValidatorKeys
+
+func (keys ValidatorsKeys) Bundle() hivesim.StartOption {
+	opts := make([]hivesim.StartOption, 0, len(keys)*2)
+	for _, k := range keys {
+		p := fmt.Sprintf(
+			"/hive/input/keystores/0x%x/keystore.json",
+			k.ValidatorPubkey[:],
+		)
+		opts = append(
+			opts,
+			hivesim.WithDynamicFile(
+				p,
+				config.BytesSource(k.ValidatorKeystoreJSON),
+			),
+		)
+		p = fmt.Sprintf("/hive/input/secrets/0x%x", k.ValidatorPubkey[:])
+		opts = append(
+			opts,
+			hivesim.WithDynamicFile(
+				p,
+				config.BytesSource([]byte(k.ValidatorKeystorePass)),
+			),
+		)
+	}
+	return hivesim.Bundle(opts...)
 }
 
 // MnemonicsKeySource creates a range of BLS validator and withdrawal keys.
@@ -78,15 +202,10 @@ type MnemonicsKeySource struct {
 	From uint64 `yaml:"from"`
 	// To account range end, exclusive
 	To uint64 `yaml:"to"`
-	// Validator mnemonic
-	Validator string `yaml:"validator"`
-	// Withdrawal mnemonic
-	Withdrawal string `yaml:"withdrawal"`
-	// Withdrawal type
-	WithdrawalCredentialType int
-
+	// Mnemonic seed
+	Mnemonic string `yaml:"mnemonic"`
 	// cache loaded validator details
-	cache []*ValidatorDetails `yaml:"-"`
+	cache ValidatorsSetupDetails `yaml:"-"`
 }
 
 func mnemonicToSeed(mnemonic string) (seed []byte, err error) {
@@ -156,15 +275,11 @@ func marshalWeakKeystoreJSON(
 	return json.MarshalIndent(store, "", "  ")
 }
 
-func (k *MnemonicsKeySource) Keys() ([]*ValidatorDetails, error) {
+func (k *MnemonicsKeySource) Keys() (ValidatorsSetupDetails, error) {
 	if k.cache != nil {
 		return k.cache, nil
 	}
-	valSeed, err := mnemonicToSeed(k.Validator)
-	if err != nil {
-		return nil, fmt.Errorf("bad validator seed: %w", err)
-	}
-	withdrSeed, err := mnemonicToSeed(k.Withdrawal)
+	seed, err := mnemonicToSeed(k.Mnemonic)
 	if err != nil {
 		return nil, fmt.Errorf("bad validator seed: %w", err)
 	}
@@ -175,10 +290,10 @@ func (k *MnemonicsKeySource) Keys() ([]*ValidatorDetails, error) {
 			k.To,
 		)
 	}
-	out := make([]*ValidatorDetails, 0, k.To-k.From)
+	out := make(ValidatorsSetupDetails, 0, k.To-k.From)
 	for i := k.From; i < k.To; i++ {
 		valpath := fmt.Sprintf("m/12381/3600/%d/0/0", i)
-		valPrivateKey, err := util.PrivateKeyFromSeedAndPath(valSeed, valpath)
+		valPrivateKey, err := util.PrivateKeyFromSeedAndPath(seed, valpath)
 		if err != nil {
 			return nil, errors.Wrapf(
 				err,
@@ -188,7 +303,7 @@ func (k *MnemonicsKeySource) Keys() ([]*ValidatorDetails, error) {
 		}
 		path := fmt.Sprintf("m/12381/3600/%d/0", i)
 		withdrPrivateKey, err := util.PrivateKeyFromSeedAndPath(
-			withdrSeed,
+			seed,
 			path,
 		)
 		if err != nil {
@@ -245,7 +360,7 @@ func (k *MnemonicsKeySource) Keys() ([]*ValidatorDetails, error) {
 		if err != nil {
 			return nil, err
 		}
-		k := &ValidatorDetails{
+		k := &ValidatorSetupDetails{
 			ValidatorKeys: validator.ValidatorKeys{
 				ValidatorKeystoreJSON: jsonData,
 				ValidatorKeystorePass: passphrase,
@@ -262,7 +377,7 @@ func (k *MnemonicsKeySource) Keys() ([]*ValidatorDetails, error) {
 	return out, nil
 }
 
-func SecretKeys(keys []*ValidatorDetails) (*[]blsu.SecretKey, error) {
+func SecretKeys(keys ValidatorsSetupDetails) (*[]blsu.SecretKey, error) {
 	secrets := make([]blsu.SecretKey, len(keys))
 	for i := 0; i < len(keys); i++ {
 		if err := secrets[i].Deserialize(&keys[i].ValidatorSecretKey); err != nil {
@@ -294,53 +409,4 @@ func (shares Shares) ValidatorSplits(validatorTotalCount uint64) []uint64 {
 		}
 	}
 	return validators
-}
-
-func KeyTranches(
-	keys []*ValidatorDetails,
-	shares Shares,
-) []ValidatorDetailsMap {
-	tranches := make(
-		[]ValidatorDetailsMap,
-		0,
-		len(shares),
-	)
-	i := uint64(0)
-	for _, c := range shares.ValidatorSplits(uint64(len(keys))) {
-		tranche := make(ValidatorDetailsMap)
-		for j := i; j < (i + c); j++ {
-			tranche[common.ValidatorIndex(j)] = keys[j]
-		}
-		tranches = append(tranches, tranche)
-		i += c
-	}
-	return tranches
-}
-
-func KeysBundle(
-	keys ValidatorDetailsMap,
-) hivesim.StartOption {
-	opts := make([]hivesim.StartOption, 0, len(keys)*2)
-	for _, k := range keys {
-		p := fmt.Sprintf(
-			"/hive/input/keystores/0x%x/keystore.json",
-			k.ValidatorPubkey[:],
-		)
-		opts = append(
-			opts,
-			hivesim.WithDynamicFile(
-				p,
-				config.BytesSource(k.ValidatorKeystoreJSON),
-			),
-		)
-		p = fmt.Sprintf("/hive/input/secrets/0x%x", k.ValidatorPubkey[:])
-		opts = append(
-			opts,
-			hivesim.WithDynamicFile(
-				p,
-				config.BytesSource([]byte(k.ValidatorKeystorePass)),
-			),
-		)
-	}
-	return hivesim.Bundle(opts...)
 }

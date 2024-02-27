@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,6 +25,9 @@ import (
 	"github.com/ethereum/hive/hivesim"
 	execution_config "github.com/ethereum/hive/simulators/eth2/common/config/execution"
 	"github.com/ethereum/hive/simulators/eth2/common/utils"
+	"github.com/marioevz/blobber"
+	blobber_config "github.com/marioevz/blobber/config"
+	"github.com/marioevz/blobber/keys"
 	beacon_client "github.com/marioevz/eth-clients/clients/beacon"
 	exec_client "github.com/marioevz/eth-clients/clients/execution"
 	node "github.com/marioevz/eth-clients/clients/node"
@@ -52,12 +56,19 @@ type Testnet struct {
 	// Consensus chain configuration
 	spec *common.Spec
 	// Execution chain configuration and genesis info
-	eth1Genesis *execution_config.ExecutionGenesis
+	executionGenesis *execution_config.ExecutionGenesis
 	// Consensus genesis state
 	eth2GenesisState common.BeaconState
 
+	// Blobber
+	blobber *blobber.Blobber
+
 	// Test configuration
 	maxConsecutiveErrorsOnWaits int
+
+	// Validators
+	Validators      *utils.Validators
+	ValidatorGroups map[string]*utils.Validators
 }
 
 type ActiveSpec struct {
@@ -135,7 +146,11 @@ func (t *Testnet) GenesisValidatorsRoot() common.Root {
 }
 
 func (t *Testnet) ExecutionGenesis() *core.Genesis {
-	return t.eth1Genesis.Genesis
+	return t.executionGenesis.Genesis
+}
+
+func (t *Testnet) Blobber() *blobber.Blobber {
+	return t.blobber
 }
 
 func StartTestnet(
@@ -144,8 +159,11 @@ func StartTestnet(
 	env *Environment,
 	config *Config,
 ) *Testnet {
+	prep, err := PrepareTestnet(env, config)
+	if err != nil {
+		t.Fatalf("FAIL: Unable to prepare testnet: %v", err)
+	}
 	var (
-		prep        = prepareTestnet(t, env, config)
 		testnet     = prep.createTestnet(t)
 		genesisTime = testnet.GenesisTimeUnix()
 	)
@@ -171,6 +189,37 @@ func StartTestnet(
 	// Init all client bundles
 	for nodeIndex := range testnet.Nodes {
 		testnet.Nodes[nodeIndex] = new(node.Node)
+	}
+
+	if config.EnableBlobber {
+		blobberKeys := make([]*keys.ValidatorKey, 0)
+		for _, key := range env.Validators {
+			validator := new(keys.ValidatorKey)
+			validator.FromBytes(key.ValidatorSecretKey[:])
+			blobberKeys = append(blobberKeys, validator)
+		}
+
+		blobberOpts := []blobber_config.Option{
+			blobber_config.WithExternalIP(simulatorIP),
+			blobber_config.WithBeaconGenesisTime(testnet.genesisTime),
+			blobber_config.WithSpec(prep.Spec),
+			blobber_config.WithValidatorKeysList(blobberKeys),
+			blobber_config.WithGenesisValidatorsRoot(testnet.genesisValidatorsRoot),
+			blobber_config.WithLogLevel(getLogLevelString()),
+		}
+		blobberOpts = append(blobberOpts, config.BlobberOptions...)
+
+		testnet.blobber, err = blobber.NewBlobber(parentCtx, blobberOpts...)
+		if err != nil {
+			t.Fatalf("FAIL: Unable to create blobber: %v", err)
+		}
+
+		// Add the blobber as trusted peer to the beacon nodes
+		ids := testnet.blobber.GetNextPeerIDs(5) // Five should be enough for any test for now
+		prep.beaconOpts = hivesim.Bundle(prep.beaconOpts,
+			hivesim.Params{
+				"HIVE_ETH2_TRUSTED_PEER_IDS": strings.Join(ids, ","),
+			})
 	}
 
 	// For each key partition, we start a client bundle that consists of:
@@ -203,13 +252,13 @@ func StartTestnet(
 		}
 		if node.ExecutionClientTTD != nil {
 			executionTTD = node.ExecutionClientTTD.Int64()
-		} else if testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty != nil {
-			executionTTD = testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty.Int64()
+		} else if testnet.executionGenesis.Genesis.Config.TerminalTotalDifficulty != nil {
+			executionTTD = testnet.executionGenesis.Genesis.Config.TerminalTotalDifficulty.Int64()
 		}
 		if node.BeaconNodeTTD != nil {
 			beaconTTD = node.BeaconNodeTTD.Int64()
-		} else if testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty != nil {
-			beaconTTD = testnet.eth1Genesis.Genesis.Config.TerminalTotalDifficulty.Int64()
+		} else if testnet.executionGenesis.Genesis.Config.TerminalTotalDifficulty != nil {
+			beaconTTD = testnet.executionGenesis.Genesis.Config.TerminalTotalDifficulty.Int64()
 		}
 
 		// Prepare the client objects with all the information necessary to
@@ -228,7 +277,7 @@ func StartTestnet(
 				ProxyConfig: &exec_client.ExecutionProxyConfig{
 					Host:                   simulatorIP,
 					Port:                   exec_client.PortEngineRPC + nodeIndex,
-					TrackForkchoiceUpdated: true,
+					TrackForkchoiceUpdated: false,
 					LogEngineCalls:         env.LogEngineCalls,
 				},
 			},
@@ -243,6 +292,7 @@ func StartTestnet(
 				config.BuilderOptions,
 				beacon_client.BeaconClientConfig{
 					ClientIndex:             nodeIndex,
+					BeaconAPIPort:           beacon_client.PortBeaconAPI,
 					TerminalTotalDifficulty: beaconTTD,
 					Spec:                    testnet.spec,
 					GenesisValidatorsRoot:   &testnet.genesisValidatorsRoot,
@@ -267,9 +317,12 @@ func StartTestnet(
 		nodeClient.Verification = node.TestVerificationNode
 		// Start the node clients if specified so
 		if !node.DisableStartup {
+			t.Logf("Starting node %d", nodeIndex)
 			if err := nodeClient.Start(); err != nil {
 				t.Fatalf("FAIL: Unable to start node %d: %v", nodeIndex, err)
 			}
+		} else {
+			t.Logf("Node %d startup disabled, skipping", nodeIndex)
 		}
 	}
 
@@ -286,6 +339,10 @@ func (t *Testnet) Stop() {
 				builder.Cancel()
 			}
 		}
+	}
+
+	if t.blobber != nil {
+		t.blobber.Close()
 	}
 }
 
@@ -318,6 +375,112 @@ func (t *Testnet) WaitSlots(ctx context.Context, slots common.Slot) error {
 		}
 	}
 	return nil
+}
+
+func (t *Testnet) WaitSlotsWithMaxMissedSlots(ctx context.Context, slots common.Slot, maxMissedSlots common.Slot) error {
+	var (
+		genesis      = t.GenesisTimeUnix()
+		slotDuration = time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
+		slotsPassed  = common.Slot(0)
+		timer        = time.NewTicker(slotDuration)
+		runningNodes = t.VerificationNodes().Running()
+		results      = makeResults(runningNodes, t.maxConsecutiveErrorsOnWaits)
+	)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case tim := <-timer.C:
+			// start polling after first slot of genesis
+			if tim.Before(genesis.Add(slotDuration)) {
+				t.Logf("Time till genesis: %s", genesis.Sub(tim))
+				continue
+			}
+
+			// new slot, log and check status of all beacon nodes
+			var (
+				wg        sync.WaitGroup
+				clockSlot = t.spec.TimeToSlot(
+					common.Timestamp(time.Now().Unix()),
+					t.GenesisTime(),
+				)
+			)
+			results.Clear()
+
+			for i, n := range runningNodes {
+				wg.Add(1)
+				go func(
+					ctx context.Context,
+					n *node.Node,
+					r *result,
+				) {
+					defer wg.Done()
+
+					b := n.BeaconClient
+
+					checkpoints, err := b.BlockFinalityCheckpoints(
+						ctx,
+						eth2api.BlockHead,
+					)
+					if err != nil {
+						r.err = errors.Wrap(
+							err,
+							"failed to poll finality checkpoint",
+						)
+						return
+					}
+
+					versionedBlock, err := b.BlockV2(
+						ctx,
+						eth2api.BlockHead,
+					)
+					if err != nil {
+						r.err = errors.Wrap(err, "failed to retrieve block")
+						return
+					}
+
+					execution := ethcommon.Hash{}
+					if executionPayload, _, _, err := versionedBlock.ExecutionPayload(); err == nil {
+						execution = executionPayload.BlockHash
+					}
+
+					slot := versionedBlock.Slot()
+					if clockSlot > slot &&
+						(clockSlot-slot) >= maxMissedSlots {
+						r.fatal = fmt.Errorf(
+							"missed more slots than allowed (max=%d): clockSlot=%d, slot=%d",
+							maxMissedSlots,
+							clockSlot,
+							slot,
+						)
+						return
+					}
+
+					r.msg = fmt.Sprintf(
+						"fork=%s, clock_slot=%s, slot=%d, head=%s, exec_payload=%s, justified=%s, finalized=%s",
+						versionedBlock.Version,
+						clockSlot,
+						slot,
+						utils.Shorten(versionedBlock.Root().String()),
+						utils.Shorten(execution.String()),
+						utils.Shorten(checkpoints.CurrentJustified.String()),
+						utils.Shorten(checkpoints.Finalized.String()),
+					)
+				}(ctx, n, results[i])
+			}
+			wg.Wait()
+
+			if err := results.CheckError(); err != nil {
+				return err
+			}
+			results.PrintMessages(t.Logf)
+			slotsPassed += 1
+			if slotsPassed >= slots {
+				return nil
+			}
+		}
+	}
 }
 
 // WaitForFork blocks until a beacon client reaches specified fork,
@@ -385,7 +548,7 @@ func (t *Testnet) WaitForFork(ctx context.Context, fork string) error {
 					}
 
 					execution := ethcommon.Hash{}
-					if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
+					if executionPayload, _, _, err := versionedBlock.ExecutionPayload(); err == nil {
 						execution = executionPayload.BlockHash
 					}
 
@@ -491,7 +654,7 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 						return
 					}
 					execution := ethcommon.Hash{}
-					if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
+					if executionPayload, _, _, err := versionedBlock.ExecutionPayload(); err == nil {
 						execution = executionPayload.BlockHash
 					}
 
@@ -538,6 +701,127 @@ func (t *Testnet) WaitForFinality(ctx context.Context) (
 				if cp, ok := results[0].result.(common.Checkpoint); ok {
 					return cp, nil
 				}
+			}
+		}
+	}
+}
+
+// WaitForSync blocks until all beacon clients converge to the same head.
+func (t *Testnet) WaitForSync(ctx context.Context) (
+	tree.Root, error,
+) {
+	var (
+		genesis      = t.GenesisTimeUnix()
+		slotDuration = time.Duration(t.spec.SECONDS_PER_SLOT) * time.Second
+		timer        = time.NewTicker(slotDuration)
+		runningNodes = t.VerificationNodes().Running()
+		results      = makeResults(runningNodes, t.maxConsecutiveErrorsOnWaits)
+	)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return tree.Root{}, ctx.Err()
+		case tim := <-timer.C:
+			// start polling after first slot of genesis
+			if tim.Before(genesis.Add(slotDuration)) {
+				t.Logf("Time till genesis: %s", genesis.Sub(tim))
+				continue
+			}
+
+			// new slot, log and check status of all beacon nodes
+			var (
+				wg        sync.WaitGroup
+				clockSlot = t.spec.TimeToSlot(
+					common.Timestamp(time.Now().Unix()),
+					t.GenesisTime(),
+				)
+				heads = make(chan tree.Root, len(runningNodes))
+			)
+			results.Clear()
+
+			for i, n := range runningNodes {
+				wg.Add(1)
+				go func(ctx context.Context, n *node.Node, r *result) {
+					defer wg.Done()
+
+					b := n.BeaconClient
+
+					checkpoints, err := b.BlockFinalityCheckpoints(
+						ctx,
+						eth2api.BlockHead,
+					)
+					if err != nil {
+						r.err = errors.Wrap(
+							err,
+							"failed to poll finality checkpoint",
+						)
+						return
+					}
+
+					versionedBlock, err := b.BlockV2(
+						ctx,
+						eth2api.BlockHead,
+					)
+					if err != nil {
+						r.err = errors.Wrap(err, "failed to retrieve block")
+						return
+					}
+					heads <- versionedBlock.Root()
+
+					execution := ethcommon.Hash{}
+					if executionPayload, _, _, err := versionedBlock.ExecutionPayload(); err == nil {
+						execution = executionPayload.BlockHash
+					}
+
+					slot := versionedBlock.Slot()
+					health, _ := GetHealth(ctx, b, t.spec, slot)
+
+					r.msg = fmt.Sprintf(
+						"fork=%s, clock_slot=%d, slot=%d, head=%s, "+
+							"health=%.2f, exec_payload=%s, justified=%s, "+
+							"finalized=%s",
+						versionedBlock.Version,
+						clockSlot,
+						slot,
+						utils.Shorten(versionedBlock.Root().String()),
+						health,
+						utils.Shorten(execution.String()),
+						utils.Shorten(checkpoints.CurrentJustified.String()),
+						utils.Shorten(checkpoints.Finalized.String()),
+					)
+
+					if (checkpoints.Finalized != common.Checkpoint{}) {
+						r.done = true
+						r.result = checkpoints.Finalized
+					}
+				}(ctx, n, results[i])
+			}
+			wg.Wait()
+
+			if err := results.CheckError(); err != nil {
+				return tree.Root{}, err
+			}
+			results.PrintMessages(t.Logf)
+
+			// Check if all heads are the same
+			close(heads)
+			var (
+				head tree.Root
+				ok   bool = true
+			)
+			for h := range heads {
+				if head == EMPTY_TREE_ROOT {
+					head = h
+					continue
+				}
+				if !bytes.Equal(head[:], h[:]) {
+					ok = false
+					break
+				}
+			}
+			if ok && head != EMPTY_TREE_ROOT {
+				return head, nil
 			}
 		}
 	}
@@ -616,7 +900,7 @@ func (t *Testnet) WaitForExecutionFinality(
 					}
 
 					execution := ethcommon.Hash{}
-					if exeuctionPayload, err := headBlock.ExecutionPayload(); err == nil {
+					if exeuctionPayload, _, _, err := headBlock.ExecutionPayload(); err == nil {
 						execution = exeuctionPayload.BlockHash
 					}
 
@@ -633,7 +917,7 @@ func (t *Testnet) WaitForExecutionFinality(
 							return
 						} else {
 							finalizedFork = finalizedBlock.Version
-							if exeuctionPayload, err := finalizedBlock.ExecutionPayload(); err == nil {
+							if exeuctionPayload, _, _, err := finalizedBlock.ExecutionPayload(); err == nil {
 								finalizedExecution = exeuctionPayload.BlockHash
 							}
 						}
@@ -731,13 +1015,13 @@ func (t *Testnet) WaitForCurrentEpochFinalization(
 
 					b := n.BeaconClient
 
-					headInfo, err := b.BlockHeader(ctx, eth2api.BlockHead)
+					headInfo, err := b.BlockV2(ctx, eth2api.BlockHead)
 					if err != nil {
 						r.err = errors.Wrap(err, "failed to poll head")
 						return
 					}
 
-					slot := headInfo.Header.Message.Slot
+					slot := headInfo.Slot()
 					if clockSlot > slot &&
 						(clockSlot-slot) >= t.spec.SLOTS_PER_EPOCH {
 						r.fatal = fmt.Errorf(
@@ -761,11 +1045,12 @@ func (t *Testnet) WaitForCurrentEpochFinalization(
 					}
 
 					r.msg = fmt.Sprintf(
-						"clock_slot=%d, slot=%d, head=%s justified=%s, "+
+						"fork=%s, clock_slot=%d, slot=%d, head=%s justified=%s, "+
 							"finalized=%s, epoch_to_finalize=%d",
+						headInfo.Version,
 						clockSlot,
 						slot,
-						utils.Shorten(headInfo.Root.String()),
+						utils.Shorten(headInfo.Root().String()),
 						utils.Shorten(checkpoints.CurrentJustified.String()),
 						utils.Shorten(checkpoints.Finalized.String()),
 						epochToBeFinalized,
@@ -828,7 +1113,7 @@ func (t *Testnet) WaitForExecutionPayload(
 				// Check if TTD has been reached
 				if td, err := executionClient.TotalDifficultyByNumber(ctx, nil); err == nil {
 					if td.Cmp(
-						t.eth1Genesis.Genesis.Config.TerminalTotalDifficulty,
+						t.executionGenesis.Genesis.Config.TerminalTotalDifficulty,
 					) >= 0 {
 						ttdReached = true
 					} else {
@@ -877,7 +1162,7 @@ func (t *Testnet) WaitForExecutionPayload(
 					}
 
 					executionHash := ethcommon.Hash{}
-					if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
+					if executionPayload, _, _, err := versionedBlock.ExecutionPayload(); err == nil {
 						executionHash = executionPayload.BlockHash
 					}
 

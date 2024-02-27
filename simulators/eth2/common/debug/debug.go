@@ -45,7 +45,7 @@ func PrintAllBeaconBlocks(
 		)
 
 		if versionedBlock, err := b.BlockV2(parentCtx, eth2api.BlockIdRoot(root)); err == nil {
-			if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
+			if executionPayload, _, _, err := versionedBlock.ExecutionPayload(); err == nil {
 				execution = utils.Shorten(executionPayload.BlockHash.Hex())
 			}
 		}
@@ -190,7 +190,7 @@ func PrintAllTestnetBeaconBlocks(
 			)
 
 			if versionedBlock, err := beaconNode.BlockV2(parentCtx, eth2api.BlockIdRoot(root)); err == nil {
-				if executionPayload, err := versionedBlock.ExecutionPayload(); err == nil {
+				if executionPayload, _, _, err := versionedBlock.ExecutionPayload(); err == nil {
 					execution = executionPayload.BlockHash
 					l.Logf(
 						"Node %d: Execution payload: hash=%s",
