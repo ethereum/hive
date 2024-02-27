@@ -50,8 +50,9 @@ case "$HIVE_LOGLEVEL" in
 esac
 
 # Create the data directory.
-mkdir /reth-hive-datadir
-FLAGS="$FLAGS --datadir /reth-hive-datadir"
+DATADIR="/reth-hive-datadir"
+mkdir $DATADIR
+FLAGS="$FLAGS --datadir $DATADIR"
 
 # TODO If a specific network ID is requested, use that
 #if [ "$HIVE_NETWORK_ID" != "" ]; then
@@ -79,6 +80,9 @@ echo $FLAGS
 # Initialize the local testchain with the genesis state
 echo "Initializing database with genesis state..."
 $reth init $FLAGS --chain /genesis.json
+
+# Make sure pruner doesn't start
+echo -e "[prune]\\nblock_interval = 500_000" >> $DATADIR/reth.toml
 
 # make sure we use the same genesis each time
 FLAGS="$FLAGS --chain /genesis.json"
