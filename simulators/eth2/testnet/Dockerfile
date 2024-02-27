@@ -1,4 +1,4 @@
-FROM golang:1-alpine AS builder
+FROM golang:1.20-alpine AS builder
 RUN apk --no-cache add gcc musl-dev linux-headers cmake make clang build-base clang-static clang-dev
 
 # Prepare workspace.
