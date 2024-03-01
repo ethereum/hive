@@ -106,7 +106,7 @@ dyn_async! {
             match client.rpc.local_content(content_key.clone()).await {
                 Ok(content) => {
                     if content != content_value {
-                        result.push(format!("Error content received for block {} was different then expected", comments[index]));
+                        result.push(format!("Error content received for block {} was different then expected: Provided: {content:?} Expected: {content_value:?}", comments[index]));
                     }
                 }
                 Err(err) => {
