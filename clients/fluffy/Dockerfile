@@ -1,6 +1,7 @@
-ARG branch=amd64-master-latest
+ARG baseimage=statusim/nimbus-fluffy
+ARG tag=amd64-master-latest
 
-FROM statusim/nimbus-fluffy:$branch
+FROM $baseimage:$tag
 
 ADD fluffy.sh /fluffy.sh
 RUN chmod +x /fluffy.sh

@@ -1,6 +1,7 @@
-ARG branch=latest
+ARG baseimage=portalnetwork/trin
+ARG tag=latest
 
-FROM portalnetwork/trin:$branch
+FROM $baseimage:$tag
 
 ADD trin.sh /trin.sh
 RUN chmod +x /trin.sh

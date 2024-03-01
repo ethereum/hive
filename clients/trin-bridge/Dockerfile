@@ -1,4 +1,7 @@
-FROM portalnetwork/trin:latest-bridge
+ARG baseimage=portalnetwork/trin
+ARG tag=latest-bridge
+
+FROM $baseimage:$tag
 
 ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml /test_data_collection_of_forks_blocks.yaml
 ADD trin_bridge.sh /trin_bridge.sh

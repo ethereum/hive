@@ -1,4 +1,8 @@
-FROM ghcr.io/ethereumjs/ultralight:latest
+
+ARG baseimage=ghcr.io/ethereumjs/ultralight
+ARG tag=latest
+
+FROM $baseimage:$tag
 
 COPY ultralight.sh /ultralight.sh
 RUN chmod +x /ultralight.sh
