@@ -4,7 +4,6 @@ use super::constants::{
 };
 use ethportal_api::HistoryContentKey;
 use ethportal_api::HistoryContentValue;
-use ethportal_api::PossibleHistoryContentValue;
 use ethportal_api::{Discv5ApiClient, HistoryNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
@@ -105,16 +104,9 @@ dyn_async! {
         let mut result = vec![];
         for (index, (content_key, content_value)) in content_vec.into_iter().enumerate() {
             match client.rpc.local_content(content_key.clone()).await {
-                Ok(possible_content) => {
-                   match possible_content {
-                        PossibleHistoryContentValue::ContentPresent(content) => {
-                            if content != content_value {
-                                result.push(format!("Error content received for block {} was different then expected", comments[index]));
-                            }
-                        }
-                        PossibleHistoryContentValue::ContentAbsent => {
-                            result.push(format!("Error content for block {} was absent", comments[index]));
-                        }
+                Ok(content) => {
+                    if content != content_value {
+                        result.push(format!("Error content received for block {} was different then expected", comments[index]));
                     }
                 }
                 Err(err) => {

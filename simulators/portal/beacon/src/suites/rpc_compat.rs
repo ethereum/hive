@@ -1,10 +1,8 @@
 use crate::suites::constants::BEACON_STRING;
 use crate::suites::constants::HIVE_PORTAL_NETWORKS_SELECTED;
 use crate::suites::constants::TRIN_BRIDGE_CLIENT_TYPE;
-use ethportal_api::types::beacon::ContentInfo;
 use ethportal_api::types::enr::generate_random_remote_enr;
 use ethportal_api::Discv5ApiClient;
-use ethportal_api::PossibleBeaconContentValue::{ContentAbsent, ContentPresent};
 use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
@@ -220,23 +218,12 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let content_key =
-        serde_json::from_value(json!(CONTENT_KEY));
+        let content_key = serde_json::from_value(json!(CONTENT_KEY));
 
         match content_key {
             Ok(content_key) => {
-                let response = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await;
-
-                match response {
-                    Ok(response) => {
-                        match response {
-                            ContentAbsent => (),
-                            _ => panic!("Expected ContentAbsent, got ContentPresent")
-                        }
-                    },
-                    Err(err) => {
-                        panic!("{}", &err.to_string());
-                    },
+                if let Ok(response)  = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
+                    panic!("Expected to recieve an error because content wasn't found {response:?}");
                 }
             }
             Err(err) => {
@@ -314,18 +301,8 @@ dyn_async! {
                 }
 
                 // Here we are calling local_content RPC to test if the content is present
-                let response = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await;
-
-                match response {
-                    Ok(response) => {
-                        match response {
-                            ContentPresent(_) => (),
-                            _ => panic!("Expected ContentPresent, got ContentAbsent")
-                        }
-                    },
-                    Err(err) => {
-                        panic!("{}", &err.to_string());
-                    },
+                if let Err(err) = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
+                    panic!("Expected content returned from local_content to be present {}", &err.to_string());
                 }
             }
             Err(err) => {
@@ -579,22 +556,8 @@ dyn_async! {
         };
         let header_with_proof_key: BeaconContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
 
-        match BeaconNetworkApiClient::recursive_find_content(&client.rpc, header_with_proof_key).await {
-            Ok(result) => {
-                match result {
-                    ContentInfo::Content{ content: ethportal_api::PossibleBeaconContentValue::ContentAbsent, utp_transfer } => {
-                        if utp_transfer {
-                            panic!("Error: Unexpected RecursiveFindContent response: utp_transfer was supposed to be false");
-                        }
-                    },
-                    other => {
-                        panic!("Error: Unexpected RecursiveFindContent response: {other:?}");
-                    }
-                }
-            },
-            Err(err) => {
-                panic!("Error: Unable to get response from RecursiveFindContent request: {err:?}");
-            }
+        if let Ok(content) = BeaconNetworkApiClient::recursive_find_content(&client.rpc, header_with_proof_key).await {
+            panic!("Error: Unexpected RecursiveFindContent expected to not get the content and instead get an error: {content:?}");
         }
     }
 }

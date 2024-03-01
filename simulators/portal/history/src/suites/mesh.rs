@@ -1,7 +1,7 @@
 use crate::suites::constants::TRIN_BRIDGE_CLIENT_TYPE;
 use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Metric, XorMetric};
-use ethportal_api::types::portal::ContentInfo;
+use ethportal_api::types::history::ContentInfo;
 use ethportal_api::{
     Discv5ApiClient, HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient,
 };
@@ -145,8 +145,8 @@ dyn_async! {
         match client_a.rpc.find_content(enrs[0].clone(), header_with_proof_key.clone()).await {
             Ok(result) => {
                 match result {
-                    ContentInfo::Content{ content: ethportal_api::PossibleHistoryContentValue::ContentPresent(val), utp_transfer } => {
-                        if val != header_with_proof_value {
+                    ContentInfo::Content{ content, utp_transfer } => {
+                        if content != header_with_proof_value {
                             panic!("Error: Unexpected FINDCONTENT response: didn't return expected header with proof value");
                         }
 
