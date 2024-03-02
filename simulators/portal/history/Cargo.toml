@@ -5,7 +5,7 @@ authors = ["Ognyan Genev <ognian.genev@gmail.com>", "Kolby ML (Moroz Liebl) <kol
 edition = "2021"
 
 [dependencies]
-ethportal-api = { git = "https://github.com/ethereum/trin", rev = "2a32224e3c2b0b80bc37c1b692c33016371f197a" }
+ethportal-api = { git = "https://github.com/ethereum/trin", tag = "v0.1.0-alpha.22" }
 portal-spec-test-utils-rs = { git = "https://github.com/ethereum/portal-spec-tests", rev = "d1e996d0d4dc2136b3cd38d9e25cdc3a6b74dcd9" }
 hivesim = { git = "https://github.com/ethereum/portal-hive", rev = "8ff1e3d3c941dd00d56dacd777a5dfb71edf402f" }
 futures = "0.3.25"

@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install clang -y
 # copy over manifests and source to build image
 COPY Cargo.toml ./Cargo.toml
 COPY src ./src
+RUN apt-get update && apt-get install clang -y
 
 # build for release
 RUN cargo build --release

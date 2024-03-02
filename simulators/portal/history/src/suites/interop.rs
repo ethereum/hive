@@ -1,9 +1,9 @@
 use crate::suites::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
-use ethportal_api::types::portal::ContentInfo;
+use ethportal_api::types::history::ContentInfo;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
     ContentValue, Discv5ApiClient, HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient,
-    OverlayContentKey, PossibleHistoryContentValue,
+    OverlayContentKey,
 };
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
@@ -292,15 +292,8 @@ dyn_async! {
 
         match client_b.rpc.local_content(target_key).await {
             Ok(possible_content) => {
-               match possible_content {
-                    PossibleHistoryContentValue::ContentPresent(content) => {
-                        if content != target_value {
-                            panic!("Error receiving content: Expected content: {target_value:?}, Received content: {content:?}");
-                        }
-                    }
-                    PossibleHistoryContentValue::ContentAbsent => {
-                        panic!("Expected content not found!");
-                    }
+                if possible_content != target_value {
+                    panic!("Error receiving content: Expected content: {target_value:?}, Received content: {possible_content:?}");
                 }
             }
             Err(err) => {
@@ -446,8 +439,8 @@ dyn_async! {
         match client_a.rpc.recursive_find_content(target_key.clone()).await {
             Ok(result) => {
                 match result {
-                    ContentInfo::Content{ content: ethportal_api::PossibleHistoryContentValue::ContentPresent(val), utp_transfer } => {
-                        if val != target_value {
+                    ContentInfo::Content{ content, utp_transfer } => {
+                        if content != target_value {
                             panic!("Error: Unexpected RECURSIVEFINDCONTENT response: didn't return expected target content");
                         }
 
@@ -523,8 +516,8 @@ dyn_async! {
         match client_a.rpc.find_content(target_enr, target_key.clone()).await {
             Ok(result) => {
                 match result {
-                    ContentInfo::Content{ content: ethportal_api::PossibleHistoryContentValue::ContentPresent(val), utp_transfer } => {
-                        if val != target_value {
+                    ContentInfo::Content{ content, utp_transfer } => {
+                        if content != target_value {
                             panic!("Error: Unexpected FINDCONTENT response: didn't return expected block body");
                         }
 
@@ -638,19 +631,12 @@ dyn_async! {
 
             match client_b.rpc.local_content(content_key.clone()).await {
                 Ok(expected_value) => {
-                    match expected_value {
-                        PossibleHistoryContentValue::ContentPresent(actual_value) => {
-                            if actual_value != content_value {
-                                result.push(format!("Error content received for block {content_details} was different then expected"));
-                            }
-                        }
-                        PossibleHistoryContentValue::ContentAbsent => {
-                            result.push(format!("Error content for block {content_details} was absent"));
-                        }
+                    if expected_value != content_value {
+                        result.push(format!("Error content received for block {content_details} was different then expected"));
                     }
                 }
                 Err(err) => {
-                    panic!("Unable to get received content: {err:?}");
+                    result.push(format!("Error content for block {err} was absent"));
                 }
             }
         }
