@@ -1,6 +1,7 @@
-ARG branch=latest
+ARG baseimage=ghcr.io/optimism-java/shisui
+ARG tag=latest
 
-FROM ghcr.io/optimism-java/shisui:$branch
+FROM $baseimage:$tag
 
 RUN echo "latest" > /version.txt
 
