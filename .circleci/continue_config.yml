@@ -45,7 +45,7 @@ jobs:
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
-      - setup_remote_docker: {version: 20.10.14}
+      - setup_remote_docker
       - run:
           command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum --loglevel 5"
       - run:
