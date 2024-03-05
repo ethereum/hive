@@ -19,8 +19,8 @@ import (
 var Deneb string = "deneb"
 
 var (
-	normalTxAccounts = globals.TestAccounts[:len(globals.TestAccounts)/2]
-	blobTxAccounts   = globals.TestAccounts[len(globals.TestAccounts)/2:]
+	blobTxAccounts   = globals.TestAccounts[:len(globals.TestAccounts)/2]
+	normalTxAccounts = globals.TestAccounts[len(globals.TestAccounts)/2:]
 )
 
 func WithdrawalAddress(vI beacon.ValidatorIndex) common.Address {
