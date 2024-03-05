@@ -17,8 +17,6 @@ use tokio::time::Duration;
 
 // This is taken from Trin. It should be fairly standard
 const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
-
-// Header with proof for block number 14764013
 const BOOTSTRAP_KEY: &str = "0x10bd9f42d9a42d972bdaf4dee84e5b419dd432b52867258acb7bcc7f567b6e3af1";
 
 fn content_pair_to_string_pair(
