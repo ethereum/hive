@@ -29,7 +29,7 @@ jobs:
   # hive needs to be able to talk to the docker containers it creates.
   smoke-tests:
     machine:
-      image: ubuntu-2004:202201-02
+      image: default
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
@@ -45,7 +45,7 @@ jobs:
     steps:
       - checkout
       - attach_workspace: {at: "/tmp/build"}
-      - setup_remote_docker: {version: 20.10.14}
+      - setup_remote_docker
       - run:
           command: "/tmp/build/hive --sim=smoke/genesis --client=go-ethereum --loglevel 5"
       - run:
