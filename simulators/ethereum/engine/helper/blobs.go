@@ -224,6 +224,8 @@ func (blobId BlobID) GenerateBlob() (*typ.Blob, *typ.KZGCommitment, *typ.KZGProo
 	// Use precomputed KZG commitments and proofs if available
 	if preComputedKZGCommitment, preComputedProof := GetPrecomputedKZG(blobId); preComputedKZGCommitment != nil && preComputedProof != nil {
 		return &blob, preComputedKZGCommitment, preComputedProof, nil
+	} else {
+		fmt.Printf("INFO: No precomputed KZG for blob %d\n", blobId)
 	}
 	ctx_4844 := CryptoCtx()
 
