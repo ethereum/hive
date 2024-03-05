@@ -12,6 +12,9 @@ if [ "$HIVE_PORTAL_NETWORKS_SELECTED" != "" ]; then
         # It can be a made up value for now as tests are not doing any sync.
         FLAGS="$FLAGS --trusted-block-root:0x0000000000000000000000000000000000000000000000000000000000000000"
     fi
+    if [[ $HIVE_PORTAL_NETWORKS_SELECTED =~ "state" ]]; then
+        FLAGS="$FLAGS --state=true"
+    fi    
 fi
 
 
