@@ -83,7 +83,7 @@ func GetBlobListByIndex(startIndex BlobID, endIndex BlobID) BlobIDs {
 		}
 	} else {
 		for i := uint64(0); i < count; i++ {
-			blobList[i] = endIndex - BlobID(i)
+			blobList[i] = startIndex - BlobID(i)
 		}
 	}
 
