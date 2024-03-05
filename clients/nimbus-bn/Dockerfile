@@ -1,36 +1,16 @@
-# Docker container spec for building the unstable branch of nimbus.
-
-FROM debian:buster-slim AS build
-
 ARG tag=unstable
-ARG github=status-im/nimbus-eth2
+ARG baseimage=ethpandaops/nimbus-eth2
 
-RUN apt-get update \
- && apt-get install -y --fix-missing build-essential make git libpcre3-dev librocksdb-dev curl \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+FROM $baseimage:$tag AS source
 
-RUN git clone --recurse-submodules --depth 1 --branch "$tag" https://github.com/$github
-
-WORKDIR /nimbus-eth2
-
-RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" V=1 update
-
-RUN NPROC=$(nproc); make -j${NPROC} NIMFLAGS="--parallelBuild:${NPROC}" nimbus_beacon_node && \
-    mv build/nimbus_beacon_node /usr/bin/
-
-# --------------------------------- #
-# Starting new image to reduce size #
-# --------------------------------- #
-
-FROM debian:buster-slim AS deploy
+FROM debian:bookworm-slim AS deploy
 
 RUN apt-get update \
  && apt-get install -y librocksdb-dev bash curl jq\
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-COPY --from=build /usr/bin/nimbus_beacon_node /usr/bin/nimbus_beacon_node
+COPY --from=source /home/user/nimbus-eth2/build/nimbus_beacon_node /usr/bin/nimbus_beacon_node
 
 RUN usr/bin/nimbus_beacon_node --version > /version.txt
 
