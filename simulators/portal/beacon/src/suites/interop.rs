@@ -237,20 +237,6 @@ dyn_async! {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
-        if let Some((optional_key, optional_value)) = test_data.get(1) {
-            let optional_key: BeaconContentKey =
-                serde_json::from_value(json!(optional_key)).unwrap();
-            let optional_value: BeaconContentValue =
-                serde_json::from_value(json!(optional_value)).unwrap();
-            match client_b.rpc.store(optional_key, optional_value).await {
-                Ok(result) => if !result {
-                    panic!("Unable to store optional content for recursive find content");
-                },
-                Err(err) => {
-                    panic!("Error storing optional content for recursive find content: {err:?}");
-                }
-            }
-        }
         let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
         let target_key: BeaconContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
@@ -378,20 +364,6 @@ dyn_async! {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
-        if let Some((optional_key, optional_value)) = test_data.get(1) {
-            let optional_key: BeaconContentKey =
-                serde_json::from_value(json!(optional_key)).unwrap();
-            let optional_value: BeaconContentValue =
-                serde_json::from_value(json!(optional_value)).unwrap();
-            match client_b.rpc.store(optional_key, optional_value).await {
-                Ok(result) => if !result {
-                    panic!("Unable to store optional content for recursive find content");
-                },
-                Err(err) => {
-                    panic!("Error storing optional content for recursive find content: {err:?}");
-                }
-            }
-        }
 
         let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
         let target_key: BeaconContentKey =
@@ -463,21 +435,6 @@ dyn_async! {
             Some(test_data) => test_data,
             None => panic!("Expected test data none was provided"),
         };
-        if let Some((optional_key, optional_value)) = test_data.get(1) {
-            let optional_key: BeaconContentKey =
-                serde_json::from_value(json!(optional_key)).unwrap();
-            let optional_value: BeaconContentValue =
-                serde_json::from_value(json!(optional_value)).unwrap();
-            match client_b.rpc.store(optional_key, optional_value).await {
-                Ok(result) => if !result {
-                    panic!("Unable to store optional content for find content");
-                },
-                Err(err) => {
-                    panic!("Error storing optional content for find content: {err:?}");
-                }
-            }
-        }
-
         let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
         let target_key: BeaconContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
