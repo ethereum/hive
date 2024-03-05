@@ -7,14 +7,15 @@ IP_ADDR=$(hostname -i | awk '{print $1}')
 FLAGS=""
 
 if [ "$HIVE_PORTAL_NETWORKS_SELECTED" != "" ]; then
+    FLAGS="$FLAGS --networks=$HIVE_PORTAL_NETWORKS_SELECTED"
+
     if [[ $HIVE_PORTAL_NETWORKS_SELECTED =~ "beacon" ]]; then
-        # Providing atrusted block root is required currently to enable the beacon network.
+        # Providing a trusted block root is required currently to fully enable the beacon network.
         # It can be a made up value for now as tests are not doing any sync.
         FLAGS="$FLAGS --trusted-block-root:0x0000000000000000000000000000000000000000000000000000000000000000"
     fi
-    if [[ $HIVE_PORTAL_NETWORKS_SELECTED =~ "state" ]]; then
-        FLAGS="$FLAGS --state=true"
-    fi    
+else
+    FLAGS="$FLAGS --networks=history"
 fi
 
 
@@ -22,5 +23,4 @@ if [ "$HIVE_CLIENT_PRIVATE_KEY" != "" ]; then
     FLAGS="$FLAGS --netkey-unsafe=0x$HIVE_CLIENT_PRIVATE_KEY"
 fi
 
-# Fluffy runs all networks by default, so we can not configure to run networks individually
-fluffy --rpc --rpc-address="0.0.0.0" --nat:extip:"$IP_ADDR" --network=none --log-level="debug" $FLAGS
+fluffy --rpc --rpc-address="0.0.0.0" --nat:extip:"$IP_ADDR" --portal-network=none --log-level="debug" $FLAGS
