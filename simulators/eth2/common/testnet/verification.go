@@ -299,6 +299,47 @@ func (t *Testnet) VerifyProposers(
 	return nil
 }
 
+// GetProposer returns the node id of the proposer for the requested slot.
+func (t *Testnet) GetProposer(
+	parentCtx context.Context,
+	vs VerificationSlot,
+) (int, error) {
+	runningNodes := t.VerificationNodes().Running()
+	bn := runningNodes[0].BeaconClient
+	slot, err := vs.Slot(parentCtx, t, bn)
+	if err != nil {
+		return 0, err
+	}
+
+	versionedBlock, err := bn.BlockV2(parentCtx, eth2api.BlockIdSlot(slot))
+	if err != nil {
+		return 0, fmt.Errorf(
+			"node %d (%s): failed to retrieve beacon block: %v",
+			0,
+			runningNodes[0].ClientNames(),
+			err,
+		)
+	}
+
+	validator, err := bn.StateValidator(
+		parentCtx,
+		eth2api.StateIdSlot(slot),
+		eth2api.ValidatorIdIndex(versionedBlock.ProposerIndex()),
+	)
+	if err != nil {
+		return 0, fmt.Errorf(
+			"node %d (%s): failed to retrieve validator: %v",
+			0,
+			runningNodes[0].ClientNames(),
+			err,
+		)
+	}
+
+	return t.ValidatorClientIndex(
+		[48]byte(validator.Validator.Pubkey),
+	)
+}
+
 func (t *Testnet) VerifyELBlockLabels(parentCtx context.Context) error {
 	runningNodes := t.VerificationNodes().Running()
 	for i := 0; i < len(runningNodes); i++ {
