@@ -207,9 +207,12 @@ func (ts BaseTestSpec) ExecutePostForkWait(
 		}
 	}
 	if ts.WaitForBlobs {
-		// Check that the latest head contains blobs
+		// Check that all clients have produced at least one block with blobs
+		blobProposers := make([]bool, len(testnet.VerificationNodes().Running()))
+
 		blobsWaitCtx, cancel := testnet.Spec().EpochTimeoutContext(ctx, 1)
 		defer cancel()
+	out:
 		for {
 			select {
 			case <-blobsWaitCtx.Done():
@@ -218,8 +221,22 @@ func (ts BaseTestSpec) ExecutePostForkWait(
 				if blobCount, err := testnet.VerifyBlobs(ctx, tn.LastestSlotByHead{}); err != nil {
 					t.Fatalf("FAIL: error verifying blobs: %v", err)
 				} else if blobCount > 0 {
-					t.Logf("INFO: blobs have been included in the chain")
-					return
+					proposerIdx, err := testnet.GetProposer(blobsWaitCtx, tn.LastestSlotByHead{})
+					if err != nil {
+						t.Fatalf("FAIL: error getting proposer: %v", err)
+					}
+					t.Logf("INFO: blobs have been included in the chain by proposer %d", proposerIdx)
+					blobProposers[proposerIdx] = true
+				}
+
+				// Check if all clients have produced a block with blobs
+				allProposers := true
+				for _, p := range blobProposers {
+					allProposers = allProposers && p
+				}
+				if allProposers {
+					t.Logf("INFO: all clients have produced a block with blobs")
+					break out
 				}
 			}
 		}
