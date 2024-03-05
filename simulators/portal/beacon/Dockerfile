@@ -21,6 +21,7 @@ RUN apt update && apt install wget -y
 
 # copy build artifacts from build stage
 COPY --from=builder /beacon/target/release/beacon .
+ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/beacon_chain/hive/test_data.yaml ./test-data/test_data.yaml
 
 ENV RUST_LOG=debug
 
