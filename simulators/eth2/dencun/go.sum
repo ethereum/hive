@@ -164,8 +164,8 @@ github.com/ethereum/hive v0.0.0-20231128202301-f931b46287a8 h1:vpOgMOOh8lQHGL8lS
 github.com/ethereum/hive v0.0.0-20231128202301-f931b46287a8/go.mod h1:lT6CsiAFb+HTThYzu3veK2x2/BlazxNQD6KWPDlvjfo=
 github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6 h1:LcSUNGwQuJyR/gdPcsif57yKX+3MyhpoAuChzR8k6Yk=
 github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6/go.mod h1:FX4oxNyTNw/P+TUWrb7vva7o/rFI0pHO7OYdtG6EtN4=
-github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305003323-ebe431380e1c h1:EBlnoT34Ea4Y7kVmmIoYqtdNvNmabQlir7SIQ0UCS/A=
-github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305003323-ebe431380e1c/go.mod h1:nag0wj4K1/0AEP1VAKwY08N4I9yymrwXsX4+n0YFfdw=
+github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305231022-f69df863de20 h1:Bf9mev5lvesQIIpJtzO+vnGQ3Jv3NuLa2buY2+2pQzg=
+github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305231022-f69df863de20/go.mod h1:nag0wj4K1/0AEP1VAKwY08N4I9yymrwXsX4+n0YFfdw=
 github.com/evanphx/json-patch v4.11.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/fasthttp-contrib/websocket v0.0.0-20160511215533-1f3b11f56072/go.mod h1:duJ4Jxv5lDcvg4QuQr0oowTf7dz4/CR8NtyCooz9HL8=
 github.com/fatih/structs v1.1.0/go.mod h1:9NiDSp5zOcgEDl+j00MP/WkGVPOlPRLejGD8Ga6PJ7M=

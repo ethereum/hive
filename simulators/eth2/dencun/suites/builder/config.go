@@ -16,6 +16,11 @@ var REQUIRES_FINALIZATION_TO_ACTIVATE_BUILDER = []string{
 	"teku",
 }
 
+var (
+	DEFAULT_FORK_WAIT_EPOCHS                  = int64(2)
+	DEFAULT_FORK_WAIT_FOR_FINALIZATION_EPOCHS = int64(5)
+)
+
 type BuilderTestSpec struct {
 	suite_base.BaseTestSpec
 	VerifyMissedSlotsCount      bool
@@ -31,7 +36,7 @@ func (ts BuilderTestSpec) GetTestnetConfig(
 ) *testnet.Config {
 	tc := ts.BaseTestSpec.GetTestnetConfig(allNodeDefinitions)
 
-	tc.DenebForkEpoch = big.NewInt(1)
+	tc.DenebForkEpoch = big.NewInt(DEFAULT_FORK_WAIT_EPOCHS)
 
 	if len(
 		allNodeDefinitions.FilterByCL(
@@ -40,7 +45,7 @@ func (ts BuilderTestSpec) GetTestnetConfig(
 	) > 0 {
 		// At least one of the CLs require finalization to start requesting
 		// headers from the builder
-		tc.DenebForkEpoch = big.NewInt(5)
+		tc.DenebForkEpoch = big.NewInt(DEFAULT_FORK_WAIT_FOR_FINALIZATION_EPOCHS)
 	}
 
 	// Builders are always enabled for these tests

@@ -7,7 +7,7 @@ toolchain go1.22.0
 require (
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/ethereum/hive v0.0.0-20231031133732-dcd7ddb75960
-	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305003323-ebe431380e1c
+	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305231022-f69df863de20
 	github.com/google/uuid v1.6.0
 	github.com/herumi/bls-eth-go-binary v1.29.1
 	github.com/holiman/uint256 v1.2.4
