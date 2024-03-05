@@ -1,6 +1,9 @@
 package main
 
 import (
+	"os"
+	"runtime/pprof"
+
 	"github.com/ethereum/hive/hivesim"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
 	suite_base "github.com/ethereum/hive/simulators/eth2/dencun/suites/base"
@@ -11,6 +14,19 @@ import (
 )
 
 func main() {
+	// Create a CPU profile file
+	cpuProfileFile, err := os.Create("cpu.prof")
+	if err != nil {
+		panic(err)
+	}
+	defer cpuProfileFile.Close()
+
+	// Start CPU profiling
+	if err := pprof.StartCPUProfile(cpuProfileFile); err != nil {
+		panic(err)
+	}
+	defer pprof.StopCPUProfile()
+
 	// Create simulator that runs all tests
 	sim := hivesim.New()
 	if sim == nil {
