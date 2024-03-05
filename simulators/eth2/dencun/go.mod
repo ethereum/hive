@@ -8,7 +8,7 @@ require (
 	github.com/ethereum/go-ethereum v1.13.14
 	github.com/ethereum/hive v0.0.0-20231128202301-f931b46287a8
 	github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6
-	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305003323-ebe431380e1c
+	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305231022-f69df863de20
 	github.com/lithammer/dedent v1.1.0
 	github.com/marioevz/blobber v1.1.1-0.20240228051014-aa5f0f9031a9
 	github.com/marioevz/mock-builder v1.1.1-0.20231123171249-08b59e943190
