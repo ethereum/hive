@@ -13,18 +13,22 @@ import (
 const (
 	EngineForkchoiceUpdatedV1 = "engine_forkchoiceUpdatedV1"
 	EngineForkchoiceUpdatedV2 = "engine_forkchoiceUpdatedV2"
+	EngineForkchoiceUpdatedV3 = "engine_forkchoiceUpdatedV3"
 	EngineNewPayloadV1        = "engine_newPayloadV1"
 	EngineNewPayloadV2        = "engine_newPayloadV2"
+	EngineNewPayloadV3        = "engine_newPayloadV3"
 )
 
 var EngineNewPayload = []string{
 	EngineNewPayloadV1,
 	EngineNewPayloadV2,
+	EngineNewPayloadV3,
 }
 
 var EngineForkchoiceUpdated = []string{
 	EngineForkchoiceUpdatedV1,
 	EngineForkchoiceUpdatedV2,
+	EngineForkchoiceUpdatedV3,
 }
 
 type FallibleLogger interface {

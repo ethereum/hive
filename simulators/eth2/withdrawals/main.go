@@ -29,7 +29,7 @@ type TestSpec interface {
 	GetName() string
 	GetDescription() string
 	Execute(*hivesim.T, *testnet.Environment, []clients.NodeDefinition)
-	GetValidatorKeys(string) []*consensus_config.ValidatorDetails
+	GetValidatorKeys(string) []*consensus_config.ValidatorSetupDetails
 }
 
 var tests = []TestSpec{
@@ -216,14 +216,9 @@ func addAllTests(
 			Description: test.GetDescription(),
 			Run: func(t *hivesim.T) {
 				keys := test.GetValidatorKeys(mnemonic)
-				secrets, err := consensus_config.SecretKeys(keys)
-				if err != nil {
-					panic(err)
-				}
 				env := &testnet.Environment{
-					Clients: c,
-					Keys:    keys,
-					Secrets: secrets,
+					Clients:    c,
+					Validators: keys,
 				}
 				test.Execute(t, env, clientCombinations)
 			},

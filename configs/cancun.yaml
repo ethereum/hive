@@ -37,7 +37,15 @@
     tag: main
 
 - client: teku-bn
+  nametag: deneb
+  build_args:
+      baseimage: ethpandaops/teku
+      tag: master
 - client: teku-vc
+  nametag: deneb
+  build_args:
+      baseimage: ethpandaops/teku
+      tag: master
 
 - client: prysm-bn
   nametag: deneb
@@ -53,24 +61,24 @@
 - client: lighthouse-bn
   nametag: deneb
   build_args:
-      baseimage: sigp/lighthouse
-      tag: deneb-modern
+      baseimage: ethpandaops/lighthouse
+      tag: unstable-linux-amd64
 - client: lighthouse-vc
   nametag: deneb
   build_args:
-      baseimage: sigp/lighthouse
-      tag: deneb-modern
+      baseimage: ethpandaops/lighthouse
+      tag: unstable-linux-amd64
 
 - client: lodestar-bn
   nametag: deneb
   build_args:
       baseimage: ethpandaops/lodestar
-      tag: deneb-builder
+      tag: unstable-linux-amd64
 - client: lodestar-vc
   nametag: deneb
   build_args:
       baseimage: ethpandaops/lodestar
-      tag: deneb-builder
+      tag: unstable-linux-amd64
 
 - client: nimbus-bn
 - client: nimbus-vc

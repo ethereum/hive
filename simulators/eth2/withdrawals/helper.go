@@ -197,7 +197,7 @@ type Validator struct {
 	Exited                     bool
 	ExitCondition              string
 	ExactWithdrawableBalance   *big.Int
-	Keys                       *cl.ValidatorDetails
+	Keys                       *cl.ValidatorSetupDetails
 	BLSToExecutionChangeDomain *beacon.BLSDomain
 	Verified                   bool
 	InitialBalance             beacon.Gwei
@@ -239,7 +239,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 	)
 
 	// Then get the balance
-	execPayload, err := headBlockState.ExecutionPayload()
+	execPayload, _, _, err := headBlockState.ExecutionPayload()
 	if err != nil {
 		return false, errors.Wrap(
 			err,
@@ -297,7 +297,7 @@ func (v *Validator) VerifyWithdrawnBalance(
 				continue
 			}
 
-			execPayload, err := blockState.ExecutionPayload()
+			execPayload, _, _, err := blockState.ExecutionPayload()
 			if err != nil {
 				return false, errors.Wrapf(err, "failed to get execution payload, slot %d", slot)
 			}
@@ -504,7 +504,7 @@ func ValidatorFromBeaconValidator(
 	index beacon.ValidatorIndex,
 	source beacon.Validator,
 	balance beacon.Gwei,
-	keys *cl.ValidatorDetails,
+	keys *cl.ValidatorSetupDetails,
 	domain *beacon.BLSDomain,
 	beaconCache BeaconCache,
 ) (*Validator, error) {
@@ -567,7 +567,7 @@ func ValidatorFromBeaconState(
 	spec beacon.Spec,
 	state beacon.BeaconState,
 	index beacon.ValidatorIndex,
-	keys *cl.ValidatorDetails,
+	keys *cl.ValidatorSetupDetails,
 	domain *beacon.BLSDomain,
 	beaconCache BeaconCache,
 ) (*Validator, error) {
@@ -601,7 +601,7 @@ func ValidatorFromBeaconState(
 func ValidatorsFromBeaconState(
 	state beacon.BeaconState,
 	spec beacon.Spec,
-	keys []*cl.ValidatorDetails,
+	keys []*cl.ValidatorSetupDetails,
 	domain *beacon.BLSDomain,
 ) (Validators, error) {
 	stateVals, err := state.Validators()

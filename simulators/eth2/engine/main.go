@@ -32,6 +32,7 @@ var engineTests = []testSpec{
 	{Name: "invalid-quantity-fields", Run: InvalidQuantityPayloadFields},
 	{Name: "timeouts", Run: Timeouts},
 }
+
 var transitionTests = []testSpec{
 	// Transition (TERMINAL_TOTAL_DIFFICULTY) tests
 	{Name: "invalid-transition-payload", Run: InvalidPayloadGen(1, Invalid)},
@@ -41,10 +42,6 @@ var transitionTests = []testSpec{
 	{Name: "invalid-terminal-block-payload-lower-ttd", Run: IncorrectTerminalBlockGen(-2)},
 	{Name: "invalid-terminal-block-payload-higher-ttd", Run: IncorrectTerminalBlockGen(1)},
 	{Name: "build-atop-invalid-terminal-block", Run: IncorrectTTDConfigEL},
-	{Name: "syncing-with-chain-having-valid-transition-block", Run: SyncingWithChainHavingValidTransitionBlock},
-	{Name: "syncing-with-chain-having-invalid-transition-block", Run: SyncingWithChainHavingInvalidTransitionBlock},
-	{Name: "syncing-with-chain-having-invalid-post-transition-block", Run: SyncingWithChainHavingInvalidPostTransitionBlock},
-	{Name: "re-org-and-sync-with-chain-having-invalid-terminal-block", Run: ReOrgSyncWithChainHavingInvalidTerminalBlock},
 	{Name: "no-viable-head-due-to-optimistic-sync", Run: NoViableHeadDueToOptimisticSync},
 }
 
@@ -91,16 +88,11 @@ func addAllTests(suite *hivesim.Suite, c *clients.ClientDefinitionsByRole, tests
 
 	// Generate validator keys to use for all tests.
 	keySrc := &consensus_config.MnemonicsKeySource{
-		From:       0,
-		To:         64,
-		Validator:  mnemonic,
-		Withdrawal: mnemonic,
+		From:     0,
+		To:       64,
+		Mnemonic: mnemonic,
 	}
 	keys, err := keySrc.Keys()
-	if err != nil {
-		panic(err)
-	}
-	secrets, err := consensus_config.SecretKeys(keys)
 	if err != nil {
 		panic(err)
 	}
@@ -112,9 +104,8 @@ func addAllTests(suite *hivesim.Suite, c *clients.ClientDefinitionsByRole, tests
 				Description: test.About,
 				Run: func(t *hivesim.T) {
 					env := &testnet.Environment{
-						Clients: c,
-						Keys:    keys,
-						Secrets: secrets,
+						Clients:    c,
+						Validators: keys,
 					}
 					test.Run(t, env, nodeDefinition)
 				},

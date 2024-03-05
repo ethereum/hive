@@ -7,7 +7,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/hive/simulators/eth2/common/clients"
+	"github.com/ethereum/hive/simulators/eth2/common/config"
+	consensus_config "github.com/ethereum/hive/simulators/eth2/common/config/consensus"
 	execution_config "github.com/ethereum/hive/simulators/eth2/common/config/execution"
+	blobber_config "github.com/marioevz/blobber/config"
 	mock_builder "github.com/marioevz/mock-builder/mock"
 )
 
@@ -28,15 +31,8 @@ var (
 )
 
 type Config struct {
-	AltairForkEpoch                 *big.Int `json:"altair_fork_epoch,omitempty"`
-	BellatrixForkEpoch              *big.Int `json:"bellatrix_fork_epoch,omitempty"`
-	CapellaForkEpoch                *big.Int `json:"capella_fork_epoch,omitempty"`
-	ValidatorCount                  *big.Int `json:"validator_count,omitempty"`
-	KeyTranches                     *big.Int `json:"key_tranches,omitempty"`
-	SlotTime                        *big.Int `json:"slot_time,omitempty"`
-	TerminalTotalDifficulty         *big.Int `json:"terminal_total_difficulty,omitempty"`
-	SafeSlotsToImportOptimistically *big.Int `json:"safe_slots_to_import_optimistically,omitempty"`
-	ExtraShares                     *big.Int `json:"extra_shares,omitempty"`
+	*config.ForkConfig                `json:"fork_config,omitempty"`
+	*consensus_config.ConsensusConfig `json:"consensus_config,omitempty"`
 
 	// Node configurations to launch. Each node as a proportional share of
 	// validators.
@@ -47,9 +43,16 @@ type Config struct {
 	InitialBaseFeePerGas     *big.Int                               `json:"initial_base_fee_per_gas,omitempty"`
 	GenesisExecutionAccounts map[common.Address]core.GenesisAccount `json:"genesis_execution_accounts,omitempty"`
 
+	// Consensus Layer specific config
+	DisablePeerScoring bool `json:"disable_peer_scoring,omitempty"`
+
 	// Builders
 	EnableBuilders bool                  `json:"enable_builders,omitempty"`
 	BuilderOptions []mock_builder.Option `json:"builder_options,omitempty"`
+
+	// Blobber
+	EnableBlobber  bool                    `json:"enable_blobber,omitempty"`
+	BlobberOptions []blobber_config.Option `json:"blobber_options,omitempty"`
 }
 
 // Choose a configuration value. `b` takes precedence
@@ -66,24 +69,11 @@ func choose(a, b *big.Int) *big.Int {
 // Join two configurations. `b` takes precedence
 func (a *Config) Join(b *Config) *Config {
 	c := Config{}
-	// Forks
-	c.AltairForkEpoch = choose(a.AltairForkEpoch, b.AltairForkEpoch)
-	c.BellatrixForkEpoch = choose(a.BellatrixForkEpoch, b.BellatrixForkEpoch)
-	c.CapellaForkEpoch = choose(a.CapellaForkEpoch, b.CapellaForkEpoch)
+	// ForkConfig
+	c.ForkConfig = a.ForkConfig.Join(b.ForkConfig)
 
-	// Testnet config
-	c.ValidatorCount = choose(a.ValidatorCount, b.ValidatorCount)
-	c.KeyTranches = choose(a.KeyTranches, b.KeyTranches)
-	c.SlotTime = choose(a.SlotTime, b.SlotTime)
-	c.TerminalTotalDifficulty = choose(
-		a.TerminalTotalDifficulty,
-		b.TerminalTotalDifficulty,
-	)
-	c.SafeSlotsToImportOptimistically = choose(
-		a.SafeSlotsToImportOptimistically,
-		b.SafeSlotsToImportOptimistically,
-	)
-	c.ExtraShares = choose(a.ExtraShares, b.ExtraShares)
+	// ConsensusConfig
+	c.ConsensusConfig = a.ConsensusConfig.Join(b.ConsensusConfig)
 
 	// EL config
 	c.InitialBaseFeePerGas = choose(
@@ -114,20 +104,11 @@ func (a *Config) Join(b *Config) *Config {
 	return &c
 }
 
-func (c *Config) activeFork() string {
-	if c.CapellaForkEpoch != nil && c.CapellaForkEpoch.Cmp(Big0) == 0 {
-		return "capella"
-	} else if c.BellatrixForkEpoch != nil && c.BellatrixForkEpoch.Cmp(Big0) == 0 {
-		return "bellatrix"
-	} else if c.AltairForkEpoch != nil && c.AltairForkEpoch.Cmp(Big0) == 0 {
-		return "altair"
-	} else {
-		return "phase0"
-	}
-}
-
 // Check the configuration and its support by the multiple client definitions
-func (c *Config) fillDefaults() error {
+func (c *Config) FillDefaults() error {
+	if c.SlotsPerEpoch == nil {
+		c.SlotsPerEpoch = big.NewInt(32)
+	}
 	if c.SlotTime == nil {
 		allNodeDefinitions := c.NodeDefinitions
 		if len(

@@ -1,7 +1,10 @@
-go 1.18
+go 1.21
+
+toolchain go1.22.0
 
 use (
 	./common
+	./dencun
 	./engine
 	./testnet
 	./withdrawals

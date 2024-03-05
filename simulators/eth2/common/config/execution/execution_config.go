@@ -56,6 +56,16 @@ var embeddedDepositContract = `
   }
 }
 `
+var embeddedBeaconRootContract = `
+{
+	"balance": "0",
+	"code": "0x3373fffffffffffffffffffffffffffffffffffffffe14604457602036146024575f5ffd5b620180005f350680545f35146037575f5ffd5b6201800001545f5260205ff35b42620180004206555f3562018000420662018000015500",
+	"nonce": "1",
+	"storage": {}
+  }
+  `
+
+var beaconRootContractAddress = common.HexToAddress("0x000F3df6D732807Ef1319fB7B8bB8522d0Beac02")
 
 var (
 	CLIQUE_PERIOD_DEFAULT        = uint64(2)
@@ -196,19 +206,85 @@ func (c ExecutionCliqueConsensus) SecondsPerBlock() uint64 {
 	return c.CliquePeriod
 }
 
+func BuildChainConfig(
+	ttd *big.Int,
+	beaconChainGenesisTime uint64,
+	slotsPerEpoch uint64,
+	secondsPerSlot uint64,
+	config *config.ForkConfig,
+) (*params.ChainConfig, error) {
+	chainConfig := &params.ChainConfig{
+		ChainID:                 big.NewInt(7),
+		HomesteadBlock:          big.NewInt(0),
+		DAOForkBlock:            nil,
+		DAOForkSupport:          false,
+		EIP150Block:             big.NewInt(0),
+		EIP155Block:             big.NewInt(0),
+		EIP158Block:             big.NewInt(0),
+		ByzantiumBlock:          big.NewInt(0),
+		ConstantinopleBlock:     big.NewInt(0),
+		PetersburgBlock:         big.NewInt(0),
+		IstanbulBlock:           big.NewInt(0),
+		MuirGlacierBlock:        big.NewInt(0),
+		BerlinBlock:             big.NewInt(0),
+		LondonBlock:             big.NewInt(0),
+		ArrowGlacierBlock:       big.NewInt(0),
+		MergeNetsplitBlock:      big.NewInt(0),
+		TerminalTotalDifficulty: ttd,
+		Clique:                  nil,
+	}
+
+	// Configure post-merge forks
+	var (
+		previousForkTime = config.BellatrixForkEpoch
+		previousFork     = "bellatrix"
+	)
+	for _, forkConfig := range []struct {
+		ForkName       string
+		BeaconForkTime *big.Int
+		ChainConfig    **uint64
+	}{
+		{
+			ForkName:       "capella",
+			BeaconForkTime: config.CapellaForkEpoch,
+			ChainConfig:    &chainConfig.ShanghaiTime,
+		},
+		{
+			ForkName:       "deneb",
+			BeaconForkTime: config.DenebForkEpoch,
+			ChainConfig:    &chainConfig.CancunTime,
+		},
+	} {
+		if forkConfig.BeaconForkTime != nil {
+			if previousForkTime == nil {
+				return nil, fmt.Errorf("fork '%s' has a time but previous fork '%s' does not", forkConfig.ForkName, previousFork)
+			}
+			if forkConfig.BeaconForkTime.Cmp(previousForkTime) < 0 {
+				return nil, fmt.Errorf("fork '%s' has a time before previous fork '%s'", forkConfig.ForkName, previousFork)
+			}
+			timestamp := beaconChainGenesisTime + (forkConfig.BeaconForkTime.Uint64() * secondsPerSlot * slotsPerEpoch)
+			*forkConfig.ChainConfig = &timestamp
+		}
+		previousForkTime = forkConfig.BeaconForkTime
+		previousFork = forkConfig.ForkName
+	}
+	return chainConfig, nil
+}
+
 type ExecutionGenesis struct {
 	Genesis        *core.Genesis
+	Block          *types.Block
+	Hash           common.Hash
 	DepositAddress common.Address
-	NetworkID      uint64
 }
 
 func BuildExecutionGenesis(
-	ttd *big.Int,
 	genesisTime uint64,
 	consensus ExecutionConsensus,
-	forkConfig *params.ChainConfig,
+	chainConfig *params.ChainConfig,
 	genesisExecAccounts map[common.Address]core.GenesisAccount,
-) *ExecutionGenesis {
+	initialBaseFee *big.Int,
+) (*ExecutionGenesis, error) {
 	depositContractAddr := common.HexToAddress(
 		"0x4242424242424242424242424242424242424242",
 	)
@@ -216,42 +292,19 @@ func BuildExecutionGenesis(
 	if err := json.Unmarshal([]byte(embeddedDepositContract), &depositContractAcc); err != nil {
 		panic(err)
 	}
-	genesis := ExecutionGenesis{
-		Genesis: &core.Genesis{
-			Config: &params.ChainConfig{
-				ChainID:                 big.NewInt(7),
-				HomesteadBlock:          big.NewInt(0),
-				DAOForkBlock:            nil,
-				DAOForkSupport:          false,
-				EIP150Block:             big.NewInt(0),
-				EIP150Hash:              common.Hash{},
-				EIP155Block:             big.NewInt(0),
-				EIP158Block:             big.NewInt(0),
-				ByzantiumBlock:          big.NewInt(0),
-				ConstantinopleBlock:     big.NewInt(0),
-				PetersburgBlock:         big.NewInt(0),
-				IstanbulBlock:           big.NewInt(0),
-				MuirGlacierBlock:        big.NewInt(0),
-				BerlinBlock:             big.NewInt(0),
-				LondonBlock:             big.NewInt(0),
-				ArrowGlacierBlock:       big.NewInt(0),
-				MergeNetsplitBlock:      big.NewInt(0),
-				TerminalTotalDifficulty: ttd,
-				Clique:                  nil,
-			},
-			Nonce:      0,
-			Timestamp:  genesisTime,
-			ExtraData:  nil,
-			GasLimit:   30_000_000,
-			Difficulty: big.NewInt(0),
-			Mixhash:    common.Hash{},
-			Coinbase:   common.Address{},
-			Alloc: core.GenesisAlloc{
-				depositContractAddr: depositContractAcc,
-			},
+	genesis := &core.Genesis{
+		Config:     chainConfig,
+		Nonce:      0,
+		Timestamp:  genesisTime,
+		ExtraData:  nil,
+		GasLimit:   30_000_000,
+		Difficulty: big.NewInt(0),
+		BaseFee:    initialBaseFee,
+		Mixhash:    common.Hash{},
+		Coinbase:   common.Address{},
+		Alloc: core.GenesisAlloc{
+			depositContractAddr: depositContractAcc,
 		},
-		DepositAddress: depositContractAddr,
-		NetworkID:      7,
 	}
 
 	for addr, acc := range genesisExecAccounts {
@@ -259,20 +312,51 @@ func BuildExecutionGenesis(
 		if acc.Balance == nil {
 			acc.Balance = common.Big0
 		}
-		genesis.Genesis.Alloc[addr] = acc
+		genesis.Alloc[addr] = acc
 	}
 
-	// Configure post-merge forks
-	if forkConfig.ShanghaiTime != nil {
-		genesis.Genesis.Config.ShanghaiTime = forkConfig.ShanghaiTime
+	if chainConfig.CancunTime != nil {
+		var beaconRootContractAcc core.GenesisAccount
+		if err := json.Unmarshal([]byte(embeddedBeaconRootContract), &beaconRootContractAcc); err != nil {
+			panic(err)
+		}
+		genesis.Alloc[beaconRootContractAddress] = beaconRootContractAcc
+
+		if genesis.Timestamp >= *chainConfig.CancunTime {
+			if genesis.BlobGasUsed == nil {
+				genesis.BlobGasUsed = new(uint64)
+			}
+			if genesis.ExcessBlobGas == nil {
+				genesis.ExcessBlobGas = new(uint64)
+			}
+		}
 	}
+
+	wrappedGenesis := &ExecutionGenesis{
+		Genesis:        genesis,
+		Block:          genesis.ToBlock(),
+		DepositAddress: depositContractAddr,
+	}
+	wrappedGenesis.Hash = wrappedGenesis.Block.Hash()
 
 	// Configure consensus
-	if err := consensus.Configure(&genesis); err != nil {
-		panic(err)
+	if err := consensus.Configure(wrappedGenesis); err != nil {
+		return nil, err
 	}
 
-	return &genesis
+	return wrappedGenesis, nil
+}
+
+func (genesis *ExecutionGenesis) NetworkID() uint64 {
+	return 7
+}
+
+func (genesis *ExecutionGenesis) ChainID() uint64 {
+	return genesis.Genesis.Config.ChainID.Uint64()
+}
+
+func (genesis *ExecutionGenesis) IsPostMerge() bool {
+	return genesis.Block.Difficulty().Cmp(genesis.Genesis.Config.TerminalTotalDifficulty) >= 0
 }
 
 func (conf *ExecutionGenesis) ToParams(
@@ -280,7 +364,7 @@ func (conf *ExecutionGenesis) ToParams(
 ) hivesim.Params {
 	params := hivesim.Params{
 		"HIVE_DEPOSIT_CONTRACT_ADDRESS": common.Address(depositAddress).String(),
-		"HIVE_NETWORK_ID":               fmt.Sprintf("%d", conf.NetworkID),
+		"HIVE_NETWORK_ID":               fmt.Sprintf("%d", conf.NetworkID()),
 		"HIVE_CHAIN_ID":                 conf.Genesis.Config.ChainID.String(),
 		"HIVE_FORK_HOMESTEAD":           conf.Genesis.Config.HomesteadBlock.String(),
 		//"HIVE_FORK_DAO_BLOCK":           conf.Genesis.Config.DAOForkBlock.String(),  // nil error, not used anyway
@@ -300,14 +384,13 @@ func (conf *ExecutionGenesis) ToParams(
 	if conf.Genesis.Config.ShanghaiTime != nil {
 		params["HIVE_SHANGHAI_TIMESTAMP"] = fmt.Sprint(*conf.Genesis.Config.ShanghaiTime)
 	}
+	if conf.Genesis.Config.CancunTime != nil {
+		params["HIVE_CANCUN_TIMESTAMP"] = fmt.Sprint(*conf.Genesis.Config.CancunTime)
+	}
 	if conf.Genesis.Config.Clique != nil {
 		params["HIVE_CLIQUE_PERIOD"] = fmt.Sprint(conf.Genesis.Config.Clique.Period)
 	}
 	return params
-}
-
-func IsEth1GenesisPostMerge(genesis *core.Genesis) bool {
-	return genesis.Config.TerminalTotalDifficulty.Cmp(genesis.Difficulty) <= 0
 }
 
 func ExecutionBundle(genesis *core.Genesis) (hivesim.StartOption, error) {
