@@ -10,7 +10,7 @@ require (
 	github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6
 	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305231022-f69df863de20
 	github.com/lithammer/dedent v1.1.0
-	github.com/marioevz/blobber v1.1.1-0.20240228051014-aa5f0f9031a9
+	github.com/marioevz/blobber v1.1.1-0.20240306221924-a7e22e59ea34
 	github.com/marioevz/mock-builder v1.1.1-0.20231123171249-08b59e943190
 	github.com/protolambda/eth2api v0.0.0-20230316214135-5f8afbd6d05d
 	github.com/protolambda/zrnt v0.32.3

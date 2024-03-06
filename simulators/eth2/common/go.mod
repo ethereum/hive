@@ -12,7 +12,7 @@ require (
 	github.com/herumi/bls-eth-go-binary v1.29.1
 	github.com/holiman/uint256 v1.2.4
 	github.com/lithammer/dedent v1.1.0
-	github.com/marioevz/blobber v1.1.1-0.20240228051014-aa5f0f9031a9
+	github.com/marioevz/blobber v1.1.1-0.20240306221924-a7e22e59ea34
 	github.com/marioevz/eth-clients v0.0.0-20231123180401-b4230c802498
 	github.com/marioevz/mock-builder v1.1.1-0.20231123171249-08b59e943190
 	github.com/pkg/errors v0.9.1
