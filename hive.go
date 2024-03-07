@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/exec"
 	"os/signal"
 	"regexp"
 	"strings"
@@ -114,6 +115,7 @@ func main() {
 		SimRandomSeed:      *simRandomSeed,
 		SimDurationLimit:   *simTimeLimit,
 		ClientStartTimeout: *clientTimeout,
+		SimulatorsVersion:  simulatorsVersion(),
 	}
 	runner := libhive.NewRunner(inv, builder, cb)
 
@@ -188,4 +190,14 @@ func flagIsSet(name string) bool {
 		}
 	})
 	return found
+}
+
+func simulatorsVersion() (commit *string) {
+	// Get the current folder's HEAD commit.
+	out, err := exec.Command("git", "rev-parse", "HEAD").Output()
+	if err != nil {
+		return nil
+	}
+	output := strings.TrimSpace(string(out[:]))
+	return &output
 }
