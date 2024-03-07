@@ -2,6 +2,7 @@ mod suites;
 
 use hivesim::{Simulation, Suite, TestSpec};
 use suites::interop::test_portal_interop;
+use suites::mesh::test_portal_scenarios;
 use suites::rpc_compat::run_rpc_compat_test_suite;
 
 #[tokio::main]
@@ -41,8 +42,23 @@ async fn main() {
         client: None,
     });
 
+    let mut mesh = Suite {
+        name: "beacon-mesh".to_string(),
+        description: "The portal mesh test suite runs a set of scenarios to test 3 clients"
+            .to_string(),
+        tests: vec![],
+    };
+
+    mesh.add(TestSpec {
+        name: "client launch".to_string(),
+        description: "This test launches the client and collects its logs.".to_string(),
+        always_run: false,
+        run: test_portal_scenarios,
+        client: None,
+    });
+
     let sim = Simulation::new();
-    run_suite(sim, vec![beacon_rpc_compat, interop]).await;
+    run_suite(sim, vec![beacon_rpc_compat, interop, mesh]).await;
 }
 
 async fn run_suite(host: Simulation, suites: Vec<Suite>) {
