@@ -1,5 +1,5 @@
 ARG baseimage=gcr.io/prysmaticlabs/prysm/beacon-chain
-ARG tag=latest-debug
+ARG tag=latest
 
 FROM $baseimage:$tag as upstream
 
