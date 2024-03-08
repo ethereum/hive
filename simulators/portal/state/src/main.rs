@@ -25,7 +25,7 @@ async fn main() {
     });
 
     let mut interop = Suite {
-        name: "history-interop".to_string(),
+        name: "state-interop".to_string(),
         description:
             "The interop test suite runs a set of scenarios to test interoperability between
         portal network clients"
