@@ -275,14 +275,6 @@ dyn_async! {
             serde_json::from_value(json!(target_key)).unwrap();
         let target_value: HistoryContentValue =
             serde_json::from_value(json!(target_value)).unwrap();
-        match client_b.rpc.store(target_key.clone(), target_value.clone()).await {
-            Ok(result) => if !result {
-                panic!("Error storing target content for recursive find content");
-            },
-            Err(err) => {
-                panic!("Error storing target content: {err:?}");
-            }
-        }
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,

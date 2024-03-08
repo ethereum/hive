@@ -21,6 +21,7 @@ RUN apt update && apt install wget -y
 
 # copy build artifacts from build stage
 COPY --from=builder /state/target/release/state .
+ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/state/hive/test_data.yaml ./test-data/test_data.yaml
 
 ENV RUST_LOG=debug
 
