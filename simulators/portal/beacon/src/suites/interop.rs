@@ -8,6 +8,8 @@ use ethportal_api::{
     OverlayContentKey,
 };
 use hivesim::types::ClientDefinition;
+use hivesim::types::ContentKeyValue;
+use hivesim::types::TestData;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use serde_json::json;
@@ -21,16 +23,19 @@ const BOOTSTRAP_KEY: &str = "0x10bd9f42d9a42d972bdaf4dee84e5b419dd432b52867258ac
 
 fn content_pair_to_string_pair(
     content_pair: (BeaconContentKey, BeaconContentValue),
-) -> (String, String) {
+) -> ContentKeyValue {
     let (content_key, content_value) = content_pair;
-    (content_key.to_hex(), hex_encode(content_value.encode()))
+    ContentKeyValue {
+        key: content_key.to_hex(),
+        value: hex_encode(content_value.encode()),
+    }
 }
 
 /// Processed content data for beacon tests
 struct ProcessedContent {
     content_type: String,
     identifier: String,
-    test_data: Vec<(String, String)>,
+    test_data: Vec<ContentKeyValue>,
 }
 
 fn process_content(content: Vec<(BeaconContentKey, BeaconContentValue)>) -> Vec<ProcessedContent> {
@@ -98,7 +103,7 @@ dyn_async! {
                         always_run: false,
                         run: test_offer,
                         environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                        test_data: Some(test_data.clone()),
+                        test_data: Some(TestData::ContentList(test_data.clone())),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -110,7 +115,7 @@ dyn_async! {
                         always_run: false,
                         run: test_recursive_find_content,
                         environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                        test_data: Some(test_data.clone()),
+                        test_data: Some(TestData::ContentList(test_data.clone())),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -122,7 +127,7 @@ dyn_async! {
                         always_run: false,
                         run: test_find_content,
                         environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                        test_data: Some(test_data),
+                        test_data: Some(TestData::ContentList(test_data)),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -172,7 +177,7 @@ dyn_async! {
                     always_run: false,
                     run: test_gossip_two_nodes,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: Some(content.clone().into_iter().map(content_pair_to_string_pair).collect()),
+                    test_data: Some(TestData::ContentList(content.clone().into_iter().map(content_pair_to_string_pair).collect())),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
             ).await;
@@ -182,7 +187,7 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will not return content via FINDCONTENT.
-    async fn test_find_content_non_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_find_content_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -224,18 +229,18 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_offer<'a>(clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_offer<'a>(clients: Vec<Client>, test_data: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data {
+        let test_data = match test_data.map(|data| data.content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
-        let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
+        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
         let target_key: BeaconContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
         let target_value: BeaconContentValue =
@@ -274,7 +279,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_ping<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_ping<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -315,7 +320,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_find_nodes_zero_distance<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_find_nodes_zero_distance<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -351,19 +356,19 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a content via RECURSIVEFINDCONTENT template that it has stored locally
-    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data {
+        let test_data = match test_data.map(|data| data.content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
 
-        let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
+        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
         let target_key: BeaconContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
         let target_value: BeaconContentValue =
@@ -422,18 +427,18 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a x content via FINDCONTENT that it has stored locally
-    async fn test_find_content<'a> (clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_find_content<'a> (clients: Vec<Client>, test_data: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data {
+        let test_data = match test_data.map(|data| data.content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data none was provided"),
         };
-        let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
+        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
         let target_key: BeaconContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
         let target_value: BeaconContentValue =
@@ -483,14 +488,14 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data {
+        let test_data = match test_data.map(|data| data.content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
@@ -510,7 +515,7 @@ dyn_async! {
         }
 
         // With default node settings nodes should be storing all content
-        for (content_key, content_value) in test_data.clone() {
+        for ContentKeyValue { key: content_key, value: content_value } in test_data.clone() {
             let content_key: BeaconContentKey =
                 serde_json::from_value(json!(content_key)).unwrap();
             let content_value: BeaconContentValue =
@@ -535,7 +540,7 @@ dyn_async! {
 
         // process raw test data to generate content details for error output
         let mut result = vec![];
-        for (content_key, content_value) in test_data.into_iter() {
+        for ContentKeyValue { key: content_key, value: content_value } in test_data.into_iter() {
             let content_key: BeaconContentKey =
                 serde_json::from_value(json!(content_key)).unwrap();
             let content_value: BeaconContentValue =

@@ -7,6 +7,7 @@ use ethportal_api::types::enr::generate_random_remote_enr;
 use ethportal_api::Discv5ApiClient;
 use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient};
 use hivesim::types::ClientDefinition;
+use hivesim::types::TestData;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use serde_json::json;
 use std::collections::HashMap;
@@ -192,7 +193,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_node_info<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_node_info<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -209,7 +210,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_local_content_expect_content_absent<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_local_content_expect_content_absent<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -232,7 +233,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_store<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_store<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -268,7 +269,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_local_content_expect_content_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_local_content_expect_content_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -311,7 +312,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_add_enr_expect_true<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_add_enr_expect_true<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -330,7 +331,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_get_enr_non_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_get_enr_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -346,7 +347,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_get_enr_local_enr<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_get_enr_local_enr<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -374,7 +375,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_get_enr_enr_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_get_enr_enr_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -405,7 +406,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_delete_enr_non_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_delete_enr_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -424,7 +425,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_delete_enr_enr_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_delete_enr_enr_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -469,7 +470,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_lookup_enr_non_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_lookup_enr_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -485,7 +486,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_lookup_enr_enr_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_lookup_enr_enr_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -516,7 +517,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_lookup_enr_local_enr<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_lookup_enr_local_enr<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -545,7 +546,7 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a AbsentContent via RecursiveFindContent when the data doesn't exist
-    async fn test_recursive_find_content_content_absent<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_recursive_find_content_content_absent<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
