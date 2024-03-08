@@ -4,6 +4,7 @@ use crate::suites::constants::CONSTANT_CONTENT_VALUE;
 use crate::suites::constants::HIVE_PORTAL_NETWORKS_SELECTED;
 use crate::suites::constants::TRIN_BRIDGE_CLIENT_TYPE;
 use ethportal_api::types::enr::generate_random_remote_enr;
+use ethportal_api::BeaconContentValue;
 use ethportal_api::Discv5ApiClient;
 use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient};
 use hivesim::types::ClientDefinition;
@@ -201,9 +202,7 @@ dyn_async! {
             }
         };
 
-        let response = Discv5ApiClient::node_info(&client.rpc).await;
-
-        if let Err(err) = response {
+        if let Err(err) = Discv5ApiClient::node_info(&client.rpc).await {
             panic!("Expected response not received: {err}");
         }
     }
@@ -217,17 +216,10 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let content_key = serde_json::from_value(json!(CONSTANT_CONTENT_KEY));
+        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
 
-        match content_key {
-            Ok(content_key) => {
-                if let Ok(response)  = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
-                    panic!("Expected to recieve an error because content wasn't found {response:?}");
-                }
-            }
-            Err(err) => {
-                panic!("{}", &err.to_string());
-            }
+        if let Ok(response)  = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
+            panic!("Expected to recieve an error because content wasn't found {response:?}");
         }
     }
 }
@@ -240,30 +232,11 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let content_key =
-        serde_json::from_value(json!(CONSTANT_CONTENT_KEY));
+        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
+        let content_value: BeaconContentValue = serde_json::from_value(json!(CONSTANT_CONTENT_VALUE)).unwrap();
 
-        let content_value =
-        serde_json::from_value(json!(CONSTANT_CONTENT_VALUE));
-
-        match content_key {
-            Ok(content_key) => {
-                match content_value {
-                    Ok(content_value) => {
-                        let response = BeaconNetworkApiClient::store(&client.rpc, content_key, content_value).await;
-
-                        if let Err(err) = response {
-                            panic!("{}", &err.to_string());
-                        }
-                    }
-                    Err(err) => {
-                        panic!("{}", &err.to_string());
-                    }
-                }
-            }
-            Err(err) => {
-                panic!("{}", &err.to_string());
-            }
+        if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key, content_value).await {
+            panic!("{}", &err.to_string());
         }
     }
 }
@@ -276,36 +249,23 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let content_key: Result<ethportal_api::BeaconContentKey, serde_json::Error> =
-        serde_json::from_value(json!(CONSTANT_CONTENT_KEY));
+        let content_key: BeaconContentKey = serde_json::from_value(json!(CONSTANT_CONTENT_KEY)).unwrap();
+        let content_value: BeaconContentValue = serde_json::from_value(json!(CONSTANT_CONTENT_VALUE)).unwrap();
 
-        let content_value =
-        serde_json::from_value(json!(CONSTANT_CONTENT_VALUE));
+        // seed CONTENT_KEY/content_value onto the local node to test local_content expect content present
+        if let Err(err) = BeaconNetworkApiClient::store(&client.rpc, content_key.clone(), content_value.clone()).await {
+            panic!("{}", &err.to_string());
+        }
 
-
-        match content_key {
-            Ok(content_key) => {
-                // seed CONTENT_KEY/content_value onto the local node to test local_content expect content present
-                match content_value {
-                    Ok(content_value) => {
-                        let response = BeaconNetworkApiClient::store(&client.rpc, content_key.clone(), content_value).await;
-
-                        if let Err(err) = response {
-                            panic!("{}", &err.to_string());
-                        }
-                    }
-                    Err(err) => {
-                        panic!("{}", &err.to_string());
-                    }
-                }
-
-                // Here we are calling local_content RPC to test if the content is present
-                if let Err(err) = BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
-                    panic!("Expected content returned from local_content to be present {}", &err.to_string());
+        // Here we are calling local_content RPC to test if the content is present
+        match BeaconNetworkApiClient::local_content(&client.rpc, content_key).await {
+            Ok(possible_content) => {
+                if possible_content != content_value {
+                    panic!("Error receiving content: Expected content: {content_value:?}, Received content: {possible_content:?}");
                 }
             }
             Err(err) => {
-                panic!("{}", &err.to_string());
+                panic!("Expected content returned from local_content to be present {}", &err.to_string());
             }
         }
     }
