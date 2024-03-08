@@ -1,11 +1,12 @@
 use crate::suites::constants::CONTENT_KEY;
-use crate::suites::constants::CONTENT_VALUE;
+use crate::suites::constants::CONTENT_LOOKUP_VALUE;
+use crate::suites::constants::CONTENT_OFFER_VALUE;
 use crate::suites::constants::HIVE_PORTAL_NETWORKS_SELECTED;
 use crate::suites::constants::STATE_STRING;
 use crate::suites::constants::TRIN_BRIDGE_CLIENT_TYPE;
 use ethportal_api::types::enr::generate_random_remote_enr;
 use ethportal_api::Discv5ApiClient;
-use ethportal_api::{StateContentKey, StateNetworkApiClient};
+use ethportal_api::{StateContentKey, StateContentValue, StateNetworkApiClient};
 use hivesim::types::ClientDefinition;
 use hivesim::types::TestData;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
@@ -201,9 +202,7 @@ dyn_async! {
             }
         };
 
-        let response = Discv5ApiClient::node_info(&client.rpc).await;
-
-        if let Err(err) = response {
+        if let Err(err) = Discv5ApiClient::node_info(&client.rpc).await {
             panic!("Expected response not received: {err}");
         }
     }
@@ -217,17 +216,10 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let content_key = serde_json::from_value(json!(CONTENT_KEY));
+        let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
 
-        match content_key {
-            Ok(content_key) => {
-                if let Ok(response)  = StateNetworkApiClient::local_content(&client.rpc, content_key).await {
-                    panic!("Expected to recieve an error because content wasn't found {response:?}");
-                }
-            }
-            Err(err) => {
-                panic!("{}", &err.to_string());
-            }
+        if let Ok(response) = StateNetworkApiClient::local_content(&client.rpc, content_key).await {
+            panic!("Expected to recieve an error because content wasn't found {response:?}");
         }
     }
 }
@@ -240,30 +232,11 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let content_key =
-        serde_json::from_value(json!(CONTENT_KEY));
+        let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
+        let content_value: StateContentValue = serde_json::from_value(json!(CONTENT_OFFER_VALUE)).unwrap();
 
-        let content_value =
-        serde_json::from_value(json!(CONTENT_VALUE));
-
-        match content_key {
-            Ok(content_key) => {
-                match content_value {
-                    Ok(content_value) => {
-                        let response = StateNetworkApiClient::store(&client.rpc, content_key, content_value).await;
-
-                        if let Err(err) = response {
-                            panic!("{}", &err.to_string());
-                        }
-                    }
-                    Err(err) => {
-                        panic!("{}", &err.to_string());
-                    }
-                }
-            }
-            Err(err) => {
-                panic!("{}", &err.to_string());
-            }
+        if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key, content_value).await {
+            panic!("{}", &err.to_string());
         }
     }
 }
@@ -276,36 +249,23 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let content_key: Result<ethportal_api::StateContentKey, serde_json::Error> =
-        serde_json::from_value(json!(CONTENT_KEY));
+        let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
+        let content_offer_value: StateContentValue = serde_json::from_value(json!(CONTENT_OFFER_VALUE)).unwrap();
+        let content_lookup_value: StateContentValue = serde_json::from_value(json!(CONTENT_LOOKUP_VALUE)).unwrap();
 
-        let content_value =
-        serde_json::from_value(json!(CONTENT_VALUE));
+        if let Err(err) = StateNetworkApiClient::store(&client.rpc, content_key.clone(), content_offer_value).await {
+            panic!("{}", &err.to_string());
+        }
 
-
-        match content_key {
-            Ok(content_key) => {
-                // seed content_key/content_value onto the local node to test local_content expect content present
-                match content_value {
-                    Ok(content_value) => {
-                        let response = StateNetworkApiClient::store(&client.rpc, content_key.clone(), content_value).await;
-
-                        if let Err(err) = response {
-                            panic!("{}", &err.to_string());
-                        }
-                    }
-                    Err(err) => {
-                        panic!("{}", &err.to_string());
-                    }
-                }
-
-                // Here we are calling local_content RPC to test if the content is present
-                if let Err(err) = StateNetworkApiClient::local_content(&client.rpc, content_key).await {
-                    panic!("Expected content returned from local_content to be present {}", &err.to_string());
+        // Here we are calling local_content RPC to test if the content is present
+        match StateNetworkApiClient::local_content(&client.rpc, content_key).await {
+            Ok(possible_content) => {
+                if possible_content != content_lookup_value {
+                    panic!("Error receiving content: Expected content: {content_lookup_value:?}, Received content: {possible_content:?}");
                 }
             }
             Err(err) => {
-                panic!("{}", &err.to_string());
+                panic!("Expected content returned from local_content to be present {}", &err.to_string());
             }
         }
     }
