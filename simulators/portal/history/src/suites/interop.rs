@@ -6,6 +6,8 @@ use ethportal_api::{
     OverlayContentKey,
 };
 use hivesim::types::ClientDefinition;
+use hivesim::types::ContentKeyValue;
+use hivesim::types::TestData;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use portal_spec_test_utils_rs::get_flair;
@@ -22,16 +24,19 @@ const HEADER_WITH_PROOF_KEY: &str =
 
 fn content_pair_to_string_pair(
     content_pair: (HistoryContentKey, HistoryContentValue),
-) -> (String, String) {
+) -> ContentKeyValue {
     let (content_key, content_value) = content_pair;
-    (content_key.to_hex(), hex_encode(content_value.encode()))
+    ContentKeyValue {
+        key: content_key.to_hex(),
+        value: hex_encode(content_value.encode()),
+    }
 }
 
 /// Processed content data for history tests
 struct ProcessedContent {
     content_type: String,
     block_number: u64,
-    test_data: Vec<(String, String)>,
+    test_data: Vec<ContentKeyValue>,
 }
 
 fn process_content(
@@ -114,7 +119,7 @@ dyn_async! {
                         always_run: false,
                         run: test_offer,
                         environments: None,
-                        test_data: Some(test_data.clone()),
+                        test_data: Some(TestData::ContentList(test_data.clone())),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -126,7 +131,7 @@ dyn_async! {
                         always_run: false,
                         run: test_recursive_find_content,
                         environments: None,
-                        test_data: Some(test_data.clone()),
+                        test_data: Some(TestData::ContentList(test_data.clone())),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -138,7 +143,7 @@ dyn_async! {
                         always_run: false,
                         run: test_find_content,
                         environments: None,
-                        test_data: Some(test_data),
+                        test_data: Some(TestData::ContentList(test_data)),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -188,7 +193,7 @@ dyn_async! {
                     always_run: false,
                     run: test_gossip_two_nodes,
                     environments: None,
-                    test_data: Some(content.clone().into_iter().map(content_pair_to_string_pair).collect()),
+                    test_data: Some(TestData::ContentList(content.clone().into_iter().map(content_pair_to_string_pair).collect())),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
             ).await;
@@ -198,7 +203,7 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will not return content via FINDCONTENT.
-    async fn test_find_content_non_present<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_find_content_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -240,18 +245,18 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_offer<'a>(clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_offer<'a>(clients: Vec<Client>, test_data: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data {
+        let test_data = match test_data.map(|data| data.content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
-        if let Some((optional_key, optional_value)) = test_data.get(1) {
+        if let Some(ContentKeyValue { key: optional_key, value: optional_value }) = test_data.get(1) {
             let optional_key: HistoryContentKey =
                 serde_json::from_value(json!(optional_key)).unwrap();
             let optional_value: HistoryContentValue =
@@ -265,7 +270,7 @@ dyn_async! {
                 }
             }
         }
-        let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
+        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
         let target_key: HistoryContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
         let target_value: HistoryContentValue =
@@ -304,7 +309,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_ping<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_ping<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -345,7 +350,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_find_nodes_zero_distance<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_find_nodes_zero_distance<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -381,18 +386,18 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a content via RECURSIVEFINDCONTENT template that it has stored locally
-    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data {
+        let test_data = match test_data.map(|data| data.content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
-        if let Some((optional_key, optional_value)) = test_data.get(1) {
+        if let Some(ContentKeyValue { key: optional_key, value: optional_value }) = test_data.get(1) {
             let optional_key: HistoryContentKey =
                 serde_json::from_value(json!(optional_key)).unwrap();
             let optional_value: HistoryContentValue =
@@ -407,7 +412,7 @@ dyn_async! {
             }
         }
 
-        let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
+        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
         let target_key: HistoryContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
         let target_value: HistoryContentValue =
@@ -466,18 +471,18 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a x content via FINDCONTENT that it has stored locally
-    async fn test_find_content<'a> (clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_find_content<'a> (clients: Vec<Client>, test_data: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data {
+        let test_data = match test_data.map(|data| data.content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data none was provided"),
         };
-        if let Some((optional_key, optional_value)) = test_data.get(1) {
+        if let Some(ContentKeyValue { key: optional_key, value: optional_value }) = test_data.get(1) {
             let optional_key: HistoryContentKey =
                 serde_json::from_value(json!(optional_key)).unwrap();
             let optional_value: HistoryContentValue =
@@ -492,7 +497,7 @@ dyn_async! {
             }
         }
 
-        let (target_key, target_value) = test_data.first().expect("Target content is required for this test");
+        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
         let target_key: HistoryContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
         let target_value: HistoryContentValue =
@@ -542,14 +547,14 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Option<Vec<(String, String)>>) {
+    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Option<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data {
+        let test_data = match test_data.map(|data| data.content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
@@ -569,7 +574,7 @@ dyn_async! {
         }
 
         // With default node settings nodes should be storing all content
-        for (content_key, content_value) in test_data.clone() {
+        for ContentKeyValue { key: content_key, value: content_value } in test_data.clone() {
             let content_key: HistoryContentKey =
                 serde_json::from_value(json!(content_key)).unwrap();
             let content_value: HistoryContentValue =
@@ -595,14 +600,14 @@ dyn_async! {
         tokio::time::sleep(Duration::from_secs(test_data.len() as u64)).await;
 
         // process raw test data to generate content details for error output
-        let (first_header_key, first_header_value) = test_data.first().unwrap();
+        let ContentKeyValue { key: first_header_key, value: first_header_value } = test_data.first().unwrap();
         let first_header_key: HistoryContentKey =
                 serde_json::from_value(json!(first_header_key)).unwrap();
         let first_header_value: HistoryContentValue =
                 serde_json::from_value(json!(first_header_value)).unwrap();
         let mut last_header_seen: (HistoryContentKey, HistoryContentValue) = (first_header_key, first_header_value);
         let mut result = vec![];
-        for (content_key, content_value) in test_data.into_iter() {
+        for ContentKeyValue { key: content_key, value: content_value } in test_data.into_iter() {
             let content_key: HistoryContentKey =
                 serde_json::from_value(json!(content_key)).unwrap();
             let content_value: HistoryContentValue =

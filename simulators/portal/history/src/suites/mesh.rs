@@ -6,6 +6,7 @@ use ethportal_api::{
     Discv5ApiClient, HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient,
 };
 use hivesim::types::ClientDefinition;
+use hivesim::types::TestData;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use serde_json::json;
@@ -72,7 +73,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_find_content_two_jumps<'a> (clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_find_content_two_jumps<'a> (clients: Vec<Client>, _: Option<TestData>) {
         let (client_a, client_b, client_c) = match clients.iter().collect_tuple() {
             Some((client_a, client_b, client_c)) => (client_a, client_b, client_c),
             None => {
@@ -167,7 +168,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_find_nodes_distance_of_client_c<'a>(clients: Vec<Client>, _: Option<Vec<(String, String)>>) {
+    async fn test_find_nodes_distance_of_client_c<'a>(clients: Vec<Client>, _: Option<TestData>) {
         let (client_a, client_b, client_c) = match clients.iter().collect_tuple() {
             Some((client_a, client_b, client_c)) => (client_a, client_b, client_c),
             None => {
