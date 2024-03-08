@@ -1,14 +1,15 @@
 use crate::suites::constants::{
-    BEACON_STRING, HIVE_PORTAL_NETWORKS_SELECTED, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE,
+    CONTENT_KEY, HIVE_PORTAL_NETWORKS_SELECTED, STATE_STRING, TEST_DATA_FILE_PATH,
+    TRIN_BRIDGE_CLIENT_TYPE,
 };
-use ethportal_api::types::beacon::ContentInfo;
+use ethportal_api::types::state::ContentInfo;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
-    BeaconContentKey, BeaconContentValue, BeaconNetworkApiClient, ContentValue, Discv5ApiClient,
-    OverlayContentKey,
+    ContentValue, Discv5ApiClient, OverlayContentKey, StateContentKey, StateContentValue,
+    StateNetworkApiClient,
 };
 use hivesim::types::ClientDefinition;
-use hivesim::types::ContentKeyValue;
+use hivesim::types::ContentKeyOfferLookupValues;
 use hivesim::types::TestData;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
@@ -19,51 +20,58 @@ use tokio::time::Duration;
 
 // This is taken from Trin. It should be fairly standard
 const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
-const BOOTSTRAP_KEY: &str = "0x10bd9f42d9a42d972bdaf4dee84e5b419dd432b52867258acb7bcc7f567b6e3af1";
 
 fn content_pair_to_string_pair(
-    content_pair: (BeaconContentKey, BeaconContentValue),
-) -> ContentKeyValue {
-    let (content_key, content_value) = content_pair;
-    ContentKeyValue {
+    content_pair: (StateContentKey, StateContentValue, StateContentValue),
+) -> ContentKeyOfferLookupValues {
+    let (content_key, content_offer_value, content_lookup_value) = content_pair;
+    ContentKeyOfferLookupValues {
         key: content_key.to_hex(),
-        value: hex_encode(content_value.encode()),
+        offer_value: hex_encode(content_offer_value.encode()),
+        lookup_value: hex_encode(content_lookup_value.encode()),
     }
 }
 
-/// Processed content data for beacon tests
+/// Processed content data for state tests
 struct ProcessedContent {
     content_type: String,
     identifier: String,
-    test_data: Vec<ContentKeyValue>,
+    test_data: Vec<ContentKeyOfferLookupValues>,
 }
 
-fn process_content(content: Vec<(BeaconContentKey, BeaconContentValue)>) -> Vec<ProcessedContent> {
+fn process_content(
+    content: Vec<(StateContentKey, StateContentValue, StateContentValue)>,
+) -> Vec<ProcessedContent> {
     let mut result: Vec<ProcessedContent> = vec![];
-    for beacon_content in content.into_iter() {
-        let (content_type, identifier, test_data) = match &beacon_content.0 {
-            BeaconContentKey::LightClientBootstrap(bootstrap) => (
-                "Bootstrap".to_string(),
-                hex_encode(bootstrap.block_hash),
-                vec![content_pair_to_string_pair(beacon_content)],
-            ),
-            BeaconContentKey::LightClientUpdatesByRange(updates_by_range) => (
-                "Updates by Range".to_string(),
+    for state_content in content.into_iter() {
+        let (content_type, identifier, test_data) = match &state_content.0 {
+            StateContentKey::AccountTrieNode(account_trie_node) => (
+                "Account Trie Node".to_string(),
                 format!(
-                    "start period: {} count: {}",
-                    updates_by_range.start_period, updates_by_range.count
+                    "path: {} node hash: {}",
+                    hex_encode(account_trie_node.path.nibbles()),
+                    hex_encode(account_trie_node.node_hash.as_bytes())
                 ),
-                vec![content_pair_to_string_pair(beacon_content)],
+                vec![content_pair_to_string_pair(state_content)],
             ),
-            BeaconContentKey::LightClientFinalityUpdate(finality_update) => (
-                "Finality Update".to_string(),
-                format!("finalized slot: {}", finality_update.finalized_slot),
-                vec![content_pair_to_string_pair(beacon_content)],
+            StateContentKey::ContractStorageTrieNode(contract_storage_trie_node) => (
+                "Contract Storage Trie Node".to_string(),
+                format!(
+                    "address: {} path: {} node hash: {}",
+                    hex_encode(contract_storage_trie_node.address.as_bytes()),
+                    hex_encode(contract_storage_trie_node.path.nibbles()),
+                    hex_encode(contract_storage_trie_node.node_hash.as_bytes())
+                ),
+                vec![content_pair_to_string_pair(state_content)],
             ),
-            BeaconContentKey::LightClientOptimisticUpdate(optimistic_update) => (
-                "Optimistic Update".to_string(),
-                format!("finalized slot: {}", optimistic_update.signature_slot),
-                vec![content_pair_to_string_pair(beacon_content)],
+            StateContentKey::ContractBytecode(contract_bytecode) => (
+                "Contract Bytecode".to_string(),
+                format!(
+                    "address: {} code hash: {}",
+                    hex_encode(contract_bytecode.address.as_bytes()),
+                    hex_encode(contract_bytecode.code_hash.as_bytes())
+                ),
+                vec![content_pair_to_string_pair(state_content)],
             ),
         };
         result.push(ProcessedContent {
@@ -85,12 +93,14 @@ dyn_async! {
         let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
             .expect("cannot find test asset");
         let values: Value = serde_yaml::from_str(&values).unwrap();
-        let content: Vec<(BeaconContentKey, BeaconContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
-            let content_key: BeaconContentKey =
+        let content: Vec<(StateContentKey, StateContentValue, StateContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
+            let content_key: StateContentKey =
                 serde_yaml::from_value(value.get("content_key").unwrap().clone()).unwrap();
-            let content_value: BeaconContentValue =
-                serde_yaml::from_value(value.get("content_value").unwrap().clone()).unwrap();
-            (content_key, content_value)
+            let content_offer_value: StateContentValue =
+                serde_yaml::from_value(value.get("content_value_offer").unwrap().clone()).unwrap();
+            let content_lookup_value: StateContentValue =
+                serde_yaml::from_value(value.get("content_value_retrieval").unwrap().clone()).unwrap();
+            (content_key, content_offer_value, content_lookup_value)
         }).collect();
 
         // Iterate over all possible pairings of clients and run the tests (including self-pairings)
@@ -102,8 +112,8 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_offer,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                        test_data: Some(TestData::ContentList(test_data.clone())),
+                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
+                        test_data: Some(TestData::StateContentList(test_data.clone())),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -114,8 +124,8 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_recursive_find_content,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                        test_data: Some(TestData::ContentList(test_data.clone())),
+                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
+                        test_data: Some(TestData::StateContentList(test_data.clone())),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -126,20 +136,20 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_find_content,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                        test_data: Some(TestData::ContentList(test_data)),
+                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
+                        test_data: Some(TestData::StateContentList(test_data)),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
             }
 
-            // Test portal beacon ping
+            // Test portal state ping
             test.run(NClientTestSpec {
                     name: format!("PING {} --> {}", client_a.name, client_b.name),
                     description: "".to_string(),
                     always_run: false,
                     run: test_ping,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
                     test_data: None,
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -151,7 +161,7 @@ dyn_async! {
                     description: "find content: calls find content that doesn't exist".to_string(),
                     always_run: false,
                     run: test_find_content_non_present,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
                     test_data: None,
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -163,7 +173,7 @@ dyn_async! {
                     description: "find nodes: distance zero expect called nodes enr".to_string(),
                     always_run: false,
                     run: test_find_nodes_zero_distance,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
                     test_data: None,
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -176,8 +186,8 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_gossip_two_nodes,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: Some(TestData::ContentList(content.clone().into_iter().map(content_pair_to_string_pair).collect())),
+                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
+                    test_data: Some(TestData::StateContentList(content.clone().into_iter().map(content_pair_to_string_pair).collect())),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
             ).await;
@@ -194,7 +204,7 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let header_with_proof_key: BeaconContentKey = serde_json::from_value(json!(BOOTSTRAP_KEY)).unwrap();
+        let header_with_proof_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
@@ -236,15 +246,18 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data.map(|data| data.content_list()) {
+        let test_data = match test_data.map(|data| data.state_content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
-        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
-        let target_key: BeaconContentKey =
+        let ContentKeyOfferLookupValues { key: target_key, offer_value: target_offer_value, lookup_value: target_lookup_value } = test_data.first().expect("Target content is required for this test");
+        let target_key: StateContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
-        let target_value: BeaconContentValue =
-            serde_json::from_value(json!(target_value)).unwrap();
+        let target_offer_value: StateContentValue =
+            serde_json::from_value(json!(target_offer_value)).unwrap();
+        let target_lookup_value: StateContentValue =
+            serde_json::from_value(json!(target_lookup_value)).unwrap();
+
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
             Err(err) => {
@@ -252,14 +265,14 @@ dyn_async! {
             }
         };
 
-        let _ = client_a.rpc.offer(target_enr, target_key.clone(), Some(target_value.clone())).await;
+        let _ = client_a.rpc.offer(target_enr, target_key.clone(), Some(target_offer_value.clone())).await;
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
         match client_b.rpc.local_content(target_key).await {
             Ok(possible_content) => {
-                if possible_content != target_value {
-                    panic!("Error receiving content: Expected content: {target_value:?}, Received content: {possible_content:?}");
+                if possible_content != target_lookup_value {
+                    panic!("Error receiving content: Expected content: {target_lookup_value:?}, Received content: {possible_content:?}");
                 }
             }
             Err(err) => {
@@ -299,7 +312,7 @@ dyn_async! {
             }
         };
 
-        match BeaconNetworkApiClient::get_enr(&client_b.rpc, stored_enr.node_id()).await {
+        match StateNetworkApiClient::get_enr(&client_b.rpc, stored_enr.node_id()).await {
             Ok(response) => {
                 if response != stored_enr {
                     panic!("Response from GetEnr didn't return expected ENR. Got: {response}; Expected: {stored_enr}")
@@ -354,17 +367,19 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data.map(|data| data.content_list()) {
+        let test_data = match test_data.map(|data| data.state_content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
 
-        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
-        let target_key: BeaconContentKey =
+        let ContentKeyOfferLookupValues { key: target_key, offer_value: target_offer_value, lookup_value: target_lookup_value } = test_data.first().expect("Target content is required for this test");
+        let target_key: StateContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
-        let target_value: BeaconContentValue =
-            serde_json::from_value(json!(target_value)).unwrap();
-        match client_b.rpc.store(target_key.clone(), target_value.clone()).await {
+        let target_offer_value: StateContentValue =
+            serde_json::from_value(json!(target_offer_value)).unwrap();
+        let target_lookup_value: StateContentValue =
+            serde_json::from_value(json!(target_lookup_value)).unwrap();
+        match client_b.rpc.store(target_key.clone(), target_offer_value.clone()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for recursive find content");
             },
@@ -380,7 +395,7 @@ dyn_async! {
             }
         };
 
-        match BeaconNetworkApiClient::add_enr(&client_a.rpc, target_enr.clone()).await {
+        match StateNetworkApiClient::add_enr(&client_a.rpc, target_enr.clone()).await {
             Ok(response) => match response {
                 true => (),
                 false => panic!("AddEnr expected to get true and instead got false")
@@ -392,11 +407,11 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_value {
+                        if content != target_lookup_value {
                             panic!("Error: Unexpected RECURSIVEFINDCONTENT response: didn't return expected target content");
                         }
 
-                        if target_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
+                        if target_lookup_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
                             if utp_transfer {
                                 panic!("Error: Unexpected RECURSIVEFINDCONTENT response: utp_transfer was supposed to be false");
                             }
@@ -425,16 +440,19 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data.map(|data| data.content_list()) {
+        let test_data = match test_data.map(|data| data.state_content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data none was provided"),
         };
-        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
-        let target_key: BeaconContentKey =
+
+        let ContentKeyOfferLookupValues { key: target_key, offer_value: target_offer_value, lookup_value: target_lookup_value } = test_data.first().expect("Target content is required for this test");
+        let target_key: StateContentKey =
             serde_json::from_value(json!(target_key)).unwrap();
-        let target_value: BeaconContentValue =
-            serde_json::from_value(json!(target_value)).unwrap();
-        match client_b.rpc.store(target_key.clone(), target_value.clone()).await {
+        let target_offer_value: StateContentValue =
+            serde_json::from_value(json!(target_offer_value)).unwrap();
+        let target_lookup_value: StateContentValue =
+            serde_json::from_value(json!(target_lookup_value)).unwrap();
+        match client_b.rpc.store(target_key.clone(), target_offer_value.clone()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for find content");
             },
@@ -454,11 +472,11 @@ dyn_async! {
             Ok(result) => {
                 match result {
                     ContentInfo::Content{ content, utp_transfer } => {
-                        if content != target_value {
+                        if content != target_lookup_value {
                             panic!("Error: Unexpected FINDCONTENT response: didn't return expected block body");
                         }
 
-                        if target_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
+                        if target_lookup_value.encode().len() < MAX_PORTAL_CONTENT_PAYLOAD_SIZE {
                             if utp_transfer {
                                 panic!("Error: Unexpected FINDCONTENT response: utp_transfer was supposed to be false");
                             }
@@ -486,7 +504,7 @@ dyn_async! {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data.map(|data| data.content_list()) {
+        let test_data = match test_data.map(|data| data.state_content_list()) {
             Some(test_data) => test_data,
             None => panic!("Expected test data non was provided"),
         };
@@ -497,7 +515,7 @@ dyn_async! {
                 panic!("Error getting node info: {err:?}");
             }
         };
-        match BeaconNetworkApiClient::add_enr(&client_a.rpc, client_b_enr.clone()).await {
+        match StateNetworkApiClient::add_enr(&client_a.rpc, client_b_enr.clone()).await {
             Ok(response) => match response {
                 true => (),
                 false => panic!("AddEnr expected to get true and instead got false")
@@ -506,13 +524,13 @@ dyn_async! {
         }
 
         // With default node settings nodes should be storing all content
-        for ContentKeyValue { key: content_key, value: content_value } in test_data.clone() {
-            let content_key: BeaconContentKey =
+        for ContentKeyOfferLookupValues { key: content_key, offer_value: content_offer_value, lookup_value: _ } in test_data.clone().into_iter() {
+            let content_key: StateContentKey =
                 serde_json::from_value(json!(content_key)).unwrap();
-            let content_value: BeaconContentValue =
-                serde_json::from_value(json!(content_value)).unwrap();
+            let content_offer_value: StateContentValue =
+                serde_json::from_value(json!(content_offer_value)).unwrap();
 
-            match client_a.rpc.gossip(content_key.clone(), content_value.clone()).await {
+            match client_a.rpc.gossip(content_key.clone(), content_offer_value.clone()).await {
                 Ok(nodes_gossiped_to) => {
                    if nodes_gossiped_to != 1 {
                         panic!("We expected to gossip to 1 node instead we gossiped to: {nodes_gossiped_to}");
@@ -531,18 +549,17 @@ dyn_async! {
 
         // process raw test data to generate content details for error output
         let mut result = vec![];
-        for ContentKeyValue { key: content_key, value: content_value } in test_data.into_iter() {
-            let content_key: BeaconContentKey =
+        for ContentKeyOfferLookupValues { key: content_key, offer_value: _, lookup_value: content_lookup_value } in test_data.into_iter() {
+            let content_key: StateContentKey =
                 serde_json::from_value(json!(content_key)).unwrap();
-            let content_value: BeaconContentValue =
-                serde_json::from_value(json!(content_value)).unwrap();
+            let content_lookup_value: StateContentValue =
+                serde_json::from_value(json!(content_lookup_value)).unwrap();
 
             let content_details = {
                     let content_type = match &content_key {
-                        BeaconContentKey::LightClientBootstrap(_) => "bootstrap".to_string(),
-                        BeaconContentKey::LightClientUpdatesByRange(_) => "updates by range".to_string(),
-                        BeaconContentKey::LightClientFinalityUpdate(_) => "finality update".to_string(),
-                        BeaconContentKey::LightClientOptimisticUpdate(_) => "optimistic update".to_string(),
+                        StateContentKey::AccountTrieNode(_) => "account trie node".to_string(),
+                        StateContentKey::ContractStorageTrieNode(_) => "contract stroage trie node".to_string(),
+                        StateContentKey::ContractBytecode(_) => "contract bytecode".to_string(),
                     };
                     format!(
                         "{:?} {}",
@@ -553,7 +570,7 @@ dyn_async! {
 
             match client_b.rpc.local_content(content_key.clone()).await {
                 Ok(expected_value) => {
-                    if expected_value != content_value {
+                    if expected_value != content_lookup_value {
                         result.push(format!("Error content received for block {content_details} was different then expected"));
                     }
                 }
