@@ -374,6 +374,8 @@ github.com/marioevz/eth2api v0.0.0-20230922201437-72bd1301e033 h1:sn57n+lbJrLS8F
 github.com/marioevz/eth2api v0.0.0-20230922201437-72bd1301e033/go.mod h1:hcwWCT4sF1X7KsMZ535MvDZVk5M20Uyj+x2LARZjQsM=
 github.com/marioevz/mock-builder v1.1.1-0.20231123171249-08b59e943190 h1:vBXJeLFGRKZid18H4JQ+vhR+AQKU6fkx0Uc8JVMc3OI=
 github.com/marioevz/mock-builder v1.1.1-0.20231123171249-08b59e943190/go.mod h1:17VX12ir8TOY2Ln2vy3jhjeVIGfrwmcsxY9VI0ZP1Zk=
+github.com/marioevz/mock-builder v1.2.1-0.20240312201838-ad9ba388e88b h1:tQ+fxfY5YHxOimJN1/NJ/ofPGMZA1ZX0OsU2Rm/xfE0=
+github.com/marioevz/mock-builder v1.2.1-0.20240312201838-ad9ba388e88b/go.mod h1:17VX12ir8TOY2Ln2vy3jhjeVIGfrwmcsxY9VI0ZP1Zk=
 github.com/marioevz/zrnt v0.26.2-0.20231109183115-d2098ec1f42c h1:ZwKLkGVKnAq1JZql6SBrQici0la1X7APcbBLwmrSsd4=
 github.com/marioevz/zrnt v0.26.2-0.20231109183115-d2098ec1f42c/go.mod h1:ZctXHBa/2rlF85iao8oqQ8264DbEBBGWr6lwIOW2yv4=
 github.com/marioevz/ztyp v0.0.0-20231106221254-dd6f24f13fd9 h1:e40k7kQLw2jyDg4+Mc+TVSSfm1TO51NxPZo9T7nVCzM=

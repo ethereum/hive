@@ -32,6 +32,7 @@ func init() {
 				Test canonical chain includes deneb payloads built by the builder api.`,
 				// All validators start with BLS withdrawal credentials
 				GenesisExecutionWithdrawalCredentialsShares: 0,
+				DenebGenesis: true,
 				WaitForBlobs: true,
 			},
 		},
@@ -44,6 +45,7 @@ func init() {
 				building payloads with invalid parent beacon block root.`,
 				// All validators can withdraw from the start
 				GenesisExecutionWithdrawalCredentialsShares: 1,
+				DenebGenesis: true,
 				WaitForBlobs: true,
 			},
 			InvalidatePayloadAttributes: mock_builder.INVALIDATE_ATTR_BEACON_ROOT,
@@ -57,6 +59,7 @@ func init() {
 				returning error on header request after deneb transition.`,
 				// All validators can withdraw from the start
 				GenesisExecutionWithdrawalCredentialsShares: 1,
+				DenebGenesis: true,
 				WaitForBlobs: true,
 			},
 			ErrorOnHeaderRequest: true,
@@ -70,6 +73,7 @@ func init() {
 				returning error on unblinded payload request after deneb transition.`,
 				// All validators can withdraw from the start
 				GenesisExecutionWithdrawalCredentialsShares: 1,
+				DenebGenesis: true,
 				WaitForBlobs: true,
 			},
 			ErrorOnPayloadReveal: true,
@@ -83,6 +87,7 @@ func init() {
 				version is outdated (capella instead of deneb).`,
 				// All validators can withdraw from the start
 				GenesisExecutionWithdrawalCredentialsShares: 1,
+				DenebGenesis: true,
 				WaitForBlobs: true,
 			},
 			InvalidPayloadVersion: true,
@@ -101,6 +106,7 @@ func init() {
 				produced locally and results in an empty slot.`,
 				// All validators can withdraw from the start
 				GenesisExecutionWithdrawalCredentialsShares: 1,
+				DenebGenesis: true,
 				WaitForBlobs: true,
 			},
 			InvalidatePayload: mock_builder.INVALIDATE_PAYLOAD_BEACON_ROOT,

@@ -238,6 +238,8 @@ func (ts BaseTestSpec) ExecutePostForkWait(
 					t.Logf("INFO: all clients have produced a block with blobs")
 					break out
 				}
+
+				testnet.BeaconClients().Running().PrintStatus(blobsWaitCtx)
 			}
 		}
 	}

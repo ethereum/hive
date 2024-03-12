@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"time"
 
 	"github.com/ethereum/hive/hivesim"
 	tn "github.com/ethereum/hive/simulators/eth2/common/testnet"
@@ -56,11 +57,42 @@ func (ts BuilderTestSpec) ExecutePostFork(
 	env *tn.Environment,
 	config *tn.Config,
 ) {
-	// Run the base test spec execute function
-	ts.BaseTestSpec.ExecutePostFork(t, ctx, testnet, env, config)
-
-	// Check that the builder was working properly until now
-	if !ts.DenebGenesis {
+	if ts.DenebGenesis {
+		// Wait until the builder has been requested at least one header with
+		// a max timeout of 5 epochs.
+		t.Log("INFO: waiting for the builder to be requested for payloads")
+		timeoutCtx, cancel := testnet.Spec().EpochTimeoutContext(ctx, 5)
+		defer cancel()
+		for {
+			select {
+			case <-timeoutCtx.Done():
+				t.Fatalf("FAIL: timeout waiting for the builder to be request for payloads")
+			case <-time.After(time.Duration(testnet.Spec().SECONDS_PER_SLOT) * time.Second):
+			}
+			allClientsRequested := true
+			for i, b := range testnet.BeaconClients().Running() {
+				builder, ok := b.Builder.(*mock_builder.MockBuilder)
+				if !ok {
+					t.Fatalf(
+						"FAIL: client %d (%s) is not a mock builder",
+						i,
+						b.ClientName(),
+					)
+				}
+				headerRequests := builder.GetHeaderRequests()
+				if len(headerRequests) == 0 {
+					allClientsRequested = false
+					break
+				}
+			}
+			if allClientsRequested {
+				t.Log("INFO: all clients requested their respective builders")
+				break
+			}
+			testnet.BeaconClients().Running().PrintStatus(timeoutCtx)
+		}
+	} else {
+		// Check that the builder was working properly until now
 		for i, b := range testnet.BeaconClients().Running() {
 			builder, ok := b.Builder.(*mock_builder.MockBuilder)
 			if !ok {
@@ -81,6 +113,9 @@ func (ts BuilderTestSpec) ExecutePostFork(
 			}
 		}
 	}
+
+	// Run the base test spec execute function
+	ts.BaseTestSpec.ExecutePostFork(t, ctx, testnet, env, config)
 }
 
 func (ts BuilderTestSpec) BuilderProducesValidPayload() bool {
