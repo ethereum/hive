@@ -40,7 +40,8 @@ Sanity test where the blobber is verified to be working correctly
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -88,7 +89,8 @@ Test chain health where the blobs are gossiped before the block
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -136,7 +138,8 @@ Test chain health where the blobs are gossiped after the block with a 500ms dela
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -185,7 +188,8 @@ Test chain health where the blobs are gossiped after the block with a 6s delay
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -241,7 +245,8 @@ delay makes the test more deterministic.
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -290,7 +295,8 @@ Test chain health if a proposer sends equivocating blobs and block to different 
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -339,7 +345,8 @@ Test chain health if a proposer sends equivocating blob sidecars (equivocating b
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -388,7 +395,8 @@ Test chain health if a proposer sends equivocating blob sidecars (equivocating b
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -437,7 +445,8 @@ Test chain health if a proposer sends equivocating blob sidecars (equivocating b
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 

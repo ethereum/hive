@@ -171,9 +171,9 @@ func (ts BaseTestSpec) GetDescription() *utils.Description {
 		ts.GetValidatorCount()/uint64(ts.GetValidatingNodeCount()),
 	))
 	if ts.DenebGenesis {
-		desc.Add(utils.CategoryTestnetConfiguration, "- Genesis Fork: Deneb")
+		desc.Add(utils.CategoryTestnetConfiguration, "\n- Genesis Fork: Deneb")
 	} else {
-		desc.Add(utils.CategoryTestnetConfiguration, "- Genesis Fork: Capella")
+		desc.Add(utils.CategoryTestnetConfiguration, "\n- Genesis Fork: Capella")
 	}
 	execCredentialCount := ts.GetExecutionWithdrawalCredentialCount()
 	blsCredentialCount := ts.GetValidatorCount() - execCredentialCount
