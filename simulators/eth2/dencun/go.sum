@@ -452,8 +452,6 @@ github.com/marioevz/eth-clients v0.0.0-20231123180401-b4230c802498 h1:FHzV7rVAhi
 github.com/marioevz/eth-clients v0.0.0-20231123180401-b4230c802498/go.mod h1:bhR5rKHekIvdWmsWUqRP6X6dLl05ohnH3X/+ZvKs3xg=
 github.com/marioevz/eth2api v0.0.0-20230922201437-72bd1301e033 h1:sn57n+lbJrLS8FKYs08W7TEzraTGOCQGrSC4hni6rYw=
 github.com/marioevz/eth2api v0.0.0-20230922201437-72bd1301e033/go.mod h1:hcwWCT4sF1X7KsMZ535MvDZVk5M20Uyj+x2LARZjQsM=
-github.com/marioevz/mock-builder v1.1.1-0.20231123171249-08b59e943190 h1:vBXJeLFGRKZid18H4JQ+vhR+AQKU6fkx0Uc8JVMc3OI=
-github.com/marioevz/mock-builder v1.1.1-0.20231123171249-08b59e943190/go.mod h1:17VX12ir8TOY2Ln2vy3jhjeVIGfrwmcsxY9VI0ZP1Zk=
 github.com/marioevz/mock-builder v1.2.1-0.20240312201838-ad9ba388e88b h1:tQ+fxfY5YHxOimJN1/NJ/ofPGMZA1ZX0OsU2Rm/xfE0=
 github.com/marioevz/mock-builder v1.2.1-0.20240312201838-ad9ba388e88b/go.mod h1:17VX12ir8TOY2Ln2vy3jhjeVIGfrwmcsxY9VI0ZP1Zk=
 github.com/marioevz/zrnt v0.26.2-0.20231109183115-d2098ec1f42c h1:ZwKLkGVKnAq1JZql6SBrQici0la1X7APcbBLwmrSsd4=
@@ -1109,8 +1107,8 @@ google.golang.org/protobuf v1.24.0/go.mod h1:r/3tXBNzIEhYS9I1OUVjXDlt8tc493IdKGj
 google.golang.org/protobuf v1.25.0/go.mod h1:9JNX74DMeImyA3h4bdi1ymwjUzf21/xIlbajtzgsN7c=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
-google.golang.org/protobuf v1.32.0 h1:pPC6BG5ex8PDFnkbrGU3EixyhKcQ2aDuBS36lqK/C7I=
-google.golang.org/protobuf v1.32.0/go.mod h1:c6P6GXX6sHbq/GpV6MGZEdwhWPcYBgnhAHhKbcUYpos=
+google.golang.org/protobuf v1.33.0 h1:uNO2rsAINq/JlFpSdYEKIZ0uKD/R9cpdv0T+yoGwGmI=
+google.golang.org/protobuf v1.33.0/go.mod h1:c6P6GXX6sHbq/GpV6MGZEdwhWPcYBgnhAHhKbcUYpos=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
