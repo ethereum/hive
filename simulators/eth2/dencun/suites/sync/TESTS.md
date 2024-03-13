@@ -53,7 +53,8 @@ Test syncing of the beacon chain by a secondary non-validating client, sync from
 - Node Count: 3
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Capella
+- Validator Key per Node: 64
+- Genesis Fork: Capella
 - Execution Withdrawal Credentials Count: 0
 - BLS Withdrawal Credentials Count: 128
 
@@ -105,7 +106,8 @@ Test syncing of the beacon chain by a secondary non-validating client, sync from
 - Node Count: 3
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 0
 - BLS Withdrawal Credentials Count: 128
 

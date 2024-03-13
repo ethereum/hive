@@ -46,13 +46,13 @@ Test canonical chain includes deneb payloads built by the builder api.
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Capella
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 0
 - BLS Withdrawal Credentials Count: 128
-- Deneb/Cancun transition occurs on Epoch 1 or 5
-	- Epoch depends on whether builder workflow activation requires finalization [on the CL client](#clients-that-require-finalization-to-enable-builder).
+- Deneb starts from genesis.
 - Builder is enabled for all nodes
-- Builder action is only enabled after fork
+- Builder action is enabled from genesis
 - Nodes have the mock-builder configured as builder endpoint
 
 #### Verifications (Execution Client)
@@ -65,8 +65,7 @@ Test canonical chain includes deneb payloads built by the builder api.
 
 - For each blob transaction on the execution chain, the blob sidecars are available for the beacon block at the same height
 - The beacon block lists the correct commitments for each blob
-- Verify that the builder, up to before Deneb fork, has been able to produce blocks and they have been included in the canonical chain
-- After Deneb fork, the builder must be able to include blocks with blobs in the canonical chain, which implicitly verifies:
+- The builder must be able to include blocks with blobs in the canonical chain, which implicitly verifies:
 	- Consensus client is able to properly format header requests to the builder
 	- Consensus client is able to properly format blinded signed requests to the builder
 	- No signed block contained an invalid format or signature
@@ -97,13 +96,13 @@ building payloads with invalid parent beacon block root.
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Capella
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
-- Deneb/Cancun transition occurs on Epoch 1 or 5
-	- Epoch depends on whether builder workflow activation requires finalization [on the CL client](#clients-that-require-finalization-to-enable-builder).
+- Deneb starts from genesis.
 - Builder is enabled for all nodes
-- Builder action is only enabled after fork
+- Builder action is enabled from genesis
 - Nodes have the mock-builder configured as builder endpoint
 
 #### Verifications (Execution Client)
@@ -116,8 +115,7 @@ building payloads with invalid parent beacon block root.
 
 - For each blob transaction on the execution chain, the blob sidecars are available for the beacon block at the same height
 - The beacon block lists the correct commitments for each blob
-- Verify that the builder, up to before Deneb fork, has been able to produce blocks and they have been included in the canonical chain
-- After Deneb fork, the builder starts producing invalid payloads, verify that:
+- The builder starts producing invalid payloads, verify that:
 	- None of the produced payloads are included in the canonical chain
 - Since action causes missed slot, verify that the circuit breaker correctly kicks in and disables the builder workflow. Builder starts corrupting payloads after fork, hence a single block in the canonical chain after the fork is enough to verify the circuit breaker
 
@@ -146,13 +144,13 @@ returning error on header request after deneb transition.
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Capella
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
-- Deneb/Cancun transition occurs on Epoch 1 or 5
-	- Epoch depends on whether builder workflow activation requires finalization [on the CL client](#clients-that-require-finalization-to-enable-builder).
+- Deneb starts from genesis.
 - Builder is enabled for all nodes
-- Builder action is only enabled after fork
+- Builder action is enabled from genesis
 - Nodes have the mock-builder configured as builder endpoint
 
 #### Verifications (Execution Client)
@@ -165,8 +163,7 @@ returning error on header request after deneb transition.
 
 - For each blob transaction on the execution chain, the blob sidecars are available for the beacon block at the same height
 - The beacon block lists the correct commitments for each blob
-- Verify that the builder, up to before Deneb fork, has been able to produce blocks and they have been included in the canonical chain
-- After Deneb fork, the builder starts producing invalid payloads, verify that:
+- The builder starts producing invalid payloads, verify that:
 	- None of the produced payloads are included in the canonical chain
 
 ### - Deneb Builder Errors Out on Signed Blinded Beacon Block/Blob Sidecars Submission After Deneb Transition
@@ -194,13 +191,13 @@ returning error on unblinded payload request after deneb transition.
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Capella
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
-- Deneb/Cancun transition occurs on Epoch 1 or 5
-	- Epoch depends on whether builder workflow activation requires finalization [on the CL client](#clients-that-require-finalization-to-enable-builder).
+- Deneb starts from genesis.
 - Builder is enabled for all nodes
-- Builder action is only enabled after fork
+- Builder action is enabled from genesis
 - Nodes have the mock-builder configured as builder endpoint
 
 #### Verifications (Execution Client)
@@ -213,8 +210,7 @@ returning error on unblinded payload request after deneb transition.
 
 - For each blob transaction on the execution chain, the blob sidecars are available for the beacon block at the same height
 - The beacon block lists the correct commitments for each blob
-- Verify that the builder, up to before Deneb fork, has been able to produce blocks and they have been included in the canonical chain
-- After Deneb fork, the builder starts producing invalid payloads, verify that:
+- The builder starts producing invalid payloads, verify that:
 	- None of the produced payloads are included in the canonical chain
 - Since action causes missed slot, verify that the circuit breaker correctly kicks in and disables the builder workflow. Builder starts corrupting payloads after fork, hence a single block in the canonical chain after the fork is enough to verify the circuit breaker
 
@@ -243,13 +239,13 @@ version is outdated (capella instead of deneb).
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Capella
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
-- Deneb/Cancun transition occurs on Epoch 1 or 5
-	- Epoch depends on whether builder workflow activation requires finalization [on the CL client](#clients-that-require-finalization-to-enable-builder).
+- Deneb starts from genesis.
 - Builder is enabled for all nodes
-- Builder action is only enabled after fork
+- Builder action is enabled from genesis
 - Nodes have the mock-builder configured as builder endpoint
 
 #### Verifications (Execution Client)
@@ -262,8 +258,7 @@ version is outdated (capella instead of deneb).
 
 - For each blob transaction on the execution chain, the blob sidecars are available for the beacon block at the same height
 - The beacon block lists the correct commitments for each blob
-- Verify that the builder, up to before Deneb fork, has been able to produce blocks and they have been included in the canonical chain
-- After Deneb fork, the builder starts producing invalid payloads, verify that:
+- The builder starts producing invalid payloads, verify that:
 	- None of the produced payloads are included in the canonical chain
 
 ### - Deneb Builder Builds Block With Invalid Beacon Root, Incorrect State Root
@@ -296,13 +291,13 @@ produced locally and results in an empty slot.
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Capella
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
-- Deneb/Cancun transition occurs on Epoch 1 or 5
-	- Epoch depends on whether builder workflow activation requires finalization [on the CL client](#clients-that-require-finalization-to-enable-builder).
+- Deneb starts from genesis.
 - Builder is enabled for all nodes
-- Builder action is only enabled after fork
+- Builder action is enabled from genesis
 - Nodes have the mock-builder configured as builder endpoint
 
 #### Verifications (Execution Client)
@@ -315,8 +310,7 @@ produced locally and results in an empty slot.
 
 - For each blob transaction on the execution chain, the blob sidecars are available for the beacon block at the same height
 - The beacon block lists the correct commitments for each blob
-- Verify that the builder, up to before Deneb fork, has been able to produce blocks and they have been included in the canonical chain
-- After Deneb fork, the builder starts producing invalid payloads, verify that:
+- The builder starts producing invalid payloads, verify that:
 	- None of the produced payloads are included in the canonical chain
 - Since action causes missed slot, verify that the circuit breaker correctly kicks in and disables the builder workflow. Builder starts corrupting payloads after fork, hence a single block in the canonical chain after the fork is enough to verify the circuit breaker
 

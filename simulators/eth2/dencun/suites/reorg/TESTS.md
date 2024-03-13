@@ -41,7 +41,8 @@ Start two clients disconnected from each other, then connect them through a thir
 - Node Count: 5
 - Validating Node Count: 5
 - Validator Key Count: 128
-- Validator Key per Node: 25- Genesis Fork: Capella
+- Validator Key per Node: 25
+- Genesis Fork: Capella
 - Execution Withdrawal Credentials Count: 0
 - BLS Withdrawal Credentials Count: 128
 
@@ -82,7 +83,8 @@ Start two clients disconnected from each other, then connect them through a thir
 - Node Count: 5
 - Validating Node Count: 5
 - Validator Key Count: 128
-- Validator Key per Node: 25- Genesis Fork: Deneb
+- Validator Key per Node: 25
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 0
 - BLS Withdrawal Credentials Count: 128
 

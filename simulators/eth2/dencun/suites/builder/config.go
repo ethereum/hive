@@ -16,11 +16,6 @@ var REQUIRES_FINALIZATION_TO_ACTIVATE_BUILDER = []string{
 	"teku",
 }
 
-var (
-	DEFAULT_FORK_WAIT_EPOCHS                  = int64(2)
-	DEFAULT_FORK_WAIT_FOR_FINALIZATION_EPOCHS = int64(5)
-)
-
 type BuilderTestSpec struct {
 	suite_base.BaseTestSpec
 	VerifyMissedSlotsCount      bool
@@ -35,18 +30,6 @@ func (ts BuilderTestSpec) GetTestnetConfig(
 	allNodeDefinitions clients.NodeDefinitions,
 ) *testnet.Config {
 	tc := ts.BaseTestSpec.GetTestnetConfig(allNodeDefinitions)
-
-	tc.DenebForkEpoch = big.NewInt(DEFAULT_FORK_WAIT_EPOCHS)
-
-	if len(
-		allNodeDefinitions.FilterByCL(
-			REQUIRES_FINALIZATION_TO_ACTIVATE_BUILDER,
-		),
-	) > 0 {
-		// At least one of the CLs require finalization to start requesting
-		// headers from the builder
-		tc.DenebForkEpoch = big.NewInt(DEFAULT_FORK_WAIT_FOR_FINALIZATION_EPOCHS)
-	}
 
 	// Builders are always enabled for these tests
 	tc.EnableBuilders = true
@@ -63,24 +46,24 @@ func (ts BuilderTestSpec) GetTestnetConfig(
 	)
 
 	// Inject test error
-	denebEpoch := beacon.Epoch(tc.DenebForkEpoch.Uint64())
+	errorInjectEpoch := beacon.Epoch(0)
 	if ts.ErrorOnHeaderRequest {
 		tc.BuilderOptions = append(
 			tc.BuilderOptions,
-			mock_builder.WithErrorOnHeaderRequestAtEpoch(denebEpoch),
+			mock_builder.WithErrorOnHeaderRequestAtEpoch(errorInjectEpoch),
 		)
 	}
 	if ts.ErrorOnPayloadReveal {
 		tc.BuilderOptions = append(
 			tc.BuilderOptions,
-			mock_builder.WithErrorOnPayloadRevealAtEpoch(denebEpoch),
+			mock_builder.WithErrorOnPayloadRevealAtEpoch(errorInjectEpoch),
 		)
 	}
 	if ts.InvalidatePayload != "" {
 		tc.BuilderOptions = append(
 			tc.BuilderOptions,
 			mock_builder.WithPayloadInvalidatorAtEpoch(
-				denebEpoch,
+				errorInjectEpoch,
 				ts.InvalidatePayload,
 			),
 		)
@@ -89,7 +72,7 @@ func (ts BuilderTestSpec) GetTestnetConfig(
 		tc.BuilderOptions = append(
 			tc.BuilderOptions,
 			mock_builder.WithPayloadAttributesInvalidatorAtEpoch(
-				denebEpoch,
+				errorInjectEpoch,
 				ts.InvalidatePayloadAttributes,
 			),
 		)
@@ -97,7 +80,7 @@ func (ts BuilderTestSpec) GetTestnetConfig(
 	if ts.InvalidPayloadVersion {
 		tc.BuilderOptions = append(
 			tc.BuilderOptions,
-			mock_builder.WithInvalidBuilderBidVersionAtEpoch(denebEpoch),
+			mock_builder.WithInvalidBuilderBidVersionAtEpoch(errorInjectEpoch),
 		)
 	}
 
@@ -107,23 +90,20 @@ func (ts BuilderTestSpec) GetTestnetConfig(
 func (ts BuilderTestSpec) GetDescription() *utils.Description {
 	desc := ts.BaseTestSpec.GetDescription()
 	desc.Add(utils.CategoryTestnetConfiguration, `
-	- Deneb/Cancun transition occurs on Epoch 1 or 5
-		- Epoch depends on whether builder workflow activation requires finalization [on the CL client](#clients-that-require-finalization-to-enable-builder).
+	- Deneb starts from genesis.
 	- Builder is enabled for all nodes
-	- Builder action is only enabled after fork
+	- Builder action is enabled from genesis
 	- Nodes have the mock-builder configured as builder endpoint`)
-	desc.Add(utils.CategoryVerificationsConsensusClient, `
-	- Verify that the builder, up to before Deneb fork, has been able to produce blocks and they have been included in the canonical chain`)
 	if ts.BuilderProducesValidPayload() {
 		desc.Add(utils.CategoryVerificationsConsensusClient, `
-	- After Deneb fork, the builder must be able to include blocks with blobs in the canonical chain, which implicitly verifies:
+	- The builder must be able to include blocks with blobs in the canonical chain, which implicitly verifies:
 		- Consensus client is able to properly format header requests to the builder
 		- Consensus client is able to properly format blinded signed requests to the builder
 		- No signed block contained an invalid format or signature
 		- Test fails with a timeout if no payload with blobs is produced after the fork`)
 	} else {
 		desc.Add(utils.CategoryVerificationsConsensusClient, `
-	- After Deneb fork, the builder starts producing invalid payloads, verify that:
+	- The builder starts producing invalid payloads, verify that:
 		- None of the produced payloads are included in the canonical chain`)
 		if ts.CausesMissedSlot() {
 			desc.Add(utils.CategoryVerificationsConsensusClient, `

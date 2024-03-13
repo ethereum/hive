@@ -38,7 +38,8 @@ Sanity test to check the fork transition to deneb.
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Capella
+- Validator Key per Node: 64
+- Genesis Fork: Capella
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
@@ -78,7 +79,8 @@ Sanity test to check the beacon clients can start with deneb genesis.
 - Node Count: 2
 - Validating Node Count: 2
 - Validator Key Count: 128
-- Validator Key per Node: 64- Genesis Fork: Deneb
+- Validator Key per Node: 64
+- Genesis Fork: Deneb
 - Execution Withdrawal Credentials Count: 128
 - BLS Withdrawal Credentials Count: 0
 
