@@ -1763,9 +1763,9 @@ var Tests = []test.Spec{
 	// DevP2P tests
 	&CancunBaseSpec{
 		BaseSpec: test.BaseSpec{
-			Name: "Request Blob Pooled Transactions",
+			Name: "Request Blob Pooled Transactions Single",
 			About: `
-			Requests blob pooled transactions and verify correct encoding.
+			Requests a single blob pooled transactions and verifies the correct encoding.
 			`,
 			MainFork: config.Cancun,
 		},
@@ -1774,13 +1774,50 @@ var Tests = []test.Spec{
 			NewPayloads{
 				PayloadCount: 1,
 			},
-			// Send multiple transactions with multiple blobs each
+			// Peer with the client before sending txs
+			DevP2PClientPeering{
+				ClientIndex:        0,
+				MaintainConnection: true,
+			},
+			// Send a single blob transaction
 			SendBlobTransactions{
 				TransactionCount:              1,
 				BlobTransactionMaxBlobGasCost: big.NewInt(1),
 			},
 			DevP2PRequestPooledTransactionHash{
 				ClientIndex:                 0,
+				UseExistingConnection:       true,
+				TransactionIndexes:          []uint64{0},
+				WaitForNewPooledTransaction: true,
+			},
+		},
+	},
+	&CancunBaseSpec{
+		BaseSpec: test.BaseSpec{
+			Name: "Request Blob Pooled Transactions Multiple",
+			About: `
+			Requests multiple blob pooled transactions and verifies the correct encoding.
+			`,
+			MainFork: config.Cancun,
+		},
+		TestSequence: TestSequence{
+			// Get past the genesis
+			NewPayloads{
+				PayloadCount: 1,
+			},
+			// Peer with the client before sending txs
+			DevP2PClientPeering{
+				ClientIndex:        0,
+				MaintainConnection: true,
+			},
+			// Send multiple blob transaction
+			SendBlobTransactions{
+				TransactionCount:              cancun.MAX_BLOBS_PER_BLOCK - 1,
+				BlobTransactionMaxBlobGasCost: big.NewInt(1),
+			},
+			DevP2PRequestPooledTransactionHash{
+				ClientIndex:                 0,
+				UseExistingConnection:       true,
 				TransactionIndexes:          []uint64{0},
 				WaitForNewPooledTransaction: true,
 			},

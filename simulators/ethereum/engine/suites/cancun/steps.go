@@ -27,6 +27,7 @@ import (
 type CancunTestContext struct {
 	*test.Env
 	*TestBlobTxPool
+	DevP2PConnections map[uint64]*devp2p.Conn
 }
 
 // Interface to represent a single step in a test vector
@@ -757,6 +758,8 @@ func (step SendModifiedLatestPayload) Description() string {
 type DevP2PClientPeering struct {
 	// Client index to peer to
 	ClientIndex uint64
+	// Maintain connection for later steps
+	MaintainConnection bool
 }
 
 func (step DevP2PClientPeering) Execute(t *CancunTestContext) error {
@@ -769,8 +772,17 @@ func (step DevP2PClientPeering) Execute(t *CancunTestContext) error {
 	if err != nil {
 		return fmt.Errorf("error peering engine client: %v", err)
 	}
-	defer conn.Close()
 	t.Logf("INFO: Connected to client %d, remote public key: %s", step.ClientIndex, conn.RemoteKey())
+
+	// Config connection closure
+	if !step.MaintainConnection {
+		defer conn.Close()
+	} else {
+		if t.DevP2PConnections == nil {
+			t.DevP2PConnections = make(map[uint64]*devp2p.Conn)
+		}
+		t.DevP2PConnections[step.ClientIndex] = conn
+	}
 
 	// Sleep
 	time.Sleep(1 * time.Second)
@@ -802,13 +814,17 @@ func (step DevP2PClientPeering) Execute(t *CancunTestContext) error {
 }
 
 func (step DevP2PClientPeering) Description() string {
-	return fmt.Sprintf("DevP2PClientPeering: client %d", step.ClientIndex)
+	return fmt.Sprintf("DevP2PClientPeering: client %d, connection maintained: %b ", step.ClientIndex, step.MaintainConnection)
 }
 
 // A step that requests a Transaction hash via P2P and expects the correct full blob tx
 type DevP2PRequestPooledTransactionHash struct {
 	// Client index to request the transaction hash from
 	ClientIndex uint64
+	// Use existing connection from previous step
+	UseExistingConnection bool
+	// Maintain connection for later steps
+	MaintainConnection bool
 	// Transaction Index to request
 	TransactionIndexes []uint64
 	// Wait for a new pooled transaction message before actually requesting the transaction
@@ -820,13 +836,35 @@ func (step DevP2PRequestPooledTransactionHash) Execute(t *CancunTestContext) err
 	if step.ClientIndex >= uint64(len(t.TestEngines)) {
 		return fmt.Errorf("invalid client index %d", step.ClientIndex)
 	}
-	engine := t.Engines[step.ClientIndex]
-	conn, err := devp2p.PeerEngineClient(engine, t.CLMock)
-	if err != nil {
-		return fmt.Errorf("error peering engine client: %v", err)
+
+	var conn *devp2p.Conn
+	var err error
+	if !step.UseExistingConnection {
+		// Establish a new connection if not using an existing one
+		engine := t.Engines[step.ClientIndex]
+		conn, err = devp2p.PeerEngineClient(engine, t.CLMock)
+		if err != nil {
+			return fmt.Errorf("error peering engine client: %v", err)
+		}
+		t.Logf("INFO: Connected to client %d, remote public key: %s", step.ClientIndex, conn.RemoteKey())
+	} else {
+		var exists bool
+		conn, exists = t.DevP2PConnections[step.ClientIndex]
+		if !exists {
+			return fmt.Errorf("no existing connection found for client index %d", step.ClientIndex)
+		}
+		t.Logf("INFO: Using existing connection to client %d, remote public key: %s", step.ClientIndex, conn.RemoteKey())
 	}
-	defer conn.Close()
-	t.Logf("INFO: Connected to client %d, remote public key: %s", step.ClientIndex, conn.RemoteKey())
+
+	// Config connection closure
+	if !step.MaintainConnection {
+		defer conn.Close()
+	} else if !step.UseExistingConnection && step.MaintainConnection {
+		if t.DevP2PConnections == nil {
+			t.DevP2PConnections = make(map[uint64]*devp2p.Conn)
+		}
+		t.DevP2PConnections[step.ClientIndex] = conn
+	}
 
 	var (
 		txHashes = make([]common.Hash, len(step.TransactionIndexes))
