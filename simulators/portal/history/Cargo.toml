@@ -15,3 +15,6 @@ tracing-subscriber = "0.3.16"
 itertools = "0.10.5"
 serde_yaml = "0.9"
 tokio = { version = "1", features = ["full"] }
+
+# todo: remove this when we update discv5. Added this because enr 10.1 is a breaking change
+enr = { version = "=0.10.0", features = ["k256", "ed25519"] }
