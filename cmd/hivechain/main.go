@@ -34,8 +34,9 @@ import (
 func main() {
 	// Initialize go-ethereum logging.
 	// This is mostly for displaying the DAG generator progress.
-	handler := ethlog.StreamHandler(os.Stderr, ethlog.TerminalFormat(false))
-	ethlog.Root().SetHandler(ethlog.LvlFilterHandler(ethlog.LvlWarn, handler))
+	logh := ethlog.NewTerminalHandlerWithLevel(os.Stderr, ethlog.LevelWarn, false)
+	logger := ethlog.NewLogger(logh)
+	ethlog.SetDefault(logger)
 
 	flag.Usage = usage
 

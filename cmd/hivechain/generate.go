@@ -21,7 +21,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/trie"
+	"github.com/ethereum/go-ethereum/triedb"
 	"golang.org/x/exp/slices"
 )
 
@@ -114,9 +114,9 @@ func (g *generator) run() error {
 	engine := g.createConsensusEngine(db)
 
 	// Init genesis block.
-	trieconfig := *trie.HashDefaults
+	trieconfig := *triedb.HashDefaults
 	trieconfig.Preimages = true
-	triedb := trie.NewDatabase(db, &trieconfig)
+	triedb := triedb.NewDatabase(db, &trieconfig)
 	genesis := g.genesis.MustCommit(db, triedb)
 
 	// Create the blocks.
