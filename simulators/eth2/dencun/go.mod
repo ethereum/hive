@@ -6,7 +6,7 @@ toolchain go1.22.0
 
 require (
 	github.com/ethereum/go-ethereum v1.13.14
-	github.com/ethereum/hive v0.0.0-20231128202301-f931b46287a8
+	github.com/ethereum/hive v0.0.0-20240319152821-ae224371b4e5
 	github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6
 	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305231022-f69df863de20
 	github.com/lithammer/dedent v1.1.0
@@ -31,7 +31,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
-	golang.org/x/sys v0.17.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -73,7 +73,7 @@ require (
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/pprof v0.0.0-20240207164012-fb44976bdcd5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/gorilla/mux v1.8.0 // indirect
+	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.5 // indirect
 	github.com/herumi/bls-eth-go-binary v1.28.1 // indirect
@@ -162,8 +162,11 @@ require (
 	golang.org/x/mod v0.15.0 // indirect
 	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
+	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/tools v0.18.0 // indirect
-	google.golang.org/protobuf v1.32.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
+	google.golang.org/grpc v1.58.3 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1 // indirect
 	k8s.io/client-go v0.22.5 // indirect
 	k8s.io/utils v0.0.0-20210930125809-cb0fa318a74b // indirect
