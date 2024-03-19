@@ -1,10 +1,14 @@
 module github.com/ethereum/hive/simulators/ethereum/rpc-compat
 
-go 1.18
+go 1.21
+
+toolchain go1.22.1
 
 require (
 	github.com/ethereum/go-ethereum v1.13.5-0.20231031113925-bc42e88415d3
-	github.com/ethereum/hive v0.0.0-20240131232337-d38a51d4e475
+	github.com/ethereum/hive v0.0.0-20240319152821-ae224371b4e5
+	github.com/tidwall/gjson v1.17.0
+	github.com/tidwall/sjson v1.2.5
 	github.com/yudai/gojsondiff v1.0.0
 )
 
@@ -25,10 +29,8 @@ require (
 	github.com/sergi/go-diff v1.2.0 // indirect
 	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a // indirect
-	github.com/tidwall/gjson v1.17.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.0 // indirect
-	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yudai/golcs v0.0.0-20170316035057-ecda9a501e82 // indirect
@@ -37,7 +39,7 @@ require (
 	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/mod v0.12.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/tools v0.13.0 // indirect
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1 // indirect
 )
