@@ -283,7 +283,7 @@ func reportTAP(t *hivesim.T, clientName string, output io.Reader) error {
 		}
 		// Forward result to hive.
 		name := fmt.Sprintf("%s (%s)", test.Description, clientName)
-		testID, err := t.Sim.StartTest(t.SuiteID, name, "")
+		testID, err := t.Sim.StartTest(t.SuiteID, hivesim.TestStartInfo{Name: name})
 		if err != nil {
 			return fmt.Errorf("can't report sub-test result: %v", err)
 		}
