@@ -33,7 +33,7 @@ func formatDescription(desc string) string {
 }
 
 // Represents a single test case to be printed in the markdown file.
-type markdownTestCase simapi.TestRequest
+type markdownTestCase TestStartInfo
 
 // Returns the command-line to run the test case.
 func (tc *markdownTestCase) commandLine(simName string, suiteName string) string {
@@ -341,9 +341,9 @@ func (docs *docsCollector) EndSuite(testSuite SuiteID) error {
 
 // Starts a new test case, and appends it to the tests map in the test suite.
 // If the suite does not exist, returns an error.
-func (docs *docsCollector) StartTest(testSuite SuiteID, test *simapi.TestRequest) (TestID, error) {
+func (docs *docsCollector) StartTest(testSuite SuiteID, test TestStartInfo) (TestID, error) {
 	// Create a new markdown test case.
-	markdownTest := markdownTestCase(*test)
+	markdownTest := markdownTestCase(test)
 	// Check if suite exists.
 	if _, ok := docs.suites[testSuite]; !ok {
 		return 0, fmt.Errorf("test suite %d does not exist", testSuite)

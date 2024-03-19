@@ -129,7 +129,7 @@ func (sim *Simulation) EndSuite(testSuite SuiteID) error {
 }
 
 // StartTest starts a new test case, returning the testcase id as a context identifier.
-func (sim *Simulation) StartTest(testSuite SuiteID, test *simapi.TestRequest) (TestID, error) {
+func (sim *Simulation) StartTest(testSuite SuiteID, test TestStartInfo) (TestID, error) {
 	if sim.docs != nil {
 		return sim.docs.StartTest(testSuite, test)
 	}

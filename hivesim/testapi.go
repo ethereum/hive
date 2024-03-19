@@ -343,8 +343,8 @@ type testSpec struct {
 	alwaysRun   bool
 }
 
-func (spec testSpec) request() *simapi.TestRequest {
-	return &simapi.TestRequest{
+func (spec testSpec) request() TestStartInfo {
+	return TestStartInfo{
 		Name:        spec.name,
 		DisplayName: spec.displayName,
 		Category:    spec.category,

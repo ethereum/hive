@@ -78,7 +78,7 @@ func TestEnodeReplaceIP(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
+	testID, err := sim.StartTest(suiteID, TestStartInfo{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
@@ -130,7 +130,7 @@ func TestStartClientStartOptions(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
+	testID, err := sim.StartTest(suiteID, TestStartInfo{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
@@ -267,7 +267,7 @@ func TestRunProgram(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
+	testID, err := sim.StartTest(suiteID, TestStartInfo{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
@@ -314,7 +314,7 @@ func TestStartClientErrors(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
+	testID, err := sim.StartTest(suiteID, TestStartInfo{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
@@ -370,7 +370,7 @@ func TestStartClientInitialNetworks(t *testing.T) {
 	if err != nil {
 		t.Fatal("can't start suite:", err)
 	}
-	testID, err := sim.StartTest(suiteID, &simapi.TestRequest{Name: "test"})
+	testID, err := sim.StartTest(suiteID, TestStartInfo{Name: "test"})
 	if err != nil {
 		t.Fatal("can't start test:", err)
 	}
