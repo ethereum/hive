@@ -46,6 +46,7 @@ require (
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/crate-crypto/go-ipa v0.0.0-20231025140028-3c0104f4b233 // indirect
 	github.com/crate-crypto/go-kzg-4844 v0.7.0 // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20200604182044-b73af7476f6c // indirect
 	github.com/deckarep/golang-set/v2 v2.3.0 // indirect
@@ -56,8 +57,9 @@ require (
 	github.com/ferranbt/fastssz v0.1.3 // indirect
 	github.com/flynn/noise v1.1.0 // indirect
 	github.com/francoispqt/gojay v1.2.13 // indirect
+	github.com/gballet/go-verkle v0.1.1-0.20231031103413-a67434b50f46 // indirect
 	github.com/getsentry/sentry-go v0.20.0 // indirect
-	github.com/go-ole/go-ole v1.2.6 // indirect
+	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
@@ -173,7 +175,5 @@ require (
 replace github.com/protolambda/zrnt => github.com/marioevz/zrnt v0.26.2-0.20231109183115-d2098ec1f42c
 
 replace github.com/protolambda/eth2api => github.com/marioevz/eth2api v0.0.0-20230922201437-72bd1301e033
-
-replace github.com/ethereum/go-ethereum => github.com/lightclient/go-ethereum v1.10.10-0.20231019143932-4d161dee0c4c
 
 replace github.com/protolambda/ztyp => github.com/marioevz/ztyp v0.0.0-20231106221254-dd6f24f13fd9
