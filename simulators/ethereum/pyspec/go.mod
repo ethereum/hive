@@ -1,10 +1,12 @@
 module github.com/ethereum/hive/simulators/ethereum/pyspec
 
-go 1.20
+go 1.21
+
+toolchain go1.22.1
 
 require (
 	github.com/ethereum/go-ethereum v1.13.5-0.20231127143928-5b57727d6de2
-	github.com/ethereum/hive v0.0.0-20231031133732-dcd7ddb75960
+	github.com/ethereum/hive v0.0.0-20240319152821-ae224371b4e5
 	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20230919054339-322945164a97
 )
 
@@ -43,6 +45,9 @@ require (
 	github.com/klauspost/compress v1.15.15 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
+	github.com/lithammer/dedent v1.1.0 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/mmcloughlin/addchain v0.4.0 // indirect
@@ -64,10 +69,11 @@ require (
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/sync v0.4.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.13.0 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
+	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
