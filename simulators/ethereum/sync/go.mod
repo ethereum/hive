@@ -1,10 +1,12 @@
 module github.com/ethereum/hive/simulators/ethereum/sync
 
-go 1.20
+go 1.21
+
+toolchain go1.22.1
 
 require (
 	github.com/ethereum/go-ethereum v1.13.5-0.20231031113925-bc42e88415d3
-	github.com/ethereum/hive v0.0.0-20240131232337-d38a51d4e475
+	github.com/ethereum/hive v0.0.0-20240319152821-ae224371b4e5
 )
 
 require (
@@ -34,6 +36,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.0 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
 	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/klauspost/compress v1.15.15 // indirect
@@ -63,10 +66,10 @@ require (
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/sync v0.3.0 // indirect
-	golang.org/x/sys v0.13.0 // indirect
+	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
 	golang.org/x/tools v0.13.0 // indirect
-	google.golang.org/protobuf v1.28.1 // indirect
+	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
