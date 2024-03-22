@@ -12,3 +12,4 @@ RUN chmod +x /shisui.sh
 EXPOSE 8545 9009/udp
 
 ENTRYPOINT ["/shisui.sh"]
+

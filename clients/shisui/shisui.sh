@@ -24,3 +24,4 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
 fi
 
 app $FLAGS
+
