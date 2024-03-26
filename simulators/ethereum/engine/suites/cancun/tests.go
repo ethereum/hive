@@ -1777,7 +1777,6 @@ var Tests = []test.Spec{
 			// Peer with the client before sending txs
 			DevP2PClientPeering{
 				ClientIndex:        0,
-				MaintainConnection: true,
 			},
 			// Send a single blob transaction
 			SendBlobTransactions{
@@ -1808,7 +1807,6 @@ var Tests = []test.Spec{
 			// Peer with the client before sending txs
 			DevP2PClientPeering{
 				ClientIndex:        0,
-				MaintainConnection: true,
 			},
 			// Send multiple blob transaction
 			SendBlobTransactions{
