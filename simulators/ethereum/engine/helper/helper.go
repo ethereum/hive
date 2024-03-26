@@ -2,6 +2,7 @@ package helper
 
 import (
 	"context"
+	"strconv"
 
 	"bytes"
 	"encoding/json"
@@ -48,7 +49,10 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 		return nil, err
 	}
 	reqLogBytes := bytes.TrimSpace(reqBytes[:])
-	if len(reqLogBytes) > MAX_LOG_BYTES {
+
+	hiveLogLevel, _ := strconv.Atoi(os.Getenv("HIVE_LOGLEVEL"))
+	reqTrimLogs := len(reqLogBytes) > MAX_LOG_BYTES && hiveLogLevel <= 3
+	if reqTrimLogs {
 		rt.Logger.Logf(">> (%s) %s... (Log trimmed)", rt.ID, reqLogBytes[:MAX_LOG_BYTES])
 	} else {
 		rt.Logger.Logf(">> (%s) %s", rt.ID, reqLogBytes)
@@ -71,7 +75,9 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	respCopy := *resp
 	respCopy.Body = io.NopCloser(bytes.NewReader(respBytes))
 	respLogBytes := bytes.TrimSpace(respBytes[:])
-	if len(respLogBytes) > MAX_LOG_BYTES {
+
+	respTrimLogs := len(respLogBytes) > MAX_LOG_BYTES && hiveLogLevel <= 3
+	if respTrimLogs {
 		rt.Logger.Logf("<< (%s) %s... (Log trimmed)", rt.ID, respLogBytes[:MAX_LOG_BYTES])
 	} else {
 		rt.Logger.Logf("<< (%s) %s", rt.ID, respLogBytes)
