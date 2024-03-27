@@ -48,6 +48,9 @@ type SimEnv struct {
 	// This configures the amount of time the simulation waits
 	// for the client to open port 8545 after launching the container.
 	ClientStartTimeout time.Duration
+
+	// Information about the simulators to put in the results.
+	SimulatorsVersion *string
 }
 
 // SimResult summarizes the results of a simulation run.
@@ -395,14 +398,15 @@ func (manager *TestManager) StartTestSuite(name string, description string) (Tes
 	}
 
 	manager.runningTestSuites[newSuiteID] = &TestSuite{
-		ID:              newSuiteID,
-		Name:            name,
-		Description:     description,
-		ClientVersions:  make(map[string]string),
-		TestCases:       make(map[TestID]*TestCase),
-		SimulatorLog:    manager.simLogFile,
-		TestDetailsLog:  testLogPath,
-		testDetailsFile: testLogFile,
+		ID:                newSuiteID,
+		Name:              name,
+		Description:       description,
+		ClientVersions:    make(map[string]string),
+		TestCases:         make(map[TestID]*TestCase),
+		SimulatorLog:      manager.simLogFile,
+		SimulatorsVersion: manager.config.SimulatorsVersion,
+		TestDetailsLog:    testLogPath,
+		testDetailsFile:   testLogFile,
 	}
 	manager.testSuiteCounter++
 	return newSuiteID, nil
