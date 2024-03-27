@@ -2,7 +2,6 @@ package helper
 
 import (
 	"context"
-	"strconv"
 
 	"bytes"
 	"encoding/json"
@@ -34,9 +33,10 @@ type LogF interface {
 }
 
 type LoggingRoundTrip struct {
-	Logger LogF
-	ID     string
-	Inner  http.RoundTripper
+	Logger   LogF
+	ID       string
+	Inner    http.RoundTripper
+	LogLevel int
 }
 
 const MAX_LOG_BYTES = 1024 * 4
@@ -49,9 +49,7 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 		return nil, err
 	}
 	reqLogBytes := bytes.TrimSpace(reqBytes[:])
-
-	hiveLogLevel, _ := strconv.Atoi(os.Getenv("HIVE_LOGLEVEL"))
-	reqTrimLogs := len(reqLogBytes) > MAX_LOG_BYTES && hiveLogLevel <= 3
+	reqTrimLogs := len(reqLogBytes) > MAX_LOG_BYTES && rt.LogLevel <= 3
 	if reqTrimLogs {
 		rt.Logger.Logf(">> (%s) %s... (Log trimmed)", rt.ID, reqLogBytes[:MAX_LOG_BYTES])
 	} else {
@@ -76,7 +74,7 @@ func (rt *LoggingRoundTrip) RoundTrip(req *http.Request) (*http.Response, error)
 	respCopy.Body = io.NopCloser(bytes.NewReader(respBytes))
 	respLogBytes := bytes.TrimSpace(respBytes[:])
 
-	respTrimLogs := len(respLogBytes) > MAX_LOG_BYTES && hiveLogLevel <= 3
+	respTrimLogs := len(respLogBytes) > MAX_LOG_BYTES && rt.LogLevel <= 3
 	if respTrimLogs {
 		rt.Logger.Logf("<< (%s) %s... (Log trimmed)", rt.ID, respLogBytes[:MAX_LOG_BYTES])
 	} else {

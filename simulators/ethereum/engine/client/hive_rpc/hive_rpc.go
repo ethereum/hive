@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -91,10 +93,12 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 	if err := CheckEthEngineLive(c); err != nil {
 		return nil, fmt.Errorf("Engine/Eth ports were never open for client: %v", err)
 	}
+	hiveLogLevel, _ := strconv.Atoi(os.Getenv("HIVE_LOGLEVEL"))
 	ec := NewHiveRPCEngineClient(c, enginePort, ethPort, jwtSecret, &helper.LoggingRoundTrip{
-		Logger: T,
-		ID:     c.Container,
-		Inner:  http.DefaultTransport,
+		Logger:   T,
+		ID:       c.Container,
+		Inner:    http.DefaultTransport,
+		LogLevel: hiveLogLevel,
 	})
 	return ec, nil
 }
