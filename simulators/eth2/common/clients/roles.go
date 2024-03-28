@@ -55,15 +55,18 @@ func byName(
 
 func (c *ClientDefinitionsByRole) Combinations() NodeDefinitions {
 	var nodes NodeDefinitions
-	for _, beacon := range c.Beacon {
-		for _, eth1 := range c.Eth1 {
-			nodes = append(
-				nodes,
-				NodeDefinition{
-					ExecutionClient: eth1.Name,
-					ConsensusClient: beacon.Name,
-				},
-			)
+	for _, validator := range c.Validator {
+		for _, beacon := range c.Beacon {
+			for _, eth1 := range c.Eth1 {
+				nodes = append(
+					nodes,
+					NodeDefinition{
+						ExecutionClient: eth1.Name,
+						ConsensusClient: beacon.Name,
+						ValidatorClient: validator.Name,
+					},
+				)
+			}
 		}
 	}
 	return nodes

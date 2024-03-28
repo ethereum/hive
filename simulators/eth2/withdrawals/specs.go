@@ -65,6 +65,14 @@ var (
 		Eth1Consensus: &el.ExecutionPostMergeGenesis{},
 	}
 
+	MINIMAL_SLOT_TIME_CLIENTS = []string{
+		"lighthouse",
+		"teku",
+		"prysm",
+		"lodestar",
+		"grandine",
+	}
+
 	// This is the account that sends vault funding transactions.
 	VaultAccountAddress = common.HexToAddress(
 		"0xcf49fda3be353c69b41ed96333cd24302da4556f",
