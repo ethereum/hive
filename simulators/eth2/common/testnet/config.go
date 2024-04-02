@@ -27,6 +27,7 @@ var (
 		"teku",
 		"prysm",
 		"lodestar",
+		"grandine",
 	}
 )
 

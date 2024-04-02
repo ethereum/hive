@@ -49,10 +49,26 @@ var (
 	}
 
 	SAFE_SLOTS_TO_IMPORT_OPTIMISTICALLY_CLIENT_OVERRIDE = map[string]*big.Int{}
+
+	MINIMAL_SLOT_TIME_CLIENTS = map[string]bool{
+		"lighthouse": true,
+		"teku":       true,
+		"prysm":      true,
+		"lodestar":   true,
+		"grandine":   true,
+	}
 )
 
 func getClientConfig(n clients.NodeDefinition) *tn.Config {
 	config := *DEFAULT_CONFIG
+	// Use unoptimized
+	if !MINIMAL_SLOT_TIME_CLIENTS[n.ConsensusClient] || !MINIMAL_SLOT_TIME_CLIENTS[n.ValidatorClient] {
+		// if some client does not support miminial slotTime -> don't use
+		config.SlotTime = big.NewInt(12)
+	}
+
+	fmt.Printf("INFO: using %d second slot time\n", config.SlotTime)
+
 	return &config
 }
 
@@ -1052,6 +1068,7 @@ func SyncingWithInvalidChain(
 			clients.NodeDefinition{
 				ExecutionClient:      n.ExecutionClient,
 				ConsensusClient:      n.ConsensusClient,
+				ValidatorClient:      n.ValidatorClient,
 				ValidatorShares:      1,
 				TestVerificationNode: false,
 			},
@@ -1059,6 +1076,7 @@ func SyncingWithInvalidChain(
 			clients.NodeDefinition{
 				ExecutionClient:      n.ExecutionClient,
 				ConsensusClient:      n.ConsensusClient,
+				ValidatorClient:      n.ValidatorClient,
 				ValidatorShares:      1,
 				TestVerificationNode: false,
 			},
@@ -1066,6 +1084,7 @@ func SyncingWithInvalidChain(
 			clients.NodeDefinition{
 				ExecutionClient:      n.ExecutionClient,
 				ConsensusClient:      n.ConsensusClient,
+				ValidatorClient:      n.ValidatorClient,
 				ValidatorShares:      0,
 				TestVerificationNode: true,
 			},
