@@ -22,7 +22,7 @@ echo ""
 echo "  cd $HIVEHOME/hiveviewer && ln -s /tmp/TestResults/ Results && python -m SimpleHTTPServer"
 echo ""
 echo "And then visit http://localhost:8000/ with your browser. "
-echo "Log-files and stuff is availalbe in $RESULTS."
+echo "Log-files and stuff is available in $RESULTS."
 echo ""
 echo ""
 
