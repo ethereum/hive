@@ -1,7 +1,7 @@
 # hivechain
 
 Hivechain creates a non-empty blockchain for testing purposes. To facilitate good tests,
-the created chain excercises many protocol features, including:
+the created chain exercises many protocol features, including:
 
 - different types of transactions
 - diverse set of contracts with interesting storage, code, etc.
