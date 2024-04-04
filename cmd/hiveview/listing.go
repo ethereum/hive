@@ -14,7 +14,7 @@ import (
 	"github.com/ethereum/hive/internal/libhive"
 )
 
-const listLimit = 200 // number of runs reported
+const listLimit = 10000 // number of runs reported
 
 // generateListing processes hive simulation output files and generates a listing file.
 func generateListing(fsys fs.FS, dir string, output io.Writer) error {
@@ -22,8 +22,8 @@ func generateListing(fsys fs.FS, dir string, output io.Writer) error {
 		stop    = errors.New("stop")
 		entries []listingEntry
 	)
-	// The files are walked in name order high->low. So to get the latest 200 items, we
-	// just need to keep going until we have 200.
+	// The files are walked in name order high->low. So to get the latest 10000 items, we
+	// just need to keep going until we have 10000.
 	err := walkSummaryFiles(fsys, dir, func(suite *libhive.TestSuite, fi fs.FileInfo) error {
 		entry := suiteToEntry(suite, fi)
 		entries = append(entries, entry)
