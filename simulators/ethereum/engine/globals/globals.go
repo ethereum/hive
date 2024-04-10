@@ -47,7 +47,7 @@ var (
 	GenesisTimestamp = uint64(0x1234)
 
 	// RPC Timeout for every call
-	RPCTimeout = 10 * time.Second
+	RPCTimeout = 20 * time.Second
 
 	// Engine, Eth ports
 	EthPortHTTP    = 8545
