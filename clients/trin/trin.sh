@@ -11,9 +11,9 @@ if [ "$HIVE_CLIENT_PRIVATE_KEY" != "" ]; then
 fi
 
 if [ "$HIVE_PORTAL_NETWORKS_SELECTED" != "" ]; then
-    FLAGS="$FLAGS --networks $HIVE_PORTAL_NETWORKS_SELECTED"
+    FLAGS="$FLAGS --portal-subnetworks $HIVE_PORTAL_NETWORKS_SELECTED"
 else
-    FLAGS="$FLAGS --networks history"
+    FLAGS="$FLAGS --portal-subnetworks history"
 fi
 
 RUST_LOG=trace trin --web3-transport http --web3-http-address http://0.0.0.0:8545 --external-address "$IP_ADDR":9009 --bootnodes none $FLAGS
