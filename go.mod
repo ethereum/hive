@@ -15,7 +15,7 @@ require (
 	github.com/holiman/uint256 v1.2.4
 	github.com/lithammer/dedent v1.1.0
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa
-	golang.org/x/net v0.21.0
+	golang.org/x/net v0.23.0
 	gopkg.in/inconshreveable/log15.v2 v2.0.0-20200109203555-b30bc20e4fd1
 	gopkg.in/yaml.v3 v3.0.1
 )
