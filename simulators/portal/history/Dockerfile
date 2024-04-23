@@ -16,6 +16,7 @@ RUN cargo build --release
 # copy real src over and make newest modified file
 COPY src ./src
 
+RUN touch -a -m ./src/main.rs
 
 # build for release
 RUN cargo build --release
