@@ -5,7 +5,6 @@ RUN USER=root cargo new --bin history
 WORKDIR /history
 
 # copy over manifests and source to build image
-# copy over manifests and source to build image
 COPY Cargo.toml ./Cargo.toml
 
 # create fake main.rs and build dependencies
