@@ -16,4 +16,4 @@ else
     FLAGS="$FLAGS --portal-subnetworks history"
 fi
 
-RUST_LOG=trace trin --web3-transport http --web3-http-address http://0.0.0.0:8545 --external-address "$IP_ADDR":9009 --bootnodes none $FLAGS
+RUST_LOG="trace,neli=error" trin --web3-transport http --web3-http-address http://0.0.0.0:8545 --external-address "$IP_ADDR":9009 --bootnodes none $FLAGS
