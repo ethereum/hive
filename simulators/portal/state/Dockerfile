@@ -8,8 +8,17 @@ RUN apt-get update && apt-get install clang -y
 
 # copy over manifests and source to build image
 COPY Cargo.toml ./Cargo.toml
-COPY src ./src
+
+# create fake main.rs and build dependencies
+RUN echo "fn main() {}" > ./src/main.rs
+
 RUN apt-get update && apt-get install clang -y
+RUN cargo build --release
+
+# copy real src over and make newest modified file
+COPY src ./src
+
+RUN touch -a -m ./src/main.rs
 
 # build for release
 RUN cargo build --release
