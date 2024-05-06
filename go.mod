@@ -6,7 +6,7 @@ toolchain go1.22.1
 
 require (
 	github.com/davecgh/go-spew v1.1.1
-	github.com/ethereum/go-ethereum v1.13.14
+	github.com/ethereum/go-ethereum v1.13.15
 	github.com/ethereum/hive/hiveproxy v0.0.0-20230919105823-37cbbe1ef86d
 	github.com/evanw/esbuild v0.18.11
 	github.com/fsouza/go-dockerclient v1.11.0
