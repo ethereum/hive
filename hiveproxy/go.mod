@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.22.1
 
 require (
-	github.com/ethereum/go-ethereum v1.13.14
+	github.com/ethereum/go-ethereum v1.13.15
 	github.com/hashicorp/yamux v0.1.1
 )
 
