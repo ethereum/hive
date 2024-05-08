@@ -46,20 +46,21 @@
 # Immediately abort the script on any error encountered
 set -e
 
-ethereumjs="node /ethereumjs-monorepo/packages/client/dist/bin/cli.js"
+ethereumjs="node ./dist/esm/bin/cli.js"
+CLIENT_DIRECTORY=/ethereumjs-monorepo/packages/client
 FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcAddr 0.0.0.0 --rpcEngineAddr 0.0.0.0 --rpcEnginePort 8551 --ws false --logLevel debug --rpcDebug all --rpcDebugVerbose all --isSingleNode"
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > /genesis.json
+jq -f /mapper.jq /genesis-input.json > $CLIENT_DIRECTORY/genesis.json
 
 # Dump genesis. 
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' $CLIENT_DIRECTORY/genesis.json
 else
     echo "Supplied genesis state:"
-    cat /genesis.json
+    cat $CLIENT_DIRECTORY/genesis.json
 fi
 
 # Import clique signing key.
@@ -89,4 +90,6 @@ if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 fi
 echo "Running ethereumjs with flags $FLAGS"
-$ethereumjs $FLAGS
+
+
+cd $CLIENT_DIRECTORY && $ethereumjs $FLAGS
