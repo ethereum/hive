@@ -46,21 +46,22 @@
 # Immediately abort the script on any error encountered
 set -e
 
-ethereumjs="node ./dist/esm/bin/cli.js"
 CLIENT_DIRECTORY=/ethereumjs-monorepo/packages/client
+
+ethereumjs="node $CLIENT_DIRECTORY/dist/esm/bin/cli.js"
 FLAGS="--gethGenesis ./genesis.json --rpc --rpcEngine --saveReceipts --rpcAddr 0.0.0.0 --rpcEngineAddr 0.0.0.0 --rpcEnginePort 8551 --ws false --logLevel debug --rpcDebug all --rpcDebugVerbose all --isSingleNode"
 
 # Configure the chain.
 mv /genesis.json /genesis-input.json
-jq -f /mapper.jq /genesis-input.json > $CLIENT_DIRECTORY/genesis.json
+jq -f /mapper.jq /genesis-input.json > ./genesis.json
 
 # Dump genesis. 
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
-    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' $CLIENT_DIRECTORY/genesis.json
+    jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' ./genesis.json
 else
     echo "Supplied genesis state:"
-    cat $CLIENT_DIRECTORY/genesis.json
+    cat ./genesis.json
 fi
 
 # Import clique signing key.
@@ -70,12 +71,12 @@ if [ "$HIVE_CLIQUE_PRIVATEKEY" != "" ]; then
     echo -n "$HIVE_CLIQUE_PRIVATEKEY" > ./private_key.txt
     # Ensure password file is used when running ethereumjs in mining mode.
     if [ "$HIVE_MINER" != "" ]; then
-        FLAGS="$FLAGS --mine --unlock ./private_key.txt --minerCoinbase $HIVE_MINER"
+        FLAGS="$FLAGS --mine --unlock ./private_key.txt --minerCoinbase 0x$HIVE_MINER"
     fi
 fi
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
-    FLAGS="$FLAGS --jwt-secret ./jwtsecret"
+    FLAGS="$FLAGS --jwtSecret ./jwtsecret"
 fi
 
 # Load the test chain if present
@@ -92,4 +93,4 @@ fi
 echo "Running ethereumjs with flags $FLAGS"
 
 
-cd $CLIENT_DIRECTORY && $ethereumjs $FLAGS
+$ethereumjs $FLAGS
