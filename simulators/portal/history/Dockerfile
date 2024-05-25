@@ -27,7 +27,7 @@ RUN apt update && apt install wget -y
 
 # copy build artifacts from build stage
 COPY --from=builder /history/target/release/history .
-ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml ./test-data/test_data_collection_of_forks_blocks.yaml
+ADD https://raw.githubusercontent.com/KolbyML/portal-spec-tests/epoch/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml ./test-data/test_data_collection_of_forks_blocks.yaml
 
 ENV RUST_LOG=debug
 
