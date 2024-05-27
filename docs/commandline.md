@@ -151,7 +151,7 @@ simulations. Build it with:
 
 To generate a chain of a desired length, run the following command:
 
-    ./hivechain generate -genesis ./genesis.json -length 200
+    ./hivechain generate --length 200
 
 hivechain generates empty blocks by default. The chain will contain non-empty blocks if
 the following accounts have balance in genesis state. You can find the corresponding
