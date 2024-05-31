@@ -28,6 +28,21 @@ def to_bool:
   end
 ;
 
+# Pads storage keys to 32 bytes.
+def pad_storage_keys:
+  .alloc |= with_entries(
+    .value.storage |= with_entries(
+      .key |= (if . == null then . else
+                 if startswith("0x") then
+                   "0x" + (.[2:] | if length < 64 then ("0" * (64 - length)) + . else . end)
+                 else
+                   "0x" + (if length < 64 then ("0" * (64 - length)) + . else . end)
+                 end
+               end)
+    )
+  )
+;
+
 # Replace config in input.
 . + {
   "config": {
@@ -58,4 +73,4 @@ def to_bool:
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
   }
-} | remove_empty
+} | pad_storage_keys | remove_empty
