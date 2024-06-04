@@ -85,6 +85,15 @@ if [ -f /chain.rlp ]; then
   echo "Warning: chain.rlp not found."
 fi
 
+if [[ -d blocks ]]; then
+  for file in blocks/*; do
+    FLAGS="$FLAGS --loadBlocksFromRlp=${file}" 
+    echo $FLAGS
+  done
+  else
+  echo "Warning: blocks directory not found."
+fi
+
 if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
 fi

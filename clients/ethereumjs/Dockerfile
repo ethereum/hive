@@ -1,6 +1,6 @@
 ### Build EthereumJS From Git:
 
-FROM node:18-alpine as build
+FROM node:20-alpine as build
 
 ARG github=ethereumjs/ethereumjs-monorepo
 ARG tag=master
