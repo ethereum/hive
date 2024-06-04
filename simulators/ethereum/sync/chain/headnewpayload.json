@@ -18,9 +18,7 @@
       "baseFeePerGas": "0x7",
       "blockHash": "0x07f7d3c5744ffddc5441cf31074c91a934afbf6ddb7e8234a081ee1f21140455",
       "transactions": [],
-      "withdrawals": [],
-      "blobGasUsed": null,
-      "excessBlobGas": null
+      "withdrawals": []
     }
   ]
 }
