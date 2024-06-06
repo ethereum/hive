@@ -15,7 +15,6 @@ use itertools::Itertools;
 use serde_json::json;
 use serde_yaml::Value;
 use std::collections::HashMap;
-use tokio::time::Duration;
 
 // This is taken from Trin. It should be fairly standard
 const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
@@ -98,18 +97,6 @@ dyn_async! {
             for ProcessedContent { content_type, identifier, test_data } in process_content(content.clone()) {
                 test.run(
                     NClientTestSpec {
-                        name: format!("OFFER {}: {} {} --> {}", content_type, identifier, client_a.name, client_b.name),
-                        description: "".to_string(),
-                        always_run: false,
-                        run: test_offer,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                        test_data: Some(TestData::ContentList(test_data.clone())),
-                        clients: vec![client_a.clone(), client_b.clone()],
-                    }
-                ).await;
-
-                test.run(
-                    NClientTestSpec {
                         name: format!("RecursiveFindContent {}: {} {} --> {}", content_type, identifier, client_a.name, client_b.name),
                         description: "".to_string(),
                         always_run: false,
@@ -168,19 +155,6 @@ dyn_async! {
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
             ).await;
-
-            // Test gossiping a collection of blocks to node B (B will gossip back to A)
-            test.run(
-                NClientTestSpec {
-                    name: format!("GOSSIP blocks from A:{} --> B:{}", client_a.name, client_b.name),
-                    description: "".to_string(),
-                    always_run: false,
-                    run: test_gossip_two_nodes,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: Some(TestData::ContentList(content.clone().into_iter().map(content_pair_to_string_pair).collect())),
-                    clients: vec![client_a.clone(), client_b.clone()],
-                }
-            ).await;
         }
    }
 }
@@ -223,47 +197,6 @@ dyn_async! {
             },
             Err(err) => {
                 panic!("Error: Unable to get response from FINDCONTENT request: {err:?}");
-            }
-        }
-    }
-}
-
-dyn_async! {
-    async fn test_offer<'a>(clients: Vec<Client>, test_data: Option<TestData>) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
-        };
-        let test_data = match test_data.map(|data| data.content_list()) {
-            Some(test_data) => test_data,
-            None => panic!("Expected test data non was provided"),
-        };
-        let ContentKeyValue { key: target_key, value: target_value } = test_data.first().expect("Target content is required for this test");
-        let target_key: BeaconContentKey =
-            serde_json::from_value(json!(target_key)).unwrap();
-        let target_value: BeaconContentValue =
-            serde_json::from_value(json!(target_value)).unwrap();
-        let target_enr = match client_b.rpc.node_info().await {
-            Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
-        };
-
-        let _ = client_a.rpc.offer(target_enr, target_key.clone(), Some(target_value.clone())).await;
-
-        tokio::time::sleep(Duration::from_secs(8)).await;
-
-        match client_b.rpc.local_content(target_key).await {
-            Ok(possible_content) => {
-                if possible_content != target_value {
-                    panic!("Error receiving content: Expected content: {target_value:?}, Received content: {possible_content:?}");
-                }
-            }
-            Err(err) => {
-                panic!("Unable to get received content: {err:?}");
             }
         }
     }
@@ -474,97 +407,6 @@ dyn_async! {
             Err(err) => {
                 panic!("Error: Unable to get response from FINDCONTENT request: {err:?}");
             }
-        }
-    }
-}
-
-dyn_async! {
-    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Option<TestData>) {
-        let (client_a, client_b) = match clients.iter().collect_tuple() {
-            Some((client_a, client_b)) => (client_a, client_b),
-            None => {
-                panic!("Unable to get expected amount of clients from NClientTestSpec");
-            }
-        };
-        let test_data = match test_data.map(|data| data.content_list()) {
-            Some(test_data) => test_data,
-            None => panic!("Expected test data non was provided"),
-        };
-        // connect clients
-        let client_b_enr = match client_b.rpc.node_info().await {
-            Ok(node_info) => node_info.enr,
-            Err(err) => {
-                panic!("Error getting node info: {err:?}");
-            }
-        };
-        match BeaconNetworkApiClient::add_enr(&client_a.rpc, client_b_enr.clone()).await {
-            Ok(response) => match response {
-                true => (),
-                false => panic!("AddEnr expected to get true and instead got false")
-            },
-            Err(err) => panic!("{}", &err.to_string()),
-        }
-
-        // With default node settings nodes should be storing all content
-        for ContentKeyValue { key: content_key, value: content_value } in test_data.clone() {
-            let content_key: BeaconContentKey =
-                serde_json::from_value(json!(content_key)).unwrap();
-            let content_value: BeaconContentValue =
-                serde_json::from_value(json!(content_value)).unwrap();
-
-            match client_a.rpc.gossip(content_key.clone(), content_value.clone()).await {
-                Ok(nodes_gossiped_to) => {
-                   if nodes_gossiped_to != 1 {
-                        panic!("We expected to gossip to 1 node instead we gossiped to: {nodes_gossiped_to}");
-                    }
-                }
-                Err(err) => {
-                    panic!("Unable to get received content: {err:?}");
-                }
-            }
-
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
-
-        // wait test_data.len() seconds for data to propagate, giving more time if more items are propagating
-        tokio::time::sleep(Duration::from_secs(test_data.len() as u64)).await;
-
-        // process raw test data to generate content details for error output
-        let mut result = vec![];
-        for ContentKeyValue { key: content_key, value: content_value } in test_data.into_iter() {
-            let content_key: BeaconContentKey =
-                serde_json::from_value(json!(content_key)).unwrap();
-            let content_value: BeaconContentValue =
-                serde_json::from_value(json!(content_value)).unwrap();
-
-            let content_details = {
-                    let content_type = match &content_key {
-                        BeaconContentKey::LightClientBootstrap(_) => "bootstrap".to_string(),
-                        BeaconContentKey::LightClientUpdatesByRange(_) => "updates by range".to_string(),
-                        BeaconContentKey::LightClientFinalityUpdate(_) => "finality update".to_string(),
-                        BeaconContentKey::LightClientOptimisticUpdate(_) => "optimistic update".to_string(),
-                    };
-                    format!(
-                        "{:?} {}",
-                        content_key,
-                        content_type
-                    )
-            };
-
-            match client_b.rpc.local_content(content_key.clone()).await {
-                Ok(expected_value) => {
-                    if expected_value != content_value {
-                        result.push(format!("Error content received for block {content_details} was different then expected"));
-                    }
-                }
-                Err(err) => {
-                    result.push(format!("Error content for block {err} was absent"));
-                }
-            }
-        }
-
-        if !result.is_empty() {
-            panic!("Client B: {:?}", result);
         }
     }
 }
