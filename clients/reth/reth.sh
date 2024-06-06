@@ -65,7 +65,7 @@ FLAGS="$FLAGS --datadir $DATADIR"
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis. 
+# Dump genesis.
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
     jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
@@ -141,6 +141,9 @@ fi
 # If clique is expected enable auto-mine
 if [ -n "${HIVE_CLIQUE_PRIVATEKEY}" ] || [ -n "${HIVE_CLIQUE_PERIOD}" ]; then
   FLAGS="$FLAGS --auto-mine"
+  if [ -n "${HIVE_CLIQUE_PERIOD}" ]; then
+    FLAGS="$FLAGS --dev.block-time ${HIVE_CLIQUE_PERIOD}s"
+  fi
 fi
 
 # Configure RPC.
