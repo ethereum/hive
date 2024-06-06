@@ -20,18 +20,26 @@ var (
 )
 
 var clientEnv = hivesim.Params{
-	"HIVE_NODETYPE":       "full",
-	"HIVE_NETWORK_ID":     networkID.String(),
-	"HIVE_CHAIN_ID":       chainID.String(),
-	"HIVE_FORK_HOMESTEAD": "0",
-	"HIVE_FORK_TANGERINE": "0",
-	"HIVE_FORK_SPURIOUS":  "0",
+	"HIVE_NODETYPE":                  "full",
+	"HIVE_NETWORK_ID":                networkID.String(),
+	"HIVE_CHAIN_ID":                  chainID.String(),
+	"HIVE_FORK_HOMESTEAD":            "0",
+	"HIVE_FORK_TANGERINE":            "0",
+	"HIVE_FORK_SPURIOUS":             "0",
+	"HIVE_FORK_BYZANTIUM":            "0",
+	"HIVE_FORK_CONSTANTINOPLE":       "0",
+	"HIVE_FORK_PETERSBURG":           "0",
+	"HIVE_FORK_ISTANBUL":             "0",
+	"HIVE_FORK_MUIR_GLACIER":         "0",
+	"HIVE_FORK_BERLIN":               "0",
+	"HIVE_FORK_LONDON":               "0",
+	"HIVE_TERMINAL_TOTAL_DIFFICULTY": "0",
 
 	// All tests use clique PoA to mine new blocks.
-	"HIVE_CLIQUE_PERIOD":     "1",
-	"HIVE_CLIQUE_PRIVATEKEY": "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
-	"HIVE_MINER":             "658bdf435d810c91414ec09147daa6db62406379",
-	"HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED": "0",
+	"HIVE_CLIQUE_PERIOD":                    "1",
+	"HIVE_CLIQUE_PRIVATEKEY":                "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c",
+	"HIVE_MINER":                            "658bdf435d810c91414ec09147daa6db62406379",
+	"HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED": "1",
 }
 
 var files = map[string]string{
