@@ -65,7 +65,7 @@ FLAGS="$FLAGS --datadir $DATADIR"
 mv /genesis.json /genesis-input.json
 jq -f /mapper.jq /genesis-input.json > /genesis.json
 
-# Dump genesis. 
+# Dump genesis.
 if [ "$HIVE_LOGLEVEL" -lt 4 ]; then
     echo "Supplied genesis state (trimmed, use --sim.loglevel 4 or 5 for full output):"
     jq 'del(.alloc[] | select(.balance == "0x123450000000000000000"))' /genesis.json
@@ -146,16 +146,6 @@ fi
 # Configure RPC.
 FLAGS="$FLAGS --http --http.addr=0.0.0.0 --http.api=admin,debug,eth,net,web3"
 FLAGS="$FLAGS --ws --ws.addr=0.0.0.0 --ws.api=admin,debug,eth,net,web3"
-
-# Enable continuous sync if there is no CL (ttd == "") and mining is disabled
-if [ -z "${HIVE_MINER}" ] && [ -z "${HIVE_CLIQUE_PRIVATEKEY}" ] && [ -z "${HIVE_TERMINAL_TOTAL_DIFFICULTY}" ]; then
-    # if there is no chain file then we need to sync with the continuous
-    # download mode
-    if [ ! -f /chain.rlp ]; then
-        FLAGS="$FLAGS --debug.continuous"
-    fi
-fi
-
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="7365637265747365637265747365637265747365637265747365637265747365"
