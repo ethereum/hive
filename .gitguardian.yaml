@@ -1,0 +1,8 @@
+version: 2
+
+secret:
+  ignored_matches:
+    - match: "9c647b8b7c4e7c3490668fb6c11473619db80c93704c70893d3813af4090c39c"
+      name: "Hive default test private key"
+    - match: "658bdf435d810c91414ec09147daa6db62406379"
+      name: "Hive miner address"
