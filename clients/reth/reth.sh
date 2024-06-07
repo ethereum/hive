@@ -141,6 +141,9 @@ fi
 # If clique is expected enable auto-mine
 if [ -n "${HIVE_CLIQUE_PRIVATEKEY}" ] || [ -n "${HIVE_CLIQUE_PERIOD}" ]; then
   FLAGS="$FLAGS --auto-mine"
+  if [ -n "${HIVE_CLIQUE_PERIOD}" ]; then
+    FLAGS="$FLAGS --dev.block-time ${HIVE_CLIQUE_PERIOD}s"
+  fi
 fi
 
 # Configure RPC.
