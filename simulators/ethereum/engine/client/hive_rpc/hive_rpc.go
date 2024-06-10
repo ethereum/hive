@@ -117,7 +117,7 @@ func (s HiveRPCEngineStarter) StartClient(T *hivesim.T, testContext context.Cont
 }
 
 func CheckEthEngineLive(c *hivesim.Client) error {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	var (
 		ticker = time.NewTicker(100 * time.Millisecond)
