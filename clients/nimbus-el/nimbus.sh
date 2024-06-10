@@ -48,7 +48,7 @@
 set -e
 
 nimbus=/usr/bin/nimbus
-FLAGS="--prune-mode:archive --nat:extip:0.0.0.0"
+FLAGS="--chaindb:archive --nat:extip:0.0.0.0"
 
 loglevel=DEBUG
 case "$HIVE_LOGLEVEL" in
