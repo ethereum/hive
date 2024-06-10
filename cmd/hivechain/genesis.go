@@ -166,7 +166,7 @@ func (cfg *generatorConfig) createGenesis() *core.Genesis {
 }
 
 func add4788Contract(ga core.GenesisAlloc) {
-	ga[params.BeaconRootsStorageAddress] = core.GenesisAccount{
+	ga[params.BeaconRootsAddress] = core.GenesisAccount{
 		Balance: big.NewInt(42),
 		Code:    common.FromHex("0x3373fffffffffffffffffffffffffffffffffffffffe14604d57602036146024575f5ffd5b5f35801560495762001fff810690815414603c575f5ffd5b62001fff01545f5260205ff35b5f5ffd5b62001fff42064281555f359062001fff015500"),
 	}

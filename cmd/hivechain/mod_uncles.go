@@ -46,7 +46,7 @@ func (m *modUncles) apply(ctx *genBlockContext) bool {
 		Extra:      []byte(fmt.Sprintf("hivechain uncle %d", m.counter)),
 	}
 	// Initialize the remaining remaining header fields by converting to a full block.
-	ub := types.NewBlock(uncle, nil, nil, nil, trie.NewStackTrie(nil))
+	ub := types.NewBlock(uncle, nil, nil, trie.NewStackTrie(nil))
 	uncle = ub.Header()
 
 	// Add the uncle to the generated block.

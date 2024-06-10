@@ -125,8 +125,8 @@ func (m *modInvokeEmit) apply(ctx *genBlockContext) bool {
 		}
 		var (
 			blob1     = kzg4844.Blob{0x01}
-			blob1C, _ = kzg4844.BlobToCommitment(blob1)
-			blob1P, _ = kzg4844.ComputeBlobProof(blob1, blob1C)
+			blob1C, _ = kzg4844.BlobToCommitment(&blob1)
+			blob1P, _ = kzg4844.ComputeBlobProof(&blob1, blob1C)
 		)
 		sidecar := &types.BlobTxSidecar{
 			Blobs:       []kzg4844.Blob{blob1},
