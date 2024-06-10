@@ -19,10 +19,8 @@ func (cs *CancunBaseSpec) Execute(t *test.Env) {
 
 	t.CLMock.WaitForTTD()
 
-	blobTestCtx := &CancunTestContext{
-		Env:            t,
-		TestBlobTxPool: new(TestBlobTxPool),
-	}
+	blobTestCtx := NewTestContext(t)
+	defer blobTestCtx.Close()
 
 	blobTestCtx.TestBlobTxPool.HashesByIndex = make(map[uint64]common.Hash)
 
