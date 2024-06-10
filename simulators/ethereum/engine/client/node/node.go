@@ -677,7 +677,7 @@ func (n *GethNode) BalanceAt(ctx context.Context, account common.Address, blockN
 	if err != nil {
 		return nil, err
 	}
-	return stateDB.GetBalance(account), nil
+	return stateDB.GetBalance(account).ToBig(), nil
 }
 
 func (n *GethNode) StorageAt(ctx context.Context, account common.Address, key common.Hash, blockNumber *big.Int) ([]byte, error) {
