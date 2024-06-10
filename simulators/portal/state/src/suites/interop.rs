@@ -558,7 +558,7 @@ dyn_async! {
             let content_details = {
                     let content_type = match &content_key {
                         StateContentKey::AccountTrieNode(_) => "account trie node".to_string(),
-                        StateContentKey::ContractStorageTrieNode(_) => "contract stroage trie node".to_string(),
+                        StateContentKey::ContractStorageTrieNode(_) => "contract storage trie node".to_string(),
                         StateContentKey::ContractBytecode(_) => "contract bytecode".to_string(),
                     };
                     format!(

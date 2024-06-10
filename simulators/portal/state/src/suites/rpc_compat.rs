@@ -219,7 +219,7 @@ dyn_async! {
         let content_key: StateContentKey = serde_json::from_value(json!(CONTENT_KEY)).unwrap();
 
         if let Ok(response) = StateNetworkApiClient::local_content(&client.rpc, content_key).await {
-            panic!("Expected to recieve an error because content wasn't found {response:?}");
+            panic!("Expected to receive an error because content wasn't found {response:?}");
         }
     }
 }

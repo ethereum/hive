@@ -148,7 +148,7 @@ func TestSkipping(t *testing.T) {
 		sort.Strings(cases)
 
 		if !reflect.DeepEqual(cases, test.WantRun) {
-			t.Errorf("pattern %q wrong exected test cases: %v", test.Pattern, cases)
+			t.Errorf("pattern %q wrong executed test cases: %v", test.Pattern, cases)
 		}
 	}
 }
