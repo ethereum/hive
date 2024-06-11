@@ -30,9 +30,11 @@ func loadTestFile(name string, r io.Reader) (rpcTest, error) {
 	var (
 		rdr      = bufio.NewReader(r)
 		scan     = bufio.NewScanner(rdr)
+		buf      = make([]byte, 0, 64*1024)
 		inHeader = true
 		test     = rpcTest{name: name}
 	)
+	scan.Buffer(buf, 1024*1024)
 	for scan.Scan() {
 		line := strings.TrimSpace(scan.Text())
 		switch {
@@ -70,7 +72,7 @@ func loadTestFile(name string, r io.Reader) (rpcTest, error) {
 // loadTests walks the given directory looking for *.io files to load.
 func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []rpcTest {
 	var tests []rpcTest
-	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			t.Logf("unable to walk path: %s", err)
 			return err
@@ -98,5 +100,8 @@ func loadTests(t *hivesim.T, root string, re *regexp.Regexp) []rpcTest {
 		tests = append(tests, test)
 		return nil
 	})
+	if err != nil {
+		t.Fatalf("failed to load tests: %s", err)
+	}
 	return tests
 }
