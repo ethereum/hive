@@ -23,4 +23,5 @@ if [ "$HIVE_CLIENT_PRIVATE_KEY" != "" ]; then
     FLAGS="$FLAGS --netkey-unsafe=0x$HIVE_CLIENT_PRIVATE_KEY"
 fi
 
-fluffy --rpc --rpc-address="0.0.0.0" --nat:extip:"$IP_ADDR" --portal-network=none --log-level="debug" $FLAGS
+fluffy --log-level=INFO --rpc --rpc-address="0.0.0.0" --nat:extip:"$IP_ADDR" --portal-network=none \
+    --log-level="debug" --disable-state-root-validation $FLAGS
