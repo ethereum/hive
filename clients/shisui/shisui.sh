@@ -3,6 +3,7 @@
 # Immediately abort the script on any error encountered
 set -e
 
+FLAGS=""
 IP_ADDR=$(hostname -i | awk '{print $1}')
 
 if [ "$HIVE_LOGLEVEL" != "" ]; then
