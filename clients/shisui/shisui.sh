@@ -22,6 +22,8 @@ fi
 
 if [ "$HIVE_BOOTNODE" != "" ]; then
     FLAGS="$FLAGS --bootnodes=$HIVE_BOOTNODE"
+else
+    FLAGS="$FLAGS --bootnodes=none"
 fi
 
 FLAGS="$FLAGS --nat extip:$IP_ADDR"
