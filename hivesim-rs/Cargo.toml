@@ -1,0 +1,16 @@
+[package]
+name = "hivesim"
+version = "0.1.0-alpha.1"
+authors = ["Kolby ML (Moroz Liebl) <kolbydml@gmail.com>", "Ognyan Genev <ognian.genev@gmail.com>"]
+edition = "2021"
+
+
+[dependencies]
+async-trait = "0.1.59"
+dyn-clone = "1.0.11"
+jsonrpsee = {version="0.20.0", features = ["client"]}
+regex = "1.10.5"
+reqwest = { version = "0.11.12", default-features = false, features = ["json", "multipart"] }
+serde = { version = "1.0.147", features = ["derive"] }
+serde_json = "1.0.87"
+tokio = { version = "1", features = ["full"] }
