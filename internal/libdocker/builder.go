@@ -11,10 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/ethereum/hive/internal/libhive"
 	docker "github.com/fsouza/go-dockerclient"
 	"gopkg.in/inconshreveable/log15.v2"
-
-	"github.com/ethereum/hive/internal/libhive"
 )
 
 // Builder takes care of building docker images.
