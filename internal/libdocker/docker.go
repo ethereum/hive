@@ -10,7 +10,7 @@ import (
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
-const apiVersion = "1.24"
+const apiVersion = "1.25"
 
 // Config is the configuration of the docker backend.
 type Config struct {
