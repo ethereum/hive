@@ -46,12 +46,6 @@ func (b *Builder) BuildClientImage(ctx context.Context, client libhive.ClientDes
 	buildArgs := make([]docker.BuildArg, 0)
 	for key, value := range client.BuildArgs {
 		buildArgs = append(buildArgs, docker.BuildArg{Name: key, Value: value})
-
-		// Backwards-compatibility for non-updated client Dockerfiles.
-		// TODO(fjl): remove this when all clients have been updated to "tag".
-		if key == "tag" {
-			buildArgs = append(buildArgs, docker.BuildArg{Name: "branch", Value: value})
-		}
 	}
 
 	err := b.buildImage(ctx, dir, dockerFile, tag, buildArgs)
