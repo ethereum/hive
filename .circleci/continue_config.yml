@@ -6,6 +6,9 @@ parameters:
   rust-ci:
     type: boolean
     default: false  
+  hivesim-rs-ci:
+    type: boolean
+    default: false
 
 jobs:
   # This job builds the hive executable and stores it in the workspace.
@@ -73,6 +76,29 @@ jobs:
           name: "Compile Go simulators"
           command: ".circleci/compile-simulators.sh"
   # this makes sure the rust code is good
+  hivesim-rs:
+    docker:
+      - image: cimg/rust:1.75.0
+    steps:
+      - checkout
+      - run:
+          name: Install rustfmt
+          command: rustup component add rustfmt
+      - run:
+          name: Install Clippy
+          command: rustup component add clippy
+      - run:
+          name: Install Clang
+          command: sudo apt update && sudo apt-get install clang -y
+      - run:
+          name: "Lint"
+          command: "cd hivesim-rs && cargo fmt --all -- --check"
+      - run:
+          name: "Build"
+          command: "cd hivesim-rs && cargo clippy --all --all-targets --all-features --no-deps -- --deny warnings"
+      - run:
+          name: "Test hivesim-rs"
+          command: "cd hivesim-rs && cargo test --workspace -- --nocapture"    
   rust-simulators:
     docker:
       - image: cimg/rust:1.75.0
@@ -100,7 +126,11 @@ workflows:
           requires: ["build"]
       - smoke-tests-remote-docker:
           requires: ["build"]
-  rust-jobs:
+  rust-simulator-jobs:
     when: << pipeline.parameters.rust-ci >>
     jobs:
       - rust-simulators
+  hivesim-rs-jobs:
+    when: << pipeline.parameters.hivesim-rs-ci >>
+    jobs:
+      - hivesim-rs

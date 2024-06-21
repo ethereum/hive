@@ -10,5 +10,6 @@ workflows:
     jobs:
       - path-filtering/filter:
           mapping: |
+            hivesim-rs/.* hivesim-rs-ci true
             simulators/portal/.* rust-ci true
           base-revision: origin/master
