@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 ethportal-api = { git = "https://github.com/ethereum/trin", rev = "33ea99da64216899f7ab2778d117a18506d963dd" }
 portal-spec-test-utils-rs = { git = "https://github.com/ethereum/portal-spec-tests", rev = "954f7d0eb2950a2131048404a1a4ce476bb64657" }
-hivesim = { git = "https://github.com/ethereum/portal-hive", rev = "0f830ea8999f2878eb78ef67efc9f80cc888413e" }
+hivesim = { git = "https://github.com/ethereum/hive", rev = "62b3362bae655754b5f624c36720ba8c44a2f375" }
 futures = "0.3.25"
 serde_json = "1.0.87"
 tracing = "0.1.37"
