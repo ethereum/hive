@@ -1,6 +1,6 @@
 mod suites;
 
-use hivesim::{Simulation, Suite, TestSpec};
+use hivesim::{run_suite, Simulation, Suite, TestSpec};
 use suites::interop::test_portal_interop;
 use suites::mesh::test_portal_scenarios;
 use suites::rpc_compat::run_rpc_compat_test_suite;
@@ -59,19 +59,4 @@ async fn main() {
 
     let sim = Simulation::new();
     run_suite(sim, vec![beacon_rpc_compat, interop, mesh]).await;
-}
-
-async fn run_suite(host: Simulation, suites: Vec<Suite>) {
-    for suite in suites {
-        let name = suite.clone().name;
-        let description = suite.clone().description;
-
-        let suite_id = host.start_suite(name, description, "".to_string()).await;
-
-        for test in &suite.tests {
-            test.run_test(host.clone(), suite_id, suite.clone()).await;
-        }
-
-        host.end_suite(suite_id).await;
-    }
 }
