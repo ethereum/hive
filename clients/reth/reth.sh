@@ -159,9 +159,6 @@ fi
 # Configure NAT
 FLAGS="$FLAGS --nat none"
 
-# Configure discv5.
-FLAGS="$FLAGS --enable.discv5.discovery --discovery.v5.port=30303"
-
 # Launch the main client.
 echo "Running reth with flags: $FLAGS"
 RUST_LOG=info $reth node $FLAGS
