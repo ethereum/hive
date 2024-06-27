@@ -4,7 +4,7 @@
 set -e
 
 IP_ADDR=$(hostname -i | awk '{print $1}')
-FLAGS=""
+FLAGS="--radiusHistory=256 --radiusState=256 --radiusBeacon=256"
 
 if [ "$HIVE_CLIENT_PRIVATE_KEY" != "" ]; then
     FLAGS="$FLAGS --pk=0x1a2408021220$HIVE_CLIENT_PRIVATE_KEY"
