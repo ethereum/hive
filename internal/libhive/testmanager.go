@@ -34,6 +34,7 @@ type SimEnv struct {
 	// Parameters of simulation.
 	SimLogLevel    int
 	SimParallelism int
+	SimArgument    string
 	SimRandomSeed  int
 	SimTestPattern string
 

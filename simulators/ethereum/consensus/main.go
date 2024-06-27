@@ -60,7 +60,18 @@ func loaderTest(t *hivesim.T) {
 	if !isset {
 		t.Fatal("$TESTPATH not set")
 	}
-	fileRoot := fmt.Sprintf("%s/BlockchainTests/", testPath)
+
+	testFolder := "BlockchainTests/"
+	arg, isset := os.LookupEnv("HIVE_ARGUMENT")
+	if isset {
+		if arg == "legacy" {
+			testFolder = "LegacyTests/Constantinople/BlockchainTests/"
+		} else if arg == "legacy-cancun" {
+			testFolder = "LegacyTests/Cancun/BlockchainTests/"
+		}
+	}
+	t.Log("testFolder: ", testFolder)
+	fileRoot := fmt.Sprintf("%s/%s", testPath, testFolder)
 
 	// Spawn workers.
 	var wg sync.WaitGroup
