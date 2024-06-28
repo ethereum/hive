@@ -76,7 +76,7 @@ fn process_content(
                     HistoryContentKey::EpochAccumulator(_) => (
                         "Epoch Accumulator".to_string(),
                         header_with_proof.header.number,
-                        vec![],
+                        vec![content_pair_to_string_pair(history_content)],
                     ),
                 }
             } else {
