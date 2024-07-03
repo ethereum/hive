@@ -215,7 +215,7 @@ var Tests = []test.Spec{
 			- Spawn a secondary client and send FCUV2(head)
 			- Wait for sync and verify withdrawn account's balance
 			`,
-				TimeoutSeconds: 6000,
+				TimeoutSeconds: 240,
 			},
 			WithdrawalsForkHeight:    1,
 			WithdrawalsBlockCount:    2,
