@@ -55,8 +55,8 @@ github.com/ethereum/go-ethereum v1.14.5 h1:szuFzO1MhJmweXjoM5nSAeDvjNUH3vIQoMzzQ
 github.com/ethereum/go-ethereum v1.14.5/go.mod h1:VEDGGhSxY7IEjn98hJRFXl/uFvpRgbIIf2PpXiyGGgc=
 github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0 h1:KrE8I4reeVvf7C1tm8elRjj4BdscTYzz/WAbYyf/JI4=
 github.com/ethereum/go-verkle v0.1.1-0.20240306133620-7d920df305f0/go.mod h1:D9AJLVXSyZQXJQVk8oh1EwjISE+sJTn2duYIZC0dy3w=
-github.com/ethereum/hive v0.0.0-20240610172825-2430a68c753a h1:iyHHRPXaxHtEvyFxc4A+is/JRt88o0gQhHrNx+khEqQ=
-github.com/ethereum/hive v0.0.0-20240610172825-2430a68c753a/go.mod h1:ghNXZW+/WQClcyiwZpbTzUCyxwql7YeMacYd44v+BJE=
+github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce h1:wgH9mh3TFSd+LFSsXO6RdTEO3niapJRywO1Xl3/IoIE=
+github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce/go.mod h1:ghNXZW+/WQClcyiwZpbTzUCyxwql7YeMacYd44v+BJE=
 github.com/fjl/memsize v0.0.2 h1:27txuSD9or+NZlnOWdKUxeBzTAUkWCVh+4Gf2dWFOzA=
 github.com/fjl/memsize v0.0.2/go.mod h1:VvhXpOYNQvB+uIk2RvXzuaQtkQJzzIx6lSBe1xv7hi0=
 github.com/fsnotify/fsnotify v1.4.7/go.mod h1:jwhsz4b93w/PPRr/qN1Yymfu8t87LnFCMoQvtojpjFo=

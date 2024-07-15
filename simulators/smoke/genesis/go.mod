@@ -4,7 +4,7 @@ go 1.21
 
 toolchain go1.22.1
 
-require github.com/ethereum/hive v0.0.0-20240610172825-2430a68c753a
+require github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect

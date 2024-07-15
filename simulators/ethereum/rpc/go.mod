@@ -6,7 +6,7 @@ toolchain go1.22.1
 
 require (
 	github.com/ethereum/go-ethereum v1.14.5
-	github.com/ethereum/hive v0.0.0-20240610172825-2430a68c753a
+	github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce
 	github.com/kr/pretty v0.3.1
 )
 

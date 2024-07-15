@@ -6,7 +6,7 @@ toolchain go1.22.0
 
 require (
 	github.com/ethereum/go-ethereum v1.14.5
-	github.com/ethereum/hive v0.0.0-20240610172825-2430a68c753a
+	github.com/ethereum/hive v0.0.0-20240715150147-c87a99dccfce
 	github.com/ethereum/hive/simulators/eth2/common v0.0.0-20230316220410-1364352c32a6
 	github.com/ethereum/hive/simulators/ethereum/engine v0.0.0-20240305231022-f69df863de20
 	github.com/lithammer/dedent v1.1.0
