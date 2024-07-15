@@ -20,9 +20,21 @@ import (
 )
 
 func main() {
+	suites := []hivesim.Suite{
+		makeSuite("consensus", "BlockchainTests"),
+		makeSuite("legacy", "LegacyTests/Constantinople/BlockchainTests"),
+		makeSuite("legacy-cancun", "LegacyTests/Cancun/BlockchainTests"),
+	}
+	client := hivesim.New()
+	for _, suite := range suites {
+		hivesim.MustRunSuite(client, suite)
+	}
+}
+
+func makeSuite(name string, testsDirectory string) hivesim.Suite {
 	suite := hivesim.Suite{
-		Name: "consensus",
-		Description: "The 'consensus' test suite executes BlockchainTests from the " +
+		Name: name,
+		Description: "The '" + name + "' test suite executes BlockchainTests from the " +
 			"official test repository (https://github.com/ethereum/tests). For every test, it starts an instance of the client, " +
 			"and makes it import the RLP blocks. After import phase, the node is queried about it's latest blocks, which is matched " +
 			"to the expected last blockhash according to the test.",
@@ -32,14 +44,16 @@ func main() {
 		Description: "This is a meta-test. It loads the blockchain test files and " +
 			"launches the actual client tests. Any errors in test files will be reported " +
 			"through this test.",
-		Run:       loaderTest,
+		Run: func(t *hivesim.T) {
+			runTestsLoader(t, testsDirectory)
+		},
 		AlwaysRun: true,
 	})
-	hivesim.MustRunSuite(hivesim.New(), suite)
+	return suite
 }
 
-// loaderTest loads the blockchain test files and spawns the client tests.
-func loaderTest(t *hivesim.T) {
+// runTestsLoader loads the blockchain test files and spawns the client tests.
+func runTestsLoader(t *hivesim.T, testsDirectory string) {
 	clientTypes, err := t.Sim.ClientTypes()
 	if err != nil {
 		t.Fatal("can't get client types:", err)
@@ -56,11 +70,12 @@ func loaderTest(t *hivesim.T) {
 	t.Log("parallelism:", parallelism)
 
 	// Find the tests directory.
-	testPath, isset := os.LookupEnv("TESTPATH")
+	basePath, isset := os.LookupEnv("TESTPATH")
 	if !isset {
 		t.Fatal("$TESTPATH not set")
 	}
-	fileRoot := fmt.Sprintf("%s/BlockchainTests/", testPath)
+	t.Log("testsDirectory:", testsDirectory)
+	fileRoot := filepath.Join(basePath, testsDirectory)
 
 	// Spawn workers.
 	var wg sync.WaitGroup
@@ -119,7 +134,7 @@ func testLink(filepath string) string {
 func loadTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) {
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			t.Logf("unable to walk path: %s", err)
+			t.Errorf("unable to walk path: %s", err)
 			return err
 		}
 		if info.IsDir() {
