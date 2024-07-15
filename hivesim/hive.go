@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -153,6 +154,8 @@ func (sim *Simulation) ClientTypes() ([]*ClientDefinition, error) {
 		resp []*ClientDefinition
 	)
 	err := get(url, &resp)
+	// remove null items
+	resp = slices.DeleteFunc(resp, func(cd *ClientDefinition) bool { return cd == nil })
 	return resp, err
 }
 
