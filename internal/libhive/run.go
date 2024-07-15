@@ -203,7 +203,6 @@ func (r *Runner) run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 		Env: map[string]string{
 			"HIVE_SIMULATOR":    "http://" + server.Addr().String(),
 			"HIVE_PARALLELISM":  strconv.Itoa(env.SimParallelism),
-			"HIVE_ARGUMENT":     env.SimArgument,
 			"HIVE_LOGLEVEL":     strconv.Itoa(env.SimLogLevel),
 			"HIVE_TEST_PATTERN": env.SimTestPattern,
 			"HIVE_RANDOM_SEED":  strconv.Itoa(env.SimRandomSeed),
