@@ -75,7 +75,7 @@ func runTestsLoader(t *hivesim.T, testsDirectory string) {
 		t.Fatal("$TESTPATH not set")
 	}
 	t.Log("testsDirectory:", testsDirectory)
-	fileRoot := filepath.Join("%s/%s", basePath, testsDirectory)
+	fileRoot := filepath.Join(basePath, testsDirectory)
 
 	// Spawn workers.
 	var wg sync.WaitGroup
@@ -134,7 +134,7 @@ func testLink(filepath string) string {
 func loadTests(t *hivesim.T, root string, re *regexp.Regexp, fn func(testcase)) {
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			t.Logf("unable to walk path: %s", err)
+			t.Errorf("unable to walk path: %s", err)
 			return err
 		}
 		if info.IsDir() {
