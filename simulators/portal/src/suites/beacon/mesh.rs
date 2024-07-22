@@ -1,9 +1,7 @@
-use crate::suites::constants::BEACON_STRING;
-use crate::suites::constants::CONSTANT_CONTENT_KEY;
-use crate::suites::constants::CONSTANT_CONTENT_VALUE;
-use crate::suites::constants::HIVE_PORTAL_NETWORKS_SELECTED;
-use crate::suites::constants::PRIVATE_KEY_ENVIRONMENT_VARIABLE;
-use crate::suites::constants::TRIN_BRIDGE_CLIENT_TYPE;
+use crate::suites::beacon::constants::{
+    BEACON_STRING, CONSTANT_CONTENT_KEY, CONSTANT_CONTENT_VALUE, HIVE_PORTAL_NETWORKS_SELECTED,
+    PRIVATE_KEY_ENVIRONMENT_VARIABLE, TRIN_BRIDGE_CLIENT_TYPE,
+};
 use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::beacon::ContentInfo;
 use ethportal_api::types::distance::{Metric, XorMetric};
@@ -18,7 +16,7 @@ use serde_json::json;
 use std::collections::HashMap;
 
 dyn_async! {
-   pub async fn test_portal_scenarios<'a> (test: &'a mut Test, _client: Option<Client>) {
+   pub async fn test_portal_beacon_mesh<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
         // todo: remove this once we implement role in hivesim-rs

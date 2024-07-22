@@ -1,4 +1,4 @@
-use crate::suites::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
+use crate::suites::history::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
 use ethportal_api::types::history::ContentInfo;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
@@ -95,12 +95,12 @@ pub fn get_test_message(block_number: u64) -> String {
     if block_number == u64::MAX {
         " ".to_string()
     } else {
-        format!(" Block number {}{}", block_number, get_flair(block_number))
+        format!(" block number {}{}", block_number, get_flair(block_number))
     }
 }
 
 dyn_async! {
-   pub async fn test_portal_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
+   pub async fn test_portal_history_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
         // todo: remove this once we implement role in hivesim-rs

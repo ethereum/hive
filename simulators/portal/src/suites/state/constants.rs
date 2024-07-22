@@ -1,4 +1,4 @@
-pub const TEST_DATA_FILE_PATH: &str = "./test-data/test_data.yaml";
+pub const TEST_DATA_FILE_PATH: &str = "./test-data/state_test_data.yaml";
 pub const HIVE_PORTAL_NETWORKS_SELECTED: &str = "HIVE_PORTAL_NETWORKS_SELECTED";
 pub const STATE_STRING: &str = "state";
 

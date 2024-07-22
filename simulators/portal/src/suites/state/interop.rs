@@ -1,4 +1,4 @@
-use crate::suites::constants::{
+use crate::suites::state::constants::{
     CONTENT_KEY, HIVE_PORTAL_NETWORKS_SELECTED, STATE_STRING, TEST_DATA_FILE_PATH,
     TRIN_BRIDGE_CLIENT_TYPE,
 };
@@ -84,7 +84,7 @@ fn process_content(
 }
 
 dyn_async! {
-   pub async fn test_portal_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
+   pub async fn test_portal_state_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
         // todo: remove this once we implement role in hivesim-rs
