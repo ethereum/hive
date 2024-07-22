@@ -1,4 +1,4 @@
-use crate::suites::constants::TRIN_BRIDGE_CLIENT_TYPE;
+use crate::suites::history::constants::TRIN_BRIDGE_CLIENT_TYPE;
 use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::distance::{Metric, XorMetric};
 use ethportal_api::types::history::ContentInfo;
@@ -21,7 +21,7 @@ const HEADER_WITH_PROOF_VALUE: &str = "0x080000002d020000f90222a02c58e3212c08517
 const PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str = "HIVE_CLIENT_PRIVATE_KEY";
 
 dyn_async! {
-   pub async fn test_portal_scenarios<'a> (test: &'a mut Test, _client: Option<Client>) {
+   pub async fn test_portal_history_mesh<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
         // todo: remove this once we implement role in hivesim-rs

@@ -5,7 +5,6 @@ workspace
 /hive
 
 # build output for rust simulators and hivesim-rs files
-simulators/**/Cargo.lock
 simulators/**/target
 hivesim-rs/Cargo.lock
 hivesim-rs/target

@@ -1,4 +1,4 @@
-use crate::suites::constants::{
+use crate::suites::beacon::constants::{
     BEACON_STRING, HIVE_PORTAL_NETWORKS_SELECTED, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE,
 };
 use ethportal_api::types::beacon::ContentInfo;
@@ -75,7 +75,7 @@ fn process_content(content: Vec<(BeaconContentKey, BeaconContentValue)>) -> Vec<
 }
 
 dyn_async! {
-   pub async fn test_portal_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
+   pub async fn test_portal_beacon_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
         // todo: remove this once we implement role in hivesim-rs

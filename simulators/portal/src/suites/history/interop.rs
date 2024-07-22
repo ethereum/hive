@@ -1,4 +1,4 @@
-use crate::suites::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
+use crate::suites::history::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
 use ethportal_api::types::history::ContentInfo;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
@@ -75,8 +75,8 @@ fn process_content(
                     ),
                     HistoryContentKey::EpochAccumulator(_) => (
                         "Epoch Accumulator".to_string(),
-                        header_with_proof.header.number,
-                        vec![],
+                        u64::MAX,
+                        vec![content_pair_to_string_pair(history_content)],
                     ),
                 }
             } else {
@@ -91,8 +91,16 @@ fn process_content(
     result
 }
 
+pub fn get_test_message(block_number: u64) -> String {
+    if block_number == u64::MAX {
+        " ".to_string()
+    } else {
+        format!(" block number {}{}", block_number, get_flair(block_number))
+    }
+}
+
 dyn_async! {
-   pub async fn test_portal_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
+   pub async fn test_portal_history_interop<'a> (test: &'a mut Test, _client: Option<Client>) {
         // Get all available portal clients
         let clients = test.sim.client_types().await;
         // todo: remove this once we implement role in hivesim-rs
@@ -114,7 +122,7 @@ dyn_async! {
             for ProcessedContent { content_type, block_number, test_data } in process_content(content.clone()) {
                 test.run(
                     NClientTestSpec {
-                        name: format!("OFFER {}: block number {}{} {} --> {}", content_type, block_number, get_flair(block_number), client_a.name, client_b.name),
+                        name: format!("OFFER {}:{} {} --> {}", content_type, get_test_message(block_number), client_a.name, client_b.name),
                         description: "".to_string(),
                         always_run: false,
                         run: test_offer,
@@ -126,7 +134,7 @@ dyn_async! {
 
                 test.run(
                     NClientTestSpec {
-                        name: format!("RecursiveFindContent {}: block number {}{} {} --> {}", content_type, block_number, get_flair(block_number), client_a.name, client_b.name),
+                        name: format!("RecursiveFindContent {}:{} {} --> {}", content_type, get_test_message(block_number), client_a.name, client_b.name),
                         description: "".to_string(),
                         always_run: false,
                         run: test_recursive_find_content,
@@ -138,7 +146,7 @@ dyn_async! {
 
                 test.run(
                     NClientTestSpec {
-                        name: format!("FindContent {}: block number {}{} {} --> {}", content_type, block_number, get_flair(block_number), client_a.name, client_b.name),
+                        name: format!("FindContent {}:{} {} --> {}", content_type, get_test_message(block_number), client_a.name, client_b.name),
                         description: "".to_string(),
                         always_run: false,
                         run: test_find_content,
@@ -617,9 +625,8 @@ dyn_async! {
                         HistoryContentKey::EpochAccumulator(_) => "epoch accumulator".to_string(),
                     };
                     format!(
-                        "{}{} {}",
-                        header_with_proof.header.number,
-                        get_flair(header_with_proof.header.number),
+                        "{} {}",
+                        get_test_message(header_with_proof.header.number),
                         content_type
                     )
                 } else {
