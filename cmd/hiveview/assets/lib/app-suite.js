@@ -359,7 +359,7 @@ function formatTestDetails(suiteData, row) {
 
     if (d.description != '') {
         let p = document.createElement('p');
-        let description = html.urlsToLinks(html.encode(d.description.trim()));
+        let description = html.urlsToLinks(d.description.trim());
         let txt = '<b>Description:</b><br/>' + description;
         p.innerHTML = txt;
         container.appendChild(p);
