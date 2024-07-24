@@ -32,6 +32,11 @@ function hiveInfoHTML(data) {
         let link = makeLink(url, data.sourceCommit.substring(0, 8));
         txt += '<span>commit: ' + link.outerHTML + '</span>';
     }
+    if (data.simulatorsVersion) {
+        let url = 'https://github.com/ethereum/hive/commits/' + escape(data.simulatorsVersion);
+        let link = makeLink(url, data.simulatorsVersion.substring(0, 8));
+        txt += '<span>simulators: ' + link.outerHTML + '</span>';
+    }
     return txt;
 }
 

@@ -104,7 +104,7 @@ func (r *Runner) Run(ctx context.Context, sim string, env SimEnv) (SimResult, er
 	if err := createWorkspace(env.LogDir); err != nil {
 		return SimResult{}, err
 	}
-	writeInstanceInfo(env.LogDir)
+	writeInstanceInfo(env.LogDir, env.SimulatorsVersion)
 	return r.run(ctx, sim, env)
 }
 
@@ -303,9 +303,10 @@ func createWorkspace(logdir string) error {
 	return nil
 }
 
-func writeInstanceInfo(logdir string) {
+func writeInstanceInfo(logdir string, simulatorsVersion *string) {
 	var obj HiveInstance
 	obj.SourceCommit, obj.SourceDate = hiveVersion()
+	obj.SimulatorsVersion = simulatorsVersion
 	buildDate := hiveBuildTime()
 	if !buildDate.IsZero() {
 		obj.BuildDate = buildDate.Format("2006-01-02T15:04:05Z")
