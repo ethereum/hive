@@ -15,6 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
+	"github.com/ethereum/go-ethereum/core/stateless"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/core/vm"
 	"github.com/ethereum/go-ethereum/eth"
@@ -33,6 +34,7 @@ import (
 	"github.com/ethereum/hive/simulators/ethereum/engine/client"
 	"github.com/ethereum/hive/simulators/ethereum/engine/helper"
 	typ "github.com/ethereum/hive/simulators/ethereum/engine/types"
+	"github.com/pkg/errors"
 )
 
 type GethNodeTestConfiguration struct {
@@ -207,6 +209,7 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		SyncMode:         downloader.FullSync,
 		DatabaseCache:    256,
 		DatabaseHandles:  256,
+		StateScheme:      rawdb.HashScheme,
 		TxPool:           ethconfig.Defaults.TxPool,
 		GPO:              ethconfig.Defaults.GPO,
 		Miner:            ethconfig.Defaults.Miner,
@@ -347,7 +350,10 @@ type validator struct{}
 func (v *validator) ValidateBody(block *types.Block) error {
 	return nil
 }
-func (v *validator) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64) error {
+func (v *validator) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts, usedGas uint64, stateless bool) error {
+	return nil
+}
+func (v *validator) ValidateWitness(witness *stateless.Witness, receiptRoot common.Hash, stateRoot common.Hash) error {
 	return nil
 }
 
@@ -370,8 +376,9 @@ func encodeBlockNumber(number uint64) []byte {
 
 func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot common.Hash) error {
 	parentTd := n.eth.BlockChain().GetTd(block.ParentHash(), block.NumberU64()-1)
-	rawdb.WriteTd(n.eth.ChainDb(), block.Hash(), block.NumberU64(), parentTd.Add(parentTd, block.Difficulty()))
-	rawdb.WriteBlock(n.eth.ChainDb(), block)
+	db := n.eth.ChainDb()
+	rawdb.WriteTd(db, block.Hash(), block.NumberU64(), parentTd.Add(parentTd, block.Difficulty()))
+	rawdb.WriteBlock(db, block)
 
 	// write real info (fixes fake number test)
 	data, err := rlp.EncodeToBytes(block.Header())
@@ -379,43 +386,43 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 		log.Crit("Failed to RLP encode header", "err", err)
 	}
 	key := headerKey(parentNumber+1, block.Hash())
-	if err := n.eth.ChainDb().Put(key, data); err != nil {
+	if err := db.Put(key, data); err != nil {
 		log.Crit("Failed to store header", "err", err)
 	}
 
-	rawdb.WriteHeaderNumber(n.eth.ChainDb(), block.Hash(), block.NumberU64())
+	rawdb.WriteHeaderNumber(db, block.Hash(), block.NumberU64())
 	bc := n.eth.BlockChain()
 	bc.SetBlockValidatorAndProcessorForTesting(new(validator), n.eth.BlockChain().Processor())
 
 	statedb, err := state.New(parentRoot, bc.StateCache(), bc.Snapshots())
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to create state db")
 	}
-	statedb.StartPrefetcher("chain")
+	statedb.StartPrefetcher("chain", nil)
 	var failedProcessing bool
 	receipts, _, _, err := n.eth.BlockChain().Processor().Process(block, statedb, *n.eth.BlockChain().GetVMConfig())
 	if err != nil {
 		failedProcessing = true
 	}
-	rawdb.WriteReceipts(n.eth.ChainDb(), block.Hash(), block.NumberU64(), receipts)
+	rawdb.WriteReceipts(db, block.Hash(), block.NumberU64(), receipts)
 	root, err := statedb.Commit(block.NumberU64(), false)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to commit state")
 	}
 
 	triedb := bc.StateCache().TrieDB()
 	if err := triedb.Commit(block.Root(), true); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to commit block trie, pathScheme=%v", triedb.Scheme())
 	}
 	if err := triedb.Commit(root, true); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to commit root trie, pathScheme=%v", triedb.Scheme())
 	}
 
-	rawdb.WriteHeadHeaderHash(n.eth.ChainDb(), block.Hash())
-	rawdb.WriteHeadFastBlockHash(n.eth.ChainDb(), block.Hash())
-	rawdb.WriteCanonicalHash(n.eth.ChainDb(), block.Hash(), block.NumberU64())
-	rawdb.WriteTxLookupEntriesByBlock(n.eth.ChainDb(), block)
-	rawdb.WriteHeadBlockHash(n.eth.ChainDb(), block.Hash())
+	rawdb.WriteHeadHeaderHash(db, block.Hash())
+	rawdb.WriteHeadFastBlockHash(db, block.Hash())
+	rawdb.WriteCanonicalHash(db, block.Hash(), block.NumberU64())
+	rawdb.WriteTxLookupEntriesByBlock(db, block)
+	rawdb.WriteHeadBlockHash(db, block.Hash())
 	oldProcessor := bc.Processor()
 	if failedProcessing {
 		bc.SetBlockValidatorAndProcessorForTesting(new(validator), new(processor))
