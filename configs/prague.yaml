@@ -1,0 +1,39 @@
+- client: besu
+  nametag: prague-git
+  dockerfile: git
+  build_args:
+      github: hyperledger/besu
+      tag: main
+
+- client: erigon
+  nametag: prague-git
+  dockerfile: git
+  build_args:
+    github: ledgerwatch/erigon
+    tag: main
+
+- client: ethereumjs
+  nametag: prague-git
+  build_args:
+      github: ethereumjs/ethereumjs-monorepo
+      tag: master
+
+- client: go-ethereum
+  nametag: prague-git
+  dockerfile: git
+  build_args:
+      github: lightclient/go-ethereum
+      tag: prague-devnet-0
+
+- client: nethermind
+  nametag: prague-git
+  dockerfile: git
+  build_args:
+      tag: pectra
+
+- client: reth
+  nametag: prague-git
+  dockerfile: git
+  build_args:
+    github: paradigmxyz/reth
+    tag: devnet-0
