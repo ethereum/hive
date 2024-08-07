@@ -139,7 +139,7 @@ fi
 if [ "$HIVE_NODETYPE" == "light" ]; then
     echo "Ignoring HIVE_NODETYPE == light: besu does not support light client"
 elif [ "$HIVE_NODETYPE" == "" ] && [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; then
-    FLAGS="$FLAGS --sync-mode=X_SNAP"
+    FLAGS="$FLAGS --sync-mode=SNAP"
 fi
 
 # Configure RPC.
