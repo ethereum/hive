@@ -345,6 +345,8 @@ func (n *GethNode) Close() error {
 	return nil
 }
 
+// Dummy validator that always returns success, used to set invalid blocks at the head of the chain, which then can be
+// served to other clients.
 type validator struct{}
 
 func (v *validator) ValidateBody(block *types.Block) error {
