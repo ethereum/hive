@@ -61,7 +61,12 @@ fn process_content(content: Vec<(BeaconContentKey, BeaconContentValue)>) -> Vec<
             ),
             BeaconContentKey::LightClientOptimisticUpdate(optimistic_update) => (
                 "Optimistic Update".to_string(),
-                format!("finalized slot: {}", optimistic_update.signature_slot),
+                format!("optimistic slot: {}", optimistic_update.signature_slot),
+                vec![content_pair_to_string_pair(beacon_content)],
+            ),
+            BeaconContentKey::HistoricalSummariesWithProof(historical_summaries) => (
+                "Historical Summaries".to_string(),
+                format!("historical summaries epoch: {}", historical_summaries.epoch),
                 vec![content_pair_to_string_pair(beacon_content)],
             ),
         };
