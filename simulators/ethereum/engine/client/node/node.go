@@ -209,7 +209,7 @@ func restart(startConfig GethNodeTestConfiguration, bootnodes []string, datadir 
 		SyncMode:         downloader.FullSync,
 		DatabaseCache:    256,
 		DatabaseHandles:  256,
-		StateScheme:      rawdb.HashScheme,
+		StateScheme:      rawdb.PathScheme,
 		TxPool:           ethconfig.Defaults.TxPool,
 		GPO:              ethconfig.Defaults.GPO,
 		Miner:            ethconfig.Defaults.Miner,
@@ -410,12 +410,15 @@ func (n *GethNode) SetBlock(block *types.Block, parentNumber uint64, parentRoot 
 		return errors.Wrap(err, "failed to commit state")
 	}
 
-	triedb := bc.StateCache().TrieDB()
-	if err := triedb.Commit(block.Root(), true); err != nil {
-		return errors.Wrapf(err, "failed to commit block trie, pathScheme=%v", triedb.Scheme())
-	}
-	if err := triedb.Commit(root, true); err != nil {
-		return errors.Wrapf(err, "failed to commit root trie, pathScheme=%v", triedb.Scheme())
+	// If node is running in path mode, skip explicit gc operation
+	// which is unnecessary in this mode.
+	if triedb := bc.StateCache().TrieDB(); triedb.Scheme() != rawdb.PathScheme {
+		if err := triedb.Commit(block.Root(), true); err != nil {
+			return errors.Wrapf(err, "failed to commit block trie, pathScheme=%v", triedb.Scheme())
+		}
+		if err := triedb.Commit(root, true); err != nil {
+			return errors.Wrapf(err, "failed to commit root trie, pathScheme=%v", triedb.Scheme())
+		}
 	}
 
 	rawdb.WriteHeadHeaderHash(db, block.Hash())
