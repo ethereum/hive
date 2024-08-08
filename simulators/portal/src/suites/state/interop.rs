@@ -50,7 +50,7 @@ fn process_content(
                 format!(
                     "path: {} node hash: {}",
                     hex_encode(account_trie_node.path.nibbles()),
-                    hex_encode(account_trie_node.node_hash.as_bytes())
+                    hex_encode(account_trie_node.node_hash.as_slice())
                 ),
                 vec![content_pair_to_string_pair(state_content)],
             ),
@@ -58,9 +58,9 @@ fn process_content(
                 "Contract Storage Trie Node".to_string(),
                 format!(
                     "address: {} path: {} node hash: {}",
-                    hex_encode(contract_storage_trie_node.address.as_bytes()),
+                    hex_encode(contract_storage_trie_node.address_hash.as_slice()),
                     hex_encode(contract_storage_trie_node.path.nibbles()),
-                    hex_encode(contract_storage_trie_node.node_hash.as_bytes())
+                    hex_encode(contract_storage_trie_node.node_hash.as_slice())
                 ),
                 vec![content_pair_to_string_pair(state_content)],
             ),
@@ -68,8 +68,8 @@ fn process_content(
                 "Contract Bytecode".to_string(),
                 format!(
                     "address: {} code hash: {}",
-                    hex_encode(contract_bytecode.address.as_bytes()),
-                    hex_encode(contract_bytecode.code_hash.as_bytes())
+                    hex_encode(contract_bytecode.address_hash.as_slice()),
+                    hex_encode(contract_bytecode.code_hash.as_slice())
                 ),
                 vec![content_pair_to_string_pair(state_content)],
             ),
@@ -265,7 +265,7 @@ dyn_async! {
             }
         };
 
-        let _ = client_a.rpc.offer(target_enr, target_key.clone(), Some(target_offer_value.clone())).await;
+        let _ = client_a.rpc.offer(target_enr, target_key.clone(), target_offer_value.clone()).await;
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 

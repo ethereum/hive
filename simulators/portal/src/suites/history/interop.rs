@@ -291,7 +291,7 @@ dyn_async! {
             }
         };
 
-        let _ = client_a.rpc.offer(target_enr, target_key.clone(), Some(target_value.clone())).await;
+        let _ = client_a.rpc.offer(target_enr, target_key.clone(), target_value.clone()).await;
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
