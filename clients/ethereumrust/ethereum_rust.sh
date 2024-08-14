@@ -48,7 +48,7 @@ set +ex
 echo "Loading initial blockchain..."
 if [ -f /chain.rlp ]; then
     echo "Importing chain.rlp..."
-    # FLAGS="$FLAGS --import /chain.rlp"
+    FLAGS="$FLAGS --import /chain.rlp"
     # $ethereum_rust import $FLAGS /chain.rlp
 else
     echo "Warning: chain.rlp not found."
