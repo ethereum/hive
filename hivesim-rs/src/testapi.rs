@@ -1,4 +1,4 @@
-use crate::types::{ClientDefinition, SuiteID, TestData, TestID, TestResult};
+use crate::types::{ClientDefinition, SuiteID, TestID, TestResult};
 use crate::Simulation;
 use ::std::{boxed::Box, future::Future, pin::Pin};
 use async_trait::async_trait;
@@ -21,9 +21,9 @@ pub type AsyncTestFunc = fn(
     >,
 >;
 
-pub type AsyncNClientsTestFunc = fn(
+pub type AsyncNClientsTestFunc<T> = fn(
     Vec<Client>,
-    Option<TestData>,
+    T,
 ) -> Pin<
     Box<
         dyn Future<Output = ()> // future API / pollable
@@ -202,7 +202,7 @@ pub async fn run_test(
 }
 
 #[derive(Clone)]
-pub struct NClientTestSpec {
+pub struct NClientTestSpec<T> {
     /// These fields are displayed in the UI. Be sure to add
     /// a meaningful description here.
     pub name: String,
@@ -212,17 +212,17 @@ pub struct NClientTestSpec {
     /// then perform further tests against it.
     pub always_run: bool,
     /// The Run function is invoked when the test executes.
-    pub run: AsyncNClientsTestFunc,
+    pub run: AsyncNClientsTestFunc<T>,
     /// For each client, there is a distinct map of Hive Environment Variable names to values.
     /// The environments must be in the same order as the `clients`
     pub environments: Option<Vec<Option<HashMap<String, String>>>>,
     /// test data which can be passed to the test
-    pub test_data: Option<TestData>,
+    pub test_data: T,
     pub clients: Vec<ClientDefinition>,
 }
 
 #[async_trait]
-impl Testable for NClientTestSpec {
+impl<T: Clone + Send + Sync + 'static> Testable for NClientTestSpec<T> {
     async fn run_test(&self, simulation: Simulation, suite_id: SuiteID, suite: Suite) {
         if let Some(test_match) = simulation.test_matcher.clone() {
             if !self.always_run && !test_match.match_test(&suite.name, &self.name) {
@@ -242,7 +242,7 @@ impl Testable for NClientTestSpec {
             simulation,
             test_run,
             self.environments.to_owned(),
-            self.test_data.to_owned(),
+            self.test_data.clone(),
             self.clients.to_owned(),
             self.run,
         )
@@ -251,13 +251,13 @@ impl Testable for NClientTestSpec {
 }
 
 // Write a test that runs against N clients.
-async fn run_n_client_test(
+async fn run_n_client_test<T: Send + 'static>(
     host: Simulation,
     test: TestRun,
     environments: Option<Vec<Option<HashMap<String, String>>>>,
-    test_data: Option<TestData>,
+    test_data: T,
     clients: Vec<ClientDefinition>,
-    func: AsyncNClientsTestFunc,
+    func: AsyncNClientsTestFunc<T>,
 ) {
     // Register test on simulation server and initialize the T.
     let test_id = host.start_test(test.suite_id, test.name, test.desc).await;
