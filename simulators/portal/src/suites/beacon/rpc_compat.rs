@@ -7,7 +7,6 @@ use ethportal_api::BeaconContentValue;
 use ethportal_api::Discv5ApiClient;
 use ethportal_api::{BeaconContentKey, BeaconNetworkApiClient};
 use hivesim::types::ClientDefinition;
-use hivesim::types::TestData;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use serde_json::json;
 use std::collections::HashMap;
@@ -28,7 +27,7 @@ dyn_async! {
                     always_run: false,
                     run: test_node_info,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -40,7 +39,7 @@ dyn_async! {
                     always_run: false,
                     run: test_local_content_expect_content_absent,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -52,7 +51,7 @@ dyn_async! {
                     always_run: false,
                     run: test_store,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -64,7 +63,7 @@ dyn_async! {
                     always_run: false,
                     run: test_local_content_expect_content_present,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -76,7 +75,7 @@ dyn_async! {
                     always_run: false,
                     run: test_add_enr_expect_true,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -88,7 +87,7 @@ dyn_async! {
                     always_run: false,
                     run: test_get_enr_non_present,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -100,7 +99,7 @@ dyn_async! {
                     always_run: false,
                     run: test_get_enr_enr_present,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -112,7 +111,7 @@ dyn_async! {
                     always_run: false,
                     run: test_get_enr_local_enr,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -124,7 +123,7 @@ dyn_async! {
                     always_run: false,
                     run: test_delete_enr_non_present,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -136,7 +135,7 @@ dyn_async! {
                     always_run: false,
                     run: test_delete_enr_enr_present,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -148,7 +147,7 @@ dyn_async! {
                     always_run: false,
                     run: test_lookup_enr_non_present,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -160,7 +159,7 @@ dyn_async! {
                     always_run: false,
                     run: test_lookup_enr_enr_present,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -172,7 +171,7 @@ dyn_async! {
                     always_run: false,
                     run: test_lookup_enr_local_enr,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -184,7 +183,7 @@ dyn_async! {
                     always_run: false,
                     run: test_recursive_find_content_content_absent,
                     environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
-                    test_data: None,
+                    test_data: (),
                     clients: vec![client.clone()],
                 }
             ).await;
@@ -193,7 +192,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_node_info<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_node_info<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -208,7 +207,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_local_content_expect_content_absent<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_local_content_expect_content_absent<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -224,7 +223,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_store<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_store<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -241,7 +240,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_local_content_expect_content_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_local_content_expect_content_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -271,7 +270,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_add_enr_expect_true<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_add_enr_expect_true<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -290,7 +289,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_get_enr_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_get_enr_non_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -306,7 +305,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_get_enr_local_enr<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_get_enr_local_enr<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -334,7 +333,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_get_enr_enr_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_get_enr_enr_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -365,7 +364,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_delete_enr_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_delete_enr_non_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -384,7 +383,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_delete_enr_enr_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_delete_enr_enr_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -429,7 +428,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_lookup_enr_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_lookup_enr_non_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -445,7 +444,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_lookup_enr_enr_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_lookup_enr_enr_present<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -476,7 +475,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_lookup_enr_local_enr<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_lookup_enr_local_enr<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
@@ -505,7 +504,7 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a AbsentContent via RecursiveFindContent when the data doesn't exist
-    async fn test_recursive_find_content_content_absent<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_recursive_find_content_content_absent<'a>(clients: Vec<Client>, _: ()) {
         let client = match clients.into_iter().next() {
             Some((client)) => client,
             None => {
