@@ -1,6 +1,7 @@
-use crate::suites::beacon::constants::{
-    BEACON_STRING, HIVE_PORTAL_NETWORKS_SELECTED, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE,
-};
+use std::collections::HashMap;
+
+use crate::suites::beacon::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
+use crate::suites::environment::PortalNetwork;
 use ethportal_api::types::beacon::ContentInfo;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
@@ -11,7 +12,6 @@ use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use serde_json::json;
 use serde_yaml::Value;
-use std::collections::HashMap;
 
 // This is taken from Trin. It should be fairly standard
 const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
@@ -75,6 +75,9 @@ dyn_async! {
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
+        let environment = Some(HashMap::from([PortalNetwork::as_environment_flag([PortalNetwork::Beacon])]));
+        let environments = Some(vec![environment.clone(), environment]);
+
         let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
             .expect("cannot find test asset");
         let values: Value = serde_yaml::from_str(&values).unwrap();
@@ -95,7 +98,7 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_recursive_find_content,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                        environments: environments.clone(),
                         test_data: test_data.clone(),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
@@ -107,7 +110,7 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_find_content,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                        environments: environments.clone(),
                         test_data,
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
@@ -120,7 +123,7 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_ping,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: environments.clone(),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -132,7 +135,7 @@ dyn_async! {
                     description: "find content: calls find content that doesn't exist".to_string(),
                     always_run: false,
                     run: test_find_content_non_present,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: environments.clone(),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
@@ -144,7 +147,7 @@ dyn_async! {
                     description: "find nodes: distance zero expect called nodes enr".to_string(),
                     always_run: false,
                     run: test_find_nodes_zero_distance,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: environments.clone(),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
