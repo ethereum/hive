@@ -1,6 +1,4 @@
 pub const TEST_DATA_FILE_PATH: &str = "./test-data/beacon_test_data.yaml";
-pub const HIVE_PORTAL_NETWORKS_SELECTED: &str = "HIVE_PORTAL_NETWORKS_SELECTED";
-pub const BEACON_STRING: &str = "beacon";
 
 // private key hive environment variable
 pub const PRIVATE_KEY_ENVIRONMENT_VARIABLE: &str = "HIVE_CLIENT_PRIVATE_KEY";

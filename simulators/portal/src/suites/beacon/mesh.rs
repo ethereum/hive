@@ -1,7 +1,8 @@
 use crate::suites::beacon::constants::{
-    BEACON_STRING, CONSTANT_CONTENT_KEY, CONSTANT_CONTENT_VALUE, HIVE_PORTAL_NETWORKS_SELECTED,
-    PRIVATE_KEY_ENVIRONMENT_VARIABLE, TRIN_BRIDGE_CLIENT_TYPE,
+    CONSTANT_CONTENT_KEY, CONSTANT_CONTENT_VALUE, PRIVATE_KEY_ENVIRONMENT_VARIABLE,
+    TRIN_BRIDGE_CLIENT_TYPE,
 };
+use crate::suites::environment::PortalNetwork;
 use ethportal_api::jsonrpsee::core::__reexports::serde_json;
 use ethportal_api::types::beacon::ContentInfo;
 use ethportal_api::types::distance::{Metric, XorMetric};
@@ -21,6 +22,8 @@ dyn_async! {
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
+        let environment_flag = PortalNetwork::as_environment_flag([PortalNetwork::Beacon]);
+
         let private_key_1 = "fc34e57cc83ed45aae140152fd84e2c21d1f4d46e19452e13acc7ee90daa5bac".to_string();
         let private_key_2 = "e5add57dc4c9ef382509e61ce106ec86f60eb73bbfe326b00f54bf8e1819ba11".to_string();
 
@@ -32,7 +35,11 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_find_content_two_jumps,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(), private_key_2.clone()), (HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(), private_key_1.clone()), (HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: Some(vec![
+                        Some(HashMap::from([environment_flag.clone()])),
+                        Some(HashMap::from([environment_flag.clone(), (PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(), private_key_2.clone())])),
+                        Some(HashMap::from([environment_flag.clone(), (PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(), private_key_1.clone())])),
+                    ]),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone(), client_c.clone()],
                 }
@@ -45,7 +52,11 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_find_content_two_jumps,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(), private_key_1.clone()), (HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(), private_key_2.clone()), (HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: Some(vec![
+                        Some(HashMap::from([environment_flag.clone()])),
+                        Some(HashMap::from([environment_flag.clone(), (PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(), private_key_1.clone())])),
+                        Some(HashMap::from([environment_flag.clone(), (PRIVATE_KEY_ENVIRONMENT_VARIABLE.to_string(), private_key_2.clone())])),
+                    ]),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone(), client_c.clone()],
                 }
@@ -57,7 +68,11 @@ dyn_async! {
                     description: "find nodes: distance of client A expect seeded enr returned".to_string(),
                     always_run: false,
                     run: test_find_nodes_distance_of_client_c,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), BEACON_STRING.to_string())]))]),
+                    environments: Some(vec![
+                        Some(HashMap::from([environment_flag.clone()])),
+                        Some(HashMap::from([environment_flag.clone()])),
+                        Some(HashMap::from([environment_flag.clone()])),
+                    ]),
                     test_data: (),
                     clients: vec![client_a.clone(), client_b.clone(), client_c.clone()],
                 }
