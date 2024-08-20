@@ -58,7 +58,7 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 		return errors.New("client list is empty, cannot simulate")
 	}
 
-	r.clientDefs = make([]*ClientDefinition, len(clientList))
+	r.clientDefs = make([]*ClientDefinition, 0, len(clientList))
 
 	var anyBuilt bool
 	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
@@ -72,12 +72,12 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 		if err != nil {
 			log15.Warn("can't read version info of "+client.Client, "image", image, "err", err)
 		}
-		r.clientDefs[i] = &ClientDefinition{
+		r.clientDefs = append(r.clientDefs, &ClientDefinition{
 			Name:    client.Name(),
 			Version: strings.TrimSpace(string(version)),
 			Image:   image,
 			Meta:    r.inv.Clients[client.Client].Meta,
-		}
+		})
 	}
 	if !anyBuilt {
 		return errors.New("all clients failed to build")
