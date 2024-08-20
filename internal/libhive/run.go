@@ -62,7 +62,7 @@ func (r *Runner) buildClients(ctx context.Context, clientList []ClientDesignator
 
 	var anyBuilt bool
 	log15.Info(fmt.Sprintf("building %d clients...", len(clientList)))
-	for i, client := range clientList {
+	for _, client := range clientList {
 		image, err := r.builder.BuildClientImage(ctx, client)
 		if err != nil {
 			continue
