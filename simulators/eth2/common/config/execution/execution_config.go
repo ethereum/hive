@@ -334,15 +334,16 @@ func BuildExecutionGenesis(
 
 	wrappedGenesis := &ExecutionGenesis{
 		Genesis:        genesis,
-		Block:          genesis.ToBlock(),
 		DepositAddress: depositContractAddr,
 	}
-	wrappedGenesis.Hash = wrappedGenesis.Block.Hash()
 
 	// Configure consensus
 	if err := consensus.Configure(wrappedGenesis); err != nil {
 		return nil, err
 	}
+
+	wrappedGenesis.Block = genesis.ToBlock()
+	wrappedGenesis.Hash = wrappedGenesis.Block.Hash()
 
 	return wrappedGenesis, nil
 }
