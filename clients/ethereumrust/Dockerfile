@@ -16,8 +16,8 @@ ADD ethereum_rust.sh /ethereum_rust.sh
 RUN chmod +x /ethereum_rust.sh
 
 # Add the enode URL retriever script.
-# ADD enode.sh /hive-bin/enode.sh
-# RUN chmod +x /hive-bin/enode.sh
+ADD enode.sh /hive-bin/enode.sh
+RUN chmod +x /hive-bin/enode.sh
 
 # Create version.txt
 # RUN /usr/local/bin/ethereum_rust --version | sed -e 's/ethereum_rust \(.*\)/\1/' > /version.txt
