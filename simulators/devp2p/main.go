@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"context"
+	"time"
 
 	"github.com/ethereum/hive/hivesim"
 	"github.com/shogo82148/go-tap"
@@ -215,9 +217,12 @@ func runDiscv5Test(t *hivesim.T, c *hivesim.Client, getENR func(*hivesim.Client)
 	}
 	t.Log("ENR:", nodeURL)
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
 	// Run the test tool.
 	_, pattern := t.Sim.TestPattern()
-	cmd := exec.Command("./devp2p", "discv5", "test", "--run", pattern, "--tap", "--listen1", bridgeIP, "--listen2", net1IP, nodeURL)
+	cmd := exec.CommandContext(ctx, "./devp2p", "discv5", "test", "--run", pattern, "--tap", "--listen1", bridgeIP, "--listen2", net1IP, nodeURL)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}
@@ -235,9 +240,12 @@ func runDiscv4Test(t *hivesim.T, c *hivesim.Client) {
 		t.Fatal("can't connect client to network1:", err)
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	// Run the test tool.
 	_, pattern := t.Sim.TestPattern()
-	cmd := exec.Command("./devp2p", "discv4", "test", "--run", pattern, "--tap", "--remote", nodeURL, "--listen1", bridgeIP, "--listen2", net1IP)
+	cmd := exec.CommandContext(ctx, "./devp2p", "discv4", "test", "--run", pattern, "--tap", "--remote", nodeURL, "--listen1", bridgeIP, "--listen2", net1IP)
 	if err := runTAP(t, c.Type, cmd); err != nil {
 		t.Fatal(err)
 	}
