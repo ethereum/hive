@@ -1,4 +1,4 @@
-FROM rust:1.75.0 AS builder
+FROM rust:1.79.0 AS builder
 
 # create a new empty shell project
 RUN USER=root cargo new --bin portal
@@ -31,7 +31,7 @@ RUN apt update && apt install wget -y
 
 # copy build artifacts from build stage
 COPY --from=builder /portal/target/release/portal .
-ADD https://raw.githubusercontent.com/KolbyML/portal-spec-tests/epoch/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml ./test-data/test_data_collection_of_forks_blocks.yaml
+ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/history/hive/test_data_collection_of_forks_blocks.yaml ./test-data/test_data_collection_of_forks_blocks.yaml
 ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/state/hive/test_data.yaml ./test-data/state_test_data.yaml
 ADD https://raw.githubusercontent.com/ethereum/portal-spec-tests/master/tests/mainnet/beacon_chain/hive/test_data.yaml ./test-data/beacon_test_data.yaml
 

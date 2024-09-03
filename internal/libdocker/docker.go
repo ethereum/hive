@@ -43,7 +43,7 @@ func Connect(dockerEndpoint string, cfg *Config) (*Builder, *ContainerBackend, e
 	if dockerEndpoint == "" {
 		client, err = docker.NewVersionedClientFromEnv(apiVersion)
 	} else {
-		client, err = docker.NewVersionedClient(apiVersion, dockerEndpoint)
+		client, err = docker.NewVersionedClient(dockerEndpoint, apiVersion)
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("can't connect to docker: %v", err)

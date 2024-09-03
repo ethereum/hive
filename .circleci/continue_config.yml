@@ -78,7 +78,7 @@ jobs:
   # this makes sure the rust code is good
   hivesim-rs:
     docker:
-      - image: cimg/rust:1.75.0
+      - image: cimg/rust:1.79.0
     steps:
       - checkout
       - run:
@@ -101,7 +101,7 @@ jobs:
           command: "cd hivesim-rs && cargo test --workspace -- --nocapture"    
   rust-simulators:
     docker:
-      - image: cimg/rust:1.75.0
+      - image: cimg/rust:1.79.0
     steps:
       - checkout
       - run:

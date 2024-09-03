@@ -201,7 +201,12 @@ func (tc InvalidPayloadTestCase) Execute(t *test.Env) {
 				s.ExpectAnyPayloadStatus(test.Syncing, test.Accepted, test.Invalid)
 			} else {
 				// At this moment the response should be SYNCING
-				s.ExpectPayloadStatus(test.Syncing)
+				if invalidDetectedOnSync {
+					// except if the client can detect the invalid payload even when syncing
+					s.ExpectAnyPayloadStatus(test.Invalid, test.Accepted, test.Syncing)
+				} else {
+					s.ExpectPayloadStatus(test.Syncing)
+				}
 
 				// When we send the previous payload, the client must now be capable of determining that the invalid payload is actually invalid
 				p := t.TestEngine.TestEngineNewPayload(&t.CLMock.LatestExecutedPayload)
