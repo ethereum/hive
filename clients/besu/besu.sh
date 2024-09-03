@@ -142,6 +142,9 @@ elif [ "$HIVE_NODETYPE" == "" ] && [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; 
     FLAGS="$FLAGS --sync-mode=SNAP"
 fi
 
+# Enable Snap Server.
+FLAGS="$FLAGS --Xsnapsync-server-enabled"
+
 # Configure RPC.
 RPCFLAGS="--host-allowlist=*"
 if [ "$HIVE_GRAPHQL_ENABLED" == "" ]; then
