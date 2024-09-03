@@ -1,34 +1,46 @@
-use crate::suites::state::constants::{
-    CONTENT_KEY, HIVE_PORTAL_NETWORKS_SELECTED, STATE_STRING, TEST_DATA_FILE_PATH,
-    TRIN_BRIDGE_CLIENT_TYPE,
+use std::collections::HashMap;
+
+use crate::suites::environment::PortalNetwork;
+use crate::suites::state::constants::{CONTENT_KEY, TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
+use alloy_primitives::Bytes;
+use alloy_rlp::Decodable;
+use ethportal_api::jsonrpsee::http_client::HttpClient;
+use ethportal_api::types::execution::header_with_proof::{
+    BlockHeaderProof, HeaderWithProof, SszNone,
 };
 use ethportal_api::types::state::ContentInfo;
 use ethportal_api::utils::bytes::hex_encode;
 use ethportal_api::{
-    ContentValue, Discv5ApiClient, OverlayContentKey, StateContentKey, StateContentValue,
-    StateNetworkApiClient,
+    ContentValue, Discv5ApiClient, Header, HistoryContentKey, HistoryContentValue, StateContentKey,
+    StateContentValue, StateNetworkApiClient,
 };
 use hivesim::types::ClientDefinition;
-use hivesim::types::ContentKeyOfferLookupValues;
-use hivesim::types::TestData;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
 use serde_json::json;
 use serde_yaml::Value;
-use std::collections::HashMap;
 use tokio::time::Duration;
 
 // This is taken from Trin. It should be fairly standard
 const MAX_PORTAL_CONTENT_PAYLOAD_SIZE: usize = 1165;
 
-fn content_pair_to_string_pair(
-    content_pair: (StateContentKey, StateContentValue, StateContentValue),
-) -> ContentKeyOfferLookupValues {
-    let (content_key, content_offer_value, content_lookup_value) = content_pair;
-    ContentKeyOfferLookupValues {
-        key: content_key.to_hex(),
-        offer_value: hex_encode(content_offer_value.encode()),
-        lookup_value: hex_encode(content_lookup_value.encode()),
+#[derive(Clone, Debug)]
+struct TestData {
+    pub header: Header,
+    pub key: StateContentKey,
+    pub offer_value: StateContentValue,
+    pub lookup_value: StateContentValue,
+}
+
+async fn store_header(header: Header, client: &HttpClient) -> bool {
+    let content_key = HistoryContentKey::BlockHeaderWithProof(header.hash().into());
+    let content_value = HistoryContentValue::BlockHeaderWithProof(HeaderWithProof {
+        header,
+        proof: BlockHeaderProof::None(SszNone::default()),
+    });
+    match ethportal_api::HistoryNetworkApiClient::store(client, content_key, content_value).await {
+        Ok(stored) => stored,
+        Err(err) => panic!("{}", &err.to_string()),
     }
 }
 
@@ -36,42 +48,37 @@ fn content_pair_to_string_pair(
 struct ProcessedContent {
     content_type: String,
     identifier: String,
-    test_data: Vec<ContentKeyOfferLookupValues>,
+    test_data: TestData,
 }
 
-fn process_content(
-    content: Vec<(StateContentKey, StateContentValue, StateContentValue)>,
-) -> Vec<ProcessedContent> {
+fn process_content(content: Vec<TestData>) -> Vec<ProcessedContent> {
     let mut result: Vec<ProcessedContent> = vec![];
-    for state_content in content.into_iter() {
-        let (content_type, identifier, test_data) = match &state_content.0 {
+    for test_data in content {
+        let (content_type, identifier) = match &test_data.key {
             StateContentKey::AccountTrieNode(account_trie_node) => (
                 "Account Trie Node".to_string(),
                 format!(
                     "path: {} node hash: {}",
                     hex_encode(account_trie_node.path.nibbles()),
-                    hex_encode(account_trie_node.node_hash.as_bytes())
+                    hex_encode(account_trie_node.node_hash.as_slice())
                 ),
-                vec![content_pair_to_string_pair(state_content)],
             ),
             StateContentKey::ContractStorageTrieNode(contract_storage_trie_node) => (
                 "Contract Storage Trie Node".to_string(),
                 format!(
                     "address: {} path: {} node hash: {}",
-                    hex_encode(contract_storage_trie_node.address.as_bytes()),
+                    hex_encode(contract_storage_trie_node.address_hash.as_slice()),
                     hex_encode(contract_storage_trie_node.path.nibbles()),
-                    hex_encode(contract_storage_trie_node.node_hash.as_bytes())
+                    hex_encode(contract_storage_trie_node.node_hash.as_slice())
                 ),
-                vec![content_pair_to_string_pair(state_content)],
             ),
             StateContentKey::ContractBytecode(contract_bytecode) => (
                 "Contract Bytecode".to_string(),
                 format!(
                     "address: {} code hash: {}",
-                    hex_encode(contract_bytecode.address.as_bytes()),
-                    hex_encode(contract_bytecode.code_hash.as_bytes())
+                    hex_encode(contract_bytecode.address_hash.as_slice()),
+                    hex_encode(contract_bytecode.code_hash.as_slice())
                 ),
-                vec![content_pair_to_string_pair(state_content)],
             ),
         };
         result.push(ProcessedContent {
@@ -90,17 +97,22 @@ dyn_async! {
         // todo: remove this once we implement role in hivesim-rs
         let clients: Vec<ClientDefinition> = clients.into_iter().filter(|client| client.name != *TRIN_BRIDGE_CLIENT_TYPE).collect();
 
+        let environment = Some(HashMap::from([PortalNetwork::as_environment_flag([PortalNetwork::State, PortalNetwork::History])]));
+        let environments = Some(vec![environment.clone(), environment]);
+
         let values = std::fs::read_to_string(TEST_DATA_FILE_PATH)
             .expect("cannot find test asset");
         let values: Value = serde_yaml::from_str(&values).unwrap();
-        let content: Vec<(StateContentKey, StateContentValue, StateContentValue)> = values.as_sequence().unwrap().iter().map(|value| {
-            let content_key: StateContentKey =
-                serde_yaml::from_value(value.get("content_key").unwrap().clone()).unwrap();
-            let content_offer_value: StateContentValue =
-                serde_yaml::from_value(value.get("content_value_offer").unwrap().clone()).unwrap();
-            let content_lookup_value: StateContentValue =
-                serde_yaml::from_value(value.get("content_value_retrieval").unwrap().clone()).unwrap();
-            (content_key, content_offer_value, content_lookup_value)
+        let content: Vec<TestData> = values.as_sequence().unwrap().iter().map(|value| {
+            let header_bytes: Bytes = serde_yaml::from_value(value["block_header"].clone()).unwrap();
+            let header = Header::decode(&mut header_bytes.as_ref()).unwrap();
+            let key: StateContentKey =
+                serde_yaml::from_value(value["content_key"].clone()).unwrap();
+            let offer_value: StateContentValue =
+                serde_yaml::from_value(value["content_value_offer"].clone()).unwrap();
+            let lookup_value: StateContentValue =
+                serde_yaml::from_value(value["content_value_retrieval"].clone()).unwrap();
+            TestData { header, key, offer_value, lookup_value }
         }).collect();
 
         // Iterate over all possible pairings of clients and run the tests (including self-pairings)
@@ -112,8 +124,8 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_offer,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
-                        test_data: Some(TestData::StateContentList(test_data.clone())),
+                        environments: environments.clone(),
+                        test_data: test_data.clone(),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -124,8 +136,8 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_recursive_find_content,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
-                        test_data: Some(TestData::StateContentList(test_data.clone())),
+                        environments: environments.clone(),
+                        test_data: test_data.clone(),
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -136,8 +148,8 @@ dyn_async! {
                         description: "".to_string(),
                         always_run: false,
                         run: test_find_content,
-                        environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
-                        test_data: Some(TestData::StateContentList(test_data)),
+                        environments: environments.clone(),
+                        test_data,
                         clients: vec![client_a.clone(), client_b.clone()],
                     }
                 ).await;
@@ -149,8 +161,8 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_ping,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
-                    test_data: None,
+                    environments: environments.clone(),
+                    test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
             ).await;
@@ -161,8 +173,8 @@ dyn_async! {
                     description: "find content: calls find content that doesn't exist".to_string(),
                     always_run: false,
                     run: test_find_content_non_present,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
-                    test_data: None,
+                    environments: environments.clone(),
+                    test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
             ).await;
@@ -173,8 +185,8 @@ dyn_async! {
                     description: "find nodes: distance zero expect called nodes enr".to_string(),
                     always_run: false,
                     run: test_find_nodes_zero_distance,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
-                    test_data: None,
+                    environments: environments.clone(),
+                    test_data: (),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
             ).await;
@@ -186,8 +198,8 @@ dyn_async! {
                     description: "".to_string(),
                     always_run: false,
                     run: test_gossip_two_nodes,
-                    environments: Some(vec![Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())])), Some(HashMap::from([(HIVE_PORTAL_NETWORKS_SELECTED.to_string(), STATE_STRING.to_string())]))]),
-                    test_data: Some(TestData::StateContentList(content.clone().into_iter().map(content_pair_to_string_pair).collect())),
+                    environments: environments.clone(),
+                    test_data: content.clone(),
                     clients: vec![client_a.clone(), client_b.clone()],
                 }
             ).await;
@@ -197,7 +209,7 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will not return content via FINDCONTENT.
-    async fn test_find_content_non_present<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_find_content_non_present<'a>(clients: Vec<Client>, _: ()) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -239,24 +251,20 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_offer<'a>(clients: Vec<Client>, test_data: Option<TestData>) {
+    async fn test_offer<'a>(clients: Vec<Client>, test_data: TestData) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data.map(|data| data.state_content_list()) {
-            Some(test_data) => test_data,
-            None => panic!("Expected test data non was provided"),
-        };
-        let ContentKeyOfferLookupValues { key: target_key, offer_value: target_offer_value, lookup_value: target_lookup_value } = test_data.first().expect("Target content is required for this test");
-        let target_key: StateContentKey =
-            serde_json::from_value(json!(target_key)).unwrap();
-        let target_offer_value: StateContentValue =
-            serde_json::from_value(json!(target_offer_value)).unwrap();
-        let target_lookup_value: StateContentValue =
-            serde_json::from_value(json!(target_lookup_value)).unwrap();
+
+        let TestData {
+            header,
+            key: target_key,
+            offer_value: target_offer_value,
+            lookup_value: target_lookup_value
+        } = test_data;
 
         let target_enr = match client_b.rpc.node_info().await {
             Ok(node_info) => node_info.enr,
@@ -265,7 +273,9 @@ dyn_async! {
             }
         };
 
-        let _ = client_a.rpc.offer(target_enr, target_key.clone(), Some(target_offer_value.clone())).await;
+        store_header(header, &client_b.rpc).await;
+
+        let _ = client_a.rpc.offer(target_enr, target_key.clone(), target_offer_value.clone()).await;
 
         tokio::time::sleep(Duration::from_secs(8)).await;
 
@@ -283,7 +293,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_ping<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_ping<'a>(clients: Vec<Client>, _: ()) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -324,7 +334,7 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_find_nodes_zero_distance<'a>(clients: Vec<Client>, _: Option<TestData>) {
+    async fn test_find_nodes_zero_distance<'a>(clients: Vec<Client>, _: ()) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
@@ -360,25 +370,21 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a content via RECURSIVEFINDCONTENT template that it has stored locally
-    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: Option<TestData>) {
+    async fn test_recursive_find_content<'a>(clients: Vec<Client>, test_data: TestData) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data.map(|data| data.state_content_list()) {
-            Some(test_data) => test_data,
-            None => panic!("Expected test data non was provided"),
-        };
 
-        let ContentKeyOfferLookupValues { key: target_key, offer_value: target_offer_value, lookup_value: target_lookup_value } = test_data.first().expect("Target content is required for this test");
-        let target_key: StateContentKey =
-            serde_json::from_value(json!(target_key)).unwrap();
-        let target_offer_value: StateContentValue =
-            serde_json::from_value(json!(target_offer_value)).unwrap();
-        let target_lookup_value: StateContentValue =
-            serde_json::from_value(json!(target_lookup_value)).unwrap();
+        let TestData {
+            key: target_key,
+            offer_value: target_offer_value,
+            lookup_value: target_lookup_value,
+            ..
+        } = test_data;
+
         match client_b.rpc.store(target_key.clone(), target_offer_value.clone()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for recursive find content");
@@ -433,25 +439,21 @@ dyn_async! {
 
 dyn_async! {
     // test that a node will return a x content via FINDCONTENT that it has stored locally
-    async fn test_find_content<'a> (clients: Vec<Client>, test_data: Option<TestData>) {
+    async fn test_find_content<'a> (clients: Vec<Client>, test_data: TestData) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
         };
-        let test_data = match test_data.map(|data| data.state_content_list()) {
-            Some(test_data) => test_data,
-            None => panic!("Expected test data none was provided"),
-        };
 
-        let ContentKeyOfferLookupValues { key: target_key, offer_value: target_offer_value, lookup_value: target_lookup_value } = test_data.first().expect("Target content is required for this test");
-        let target_key: StateContentKey =
-            serde_json::from_value(json!(target_key)).unwrap();
-        let target_offer_value: StateContentValue =
-            serde_json::from_value(json!(target_offer_value)).unwrap();
-        let target_lookup_value: StateContentValue =
-            serde_json::from_value(json!(target_lookup_value)).unwrap();
+        let TestData {
+            key: target_key,
+            offer_value: target_offer_value,
+            lookup_value: target_lookup_value,
+            ..
+        } = test_data;
+
         match client_b.rpc.store(target_key.clone(), target_offer_value.clone()).await {
             Ok(result) => if !result {
                 panic!("Error storing target content for find content");
@@ -497,16 +499,12 @@ dyn_async! {
 }
 
 dyn_async! {
-    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Option<TestData>) {
+    async fn test_gossip_two_nodes<'a> (clients: Vec<Client>, test_data: Vec<TestData>) {
         let (client_a, client_b) = match clients.iter().collect_tuple() {
             Some((client_a, client_b)) => (client_a, client_b),
             None => {
                 panic!("Unable to get expected amount of clients from NClientTestSpec");
             }
-        };
-        let test_data = match test_data.map(|data| data.state_content_list()) {
-            Some(test_data) => test_data,
-            None => panic!("Expected test data non was provided"),
         };
         // connect clients
         let client_b_enr = match client_b.rpc.node_info().await {
@@ -524,11 +522,8 @@ dyn_async! {
         }
 
         // With default node settings nodes should be storing all content
-        for ContentKeyOfferLookupValues { key: content_key, offer_value: content_offer_value, lookup_value: _ } in test_data.clone().into_iter() {
-            let content_key: StateContentKey =
-                serde_json::from_value(json!(content_key)).unwrap();
-            let content_offer_value: StateContentValue =
-                serde_json::from_value(json!(content_offer_value)).unwrap();
+        for TestData { header, key: content_key, offer_value: content_offer_value, .. } in test_data.clone() {
+            store_header(header, &client_b.rpc).await;
 
             match client_a.rpc.gossip(content_key.clone(), content_offer_value.clone()).await {
                 Ok(nodes_gossiped_to) => {
@@ -549,12 +544,7 @@ dyn_async! {
 
         // process raw test data to generate content details for error output
         let mut result = vec![];
-        for ContentKeyOfferLookupValues { key: content_key, offer_value: _, lookup_value: content_lookup_value } in test_data.into_iter() {
-            let content_key: StateContentKey =
-                serde_json::from_value(json!(content_key)).unwrap();
-            let content_lookup_value: StateContentValue =
-                serde_json::from_value(json!(content_lookup_value)).unwrap();
-
+        for TestData { key: content_key, lookup_value: content_lookup_value, .. } in test_data {
             let content_details = {
                     let content_type = match &content_key {
                         StateContentKey::AccountTrieNode(_) => "account trie node".to_string(),

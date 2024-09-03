@@ -5,19 +5,18 @@ authors = ["Kolby ML (Moroz Liebl) <kolbydml@gmail.com>"]
 edition = "2021"
 
 [dependencies]
-ethportal-api = { git = "https://github.com/ethereum/trin", rev = "33ea99da64216899f7ab2778d117a18506d963dd" }
-portal-spec-test-utils-rs = { git = "https://github.com/ethereum/portal-spec-tests", rev = "954f7d0eb2950a2131048404a1a4ce476bb64657" }
-hivesim = { git = "https://github.com/ethereum/hive", rev = "62b3362bae655754b5f624c36720ba8c44a2f375" }
-futures = "0.3.25"
-itertools = "0.10.5"
-serde_json = "1.0.87"
-serde_yaml = "0.9"
-tracing = "0.1.37"
-tracing-subscriber = "0.3.16"
-tokio = { version = "1", features = ["full"] }
-
+alloy-rlp = "0.3.8"
+alloy-primitives = "0.7.7"
 # todo: remove this when we update discv5. Added this because enr 10.1 is a breaking change
 enr = { version = "=0.10.0", features = ["k256", "ed25519"] }
-zstd = "=0.13.0"
-zstd-safe = "=7.0.0"
-zstd-sys = "=2.0.9+zstd.1.5.5"
+ethportal-api = { git = "https://github.com/ethereum/trin", rev = "688847c64c1ef15df20828aa44ef871d3345fc98" }
+futures = "0.3.25"
+hivesim = { git = "https://github.com/ethereum/hive", rev = "81fc9a350d7f7ca8bcbe5f54886483d405d4daa8" }
+itertools = "0.10.5"
+portal-spec-test-utils-rs = { git = "https://github.com/ethereum/portal-spec-tests", rev = "954f7d0eb2950a2131048404a1a4ce476bb64657" }
+serde_json = "1.0.87"
+serde_yaml = "0.9"
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
+
