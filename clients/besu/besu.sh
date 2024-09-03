@@ -143,7 +143,7 @@ elif [ "$HIVE_NODETYPE" == "" ] && [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" == "" ]; 
 fi
 
 # Enable Snap Server.
-FLAGS="$FLAGS --Xsnapsync-server-enabled --Xbonsai-limit-trie-logs-enabled=false"
+FLAGS="$FLAGS --Xsnapsync-server-enabled"
 
 # Configure RPC.
 RPCFLAGS="--host-allowlist=*"
