@@ -57,5 +57,6 @@ def to_bool:
     "terminalTotalDifficultyPassed": (if env.HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED == null then true else env.HIVE_TERMINAL_TOTAL_DIFFICULTY_PASSED|to_bool end),
     "shanghaiTime": env.HIVE_SHANGHAI_TIMESTAMP|to_int,
     "cancunTime": env.HIVE_CANCUN_TIMESTAMP|to_int,
+    "pragueTime": env.HIVE_PRAGUE_TIMESTAMP|to_int,
   }|remove_empty
 }
