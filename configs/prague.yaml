@@ -1,0 +1,24 @@
+- client: ethereumjs
+  nametag: prague-git
+  build_args:
+      github: ethereumjs/ethereumjs-monorepo
+      tag: t8ntool
+
+- client: nethermind
+  nametag: prague
+  build_args:
+      baseimage: nethermindeth/nethermind
+      tag: pectra
+
+- client: erigon
+  nametag: prague
+  build_args:
+      baseimage: thorax/erigon
+      tag: docker_pectra
+
+- client: reth
+  nametag: prague-git
+  dockerfile: git
+  build_args:
+    github: paradigmxyz/reth
+    tag: onbjerg/devnet-3
