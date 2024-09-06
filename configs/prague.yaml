@@ -5,9 +5,10 @@
       tag: t8ntool
 
 - client: nethermind
-  nametag: prague
+  nametag: prague-git
+  dockerfile: git
   build_args:
-      baseimage: nethermindeth/nethermind
+      github: NethermindEth/nethermind
       tag: pectra
 
 - client: erigon
