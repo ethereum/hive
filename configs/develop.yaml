@@ -1,36 +1,37 @@
 - client: go-ethereum
-  nametag: prague-git
+  nametag: prague-devnet-3
+  dockerfile: git
   build_args:
       github: lightclient/go-ethereum
       tag: prague-devnet-3
 
 - client: nethermind
-  nametag: prague
+  nametag: prague-devnet-3
   build_args:
       baseimage: nethermindeth/nethermind
       tag: pectra
 
 - client: reth
-  nametag: prague-git
+  nametag: prague-devnet-3
   dockerfile: git
   build_args:
     github: paradigmxyz/reth
     tag: onbjerg/devnet-3
 
 - client: besu
-  nametag: prague
+  nametag: prague-devnet-3
   build_args:
     baseimage: ethpandaops/besu
     tag: main
 
 - client: ethereumjs
-  nametag: prague-git
+  nametag: prague-devnet-3
   build_args:
       github: ethereumjs/ethereumjs-monorepo
       tag: t8ntool
 
 - client: erigon
-  nametag: prague
+  nametag: prague-devnet-3
   build_args:
       baseimage: thorax/erigon
       tag: docker_pectra
