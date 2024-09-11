@@ -13,5 +13,5 @@ WORKDIR execution-spec-tests
 RUN pip install uv && uv sync
 
 ## Define `consume rlp` entry point using the local fixtures
-ENTRYPOINT ["uv", "run", "consume", "rlp", "-v", "--input", "latest-develop-release"]
+ENTRYPOINT ["uv", "run", "consume", "rlp", "-v", "--input", "https://github.com/ethereum/execution-spec-tests/releases/download/pectra-devnet-3%40v1.5.0/fixtures_pectra-devnet-3.tar.gz"]
 

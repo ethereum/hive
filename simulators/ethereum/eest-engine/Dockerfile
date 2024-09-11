@@ -13,4 +13,4 @@ WORKDIR execution-spec-tests
 RUN pip install uv && uv sync
 
 ## Define `consume engine` entry point using the local fixtures
-ENTRYPOINT ["uv", "run", "consume", "engine", "-v", "--input", "latest-develop-release"]
+ENTRYPOINT ["uv", "run", "consume", "engine", "-v", "--input", "https://github.com/ethereum/execution-spec-tests/releases/download/pectra-devnet-3%40v1.5.0/fixtures_pectra-devnet-3.tar.gz"]
