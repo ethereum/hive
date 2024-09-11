@@ -1,4 +1,3 @@
-
 ### Build Reth From Git:
 ## Pulls reth from a git repository and builds it from source.
 
@@ -8,11 +7,15 @@ FROM rust:latest as builder
 ARG github=paradigmxyz/reth
 ARG tag=main
 
+# Update system and install necessary dependencies
 RUN apt-get update && apt-get install -y libclang-dev pkg-config build-essential \
     && echo "Cloning: $github - $tag" \
     && git clone --depth 1 --branch $tag https://github.com/$github reth \
-    && cd reth && cargo build --release \
-    && cp target/release/reth /usr/local/bin/reth
+    && cd reth \
+    && cargo build --release \
+    && ls -lh target/release \
+    && cp target/release/reth /usr/local/bin/reth \
+    || { echo "Cargo build or copy failed"; exit 1; }
 
 ## Final stage: Sets up the environment for running reth
 FROM debian:latest
