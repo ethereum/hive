@@ -134,7 +134,7 @@ FLAGS="$FLAGS --ws --ws.port=8546"
 FLAGS="$FLAGS --txpool.blobslots=1000 --txpool.totalblobpoollimit=10000"
 
 # Disable performance optimization incompatible with the tests
-FLAGS="$FLAGS --sync.parallel-state-flushing=false"
+# FLAGS="$FLAGS --sync.parallel-state-flushing=false"
 
 if [ "$HIVE_TERMINAL_TOTAL_DIFFICULTY" != "" ]; then
     JWT_SECRET="0x7365637265747365637265747365637265747365637265747365637265747365"
