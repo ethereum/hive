@@ -1,4 +1,5 @@
 use crate::suites::history::constants::{TEST_DATA_FILE_PATH, TRIN_BRIDGE_CLIENT_TYPE};
+use crate::suites::utils::get_flair;
 use ethportal_api::types::history::ContentInfo;
 use ethportal_api::{
     ContentValue, Discv5ApiClient, HistoryContentKey, HistoryContentValue, HistoryNetworkApiClient,
@@ -6,7 +7,6 @@ use ethportal_api::{
 use hivesim::types::ClientDefinition;
 use hivesim::{dyn_async, Client, NClientTestSpec, Test};
 use itertools::Itertools;
-use portal_spec_test_utils_rs::get_flair;
 use serde_json::json;
 use serde_yaml::Value;
 use tokio::time::Duration;
