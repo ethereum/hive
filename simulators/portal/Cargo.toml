@@ -13,7 +13,6 @@ ethportal-api = { git = "https://github.com/ethereum/trin", rev = "688847c64c1ef
 futures = "0.3.25"
 hivesim = { git = "https://github.com/ethereum/hive", rev = "81fc9a350d7f7ca8bcbe5f54886483d405d4daa8" }
 itertools = "0.10.5"
-portal-spec-test-utils-rs = { git = "https://github.com/ethereum/portal-spec-tests", rev = "954f7d0eb2950a2131048404a1a4ce476bb64657" }
 serde_json = "1.0.87"
 serde_yaml = "0.9"
 tokio = { version = "1", features = ["full"] }

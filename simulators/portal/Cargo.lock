@@ -2687,18 +2687,12 @@ dependencies = [
  "futures",
  "hivesim",
  "itertools 0.10.5",
- "portal-spec-test-utils-rs",
  "serde_json",
  "serde_yaml",
  "tokio",
  "tracing",
  "tracing-subscriber",
 ]
-
-[[package]]
-name = "portal-spec-test-utils-rs"
-version = "0.1.0"
-source = "git+https://github.com/ethereum/portal-spec-tests?rev=954f7d0eb2950a2131048404a1a4ce476bb64657#954f7d0eb2950a2131048404a1a4ce476bb64657"
 
 [[package]]
 name = "powerfmt"
